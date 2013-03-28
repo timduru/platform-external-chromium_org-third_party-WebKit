@@ -53,7 +53,7 @@ class WebView;
 
 class WebInspectorClient : public WebCore::InspectorClient, public WebCore::InspectorFrontendChannel {
 public:
-    WebInspectorClient(WebView*);
+    explicit WebInspectorClient(WebView*);
 
     // InspectorClient
     virtual void inspectorDestroyed();
@@ -97,7 +97,6 @@ public:
     virtual void frontendLoaded();
     
     virtual WTF::String localizedStringsURL();
-    virtual WTF::String hiddenPanels();
     
     virtual void bringToFront();
     virtual void closeWindow();

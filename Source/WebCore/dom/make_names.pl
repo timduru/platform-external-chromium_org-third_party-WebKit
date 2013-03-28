@@ -31,6 +31,7 @@
 
 use strict;
 
+use StaticString;
 use Config;
 use Getopt::Long;
 use File::Path;
@@ -54,6 +55,7 @@ my %enabledTags = ();
 my %enabledAttrs = ();
 my %allTags = ();
 my %allAttrs = ();
+my %allStrings = ();
 my %parameters = ();
 my $extraDefines = 0;
 my $initDefaults = 1;
@@ -115,14 +117,19 @@ if (length($fontNamesIn)) {
     printLicenseHeader($F);
     printCppHead($F, "CSS", $familyNamesFileBase, "WTF");
 
+    print F StaticString::GenerateStrings(\%parameters);
+
     while ( my ($name, $identifier) = each %parameters ) {
         print F "DEFINE_GLOBAL(AtomicString, $name)\n";
     }
 
     printInit($F, 0);
 
+    print F "\n";
+    print F StaticString::GenerateStringAsserts(\%parameters);
+
     while ( my ($name, $identifier) = each %parameters ) {
-        print F "    new ((void*)&$name) AtomicString(\"$identifier\");\n";
+        print F "    new ((void*)&$name) AtomicString(${name}Impl);\n";
     }
 
     print F "}\n}\n}\n";
@@ -135,11 +142,13 @@ die "You must specify at least one of --tags <file> or --attrs <file>" unless (l
 if (length($tagsFile)) {
     %allTags = %{readTags($tagsFile, 0)};
     %enabledTags = %{readTags($tagsFile, 1)};
+    namesToStrings(\%allTags, \%allStrings);
 }
 
 if (length($attrsFile)) {
     %allAttrs = %{readAttrs($attrsFile, 0)};
     %enabledAttrs = %{readAttrs($attrsFile, 1)};
+    namesToStrings(\%allAttrs, \%allStrings);
 }
 
 die "You must specify a namespace (e.g. SVG) for <namespace>Names.h" unless $parameters{namespace};
@@ -211,6 +220,31 @@ sub defaultInterfaceName
 }
 
 ### Parsing handlers
+
+sub valueForName
+{
+    my $name = shift;
+    my $value = $extensionAttrs{$name};
+
+    if (!$value) {
+        $value = $name;
+        $value =~ s/_/-/g;
+    }
+
+    return $value;
+}
+
+sub namesToStrings
+{
+    my $namesRef = shift;
+    my $stringsRef = shift;
+
+    my %names = %$namesRef;
+
+    for my $name (keys %names) {
+        $stringsRef->{$name} = valueForName($name);
+    }
+}
 
 sub tagsHandler
 {
@@ -369,7 +403,7 @@ sub printConstructorInterior
     if ($enabledTags{$tagName}{wrapperOnlyIfMediaIsAvailable}) {
         print F <<END
     Settings* settings = document->settings();
-    if (!MediaPlayer::isAvailable() || (settings && !settings->isMediaEnabled()))
+    if (!MediaPlayer::isAvailable() || (settings && !settings->mediaEnabled()))
         return 0;
     
 END
@@ -636,6 +670,8 @@ sub printNamesCppFile
 
     print F "DEFINE_GLOBAL(AtomicString, ${lowerNamespace}NamespaceURI)\n\n";
 
+    print F StaticString::GenerateStrings(\%allStrings);
+
     if (keys %allTags) {
         print F "// Tags\n";
         for my $name (sort keys %allTags) {
@@ -672,7 +708,10 @@ sub printNamesCppFile
     print(F "    AtomicString ${lowerNamespace}NS(\"$parameters{namespaceURI}\", AtomicString::ConstructFromLiteral);\n\n");
 
     print(F "    // Namespace\n");
-    print(F "    new ((void*)&${lowerNamespace}NamespaceURI) AtomicString(${lowerNamespace}NS);\n\n");
+    print(F "    new ((void*)&${lowerNamespace}NamespaceURI) AtomicString(${lowerNamespace}NS);\n");
+    print(F "\n");
+    print F StaticString::GenerateStringAsserts(\%allStrings);
+
     if (keys %allTags) {
         my $tagsNamespace = $parameters{tagsNullNamespace} ? "nullAtom" : "${lowerNamespace}NS";
         printDefinitions($F, \%allTags, "tags", $tagsNamespace);
@@ -774,17 +813,11 @@ sub printDefinitions
     print F "    // " . ucfirst($type) . "\n";
 
     for my $name (sort keys %$namesRef) {
-        my $realName = $extensionAttrs{$name};
-        if (!$realName) {
-            $realName = $name;
-            $realName =~ s/_/-/g;
-        }
-
         # To generate less code in init(), the common case of nullAtom for the namespace, we call createQualifiedName() without passing $namespaceURI.
         if ($namespaceURI eq "nullAtom") {
-            print F "    createQualifiedName((void*)&$name","${shortCamelType}, \"$realName\", ", length $realName ,");\n";
+            print F "    createQualifiedName((void*)&$name","${shortCamelType}, ${name}Impl);\n";
         } else {
-            print F "    createQualifiedName((void*)&$name","${shortCamelType}, \"$realName\", ", length $realName ,", $namespaceURI);\n";
+            print F "    createQualifiedName((void*)&$name","${shortCamelType}, ${name}Impl, $namespaceURI);\n";
         }
     }
 }
@@ -822,6 +855,11 @@ print F <<END
 
 #include "ContextFeatures.h"
 #include "RuntimeEnabledFeatures.h"
+
+#if ENABLE(CUSTOM_ELEMENTS)
+#include "CustomElementConstructor.h"
+#include "CustomElementRegistry.h"
+#endif
 
 #if ENABLE(DASHBOARD_SUPPORT) || ENABLE(VIDEO)
 #include "Document.h"
@@ -896,6 +934,16 @@ END
 }
 
 print F <<END
+#if ENABLE(CUSTOM_ELEMENTS)
+    if (document->registry()) {
+        if (RefPtr<CustomElementConstructor> constructor = document->registry()->find(nullQName(), qName)) {
+            RefPtr<Element> element = constructor->createElement();
+            ASSERT(element->is$parameters{namespace}Element());
+            return static_pointer_cast<$parameters{namespace}Element>(element.release());
+        }
+    }
+#endif
+
     if (!gFunctionMap)
         createFunctionMap();
     if (ConstructorFunction function = gFunctionMap->get(qName.localName().impl())) {
@@ -912,11 +960,7 @@ if ($parameters{namespace} eq "HTML") {
 print F <<END
     }
 
-END
-;
-print F "    return $parameters{fallbackInterfaceName}::create(qName, document);\n";
-
-print F <<END
+    return $parameters{fallbackInterfaceName}::create(qName, document);
 }
 
 } // namespace WebCore
@@ -1018,7 +1062,7 @@ sub printWrapperFunctions
 static JSDOMWrapper* create${JSInterfaceName}Wrapper(ExecState* exec, JSDOMGlobalObject* globalObject, PassRefPtr<$parameters{namespace}Element> element)
 {
     Settings* settings = element->document()->settings();
-    if (!MediaPlayer::isAvailable() || (settings && !settings->isMediaEnabled()))
+    if (!MediaPlayer::isAvailable() || (settings && !settings->mediaEnabled()))
         return CREATE_DOM_WRAPPER(exec, globalObject, $parameters{namespace}Element, element.get());
     return CREATE_DOM_WRAPPER(exec, globalObject, ${JSInterfaceName}, element.get());
 }
@@ -1066,12 +1110,12 @@ END
         } elsif ($wrapperFactoryType eq "V8") {
             if ($enabledTags{$tagName}{wrapperOnlyIfMediaIsAvailable}) {
                 print F <<END
-static v8::Handle<v8::Value> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+static v8::Handle<v8::Object> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     Settings* settings = element->document()->settings();
-    if (!MediaPlayer::isAvailable() || (settings && !settings->isMediaEnabled()))
-        return V8$parameters{namespace}Element::wrap(element, creationContext, isolate);
-    return toV8(static_cast<${JSInterfaceName}*>(element), creationContext, isolate);
+    if (!MediaPlayer::isAvailable() || (settings && !settings->mediaEnabled()))
+        return createV8$parameters{namespace}DirectWrapper(element, creationContext, isolate);
+    return wrap(static_cast<${JSInterfaceName}*>(element), creationContext, isolate);
 }
 
 END
@@ -1079,39 +1123,40 @@ END
             } elsif ($enabledTags{$tagName}{contextConditional}) {
                 my $contextConditional = $enabledTags{$tagName}{contextConditional};
                 print F <<END
-static v8::Handle<v8::Value> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+static v8::Handle<v8::Object> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     if (!ContextFeatures::${contextConditional}Enabled(element->document()))
-        return V8$parameters{fallbackInterfaceName}::wrap(to$parameters{fallbackInterfaceName}(element), creationContext, isolate);
-    return toV8(static_cast<${JSInterfaceName}*>(element), creationContext, isolate);
+        return createV8$parameters{namespace}FallbackWrapper(to$parameters{fallbackInterfaceName}(element), creationContext, isolate);
+    return wrap(static_cast<${JSInterfaceName}*>(element), creationContext, isolate);
 }
 END
 ;
             } elsif ($enabledTags{$tagName}{runtimeConditional}) {
                 my $runtimeConditional = $enabledTags{$tagName}{runtimeConditional};
                 print F <<END
-static v8::Handle<v8::Value> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+static v8::Handle<v8::Object> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     if (!RuntimeEnabledFeatures::${runtimeConditional}Enabled())
-        return V8$parameters{fallbackInterfaceName}::wrap(to$parameters{fallbackInterfaceName}(element), creationContext, isolate);
-    return toV8(static_cast<${JSInterfaceName}*>(element), creationContext, isolate);
+        return createV8$parameters{namespace}FallbackWrapper(to$parameters{fallbackInterfaceName}(element), creationContext, isolate);
+    return wrap(static_cast<${JSInterfaceName}*>(element), creationContext, isolate);
 }
 END
 ;
             } elsif (${JSInterfaceName} eq "HTMLElement") {
                 print F <<END
-static v8::Handle<v8::Value> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+static v8::Handle<v8::Object> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    return V8$parameters{namespace}Element::wrap(element, creationContext, isolate);
+    ASSERT_NOT_REACHED();
+    return v8::Handle<v8::Object>();
 }
 
 END
 ;
              } else {
             print F <<END
-static v8::Handle<v8::Value> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+static v8::Handle<v8::Object> create${JSInterfaceName}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    return toV8(static_cast<${JSInterfaceName}*>(element), creationContext, isolate);
+    return wrap(static_cast<${JSInterfaceName}*>(element), creationContext, isolate);
 }
 
 
@@ -1172,7 +1217,11 @@ END
     } elsif ($wrapperFactoryType eq "V8") {
         print F <<END
 #include "V8$parameters{namespace}Element.h"
-        
+
+#if ENABLE(CUSTOM_ELEMENTS)
+#include "V8CustomElement.h"
+#endif
+
 #include <v8.h>
 END
 ;
@@ -1194,7 +1243,7 @@ END
 ;
     } elsif ($wrapperFactoryType eq "V8") {
         print F <<END
-typedef v8::Handle<v8::Value> (*Create$parameters{namespace}ElementWrapperFunction)($parameters{namespace}Element*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+typedef v8::Handle<v8::Object> (*Create$parameters{namespace}ElementWrapperFunction)($parameters{namespace}Element*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
 
 END
 ;
@@ -1213,7 +1262,7 @@ END
 ;
     } elsif ($wrapperFactoryType eq "V8") {
         print F <<END
-v8::Handle<v8::Value> createV8$parameters{namespace}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+v8::Handle<v8::Object> createV8$parameters{namespace}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     typedef HashMap<WTF::AtomicStringImpl*, Create$parameters{namespace}ElementWrapperFunction> FunctionMap;
     DEFINE_STATIC_LOCAL(FunctionMap, map, ());
@@ -1242,6 +1291,19 @@ END
 
     print F <<END
     }
+END
+;
+    if ($wrapperFactoryType eq "V8") {
+        print F <<END
+#if ENABLE(CUSTOM_ELEMENTS)
+    if (PassRefPtr<CustomElementConstructor> constructor = V8CustomElement::constructorOf(element))
+        return V8CustomElement::wrap(element, creationContext, constructor, isolate);
+#endif
+END
+;
+    }
+
+    print F <<END
     Create$parameters{namespace}ElementWrapperFunction createWrapperFunction = map.get(element->localName().impl());
     if (createWrapperFunction)
 END
@@ -1254,19 +1316,76 @@ END
 ;
     } elsif ($wrapperFactoryType eq "V8") {
         print F <<END
-        return createWrapperFunction(element, creationContext, isolate);
-    return V8$parameters{fallbackInterfaceName}::wrap(to$parameters{fallbackInterfaceName}(element), creationContext, isolate);
+    {
 END
 ;
+        if ($parameters{namespace} eq "HTML") {
+            print F <<END
+        if (createWrapperFunction == createHTMLElementWrapper)
+           return V8HTMLElement::createWrapper(element, creationContext, isolate);
+END
+        }
+        print F <<END
+        return createWrapperFunction(element, creationContext, isolate);
+    }
+END
+;
+        if ($parameters{namespace} eq "SVG") {
+            print F <<END
+    return V8SVGElement::createWrapper(element, creationContext, isolate);
+END
+;
+        } else {
+            print F <<END
+    return wrap(to$parameters{fallbackInterfaceName}(element), creationContext, isolate);
+END
+;
+        }
     }
     print F <<END
 }
+END
+;
 
+    if ($wrapperFactoryType eq "V8") {
+        print F <<END
+
+const QualifiedName* find$parameters{namespace}TagNameOfV8Type(const WrapperTypeInfo* type)
+{
+    typedef HashMap<const WrapperTypeInfo*, const QualifiedName*> TypeNameMap;
+    DEFINE_STATIC_LOCAL(TypeNameMap, map, ());
+    if (map.isEmpty()) {
+END
+;
+
+        for my $tagName (sort keys %enabledTags) {
+            if (!usesDefaultJSWrapper($tagName)) {
+                my $conditional = $enabledTags{$tagName}{conditional};
+                if ($conditional) {
+                    my $conditionalString = "ENABLE(" . join(") && ENABLE(", split(/&/, $conditional)) . ")";
+                    print F "#if ${conditionalString}\n";
+                }
+
+                my $JSInterfaceName = $enabledTags{$tagName}{JSInterfaceName};
+                print F "       map.set(WrapperTypeTraits<${JSInterfaceName}>::info(), &${tagName}Tag);\n";
+
+                if ($conditional) {
+                    print F "#endif\n";
+                }
+            }
+        }
+
+        print F <<END
+    }
+
+    return map.get(type);
 }
 
 END
 ;
+    }
 
+    print F "}\n\n";
     print F "#endif\n" if $parameters{guardFactoryWith};
 
     close F;
@@ -1309,13 +1428,24 @@ END
 ;
     } elsif ($wrapperFactoryType eq "V8") {
         print F <<END
+#include <V8$parameters{namespace}Element.h>
+#include <V8$parameters{fallbackInterfaceName}.h>
 #include <v8.h>
 
 namespace WebCore {
 
     class $parameters{namespace}Element;
 
-    v8::Handle<v8::Value> createV8$parameters{namespace}Wrapper($parameters{namespace}Element*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+    const QualifiedName* find$parameters{namespace}TagNameOfV8Type(const WrapperTypeInfo*);
+    v8::Handle<v8::Object> createV8$parameters{namespace}Wrapper($parameters{namespace}Element*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+    inline v8::Handle<v8::Object> createV8$parameters{namespace}DirectWrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+    {
+        return V8$parameters{namespace}Element::createWrapper(element, creationContext, isolate);
+    }
+    inline v8::Handle<v8::Object> createV8$parameters{namespace}FallbackWrapper($parameters{fallbackInterfaceName}* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+    {
+        return V8$parameters{fallbackInterfaceName}::createWrapper(element, creationContext, isolate);
+    }
 }
 END
 ;

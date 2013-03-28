@@ -41,7 +41,7 @@
 #include "SkiaUtils.h"
 
 #if PLATFORM(CHROMIUM)
-#include "ImageDecodingStore.h"
+#include "DeferredImageDecoder.h"
 #include "TraceEvent.h"
 #endif
 
@@ -79,8 +79,8 @@ bool NativeImageSkia::hasResizedBitmap(const SkISize& scaledImageSize, const SkI
 SkBitmap NativeImageSkia::resizedBitmap(const SkISize& scaledImageSize, const SkIRect& scaledImageSubset) const
 {
 #if PLATFORM(CHROMIUM)
-    if (ImageDecodingStore::isLazyDecoded(m_image))
-        return ImageDecodingStore::instanceOnMainThread()->resizeLazyDecodedSkBitmap(m_image, scaledImageSize, scaledImageSubset);
+    if (DeferredImageDecoder::isLazyDecoded(m_image))
+        return DeferredImageDecoder::createResizedLazyDecodingBitmap(m_image, scaledImageSize, scaledImageSubset);
 #endif
 
     if (!hasResizedBitmap(scaledImageSize, scaledImageSubset)) {
@@ -179,11 +179,12 @@ SkIRect NativeImageSkia::CachedImageInfo::rectInSubset(const SkIRect& otherScale
 void NativeImageSkia::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this);
-    info.addMember(m_image);
-    info.addMember(m_resizedImage);
+    info.addMember(m_image, "image");
+    info.addMember(m_resizedImage, "resizedImage");
+    info.addMember(m_cachedImageInfo, "cachedImageInfo");
 }
 
-void reportMemoryUsage(const NativeImageSkia* const& image, MemoryObjectInfo* memoryObjectInfo)
+void reportMemoryUsage(const NativeImageSkia* image, MemoryObjectInfo* memoryObjectInfo)
 {
     image->reportMemoryUsage(memoryObjectInfo);
 }

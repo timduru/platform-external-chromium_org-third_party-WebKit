@@ -34,17 +34,19 @@
 
 namespace WebCore {
 
+class DOMRequestState;
 class IDBKey;
 class IDBKeyPath;
 class SerializedScriptValue;
+class SharedBuffer;
 
-PassRefPtr<IDBKey> createIDBKeyFromValue(v8::Handle<v8::Value>);
-
-bool injectIDBKeyIntoScriptValue(PassRefPtr<IDBKey>, ScriptValue&, const IDBKeyPath&);
-PassRefPtr<IDBKey> createIDBKeyFromScriptValueAndKeyPath(const ScriptValue&, const IDBKeyPath&);
-bool canInjectIDBKeyIntoScriptValue(const ScriptValue&, const IDBKeyPath&);
-ScriptValue deserializeIDBValue(ScriptExecutionContext*, PassRefPtr<SerializedScriptValue>);
-ScriptValue idbKeyToScriptValue(ScriptExecutionContext*, PassRefPtr<IDBKey>);
+bool injectIDBKeyIntoScriptValue(DOMRequestState*, PassRefPtr<IDBKey>, ScriptValue&, const IDBKeyPath&);
+PassRefPtr<IDBKey> createIDBKeyFromScriptValueAndKeyPath(DOMRequestState*, const ScriptValue&, const IDBKeyPath&);
+bool canInjectIDBKeyIntoScriptValue(DOMRequestState*, const ScriptValue&, const IDBKeyPath&);
+ScriptValue deserializeIDBValue(DOMRequestState*, PassRefPtr<SerializedScriptValue>);
+ScriptValue deserializeIDBValueBuffer(DOMRequestState*, PassRefPtr<SharedBuffer>);
+ScriptValue idbKeyToScriptValue(DOMRequestState*, PassRefPtr<IDBKey>);
+PassRefPtr<IDBKey> scriptValueToIDBKey(DOMRequestState*, const ScriptValue&);
 
 }
 

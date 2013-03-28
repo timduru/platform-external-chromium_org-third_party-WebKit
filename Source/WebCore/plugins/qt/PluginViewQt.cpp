@@ -76,8 +76,8 @@
 #define Status int
 #include <X11/extensions/Xrender.h>
 #endif
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSLock.h>
-#include <runtime/JSValue.h>
 
 #include "QtX11ImageConversion.h"
 #include <QGuiApplication>
@@ -137,7 +137,7 @@ void PluginView::updatePluginWidget()
         return;
 
     ASSERT(parent()->isFrameView());
-    FrameView* frameView = static_cast<FrameView*>(parent());
+    FrameView* frameView = toFrameView(parent());
 
     IntRect oldWindowRect = m_windowRect;
     IntRect oldClipRect = m_clipRect;

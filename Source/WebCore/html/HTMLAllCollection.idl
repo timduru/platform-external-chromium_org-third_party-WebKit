@@ -28,8 +28,8 @@
     NamedGetter,
     CustomCall,
     MasqueradesAsUndefined,
-    GenerateIsReachable=ImplBaseRoot,
-    V8DependentLifetime
+    GenerateIsReachable=ImplOwnerNodeRoot,
+    V8DependentLifetime,
 ] interface HTMLAllCollection {
     readonly attribute unsigned long length;
     [Custom] Node item(in [Optional=DefaultIsUndefined] unsigned long index);

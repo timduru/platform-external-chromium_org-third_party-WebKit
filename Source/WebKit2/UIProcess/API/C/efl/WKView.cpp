@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Samsung Electronics
+ * Copyright (C) 2013 Intel Corporation. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -20,20 +21,112 @@
 #include "config.h"
 #include "WKView.h"
 
-#include "EwkViewImpl.h"
+#include "EwkView.h"
 #include "WKAPICast.h"
-#include "ewk_view_private.h"
+#include "ewk_context_private.h"
+#include "ewk_page_group_private.h"
+#include <WebKit2/WKImageCairo.h>
 
 using namespace WebKit;
 
-WKViewRef WKViewCreate(Evas* canvas, WKContextRef contextRef, WKPageGroupRef pageGroupRef)
+WKViewRef WKViewCreate(WKContextRef contextRef, WKPageGroupRef pageGroupRef)
 {
-    return toAPI(ewk_view_base_add(canvas, contextRef, pageGroupRef));
+    RefPtr<WebView> webView = WebView::create(toImpl(contextRef), toImpl(pageGroupRef));
+    return toAPI(webView.release().leakRef());
+}
+
+void WKViewInitialize(WKViewRef viewRef)
+{
+    toImpl(viewRef)->initialize();
+}
+
+void WKViewSetViewClient(WKViewRef viewRef, const WKViewClient* client)
+{
+    toImpl(viewRef)->initializeClient(client);
+}
+
+void WKViewSetUserViewportTranslation(WKViewRef viewRef, double tx, double ty)
+{
+    toImpl(viewRef)->setUserViewportTranslation(tx, ty);
+}
+
+WKPoint WKViewUserViewportToContents(WKViewRef viewRef, WKPoint point)
+{
+    const WebCore::IntPoint& result = toImpl(viewRef)->userViewportToContents(toIntPoint(point));
+    return WKPointMake(result.x(), result.y());
+}
+
+void WKViewPaintToCurrentGLContext(WKViewRef viewRef)
+{
+    toImpl(viewRef)->paintToCurrentGLContext();
+}
+
+void WKViewPaintToCairoSurface(WKViewRef viewRef, cairo_surface_t* surface)
+{
+    toImpl(viewRef)->paintToCairoSurface(surface);
 }
 
 WKPageRef WKViewGetPage(WKViewRef viewRef)
 {
-    EwkViewImpl* viewImpl = EwkViewImpl::fromEvasObject(toImpl(viewRef));
+    return toImpl(viewRef)->pageRef();
+}
 
-    return viewImpl->wkPage();
+void WKViewSetDrawsBackground(WKViewRef viewRef, bool flag)
+{
+    toImpl(viewRef)->setDrawsBackground(flag);
+}
+
+bool WKViewGetDrawsBackground(WKViewRef viewRef)
+{
+    return toImpl(viewRef)->drawsBackground();
+}
+
+void WKViewSetDrawsTransparentBackground(WKViewRef viewRef, bool flag)
+{
+    toImpl(viewRef)->setDrawsTransparentBackground(flag);
+}
+
+bool WKViewGetDrawsTransparentBackground(WKViewRef viewRef)
+{
+    return toImpl(viewRef)->drawsTransparentBackground();
+}
+
+void WKViewSetThemePath(WKViewRef viewRef, WKStringRef theme)
+{
+    toImpl(viewRef)->setThemePath(toImpl(theme)->string());
+}
+
+void WKViewSuspendActiveDOMObjectsAndAnimations(WKViewRef viewRef)
+{
+    toImpl(viewRef)->suspendActiveDOMObjectsAndAnimations();
+}
+
+void WKViewResumeActiveDOMObjectsAndAnimations(WKViewRef viewRef)
+{
+    toImpl(viewRef)->resumeActiveDOMObjectsAndAnimations();
+}
+
+void WKViewSetShowsAsSource(WKViewRef viewRef, bool flag)
+{
+    toImpl(viewRef)->setShowsAsSource(flag);
+}
+
+bool WKViewGetShowsAsSource(WKViewRef viewRef)
+{
+    return toImpl(viewRef)->showsAsSource();
+}
+
+void WKViewExitFullScreen(WKViewRef viewRef)
+{
+#if ENABLE(FULLSCREEN_API)
+    toImpl(viewRef)->exitFullScreen();
+#else
+    UNUSED_PARAM(viewRef);
+#endif
+}
+
+WKImageRef WKViewCreateSnapshot(WKViewRef viewRef)
+{
+    EwkView* ewkView = toEwkView(toImpl(viewRef)->evasObject());
+    return WKImageCreateFromCairoSurface(ewkView->takeSnapshot().get(), 0 /* options */);
 }

@@ -40,8 +40,8 @@ public:
     typedef typename WeakImplAccessor<Weak<T>, T>::GetType GetType;
 
     Weak();
-    Weak(std::nullptr_t);
-    Weak(GetType, WeakHandleOwner* = 0, void* context = 0);
+    explicit Weak(std::nullptr_t);
+    explicit Weak(GetType, WeakHandleOwner* = 0, void* context = 0);
 
     enum HashTableDeletedValueTag { HashTableDeletedValue };
     bool isHashTableDeletedValue() const;
@@ -149,6 +149,11 @@ template<typename T> inline void Weak<T>::clear()
 template<typename T> inline WeakImpl* Weak<T>::hashTableDeletedValue()
 {
     return reinterpret_cast<WeakImpl*>(-1);
+}
+
+template <typename T> inline bool operator==(const Weak<T>& lhs, const Weak<T>& rhs)
+{
+    return lhs.get() == rhs.get();
 }
 
 // This function helps avoid modifying a weak table while holding an iterator into it. (Object allocation

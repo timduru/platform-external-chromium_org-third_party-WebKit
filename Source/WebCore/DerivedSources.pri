@@ -47,6 +47,8 @@ EVENT_TARGET_FACTORY = $$PWD/dom/EventTargetFactory.in
 
 DOM_EXCEPTIONS = $$PWD/dom/DOMExceptions.in
 
+SETTINGS_MACROS = $$PWD/page/Settings.in
+
 COLORDATA_GPERF = $$PWD/platform/ColorData.gperf
 
 WALDOCSSPROPS = $$PWD/css/CSSPropertyNames.in
@@ -80,6 +82,7 @@ STYLESHEETS_EMBED = \
     $$PWD/css/mediaControls.css \
     $$PWD/css/mediaControlsQt.css \
     $$PWD/css/mediaControlsQtFullscreen.css \
+    $$PWD/css/plugIns.css \
     $$PWD/css/themeQtNoListboxes.css \
     $$PWD/css/mobileThemeQt.css
 
@@ -107,6 +110,7 @@ IDL_BINDINGS += \
     $$PWD/Modules/filesystem/Metadata.idl \
     $$PWD/Modules/filesystem/MetadataCallback.idl \
     $$PWD/Modules/filesystem/WorkerContextFileSystem.idl \
+    $$PWD/Modules/geolocation/Coordinates.idl \
     $$PWD/Modules/geolocation/Geolocation.idl \
     $$PWD/Modules/geolocation/Geoposition.idl \
     $$PWD/Modules/geolocation/NavigatorGeolocation.idl \
@@ -116,11 +120,9 @@ IDL_BINDINGS += \
     $$PWD/Modules/indexeddb/DOMWindowIndexedDatabase.idl \
     $$PWD/Modules/indexeddb/IDBAny.idl \
     $$PWD/Modules/indexeddb/IDBCursor.idl \
-    $$PWD/Modules/indexeddb/IDBDatabaseException.idl \
     $$PWD/Modules/indexeddb/IDBDatabase.idl \
     $$PWD/Modules/indexeddb/IDBFactory.idl \
     $$PWD/Modules/indexeddb/IDBIndex.idl \
-    $$PWD/Modules/indexeddb/IDBKey.idl \
     $$PWD/Modules/indexeddb/IDBKeyRange.idl \
     $$PWD/Modules/indexeddb/IDBObjectStore.idl \
     $$PWD/Modules/indexeddb/IDBRequest.idl \
@@ -132,10 +134,13 @@ IDL_BINDINGS += \
     $$PWD/Modules/notifications/NotificationPermissionCallback.idl \
     $$PWD/Modules/notifications/WorkerContextNotifications.idl \
     $$PWD/Modules/quota/DOMWindowQuota.idl \
+    $$PWD/Modules/quota/NavigatorStorageQuota.idl \
     $$PWD/Modules/quota/StorageInfo.idl \
-    $$PWD/Modules/quota/StorageInfoErrorCallback.idl \
-    $$PWD/Modules/quota/StorageInfoQuotaCallback.idl \
-    $$PWD/Modules/quota/StorageInfoUsageCallback.idl \
+    $$PWD/Modules/quota/StorageErrorCallback.idl \
+    $$PWD/Modules/quota/StorageQuota.idl \
+    $$PWD/Modules/quota/StorageQuotaCallback.idl \
+    $$PWD/Modules/quota/StorageUsageCallback.idl \
+    $$PWD/Modules/quota/WorkerNavigatorStorageQuota.idl \
     $$PWD/Modules/webaudio/AudioBuffer.idl \
     $$PWD/Modules/webaudio/AudioBufferCallback.idl \
     $$PWD/Modules/webaudio/AudioBufferSourceNode.idl \
@@ -143,7 +148,6 @@ IDL_BINDINGS += \
     $$PWD/Modules/webaudio/ChannelSplitterNode.idl \
     $$PWD/Modules/webaudio/AudioContext.idl \
     $$PWD/Modules/webaudio/AudioDestinationNode.idl \
-    $$PWD/Modules/webaudio/AudioGain.idl \
     $$PWD/Modules/webaudio/GainNode.idl \
     $$PWD/Modules/webaudio/AudioListener.idl \
     $$PWD/Modules/webaudio/AudioNode.idl \
@@ -159,6 +163,7 @@ IDL_BINDINGS += \
     $$PWD/Modules/webaudio/ScriptProcessorNode.idl \
     $$PWD/Modules/webaudio/MediaElementAudioSourceNode.idl \
     $$PWD/Modules/webaudio/MediaStreamAudioSourceNode.idl \
+    $$PWD/Modules/webaudio/OfflineAudioContext.idl \
     $$PWD/Modules/webaudio/OfflineAudioCompletionEvent.idl \
     $$PWD/Modules/webaudio/OscillatorNode.idl \
     $$PWD/Modules/webaudio/AnalyserNode.idl \
@@ -186,7 +191,9 @@ IDL_BINDINGS += \
     $$PWD/Modules/websockets/WorkerContextWebSocket.idl \
     $$PWD/css/Counter.idl \
     $$PWD/css/CSSCharsetRule.idl \
+    $$PWD/css/CSSFontFaceLoadEvent.idl \
     $$PWD/css/CSSFontFaceRule.idl \
+    $$PWD/css/CSSHostRule.idl \
     $$PWD/css/CSSImportRule.idl \
     $$PWD/css/CSSMediaRule.idl \
     $$PWD/css/CSSPageRule.idl \
@@ -196,8 +203,11 @@ IDL_BINDINGS += \
     $$PWD/css/CSSStyleDeclaration.idl \
     $$PWD/css/CSSStyleRule.idl \
     $$PWD/css/CSSStyleSheet.idl \
+    $$PWD/css/CSSSupportsRule.idl \
     $$PWD/css/CSSValue.idl \
     $$PWD/css/CSSValueList.idl \
+    $$PWD/css/DOMWindowCSS.idl \
+    $$PWD/css/FontLoader.idl \
     $$PWD/css/MediaList.idl \
     $$PWD/css/MediaQueryList.idl \
     $$PWD/css/Rect.idl \
@@ -205,12 +215,15 @@ IDL_BINDINGS += \
     $$PWD/css/StyleMedia.idl \
     $$PWD/css/StyleSheet.idl \
     $$PWD/css/StyleSheetList.idl \
+    $$PWD/css/WebKitCSSFilterRule.idl \
     $$PWD/css/WebKitCSSFilterValue.idl \
     $$PWD/css/WebKitCSSKeyframeRule.idl \
     $$PWD/css/WebKitCSSKeyframesRule.idl \
     $$PWD/css/WebKitCSSMatrix.idl \
+    $$PWD/css/WebKitCSSMixFunctionValue.idl \
     $$PWD/css/WebKitCSSRegionRule.idl \
     $$PWD/css/WebKitCSSTransformValue.idl \
+    $$PWD/css/WebKitCSSViewportRule.idl \
     $$PWD/dom/Attr.idl \
     $$PWD/dom/BeforeLoadEvent.idl \
     $$PWD/dom/CharacterData.idl \
@@ -241,6 +254,7 @@ IDL_BINDINGS += \
     $$PWD/dom/EventException.idl \
 #    $$PWD/dom/EventListener.idl \
     $$PWD/dom/EventTarget.idl \
+    $$PWD/dom/FocusEvent.idl \
     $$PWD/dom/HashChangeEvent.idl \
     $$PWD/dom/KeyboardEvent.idl \
     $$PWD/dom/MouseEvent.idl \
@@ -248,6 +262,8 @@ IDL_BINDINGS += \
     $$PWD/dom/MessageEvent.idl \
     $$PWD/dom/MessagePort.idl \
     $$PWD/dom/MutationEvent.idl \
+    $$PWD/dom/MutationObserver.idl \
+    $$PWD/dom/MutationRecord.idl \
     $$PWD/dom/NamedNodeMap.idl \
     $$PWD/dom/Node.idl \
     $$PWD/dom/NodeFilter.idl \
@@ -270,6 +286,7 @@ IDL_BINDINGS += \
     $$PWD/dom/Touch.idl \
     $$PWD/dom/TouchEvent.idl \
     $$PWD/dom/TouchList.idl \
+    $$PWD/dom/TransitionEvent.idl \
     $$PWD/dom/TreeWalker.idl \
     $$PWD/dom/UIEvent.idl \
     $$PWD/dom/WebKitAnimationEvent.idl \
@@ -293,15 +310,21 @@ IDL_BINDINGS += \
     $$PWD/html/canvas/CanvasGradient.idl \
     $$PWD/html/canvas/Int32Array.idl \
     $$PWD/html/canvas/CanvasPattern.idl \
+    $$PWD/html/canvas/CanvasProxy.idl \
     $$PWD/html/canvas/CanvasRenderingContext.idl \
     $$PWD/html/canvas/CanvasRenderingContext2D.idl \
+    $$PWD/html/canvas/DOMPath.idl \
+    $$PWD/html/canvas/EXTDrawBuffers.idl \
     $$PWD/html/canvas/EXTTextureFilterAnisotropic.idl \
     $$PWD/html/canvas/OESStandardDerivatives.idl \
     $$PWD/html/canvas/OESTextureFloat.idl \
+    $$PWD/html/canvas/OESTextureHalfFloat.idl \
     $$PWD/html/canvas/OESVertexArrayObject.idl \
     $$PWD/html/canvas/OESElementIndexUint.idl \
     $$PWD/html/canvas/WebGLActiveInfo.idl \
     $$PWD/html/canvas/WebGLBuffer.idl \
+    $$PWD/html/canvas/WebGLCompressedTextureATC.idl \
+    $$PWD/html/canvas/WebGLCompressedTexturePVRTC.idl \
     $$PWD/html/canvas/WebGLCompressedTextureS3TC.idl \
     $$PWD/html/canvas/WebGLContextAttributes.idl \
     $$PWD/html/canvas/WebGLContextEvent.idl \
@@ -350,6 +373,7 @@ IDL_BINDINGS += \
     $$PWD/html/HTMLEmbedElement.idl \
     $$PWD/html/HTMLFieldSetElement.idl \
     $$PWD/html/HTMLFontElement.idl \
+    $$PWD/html/HTMLFormControlsCollection.idl \
     $$PWD/html/HTMLFormElement.idl \
     $$PWD/html/HTMLFrameElement.idl \
     $$PWD/html/HTMLFrameSetElement.idl \
@@ -420,7 +444,6 @@ IDL_BINDINGS += \
     $$PWD/loader/appcache/DOMApplicationCache.idl \
     $$PWD/page/BarInfo.idl \
     $$PWD/page/Console.idl \
-    $$PWD/page/Coordinates.idl \
     $$PWD/page/Crypto.idl \
     $$PWD/page/DOMSecurityPolicy.idl \
     $$PWD/page/DOMSelection.idl \
@@ -440,8 +463,6 @@ IDL_BINDINGS += \
     $$PWD/page/SpeechInputEvent.idl \
     $$PWD/page/SpeechInputResult.idl \
     $$PWD/page/SpeechInputResultList.idl \
-    $$PWD/page/WebKitAnimation.idl \
-    $$PWD/page/WebKitAnimationList.idl \
     $$PWD/page/WebKitPoint.idl \
     $$PWD/page/WorkerNavigator.idl \
     $$PWD/plugins/DOMPlugin.idl \
@@ -453,6 +474,7 @@ IDL_BINDINGS += \
     $$PWD/testing/Internals.idl \
     $$PWD/testing/InternalSettings.idl \
     $$PWD/testing/MallocStatistics.idl \
+    $$PWD/testing/TypeConversions.idl \
     $$PWD/workers/AbstractWorker.idl \
     $$PWD/workers/DedicatedWorkerContext.idl \
     $$PWD/workers/SharedWorker.idl \
@@ -599,6 +621,7 @@ enable?(SVG) {
     $$PWD/svg/SVGStopElement.idl \
     $$PWD/svg/SVGStringList.idl \
     $$PWD/svg/SVGStyleElement.idl \
+    $$PWD/svg/SVGStyledElement.idl \
     $$PWD/svg/SVGSVGElement.idl \
     $$PWD/svg/SVGSwitchElement.idl \
     $$PWD/svg/SVGSymbolElement.idl \
@@ -643,6 +666,8 @@ enable?(MEDIA_SOURCE) {
     $$PWD/Modules/mediasource/SourceBufferList.idl
 }
 
+qtPrepareTool(QMAKE_MOC, moc)
+
 mathmlnames.output = MathMLNames.cpp
 mathmlnames.input = MATHML_NAMES
 mathmlnames.depends = $$PWD/mathml/mathattrs.in
@@ -685,6 +710,21 @@ cssvalues.depends = ${QMAKE_FILE_NAME} $${EXTRACSSVALUES} $$cssvalues.script
 cssvalues.clean = ${QMAKE_FILE_OUT} ${QMAKE_FUNC_FILE_OUT_PATH}/${QMAKE_FILE_BASE}.h
 GENERATORS += cssvalues
 
+INTERNAL_SETTINGS_GENERATED_IDL = InternalSettingsGenerated.idl
+# GENERATOR 6-C:
+settingsmacros.output = $$INTERNAL_SETTINGS_GENERATED_IDL InternalSettingsGenerated.cpp
+settingsmacros.input = SETTINGS_MACROS
+settingsmacros.script = $$PWD/page/make_settings.pl
+settingsmacros.commands = perl -I$$PWD/bindings/scripts $$settingsmacros.script --input $$SETTINGS_MACROS --outputDir ${QMAKE_FUNC_FILE_OUT_PATH}
+settingsmacros.depends = $$PWD/page/make_settings.pl $$SETTINGS_MACROS
+settingsmacros.add_output_to_sources = false
+settingsmacros.extra_sources = InternalSettingsGenerated.cpp
+GENERATORS += settingsmacros
+
+# make_settings.pl generates this file. We can't use ${QMAKE_FUNC_FILE_OUT_PATH} here since generateBindings.input
+# doesn't know how to resolve ${QMAKE_FUNC_FILE_OUT_PATH}.
+IDL_BINDINGS += generated/$$INTERNAL_SETTINGS_GENERATED_IDL
+
 # GENERATOR 0: Resolve [Supplemental] dependency in IDLs
 SUPPLEMENTAL_DEPENDENCY_FILE = supplemental_dependency.tmp
 IDL_FILES_TMP = ${QMAKE_FUNC_FILE_OUT_PATH}/idl_files.tmp
@@ -704,12 +744,10 @@ for(binding, IDL_BINDINGS) {
 preprocessIdls.commands += perl -I$$PWD/bindings/scripts $$preprocessIdls.script \
                                --defines \"$$javascriptFeatureDefines()\" \
                                --idlFilesList $$IDL_FILES_TMP \
-                               --supplementalDependencyFile ${QMAKE_FUNC_FILE_OUT_PATH}/$$SUPPLEMENTAL_DEPENDENCY_FILE \
-                               --idlAttributesFile $${IDL_ATTRIBUTES_FILE} \
-                               --preprocessor \"$${QMAKE_MOC} -E\"
+                               --supplementalDependencyFile ${QMAKE_FUNC_FILE_OUT_PATH}/$$SUPPLEMENTAL_DEPENDENCY_FILE
 preprocessIdls.output = $$SUPPLEMENTAL_DEPENDENCY_FILE
 preprocessIdls.add_output_to_sources = false
-preprocessIdls.depends = $$PWD/bindings/scripts/IDLParser.pm $$IDL_BINDINGS
+preprocessIdls.depends = $$IDL_BINDINGS
 GENERATORS += preprocessIdls
 
 # GENERATOR 1: Generate .h and .cpp from IDLs
@@ -746,15 +784,16 @@ generateBindings.commands = $$setEnvironmentVariable(SOURCE_ROOT, $$toSystemPath
                             --include xml \
                             --outputDir ${QMAKE_FUNC_FILE_OUT_PATH} \
                             --supplementalDependencyFile ${QMAKE_FUNC_FILE_OUT_PATH}/$$SUPPLEMENTAL_DEPENDENCY_FILE \
+                            --idlAttributesFile $${IDL_ATTRIBUTES_FILE} \
                             --preprocessor \"$${QMAKE_MOC} -E\" ${QMAKE_FILE_NAME}
 generateBindings.output = JS${QMAKE_FILE_BASE}.cpp
 generateBindings.depends = ${QMAKE_FUNC_FILE_OUT_PATH}/$$SUPPLEMENTAL_DEPENDENCY_FILE \
                            $$PWD/bindings/scripts/CodeGenerator.pm \
                            $$PWD/bindings/scripts/CodeGeneratorJS.pm \
                            $$PWD/bindings/scripts/IDLParser.pm \
-                           $$PWD/bindings/scripts/IDLStructure.pm \
                            $$PWD/bindings/scripts/InFilesParser.pm \
-                           $$PWD/bindings/scripts/preprocessor.pm
+                           $$PWD/bindings/scripts/preprocessor.pm \
+                           $$IDL_ATTRIBUTES_FILE
 GENERATORS += generateBindings
 
 # GENERATOR 2: inspector idl compiler

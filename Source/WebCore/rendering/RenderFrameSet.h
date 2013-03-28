@@ -76,6 +76,8 @@ public:
 
     void notifyFrameEdgeInfoChanged();
 
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
 private:
     static const int noSplit = -1;
 
@@ -84,6 +86,9 @@ private:
     public:
         GridAxis();
         void resize(int);
+
+        void reportMemoryUsage(MemoryObjectInfo*) const;
+
         Vector<int> m_sizes;
         Vector<int> m_deltas;
         Vector<bool> m_preventResize;
@@ -99,7 +104,6 @@ private:
     virtual bool isFrameSet() const { return true; }
 
     virtual void layout();
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
     virtual void paint(PaintInfo&, const LayoutPoint&);
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
     virtual CursorDirective getCursor(const LayoutPoint&, Cursor&) const;
@@ -137,7 +141,7 @@ private:
 
 inline RenderFrameSet* toRenderFrameSet(RenderObject* object)
 {
-    ASSERT(!object || object->isFrameSet());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isFrameSet());
     return static_cast<RenderFrameSet*>(object);
 }
 

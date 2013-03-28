@@ -31,7 +31,7 @@
 
 namespace WebKit {
 
-class RemoteLayerTreeController;
+class RemoteLayerTreeContext;
 
 class RemoteLayerTreeDrawingArea : public DrawingArea {
 public:
@@ -42,14 +42,15 @@ private:
     RemoteLayerTreeDrawingArea(WebPage*, const WebPageCreationParameters&);
 
     // DrawingArea
-    virtual void setNeedsDisplay(const WebCore::IntRect&) OVERRIDE;
-    virtual void scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset) OVERRIDE;
+    virtual void setNeedsDisplay() OVERRIDE;
+    virtual void setNeedsDisplayInRect(const WebCore::IntRect&) OVERRIDE;
+    virtual void scroll(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollDelta) OVERRIDE;
 
     virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() OVERRIDE;
     virtual void setRootCompositingLayer(WebCore::GraphicsLayer*) OVERRIDE;
     virtual void scheduleCompositingLayerFlush() OVERRIDE;
 
-    OwnPtr<RemoteLayerTreeController> m_remoteLayerTreeController;
+    OwnPtr<RemoteLayerTreeContext> m_RemoteLayerTreeContext;
 };
 
 } // namespace WebKit

@@ -27,7 +27,6 @@
 
 #include "FileChooser.h"
 #include "HTMLTextFormControlElement.h"
-#include "ImageLoaderClient.h"
 #include "StepRange.h"
 
 namespace WebCore {
@@ -36,6 +35,7 @@ class CheckedRadioButtons;
 class DragData;
 class FileList;
 class HTMLDataListElement;
+class HTMLImageLoader;
 class HTMLOptionElement;
 class Icon;
 class InputType;
@@ -43,7 +43,7 @@ class KURL;
 class ListAttributeTargetObserver;
 struct DateTimeChooserParameters;
 
-class HTMLInputElement : public HTMLTextFormControlElement, public ImageLoaderClientBase<HTMLInputElement> {
+class HTMLInputElement : public HTMLTextFormControlElement {
 public:
     static PassRefPtr<HTMLInputElement> create(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
     virtual ~HTMLInputElement();
@@ -55,6 +55,7 @@ public:
     virtual bool shouldAutocomplete() const;
 
     // For ValidityState
+    virtual bool hasBadInput() const OVERRIDE;
     virtual bool patternMismatch() const OVERRIDE;
     virtual bool rangeUnderflow() const OVERRIDE;
     virtual bool rangeOverflow() const;
@@ -95,6 +96,10 @@ public:
     bool isPasswordField() const;
     bool isCheckbox() const;
     bool isRangeControl() const;
+
+#if ENABLE(INPUT_TYPE_COLOR)
+    bool isColorControl() const;
+#endif
 
     // FIXME: It's highly likely that any call site calling this function should instead
     // be using a different one. Many input elements behave like text fields, and in addition
@@ -163,9 +168,6 @@ public:
 
     // The value which is drawn by a renderer.
     String visibleValue() const;
-    String convertFromVisibleValue(const String&) const;
-    // Returns true if the specified string can be set as the value of HTMLInputElement.
-    bool isAcceptableValue(const String&) const;
 
     const String& suggestedValue() const;
     void setSuggestedValue(const String&);
@@ -177,9 +179,6 @@ public:
 
     double valueAsNumber() const;
     void setValueAsNumber(double, ExceptionCode&, TextFieldEventBehavior = DispatchNoEvent);
-
-    virtual String placeholder() const;
-    virtual void setPlaceholder(const String&);
 
     String valueWithDefault() const;
 
@@ -241,6 +240,8 @@ public:
     void addSearchResult();
     void onSearch();
 
+    void updateClearButtonVisibility();
+
     virtual bool willRespondToMouseClickEvents() OVERRIDE;
 
 #if ENABLE(DATALIST_ELEMENT)
@@ -250,7 +251,7 @@ public:
 #endif
 
     HTMLInputElement* checkedRadioButtonForGroup() const;
-    bool isInRequiredRadioButtonGroup() const;
+    bool isInRequiredRadioButtonGroup();
 
     // Functions for InputType classes.
     void setValueInternal(const String&, TextFieldEventBehavior);
@@ -282,15 +283,20 @@ public:
 
     virtual void blur() OVERRIDE;
     void defaultBlur();
-    void defaultFocus(bool restorePreviousSelection);
-    virtual void focus(bool restorePreviousSelection = true) OVERRIDE;
 
     virtual const AtomicString& name() const OVERRIDE;
 
+    void endEditing();
+
     static Vector<FileChooserFileInfo> filesFromFileInputFormControlState(const FormControlState&);
 
+    virtual bool matchesReadOnlyPseudoClass() const OVERRIDE;
+    virtual bool matchesReadWritePseudoClass() const OVERRIDE;
     virtual void setRangeText(const String& replacement, ExceptionCode&) OVERRIDE;
     virtual void setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionCode&) OVERRIDE;
+
+    bool hasImageLoader() const { return m_imageLoader; }
+    HTMLImageLoader* imageLoader();
 
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     bool setupDateTimeChooserParameters(DateTimeChooserParameters&);
@@ -299,14 +305,17 @@ public:
 
 protected:
     HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
-    void createShadowSubtree();
+
     virtual void defaultEventHandler(Event*);
+
+private:
+    enum AutoCompleteSetting { Uninitialized, On, Off };
+
     // FIXME: Author shadows should be allowed
     // https://bugs.webkit.org/show_bug.cgi?id=92608
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
-private:
-    enum AutoCompleteSetting { Uninitialized, On, Off };
+    virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
 
     virtual void willChangeForm() OVERRIDE;
     virtual void didChangeForm() OVERRIDE;
@@ -320,7 +329,6 @@ private:
     virtual bool isEnumeratable() const;
     virtual bool supportLabels() const OVERRIDE;
     virtual void updateFocusAppearance(bool restorePreviousSelection);
-    virtual void aboutToUnload();
     virtual bool shouldUseInputMethod();
 
     virtual bool isTextFormControl() const { return isTextField(); }
@@ -337,9 +345,9 @@ private:
 
     virtual void accessKeyAction(bool sendMouseEvents);
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
     virtual void finishParsingChildren();
 
     virtual void copyNonAttributePropertiesFromElement(const Element&);
@@ -356,9 +364,6 @@ private:
     virtual void postDispatchEventHandler(Event*, void* dataFromPreDispatch);
 
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
-
-    virtual bool hasUnacceptableValue() const;
-
     virtual bool isInRange() const;
     virtual bool isOutOfRange() const;
 
@@ -378,7 +383,7 @@ private:
     virtual void updatePlaceholderText();
     virtual bool isEmptyValue() const OVERRIDE { return innerTextValue().isEmpty(); }
     virtual bool isEmptySuggestedValue() const { return suggestedValue().isEmpty(); }
-    virtual void handleFocusEvent();
+    virtual void handleFocusEvent(Node* oldFocusedNode, FocusDirection) OVERRIDE;
     virtual void handleBlurEvent();
 
     virtual bool isOptionalFormControl() const { return !isRequiredFormControl(); }
@@ -393,13 +398,16 @@ private:
 #if ENABLE(DATALIST_ELEMENT)
     void resetListAttributeTargetObserver();
 #endif
-    void parseMaxLengthAttribute(const Attribute&);
+    void parseMaxLengthAttribute(const AtomicString&);
     void updateValueIfNeeded();
 
     // Returns null if this isn't associated with any radio button group.
     CheckedRadioButtons* checkedRadioButtons() const;
     void addToRadioButtonGroup();
     void removeFromRadioButtonGroup();
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
+#endif
 
     AtomicString m_name;
     String m_valueIfDirty;
@@ -426,16 +434,14 @@ private:
     bool m_hasTouchEventHandler : 1;
 #endif
     OwnPtr<InputType> m_inputType;
+    // The ImageLoader must be owned by this element because the loader code assumes
+    // that it lives as long as its owning element lives. If we move the loader into
+    // the ImageInput object we may delete the loader while this element lives on.
+    OwnPtr<HTMLImageLoader> m_imageLoader;
 #if ENABLE(DATALIST_ELEMENT)
     OwnPtr<ListAttributeTargetObserver> m_listAttributeTargetObserver;
 #endif
 };
-
-inline bool isHTMLInputElement(Node* node)
-{
-    ASSERT(node);
-    return node->hasTagName(HTMLNames::inputTag);
-}
 
 } //namespace
 #endif

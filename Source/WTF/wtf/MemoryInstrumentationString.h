@@ -39,7 +39,7 @@
 
 namespace WTF {
 
-inline void reportMemoryUsage(const StringImpl* const& stringImpl, MemoryObjectInfo* memoryObjectInfo)
+inline void reportMemoryUsage(const StringImpl* stringImpl, MemoryObjectInfo* memoryObjectInfo)
 {
     size_t selfSize = sizeof(StringImpl);
 
@@ -54,37 +54,37 @@ inline void reportMemoryUsage(const StringImpl* const& stringImpl, MemoryObjectI
     MemoryClassInfo info(memoryObjectInfo, stringImpl, 0, selfSize);
 
     if (StringImpl* baseString = stringImpl->baseString())
-        info.addMember(baseString);
+        info.addMember(baseString, "baseString", RetainingPointer);
     else {
         if (stringImpl->hasOwnedBuffer())
-            info.addRawBuffer(buffer, bufferSize);
+            info.addRawBuffer(buffer, bufferSize, "char[]", "ownedBuffer");
 
         if (stringImpl->has16BitShadow())
-            info.addRawBuffer(stringImpl->characters(), length * sizeof(UChar));
+            info.addRawBuffer(stringImpl->characters(), length * sizeof(UChar), "UChar[]", "16bitShadow");
     }
 }
 
-inline void reportMemoryUsage(const String* const& string, MemoryObjectInfo* memoryObjectInfo)
+inline void reportMemoryUsage(const String* string, MemoryObjectInfo* memoryObjectInfo)
 {
     MemoryClassInfo info(memoryObjectInfo, string);
-    info.addMember(string->impl());
+    info.addMember(string->impl(), "stringImpl", RetainingPointer);
 }
 
-inline void reportMemoryUsage(const AtomicString* const& atomicString, MemoryObjectInfo* memoryObjectInfo)
+inline void reportMemoryUsage(const AtomicString* atomicString, MemoryObjectInfo* memoryObjectInfo)
 {
     MemoryClassInfo info(memoryObjectInfo, atomicString);
-    info.addMember(atomicString->string());
+    info.addMember(atomicString->string(), "string");
 }
 
-inline void reportMemoryUsage(const CStringBuffer* const& cStringBuffer, MemoryObjectInfo* memoryObjectInfo)
+inline void reportMemoryUsage(const CStringBuffer* cStringBuffer, MemoryObjectInfo* memoryObjectInfo)
 {
     MemoryClassInfo info(memoryObjectInfo, cStringBuffer, 0, sizeof(*cStringBuffer) + cStringBuffer->length());
 }
 
-inline void reportMemoryUsage(const CString* const& cString, MemoryObjectInfo* memoryObjectInfo)
+inline void reportMemoryUsage(const CString* cString, MemoryObjectInfo* memoryObjectInfo)
 {
     MemoryClassInfo info(memoryObjectInfo, cString);
-    info.addMember(cString->buffer());
+    info.addMember(cString->buffer(), "buffer", RetainingPointer);
 }
 
 }

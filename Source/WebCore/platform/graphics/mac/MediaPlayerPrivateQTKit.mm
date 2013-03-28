@@ -43,7 +43,7 @@
 #import "TimeRanges.h"
 #import "WebCoreSystemInterface.h"
 #import <QTKit/QTKit.h>
-#import <objc/objc-runtime.h>
+#import <objc/runtime.h>
 #import <wtf/UnusedParam.h>
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -190,7 +190,7 @@ PassOwnPtr<MediaPlayerPrivateInterface> MediaPlayerPrivateQTKit::create(MediaPla
 void MediaPlayerPrivateQTKit::registerMediaEngine(MediaEngineRegistrar registrar)
 {
     if (isAvailable())
-#if ENABLE(ENCRYPTED_MEDIA)
+#if ENABLE(ENCRYPTED_MEDIA) || ENABLE(ENCRYPTED_MEDIA_V2)
         registrar(create, getSupportedTypes, extendedSupportsType, getSitesInMediaCache, clearMediaCache, clearMediaCacheForSite);
 #else
         registrar(create, getSupportedTypes, supportsType, getSitesInMediaCache, clearMediaCache, clearMediaCacheForSite);
@@ -957,7 +957,7 @@ float MediaPlayerPrivateQTKit::maxTimeSeekable() const
         return 0;
 
     // infinite duration means live stream
-    if (isinf(duration()))
+    if (std::isinf(duration()))
         return 0;
 
     return wkQTMovieMaxTimeSeekable(m_qtMovie.get());
@@ -1343,6 +1343,18 @@ void MediaPlayerPrivateQTKit::paintCurrentFrameInContext(GraphicsContext* contex
     paint(context, r);
 }
 
+#if PLATFORM(QT) && USE(QTKIT)
+static inline void swapBgrToRgb(uint32_t* pixel, uint32_t width, uint32_t height)
+{
+    uint32_t* end = pixel + (width * height);
+
+    while (pixel < end) {
+        *pixel = ((*pixel << 16) & 0xff0000) | ((*pixel >> 16) & 0xff) | (*pixel & 0xff00ff00);
+        ++pixel;
+    }
+}
+#endif
+
 void MediaPlayerPrivateQTKit::paint(GraphicsContext* context, const IntRect& r)
 {
     if (context->paintingDisabled() || m_hasUnsupportedTracks)
@@ -1359,15 +1371,17 @@ void MediaPlayerPrivateQTKit::paint(GraphicsContext* context, const IntRect& r)
     IntRect paintRect(IntPoint(0, 0), IntSize(r.width(), r.height()));
 
 #if PLATFORM(QT) && USE(QTKIT)
-    // In Qt, GraphicsContext is a QPainter so every transformations applied on it won't matter because here
-    // the video is rendered by QuickTime not by Qt.
-    CGContextRef cgContext = static_cast<CGContextRef>([[NSGraphicsContext currentContext] graphicsPort]);
-    CGContextSaveGState(cgContext);
-    CGContextSetInterpolationQuality(cgContext, kCGInterpolationLow);
-    CGContextTranslateCTM(cgContext, r.x(), r.y() + r.height());
-    CGContextScaleCTM(cgContext, scaleFactor.width(), scaleFactor.height());
-
-    newContext = [NSGraphicsContext currentContext];
+    NSBitmapImageRep *imageRep = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: NULL
+                                                            pixelsWide: paintRect.width()
+                                                            pixelsHigh: paintRect.height()
+                                                            bitsPerSample: 8
+                                                            samplesPerPixel: 4
+                                                            hasAlpha: YES
+                                                            isPlanar: NO
+                                                            colorSpaceName: NSCalibratedRGBColorSpace
+                                                            bytesPerRow: 4 * paintRect.width() // 32 bit per pixel.
+                                                            bitsPerPixel: 32];
+    newContext = [NSGraphicsContext graphicsContextWithBitmapImageRep: imageRep];
 #else
     GraphicsContextStateSaver stateSaver(*context);
     context->translate(r.x(), r.y() + r.height());
@@ -1430,7 +1444,12 @@ void MediaPlayerPrivateQTKit::paint(GraphicsContext* context, const IntRect& r)
     }
 #endif
 #if PLATFORM(QT) && USE(QTKIT)
-    CGContextRestoreGState(cgContext);
+    unsigned char* bitmap = [imageRep bitmapData];
+    swapBgrToRgb(reinterpret_cast<uint32_t*>(bitmap), paintRect.width(), paintRect.height());
+    QImage videoFrame(bitmap, paintRect.width(), paintRect.height(), QImage::Format_ARGB32);
+    QPainter* painter = context->platformContext();
+    painter->drawImage(QRect(r), videoFrame);
+    [imageRep release];
 #endif
     END_BLOCK_OBJC_EXCEPTIONS;
     [m_objcObserver.get() setDelayCallbacks:NO];
@@ -1457,8 +1476,15 @@ static void addFileTypesToCache(NSArray * fileTypes, HashSet<String> &cache)
             Vector<String> typesForExtension = MIMETypeRegistry::getMediaMIMETypesForExtension(ext);
             unsigned count = typesForExtension.size();
             for (unsigned ndx = 0; ndx < count; ++ndx) {
-                if (!cache.contains(typesForExtension[ndx]))
-                    cache.add(typesForExtension[ndx]);
+                String& type = typesForExtension[ndx];
+
+                // QTKit will return non-video MIME types which it claims to support, but which we
+                // do not support in the <video> element. Disclaim all non video/ or audio/ types.
+                if (!type.startsWith("video/") && !type.startsWith("audio/"))
+                    continue;
+
+                if (!cache.contains(type))
+                    cache.add(type);
             }
         }
     }    
@@ -1490,20 +1516,24 @@ static HashSet<String> mimeModernTypesCache()
     }
     
     return cache;
-} 
+}
+
+static void concatenateHashSets(HashSet<String>& destination, const HashSet<String>& source)
+{
+    HashSet<String>::const_iterator it = source.begin();
+    HashSet<String>::const_iterator end = source.end();
+    for (; it != end; ++it)
+        destination.add(*it);
+}
 
 void MediaPlayerPrivateQTKit::getSupportedTypes(HashSet<String>& supportedTypes)
 {
-    supportedTypes = mimeModernTypesCache();
-    
+    concatenateHashSets(supportedTypes, mimeModernTypesCache());
+
     // Note: this method starts QTKitServer if it isn't already running when in 64-bit because it has to return the list 
     // of every MIME type supported by QTKit.
-    HashSet<String> commonTypes = mimeCommonTypesCache();
-    HashSet<String>::const_iterator it = commonTypes.begin();
-    HashSet<String>::const_iterator end = commonTypes.end();
-    for (; it != end; ++it)
-        supportedTypes.add(*it);
-} 
+    concatenateHashSets(supportedTypes, mimeCommonTypesCache());
+}
 
 MediaPlayer::SupportsType MediaPlayerPrivateQTKit::supportsType(const String& type, const String& codecs, const KURL&)
 {
@@ -1522,7 +1552,7 @@ MediaPlayer::SupportsType MediaPlayerPrivateQTKit::supportsType(const String& ty
     return MediaPlayer::IsNotSupported;
 }
 
-#if ENABLE(ENCRYPTED_MEDIA)
+#if ENABLE(ENCRYPTED_MEDIA) || ENABLE(ENCRYPTED_MEDIA_V2)
 MediaPlayer::SupportsType MediaPlayerPrivateQTKit::extendedSupportsType(const String& type, const String& codecs, const String& keySystem, const KURL& url)
 {
     // QTKit does not support any encrytped media, so return IsNotSupported if the keySystem is non-NULL:

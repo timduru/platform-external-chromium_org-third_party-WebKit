@@ -44,14 +44,29 @@
 #include "V8HTMLDocument.h"
 #include "V8Utilities.h"
 #include "WorkerContext.h"
-#include "WorkerContextExecutionProxy.h"
 #include "XMLHttpRequest.h"
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8XMLHttpRequest::responseTextAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+v8::Handle<v8::Value> V8XMLHttpRequest::constructorCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.XMLHttpRequest.responsetext._get");
+    ScriptExecutionContext* context = getScriptExecutionContext();
+
+    RefPtr<SecurityOrigin> securityOrigin;
+    if (context->isDocument()) {
+        if (DOMWrapperWorld* world = isolatedWorldForEnteredContext())
+            securityOrigin = world->isolatedWorldSecurityOrigin();
+    }
+
+    RefPtr<XMLHttpRequest> xmlHttpRequest = XMLHttpRequest::create(context, securityOrigin);
+
+    v8::Handle<v8::Object> wrapper = args.Holder();
+    V8DOMWrapper::associateObjectWithWrapper(xmlHttpRequest.release(), &info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    return wrapper;
+}
+
+v8::Handle<v8::Value> V8XMLHttpRequest::responseTextAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
     XMLHttpRequest* xmlHttpRequest = V8XMLHttpRequest::toNative(info.Holder());
     ExceptionCode ec = 0;
     const String& text = xmlHttpRequest->responseText(ec);
@@ -60,15 +75,14 @@ v8::Handle<v8::Value> V8XMLHttpRequest::responseTextAccessorGetter(v8::Local<v8:
     return v8String(text, info.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8XMLHttpRequest::responseAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+v8::Handle<v8::Value> V8XMLHttpRequest::responseAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.XMLHttpRequest.response._get");
     XMLHttpRequest* xmlHttpRequest = V8XMLHttpRequest::toNative(info.Holder());
 
     switch (xmlHttpRequest->responseTypeCode()) {
     case XMLHttpRequest::ResponseTypeDefault:
     case XMLHttpRequest::ResponseTypeText:
-        return responseTextAccessorGetter(name, info);
+        return responseTextAttrGetterCustom(name, info);
 
     case XMLHttpRequest::ResponseTypeDocument:
         {
@@ -76,7 +90,7 @@ v8::Handle<v8::Value> V8XMLHttpRequest::responseAccessorGetter(v8::Local<v8::Str
             Document* document = xmlHttpRequest->responseXML(ec);
             if (ec)
                 return setDOMException(ec, info.GetIsolate());
-            return toV8(document, info.Holder(), info.GetIsolate());
+            return toV8Fast(document, info, xmlHttpRequest);
         }
 
     case XMLHttpRequest::ResponseTypeBlob:
@@ -85,7 +99,7 @@ v8::Handle<v8::Value> V8XMLHttpRequest::responseAccessorGetter(v8::Local<v8::Str
             Blob* blob = xmlHttpRequest->responseBlob(ec);
             if (ec)
                 return setDOMException(ec, info.GetIsolate());
-            return toV8(blob, info.Holder(), info.GetIsolate());
+            return toV8Fast(blob, info, xmlHttpRequest);
         }
 
     case XMLHttpRequest::ResponseTypeArrayBuffer:
@@ -94,16 +108,15 @@ v8::Handle<v8::Value> V8XMLHttpRequest::responseAccessorGetter(v8::Local<v8::Str
             ArrayBuffer* arrayBuffer = xmlHttpRequest->responseArrayBuffer(ec);
             if (ec)
                 return setDOMException(ec, info.GetIsolate());
-            return toV8(arrayBuffer, info.Holder(), info.GetIsolate());
+            return toV8Fast(arrayBuffer, info, xmlHttpRequest);
         }
     }
 
     return v8::Undefined();
 }
 
-v8::Handle<v8::Value> V8XMLHttpRequest::openCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8XMLHttpRequest::openMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.XMLHttpRequest.open()");
     // Four cases:
     // open(method, url)
     // open(method, url, async)
@@ -145,15 +158,14 @@ v8::Handle<v8::Value> V8XMLHttpRequest::openCallback(const v8::Arguments& args)
     return v8::Undefined();
 }
 
-static bool isDocumentType(v8::Handle<v8::Value> value)
+static bool isDocumentType(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     // FIXME: add other document types.
-    return V8Document::HasInstance(value) || V8HTMLDocument::HasInstance(value);
+    return V8Document::HasInstance(value, isolate, currentWorldType) || V8HTMLDocument::HasInstance(value, isolate, currentWorldType);
 }
 
-v8::Handle<v8::Value> V8XMLHttpRequest::sendCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8XMLHttpRequest::sendMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.XMLHttpRequest.send()");
     XMLHttpRequest* xmlHttpRequest = V8XMLHttpRequest::toNative(args.Holder());
 
     InspectorInstrumentation::willSendXMLHttpRequest(xmlHttpRequest->scriptExecutionContext(), xmlHttpRequest->url());
@@ -163,30 +175,31 @@ v8::Handle<v8::Value> V8XMLHttpRequest::sendCallback(const v8::Arguments& args)
         xmlHttpRequest->send(ec);
     else {
         v8::Handle<v8::Value> arg = args[0];
+        WrapperWorldType currentWorldType = worldType(args.GetIsolate());
         if (isUndefinedOrNull(arg))
             xmlHttpRequest->send(ec);
-        else if (isDocumentType(arg)) {
+        else if (isDocumentType(arg, args.GetIsolate(), currentWorldType)) {
             v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(arg);
             Document* document = V8Document::toNative(object);
             ASSERT(document);
             xmlHttpRequest->send(document, ec);
-        } else if (V8Blob::HasInstance(arg)) {
+        } else if (V8Blob::HasInstance(arg, args.GetIsolate(), currentWorldType)) {
             v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(arg);
             Blob* blob = V8Blob::toNative(object);
             ASSERT(blob);
             xmlHttpRequest->send(blob, ec);
-        } else if (V8DOMFormData::HasInstance(arg)) {
+        } else if (V8DOMFormData::HasInstance(arg, args.GetIsolate(), currentWorldType)) {
             v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(arg);
             DOMFormData* domFormData = V8DOMFormData::toNative(object);
             ASSERT(domFormData);
             xmlHttpRequest->send(domFormData, ec);
 #if ENABLE(WEBGL) || ENABLE(BLOB)
-        } else if (V8ArrayBuffer::HasInstance(arg)) {
+        } else if (V8ArrayBuffer::HasInstance(arg, args.GetIsolate(), currentWorldType)) {
             v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(arg);
             ArrayBuffer* arrayBuffer = V8ArrayBuffer::toNative(object);
             ASSERT(arrayBuffer);
             xmlHttpRequest->send(arrayBuffer, ec);
-        } else if (V8ArrayBufferView::HasInstance(arg)) {
+        } else if (V8ArrayBufferView::HasInstance(arg, args.GetIsolate(), currentWorldType)) {
             v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(arg);
             ArrayBufferView* arrayBufferView = V8ArrayBufferView::toNative(object);
             ASSERT(arrayBufferView);

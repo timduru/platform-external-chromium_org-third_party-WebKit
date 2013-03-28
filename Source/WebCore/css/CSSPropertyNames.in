@@ -27,7 +27,6 @@ text-rendering
 -webkit-locale
 -webkit-text-orientation
 -epub-text-orientation = -webkit-text-orientation
--webkit-text-size-adjust
 -webkit-writing-mode
 -epub-writing-mode = -webkit-writing-mode
 zoom
@@ -100,6 +99,9 @@ content
 counter-increment
 counter-reset
 cursor
+#if defined(ENABLE_CURSOR_VISIBILITY) && ENABLE_CURSOR_VISIBILITY
+-webkit-cursor-visibility
+#endif
 empty-cells
 float
 font-stretch
@@ -182,6 +184,12 @@ text-underline-mode
 text-underline-style
 text-underline-width
 top
+transition
+transition-delay
+transition-duration
+transition-property
+transition-timing-function
+
 unicode-bidi
 unicode-range
 vertical-align
@@ -267,6 +275,7 @@ z-index
 #endif
 #if defined(ENABLE_CSS_COMPOSITING) && ENABLE_CSS_COMPOSITING
 -webkit-blend-mode
+-webkit-background-blend-mode
 #endif
 #if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
 -webkit-filter
@@ -283,10 +292,17 @@ z-index
 -webkit-flex-wrap
 -webkit-justify-content
 -webkit-font-size-delta
+-webkit-grid-auto-columns
+-webkit-grid-auto-rows
 -webkit-grid-columns
 -webkit-grid-rows
+-webkit-grid-start
+-webkit-grid-end
+-webkit-grid-before
+-webkit-grid-after
 -webkit-grid-column
 -webkit-grid-row
+-webkit-grid-auto-flow
 -webkit-highlight
 -webkit-hyphenate-character
 -webkit-hyphenate-limit-after
@@ -318,7 +334,6 @@ z-index
 -webkit-marquee-speed
 -webkit-marquee-style
 -webkit-mask
--webkit-mask-attachment
 -webkit-mask-box-image
 -webkit-mask-box-image-outset
 -webkit-mask-box-image-repeat
@@ -352,11 +367,15 @@ z-index
 -webkit-perspective-origin-y
 -webkit-print-color-adjust
 -webkit-rtl-ordering
+-webkit-ruby-position
 -webkit-text-combine
 -epub-text-combine = -webkit-text-combine
 #if defined(ENABLE_CSS3_TEXT) && ENABLE_CSS3_TEXT
 -webkit-text-decoration-line
 -webkit-text-decoration-style
+-webkit-text-decoration-color
+-webkit-text-align-last
+-webkit-text-underline-position
 #endif
 -webkit-text-decorations-in-effect
 -webkit-text-emphasis
@@ -396,8 +415,8 @@ z-index
 #if defined(ENABLE_CSS_EXCLUSIONS) && ENABLE_CSS_EXCLUSIONS
 -webkit-shape-inside
 -webkit-shape-outside
--webkit-wrap-margin
--webkit-wrap-padding
+-webkit-shape-margin
+-webkit-shape-padding
 -webkit-wrap-flow
 -webkit-wrap-through
 -webkit-wrap

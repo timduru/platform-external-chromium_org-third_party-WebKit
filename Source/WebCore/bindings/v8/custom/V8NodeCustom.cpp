@@ -60,114 +60,105 @@
 
 namespace WebCore {
 
-// This function is customized to take advantage of the optional 4th argument: shouldLazyAttach
-v8::Handle<v8::Value> V8Node::insertBeforeCallback(const v8::Arguments& args)
+// This function is customized to take advantage of the optional 4th argument: AttachBehavior
+v8::Handle<v8::Value> V8Node::insertBeforeMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.Node.insertBefore");
     v8::Handle<v8::Object> holder = args.Holder();
     Node* imp = V8Node::toNative(holder);
     ExceptionCode ec = 0;
-    Node* newChild = V8Node::HasInstance(args[0]) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
-    Node* refChild = V8Node::HasInstance(args[1]) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[1])) : 0;
-    bool success = imp->insertBefore(newChild, refChild, ec, true);
+    Node* newChild = V8Node::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
+    Node* refChild = V8Node::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[1])) : 0;
+    bool success = imp->insertBefore(newChild, refChild, ec, AttachLazily);
     if (ec)
         return setDOMException(ec, args.GetIsolate());
     if (success)
         return args[0];
-    return v8::Null(args.GetIsolate());
+    return v8Null(args.GetIsolate());
 }
 
-// This function is customized to take advantage of the optional 4th argument: shouldLazyAttach
-v8::Handle<v8::Value> V8Node::replaceChildCallback(const v8::Arguments& args)
+// This function is customized to take advantage of the optional 4th argument: AttachBehavior
+v8::Handle<v8::Value> V8Node::replaceChildMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.Node.replaceChild");
     v8::Handle<v8::Object> holder = args.Holder();
     Node* imp = V8Node::toNative(holder);
     ExceptionCode ec = 0;
-    Node* newChild = V8Node::HasInstance(args[0]) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
-    Node* oldChild = V8Node::HasInstance(args[1]) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[1])) : 0;
-    bool success = imp->replaceChild(newChild, oldChild, ec, true);
+    Node* newChild = V8Node::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
+    Node* oldChild = V8Node::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[1])) : 0;
+    bool success = imp->replaceChild(newChild, oldChild, ec, AttachLazily);
     if (ec)
         return setDOMException(ec, args.GetIsolate());
     if (success)
         return args[1];
-    return v8::Null(args.GetIsolate());
+    return v8Null(args.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8Node::removeChildCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8Node::removeChildMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.Node.removeChild");
     v8::Handle<v8::Object> holder = args.Holder();
     Node* imp = V8Node::toNative(holder);
     ExceptionCode ec = 0;
-    Node* oldChild = V8Node::HasInstance(args[0]) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
+    Node* oldChild = V8Node::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
     bool success = imp->removeChild(oldChild, ec);
     if (ec)
         return setDOMException(ec, args.GetIsolate());
     if (success)
         return args[0];
-    return v8::Null(args.GetIsolate());
+    return v8Null(args.GetIsolate());
 }
 
-// This function is customized to take advantage of the optional 4th argument: shouldLazyAttach
-v8::Handle<v8::Value> V8Node::appendChildCallback(const v8::Arguments& args)
+// This function is customized to take advantage of the optional 4th argument: AttachBehavior
+v8::Handle<v8::Value> V8Node::appendChildMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.Node.appendChild");
     v8::Handle<v8::Object> holder = args.Holder();
     Node* imp = V8Node::toNative(holder);
     ExceptionCode ec = 0;
-    Node* newChild = V8Node::HasInstance(args[0]) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
-    bool success = imp->appendChild(newChild, ec, true );
+    Node* newChild = V8Node::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
+    bool success = imp->appendChild(newChild, ec, AttachLazily);
     if (ec)
         return setDOMException(ec, args.GetIsolate());
     if (success)
         return args[0];
-    return v8::Null(args.GetIsolate());
+    return v8Null(args.GetIsolate());
 }
 
-v8::Handle<v8::Value> toV8Slow(Node* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+v8::Handle<v8::Object> wrap(Node* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    if (!impl)
-        return v8NullWithCheck(isolate);
-
-    v8::Handle<v8::Value> wrapper = V8DOMWrapper::getCachedWrapper(impl);
-    if (!wrapper.IsEmpty())
-        return wrapper;
-
+    ASSERT(impl);
     switch (impl->nodeType()) {
     case Node::ELEMENT_NODE:
+        // For performance reasons, this is inlined from V8Element::wrap and must remain in sync.
         if (impl->isHTMLElement())
-            return toV8(toHTMLElement(impl), creationContext, isolate);
+            return wrap(toHTMLElement(impl), creationContext, isolate);
 #if ENABLE(SVG)
         if (impl->isSVGElement())
-            return toV8(static_cast<SVGElement*>(impl), creationContext, isolate);
+            return wrap(toSVGElement(impl), creationContext, isolate);
 #endif
-        return V8Element::wrap(static_cast<Element*>(impl), creationContext, isolate);
+        return V8Element::createWrapper(toElement(impl), creationContext, isolate);
     case Node::ATTRIBUTE_NODE:
-        return toV8(static_cast<Attr*>(impl), creationContext, isolate);
+        return wrap(static_cast<Attr*>(impl), creationContext, isolate);
     case Node::TEXT_NODE:
-        return toV8(toText(impl), creationContext, isolate);
+        return wrap(toText(impl), creationContext, isolate);
     case Node::CDATA_SECTION_NODE:
-        return toV8(static_cast<CDATASection*>(impl), creationContext, isolate);
+        return wrap(static_cast<CDATASection*>(impl), creationContext, isolate);
     case Node::ENTITY_REFERENCE_NODE:
-        return toV8(static_cast<EntityReference*>(impl), creationContext, isolate);
+        return wrap(static_cast<EntityReference*>(impl), creationContext, isolate);
     case Node::ENTITY_NODE:
-        return toV8(static_cast<Entity*>(impl), creationContext, isolate);
+        return wrap(static_cast<Entity*>(impl), creationContext, isolate);
     case Node::PROCESSING_INSTRUCTION_NODE:
-        return toV8(static_cast<ProcessingInstruction*>(impl), creationContext, isolate);
+        return wrap(static_cast<ProcessingInstruction*>(impl), creationContext, isolate);
     case Node::COMMENT_NODE:
-        return toV8(static_cast<Comment*>(impl), creationContext, isolate);
+        return wrap(static_cast<Comment*>(impl), creationContext, isolate);
     case Node::DOCUMENT_NODE:
-        return toV8(static_cast<Document*>(impl), creationContext, isolate);
+        return wrap(toDocument(impl), creationContext, isolate);
     case Node::DOCUMENT_TYPE_NODE:
-        return toV8(static_cast<DocumentType*>(impl), creationContext, isolate);
+        return wrap(static_cast<DocumentType*>(impl), creationContext, isolate);
     case Node::DOCUMENT_FRAGMENT_NODE:
-        return toV8(static_cast<DocumentFragment*>(impl), creationContext, isolate);
+        return wrap(static_cast<DocumentFragment*>(impl), creationContext, isolate);
     case Node::NOTATION_NODE:
-        return toV8(static_cast<Notation*>(impl), creationContext, isolate);
+        return wrap(static_cast<Notation*>(impl), creationContext, isolate);
     default:
         break; // XPATH_NAMESPACE_NODE
     }
-    return V8Node::wrap(impl, creationContext, isolate);
+    return V8Node::createWrapper(impl, creationContext, isolate);
 }
 } // namespace WebCore

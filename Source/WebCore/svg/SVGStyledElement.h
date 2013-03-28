@@ -25,15 +25,18 @@
 #include "CSSPropertyNames.h"
 #include "SVGAnimatedString.h"
 #include "SVGLocatable.h"
-#include "SVGStylable.h"
 #include <wtf/HashSet.h>
+#include <wtf/PassRefPtr.h>
 
 namespace WebCore {
 
 void mapAttributeToCSSProperty(HashMap<AtomicStringImpl*, CSSPropertyID>* propertyNameToIdMap, const QualifiedName& attrName);
 
-class SVGStyledElement : public SVGElement,
-                         public SVGStylable {
+class CSSValue;
+class CSSStyleDeclaration;
+
+// FIXME(webkit.org/b/107386): SVGStyledElement should be merged into SVGElement as specified by SVG2.
+class SVGStyledElement : public SVGElement {
 public:
     virtual String title() const;
 
@@ -60,9 +63,9 @@ protected:
     SVGStyledElement(const QualifiedName&, Document*, ConstructionType = CreateSVGElement);
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
-    virtual void collectStyleForAttribute(const Attribute&, StylePropertySet*) OVERRIDE;
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
@@ -76,7 +79,7 @@ protected:
     virtual bool selfHasRelativeLengths() const { return false; }
 
 private:
-    virtual bool isStyled() const { return true; }
+    virtual bool isSVGStyledElement() const OVERRIDE { return true; }
 
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
@@ -92,7 +95,7 @@ private:
 
 inline SVGStyledElement* toSVGStyledElement(Node* node)
 {
-    ASSERT(!node || (node->isStyledElement() && node->isSVGElement()));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || (node->isStyledElement() && node->isSVGElement()));
     return static_cast<SVGStyledElement*>(node);
 }
 

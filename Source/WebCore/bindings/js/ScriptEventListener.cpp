@@ -52,10 +52,10 @@ static const String& eventParameterName(bool isSVGEvent)
     return isSVGEvent ? evtString : eventString;
 }
 
-PassRefPtr<JSLazyEventListener> createAttributeEventListener(Node* node, const Attribute& attribute)
+PassRefPtr<JSLazyEventListener> createAttributeEventListener(Node* node, const QualifiedName& name, const AtomicString& value)
 {
     ASSERT(node);
-    if (attribute.isNull())
+    if (value.isNull())
         return 0;
 
     TextPosition position = TextPosition::minimumPosition();
@@ -71,15 +71,15 @@ PassRefPtr<JSLazyEventListener> createAttributeEventListener(Node* node, const A
         sourceURL = node->document()->url().string();
     }
 
-    return JSLazyEventListener::create(attribute.localName().string(), eventParameterName(node->isSVGElement()), attribute.value(), node, sourceURL, position, 0, mainThreadNormalWorld());
+    return JSLazyEventListener::create(name.localName().string(), eventParameterName(node->isSVGElement()), value, node, sourceURL, position, 0, mainThreadNormalWorld());
 }
 
-PassRefPtr<JSLazyEventListener> createAttributeEventListener(Frame* frame, const Attribute& attribute)
+PassRefPtr<JSLazyEventListener> createAttributeEventListener(Frame* frame, const QualifiedName& name, const AtomicString& value)
 {
     if (!frame)
         return 0;
 
-    if (attribute.isNull())
+    if (value.isNull())
         return 0;
 
     ScriptController* scriptController = frame->script();
@@ -89,7 +89,7 @@ PassRefPtr<JSLazyEventListener> createAttributeEventListener(Frame* frame, const
     TextPosition position = scriptController->eventHandlerPosition();
     String sourceURL = frame->document()->url().string();
     JSObject* wrapper = toJSDOMWindow(frame, mainThreadNormalWorld());
-    return JSLazyEventListener::create(attribute.localName().string(), eventParameterName(frame->document()->isSVGDocument()), attribute.value(), 0, sourceURL, position, wrapper, mainThreadNormalWorld());
+    return JSLazyEventListener::create(name.localName().string(), eventParameterName(frame->document()->isSVGDocument()), value, 0, sourceURL, position, wrapper, mainThreadNormalWorld());
 }
 
 String eventListenerHandlerBody(Document* document, EventListener* eventListener)
@@ -104,6 +104,31 @@ String eventListenerHandlerBody(Document* document, EventListener* eventListener
         return "";
     ScriptState* scriptState = scriptStateFromNode(jsListener->isolatedWorld(), document);
     return jsFunction->toString(scriptState)->value(scriptState);
+}
+
+ScriptValue eventListenerHandler(Document* document, EventListener* eventListener)
+{
+    const JSEventListener* jsListener = JSEventListener::cast(eventListener);
+    ASSERT(jsListener);
+    if (!jsListener)
+        return ScriptValue();
+    JSLockHolder lock(jsListener->isolatedWorld()->globalData());
+    JSC::JSObject* jsFunction = jsListener->jsFunction(document);
+    if (!jsFunction)
+        return ScriptValue();
+    return ScriptValue(*jsListener->isolatedWorld()->globalData(), jsFunction);
+}
+
+ScriptState* eventListenerHandlerScriptState(Frame* frame, EventListener* eventListener)
+{
+    const JSEventListener* jsListener = JSEventListener::cast(eventListener);
+    ASSERT(jsListener);
+    if (!jsListener)
+        return 0;
+    if (!frame->script()->canExecuteScripts(NotAboutToExecuteScript))
+        return 0;
+    DOMWrapperWorld* world = jsListener->isolatedWorld();
+    return frame->script()->globalObject(world)->globalExec();
 }
 
 bool eventListenerHandlerLocation(Document* document, EventListener* eventListener, String& sourceName, String& scriptId, int& lineNumber)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -31,7 +31,6 @@
 #include "CSSStyleSheet.h"
 #include "StylePropertySet.h"
 #include "StyleSheet.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include "WebKitCSSKeyframeRule.h"
 #include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/text/StringBuilder.h>
@@ -91,12 +90,12 @@ int StyleRuleKeyframes::findKeyframeIndex(const String& key) const
 void StyleRuleKeyframes::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_keyframes);
-    info.addMember(m_name);
+    info.addMember(m_keyframes, "keyframes");
+    info.addMember(m_name, "name");
 }
 
 WebKitCSSKeyframesRule::WebKitCSSKeyframesRule(StyleRuleKeyframes* keyframesRule, CSSStyleSheet* parent)
-    : CSSRule(parent, CSSRule::WEBKIT_KEYFRAMES_RULE)
+    : CSSRule(parent)
     , m_keyframesRule(keyframesRule)
     , m_childRuleCSSOMWrappers(keyframesRule->keyframes().size())
 {
@@ -201,19 +200,20 @@ CSSRuleList* WebKitCSSKeyframesRule::cssRules()
     return m_ruleListCSSOMWrapper.get();
 }
 
-void WebKitCSSKeyframesRule::reattach(StyleRuleKeyframes* rule)
+void WebKitCSSKeyframesRule::reattach(StyleRuleBase* rule)
 {
     ASSERT(rule);
-    m_keyframesRule = rule;
+    ASSERT_WITH_SECURITY_IMPLICATION(rule->isKeyframesRule());
+    m_keyframesRule = static_cast<StyleRuleKeyframes*>(rule);
 }
 
-void WebKitCSSKeyframesRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void WebKitCSSKeyframesRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSRule::reportBaseClassMemoryUsage(memoryObjectInfo);
-    info.addMember(m_keyframesRule);
-    info.addMember(m_childRuleCSSOMWrappers);
-    info.addMember(m_ruleListCSSOMWrapper);
+    CSSRule::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_keyframesRule, "keyframesRule");
+    info.addMember(m_childRuleCSSOMWrappers, "childRuleCSSOMWrappers");
+    info.addMember(m_ruleListCSSOMWrapper, "ruleListCSSOMWrapper");
 }
 
 } // namespace WebCore

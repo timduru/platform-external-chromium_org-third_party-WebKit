@@ -31,6 +31,8 @@
 
 namespace WebCore {
 
+using namespace HTMLNames;
+
 ClassList::ClassList(Element* element) : m_element(element) { }
 
 void ClassList::ref()
@@ -60,12 +62,6 @@ bool ClassList::containsInternal(const AtomicString& token) const
     return m_element->hasClass() && classNames().contains(token);
 }
 
-void ClassList::reset(const String& newClassName)
-{
-    if (m_element->document()->inQuirksMode())
-        m_classNamesForQuirksMode = adoptPtr(new SpaceSplitString(newClassName, false));
-}
-
 const SpaceSplitString& ClassList::classNames() const
 {
     ASSERT(m_element->hasClass());
@@ -74,7 +70,7 @@ const SpaceSplitString& ClassList::classNames() const
             m_classNamesForQuirksMode = adoptPtr(new SpaceSplitString(value(), false));
         return *m_classNamesForQuirksMode.get();
     }
-    return m_element->attributeData()->classNames();
+    return m_element->elementData()->classNames();
 }
 
 } // namespace WebCore

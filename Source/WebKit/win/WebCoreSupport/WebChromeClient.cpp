@@ -334,7 +334,7 @@ void WebChromeClient::setResizable(bool resizable)
     }
 }
 
-void WebChromeClient::addMessageToConsole(MessageSource source, MessageType type, MessageLevel level, const String& message, unsigned line, const String& url)
+void WebChromeClient::addMessageToConsole(MessageSource source, MessageLevel level, const String& message, unsigned line, const String& url)
 {
     COMPtr<IWebUIDelegate> uiDelegate;
     if (SUCCEEDED(m_webView->uiDelegate(&uiDelegate))) {
@@ -581,7 +581,7 @@ void WebChromeClient::print(Frame* frame)
 }
 
 #if ENABLE(SQL_DATABASE)
-void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseIdentifier)
+void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseIdentifier, DatabaseDetails)
 {
     COMPtr<WebSecurityOrigin> origin(AdoptCOM, WebSecurityOrigin::createInstance(frame->document()->securityOrigin()));
     COMPtr<IWebUIDelegate> uiDelegate;

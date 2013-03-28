@@ -34,9 +34,6 @@ class WebContentLayerClient;
 
 class WebContentLayer {
 public:
-    // The client must outlive the WebContentLayer.
-    WEBKIT_EXPORT static WebContentLayer* create(WebContentLayerClient*);
-
     virtual ~WebContentLayer() { }
 
     // The WebContentLayer has ownership of this wrapper.
@@ -45,9 +42,6 @@ public:
     // Set to true if the backside of this layer's contents should be visible when composited.
     // Defaults to false.
     virtual void setDoubleSided(bool) = 0;
-
-    virtual void setBoundsContainPageScale(bool) = 0;
-    virtual bool boundsContainPageScale() const = 0;
 
     // Allow the compositor to determine the scale at which the layer should
     // be rasterized based on the layer's hierarchy and transform. This defaults

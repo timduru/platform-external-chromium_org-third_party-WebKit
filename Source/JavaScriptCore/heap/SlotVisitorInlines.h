@@ -26,9 +26,11 @@
 #ifndef SlotVisitorInlines_h
 #define SlotVisitorInlines_h
 
+#include "CopiedBlockInlines.h"
 #include "CopiedSpaceInlines.h"
 #include "Options.h"
 #include "SlotVisitor.h"
+#include "Weak.h"
 
 namespace JSC {
 
@@ -64,6 +66,14 @@ ALWAYS_INLINE void SlotVisitor::append(JSCell** slot)
 {
     ASSERT(slot);
     internalAppend(*slot);
+}
+
+template<typename T>
+ALWAYS_INLINE void SlotVisitor::appendUnbarrieredWeak(Weak<T>* weak)
+{
+    ASSERT(weak);
+    if (weak->get())
+        internalAppend(weak->get());
 }
 
 ALWAYS_INLINE void SlotVisitor::internalAppend(JSValue value)
@@ -111,6 +121,16 @@ inline bool SlotVisitor::containsOpaqueRoot(void* root)
 #endif
 }
 
+inline TriState SlotVisitor::containsOpaqueRootTriState(void* root)
+{
+    if (m_opaqueRoots.contains(root))
+        return TrueTriState;
+    MutexLocker locker(m_shared.m_opaqueRootsLock);
+    if (m_shared.m_opaqueRoots.contains(root))
+        return TrueTriState;
+    return MixedTriState;
+}
+
 inline int SlotVisitor::opaqueRootCount()
 {
     ASSERT(!m_isInParallelMode);
@@ -151,21 +171,18 @@ inline void SlotVisitor::donateAndDrain()
     drain();
 }
 
-inline void SlotVisitor::copyLater(void* ptr, size_t bytes)
+inline void SlotVisitor::copyLater(JSCell* owner, void* ptr, size_t bytes)
 {
-    if (CopiedSpace::isOversize(bytes)) {
-        m_shared.m_copiedSpace->pin(CopiedSpace::oversizeBlockFor(ptr));
+    CopiedBlock* block = CopiedSpace::blockFor(ptr);
+    if (block->isOversize()) {
+        m_shared.m_copiedSpace->pin(block);
         return;
     }
 
-    CopiedBlock* block = CopiedSpace::blockFor(ptr);
     if (block->isPinned())
         return;
 
-    block->reportLiveBytes(bytes);
-
-    if (!block->shouldEvacuate())
-        m_shared.m_copiedSpace->pin(block);
+    block->reportLiveBytes(owner, bytes);
 }
     
 } // namespace JSC

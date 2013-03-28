@@ -28,7 +28,7 @@
 
 import re
 import sys
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system.executive_mock import MockExecutive
 from webkitpy.common.system.outputcapture import OutputCapture
@@ -63,8 +63,8 @@ class TestLayoutTestApacheHttpd(unittest.TestCase):
             server.start()
             server.stop()
         finally:
-            out, err, logs = oc.restore_output()
-        self.assertTrue("StartServers 4" in err)
-        self.assertTrue("MinSpareServers 4" in err)
-        self.assertTrue("MaxSpareServers 4" in err)
+            _, _, logs = oc.restore_output()
+        self.assertIn("StartServers 4", logs)
+        self.assertIn("MinSpareServers 4", logs)
+        self.assertIn("MaxSpareServers 4", logs)
         self.assertTrue(host.filesystem.exists("/mock/output_dir/httpd.conf"))

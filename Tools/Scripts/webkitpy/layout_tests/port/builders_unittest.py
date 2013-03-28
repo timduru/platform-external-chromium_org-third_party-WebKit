@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import builders
-import unittest
+import unittest2 as unittest
 
 
 class BuildersTest(unittest.TestCase):
@@ -38,7 +38,4 @@ class BuildersTest(unittest.TestCase):
             '(.) ': '____',
         }
         for name, expected in tests.items():
-            self.assertEquals(expected, builders.builder_path_from_name(name))
-
-if __name__ == '__main__':
-    unittest.main()
+            self.assertEqual(expected, builders.builder_path_from_name(name))

@@ -67,6 +67,8 @@ namespace WebCore {
             updateFromSoupMessage(soupMessage);
         }
 
+        void updateFromDelegatePreservingOldHTTPBody(const ResourceRequest& delegateProvidedRequest) { *this = delegateProvidedRequest; }
+
         void updateSoupMessage(SoupMessage*) const;
         SoupMessage* toSoupMessage() const;
         void updateFromSoupMessage(SoupMessage*);
@@ -74,15 +76,17 @@ namespace WebCore {
         SoupMessageFlags soupMessageFlags() const { return m_soupFlags; }
         void setSoupMessageFlags(SoupMessageFlags soupFlags) { m_soupFlags = soupFlags; }
 
-        String urlStringForSoup() const;
+        SoupURI* soupURI() const;
 
     private:
         friend class ResourceRequestBase;
 
         SoupMessageFlags m_soupFlags;
 
-        void doUpdatePlatformRequest() {};
-        void doUpdateResourceRequest() {};
+        void doUpdatePlatformRequest() { }
+        void doUpdateResourceRequest() { }
+        void doUpdatePlatformHTTPBody() { }
+        void doUpdateResourceHTTPBody() { }
 
         PassOwnPtr<CrossThreadResourceRequestData> doPlatformCopyData(PassOwnPtr<CrossThreadResourceRequestData> data) const { return data; }
         void doPlatformAdopt(PassOwnPtr<CrossThreadResourceRequestData>) { }

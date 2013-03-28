@@ -99,6 +99,7 @@ public:
 
     // Used for rendering
     void didDraw(const FloatRect&);
+    void notifyObserversCanvasChanged(const FloatRect&);
 
     void paint(GraphicsContext*, const LayoutRect&, bool useLowQualityScale = false);
 
@@ -138,12 +139,14 @@ public:
 
     float deviceScaleFactor() const { return m_deviceScaleFactor; }
 
+    virtual bool canContainRangeEndPoint() const { return false; }
+
     virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
     HTMLCanvasElement(const QualifiedName&, Document*);
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual void attach();
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
@@ -156,8 +159,6 @@ private:
     void clearImageBuffer() const;
 
     void setSurfaceSize(const IntSize&);
-
-    bool shouldDefer() const;
 
     bool paintsIntoCanvasBuffer() const;
 

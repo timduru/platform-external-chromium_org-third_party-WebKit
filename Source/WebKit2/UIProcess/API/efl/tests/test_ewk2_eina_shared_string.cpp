@@ -26,13 +26,9 @@
 #include "config.h"
 
 #include "UnitTestUtils/EWK2UnitTestBase.h"
-#include "UnitTestUtils/EWK2UnitTestEnvironment.h"
 #include "WKEinaSharedString.h"
-#include <EWebKit2.h>
-#include <Ecore.h>
 #include <WebKit2/WKString.h>
 #include <WebKit2/WKURL.h>
-#include <gtest/gtest.h>
 
 using namespace EWK2UnitTest;
 
@@ -127,4 +123,18 @@ TEST_F(EWK2UnitTestBase, assignmentOperators)
 
     string = string; // Check that self-assignment does not break WKEinaSharedString internal data.
     checkString(string, anotherTestString);
+}
+
+TEST_F(EWK2UnitTestBase, leakString)
+{
+    WKEinaSharedString string;
+
+    string = testString;
+    checkString(string, testString);
+
+    Eina_Stringshare* leakedString = string.leakString();
+    checkString(string, 0);
+    ASSERT_STREQ(leakedString, testString);
+
+    eina_stringshare_del(leakedString);
 }

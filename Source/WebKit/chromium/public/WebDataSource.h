@@ -31,9 +31,9 @@
 #ifndef WebDataSource_h
 #define WebDataSource_h
 
+#include "../../../Platform/chromium/public/WebCommon.h"
 #include "WebNavigationType.h"
 #include "WebTextDirection.h"
-#include "platform/WebCommon.h"
 
 namespace WebKit {
 
@@ -75,6 +75,10 @@ public:
     // if there is one redirect, it will contain the source and destination
     // URL).
     virtual void redirectChain(WebVector<WebURL>&) const = 0;
+
+    // Returns whether the navigation associated with this datasource is a
+    // client redirect that should replace the current history item.
+    virtual bool isClientRedirect() const = 0;
 
     // Returns the title for the current page.
     virtual WebString pageTitle() const = 0;

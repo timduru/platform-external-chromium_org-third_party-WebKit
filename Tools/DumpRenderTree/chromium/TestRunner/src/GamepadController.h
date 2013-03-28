@@ -32,21 +32,23 @@
 #define GamepadController_h
 
 #include "CppBoundClass.h"
-#include "platform/WebGamepads.h"
-
-class TestDelegate;
+#include <public/WebGamepads.h>
 
 namespace WebKit {
 class WebGamepads;
 class WebFrame;
 }
 
+namespace WebTestRunner {
+
+class WebTestDelegate;
+
 class GamepadController : public CppBoundClass {
 public:
     GamepadController();
 
     void bindToJavascript(WebKit::WebFrame*, const WebKit::WebString& classname);
-    void setDelegate(TestDelegate*);
+    void setDelegate(WebTestDelegate*);
     void reset();
 
 private:
@@ -62,7 +64,9 @@ private:
 
     WebKit::WebGamepads m_gamepads;
 
-    TestDelegate* m_delegate;
+    WebTestDelegate* m_delegate;
 };
+
+}
 
 #endif // GamepadController_h

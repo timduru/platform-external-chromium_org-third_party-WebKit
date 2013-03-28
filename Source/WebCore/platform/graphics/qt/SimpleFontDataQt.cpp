@@ -58,16 +58,15 @@ float SimpleFontData::platformWidthForGlyph(Glyph glyph) const
     return advances.at(0).x();
 }
 
-PassRefPtr<SimpleFontData> SimpleFontData::createScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
+PassRefPtr<SimpleFontData> SimpleFontData::platformCreateScaledFontData(const FontDescription& fontDescription, float scaleFactor) const
 {
     const float scaledSize = lroundf(fontDescription.computedSize() * scaleFactor);
     return SimpleFontData::create(FontPlatformData(m_platformData, scaledSize), isCustomFont(), false);
 }
 
-FloatRect SimpleFontData::platformBoundsForGlyph(Glyph) const
+FloatRect SimpleFontData::platformBoundsForGlyph(Glyph glyph) const
 {
-    notImplemented();
-    return FloatRect();
+    return m_platformData.rawFont().boundingRect(glyph);
 }
 
 void SimpleFontData::platformInit()
@@ -89,6 +88,10 @@ void SimpleFontData::platformInit()
     QVector<QPointF> advances = rawFont.advancesForGlyphIndexes(indexes);
     float spaceWidth = advances.at(0).x();
 
+    indexes = rawFont.glyphIndexesForString(QLatin1String("0"));
+    advances = rawFont.advancesForGlyphIndexes(indexes);
+    float zeroWidth = advances.at(0).x();
+
     // The line spacing should always be >= (ascent + descent), but this
     // may be false in some cases due to misbehaving platform libraries.
     // Workaround from SimpleFontPango.cpp and SimpleFontFreeType.cpp
@@ -105,6 +108,7 @@ void SimpleFontData::platformInit()
     m_fontMetrics.setLineSpacing(lineSpacing);
     m_fontMetrics.setXHeight(xHeight);
     m_fontMetrics.setLineGap(lineGap);
+    m_fontMetrics.setZeroWidth(zeroWidth);
     m_spaceWidth = spaceWidth;
 }
 

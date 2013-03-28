@@ -63,8 +63,7 @@ void findPasswordFormFields(HTMLFormElement* form, PasswordFormFields* fields)
     ASSERT(form);
     ASSERT(fields);
 
-    int firstPasswordIndex = 0;
-    // First, find the password fields and activated submit button
+    HTMLInputElement* latestInputElement = 0;
     const Vector<FormAssociatedElement*>& formElements = form->associatedElements();
     for (size_t i = 0; i < formElements.size(); i++) {
         if (!formElements[i]->isFormControlElement())
@@ -81,33 +80,26 @@ void findPasswordFormFields(HTMLFormElement* form, PasswordFormFields* fields)
             continue;
 
         if ((fields->passwords.size() < maxPasswords)
-            && inputElement->isPasswordField()
-            && inputElement->shouldAutocomplete()) {
-            if (fields->passwords.isEmpty())
-                firstPasswordIndex = i;
+            && inputElement->isPasswordField()) {
+            // We assume that the username is the input element before the
+            // first password element.
+            if (fields->passwords.isEmpty() && latestInputElement) {
+                fields->userName = latestInputElement;
+                // Remove the selected username from alternateUserNames.
+                if (!fields->alternateUserNames.isEmpty() && !latestInputElement->value().isEmpty())
+                    fields->alternateUserNames.removeLast();
+            }
             fields->passwords.append(inputElement);
         }
-    }
 
-    if (!fields->passwords.isEmpty()) {
-        // Then, search backwards for the username field
-        for (int i = firstPasswordIndex - 1; i >= 0; i--) {
-            if (!formElements[i]->isFormControlElement())
-                continue;
-            HTMLFormControlElement* formElement = static_cast<HTMLFormControlElement*>(formElements[i]);
-            if (!formElement->hasLocalName(HTMLNames::inputTag))
-                continue;
-
-            HTMLInputElement* inputElement = toHTMLInputElement(formElement);
-            if (!inputElement->isEnabledFormControl())
-                continue;
-
-            // Various input types such as text, url, email can be a username field.
-            if ((inputElement->isTextField() && !inputElement->isPasswordField())
-                && (inputElement->shouldAutocomplete())) {
-                fields->userName = inputElement;
-                break;
-            }
+        // Various input types such as text, url, email can be a username field.
+        if (inputElement->isTextField() && !inputElement->isPasswordField()) {
+            latestInputElement = inputElement;
+            // We ignore elements that have no value. Unlike userName, alternateUserNames
+            // is used only for autofill, not for form identification, and blank autofill
+            // entries are not useful.
+            if (!inputElement->value().isEmpty())
+                fields->alternateUserNames.append(inputElement->value());
         }
     }
 }

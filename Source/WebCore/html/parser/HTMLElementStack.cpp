@@ -38,13 +38,14 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static inline bool isRootNode(HTMLStackItem* item)
+
+namespace {
+
+inline bool isRootNode(HTMLStackItem* item)
 {
     return item->isDocumentFragmentNode()
         || item->hasTagName(htmlTag);
 }
-
-namespace {
 
 inline bool isScopeMarker(HTMLStackItem* item)
 {
@@ -64,6 +65,9 @@ inline bool isScopeMarker(HTMLStackItem* item)
         || item->hasTagName(SVGNames::foreignObjectTag)
         || item->hasTagName(SVGNames::descTag)
         || item->hasTagName(SVGNames::titleTag)
+#if ENABLE(TEMPLATE_ELEMENT)
+        || item->hasTagName(templateTag)
+#endif
         || isRootNode(item);
 }
 
@@ -77,6 +81,9 @@ inline bool isListItemScopeMarker(HTMLStackItem* item)
 inline bool isTableScopeMarker(HTMLStackItem* item)
 {
     return item->hasTagName(tableTag)
+#if ENABLE(TEMPLATE_ELEMENT)
+        || item->hasTagName(templateTag)
+#endif
         || isRootNode(item);
 }
 
@@ -85,12 +92,18 @@ inline bool isTableBodyScopeMarker(HTMLStackItem* item)
     return item->hasTagName(tbodyTag)
         || item->hasTagName(tfootTag)
         || item->hasTagName(theadTag)
+#if ENABLE(TEMPLATE_ELEMENT)
+        || item->hasTagName(templateTag)
+#endif
         || isRootNode(item);
 }
 
 inline bool isTableRowScopeMarker(HTMLStackItem* item)
 {
     return item->hasTagName(trTag)
+#if ENABLE(TEMPLATE_ELEMENT)
+        || item->hasTagName(templateTag)
+#endif
         || isRootNode(item);
 }
 
@@ -207,13 +220,26 @@ void HTMLElementStack::pop()
 void HTMLElementStack::popUntil(const AtomicString& tagName)
 {
     while (!topStackItem()->hasLocalName(tagName)) {
-        // pop() will ASSERT at <body> if callers fail to check that there is an
-        // element with localName |tagName| on the stack of open elements.
+        // pop() will ASSERT if a <body>, <head> or <html> will be popped.
+        pop();
+    }
+}
+
+void HTMLElementStack::popUntil(const QualifiedName& tagName)
+{
+    while (!topStackItem()->hasTagName(tagName)) {
+        // pop() will ASSERT if a <body>, <head> or <html> will be popped.
         pop();
     }
 }
 
 void HTMLElementStack::popUntilPopped(const AtomicString& tagName)
+{
+    popUntil(tagName);
+    pop();
+}
+
+void HTMLElementStack::popUntilPopped(const QualifiedName& tagName)
 {
     popUntil(tagName);
     pop();
@@ -277,7 +303,7 @@ bool HTMLElementStack::isHTMLIntegrationPoint(HTMLStackItem* item)
     if (!item->isElementNode())
         return false;
     if (item->hasTagName(MathMLNames::annotation_xmlTag)) {
-        Attribute* encodingAttr = item->token()->getAttributeItem(MathMLNames::encodingAttr);
+        Attribute* encodingAttr = item->getAttributeItem(MathMLNames::encodingAttr);
         if (encodingAttr) {
             const String& encoding = encodingAttr->value();
             return equalIgnoringCase(encoding, "text/html")
@@ -446,6 +472,20 @@ bool inScopeCommon(HTMLElementStack::ElementRecord* top, const AtomicString& tar
     return false;
 }
 
+template <bool isMarker(HTMLStackItem*)>
+bool inScopeCommon(HTMLElementStack::ElementRecord* top, const QualifiedName& targetTag)
+{
+    for (HTMLElementStack::ElementRecord* pos = top; pos; pos = pos->next()) {
+        HTMLStackItem* item = pos->stackItem().get();
+        if (item->hasTagName(targetTag))
+            return true;
+        if (isMarker(item))
+            return false;
+    }
+    ASSERT_NOT_REACHED(); // <html> is always on the stack and is a scope marker.
+    return false;
+}
+
 bool HTMLElementStack::hasNumberedHeaderElementInScope() const
 {
     for (ElementRecord* record = m_top.get(); record; record = record->next()) {
@@ -501,8 +541,7 @@ bool HTMLElementStack::inTableScope(const AtomicString& targetTag) const
 
 bool HTMLElementStack::inTableScope(const QualifiedName& tagName) const
 {
-    // FIXME: Is localName() right for non-html elements?
-    return inTableScope(tagName.localName());
+    return inScopeCommon<isTableScopeMarker>(m_top.get(), tagName);
 }
 
 bool HTMLElementStack::inButtonScope(const AtomicString& targetTag) const
@@ -526,6 +565,13 @@ bool HTMLElementStack::inSelectScope(const QualifiedName& tagName) const
     // FIXME: Is localName() right for non-html elements?
     return inSelectScope(tagName.localName());
 }
+
+#if ENABLE(TEMPLATE_ELEMENT)
+bool HTMLElementStack::hasTemplateInHTMLScope() const
+{
+    return inScopeCommon<isRootNode>(m_top.get(), templateTag.localName());
+}
+#endif
 
 Element* HTMLElementStack::htmlElement() const
 {

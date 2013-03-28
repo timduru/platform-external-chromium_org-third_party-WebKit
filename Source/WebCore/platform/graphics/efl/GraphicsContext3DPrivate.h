@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2012 Samsung Electronics
+    Copyright (C) 2012 Intel Corporation. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -20,21 +21,16 @@
 #ifndef GraphicsContext3DPrivate_h
 #define GraphicsContext3DPrivate_h
 
+#if USE(3D_GRAPHICS) || USE(ACCELERATED_COMPOSITING)
+
 #include "GraphicsContext3D.h"
 
 #if USE(TEXTURE_MAPPER_GL)
 #include <texmap/TextureMapperPlatformLayer.h>
 #endif
 
-#if USE(GRAPHICS_SURFACE)
-#include "GraphicsSurface.h"
-#endif
-
-typedef struct _Evas_GL               Evas_GL;
-typedef struct _Evas_GL_Surface       Evas_GL_Surface;
-typedef struct _Evas_GL_Context       Evas_GL_Context;
-typedef struct _Evas_GL_Config        Evas_GL_Config;
-typedef struct _Evas_GL_API           Evas_GL_API;
+#include "GLPlatformContext.h"
+#include <wtf/PassOwnPtr.h>
 
 class PageClientEfl;
 
@@ -45,47 +41,59 @@ class GraphicsContext3DPrivate
 #endif
 {
 public:
-    GraphicsContext3DPrivate(GraphicsContext3D*, HostWindow*, GraphicsContext3D::RenderStyle);
+    static PassOwnPtr<GraphicsContext3DPrivate> create(GraphicsContext3D*, HostWindow*);
     ~GraphicsContext3DPrivate();
 
+    bool createSurface(PageClientEfl*, bool);
     PlatformGraphicsContext3D platformGraphicsContext3D() const;
-
-#if USE(ACCELERATED_COMPOSITING)
-    PlatformLayer* platformLayer() const;
-#endif
+    void setContextLostCallback(PassOwnPtr<GraphicsContext3D::ContextLostCallback>);
 #if USE(TEXTURE_MAPPER_GL)
-    virtual void paintToTextureMapper(TextureMapper*, const FloatRect& target, const TransformationMatrix&, float opacity, BitmapTexture* mask);
+    virtual void paintToTextureMapper(TextureMapper*, const FloatRect&, const TransformationMatrix&, float) OVERRIDE;
 #endif
 #if USE(GRAPHICS_SURFACE)
-    virtual uint32_t copyToGraphicsSurface();
-    virtual GraphicsSurfaceToken graphicsSurfaceToken() const;
-    void createGraphicsSurfaces(const IntSize&);
+    virtual IntSize platformLayerSize() const OVERRIDE;
+    virtual uint32_t copyToGraphicsSurface() OVERRIDE;
+    virtual GraphicsSurfaceToken graphicsSurfaceToken() const OVERRIDE;
+    void didResizeCanvas(const IntSize&);
+#endif
+    bool makeContextCurrent() const;
+
+private:
+#if USE(GRAPHICS_SURFACE)
+    enum PendingOperation {
+        Default = 0x00, // No Pending Operation.
+        CreateSurface = 0x01,
+        Resize = 0x02,
+        DeletePreviousSurface = 0x04
+    };
+
+    typedef unsigned PendingSurfaceOperation;
 #endif
 
-    bool makeContextCurrent();
-    bool createSurface(PageClientEfl*, bool renderDirectlyToEvasGLObject);
-    void setCurrentGLContext(void*, void*);
+    GraphicsContext3DPrivate(GraphicsContext3D*, HostWindow*);
+    bool initialize();
+    void createGraphicsSurface();
+    bool prepareBuffer() const;
+    void releaseResources();
 
-    GraphicsContext3D::Attributes m_attributes;
     GraphicsContext3D* m_context;
     HostWindow* m_hostWindow;
+    OwnPtr<GLPlatformContext> m_offScreenContext;
+    OwnPtr<GLPlatformSurface> m_offScreenSurface;
 #if USE(GRAPHICS_SURFACE)
-    GraphicsSurface::Flags m_surfaceFlags;
+    GraphicsSurfaceToken m_surfaceHandle;
     RefPtr<GraphicsSurface> m_graphicsSurface;
+    RefPtr<GraphicsSurface> m_previousGraphicsSurface;
+    PendingSurfaceOperation m_surfaceOperation : 3;
 #endif
-
+    OwnPtr<GraphicsContext3D::ContextLostCallback> m_contextLostCallback;
     ListHashSet<GC3Denum> m_syntheticErrors;
-
-    OwnPtr<Ecore_Evas> m_ecoreEvas;
-    Evas_GL* m_evasGL;
-    Evas_GL_Context* m_evasGLContext;
-    Evas_GL_Surface* m_evasGLSurface;
-    void* m_glContext;
-    void* m_glSurface;
-    Evas_GL_API* m_api;
-    GraphicsContext3D::RenderStyle m_renderStyle;
+    IntSize m_size;
+    IntRect m_targetRect;
 };
 
 } // namespace WebCore
 
-#endif // GraphicsLayerEfl_h
+#endif
+
+#endif

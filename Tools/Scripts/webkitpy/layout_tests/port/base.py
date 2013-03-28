@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) 2010 Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -54,6 +53,7 @@ from webkitpy.common.memoized import memoized
 from webkitpy.common.system import path
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.common.system.systemhost import SystemHost
+from webkitpy.common.webkit_finder import WebKitFinder
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port import config as port_config
 from webkitpy.layout_tests.port import driver
@@ -88,15 +88,17 @@ class Port(object):
     def determine_full_port_name(cls, host, options, port_name):
         """Return a fully-specified port name that can be used to construct objects."""
         # Subclasses will usually override this.
-        return cls.port_name
+        options = options or {}
+        assert port_name.startswith(cls.port_name)
+        if getattr(options, 'webkit_test_runner', False) and not '-wk2' in port_name:
+            return port_name + '-wk2'
+        return port_name
 
-    def __init__(self, host, port_name=None, options=None, config=None, **kwargs):
+    def __init__(self, host, port_name, options=None, **kwargs):
 
         # This value may be different from cls.port_name by having version modifiers
         # and other fields appended to it (for example, 'qt-arm' or 'mac-wk2').
-
-        # FIXME: port_name should be a required parameter. It isn't yet because lots of tests need to be updatd.
-        self._name = port_name or self.port_name
+        self._name = port_name
 
         # These are default values that should be overridden in a subclasses.
         self._version = ''
@@ -107,10 +109,14 @@ class Port(object):
         # options defined on it.
         self._options = options or optparse.Values()
 
+        if self._name and '-wk2' in self._name:
+            self._options.webkit_test_runner = True
+
         self.host = host
         self._executive = host.executive
         self._filesystem = host.filesystem
-        self._config = config or port_config.Config(self._executive, self._filesystem, self.port_name)
+        self._webkit_finder = WebKitFinder(host.filesystem)
+        self._config = port_config.Config(self._executive, self._filesystem, self.port_name)
 
         self._helper = None
         self._http_server = None
@@ -147,6 +153,9 @@ class Port(object):
 
     def additional_drt_flag(self):
         return []
+
+    def supports_per_test_timeout(self):
+        return False
 
     def default_pixel_tests(self):
         # FIXME: Disable until they are run by default on build.webkit.org.
@@ -571,12 +580,14 @@ class Port(object):
                         reftest_list.append((expectation, path))
             return reftest_list
 
-        return reftest_list.get(self._filesystem.join(self.layout_tests_dir(), test_name), [])
+        return reftest_list.get(self._filesystem.join(self.layout_tests_dir(), test_name), [])  # pylint: disable=E1103
 
     def tests(self, paths):
         """Return the list of tests found. Both generic and platform-specific tests matching paths should be returned."""
         expanded_paths = self._expanded_paths(paths)
-        return self._real_tests(expanded_paths).union(self._virtual_tests(expanded_paths, self.populated_virtual_test_suites()))
+        tests = self._real_tests(expanded_paths)
+        tests.extend(self._virtual_tests(expanded_paths, self.populated_virtual_test_suites()))
+        return tests
 
     def _expanded_paths(self, paths):
         expanded_paths = []
@@ -594,16 +605,17 @@ class Port(object):
     def _real_tests(self, paths):
         # When collecting test cases, skip these directories
         skipped_directories = set(['.svn', '_svn', 'resources', 'script-tests', 'reference', 'reftest'])
-        files = find_files.find(self._filesystem, self.layout_tests_dir(), paths, skipped_directories, Port._is_test_file)
-        return set([self.relative_test_filename(f) for f in files])
+        files = find_files.find(self._filesystem, self.layout_tests_dir(), paths, skipped_directories, Port._is_test_file, self.test_key)
+        return [self.relative_test_filename(f) for f in files]
 
     # When collecting test cases, we include any file with these extensions.
     _supported_file_extensions = set(['.html', '.shtml', '.xml', '.xhtml', '.pl',
                                       '.htm', '.php', '.svg', '.mht'])
 
     @staticmethod
+    # If any changes are made here be sure to update the isUsedInReftest method in old-run-webkit-tests as well.
     def is_reference_html_file(filesystem, dirname, filename):
-        if filename.startswith('ref-') or filename.endswith('notref-'):
+        if filename.startswith('ref-') or filename.startswith('notref-'):
             return True
         filename_wihout_ext, unused = filesystem.splitext(filename)
         for suffix in ['-expected', '-expected-mismatch', '-ref', '-notref']:
@@ -620,6 +632,31 @@ class Port(object):
     @staticmethod
     def _is_test_file(filesystem, dirname, filename):
         return Port._has_supported_extension(filesystem, filename) and not Port.is_reference_html_file(filesystem, dirname, filename)
+
+    def test_key(self, test_name):
+        """Turns a test name into a list with two sublists, the natural key of the
+        dirname, and the natural key of the basename.
+
+        This can be used when sorting paths so that files in a directory.
+        directory are kept together rather than being mixed in with files in
+        subdirectories."""
+        dirname, basename = self.split_test(test_name)
+        return (self._natural_sort_key(dirname + self.TEST_PATH_SEPARATOR), self._natural_sort_key(basename))
+
+    def _natural_sort_key(self, string_to_split):
+        """ Turns a string into a list of string and number chunks, i.e. "z23a" -> ["z", 23, "a"]
+
+        This can be used to implement "natural sort" order. See:
+        http://www.codinghorror.com/blog/2007/12/sorting-for-humans-natural-sort-order.html
+        http://nedbatchelder.com/blog/200712.html#e20071211T054956
+        """
+        def tryint(val):
+            try:
+                return int(val)
+            except ValueError:
+                return val
+
+        return [tryint(chunk) for chunk in re.split('(\d+)', string_to_split)]
 
     def test_dirs(self):
         """Returns the list of top-level test directories."""
@@ -683,17 +720,21 @@ class Port(object):
         """
         self._filesystem.write_binary_file(baseline_path, data)
 
-    @memoized
+    # FIXME: update callers to create a finder and call it instead of these next five routines (which should be protected).
+    def webkit_base(self):
+        return self._webkit_finder.webkit_base()
+
+    def path_from_webkit_base(self, *comps):
+        return self._webkit_finder.path_from_webkit_base(*comps)
+
+    def path_to_script(self, script_name):
+        return self._webkit_finder.path_to_script(script_name)
+
     def layout_tests_dir(self):
-        """Return the absolute path to the top of the LayoutTests directory."""
-        return self._filesystem.normpath(self.path_from_webkit_base('LayoutTests'))
+        return self._webkit_finder.layout_tests_dir()
 
     def perf_tests_dir(self):
-        """Return the absolute path to the top of the PerformanceTests directory."""
-        return self.path_from_webkit_base('PerformanceTests')
-
-    def webkit_base(self):
-        return self._filesystem.abspath(self.path_from_webkit_base('.'))
+        return self._webkit_finder.perf_tests_dir()
 
     def skipped_layout_tests(self, test_list):
         """Returns tests skipped outside of the TestExpectations files."""
@@ -764,10 +805,9 @@ class Port(object):
     def set_option_default(self, name, default_value):
         return self._options.ensure_value(name, default_value)
 
-    def path_from_webkit_base(self, *comps):
-        """Returns the full path to path made by joining the top of the
-        WebKit source tree and the list of path components in |*comps|."""
-        return self._config.path_from_webkit_base(*comps)
+    @memoized
+    def path_to_generic_test_expectations_file(self):
+        return self._filesystem.join(self.layout_tests_dir(), 'TestExpectations')
 
     @memoized
     def path_to_test_expectations_file(self):
@@ -792,12 +832,6 @@ class Port(object):
         # filenames with backslashes in them.
         if filename.startswith(self.layout_tests_dir()):
             return self.host.filesystem.relpath(filename, self.layout_tests_dir())
-        else:
-            return self.host.filesystem.abspath(filename)
-
-    def relative_perf_test_filename(self, filename):
-        if filename.startswith(self.perf_tests_dir()):
-            return self.host.filesystem.relpath(filename, self.perf_tests_dir())
         else:
             return self.host.filesystem.abspath(filename)
 
@@ -871,6 +905,9 @@ class Port(object):
             # Most ports (?):
             'WEBKIT_TESTFONTS',
             'WEBKITOUTPUTDIR',
+
+            # Chromium:
+            'CHROME_DEVEL_SANDBOX',
         ]
         for variable in variables_to_copy:
             self._copy_value_from_environ_if_set(clean_env, variable)
@@ -1037,29 +1074,34 @@ class Port(object):
                 _log.warning("additional_expectations path '%s' does not exist" % path)
         return expectations
 
-    def expectations_files(self):
+    def _port_specific_expectations_files(self):
         # Unlike baseline_search_path, we only want to search [WK2-PORT, PORT-VERSION, PORT] and any directories
         # included via --additional-platform-directory, not the full casade.
         search_paths = [self.port_name]
-        if self.name() != self.port_name:
-            search_paths.append(self.name())
+
+        non_wk2_name = self.name().replace('-wk2', '')
+        if non_wk2_name != self.port_name:
+            search_paths.append(non_wk2_name)
 
         if self.get_option('webkit_test_runner'):
             # Because nearly all of the skipped tests for WebKit 2 are due to cross-platform
             # issues, all wk2 ports share a skipped list under platform/wk2.
-            search_paths.extend([self._wk2_port_name(), "wk2"])
+            search_paths.extend(["wk2", self._wk2_port_name()])
 
         search_paths.extend(self.get_option("additional_platform_directory", []))
 
         return [self._filesystem.join(self._webkit_baseline_path(d), 'TestExpectations') for d in search_paths]
 
+    def expectations_files(self):
+        return [self.path_to_generic_test_expectations_file()] + self._port_specific_expectations_files()
+
     def repository_paths(self):
         """Returns a list of (repository_name, repository_path) tuples of its depending code base.
-        By default it returns a list that only contains a ('webkit', <webkitRepossitoryPath>) tuple."""
+        By default it returns a list that only contains a ('WebKit', <webkitRepositoryPath>) tuple."""
 
-        # We use LayoutTest directory here because webkit_base isn't a part webkit repository in Chromium port
+        # We use LayoutTest directory here because webkit_base isn't a part of WebKit repository in Chromium port
         # where turnk isn't checked out as a whole.
-        return [('webkit', self.layout_tests_dir())]
+        return [('WebKit', self.layout_tests_dir())]
 
     _WDIFF_DEL = '##WDIFF_DEL##'
     _WDIFF_ADD = '##WDIFF_ADD##'
@@ -1177,13 +1219,17 @@ class Port(object):
     def _is_debian_based(self):
         return self._filesystem.exists('/etc/debian_version')
 
+    def _apache_version(self):
+        config = self._executive.run_command([self._path_to_apache(), '-v'])
+        return re.sub(r'(?:.|\n)*Server version: Apache/(\d+\.\d+)(?:.|\n)*', r'\1', config)
+
     # We pass sys_platform into this method to make it easy to unit test.
     def _apache_config_file_name_for_platform(self, sys_platform):
         if sys_platform == 'cygwin':
             return 'cygwin-httpd.conf'  # CYGWIN is the only platform to still use Apache 1.3.
         if sys_platform.startswith('linux'):
             if self._is_redhat_based():
-                return 'fedora-httpd.conf'  # This is an Apache 2.x config file despite the naming.
+                return 'fedora-httpd-' + self._apache_version() + '.conf'
             if self._is_debian_based():
                 return 'apache2-debian-httpd.conf'
         # All platforms use apache2 except for CYGWIN (and Mac OS X Tiger and prior, which we no longer support).
@@ -1297,6 +1343,9 @@ class Port(object):
     def look_for_new_crash_logs(self, crashed_processes, start_time):
         pass
 
+    def look_for_new_samples(self, unresponsive_processes, start_time):
+        pass
+
     def sample_process(self, name, pid):
         pass
 
@@ -1320,14 +1369,14 @@ class Port(object):
         return suites
 
     def _virtual_tests(self, paths, suites):
-        virtual_tests = set()
+        virtual_tests = list()
         for suite in suites:
             if paths:
                 for test in suite.tests:
                     if any(test.startswith(p) for p in paths):
-                        virtual_tests.add(test)
+                        virtual_tests.append(test)
             else:
-                virtual_tests.update(set(suite.tests.keys()))
+                virtual_tests.extend(suite.tests.keys())
         return virtual_tests
 
     def lookup_virtual_test_base(self, test_name):
@@ -1373,12 +1422,12 @@ class Port(object):
         return config_args
 
     def _run_script(self, script_name, args=None, include_configuration_arguments=True, decode_output=True, env=None):
-        run_script_command = [self._config.script_path(script_name)]
+        run_script_command = [self.path_to_script(script_name)]
         if include_configuration_arguments:
             run_script_command.extend(self._arguments_for_configuration())
         if args:
             run_script_command.extend(args)
-        output = self._executive.run_command(run_script_command, cwd=self._config.webkit_base_dir(), decode_output=decode_output, env=env)
+        output = self._executive.run_command(run_script_command, cwd=self.webkit_base(), decode_output=decode_output, env=env)
         _log.debug('Output of %s:\n%s' % (run_script_command, output))
         return output
 
@@ -1465,7 +1514,7 @@ class Port(object):
             "MathMLElement": ["mathml"],
             "GraphicsLayer": ["compositing"],
             "WebCoreHas3DRendering": ["animations/3d", "transforms/3d"],
-            "WebGLShader": ["fast/canvas/webgl", "compositing/webgl", "http/tests/canvas/webgl"],
+            "WebGLShader": ["fast/canvas/webgl", "compositing/webgl", "http/tests/canvas/webgl", "webgl"],
             "MHTMLArchive": ["mhtml"],
             "CSSVariableValue": ["fast/css/variables", "inspector/styles/variables"],
         }

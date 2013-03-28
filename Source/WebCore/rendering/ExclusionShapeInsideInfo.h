@@ -13,7 +13,7 @@
  *    disclaimer in the documentation and/or other materials
  *    provided with the distribution.
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER “AS IS” AND ANY
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDER "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
  * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
  * PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER BE
@@ -32,31 +32,47 @@
 
 #if ENABLE(CSS_EXCLUSIONS)
 
-#include "ExclusionShape.h"
-#include "FloatRect.h"
-#include "LayoutUnit.h"
-#include <wtf/OwnPtr.h>
+#include "ExclusionShapeInfo.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/Vector.h>
 
 namespace WebCore {
 
+class InlineIterator;
 class RenderBlock;
+class RenderObject;
 
-class ExclusionShapeInsideInfo {
-    WTF_MAKE_FAST_ALLOCATED;
+struct LineSegmentIterator {
+    RenderObject* root;
+    RenderObject* object;
+    unsigned offset;
+    LineSegmentIterator(RenderObject* root, RenderObject* object, unsigned offset)
+        : root(root)
+        , object(object)
+        , offset(offset)
+    {
+    }
+};
+
+struct LineSegmentRange {
+    LineSegmentIterator start;
+    LineSegmentIterator end;
+    LineSegmentRange(const InlineIterator& start, const InlineIterator& end);
+};
+
+typedef Vector<LineSegmentRange> SegmentRangeList;
+
+class ExclusionShapeInsideInfo : public ExclusionShapeInfo<RenderBlock, &RenderStyle::resolvedShapeInside, &ExclusionShape::getIncludedIntervals> {
 public:
-    ~ExclusionShapeInsideInfo();
+    static PassOwnPtr<ExclusionShapeInsideInfo> createInfo(const RenderBlock* renderer) { return adoptPtr(new ExclusionShapeInsideInfo(renderer)); }
 
-    static PassOwnPtr<ExclusionShapeInsideInfo> create(RenderBlock* block) { return adoptPtr(new ExclusionShapeInsideInfo(block)); }
-    static ExclusionShapeInsideInfo* exclusionShapeInsideInfoForRenderBlock(const RenderBlock*);
-    static ExclusionShapeInsideInfo* ensureExclusionShapeInsideInfoForRenderBlock(RenderBlock*);
-    static void removeExclusionShapeInsideInfoForRenderBlock(const RenderBlock*);
-    static bool isExclusionShapeInsideInfoEnabledForRenderBlock(const RenderBlock*);
+    static bool isEnabledFor(const RenderBlock* renderer);
 
-    LayoutUnit shapeLogicalTop() const { return shapeLogicalBoundsY(); }
-    LayoutUnit shapeLogicalBottom() const { return shapeLogicalBoundsMaxY(); }
-    bool lineOverlapsShapeBounds() const { return m_lineTop < shapeLogicalBottom() && m_lineTop + m_lineHeight >= shapeLogicalTop(); }
+    virtual bool computeSegmentsForLine(LayoutUnit lineTop, LayoutUnit lineHeight) OVERRIDE
+    {
+        m_segmentRanges.clear();
+        return ExclusionShapeInfo<RenderBlock, &RenderStyle::resolvedShapeInside, &ExclusionShape::getIncludedIntervals>::computeSegmentsForLine(lineTop, lineHeight);
+    }
 
     bool hasSegments() const
     {
@@ -67,37 +83,28 @@ public:
         ASSERT(hasSegments());
         return m_segments;
     }
-    bool computeSegmentsForLine(LayoutUnit lineTop, LayoutUnit lineHeight);
-    void computeShapeSize(LayoutUnit logicalWidth, LayoutUnit logicalHeight);
-    void dirtyShapeSize() { m_shapeSizeDirty = true; }
+    SegmentRangeList& segmentRanges() { return m_segmentRanges; }
+    const SegmentRangeList& segmentRanges() const { return m_segmentRanges; }
+    const LineSegment* currentSegment() const
+    {
+        if (!hasSegments())
+            return 0;
+        ASSERT(m_segmentRanges.size() < m_segments.size());
+        return &m_segments[m_segmentRanges.size()];
+    }
+    bool adjustLogicalLineTop(float minSegmentWidth);
+
+    void setNeedsLayout(bool value) { m_needsLayout = value; }
+    bool needsLayout() { return m_needsLayout; }
 
 private:
-    ExclusionShapeInsideInfo(RenderBlock*);
+    ExclusionShapeInsideInfo(const RenderBlock* renderer)
+    : ExclusionShapeInfo<RenderBlock, &RenderStyle::resolvedShapeInside, &ExclusionShape::getIncludedIntervals> (renderer)
+    , m_needsLayout(false)
+    { }
 
-    inline LayoutUnit shapeLogicalBoundsY() const
-    {
-        ASSERT(m_shape);
-        // Use fromFloatCeil() to ensure that the returned LayoutUnit value is within the shape's bounds.
-        return LayoutUnit::fromFloatCeil(m_shape->shapeLogicalBoundingBox().y());
-    }
-
-    inline LayoutUnit shapeLogicalBoundsMaxY() const
-    {
-        ASSERT(m_shape);
-        // Use fromFloatFloor() to ensure that the returned LayoutUnit value is within the shape's bounds.
-        return LayoutUnit::fromFloatFloor(m_shape->shapeLogicalBoundingBox().maxY());
-    }
-
-    RenderBlock* m_block;
-    OwnPtr<ExclusionShape> m_shape;
-
-    LayoutUnit m_lineTop;
-    LayoutUnit m_lineHeight;
-    LayoutUnit m_logicalWidth;
-    LayoutUnit m_logicalHeight;
-
-    SegmentList m_segments;
-    bool m_shapeSizeDirty;
+    SegmentRangeList m_segmentRanges;
+    bool m_needsLayout;
 };
 
 }

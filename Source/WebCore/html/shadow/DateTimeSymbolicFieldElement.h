@@ -28,36 +28,43 @@
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "DateTimeFieldElement.h"
+#include "TypeAhead.h"
 
 namespace WebCore {
 
 // DateTimeSymbolicFieldElement represents non-numeric field of data time
 // format, such as: AM/PM, and month.
-class DateTimeSymbolicFieldElement : public DateTimeFieldElement {
+class DateTimeSymbolicFieldElement : public DateTimeFieldElement, public TypeAheadDataSource {
     WTF_MAKE_NONCOPYABLE(DateTimeSymbolicFieldElement);
 
 protected:
-    DateTimeSymbolicFieldElement(Document*, FieldOwner&, const Vector<String>&);
+    DateTimeSymbolicFieldElement(Document*, FieldOwner&, const Vector<String>&, int minimum, int maximum);
     size_t symbolsSize() const { return m_symbols.size(); }
     virtual bool hasValue() const OVERRIDE FINAL;
-    virtual void setEmptyValue(const DateComponents& dateForReadOnlyField, EventBehavior = DispatchNoEvent) OVERRIDE FINAL;
+    void initialize(const AtomicString& pseudo, const String& axHelpText);
+    virtual void setEmptyValue(EventBehavior = DispatchNoEvent) OVERRIDE FINAL;
     virtual void setValueAsInteger(int, EventBehavior = DispatchNoEvent) OVERRIDE FINAL;
     virtual int valueAsInteger() const OVERRIDE FINAL;
 
 private:
     static const int invalidIndex = -1;
 
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE FINAL;
     String visibleEmptyValue() const;
+    bool indexIsInRange(int index) const { return index >= m_minimumIndex && index <= m_maximumIndex; }
 
     // DateTimeFieldElement functions.
     virtual void handleKeyboardEvent(KeyboardEvent*) OVERRIDE FINAL;
-    virtual int maximum() const OVERRIDE FINAL;
-    virtual int minimum() const OVERRIDE FINAL;
+    virtual float maximumWidth(const Font&) OVERRIDE;
     virtual void stepDown() OVERRIDE FINAL;
     virtual void stepUp() OVERRIDE FINAL;
     virtual String value() const OVERRIDE FINAL;
+    virtual int valueForARIAValueNow() const OVERRIDE FINAL;
     virtual String visibleValue() const OVERRIDE FINAL;
+
+    // TypeAheadDataSource functions.
+    virtual int indexOfSelectedOption() const OVERRIDE;
+    virtual int optionCount() const OVERRIDE;
+    virtual String optionAtIndex(int index) const OVERRIDE;
 
     const Vector<String> m_symbols;
 
@@ -65,6 +72,9 @@ private:
     // DateTimeEditElements in the page.
     const AtomicString m_visibleEmptyValue;
     int m_selectedIndex;
+    TypeAhead m_typeAhead;
+    const int m_minimumIndex;
+    const int m_maximumIndex;
 };
 
 } // namespace WebCore

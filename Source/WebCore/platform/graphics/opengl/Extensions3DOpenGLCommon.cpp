@@ -118,6 +118,15 @@ void Extensions3DOpenGLCommon::ensureEnabled(const String& name)
             ANGLEResources.OES_standard_derivatives = 1;
             compiler.setResources(ANGLEResources);
         }
+    } else if (name == "GL_EXT_draw_buffers") {
+        // Enable support in ANGLE (if not enabled already)
+        ANGLEWebKitBridge& compiler = m_context->m_compiler;
+        ShBuiltInResources ANGLEResources = compiler.getResources();
+        if (!ANGLEResources.EXT_draw_buffers) {
+            ANGLEResources.EXT_draw_buffers = 1;
+            m_context->getIntegerv(Extensions3D::MAX_DRAW_BUFFERS_EXT, &ANGLEResources.MaxDrawBuffers);
+            compiler.setResources(ANGLEResources);
+        }
     }
 }
 
@@ -165,6 +174,12 @@ String Extensions3DOpenGLCommon::getTranslatedShaderSourceANGLE(Platform3DObject
 
     if (m_requiresBuiltInFunctionEmulation)
         extraCompileOptions |= SH_EMULATE_BUILT_IN_FUNCTIONS;
+
+#if !PLATFORM(CHROMIUM)
+    // Chromium does not use the ANGLE bundled in WebKit source, and thus
+    // does not yet have the symbol SH_CLAMP_INDIRECT_ARRAY_BOUNDS.
+    extraCompileOptions |= SH_CLAMP_INDIRECT_ARRAY_BOUNDS;
+#endif
 
     Vector<ANGLEShaderSymbol> symbols;
     bool isValid = compiler.compileShaderSource(entry.source.utf8().data(), shaderType, translatedShaderSource, shaderInfoLog, symbols, extraCompileOptions);

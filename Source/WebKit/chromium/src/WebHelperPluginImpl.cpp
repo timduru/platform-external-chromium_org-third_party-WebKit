@@ -40,6 +40,7 @@
 #include "Page.h"
 #include "PageWidgetDelegate.h"
 #include "Settings.h"
+#include "WebDocument.h"
 #include "WebFrameImpl.h"
 #include "WebPlugin.h"
 #include "WebPluginContainerImpl.h"
@@ -59,11 +60,15 @@ static inline void addString(const String& str, DocumentWriter& writer)
     writer.addData(str8.data(), str8.length());
 }
 
-void writeDocument(WebCore::DocumentWriter& writer, const String& pluginType)
+void writeDocument(const String& pluginType, const WebDocument& hostDocument, WebCore::DocumentWriter& writer)
 {
+    // Give the new document the same URL as the hose document so that content
+    // settings and other decisions can be made based on the correct origin.
+    const WebURL& url = hostDocument.url();
+
     writer.setMIMEType("text/html");
     writer.setEncoding("UTF-8", false);
-    writer.begin();
+    writer.begin(url);
 
     addLiteral("<!DOCTYPE html><head><meta charset='UTF-8'></head><body>\n", writer);
     String objectTag = "<object type=\"" + pluginType + "\"></object>";
@@ -87,6 +92,9 @@ public:
 private:
     virtual void closeWindowSoon() OVERRIDE
     {
+        // This should never be called since the only way to close the
+        // invisible page is via closeHelperPlugin().
+        ASSERT_NOT_REACHED(); 
         m_widget->closeHelperPlugin();
     }
 
@@ -112,18 +120,12 @@ WebHelperPluginImpl::~WebHelperPluginImpl()
     ASSERT(!m_page);
 }
 
-bool WebHelperPluginImpl::init(WebViewImpl* webView, const String& pluginType)
+bool WebHelperPluginImpl::initialize(const String& pluginType, const WebDocument& hostDocument, WebViewImpl* webView)
 {
     ASSERT(webView);
     m_webView = webView;
 
-    if (!initPage(webView, pluginType))
-        return false;
-    m_widgetClient->show(WebNavigationPolicy());
-
-    setFocus(true);
-
-    return true;
+    return initializePage(pluginType, hostDocument);
 }
 
 void WebHelperPluginImpl::closeHelperPlugin()
@@ -133,6 +135,12 @@ void WebHelperPluginImpl::closeHelperPlugin()
         m_page->mainFrame()->loader()->stopAllLoaders();
         m_page->mainFrame()->loader()->stopLoading(UnloadEventPolicyNone);
     }
+
+    // We must destroy the page now in case the host page is being destroyed, in
+    // which case some of the objects the page depends on may have been
+    // destroyed by the time this->close() is called asynchronously.
+    destroyPage();
+
     // m_widgetClient might be 0 because this widget might be already closed.
     if (m_widgetClient) {
         // closeWidgetSoon() will call this->close() later.
@@ -158,7 +166,7 @@ WebPlugin* WebHelperPluginImpl::getPlugin()
         return 0;
     Node* node = objectElements->item(0);
     ASSERT(node->hasTagName(WebCore::HTMLNames::objectTag));
-    WebCore::Widget* widget = static_cast<HTMLPlugInElement*>(node)->pluginWidget();
+    WebCore::Widget* widget = toHTMLPlugInElement(node)->pluginWidget();
     if (!widget)
         return 0;
     WebPlugin* plugin = static_cast<WebPluginContainerImpl*>(widget)->plugin();
@@ -172,7 +180,7 @@ WebPlugin* WebHelperPluginImpl::getPlugin()
     return plugin;
 }
 
-bool WebHelperPluginImpl::initPage(WebKit::WebViewImpl* webView, const String& pluginType)
+bool WebHelperPluginImpl::initializePage(const String& pluginType, const WebDocument& hostDocument)
 {
     Page::PageClients pageClients;
     fillWithEmptyClients(pageClients);
@@ -187,7 +195,7 @@ bool WebHelperPluginImpl::initPage(WebKit::WebViewImpl* webView, const String& p
     unsigned layoutMilestones = DidFirstLayout | DidFirstVisuallyNonEmptyLayout;
     m_page->addLayoutMilestones(static_cast<LayoutMilestones>(layoutMilestones));
 
-    webView->client()->initializeHelperPluginWebFrame(this);
+    m_webView->client()->initializeHelperPluginWebFrame(this);
 
     // The page's main frame was set in initializeFrame() as a result of the above call.
     Frame* frame = m_page->mainFrame();
@@ -196,17 +204,20 @@ bool WebHelperPluginImpl::initPage(WebKit::WebViewImpl* webView, const String& p
     // No need to set a size or make it not transparent.
 
     DocumentWriter* writer = frame->loader()->activeDocumentLoader()->writer();
-    writeDocument(*writer, pluginType);
+    writeDocument(pluginType, hostDocument, *writer);
 
     return true;
 }
 
-void WebHelperPluginImpl::setCompositorSurfaceReady()
+void WebHelperPluginImpl::destroyPage()
 {
-}
+    if (!m_page)
+        return;
 
-void WebHelperPluginImpl::composite(bool)
-{
+    if (m_page->mainFrame())
+        m_page->mainFrame()->loader()->frameDetached();
+
+    m_page.clear();
 }
 
 void WebHelperPluginImpl::layout()
@@ -214,28 +225,14 @@ void WebHelperPluginImpl::layout()
     PageWidgetDelegate::layout(m_page.get());
 }
 
-void WebHelperPluginImpl::setFocus(bool enable)
+void WebHelperPluginImpl::setFocus(bool)
 {
-    if (!m_page)
-        return;
-    m_page->focusController()->setFocused(enable);
-    if (enable)
-        m_page->focusController()->setActive(true);
+    ASSERT_NOT_REACHED();
 }
 
 void WebHelperPluginImpl::close()
 {
-    RefPtr<WebFrameImpl> mainFrameImpl;
-
-    if (m_page) {
-        // Initiate shutdown. This will cause a lot of notifications to be sent.
-        if (m_page->mainFrame()) {
-            mainFrameImpl = WebFrameImpl::fromFrame(m_page->mainFrame());
-            m_page->mainFrame()->loader()->frameDetached();
-        }
-        m_page.clear();
-    }
-
+    ASSERT(!m_page); // Should only be called via closePopup().
     m_widgetClient = 0;
     deref();
 }
@@ -248,10 +245,10 @@ WebHelperPlugin* WebHelperPlugin::create(WebWidgetClient* client)
         CRASH();
     // A WebHelperPluginImpl instance usually has two references.
     //  - One owned by the instance itself. It represents the visible widget.
-    //  - One owned by a WebViewImpl. It's released when the WebViewImpl ask the
-    //    WebHelperPluginImpl to close.
+    //  - One owned by the hosting element. It's released when the hosting
+    //    element asks the WebHelperPluginImpl to close.
     // We need them because the closing operation is asynchronous and the widget
-    // can be closed while the WebViewImpl is unaware of it.
+    // can be closed while the hosting element is unaware of it.
     return adoptRef(new WebHelperPluginImpl(client)).leakRef();
 }
 

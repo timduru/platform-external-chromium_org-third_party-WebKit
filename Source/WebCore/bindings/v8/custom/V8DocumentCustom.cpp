@@ -64,51 +64,44 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8Document::evaluateCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8Document::evaluateMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.Document.evaluate()");
-
     RefPtr<Document> document = V8Document::toNative(args.Holder());
     ExceptionCode ec = 0;
     String expression = toWebCoreString(args[0]);
     RefPtr<Node> contextNode;
-    if (V8Node::HasInstance(args[1]))
+    if (V8Node::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate())))
         contextNode = V8Node::toNative(v8::Handle<v8::Object>::Cast(args[1]));
 
-    RefPtr<XPathNSResolver> resolver = toXPathNSResolver(args[2]);
+    RefPtr<XPathNSResolver> resolver = toXPathNSResolver(args[2], args.GetIsolate());
     if (!resolver && !args[2]->IsNull() && !args[2]->IsUndefined())
         return setDOMException(TYPE_MISMATCH_ERR, args.GetIsolate());
 
     int type = toInt32(args[3]);
     RefPtr<XPathResult> inResult;
-    if (V8XPathResult::HasInstance(args[4]))
+    if (V8XPathResult::HasInstance(args[4], args.GetIsolate(), worldType(args.GetIsolate())))
         inResult = V8XPathResult::toNative(v8::Handle<v8::Object>::Cast(args[4]));
 
-    v8::TryCatch exceptionCatcher;
-    RefPtr<XPathResult> result = document->evaluate(expression, contextNode.get(), resolver.get(), type, inResult.get(), ec);
-    if (exceptionCatcher.HasCaught())
-        return throwError(exceptionCatcher.Exception(), args.GetIsolate());
-
+    V8TRYCATCH(RefPtr<XPathResult>, result, document->evaluate(expression, contextNode.get(), resolver.get(), type, inResult.get(), ec));
     if (ec)
         return setDOMException(ec, args.GetIsolate());
 
-    return toV8(result.release(), args.Holder(), args.GetIsolate());
+    return toV8Fast(result.release(), args, document.get());
 }
 
-v8::Handle<v8::Value> toV8(Document* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+v8::Handle<v8::Object> wrap(Document* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    if (!impl)
-        return v8NullWithCheck(isolate);
+    ASSERT(impl);
     if (impl->isHTMLDocument())
-        return toV8(static_cast<HTMLDocument*>(impl), creationContext, isolate);
+        return wrap(toHTMLDocument(impl), creationContext, isolate);
 #if ENABLE(SVG)
     if (impl->isSVGDocument())
-        return toV8(static_cast<SVGDocument*>(impl), creationContext, isolate);
+        return wrap(toSVGDocument(impl), creationContext, isolate);
 #endif
-    v8::Handle<v8::Object> wrapper = V8Document::wrap(impl, creationContext, isolate);
+    v8::Handle<v8::Object> wrapper = V8Document::createWrapper(impl, creationContext, isolate);
     if (wrapper.IsEmpty())
         return wrapper;
-    if (!V8DOMWindowShell::getEntered()) {
+    if (!isolatedWorldForEnteredContext()) {
         if (Frame* frame = impl->frame())
             frame->script()->windowShell(mainThreadNormalWorld())->updateDocumentWrapper(wrapper);
     }
@@ -116,7 +109,7 @@ v8::Handle<v8::Value> toV8(Document* impl, v8::Handle<v8::Object> creationContex
 }
 
 #if ENABLE(TOUCH_EVENTS)
-v8::Handle<v8::Value> V8Document::createTouchListCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8Document::createTouchListMethodCustom(const v8::Arguments& args)
 {
     RefPtr<TouchList> touchList = TouchList::create();
 

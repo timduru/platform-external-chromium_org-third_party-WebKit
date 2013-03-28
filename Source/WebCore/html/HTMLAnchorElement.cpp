@@ -28,6 +28,7 @@
 #include "DNS.h"
 #include "EventNames.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameLoaderTypes.h"
 #include "HTMLImageElement.h"
@@ -37,6 +38,7 @@
 #include "MouseEvent.h"
 #include "PingLoader.h"
 #include "RenderImage.h"
+#include "ResourceRequest.h"
 #include "SecurityOrigin.h"
 #include "SecurityPolicy.h"
 #include "Settings.h"
@@ -135,9 +137,9 @@ static void appendServerMapMousePosition(StringBuilder& url, Event* event)
     if (!imageElement || !imageElement->isServerMap())
         return;
 
-    RenderImage* renderer = toRenderImage(imageElement->renderer());
-    if (!renderer)
+    if (!imageElement->renderer() || !imageElement->renderer()->isRenderImage())
         return;
+    RenderImage* renderer = toRenderImage(imageElement->renderer());
 
     // FIXME: This should probably pass true for useTransforms.
     FloatPoint absolutePosition = renderer->absoluteToLocal(FloatPoint(static_cast<MouseEvent*>(event)->pageX(), static_cast<MouseEvent*>(event)->pageY()));
@@ -213,38 +215,37 @@ void HTMLAnchorElement::setActive(bool down, bool pause)
     ContainerNode::setActive(down, pause);
 }
 
-void HTMLAnchorElement::parseAttribute(const Attribute& attribute)
+void HTMLAnchorElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == hrefAttr) {
+    if (name == hrefAttr) {
         bool wasLink = isLink();
-        setIsLink(!attribute.isNull());
+        setIsLink(!value.isNull());
         if (wasLink != isLink())
-            setNeedsStyleRecalc();
+            didAffectSelector(AffectedSelectorLink | AffectedSelectorVisited | AffectedSelectorEnabled);
         if (isLink()) {
-            String parsedURL = stripLeadingAndTrailingHTMLSpaces(attribute.value());
+            String parsedURL = stripLeadingAndTrailingHTMLSpaces(value);
             if (document()->isDNSPrefetchEnabled()) {
                 if (protocolIs(parsedURL, "http") || protocolIs(parsedURL, "https") || parsedURL.startsWith("//"))
                     prefetchDNS(document()->completeURL(parsedURL).host());
             }
         }
         invalidateCachedVisitedLinkHash();
-    } else if (attribute.name() == nameAttr || attribute.name() == titleAttr) {
+    } else if (name == nameAttr || name == titleAttr) {
         // Do nothing.
-    } else if (attribute.name() == relAttr)
-        setRel(attribute.value());
+    } else if (name == relAttr)
+        setRel(value);
     else
-        HTMLElement::parseAttribute(attribute);
+        HTMLElement::parseAttribute(name, value);
 }
 
 void HTMLAnchorElement::accessKeyAction(bool sendMouseEvents)
 {
-    // send the mouse button events if the caller specified sendMouseEvents
-    dispatchSimulatedClick(0, sendMouseEvents);
+    dispatchSimulatedClick(0, sendMouseEvents ? SendMouseUpDownEvents : SendNoEvents);
 }
 
 bool HTMLAnchorElement::isURLAttribute(const Attribute& attribute) const
 {
-    return attribute.name() == hrefAttr || HTMLElement::isURLAttribute(attribute);
+    return attribute.name().localName() == hrefAttr || HTMLElement::isURLAttribute(attribute);
 }
 
 bool HTMLAnchorElement::canStartSelection() const
@@ -510,6 +511,7 @@ void HTMLAnchorElement::handleClick(Event* event)
     if (hasAttribute(downloadAttr)) {
         ResourceRequest request(kurl);
 
+        // FIXME: Why are we not calling addExtraFieldsToMainResourceRequest() if this check fails? It sets many important header fields.
         if (!hasRel(RelationNoReferrer)) {
             String referrer = SecurityPolicy::generateReferrerHeader(document()->referrerPolicy(), kurl, frame->loader()->outgoingReferrer());
             if (!referrer.isEmpty())

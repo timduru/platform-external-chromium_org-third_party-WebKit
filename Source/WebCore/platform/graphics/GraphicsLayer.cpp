@@ -33,9 +33,11 @@
 #include "FloatRect.h"
 #include "GraphicsContext.h"
 #include "LayoutRect.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "RotateTransformOperation.h"
 #include "TextStream.h"
 #include <wtf/HashMap.h>
+#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
@@ -78,11 +80,10 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_anchorPoint(0.5f, 0.5f, 0)
     , m_opacity(1)
     , m_zPosition(0)
-    , m_backgroundColorSet(false)
     , m_contentsOpaque(false)
     , m_preserves3D(false)
     , m_backfaceVisibility(true)
-    , m_usingTiledLayer(false)
+    , m_usingTiledBacking(false)
     , m_masksToBounds(false)
     , m_drawsContent(false)
     , m_contentsVisible(true)
@@ -296,7 +297,7 @@ void GraphicsLayer::setReplicatedByLayer(GraphicsLayer* layer)
     m_replicaLayer = layer;
 }
 
-void GraphicsLayer::setOffsetFromRenderer(const IntSize& offset)
+void GraphicsLayer::setOffsetFromRenderer(const IntSize& offset, ShouldSetNeedsDisplay shouldSetNeedsDisplay)
 {
     if (offset == m_offsetFromRenderer)
         return;
@@ -304,19 +305,13 @@ void GraphicsLayer::setOffsetFromRenderer(const IntSize& offset)
     m_offsetFromRenderer = offset;
 
     // If the compositing layer offset changes, we need to repaint.
-    setNeedsDisplay();
+    if (shouldSetNeedsDisplay == SetNeedsDisplay)
+        setNeedsDisplay();
 }
 
 void GraphicsLayer::setBackgroundColor(const Color& color)
 {
     m_backgroundColor = color;
-    m_backgroundColorSet = true;
-}
-
-void GraphicsLayer::clearBackgroundColor()
-{
-    m_backgroundColor = Color();
-    m_backgroundColorSet = false;
 }
 
 void GraphicsLayer::paintGraphicsLayerContents(GraphicsContext& context, const IntRect& clip)
@@ -337,7 +332,7 @@ String GraphicsLayer::animationNameForTransition(AnimatedPropertyID property)
     // | is not a valid identifier character in CSS, so this can never conflict with a keyframe identifier.
     StringBuilder id;
     id.appendLiteral("-|transition");
-    id.append(static_cast<char>(property));
+    id.appendNumber(static_cast<int>(property));
     id.append('-');
     return id.toString();
 }
@@ -353,7 +348,7 @@ void GraphicsLayer::resumeAnimations()
 void GraphicsLayer::getDebugBorderInfo(Color& color, float& width) const
 {
     if (drawsContent()) {
-        if (m_usingTiledLayer) {
+        if (m_usingTiledBacking) {
             color = Color(255, 128, 0, 128); // tiled layer: orange
             width = 2;
             return;
@@ -414,15 +409,6 @@ void GraphicsLayer::distributeOpacity(float accumulatedOpacity)
             children()[i]->distributeOpacity(accumulatedOpacity);
     }
 }
-
-#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
-GraphicsLayer::GraphicsLayerFactoryCallback* GraphicsLayer::s_graphicsLayerFactory = 0;
-
-void GraphicsLayer::setGraphicsLayerFactory(GraphicsLayer::GraphicsLayerFactoryCallback factory)
-{
-    s_graphicsLayerFactory = factory;
-}
-#endif
 
 #if ENABLE(CSS_FILTERS)
 static inline const FilterOperations* filterOperationsAt(const KeyframeValueList& valueList, size_t index)
@@ -619,9 +605,14 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << "(opacity " << m_opacity << ")\n";
     }
     
-    if (m_usingTiledLayer) {
+    if (m_usingTiledBacking) {
         writeIndent(ts, indent + 1);
-        ts << "(usingTiledLayer " << m_usingTiledLayer << ")\n";
+        ts << "(usingTiledLayer " << m_usingTiledBacking << ")\n";
+    }
+
+    if (m_contentsOpaque) {
+        writeIndent(ts, indent + 1);
+        ts << "(contentsOpaque " << m_contentsOpaque << ")\n";
     }
 
     if (m_preserves3D) {
@@ -654,7 +645,7 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         ts << ")\n";
     }
 
-    if (m_backgroundColorSet) {
+    if (m_backgroundColor.isValid()) {
         writeIndent(ts, indent + 1);
         ts << "(backgroundColor " << m_backgroundColor.nameForRenderTreeAsText() << ")\n";
     }
@@ -713,7 +704,34 @@ void GraphicsLayer::dumpProperties(TextStream& ts, int indent, LayerTreeAsTextBe
         writeIndent(ts, indent + 1);
         ts << ")\n";
     }
-    
+
+    if (behavior & LayerTreeAsTextIncludePaintingPhases && paintingPhase()) {
+        writeIndent(ts, indent + 1);
+        ts << "(paintingPhases\n";
+        if (paintingPhase() & GraphicsLayerPaintBackground) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintBackground\n";
+        }
+        if (paintingPhase() & GraphicsLayerPaintForeground) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintForeground\n";
+        }
+        if (paintingPhase() & GraphicsLayerPaintMask) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintMask\n";
+        }
+        if (paintingPhase() & GraphicsLayerPaintOverflowContents) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintOverflowContents\n";
+        }
+        if (paintingPhase() & GraphicsLayerPaintCompositedScroll) {
+            writeIndent(ts, indent + 2);
+            ts << "GraphicsLayerPaintCompositedScroll\n";
+        }
+        writeIndent(ts, indent + 1);
+        ts << ")\n";
+    }
+
     dumpAdditionalProperties(ts, indent, behavior);
     
     if (m_children.size()) {
@@ -734,6 +752,18 @@ String GraphicsLayer::layerTreeAsText(LayerTreeAsTextBehavior behavior) const
 
     dumpLayer(ts, 0, behavior);
     return ts.release();
+}
+
+void GraphicsLayer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Layers);
+    info.addMember(m_children, "children");
+    info.addMember(m_parent, "parent");
+    info.addMember(m_maskLayer, "maskLayer");
+    info.addMember(m_replicaLayer, "replicaLayer");
+    info.addMember(m_replicatedLayer, "replicatedLayer");
+    info.ignoreMember(m_client);
+    info.addMember(m_name, "name");
 }
 
 } // namespace WebCore

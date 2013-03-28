@@ -33,6 +33,7 @@
 #include "FrameLoaderTypes.h"
 #include "IconURL.h"
 #include "LayoutMilestones.h"
+#include "ResourceLoadPriority.h"
 #include <wtf/Forward.h>
 #include <wtf/Vector.h>
 
@@ -63,6 +64,7 @@ namespace WebCore {
 
     class AuthenticationChallenge;
     class CachedFrame;
+    class CachedResourceRequest;
     class Color;
     class DOMWindowExtension;
     class DOMWrapperWorld;
@@ -81,9 +83,6 @@ namespace WebCore {
 #endif
     class HTMLPlugInElement;
     class IntSize;
-#if ENABLE(WEB_INTENTS)
-    class IntentRequest;
-#endif
     class KURL;
     class MessageEvent;
     class NavigationAction;
@@ -93,7 +92,6 @@ namespace WebCore {
     class PolicyChecker;
     class ResourceError;
     class ResourceHandle;
-    class ResourceLoader;
     class ResourceRequest;
     class ResourceResponse;
 #if ENABLE(MEDIA_STREAM)
@@ -179,6 +177,8 @@ namespace WebCore {
 
         virtual void dispatchUnableToImplementPolicy(const ResourceError&) = 0;
 
+        virtual void dispatchWillRequestResource(CachedResourceRequest*) { }
+
         virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) = 0;
         virtual void dispatchWillSubmitForm(FramePolicyFunction, PassRefPtr<FormState>) = 0;
 
@@ -208,6 +208,18 @@ namespace WebCore {
         virtual bool shouldGoToHistoryItem(HistoryItem*) const = 0;
         virtual bool shouldStopLoadingForHistoryItem(HistoryItem*) const = 0;
         virtual void updateGlobalHistoryItemForPage() { }
+
+#if PLATFORM(CHROMIUM)
+        // Another page has accessed the initial empty document of this frame.
+        // It is no longer safe to display a provisional URL, since a URL spoof
+        // is now possible.
+        virtual void didAccessInitialDocument() { }
+#endif
+
+        // This frame has set its opener to null, disowning it for the lifetime of the frame.
+        // See http://html.spec.whatwg.org/#dom-opener.
+        // FIXME: JSC should allow disowning opener. - <https://bugs.webkit.org/show_bug.cgi?id=103913>.
+        virtual void didDisownOpener() { }
 
         // This frame has displayed inactive content (such as an image) from an
         // insecure source.  Inactive content cannot spread to other frames.
@@ -258,7 +270,7 @@ namespace WebCore {
         virtual void dispatchDidBecomeFrameset(bool) = 0; // Can change due to navigation or DOM modification.
 
         virtual bool canCachePage() const = 0;
-        virtual void download(ResourceHandle*, const ResourceRequest&, const ResourceResponse&) = 0;
+        virtual void convertMainResourceLoadToDownload(DocumentLoader*, const ResourceRequest&, const ResourceResponse&) = 0;
 
         virtual PassRefPtr<Frame> createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) = 0;
         virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) = 0;
@@ -332,12 +344,7 @@ namespace WebCore {
         // Returns true if the embedder intercepted the postMessage call
         virtual bool willCheckAndDispatchMessageEvent(SecurityOrigin* /*target*/, MessageEvent*) const { return false; }
 
-#if ENABLE(WEB_INTENTS)
-        virtual void dispatchIntent(PassRefPtr<IntentRequest>) = 0;
-#endif
-#if ENABLE(WEB_INTENTS_TAG)
-        virtual void registerIntentService(const String&, const String&, const KURL&, const String&, const String&) { }
-#endif
+        virtual void didChangeName(const String&) { }
 
         virtual void dispatchWillOpenSocketStream(SocketStreamHandle*) { }
 
@@ -353,6 +360,18 @@ namespace WebCore {
 #if ENABLE(REQUEST_AUTOCOMPLETE)
         virtual void didRequestAutocomplete(PassRefPtr<FormState>) = 0;
 #endif
+
+#if ENABLE(WEBGL)
+        virtual bool allowWebGL(bool enabledPerSettings) { return enabledPerSettings; }
+        // Informs the embedder that a WebGL canvas inside this frame received a lost context
+        // notification with the given GL_ARB_robustness guilt/innocence code (see Extensions3D.h).
+        virtual void didLoseWebGLContext(int) { }
+#endif
+
+        // If an HTML document is being loaded, informs the embedder that the document will have its <body> attached soon.
+        virtual void dispatchWillInsertBody() { }
+
+        virtual void dispatchDidChangeResourcePriority(unsigned long /*identifier*/, ResourceLoadPriority) { }
     };
 
 } // namespace WebCore

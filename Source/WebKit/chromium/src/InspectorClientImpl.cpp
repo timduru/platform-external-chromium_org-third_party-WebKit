@@ -36,10 +36,10 @@
 #include "InspectorInstrumentation.h"
 #include "NotImplemented.h"
 #include "Page.h"
+#include "Settings.h"
 #include "WebDevToolsAgentImpl.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
-#include <public/Platform.h>
 #include <public/WebRect.h>
 #include <public/WebURL.h>
 #include <public/WebURLRequest.h>
@@ -136,16 +136,6 @@ bool InspectorClientImpl::canMonitorMainThread()
     return true;
 }
 
-void InspectorClientImpl::startMainThreadMonitoring()
-{
-    WebKit::Platform::current()->currentThread()->addTaskObserver(this);
-}
-
-void InspectorClientImpl::stopMainThreadMonitoring()
-{
-    WebKit::Platform::current()->currentThread()->removeTaskObserver(this);
-}
-
 bool InspectorClientImpl::canOverrideDeviceMetrics()
 {
     return true;
@@ -161,6 +151,50 @@ void InspectorClientImpl::autoZoomPageToFitWidth()
 {
     if (WebDevToolsAgentImpl* agent = devToolsAgent())
         agent->autoZoomPageToFitWidth();
+}
+
+bool InspectorClientImpl::overridesShowPaintRects()
+{
+    return m_inspectedWebView->isAcceleratedCompositingActive();
+}
+
+void InspectorClientImpl::setShowPaintRects(bool show)
+{
+    m_inspectedWebView->setShowPaintRects(show);
+}
+
+bool InspectorClientImpl::canShowDebugBorders()
+{
+    return true;
+}
+
+void InspectorClientImpl::setShowDebugBorders(bool show)
+{
+    m_inspectedWebView->setShowDebugBorders(show);
+}
+
+bool InspectorClientImpl::canShowFPSCounter()
+{
+    if (m_inspectedWebView->page())
+        return m_inspectedWebView->page()->settings()->forceCompositingMode();
+    return false;
+}
+
+void InspectorClientImpl::setShowFPSCounter(bool show)
+{
+    m_inspectedWebView->setShowFPSCounter(show);
+}
+
+bool InspectorClientImpl::canContinuouslyPaint()
+{
+    if (m_inspectedWebView->page())
+        return m_inspectedWebView->page()->settings()->forceCompositingMode();
+    return false;
+}
+
+void InspectorClientImpl::setContinuousPaintingEnabled(bool enabled)
+{
+    m_inspectedWebView->setContinuousPaintingEnabled(enabled);
 }
 
 bool InspectorClientImpl::supportsFrameInstrumentation()
@@ -180,14 +214,29 @@ void InspectorClientImpl::dumpUncountedAllocatedObjects(const HashMap<const void
         agent->dumpUncountedAllocatedObjects(map);
 }
 
-void InspectorClientImpl::willProcessTask()
+bool InspectorClientImpl::captureScreenshot(String* data)
 {
-    InspectorInstrumentation::willProcessTask(m_inspectedWebView->page());
+    if (WebDevToolsAgentImpl* agent = devToolsAgent())
+        return agent->captureScreenshot(data);
+    return false;
 }
 
-void InspectorClientImpl::didProcessTask()
+bool InspectorClientImpl::handleJavaScriptDialog(bool accept, const String* promptText)
 {
-    InspectorInstrumentation::didProcessTask(m_inspectedWebView->page());
+    if (WebDevToolsAgentImpl* agent = devToolsAgent())
+        return agent->handleJavaScriptDialog(accept, promptText);
+    return false;
+}
+
+bool InspectorClientImpl::canSetFileInputFiles()
+{
+    return true;
+}
+
+void InspectorClientImpl::setTraceEventCallback(TraceEventCallback callback)
+{
+    if (WebDevToolsAgentImpl* agent = devToolsAgent())
+        agent->setTraceEventCallback(callback);
 }
 
 WebDevToolsAgentImpl* InspectorClientImpl::devToolsAgent()

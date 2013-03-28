@@ -53,11 +53,13 @@ public:
     WebPage* inspectorPage() const { return m_inspectorPage; }
 
     // Implemented in generated WebInspectorMessageReceiver.cpp
-    void didReceiveWebInspectorMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    void didReceiveWebInspectorMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
 
     // Called by WebInspector messages
     void show();
     void close();
+
+    void setAttachedWindow(bool);
 
     void evaluateScriptForTest(long callID, const String& script);
 
@@ -90,7 +92,6 @@ private:
     void destroyInspectorPage();
 
     // Called from WebInspectorFrontendClient
-    void didLoadInspectorPage();
     void didClose();
     void bringToFront();
     void inspectedURLChanged(const String&);
@@ -122,7 +123,9 @@ private:
     WebInspectorFrontendClient* m_frontendClient;
     WebCore::InspectorFrontendChannel* m_frontendChannel;
 #if PLATFORM(MAC)
-    String m_localizedStringsURL;
+    mutable String m_localizedStringsURL;
+    mutable bool m_hasLocalizedStringsURL;
+    bool m_usesWebKitUserInterface;
 #endif
 #if ENABLE(INSPECTOR_SERVER)
     bool m_remoteFrontendConnected;

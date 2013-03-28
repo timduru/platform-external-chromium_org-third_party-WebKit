@@ -40,7 +40,6 @@
 #include "NotImplemented.h"
 #include "WebFileSystemCallbacksImpl.h"
 #include "WebFileWriter.h"
-#include "WebWorkerBase.h"
 #include "WorkerAsyncFileWriterChromium.h"
 #include "WorkerContext.h"
 #include "WorkerFileSystemCallbacksBridge.h"
@@ -62,8 +61,7 @@ WorkerAsyncFileSystemChromium::WorkerAsyncFileSystemChromium(ScriptExecutionCont
 {
     ASSERT(m_scriptExecutionContext->isWorkerContext());
 
-    WorkerLoaderProxy* workerLoaderProxy = &m_workerContext->thread()->workerLoaderProxy();
-    m_worker = static_cast<WebWorkerBase*>(workerLoaderProxy);
+    m_workerLoaderProxy = &m_workerContext->thread()->workerLoaderProxy();
 }
 
 WorkerAsyncFileSystemChromium::~WorkerAsyncFileSystemChromium()
@@ -181,20 +179,17 @@ void WorkerAsyncFileSystemChromium::createWriter(AsyncFileWriterClient* client, 
 
 void WorkerAsyncFileSystemChromium::createSnapshotFileAndReadMetadata(const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    KURL internalBlobURL = BlobURL::createInternalURL();
-
-    createWorkerFileSystemCallbacksBridge(createSnapshotFileCallback(internalBlobURL, callbacks))->postCreateSnapshotFileToMainThread(m_webFileSystem, internalBlobURL, path, m_modeForCurrentOperation);
+    createWorkerFileSystemCallbacksBridge(callbacks)->postCreateSnapshotFileToMainThread(m_webFileSystem, path, m_modeForCurrentOperation);
 }
 
 PassRefPtr<WorkerFileSystemCallbacksBridge> WorkerAsyncFileSystemChromium::createWorkerFileSystemCallbacksBridge(PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    ASSERT(m_synchronousType == AsynchronousFileSystem || !m_bridgeForCurrentOperation);
-    (void)m_synchronousType;
+    ASSERT_UNUSED(m_synchronousType, m_synchronousType == AsynchronousFileSystem || !m_bridgeForCurrentOperation);
 
     m_modeForCurrentOperation = fileSystemOperationsMode;
     m_modeForCurrentOperation.append(String::number(m_workerContext->thread()->runLoop().createUniqueId()));
 
-    m_bridgeForCurrentOperation = WorkerFileSystemCallbacksBridge::create(m_worker, m_scriptExecutionContext, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    m_bridgeForCurrentOperation = WorkerFileSystemCallbacksBridge::create(m_workerLoaderProxy, m_scriptExecutionContext, new WebKit::WebFileSystemCallbacksImpl(callbacks));
     return m_bridgeForCurrentOperation;
 }
 

@@ -54,16 +54,29 @@ namespace WebKit {
 
 static const double millisPerSecond = 1000.0;
 
+static float widgetScaleFactor(const Widget* widget)
+{
+    if (!widget)
+        return 1;
+
+    ScrollView* rootView = widget->root();
+    if (!rootView)
+        return 1;
+
+    return rootView->visibleContentScaleFactor();
+}
+
 // MakePlatformMouseEvent -----------------------------------------------------
 
 PlatformMouseEventBuilder::PlatformMouseEventBuilder(Widget* widget, const WebMouseEvent& e)
 {
+    float scale = widgetScaleFactor(widget);
     // FIXME: widget is always toplevel, unless it's a popup.  We may be able
     // to get rid of this once we abstract popups into a WebKit API.
-    m_position = widget->convertFromContainingWindow(IntPoint(e.x, e.y));
+    m_position = widget->convertFromContainingWindow(IntPoint(e.x / scale, e.y / scale));
     m_globalPosition = IntPoint(e.globalX, e.globalY);
 #if ENABLE(POINTER_LOCK)
-    m_movementDelta = IntPoint(e.movementX, e.movementY);
+    m_movementDelta = IntPoint(e.movementX / scale, e.movementY / scale);
 #endif
     m_button = static_cast<MouseButton>(e.button);
 
@@ -104,7 +117,8 @@ PlatformMouseEventBuilder::PlatformMouseEventBuilder(Widget* widget, const WebMo
 
 PlatformWheelEventBuilder::PlatformWheelEventBuilder(Widget* widget, const WebMouseWheelEvent& e)
 {
-    m_position = widget->convertFromContainingWindow(IntPoint(e.x, e.y));
+    float scale = widgetScaleFactor(widget);
+    m_position = widget->convertFromContainingWindow(IntPoint(e.x / scale, e.y / scale));
     m_globalPosition = IntPoint(e.globalX, e.globalY);
     m_deltaX = e.deltaX;
     m_deltaY = e.deltaY;
@@ -141,6 +155,7 @@ PlatformWheelEventBuilder::PlatformWheelEventBuilder(Widget* widget, const WebMo
 #if ENABLE(GESTURE_EVENTS)
 PlatformGestureEventBuilder::PlatformGestureEventBuilder(Widget* widget, const WebGestureEvent& e)
 {
+    float scale = widgetScaleFactor(widget);
     switch (e.type) {
     case WebInputEvent::GestureScrollBegin:
         m_type = PlatformEvent::GestureScrollBegin;
@@ -150,36 +165,38 @@ PlatformGestureEventBuilder::PlatformGestureEventBuilder(Widget* widget, const W
         break;
     case WebInputEvent::GestureScrollUpdate:
         m_type = PlatformEvent::GestureScrollUpdate;
-        m_deltaX = e.data.scrollUpdate.deltaX;
-        m_deltaY = e.data.scrollUpdate.deltaY;
+        m_deltaX = e.data.scrollUpdate.deltaX / scale;
+        m_deltaY = e.data.scrollUpdate.deltaY / scale;
+        break;
+    case WebInputEvent::GestureScrollUpdateWithoutPropagation:
+        m_type = PlatformEvent::GestureScrollUpdateWithoutPropagation;
+        m_deltaX = e.data.scrollUpdate.deltaX / scale;
+        m_deltaY = e.data.scrollUpdate.deltaY / scale;
         break;
     case WebInputEvent::GestureTap:
         m_type = PlatformEvent::GestureTap;
-        m_area = IntSize(e.data.tap.width, e.data.tap.height);
+        m_area = expandedIntSize(FloatSize(e.data.tap.width / scale, e.data.tap.height / scale));
         // FIXME: PlatformGestureEvent deltaX is overloaded - wkb.ug/93123
         m_deltaX = static_cast<int>(e.data.tap.tapCount);
         break;
     case WebInputEvent::GestureTapDown:
         m_type = PlatformEvent::GestureTapDown;
-        m_area = IntSize(e.data.tapDown.width, e.data.tapDown.height);
+        m_area = expandedIntSize(FloatSize(e.data.tapDown.width / scale, e.data.tapDown.height / scale));
         break;
     case WebInputEvent::GestureTapCancel:
         m_type = PlatformEvent::GestureTapDownCancel;
         break;
-    case WebInputEvent::GestureDoubleTap:
-        m_type = PlatformEvent::GestureDoubleTap;
-        break;
     case WebInputEvent::GestureTwoFingerTap:
         m_type = PlatformEvent::GestureTwoFingerTap;
-        m_area = IntSize(e.data.twoFingerTap.firstFingerWidth, e.data.twoFingerTap.firstFingerHeight);
+        m_area = expandedIntSize(FloatSize(e.data.twoFingerTap.firstFingerWidth / scale, e.data.twoFingerTap.firstFingerHeight / scale));
         break;
     case WebInputEvent::GestureLongPress:
         m_type = PlatformEvent::GestureLongPress;
-        m_area = IntSize(e.data.longPress.width, e.data.longPress.height);
+        m_area = expandedIntSize(FloatSize(e.data.longPress.width / scale, e.data.longPress.height / scale));
         break;
     case WebInputEvent::GestureLongTap:
         m_type = PlatformEvent::GestureLongTap;
-        m_area = IntSize(e.data.longPress.width, e.data.longPress.height);
+        m_area = expandedIntSize(FloatSize(e.data.longPress.width / scale, e.data.longPress.height / scale));
         break;
     case WebInputEvent::GesturePinchBegin:
         m_type = PlatformEvent::GesturePinchBegin;
@@ -195,7 +212,7 @@ PlatformGestureEventBuilder::PlatformGestureEventBuilder(Widget* widget, const W
     default:
         ASSERT_NOT_REACHED();
     }
-    m_position = widget->convertFromContainingWindow(IntPoint(e.x, e.y));
+    m_position = widget->convertFromContainingWindow(IntPoint(e.x / scale, e.y / scale));
     m_globalPosition = IntPoint(e.globalX, e.globalY);
     m_timestamp = e.timeStampSeconds;
 
@@ -357,12 +374,13 @@ inline WebTouchPoint::State toWebTouchPointState(const AtomicString& type)
 
 PlatformTouchPointBuilder::PlatformTouchPointBuilder(Widget* widget, const WebTouchPoint& point)
 {
+    float scale = widgetScaleFactor(widget);
     m_id = point.id;
     m_state = toPlatformTouchPointState(point.state);
-    m_pos = widget->convertFromContainingWindow(point.position);
+    m_pos = widget->convertFromContainingWindow(IntPoint(point.position.x / scale, point.position.y / scale));
     m_screenPos = point.screenPosition;
-    m_radiusY = point.radiusY;
-    m_radiusX = point.radiusX;
+    m_radiusY = point.radiusY / scale;
+    m_radiusX = point.radiusX / scale;
     m_rotationAngle = point.rotationAngle;
     m_force = point.force;
 }
@@ -402,23 +420,23 @@ static int getWebInputModifiers(const UIEventWithKeyState& event)
     return modifiers;
 }
 
-static IntPoint convertLocationForRenderObject(const LayoutPoint& location, const WebCore::RenderObject& renderObject)
+static IntPoint convertAbsoluteLocationForRenderObject(const LayoutPoint& location, const WebCore::RenderObject& renderObject)
 {
-    return roundedIntPoint(renderObject.absoluteToLocal(location, UseTransforms | SnapOffsetForTransforms));
+    return roundedIntPoint(renderObject.absoluteToLocal(location, UseTransforms));
 }
 
-static void updateWebMouseEventFromWebCoreMouseEvent(const MouseEvent& event, const Widget& widget, const WebCore::RenderObject& renderObject, WebMouseEvent& webEvent)
+static void updateWebMouseEventFromWebCoreMouseEvent(const MouseRelatedEvent& event, const Widget& widget, const WebCore::RenderObject& renderObject, WebMouseEvent& webEvent)
 {
     webEvent.timeStampSeconds = event.timeStamp() / millisPerSecond;
     webEvent.modifiers = getWebInputModifiers(event);
 
-    ScrollView* view = widget.parent();
+    ScrollView* view = widget.root();
     IntPoint windowPoint = view->contentsToWindow(IntPoint(event.absoluteLocation().x(), event.absoluteLocation().y()));
     webEvent.globalX = event.screenX();
     webEvent.globalY = event.screenY();
     webEvent.windowX = windowPoint.x();
     webEvent.windowY = windowPoint.y();
-    IntPoint localPoint = convertLocationForRenderObject(event.absoluteLocation(), renderObject);
+    IntPoint localPoint = convertAbsoluteLocationForRenderObject(event.absoluteLocation(), renderObject);
     webEvent.x = localPoint.x();
     webEvent.y = localPoint.y();
 }
@@ -473,6 +491,39 @@ WebMouseEventBuilder::WebMouseEventBuilder(const Widget* widget, const WebCore::
     clickCount = event.detail();
 }
 
+WebMouseEventBuilder::WebMouseEventBuilder(const Widget* widget, const WebCore::RenderObject* renderObject, const TouchEvent& event)
+{
+    if (!event.touches())
+        return;
+    if (event.touches()->length() != 1) {
+        if (event.touches()->length() || event.type() != eventNames().touchendEvent || !event.changedTouches() || event.changedTouches()->length() != 1)
+            return;
+    }
+
+    const Touch* touch = event.touches()->length() == 1 ? event.touches()->item(0) : event.changedTouches()->item(0);
+    if (touch->identifier())
+        return;
+
+    if (event.type() == eventNames().touchstartEvent)
+        type = MouseDown;
+    else if (event.type() == eventNames().touchmoveEvent)
+        type = MouseMove;
+    else if (event.type() == eventNames().touchendEvent)
+        type = MouseUp;
+    else
+        return;
+
+    updateWebMouseEventFromWebCoreMouseEvent(event, *widget, *renderObject, *this);
+
+    button = WebMouseEvent::ButtonLeft;
+    modifiers |= WebInputEvent::LeftButtonDown;
+    clickCount = (type == MouseDown || type == MouseUp);
+
+    IntPoint localPoint = convertAbsoluteLocationForRenderObject(touch->absoluteLocation(), *renderObject);
+    x = localPoint.x();
+    y = localPoint.y();
+}
+
 WebMouseWheelEventBuilder::WebMouseWheelEventBuilder(const Widget* widget, const WebCore::RenderObject* renderObject, const WheelEvent& event)
 {
     if (event.type() != eventNames().mousewheelEvent)
@@ -484,7 +535,7 @@ WebMouseWheelEventBuilder::WebMouseWheelEventBuilder(const Widget* widget, const
     // The 120 is from WheelEvent::initWheelEvent().
     wheelTicksX = static_cast<float>(event.wheelDeltaX()) / 120;
     wheelTicksY = static_cast<float>(event.wheelDeltaY()) / 120;
-    scrollByPage = event.granularity() == WheelEvent::Page;
+    scrollByPage = event.deltaMode() == WheelEvent::DOM_DELTA_PAGE;
 }
 
 WebKeyboardEventBuilder::WebKeyboardEventBuilder(const KeyboardEvent& event)
@@ -499,11 +550,11 @@ WebKeyboardEventBuilder::WebKeyboardEventBuilder(const KeyboardEvent& event)
         return; // Skip all other keyboard events.
 
     modifiers = getWebInputModifiers(event);
-    if (event.keyLocation() == KeyboardEvent::DOM_KEY_LOCATION_NUMPAD)
+    if (event.keyLocation() == KeyboardEvent::DOMKeyLocationNumpad)
         modifiers |= WebInputEvent::IsKeyPad;
-    else if (event.keyLocation() == KeyboardEvent::DOM_KEY_LOCATION_LEFT)
+    else if (event.keyLocation() == KeyboardEvent::DOMKeyLocationLeft)
         modifiers |= WebInputEvent::IsLeft;
-    else if (event.keyLocation() == KeyboardEvent::DOM_KEY_LOCATION_RIGHT)
+    else if (event.keyLocation() == KeyboardEvent::DOMKeyLocationRight)
         modifiers |= WebInputEvent::IsRight;
 
     timeStampSeconds = event.timeStamp() / millisPerSecond;
@@ -524,7 +575,7 @@ WebKeyboardEventBuilder::WebKeyboardEventBuilder(const KeyboardEvent& event)
 
 #if ENABLE(TOUCH_EVENTS)
 
-static void addTouchPoints(const AtomicString& touchType, TouchList* touches, WebTouchPoint* touchPoints, unsigned* touchPointsLength, const WebCore::RenderObject* renderObject)
+static void addTouchPoints(const Widget* widget, const AtomicString& touchType, TouchList* touches, WebTouchPoint* touchPoints, unsigned* touchPointsLength, const WebCore::RenderObject* renderObject)
 {
     unsigned numberOfTouches = std::min(touches->length(), static_cast<unsigned>(WebTouchEvent::touchesLengthCap));
     for (unsigned i = 0; i < numberOfTouches; ++i) {
@@ -533,7 +584,7 @@ static void addTouchPoints(const AtomicString& touchType, TouchList* touches, We
         WebTouchPoint point;
         point.id = touch->identifier();
         point.screenPosition = WebPoint(touch->screenX(), touch->screenY());
-        point.position = convertLocationForRenderObject(LayoutPoint(IntPoint(touch->pageX(), touch->pageY())), *renderObject);
+        point.position = convertAbsoluteLocationForRenderObject(touch->absoluteLocation(), *renderObject);
         point.radiusX = touch->webkitRadiusX();
         point.radiusY = touch->webkitRadiusY();
         point.rotationAngle = touch->webkitRotationAngle();
@@ -564,9 +615,9 @@ WebTouchEventBuilder::WebTouchEventBuilder(const Widget* widget, const WebCore::
     modifiers = getWebInputModifiers(event);
     timeStampSeconds = event.timeStamp() / millisPerSecond;
 
-    addTouchPoints(event.type(), event.touches(), touches, &touchesLength, renderObject);
-    addTouchPoints(event.type(), event.changedTouches(), changedTouches, &changedTouchesLength, renderObject);
-    addTouchPoints(event.type(), event.targetTouches(), targetTouches, &targetTouchesLength, renderObject);
+    addTouchPoints(widget, event.type(), event.touches(), touches, &touchesLength, renderObject);
+    addTouchPoints(widget, event.type(), event.changedTouches(), changedTouches, &changedTouchesLength, renderObject);
+    addTouchPoints(widget, event.type(), event.targetTouches(), targetTouches, &targetTouchesLength, renderObject);
 }
 
 #endif // ENABLE(TOUCH_EVENTS)
@@ -593,7 +644,7 @@ WebGestureEventBuilder::WebGestureEventBuilder(const Widget* widget, const WebCo
 
     globalX = event.screenX();
     globalY = event.screenY();
-    IntPoint localPoint = convertLocationForRenderObject(event.absoluteLocation(), *renderObject);
+    IntPoint localPoint = convertAbsoluteLocationForRenderObject(event.absoluteLocation(), *renderObject);
     x = localPoint.x();
     y = localPoint.y();
 }

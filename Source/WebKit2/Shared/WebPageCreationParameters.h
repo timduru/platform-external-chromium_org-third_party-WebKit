@@ -46,7 +46,7 @@ namespace WebKit {
 
 struct WebPageCreationParameters {
     void encode(CoreIPC::ArgumentEncoder&) const;
-    static bool decode(CoreIPC::ArgumentDecoder*, WebPageCreationParameters&);
+    static bool decode(CoreIPC::ArgumentDecoder&, WebPageCreationParameters&);
 
     WebCore::IntSize viewSize;
 
@@ -61,6 +61,8 @@ struct WebPageCreationParameters {
 
     bool drawsBackground;
     bool drawsTransparentBackground;
+
+    WebCore::Color underlayColor;
 
     bool areMemoryCacheClientCallsEnabled;
 
@@ -85,15 +87,13 @@ struct WebPageCreationParameters {
     float deviceScaleFactor;
     
     float mediaVolume;
+    bool mayStartMediaWhenInWindow;
+
+    bool overridePrivateBrowsingEnabled;
 
 #if PLATFORM(MAC)
-    bool isSmartInsertDeleteEnabled;
     LayerHostingMode layerHostingMode;
     ColorSpaceData colorSpace;
-#endif
-
-#if PLATFORM(WIN)
-    HWND nativeWindow;
 #endif
 };
 

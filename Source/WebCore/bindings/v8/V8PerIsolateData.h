@@ -27,6 +27,7 @@
 #define V8PerIsolateData_h
 
 #include "ScopedPersistent.h"
+#include "WrapperTypeInfo.h"
 #include <v8.h>
 #include <wtf/Forward.h>
 #include <wtf/HashMap.h>
@@ -64,10 +65,21 @@ public:
     }
     static void dispose(v8::Isolate*);
 
-    typedef HashMap<WrapperTypeInfo*, v8::Persistent<v8::FunctionTemplate> > TemplateMap;
+    typedef HashMap<void*, v8::Persistent<v8::FunctionTemplate> > TemplateMap;
 
-    TemplateMap& rawTemplateMap() { return m_rawTemplates; }
-    TemplateMap& templateMap() { return m_templates; }
+    TemplateMap& rawTemplateMap(WrapperWorldType worldType)
+    {
+        if (worldType == MainWorld)
+            return m_rawTemplatesForMainWorld;
+        return m_rawTemplatesForNonMainWorld;
+    }
+
+    TemplateMap& templateMap(WrapperWorldType worldType)
+    {
+        if (worldType == MainWorld)
+            return m_templatesForMainWorld;
+        return m_templatesForNonMainWorld;
+    }
 
     v8::Handle<v8::FunctionTemplate> toStringTemplate();
     v8::Persistent<v8::FunctionTemplate>& lazyEventListenerToStringTemplate()
@@ -77,6 +89,8 @@ public:
 
     StringCache* stringCache() { return m_stringCache.get(); }
     IntegerCache* integerCache() { return m_integerCache.get(); }
+
+    v8::Handle<v8::Value> v8Null() { return m_v8Null.get(); }
 
     v8::Persistent<v8::Value> ensureLiveRoot();
 
@@ -107,8 +121,6 @@ public:
     int incrementRecursionLevel() { return ++m_recursionLevel; }
     int decrementRecursionLevel() { return --m_recursionLevel; }
 
-    int nextDependentRetainedId() { return m_nextDependentRetainedId++; }
-
 #ifndef NDEBUG
     int internalScriptRecursionLevel() const { return m_internalScriptRecursionLevel; }
     int incrementInternalScriptRecursionLevel() { return ++m_internalScriptRecursionLevel; }
@@ -127,17 +139,28 @@ public:
     void clearShouldCollectGarbageSoon() { m_shouldCollectGarbageSoon = false; }
     bool shouldCollectGarbageSoon() const { return m_shouldCollectGarbageSoon; }
 
+    bool hasPrivateTemplate(WrapperWorldType, void* privatePointer);
+    v8::Persistent<v8::FunctionTemplate> privateTemplate(WrapperWorldType, void* privatePointer, v8::InvocationCallback, v8::Handle<v8::Value> data, v8::Handle<v8::Signature>, int length = 0);
+
+    v8::Persistent<v8::FunctionTemplate> rawTemplate(WrapperTypeInfo*, WrapperWorldType);
+
+    bool hasInstance(WrapperTypeInfo*, v8::Handle<v8::Value>, WrapperWorldType);
+
 private:
     explicit V8PerIsolateData(v8::Isolate*);
     ~V8PerIsolateData();
     static v8::Handle<v8::Value> constructorOfToString(const v8::Arguments&);
 
-    TemplateMap m_rawTemplates;
-    TemplateMap m_templates;
+    v8::Isolate* m_isolate;
+    TemplateMap m_rawTemplatesForMainWorld;
+    TemplateMap m_rawTemplatesForNonMainWorld;
+    TemplateMap m_templatesForMainWorld;
+    TemplateMap m_templatesForNonMainWorld;
     ScopedPersistent<v8::FunctionTemplate> m_toStringTemplate;
     v8::Persistent<v8::FunctionTemplate> m_lazyEventListenerToStringTemplate;
     OwnPtr<StringCache> m_stringCache;
     OwnPtr<IntegerCache> m_integerCache;
+    ScopedPersistent<v8::Value> m_v8Null;
 
     Vector<DOMDataStore*> m_domDataList;
     DOMDataStore* m_domDataStore;
@@ -150,7 +173,6 @@ private:
     friend class ConstructorMode;
 
     int m_recursionLevel;
-    int m_nextDependentRetainedId;
 
 #ifndef NDEBUG
     int m_internalScriptRecursionLevel;

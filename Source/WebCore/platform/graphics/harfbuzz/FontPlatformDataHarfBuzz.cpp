@@ -32,17 +32,11 @@
 #include "FontPlatformDataHarfBuzz.h"
 
 #include "FontCache.h"
+#include "HarfBuzzFace.h"
 #include "NotImplemented.h"
 #include "SkAdvancedTypefaceMetrics.h"
-#include "SkFontHost.h"
 #include "SkPaint.h"
 #include "SkTypeface.h"
-
-#if USE(HARFBUZZ_NG)
-#include "HarfBuzzNGFace.h"
-#else
-#include "HarfBuzzSkia.h"
-#endif
 
 #include <public/linux/WebFontInfo.h>
 #include <public/linux/WebFontRenderStyle.h>
@@ -97,7 +91,6 @@ FontPlatformData::FontPlatformData(WTF::HashTableDeletedValueType)
     , m_fakeBold(false)
     , m_fakeItalic(false)
     , m_orientation(Horizontal)
-    , m_textOrientation(TextOrientationVerticalRight)
 {
 }
 
@@ -108,7 +101,6 @@ FontPlatformData::FontPlatformData()
     , m_fakeBold(false)
     , m_fakeItalic(false)
     , m_orientation(Horizontal)
-    , m_textOrientation(TextOrientationVerticalRight)
 {
 }
 
@@ -119,7 +111,6 @@ FontPlatformData::FontPlatformData(float textSize, bool fakeBold, bool fakeItali
     , m_fakeBold(fakeBold)
     , m_fakeItalic(fakeItalic)
     , m_orientation(Horizontal)
-    , m_textOrientation(TextOrientationVerticalRight)
 {
 }
 
@@ -131,14 +122,13 @@ FontPlatformData::FontPlatformData(const FontPlatformData& src)
     , m_fakeBold(src.m_fakeBold)
     , m_fakeItalic(src.m_fakeItalic)
     , m_orientation(src.m_orientation)
-    , m_textOrientation(src.m_textOrientation)
     , m_style(src.m_style)
-    , m_harfbuzzFace(src.m_harfbuzzFace)
+    , m_harfBuzzFace(src.m_harfBuzzFace)
 {
     SkSafeRef(m_typeface);
 }
 
-FontPlatformData::FontPlatformData(SkTypeface* tf, const char* family, float textSize, bool fakeBold, bool fakeItalic, FontOrientation orientation, TextOrientation textOrientation)
+FontPlatformData::FontPlatformData(SkTypeface* tf, const char* family, float textSize, bool fakeBold, bool fakeItalic, FontOrientation orientation)
     : m_typeface(tf)
     , m_family(family)
     , m_textSize(textSize)
@@ -146,7 +136,6 @@ FontPlatformData::FontPlatformData(SkTypeface* tf, const char* family, float tex
     , m_fakeBold(fakeBold)
     , m_fakeItalic(fakeItalic)
     , m_orientation(orientation)
-    , m_textOrientation(textOrientation)
 {
     SkSafeRef(m_typeface);
     querySystemForRenderStyle();
@@ -160,8 +149,7 @@ FontPlatformData::FontPlatformData(const FontPlatformData& src, float textSize)
     , m_fakeBold(src.m_fakeBold)
     , m_fakeItalic(src.m_fakeItalic)
     , m_orientation(src.m_orientation)
-    , m_textOrientation(src.m_textOrientation)
-    , m_harfbuzzFace(src.m_harfbuzzFace)
+    , m_harfBuzzFace(src.m_harfBuzzFace)
 {
     SkSafeRef(m_typeface);
     querySystemForRenderStyle();
@@ -177,17 +165,7 @@ int FontPlatformData::emSizeInFontUnits() const
     if (m_emSizeInFontUnits)
         return m_emSizeInFontUnits;
 
-    // FIXME: Switch to the SkTypeface::GetUnitsPerEm API once this becomes available.
-    // https://bugs.webkit.org/show_bug.cgi?id=75961
-#if OS(ANDROID)
-    // Android doesn't currently support Skia's getAdvancedTypefaceMetrics(),
-    // but it has access to another method to replace this functionality.
-    m_emSizeInFontUnits = SkFontHost::GetUnitsPerEm(m_typeface->uniqueID());
-#else
-    SkAdvancedTypefaceMetrics* metrics = m_typeface->getAdvancedTypefaceMetrics(SkAdvancedTypefaceMetrics::kNo_PerGlyphInfo);
-    m_emSizeInFontUnits = metrics->fEmSize;
-    metrics->unref();
-#endif
+    m_emSizeInFontUnits = m_typeface->getUnitsPerEm();
     return m_emSizeInFontUnits;
 }
 
@@ -199,9 +177,8 @@ FontPlatformData& FontPlatformData::operator=(const FontPlatformData& src)
     m_textSize = src.m_textSize;
     m_fakeBold = src.m_fakeBold;
     m_fakeItalic = src.m_fakeItalic;
-    m_harfbuzzFace = src.m_harfbuzzFace;
+    m_harfBuzzFace = src.m_harfBuzzFace;
     m_orientation = src.m_orientation;
-    m_textOrientation = src.m_textOrientation;
     m_style = src.m_style;
     m_emSizeInFontUnits = src.m_emSizeInFontUnits;
 
@@ -256,14 +233,13 @@ bool FontPlatformData::operator==(const FontPlatformData& a) const
         && m_fakeBold == a.m_fakeBold
         && m_fakeItalic == a.m_fakeItalic
         && m_orientation == a.m_orientation
-        && m_textOrientation == a.m_textOrientation
         && m_style == a.m_style;
 }
 
 unsigned FontPlatformData::hash() const
 {
     unsigned h = SkTypeface::UniqueID(m_typeface);
-    h ^= 0x01010101 * ((static_cast<int>(m_textOrientation) << 3) | (static_cast<int>(m_orientation) << 2) | (static_cast<int>(m_fakeBold) << 1) | static_cast<int>(m_fakeItalic));
+    h ^= 0x01010101 * ((static_cast<int>(m_orientation) << 2) | (static_cast<int>(m_fakeBold) << 1) | static_cast<int>(m_fakeItalic));
 
     // This memcpy is to avoid a reinterpret_cast that breaks strict-aliasing
     // rules. Memcpy is generally optimized enough so that performance doesn't
@@ -281,23 +257,13 @@ bool FontPlatformData::isFixedPitch() const
     return false;
 }
 
-#if USE(HARFBUZZ_NG)
-HarfBuzzNGFace* FontPlatformData::harfbuzzFace() const
+HarfBuzzFace* FontPlatformData::harfBuzzFace() const
 {
-    if (!m_harfbuzzFace)
-        m_harfbuzzFace = HarfBuzzNGFace::create(const_cast<FontPlatformData*>(this), uniqueID());
+    if (!m_harfBuzzFace)
+        m_harfBuzzFace = HarfBuzzFace::create(const_cast<FontPlatformData*>(this), uniqueID());
 
-    return m_harfbuzzFace.get();
+    return m_harfBuzzFace.get();
 }
-#else
-HarfbuzzFace* FontPlatformData::harfbuzzFace() const
-{
-    if (!m_harfbuzzFace)
-        m_harfbuzzFace = HarfbuzzFace::create(const_cast<FontPlatformData*>(this));
-
-    return m_harfbuzzFace.get();
-}
-#endif
 
 void FontPlatformData::getRenderStyleForStrike(const char* font, int sizeAndStyle)
 {
@@ -348,7 +314,7 @@ static SkFontTableTag reverseByteOrder(uint32_t tableTag)
     return (tableTag >> 24) | ((tableTag >> 8) & 0xff00) | ((tableTag & 0xff00) << 8) | ((tableTag & 0xff) << 24);
 }
 
-const OpenTypeVerticalData* FontPlatformData::verticalData() const
+PassRefPtr<OpenTypeVerticalData> FontPlatformData::verticalData() const
 {
     return fontCache()->getVerticalData(uniqueID(), *this);
 }
@@ -358,10 +324,10 @@ PassRefPtr<SharedBuffer> FontPlatformData::openTypeTable(uint32_t table) const
     RefPtr<SharedBuffer> buffer;
 
     SkFontTableTag tag = reverseByteOrder(table);
-    const size_t tableSize = SkFontHost::GetTableSize(uniqueID(), tag);
+    const size_t tableSize = m_typeface->getTableSize(tag);
     if (tableSize) {
         Vector<char> tableBuffer(tableSize);
-        SkFontHost::GetTableData(uniqueID(), tag, 0, tableSize, &tableBuffer[0]);
+        m_typeface->getTableData(tag, 0, tableSize, &tableBuffer[0]);
         buffer = SharedBuffer::adoptVector(tableBuffer);
     }
     return buffer.release();

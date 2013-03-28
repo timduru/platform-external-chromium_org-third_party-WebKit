@@ -32,7 +32,7 @@
 
 vars = {
   'chromium_svn': 'http://src.chromium.org/svn/trunk/src',
-  'chromium_rev': 'HEAD'
+  'chromium_rev': '190515'
 }
 
 deps = {
@@ -46,6 +46,8 @@ deps = {
     From('chromium_deps', 'src/tools/gyp'),
   'tools/clang':
     Var('chromium_svn')+'/tools/clang@'+Var('chromium_rev'),
+  'tools/protoc_wrapper':
+    Var('chromium_svn')+'/tools/protoc_wrapper@'+Var('chromium_rev'),
 
   # Basic tools
   'base':
@@ -101,6 +103,8 @@ deps = {
     Var('chromium_svn')+'/media@'+Var('chromium_rev'),
   'printing':
     Var('chromium_svn')+'/printing@'+Var('chromium_rev'),
+  'webkit/media/crypto/ppapi/cdm':
+    From('chromium_deps', 'src/webkit/media/crypto/ppapi/cdm'),
   'ppapi':
     Var('chromium_svn')+'/ppapi@'+Var('chromium_rev'),
   'sql':
@@ -117,18 +121,24 @@ deps = {
     From('chromium_deps', 'src/tools/grit'),
   'tools/gritsettings':
     Var('chromium_svn')+'/tools/gritsettings@'+Var('chromium_rev'),
+  'tools/generate_library_loader':
+    Var('chromium_svn')+'/tools/generate_library_loader@'+Var('chromium_rev'),
   'tools/generate_stubs':
     Var('chromium_svn')+'/tools/generate_stubs@'+Var('chromium_rev'),
   'tools/win':
     Var('chromium_svn')+'/tools/win@'+Var('chromium_rev'),
   'ui':
     Var('chromium_svn')+'/ui@'+Var('chromium_rev'),
+  'win8':
+    Var('chromium_svn')+'/win8@'+Var('chromium_rev'),
 
   # other third party
   'third_party/pyftpdlib/src':
     From('chromium_deps', 'src/third_party/pyftpdlib/src'),
   'third_party/icu':
     From('chromium_deps', 'src/third_party/icu'),
+  'third_party/opus/src':
+    From('chromium_deps', 'src/third_party/opus/src'),
   'third_party/ots':
     From('chromium_deps', 'src/third_party/ots'),
   'third_party/yasm/source/patched-yasm':
@@ -137,6 +147,8 @@ deps = {
     From('chromium_deps', 'src/third_party/libjpeg_turbo'),
   'third_party/leveldatabase/src':
     From('chromium_deps', 'src/third_party/leveldatabase/src'),
+  'third_party/smhasher/src':
+    From('chromium_deps', 'src/third_party/smhasher/src'),
   'third_party/snappy/src':
     From('chromium_deps', 'src/third_party/snappy/src'),
   'third_party/sfntly/cpp/src':
@@ -175,6 +187,8 @@ deps_os = {
     # Linux, actually.
     'tools/xdisplaycheck':
       Var('chromium_svn')+'/tools/xdisplaycheck@'+Var('chromium_rev'),
+    'third_party/freetype2/src':
+      From('chromium_deps', 'src/third_party/freetype2/src'),
     'third_party/gold':
       From('chromium_deps', 'src/third_party/gold'),
     'third_party/openssl':
@@ -185,6 +199,8 @@ deps_os = {
       From('chromium_deps', 'src/third_party/android_tools'),
     'third_party/freetype':
       From('chromium_deps', 'src/third_party/freetype'),
+    'third_party/jsr-305/src':
+      From('chromium_deps', 'src/third_party/jsr-305/src'),
     'tools/android':
       Var('chromium_svn') + '/tools/android@' + Var('chromium_rev'),
   },

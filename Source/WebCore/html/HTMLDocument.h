@@ -50,8 +50,6 @@ public:
     String designMode() const;
     void setDesignMode(const String&);
 
-    virtual void setCompatibilityModeFromDoctype();
-
     Element* activeElement();
     bool hasFocus();
 
@@ -78,6 +76,8 @@ public:
     void addExtraNamedItem(const AtomicString& name);
     void removeExtraNamedItem(const AtomicString& name);
     bool hasExtraNamedItem(AtomicStringImpl* name);
+
+    static bool isCaseSensitiveAttribute(const QualifiedName&);
 
 protected:
     HTMLDocument(Frame*, const KURL&);
@@ -106,6 +106,21 @@ inline bool HTMLDocument::hasExtraNamedItem(AtomicStringImpl* name)
     ASSERT(name);
     return m_extraNamedItemCounts.contains(name);
 }
+
+inline HTMLDocument* toHTMLDocument(Document* document)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!document || document->isHTMLDocument());
+    return static_cast<HTMLDocument*>(document);
+}
+
+inline const HTMLDocument* toHTMLDocument(const Document* document)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!document || document->isHTMLDocument());
+    return static_cast<const HTMLDocument*>(document);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toHTMLDocument(const HTMLDocument*);
 
 } // namespace WebCore
 

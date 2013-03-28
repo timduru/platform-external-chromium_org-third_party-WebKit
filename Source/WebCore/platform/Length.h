@@ -38,7 +38,7 @@ enum LengthType {
     Intrinsic, MinIntrinsic,
     MinContent, MaxContent, FillAvailable, FitContent,
     Calculated,
-    ViewportPercentageWidth, ViewportPercentageHeight, ViewportPercentageMin,
+    ViewportPercentageWidth, ViewportPercentageHeight, ViewportPercentageMin, ViewportPercentageMax,
     Undefined
 };
 
@@ -223,8 +223,11 @@ public:
     bool isLegacyIntrinsic() const { return type() == Intrinsic || type() == MinIntrinsic; }
     bool isIntrinsic() const { return type() == MinContent || type() == MaxContent || type() == FillAvailable || type() == FitContent; }
     bool isSpecified() const { return type() == Fixed || type() == Percent || type() == Calculated || isViewportPercentage(); }
+    bool isSpecifiedOrIntrinsic() const { return isSpecified() || isIntrinsic(); }
     bool isCalculated() const { return type() == Calculated; }
     bool isCalculatedEqual(const Length&) const;
+    bool isMinContent() const { return type() == MinContent; }
+    bool isMaxContent() const { return type() == MaxContent; }
 
     Length blend(const Length& from, double progress) const
     {
@@ -263,7 +266,7 @@ public:
     bool isViewportPercentage() const
     {
         LengthType lengthType = type();
-        return lengthType >= ViewportPercentageWidth && lengthType <= ViewportPercentageMin;
+        return lengthType >= ViewportPercentageWidth && lengthType <= ViewportPercentageMax;
     }
     float viewportPercentageLength() const
     {

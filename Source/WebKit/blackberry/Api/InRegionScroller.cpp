@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -80,6 +80,10 @@ InRegionScrollerPrivate::InRegionScrollerPrivate(WebPagePrivate* webPagePrivate)
 
 void InRegionScrollerPrivate::reset()
 {
+    // Notify the client side to clear InRegion scrollable areas before we destroy them here.
+    std::vector<Platform::ScrollViewBase*> emptyInRegionScrollableAreas;
+    m_webPage->m_client->notifyInRegionScrollableAreasChanged(emptyInRegionScrollableAreas);
+
     m_needsActiveScrollableAreaCalculation = false;
     for (size_t i = 0; i < m_activeInRegionScrollableAreas.size(); ++i)
         delete m_activeInRegionScrollableAreas[i];
@@ -106,7 +110,11 @@ void InRegionScrollerPrivate::clearDocumentData(const Document* documentGoingAwa
 
 bool InRegionScrollerPrivate::setScrollPositionCompositingThread(unsigned camouflagedLayer, const WebCore::IntPoint& scrollPosition)
 {
-    LayerCompositingThread* scrollLayer = reinterpret_cast<LayerWebKitThread*>(camouflagedLayer)->layerCompositingThread();
+    LayerWebKitThread* layerWebKitThread = reinterpret_cast<LayerWebKitThread*>(camouflagedLayer);
+    if (!isValidScrollableLayerWebKitThread(layerWebKitThread))
+        return false;
+
+    LayerCompositingThread* scrollLayer = layerWebKitThread->layerCompositingThread();
 
     // FIXME: Clamp maximum and minimum scroll positions as a last attempt to fix round errors.
     FloatPoint anchor;
@@ -138,7 +146,9 @@ bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflaged
 
     if (supportsAcceleratedScrolling) {
         LayerWebKitThread* layerWebKitThread = reinterpret_cast<LayerWebKitThread*>(camouflagedLayer);
-        ASSERT(layerWebKitThread);
+        if (!isValidScrollableLayerWebKitThread(layerWebKitThread))
+            return false;
+
         if (layerWebKitThread->owner()) {
             GraphicsLayer* graphicsLayer = layerWebKitThread->owner();
 
@@ -152,8 +162,7 @@ bool InRegionScrollerPrivate::setScrollPositionWebKitThread(unsigned camouflaged
         }
     } else {
         Node* node = reinterpret_cast<Node*>(camouflagedLayer);
-        ASSERT(node);
-        if (!node->renderer())
+        if (!isValidScrollableNode(node) || !node->renderer())
             return false;
 
         layer = node->renderer()->enclosingLayer();
@@ -194,6 +203,34 @@ void InRegionScrollerPrivate::calculateActiveAndShrinkCachedScrollableAreas(Rend
     m_needsActiveScrollableAreaCalculation = false;
 }
 
+WebCore::IntRect InRegionScrollerPrivate::clipToRect(const WebCore::IntRect& clippingRect, InRegionScrollableArea* scrollable)
+{
+    RenderLayer* layer = scrollable->layer();
+    if (!layer)
+        return clippingRect;
+
+    if (layer->renderer()->isRenderView()) { // #document case
+        FrameView* view = toRenderView(layer->renderer())->frameView();
+        ASSERT(view);
+        ASSERT(canScrollInnerFrame(view->frame()));
+
+        WebCore::IntRect frameWindowRect = m_webPage->mapToTransformed(m_webPage->getRecursiveVisibleWindowRect(view));
+        frameWindowRect.intersect(clippingRect);
+        return frameWindowRect;
+    }
+
+    RenderBox* box = layer->renderBox();
+    ASSERT(box);
+    ASSERT(canScrollRenderBox(box));
+
+    // We want the window rect in pixel viewport coordinates clipped to the clipping rect.
+    WebCore::IntRect visibleWindowRect = enclosingIntRect(box->absoluteClippedOverflowRect());
+    visibleWindowRect = box->frame()->view()->contentsToWindow(visibleWindowRect);
+    visibleWindowRect = m_webPage->mapToTransformed(visibleWindowRect);
+    visibleWindowRect.intersect(clippingRect);
+    return visibleWindowRect;
+}
+
 void InRegionScrollerPrivate::calculateInRegionScrollableAreasForPoint(const WebCore::IntPoint& documentPoint)
 {
     ASSERT(m_activeInRegionScrollableAreas.empty());
@@ -205,10 +242,14 @@ void InRegionScrollerPrivate::calculateInRegionScrollableAreasForPoint(const Web
         return;
 
     RenderLayer* layer = node->renderer()->enclosingLayer();
+    if (!layer)
+        return;
+
     do {
+
         RenderObject* renderer = layer->renderer();
 
-        if (renderer->isRenderView()) {
+        if (renderer && renderer->isRenderView()) {
             if (RenderView* renderView = toRenderView(renderer)) {
                 FrameView* view = renderView->frameView();
                 if (!view) {
@@ -247,37 +288,68 @@ void InRegionScrollerPrivate::calculateInRegionScrollableAreasForPoint(const Web
     // we account for all and any clipping rects.
     WebCore::IntRect recursiveClippingRect(WebCore::IntPoint::zero(), m_webPage->transformedViewportSize());
 
-    std::vector<Platform::ScrollViewBase*>::reverse_iterator rend = m_activeInRegionScrollableAreas.rend();
-    for (std::vector<Platform::ScrollViewBase*>::reverse_iterator rit = m_activeInRegionScrollableAreas.rbegin(); rit != rend; ++rit) {
-
-        InRegionScrollableArea* curr = static_cast<InRegionScrollableArea*>(*rit);
-        RenderLayer* layer = curr->layer();
-
-        if (layer && layer->renderer()->isRenderView()) { // #document case
-            FrameView* view = toRenderView(layer->renderer())->frameView();
-            ASSERT(view);
-            ASSERT(canScrollInnerFrame(view->frame()));
-
-            WebCore::IntRect frameWindowRect = m_webPage->mapToTransformed(m_webPage->getRecursiveVisibleWindowRect(view));
-            frameWindowRect.intersect(recursiveClippingRect);
-            curr->setVisibleWindowRect(frameWindowRect);
-            recursiveClippingRect = frameWindowRect;
-
-        } else { // RenderBox-based elements case (scrollable boxes (div's, p's, textarea's, etc)).
-
-            RenderBox* box = layer->renderBox();
-            ASSERT(box);
-            ASSERT(canScrollRenderBox(box));
-
-            WebCore::IntRect visibleWindowRect = enclosingIntRect(box->absoluteClippedOverflowRect());
-            visibleWindowRect = box->frame()->view()->contentsToWindow(visibleWindowRect);
-            visibleWindowRect = m_webPage->mapToTransformed(visibleWindowRect);
-            visibleWindowRect.intersect(recursiveClippingRect);
-
-            curr->setVisibleWindowRect(visibleWindowRect);
-            recursiveClippingRect = visibleWindowRect;
-        }
+    for (int i = m_activeInRegionScrollableAreas.size() - 1; i >= 0; --i) {
+        InRegionScrollableArea* scrollable = static_cast<InRegionScrollableArea*>(m_activeInRegionScrollableAreas[i]);
+        scrollable->setVisibleWindowRect(clipToRect(recursiveClippingRect, scrollable));
+        recursiveClippingRect = scrollable->visibleWindowRect();
     }
+}
+
+void InRegionScrollerPrivate::updateSelectionScrollView(const Node* node)
+{
+    // TODO: don't notify the client if the node didn't change.
+    // Deleting the scrollview is handled by the client.
+    Platform::ScrollViewBase* selectionScrollView = firstScrollableInRegionForNode(node);
+    m_webPage->m_client->notifySelectionScrollView(selectionScrollView);
+    // if there's no subframe set an empty rect so that we default to the main frame.
+    m_webPage->m_selectionHandler->setSelectionViewportRect(selectionScrollView ? WebCore::IntRect(selectionScrollView->documentViewportRect()) : WebCore::IntRect());
+}
+
+Platform::ScrollViewBase* InRegionScrollerPrivate::firstScrollableInRegionForNode(const Node* node)
+{
+    if (!node || !node->renderer())
+        return 0;
+
+    RenderLayer* layer = node->renderer()->enclosingLayer();
+    if (!layer)
+        return 0;
+    do {
+        RenderObject* renderer = layer->renderer();
+
+        if (renderer->isRenderView()) {
+            if (RenderView* renderView = toRenderView(renderer)) {
+                FrameView* view = renderView->frameView();
+                if (!view) {
+                    reset();
+                    return 0;
+                }
+
+                if (!renderView->compositor()->scrollLayer())
+                    continue;
+
+                if (canScrollInnerFrame(view->frame()))
+                    return clipAndCreateInRegionScrollableArea(layer);
+            }
+        } else if (canScrollRenderBox(layer->renderBox()))
+            return clipAndCreateInRegionScrollableArea(layer);
+
+        // If we run into a fix positioned layer, set the last scrollable in-region object
+        // as not able to propagate scroll to its parent scrollable.
+        if (isNonRenderViewFixedPositionedContainer(layer) && m_activeInRegionScrollableAreas.size()) {
+            Platform::ScrollViewBase* end = m_activeInRegionScrollableAreas.back();
+            end->setCanPropagateScrollingToEnclosingScrollable(false);
+        }
+
+    } while (layer = parentLayer(layer));
+    return 0;
+}
+
+Platform::ScrollViewBase* InRegionScrollerPrivate::clipAndCreateInRegionScrollableArea(RenderLayer* layer)
+{
+    WebCore::IntRect recursiveClippingRect(WebCore::IntPoint::zero(), m_webPage->transformedViewportSize());
+    InRegionScrollableArea* scrollable = new InRegionScrollableArea(m_webPage, layer);
+    scrollable->setVisibleWindowRect(clipToRect(recursiveClippingRect, scrollable));
+    return scrollable;
 }
 
 const std::vector<Platform::ScrollViewBase*>& InRegionScrollerPrivate::activeInRegionScrollableAreas() const
@@ -304,10 +376,10 @@ bool InRegionScrollerPrivate::setLayerScrollPosition(RenderLayer* layer, const I
     } else {
 
         // RenderBox-based elements case (scrollable boxes (div's, p's, textarea's, etc)).
-        layer->scrollToOffset(toSize(scrollPosition));
+        layer->scrollToOffset(toIntSize(scrollPosition));
     }
 
-    m_webPage->m_selectionHandler->selectionPositionChanged();
+    layer->renderer()->frame()->selection()->updateAppearance();
     // FIXME: We have code in place to handle scrolling and clipping tap highlight
     // on in-region scrolling. As soon as it is fast enough (i.e. we have it backed by
     // a backing store), we can reliably make use of it in the real world.
@@ -389,8 +461,15 @@ static RenderLayer* parentLayer(RenderLayer* layer)
         return layer->parent();
 
     RenderObject* renderer = layer->renderer();
-    if (renderer->document() && renderer->document()->ownerElement() && renderer->document()->ownerElement()->renderer())
-        return renderer->document()->ownerElement()->renderer()->enclosingLayer();
+    Document* document = renderer->document();
+    if (document) {
+        HTMLFrameOwnerElement* ownerElement = document->ownerElement();
+        if (ownerElement) {
+            RenderObject* subRenderer = ownerElement->renderer();
+            if (subRenderer)
+                return subRenderer->enclosingLayer();
+        }
+    }
 
     return 0;
 }
@@ -410,6 +489,32 @@ void InRegionScrollerPrivate::pushBackInRegionScrollable(InRegionScrollableArea*
 
     scrollableArea->setCanPropagateScrollingToEnclosingScrollable(!isNonRenderViewFixedPositionedContainer(scrollableArea->layer()));
     m_activeInRegionScrollableAreas.push_back(scrollableArea);
+}
+
+bool InRegionScrollerPrivate::isValidScrollableLayerWebKitThread(LayerWebKitThread* layerWebKitThread) const
+{
+    if (!layerWebKitThread)
+        return false;
+
+    for (unsigned i = 0; i < m_activeInRegionScrollableAreas.size(); ++i) {
+        if (static_cast<InRegionScrollableArea*>(m_activeInRegionScrollableAreas[i])->cachedScrollableLayer() == layerWebKitThread)
+            return true;
+    }
+
+    return false;
+}
+
+bool InRegionScrollerPrivate::isValidScrollableNode(Node* node) const
+{
+    if (!node)
+        return false;
+
+    for (unsigned i = 0; i < m_activeInRegionScrollableAreas.size(); ++i) {
+        if (static_cast<InRegionScrollableArea*>(m_activeInRegionScrollableAreas[i])->cachedScrollableNode() == node)
+            return true;
+    }
+
+    return false;
 }
 
 }

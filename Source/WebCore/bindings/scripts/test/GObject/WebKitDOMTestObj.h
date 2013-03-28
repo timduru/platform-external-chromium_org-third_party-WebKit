@@ -18,13 +18,16 @@
     Boston, MA 02110-1301, USA.
 */
 
+#if !defined(__WEBKITDOM_H_INSIDE__) && !defined(BUILDING_WEBKIT)
+#error "Only <webkitdom/webkitdom.h> can be included directly."
+#endif
+
 #ifndef WebKitDOMTestObj_h
 #define WebKitDOMTestObj_h
 
 #include <glib-object.h>
-#include <webkit/WebKitDOMObject.h>
-#include <webkit/webkitdefines.h>
-#include <webkit/webkitdomdefines.h>
+#include <webkitdom/WebKitDOMObject.h>
+#include <webkitdom/webkitdomdefines.h>
 
 G_BEGIN_DECLS
 
@@ -116,6 +119,17 @@ WEBKIT_API WebKitDOMTestObj*
 webkit_dom_test_obj_obj_method_with_args(WebKitDOMTestObj* self, glong longArg, const gchar* strArg, WebKitDOMTestObj* objArg);
 
 /**
+ * webkit_dom_test_obj_method_with_enum_arg:
+ * @self: A #WebKitDOMTestObj
+ * @enumArg: A #WebKitDOMTestEnumType
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API void
+webkit_dom_test_obj_method_with_enum_arg(WebKitDOMTestObj* self, WebKitDOMTestEnumType* enumArg);
+
+/**
  * webkit_dom_test_obj_method_that_requires_all_args_and_throws:
  * @self: A #WebKitDOMTestObj
  * @strArg: A #gchar
@@ -138,17 +152,6 @@ webkit_dom_test_obj_method_that_requires_all_args_and_throws(WebKitDOMTestObj* s
 **/
 WEBKIT_API void
 webkit_dom_test_obj_serialized_value(WebKitDOMTestObj* self, WebKitDOMSerializedScriptValue* serializedArg);
-
-/**
- * webkit_dom_test_obj_idb_key:
- * @self: A #WebKitDOMTestObj
- * @key: A #WebKitDOMIDBKey
- *
- * Returns:
- *
-**/
-WEBKIT_API void
-webkit_dom_test_obj_idb_key(WebKitDOMTestObj* self, WebKitDOMIDBKey* key);
 
 /**
  * webkit_dom_test_obj_options_object:
@@ -1396,6 +1399,89 @@ webkit_dom_test_obj_get_hash(WebKitDOMTestObj* self);
 **/
 WEBKIT_API glong
 webkit_dom_test_obj_get_replaceable_attribute(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_get_nullable_double_attribute:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API gdouble
+webkit_dom_test_obj_get_nullable_double_attribute(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_get_nullable_long_attribute:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API glong
+webkit_dom_test_obj_get_nullable_long_attribute(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_get_nullable_boolean_attribute:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API gboolean
+webkit_dom_test_obj_get_nullable_boolean_attribute(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_get_nullable_string_attribute:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API gchar*
+webkit_dom_test_obj_get_nullable_string_attribute(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_get_nullable_long_settable_attribute:
+ * @self: A #WebKitDOMTestObj
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API glong
+webkit_dom_test_obj_get_nullable_long_settable_attribute(WebKitDOMTestObj* self);
+
+/**
+ * webkit_dom_test_obj_set_nullable_long_settable_attribute:
+ * @self: A #WebKitDOMTestObj
+ * @value: A #glong
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API void
+webkit_dom_test_obj_set_nullable_long_settable_attribute(WebKitDOMTestObj* self, glong value);
+
+/**
+ * webkit_dom_test_obj_get_nullable_string_value:
+ * @self: A #WebKitDOMTestObj
+ * @error: #GError
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API glong
+webkit_dom_test_obj_get_nullable_string_value(WebKitDOMTestObj* self, GError** error);
+
+/**
+ * webkit_dom_test_obj_set_nullable_string_value:
+ * @self: A #WebKitDOMTestObj
+ * @value: A #glong
+ *
+ * Returns:
+ *
+**/
+WEBKIT_API void
+webkit_dom_test_obj_set_nullable_string_value(WebKitDOMTestObj* self, glong value);
 
 G_END_DECLS
 

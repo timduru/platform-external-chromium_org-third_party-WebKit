@@ -39,6 +39,13 @@ _log = logging.getLogger(__name__)
 
 
 class XvfbDriver(Driver):
+    @staticmethod
+    def check_xvfb(port):
+        xvfb_found = port.host.executive.run_command(['which', 'Xvfb'], return_exit_code=True) is 0
+        if not xvfb_found:
+            _log.error("No Xvfb found. Cannot run layout tests.")
+        return xvfb_found
+
     def __init__(self, *args, **kwargs):
         Driver.__init__(self, *args, **kwargs)
         self._guard_lock = None
@@ -54,11 +61,13 @@ class XvfbDriver(Driver):
         for i in range(99):
             if i not in reserved_screens:
                 _guard_lock_file = self._port.host.filesystem.join('/tmp', 'WebKitXvfb.lock.%i' % i)
-                self._guard_lock = FileLock(_guard_lock_file)
+                self._guard_lock = self._port.host.make_file_lock(_guard_lock_file)
                 if self._guard_lock.acquire_lock():
                     return i
 
     def _start(self, pixel_tests, per_test_args):
+        self.stop()
+
         # Use even displays for pixel tests and odd ones otherwise. When pixel tests are disabled,
         # DriverProxy creates two drivers, one for normal and the other for ref tests. Both have
         # the same worker number, so this prevents them from using the same Xvfb instance.

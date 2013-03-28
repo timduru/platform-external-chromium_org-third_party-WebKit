@@ -104,9 +104,8 @@ public:
     void loadFrameRequest(const FrameLoadRequest&, bool lockHistory, bool lockBackForwardList,  // Called by submitForm, calls loadPostRequest and loadURL.
         PassRefPtr<Event>, PassRefPtr<FormState>, ShouldSendReferrer);
 
-    void load(const ResourceRequest&, bool lockHistory);                                        // Called by WebFrame, calls load(ResourceRequest, SubstituteData).
-    void load(const ResourceRequest&, const SubstituteData&, bool lockHistory);                 // Called both by WebFrame and internally, calls load(DocumentLoader*).
-    void load(const ResourceRequest&, const String& frameName, bool lockHistory);               // Called by WebPluginController.
+    void load(const FrameLoadRequest&);
+
 #if ENABLE(WEB_ARCHIVE) || ENABLE(MHTML)
     void loadArchive(PassRefPtr<Archive>);
 #endif
@@ -124,6 +123,8 @@ public:
     void loadItem(HistoryItem*, FrameLoadType);
     HistoryItem* requestedHistoryItem() const { return m_requestedHistoryItem.get(); }
 
+    void retryAfterFailedCacheOnlyMainResourceLoad();
+
     static void reportLocalLoadFailed(Frame*, const String& url);
 
     // FIXME: These are all functions which stop loads. We have too many.
@@ -135,6 +136,11 @@ public:
     void cancelAndClear();
     // FIXME: clear() is trying to do too many things. We should break it down into smaller functions (ideally with fewer raw Boolean parameters).
     void clear(Document* newDocument, bool clearWindowProperties = true, bool clearScriptObjects = true, bool clearFrameView = true);
+
+#if PLATFORM(CHROMIUM)
+    void didAccessInitialDocument();
+    void didAccessInitialDocumentTimerFired(Timer<FrameLoader>*);
+#endif
 
     bool isLoading() const;
     bool frameHasLoaded() const;
@@ -283,12 +289,17 @@ public:
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
+    enum FormSubmissionCacheLoadPolicy {
+        MayAttemptCacheOnlyLoadForFormSubmissionItem,
+        MayNotAttemptCacheOnlyLoadForFormSubmissionItem
+    };
+
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
     void checkTimerFired(Timer<FrameLoader>*);
     
     void loadSameDocumentItem(HistoryItem*);
-    void loadDifferentDocumentItem(HistoryItem*, FrameLoadType);
+    void loadDifferentDocumentItem(HistoryItem*, FrameLoadType, FormSubmissionCacheLoadPolicy);
     
     void loadProvisionalItemFromCachedPage();
 
@@ -353,7 +364,7 @@ private:
     void detachChildren();
     void closeAndRemoveChild(Frame*);
 
-    void loadInSameDocument(const KURL&, SerializedScriptValue* stateObject, bool isNewNavigation);
+    void loadInSameDocument(const KURL&, PassRefPtr<SerializedScriptValue> stateObject, bool isNewNavigation);
 
     void prepareForLoadStart();
     void provisionalLoadStarted();
@@ -424,6 +435,10 @@ private:
     Frame* m_opener;
     HashSet<Frame*> m_openedFrames;
 
+#if PLATFORM(CHROMIUM)
+    bool m_didAccessInitialDocument;
+    Timer<FrameLoader> m_didAccessInitialDocumentTimer;
+#endif
     bool m_didPerformFirstNavigation;
     bool m_loadingFromCachedPage;
     bool m_suppressOpenerInNewFrame;

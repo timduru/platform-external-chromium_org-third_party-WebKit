@@ -112,11 +112,6 @@ void TestRunner::keepWebHistory()
     DumpRenderTreeSupportEfl::setShouldTrackVisitedLinks(true);
 }
 
-JSValueRef TestRunner::computedStyleIncludingVisitedInfo(JSContextRef context, JSValueRef value)
-{
-    return DumpRenderTreeSupportEfl::computedStyleIncludingVisitedInfo(context, value);
-}
-
 size_t TestRunner::webHistoryItemCount()
 {
     const Ewk_History* history = ewk_view_history_get(browser->mainView());
@@ -124,11 +119,6 @@ size_t TestRunner::webHistoryItemCount()
         return -1;
 
     return ewk_history_back_list_length(history) + ewk_history_forward_list_length(history);
-}
-
-unsigned TestRunner::workerThreadCount() const
-{
-    return DumpRenderTreeSupportEfl::workerThreadCount();
 }
 
 void TestRunner::notifyDone()
@@ -282,11 +272,6 @@ void TestRunner::setWindowIsKey(bool)
     notImplemented();
 }
 
-void TestRunner::setSmartInsertDeleteEnabled(bool flag)
-{
-    DumpRenderTreeSupportEfl::setSmartInsertDeleteEnabled(browser->mainView(), flag);
-}
-
 static Eina_Bool waitToDumpWatchdogFired(void*)
 {
     waitToDumpWatchdog = 0;
@@ -323,11 +308,6 @@ void TestRunner::setXSSAuditorEnabled(bool flag)
     ewk_view_setting_enable_xss_auditor_set(browser->mainView(), flag);
 }
 
-void TestRunner::setFrameFlatteningEnabled(bool flag)
-{
-    ewk_view_setting_enable_frame_flattening_set(browser->mainView(), flag);
-}
-
 void TestRunner::setSpatialNavigationEnabled(bool flag)
 {
     ewk_view_setting_spatial_navigation_set(browser->mainView(), flag);
@@ -346,16 +326,6 @@ void TestRunner::setAllowFileAccessFromFileURLs(bool flag)
 void TestRunner::setAuthorAndUserStylesEnabled(bool flag)
 {
     DumpRenderTreeSupportEfl::setAuthorAndUserStylesEnabled(browser->mainView(), flag);
-}
-
-void TestRunner::setAutofilled(JSContextRef context, JSValueRef nodeObject, bool autofilled)
-{
-    DumpRenderTreeSupportEfl::setAutofilled(context, nodeObject, autofilled);
-}
-
-void TestRunner::disableImageLoading()
-{
-    ewk_view_setting_auto_load_images_set(browser->mainView(), EINA_FALSE);
 }
 
 void TestRunner::setMockDeviceOrientation(bool, double, bool, double, bool, double)
@@ -446,11 +416,6 @@ void TestRunner::setIconDatabaseEnabled(bool enabled)
         ewk_settings_icon_database_path_set(databasePath.utf8().data());
 }
 
-void TestRunner::setSelectTrailingWhitespaceEnabled(bool flag)
-{
-    DumpRenderTreeSupportEfl::setSelectTrailingWhitespaceEnabled(browser->mainView(), flag);
-}
-
 void TestRunner::setPopupBlockingEnabled(bool flag)
 {
     ewk_view_setting_scripts_can_open_windows_set(browser->mainView(), !flag);
@@ -459,13 +424,6 @@ void TestRunner::setPopupBlockingEnabled(bool flag)
 void TestRunner::setPluginsEnabled(bool flag)
 {
     ewk_view_setting_enable_plugins_set(browser->mainView(), flag);
-}
-
-bool TestRunner::elementDoesAutoCompleteForElementWithId(JSStringRef id)
-{
-    const String elementId(id->string());
-    const Evas_Object* mainFrame = browser->mainFrame();
-    return DumpRenderTreeSupportEfl::elementDoesAutoCompleteForElementWithId(mainFrame, elementId);
 }
 
 void TestRunner::execCommand(JSStringRef name, JSStringRef value)
@@ -660,21 +618,6 @@ void TestRunner::setAppCacheMaximumSize(unsigned long long size)
     ewk_settings_application_cache_max_quota_set(size);
 }
 
-bool TestRunner::pauseAnimationAtTimeOnElementWithId(JSStringRef animationName, double time, JSStringRef elementId)
-{
-    return DumpRenderTreeSupportEfl::pauseAnimation(browser->mainFrame(), animationName->string().utf8().data(), elementId->string().utf8().data(), time);
-}
-
-bool TestRunner::pauseTransitionAtTimeOnElementWithId(JSStringRef propertyName, double time, JSStringRef elementId)
-{
-    return DumpRenderTreeSupportEfl::pauseTransition(browser->mainFrame(), propertyName->string().utf8().data(), elementId->string().utf8().data(), time);
-}
-
-unsigned TestRunner::numberOfActiveAnimations() const
-{
-    return DumpRenderTreeSupportEfl::activeAnimationsCount(browser->mainFrame());
-}
-
 static inline bool toBool(JSStringRef value)
 {
     return equals(value, "true") || equals(value, "1");
@@ -736,11 +679,6 @@ void TestRunner::setDeveloperExtrasEnabled(bool enabled)
     ewk_view_setting_enable_developer_extras_set(browser->mainView(), enabled);
 }
 
-void TestRunner::setAsynchronousSpellCheckingEnabled(bool)
-{
-    notImplemented();
-}
-
 void TestRunner::showWebInspector()
 {
     ewk_view_inspector_show(browser->mainView());
@@ -796,16 +734,6 @@ void TestRunner::setWebViewEditable(bool)
     ewk_frame_editable_set(browser->mainFrame(), EINA_TRUE);
 }
 
-JSRetainPtr<JSStringRef> TestRunner::markerTextForListItem(JSContextRef context, JSValueRef nodeObject) const
-{
-    String markerTextChar = DumpRenderTreeSupportEfl::markerTextForListItem(context, nodeObject);
-    if (markerTextChar.isEmpty())
-        return 0;
-
-    JSRetainPtr<JSStringRef> markerText(Adopt, JSStringCreateWithUTF8CString(markerTextChar.utf8().data()));
-    return markerText;
-}
-
 void TestRunner::authenticateSession(JSStringRef, JSStringRef, JSStringRef)
 {
     notImplemented();
@@ -819,11 +747,6 @@ void TestRunner::abortModal()
 void TestRunner::setSerializeHTTPLoads(bool serialize)
 {
     DumpRenderTreeSupportEfl::setSerializeHTTPLoads(serialize);
-}
-
-void TestRunner::setMinimumTimerInterval(double minimumTimerInterval)
-{
-    ewk_view_setting_minimum_timer_interval_set(browser->mainView(), minimumTimerInterval);
 }
 
 void TestRunner::setTextDirection(JSStringRef direction)
@@ -906,21 +829,18 @@ void TestRunner::setAutomaticLinkDetectionEnabled(bool)
     notImplemented();
 }
 
-void TestRunner::sendWebIntentResponse(JSStringRef response)
-{
-    Ewk_Intent_Request* request = browser->currentIntentRequest();
-    if (!request)
-        return;
-
-    DumpRenderTreeSupportEfl::sendWebIntentResponse(request, response);
-}
-
-void TestRunner::deliverWebIntent(JSStringRef action, JSStringRef type, JSStringRef data)
-{
-    DumpRenderTreeSupportEfl::deliverWebIntent(browser->mainFrame(), action, type, data);
-}
-
 void TestRunner::setStorageDatabaseIdleInterval(double)
 {
     notImplemented();
+}
+
+void TestRunner::closeIdleLocalStorageDatabases()
+{
+    notImplemented();
+}
+
+JSRetainPtr<JSStringRef> TestRunner::platformName() const
+{
+    JSRetainPtr<JSStringRef> platformName(Adopt, JSStringCreateWithUTF8CString("efl"));
+    return platformName;
 }

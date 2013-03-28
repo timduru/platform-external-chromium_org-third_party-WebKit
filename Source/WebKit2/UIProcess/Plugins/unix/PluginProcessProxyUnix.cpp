@@ -35,7 +35,7 @@
 #include <WebCore/FileSystem.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
-#if PLATFORM(GTK) || (PLATFORM(EFL) && ENABLE(GLIB_SUPPORT))
+#if PLATFORM(GTK) || PLATFORM(EFL)
 #include <glib.h>
 #endif
 
@@ -43,15 +43,15 @@ using namespace WebCore;
 
 namespace WebKit {
 
-void PluginProcessProxy::platformInitializeLaunchOptions(ProcessLauncher::LaunchOptions& launchOptions, const PluginModuleInfo&)
+void PluginProcessProxy::platformGetLaunchOptions(ProcessLauncher::LaunchOptions& launchOptions, const PluginModuleInfo& pluginInfo)
 {
 #if PLATFORM(EFL) && !defined(NDEBUG)
     const char* commandPrefix = getenv("PLUGIN_PROCESS_COMMAND_PREFIX");
     if (commandPrefix && *commandPrefix)
         launchOptions.processCmdPrefix = String::fromUTF8(commandPrefix);
-#else
-    UNUSED_PARAM(launchOptions);
 #endif
+
+    launchOptions.extraInitializationData.add("plugin-path", pluginInfo.path);
 }
 
 void PluginProcessProxy::platformInitializePluginProcess(PluginProcessCreationParameters&)
@@ -60,7 +60,7 @@ void PluginProcessProxy::platformInitializePluginProcess(PluginProcessCreationPa
 
 bool PluginProcessProxy::scanPlugin(const String& pluginPath, RawPluginMetaData& result)
 {
-#if PLATFORM(GTK) || (PLATFORM(EFL) && ENABLE(GLIB_SUPPORT))
+#if PLATFORM(GTK) || PLATFORM(EFL)
     CString binaryPath = fileSystemRepresentation(executablePathOfPluginProcess());
     CString pluginPathCString = fileSystemRepresentation(pluginPath);
     char* argv[4];
@@ -96,7 +96,7 @@ bool PluginProcessProxy::scanPlugin(const String& pluginPath, RawPluginMetaData&
     free(stdOut);
 
     Vector<String> lines;
-    stdOutString.split(UChar('\n'), lines);
+    stdOutString.split(UChar('\n'), true, lines);
 
     if (lines.size() < 3)
         return false;
@@ -105,9 +105,9 @@ bool PluginProcessProxy::scanPlugin(const String& pluginPath, RawPluginMetaData&
     result.description.swap(lines[1]);
     result.mimeDescription.swap(lines[2]);
     return !result.mimeDescription.isEmpty();
-#else // PLATFORM(GTK) || (PLATFORM(EFL) && ENABLE(GLIB_SUPPORT))
+#else // PLATFORM(GTK) || PLATFORM(EFL)
     return false;
-#endif // PLATFORM(GTK) || (PLATFORM(EFL) && ENABLE(GLIB_SUPPORT))
+#endif // PLATFORM(GTK) || PLATFORM(EFL)
 }
 
 } // namespace WebKit

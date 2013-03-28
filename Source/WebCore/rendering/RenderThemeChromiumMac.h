@@ -25,11 +25,11 @@
 #define RenderThemeChromiumMac_h
 
 #import "RenderThemeChromiumCommon.h"
-#import "RenderThemeMac.h"
+#import "RenderThemeMacShared.h"
 
 namespace WebCore {
 
-class RenderThemeChromiumMac : public RenderThemeMac {
+class RenderThemeChromiumMac : public RenderThemeMacShared {
 public:
     static PassRefPtr<RenderTheme> create();
 
@@ -73,9 +73,6 @@ private:
     virtual String extraDefaultStyleSheet();
 #if ENABLE(DATALIST_ELEMENT)
     virtual LayoutUnit sliderTickSnappingThreshold() const OVERRIDE;
-#endif
-#if ENABLE(CALENDAR_PICKER)
-    virtual CString extraCalendarPickerStyleSheet() OVERRIDE;
 #endif
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
     virtual bool supportsCalendarPicker(const AtomicString& type) const OVERRIDE;

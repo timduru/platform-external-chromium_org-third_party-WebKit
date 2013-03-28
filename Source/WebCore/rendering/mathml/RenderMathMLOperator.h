@@ -36,7 +36,8 @@ namespace WebCore {
 class RenderMathMLOperator : public RenderMathMLBlock {
 public:
     RenderMathMLOperator(Element*);
-    RenderMathMLOperator(Node*, UChar operatorChar);
+    RenderMathMLOperator(Element*, UChar operatorChar);
+
     virtual bool isRenderMathMLOperator() const { return true; }
     
     virtual bool isChildAllowed(RenderObject*, RenderStyle*) const;
@@ -46,7 +47,11 @@ public:
     void stretchToHeight(int pixelHeight);
     
     virtual int firstLineBoxBaseline() const OVERRIDE;
-        
+    
+    enum OperatorType { Default, Separator, Fence };
+    void setOperatorType(OperatorType type) { m_operatorType = type; }
+    OperatorType operatorType() const { return m_operatorType; }
+    
 protected:
     virtual void computePreferredLogicalWidths() OVERRIDE;
     PassRefPtr<RenderStyle> createStackableStyle(int maxHeightForRenderer);
@@ -62,17 +67,18 @@ private:
     int m_stretchHeight;
     bool m_isStacked;
     UChar m_operator;
+    OperatorType m_operatorType;
 };
 
 inline RenderMathMLOperator* toRenderMathMLOperator(RenderMathMLBlock* block)
 { 
-    ASSERT(!block || block->isRenderMathMLOperator());
+    ASSERT_WITH_SECURITY_IMPLICATION(!block || block->isRenderMathMLOperator());
     return static_cast<RenderMathMLOperator*>(block);
 }
 
 inline const RenderMathMLOperator* toRenderMathMLOperator(const RenderMathMLBlock* block)
 { 
-    ASSERT(!block || block->isRenderMathMLOperator());
+    ASSERT_WITH_SECURITY_IMPLICATION(!block || block->isRenderMathMLOperator());
     return static_cast<const RenderMathMLOperator*>(block);
 }
 

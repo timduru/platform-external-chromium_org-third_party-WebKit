@@ -25,9 +25,10 @@
 
 [
     Conditional=SCRIPTED_SPEECH,
-    ConstructorTemplate=Event
+    ConstructorTemplate=Event,
 ] interface SpeechRecognitionEvent : Event {
-    [InitializedByEventConstructor] readonly attribute SpeechRecognitionResult result;
-    [InitializedByEventConstructor] readonly attribute short resultIndex;
-    [InitializedByEventConstructor] readonly attribute SpeechRecognitionResultList resultHistory;
+    [InitializedByEventConstructor] readonly attribute unsigned long resultIndex;
+    [InitializedByEventConstructor] readonly attribute SpeechRecognitionResultList results;
+
+    readonly attribute Document emma;
 };

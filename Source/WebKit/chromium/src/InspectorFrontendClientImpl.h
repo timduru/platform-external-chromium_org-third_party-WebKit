@@ -57,7 +57,6 @@ public:
     virtual void moveWindowBy(float x, float y);
 
     virtual WTF::String localizedStringsURL();
-    virtual WTF::String hiddenPanels();
 
     virtual void bringToFront();
     virtual void closeWindow();
@@ -70,11 +69,18 @@ public:
     virtual bool canSave();
     virtual void save(const WTF::String& urk, const WTF::String& content, bool forceSaveAs);
     virtual void append(const WTF::String& urk, const WTF::String& content);
-    virtual bool canInspectWorkers();
 
     virtual void inspectedURLChanged(const WTF::String&);
 
     virtual void sendMessageToBackend(const WTF::String&);
+
+    virtual bool supportsFileSystems();
+    virtual void requestFileSystems();
+    virtual void addFileSystem();
+    virtual void removeFileSystem(const String& fileSystemPath);
+
+    virtual bool isUnderTest();
+
 private:
     WebCore::Page* m_frontendPage;
     WebDevToolsFrontendClient* m_client;

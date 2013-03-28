@@ -68,12 +68,15 @@ namespace WebKit {
         WEBKIT_EXPORT bool isText() const;
         WEBKIT_EXPORT bool isPasswordField() const;
         WEBKIT_EXPORT bool isImageButton() const;
+        WEBKIT_EXPORT bool isRadioButton() const;
+        WEBKIT_EXPORT bool isCheckbox() const;
         WEBKIT_EXPORT bool autoComplete() const;
         WEBKIT_EXPORT int maxLength() const;
         WEBKIT_EXPORT bool isActivatedSubmit() const;
         WEBKIT_EXPORT void setActivatedSubmit(bool);
         WEBKIT_EXPORT int size() const;
         WEBKIT_EXPORT void setValue(const WebString&, bool sendChangeEvent = false);
+        WEBKIT_EXPORT void setChecked(bool, bool sendChangeEvent = false);
         WEBKIT_EXPORT WebString value() const;
         // This returns the non-sanitized, exact value inside the text field.
         WEBKIT_EXPORT WebString editingValue() const;

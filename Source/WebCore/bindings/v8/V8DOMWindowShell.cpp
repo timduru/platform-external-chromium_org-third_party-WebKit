@@ -31,47 +31,37 @@
 #include "config.h"
 #include "V8DOMWindowShell.h"
 
-#include "BindingState.h"
 #include "ContentSecurityPolicy.h"
+#include "DOMWrapperWorld.h"
 #include "DateExtension.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
+#include "HTMLCollection.h"
+#include "HTMLIFrameElement.h"
 #include "InspectorInstrumentation.h"
-#include "MemoryUsageSupport.h"
 #include "Page.h"
-#include "PageGroup.h"
 #include "RuntimeEnabledFeatures.h"
-#include "ScriptCallStack.h"
-#include "ScriptCallStackFactory.h"
 #include "ScriptController.h"
-#include "ScriptProfiler.h"
 #include "SecurityOrigin.h"
-#include "StorageNamespace.h"
-#include "StylePropertySet.h"
 #include "V8Binding.h"
-#include "V8Collection.h"
 #include "V8DOMWindow.h"
 #include "V8Document.h"
-#include "V8GCController.h"
 #include "V8GCForContextDispose.h"
+#include "V8HTMLCollection.h"
 #include "V8HTMLDocument.h"
 #include "V8HiddenPropertyName.h"
-#include "V8History.h"
-#include "V8Location.h"
+#include "V8Initializer.h"
 #include "V8ObjectConstructor.h"
 #include "V8PerContextData.h"
-#include "WorkerContextExecutionProxy.h"
 #include <algorithm>
-#include <stdio.h>
 #include <utility>
 #include <v8-debug.h>
 #include <v8.h>
 #include <wtf/Assertions.h>
 #include <wtf/OwnArrayPtr.h>
-#include <wtf/StdLibExtras.h>
 #include <wtf/StringExtras.h>
-#include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 
 #if ENABLE(JAVASCRIPT_I18N_API)
@@ -80,103 +70,10 @@
 
 namespace WebCore {
 
-static void reportFatalError(const char* location, const char* message)
-{
-    int memoryUsageMB = MemoryUsageSupport::actualMemoryUsageMB();
-    printf("V8 error: %s (%s).  Current memory usage: %d MB\n", message, location, memoryUsageMB);
-    CRASH();
-}
-
-static void reportUncaughtException(v8::Handle<v8::Message> message, v8::Handle<v8::Value> data)
-{
-    DOMWindow* firstWindow = firstDOMWindow(BindingState::instance());
-    if (!firstWindow->isCurrentlyDisplayedInFrame())
-        return;
-
-    String errorMessage = toWebCoreString(message->Get());
-
-    v8::Handle<v8::StackTrace> stackTrace = message->GetStackTrace();
-    RefPtr<ScriptCallStack> callStack;
-    // Currently stack trace is only collected when inspector is open.
-    if (!stackTrace.IsEmpty() && stackTrace->GetFrameCount() > 0)
-        callStack = createScriptCallStack(stackTrace, ScriptCallStack::maxCallStackSizeToCapture);
-
-    v8::Handle<v8::Value> resourceName = message->GetScriptResourceName();
-    bool shouldUseDocumentURL = resourceName.IsEmpty() || !resourceName->IsString();
-    String resource = shouldUseDocumentURL ? firstWindow->document()->url() : toWebCoreString(resourceName);
-    firstWindow->document()->reportException(errorMessage, message->GetLineNumber(), resource, callStack);
-}
-
-static Frame* findFrame(v8::Local<v8::Object> host, v8::Local<v8::Value> data)
-{
-    WrapperTypeInfo* type = WrapperTypeInfo::unwrap(data);
-
-    if (V8DOMWindow::info.equals(type)) {
-        v8::Handle<v8::Object> windowWrapper = V8DOMWrapper::lookupDOMWrapper(V8DOMWindow::GetTemplate(), host);
-        if (windowWrapper.IsEmpty())
-            return 0;
-        return V8DOMWindow::toNative(windowWrapper)->frame();
-    }
-
-    if (V8History::info.equals(type))
-        return V8History::toNative(host)->frame();
-
-    if (V8Location::info.equals(type))
-        return V8Location::toNative(host)->frame();
-
-    // This function can handle only those types listed above.
-    ASSERT_NOT_REACHED();
-    return 0;
-}
-
-static void reportUnsafeJavaScriptAccess(v8::Local<v8::Object> host, v8::AccessType type, v8::Local<v8::Value> data)
-{
-    Frame* target = findFrame(host, data);
-    if (!target)
-        return;
-    DOMWindow* targetWindow = target->document()->domWindow();
-    targetWindow->printErrorMessage(targetWindow->crossDomainAccessErrorMessage(activeDOMWindow(BindingState::instance())));
-}
-
-static void initializeV8IfNeeded()
-{
-    ASSERT(isMainThread());
-
-    static bool initialized = false;
-    if (initialized)
-        return;
-    initialized = true;
-
-    v8::V8::IgnoreOutOfMemoryException();
-    v8::V8::SetFatalErrorHandler(reportFatalError);
-    v8::V8::AddGCPrologueCallback(&V8GCController::gcPrologue);
-    v8::V8::AddGCEpilogueCallback(&V8GCController::gcEpilogue);
-    v8::V8::AddMessageListener(&reportUncaughtException);
-    v8::V8::SetFailedAccessCheckCallbackFunction(reportUnsafeJavaScriptAccess);
-#if ENABLE(JAVASCRIPT_DEBUGGER)
-    ScriptProfiler::initialize();
-#endif
-    V8PerIsolateData::ensureInitialized(v8::Isolate::GetCurrent());
-
-    // FIXME: Remove the following 2 lines when V8 default has changed.
-    const char es5ReadonlyFlag[] = "--es5_readonly";
-    v8::V8::SetFlagsFromString(es5ReadonlyFlag, sizeof(es5ReadonlyFlag));
-}
-
 static void checkDocumentWrapper(v8::Handle<v8::Object> wrapper, Document* document)
 {
     ASSERT(V8Document::toNative(wrapper) == document);
     ASSERT(!document->isHTMLDocument() || (V8Document::toNative(v8::Handle<v8::Object>::Cast(wrapper->GetPrototype())) == document));
-}
-
-static void setIsolatedWorldField(V8DOMWindowShell* shell, v8::Local<v8::Context> context)
-{
-    toInnerGlobalObject(context)->SetPointerInInternalField(V8DOMWindow::enteredIsolatedWorldIndex, shell);
-}
-
-V8DOMWindowShell* V8DOMWindowShell::enteredIsolatedWorldContext()
-{
-    return static_cast<V8DOMWindowShell*>(toInnerGlobalObject(v8::Context::GetEntered())->GetPointerFromInternalField(V8DOMWindow::enteredIsolatedWorldIndex));
 }
 
 static void setInjectedScriptContextDebugId(v8::Handle<v8::Context> targetContext, int debugId)
@@ -186,34 +83,36 @@ static void setInjectedScriptContextDebugId(v8::Handle<v8::Context> targetContex
         snprintf(buffer, sizeof(buffer), "injected");
     else
         snprintf(buffer, sizeof(buffer), "injected,%d", debugId);
-    targetContext->SetData(v8::String::New(buffer));
+    targetContext->SetEmbedderData(0, v8::String::NewSymbol(buffer));
 }
 
-PassOwnPtr<V8DOMWindowShell> V8DOMWindowShell::create(Frame* frame, PassRefPtr<DOMWrapperWorld> world)
+PassOwnPtr<V8DOMWindowShell> V8DOMWindowShell::create(Frame* frame, PassRefPtr<DOMWrapperWorld> world, v8::Isolate* isolate)
 {
-    return adoptPtr(new V8DOMWindowShell(frame, world));
+    return adoptPtr(new V8DOMWindowShell(frame, world, isolate));
 }
 
-V8DOMWindowShell::V8DOMWindowShell(Frame* frame, PassRefPtr<DOMWrapperWorld> world)
+V8DOMWindowShell::V8DOMWindowShell(Frame* frame, PassRefPtr<DOMWrapperWorld> world, v8::Isolate* isolate)
     : m_frame(frame)
     , m_world(world)
+    , m_isolate(isolate)
 {
 }
 
 void V8DOMWindowShell::destroyIsolatedShell()
 {
-    disposeContext(true);
+    ASSERT(m_world->isIsolatedWorld());
+
+    if (m_context.isEmpty())
+        return;
+
+    v8::HandleScope handleScope;
+    m_world->makeContextWeak(m_context.get());
+    disposeContext();
+    m_global.clear();
 }
 
-static void isolatedContextWeakCallback(v8::Persistent<v8::Value> object, void* parameter)
+void V8DOMWindowShell::disposeContext()
 {
-    // Handle will be disposed in delete.
-    delete static_cast<V8DOMWindowShell*>(parameter);
-}
-
-void V8DOMWindowShell::disposeContext(bool weak)
-{
-    ASSERT(!m_context.get().IsWeak());
     m_perContextData.clear();
 
     if (m_context.isEmpty())
@@ -221,31 +120,20 @@ void V8DOMWindowShell::disposeContext(bool weak)
 
     m_frame->loader()->client()->willReleaseScriptContext(m_context.get(), m_world->worldId());
 
-    if (!weak)
-        m_context.clear();
-    else {
-        ASSERT(!m_world->isMainWorld());
-        destroyGlobal();
-        m_frame = 0;
-        m_context.get().MakeWeak(this, isolatedContextWeakCallback);
-    }
+    m_context.clear();
 
     // It's likely that disposing the context has created a lot of
     // garbage. Notify V8 about this so it'll have a chance of cleaning
     // it up when idle.
-    if (m_world->isMainWorld()) {
-        bool isMainFrame = m_frame->page() && (m_frame->page()->mainFrame() == m_frame);
-        V8GCForContextDispose::instance().notifyContextDisposed(isMainFrame);
-    }
+    bool isMainFrame = m_frame->page() && (m_frame->page()->mainFrame() == m_frame);
+    V8GCForContextDispose::instance().notifyContextDisposed(isMainFrame);
 }
 
-void V8DOMWindowShell::destroyGlobal()
+void V8DOMWindowShell::clearForClose(bool destroyGlobal)
 {
-    m_global.clear();
-}
+    if (destroyGlobal)
+        m_global.clear();
 
-void V8DOMWindowShell::clearForClose()
-{
     if (m_context.isEmpty())
         return;
 
@@ -270,7 +158,7 @@ void V8DOMWindowShell::clearForNavigation()
     // will be protected by the security checks on the DOMWindow wrapper.
     clearDocumentProperty();
 
-    v8::Handle<v8::Object> windowWrapper = V8DOMWrapper::lookupDOMWrapper(V8DOMWindow::GetTemplate(), m_global.get());
+    v8::Handle<v8::Object> windowWrapper = m_global->FindInstanceInPrototypeChain(V8DOMWindow::GetTemplate(m_isolate, worldTypeInMainThread(m_isolate)));
     ASSERT(!windowWrapper.IsEmpty());
     windowWrapper->TurnOnAccessCheck();
     m_context->DetachGlobal();
@@ -319,11 +207,13 @@ bool V8DOMWindowShell::initializeIfNeeded()
 
     v8::HandleScope handleScope;
 
-    initializeV8IfNeeded();
+    V8Initializer::initializeMainThreadIfNeeded(m_isolate);
 
     createContext();
     if (m_context.isEmpty())
         return false;
+
+    m_world->setIsolatedWorldField(m_context.get());
 
     bool isMainWorld = m_world->isMainWorld();
 
@@ -338,12 +228,10 @@ bool V8DOMWindowShell::initializeIfNeeded()
         }
     }
 
-    // Flag context as isolated.
     if (!isMainWorld) {
         V8DOMWindowShell* mainWindow = m_frame->script()->existingWindowShell(mainThreadNormalWorld());
         if (mainWindow && !mainWindow->context().IsEmpty())
             setInjectedScriptContextDebugId(m_context.get(), m_frame->script()->contextDebugId(mainWindow->context()));
-        setIsolatedWorldField(this, context);
     }
 
     m_perContextData = V8PerContextData::create(m_context.get());
@@ -351,7 +239,7 @@ bool V8DOMWindowShell::initializeIfNeeded()
         disposeContext();
         return false;
     }
-
+    m_perContextData->setActivityLogger(DOMWrapperWorld::activityLogger(m_world->worldId()));
     if (!installDOMWindow()) {
         disposeContext();
         return false;
@@ -363,7 +251,7 @@ bool V8DOMWindowShell::initializeIfNeeded()
         if (m_frame->document()) {
             ContentSecurityPolicy* csp = m_frame->document()->contentSecurityPolicy();
             context->AllowCodeGenerationFromStrings(csp->allowEval(0, ContentSecurityPolicy::SuppressReport));
-            context->SetErrorMessageForCodeGenerationFromStrings(v8String(csp->evalDisabledErrorMessage()));
+            context->SetErrorMessageForCodeGenerationFromStrings(v8String(csp->evalDisabledErrorMessage(), m_isolate));
         }
     } else {
         // Using the default security token means that the canAccess is always
@@ -393,7 +281,7 @@ void V8DOMWindowShell::createContext()
 
     // Create a new environment using an empty template for the shadow
     // object. Reuse the global object if one has been created earlier.
-    v8::Persistent<v8::ObjectTemplate> globalTemplate = V8DOMWindow::GetShadowObjectTemplate();
+    v8::Persistent<v8::ObjectTemplate> globalTemplate = V8DOMWindow::GetShadowObjectTemplate(m_isolate, m_world->isMainWorld() ? MainWorld : IsolatedWorld);
     if (globalTemplate.IsEmpty())
         return;
 
@@ -427,16 +315,15 @@ void V8DOMWindowShell::createContext()
 
 bool V8DOMWindowShell::installDOMWindow()
 {
+    DOMWrapperWorld::setInitializingWindow(true);
     DOMWindow* window = m_frame->document()->domWindow();
     v8::Local<v8::Object> windowWrapper = V8ObjectConstructor::newInstance(V8PerContextData::from(m_context.get())->constructorForType(&V8DOMWindow::info));
     if (windowWrapper.IsEmpty())
         return false;
 
-    V8DOMWindow::installPerContextProperties(windowWrapper, window);
+    V8DOMWindow::installPerContextProperties(windowWrapper, window, m_isolate);
 
-    V8DOMWrapper::setDOMWrapper(windowWrapper, &V8DOMWindow::info, window);
-    V8DOMWrapper::setDOMWrapper(v8::Handle<v8::Object>::Cast(windowWrapper->GetPrototype()), &V8DOMWindow::info, window);
-    V8DOMWrapper::setJSWrapperForDOMObject(PassRefPtr<DOMWindow>(window), windowWrapper);
+    V8DOMWrapper::setNativeInfo(v8::Handle<v8::Object>::Cast(windowWrapper->GetPrototype()), &V8DOMWindow::info, window);
 
     // Install the windowWrapper as the prototype of the innerGlobalObject.
     // The full structure of the global object is as follows:
@@ -452,8 +339,10 @@ bool V8DOMWindowShell::installDOMWindow()
     //       JavaScript object.
     //
     v8::Handle<v8::Object> innerGlobalObject = toInnerGlobalObject(m_context.get());
-    V8DOMWrapper::setDOMWrapper(innerGlobalObject, &V8DOMWindow::info, window);
+    V8DOMWrapper::setNativeInfo(innerGlobalObject, &V8DOMWindow::info, window);
     innerGlobalObject->SetPrototype(windowWrapper);
+    V8DOMWrapper::associateObjectWithWrapper(PassRefPtr<DOMWindow>(window), &V8DOMWindow::info, windowWrapper, m_isolate, WrapperConfiguration::Dependent);
+    DOMWrapperWorld::setInitializingWindow(false);
     return true;
 }
 
@@ -472,7 +361,7 @@ void V8DOMWindowShell::updateDocumentProperty()
     // FIXME: Should we use a new Local handle here?
     v8::Context::Scope contextScope(m_context.get());
 
-    v8::Handle<v8::Value> documentWrapper = toV8(m_frame->document());
+    v8::Handle<v8::Value> documentWrapper = toV8(m_frame->document(), v8::Handle<v8::Object>(), m_context.get()->GetIsolate());
     ASSERT(documentWrapper == m_document.get() || m_document.isEmpty());
     if (m_document.isEmpty())
         updateDocumentWrapper(v8::Handle<v8::Object>::Cast(documentWrapper));
@@ -485,7 +374,7 @@ void V8DOMWindowShell::updateDocumentProperty()
         return;
     }
     ASSERT(documentWrapper->IsObject());
-    m_context->Global()->ForceSet(v8::String::New("document"), documentWrapper, static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete));
+    m_context->Global()->ForceSet(v8::String::NewSymbol("document"), documentWrapper, static_cast<v8::PropertyAttribute>(v8::ReadOnly | v8::DontDelete));
 
     // We also stash a reference to the document on the inner global object so that
     // DOMWindow objects we obtain from JavaScript references are guaranteed to have
@@ -498,7 +387,7 @@ void V8DOMWindowShell::clearDocumentProperty()
     ASSERT(!m_context.isEmpty());
     if (!m_world->isMainWorld())
         return;
-    m_context->Global()->ForceDelete(v8::String::New("document"));
+    m_context->Global()->ForceDelete(v8::String::NewSymbol("document"));
 }
 
 void V8DOMWindowShell::setSecurityToken()
@@ -513,7 +402,11 @@ void V8DOMWindowShell::setSecurityToken()
     // Note: we can't use the HTTPOrigin if it was set from the DOM.
     SecurityOrigin* origin = document->securityOrigin();
     String token;
-    if (!origin->domainWasSetInDOM())
+    // We stick with an empty token if document.domain was modified or if we
+    // are in the initial empty document, so that we can do a full canAccess
+    // check in those cases.
+    if (!origin->domainWasSetInDOM()
+        && !m_frame->loader()->stateMachine()->isDisplayingInitialEmptyDocument())
         token = document->securityOrigin()->toString();
 
     // An empty or "null" token means we always have to call
@@ -544,13 +437,32 @@ void V8DOMWindowShell::updateDocument()
     updateSecurityOrigin();
 }
 
+static v8::Handle<v8::Value> getNamedProperty(HTMLDocument* htmlDocument, const AtomicString& key, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+{
+    if (!htmlDocument->hasNamedItem(key.impl()) && !htmlDocument->hasExtraNamedItem(key.impl()))
+        return v8Undefined();
+
+    RefPtr<HTMLCollection> items = htmlDocument->documentNamedItems(key);
+    if (items->isEmpty())
+        return v8Undefined();
+
+    if (items->hasExactlyOneItem()) {
+        Node* node = items->item(0);
+        Frame* frame = 0;
+        if (node->hasTagName(HTMLNames::iframeTag) && (frame = static_cast<HTMLIFrameElement*>(node)->contentFrame()))
+            return toV8(frame->document()->domWindow(), creationContext, isolate);
+        return toV8(node, creationContext, isolate);
+    }
+    return toV8(items.release(), creationContext, isolate);
+}
+
 static v8::Handle<v8::Value> getter(v8::Local<v8::String> property, const v8::AccessorInfo& info)
 {
     // FIXME: Consider passing AtomicStringImpl directly.
     AtomicString name = toWebCoreAtomicString(property);
     HTMLDocument* htmlDocument = V8HTMLDocument::toNative(info.Holder());
     ASSERT(htmlDocument);
-    v8::Handle<v8::Value> result = V8HTMLDocument::getNamedProperty(htmlDocument, name, info.Holder(), info.GetIsolate());
+    v8::Handle<v8::Value> result = getNamedProperty(htmlDocument, name, info.Holder(), info.GetIsolate());
     if (!result.IsEmpty())
         return result;
     v8::Handle<v8::Value> prototype = info.Holder()->GetPrototype();
@@ -571,7 +483,7 @@ void V8DOMWindowShell::namedItemAdded(HTMLDocument* document, const AtomicString
 
     ASSERT(!m_document.isEmpty());
     checkDocumentWrapper(m_document.get(), document);
-    m_document->SetAccessor(v8String(name), getter);
+    m_document->SetAccessor(v8String(name, m_isolate), getter);
 }
 
 void V8DOMWindowShell::namedItemRemoved(HTMLDocument* document, const AtomicString& name)
@@ -589,7 +501,7 @@ void V8DOMWindowShell::namedItemRemoved(HTMLDocument* document, const AtomicStri
 
     ASSERT(!m_document.isEmpty());
     checkDocumentWrapper(m_document.get(), document);
-    m_document->Delete(v8String(name));
+    m_document->Delete(v8String(name, m_isolate));
 }
 
 void V8DOMWindowShell::updateSecurityOrigin()

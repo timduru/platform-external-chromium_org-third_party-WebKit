@@ -141,7 +141,7 @@ ResourceRequest::TargetType ResourceRequest::targetTypeFromMimeType(const String
     return iter->value;
 }
 
-void ResourceRequest::initializePlatformRequest(NetworkRequest& platformRequest, bool cookiesEnabled, bool isInitial, bool isRedirect) const
+void ResourceRequest::initializePlatformRequest(NetworkRequest& platformRequest, bool cookiesEnabled, bool isInitial, bool rereadCookies) const
 {
     // If this is the initial load, skip the request body and headers.
     if (isInitial)
@@ -157,7 +157,11 @@ void ResourceRequest::initializePlatformRequest(NetworkRequest& platformRequest,
         platformRequest.setSuggestedSaveName(suggestedSaveName());
 
         if (httpBody() && !httpBody()->isEmpty()) {
-            const Vector<FormDataElement>& elements = httpBody()->elements();
+            RefPtr<FormData> formData = httpBody();
+#if ENABLE(BLOB)
+            formData = formData->resolveBlobReferences();
+#endif
+            const Vector<FormDataElement>& elements = formData->elements();
             // Use setData for simple forms because it is slightly more efficient.
             if (elements.size() == 1 && elements[0].m_type == FormDataElement::data)
                 platformRequest.setData(elements[0].m_data.data(), elements[0].m_data.size());
@@ -168,30 +172,14 @@ void ResourceRequest::initializePlatformRequest(NetworkRequest& platformRequest,
                         platformRequest.addMultipartData(element.m_data.data(), element.m_data.size());
                     else if (element.m_type == FormDataElement::encodedFile)
                         platformRequest.addMultipartFilename(element.m_filename.characters(), element.m_filename.length());
-#if ENABLE(BLOB)
-                    else if (element.m_type == FormDataElement::encodedBlob) {
-                        RefPtr<BlobStorageData> blobData = static_cast<BlobRegistryImpl&>(blobRegistry()).getBlobDataFromURL(KURL(ParsedURLString, element.m_url));
-                        if (blobData) {
-                            for (size_t j = 0; j < blobData->items().size(); ++j) {
-                                const BlobDataItem& blobItem = blobData->items()[j];
-                                if (blobItem.type == BlobDataItem::Data)
-                                    platformRequest.addMultipartData(blobItem.data->data() + static_cast<int>(blobItem.offset), static_cast<int>(blobItem.length));
-                                else {
-                                    ASSERT(blobItem.type == BlobDataItem::File);
-                                    platformRequest.addMultipartFilename(blobItem.path.characters(), blobItem.path.length(), blobItem.offset, blobItem.length, blobItem.expectedModificationTime);
-                                }
-                            }
-                        }
-                    }
-#endif
                     else
-                        ASSERT_NOT_REACHED(); // unknown type
+                        ASSERT_NOT_REACHED(); // Blobs should be resolved at this point.
                 }
             }
         }
 
         // When ResourceRequest is reused by CacheResourceLoader, page refreshing or redirection, its cookies may be dirtied. We won't use these cookies any more.
-        bool cookieHeaderMayBeDirty = isRedirect || cachePolicy() == WebCore::ReloadIgnoringCacheData || cachePolicy() == WebCore::ReturnCacheDataElseLoad;
+        bool cookieHeaderMayBeDirty = rereadCookies || cachePolicy() == WebCore::ReloadIgnoringCacheData || cachePolicy() == WebCore::ReturnCacheDataElseLoad;
 
         for (HTTPHeaderMap::const_iterator it = httpHeaderFields().begin(); it != httpHeaderFields().end(); ++it) {
             String key = it->key;
@@ -256,7 +244,7 @@ void ResourceRequest::clearHTTPContentLength()
 
     m_httpHeaderFields.remove("Content-Length");
 
-    if (url().protocolInHTTPFamily())
+    if (url().protocolIsInHTTPFamily())
         m_platformRequestUpdated = false;
 }
 
@@ -266,7 +254,7 @@ void ResourceRequest::clearHTTPContentType()
 
     m_httpHeaderFields.remove("Content-Type");
 
-    if (url().protocolInHTTPFamily())
+    if (url().protocolIsInHTTPFamily())
         m_platformRequestUpdated = false;
 }
 

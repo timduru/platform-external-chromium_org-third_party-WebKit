@@ -85,7 +85,9 @@ bool AuthenticationChallenge::platformCompare(const AuthenticationChallenge& a, 
 }
 
 CFURLAuthChallengeRef createCF(const AuthenticationChallenge& coreChallenge)
-{  
+{
+    // FIXME: Why not cache CFURLAuthChallengeRef in m_cfChallenge? Foundation counterpart does that.
+
     CFURLProtectionSpaceRef protectionSpace = createCF(coreChallenge.protectionSpace());
     CFURLCredentialRef credential = createCF(coreChallenge.proposedCredential());
     

@@ -53,7 +53,7 @@ class HTMLDocument;
 // persist between navigations.
 class V8DOMWindowShell {
 public:
-    static PassOwnPtr<V8DOMWindowShell> create(Frame*, PassRefPtr<DOMWrapperWorld>);
+    static PassOwnPtr<V8DOMWindowShell> create(Frame*, PassRefPtr<DOMWrapperWorld>, v8::Isolate*);
 
     v8::Persistent<v8::Context> context() const { return m_context.get(); }
 
@@ -70,43 +70,20 @@ public:
     bool isContextInitialized() { return !m_context.isEmpty(); }
     bool isGlobalInitialized() { return !m_global.isEmpty(); }
 
-    v8::Persistent<v8::Context> createNewContext(v8::Handle<v8::Object> global, int extensionGroup, int worldId);
-
     bool initializeIfNeeded();
     void updateDocumentWrapper(v8::Handle<v8::Object> wrapper);
 
     void clearForNavigation();
-    void clearForClose();
-
-    void destroyGlobal();
-
-    V8PerContextData* perContextData() { return m_perContextData.get(); }
+    void clearForClose(bool destroyGlobal);
 
     DOMWrapperWorld* world() { return m_world.get(); }
 
-    // Returns the isolated world associated with
-    // v8::Context::GetEntered(). Because worlds are isolated, the entire
-    // JavaScript call stack should be from the same isolated world.
-    // Returns 0 if the entered context is from the main world.
-    //
-    // FIXME: Consider edge cases with DOM mutation events that might
-    // violate this invariant.
-    //
-    // FIXME: This is poorly named after the deletion of isolated contexts.
-    static V8DOMWindowShell* getEntered()
-    {
-        if (!DOMWrapperWorld::isolatedWorldsExist())
-            return 0;
-        if (!v8::Context::InContext())
-            return 0;
-        return enteredIsolatedWorldContext();
-    }
-
     void destroyIsolatedShell();
-private:
-    V8DOMWindowShell(Frame*, PassRefPtr<DOMWrapperWorld>);
 
-    void disposeContext(bool weak = false);
+private:
+    V8DOMWindowShell(Frame*, PassRefPtr<DOMWrapperWorld>, v8::Isolate*);
+
+    void disposeContext();
 
     void setSecurityToken();
 
@@ -124,6 +101,7 @@ private:
 
     Frame* m_frame;
     RefPtr<DOMWrapperWorld> m_world;
+    v8::Isolate* m_isolate;
 
     OwnPtr<V8PerContextData> m_perContextData;
 

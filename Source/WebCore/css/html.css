@@ -59,6 +59,12 @@ body {
     margin: 8px
 }
 
+#if defined(ENABLE_IFRAME_SEAMLESS) && ENABLE_IFRAME_SEAMLESS
+body:-webkit-seamless-document {
+    margin: 0px;
+}
+#endif
+
 p {
     display: block;
     -webkit-margin-before: 1__qem;
@@ -75,7 +81,7 @@ layer {
     display: block
 }
 
-article, aside, footer, header, hgroup, nav, section {
+article, aside, footer, header, hgroup, main, nav, section {
     display: block
 }
 
@@ -387,7 +393,8 @@ fieldset {
     -webkit-padding-start: 0.75em;
     -webkit-padding-end: 0.75em;
     -webkit-padding-after: 0.625em;
-    border: 2px groove ThreeDFace
+    border: 2px groove ThreeDFace;
+    min-width: -webkit-min-content;
 }
 
 button {
@@ -433,40 +440,55 @@ input[type="search"] {
 }
 
 input::-webkit-textfield-decoration-container {
-    display: -webkit-box;
-    -webkit-box-align: center;
+    display: -webkit-flex;
+    -webkit-align-items: center;
     -webkit-user-modify: read-only !important;
+    content: none !important;
 }
 
 input[type="search"]::-webkit-textfield-decoration-container {
     direction: ltr;
 }
 
+input::-webkit-clear-button {
+    -webkit-appearance: searchfield-cancel-button;
+    display: inline-block;
+    -webkit-flex: none;
+    -webkit-user-modify: read-only !important;
+    margin-left: 2px;
+}
+
 input[type="search"]::-webkit-search-cancel-button {
     -webkit-appearance: searchfield-cancel-button;
     display: block;
-    -webkit-box-flex: 0;
+    -webkit-flex: none;
     -webkit-user-modify: read-only !important;
+    -webkit-align-self: flex-start;
+    margin: auto 0;
 }
 
 input[type="search"]::-webkit-search-decoration {
     -webkit-appearance: searchfield-decoration;
     display: block;
-    -webkit-box-flex: 0;
+    -webkit-flex: none;
     -webkit-user-modify: read-only !important;
+    -webkit-align-self: flex-start;
+    margin: auto 0;
 }
 
 input[type="search"]::-webkit-search-results-decoration {
     -webkit-appearance: searchfield-results-decoration;
     display: block;
-    -webkit-box-flex: 0;
+    -webkit-flex: none;
     -webkit-user-modify: read-only !important;
+    -webkit-align-self: flex-start;
+    margin: auto 0;
 }
 
 input[type="search"]::-webkit-search-results-button {
     -webkit-appearance: searchfield-results-button;
     display: block;
-    -webkit-box-flex: 0;
+    -webkit-flex: none;
     -webkit-user-modify: read-only !important;
 }
 
@@ -479,54 +501,60 @@ datalist {
 #if defined(ENABLE_INPUT_MULTIPLE_FIELDS_UI) && ENABLE_INPUT_MULTIPLE_FIELDS_UI
 #if defined(ENABLE_INPUT_TYPE_DATE) && ENABLE_INPUT_TYPE_DATE
 input[type="date"] {
-    -webkit-align-items: stretch;
+    -webkit-align-items: center;
     display: -webkit-inline-flex;
     font-family: monospace;
+    overflow: hidden;
     padding: 0;
     -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_DATETIME) && ENABLE_INPUT_TYPE_DATETIME
 input[type="datetime"] {
-    -webkit-align-items: stretch;
+    -webkit-align-items: center;
     display: -webkit-inline-flex;
     font-family: monospace;
+    overflow: hidden;
     padding: 0;
     -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_DATETIMELOCAL) && ENABLE_INPUT_TYPE_DATETIMELOCAL
 input[type="datetime-local"] {
-    -webkit-align-items: stretch;
+    -webkit-align-items: center;
     display: -webkit-inline-flex;
     font-family: monospace;
+    overflow: hidden;
     padding: 0;
     -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_MONTH) && ENABLE_INPUT_TYPE_MONTH
 input[type="month"] {
-    -webkit-align-items: stretch;
+    -webkit-align-items: center;
     display: -webkit-inline-flex;
     font-family: monospace;
+    overflow: hidden;
     padding: 0;
     -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_TIME) && ENABLE_INPUT_TYPE_TIME
 input[type="time"] {
-    -webkit-align-items: stretch;
+    -webkit-align-items: center;
     display: -webkit-inline-flex;
     font-family: monospace;
+    overflow: hidden;
     padding: 0;
     -webkit-padding-start: 1px;
 }
 #endif
 #if defined(ENABLE_INPUT_TYPE_WEEK) && ENABLE_INPUT_TYPE_WEEK
 input[type="week"] {
-    -webkit-align-items: stretch;
+    -webkit-align-items: center;
     display: -webkit-inline-flex;
     font-family: monospace;
+    overflow: hidden;
     padding: 0;
     -webkit-padding-start: 1px;
 }
@@ -536,9 +564,19 @@ input::-webkit-datetime-edit {
     -webkit-flex: 1;
     -webkit-user-modify: read-only !important;
     display: inline-block;
+    min-width: 0;
+    overflow: hidden;
+}
+
+input::-webkit-datetime-edit-fields-wrapper {
+    -webkit-user-modify: read-only !important;
+    display: inline-block;
+    padding: 1px 0;
     white-space: pre;
 }
 
+/* If you update padding, border, or margin in the following ruleset, update
+   DateTimeFieldElement::maximumWidth too. */
 input::-webkit-datetime-edit-ampm-field,
 input::-webkit-datetime-edit-day-field,
 input::-webkit-datetime-edit-hour-field,
@@ -550,9 +588,9 @@ input::-webkit-datetime-edit-week-field,
 input::-webkit-datetime-edit-year-field {
     -webkit-user-modify: read-only !important;
     border: none;
-    display: inline-block;
-    margin: 1px;
-    text-align: center;
+    display: inline;
+    font: inherit !important;
+    padding: 1px;
 }
 
 /* Remove focus ring from fields and use highlight color */
@@ -570,25 +608,24 @@ input::-webkit-datetime-edit-year-field:focus {
     outline: none;
 }
 
-/* This selector is used when step >= 3600 second but format contains minute field. */
-input::-webkit-datetime-edit-minute-field[readonly] {
+input::-webkit-datetime-edit-year-field[disabled],
+input::-webkit-datetime-edit-month-field[disabled],
+input::-webkit-datetime-edit-week-field[disabled],
+input::-webkit-datetime-edit-day-field[disabled],
+input::-webkit-datetime-edit-ampm-field[disabled],
+input::-webkit-datetime-edit-hour-field[disabled],
+input::-webkit-datetime-edit-millisecond-field[disabled],
+input::-webkit-datetime-edit-minute-field[disabled],
+input::-webkit-datetime-edit-second-field[disabled] {
     color: GrayText;
 }
 
-/* This selector is used when step >= 60 second but format contains second field. */
-input::-webkit-datetime-edit-second-field[readonly] {
-    color: GrayText;
-}
-
+/* If you update padding, border, or margin in the following ruleset, update
+   DateTimeEditElement::customStyelForRenderer too. */
 input::-webkit-datetime-edit-text {
     -webkit-user-modify: read-only !important;
-    display: inline-block;
-}
-
-input::-webkit-date-and-time-container {
-    -webkit-align-items: center;
-    -webkit-flex: 1;
-    display: -webkit-inline-flex;
+    display: inline;
+    font: inherit !important;
 }
 
 input[type="date"]::-webkit-inner-spin-button,
@@ -607,7 +644,7 @@ input[type="week"]::-webkit-inner-spin-button {
 #if defined(ENABLE_INPUT_TYPE_DATE) && ENABLE_INPUT_TYPE_DATE
 input[type="date"] {
     -webkit-align-items: center;
-    -webkit-appearance: menulist;
+    -webkit-appearance: menulist-button;
     display: -webkit-inline-flex;
     overflow: hidden;
     width: 10em;
@@ -616,7 +653,7 @@ input[type="date"] {
 #if defined(ENABLE_INPUT_TYPE_DATETIME) && ENABLE_INPUT_TYPE_DATETIME
 input[type="datetime"] {
     -webkit-align-items: center;
-    -webkit-appearance: menulist;
+    -webkit-appearance: menulist-button;
     display: -webkit-inline-flex;
     overflow: hidden;
     width: 10em;
@@ -625,7 +662,7 @@ input[type="datetime"] {
 #if defined(ENABLE_INPUT_TYPE_DATETIMELOCAL) && ENABLE_INPUT_TYPE_DATETIMELOCAL
 input[type="datetime-local"] {
     -webkit-align-items: center;
-    -webkit-appearance: menulist;
+    -webkit-appearance: menulist-button;
     display: -webkit-inline-flex;
     overflow: hidden;
     width: 10em;
@@ -634,7 +671,7 @@ input[type="datetime-local"] {
 #if defined(ENABLE_INPUT_TYPE_MONTH) && ENABLE_INPUT_TYPE_MONTH
 input[type="month"] {
     -webkit-align-items: center;
-    -webkit-appearance: menulist;
+    -webkit-appearance: menulist-button;
     display: -webkit-inline-flex;
     overflow: hidden;
     width: 10em;
@@ -643,7 +680,7 @@ input[type="month"] {
 #if defined(ENABLE_INPUT_TYPE_TIME) && ENABLE_INPUT_TYPE_TIME
 input[type="time"] {
     -webkit-align-items: center;
-    -webkit-appearance: menulist;
+    -webkit-appearance: menulist-button;
     display: -webkit-inline-flex;
     overflow: hidden;
     width: 10em;
@@ -652,7 +689,7 @@ input[type="time"] {
 #if defined(ENABLE_INPUT_TYPE_WEEK) && ENABLE_INPUT_TYPE_WEEK
 input[type="week"] {
     -webkit-align-items: center;
-    -webkit-appearance: menulist;
+    -webkit-appearance: menulist-button;
     display: -webkit-inline-flex;
     overflow: hidden;
     width: 10em;
@@ -660,7 +697,8 @@ input[type="week"] {
 #endif
 
 input::-webkit-date-and-time-value {
-    margin-left: 4px;
+    margin: 1px 24px 1px 4px;
+    white-space: pre;
 }
 #endif
 
@@ -674,7 +712,7 @@ input::-webkit-inner-spin-button {
      * button in layout(). */
     height: 1.5em;
     vertical-align: top;
-    -webkit-box-flex: 0;
+    -webkit-flex: none;
     -webkit-user-select: none;
     -webkit-user-modify: read-only !important;
 }
@@ -684,8 +722,10 @@ input::-webkit-input-speech-button {
     -webkit-appearance: -webkit-input-speech-button;
     display: block;
     vertical-align: top;
-    -webkit-box-flex: 0;
+    -webkit-flex: none;
     -webkit-user-modify: read-only !important;
+    -webkit-align-self: flex-start;
+    margin: auto 0;
 }
 #endif
 
@@ -703,7 +743,7 @@ textarea {
     border: 1px solid;
     -webkit-rtl-ordering: logical;
     -webkit-user-select: text;
-    -webkit-box-orient: vertical;
+    -webkit-flex-direction: column;
     resize: auto;
     cursor: auto;
     padding: 2px;
@@ -737,7 +777,7 @@ input[type="hidden"], input[type="image"], input[type="file"] {
 }
 
 input[type="file"] {
-    -webkit-box-align: baseline;
+    -webkit-align-items: baseline;
     color: inherit;
     text-align: start !important;
 }
@@ -769,7 +809,7 @@ input[type="file"]::-webkit-file-upload-button {
 }
 
 input[type="button"], input[type="submit"], input[type="reset"], input[type="file"]::-webkit-file-upload-button, button {
-    -webkit-box-align: center;
+    -webkit-align-items: flex-start;
     text-align: center;
     cursor: default;
     color: ButtonText;
@@ -852,7 +892,7 @@ input[type="color"] {
 }
 
 input[type="color"]::-webkit-color-swatch-wrapper {
-    display:-webkit-box;
+    display:-webkit-flex;
     padding: 4px 2px;
     box-sizing: border-box;
     -webkit-user-modify: read-only !important;
@@ -863,7 +903,7 @@ input[type="color"]::-webkit-color-swatch-wrapper {
 input[type="color"]::-webkit-color-swatch {
     background-color: #000000;
     border: 1px solid #777777;
-    -webkit-box-flex: 1;
+    -webkit-flex: 1;
     -webkit-user-modify: read-only !important;
 }
 
@@ -890,6 +930,7 @@ input[type="color"][list]::-webkit-color-swatch {
 
 #if defined(ENABLE_CALENDAR_PICKER) && ENABLE_CALENDAR_PICKER
 input::-webkit-calendar-picker-indicator {
+    display: inline-block;
     width: 0.66em;
     height: 0.66em;
     padding: 0.17em 0.34em;
@@ -904,7 +945,7 @@ input::-webkit-calendar-picker-indicator:hover {
 select {
     -webkit-appearance: menulist;
     box-sizing: border-box;
-    -webkit-box-align: center;
+    -webkit-align-items: center;
     border: 1px solid;
     white-space: pre;
     -webkit-rtl-ordering: logical;
@@ -917,7 +958,7 @@ select[size],
 select[multiple],
 select[size][multiple] {
     -webkit-appearance: listbox;
-    -webkit-box-align: start;
+    -webkit-align-items: flex-start;
     border: 1px inset gray;
     border-radius: initial;
     white-space: initial;
@@ -926,7 +967,7 @@ select[size][multiple] {
 select[size="0"],
 select[size="1"] {
     -webkit-appearance: menulist;
-    -webkit-box-align: center;
+    -webkit-align-items: center;
     border: 1px solid;
     border-radius: 5px;
     white-space: pre;
@@ -959,7 +1000,7 @@ output {
 }
 
 ::-webkit-validation-bubble-message {
-    display: -webkit-box;
+    display: -webkit-flex;
     position: relative;
     top: -4px;
     font: message-box;
@@ -980,7 +1021,7 @@ output {
 }
 
 ::-webkit-validation-bubble-text-block {
-    -webkit-box-flex: 1;
+    -webkit-flex: 1;
     -webkit-user-modify: read-only !important;
 }
 
@@ -1101,10 +1142,6 @@ progress::-webkit-progress-value {
 #endif
 
 /* inline elements */
-
-img {
-    display: inline-block;
-}
 
 u, ins {
     text-decoration: underline
@@ -1259,6 +1296,12 @@ summary::-webkit-details-marker {
     height: 0.66em;
     margin-right: 0.4em;
 }
+
+#if defined(ENABLE_TEMPLATE_ELEMENT) && ENABLE_TEMPLATE_ELEMENT
+template {
+    display: none
+}
+#endif
 
 bdi, output {
     unicode-bidi: -webkit-isolate;

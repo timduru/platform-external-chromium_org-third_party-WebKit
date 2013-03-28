@@ -31,20 +31,23 @@
 #include "config.h"
 #include "AccessibilityUIElementChromium.h"
 
+#include "TestCommon.h"
 #include "WebAccessibilityObject.h"
-#include "platform/WebCString.h"
-#include "platform/WebPoint.h"
-#include "platform/WebRect.h"
-#include "platform/WebString.h"
-#include <wtf/Assertions.h>
-#include <wtf/StringExtras.h>
+#include <public/WebCString.h>
+#include <public/WebPoint.h>
+#include <public/WebRect.h>
+#include <public/WebString.h>
 
 using namespace WebKit;
 using namespace std;
 
+namespace WebTestRunner {
+
+namespace {
+
 // Map role value to string, matching Safari/Mac platform implementation to
 // avoid rebaselining layout tests.
-static string roleToString(WebAccessibilityRole role)
+string roleToString(WebAccessibilityRole role)
 {
     string result = "AXRole: AX";
     switch (role) {
@@ -165,10 +168,12 @@ static string roleToString(WebAccessibilityRole role)
         return result.append("ListBoxOption");
     case WebAccessibilityRoleTableHeaderContainer:
         return result.append("TableHeaderContainer");
-    case WebAccessibilityRoleDefinitionListTerm:
-        return result.append("DefinitionListTerm");
-    case WebAccessibilityRoleDefinitionListDefinition:
-        return result.append("DefinitionListDefinition");
+    case WebAccessibilityRoleDefinition:
+        return result.append("Definition");
+    case WebAccessibilityRoleDescriptionListTerm:
+        return result.append("DescriptionListTerm");
+    case WebAccessibilityRoleDescriptionListDetail:
+        return result.append("DescriptionListDetail");
     case WebAccessibilityRoleAnnotation:
         return result.append("Annotation");
     case WebAccessibilityRoleSliderThumb:
@@ -281,7 +286,15 @@ string getHelpText(const WebAccessibilityObject& object)
 
 string getStringValue(const WebAccessibilityObject& object)
 {
-    string value = object.stringValue().utf8();
+    string value;
+    if (object.roleValue() == WebAccessibilityRoleColorWell) {
+        int r, g, b;
+        char buffer[100];
+        object.colorValue(r, g, b);
+        snprintf(buffer, sizeof(buffer), "rgb %7.5f %7.5f %7.5f 1", r / 255., g / 255., b / 255.);
+        value = buffer;
+    } else
+        value = object.stringValue().utf8();
     return value.insert(0, "AXValue: ");
 }
 
@@ -347,12 +360,14 @@ private:
     string m_attributes;
 };
 
+}
+
 AccessibilityUIElement::AccessibilityUIElement(const WebAccessibilityObject& object, Factory* factory)
     : m_accessibilityObject(object)
     , m_factory(factory)
 {
 
-    ASSERT(factory);
+    WEBKIT_ASSERT(factory);
 
     //
     // Properties
@@ -391,6 +406,8 @@ AccessibilityUIElement::AccessibilityUIElement(const WebAccessibilityObject& obj
     bindProperty("isValid", &AccessibilityUIElement::isValidGetterCallback);
     bindProperty("isReadOnly", &AccessibilityUIElement::isReadOnlyGetterCallback);
     bindProperty("orientation", &AccessibilityUIElement::orientationGetterCallback);
+    bindProperty("clickPointX", &AccessibilityUIElement::clickPointXGetterCallback);
+    bindProperty("clickPointY", &AccessibilityUIElement::clickPointYGetterCallback);
 
     //
     // Methods
@@ -419,7 +436,9 @@ AccessibilityUIElement::AccessibilityUIElement(const WebAccessibilityObject& obj
     bindMethod("setSelectedTextRange", &AccessibilityUIElement::setSelectedTextRangeCallback);
     bindMethod("attributeValue", &AccessibilityUIElement::attributeValueCallback);
     bindMethod("isAttributeSettable", &AccessibilityUIElement::isAttributeSettableCallback);
-    bindMethod("isActionSupported", &AccessibilityUIElement::isActionSupportedCallback);
+    bindMethod("isPressActionSupported", &AccessibilityUIElement::isPressActionSupportedCallback);
+    bindMethod("isIncrementActionSupported", &AccessibilityUIElement::isIncrementActionSupportedCallback);
+    bindMethod("isDecrementActionSupported", &AccessibilityUIElement::isDecrementActionSupportedCallback);
     bindMethod("parentElement", &AccessibilityUIElement::parentElementCallback);
     bindMethod("increment", &AccessibilityUIElement::incrementCallback);
     bindMethod("decrement", &AccessibilityUIElement::decrementCallback);
@@ -508,7 +527,12 @@ void AccessibilityUIElement::heightGetterCallback(CppVariant* result)
 
 void AccessibilityUIElement::intValueGetterCallback(CppVariant* result)
 {
-    result->set(accessibilityObject().valueForRange());
+    if (accessibilityObject().supportsRangeValue())
+        result->set(accessibilityObject().valueForRange());
+    else if (accessibilityObject().roleValue() == WebAccessibilityRoleHeading)
+        result->set(accessibilityObject().headingLevel());
+    else
+        result->set(atoi(accessibilityObject().stringValue().utf8().data()));
 }
 
 void AccessibilityUIElement::minValueGetterCallback(CppVariant* result)
@@ -640,6 +664,16 @@ void AccessibilityUIElement::orientationGetterCallback(CppVariant* result)
     result->set(getOrientation(accessibilityObject()));
 }
 
+void AccessibilityUIElement::clickPointXGetterCallback(CppVariant* result)
+{
+    result->set(accessibilityObject().clickPoint().x);
+}
+
+void AccessibilityUIElement::clickPointYGetterCallback(CppVariant* result)
+{
+    result->set(accessibilityObject().clickPoint().y);
+}
+
 //
 // Methods
 //
@@ -717,9 +751,21 @@ void AccessibilityUIElement::childAtIndexCallback(const CppArgumentList& argumen
     result->set(*(child->getAsCppVariant()));
 }
 
-void AccessibilityUIElement::elementAtPointCallback(const CppArgumentList&, CppVariant* result)
+void AccessibilityUIElement::elementAtPointCallback(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
+
+    if (arguments.size() != 2 || !arguments[0].isNumber() || !arguments[1].isNumber())
+        return;
+
+    int x = arguments[0].toInt32();
+    int y = arguments[1].toInt32();
+    WebPoint point(x, y);
+    WebAccessibilityObject obj = accessibilityObject().hitTest(point);
+    if (obj.isNull())
+        return;
+
+    result->set(*(m_factory->getOrCreate(obj)->getAsCppVariant()));
 }
 
 void AccessibilityUIElement::attributesOfColumnHeadersCallback(const CppArgumentList&, CppVariant* result)
@@ -813,25 +859,41 @@ void AccessibilityUIElement::isAttributeSettableCallback(const CppArgumentList& 
     result->set(settable);
 }
 
-void AccessibilityUIElement::isActionSupportedCallback(const CppArgumentList&, CppVariant* result)
+void AccessibilityUIElement::isPressActionSupportedCallback(const CppArgumentList&, CppVariant* result)
 {
-    // This one may be really hard to implement.
-    // Not exposed by AccessibilityObject.
-    result->setNull();
+    result->set(accessibilityObject().canPress());
+}
+
+void AccessibilityUIElement::isIncrementActionSupportedCallback(const CppArgumentList&, CppVariant* result)
+{
+    result->set(accessibilityObject().canIncrement());
+}
+
+void AccessibilityUIElement::isDecrementActionSupportedCallback(const CppArgumentList&, CppVariant* result)
+{
+    result->set(accessibilityObject().canDecrement());
 }
 
 void AccessibilityUIElement::parentElementCallback(const CppArgumentList&, CppVariant* result)
 {
-    result->setNull();
+    AccessibilityUIElement* parent = m_factory->getOrCreate(accessibilityObject().parentObject());
+    if (!parent) {
+        result->setNull();
+        return;
+    }
+
+    result->set(*(parent->getAsCppVariant()));
 }
 
 void AccessibilityUIElement::incrementCallback(const CppArgumentList&, CppVariant* result)
 {
+    accessibilityObject().increment();
     result->setNull();
 }
 
 void AccessibilityUIElement::decrementCallback(const CppArgumentList&, CppVariant* result)
 {
+    accessibilityObject().decrement();
     result->setNull();
 }
 
@@ -842,7 +904,7 @@ void AccessibilityUIElement::showMenuCallback(const CppArgumentList&, CppVariant
 
 void AccessibilityUIElement::pressCallback(const CppArgumentList&, CppVariant* result)
 {
-    accessibilityObject().performDefaultAction();
+    accessibilityObject().press();
     result->setNull();
 }
 
@@ -962,13 +1024,15 @@ AccessibilityUIElement* AccessibilityUIElementList::getOrCreate(const WebAccessi
     }
 
     AccessibilityUIElement* element = new AccessibilityUIElement(object, this);
-    m_elements.append(element);
+    m_elements.push_back(element);
     return element;
 }
 
 AccessibilityUIElement* AccessibilityUIElementList::createRoot(const WebAccessibilityObject& object)
 {
     AccessibilityUIElement* element = new RootAccessibilityUIElement(object, this);
-    m_elements.append(element);
+    m_elements.push_back(element);
     return element;
+}
+
 }

@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 import os
 from copy import deepcopy
 
@@ -42,15 +42,7 @@ class QtPortTest(port_testcase.PortTestCase):
     port_name = 'qt-mac'
     port_maker = QtPort
     search_paths_cases = [
-        {'search_paths':['qt-4.8', 'qt-mac', 'qt'], 'os_name':'mac', 'use_webkit2':False, 'qt_version':'4.8'},
-        {'search_paths':['qt-4.8', 'qt-win', 'qt'], 'os_name':'win', 'use_webkit2':False, 'qt_version':'4.8'},
-        {'search_paths':['qt-4.8', 'qt-linux', 'qt'], 'os_name':'linux', 'use_webkit2':False, 'qt_version':'4.8'},
-
-        {'search_paths':['qt-4.8', 'qt-mac', 'qt'], 'os_name':'mac', 'use_webkit2':False},
-        {'search_paths':['qt-4.8', 'qt-win', 'qt'], 'os_name':'win', 'use_webkit2':False},
-        {'search_paths':['qt-4.8', 'qt-linux', 'qt'], 'os_name':'linux', 'use_webkit2':False},
-
-        {'search_paths':['qt-5.0-wk2', 'qt-5.0', 'qt-mac', 'qt'], 'os_name':'mac', 'use_webkit2':True, 'qt_version':'5.0'},
+        {'search_paths':['qt-5.0-mac-wk2', 'qt-5.0-wk2', 'qt-5.0', 'qt-mac', 'qt'], 'os_name':'mac', 'use_webkit2':True, 'qt_version':'5.0'},
         {'search_paths':['qt-5.0-wk2', 'qt-5.0', 'qt-win', 'qt'], 'os_name':'win', 'use_webkit2':True, 'qt_version':'5.0'},
         {'search_paths':['qt-5.0-wk2', 'qt-5.0', 'qt-linux', 'qt'], 'os_name':'linux', 'use_webkit2':True, 'qt_version':'5.0'},
 
@@ -59,7 +51,7 @@ class QtPortTest(port_testcase.PortTestCase):
         {'search_paths':['qt-5.0-wk1', 'qt-5.0', 'qt-linux', 'qt'], 'os_name':'linux', 'use_webkit2':False, 'qt_version':'5.0'},
     ]
 
-    def _assert_search_path(self, search_paths, os_name, use_webkit2=False, qt_version='4.8'):
+    def _assert_search_path(self, search_paths, os_name, use_webkit2=False, qt_version='5.0'):
         # FIXME: Port constructors should not "parse" the port name, but
         # rather be passed components (directly or via setters).  Once
         # we fix that, this method will need a re-write.
@@ -69,9 +61,9 @@ class QtPortTest(port_testcase.PortTestCase):
         port = self.make_port(host=host, qt_version=qt_version, port_name=port_name,
                               options=MockOptions(webkit_test_runner=use_webkit2, platform='qt'))
         absolute_search_paths = map(port._webkit_baseline_path, search_paths)
-        self.assertEquals(port.baseline_search_path(), absolute_search_paths)
+        self.assertEqual(port.baseline_search_path(), absolute_search_paths)
 
-    def _assert_expectations_files(self, search_paths, os_name, use_webkit2=False, qt_version='4.8'):
+    def _assert_expectations_files(self, search_paths, os_name, use_webkit2=False, qt_version='5.0'):
         # FIXME: Port constructors should not "parse" the port name, but
         # rather be passed components (directly or via setters).  Once
         # we fix that, this method will need a re-write.
@@ -80,11 +72,9 @@ class QtPortTest(port_testcase.PortTestCase):
         port_name = 'qt-' + os_name
         port = self.make_port(host=host, qt_version=qt_version, port_name=port_name,
                               options=MockOptions(webkit_test_runner=use_webkit2, platform='qt'))
-        self.assertEquals(port.expectations_files(), search_paths)
+        self.assertEqual(port.expectations_files(), search_paths)
 
     def _qt_version(self, qt_version):
-        if qt_version in '4.8':
-            return 'QMake version 2.01a\nUsing Qt version 4.8.0 in /usr/local/Trolltech/Qt-4.8.2/lib'
         if qt_version in '5.0':
             return 'QMake version 2.01a\nUsing Qt version 5.0.0 in /usr/local/Trolltech/Qt-5.0.0/lib'
 
@@ -97,20 +87,21 @@ class QtPortTest(port_testcase.PortTestCase):
             expectations_case = deepcopy(case)
             if expectations_case['use_webkit2']:
                 expectations_case['search_paths'].append("wk2")
+            expectations_case['search_paths'].append('')
             expectations_case['search_paths'].reverse()
-            expectations_case['search_paths'] = map(lambda path: '/mock-checkout/LayoutTests/platform/%s/TestExpectations' % (path), expectations_case['search_paths'])
+            expectations_case['search_paths'] = map(lambda path: '/mock-checkout/LayoutTests/TestExpectations' if not path else '/mock-checkout/LayoutTests/platform/%s/TestExpectations' % (path), expectations_case['search_paths'])
             self._assert_expectations_files(**expectations_case)
 
     def test_show_results_html_file(self):
         port = self.make_port()
         port._executive = MockExecutive(should_log=True)
-        expected_stderr = "MOCK run_command: ['Tools/Scripts/run-launcher', '--release', '--qt', 'file://test.html'], cwd=/mock-checkout\n"
-        OutputCapture().assert_outputs(self, port.show_results_html_file, ["test.html"], expected_stderr=expected_stderr)
+        expected_logs = "MOCK run_command: ['Tools/Scripts/run-launcher', '--release', '--qt', 'file://test.html'], cwd=/mock-checkout\n"
+        OutputCapture().assert_outputs(self, port.show_results_html_file, ["test.html"], expected_logs=expected_logs)
 
     def test_setup_environ_for_server(self):
         port = self.make_port()
         env = port.setup_environ_for_server(port.driver_name())
-        self.assertEquals(env['QTWEBKIT_PLUGIN_PATH'], '/mock-build/lib/plugins')
+        self.assertEqual(env['QTWEBKIT_PLUGIN_PATH'], '/mock-build/lib/plugins')
 
     def test_operating_system(self):
         self.assertEqual('linux', self.make_port(port_name='qt-linux', os_name='linux').operating_system())

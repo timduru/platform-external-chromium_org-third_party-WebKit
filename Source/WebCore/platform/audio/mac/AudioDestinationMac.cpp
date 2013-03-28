@@ -34,6 +34,7 @@
 
 #include "AudioIOCallback.h"
 #include "FloatConversion.h"
+#include "Logging.h"
 #include "VectorMath.h"
 #include <CoreAudio/AudioHardware.h>
 
@@ -44,8 +45,18 @@ const float kLowThreshold = -1;
 const float kHighThreshold = 1;
 
 // Factory method: Mac-implementation
-PassOwnPtr<AudioDestination> AudioDestination::create(AudioIOCallback& callback, float sampleRate)
+PassOwnPtr<AudioDestination> AudioDestination::create(AudioIOCallback& callback, const String&, unsigned numberOfInputChannels, unsigned numberOfOutputChannels, float sampleRate)
 {
+    // FIXME: make use of inputDeviceId as appropriate.
+
+    // FIXME: Add support for local/live audio input.
+    if (numberOfInputChannels)
+        LOG(Media, "AudioDestination::create(%u, %u, %f) - unhandled input channels", numberOfInputChannels, numberOfOutputChannels, sampleRate);
+
+    // FIXME: Add support for multi-channel (> stereo) output.
+    if (numberOfOutputChannels != 2)
+        LOG(Media, "AudioDestination::create(%u, %u, %f) - unhandled output channels", numberOfInputChannels, numberOfOutputChannels, sampleRate);
+
     return adoptPtr(new AudioDestinationMac(callback, sampleRate));
 }
 
@@ -69,6 +80,15 @@ float AudioDestination::hardwareSampleRate()
         return 0; // error
 
     return narrowPrecisionToFloat(nominalSampleRate);
+}
+
+unsigned long AudioDestination::maxChannelCount()
+{
+    // FIXME: query the default audio hardware device to return the actual number
+    // of channels of the device. Also see corresponding FIXME in create().
+    // There is a small amount of code which assumes stereo in AudioDestinationMac which
+    // can be upgraded.
+    return 0;
 }
 
 AudioDestinationMac::AudioDestinationMac(AudioIOCallback& callback, float sampleRate)

@@ -93,8 +93,7 @@ public:
     virtual void setAccessibleName(const AtomicString&);
     
     // Provides common logic used by all elements when determining isIgnored.
-    AccessibilityObjectInclusion accessibilityIsIgnoredBase() const;
-    virtual bool accessibilityIsIgnored() const;
+    virtual AccessibilityObjectInclusion defaultObjectInclusion() const;
     
     virtual int layoutCount() const;
     virtual double estimatedLoadingProgress() const;
@@ -173,6 +172,7 @@ public:
     virtual void visibleChildren(AccessibilityChildrenVector&);
     virtual void tabChildren(AccessibilityChildrenVector&);
     virtual bool shouldFocusActiveDescendant() const;
+    bool shouldNotifyActiveDescendant() const;
     virtual AccessibilityObject* activeDescendant() const;
     virtual void handleActiveDescendantChanged();
     virtual void handleAriaExpandedChanged();
@@ -223,11 +223,11 @@ protected:
     virtual bool isDetached() const { return !m_renderer; }
 
     virtual AccessibilityRole determineAccessibilityRole();
+    virtual bool computeAccessibilityIsIgnored() const;
 
 private:
     void ariaListboxSelectedChildren(AccessibilityChildrenVector&);
     void ariaListboxVisibleChildren(AccessibilityChildrenVector&);
-    bool ariaIsHidden() const;
     bool isAllowedChildOfTree() const;
     bool hasTextAlternative() const;
     String positionalDescriptionForMSAA() const;
@@ -277,17 +277,63 @@ private:
     virtual bool ariaLiveRegionBusy() const;    
     
     bool inheritsPresentationalRole() const;
+
+#if ENABLE(MATHML)
+    // All math elements return true for isMathElement().
+    virtual bool isMathElement() const;
+    virtual bool isMathFraction() const;
+    virtual bool isMathFenced() const;
+    virtual bool isMathSubscriptSuperscript() const;
+    virtual bool isMathRow() const;
+    virtual bool isMathUnderOver() const;
+    virtual bool isMathRoot() const;
+    virtual bool isMathSquareRoot() const;
+    virtual bool isMathText() const;
+    virtual bool isMathNumber() const;
+    virtual bool isMathOperator() const;
+    virtual bool isMathFenceOperator() const;
+    virtual bool isMathSeparatorOperator() const;
+    virtual bool isMathIdentifier() const;
+    virtual bool isMathTable() const;
+    virtual bool isMathTableRow() const;
+    virtual bool isMathTableCell() const;
+    
+    // Generic components.
+    virtual AccessibilityObject* mathBaseObject();
+    
+    // Root components.
+    virtual AccessibilityObject* mathRadicandObject();
+    virtual AccessibilityObject* mathRootIndexObject();
+    
+    // Fraction components.
+    virtual AccessibilityObject* mathNumeratorObject();
+    virtual AccessibilityObject* mathDenominatorObject();
+
+    // Under over components.
+    virtual AccessibilityObject* mathUnderObject();
+    virtual AccessibilityObject* mathOverObject();
+    
+    // Subscript/superscript components.
+    virtual AccessibilityObject* mathSubscriptObject();
+    virtual AccessibilityObject* mathSuperscriptObject();
+    
+    // Fenced components.
+    virtual String mathFencedOpenString() const;
+    virtual String mathFencedCloseString() const;
+
+    bool isIgnoredElementWithinMathTree() const;
+#endif
 };
 
 inline AccessibilityRenderObject* toAccessibilityRenderObject(AccessibilityObject* object)
 {
-    ASSERT(!object || object->isAccessibilityRenderObject());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isAccessibilityRenderObject());
     return static_cast<AccessibilityRenderObject*>(object);
 }
 
 inline const AccessibilityRenderObject* toAccessibilityRenderObject(const AccessibilityObject* object)
 {
-    ASSERT(!object || object->isAccessibilityRenderObject());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isAccessibilityRenderObject());
     return static_cast<const AccessibilityRenderObject*>(object);
 }
 

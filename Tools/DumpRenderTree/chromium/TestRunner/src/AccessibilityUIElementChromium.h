@@ -34,7 +34,8 @@
 #include "CppBoundClass.h"
 #include "WebAccessibilityObject.h"
 #include <vector>
-#include <wtf/Vector.h>
+
+namespace WebTestRunner {
 
 class AccessibilityUIElement : public CppBoundClass {
 public:
@@ -92,6 +93,8 @@ private:
     void isValidGetterCallback(CppVariant*);
     void isReadOnlyGetterCallback(CppVariant*);
     void orientationGetterCallback(CppVariant*);
+    void clickPointXGetterCallback(CppVariant*);
+    void clickPointYGetterCallback(CppVariant*);
 
     // Bound methods.
     void allAttributesCallback(const CppArgumentList&, CppVariant*);
@@ -118,7 +121,9 @@ private:
     void setSelectedTextRangeCallback(const CppArgumentList&, CppVariant*);
     void attributeValueCallback(const CppArgumentList&, CppVariant*);
     void isAttributeSettableCallback(const CppArgumentList&, CppVariant*);
-    void isActionSupportedCallback(const CppArgumentList&, CppVariant*);
+    void isPressActionSupportedCallback(const CppArgumentList&, CppVariant*);
+    void isIncrementActionSupportedCallback(const CppArgumentList&, CppVariant*);
+    void isDecrementActionSupportedCallback(const CppArgumentList&, CppVariant*);
     void parentElementCallback(const CppArgumentList&, CppVariant*);
     void incrementCallback(const CppArgumentList&, CppVariant*);
     void decrementCallback(const CppArgumentList&, CppVariant*);
@@ -162,8 +167,10 @@ public:
     AccessibilityUIElement* createRoot(const WebKit::WebAccessibilityObject&);
 
 private:
-    typedef Vector<AccessibilityUIElement*> ElementList;
+    typedef std::vector<AccessibilityUIElement*> ElementList;
     ElementList m_elements;
 };
+
+}
 
 #endif // AccessibilityUIElementChromium_h

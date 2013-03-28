@@ -65,10 +65,8 @@ protected:
     void clearCaretRect();
     bool updateCaretRect(Document*, const VisiblePosition& caretPosition);
     IntRect absoluteBoundsForLocalRect(Node*, const LayoutRect&) const;
-    IntRect caretRepaintRect(Node*) const;
     bool shouldRepaintCaret(const RenderView*, bool isContentEditable) const;
     void paintCaret(Node*, GraphicsContext*, const LayoutPoint&, const LayoutRect& clipRect) const;
-    RenderObject* caretRenderer(Node*) const;
 
     const LayoutRect& localCaretRectWithoutUpdate() const { return m_caretLocalRect; }
 
@@ -123,7 +121,8 @@ public:
         ClearTypingStyle = 1 << 2,
         SpellCorrectionTriggered = 1 << 3,
         DoNotSetFocus = 1 << 4,
-        DictationTriggered = 1 << 5
+        DictationTriggered = 1 << 5,
+        DoNotUpdateAppearance = 1 << 6,
     };
     typedef unsigned SetSelectionOptions; // Union of values in SetSelectionOption and EUserTriggered
     static inline EUserTriggered selectionOptionsToUserTriggered(SetSelectionOptions options)
@@ -135,6 +134,7 @@ public:
 
     Element* rootEditableElement() const { return m_selection.rootEditableElement(); }
     Element* rootEditableElementOrDocumentElement() const;
+    Node* rootEditableElementOrTreeScopeRootNode() const;
     Element* rootEditableElementRespectingShadowTree() const;
 
     bool rendererIsEditable() const { return m_selection.rendererIsEditable(); }
@@ -153,7 +153,8 @@ public:
     bool setSelectedRange(Range*, EAffinity, bool closeTyping);
     void selectAll();
     void clear();
-    
+    void prepareForDestruction();
+
     // Call this after doing user-triggered selections to make it easy to delete the frame you entirely selected.
     void selectFrameElementInParentIfFullySelected();
 
@@ -300,13 +301,13 @@ private:
     VisiblePosition m_originalBase; // Used to store base before the adjustment at bidi boundary
     TextGranularity m_granularity;
 
+    RefPtr<Node> m_previousCaretNode; // The last node which painted the caret. Retained for clearing the old caret when it moves.
+
     RefPtr<EditingStyle> m_typingStyle;
 
     Timer<FrameSelection> m_caretBlinkTimer;
     // The painted bounds of the caret in absolute coordinates
     IntRect m_absCaretBounds;
-    // Similar to above, but inflated to ensure proper repaint (see https://bugs.webkit.org/show_bug.cgi?id=19086)
-    IntRect m_absoluteCaretRepaintBounds;
     bool m_absCaretBoundsDirty : 1;
     bool m_caretPaint : 1;
     bool m_isCaretBlinkingSuspended : 1;
@@ -328,7 +329,7 @@ inline void FrameSelection::setTypingStyle(PassRefPtr<EditingStyle> style)
     m_typingStyle = style;
 }
 
-#if !(PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(CHROMIUM))
+#if !(PLATFORM(MAC) || PLATFORM(GTK) || PLATFORM(CHROMIUM) || PLATFORM(EFL))
 inline void FrameSelection::notifyAccessibilityForSelectionChange()
 {
 }

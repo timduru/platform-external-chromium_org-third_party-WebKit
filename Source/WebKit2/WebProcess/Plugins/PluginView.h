@@ -30,6 +30,7 @@
 #include "Plugin.h"
 #include "PluginController.h"
 #include "WebFrame.h"
+#include <WebCore/FindOptions.h>
 #include <WebCore/Image.h>
 #include <WebCore/MediaCanStartListener.h>
 #include <WebCore/PluginViewBase.h>
@@ -44,10 +45,13 @@
 namespace WebCore {
 class Frame;
 class HTMLPlugInElement;
+class MouseEvent;
 class RenderBoxModelObject;
 }
 
 namespace WebKit {
+
+class WebEvent;
 
 class PluginView : public WebCore::PluginViewBase, public PluginController, private WebCore::MediaCanStartListener, private WebFrame::LoadListener {
 public:
@@ -68,7 +72,7 @@ public:
     void setWindowIsVisible(bool);
     void setWindowIsFocused(bool);
     void setDeviceScaleFactor(float);
-    void windowAndViewFramesChanged(const WebCore::IntRect& windowFrameInScreenCoordinates, const WebCore::IntRect& viewFrameInWindowCoordinates);
+    void windowAndViewFramesChanged(const WebCore::FloatRect& windowFrameInScreenCoordinates, const WebCore::FloatRect& viewFrameInWindowCoordinates);
     bool sendComplexTextInput(uint64_t pluginComplexTextInputIdentifier, const String& textInput);
     void setLayerHostingMode(LayerHostingMode);
     RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return m_plugin->pdfDocumentForPrinting(); }
@@ -87,10 +91,18 @@ public:
     void pageScaleFactorDidChange();
     void webPageDestroyed();
 
-    virtual bool handleEditingCommand(const String& commandName, const String& argument);
-    virtual bool isEditingCommandEnabled(const String& commandName);
+    bool handleEditingCommand(const String& commandName, const String& argument);
+    bool isEditingCommandEnabled(const String& commandName);
+    
+    unsigned countFindMatches(const String& target, WebCore::FindOptions, unsigned maxMatchCount);
+    bool findString(const String& target, WebCore::FindOptions, unsigned maxMatchCount);
+
+    String getSelectionString() const;
 
     bool shouldAllowScripting();
+
+    PassRefPtr<WebCore::SharedBuffer> liveResourceData() const;
+    bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&);
 
 private:
     PluginView(PassRefPtr<WebCore::HTMLPlugInElement>, PassRefPtr<Plugin>, const Plugin::Parameters& parameters);
@@ -121,6 +133,7 @@ private:
     void redeliverManualStream();
 
     void pluginSnapshotTimerFired(WebCore::DeferrableOneShotTimer<PluginView>*);
+    void pluginDidReceiveUserInteraction();
 
     // WebCore::PluginViewBase
 #if PLATFORM(MAC)
@@ -134,6 +147,8 @@ private:
     virtual WebCore::Scrollbar* horizontalScrollbar();
     virtual WebCore::Scrollbar* verticalScrollbar();
     virtual bool wantsWheelEvents();
+    virtual bool shouldAlwaysAutoStart() const OVERRIDE;
+    virtual bool shouldAllowNavigationFromDrags() const OVERRIDE;
 
     // WebCore::Widget
     virtual void setFrameRect(const WebCore::IntRect&);
@@ -147,6 +162,7 @@ private:
     virtual void show();
     virtual void hide();
     virtual bool transformsAffectFrameRect();
+    virtual void clipRectChanged() OVERRIDE;
 
     // WebCore::MediaCanStartListener
     virtual void mediaCanStart();
@@ -168,10 +184,6 @@ private:
     virtual bool isAcceleratedCompositingEnabled();
     virtual void pluginProcessCrashed();
     virtual void willSendEventToPlugin();
-#if PLATFORM(WIN)
-    virtual HWND nativeParentWindow();
-    virtual void scheduleWindowedPluginGeometryUpdate(const WindowGeometry&);
-#endif
 #if PLATFORM(MAC)
     virtual void pluginFocusOrWindowFocusChanged(bool pluginHasFocusAndWindowHasFocus);
     virtual void setComplexTextInputState(PluginComplexTextInputState);
@@ -200,6 +212,8 @@ private:
     // WebFrame::LoadListener
     virtual void didFinishLoad(WebFrame*);
     virtual void didFailLoad(WebFrame*, bool wasCancelled);
+
+    PassOwnPtr<WebEvent> createWebEvent(WebCore::MouseEvent*) const;
 
     RefPtr<WebCore::HTMLPlugInElement> m_pluginElement;
     RefPtr<Plugin> m_plugin;
@@ -245,6 +259,8 @@ private:
     RefPtr<ShareableBitmap> m_transientPaintingSnapshot;
     // This timer is used when plugin snapshotting is enabled, to capture a plugin placeholder.
     WebCore::DeferrableOneShotTimer<PluginView> m_pluginSnapshotTimer;
+    unsigned m_countSnapshotRetries;
+    bool m_didReceiveUserInteraction;
 
     double m_pageScaleFactor;
 };

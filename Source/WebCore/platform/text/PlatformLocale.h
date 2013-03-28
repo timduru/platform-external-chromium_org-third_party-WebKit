@@ -67,6 +67,9 @@ public:
     // Returns a year-month format in Unicode TR35 LDML.
     virtual String monthFormat() = 0;
 
+    // Returns a year-month format using short month lanel in Unicode TR35 LDML.
+    virtual String shortMonthFormat() = 0;
+
     // Returns time format in Unicode TR35 LDML[1] containing hour, minute, and
     // second with optional period(AM/PM), e.g. "h:mm:ss a"
     // [1] LDML http://unicode.org/reports/tr35/#Date_Format_Patterns
@@ -79,11 +82,11 @@ public:
 
     // Returns a date-time format in Unicode TR35 LDML. It should have a seconds
     // field.
-    String dateTimeFormatWithSeconds();
+    virtual String dateTimeFormatWithSeconds() = 0;
 
     // Returns a date-time format in Unicode TR35 LDML. It should have no seconds
     // field.
-    String dateTimeFormatWithoutSeconds();
+    virtual String dateTimeFormatWithoutSeconds() = 0;
 
     // Returns a vector of string of which size is 12. The first item is a
     // localized string of Jan and the last item is a localized string of
@@ -128,6 +131,7 @@ public:
     // Serializes the specified date into a formatted date string to
     // display to the user. If an implementation doesn't support
     // localized dates the function should return an empty string.
+    // FormatType can be used to specify if you want the short format. 
     String formatDateTime(const DateComponents&, FormatType = FormatTypeUnspecified);
 #endif
 
@@ -140,11 +144,6 @@ protected:
         GroupSeparatorIndex = 11,
         DecimalSymbolsSize
     };
-
-#if ENABLE(DATE_AND_TIME_INPUT_TYPES)
-    String m_dateTimeFormatWithSeconds;
-    String m_dateTimeFormatWithoutSeconds;
-#endif
 
     Locale() : m_hasLocaleData(false) { }
     virtual void initializeLocaleData() = 0;

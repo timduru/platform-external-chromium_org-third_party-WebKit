@@ -27,6 +27,7 @@
 #include "JSBasePrivate.h"
 #include "JSContextRefPrivate.h"
 #include "JSObjectRefPrivate.h"
+#include "JSScriptRefPrivate.h"
 #include <math.h>
 #define ASSERT_DISABLED 0
 #include <wtf/Assertions.h>
@@ -45,10 +46,19 @@ static double nan(const char*)
     return std::numeric_limits<double>::quiet_NaN();
 }
 
+using std::isinf;
+using std::isnan;
+
 #endif
 
+#if JSC_OBJC_API_ENABLED
+void testObjectiveCAPI(void);
+#endif
+
+extern void JSSynchronousGarbageCollectForDebugging(JSContextRef);
+
 static JSGlobalContextRef context;
-static int failed;
+int failed;
 static void assertEqualsAsBoolean(JSValueRef value, bool expectedValue)
 {
     if (JSValueToBoolean(context, value) != expectedValue) {
@@ -1039,6 +1049,10 @@ int main(int argc, char* argv[])
     ::SetErrorMode(0);
 #endif
 
+#if JSC_OBJC_API_ENABLED
+    testObjectiveCAPI();
+#endif
+
     const char *scriptPath = "testapi.js";
     if (argc > 1) {
         scriptPath = argv[1];
@@ -1061,6 +1075,8 @@ int main(int argc, char* argv[])
     JSClassRef globalObjectClass = JSClassCreate(&globalObjectClassDefinition);
     context = JSGlobalContextCreateInGroup(NULL, globalObjectClass);
 
+    JSContextGroupRef contextGroup = JSContextGetGroup(context);
+    
     JSGlobalContextRetain(context);
     JSGlobalContextRelease(context);
     ASSERT(JSContextGetGlobalContext(context) == context);
@@ -1117,6 +1133,7 @@ int main(int argc, char* argv[])
     free(buffer);
     JSValueRef jsCFEmptyStringWithCharacters = JSValueMakeString(context, jsCFEmptyIStringWithCharacters);
 
+    ASSERT(JSValueGetType(context, NULL) == kJSTypeNull);
     ASSERT(JSValueGetType(context, jsUndefined) == kJSTypeUndefined);
     ASSERT(JSValueGetType(context, jsNull) == kJSTypeNull);
     ASSERT(JSValueGetType(context, jsTrue) == kJSTypeBoolean);
@@ -1130,6 +1147,17 @@ int main(int argc, char* argv[])
     ASSERT(JSValueGetType(context, jsCFStringWithCharacters) == kJSTypeString);
     ASSERT(JSValueGetType(context, jsCFEmptyString) == kJSTypeString);
     ASSERT(JSValueGetType(context, jsCFEmptyStringWithCharacters) == kJSTypeString);
+
+    ASSERT(!JSValueIsBoolean(context, NULL));
+    ASSERT(!JSValueIsObject(context, NULL));
+    ASSERT(!JSValueIsString(context, NULL));
+    ASSERT(!JSValueIsNumber(context, NULL));
+    ASSERT(!JSValueIsUndefined(context, NULL));
+    ASSERT(JSValueIsNull(context, NULL));
+    ASSERT(!JSObjectCallAsFunction(context, NULL, NULL, 0, NULL, NULL));
+    ASSERT(!JSObjectCallAsConstructor(context, NULL, 0, NULL, NULL));
+    ASSERT(!JSObjectIsConstructor(context, NULL));
+    ASSERT(!JSObjectIsFunction(context, NULL));
 
     JSStringRef nullString = JSStringCreateWithUTF8CString(0);
     const JSChar* characters = JSStringGetCharactersPtr(nullString);
@@ -1399,9 +1427,12 @@ int main(int argc, char* argv[])
     JSValueUnprotect(context, jsNumberValue);
 
     JSStringRef goodSyntax = JSStringCreateWithUTF8CString("x = 1;");
-    JSStringRef badSyntax = JSStringCreateWithUTF8CString("x := 1;");
+    const char* badSyntaxConstant = "x := 1;";
+    JSStringRef badSyntax = JSStringCreateWithUTF8CString(badSyntaxConstant);
     ASSERT(JSCheckScriptSyntax(context, goodSyntax, NULL, 0, NULL));
     ASSERT(!JSCheckScriptSyntax(context, badSyntax, NULL, 0, NULL));
+    ASSERT(!JSScriptCreateFromString(contextGroup, 0, 0, badSyntax, 0, 0));
+    ASSERT(!JSScriptCreateReferencingImmortalASCIIText(contextGroup, 0, 0, badSyntaxConstant, strlen(badSyntaxConstant), 0, 0));
 
     JSValueRef result;
     JSValueRef v;
@@ -1590,12 +1621,20 @@ int main(int argc, char* argv[])
     v = JSObjectCallAsFunction(context, function, o, 0, NULL, NULL);
     ASSERT(JSValueIsEqual(context, v, o, NULL));
 
-    JSStringRef script = JSStringCreateWithUTF8CString("this;");
+    const char* thisScript = "this;";
+    JSStringRef script = JSStringCreateWithUTF8CString(thisScript);
     v = JSEvaluateScript(context, script, NULL, NULL, 1, NULL);
     ASSERT(JSValueIsEqual(context, v, globalObject, NULL));
     v = JSEvaluateScript(context, script, o, NULL, 1, NULL);
     ASSERT(JSValueIsEqual(context, v, o, NULL));
     JSStringRelease(script);
+
+    JSScriptRef scriptObject = JSScriptCreateReferencingImmortalASCIIText(contextGroup, 0, 0, thisScript, strlen(thisScript), 0, 0);
+    v = JSScriptEvaluate(context, scriptObject, NULL, NULL);
+    ASSERT(JSValueIsEqual(context, v, globalObject, NULL));
+    v = JSScriptEvaluate(context, scriptObject, o, NULL);
+    ASSERT(JSValueIsEqual(context, v, o, NULL));
+    JSScriptRelease(scriptObject);
 
     script = JSStringCreateWithUTF8CString("eval(this);");
     v = JSEvaluateScript(context, script, NULL, NULL, 1, NULL);
@@ -1616,8 +1655,23 @@ int main(int argc, char* argv[])
         printf("FAIL: Test script could not be loaded.\n");
         failed = 1;
     } else {
-        script = JSStringCreateWithUTF8CString(scriptUTF8);
-        result = JSEvaluateScript(context, script, NULL, NULL, 1, &exception);
+        JSStringRef url = JSStringCreateWithUTF8CString(scriptPath);
+        JSStringRef script = JSStringCreateWithUTF8CString(scriptUTF8);
+        JSStringRef errorMessage = 0;
+        int errorLine = 0;
+        JSScriptRef scriptObject = JSScriptCreateFromString(contextGroup, url, 1, script, &errorMessage, &errorLine);
+        ASSERT((!scriptObject) != (!errorMessage));
+        if (!scriptObject) {
+            printf("FAIL: Test script did not parse\n\t%s:%d\n\t", scriptPath, errorLine);
+            CFStringRef errorCF = JSStringCopyCFString(kCFAllocatorDefault, errorMessage);
+            CFShow(errorCF);
+            CFRelease(errorCF);
+            JSStringRelease(errorMessage);
+            failed = 1;
+        }
+
+        JSStringRelease(script);
+        result = scriptObject ? JSScriptEvaluate(context, scriptObject, 0, &exception) : 0;
         if (result && JSValueIsUndefined(context, result))
             printf("PASS: Test script executed successfully.\n");
         else {
@@ -1629,7 +1683,7 @@ int main(int argc, char* argv[])
             JSStringRelease(exceptionIString);
             failed = 1;
         }
-        JSStringRelease(script);
+        JSScriptRelease(scriptObject);
         free(scriptUTF8);
     }
 

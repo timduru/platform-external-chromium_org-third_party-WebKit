@@ -93,6 +93,23 @@ DebuggerScript.getInternalProperties = function(value)
     return result;
 }
 
+DebuggerScript.setFunctionVariableValue = function(functionValue, scopeIndex, variableName, newValue)
+{
+    var mirror = MakeMirror(functionValue);
+    if (!mirror.isFunction())
+        throw new Error("Function value has incorrect type");
+    return DebuggerScript._setScopeVariableValue(mirror, scopeIndex, variableName, newValue);
+}
+
+DebuggerScript._setScopeVariableValue = function(scopeHolder, scopeIndex, variableName, newValue)
+{
+    var scopeMirror = scopeHolder.scope(scopeIndex);
+    if (!scopeMirror)
+        throw new Error("Incorrect scope index");
+    scopeMirror.setVariableValue(variableName, newValue);
+    return undefined;
+}
+
 DebuggerScript.getScripts = function(contextData)
 {
     var result = [];
@@ -210,7 +227,7 @@ DebuggerScript.stepOutOfFunction = function(execState)
     execState.prepareStep(Debug.StepAction.StepOut, 1);
 }
 
-DebuggerScript.setScriptSource = function(scriptId, newSource, preview)
+DebuggerScript.liveEditScriptSource = function(scriptId, newSource, preview)
 {
     var scripts = Debug.scripts();
     var scriptToEdit = null;
@@ -235,6 +252,23 @@ DebuggerScript.clearBreakpoints = function(execState, args)
 DebuggerScript.setBreakpointsActivated = function(execState, args)
 {
     Debug.debuggerFlags().breakPointsActive.setValue(args.enabled);
+}
+
+DebuggerScript.getScriptSource = function(eventData)
+{
+    return eventData.script().source();
+}
+
+DebuggerScript.setScriptSource = function(eventData, source)
+{
+    if (eventData.script().data() === "injected-script")
+        return;
+    eventData.script().setSource(source);
+}
+
+DebuggerScript.getScriptName = function(eventData)
+{
+    return eventData.script().script_.nameOrSourceURL();
 }
 
 DebuggerScript._frameMirrorToJSCallFrame = function(frameMirror, callerFrame)
@@ -278,6 +312,11 @@ DebuggerScript._frameMirrorToJSCallFrame = function(frameMirror, callerFrame)
         return Debug.LiveEdit.RestartFrame(frameMirror);
     }
 
+    function setVariableValue(scopeNumber, variableName, newValue)
+    {
+        return DebuggerScript._setScopeVariableValue(frameMirror, scopeNumber, variableName, newValue);
+    }
+
     return {
         "sourceID": sourceID,
         "line": location ? location.line : 0,
@@ -288,7 +327,8 @@ DebuggerScript._frameMirrorToJSCallFrame = function(frameMirror, callerFrame)
         "scopeType": scopeType,
         "evaluate": evaluate,
         "caller": callerFrame,
-        "restart": restart
+        "restart": restart,
+        "setVariableValue": setVariableValue
     };
 }
 

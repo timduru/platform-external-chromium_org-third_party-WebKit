@@ -62,6 +62,32 @@ window.getComputedStyle = function(element) {}
 /** @param {*} message */
 function postMessage(message) {}
 
+/** @type {*} */
+window.testRunner = null;
+
+/**
+ * @constructor
+ */
+function WebKitMutation(callback)
+{
+    this.type = "";
+    /** @type {Node} */ this.target = null;
+    /** @type {Array.<Node>} */ this.addedNodes = [];
+    /** @type {Array.<Node>} */ this.removedNodes = [];
+}
+
+/**
+ * @constructor
+ * @param {function(Array.<WebKitMutation>)} callback
+ */
+function WebKitMutationObserver(callback) {}
+/** 
+ * @param {Node} container
+ * @param {Object} options
+ */
+WebKitMutationObserver.prototype.observe = function(container, options) {}
+WebKitMutationObserver.prototype.disconnect = function() {}
+
 /**
  * @param {string} eventName
  * @param {Function} listener
@@ -103,12 +129,29 @@ Array.prototype.qselect = function(k, comparator) {}
  */
 Array.prototype.select = function(field) {}
 
+/**
+ * @this {Array.<*>}
+ * @return {*}
+ */
+Array.prototype.peekLast = function() {}
+
 DOMApplicationCache.prototype.UNCACHED = 0;
 DOMApplicationCache.prototype.IDLE = 1;
 DOMApplicationCache.prototype.CHECKING = 2;
 DOMApplicationCache.prototype.DOWNLOADING = 3;
 DOMApplicationCache.prototype.UPDATEREADY = 4;
 DOMApplicationCache.prototype.OBSOLETE = 5;
+
+// File System API
+/**
+ * @constructor
+ */
+function DOMFileSystem() {}
+
+/**
+ * @type {DirectoryEntry}
+ */
+DOMFileSystem.prototype.root = null;
 
 /** @type {Node} */
 Range.prototype.startContainer;
@@ -129,7 +172,6 @@ InspectorFrontendHostAPI.prototype.moveWindowBy = function(x, y) {}
 InspectorFrontendHostAPI.prototype.setInjectedScriptForOrigin = function(origin, script) {}
 InspectorFrontendHostAPI.prototype.loaded = function() {}
 InspectorFrontendHostAPI.prototype.localizedStringsURL = function() {}
-InspectorFrontendHostAPI.prototype.hiddenPanels = function() {}
 InspectorFrontendHostAPI.prototype.inspectedURLChanged = function(url) {}
 InspectorFrontendHostAPI.prototype.documentCopy = function(event) {}
 InspectorFrontendHostAPI.prototype.copyText = function(text) {}
@@ -143,8 +185,12 @@ InspectorFrontendHostAPI.prototype.recordActionTaken = function(actionCode) {}
 InspectorFrontendHostAPI.prototype.recordPanelShown = function(panelCode) {}
 InspectorFrontendHostAPI.prototype.recordSettingChanged = function(settingCode) {}
 InspectorFrontendHostAPI.prototype.loadResourceSynchronously = function(url) {}
+InspectorFrontendHostAPI.prototype.supportsFileSystems = function() {}
+InspectorFrontendHostAPI.prototype.requestFileSystems = function() {}
+InspectorFrontendHostAPI.prototype.addFileSystem = function() {}
+InspectorFrontendHostAPI.prototype.removeFileSystem = function(fileSystemPath) {}
+InspectorFrontendHostAPI.prototype.isolatedFileSystem = function(fileSystemId, registeredName) {}
 InspectorFrontendHostAPI.prototype.setZoomFactor = function(zoom) {}
-InspectorFrontendHostAPI.prototype.canInspectWorkers = function() {}
 /** @type {InspectorFrontendHostAPI} */
 var InspectorFrontendHost;
 
@@ -210,6 +256,7 @@ WebInspector.evaluateInConsole = function(expression, showResultOnly) {}
 WebInspector.queryParamsObject = {}
 
 WebInspector.Events = {
+    InspectorLoaded: "InspectorLoaded",
     InspectorClosing: "InspectorClosing"
 }
 
@@ -233,6 +280,8 @@ function Request() {}
 function Resource() {}
 /** @constructor */
 function Timeline() {}
+
+var extensionServer;
 
 /** @type {string} */
 Location.prototype.origin = "";
@@ -278,4 +327,11 @@ difflib.SequenceMatcher.prototype.get_opcodes = function() { return []; }
 /** @constructor */
 WebInspector.CodeMirrorTextEditor = function(url, delegate) { }
 
-WebInspector.ProfileURLRegExp = "";
+/** @constructor */
+WebInspector.AceTextEditor = function(url, delegate) { }
+
+WebInspector.suggestReload = function() { }
+WebInspector.reload = function() { }
+
+/** @type {boolean} */
+window.dispatchStandaloneTestRunnerMessages;

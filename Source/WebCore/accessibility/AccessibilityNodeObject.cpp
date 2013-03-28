@@ -63,14 +63,16 @@
 #include "LocalizedStrings.h"
 #include "MathMLNames.h"
 #include "NodeList.h"
+#include "NodeTraversal.h"
 #include "Page.h"
 #include "ProgressTracker.h"
 #include "Text.h"
 #include "TextControlInnerElements.h"
 #include "TextIterator.h"
+#include "UserGestureIndicator.h"
+#include "VisibleUnits.h"
 #include "Widget.h"
 #include "htmlediting.h"
-#include "visible_units.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -86,6 +88,9 @@ AccessibilityNodeObject::AccessibilityNodeObject(Node* node)
     , m_ariaRole(UnknownRole)
     , m_childrenDirty(false)
     , m_roleForMSAA(UnknownRole)
+#ifndef NDEBUG
+    , m_initialized(false)
+#endif
     , m_node(node)
 {
 }
@@ -97,14 +102,16 @@ AccessibilityNodeObject::~AccessibilityNodeObject()
 
 void AccessibilityNodeObject::init()
 {
+#ifndef NDEBUG
+    ASSERT(!m_initialized);
+    m_initialized = true;
+#endif
     m_role = determineAccessibilityRole();
 }
 
 PassRefPtr<AccessibilityNodeObject> AccessibilityNodeObject::create(Node* node)
 {
-    AccessibilityNodeObject* obj = new AccessibilityNodeObject(node);
-    obj->init();
-    return adoptRef(obj);
+    return adoptRef(new AccessibilityNodeObject(node));
 }
 
 void AccessibilityNodeObject::detach()
@@ -282,6 +289,13 @@ AccessibilityRole AccessibilityNodeObject::determineAccessibilityRole()
             return buttonRoleType();
         if (input->isRangeControl())
             return SliderRole;
+
+#if ENABLE(INPUT_TYPE_COLOR)
+        const AtomicString& type = input->getAttribute(typeAttr);
+        if (equalIgnoringCase(type, "color"))
+            return ColorWellRole;
+#endif
+
         return TextFieldRole;
     }
     if (node()->hasTagName(selectTag)) {
@@ -375,8 +389,14 @@ bool AccessibilityNodeObject::canHaveChildren() const
     }
 }
 
-bool AccessibilityNodeObject::accessibilityIsIgnored() const
+bool AccessibilityNodeObject::computeAccessibilityIsIgnored() const
 {
+#ifndef NDEBUG
+    // Double-check that an AccessibilityObject is never accessed before
+    // it's been initialized.
+    ASSERT(m_initialized);
+#endif
+
     // If this element is within a parent that cannot have children, it should not be exposed.
     if (isDescendantOfBarrenParent())
         return true;
@@ -399,11 +419,6 @@ bool AccessibilityNodeObject::canvasHasFallbackContent() const
     }
 
     return false;
-}
-
-bool AccessibilityNodeObject::isWebArea() const
-{
-    return roleValue() == WebAreaRole;
 }
 
 bool AccessibilityNodeObject::isImageButton() const
@@ -686,7 +701,7 @@ bool AccessibilityNodeObject::isRequired() const
 
     Node* n = this->node();
     if (n && (n->isElementNode() && toElement(n)->isFormControlElement()))
-        return static_cast<HTMLFormControlElement*>(n)->required();
+        return static_cast<HTMLFormControlElement*>(n)->isRequired();
 
     return false;
 }
@@ -974,11 +989,13 @@ void AccessibilityNodeObject::alterSliderValue(bool increase)
     
 void AccessibilityNodeObject::increment()
 {
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingNewUserGesture);
     alterSliderValue(true);
 }
 
 void AccessibilityNodeObject::decrement()
 {
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingNewUserGesture);
     alterSliderValue(false);
 }
 
@@ -1032,6 +1049,11 @@ bool AccessibilityNodeObject::isGenericFocusableElement() const
     if (node() && node()->hasTagName(bodyTag))
         return false;
 
+    // An SVG root is focusable by default, but it's probably not interactive, so don't
+    // include it. It can still be made accessible by giving it an ARIA role.
+    if (roleValue() == SVGRootRole)
+        return false;
+
     return true;
 }
 
@@ -1069,7 +1091,11 @@ String AccessibilityNodeObject::ariaAccessibilityDescription() const
 
 static Element* siblingWithAriaRole(String role, Node* node)
 {
-    for (Node* sibling = node->parentNode()->firstChild(); sibling; sibling = sibling->nextSibling()) {
+    Node* parent = node->parentNode();
+    if (!parent)
+        return 0;
+    
+    for (Node* sibling = parent->firstChild(); sibling; sibling = sibling->nextSibling()) {
         if (sibling->isElementNode()) {
             const AtomicString& siblingAriaRole = toElement(sibling)->getAttribute(roleAttr);
             if (equalIgnoringCase(siblingAriaRole, role))
@@ -1108,7 +1134,7 @@ AccessibilityObject* AccessibilityNodeObject::menuButtonForMenu() const
     if (menuItem) {
         // ARIA just has generic menu items. AppKit needs to know if this is a top level items like MenuBarButton or MenuBarItem
         AccessibilityObject* menuItemAX = axObjectCache()->getOrCreate(menuItem);
-        if (menuItemAX->isMenuButton())
+        if (menuItemAX && menuItemAX->isMenuButton())
             return menuItemAX;
     }
     return 0;
@@ -1188,6 +1214,9 @@ void AccessibilityNodeObject::visibleText(Vector<AccessibilityText>& textOrder) 
     
     switch (roleValue()) {
     case PopUpButtonRole:
+        // Native popup buttons should not use their button children's text as a title. That value is retrieved through stringValue().
+        if (node->hasTagName(selectTag))
+            break;
     case ButtonRole:
     case ToggleButtonRole:
     case CheckBoxRole:
@@ -1411,9 +1440,9 @@ unsigned AccessibilityNodeObject::hierarchicalLevel() const
     if (roleValue() != TreeItemRole)
         return 0;
     
-    // Hierarchy leveling starts at 0.
+    // Hierarchy leveling starts at 1, to match the aria-level spec.
     // We measure tree hierarchy by the number of groups that the item is within.
-    unsigned level = 0;
+    unsigned level = 1;
     for (AccessibilityObject* parent = parentObject(); parent; parent = parent->parentObject()) {
         AccessibilityRole parentRole = parent->roleValue();
         if (parentRole == GroupRole)
@@ -1425,20 +1454,62 @@ unsigned AccessibilityNodeObject::hierarchicalLevel() const
     return level;
 }
 
+// When building the textUnderElement for an object, determine whether or not
+// we should include the inner text of this given descendant object or skip it.
+static bool shouldUseAccessiblityObjectInnerText(AccessibilityObject* obj)
+{
+    // Consider this hypothetical example:
+    // <div tabindex=0>
+    //   <h2>
+    //     Table of contents
+    //   </h2>
+    //   <a href="#start">Jump to start of book</a>
+    //   <ul>
+    //     <li><a href="#1">Chapter 1</a></li>
+    //     <li><a href="#1">Chapter 2</a></li>
+    //   </ul>
+    // </div>
+    //
+    // The goal is to return a reasonable title for the outer container div, because
+    // it's focusable - but without making its title be the full inner text, which is
+    // quite long. As a heuristic, skip links, controls, and elements that are usually
+    // containers with lots of children.
+
+    // Skip focusable children, so we don't include the text of links and controls.
+    if (obj->canSetFocusAttribute())
+        return false;
+
+    // Skip big container elements like lists, tables, etc.
+    if (obj->isList() || obj->isAccessibilityTable() || obj->isTree() || obj->isCanvas())
+        return false;
+
+    return true;
+}
+
 String AccessibilityNodeObject::textUnderElement() const
 {
     Node* node = this->node();
-    if (!node)
-        return String();
-
-    // Note: TextIterator doesn't return any text for nodes that don't have renderers.
-    // If this could be fixed, it'd be more accurate use TextIterator here.
-    if (node->isElementNode())
-        return toElement(node)->innerText();
-    else if (node->isTextNode())
+    if (node && node->isTextNode())
         return toText(node)->wholeText();
-    
-    return String();
+
+    String result;
+    for (AccessibilityObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (!shouldUseAccessiblityObjectInnerText(child))
+            continue;
+
+        if (child->isAccessibilityNodeObject()) {
+            Vector<AccessibilityText> textOrder;
+            toAccessibilityNodeObject(child)->alternativeText(textOrder);
+            if (textOrder.size() > 0) {
+                result.append(textOrder[0].text);
+                continue;
+            }
+        }
+
+        result.append(child->textUnderElement());
+    }
+
+    return result;
 }
 
 String AccessibilityNodeObject::title() const
@@ -1466,6 +1537,9 @@ String AccessibilityNodeObject::title() const
 
     switch (roleValue()) {
     case PopUpButtonRole:
+        // Native popup buttons should not use their button children's text as a title. That value is retrieved through stringValue().
+        if (node->hasTagName(selectTag))
+            return String();
     case ButtonRole:
     case ToggleButtonRole:
     case CheckBoxRole:
@@ -1559,6 +1633,30 @@ String AccessibilityNodeObject::stringValue() const
     return String();
 }
 
+void AccessibilityNodeObject::colorValue(int& r, int& g, int& b) const
+{
+    r = 0;
+    g = 0;
+    b = 0;
+
+    if (!isColorWell())
+        return;
+
+    if (!node() || !node()->hasTagName(inputTag))
+        return;
+
+    HTMLInputElement* input = static_cast<HTMLInputElement*>(node());
+    const AtomicString& type = input->getAttribute(typeAttr);
+    if (!equalIgnoringCase(type, "color"))
+        return;
+
+    // HTMLInputElement::value always returns a string parseable by Color().
+    Color color(input->value());
+    r = color.red();
+    g = color.green();
+    b = color.blue();
+}
+
 // This function implements the ARIA accessible name as described by the Mozilla                                        
 // ARIA Implementer's Guide.                                                                                            
 static String accessibleNameForNode(Node* node)
@@ -1586,7 +1684,7 @@ String AccessibilityNodeObject::accessibilityDescriptionForElements(Vector<Eleme
         Element* idElement = elements[i];
 
         builder.append(accessibleNameForNode(idElement));
-        for (Node* n = idElement->firstChild(); n; n = n->traverseNextNode(idElement))
+        for (Node* n = idElement->firstChild(); n; n = NodeTraversal::next(n, idElement))
             builder.append(accessibleNameForNode(n));
 
         if (i != size - 1)

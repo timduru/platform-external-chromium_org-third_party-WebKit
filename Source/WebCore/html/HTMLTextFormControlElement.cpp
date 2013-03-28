@@ -31,12 +31,14 @@
 #include "Document.h"
 #include "Event.h"
 #include "EventNames.h"
+#include "FeatureObserver.h"
 #include "Frame.h"
 #include "HTMLBRElement.h"
 #include "HTMLFormElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "NodeRenderingContext.h"
+#include "NodeTraversal.h"
 #include "RenderBox.h"
 #include "RenderTextControl.h"
 #include "RenderTheme.h"
@@ -65,6 +67,10 @@ HTMLTextFormControlElement::~HTMLTextFormControlElement()
 
 bool HTMLTextFormControlElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
+    // FIXME: We shouldn't force the pseudo elements down into the shadow, but
+    // this perserves the current behavior of WebKit.
+    if (childContext.node()->isPseudoElement())
+        return HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
     return childContext.isOnEncapsulationBoundary() && HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
 }
 
@@ -78,12 +84,12 @@ Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(Cont
     return InsertionDone;
 }
 
-void HTMLTextFormControlElement::dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode)
+void HTMLTextFormControlElement::dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode, FocusDirection direction)
 {
     if (supportsPlaceholder())
         updatePlaceholderVisibility(false);
-    handleFocusEvent();
-    HTMLFormControlElementWithState::dispatchFocusEvent(oldFocusedNode);
+    handleFocusEvent(oldFocusedNode.get(), direction);
+    HTMLFormControlElementWithState::dispatchFocusEvent(oldFocusedNode, direction);
 }
 
 void HTMLTextFormControlElement::dispatchBlurEvent(PassRefPtr<Node> newFocusedNode)
@@ -116,7 +122,7 @@ String HTMLTextFormControlElement::strippedPlaceholder() const
 {
     // According to the HTML5 specification, we need to remove CR and LF from
     // the attribute value.
-    const AtomicString& attributeValue = getAttribute(placeholderAttr);
+    const AtomicString& attributeValue = fastGetAttribute(placeholderAttr);
     if (!attributeValue.contains(newlineCharacter) && !attributeValue.contains(carriageReturn))
         return attributeValue;
 
@@ -136,7 +142,7 @@ static bool isNotLineBreak(UChar ch) { return ch != newlineCharacter && ch != ca
 
 bool HTMLTextFormControlElement::isPlaceholderEmpty() const
 {
-    const AtomicString& attributeValue = getAttribute(placeholderAttr);
+    const AtomicString& attributeValue = fastGetAttribute(placeholderAttr);
     return attributeValue.string().find(isNotLineBreak) == notFound;
 }
 
@@ -170,11 +176,12 @@ void HTMLTextFormControlElement::fixPlaceholderRenderer(HTMLElement* placeholder
         return;
     RenderObject* placeholderRenderer = placeholder->renderer();
     RenderObject* siblingRenderer = siblingElement->renderer();
-    ASSERT(siblingRenderer);
+    if (!siblingRenderer)
+        return;
     if (placeholderRenderer->nextSibling() == siblingRenderer)
         return;
     RenderObject* parentRenderer = placeholderRenderer->parent();
-    ASSERT(parentRenderer == siblingRenderer->parent());
+    ASSERT(siblingRenderer->parent() == parentRenderer);
     parentRenderer->removeChild(placeholderRenderer);
     parentRenderer->addChild(placeholderRenderer, siblingRenderer);
 }
@@ -325,8 +332,8 @@ void HTMLTextFormControlElement::setSelectionRange(int start, int end, TextField
     // startPosition and endPosition can be null position for example when
     // "-webkit-user-select: none" style attribute is specified.
     if (startPosition.isNotNull() && endPosition.isNotNull()) {
-        ASSERT(startPosition.deepEquivalent().deprecatedNode()->shadowAncestorNode() == this
-            && endPosition.deepEquivalent().deprecatedNode()->shadowAncestorNode() == this);
+        ASSERT(startPosition.deepEquivalent().deprecatedNode()->shadowHost() == this
+            && endPosition.deepEquivalent().deprecatedNode()->shadowHost() == this);
     }
     VisibleSelection newSelection;
     if (direction == SelectionHasBackwardDirection)
@@ -344,12 +351,9 @@ int HTMLTextFormControlElement::indexForVisiblePosition(const VisiblePosition& p
     Position indexPosition = pos.deepEquivalent().parentAnchoredEquivalent();
     if (enclosingTextFormControl(indexPosition) != this)
         return 0;
-    ExceptionCode ec = 0;
     RefPtr<Range> range = Range::create(indexPosition.document());
-    range->setStart(innerTextElement(), 0, ec);
-    ASSERT(!ec);
-    range->setEnd(indexPosition.containerNode(), indexPosition.offsetInContainerNode(), ec);
-    ASSERT(!ec);
+    range->setStart(innerTextElement(), 0, ASSERT_NO_EXCEPTION);
+    range->setEnd(indexPosition.containerNode(), indexPosition.offsetInContainerNode(), ASSERT_NO_EXCEPTION);
     return TextIterator::rangeLength(range.get());
 }
 
@@ -462,7 +466,7 @@ PassRefPtr<Range> HTMLTextFormControlElement::selection() const
     int offset = 0;
     Node* startNode = 0;
     Node* endNode = 0;
-    for (Node* node = innerText->firstChild(); node; node = node->traverseNextNode(innerText)) {
+    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(node, innerText)) {
         ASSERT(!node->firstChild());
         ASSERT(node->isTextNode() || node->hasTagName(brTag));
         int length = node->isTextNode() ? lastOffsetInNode(node) : 1;
@@ -503,16 +507,17 @@ void HTMLTextFormControlElement::selectionChanged(bool userTriggered)
     }
 }
 
-void HTMLTextFormControlElement::parseAttribute(const Attribute& attribute)
+void HTMLTextFormControlElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == placeholderAttr)
+    if (name == placeholderAttr) {
         updatePlaceholderVisibility(true);
-    else if (attribute.name() == onselectAttr)
-        setAttributeEventListener(eventNames().selectEvent, createAttributeEventListener(this, attribute));
-    else if (attribute.name() == onchangeAttr)
-        setAttributeEventListener(eventNames().changeEvent, createAttributeEventListener(this, attribute));
+        FeatureObserver::observe(document(), FeatureObserver::PlaceholderAttribute);
+    } else if (name == onselectAttr)
+        setAttributeEventListener(eventNames().selectEvent, createAttributeEventListener(this, name, value));
+    else if (name == onchangeAttr)
+        setAttributeEventListener(eventNames().changeEvent, createAttributeEventListener(this, name, value));
     else
-        HTMLFormControlElementWithState::parseAttribute(attribute);
+        HTMLFormControlElementWithState::parseAttribute(name, value);
 }
 
 bool HTMLTextFormControlElement::lastChangeWasUserEdit() const
@@ -529,17 +534,14 @@ void HTMLTextFormControlElement::setInnerTextValue(const String& value)
 
     bool textIsChanged = value != innerTextValue();
     if (textIsChanged || !innerTextElement()->hasChildNodes()) {
-        if (textIsChanged && document() && renderer() && AXObjectCache::accessibilityEnabled())
-            document()->axObjectCache()->postNotification(this, AXObjectCache::AXValueChanged, false);
-
-        ExceptionCode ec = 0;
-        innerTextElement()->setInnerText(value, ec);
-        ASSERT(!ec);
-
-        if (value.endsWith('\n') || value.endsWith('\r')) {
-            innerTextElement()->appendChild(HTMLBRElement::create(document()), ec);
-            ASSERT(!ec);
+        if (textIsChanged && document() && renderer()) {
+            if (AXObjectCache* cache = document()->existingAXObjectCache())
+                cache->postNotification(this, AXObjectCache::AXValueChanged, false);
         }
+        innerTextElement()->setInnerText(value, ASSERT_NO_EXCEPTION);
+
+        if (value.endsWith('\n') || value.endsWith('\r'))
+            innerTextElement()->appendChild(HTMLBRElement::create(document()), ASSERT_NO_EXCEPTION);
     }
 
     setFormControlValueMatchesRenderer(true);
@@ -561,7 +563,7 @@ String HTMLTextFormControlElement::innerTextValue() const
         return emptyString();
 
     StringBuilder result;
-    for (Node* node = innerText; node; node = node->traverseNextNode(innerText)) {
+    for (Node* node = innerText; node; node = NodeTraversal::next(node, innerText)) {
         if (node->hasTagName(brTag))
             result.append(newlineCharacter);
         else if (node->isTextNode())
@@ -608,7 +610,7 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
     getNextSoftBreak(line, breakNode, breakOffset);
 
     StringBuilder result;
-    for (Node* node = innerText->firstChild(); node; node = node->traverseNextNode(innerText)) {
+    for (Node* node = innerText->firstChild(); node; node = NodeTraversal::next(node, innerText)) {
         if (node->hasTagName(brTag))
             result.append(newlineCharacter);
         else if (node->isTextNode()) {
@@ -634,12 +636,14 @@ String HTMLTextFormControlElement::valueWithHardLineBreaks() const
 HTMLTextFormControlElement* enclosingTextFormControl(const Position& position)
 {
     ASSERT(position.isNull() || position.anchorType() == Position::PositionIsOffsetInAnchor
-           || position.containerNode() || !position.anchorNode()->shadowAncestorNode());
+        || position.containerNode() || !position.anchorNode()->shadowHost()
+        || (position.anchorNode()->parentNode() && position.anchorNode()->parentNode()->isShadowRoot()));
+        
     Node* container = position.containerNode();
     if (!container)
         return 0;
-    Node* ancestor = container->shadowAncestorNode();
-    return ancestor != container ? toTextFormControl(ancestor) : 0;
+    Element* ancestor = container->shadowHost();
+    return ancestor && isHTMLTextFormControlElement(ancestor) ? toHTMLTextFormControlElement(ancestor) : 0;
 }
 
 static const Element* parentHTMLElement(const Element* element)
@@ -676,7 +680,7 @@ void HTMLTextFormControlElement::reportMemoryUsage(MemoryObjectInfo* memoryObjec
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
     HTMLFormControlElementWithState::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_textAsOfLastFormControlChangeEvent);
+    info.addMember(m_textAsOfLastFormControlChangeEvent, "textAsOfLastFormControlChangeEvent");
 }
 
 } // namespace Webcore

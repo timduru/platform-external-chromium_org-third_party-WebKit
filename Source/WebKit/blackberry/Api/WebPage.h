@@ -80,9 +80,11 @@ class WebViewportArguments;
 
 enum JavaScriptDataType { JSUndefined = 0, JSNull, JSBoolean, JSNumber, JSString, JSObject, JSException, JSDataTypeMax };
 
+enum SelectionExpansionType { Word = 0, Sentence, Paragraph, NextParagraph };
+
 enum ActivationStateType { ActivationActive, ActivationInactive, ActivationStandby };
 
-enum TargetDetectionStrategy {PointBased, RectBased};
+enum TargetDetectionStrategy {PointBased, RectBased, FocusBased};
 
 class BLACKBERRY_EXPORT WebPage : public Platform::GuardedPointerBase {
 public:
@@ -131,11 +133,12 @@ public:
 
     WebCookieJar* cookieJar() const;
 
+    bool isLoading() const;
+
     void setVisible(bool);
     bool isVisible() const;
 
     void setScreenOrientation(int);
-    void setHasPendingSurfaceSizeChange();
     void applyPendingOrientationIfNeeded();
 
     Platform::ViewportAccessor* webkitThreadViewportAccessor() const;
@@ -155,7 +158,7 @@ public:
 
     // For conversion to mouse events.
     void touchEventCancel();
-    bool touchPointAsMouseEvent(const Platform::TouchPoint&, bool useFatFingers = true);
+    void touchPointAsMouseEvent(const Platform::TouchPoint&, unsigned modifiers = 0);
 
     void playSoundIfAnchorIsTarget() const;
 
@@ -189,7 +192,7 @@ public:
     InRegionScroller* inRegionScroller() const;
 
     bool blockZoom(const Platform::IntPoint& documentTargetPoint);
-    void blockZoomAnimationFinished();
+    void zoomAnimationFinished(double finalScale, const Platform::FloatPoint& finalDocumentScrollPosition, bool shouldConstrainScrollingToContentEdge);
     void resetBlockZoom();
     bool isAtInitialZoom() const;
     bool isMaxZoomed() const;
@@ -210,6 +213,10 @@ public:
     void assignFocus(Platform::FocusDirection);
 
     void setFocused(bool);
+
+    void focusNextField();
+    void focusPreviousField();
+    void submitForm();
 
     void clearBrowsingData();
     void clearHistory();
@@ -252,9 +259,13 @@ public:
     void spellCheckingRequestProcessed(int32_t transactionId, spannable_string_t*);
     void spellCheckingRequestCancelled(int32_t transactionId);
 
+    bool isInputMode() const;
     void setDocumentSelection(const Platform::IntPoint& documentStartPoint, const Platform::IntPoint& documentEndPoint);
     void setDocumentCaretPosition(const Platform::IntPoint&);
-    void selectAtDocumentPoint(const Platform::IntPoint&);
+    void selectAtDocumentPoint(const Platform::IntPoint&, SelectionExpansionType = Word);
+    void expandSelection(bool isScrollStarted);
+    void setOverlayExpansionPixelHeight(int);
+    void setParagraphExpansionPixelScrollMargin(const Platform::IntSize&);
     void selectionCancelled();
     bool selectionContainsDocumentPoint(const Platform::IntPoint&);
 
@@ -263,13 +274,10 @@ public:
     void setDateTimeInput(const BlackBerry::Platform::String& value);
     void setColorInput(const BlackBerry::Platform::String& value);
 
-    void onInputLocaleChanged(bool isRTL);
     static void onNetworkAvailabilityChanged(bool available);
     static void onCertificateStoreLocationSet(const BlackBerry::Platform::String& caPath);
 
     BlackBerry::Platform::String textHasAttribute(const BlackBerry::Platform::String& query) const;
-
-    void setAllowNotification(const BlackBerry::Platform::String& domain, bool allow);
 
     Platform::WebContext webContext(TargetDetectionStrategy) const;
 
@@ -321,6 +329,8 @@ public:
     void dispatchInspectorMessage(const BlackBerry::Platform::String& message);
     void inspectCurrentContextElement();
 
+    Platform::IntPoint adjustDocumentScrollPosition(const Platform::IntPoint& documentScrollPosition, const Platform::IntRect& documentPaddingRect);
+
     // FIXME: Needs API review on this header. See PR #120402.
     void notifyPagePause();
     void notifyPageResume();
@@ -334,6 +344,8 @@ public:
     void notifyScreenPowerStateChanged(bool powered);
     void notifyFullScreenVideoExited(bool done);
     void clearPluginSiteData();
+    void setExtraPluginDirectory(const BlackBerry::Platform::String& path);
+    void updateDisabledPluginFiles(const BlackBerry::Platform::String& fileName, bool disabled);
     void setJavaScriptCanAccessClipboard(bool);
     bool isWebGLEnabled() const;
     void setWebGLEnabled(bool);
@@ -344,6 +356,7 @@ public:
     void resetUserViewportArguments();
 
     WebTapHighlight* tapHighlight() const;
+    WebTapHighlight* selectionHighlight() const;
 
     // Adds an overlay that can be modified on the WebKit thread, and
     // whose attributes can be overridden on the compositing thread.
@@ -366,6 +379,14 @@ public:
     void enableQnxJavaScriptObject(bool);
 
     BlackBerry::Platform::String renderTreeAsText();
+
+    void updateNotificationPermission(const BlackBerry::Platform::String& requestId, bool allowed);
+    void notificationClicked(const BlackBerry::Platform::String& notificationId);
+    void notificationClosed(const BlackBerry::Platform::String& notificationId);
+    void notificationError(const BlackBerry::Platform::String& notificationId);
+    void notificationShown(const BlackBerry::Platform::String& notificationId);
+
+    void animateToScaleAndDocumentScrollPosition(double destinationZoomScale, const BlackBerry::Platform::FloatPoint& destinationScrollPosition, bool shouldConstrainScrollingToContentEdge = true);
 
 private:
     virtual ~WebPage();

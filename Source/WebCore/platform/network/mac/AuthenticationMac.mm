@@ -170,7 +170,6 @@ NSURLCredential *mac(const Credential& coreCredential)
 NSString * const NSURLAuthenticationMethodNTLM = @"NSURLAuthenticationMethodNTLM";
 #endif
 
-
 AuthenticationChallenge::AuthenticationChallenge(const ProtectionSpace& protectionSpace,
                                                  const Credential& proposedCredential,
                                                  unsigned previousFailureCount,
@@ -199,7 +198,8 @@ void AuthenticationChallenge::setAuthenticationClient(AuthenticationClient* clie
 {
     if (client) {
         m_sender.adoptNS([[WebCoreAuthenticationClientAsChallengeSender alloc] initWithAuthenticationClient:client]);
-        m_nsChallenge.adoptNS([[NSURLAuthenticationChallenge alloc] initWithAuthenticationChallenge:m_nsChallenge.get() sender:m_sender.get()]);
+        if (m_nsChallenge)
+            m_nsChallenge.adoptNS([[NSURLAuthenticationChallenge alloc] initWithAuthenticationChallenge:m_nsChallenge.get() sender:m_sender.get()]);
     } else {
         if ([m_sender.get() isMemberOfClass:[WebCoreAuthenticationClientAsChallengeSender class]])
             [(WebCoreAuthenticationClientAsChallengeSender *)m_sender.get() detachClient];

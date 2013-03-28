@@ -40,9 +40,8 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8SVGLength::valueAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+v8::Handle<v8::Value> V8SVGLength::valueAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.SVGLength.value._get");
     SVGPropertyTearOff<SVGLength>* wrapper = V8SVGLength::toNative(info.Holder());
     SVGLength& imp = wrapper->propertyReference();
     ExceptionCode ec = 0;
@@ -53,9 +52,8 @@ v8::Handle<v8::Value> V8SVGLength::valueAccessorGetter(v8::Local<v8::String> nam
     return v8::Number::New(value);
 }
 
-void V8SVGLength::valueAccessorSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+void V8SVGLength::valueAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.SVGLength.value._set");
     SVGPropertyTearOff<SVGLength>* wrapper = V8SVGLength::toNative(info.Holder());
     if (wrapper->isReadOnly()) {
         setDOMException(NO_MODIFICATION_ALLOWED_ERR, info.GetIsolate());
@@ -77,9 +75,8 @@ void V8SVGLength::valueAccessorSetter(v8::Local<v8::String> name, v8::Local<v8::
         wrapper->commitChange();
 }
 
-v8::Handle<v8::Value> V8SVGLength::convertToSpecifiedUnitsCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8SVGLength::convertToSpecifiedUnitsMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.SVGLength.convertToSpecifiedUnits");
     SVGPropertyTearOff<SVGLength>* wrapper = V8SVGLength::toNative(args.Holder());
     if (wrapper->isReadOnly())
         return setDOMException(NO_MODIFICATION_ALLOWED_ERR, args.GetIsolate());
@@ -89,7 +86,7 @@ v8::Handle<v8::Value> V8SVGLength::convertToSpecifiedUnitsCallback(const v8::Arg
 
     SVGLength& imp = wrapper->propertyReference();
     ExceptionCode ec = 0;
-    EXCEPTION_BLOCK(int, unitType, toUInt32(args[0]));
+    V8TRYCATCH(int, unitType, toUInt32(args[0]));
     SVGLengthContext lengthContext(wrapper->contextElement());
     imp.convertToSpecifiedUnits(unitType, lengthContext, ec);
     if (UNLIKELY(ec))

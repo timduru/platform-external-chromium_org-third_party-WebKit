@@ -33,7 +33,7 @@
 
 namespace WebCore {
 
-void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect& destRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp)
+void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect& destRect, const FloatRect& srcRect, ColorSpace, CompositeOperator compositeOp, BlendMode)
 {
     GraphicsContextStateSaver stateSaver(*destContext);
     destContext->setCompositeOperation(compositeOp);
@@ -46,7 +46,7 @@ void GeneratorGeneratedImage::draw(GraphicsContext* destContext, const FloatRect
 }
 
 void GeneratorGeneratedImage::drawPattern(GraphicsContext* destContext, const FloatRect& srcRect, const AffineTransform& patternTransform,
-                                 const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator compositeOp, const FloatRect& destRect)
+    const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator compositeOp, const FloatRect& destRect, BlendMode)
 {
     // Allow the generator to provide visually-equivalent tiling parameters for better performance.
     IntSize adjustedSize = m_size;
@@ -64,7 +64,7 @@ void GeneratorGeneratedImage::drawPattern(GraphicsContext* destContext, const Fl
     unsigned generatorHash = m_generator->hash();
 
     if (!m_cachedImageBuffer || m_cachedGeneratorHash != generatorHash || m_cachedAdjustedSize != adjustedSize || !destContext->isCompatibleWithBuffer(m_cachedImageBuffer.get())) {
-        m_cachedImageBuffer = destContext->createCompatibleBuffer(adjustedSize);
+        m_cachedImageBuffer = destContext->createCompatibleBuffer(adjustedSize, m_generator->hasAlpha());
         if (!m_cachedImageBuffer)
             return;
 
@@ -90,9 +90,9 @@ void GeneratorGeneratedImage::reportMemoryUsage(MemoryObjectInfo* memoryObjectIn
 {
     MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
     GeneratedImage::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_generator);
-    info.addMember(m_cachedImageBuffer);
-    info.addMember(m_cacheTimer);
+    info.addMember(m_generator, "generator");
+    info.addMember(m_cachedImageBuffer, "cachedImageBuffer");
+    info.addMember(m_cacheTimer, "cacheTimer");
 }
 
 }

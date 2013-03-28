@@ -33,6 +33,7 @@
 #import "EventDispatcher.h"
 #import "LayerHostingContext.h"
 #import "LayerTreeContext.h"
+#import "WebFrame.h"
 #import "WebPage.h"
 #import "WebPageCreationParameters.h"
 #import "WebPageProxyMessages.h"
@@ -69,6 +70,7 @@ TiledCoreAnimationDrawingArea::TiledCoreAnimationDrawingArea(WebPage* webPage, c
     , m_layerTreeStateIsFrozen(false)
     , m_layerFlushScheduler(this)
     , m_isPaintingSuspended(!parameters.isVisible)
+    , m_clipsToExposedRect(false)
 {
     Page* page = m_webPage->corePage();
 
@@ -99,24 +101,27 @@ TiledCoreAnimationDrawingArea::~TiledCoreAnimationDrawingArea()
     m_layerFlushScheduler.invalidate();
 }
 
-void TiledCoreAnimationDrawingArea::setNeedsDisplay(const IntRect& rect)
+void TiledCoreAnimationDrawingArea::setNeedsDisplay()
 {
 }
 
-void TiledCoreAnimationDrawingArea::scroll(const IntRect& scrollRect, const IntSize& scrollOffset)
+void TiledCoreAnimationDrawingArea::setNeedsDisplayInRect(const IntRect& rect)
 {
+}
+
+void TiledCoreAnimationDrawingArea::scroll(const IntRect& scrollRect, const IntSize& scrollDelta)
+{
+}
+
+void TiledCoreAnimationDrawingArea::didChangeScrollOffsetForAnyFrame()
+{
+    for (PageOverlayLayerMap::iterator it = m_pageOverlayLayers.begin(), end = m_pageOverlayLayers.end(); it != end; ++it)
+        it->value->setNeedsDisplay();
 }
 
 void TiledCoreAnimationDrawingArea::setRootCompositingLayer(GraphicsLayer* graphicsLayer)
 {
     CALayer *rootCompositingLayer = graphicsLayer ? graphicsLayer->platformLayer() : nil;
-
-    // Since we'll always be in accelerated compositing mode, the only time that layer will be nil
-    // is when the WKView is removed from its containing window. In that case, the layer will already be
-    // removed from the layer tree hierarchy over in the UI process, so there's no reason to remove it locally.
-    // In addition, removing the layer here will cause flashes when switching between tabs.
-    if (!rootCompositingLayer)
-        return;
 
     if (m_layerTreeStateIsFrozen) {
         m_pendingRootCompositingLayer = rootCompositingLayer;
@@ -178,55 +183,84 @@ void TiledCoreAnimationDrawingArea::scheduleCompositingLayerFlush()
     m_layerFlushScheduler.schedule();
 }
 
-void TiledCoreAnimationDrawingArea::didInstallPageOverlay()
+void TiledCoreAnimationDrawingArea::didInstallPageOverlay(PageOverlay* pageOverlay)
 {
     m_webPage->corePage()->scrollingCoordinator()->setForceMainThreadScrollLayerPositionUpdates(true);
 
-    createPageOverlayLayer();
+    createPageOverlayLayer(pageOverlay);
     scheduleCompositingLayerFlush();
 }
 
-void TiledCoreAnimationDrawingArea::didUninstallPageOverlay()
+void TiledCoreAnimationDrawingArea::didUninstallPageOverlay(PageOverlay* pageOverlay)
 {
+    destroyPageOverlayLayer(pageOverlay);
+    scheduleCompositingLayerFlush();
+
+    if (m_pageOverlayLayers.size())
+        return;
+
     if (Page* page = m_webPage->corePage())
         page->scrollingCoordinator()->setForceMainThreadScrollLayerPositionUpdates(false);
-
-    destroyPageOverlayLayer();
-    scheduleCompositingLayerFlush();
 }
 
-void TiledCoreAnimationDrawingArea::setPageOverlayNeedsDisplay(const IntRect& rect)
+void TiledCoreAnimationDrawingArea::setPageOverlayNeedsDisplay(PageOverlay* pageOverlay, const IntRect& rect)
 {
-    ASSERT(m_pageOverlayLayer);
-    m_pageOverlayLayer->setNeedsDisplayInRect(rect);
+    GraphicsLayer* layer = m_pageOverlayLayers.get(pageOverlay);
+
+    if (!layer)
+        return;
+
+    if (!layer->drawsContent()) {
+        layer->setDrawsContent(true);
+        layer->setSize(expandedIntSize(FloatSize(m_rootLayer.get().frame.size)));
+    }
+
+    layer->setNeedsDisplayInRect(rect);
     scheduleCompositingLayerFlush();
 }
 
 void TiledCoreAnimationDrawingArea::updatePreferences(const WebPreferencesStore&)
 {
+    Settings* settings = m_webPage->corePage()->settings();
     bool scrollingPerformanceLoggingEnabled = m_webPage->scrollingPerformanceLoggingEnabled();
     ScrollingThread::dispatch(bind(&ScrollingTree::setScrollingPerformanceLoggingEnabled, m_webPage->corePage()->scrollingCoordinator()->scrollingTree(), scrollingPerformanceLoggingEnabled));
+
+    if (TiledBacking* tiledBacking = mainFrameTiledBacking())
+        tiledBacking->setAggressivelyRetainsTiles(settings->aggressiveTileRetentionEnabled());
+
+    PageOverlayLayerMap::iterator end = m_pageOverlayLayers.end();
+    for (PageOverlayLayerMap::iterator it = m_pageOverlayLayers.begin(); it != end; ++it) {
+        it->value->setAcceleratesDrawing(settings->acceleratedDrawingEnabled());
+        it->value->setShowDebugBorder(settings->showDebugBorders());
+        it->value->setShowRepaintCounter(settings->showRepaintCounter());
+    }
 
     // Soon we want pages with fixed positioned elements to be able to be scrolled by the ScrollingCoordinator.
     // As a part of that work, we have to composite fixed position elements, and we have to allow those
     // elements to create a stacking context.
-    m_webPage->corePage()->settings()->setAcceleratedCompositingForFixedPositionEnabled(true);
-    m_webPage->corePage()->settings()->setFixedPositionCreatesStackingContext(true);
+    settings->setAcceleratedCompositingForFixedPositionEnabled(true);
+    settings->setFixedPositionCreatesStackingContext(true);
 
-    bool showDebugBorders = m_webPage->corePage()->settings()->showDebugBorders();
-
-    if (showDebugBorders == !!m_debugInfoLayer)
+    bool showTiledScrollingIndicator = settings->showTiledScrollingIndicator();
+    if (showTiledScrollingIndicator == !!m_debugInfoLayer)
         return;
 
-    if (showDebugBorders) {
-        m_debugInfoLayer = [CALayer layer];
-        [m_rootLayer.get() addSublayer:m_debugInfoLayer.get()];
-    } else {
-        [m_debugInfoLayer.get() removeFromSuperlayer];
-        m_debugInfoLayer = nullptr;
-    }
+    updateDebugInfoLayer(showTiledScrollingIndicator);
+}
 
-    ScrollingThread::dispatch(bind(&ScrollingTree::setDebugRootLayer, m_webPage->corePage()->scrollingCoordinator()->scrollingTree(), m_debugInfoLayer));
+void TiledCoreAnimationDrawingArea::mainFrameContentSizeChanged(const IntSize& contentSize)
+{
+    if (!m_webPage->minimumLayoutWidth())
+        return;
+
+    if (m_inUpdateGeometry)
+        return;
+
+    if (m_lastSentIntrinsicContentSize == contentSize)
+        return;
+
+    m_lastSentIntrinsicContentSize = contentSize;
+    m_webPage->send(Messages::DrawingAreaProxy::IntrinsicContentSizeDidChange(contentSize));
 }
 
 void TiledCoreAnimationDrawingArea::dispatchAfterEnsuringUpdatedScrollPosition(const Function<void ()>& functionRef)
@@ -268,9 +302,13 @@ void TiledCoreAnimationDrawingArea::notifyFlushRequired(const GraphicsLayer*)
 
 void TiledCoreAnimationDrawingArea::paintContents(const GraphicsLayer* graphicsLayer, GraphicsContext& graphicsContext, GraphicsLayerPaintingPhase, const IntRect& clipRect)
 {
-    ASSERT_UNUSED(graphicsLayer, graphicsLayer == m_pageOverlayLayer);
-
-    m_webPage->drawPageOverlay(graphicsContext, clipRect);
+    PageOverlayLayerMap::iterator end = m_pageOverlayLayers.end();
+    for (PageOverlayLayerMap::iterator it = m_pageOverlayLayers.begin(); it != end; ++it) {
+        if (it->value == graphicsLayer) {
+            m_webPage->drawPageOverlay(it->key, graphicsContext, clipRect);
+            break;
+        }
+    }
 }
 
 float TiledCoreAnimationDrawingArea::deviceScaleFactor() const
@@ -292,9 +330,13 @@ bool TiledCoreAnimationDrawingArea::flushLayers()
         m_pendingRootCompositingLayer = nullptr;
     }
 
-    if (m_pageOverlayLayer) {
-        m_pageOverlayLayer->setNeedsDisplay();
-        m_pageOverlayLayer->flushCompositingStateForThisLayerOnly();
+    PageOverlayLayerMap::iterator end = m_pageOverlayLayers.end();
+    IntRect visibleRect = enclosingIntRect(m_rootLayer.get().frame);
+    if (m_clipsToExposedRect)
+        visibleRect.intersect(enclosingIntRect(m_exposedRect));
+    for (PageOverlayLayerMap::iterator it = m_pageOverlayLayers.begin(); it != end; ++it) {
+        GraphicsLayer* layer = it->value.get();
+        layer->flushCompositingState(visibleRect);
     }
 
     bool returnValue = m_webPage->corePage()->mainFrame()->view()->flushCompositingStateIncludingSubframes();
@@ -330,13 +372,53 @@ void TiledCoreAnimationDrawingArea::resumePainting()
         m_webPage->corePage()->resumeScriptedAnimations();
 }
 
+void TiledCoreAnimationDrawingArea::setExposedRect(const FloatRect& exposedRect)
+{
+    // FIXME: This should be mapped through the scroll offset, but we need to keep it up to date.
+    m_exposedRect = exposedRect;
+
+    mainFrameTiledBacking()->setExposedRect(exposedRect);
+
+    PageOverlayLayerMap::iterator end = m_pageOverlayLayers.end();
+    for (PageOverlayLayerMap::iterator it = m_pageOverlayLayers.begin(); it != end; ++it)
+        if (TiledBacking* tiledBacking = it->value->tiledBacking())
+            tiledBacking->setExposedRect(exposedRect);
+}
+
+void TiledCoreAnimationDrawingArea::mainFrameScrollabilityChanged(bool isScrollable)
+{
+    m_clipsToExposedRect = !isScrollable;
+    mainFrameTiledBacking()->setClipsToExposedRect(!isScrollable);
+
+    PageOverlayLayerMap::iterator end = m_pageOverlayLayers.end();
+    for (PageOverlayLayerMap::iterator it = m_pageOverlayLayers.begin(); it != end; ++it)
+        if (TiledBacking* tiledBacking = it->value->tiledBacking())
+            tiledBacking->setClipsToExposedRect(!isScrollable);
+}
+
 void TiledCoreAnimationDrawingArea::updateGeometry(const IntSize& viewSize)
 {
-    m_webPage->setSize(viewSize);
+    m_inUpdateGeometry = true;
+
+    IntSize size = viewSize;
+    IntSize contentSize = IntSize(-1, -1);
+
+    if (!m_webPage->minimumLayoutWidth())
+        m_webPage->setSize(size);
+
     m_webPage->layoutIfNeeded();
 
-    if (m_pageOverlayLayer)
-        m_pageOverlayLayer->setSize(viewSize);
+    if (m_webPage->minimumLayoutWidth()) {
+        contentSize = m_webPage->mainWebFrame()->contentBounds().size();
+        size = contentSize;
+    }
+
+    PageOverlayLayerMap::iterator end = m_pageOverlayLayers.end();
+    for (PageOverlayLayerMap::iterator it = m_pageOverlayLayers.begin(); it != end; ++it) {
+        GraphicsLayer* layer = it->value.get();
+        if (layer->drawsContent())
+            layer->setSize(viewSize);
+    }
 
     if (!m_layerTreeStateIsFrozen)
         flushLayers();
@@ -351,7 +433,10 @@ void TiledCoreAnimationDrawingArea::updateGeometry(const IntSize& viewSize)
     [CATransaction flush];
     [CATransaction synchronize];
 
-    m_webPage->send(Messages::DrawingAreaProxy::DidUpdateGeometry());
+    m_lastSentIntrinsicContentSize = contentSize;
+    m_webPage->send(Messages::DrawingAreaProxy::DidUpdateGeometry(contentSize));
+
+    m_inUpdateGeometry = false;
 }
 
 void TiledCoreAnimationDrawingArea::setDeviceScaleFactor(float deviceScaleFactor)
@@ -403,60 +488,138 @@ void TiledCoreAnimationDrawingArea::updateLayerHostingContext()
 #endif
     }
 
-    m_layerHostingContext->setRootLayer(m_rootLayer.get());
+    if (m_hasRootCompositingLayer)
+        m_layerHostingContext->setRootLayer(m_rootLayer.get());
+
     if (colorSpace)
         m_layerHostingContext->setColorSpace(colorSpace.get());
 }
 
 void TiledCoreAnimationDrawingArea::setRootCompositingLayer(CALayer *layer)
 {
-    ASSERT(layer);
     ASSERT(!m_layerTreeStateIsFrozen);
 
+    bool hadRootCompositingLayer = m_hasRootCompositingLayer;
+    m_hasRootCompositingLayer = !!layer;
+
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
 
-    m_rootLayer.get().sublayers = [NSArray arrayWithObject:layer];
+    m_rootLayer.get().sublayers = m_hasRootCompositingLayer ? [NSArray arrayWithObject:layer] : [NSArray array];
 
-    if (m_pageOverlayLayer)
-        [m_rootLayer.get() addSublayer:m_pageOverlayLayer->platformLayer()];
+    if (hadRootCompositingLayer != m_hasRootCompositingLayer)
+        m_layerHostingContext->setRootLayer(m_hasRootCompositingLayer ? m_rootLayer.get() : 0);
 
-    if (m_debugInfoLayer)
-        [m_rootLayer.get() addSublayer:m_debugInfoLayer.get()];
+    PageOverlayLayerMap::iterator end = m_pageOverlayLayers.end();
+    for (PageOverlayLayerMap::iterator it = m_pageOverlayLayers.begin(); it != end; ++it)
+        [m_rootLayer.get() addSublayer:it->value->platformLayer()];
+
+    if (TiledBacking* tiledBacking = mainFrameTiledBacking()) {
+        tiledBacking->setAggressivelyRetainsTiles(m_webPage->corePage()->settings()->aggressiveTileRetentionEnabled());
+        tiledBacking->setExposedRect(m_exposedRect);
+        tiledBacking->setClipsToExposedRect(!m_webPage->mainFrameIsScrollable());
+    }
+
+    updateDebugInfoLayer(m_webPage->corePage()->settings()->showTiledScrollingIndicator());
 
     [CATransaction commit];
 }
 
-void TiledCoreAnimationDrawingArea::createPageOverlayLayer()
+void TiledCoreAnimationDrawingArea::createPageOverlayLayer(PageOverlay* pageOverlay)
 {
-    ASSERT(!m_pageOverlayLayer);
-
-    m_pageOverlayLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
+    OwnPtr<GraphicsLayer> layer = GraphicsLayer::create(graphicsLayerFactory(), this);
 #ifndef NDEBUG
-    m_pageOverlayLayer->setName("page overlay content");
+    layer->setName("page overlay content");
 #endif
 
-    // We don't ever want the overlay layer to become tiled because that will look bad, and
-    // we also never expect the underlying CALayer to change.
-    static_cast<GraphicsLayerCA*>(m_pageOverlayLayer.get())->setAllowTiledLayer(false);
-    m_pageOverlayLayer->setAcceleratesDrawing(true);
-    m_pageOverlayLayer->setDrawsContent(true);
-    m_pageOverlayLayer->setSize(m_webPage->size());
+    layer->setAcceleratesDrawing(m_webPage->corePage()->settings()->acceleratedDrawingEnabled());
+    layer->setShowDebugBorder(m_webPage->corePage()->settings()->showDebugBorders());
+    layer->setShowRepaintCounter(m_webPage->corePage()->settings()->showRepaintCounter());
+
+    m_pageOverlayPlatformLayers.set(layer.get(), layer->platformLayer());
+
+    if (TiledBacking* tiledBacking = layer->tiledBacking()) {
+        tiledBacking->setExposedRect(m_exposedRect);
+        tiledBacking->setClipsToExposedRect(!m_webPage->mainFrameIsScrollable());
+    }
 
     [CATransaction begin];
     [CATransaction setDisableActions:YES];
 
-    [m_rootLayer.get() addSublayer:m_pageOverlayLayer->platformLayer()];
+    [m_rootLayer.get() addSublayer:layer->platformLayer()];
 
     [CATransaction commit];
+
+    m_pageOverlayLayers.add(pageOverlay, layer.release());
 }
 
-void TiledCoreAnimationDrawingArea::destroyPageOverlayLayer()
+void TiledCoreAnimationDrawingArea::destroyPageOverlayLayer(PageOverlay* pageOverlay)
 {
-    ASSERT(m_pageOverlayLayer);
+    OwnPtr<GraphicsLayer> layer = m_pageOverlayLayers.take(pageOverlay);
+    ASSERT(layer);
 
-    [m_pageOverlayLayer->platformLayer() removeFromSuperlayer];
-    m_pageOverlayLayer = nullptr;
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+
+    [layer->platformLayer() removeFromSuperlayer];
+
+    [CATransaction commit];
+
+    m_pageOverlayPlatformLayers.remove(layer.get());
+}
+
+void TiledCoreAnimationDrawingArea::didCommitChangesForLayer(const GraphicsLayer* layer) const
+{
+    RetainPtr<CALayer> oldPlatformLayer = m_pageOverlayPlatformLayers.get(layer);
+
+    if (!oldPlatformLayer)
+        return;
+
+    if (oldPlatformLayer.get() == layer->platformLayer())
+        return;
+
+    [CATransaction begin];
+    [CATransaction setDisableActions:YES];
+
+    [m_rootLayer.get() insertSublayer:layer->platformLayer() above:oldPlatformLayer.get()];
+    [oldPlatformLayer.get() removeFromSuperlayer];
+
+    [CATransaction commit];
+
+    if (TiledBacking* tiledBacking = layer->tiledBacking()) {
+        tiledBacking->setExposedRect(m_exposedRect);
+        tiledBacking->setClipsToExposedRect(!m_webPage->mainFrameIsScrollable());
+    }
+
+    m_pageOverlayPlatformLayers.set(layer, layer->platformLayer());
+}
+
+TiledBacking* TiledCoreAnimationDrawingArea::mainFrameTiledBacking() const
+{
+    Frame* frame = m_webPage->corePage()->mainFrame();
+    if (!frame)
+        return 0;
+    
+    FrameView* frameView = frame->view();
+    return frameView ? frameView->tiledBacking() : 0;
+}
+
+void TiledCoreAnimationDrawingArea::updateDebugInfoLayer(bool showLayer)
+{
+    if (showLayer) {
+        if (TiledBacking* tiledBacking = mainFrameTiledBacking())
+            m_debugInfoLayer = tiledBacking->tiledScrollingIndicatorLayer();
+        
+        if (m_debugInfoLayer) {
+#ifndef NDEBUG
+            [m_debugInfoLayer.get() setName:@"Debug Info"];
+#endif
+            [m_rootLayer.get() addSublayer:m_debugInfoLayer.get()];
+        }
+    } else if (m_debugInfoLayer) {
+        [m_debugInfoLayer.get() removeFromSuperlayer];
+        m_debugInfoLayer = nullptr;
+    }
 }
 
 } // namespace WebKit

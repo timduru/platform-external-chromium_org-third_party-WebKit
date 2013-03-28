@@ -30,10 +30,13 @@
 #define LIBSOUP_USE_UNSTABLE_REQUEST_API
 
 #include "WKBase.h"
+#include <WebCore/AuthenticationChallenge.h>
+#include <WebCore/NetworkingContext.h>
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/RunLoop.h>
 #include <WebKit2/WebProcess.h>
 #include <gtk/gtk.h>
+#include <libintl.h>
 #include <libsoup/soup-cache.h>
 #include <runtime/InitializeThreading.h>
 #include <unistd.h>
@@ -55,14 +58,20 @@ WK_EXPORT int WebProcessMainGtk(int argc, char* argv[])
 #endif
 
     gtk_init(&argc, &argv);
-    g_type_init();
+
+    bindtextdomain(GETTEXT_PACKAGE, PACKAGE_LOCALE_DIR);
+    bind_textdomain_codeset(GETTEXT_PACKAGE, "UTF-8");
 
     JSC::initializeThreading();
     WTF::initializeMainThread();
 
     RunLoop::initializeMainRunLoop();
     int socket = atoi(argv[1]);
-    WebProcess::shared().initialize(socket, RunLoop::main());
+
+    ChildProcessInitializationParameters parameters;
+    parameters.connectionIdentifier = socket;
+
+    WebProcess::shared().initialize(parameters);
 
     // Despite using system CAs to validate certificates we're
     // accepting invalid certificates by default. New API will be
@@ -75,9 +84,6 @@ WK_EXPORT int WebProcessMainGtk(int argc, char* argv[])
     GRefPtr<SoupCache> soupCache = adoptGRef(soup_cache_new(soupCacheDirectory.get(), SOUP_CACHE_SINGLE_USER));
     soup_session_add_feature(session, SOUP_SESSION_FEATURE(soupCache.get()));
     soup_cache_load(soupCache.get());
-
-    // This is for compatibility, it will be removed when UI process can handle SSL errors.
-    WebCore::ResourceHandle::setIgnoreSSLErrors(true);
 
     RunLoop::run();
 

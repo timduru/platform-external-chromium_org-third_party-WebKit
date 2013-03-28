@@ -26,10 +26,14 @@
 #include "config.h"
 #include "NetworkProcessConnection.h"
 
+#include "DataReference.h"
 #include "NetworkConnectionToWebProcessMessages.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebProcess.h"
 #include "WebResourceBuffer.h"
+#include "WebResourceLoadScheduler.h"
+#include "WebResourceLoaderMessages.h"
+#include <WebCore/MemoryCache.h>
 #include <WebCore/ResourceBuffer.h>
 
 #if ENABLE(NETWORK_PROCESS)
@@ -40,7 +44,7 @@ namespace WebKit {
 
 NetworkProcessConnection::NetworkProcessConnection(CoreIPC::Connection::Identifier connectionIdentifier)
 {
-    m_connection = CoreIPC::Connection::createClientConnection(connectionIdentifier, this, WebProcess::shared().runLoop());
+    m_connection = CoreIPC::Connection::createClientConnection(connectionIdentifier, this, RunLoop::main());
     m_connection->open();
 }
 
@@ -48,17 +52,27 @@ NetworkProcessConnection::~NetworkProcessConnection()
 {
 }
 
-void NetworkProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void NetworkProcessConnection::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
 {
-    if (messageID.is<CoreIPC::MessageClassNetworkProcessConnection>()) {
-        didReceiveNetworkProcessConnectionMessage(connection, messageID, decoder);
+    if (decoder.messageReceiverName() == Messages::WebResourceLoader::messageReceiverName()) {
+        if (WebResourceLoader* webResourceLoader = WebProcess::shared().webResourceLoadScheduler().webResourceLoaderForIdentifier(decoder.destinationID()))
+            webResourceLoader->didReceiveWebResourceLoaderMessage(connection, decoder);
+        
         return;
     }
-    ASSERT_NOT_REACHED();
+
+    didReceiveNetworkProcessConnectionMessage(connection, decoder);
 }
 
-void NetworkProcessConnection::didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&)
+void NetworkProcessConnection::didReceiveSyncMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder, OwnPtr<CoreIPC::MessageEncoder>& replyEncoder)
 {
+    if (decoder.messageReceiverName() == Messages::WebResourceLoader::messageReceiverName()) {
+        if (WebResourceLoader* webResourceLoader = WebProcess::shared().webResourceLoadScheduler().webResourceLoaderForIdentifier(decoder.destinationID()))
+            webResourceLoader->didReceiveSyncWebResourceLoaderMessage(connection, decoder, replyEncoder);
+        
+        return;
+    }
+
     ASSERT_NOT_REACHED();
 }
 
@@ -72,35 +86,19 @@ void NetworkProcessConnection::didReceiveInvalidMessage(CoreIPC::Connection*, Co
 {
 }
 
-void NetworkProcessConnection::willSendRequest(uint64_t requestID, ResourceLoadIdentifier resourceLoadIdentifier, const ResourceRequest& proposedRequest, const ResourceResponse& redirectResponse)
+void NetworkProcessConnection::didCacheResource(const ResourceRequest& request, const ShareableResource::Handle& handle)
 {
-    ResourceRequest newRequest = proposedRequest;
-    WebProcess::shared().webResourceLoadScheduler().willSendRequest(resourceLoadIdentifier, newRequest, redirectResponse);
-
-    WebProcess::shared().networkConnection()->connection()->send(Messages::NetworkConnectionToWebProcess::WillSendRequestHandled(requestID, newRequest), 0);
-}
-
-void NetworkProcessConnection::didReceiveResponse(ResourceLoadIdentifier resourceLoadIdentifier, const ResourceResponse& response)
-{
-    WebProcess::shared().webResourceLoadScheduler().didReceiveResponse(resourceLoadIdentifier, response);
-}
-
-void NetworkProcessConnection::didReceiveResource(ResourceLoadIdentifier resourceLoadIdentifier, const ShareableResource::Handle& handle, double finishTime)
-{
-    RefPtr<ResourceBuffer> resourceBuffer;
-
-    RefPtr<ShareableResource> resource = ShareableResource::create(handle);
-    if (resource)
-        resourceBuffer = WebResourceBuffer::create(resource.release());
-    else
-        resourceBuffer = ResourceBuffer::create();
+    CachedResource* resource = memoryCache()->resourceForRequest(request);
+    if (!resource)
+        return;
     
-    WebProcess::shared().webResourceLoadScheduler().didReceiveResource(resourceLoadIdentifier, *resourceBuffer, finishTime);
-}
+    RefPtr<SharedBuffer> buffer = handle.tryWrapInSharedBuffer();
+    if (!buffer) {
+        LOG_ERROR("Unabled to create SharedBuffer from ShareableResource handle for resource url %s", request.url().string().utf8().data());
+        return;
+    }
 
-void NetworkProcessConnection::didFailResourceLoad(ResourceLoadIdentifier resourceLoadIdentifier, const ResourceError& error)
-{
-    WebProcess::shared().webResourceLoadScheduler().didFailResourceLoad(resourceLoadIdentifier, error);
+    resource->tryReplaceEncodedData(buffer.release());
 }
 
 } // namespace WebKit

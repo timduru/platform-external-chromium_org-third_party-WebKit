@@ -43,26 +43,26 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8InspectorFrontendHost::platformCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8InspectorFrontendHost::platformMethodCustom(const v8::Arguments& args)
 {
 #if defined(OS_MACOSX)
-    return v8String("mac", args.GetIsolate());
+    return v8::String::NewSymbol("mac");
 #elif defined(OS_LINUX)
-    return v8String("linux", args.GetIsolate());
+    return v8::String::NewSymbol("linux");
 #elif defined(OS_FREEBSD)
-    return v8String("freebsd", args.GetIsolate());
+    return v8::String::NewSymbol("freebsd");
 #elif defined(OS_OPENBSD)
-    return v8String("openbsd", args.GetIsolate());
+    return v8::String::NewSymbol("openbsd");
 #elif defined(OS_SOLARIS)
-    return v8String("solaris", args.GetIsolate());
+    return v8::String::NewSymbol("solaris");
 #elif defined(OS_WIN)
-    return v8String("windows", args.GetIsolate());
+    return v8::String::NewSymbol("windows");
 #else
-    return v8String("unknown", args.GetIsolate());
+    return v8::String::NewSymbol("unknown");
 #endif
 }
 
-v8::Handle<v8::Value> V8InspectorFrontendHost::portCallback(const v8::Arguments&)
+v8::Handle<v8::Value> V8InspectorFrontendHost::portMethodCustom(const v8::Arguments&)
 {
     return v8::Undefined();
 }
@@ -71,12 +71,12 @@ static void populateContextMenuItems(v8::Local<v8::Array>& itemArray, ContextMen
 {
     for (size_t i = 0; i < itemArray->Length(); ++i) {
         v8::Local<v8::Object> item = v8::Local<v8::Object>::Cast(itemArray->Get(i));
-        v8::Local<v8::Value> type = item->Get(v8::String::New("type"));
-        v8::Local<v8::Value> id = item->Get(v8::String::New("id"));
-        v8::Local<v8::Value> label = item->Get(v8::String::New("label"));
-        v8::Local<v8::Value> enabled = item->Get(v8::String::New("enabled"));
-        v8::Local<v8::Value> checked = item->Get(v8::String::New("checked"));
-        v8::Local<v8::Value> subItems = item->Get(v8::String::New("subItems"));
+        v8::Local<v8::Value> type = item->Get(v8::String::NewSymbol("type"));
+        v8::Local<v8::Value> id = item->Get(v8::String::NewSymbol("id"));
+        v8::Local<v8::Value> label = item->Get(v8::String::NewSymbol("label"));
+        v8::Local<v8::Value> enabled = item->Get(v8::String::NewSymbol("enabled"));
+        v8::Local<v8::Value> checked = item->Get(v8::String::NewSymbol("checked"));
+        v8::Local<v8::Value> subItems = item->Get(v8::String::NewSymbol("subItems"));
         if (!type->IsString())
             continue;
         String typeString = toWebCoreStringWithNullCheck(type);
@@ -106,13 +106,13 @@ static void populateContextMenuItems(v8::Local<v8::Array>& itemArray, ContextMen
     }
 }
 
-v8::Handle<v8::Value> V8InspectorFrontendHost::showContextMenuCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8InspectorFrontendHost::showContextMenuMethodCustom(const v8::Arguments& args)
 {
     if (args.Length() < 2)
         return v8::Undefined();
 
     v8::Local<v8::Object> eventWrapper = v8::Local<v8::Object>::Cast(args[0]);
-    if (!V8MouseEvent::info.equals(V8DOMWrapper::domWrapperType(eventWrapper)))
+    if (!V8MouseEvent::info.equals(toWrapperTypeInfo(eventWrapper)))
         return v8::Undefined();
 
     Event* event = V8Event::toNative(eventWrapper);
@@ -146,17 +146,17 @@ static v8::Handle<v8::Value> histogramEnumeration(const char* name, const v8::Ar
     return v8::Undefined();
 }
 
-v8::Handle<v8::Value> V8InspectorFrontendHost::recordActionTakenCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8InspectorFrontendHost::recordActionTakenMethodCustom(const v8::Arguments& args)
 {
     return histogramEnumeration("DevTools.ActionTaken", args, 100);
 }
 
-v8::Handle<v8::Value> V8InspectorFrontendHost::recordPanelShownCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8InspectorFrontendHost::recordPanelShownMethodCustom(const v8::Arguments& args)
 {
     return histogramEnumeration("DevTools.PanelShown", args, 20);
 }
 
-v8::Handle<v8::Value> V8InspectorFrontendHost::recordSettingChangedCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8InspectorFrontendHost::recordSettingChangedMethodCustom(const v8::Arguments& args)
 {
     return histogramEnumeration("DevTools.SettingChanged", args, 100);
 }

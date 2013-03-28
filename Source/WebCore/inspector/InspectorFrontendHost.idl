@@ -31,7 +31,8 @@
  */
 
 [
-    Conditional=INSPECTOR
+    Conditional=INSPECTOR,
+    ImplementationLacksVTable
 ] interface InspectorFrontendHost {
     void loaded();
     void closeWindow();
@@ -45,7 +46,6 @@
     void setInjectedScriptForOrigin(in DOMString origin, in DOMString script);
 
     DOMString localizedStringsURL();
-    DOMString hiddenPanels();
 
     void copyText(in DOMString text);
     void openInNewTab(in DOMString url);
@@ -54,16 +54,27 @@
     void append(in DOMString url, in DOMString content);
     void close(in DOMString url);
 
-    boolean canInspectWorkers();
-
     [Custom] DOMString platform();
     [Custom] DOMString port();
-    [Custom] void showContextMenu(in MouseEvent event, in DOMObject items);
+    [Custom] void showContextMenu(in MouseEvent event, in any items);
     void sendMessageToBackend(in DOMString message);
 
     [Custom] void recordActionTaken(in unsigned long actionCode);
     [Custom] void recordPanelShown(in unsigned long panelCode);
     [Custom] void recordSettingChanged(in unsigned long settingChanged);
-    
+
     DOMString loadResourceSynchronously(in DOMString url);
+
+    boolean supportsFileSystems();
+    void requestFileSystems();
+    void addFileSystem();
+    void removeFileSystem(in DOMString fileSystemPath);
+    [Conditional=FILE_SYSTEM] DOMFileSystem isolatedFileSystem(in DOMString fileSystemId, in DOMString registeredName);
+
+    boolean isUnderTest();
+
+    // Deprecated
+    boolean canInspectWorkers();
+    boolean canSaveAs();
+    DOMString hiddenPanels();
 };

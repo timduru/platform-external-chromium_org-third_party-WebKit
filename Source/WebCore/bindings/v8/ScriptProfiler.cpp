@@ -37,18 +37,29 @@
 #include "ScriptObject.h"
 #include "V8ArrayBufferView.h"
 #include "V8Binding.h"
+#include "V8DOMWindow.h"
+#include "V8DOMWrapper.h"
 #include "V8Node.h"
 #include "WebCoreMemoryInstrumentation.h"
 #include "WrapperTypeInfo.h"
 
 #include <v8-profiler.h>
 
+#include <wtf/ThreadSpecific.h>
+
 namespace WebCore {
+
+typedef HashMap<String, double> ProfileNameIdleTimeMap;
 
 void ScriptProfiler::start(ScriptState* state, const String& title)
 {
+    ProfileNameIdleTimeMap* profileNameIdleTimeMap = ScriptProfiler::currentProfileNameIdleTimeMap();
+    if (profileNameIdleTimeMap->contains(title))
+        return;
+    profileNameIdleTimeMap->add(title, 0);
+
     v8::HandleScope hs;
-    v8::CpuProfiler::StartProfiling(v8String(title));
+    v8::CpuProfiler::StartProfiling(v8String(title, state ? state->isolate() : v8::Isolate::GetCurrent()));
 }
 
 void ScriptProfiler::startForPage(Page*, const String& title)
@@ -67,9 +78,21 @@ PassRefPtr<ScriptProfile> ScriptProfiler::stop(ScriptState* state, const String&
 {
     v8::HandleScope hs;
     const v8::CpuProfile* profile = state ?
-        v8::CpuProfiler::StopProfiling(v8String(title), state->context()->GetSecurityToken()) :
-        v8::CpuProfiler::StopProfiling(v8String(title));
-    return profile ? ScriptProfile::create(profile) : 0;
+        v8::CpuProfiler::StopProfiling(v8String(title, state->isolate()), state->context()->GetSecurityToken()) :
+        v8::CpuProfiler::StopProfiling(v8String(title, v8::Isolate::GetCurrent()));
+    if (!profile)
+        return 0;
+
+    String profileTitle = toWebCoreString(profile->GetTitle());
+    double idleTime = 0.0;
+    ProfileNameIdleTimeMap* profileNameIdleTimeMap = ScriptProfiler::currentProfileNameIdleTimeMap();
+    ProfileNameIdleTimeMap::iterator profileIdleTime = profileNameIdleTimeMap->find(profileTitle);
+    if (profileIdleTime != profileNameIdleTimeMap->end()) {
+        idleTime = profileIdleTime->value * 1000.0;
+        profileNameIdleTimeMap->remove(profileIdleTime);
+    }
+
+    return ScriptProfile::create(profile, idleTime);
 }
 
 PassRefPtr<ScriptProfile> ScriptProfiler::stopForPage(Page*, const String& title)
@@ -111,13 +134,7 @@ ScriptObject ScriptProfiler::objectByHeapObjectId(unsigned id)
         return ScriptObject();
 
     v8::Handle<v8::Object> object = value.As<v8::Object>();
-    if (object->InternalFieldCount() >= v8DefaultWrapperInternalFieldCount) {
-        v8::Handle<v8::Value> wrapper = object->GetInternalField(v8DOMWrapperObjectIndex);
-        // Skip wrapper boilerplates which are like regular wrappers but don't have
-        // native object.
-        if (!wrapper.IsEmpty() && wrapper->IsUndefined())
-            return ScriptObject();
-    }
+
     ScriptState* scriptState = ScriptState::forContext(object->CreationContext());
     return ScriptObject(scriptState, object);
 }
@@ -151,14 +168,35 @@ private:
     bool m_firstReport;
 };
 
+class GlobalObjectNameResolver : public v8::HeapProfiler::ObjectNameResolver {
+public:
+    virtual const char* GetName(v8::Handle<v8::Object> object)
+    {
+        if (V8DOMWrapper::isWrapperOfType(object, &V8DOMWindow::info)) {
+            DOMWindow* window = V8DOMWindow::toNative(object);
+            if (window) {
+                CString url = window->document()->url().string().utf8();
+                m_strings.append(url);
+                return url.data();
+            }
+        }
+        return 0;
+    }
+
+private:
+    Vector<CString> m_strings;
+};
+
 } // namespace
 
+// FIXME: This method should receive a ScriptState, from which we should retrieve an Isolate.
 PassRefPtr<ScriptHeapSnapshot> ScriptProfiler::takeHeapSnapshot(const String& title, HeapSnapshotProgress* control)
 {
     v8::HandleScope hs;
     ASSERT(control);
     ActivityControlAdapter adapter(control);
-    const v8::HeapSnapshot* snapshot = v8::HeapProfiler::TakeSnapshot(v8String(title), v8::HeapSnapshot::kFull, &adapter);
+    GlobalObjectNameResolver resolver;
+    const v8::HeapSnapshot* snapshot = v8::HeapProfiler::TakeSnapshot(v8String(title, v8::Isolate::GetCurrent()), v8::HeapSnapshot::kFull, &adapter, &resolver);
     return snapshot ? ScriptHeapSnapshot::create(snapshot) : 0;
 }
 
@@ -180,10 +218,15 @@ void ScriptProfiler::visitNodeWrappers(WrappedNodeVisitor* visitor)
 {
     v8::HandleScope scope;
 
+    // visitNodeWrappers() should receive a ScriptState and retrieve an Isolate
+    // from the ScriptState.
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+
     class DOMNodeWrapperVisitor : public v8::PersistentHandleVisitor {
     public:
-        explicit DOMNodeWrapperVisitor(WrappedNodeVisitor* visitor)
+        DOMNodeWrapperVisitor(WrappedNodeVisitor* visitor, v8::Isolate* isolate)
             : m_visitor(visitor)
+            , m_isolate(isolate)
         {
         }
 
@@ -191,7 +234,8 @@ void ScriptProfiler::visitNodeWrappers(WrappedNodeVisitor* visitor)
         {
             if (classId != v8DOMNodeClassId)
                 return;
-            ASSERT(V8Node::HasInstance(value));
+            UNUSED_PARAM(m_isolate);
+            ASSERT(V8Node::HasInstance(value, m_isolate, worldType(m_isolate)));
             ASSERT(value->IsObject());
             v8::Persistent<v8::Object> wrapper = v8::Persistent<v8::Object>::Cast(value);
             m_visitor->visitNode(V8Node::toNative(wrapper));
@@ -199,7 +243,8 @@ void ScriptProfiler::visitNodeWrappers(WrappedNodeVisitor* visitor)
 
     private:
         WrappedNodeVisitor* m_visitor;
-    } wrapperVisitor(visitor);
+        v8::Isolate* m_isolate;
+    } wrapperVisitor(visitor, isolate);
 
     v8::V8::VisitHandlesWithClassIds(&wrapperVisitor);
 }
@@ -224,7 +269,7 @@ void ScriptProfiler::visitExternalArrays(ExternalArrayVisitor* visitor)
                 return;
             ASSERT(value->IsObject());
             v8::Persistent<v8::Object> wrapper = v8::Persistent<v8::Object>::Cast(value);
-            if (!V8DOMWrapper::domWrapperType(wrapper)->isSubclass(&V8ArrayBufferView::info))
+            if (!toWrapperTypeInfo(wrapper)->isSubclass(&V8ArrayBufferView::info))
                 return;
             m_visitor->visitJSExternalArray(V8ArrayBufferView::toNative(wrapper));
         }
@@ -245,6 +290,12 @@ void ScriptProfiler::collectBindingMemoryInfo(MemoryInstrumentation* instrumenta
 size_t ScriptProfiler::profilerSnapshotsSize()
 {
     return v8::HeapProfiler::GetMemorySizeUsedByProfiler();
+}
+
+ProfileNameIdleTimeMap* ScriptProfiler::currentProfileNameIdleTimeMap()
+{
+    AtomicallyInitializedStatic(WTF::ThreadSpecific<ProfileNameIdleTimeMap>*, map = new WTF::ThreadSpecific<ProfileNameIdleTimeMap>);
+    return *map;
 }
 
 } // namespace WebCore

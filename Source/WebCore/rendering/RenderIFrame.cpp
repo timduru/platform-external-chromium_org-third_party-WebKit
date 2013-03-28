@@ -63,7 +63,7 @@ LayoutUnit RenderIFrame::minPreferredLogicalWidth() const
     if (!childRoot)
         return 0;
 
-    return childRoot->minPreferredLogicalWidth();
+    return childRoot->minPreferredLogicalWidth() + borderAndPaddingLogicalWidth();
 }
 
 LayoutUnit RenderIFrame::maxPreferredLogicalWidth() const
@@ -75,7 +75,7 @@ LayoutUnit RenderIFrame::maxPreferredLogicalWidth() const
     if (!childRoot)
         return 0;
 
-    return childRoot->maxPreferredLogicalWidth();
+    return childRoot->maxPreferredLogicalWidth() + borderAndPaddingLogicalWidth();
 }
 
 bool RenderIFrame::isSeamless() const
@@ -83,12 +83,17 @@ bool RenderIFrame::isSeamless() const
     return node() && node()->hasTagName(iframeTag) && static_cast<HTMLIFrameElement*>(node())->shouldDisplaySeamlessly();
 }
 
+bool RenderIFrame::requiresLayer() const
+{
+    return RenderFrameBase::requiresLayer() || style()->resize() != RESIZE_NONE;
+}
+
 RenderView* RenderIFrame::contentRootRenderer() const
 {
     // FIXME: Is this always a valid cast? What about plugins?
     ASSERT(!widget() || widget()->isFrameView());
-    FrameView* childFrameView = static_cast<FrameView*>(widget());
-    return childFrameView ? static_cast<RenderView*>(childFrameView->frame()->contentRenderer()) : 0;
+    FrameView* childFrameView = toFrameView(widget());
+    return childFrameView ? childFrameView->frame()->contentRenderer() : 0;
 }
 
 bool RenderIFrame::flattenFrame() const
@@ -130,17 +135,17 @@ void RenderIFrame::layoutSeamlessly()
     updateWidgetPosition(); // Tell the Widget about our new width/height (it will also layout the child document).
 
     // Laying out our kids is normally responsible for adjusting our height, so we set it here.
-    // Replaced elements do not respect padding, so we just add border to the child's height.
-    // FIXME: It's possible that seamless iframes (since they act like divs) *should* respect padding.
-    FrameView* childFrameView = static_cast<FrameView*>(widget());
+    // Replaced elements normally do not respect padding, but seamless elements should: we'll add
+    // both padding and border to the child's logical height here.
+    FrameView* childFrameView = toFrameView(widget());
     if (childFrameView) // Widget should never be null during layout(), but just in case.
-        setLogicalHeight(childFrameView->contentsHeight() + borderTop() + borderBottom());
+        setLogicalHeight(childFrameView->contentsHeight() + borderTop() + borderBottom() + paddingTop() + paddingBottom());
     updateLogicalHeight();
 
     updateWidgetPosition(); // Notify the Widget of our final height.
 
     // Assert that the child document did a complete layout.
-    RenderView* childRoot = childFrameView ? static_cast<RenderView*>(childFrameView->frame()->contentRenderer()) : 0;
+    RenderView* childRoot = childFrameView ? childFrameView->frame()->contentRenderer() : 0;
     ASSERT(!childFrameView || !childFrameView->layoutPending());
     ASSERT_UNUSED(childRoot, !childRoot || !childRoot->needsLayout());
 }

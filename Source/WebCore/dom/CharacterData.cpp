@@ -32,6 +32,7 @@
 #include "NodeRenderingContext.h"
 #include "RenderText.h"
 #include "StyleInheritedData.h"
+#include "Text.h"
 #include "TextBreakIterator.h"
 #include "WebCoreMemoryInstrumentation.h"
 
@@ -89,7 +90,10 @@ unsigned CharacterData::parserAppendData(const String& string, unsigned offset, 
     else
         m_data.append(string.characters16() + offset, characterLengthLimit);
 
-    updateRenderer(oldLength, 0);
+    ASSERT(!renderer() || isTextNode());
+    if (isTextNode())
+        toText(this)->updateTextRenderer(oldLength, 0);
+
     document()->incDOMTreeVersion();
     // We don't call dispatchModifiedEvent here because we don't want the
     // parser to dispatch DOM mutation events.
@@ -103,7 +107,7 @@ void CharacterData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
     Node::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_data);
+    info.addMember(m_data, "data");
 }
 
 void CharacterData::appendData(const String& data, ExceptionCode&)
@@ -193,7 +197,9 @@ void CharacterData::setDataAndUpdate(const String& newData, unsigned offsetOfRep
     String oldData = m_data;
     m_data = newData;
 
-    updateRenderer(offsetOfReplacedData, oldLength);
+    ASSERT(!renderer() || isTextNode());
+    if (isTextNode())
+        toText(this)->updateTextRenderer(offsetOfReplacedData, oldLength);
 
     if (document()->frame())
         document()->frame()->selection()->textWasReplaced(this, offsetOfReplacedData, oldLength, newLength);
@@ -202,20 +208,10 @@ void CharacterData::setDataAndUpdate(const String& newData, unsigned offsetOfRep
     dispatchModifiedEvent(oldData);
 }
 
-void CharacterData::updateRenderer(unsigned offsetOfReplacedData, unsigned lengthOfReplacedData)
-{
-    if ((!renderer() || !rendererIsNeeded(NodeRenderingContext(this, renderer()->style()))) && attached())
-        reattach();
-    else if (renderer())
-        toRenderText(renderer())->setTextWithOffset(m_data.impl(), offsetOfReplacedData, lengthOfReplacedData);
-}
-
 void CharacterData::dispatchModifiedEvent(const String& oldData)
 {
-#if ENABLE(MUTATION_OBSERVERS)
     if (OwnPtr<MutationObserverInterestGroup> mutationRecipients = MutationObserverInterestGroup::createForCharacterDataMutation(this))
         mutationRecipients->enqueueMutationRecord(MutationRecord::createCharacterData(this, oldData));
-#endif
     if (!isInShadowTree()) {
         if (parentNode())
             parentNode()->childrenChanged();
@@ -243,13 +239,6 @@ void CharacterData::checkCharDataOperation(unsigned offset, ExceptionCode& ec)
 int CharacterData::maxCharacterOffset() const
 {
     return static_cast<int>(length());
-}
-
-bool CharacterData::rendererIsNeeded(const NodeRenderingContext& context)
-{
-    if (!m_data || !length())
-        return false;
-    return Node::rendererIsNeeded(context);
 }
 
 bool CharacterData::offsetInCharacters() const

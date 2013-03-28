@@ -257,12 +257,22 @@ X86_INSTRUCTIONS =
      "idivi"
     ]
 
-ARMv7_INSTRUCTIONS =
+ARM_INSTRUCTIONS =
     [
      "smulli",
      "addis",
      "subis",
      "oris"
+    ]
+
+MIPS_INSTRUCTIONS =
+    [
+    "movz",
+    "movn",
+    "slt",
+    "sltu",
+    "pichdr",
+    "pichdrra"
     ]
 
 CXX_INSTRUCTIONS =
@@ -281,7 +291,7 @@ CXX_INSTRUCTIONS =
      "cloopDo",              # no operands
     ]
 
-INSTRUCTIONS = MACRO_INSTRUCTIONS + X86_INSTRUCTIONS + ARMv7_INSTRUCTIONS + CXX_INSTRUCTIONS
+INSTRUCTIONS = MACRO_INSTRUCTIONS + X86_INSTRUCTIONS + ARM_INSTRUCTIONS + MIPS_INSTRUCTIONS + CXX_INSTRUCTIONS
 
 INSTRUCTION_PATTERN = Regexp.new('\\A((' + INSTRUCTIONS.join(')|(') + '))\\Z')
 

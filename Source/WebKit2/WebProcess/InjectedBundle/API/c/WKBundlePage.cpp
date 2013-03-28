@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2010, 2011, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -30,13 +30,19 @@
 #include "InjectedBundleBackForwardList.h"
 #include "InjectedBundleNodeHandle.h"
 #include "WKAPICast.h"
+#include "WKArray.h"
 #include "WKBundleAPICast.h"
+#include "WKRetainPtr.h"
+#include "WKString.h"
+#include "WebContextMenu.h"
+#include "WebContextMenuItem.h"
 #include "WebFrame.h"
 #include "WebFullScreenManager.h"
 #include "WebImage.h"
 #include "WebPage.h"
 #include "WebRenderLayer.h"
 #include "WebRenderObject.h"
+#include "WebString.h"
 #include "WebURL.h"
 #include "WebURLRequest.h"
 
@@ -44,12 +50,8 @@
 #include <WebCore/AccessibilityObject.h>
 #include <WebCore/Frame.h>
 #include <WebCore/KURL.h>
-#include <WebCore/MIMETypeRegistry.h>
 #include <WebCore/Page.h>
-
-#if ENABLE(WEB_INTENTS)
-#include "InjectedBundleIntent.h"
-#endif
+#include <wtf/UnusedParam.h>
 
 using namespace WebKit;
 
@@ -143,6 +145,22 @@ WKBundlePageGroupRef WKBundlePageGetPageGroup(WKBundlePageRef pageRef)
 WKBundleFrameRef WKBundlePageGetMainFrame(WKBundlePageRef pageRef)
 {
     return toAPI(toImpl(pageRef)->mainWebFrame());
+}
+
+WKArrayRef WKBundlePageCopyContextMenuItemTitles(WKBundlePageRef pageRef)
+{
+#if ENABLE(CONTEXT_MENUS)
+    WebContextMenu* contextMenu = toImpl(pageRef)->contextMenu();
+    const Vector<WebContextMenuItemData> &items = contextMenu->items();
+    size_t arrayLength = items.size();
+    OwnArrayPtr<WKTypeRef> itemNames = adoptArrayPtr(new WKTypeRef[arrayLength]);
+    for (size_t i = 0; i < arrayLength; ++i)
+        itemNames[i] = WKStringCreateWithUTF8CString(items[i].title().utf8().data());
+
+    return WKArrayCreateAdoptingValues(itemNames.get(), arrayLength);
+#else
+    return 0;
+#endif
 }
 
 void* WKAccessibilityRootObject(WKBundlePageRef pageRef)
@@ -272,7 +290,37 @@ void WKBundlePageInstallPageOverlay(WKBundlePageRef pageRef, WKBundlePageOverlay
 
 void WKBundlePageUninstallPageOverlay(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
 {
-    toImpl(pageRef)->uninstallPageOverlay(toImpl(pageOverlayRef), false);
+    toImpl(pageRef)->uninstallPageOverlay(toImpl(pageOverlayRef));
+}
+
+void WKBundlePageInstallPageOverlayWithAnimation(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
+{
+    toImpl(pageRef)->installPageOverlay(toImpl(pageOverlayRef), true);
+}
+
+void WKBundlePageUninstallPageOverlayWithAnimation(WKBundlePageRef pageRef, WKBundlePageOverlayRef pageOverlayRef)
+{
+    toImpl(pageRef)->uninstallPageOverlay(toImpl(pageOverlayRef), true);
+}
+
+void WKBundlePageSetTopOverhangImage(WKBundlePageRef page, WKImageRef image)
+{
+#if PLATFORM(MAC)
+    toImpl(page)->setTopOverhangImage(toImpl(image));
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(image);
+#endif
+}
+
+void WKBundlePageSetBottomOverhangImage(WKBundlePageRef page, WKImageRef image)
+{
+#if PLATFORM(MAC)
+    toImpl(page)->setBottomOverhangImage(toImpl(image));
+#else
+    UNUSED_PARAM(page);
+    UNUSED_PARAM(image);
+#endif
 }
 
 bool WKBundlePageHasLocalDataForURL(WKBundlePageRef pageRef, WKURLRef urlRef)
@@ -326,19 +374,15 @@ void WKBundlePageListenForLayoutMilestones(WKBundlePageRef pageRef, WKLayoutMile
     toImpl(pageRef)->listenForLayoutMilestones(toLayoutMilestones(milestones));
 }
 
-void WKBundlePageDeliverIntentToFrame(WKBundlePageRef pageRef, WKBundleFrameRef frameRef, WKBundleIntentRef intentRef)
-{
-#if ENABLE(WEB_INTENTS)
-    toImpl(pageRef)->deliverCoreIntentToFrame(toImpl(frameRef)->frameID(), toImpl(intentRef)->coreIntent());
-#endif
-}
-
-#if defined(ENABLE_INSPECTOR) && ENABLE_INSPECTOR
 WKBundleInspectorRef WKBundlePageGetInspector(WKBundlePageRef pageRef)
 {
+#if ENABLE(INSPECTOR)
     return toAPI(toImpl(pageRef)->inspector());
-}
+#else
+    UNUSED_PARAM(pageRef);
+    return 0;
 #endif
+}
 
 void WKBundlePageForceRepaint(WKBundlePageRef page)
 {
@@ -421,9 +465,7 @@ void WKBundlePageConfirmCompositionWithText(WKBundlePageRef pageRef, WKStringRef
     toImpl(pageRef)->confirmCompositionForTesting(toWTFString(text));
 }
 
-bool WKBundlePageCanShowMIMEType(WKBundlePageRef, WKStringRef mimeTypeRef)
+bool WKBundlePageCanShowMIMEType(WKBundlePageRef pageRef, WKStringRef mimeTypeRef)
 {
-    const String mimeType = toWTFString(mimeTypeRef);
-
-    return WebCore::MIMETypeRegistry::canShowMIMEType(mimeType);
+    return toImpl(pageRef)->canShowMIMEType(toWTFString(mimeTypeRef));
 }

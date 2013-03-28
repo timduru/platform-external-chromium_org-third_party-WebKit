@@ -54,11 +54,12 @@ namespace WebCore {
         virtual void clearOriginForDeletion(SecurityOrigin*);
         virtual void clearAllOriginsForDeletion();
         virtual void sync();
-        
+        virtual void closeIdleLocalStorageDatabases();
+
     private:
         StorageNamespaceImpl(StorageType, const String& path, unsigned quota);
 
-        typedef HashMap<RefPtr<SecurityOrigin>, RefPtr<StorageAreaImpl>, SecurityOriginHash> StorageAreaMap;
+        typedef HashMap<RefPtr<SecurityOrigin>, RefPtr<StorageAreaImpl> > StorageAreaMap;
         StorageAreaMap m_storageAreaMap;
 
         StorageType m_storageType;

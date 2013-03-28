@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -40,31 +40,49 @@ public:
     static PassOwnPtr<CaptionUserPreferencesMac> create(PageGroup* group) { return adoptPtr(new CaptionUserPreferencesMac(group)); }
     virtual ~CaptionUserPreferencesMac();
 
-    virtual bool userPrefersCaptions() const OVERRIDE;
+#if HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
     virtual bool userHasCaptionPreferences() const OVERRIDE;
-    virtual float captionFontSizeScale() const OVERRIDE;
-    virtual String captionsStyleSheetOverride() const OVERRIDE;
-    virtual void registerForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener*) OVERRIDE;
-    virtual void unregisterForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener*) OVERRIDE;
+    virtual bool shouldShowCaptions() const OVERRIDE;
+    virtual void setShouldShowCaptions(bool) OVERRIDE;
 
-    void captionPreferencesChanged();
+    virtual bool userPrefersCaptions() const OVERRIDE;
+    virtual bool userPrefersSubtitles() const OVERRIDE;
+    
+    virtual float captionFontSizeScale(bool&) const OVERRIDE;
+    virtual String captionsStyleSheetOverride() const OVERRIDE;
+
+    virtual void setInterestedInCaptionPreferenceChanges() OVERRIDE;
+
+    virtual void setPreferredLanguage(String) OVERRIDE;
+    virtual Vector<String> preferredLanguages() const OVERRIDE;
+
+    virtual void captionPreferencesChanged() OVERRIDE;
+
+#endif
+
+    virtual int textTrackSelectionScore(TextTrack*) const OVERRIDE;
+    virtual Vector<RefPtr<TextTrack> > sortedTrackListForMenu(TextTrackList*) OVERRIDE;
+    virtual String displayNameForTrack(TextTrack*) const OVERRIDE;
 
 private:
     CaptionUserPreferencesMac(PageGroup*);
 
-    Color captionsWindowColor() const;
-    Color captionsBackgroundColor() const;
-    Color captionsTextColor() const;
-    String captionsDefaultFont() const;
+#if HAVE(MEDIA_ACCESSIBILITY_FRAMEWORK)
+    String captionsWindowCSS() const;
+    String captionsBackgroundCSS() const;
+    String captionsTextColorCSS() const;
+    Color captionsTextColor(bool&) const;
+    String captionsDefaultFontCSS() const;
     Color captionsEdgeColorForTextColor(const Color&) const;
-    String captionsTextEdgeStyle() const;
-    String cssPropertyWithTextEdgeColor(CSSPropertyID, const String&, const Color&) const;
-    String cssColorProperty(CSSPropertyID, const Color&) const;
+    String windowRoundedCornerRadiusCSS() const;
+    String captionsTextEdgeCSS() const;
+    String cssPropertyWithTextEdgeColor(CSSPropertyID, const String&, const Color&, bool) const;
+    String colorPropertyCSS(CSSPropertyID, const Color&, bool) const;
 
     void updateCaptionStyleSheetOveride();
 
-    HashSet<CaptionPreferencesChangedListener*> m_captionPreferenceChangeListeners;
     bool m_listeningForPreferenceChanges;
+#endif
 };
     
 }

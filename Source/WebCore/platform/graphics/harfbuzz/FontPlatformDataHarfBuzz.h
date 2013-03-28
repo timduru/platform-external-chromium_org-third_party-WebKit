@@ -33,9 +33,9 @@
 
 #include "FontOrientation.h"
 #include "FontRenderStyle.h"
+#include "OpenTypeVerticalData.h"
 #include "SharedBuffer.h"
 #include "SkPaint.h"
-#include "TextOrientation.h"
 #include <wtf/Forward.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/CString.h>
@@ -47,13 +47,7 @@ typedef uint32_t SkFontID;
 namespace WebCore {
 
 class FontDescription;
-class OpenTypeVerticalData;
-
-#if USE(HARFBUZZ_NG)
-class HarfBuzzNGFace;
-#else
-class HarfbuzzFace;
-#endif
+class HarfBuzzFace;
 
 // -----------------------------------------------------------------------------
 // FontPlatformData is the handle which WebKit has on a specific face. A face
@@ -71,7 +65,7 @@ public:
     FontPlatformData();
     FontPlatformData(float textSize, bool fakeBold, bool fakeItalic);
     FontPlatformData(const FontPlatformData&);
-    FontPlatformData(SkTypeface*, const char* name, float textSize, bool fakeBold, bool fakeItalic, FontOrientation = Horizontal, TextOrientation = TextOrientationVerticalRight);
+    FontPlatformData(SkTypeface*, const char* name, float textSize, bool fakeBold, bool fakeItalic, FontOrientation = Horizontal);
     FontPlatformData(const FontPlatformData& src, float textSize);
     ~FontPlatformData();
 
@@ -91,6 +85,7 @@ public:
     // the font's file name so refers to a single face.
     // -------------------------------------------------------------------------
     SkFontID uniqueID() const;
+    SkTypeface* typeface() const { return m_typeface; }
 
     unsigned hash() const;
     float size() const { return m_textSize; }
@@ -105,7 +100,7 @@ public:
     bool isHashTableDeletedValue() const { return m_typeface == hashTableDeletedFontValue(); }
 
 #if ENABLE(OPENTYPE_VERTICAL)
-    const OpenTypeVerticalData* verticalData() const;
+    PassRefPtr<OpenTypeVerticalData> verticalData() const;
     PassRefPtr<SharedBuffer> openTypeTable(uint32_t table) const;
 #endif
 
@@ -113,11 +108,7 @@ public:
     String description() const;
 #endif
 
-#if USE(HARFBUZZ_NG)
-    HarfBuzzNGFace* harfbuzzFace() const;
-#else
-    HarfbuzzFace* harfbuzzFace() const;
-#endif
+    HarfBuzzFace* harfBuzzFace() const;
 
     // The returned styles are all actual styles without FontRenderStyle::NoPreference.
     const FontRenderStyle& fontRenderStyle() const { return m_style; }
@@ -144,13 +135,8 @@ private:
     bool m_fakeBold;
     bool m_fakeItalic;
     FontOrientation m_orientation;
-    TextOrientation m_textOrientation;
     FontRenderStyle m_style;
-#if USE(HARFBUZZ_NG)
-    mutable RefPtr<HarfBuzzNGFace> m_harfbuzzFace;
-#else
-    mutable RefPtr<HarfbuzzFace> m_harfbuzzFace;
-#endif
+    mutable RefPtr<HarfBuzzFace> m_harfBuzzFace;
 
     SkTypeface* hashTableDeletedFontValue() const { return reinterpret_cast<SkTypeface*>(-1); }
 };

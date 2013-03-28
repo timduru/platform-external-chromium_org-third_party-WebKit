@@ -75,8 +75,6 @@ public:
     virtual void layout() OVERRIDE;
     virtual void paint(WebCanvas*, const WebRect&, PaintOptions = ReadbackFromCompositorIfAvailable) OVERRIDE;
     virtual void themeChanged() OVERRIDE;
-    virtual void setCompositorSurfaceReady() OVERRIDE;
-    virtual void composite(bool finish) OVERRIDE;
     virtual bool handleInputEvent(const WebInputEvent&) OVERRIDE;
     virtual void mouseCaptureLost() OVERRIDE;
     virtual void setFocus(bool enable) OVERRIDE;
@@ -93,7 +91,7 @@ public:
     virtual bool isAcceleratedCompositingActive() const OVERRIDE { return false; }
 
     // WebPopupMenuImpl
-    void init(WebCore::FramelessScrollView* widget, const WebRect& bounds);
+    void initialize(WebCore::FramelessScrollView* widget, const WebRect& bounds);
 
     WebWidgetClient* client() { return m_client; }
 

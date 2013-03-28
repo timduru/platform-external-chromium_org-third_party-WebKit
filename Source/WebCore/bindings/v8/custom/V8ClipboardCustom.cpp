@@ -43,14 +43,13 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8Clipboard::typesAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+v8::Handle<v8::Value> V8Clipboard::typesAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.Clipboard.types()");
     Clipboard* clipboard = V8Clipboard::toNative(info.Holder());
 
     ListHashSet<String> types = clipboard->types();
     if (types.isEmpty())
-        return v8::Null(info.GetIsolate());
+        return v8Null(info.GetIsolate());
 
     v8::Local<v8::Array> result = v8::Array::New(types.size());
     ListHashSet<String>::const_iterator end = types.end();
@@ -61,9 +60,8 @@ v8::Handle<v8::Value> V8Clipboard::typesAccessorGetter(v8::Local<v8::String> nam
     return result;
 }
 
-v8::Handle<v8::Value> V8Clipboard::clearDataCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8Clipboard::clearDataMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.Clipboard.clearData()");
     Clipboard* clipboard = V8Clipboard::toNative(args.Holder());
 
     if (!args.Length()) {
@@ -72,35 +70,34 @@ v8::Handle<v8::Value> V8Clipboard::clearDataCallback(const v8::Arguments& args)
     }
 
     if (args.Length() != 1)
-        return throwError(SyntaxError, "clearData: Invalid number of arguments", args.GetIsolate());
+        return throwError(v8SyntaxError, "clearData: Invalid number of arguments", args.GetIsolate());
 
     String type = toWebCoreString(args[0]);
     clipboard->clearData(type);
     return v8::Undefined();
 }
 
-v8::Handle<v8::Value> V8Clipboard::setDragImageCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8Clipboard::setDragImageMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.Clipboard.setDragImage()");
     Clipboard* clipboard = V8Clipboard::toNative(args.Holder());
 
     if (!clipboard->isForDragAndDrop())
         return v8::Undefined();
 
     if (args.Length() != 3)
-        return throwError(SyntaxError, "setDragImage: Invalid number of arguments", args.GetIsolate());
+        return throwError(v8SyntaxError, "setDragImage: Invalid number of arguments", args.GetIsolate());
 
     int x = toInt32(args[1]);
     int y = toInt32(args[2]);
 
     Node* node = 0;
-    if (V8Node::HasInstance(args[0]))
+    if (V8Node::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
         node = V8Node::toNative(v8::Handle<v8::Object>::Cast(args[0]));
 
     if (!node || !node->isElementNode())
         return throwTypeError("setDragImageFromElement: Invalid first argument", args.GetIsolate());
 
-    if (static_cast<Element*>(node)->hasLocalName(HTMLNames::imgTag) && !node->inDocument())
+    if (toElement(node)->hasLocalName(HTMLNames::imgTag) && !node->inDocument())
         clipboard->setDragImage(static_cast<HTMLImageElement*>(node)->cachedImage(), IntPoint(x, y));
     else
         clipboard->setDragImageElement(node, IntPoint(x, y));

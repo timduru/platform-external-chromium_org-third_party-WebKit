@@ -38,6 +38,7 @@
 #include "MouseEvent.h"
 #include "Page.h"
 #include "RenderSearchField.h"
+#include "RenderTextControl.h"
 #include "RenderView.h"
 #include "ScriptController.h"
 #include "SpeechInput.h"
@@ -50,10 +51,25 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
+TextControlInnerContainer::TextControlInnerContainer(Document* document)
+    : HTMLDivElement(divTag, document)
+{
+}
+
+PassRefPtr<TextControlInnerContainer> TextControlInnerContainer::create(Document* document)
+{
+    return adoptRef(new TextControlInnerContainer(document));
+}
+    
+RenderObject* TextControlInnerContainer::createRenderer(RenderArena* arena, RenderStyle*)
+{
+    return new (arena) RenderTextControlInnerContainer(this);
+}
+
 TextControlInnerElement::TextControlInnerElement(Document* document)
     : HTMLDivElement(divTag, document)
 {
-    setHasCustomCallbacks();
+    setHasCustomStyleCallbacks();
 }
 
 PassRefPtr<TextControlInnerElement> TextControlInnerElement::create(Document* document)
@@ -72,7 +88,7 @@ PassRefPtr<RenderStyle> TextControlInnerElement::customStyleForRenderer()
 inline TextControlInnerTextElement::TextControlInnerTextElement(Document* document)
     : HTMLDivElement(divTag, document)
 {
-    setHasCustomCallbacks();
+    setHasCustomStyleCallbacks();
 }
 
 PassRefPtr<TextControlInnerTextElement> TextControlInnerTextElement::create(Document* document)
@@ -144,7 +160,7 @@ void SearchFieldResultsButtonElement::defaultEventHandler(Event* event)
 {
     // On mousedown, bring up a menu, if needed
     HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
-    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (input && event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
         input->focus();
         input->select();
         RenderSearchField* renderer = toRenderSearchField(input->renderer());
@@ -197,7 +213,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
 {
     // If the element is visible, on mouseup, clear the value, and set selection
     RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
-    if (input->disabled() || input->readOnly()) {
+    if (!input || input->isDisabledOrReadOnly()) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
         return;
@@ -236,7 +252,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
 bool SearchFieldCancelButtonElement::willRespondToMouseClickEvents()
 {
     const HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
-    if (!input->disabled() && !input->readOnly())
+    if (input && !input->isDisabledOrReadOnly())
         return true;
 
     return HTMLDivElement::willRespondToMouseClickEvents();
@@ -282,7 +298,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
     // here, we take a temporary reference.
     RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
 
-    if (input->disabled() || input->readOnly()) {
+    if (!input || input->isDisabledOrReadOnly()) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
         return;
@@ -333,7 +349,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
 bool InputFieldSpeechButtonElement::willRespondToMouseClickEvents()
 {
     const HTMLInputElement* input = static_cast<HTMLInputElement*>(shadowHost());
-    if (!input->disabled() && !input->readOnly())
+    if (input && !input->disabled() && !input->readOnly())
         return true;
 
     return HTMLDivElement::willRespondToMouseClickEvents();
@@ -370,7 +386,7 @@ void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputR
     // remove the input element from DOM. To make sure it remains valid until we finish our work
     // here, we take a temporary reference.
     RefPtr<HTMLInputElement> input(static_cast<HTMLInputElement*>(shadowHost()));
-    if (input->disabled() || input->readOnly())
+    if (!input || input->disabled() || input->readOnly())
         return;
 
     RefPtr<InputFieldSpeechButtonElement> holdRefButton(this);

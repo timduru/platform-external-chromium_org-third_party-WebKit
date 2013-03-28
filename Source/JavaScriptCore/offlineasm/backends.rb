@@ -22,16 +22,20 @@
 # THE POSSIBILITY OF SUCH DAMAGE.
 
 require "config"
-require "armv7"
+require "arm"
 require "ast"
 require "x86"
+require "mips"
 require "cloop"
 
 BACKENDS =
     [
      "X86",
      "X86_64",
+     "ARM",
      "ARMv7",
+     "ARMv7_TRADITIONAL",
+     "MIPS",
      "C_LOOP"
     ]
 
@@ -44,7 +48,10 @@ WORKING_BACKENDS =
     [
      "X86",
      "X86_64",
+     "ARM",
      "ARMv7",
+     "ARMv7_TRADITIONAL",
+     "MIPS",
      "C_LOOP"
     ]
 

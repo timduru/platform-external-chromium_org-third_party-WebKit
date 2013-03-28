@@ -27,7 +27,6 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 from webkitpy.common.config import urls
-from webkitpy.common.system.deprecated_logging import log
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.tool.grammar import join_with_separators
 
@@ -89,7 +88,7 @@ class Sheriff(object):
         ])
         return urls.parse_bug_id(output)
 
-    def post_chromium_deps_roll(self, revision, revision_name):
+    def post_chromium_deps_roll(self, revision, revision_name, changelog_message):
         args = [
             "post-chromium-deps-roll",
             "--force-clean",
@@ -97,7 +96,7 @@ class Sheriff(object):
             "--parent-command=sheriff-bot",
         ]
         # revision can be None, but revision_name is always something meaningful.
-        args += [revision, revision_name]
+        args += [revision, revision_name, changelog_message]
         output = self._sheriffbot.run_webkit_patch(args)
         return urls.parse_bug_id(output)
 

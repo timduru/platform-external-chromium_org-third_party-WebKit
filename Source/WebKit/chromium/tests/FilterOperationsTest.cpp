@@ -40,13 +40,11 @@ TEST(FilterOperationsTest, getOutsetsBlur)
     FilterOperations ops;
     ops.operations().append(BlurFilterOperation::create(Length(20.0, WebCore::Fixed), FilterOperation::BLUR));
     EXPECT_TRUE(ops.hasOutsets());
-    int top, right, bottom, left;
-    top = right = bottom = left = 0;
-    ops.getOutsets(top, right, bottom, left);
-    EXPECT_EQ(57, top);
-    EXPECT_EQ(57, right);
-    EXPECT_EQ(57, bottom);
-    EXPECT_EQ(57, left);
+    FilterOutsets outsets = ops.outsets();
+    EXPECT_EQ(57, outsets.top());
+    EXPECT_EQ(57, outsets.right());
+    EXPECT_EQ(57, outsets.bottom());
+    EXPECT_EQ(57, outsets.left());
 }
 
 TEST(FilterOperationsTest, getOutsetsDropShadow)
@@ -54,13 +52,11 @@ TEST(FilterOperationsTest, getOutsetsDropShadow)
     FilterOperations ops;
     ops.operations().append(DropShadowFilterOperation::create(IntPoint(3, 8), 20, Color(1, 2, 3), FilterOperation::DROP_SHADOW));
     EXPECT_TRUE(ops.hasOutsets());
-    int top, right, bottom, left;
-    top = right = bottom = left = 0;
-    ops.getOutsets(top, right, bottom, left);
-    EXPECT_EQ(49, top);
-    EXPECT_EQ(60, right);
-    EXPECT_EQ(65, bottom);
-    EXPECT_EQ(54, left);
+    FilterOutsets outsets = ops.outsets();
+    EXPECT_EQ(49, outsets.top());
+    EXPECT_EQ(60, outsets.right());
+    EXPECT_EQ(65, outsets.bottom());
+    EXPECT_EQ(54, outsets.left());
 }
 
 TEST(WebFilterOperationsTest, getOutsetsBlur)
@@ -151,25 +147,25 @@ TEST(WebFilterOperationsTest, getOutsetsDropShadow)
             EXPECT_EQ(a[i], op.matrix()[i]); \
     }
 
-#define SAVE_RESTORE_ZOOMRECT_AMOUNT(Type, a, b) \
+#define SAVE_RESTORE_AMOUNT_INSET(Type, a, b) \
     { \
         WebFilterOperation op = WebFilterOperation::create##Type##Filter(a, b); \
         EXPECT_EQ(WebFilterOperation::FilterType##Type, op.type()); \
-        EXPECT_EQ(a, op.zoomRect()); \
-        EXPECT_EQ(b, op.amount()); \
+        EXPECT_EQ(a, op.amount()); \
+        EXPECT_EQ(b, op.zoomInset()); \
         \
         WebFilterOperation op2 = WebFilterOperation::createEmptyFilter(); \
         op2.setType(WebFilterOperation::FilterType##Type); \
         \
-        EXPECT_NE(a, op2.zoomRect()); \
-        EXPECT_NE(b, op2.amount()); \
+        EXPECT_NE(a, op2.amount()); \
+        EXPECT_NE(b, op2.zoomInset()); \
         \
-        op2.setZoomRect(a); \
-        op2.setAmount(b); \
+        op2.setAmount(a); \
+        op2.setZoomInset(b); \
         \
         EXPECT_EQ(WebFilterOperation::FilterType##Type, op2.type()); \
-        EXPECT_EQ(a, op2.zoomRect()); \
-        EXPECT_EQ(b, op2.amount()); \
+        EXPECT_EQ(a, op2.amount()); \
+        EXPECT_EQ(b, op2.zoomInset()); \
     }
 
 
@@ -189,7 +185,7 @@ TEST(WebFilterOperationsTest, saveAndRestore)
     SkScalar matrix[20] = { 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20 };
     SAVE_RESTORE_MATRIX(ColorMatrix, matrix);
 
-    SAVE_RESTORE_ZOOMRECT_AMOUNT(Zoom, WebRect(20, 19, 18, 17), 32);
+    SAVE_RESTORE_AMOUNT_INSET(Zoom, 0.5f, 32);
 }
 
 }

@@ -60,8 +60,11 @@ public:
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     virtual String dateFormat() OVERRIDE;
     virtual String monthFormat() OVERRIDE;
+    virtual String shortMonthFormat() OVERRIDE;
     virtual String timeFormat() OVERRIDE;
     virtual String shortTimeFormat() OVERRIDE;
+    virtual String dateTimeFormatWithSeconds() OVERRIDE;
+    virtual String dateTimeFormatWithoutSeconds() OVERRIDE;
     virtual const Vector<String>& monthLabels() OVERRIDE;
     virtual const Vector<String>& shortMonthLabels() OVERRIDE;
     virtual const Vector<String>& standAloneMonthLabels() OVERRIDE;
@@ -83,11 +86,16 @@ private:
     Vector<String> m_monthLabels;
     RetainPtr<NSDateFormatter> timeFormatter();
     RetainPtr<NSDateFormatter> shortTimeFormatter();
+    RetainPtr<NSDateFormatter> dateTimeFormatterWithSeconds();
+    RetainPtr<NSDateFormatter> dateTimeFormatterWithoutSeconds();
 
     String m_dateFormat;
     String m_monthFormat;
+    String m_shortMonthFormat;
     String m_timeFormatWithSeconds;
     String m_timeFormatWithoutSeconds;
+    String m_dateTimeFormatWithSeconds;
+    String m_dateTimeFormatWithoutSeconds;
     Vector<String> m_shortMonthLabels;
     Vector<String> m_standAloneMonthLabels;
     Vector<String> m_shortStandAloneMonthLabels;

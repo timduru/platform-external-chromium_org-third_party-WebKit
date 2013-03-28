@@ -22,7 +22,7 @@
 
 import logging
 import sys
-import unittest
+import unittest2 as unittest
 import StringIO
 
 from webkitpy.common.system.filesystem import FileSystem
@@ -70,8 +70,8 @@ class TesterTest(unittest.TestCase):
             _, _, logs = oc.restore_output()
             root_logger.handlers = root_handlers
 
-        self.assertTrue('No tests to run' in errors.getvalue())
-        self.assertTrue('No tests to run' in logs)
+        self.assertIn('No tests to run', errors.getvalue())
+        self.assertIn('No tests to run', logs)
 
     def _find_test_names(self, args):
         tester = Tester()
@@ -81,25 +81,25 @@ class TesterTest(unittest.TestCase):
     def test_individual_names_are_not_run_twice(self):
         args = [STUBS_CLASS + '.test_empty']
         parallel_tests, serial_tests = self._find_test_names(args)
-        self.assertEquals(parallel_tests, args)
-        self.assertEquals(serial_tests, [])
+        self.assertEqual(parallel_tests, args)
+        self.assertEqual(serial_tests, [])
 
     def test_integration_tests_are_not_found_by_default(self):
         parallel_tests, serial_tests = self._find_test_names([STUBS_CLASS])
-        self.assertEquals(parallel_tests, [
+        self.assertEqual(parallel_tests, [
             STUBS_CLASS + '.test_empty',
             ])
-        self.assertEquals(serial_tests, [
+        self.assertEqual(serial_tests, [
             STUBS_CLASS + '.serial_test_empty',
             ])
 
     def test_integration_tests_are_found(self):
         parallel_tests, serial_tests = self._find_test_names(['--integration-tests', STUBS_CLASS])
-        self.assertEquals(parallel_tests, [
+        self.assertEqual(parallel_tests, [
             STUBS_CLASS + '.integration_test_empty',
             STUBS_CLASS + '.test_empty',
             ])
-        self.assertEquals(serial_tests, [
+        self.assertEqual(serial_tests, [
             STUBS_CLASS + '.serial_integration_test_empty',
             STUBS_CLASS + '.serial_test_empty',
             ])
@@ -113,5 +113,5 @@ class TesterTest(unittest.TestCase):
                                stdout=executive.PIPE, stderr=executive.PIPE)
         out, _ = proc.communicate()
         retcode = proc.returncode
-        self.assertEquals(retcode, 0)
-        self.assertTrue('Cover' in out)
+        self.assertEqual(retcode, 0)
+        self.assertIn('Cover', out)

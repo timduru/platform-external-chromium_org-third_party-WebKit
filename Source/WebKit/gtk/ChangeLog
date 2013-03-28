@@ -1,3 +1,1653 @@
+2013-03-23  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK][Regression] webkit_dom_html_table_element_insert_row returns value that doesn't pass WEBKIT_DOM_IS_HTML_TABLE_ROW_ELEMENT macro
+        https://bugs.webkit.org/show_bug.cgi?id=111714
+
+        Reviewed by Martin Robinson.
+
+        Add test that checks webkit_dom_html_table_element_insert_row() to
+        also preproduce this issue.
+
+        * tests/testdomdocument.c:
+        (test_dom_document_insert_row):
+        (main):
+
+2013-03-22  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Trivial fixes to the gyp-build autogen.sh script.
+
+        Reviewed by Martin Robinson (mrobinson).
+
+        * gyp/autogen.sh: add /bin/sh -e as hashbang, so stricter shells will be happy to
+        run the script; deal with automake exiting with an error code because there is no
+        Makefile.am for it to work on.
+
+2013-03-19  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add support for building the WebCore bindings to the gyp build
+        https://bugs.webkit.org/show_bug.cgi?id=112638
+
+        Reviewed by Nico Weber.
+
+        * gyp/Configuration.gypi.in: Added options for enabling SVG and setting the location of
+        the WebCore derived sources.
+        * gyp/run-gyp: Include the gyp scripts directory on the Python path and make the WebCoreGTK
+        gyp file the default for the build.
+
+2013-03-22  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [gyp] Expose a few more compiler defines for the gyp build
+        https://bugs.webkit.org/show_bug.cgi?id=113109
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * gyp/Configuration.gypi.in: Expose the version number string and data
+        directory to the gyp build as command-line arguments.
+
+2013-03-22  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] [gyp] Feature defines are not space separated
+        https://bugs.webkit.org/show_bug.cgi?id=113108
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * gyp/configure.ac: Properly export feature defines for gyp during
+        configure phase.
+
+2013-03-22  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Include the right GL header for GLES2
+        https://bugs.webkit.org/show_bug.cgi?id=113034
+
+        Reviewed by Martin Robinson.
+
+        Include GLES2/gl2.h when using GLES2.
+
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+
+2013-03-20  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Build ANGLE sources into a separate library from libWebCore.la
+        https://bugs.webkit.org/show_bug.cgi?id=112778
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Add libLevelDB.la to the libwebkitgtk library if using the OpenGL accelerated backend.
+
+2013-03-17  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Fix and improve dist hooks for translations
+        https://bugs.webkit.org/show_bug.cgi?id=112519
+
+        Reviewed by Carlos Garcia Campos.
+
+        * GNUmakefile.am: removed left-over translation files from EXTRA_DIST
+
+2013-03-15  Nate Chapin  <japhet@chromium.org>
+
+        Hide MainResourceLoader from the outside world
+        https://bugs.webkit.org/show_bug.cgi?id=109971
+
+        Reviewed by Adam Barth.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::convertMainResourceLoadToDownload):
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+        (FrameLoaderClient):
+
+2013-03-15  Abhishek Arya  <inferno@chromium.org>
+
+        Replace static_casts with to* helper functions.
+        https://bugs.webkit.org/show_bug.cgi?id=112401
+
+        Reviewed by Stephen Chenney.
+
+        to* helper functions are preferred over static_cast calls since they
+        help to catch bad casts easily on the testing infrastructure.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::redirectDataToPlugin):
+
+2013-03-14  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        Add selectTrailingWhitespaceEnabled setting to WebCore::Page
+        https://bugs.webkit.org/show_bug.cgi?id=109404
+
+        Reviewed by Tony Chang.
+
+        Use new settings for smartInsertDeleteEnabled and
+        selectTrailingWhitespaceEnabled.
+
+        Remove code related to DRT as it is not needed anymore.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::smartInsertDeleteEnabled):
+        (WebKit::EditorClient::isSelectTrailingWhitespaceEnabled):
+        (WebKit::EditorClient::EditorClient):
+        * WebCoreSupport/EditorClientGtk.h:
+        (EditorClient):
+
+2013-03-14  Abhishek Arya  <inferno@chromium.org>
+
+        Replace static_casts with to* helper functions.
+        https://bugs.webkit.org/show_bug.cgi?id=112296
+
+        Reviewed by Kentaro Hara.
+
+        to* helper functions are preferred over static_cast calls since they
+        help to catch bad casts easily on the testing infrastructure.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_query_tooltip):
+
+2013-03-13  Tomas Popela  <tpopela@redhat.com>
+
+        [GTK][Introspection] Fix of gtk doc annotation warnings
+        https://bugs.webkit.org/show_bug.cgi?id=109182
+
+        Reviewed by Martin Robinson.
+
+        Fixed some gtk doc annotation warnings that appears during
+        compiling. Also some white characters were removed and some restyling
+        was done - all the g_signal_new in webkit directory have now the same
+        style. 
+
+
+        * webkit/webkitdownload.cpp:
+        (webkit_download_class_init):
+        * webkit/webkitfavicondatabase.cpp:
+        (webkit_favicon_database_class_init):
+        * webkit/webkitgeolocationpolicydecision.cpp:
+        * webkit/webkitglobals.cpp:
+        * webkit/webkithittestresult.h:
+        * webkit/webkiticondatabase.cpp:
+        (webkit_icon_database_class_init):
+        * webkit/webkitsecurityorigin.cpp:
+        * webkit/webkitsecurityorigin.h:
+        * webkit/webkitsoupauthdialog.cpp:
+        * webkit/webkitspellchecker.cpp:
+        * webkit/webkitviewportattributes.cpp:
+        (webkit_viewport_attributes_class_init):
+        * webkit/webkitwebdatabase.cpp:
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_class_init):
+        * webkit/webkitwebframe.h:
+        * webkit/webkitwebinspector.cpp:
+        (webkit_web_inspector_class_init):
+        * webkit/webkitwebnavigationaction.cpp:
+        (webkit_web_navigation_action_class_init):
+        * webkit/webkitwebplugindatabase.cpp:
+        * webkit/webkitwebpolicydecision.cpp:
+        * webkit/webkitwebresource.cpp:
+        (webkit_web_resource_class_init):
+        * webkit/webkitwebsettings.cpp:
+        (webkit_web_settings_class_init):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_class_init):
+        (webkit_web_view_apply_zoom_level):
+        * webkit/webkitwebwindowfeatures.cpp:
+        (webkit_web_window_features_equal):
+
+2013-03-13  Pavel Feldman  <pfeldman@chromium.org>
+
+        Web Inspector: get rid of hiddenPanels filter
+        https://bugs.webkit.org/show_bug.cgi?id=112252
+
+        Reviewed by Vsevolod Vlasov.
+
+        * WebCoreSupport/InspectorClientGtk.cpp:
+        * WebCoreSupport/InspectorClientGtk.h:
+        (InspectorFrontendClient):
+
+2013-03-12  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Set up the libPlatformGtk.la library
+        https://bugs.webkit.org/show_bug.cgi?id=111738
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Reference platformgtk_cppflags variable, libPlatformGtk.la along with webcoregtk_cppflags variable, libWebCoreGtk.la.
+        Adjust the path to GtkVersioning.c, the file has moved under Source/Platform.
+
+2013-03-07  Zan Dobersek  <zdobersek@igalia.com>
+
+        [GTK] Limit the supported compilers to GCC >= 4.7 and Clang >= 3.0
+        https://bugs.webkit.org/show_bug.cgi?id=109932
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: Replace references to SYMBOL_VISIBILITY_INLINES and SYMBOL_VISIBILITY variables with the actual flags.
+        They are now available by default due to the limited set of supported compilers.
+
+2013-03-06  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Enable translations for WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=111398
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: no longer distribute po files from here, they've moved to
+        Sources/WebCore/platform/gtk.
+
+2013-03-07  Tomas Popela  <tpopela@redhat.com>
+
+        [GTK] Expose "ShouldRespectImageOrientation" setting into WebKitWebSettings
+        https://bugs.webkit.org/show_bug.cgi?id=111414
+
+        Reviewed by Carlos Garcia Campos.
+
+        We should expose ShouldRespectImageOrientation setting into
+        WebKitWebSettings. When it is enabled, the images are shown with right
+        orientation regarding to images EXIF data.
+
+        * webkit/webkitwebsettings.cpp:
+        (webkit_web_settings_class_init):
+        (webkit_web_settings_set_property):
+        (webkit_web_settings_get_property):
+        * webkit/webkitwebsettingsprivate.h:
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+        (webkit_web_view_settings_notify):
+
+2013-03-06  Benjamin Poulain  <benjamin@webkit.org>
+
+        WebKitTestRunner needs layoutTestController.elementDoesAutoCompleteForElementWithId
+        https://bugs.webkit.org/show_bug.cgi?id=42696
+
+        Reviewed by Andreas Kling.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2013-03-06  Sudarsana Nagineni  <sudarsana.nagineni@intel.com>
+
+        [GTK] Return m_inspectorFilesPath if it is not null
+        https://bugs.webkit.org/show_bug.cgi?id=111633
+
+        Reviewed by Martin Robinson.
+
+        Added missing return in InspectorClient::inspectorFilesPath().
+
+        * WebCoreSupport/InspectorClientGtk.cpp:
+        (WebKit::InspectorClient::inspectorFilesPath):
+
+2013-03-06  Dominique Leuenberger  <dimstar@opensuse.org>
+
+        Link the webkit_tests to XRENDER_LIBS.
+        This solves the linking failure when building against gtk2 like:
+        usr/lib/gcc/i586-suse-linux/4.7/../../../../i586-suse-linux/bin/ld:
+        Source/WebCore/platform/gtk/Programs_unittests_testcopyandpaste-GtkVersioning.o:
+        undefined reference to symbol 'XFree'
+        /usr/lib/gcc/i586-suse-linux/4.7/../../../../i586-suse-linux/bin/ld:
+        note: 'XFree' is defined in DSO /usr/lib/libX11.so.6 so try adding it
+        to the linker command line
+        /usr/lib/libX11.so.6: could not read symbols: Invalid operation
+
+        https://bugs.webkit.org/show_bug.cgi?id=111572
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am:
+
+2013-03-03  Adam Barth  <abarth@webkit.org>
+
+        Unreviewed rollout of http://trac.webkit.org/r144530
+        As described in https://bugs.webkit.org/show_bug.cgi?id=111167 and
+        https://bugs.webkit.org/show_bug.cgi?id=111035, this patch caused a
+        large number of ASSERTs in chromium-win.
+
+        * webkit/webkitwebpolicydecision.cpp:
+
+2013-03-02  Benjamin Poulain  <bpoulain@apple.com>
+
+        Move computedStyleIncludingVisitedInfo from TestRunner to Internals
+        https://bugs.webkit.org/show_bug.cgi?id=109772
+
+        Reviewed by Andreas Kling.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2013-02-28  Alexey Proskuryakov  <ap@apple.com>
+
+        Reduce amount of rebuilding when touching networking headers
+        https://bugs.webkit.org/show_bug.cgi?id=111035
+
+        Reviewed by Eric Seidel.
+
+        Adding includes that are now necessary because WebCore headers don't have them
+        any more.
+
+        * webkit/webkitwebpolicydecision.cpp:
+
+2013-03-01  Jason Anderssen  <janderssen@gmail.com>
+
+        Move markerTextForListItem from TestRunner to Internals
+        https://bugs.webkit.org/show_bug.cgi?id=110939
+
+        Reviewed by Benjamin Poulain.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2013-03-01  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Expose more of the configuration step to the gyp build
+        https://bugs.webkit.org/show_bug.cgi?id=111213
+
+        Reviewed by Dirk Pranke.
+
+        Expose more of the configuration phase to the gyp build, including WebKit features
+        and binary paths.
+
+        * gyp/Configuration.gypi.in: Add templatized gyp variables for the new configuration bits.
+        * gyp/autogen.sh: Properly link up the WebKit features script. So we can access it
+        relatively as if we were at the top-level of the source directory.
+        * gyp/configure.ac: Export the WebKit features.
+
+2013-03-01  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r144422 and r144424.
+        http://trac.webkit.org/changeset/144422
+        http://trac.webkit.org/changeset/144424
+        https://bugs.webkit.org/show_bug.cgi?id=111167
+
+        Caused over 20 tests to fail assertion on Chromium Win port as
+        ASSERTION FAILED: m_platformRequestUpdated (Requested by
+        toyoshim on #webkit).
+
+        * webkit/webkitwebpolicydecision.cpp:
+
+2013-02-28  Alexey Proskuryakov  <ap@apple.com>
+
+        Reduce amount of rebuilding when touching networking headers
+        https://bugs.webkit.org/show_bug.cgi?id=111035
+
+        Reviewed by Eric Seidel.
+
+        Adding includes that are now necessary because WebCore headers don't have them
+        any more.
+
+        * webkit/webkitwebpolicydecision.cpp:
+
+2013-02-26  Martin Robinson  <mrobinson@igalia.com>
+
+        REGRESSION (r143619): Crashes in three layout tests
+        https://bugs.webkit.org/show_bug.cgi?id=110588
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Guard against null main resource identifiers. The main resource
+        identifier can be null at various times during the load. A null
+        identifier is never equal to the ones we are looking to remove.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidFinishLoading): Use the new webkitWebViewRemoveSubresource helper.
+        (WebKit::FrameLoaderClient::dispatchDidFailLoading): ditto.
+        * webkit/webkitwebview.cpp:
+        (webkitWebViewRemoveSubresource): Added this helper which removes a subresource, but
+        never touches the main resource. This is adapted from the old method, for which the
+        main resource branch was dead code.
+        * webkit/webkitwebviewprivate.h: Update the method list.
+
+2013-02-25  Andreas Kling  <akling@apple.com>
+
+        Reduce amount of code that includes StylePropertySet.h
+        <http://webkit.org/b/101149>
+
+        Reviewed by Antti Koivisto.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+
+2013-02-24  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] GTK+ 2 build broken since GTK_API_VERSION_2 moved to autoconfig.h
+        https://bugs.webkit.org/show_bug.cgi?id=110702
+
+        Reviewed by Martin Robinson.
+
+        * tests/testapplicationcache.c: include autotoolsconfig.h.
+        * tests/testatk.c: ditto.
+        * tests/testatkroles.c: ditto.
+        * tests/testcontextmenu.c: ditto.
+        * tests/testcopyandpaste.c: ditto.
+        * tests/testdomdocument.c: ditto.
+        * tests/testdomdomwindow.c: ditto.
+        * tests/testdomnode.c: ditto.
+        * tests/testdownload.c: ditto.
+        * tests/testfavicondatabase.c: ditto.
+        * tests/testglobals.c: ditto.
+        * tests/testhittestresult.c: ditto.
+        * tests/testhttpbackend.c: ditto.
+        * tests/testkeyevents.c: ditto.
+        * tests/testloading.c: ditto.
+        * tests/testmimehandling.c: ditto.
+        * tests/testnetworkrequest.c: ditto.
+        * tests/testnetworkresponse.c: ditto.
+        * tests/testwebbackforwardlist.c: ditto.
+        * tests/testwebdatasource.c: ditto.
+        * tests/testwebframe.c: ditto.
+        * tests/testwebhistoryitem.c: ditto.
+        * tests/testwebinspector.c: ditto.
+        * tests/testwebplugindatabase.c: ditto.
+        * tests/testwebresource.c: ditto.
+        * tests/testwebsettings.c: ditto.
+        * tests/testwebview.c: ditto.
+        * tests/testwindow.c: ditto.
+
+2013-02-23  Jason Anderssen  <janderssen@gmail.com>
+
+        Move setAutofilled from TestRunner to WebCore
+        https://bugs.webkit.org/show_bug.cgi?id=110521
+
+        Reviewed by Benjamin Poulain.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2013-02-22  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Expose all dependencies to the gyp build
+        https://bugs.webkit.org/show_bug.cgi?id=110498
+
+        Reviewed by Dirk Pranke.
+
+        * gyp/Configuration.gypi.in: Add the missing configuration cflags here.
+        * gyp/Dependencies.gyp: Add targets for all missing dependencies.
+
+2013-02-21  George McCollister  <george.mccollister@gmail.com>
+
+        [GTK] Remove subresource leaks from WebKit1 and WebKit2
+        https://bugs.webkit.org/show_bug.cgi?id=108960
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidFinishLoading): Remove resource
+        if it isn't the main resource to prevent leak.
+        (WebKit::FrameLoaderClient::dispatchDidFailLoading): Ditto
+        * webkit/webkitwebview.cpp:
+        (cleanupTemporarilyCachedSubresources): Added to cleanup subresources.
+        (webkit_web_view_get_subresources): Use getSubresources from the
+        documentLoader to provide subresources since resources will be removed
+        from webview after loading.
+
+2013-02-21  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Fix make distcheck.
+
+        * GNUmakefile.am: Add -DBUILDING_WEBKIT flags to introspection
+        scanner.
+
+2013-02-15  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Spread the gyp build files throughout the tree
+        https://bugs.webkit.org/show_bug.cgi?id=109960
+
+        Reviewed by Dirk Pranke.
+
+        * gyp/Configuration.gypi.in: Remove the 'Source', since now it cannot be shared.
+        * gyp/run-gyp: Update the path to the JavaScriptCore gypfile.
+
+2013-02-15  Martin Robinson  <mrobinson@igalia.com>
+
+        Unreviewed, rolling out parts of r142731.
+        http://trac.webkit.org/changeset/142731
+        https://bugs.webkit.org/show_bug.cgi?id=109672
+
+        This patch broke the GTK+ gyp build. Roll out the changes there,
+        since they were actually unnecessary.
+
+        * gyp/Configuration.gypi.in:
+        * gyp/Dependencies.gyp:
+        * gyp/JavaScriptCore.gyp:
+        * gyp/WTF.gyp:
+
+2013-02-13  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        [Qt] window.open passes height and width parameters even if not defined in a page
+        https://bugs.webkit.org/show_bug.cgi?id=107705
+
+        Reviewed by Kenneth Rohde Christiansen.
+
+        Do not resize window when default size is requested.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::setWindowRect):
+
+2013-02-13  Andrew Wilson  <atwilson@chromium.org>
+
+        Unreviewed Chromium gyp-file cleanup after glib backend removal.
+        https://bugs.webkit.org/show_bug.cgi?id=109672
+
+        Removed references to GLib unicode backend:
+
+        * gyp/Configuration.gypi.in:
+        * gyp/Dependencies.gyp:
+        * gyp/JavaScriptCore.gyp:
+        * gyp/WTF.gyp:
+
+2013-02-12  Martin Robinson  <mrobinson@igalia.com>
+
+        2013-02-10  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Connect the gyp build to autoconf
+        https://bugs.webkit.org/show_bug.cgi?id=109360
+
+        Reviewed by Dirk Pranke.
+
+        Move Configuration.gypi to Configuration.gypi.in and allow autoconf to
+        fill in variables during a configuration phase. Also add some scripts
+        to support connecting autoconf up to the gyp build. This allows us
+        to have a very autotools-esque experience.
+
+        * gyp/Configuration.gypi: Removed.
+        * gyp/Configuration.gypi.in: Added. Fleshed out Configuration.gypi to include
+        dependency CFLAGS and LIBS directly from configure. Due to the way we are
+        generating the gyp build now, we also need to include an absolute path to
+        the build directory. Fixing bugs in gyp should allow us to avoid this in the
+        future.
+        * gyp/Dependencies.gyp: Added this file which holds external dependency targets.
+        We could consider auto-generating this at some point.
+        * gyp/JavaScriptCore.gyp: Remove references to the old Configuration.gypi.
+        It's now included via the command-line -I flag. Update to support the new
+        s/default/global/g terminology for variables.
+        * gyp/WTF.gyp: Remove the dependency targets as this is now handled entirely
+        by autoconf.
+        * gyp/autogen.sh: Added. Set up the build directory and kick off autoconf.
+        * gyp/configure.ac: Added. An autoconf build that re-uses much of our
+        existing autoconf setup.
+        * gyp/run-gyp: Added. Script for invoking gyp for out-of-tree builds.
+
+2013-02-12  Huang Dongsung  <luxtella@company100.net>
+
+        [TexMap] Apply frames-per-second debug counter to WK1.
+        https://bugs.webkit.org/show_bug.cgi?id=109540
+
+        Reviewed by Noam Rosenthal.
+
+        Make AcceleratedCompositingContext use TextureMapperFPSCounter.
+
+        * WebCoreSupport/AcceleratedCompositingContext.h:
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+        (WebKit::AcceleratedCompositingContext::compositeLayersToContext):
+
+2013-02-11  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Disable delete button controller on non-Mac ports and delete EditorClient::shouldShowDeleteInterface
+        https://bugs.webkit.org/show_bug.cgi?id=109534
+
+        Reviewed by Anders Carlsson.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit):
+        * WebCoreSupport/EditorClientGtk.h:
+        (EditorClient):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_class_init):
+
+2013-02-11  Benjamin Poulain  <benjamin@webkit.org>
+
+        Kill TestRunner::setMinimumTimerInterval; implement the feature with InternalSettings
+        https://bugs.webkit.org/show_bug.cgi?id=109349
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2013-02-10  Jae Hyun Park  <jae.park08@gmail.com>
+
+        Rename ENABLE(GLIB_SUPPORT) to USE(GLIB)
+        https://bugs.webkit.org/show_bug.cgi?id=104266
+
+        Reviewed by Philippe Normand.
+
+        Using USE(GLIB) instead of ENABLE(GLIB_SUPPORT) is more consistent with
+        the existing macro naming conventions.
+
+        From Platform.h
+        USE() - use a particular third-party library or optional OS service
+        ENABLE() - turn on a specific feature of WebKit
+
+        * gyp/Configuration.gypi:
+
+2013-02-08  Benjamin Poulain  <bpoulain@apple.com>
+
+        Move workerThreadCount from TestRunner to WebCore Internals
+        https://bugs.webkit.org/show_bug.cgi?id=109239
+
+        Reviewed by Darin Adler.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2013-02-08  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add an experimental gyp build
+        https://bugs.webkit.org/show_bug.cgi?id=109003
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add an experimental gyp build for WebKitGTK+. Currently only libjavascriptcoregtk,
+        jsc, and minidom build (and only on platforms for that support bash). To use the
+        build simply run:
+
+        $ gyp --generator-output=build --depth=. Source/WebKit/gtk/gyp/JavaScriptCore.gyp
+
+        Then enter the build directory and run make.
+
+        * gyp/Configuration.gypi: Added.
+        * gyp/JavaScriptCore.gyp: Added.
+        * gyp/WTF.gyp: Added.
+        * gyp/generate-derived-sources.sh: Added.
+
+2013-02-07  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Cleanup command-line defines
+        https://bugs.webkit.org/show_bug.cgi?id=109213
+
+        Reviewed by Xan Lopez.
+
+        * GNUmakefile.am: Remove references to flags that are now provided
+        by autotoolsconfig.h
+
+2013-02-07  Benjamin Poulain  <bpoulain@apple.com>
+
+        Move pauseAnimation/pauseTransition from TestRunner to Internals
+        https://bugs.webkit.org/show_bug.cgi?id=109107
+
+        Reviewed by Anders Carlsson.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2013-02-07  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [GTK][AC] Implement opacity animation with clutter ac backend
+        https://bugs.webkit.org/show_bug.cgi?id=108961
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add AnimationTrigger for ac compositing.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::allowedCompositingTriggers):
+
+2013-02-05  Martin Robinson  <mrobinson@igalia.com>
+
+        Update the NEWS and configuration in preparation for 1.11.5.
+
+        Reviewed by Philippe Normand.
+
+        * NEWS:
+
+2013-02-04  Benjamin Poulain  <bpoulain@apple.com>
+
+        Kill suspendAnimation(), resumeAnimation() and numberOfActiveAnimations() from DRT/WTR; use Internals
+        https://bugs.webkit.org/show_bug.cgi?id=108741
+
+        Reviewed by Tony Chang.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2013-02-04  Gustavo Noronha Silva  <gns@gnome.org>
+
+        Made the documentation on the confirmed argument for the
+        WebView::script-confirm signal clearer about its type.
+
+        Reviewed by Martin Robinson.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_class_init):
+
+2013-02-04  Balazs Kelemen  <kbalazs@webkit.org>
+
+        [Soup] Wrap SoupSession by NetworkStorageSession
+        https://bugs.webkit.org/show_bug.cgi?id=108615
+
+        Reviewed by Alexey Proskuryakov.
+
+        * WebCoreSupport/FrameNetworkingContextGtk.cpp:
+        (WebKit::FrameNetworkingContextGtk::storageSession):
+        * WebCoreSupport/FrameNetworkingContextGtk.h:
+        (FrameNetworkingContextGtk):
+
+2013-02-03  KwangYong Choi  <ky0.choi@samsung.com>
+
+        Fix build warning after r141473
+        https://bugs.webkit.org/show_bug.cgi?id=108782
+
+        Reviewed by Kentaro Hara.
+
+        Fix -Wunused-parameter build warning.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::getClientPasteboardDataForRange):
+
+2013-02-01  Philippe Normand  <pnormand@igalia.com>
+
+        [GTK][GStreamer] FullscreenVideoControllerGtk implementation
+        https://bugs.webkit.org/show_bug.cgi?id=107398
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Remove the FullscreenVideoController as it moved to
+        FullscreenVideoControllerGStreamer and its Gtk subclass in
+        WebCore. Hook in NATIVE_FULLSCREEN_VIDEO in the ChromeClient in
+        the two possible scenarios, wether FULLSCREEN_API is enabled or not.
+
+        * GNUmakefile.am: Remove FullscreenVideoController.
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit):
+        (WebKit::ChromeClient::enterFullscreenForNode): Hook
+        NATIVE_FULLSCREEN_VIDEO support.
+        (WebKit::ChromeClient::exitFullscreenForNode): Ditto
+        (WebKit::ChromeClient::enterFullScreenForElement): Ditto
+        (WebKit::ChromeClient::exitFullScreenForElement): Ditto
+        * WebCoreSupport/ChromeClientGtk.h:
+        (ChromeClient):
+        * WebCoreSupport/FullscreenVideoController.cpp: Removed.
+        * WebCoreSupport/FullscreenVideoController.h: Removed.
+        * webkit/webkitwebview.cpp: Remove FullscreenVideoController support.
+        * webkit/webkitwebviewprivate.h: Ditto
+
+2013-01-31  Aurimas Liutikas  <aurimas@chromium.org>
+
+        Editor::m_compositionNode not updated on HTMLInputElement::setValue()
+        https://bugs.webkit.org/show_bug.cgi?id=107737
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::respondToChangedSelection):
+            Adding a call to the newly refactored Editor method.
+
+2013-01-31  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r141479.
+        http://trac.webkit.org/changeset/141479
+        https://bugs.webkit.org/show_bug.cgi?id=108564
+
+        breaks chromium test (Requested by morrita on #webkit).
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::respondToChangedSelection):
+
+2013-01-31  Aurimas Liutikas  <aurimas@chromium.org>
+
+        Editor::m_compositionNode not updated on HTMLInputElement::setValue()
+        https://bugs.webkit.org/show_bug.cgi?id=107737
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::respondToChangedSelection):
+            Adding a call to the newly refactored Editor method.
+
+2013-01-31  Enrica Casucci  <enrica@apple.com>
+
+        WebKit2: provide new bundle APIs to allow bundle clients to be notified of pasteboard access.
+        https://bugs.webkit.org/show_bug.cgi?id=108396.
+        <rdar://problem/12920461>
+
+        Reviewed by Alexey Proskuryakov.
+
+        Adds stub implementation for WebKit of the new EditorClient methods.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::willWriteSelectionToPasteboard):
+        (WebKit::EditorClient::getClientPasteboardDataForRange):
+        * WebCoreSupport/EditorClientGtk.h:
+
+2013-01-30  Huang Dongsung  <luxtella@company100.net>
+
+        [TexMap] Remove GraphicsLayer in TextureMapperLayer.
+        https://bugs.webkit.org/show_bug.cgi?id=107073
+
+        Reviewed by Noam Rosenthal.
+
+        Include GraphicsLayerTextureMapper.h to use toTextureMapperLayer().
+
+        * WebCoreSupport/AcceleratedCompositingContextGL.cpp:
+
+2013-01-29  Mario Sanchez Prada  <mario.prada@samsung.com>
+
+        [GTK] Missing build flags when building with Harfbuzz
+        https://bugs.webkit.org/show_bug.cgi?id=108174
+
+        Reviewed by Martin Robinson.
+
+        Add FREETYPE_CFLAGS and FREETYPE_LIBS to makefiles so -lharfbuzz
+        parameter will be added to linking lines when needed.
+
+        * GNUmakefile.am: Added FREETYPE_CFLAGS and FREETYPE_LIBS.
+
+2013-01-28  Huang Dongsung  <luxtella@company100.net>
+
+        [TexMap] Enable debug borders and repaint counter via Settings.
+        https://bugs.webkit.org/show_bug.cgi?id=107198
+
+        Reviewed by Benjamin Poulain.
+
+        If WEBKIT_SHOW_COMPOSITING_DEBUG_VISUALS is set to 1, set
+        showDebugBorders and showRepaintCounter in Settings to true.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+
+2013-01-25  Joone Hur  <joone.hur@intel.com>
+
+        [GTK][AC] Use new Clutter APIs instead of deprecated APIs
+        https://bugs.webkit.org/show_bug.cgi?id=105736
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Use clutter_actor_set_background_color instead of clutter_stage_set_color.
+        Use clutter_actor_add_child instead of clutter_container_add_actor.
+        Remove clutter_actor_show_all because Actors are visible by default.
+
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp:
+        (WebKit::AcceleratedCompositingContext::setRootCompositingLayer):
+
+2013-01-25  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] LDFLAGS are being incorrectly used at compile time (rather than linking)
+        https://bugs.webkit.org/show_bug.cgi?id=100616
+
+        Unreviewed, since this is just a build fix.
+
+        * GNUmakefile.am: use PACKAGE_CFLAGS instead of PACKAGE_LIBS when appending pkg-config
+        variables to build target _CFLAGS.
+
+2013-01-24  Mark Hahnenberg  <mhahnenberg@apple.com>
+
+        Objective-C API: Rename JSValue.h/APIJSValue.h to JSCJSValue.h/JSValue.h
+        https://bugs.webkit.org/show_bug.cgi?id=107327
+
+        Reviewed by Filip Pizlo.
+
+        We're renaming these two files, so we have to replace the names everywhere.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+
+2013-01-23  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [GTK] Avoid reset title for navigation within the page
+        https://bugs.webkit.org/show_bug.cgi?id=106908
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidNavigateWithinPage): Call
+        dispatchDidCommitLoad with true as param.
+        (WebKit::FrameLoaderClient::dispatchDidCommitLoad): The method has been
+        overloaded. The default implementation (without params) simply calls
+        dispatchDidCommitLoad with false. The new private method with
+        isNavigatingWithinPage as param will avoid to reset the title for
+        navigation within the page.
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+        (FrameLoaderClient): Add new private method dispatchDidCommitLoad with a
+        boolean parameter to know if it is navigating withing the same page or
+        not.
+
+2013-01-22  Anders Carlsson  <andersca@apple.com>
+
+        Use a platforom strategy for local storage
+        https://bugs.webkit.org/show_bug.cgi?id=107600
+
+        Reviewed by Andreas Kling.
+
+        Update for new storage strategy.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::createStorageStrategy):
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+        (PlatformStrategiesGtk):
+
+2013-01-22  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [GTK] Add listener for direction-changed signal in WebKitWebView
+        https://bugs.webkit.org/show_bug.cgi?id=107131
+
+        Reviewed by Philippe Normand.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init): Add listener for direction-changed signal.
+        (webkitWebViewDirectionChanged): Implement listener using
+        Editor::setBaseWritingDirection().
+
+2013-01-21  Oleg Smirnov  <oleg.smirnov@lge.com>
+
+        [Gtk] Dispatching event list into input element.
+        https://bugs.webkit.org/show_bug.cgi?id=107259
+
+        Reviewed by Martin Robinson.
+
+        Clear pending command list after dispatching events.
+
+        * WebCoreSupport/EditorClientGtk.cpp:
+        (WebKit::EditorClient::handleKeyboardEvent):
+
+2013-01-18  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add property for IndexedDB database path to WebKitGTK+
+        https://bugs.webkit.org/show_bug.cgi?id=106136
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Make the web database directory affect both the legacy SQLite web
+        database API and the newer indexed database API. This will allow us
+        to run IDB tests in WebKit1.
+
+        * webkit/webkitglobals.cpp:
+        (webkitPageGroupName): Added this helper to get the default page
+        group name.
+        * webkit/webkitglobalsprivate.h: Added a declaration for the helper.
+        * webkit/webkitwebdatabase.cpp:
+        (webkit_get_web_database_directory_path): Just return the cached value.
+        This is always set by webkitInit.
+        (webkit_set_web_database_directory_path): Set both the IDB and legacy
+        database paths.
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_init): Use the new page group name helper.
+
+2013-01-18  Seokju Kwon  <seokju.kwon@gmail.com>
+
+        Add explicit keyword to constructors in platform-specific InspectorClient
+        https://bugs.webkit.org/show_bug.cgi?id=107255
+
+        Reviewed by Kentaro Hara.
+
+        Add explicit keyword to constructors that take one argument
+        in platform-specific implementation of InspectorClient.
+        And fix some coding style.
+
+        * WebCoreSupport/InspectorClientGtk.h:
+        (WebCore):
+        (WebKit):
+        (InspectorClient):
+        (WebKit::InspectorClient::disconnectFrontendClient):
+        (InspectorFrontendClient):
+        (WebKit::InspectorFrontendClient::disconnectInspectorClient):
+
+2013-01-18  Manuel Rego Casasnovas  <rego@igalia.com>
+
+        [GTK] Add new method to support addUserScript in DumpRenderTree
+        https://bugs.webkit.org/show_bug.cgi?id=107275
+
+        Reviewed by Philippe Normand.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::addUserScript): Implement new method using
+        PageGroup::addUserScriptToWorld.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk): Define method header.
+
+2013-01-17  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Build with LevelDB when IndexedDB is enabled
+        https://bugs.webkit.org/show_bug.cgi?id=103220
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: When IndexedDatabase is enabled add the leveldb convenience
+        library to the shared library link phase.
+
+2013-01-15  Zan Dobersek  <zandobersek@gmail.com>
+
+        [Autotools] Add support for WebKit2-only builds
+        https://bugs.webkit.org/show_bug.cgi?id=106889
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Only build the WebKit1-specific targets if actually
+        building WebKit1. This puts the libwebkitgtk library, the pkg-config file
+        and the WebKit1-specific unit tests under the ENABLE_WEBKIT1 Automake
+        conditional.
+
+2013-01-11  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and configure.ac for 1.11.4 release
+
+        * NEWS: Added release notes for 1.11.4.
+
+2013-01-08  Mark Lam  <mark.lam@apple.com>
+
+        Removed the need for the ProposedDatabase mechanism.
+        https://bugs.webkit.org/show_bug.cgi?id=106292.
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::exceededDatabaseQuota):
+        * WebCoreSupport/ChromeClientGtk.h:
+        (ChromeClient):
+
+2013-01-03  Sergio Villar Senin  <svillar@igalia.com>
+
+        [GTK] Add WebP image support
+        https://bugs.webkit.org/show_bug.cgi?id=105915
+
+        Reviewed by Martin Robinson.
+
+        * GNUmakefile.am: link against WebP library.
+
+2013-01-07  Mike West  <mkwst@chromium.org>
+
+        Make the IFRAME_SEAMLESS flag runtime-enabled.
+        https://bugs.webkit.org/show_bug.cgi?id=106213
+
+        Reviewed by Ojan Vafai.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+            Add a toggle for seamless IFrames to GTK's DRTSuport.
+
+2013-01-04  Adam Klein  <adamk@chromium.org>
+
+        Remove ENABLE_MUTATION_OBSERVERS #define
+        https://bugs.webkit.org/show_bug.cgi?id=105459
+
+        Reviewed by Ryosuke Niwa.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::deliverAllMutationsIfNecessary):
+
+2012-12-28  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK][WK2] Add support for IME Composition
+        https://bugs.webkit.org/show_bug.cgi?id=65093
+
+        Reviewed by Carlos Garcia Campos.
+
+        Update the method signatures for concrete WebKit1 implementation of
+        the GtkInputMethodFilter.
+
+        * WebCoreSupport/WebViewInputMethodFilter.cpp:
+        (WebKit::WebViewInputMethodFilter::sendSimpleKeyEvent):
+        (WebKit::WebViewInputMethodFilter::sendKeyEventWithCompositionResults):
+        * WebCoreSupport/WebViewInputMethodFilter.h:
+        (WebViewInputMethodFilter):
+
+2012-12-27  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [GTK] invalid use of incomplete type WebCore::ResourceResponse in webkitwebviewprivate.h
+        https://bugs.webkit.org/show_bug.cgi?id=105720
+
+        Reviewed by Martin Robinson.
+
+        If the acceleration backend is clutter, then css_filter feature is disabled.
+        So ResourceResponse.h could not be reached with only existing headers
+        in webkitwebviewprivate.h. For this reason, I add ResourceResponse.h explicitly
+        to fix a build failure using incomplete type 'WebCore::ResourceResponse()'.
+
+        * webkit/webkitwebviewprivate.h:
+
+2012-12-23  Alexey Proskuryakov  <ap@apple.com>
+
+        <rdar://problem/12808377> Network process should respect cookie accept policy
+        https://bugs.webkit.org/show_bug.cgi?id=105684
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+        CookiesStrategy no longer has notifyCookiesChanged(). This port didn't use it anyway.
+
+2012-12-22  Alexey Proskuryakov  <ap@apple.com>
+
+        Add a separate class for networking related storage
+        https://bugs.webkit.org/show_bug.cgi?id=105676
+
+        Reviewed by Sam Weinig.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::cookiesForDOM):
+        (PlatformStrategiesGtk::setCookiesFromDOM):
+        (PlatformStrategiesGtk::cookiesEnabled):
+        (PlatformStrategiesGtk::cookieRequestHeaderFieldValue):
+        (PlatformStrategiesGtk::getRawCookies):
+        (PlatformStrategiesGtk::deleteCookie):
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+        Cookie functions now take a NetworkStorageSession, not a NetworkingContext.
+
+2012-12-18  Alexey Proskuryakov  <ap@apple.com>
+
+        Remove unnecessary functions from CookiesStrategy
+        https://bugs.webkit.org/show_bug.cgi?id=105369
+
+        Reviewed by Brady Eidson.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+
+2012-12-18  ChangSeok Oh  <shivamidow@gmail.com>
+
+        [GTK][AC] Fix assertion failures for AC with clutter
+        https://bugs.webkit.org/show_bug.cgi?id=105039
+
+        Reviewed by Gustavo Noronha Silva.
+
+        AcceleratedCompositingContext could be a client of GraphicsLayerClutter
+        not only RenderLayerBacking. So inserting ASSERT_NOT_REACH in notifyFlushRequired()
+        causes a crash by calling GraphicsLayerClutter::noteLayerPropertyChanged in debug build.
+        And also I added flushCompositingStateIncludingSubframes taken from
+        AcceleratedCompositingContextGL to flushAndRenderLayers(). If not so,
+        ASSERT(!needsLayout()) failed in FrameView::paintContents() too in debug build.
+
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp:
+        (WebKit::AcceleratedCompositingContext::flushAndRenderLayers): Add updateLayoutAndStyleIfNeededRecursive()
+        (WebKit::AcceleratedCompositingContext::notifyAnimationStarted): Removed ASSERT_NOT_REACHED()
+        (WebKit::AcceleratedCompositingContext::notifyFlushRequired): Removed ASSERT_NOT_REACHED()
+
+2012-12-15  Anders Carlsson  <andersca@apple.com>
+
+        Rename FrameLoaderClient::download to convertMainResourceLoadToDownload
+        https://bugs.webkit.org/show_bug.cgi?id=105122
+
+        Reviewed by Andreas Kling.
+
+        Update for WebCore changes.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::convertMainResourceLoadToDownload):
+        * WebCoreSupport/FrameLoaderClientGtk.h:
+        (FrameLoaderClient):
+
+2012-12-15  Mark Lam  <mark.lam@apple.com>
+
+        Re-landing patch for "Introducing the DatabaseStrategy and database servers".
+        https://bugs.webkit.org/show_bug.cgi?id=104934.
+
+        Not reviewed.
+
+        Merged from r137767. Previously reviewed by Sam Weinig.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::createDatabaseStrategy):
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+        (PlatformStrategiesGtk):
+
+2012-12-14  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r137767.
+        http://trac.webkit.org/changeset/137767
+        https://bugs.webkit.org/show_bug.cgi?id=105062
+
+        Broke Mac builds. (Requested by mlam on #webkit).
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+        (PlatformStrategiesGtk):
+
+2012-12-14  Mark Lam  <mark.lam@apple.com>
+
+        Introducing the DatabaseStrategy and database servers.
+        https://bugs.webkit.org/show_bug.cgi?id=104934.
+
+        Reviewed by Sam Weinig.
+
+        The database server is currently a placeholder that does nothing.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::createDatabaseStrategy):
+        * WebCoreSupport/PlatformStrategiesGtk.h:
+        (PlatformStrategiesGtk):
+
+2012-12-14  Alberto Garcia  <agarcia@igalia.com>
+
+        [GTK] When in private mode WebKitGTK+ should not save HTTP authentication credentials to the persistent storage
+        https://bugs.webkit.org/show_bug.cgi?id=104910
+
+        Reviewed by Martin Robinson.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidReceiveAuthenticationChallenge):
+        When creating the GtkAuthenticationDialog, set the credential
+        storage mode using the private browsing setting from the current
+        page.
+
+        * webkit/webkitsoupauthdialog.cpp:
+        (sessionAuthenticate):
+        Create the GtkAuthenticationDialog with no persistent storage
+        allowed, as we are not handling the credential persistence here.
+
+2012-12-12  Mark Lam  <mark.lam@apple.com>
+
+        Encapsulate externally used webdatabase APIs in DatabaseManager.
+        https://bugs.webkit.org/show_bug.cgi?id=104741.
+
+        Reviewed by Sam Weinig.
+
+        Use DatabaseManager instead of accessing DatabaseTracker, AbstractDatabase,
+        and DatabaseContext directly. This is to prepare for upcoming webkit2
+        refactoring.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::exceededDatabaseQuota):
+        * webkit/webkitfavicondatabase.cpp:
+        * webkit/webkiticondatabase.cpp:
+        * webkit/webkitsecurityorigin.cpp:
+        (webkit_security_origin_get_web_database_usage):
+        (webkit_security_origin_get_web_database_quota):
+        (webkit_security_origin_set_web_database_quota):
+        (webkit_security_origin_get_all_web_databases):
+        * webkit/webkitwebdatabase.cpp:
+        (webkit_web_database_get_display_name):
+        (webkit_web_database_get_expected_size):
+        (webkit_web_database_get_size):
+        (webkit_web_database_get_filename):
+        (webkit_web_database_remove):
+        (webkit_remove_all_web_databases):
+        (webkit_get_web_database_directory_path):
+        (webkit_set_web_database_directory_path):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+        (webkit_web_view_settings_notify):
+
+2012-12-12  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Add authentication support to DRT and fix exposed issues in the libsoup backend
+        https://bugs.webkit.org/show_bug.cgi?id=104285
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add support to DumpRenderTree for running authentication tests. Since the DRT
+        expects an authentication callback, we add one to DRTSupport to avoid #ifdefs
+        in platform-independent code for GTK+.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setAuthenticationCallback): Added.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk): Add a method to set the authentication callback.
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::dispatchDidReceiveAuthenticationChallenge): When
+        in DRT mode we need to call the authentication callback instead of popping
+        up the dialog or ignoring the request.
+
+2012-12-12  Alexey Proskuryakov  <ap@apple.com>
+
+        Make LOG() work in WebProcess and NetworkProcess
+        https://bugs.webkit.org/show_bug.cgi?id=104718
+
+        Reviewed by Tim Horton.
+
+        * webkit/webkitglobals.cpp: Include InitializeLogging.h
+
+2012-12-12  Joone Hur  <joone.hur@intel.com>
+
+        [GTK][AC] The non-composited content is not painted
+        https://bugs.webkit.org/show_bug.cgi?id=104819
+
+        Reviewed by Gustavo Noronha Silva.
+
+        When Accelerated Compositing is enabled, only GraphicsLayers are painted.
+        This patch allows to paint the non-composited content on the viewport with 
+        GraphicsLayers. Most of the codes are the same as AcceleratedCompositingContextGL.cpp
+
+        * WebCoreSupport/AcceleratedCompositingContext.h: Add m_nonCompositedContentLayer.
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp:
+        (WebKit::AcceleratedCompositingContext::AcceleratedCompositingContext):
+        (WebKit::AcceleratedCompositingContext::initialize):
+        (WebKit):
+        (WebKit::AcceleratedCompositingContext::~AcceleratedCompositingContext):
+        (WebKit::AcceleratedCompositingContext::renderLayersToWindow):
+        (WebKit::AcceleratedCompositingContext::setRootCompositingLayer):
+        (WebKit::AcceleratedCompositingContext::setNonCompositedContentsNeedDisplay):
+        (WebKit::AcceleratedCompositingContext::resizeRootLayer):
+        (WebKit::AcceleratedCompositingContext::scrollNonCompositedContents): Make the non-composited 
+        content scroll.
+        (WebKit::AcceleratedCompositingContext::layerFlushTimerFiredCallback):
+        (WebKit::AcceleratedCompositingContext::flushPendingLayerChanges):
+        (WebKit::AcceleratedCompositingContext::flushAndRenderLayers):
+        (WebKit::AcceleratedCompositingContext::notifyAnimationStarted):
+        (WebKit::AcceleratedCompositingContext::paintContents): Paint the non-composited content.
+
+2012-12-12  Joone Hur  <joone.hur@intel.com>
+
+        [GTK][AC] GraphicsLayers are not shown on the viewport
+        https://bugs.webkit.org/show_bug.cgi?id=104670
+
+        Reviewed by Gustavo Noronha Silva.
+
+        GraphicsLayers are not shown on the viewport because the container(GtkClutterEmbed) 
+        is not resized and shown, so this patch allows it to fit to the viewport.
+
+        * WebCoreSupport/AcceleratedCompositingContext.h:
+        * WebCoreSupport/AcceleratedCompositingContextClutter.cpp:
+        (WebKit::AcceleratedCompositingContext::renderLayersToWindow):
+        (WebKit::AcceleratedCompositingContext::setRootCompositingLayer):
+        (WebKit::AcceleratedCompositingContext::resizeRootLayer):
+        (WebKit::AcceleratedCompositingContext::layerFlushTimerFiredCallback):
+        (WebKit::AcceleratedCompositingContext::scheduleLayerFlush):
+
+2012-12-11  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Install GObject DOM bindings headers in its own directory
+        https://bugs.webkit.org/show_bug.cgi?id=104663
+
+        Reviewed by Gustavo Noronha Silva.
+
+        * GNUmakefile.am: Add webkitdom.h.
+        * webkit/webkitdom.h: Compatibility header just including the new
+        one.
+        * webkit/webkitwebframe.cpp: Update includes.
+        * webkit/webkitwebframe.h: Ditto.
+        * webkit/webkitwebinspector.cpp: Ditto.
+        * webkit/webkitwebinspector.h: Ditto.
+        * webkit/webkitwebview.cpp: Ditto.
+        * webkit/webkitwebview.h: Ditto.
+
+2012-12-11  Mike West  <mkwst@chromium.org>
+
+        Web Inspector: ConsoleTypes should not expose MessageType - it should be private to inspector.
+        https://bugs.webkit.org/show_bug.cgi?id=66371
+
+        Reviewed by Pavel Feldman.
+
+        Drops WebCore::MessageType from the addMessageToConsole method.
+
+        * WebCoreSupport/ChromeClientGtk.cpp:
+        (WebKit::ChromeClient::addMessageToConsole):
+        * WebCoreSupport/ChromeClientGtk.h:
+        (ChromeClient):
+
+2012-12-11  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Implement some missing FrameLoaderClient message in DRT
+        https://bugs.webkit.org/show_bug.cgi?id=104444
+
+        Reviewed by Gustavo Noronha Silva.
+
+        When in DumpRenderTree mode allow the DRT to install a FrameLoaderEvent callback
+        for events that we do not expose in the API. This will allow us to share more
+        results with WebKit2.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setFrameLoadEventCallback): Added.
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        * WebCoreSupport/FrameLoaderClientGtk.cpp: Use the new callback to deliver
+        events to DRT.
+
+2012-12-11  Martin Robinson  <mrobinson@igalia.com>
+
+        [Coverity] [GTK] Remove some redundant null checks in DumpRenderTree
+        https://bugs.webkit.org/show_bug.cgi?id=104570
+
+        Reviewed by Daniel Bates.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::elementDoesAutoCompleteForElementWithId): Remove a redundant null check.
+
+2012-12-10  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Build GObject DOM bindings as a separate library
+        https://bugs.webkit.org/show_bug.cgi?id=104527
+
+        Reviewed by Xan Lopez.
+
+        * GNUmakefile.am: Link to libWebCoreDOM.la.
+
+2012-12-10  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Bring Harfbuzz-ng support to Gtk
+        https://bugs.webkit.org/show_bug.cgi?id=92098
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Add HarfBuzz dependency.
+
+        * GNUmakefile.am: Add FreeType/HarfBuzz CFLAGS to the library.
+
+2012-12-05  Arnaud Renevier  <a.renevier@sisa.samsung.com>
+
+        [Gtk] navigator.plugins contains too many plugin entries. First one are garbages
+        https://bugs.webkit.org/show_bug.cgi?id=102438
+
+        Reviewed by Xan Lopez.
+
+        In getPluginInfo, outPlugins is resized to plugins.size and then,
+        plugins are appended to it. So at the end, outPlugins will be twice
+        too large, and first half will contain null objects. As outPlugins
+        size is 0 when calling getPluginInfo, we don't need to resize it.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::getPluginInfo):
+
+2012-12-04  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [GTK] Avoid unnecessary heap allocations during drag and drop operations
+        https://bugs.webkit.org/show_bug.cgi?id=87938
+
+        Reviewed by Martin Robinson.
+
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_drag_motion): Create DragData for the given
+        DataObjectGtk in the stack.
+        (webkit_web_view_drag_data_received): Ditto.
+        (webkit_web_view_drag_drop): Ditto.
+
+2012-12-02  Mike West  <mkwst@chromium.org>
+
+        [gtk] Enable the CSP_NEXT runtime flag.
+        https://bugs.webkit.org/show_bug.cgi?id=103810
+
+        Reviewed by Adam Barth.
+
+        This patch adds methods to DumpRenderTreeSupport in order to ensure that
+        CSP 1.1 features are enabled when running DRT tests in the GTK port.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setExperimentalContentSecurityPolicyFeaturesEnabled):
+        * WebCoreSupport/DumpRenderTreeSupportGtk.h:
+        (DumpRenderTreeSupportGtk):
+
+2012-11-30  Mihai Maerean  <mmaerean@adobe.com>
+
+        [CSSRegions] when WebKit uses V8, there should be a single variable to store if the CSS Regions feature is enabled
+        https://bugs.webkit.org/show_bug.cgi?id=101192
+
+        Reviewed by Hajime Morita.
+
+        Removed the CSS Regions flag in Settings and switched to using the new flag I have added in RuntimeEnabledFeatures.
+
+        Tests: No new tests because there is no functional change.
+
+        * WebCoreSupport/DumpRenderTreeSupportGtk.cpp:
+        (DumpRenderTreeSupportGtk::setCSSRegionsEnabled):
+
+2012-11-29  Alexey Proskuryakov  <ap@apple.com>
+
+        [WK2] Forward cookie jar calls to NetworkProcess
+        https://bugs.webkit.org/show_bug.cgi?id=103457
+
+        Reviewed by Darin Adler.
+
+        * WebCoreSupport/PlatformStrategiesGtk.cpp:
+        (PlatformStrategiesGtk::cookiesForDOM):
+        (PlatformStrategiesGtk::setCookiesFromDOM):
+        (PlatformStrategiesGtk::cookiesEnabled):
+        (PlatformStrategiesGtk::cookieRequestHeaderFieldValue):
+        (PlatformStrategiesGtk::getRawCookies):
+        (PlatformStrategiesGtk::deleteCookie):
+        (PlatformStrategiesGtk::getHostnamesWithCookies):
+        (PlatformStrategiesGtk::deleteCookiesForHostname):
+        (PlatformStrategiesGtk::deleteAllCookies):
+
+2012-11-27  James Simonsen  <simonjam@chromium.org>
+
+        Consolidate FrameLoader::load() into one function taking a FrameLoadRequest
+        https://bugs.webkit.org/show_bug.cgi?id=102151
+
+        Reviewed by Adam Barth.
+
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_load_uri):
+        (webkit_web_frame_load_data):
+        (webkit_web_frame_load_request):
+
+2012-11-27  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r135786.
+        http://trac.webkit.org/changeset/135786
+        https://bugs.webkit.org/show_bug.cgi?id=103379
+
+        It made 3 plugin tests timeout on several platforms (Requested
+        by Ossy on #webkit).
+
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_load_uri):
+        (webkit_web_frame_load_data):
+        (webkit_web_frame_load_request):
+
+2012-11-26  James Simonsen  <simonjam@chromium.org>
+
+        Consolidate FrameLoader::load() into one function taking a FrameLoadRequest
+        https://bugs.webkit.org/show_bug.cgi?id=102151
+
+        Reviewed by Adam Barth.
+
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_load_uri):
+        (webkit_web_frame_load_data):
+        (webkit_web_frame_load_request):
+
+2012-11-25  Kaustubh Atrawalkar  <kaustubh@motorola.com>
+
+        Remove deprecated load-done signal
+        https://bugs.webkit.org/show_bug.cgi?id=72712
+
+        Reviewed by Brent Fulgham.
+
+        Remove deprecated load-done signal and migrate to load-status.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit):
+        (WebKit::FrameLoaderClient::dispatchDidFinishLoad):
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_class_init):
+
+2012-09-26  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Split SVG from WebCore to work-around make limitation
+        https://bugs.webkit.org/show_bug.cgi?id=97735
+
+        Reviewed by Carlos Garcia Campos.
+
+        Add a new libtool convenience library, libWebCoreSVG.la, to work-around
+        make limitation when linking libWebCore.
+
+        * GNUmakefile.am: link libWebCoreSVG.la into libwebkitgtk.
+
+2012-11-21  Allan Sandfeld Jensen  <allan.jensen@digia.com>
+
+        Disambiguate innerNodeFramePoint and mainFramePoint
+        https://bugs.webkit.org/show_bug.cgi?id=98139
+
+        Reviewed by Julien Chaffraix.
+
+        Switched to using point in innerNodeFrame. While the use here seems wrong it has been
+        left functionally unchanged to be fixed by a later patch.
+
+        * webkit/webkithittestresult.cpp:
+        (WebKit::kit):
+
+2012-11-20  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r135295.
+        http://trac.webkit.org/changeset/135295
+        https://bugs.webkit.org/show_bug.cgi?id=102834
+
+        This patch causes assertion to some layout tests on chromium
+        (Requested by jianli on #webkit).
+
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_load_uri):
+        (webkit_web_frame_load_data):
+        (webkit_web_frame_load_request):
+
+2012-11-20  James Simonsen  <simonjam@chromium.org>
+
+        Consolidate FrameLoader::load() into one function taking a FrameLoadRequest
+        https://bugs.webkit.org/show_bug.cgi?id=102151
+
+        Reviewed by Adam Barth.
+
+        * webkit/webkitwebframe.cpp:
+        (webkit_web_frame_load_uri):
+        (webkit_web_frame_load_data):
+        (webkit_web_frame_load_request):
+
+2012-11-20  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        Unreviewed. Update NEWS and configure.ac for 1.11.2 release
+
+        * NEWS: Added release notes for 1.11.2.
+
+2012-11-16  Martin Robinson  <mrobinson@igalia.com>
+
+        [GTK] Move CredentialBackingStore usage from GtkAuthenticationDialog to ResourceHandleSoup
+        https://bugs.webkit.org/show_bug.cgi?id=101840
+
+        Reviewed by Gustavo Noronha Silva.
+
+        Enable the CredentialStore by default for the WebKit1 GTK+ port. Before this value
+        didn't have an bearing on whether or not the persistent credential storage was used.
+        Now is does.
+
+        * WebCoreSupport/FrameLoaderClientGtk.cpp:
+        (WebKit::FrameLoaderClient::shouldUseCredentialStorage): Enable credential storage by default.
+
+2012-11-15  Gustavo Noronha Silva  <gns@gnome.org>
+
+        [GTK] Split WebCore/platform into a separate library
+        https://bugs.webkit.org/show_bug.cgi?id=94435
+
+        Reviewed by Martin Robinson.
+
+        More people have been reporting problems when linking WebCore because
+        the command line limit is being exceeded. Splitting WebCore a bit more
+        is in order.
+
+        * GNUmakefile.am: link libWebCorePlatform into libwebkitgtk
+
+2012-11-15  Zan Dobersek  <zandobersek@gmail.com>
+
+        Unreviewed build fix attempt after r134765.
+
+        * webkit/webkitviewportattributes.cpp:
+        (webkitViewportAttributesRecompute):
+
+2012-11-12  Josh Rickmar  <jrick@devio.us>
+
+        Add WebCore::Setting to block displaying and/or running insecure content on secure pages
+        https://bugs.webkit.org/show_bug.cgi?id=58378
+
+        Reviewed by Martin Robinson.
+
+        * webkit/webkitwebsettings.cpp:
+        (webkit_web_settings_class_init):
+        (webkit_web_settings_set_property):
+        (webkit_web_settings_get_property):
+        (webkit_web_settings_copy):
+        * webkit/webkitwebview.cpp:
+        (webkit_web_view_update_settings):
+        (webkit_web_view_settings_notify):
+
 2012-11-05  Simon Fraser  <simon.fraser@apple.com>
 
         Fix layer borders to cleaning appear and disappear on switching

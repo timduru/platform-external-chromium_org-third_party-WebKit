@@ -29,6 +29,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import fnmatch
+import logging
 import re
 
 from datetime import datetime
@@ -43,26 +44,24 @@ from webkitpy.common.net.buildbot import BuildBot
 from webkitpy.common.net.regressionwindow import RegressionWindow
 from webkitpy.common.system.crashlogs import CrashLogs
 from webkitpy.common.system.user import User
+from webkitpy.tool.commands.abstractsequencedcommand import AbstractSequencedCommand
 from webkitpy.tool.grammar import pluralize
 from webkitpy.tool.multicommandtool import AbstractDeclarativeCommand
-from webkitpy.common.system.deprecated_logging import log
 from webkitpy.layout_tests.models.test_expectations import TestExpectations
 from webkitpy.layout_tests.port import platform_options, configuration_options
 
+_log = logging.getLogger(__name__)
 
-class SuggestReviewers(AbstractDeclarativeCommand):
+
+class SuggestReviewers(AbstractSequencedCommand):
     name = "suggest-reviewers"
     help_text = "Suggest reviewers for a patch based on recent changes to the modified files."
+    steps = [
+        steps.SuggestReviewers,
+    ]
 
-    def __init__(self):
-        options = [
-            steps.Options.git_commit,
-        ]
-        AbstractDeclarativeCommand.__init__(self, options=options)
-
-    def execute(self, options, args, tool):
-        reviewers = tool.checkout().suggested_reviewers(options.git_commit)
-        print "\n".join([reviewer.full_name for reviewer in reviewers])
+    def _prepare_state(self, options, args, tool):
+        options.suggest_reviewers = True
 
 
 class BugsToCommit(AbstractDeclarativeCommand):
@@ -82,7 +81,7 @@ class PatchesInCommitQueue(AbstractDeclarativeCommand):
 
     def execute(self, options, args, tool):
         patches = tool.bugs.queries.fetch_patches_from_commit_queue()
-        log("Patches in commit queue:")
+        _log.info("Patches in commit queue:")
         for patch in patches:
             print patch.url()
 
@@ -99,13 +98,13 @@ class PatchesToCommitQueue(AbstractDeclarativeCommand):
     @staticmethod
     def _needs_commit_queue(patch):
         if patch.commit_queue() == "+": # If it's already cq+, ignore the patch.
-            log("%s already has cq=%s" % (patch.id(), patch.commit_queue()))
+            _log.info("%s already has cq=%s" % (patch.id(), patch.commit_queue()))
             return False
 
         # We only need to worry about patches from contributers who are not yet committers.
         committer_record = CommitterList().committer_by_email(patch.attacher_email())
         if committer_record:
-            log("%s committer = %s" % (patch.id(), committer_record))
+            _log.info("%s committer = %s" % (patch.id(), committer_record))
         return not committer_record
 
     def execute(self, options, args, tool):
@@ -440,13 +439,15 @@ class PrintExpectations(AbstractDeclarativeCommand):
                         help='Print a CSV-style report that includes the port name, modifiers, tests, and expectations'),
             make_option('-f', '--full', action='store_true', default=False,
                         help='Print a full TestExpectations-style line for every match'),
+            make_option('--paths', action='store_true', default=False,
+                        help='display the paths for all applicable expectation files'),
         ] + platform_options(use_globs=True)
 
         AbstractDeclarativeCommand.__init__(self, options=options)
         self._expectation_models = {}
 
     def execute(self, options, args, tool):
-        if not args and not options.all:
+        if not options.paths and not args and not options.all:
             print "You must either specify one or more test paths or --all."
             return
 
@@ -465,7 +466,16 @@ class PrintExpectations(AbstractDeclarativeCommand):
             default_port = tool.port_factory.get(options=options)
             port_names = [default_port.name()]
 
-        tests = default_port.tests(args)
+        if options.paths:
+            files = default_port.expectations_files()
+            layout_tests_dir = default_port.layout_tests_dir()
+            for file in files:
+                if file.startswith(layout_tests_dir):
+                    file = file.replace(layout_tests_dir, 'LayoutTests')
+                print file
+            return
+
+        tests = set(default_port.tests(args))
         for port_name in port_names:
             model = self._model(options, port_name, tests)
             tests_to_print = self._filter_tests(options, model, tests)
@@ -501,10 +511,7 @@ class PrintExpectations(AbstractDeclarativeCommand):
 
     def _model(self, options, port_name, tests):
         port = self._tool.port_factory.get(port_name, options)
-        expectations_path = port.path_to_test_expectations_file()
-        if not expectations_path in self._expectation_models:
-            self._expectation_models[expectations_path] = TestExpectations(port, tests).model()
-        return self._expectation_models[expectations_path]
+        return TestExpectations(port, tests).model()
 
 
 class PrintBaselines(AbstractDeclarativeCommand):

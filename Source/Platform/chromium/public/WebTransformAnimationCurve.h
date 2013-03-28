@@ -29,15 +29,12 @@
 
 #include "WebCommon.h"
 #include "WebTransformKeyframe.h"
-#include "WebTransformationMatrix.h"
 
 namespace WebKit {
 
 // A keyframed transform animation curve.
 class WebTransformAnimationCurve : public WebAnimationCurve {
 public:
-    WEBKIT_EXPORT static WebTransformAnimationCurve* create();
-
     virtual ~WebTransformAnimationCurve() { }
 
     // Adds the keyframe with the default timing function (ease).
@@ -46,9 +43,6 @@ public:
     // Adds the keyframe with a custom, bezier timing function. Note, it is
     // assumed that x0 = y0 = 0, and x3 = y3 = 1.
     virtual void add(const WebTransformKeyframe&, double x1, double y1, double x2, double y2) = 0;
-
-    virtual WebTransformationMatrix getValue(double time) const = 0;
-
 };
 
 } // namespace WebKit

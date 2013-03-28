@@ -43,29 +43,16 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> toV8(Blob* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+v8::Handle<v8::Object> wrap(Blob* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    if (!impl)
-        return v8NullWithCheck(isolate);
-
+    ASSERT(impl);
     if (impl->isFile())
-        return toV8(toFile(impl), creationContext, isolate);
-
-    return V8Blob::wrap(impl, creationContext, isolate);
+        return wrap(toFile(impl), creationContext, isolate);
+    return V8Blob::createWrapper(impl, creationContext, isolate);
 }
 
-v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8Blob::constructorCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.Blob.Constructor");
-
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
-
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
-
-    ScriptExecutionContext* context = getScriptExecutionContext();
-
     if (!args.Length()) {
         RefPtr<Blob> blob = Blob::create();
         return toV8(blob.get(), args.Holder(), args.GetIsolate());
@@ -82,24 +69,18 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
         if (!args[1]->IsObject())
             return throwTypeError("Second argument of the constructor is not of type Object", args.GetIsolate());
 
-        EXCEPTION_BLOCK(Dictionary, dictionary, Dictionary(args[1], args.GetIsolate()));
+        V8TRYCATCH(Dictionary, dictionary, Dictionary(args[1], args.GetIsolate()));
 
-        v8::TryCatch tryCatchEndings;
-        bool containsEndings = dictionary.get("endings", endings);
-        if (tryCatchEndings.HasCaught())
-            return throwError(tryCatchEndings.Exception(), args.GetIsolate());
-
+        V8TRYCATCH(bool, containsEndings, dictionary.get("endings", endings));
         if (containsEndings) {
             if (endings != "transparent" && endings != "native")
                 return throwTypeError("The endings property must be either \"transparent\" or \"native\"", args.GetIsolate());
         }
 
-        v8::TryCatch tryCatchType;
-        dictionary.get("type", type);
-        if (tryCatchType.HasCaught())
-            return throwError(tryCatchType.Exception(), args.GetIsolate());
+        V8TRYCATCH(bool, containsType, dictionary.get("type", type));
+        UNUSED_PARAM(containsType);
         if (!type.containsOnlyASCII())
-            return throwError(SyntaxError, "type must consist of ASCII characters", args.GetIsolate());
+            return throwError(v8SyntaxError, "type must consist of ASCII characters", args.GetIsolate());
         type.makeLower();
     }
 
@@ -107,29 +88,29 @@ v8::Handle<v8::Value> V8Blob::constructorCallback(const v8::Arguments& args)
 
     BlobBuilder blobBuilder;
 
-    EXCEPTION_BLOCK(v8::Local<v8::Array>, blobParts, v8::Local<v8::Array>::Cast(firstArg));
+    V8TRYCATCH(v8::Local<v8::Array>, blobParts, v8::Local<v8::Array>::Cast(firstArg));
     uint32_t length = blobParts->Length();
 
     for (uint32_t i = 0; i < length; ++i) {
         v8::Local<v8::Value> item = blobParts->Get(v8::Uint32::New(i));
         ASSERT(!item.IsEmpty());
 #if ENABLE(BLOB)
-        if (V8ArrayBuffer::HasInstance(item)) {
+        if (V8ArrayBuffer::HasInstance(item, args.GetIsolate(), worldType(args.GetIsolate()))) {
             ArrayBuffer* arrayBuffer = V8ArrayBuffer::toNative(v8::Handle<v8::Object>::Cast(item));
             ASSERT(arrayBuffer);
-            blobBuilder.append(context, arrayBuffer);
-        } else if (V8ArrayBufferView::HasInstance(item)) {
+            blobBuilder.append(arrayBuffer);
+        } else if (V8ArrayBufferView::HasInstance(item, args.GetIsolate(), worldType(args.GetIsolate()))) {
             ArrayBufferView* arrayBufferView = V8ArrayBufferView::toNative(v8::Handle<v8::Object>::Cast(item));
             ASSERT(arrayBufferView);
             blobBuilder.append(arrayBufferView);
         } else
 #endif
-        if (V8Blob::HasInstance(item)) {
+        if (V8Blob::HasInstance(item, args.GetIsolate(), worldType(args.GetIsolate()))) {
             Blob* blob = V8Blob::toNative(v8::Handle<v8::Object>::Cast(item));
             ASSERT(blob);
             blobBuilder.append(blob);
         } else {
-            EXCEPTION_BLOCK(String, stringValue, toWebCoreString(item));
+            V8TRYCATCH(String, stringValue, toWebCoreString(item));
             blobBuilder.append(stringValue, endings);
         }
     }

@@ -31,9 +31,10 @@
 #ifndef WebPasswordFormData_h
 #define WebPasswordFormData_h
 
+#include "../../../Platform/chromium/public/WebString.h"
+#include "../../../Platform/chromium/public/WebURL.h"
+#include "../../../Platform/chromium/public/WebVector.h"
 #include "WebFormElement.h"
-#include "platform/WebString.h"
-#include "platform/WebURL.h"
 
 namespace WebKit {
 
@@ -87,6 +88,13 @@ struct WebPasswordFormData {
     // has implemented some form of autofill.
     WebString userNameValue;
 
+    // If the form has more than one field which could possibly contain the
+    // username, the extra are placed here. Used for autofill in cases where
+    // our heuristics for determining the username are wrong. Optional.
+    //
+    // When parsing an HTML form, this is typically empty.
+    WebVector<WebString> possibleUserNames;
+
     // The name of the password input element, Optional (improves scoring).
     //
     // When parsing an HTML form, this must always be set.
@@ -97,12 +105,20 @@ struct WebPasswordFormData {
     // When parsing an HTML form, this is typically empty.
     WebString passwordValue;
 
+    // Value of shouldAutocomplete for the password element.
+    bool passwordShouldAutocomplete;
+
     // If the form was a change password form, the name of the
     // 'old password' input element. Optional.
     WebString oldPasswordElement;
 
     // The old password. Optional.
     WebString oldPasswordValue;
+
+    WebPasswordFormData()
+        : passwordShouldAutocomplete(false)
+    {
+    }
 };
 
 } // namespace WebKit

@@ -23,6 +23,7 @@
 #define ewk_view_private_h
 
 #include "Frame.h"
+#include "NetworkStorageSession.h"
 #include "Page.h"
 #include "Widget.h"
 #include "ewk_paint_context_private.h"
@@ -134,6 +135,10 @@ Eina_Bool ewk_view_paint_contents(Ewk_View_Private_Data* priv, Ewk_Paint_Context
 void ewk_view_js_window_object_clear(Evas_Object* ewkView, Evas_Object* frame);
 #endif
 
+#if USE(TILED_BACKING_STORE)
+void ewk_view_tiled_backing_store_invalidate(Evas_Object* ewkView, const WebCore::IntRect& area);
+#endif
+
 #if ENABLE(TOUCH_EVENTS)
 void ewk_view_need_touch_events_set(Evas_Object*, bool needed);
 bool ewk_view_need_touch_events_get(const Evas_Object*);
@@ -170,6 +175,7 @@ void ewk_view_fullscreen_exit(const Evas_Object* ewkView);
 namespace EWKPrivate {
 WebCore::Page *corePage(const Evas_Object *ewkView);
 PlatformPageClient corePageClient(Evas_Object* ewkView);
+WebCore::NetworkStorageSession* storageSession(const Evas_Object* ewkView);
 } // namespace EWKPrivate
 
 #endif // ewk_view_private_h

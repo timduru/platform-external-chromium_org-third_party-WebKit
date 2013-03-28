@@ -29,6 +29,7 @@
 #include "NotImplemented.h"
 #include "Page.h"
 #include "PageGroup.h"
+#include "PlatformCookieJar.h"
 #include "PluginDatabase.h"
 #include "PluginPackage.h"
 
@@ -45,6 +46,11 @@ PlatformStrategiesEfl::PlatformStrategiesEfl()
 }
 
 CookiesStrategy* PlatformStrategiesEfl::createCookiesStrategy()
+{
+    return this;
+}
+
+DatabaseStrategy* PlatformStrategiesEfl::createDatabaseStrategy()
 {
     return this;
 }
@@ -75,9 +81,40 @@ VisitedLinkStrategy* PlatformStrategiesEfl::createVisitedLinkStrategy()
     return this;
 }
 
-// CookiesStrategy
-void PlatformStrategiesEfl::notifyCookiesChanged()
+StorageStrategy* PlatformStrategiesEfl::createStorageStrategy()
 {
+    return this;
+}
+
+// CookiesStrategy
+String PlatformStrategiesEfl::cookiesForDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+{
+    return WebCore::cookiesForDOM(session, firstParty, url);
+}
+
+void PlatformStrategiesEfl::setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, const String& cookieString)
+{
+    WebCore::setCookiesFromDOM(session, firstParty, url, cookieString);
+}
+
+bool PlatformStrategiesEfl::cookiesEnabled(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+{
+    return WebCore::cookiesEnabled(session, firstParty, url);
+}
+
+String PlatformStrategiesEfl::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+{
+    return WebCore::cookieRequestHeaderFieldValue(session, firstParty, url);
+}
+
+bool PlatformStrategiesEfl::getRawCookies(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
+{
+    return WebCore::getRawCookies(session, firstParty, url, rawCookies);
+}
+
+void PlatformStrategiesEfl::deleteCookie(const NetworkStorageSession& session, const KURL& url, const String& cookieName)
+{
+    WebCore::deleteCookie(session, url, cookieName);
 }
 
 void PlatformStrategiesEfl::refreshPlugins()

@@ -28,7 +28,6 @@
 #include "BaseChooserOnlyDateAndTimeInputType.h"
 
 #include "Chrome.h"
-#include "ChromeClient.h"
 #include "HTMLDivElement.h"
 #include "HTMLInputElement.h"
 #include "Page.h"
@@ -44,7 +43,7 @@ BaseChooserOnlyDateAndTimeInputType::~BaseChooserOnlyDateAndTimeInputType()
 
 void BaseChooserOnlyDateAndTimeInputType::handleDOMActivateEvent(Event*)
 {
-    if (element()->disabled() || element()->readOnly() || !element()->renderer() || !ScriptController::processingUserGesture())
+    if (element()->isDisabledOrReadOnly() || !element()->renderer() || !ScriptController::processingUserGesture())
         return;
 
     if (m_dateTimeChooser)
@@ -57,26 +56,7 @@ void BaseChooserOnlyDateAndTimeInputType::handleDOMActivateEvent(Event*)
     DateTimeChooserParameters parameters;
     if (!element()->setupDateTimeChooserParameters(parameters))
         return;
-    m_dateTimeChooser = chrome->client()->openDateTimeChooser(this, parameters);
-}
-
-RenderObject* BaseChooserOnlyDateAndTimeInputType::createRenderer(RenderArena* arena, RenderStyle* style) const
-{
-    // Cancel the override by TextFieldInputType.
-    // FIXME: Remove this function when we stop inheriting TextFieldInputType.
-    return InputType::createRenderer(arena, style);
-}
-
-void BaseChooserOnlyDateAndTimeInputType::updateInnerTextValue()
-{
-    // Cancel the override by TextFieldInputType.
-    // FIXME: Remove this function when we stop inheriting TextFieldInputType.
-}
-
-void BaseChooserOnlyDateAndTimeInputType::forwardEvent(Event*)
-{
-    // Cancel the override by TextFieldInputType.
-    // FIXME: Remove this function when we stop inheriting TextFieldInputType.
+    m_dateTimeChooser = chrome->openDateTimeChooser(this, parameters);
 }
 
 void BaseChooserOnlyDateAndTimeInputType::createShadowSubtree()
@@ -116,7 +96,7 @@ void BaseChooserOnlyDateAndTimeInputType::detach()
 
 void BaseChooserOnlyDateAndTimeInputType::didChooseValue(const String& value)
 {
-    element()->setValue(value, DispatchChangeEvent);
+    element()->setValue(value, DispatchInputAndChangeEvent);
 }
 
 void BaseChooserOnlyDateAndTimeInputType::didEndChooser()
@@ -149,6 +129,11 @@ void BaseChooserOnlyDateAndTimeInputType::accessKeyAction(bool sendMouseEvents)
 {
     BaseDateAndTimeInputType::accessKeyAction(sendMouseEvents);
     BaseClickableWithKeyInputType::accessKeyAction(element(), sendMouseEvents);
+}
+
+bool BaseChooserOnlyDateAndTimeInputType::isMouseFocusable() const
+{
+    return element()->isTextFormControlFocusable();
 }
 
 }

@@ -34,6 +34,7 @@
 
 #include "AXObjectCache.h"
 #include "ElementShadow.h"
+#include "ExceptionCodePlaceholder.h"
 #include "HTMLDivElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
@@ -92,6 +93,11 @@ RangeInputType::RangeInputType(HTMLInputElement* element)
 {
 }
 
+void RangeInputType::attach()
+{
+    observeFeatureIfVisible(FeatureObserver::InputTypeRange);
+}
+
 bool RangeInputType::isRangeControl() const
 {
     return true;
@@ -114,7 +120,7 @@ void RangeInputType::setValueAsDecimal(const Decimal& newValue, TextFieldEventBe
 
 bool RangeInputType::typeMismatchFor(const String& value) const
 {
-    return !value.isEmpty() && !isfinite(parseToDoubleForNumberType(value));
+    return !value.isEmpty() && !std::isfinite(parseToDoubleForNumberType(value));
 }
 
 bool RangeInputType::supportsRequired() const
@@ -146,7 +152,7 @@ bool RangeInputType::isSteppable() const
 
 void RangeInputType::handleMouseDownEvent(MouseEvent* event)
 {
-    if (element()->disabled() || element()->readOnly())
+    if (element()->isDisabledOrReadOnly())
         return;
 
     Node* targetNode = event->target()->toNode();
@@ -165,7 +171,7 @@ void RangeInputType::handleMouseDownEvent(MouseEvent* event)
 #if ENABLE(TOUCH_SLIDER)
 void RangeInputType::handleTouchEvent(TouchEvent* event)
 {
-    if (element()->disabled() || element()->readOnly())
+    if (element()->isDisabledOrReadOnly())
         return;
 
     if (event->type() == eventNames().touchendEvent) {
@@ -191,7 +197,7 @@ bool RangeInputType::hasTouchEventHandler() const
 
 void RangeInputType::handleKeydownEvent(KeyboardEvent* event)
 {
-    if (element()->disabled() || element()->readOnly())
+    if (element()->isDisabledOrReadOnly())
         return;
 
     const String& key = event->keyIdentifier();
@@ -237,12 +243,11 @@ void RangeInputType::handleKeydownEvent(KeyboardEvent* event)
 
     if (newValue != current) {
         EventQueueScope scope;
-        ExceptionCode ec;
         TextFieldEventBehavior eventBehavior = DispatchChangeEvent;
-        setValueAsDecimal(newValue, eventBehavior, ec);
+        setValueAsDecimal(newValue, eventBehavior, IGNORE_EXCEPTION);
 
-        if (AXObjectCache::accessibilityEnabled())
-            element()->document()->axObjectCache()->postNotification(element(), AXObjectCache::AXValueChanged, true);
+        if (AXObjectCache* cache = element()->document()->existingAXObjectCache())
+            cache->postNotification(element(), AXObjectCache::AXValueChanged, true);
         element()->dispatchFormControlChangeEvent();
     }
 
@@ -256,12 +261,10 @@ void RangeInputType::createShadowSubtree()
     Document* document = element()->document();
     RefPtr<HTMLDivElement> track = HTMLDivElement::create(document);
     track->setPseudo(AtomicString("-webkit-slider-runnable-track", AtomicString::ConstructFromLiteral));
-    ExceptionCode ec = 0;
-    track->appendChild(SliderThumbElement::create(document), ec);
+    track->appendChild(SliderThumbElement::create(document), IGNORE_EXCEPTION);
     RefPtr<HTMLElement> container = SliderContainerElement::create(document);
-    container->appendChild(track.release(), ec);
-    container->appendChild(TrackLimiterElement::create(document), ec);
-    element()->userAgentShadowRoot()->appendChild(container.release(), ec);
+    container->appendChild(track.release(), IGNORE_EXCEPTION);
+    element()->userAgentShadowRoot()->appendChild(container.release(), IGNORE_EXCEPTION);
 }
 
 RenderObject* RangeInputType::createRenderer(RenderArena* arena, RenderStyle*) const
@@ -286,9 +289,7 @@ void RangeInputType::accessKeyAction(bool sendMouseEvents)
 {
     InputType::accessKeyAction(sendMouseEvents);
 
-    // Send mouse button events if the caller specified sendMouseEvents.
-    // FIXME: The comment above is no good. It says what we do, but not why.
-    element()->dispatchSimulatedClick(0, sendMouseEvents);
+    element()->dispatchSimulatedClick(0, sendMouseEvents ? SendMouseUpDownEvents : SendNoEvents);
 }
 
 void RangeInputType::minOrMaxAttributeChanged()
@@ -342,8 +343,9 @@ HTMLElement* RangeInputType::sliderTrackElement() const
 void RangeInputType::listAttributeTargetChanged()
 {
     m_tickMarkValuesDirty = true;
-    if (element()->renderer())
-        element()->renderer()->setNeedsLayout(true);
+    HTMLElement* sliderTrackElement = sliderTrackElementOf(element());
+    if (sliderTrackElement->renderer())
+        sliderTrackElement->renderer()->setNeedsLayout(true);
 }
 
 static bool decimalCompare(const Decimal& a, const Decimal& b)

@@ -26,14 +26,20 @@
 #include "config.h"
 #include "RenderSnapshottedPlugIn.h"
 
+#include "Chrome.h"
+#include "ChromeClient.h"
 #include "Cursor.h"
+#include "Filter.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
 #include "Gradient.h"
 #include "HTMLPlugInImageElement.h"
+#include "ImageBuffer.h"
 #include "MouseEvent.h"
+#include "Page.h"
 #include "PaintInfo.h"
 #include "Path.h"
+#include "RenderView.h"
 
 namespace WebCore {
 
@@ -52,7 +58,22 @@ RenderSnapshottedPlugIn::~RenderSnapshottedPlugIn()
 
 HTMLPlugInImageElement* RenderSnapshottedPlugIn::plugInImageElement() const
 {
-    return static_cast<HTMLPlugInImageElement*>(node());
+    return toHTMLPlugInImageElement(node());
+}
+
+void RenderSnapshottedPlugIn::layout()
+{
+    StackStats::LayoutCheckPoint layoutCheckPoint;
+    LayoutSize oldSize = contentBoxRect().size();
+
+    RenderEmbeddedObject::layout();
+
+    LayoutSize newSize = contentBoxRect().size();
+    if (newSize == oldSize)
+        return;
+
+    if (document()->view())
+        document()->view()->addWidgetToUpdate(this);
 }
 
 void RenderSnapshottedPlugIn::updateSnapshot(PassRefPtr<Image> image)
@@ -67,35 +88,35 @@ void RenderSnapshottedPlugIn::updateSnapshot(PassRefPtr<Image> image)
 
 void RenderSnapshottedPlugIn::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    if (plugInImageElement()->displayState() < HTMLPlugInElement::Playing) {
-        RenderReplaced::paint(paintInfo, paintOffset);
-        return;
+    if (paintInfo.phase == PaintPhaseForeground && plugInImageElement()->displayState() < HTMLPlugInElement::Restarting) {
+        paintSnapshot(paintInfo, paintOffset);
+    }
+
+    PaintPhase newPhase = (paintInfo.phase == PaintPhaseChildOutlines) ? PaintPhaseOutline : paintInfo.phase;
+    newPhase = (newPhase == PaintPhaseChildBlockBackgrounds) ? PaintPhaseChildBlockBackground : newPhase;
+
+    PaintInfo paintInfoForChild(paintInfo);
+    paintInfoForChild.phase = newPhase;
+    paintInfoForChild.updatePaintingRootForChildren(this);
+
+    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
+        LayoutPoint childPoint = flipForWritingModeForChild(child, paintOffset);
+        if (!child->hasSelfPaintingLayer() && !child->isFloating())
+            child->paint(paintInfoForChild, childPoint);
     }
 
     RenderEmbeddedObject::paint(paintInfo, paintOffset);
 }
 
-void RenderSnapshottedPlugIn::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
+void RenderSnapshottedPlugIn::paintSnapshot(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    if (plugInImageElement()->displayState() < HTMLPlugInElement::Playing) {
-        paintReplacedSnapshot(paintInfo, paintOffset);
-        theme()->paintPlugInSnapshotOverlay(this, paintInfo, paintOffset);
+    Image* image = m_snapshotResource->image().get();
+    if (!image || image->isNull())
         return;
-    }
 
-    RenderEmbeddedObject::paintReplaced(paintInfo, paintOffset);
-}
-
-void RenderSnapshottedPlugIn::paintReplacedSnapshot(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
-{
-    // This code should be similar to RenderImage::paintReplaced() and RenderImage::paintIntoRect().
     LayoutUnit cWidth = contentWidth();
     LayoutUnit cHeight = contentHeight();
     if (!cWidth || !cHeight)
-        return;
-
-    RefPtr<Image> image = m_snapshotResource->image();
-    if (!image || image->isNull())
         return;
 
     GraphicsContext* context = paintInfo.context;
@@ -105,7 +126,7 @@ void RenderSnapshottedPlugIn::paintReplacedSnapshot(PaintInfo& paintInfo, const 
 #endif
 
     LayoutSize contentSize(cWidth, cHeight);
-    LayoutPoint contentLocation = paintOffset;
+    LayoutPoint contentLocation = location() + paintOffset;
     contentLocation.move(borderLeft() + paddingLeft(), borderTop() + paddingTop());
 
     LayoutRect rect(contentLocation, contentSize);
@@ -113,13 +134,13 @@ void RenderSnapshottedPlugIn::paintReplacedSnapshot(PaintInfo& paintInfo, const 
     if (alignedRect.width() <= 0 || alignedRect.height() <= 0)
         return;
 
-    bool useLowQualityScaling = shouldPaintAtLowQuality(context, image.get(), image.get(), alignedRect.size());
-    context->drawImage(image.get(), style()->colorSpace(), alignedRect, CompositeSourceOver, shouldRespectImageOrientation(), useLowQualityScaling);
+    bool useLowQualityScaling = shouldPaintAtLowQuality(context, image, image, alignedRect.size());
+    context->drawImage(image, style()->colorSpace(), alignedRect, CompositeSourceOver, shouldRespectImageOrientation(), useLowQualityScaling);
 }
 
 CursorDirective RenderSnapshottedPlugIn::getCursor(const LayoutPoint& point, Cursor& overrideCursor) const
 {
-    if (plugInImageElement()->displayState() < HTMLPlugInElement::Playing) {
+    if (plugInImageElement()->displayState() < HTMLPlugInElement::Restarting) {
         overrideCursor = handCursor();
         return SetCursor;
     }
@@ -132,13 +153,18 @@ void RenderSnapshottedPlugIn::handleEvent(Event* event)
         return;
 
     MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
-    if (event->type() == eventNames().clickEvent && mouseEvent->button() == LeftButton) {
-        plugInImageElement()->setDisplayState(HTMLPlugInElement::Playing);
-        if (widget()) {
-            if (Frame* frame = document()->frame())
-                frame->loader()->client()->recreatePlugin(widget());
-            repaint();
-        }
+
+    if (event->type() == eventNames().clickEvent) {
+        if (mouseEvent->button() != LeftButton)
+            return;
+
+        plugInImageElement()->setDisplayState(HTMLPlugInElement::RestartingWithPendingMouseClick);
+        plugInImageElement()->userDidClickSnapshot(mouseEvent);
+        event->setDefaultHandled();
+    } else if (event->type() == eventNames().mousedownEvent) {
+        if (mouseEvent->button() != LeftButton)
+            return;
+
         event->setDefaultHandled();
     }
 }

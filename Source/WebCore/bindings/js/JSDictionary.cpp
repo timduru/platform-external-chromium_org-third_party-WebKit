@@ -28,6 +28,8 @@
 
 #include "ArrayValue.h"
 #include "Dictionary.h"
+#include "JSCSSFontFaceRule.h"
+#include "JSDOMError.h"
 #include "JSDOMWindow.h"
 #include "JSEventTarget.h"
 #include "JSMessagePortCustom.h"
@@ -35,6 +37,7 @@
 #include "JSStorage.h"
 #include "JSTrackCustom.h"
 #include "JSUint8Array.h"
+#include "JSVoidCallback.h"
 #include "ScriptValue.h"
 #include "SerializedScriptValue.h"
 #include <wtf/HashMap.h>
@@ -43,6 +46,10 @@
 
 #if ENABLE(ENCRYPTED_MEDIA)
 #include "JSMediaKeyError.h"
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+#include "JSMediaStream.h"
 #endif
 
 using namespace JSC;
@@ -86,6 +93,11 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, unsigned& result
 void JSDictionary::convertValue(ExecState* exec, JSValue value, unsigned short& result)
 {
     result = static_cast<unsigned short>(value.toUInt32(exec));
+}
+
+void JSDictionary::convertValue(ExecState* exec, JSValue value, unsigned long& result)
+{
+    result = static_cast<unsigned long>(value.toUInt32(exec));
 }
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, unsigned long long& result)
@@ -170,7 +182,6 @@ void JSDictionary::convertValue(ExecState*, JSValue value, RefPtr<TrackBase>& re
 }
 #endif
 
-#if ENABLE(MUTATION_OBSERVERS) || ENABLE(WEB_INTENTS)
 void JSDictionary::convertValue(ExecState* exec, JSValue value, HashSet<AtomicString>& result)
 {
     result.clear();
@@ -190,7 +201,6 @@ void JSDictionary::convertValue(ExecState* exec, JSValue value, HashSet<AtomicSt
         result.add(itemValue.toString(exec)->value(exec));
     }
 }
-#endif
 
 void JSDictionary::convertValue(ExecState* exec, JSValue value, ArrayValue& result)
 {
@@ -209,6 +219,33 @@ void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<Uint
 void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<MediaKeyError>& result)
 {
     result = toMediaKeyError(value);
+}
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<MediaStream>& result)
+{
+    result = toMediaStream(value);
+}
+#endif
+
+#if ENABLE(FONT_LOAD_EVENTS)
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<CSSFontFaceRule>& result)
+{
+    result = toCSSFontFaceRule(value);
+}
+
+void JSDictionary::convertValue(JSC::ExecState*, JSC::JSValue value, RefPtr<DOMError>& result)
+{
+    result = toDOMError(value);
+}
+
+void JSDictionary::convertValue(JSC::ExecState* exec, JSC::JSValue value, RefPtr<VoidCallback>& result)
+{
+    if (!value.isFunction())
+        return;
+
+    result = JSVoidCallback::create(asObject(value), jsCast<JSDOMGlobalObject*>(exec->lexicalGlobalObject()));
 }
 #endif
 

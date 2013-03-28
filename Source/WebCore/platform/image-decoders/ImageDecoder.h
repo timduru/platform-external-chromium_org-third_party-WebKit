@@ -123,6 +123,7 @@ namespace WebCore {
         unsigned duration() const { return m_duration; }
         FrameDisposalMethod disposalMethod() const { return m_disposalMethod; }
         bool premultiplyAlpha() const { return m_premultiplyAlpha; }
+        void reportMemoryUsage(MemoryObjectInfo*) const;
 
         void setHasAlpha(bool alpha);
         void setColorProfile(const ColorProfile&);
@@ -146,8 +147,6 @@ namespace WebCore {
 #endif
         }
 
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-
 #if PLATFORM(CHROMIUM)
         void setSkBitmap(const SkBitmap& bitmap)
         {
@@ -158,36 +157,69 @@ namespace WebCore {
         {
             return m_bitmap.bitmap();
         }
+
+        void setMemoryAllocator(SkBitmap::Allocator* allocator)
+        {
+            m_allocator = allocator;
+        }
+
+        SkBitmap::Allocator* allocator() const { return m_allocator; }
 #endif
 
-    private:
-        int width() const;
-        int height() const;
+        // Use fix point multiplier instead of integer division or floating point math.
+        // This multipler produces exactly the same result for all values in range 0 - 255.
+        static const unsigned fixPointShift = 24;
+        static const unsigned fixPointMult = static_cast<unsigned>(1.0 / 255.0 * (1 << fixPointShift)) + 1;
+        // Multiplies unsigned value by fixpoint value and converts back to unsigned.
+        static unsigned fixPointUnsignedMultiply(unsigned fixed, unsigned v)
+        {
+            return  (fixed * v) >> fixPointShift;
+        }
 
         inline void setRGBA(PixelData* dest, unsigned r, unsigned g, unsigned b, unsigned a)
         {
-            if (m_premultiplyAlpha && !a)
-                *dest = 0;
-            else {
-                if (m_premultiplyAlpha && a < 255) {
-                    float alphaPercent = a / 255.0f;
-                    r = static_cast<unsigned>(r * alphaPercent);
-                    g = static_cast<unsigned>(g * alphaPercent);
-                    b = static_cast<unsigned>(b * alphaPercent);
+            if (m_premultiplyAlpha && a < 255) {
+                if (!a) {
+                    *dest = 0;
+                    return;
                 }
-#if USE(SKIA)
-                // we are sure to call the NoCheck version, since we may
-                // deliberately pass non-premultiplied values, and we don't want
-                // an assert.
-                *dest = SkPackARGB32NoCheck(a, r, g, b);
-#else
-                *dest = (a << 24 | r << 16 | g << 8 | b);
-#endif
+
+                unsigned alphaMult = a * fixPointMult;
+                r = fixPointUnsignedMultiply(r, alphaMult);
+                g = fixPointUnsignedMultiply(g, alphaMult);
+                b = fixPointUnsignedMultiply(b, alphaMult);
             }
+#if USE(SKIA)
+            // Call the "NoCheck" version since we may deliberately pass non-premultiplied
+            // values, and we don't want an assert.
+            *dest = SkPackARGB32NoCheck(a, r, g, b);
+#else
+            *dest = (a << 24 | r << 16 | g << 8 | b);
+#endif
+        }
+
+    private:
+        int width() const
+        {
+#if USE(SKIA)
+            return m_bitmap.bitmap().width();
+#else
+            return m_size.width();
+#endif
+        }
+
+        int height() const
+        {
+#if USE(SKIA)
+            return m_bitmap.bitmap().height();
+#else
+            return m_size.height();
+#endif
         }
 
 #if USE(SKIA)
         NativeImageSkia m_bitmap;
+        SkBitmap::Allocator* m_allocator;
 #else
         Vector<PixelData> m_backingStore;
         PixelData* m_bytes; // The memory is backed by m_backingStore.
@@ -376,8 +408,38 @@ namespace WebCore {
         void setMaxNumPixels(int m) { m_maxNumPixels = m; }
 #endif
 
+        // If the image has a cursor hot-spot, stores it in the argument
+        // and returns true. Otherwise returns false.
+        virtual bool hotSpot(IntPoint&) const { return false; }
+
         virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
+#if USE(SKIA)
+        virtual void setMemoryAllocator(SkBitmap::Allocator* allocator)
+        {
+            // FIXME: this doesn't work for images with multiple frames.
+            if (m_frameBufferCache.isEmpty())
+                m_frameBufferCache.resize(1);
+            m_frameBufferCache[0].setMemoryAllocator(allocator);
+        }
+
+        virtual bool lockFrameBuffers()
+        {
+            bool ret = true;
+            for (unsigned i = 0; i < m_frameBufferCache.size(); ++i) {
+                const SkBitmap& bitmap = m_frameBufferCache[i].getSkBitmap();
+                bitmap.lockPixels();
+                ret = ret && bitmap.getPixels();
+            }
+            return ret;
+        }
+
+        virtual void unlockFrameBuffers()
+        {
+            for (unsigned i = 0; i < m_frameBufferCache.size(); ++i)
+                m_frameBufferCache[i].getSkBitmap().unlockPixels();
+        }
+#endif
     protected:
         void prepareScaleDataIfNecessary();
         int upperBoundScaledX(int origX, int searchStart = 0);

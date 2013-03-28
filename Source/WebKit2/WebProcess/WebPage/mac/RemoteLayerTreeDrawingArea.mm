@@ -26,7 +26,7 @@
 #import "config.h"
 #import "RemoteLayerTreeDrawingArea.h"
 
-#import "RemoteLayerTreeController.h"
+#import "RemoteLayerTreeContext.h"
 
 using namespace WebCore;
 
@@ -39,7 +39,7 @@ PassOwnPtr<RemoteLayerTreeDrawingArea> RemoteLayerTreeDrawingArea::create(WebPag
 
 RemoteLayerTreeDrawingArea::RemoteLayerTreeDrawingArea(WebPage* webPage, const WebPageCreationParameters&)
     : DrawingArea(DrawingAreaTypeRemoteLayerTree, webPage)
-    , m_remoteLayerTreeController(RemoteLayerTreeController::create())
+    , m_RemoteLayerTreeContext(RemoteLayerTreeContext::create(webPage))
 {
 }
 
@@ -47,25 +47,31 @@ RemoteLayerTreeDrawingArea::~RemoteLayerTreeDrawingArea()
 {
 }
 
-void RemoteLayerTreeDrawingArea::setNeedsDisplay(const IntRect&)
+void RemoteLayerTreeDrawingArea::setNeedsDisplay()
 {
 }
 
-void RemoteLayerTreeDrawingArea::scroll(const IntRect& scrollRect, const IntSize& scrollOffset)
+void RemoteLayerTreeDrawingArea::setNeedsDisplayInRect(const IntRect&)
+{
+}
+
+void RemoteLayerTreeDrawingArea::scroll(const IntRect& scrollRect, const IntSize& scrollDelta)
 {
 }
 
 GraphicsLayerFactory* RemoteLayerTreeDrawingArea::graphicsLayerFactory()
 {
-    return m_remoteLayerTreeController.get();
+    return m_RemoteLayerTreeContext.get();
 }
 
-void RemoteLayerTreeDrawingArea::setRootCompositingLayer(GraphicsLayer*)
+void RemoteLayerTreeDrawingArea::setRootCompositingLayer(GraphicsLayer* rootLayer)
 {
+    m_RemoteLayerTreeContext->setRootLayer(rootLayer);
 }
 
 void RemoteLayerTreeDrawingArea::scheduleCompositingLayerFlush()
 {
+    m_RemoteLayerTreeContext->scheduleLayerFlush();
 }
 
 } // namespace WebKit

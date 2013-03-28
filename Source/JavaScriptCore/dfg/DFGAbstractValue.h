@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -193,6 +193,9 @@ struct AbstractValue {
     
     bool merge(const AbstractValue& other)
     {
+        if (other.isClear())
+            return false;
+        
 #if !ASSERT_DISABLED
         AbstractValue oldMe = *this;
 #endif
@@ -231,6 +234,9 @@ struct AbstractValue {
     
     void filter(const StructureSet& other)
     {
+        // FIXME: This could be optimized for the common case of m_type not
+        // having structures, array modes, or a specific value.
+        // https://bugs.webkit.org/show_bug.cgi?id=109663
         m_type &= other.speculationFromStructures();
         m_arrayModes &= other.arrayModesFromStructures();
         m_currentKnownStructure.filter(other);
@@ -284,6 +290,21 @@ struct AbstractValue {
         checkConsistency();
     }
     
+    bool filterByValue(JSValue value)
+    {
+        if (!validate(value))
+            return false;
+        
+        if (!!value && value.isCell())
+            filter(StructureSet(value.asCell()->structure()));
+        else
+            filter(speculationFromValue(value));
+        
+        m_value = value;
+        
+        return true;
+    }
+    
     bool validateType(JSValue value) const
     {
         if (isTop())
@@ -327,6 +348,15 @@ struct AbstractValue {
         return true;
     }
     
+    Structure* bestProvenStructure() const
+    {
+        if (m_currentKnownStructure.hasSingleton())
+            return m_currentKnownStructure.singleton();
+        if (m_futurePossibleStructure.hasSingleton())
+            return m_futurePossibleStructure.singleton();
+        return 0;
+    }
+    
     void checkConsistency() const
     {
         if (!(m_type & SpecCell)) {
@@ -347,15 +377,14 @@ struct AbstractValue {
         // complexity of the code.
     }
     
-    void dump(FILE* out) const
+    void dump(PrintStream& out) const
     {
-        fprintf(out, "(%s, %s, ", speculationToString(m_type), arrayModesToString(m_arrayModes));
-        m_currentKnownStructure.dump(out);
-        dataLog(", ");
-        m_futurePossibleStructure.dump(out);
+        out.print(
+            "(", SpeculationDump(m_type), ", ", ArrayModesDump(m_arrayModes), ", ",
+            m_currentKnownStructure, ", ", m_futurePossibleStructure);
         if (!!m_value)
-            fprintf(out, ", %s", m_value.description());
-        fprintf(out, ")");
+            out.print(", ", m_value);
+        out.print(")");
     }
     
     // A great way to think about the difference between m_currentKnownStructure and
@@ -392,6 +421,8 @@ struct AbstractValue {
     //    change x's structure and we have no way of proving otherwise, but
     //    x's m_futurePossibleStructure will be whatever structure we had checked
     //    when getting property 'f'.
+    
+    // NB. All fields in this struct must have trivial destructors.
 
     // This is a proven constraint on the structures that this value can have right
     // now. The structure of the current value must belong to this set. The set may

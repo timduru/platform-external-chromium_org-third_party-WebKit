@@ -28,6 +28,7 @@
 
 #if USE(LEVELDB)
 
+#include "HistogramSupport.h"
 #include "LevelDBComparator.h"
 #include "LevelDBIterator.h"
 #include "LevelDBSlice.h"
@@ -42,6 +43,22 @@
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
+
+#if PLATFORM(CHROMIUM)
+#include <env_idb.h>
+#include <public/Platform.h>
+#endif
+
+#if !PLATFORM(CHROMIUM)
+namespace leveldb {
+
+static Env* IDBEnv()
+{
+    return leveldb::Env::Default();
+}
+
+}
+#endif
 
 namespace WebCore {
 
@@ -58,13 +75,6 @@ static leveldb::Slice makeSlice(const LevelDBSlice& s)
 static LevelDBSlice makeLevelDBSlice(const leveldb::Slice& s)
 {
     return LevelDBSlice(s.data(), s.data() + s.size());
-}
-
-static Vector<char> makeVector(const std::string& s)
-{
-    Vector<char> res;
-    res.append(s.c_str(), s.length());
-    return res;
 }
 
 class ComparatorAdapter : public leveldb::Comparator {
@@ -118,6 +128,8 @@ static leveldb::Status openDB(leveldb::Comparator* comparator, leveldb::Env* env
     options.comparator = comparator;
     options.create_if_missing = true;
     options.paranoid_checks = true;
+    // 20 max_open_files is the minimum LevelDB allows.
+    options.max_open_files = 20;
     options.env = env;
 
     return leveldb::DB::Open(options, path.utf8().data(), db);
@@ -126,8 +138,25 @@ static leveldb::Status openDB(leveldb::Comparator* comparator, leveldb::Env* env
 bool LevelDBDatabase::destroy(const String& fileName)
 {
     leveldb::Options options;
+    options.env = leveldb::IDBEnv();
     const leveldb::Status s = leveldb::DestroyDB(fileName.utf8().data(), options);
     return s.ok();
+}
+
+static void histogramFreeSpace(const char* type, String fileName)
+{
+#if PLATFORM(CHROMIUM)
+    String name = "WebCore.IndexedDB.LevelDB.Open" + String(type) + "FreeDiskSpace";
+    long long freeDiskSpaceInKBytes = WebKit::Platform::current()->availableDiskSpaceInBytes(fileName) / 1024;
+    if (freeDiskSpaceInKBytes < 0) {
+        HistogramSupport::histogramEnumeration("WebCore.IndexedDB.LevelDB.FreeDiskSpaceFailure", 1/*sample*/, 2/*boundary*/);
+        return;
+    }
+    int clampedDiskSpaceKBytes = freeDiskSpaceInKBytes > INT_MAX ? INT_MAX : freeDiskSpaceInKBytes;
+    const uint64_t histogramMax = static_cast<uint64_t>(1e9);
+    COMPILE_ASSERT(histogramMax <= INT_MAX, histogramMaxTooBig);
+    HistogramSupport::histogramCustomCounts(name.utf8().data(), clampedDiskSpaceKBytes, 1, histogramMax, 11/*buckets*/);
+#endif
 }
 
 PassOwnPtr<LevelDBDatabase> LevelDBDatabase::open(const String& fileName, const LevelDBComparator* comparator)
@@ -135,12 +164,32 @@ PassOwnPtr<LevelDBDatabase> LevelDBDatabase::open(const String& fileName, const 
     OwnPtr<ComparatorAdapter> comparatorAdapter = adoptPtr(new ComparatorAdapter(comparator));
 
     leveldb::DB* db;
-    const leveldb::Status s = openDB(comparatorAdapter.get(), leveldb::Env::Default(), fileName, &db);
+    const leveldb::Status s = openDB(comparatorAdapter.get(), leveldb::IDBEnv(), fileName, &db);
 
     if (!s.ok()) {
+        enum {
+            LevelDBNotFound,
+            LevelDBCorruption,
+            LevelDBIOError,
+            LevelDBOther,
+            LevelDBMaxError
+        };
+        int levelDBError = LevelDBOther;
+        if (s.IsNotFound())
+            levelDBError = LevelDBNotFound;
+        else if (s.IsCorruption())
+            levelDBError = LevelDBCorruption;
+        else if (s.IsIOError())
+            levelDBError = LevelDBIOError;
+        HistogramSupport::histogramEnumeration("WebCore.IndexedDB.LevelDBOpenErrors", levelDBError, LevelDBMaxError);
+
+        histogramFreeSpace("Failure", fileName);
+
         LOG_ERROR("Failed to open LevelDB database from %s: %s", fileName.ascii().data(), s.ToString().c_str());
         return nullptr;
     }
+
+    histogramFreeSpace("Success", fileName);
 
     OwnPtr<LevelDBDatabase> result = adoptPtr(new LevelDBDatabase);
     result->m_db = adoptPtr(db);
@@ -153,7 +202,7 @@ PassOwnPtr<LevelDBDatabase> LevelDBDatabase::open(const String& fileName, const 
 PassOwnPtr<LevelDBDatabase> LevelDBDatabase::openInMemory(const LevelDBComparator* comparator)
 {
     OwnPtr<ComparatorAdapter> comparatorAdapter = adoptPtr(new ComparatorAdapter(comparator));
-    OwnPtr<leveldb::Env> inMemoryEnv = adoptPtr(leveldb::NewMemEnv(leveldb::Env::Default()));
+    OwnPtr<leveldb::Env> inMemoryEnv = adoptPtr(leveldb::NewMemEnv(leveldb::IDBEnv()));
 
     leveldb::DB* db;
     const leveldb::Status s = openDB(comparatorAdapter.get(), inMemoryEnv.get(), String(), &db);
@@ -198,8 +247,9 @@ bool LevelDBDatabase::remove(const LevelDBSlice& key)
     return false;
 }
 
-bool LevelDBDatabase::get(const LevelDBSlice& key, Vector<char>& value, const LevelDBSnapshot* snapshot)
+bool LevelDBDatabase::safeGet(const LevelDBSlice& key, Vector<char>& value, bool& found, const LevelDBSnapshot* snapshot)
 {
+    found = false;
     std::string result;
     leveldb::ReadOptions readOptions;
     readOptions.verify_checksums = true; // FIXME: Disable this if the performance impact is too great.
@@ -207,11 +257,13 @@ bool LevelDBDatabase::get(const LevelDBSlice& key, Vector<char>& value, const Le
 
     const leveldb::Status s = m_db->Get(readOptions, makeSlice(key), &result);
     if (s.ok()) {
-        value = makeVector(result);
+        found = true;
+        value.clear();
+        value.append(result.c_str(), result.length());
         return true;
     }
     if (s.IsNotFound())
-        return false;
+        return true;
     LOG_ERROR("LevelDB get failed: %s", s.ToString().c_str());
     return false;
 }

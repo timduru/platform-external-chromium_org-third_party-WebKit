@@ -31,8 +31,8 @@
 #ifndef WebCursorInfo_h
 #define WebCursorInfo_h
 
-#include "platform/WebImage.h"
-#include "platform/WebPoint.h"
+#include "../../../Platform/chromium/public/WebImage.h"
+#include "../../../Platform/chromium/public/WebPoint.h"
 
 #if WEBKIT_IMPLEMENTATION
 namespace WebCore { class Cursor; }
@@ -95,6 +95,7 @@ struct WebCursorInfo {
 
     Type type;
     WebPoint hotSpot;
+    float imageScaleFactor;
     WebImage customImage;
 
 #ifdef WIN32
@@ -107,6 +108,7 @@ struct WebCursorInfo {
 
     explicit WebCursorInfo(Type type = TypePointer)
         : type(type)
+        , imageScaleFactor(1)
     {
 #ifdef WIN32
         externalHandle = 0;

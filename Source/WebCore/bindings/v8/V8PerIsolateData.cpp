@@ -44,19 +44,20 @@ template<> struct SequenceMemoryInstrumentationTraits<WebCore::WrapperTypeInfo*>
 namespace WebCore {
 
 V8PerIsolateData::V8PerIsolateData(v8::Isolate* isolate)
-    : m_stringCache(adoptPtr(new StringCache()))
+    : m_isolate(isolate)
+    , m_stringCache(adoptPtr(new StringCache()))
     , m_integerCache(adoptPtr(new IntegerCache()))
     , m_domDataStore(0)
     , m_hiddenPropertyName(adoptPtr(new V8HiddenPropertyName()))
     , m_constructorMode(ConstructorMode::CreateNewObject)
     , m_recursionLevel(0)
-    , m_nextDependentRetainedId(0)
 #ifndef NDEBUG
     , m_internalScriptRecursionLevel(0)
 #endif
     , m_gcEventData(adoptPtr(new GCEventData()))
     , m_shouldCollectGarbageSoon(false)
 {
+    m_v8Null.set(v8::Null(isolate));
 }
 
 V8PerIsolateData::~V8PerIsolateData()
@@ -103,15 +104,65 @@ v8::Handle<v8::FunctionTemplate> V8PerIsolateData::toStringTemplate()
 void V8PerIsolateData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Binding);
-    info.addMember(m_rawTemplates);
-    info.addMember(m_templates);
-    info.addMember(m_stringCache);
-    info.addMember(m_domDataList);
+    info.addMember(m_rawTemplatesForMainWorld, "rawTemplatesForMainWorld");
+    info.addMember(m_rawTemplatesForNonMainWorld, "rawTemplatesForNonMainWorld");
+    info.addMember(m_templatesForMainWorld, "templatesForMainWorld");
+    info.addMember(m_templatesForNonMainWorld, "templatesForNonMainWorld");
+    info.addMember(m_stringCache, "stringCache");
+    info.addMember(m_integerCache, "integerCache");
+    info.addMember(m_domDataList, "domDataList");
+    info.addMember(m_domDataStore, "domDataStore");
+    info.addMember(m_hiddenPropertyName, "hiddenPropertyName");
+    info.addMember(m_gcEventData, "gcEventData");
 
-    for (size_t i = 0; i < m_domDataList.size(); i++)
-        info.addMember(m_domDataList[i]);
+    info.addPrivateBuffer(ScriptProfiler::profilerSnapshotsSize(), WebCoreMemoryTypes::InspectorProfilerAgent, "HeapSnapshots", "snapshots");
 
-    info.addPrivateBuffer(ScriptProfiler::profilerSnapshotsSize(), WebCoreMemoryTypes::InspectorProfilerAgent);
+    info.ignoreMember(m_toStringTemplate);
+    info.ignoreMember(m_lazyEventListenerToStringTemplate);
+    info.ignoreMember(m_v8Null);
+    info.ignoreMember(m_liveRoot);
+    info.ignoreMember(m_auxiliaryContext);
+}
+
+bool V8PerIsolateData::hasPrivateTemplate(WrapperWorldType currentWorldType, void* privatePointer)
+{
+    if (currentWorldType == MainWorld)
+        return m_templatesForMainWorld.find(privatePointer) != m_templatesForMainWorld.end();
+    return m_templatesForNonMainWorld.find(privatePointer) != m_templatesForNonMainWorld.end();
+}
+
+v8::Persistent<v8::FunctionTemplate> V8PerIsolateData::privateTemplate(WrapperWorldType currentWorldType, void* privatePointer, v8::InvocationCallback callback, v8::Handle<v8::Value> data, v8::Handle<v8::Signature> signature, int length)
+{
+    v8::Persistent<v8::FunctionTemplate> privateTemplate;
+    TemplateMap& templates = templateMap(currentWorldType);
+    TemplateMap::iterator result = templates.find(privatePointer);
+    if (result != templates.end())
+        return result->value;
+    v8::Persistent<v8::FunctionTemplate> newPrivateTemplate = v8::Persistent<v8::FunctionTemplate>::New(m_isolate, v8::FunctionTemplate::New(callback, data, signature, length));
+    templates.add(privatePointer, newPrivateTemplate);
+    return newPrivateTemplate;
+}
+
+v8::Persistent<v8::FunctionTemplate> V8PerIsolateData::rawTemplate(WrapperTypeInfo* info, WrapperWorldType currentWorldType)
+{
+    TemplateMap& templates = rawTemplateMap(currentWorldType);
+    TemplateMap::iterator result = templates.find(info);
+    if (result != templates.end())
+        return result->value;
+
+    v8::HandleScope handleScope;
+    v8::Persistent<v8::FunctionTemplate> templ = createRawTemplate(m_isolate);
+    templates.add(info, templ);
+    return templ;
+}
+
+bool V8PerIsolateData::hasInstance(WrapperTypeInfo* info, v8::Handle<v8::Value> value, WrapperWorldType currentWorldType)
+{
+    TemplateMap& templates = rawTemplateMap(currentWorldType);
+    TemplateMap::iterator result = templates.find(info);
+    if (result == templates.end())
+        return false;
+    return result->value->HasInstance(value);
 }
 
 #if ENABLE(INSPECTOR)
@@ -124,7 +175,7 @@ void V8PerIsolateData::visitExternalStrings(ExternalStringVisitor* visitor)
         virtual ~VisitorImpl() { }
         virtual void VisitExternalString(v8::Handle<v8::String> string)
         {
-            WebCoreStringResource* resource = static_cast<WebCoreStringResource*>(string->GetExternalStringResource());
+            WebCoreStringResourceBase* resource = WebCoreStringResourceBase::toWebCoreStringResourceBase(string);
             if (resource)
                 resource->visitStrings(m_visitor);
         }
@@ -147,7 +198,7 @@ v8::Handle<v8::Value> V8PerIsolateData::constructorOfToString(const v8::Argument
     // obscure and unlikely to be a problem.
     v8::Handle<v8::Value> value = args.Callee()->Get(v8::String::NewSymbol("toString"));
     if (!value->IsFunction()) 
-        return v8::String::New("");
+        return v8::String::Empty(args.GetIsolate());
     return v8::Handle<v8::Function>::Cast(value)->Call(args.This(), 0, 0);
 }
 

@@ -105,13 +105,17 @@ macro dispatchAfterCall()
 end
 
 macro cCall2(function, arg1, arg2)
-    if ARMv7
+    if ARM or ARMv7 or ARMv7_TRADITIONAL
         move arg1, t0
         move arg2, t1
         call function
     elsif X86
         poke arg1, 0
         poke arg2, 1
+        call function
+    elsif MIPS
+        move arg1, a0
+        move arg2, a1
         call function
     elsif C_LOOP
         cloopCallSlowPath function, arg1, arg2
@@ -122,7 +126,7 @@ end
 
 # This barely works. arg3 and arg4 should probably be immediates.
 macro cCall4(function, arg1, arg2, arg3, arg4)
-    if ARMv7
+    if ARM or ARMv7 or ARMv7_TRADITIONAL
         move arg1, t0
         move arg2, t1
         move arg3, t2
@@ -133,6 +137,12 @@ macro cCall4(function, arg1, arg2, arg3, arg4)
         poke arg2, 1
         poke arg3, 2
         poke arg4, 3
+        call function
+    elsif MIPS
+        move arg1, a0
+        move arg2, a1
+        move arg3, a2
+        move arg4, a3
         call function
     elsif C_LOOP
         error
@@ -349,18 +359,31 @@ _llint_op_create_arguments:
 
 _llint_op_create_this:
     traceExecution()
-    loadp Callee[cfr], t0
-    loadp JSFunction::m_cachedInheritorID[t0], t2
-    btpz t2, .opCreateThisSlow
-    allocateBasicJSObject(JSFinalObjectSizeClassIndex, t2, t0, t1, t3, .opCreateThisSlow)
+    loadi 8[PC], t0
+    loadp PayloadOffset[cfr, t0, 8], t0
+    loadp JSFunction::m_allocationProfile + ObjectAllocationProfile::m_allocator[t0], t1
+    loadp JSFunction::m_allocationProfile + ObjectAllocationProfile::m_structure[t0], t2
+    btpz t1, .opCreateThisSlow
+    allocateJSObject(t1, t2, t0, t3, .opCreateThisSlow)
     loadi 4[PC], t1
     storei CellTag, TagOffset[cfr, t1, 8]
     storei t0, PayloadOffset[cfr, t1, 8]
-    dispatch(2)
+    dispatch(4)
 
 .opCreateThisSlow:
     callSlowPath(_llint_slow_path_create_this)
-    dispatch(2)
+    dispatch(4)
+
+
+_llint_op_get_callee:
+    traceExecution()
+    loadi 4[PC], t0
+    loadp PayloadOffset + Callee[cfr], t1
+    loadp 8[PC], t2
+    valueProfile(CellTag, t1, t2)
+    storei CellTag, TagOffset[cfr, t0, 8]
+    storei t1, PayloadOffset[cfr, t0, 8]
+    dispatch(3)
 
 
 _llint_op_convert_this:
@@ -381,18 +404,18 @@ _llint_op_convert_this:
 
 _llint_op_new_object:
     traceExecution()
-    loadp CodeBlock[cfr], t0
-    loadp CodeBlock::m_globalObject[t0], t0
-    loadp JSGlobalObject::m_emptyObjectStructure[t0], t1
-    allocateBasicJSObject(JSFinalObjectSizeClassIndex, t1, t0, t2, t3, .opNewObjectSlow)
+    loadpFromInstruction(3, t0)
+    loadp ObjectAllocationProfile::m_allocator[t0], t1
+    loadp ObjectAllocationProfile::m_structure[t0], t2
+    allocateJSObject(t1, t2, t0, t3, .opNewObjectSlow)
     loadi 4[PC], t1
     storei CellTag, TagOffset[cfr, t1, 8]
     storei t0, PayloadOffset[cfr, t1, 8]
-    dispatch(2)
+    dispatch(4)
 
 .opNewObjectSlow:
     callSlowPath(_llint_slow_path_new_object)
-    dispatch(2)
+    dispatch(4)
 
 
 _llint_op_mov:
@@ -1189,14 +1212,14 @@ _llint_op_get_by_val:
     bineq t2, ContiguousShape, .opGetByValNotContiguous
 .opGetByValIsContiguous:
     
-    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValSlow
+    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValOutOfBounds
     loadi TagOffset[t3, t1, 8], t2
     loadi PayloadOffset[t3, t1, 8], t1
     jmp .opGetByValDone
 
 .opGetByValNotContiguous:
     bineq t2, DoubleShape, .opGetByValNotDouble
-    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValSlow
+    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValOutOfBounds
     loadd [t3, t1, 8], ft0
     bdnequn ft0, ft0, .opGetByValSlow
     # FIXME: This could be massively optimized.
@@ -1207,13 +1230,13 @@ _llint_op_get_by_val:
 .opGetByValNotDouble:
     subi ArrayStorageShape, t2
     bia t2, SlowPutArrayStorageShape - ArrayStorageShape, .opGetByValSlow
-    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t3], .opGetByValSlow
+    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t3], .opGetByValOutOfBounds
     loadi ArrayStorage::m_vector + TagOffset[t3, t1, 8], t2
     loadi ArrayStorage::m_vector + PayloadOffset[t3, t1, 8], t1
 
 .opGetByValDone:
     loadi 4[PC], t0
-    bieq t2, EmptyValueTag, .opGetByValSlow
+    bieq t2, EmptyValueTag, .opGetByValOutOfBounds
 .opGetByValNotEmpty:
     storei t2, TagOffset[cfr, t0, 8]
     storei t1, PayloadOffset[cfr, t0, 8]
@@ -1221,6 +1244,11 @@ _llint_op_get_by_val:
     valueProfile(t2, t1, t0)
     dispatch(6)
 
+.opGetByValOutOfBounds:
+    if VALUE_PROFILER
+        loadpFromInstruction(4, t0)
+        storeb 1, ArrayProfile::m_outOfBounds[t0]
+    end
 .opGetByValSlow:
     callSlowPath(_llint_slow_path_get_by_val)
     dispatch(6)
@@ -1291,7 +1319,7 @@ macro contiguousPutByVal(storeCallback)
     dispatch(5)
 
 .outOfBounds:
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
+    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValOutOfBounds
     if VALUE_PROFILER
         loadp 16[PC], t2
         storeb 1, ArrayProfile::m_mayStoreToHole[t2]
@@ -1351,7 +1379,7 @@ _llint_op_put_by_val:
 
 .opPutByValNotContiguous:
     bineq t2, ArrayStorageShape, .opPutByValSlow
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
+    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValOutOfBounds
     bieq ArrayStorage::m_vector + TagOffset[t0, t3, 8], EmptyValueTag, .opPutByValArrayStorageEmpty
 .opPutByValArrayStorageStoreResult:
     loadi 12[PC], t2
@@ -1372,6 +1400,11 @@ _llint_op_put_by_val:
     storei t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0]
     jmp .opPutByValArrayStorageStoreResult
 
+.opPutByValOutOfBounds:
+    if VALUE_PROFILER
+        loadpFromInstruction(4, t0)
+        storeb 1, ArrayProfile::m_outOfBounds[t0]
+    end
 .opPutByValSlow:
     callSlowPath(_llint_slow_path_put_by_val)
     dispatch(5)
@@ -1453,7 +1486,7 @@ _llint_op_jneq_ptr:
     loadp CodeBlock[cfr], t2
     loadp CodeBlock::m_globalObject[t2], t2
     bineq TagOffset[cfr, t0, 8], CellTag, .opJneqPtrBranch
-    loadp JSGlobalObject::m_specialPointers[t2, t1, 8], t1
+    loadp JSGlobalObject::m_specialPointers[t2, t1, 4], t1
     bpeq PayloadOffset[cfr, t0, 8], t1, .opJneqPtrFallThrough
 .opJneqPtrBranch:
     dispatchBranch(12[PC])
@@ -1748,6 +1781,71 @@ _llint_op_catch:
     dispatch(2)
 
 
+# Gives you the scope in t0, while allowing you to optionally perform additional checks on the
+# scopes as they are traversed. scopeCheck() is called with two arguments: the register
+# holding the scope, and a register that can be used for scratch. Note that this does not
+# use t3, so you can hold stuff in t3 if need be.
+macro getDeBruijnScope(deBruijinIndexOperand, scopeCheck)
+    loadp ScopeChain + PayloadOffset[cfr], t0
+    loadi deBruijinIndexOperand, t2
+
+    btiz t2, .done
+
+    loadp CodeBlock[cfr], t1
+    bineq CodeBlock::m_codeType[t1], FunctionCode, .loop
+    btbz CodeBlock::m_needsActivation[t1], .loop
+
+    loadi CodeBlock::m_activationRegister[t1], t1
+
+    # Need to conditionally skip over one scope.
+    bieq TagOffset[cfr, t1, 8], EmptyValueTag, .noActivation
+    scopeCheck(t0, t1)
+    loadp JSScope::m_next[t0], t0
+.noActivation:
+    subi 1, t2
+
+    btiz t2, .done
+.loop:
+    scopeCheck(t0, t1)
+    loadp JSScope::m_next[t0], t0
+    subi 1, t2
+    btinz t2, .loop
+
+.done:
+
+end
+
+_llint_op_get_scoped_var:
+    traceExecution()
+    # Operands are as follows:
+    # 4[PC]   Destination for the load.
+    # 8[PC]   Index of register in the scope.
+    # 12[PC]  De Bruijin index.
+    getDeBruijnScope(12[PC], macro (scope, scratch) end)
+    loadi 4[PC], t1
+    loadi 8[PC], t2
+    loadp JSVariableObject::m_registers[t0], t0
+    loadi TagOffset[t0, t2, 8], t3
+    loadi PayloadOffset[t0, t2, 8], t0
+    storei t3, TagOffset[cfr, t1, 8]
+    storei t0, PayloadOffset[cfr, t1, 8]
+    loadi 16[PC], t1
+    valueProfile(t3, t0, t1)
+    dispatch(5)
+
+
+_llint_op_put_scoped_var:
+    traceExecution()
+    getDeBruijnScope(8[PC], macro (scope, scratch) end)
+    loadi 12[PC], t1
+    loadConstantOrVariable(t1, t3, t2)
+    loadi 4[PC], t1
+    writeBarrier(t3, t2)
+    loadp JSVariableObject::m_registers[t0], t0
+    storei t3, TagOffset[t0, t1, 8]
+    storei t2, PayloadOffset[t0, t1, 8]
+    dispatch(4)
+
 _llint_op_end:
     traceExecution()
     checkSwitchToJITForEpilogue()
@@ -1793,7 +1891,7 @@ macro nativeCallTrampoline(executableOffsetToFunction)
         call executableOffsetToFunction[t1]
         addp 16 - 4, sp
         loadp JITStackFrame::globalData + 4[sp], t3
-    elsif ARMv7
+    elsif ARM or ARMv7 or ARMv7_TRADITIONAL
         loadp JITStackFrame::globalData[sp], t3
         storep cfr, JSGlobalData::topCallFrame[t3]
         move t0, t2
@@ -1803,6 +1901,20 @@ macro nativeCallTrampoline(executableOffsetToFunction)
         loadi Callee + PayloadOffset[cfr], t1
         loadp JSFunction::m_executable[t1], t1
         move t2, cfr
+        call executableOffsetToFunction[t1]
+        restoreReturnAddressBeforeReturn(t3)
+        loadp JITStackFrame::globalData[sp], t3
+    elsif MIPS
+        loadp JITStackFrame::globalData[sp], t3
+        storep cfr, JSGlobalData::topCallFrame[t3]
+        move t0, t2
+        preserveReturnAddressAfterCall(t3)
+        storep t3, ReturnPC[cfr]
+        move cfr, t0
+        loadi Callee + PayloadOffset[cfr], t1
+        loadp JSFunction::m_executable[t1], t1
+        move t2, cfr
+        move t0, a0
         call executableOffsetToFunction[t1]
         restoreReturnAddressBeforeReturn(t3)
         loadp JITStackFrame::globalData[sp], t3

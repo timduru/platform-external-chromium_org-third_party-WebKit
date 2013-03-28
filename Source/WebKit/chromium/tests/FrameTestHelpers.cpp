@@ -36,12 +36,14 @@
 #include "WebFrame.h"
 #include "WebFrameClient.h"
 #include "WebSettings.h"
-#include "platform/WebString.h"
-#include "platform/WebURLRequest.h"
-#include "platform/WebURLResponse.h"
 #include "WebView.h"
 #include "WebViewClient.h"
-#include <webkit/support/webkit_support.h>
+#include <public/Platform.h>
+#include <public/WebString.h>
+#include <public/WebThread.h>
+#include <public/WebURLRequest.h>
+#include <public/WebURLResponse.h>
+#include <public/WebUnitTestSupport.h>
 
 namespace WebKit {
 namespace FrameTestHelpers {
@@ -72,7 +74,7 @@ static WebViewClient* defaultWebViewClient()
     return &client;
 }
 
-WebView* createWebViewAndLoad(const std::string& url, bool enableJavascript, WebFrameClient* webFrameClient, WebViewClient* webViewClient)
+WebView* createWebView(bool enableJavascript, WebFrameClient* webFrameClient, WebViewClient* webViewClient)
 {
     if (!webFrameClient)
         webFrameClient = defaultWebFrameClient();
@@ -83,10 +85,31 @@ WebView* createWebViewAndLoad(const std::string& url, bool enableJavascript, Web
     webView->settings()->setDeviceSupportsMouse(false);
     webView->initializeMainFrame(webFrameClient);
 
+    return webView;
+}
+
+WebView* createWebViewAndLoad(const std::string& url, bool enableJavascript, WebFrameClient* webFrameClient, WebViewClient* webViewClient)
+{
+    WebView* webView = createWebView(enableJavascript, webFrameClient, webViewClient);
+
     loadFrame(webView->mainFrame(), url);
-    webkit_support::ServeAsynchronousMockedRequests();
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
 
     return webView;
+}
+
+class QuitTask : public WebThread::Task {
+public:
+    virtual void run()
+    {
+        Platform::current()->currentThread()->exitRunLoop();
+    }
+};
+
+void runPendingTasks()
+{
+    Platform::current()->currentThread()->postTask(new QuitTask);
+    Platform::current()->currentThread()->enterRunLoop();
 }
 
 } // namespace FrameTestHelpers

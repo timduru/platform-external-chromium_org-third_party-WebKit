@@ -40,6 +40,7 @@
 #include "DocumentMarkerController.h"
 #include "Editor.h"
 #include "EventHandler.h"
+#include "ExceptionCodePlaceholder.h"
 #include "FrameLoader.h"
 #include "FrameView.h"
 #include "HTMLFormElement.h"
@@ -102,8 +103,8 @@ static bool isASingleWord(const String& text)
 }
 
 // Helper function to get misspelled word on which context menu
-// is to be evolked. This function also sets the word on which context menu
-// has been evoked to be the selected word, as required. This function changes
+// is to be invoked. This function also sets the word on which context menu
+// has been invoked to be the selected word, as required. This function changes
 // the selection only when there were no selected characters on OS X.
 static String selectMisspelledWord(const ContextMenu* defaultMenu, Frame* selectedFrame)
 {
@@ -120,7 +121,7 @@ static String selectMisspelledWord(const ContextMenu* defaultMenu, Frame* select
 
     // Selection is empty, so change the selection to the word under the cursor.
     HitTestResult hitTestResult = selectedFrame->eventHandler()->
-        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().point(), true);
+        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().pointInInnerNodeFrame(), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AllowShadowContent);
     Node* innerNode = hitTestResult.innerNode();
     VisiblePosition pos(innerNode->renderer()->positionForPoint(
         hitTestResult.localPoint()));
@@ -143,6 +144,40 @@ static String selectMisspelledWord(const ContextMenu* defaultMenu, Frame* select
     return misspelledWord;
 }
 
+static bool IsWhiteSpaceOrPunctuation(UChar c)
+{
+    return isSpaceOrNewline(c) || WTF::Unicode::isPunct(c);
+}
+
+static String selectMisspellingAsync(Frame* selectedFrame, DocumentMarker& marker)
+{
+    VisibleSelection selection = selectedFrame->selection()->selection();
+    if (!selection.isCaretOrRange())
+        return String();
+
+    // Caret and range selections always return valid normalized ranges.
+    RefPtr<Range> selectionRange = selection.toNormalizedRange();
+    Vector<DocumentMarker*> markers = selectedFrame->document()->markers()->markersInRange(selectionRange.get(), DocumentMarker::Spelling | DocumentMarker::Grammar);
+    if (markers.size() != 1)
+        return String();
+    marker = *markers[0];
+
+    // Cloning a range fails only for invalid ranges.
+    RefPtr<Range> markerRange = selectionRange->cloneRange(ASSERT_NO_EXCEPTION);
+    markerRange->setStart(markerRange->startContainer(), marker.startOffset());
+    markerRange->setEnd(markerRange->endContainer(), marker.endOffset());
+    if (selection.isCaret()) {
+        selection = VisibleSelection(markerRange.get());
+        selectedFrame->selection()->setSelection(selection, WordGranularity);
+        selectionRange = selection.toNormalizedRange();
+    }
+
+    if (markerRange->text().stripWhiteSpace(&IsWhiteSpaceOrPunctuation) != selectionRange->text().stripWhiteSpace(&IsWhiteSpaceOrPunctuation))
+        return String();
+
+    return markerRange->text();
+}
+
 PlatformMenuDescription ContextMenuClientImpl::getCustomMenuFromDefaultItems(
     ContextMenu* defaultMenu)
 {
@@ -155,10 +190,10 @@ PlatformMenuDescription ContextMenuClientImpl::getCustomMenuFromDefaultItems(
         return 0;
 
     HitTestResult r = m_webView->page()->contextMenuController()->hitTestResult();
-    Frame* selectedFrame = r.innerNonSharedNode()->document()->frame();
+    Frame* selectedFrame = r.innerNodeFrame();
 
     WebContextMenuData data;
-    data.mousePosition = selectedFrame->view()->contentsToWindow(r.roundedPoint());
+    data.mousePosition = selectedFrame->view()->contentsToWindow(r.roundedPointInInnerNodeFrame());
 
     // Compute edit flags.
     data.editFlags = WebContextMenuData::CanDoNone;
@@ -191,7 +226,7 @@ PlatformMenuDescription ContextMenuClientImpl::getCustomMenuFromDefaultItems(
         // We know that if absoluteMediaURL() is not empty, then this
         // is a media element.
         HTMLMediaElement* mediaElement =
-            static_cast<HTMLMediaElement*>(r.innerNonSharedNode());
+            toMediaElement(r.innerNonSharedNode());
         if (mediaElement->hasTagName(HTMLNames::videoTag))
             data.mediaType = WebContextMenuData::MediaTypeVideo;
         else if (mediaElement->hasTagName(HTMLNames::audioTag))
@@ -212,7 +247,7 @@ PlatformMenuDescription ContextMenuClientImpl::getCustomMenuFromDefaultItems(
         if (mediaElement->hasVideo())
             data.mediaFlags |= WebContextMenuData::MediaHasVideo;
         if (mediaElement->controls())
-            data.mediaFlags |= WebContextMenuData::MediaControlRootElement;
+            data.mediaFlags |= WebContextMenuData::MediaControls;
     } else if (r.innerNonSharedNode()->hasTagName(HTMLNames::objectTag)
                || r.innerNonSharedNode()->hasTagName(HTMLNames::embedTag)) {
         RenderObject* object = r.innerNonSharedNode()->renderer();
@@ -231,7 +266,7 @@ PlatformMenuDescription ContextMenuClientImpl::getCustomMenuFromDefaultItems(
                 if (plugin->plugin()->supportsPaginatedPrint())
                     data.mediaFlags |= WebContextMenuData::MediaCanPrint;
 
-                HTMLPlugInImageElement* pluginElement = static_cast<HTMLPlugInImageElement*>(r.innerNonSharedNode());
+                HTMLPlugInImageElement* pluginElement = toHTMLPlugInImageElement(r.innerNonSharedNode());
                 data.srcURL = pluginElement->document()->completeURL(pluginElement->url());
                 data.mediaFlags |= WebContextMenuData::MediaCanSave;
 
@@ -274,32 +309,21 @@ PlatformMenuDescription ContextMenuClientImpl::getCustomMenuFromDefaultItems(
 #endif
         // When Chrome enables asynchronous spellchecking, its spellchecker adds spelling markers to misspelled
         // words and attaches suggestions to these markers in the background. Therefore, when a user right-clicks
-        // a mouse on a word, Chrome just needs to find a spelling marker on the word instread of spellchecking it.
+        // a mouse on a word, Chrome just needs to find a spelling marker on the word instead of spellchecking it.
         if (selectedFrame->settings() && selectedFrame->settings()->asynchronousSpellCheckingEnabled()) {
-            VisibleSelection selection = selectedFrame->selection()->selection();
-            if (selection.isCaret()) {
-                selection.expandUsingGranularity(WordGranularity);
-                RefPtr<Range> range = selection.toNormalizedRange();
-                Vector<DocumentMarker*> markers = selectedFrame->document()->markers()->markersInRange(range.get(), DocumentMarker::Spelling | DocumentMarker::Grammar);
-                if (markers.size() == 1) {
-                    range->setStart(range->startContainer(), markers[0]->startOffset());
-                    range->setEnd(range->endContainer(), markers[0]->endOffset());
-                    data.misspelledWord = range->text();
-                    if (markers[0]->description().length()) {
-                        Vector<String> suggestions;
-                        markers[0]->description().split('\n', suggestions);
-                        data.dictionarySuggestions = suggestions;
-                    } else if (m_webView->spellCheckClient()) {
-                        int misspelledOffset, misspelledLength;
-                        m_webView->spellCheckClient()->spellCheck(data.misspelledWord, misspelledOffset, misspelledLength, &data.dictionarySuggestions);
-                    }
-                    selection = VisibleSelection(range.get());
-                    if (selectedFrame->selection()->shouldChangeSelection(selection))
-                        selectedFrame->selection()->setSelection(selection, WordGranularity);
-                }
+            DocumentMarker marker;
+            data.misspelledWord = selectMisspellingAsync(selectedFrame, marker);
+            if (marker.description().length()) {
+                Vector<String> suggestions;
+                marker.description().split('\n', suggestions);
+                data.dictionarySuggestions = suggestions;
+            } else if (m_webView->spellCheckClient()) {
+                int misspelledOffset, misspelledLength;
+                m_webView->spellCheckClient()->spellCheck(data.misspelledWord, misspelledOffset, misspelledLength, &data.dictionarySuggestions);
             }
-        } else if (m_webView->focusedWebCoreFrame()->editor()->isContinuousSpellCheckingEnabled()) {
-            data.isSpellCheckingEnabled = true;
+        } else {
+            data.isSpellCheckingEnabled = 
+                m_webView->focusedWebCoreFrame()->editor()->isContinuousSpellCheckingEnabled();
             // Spellchecking might be enabled for the field, but could be disabled on the node.
             if (m_webView->focusedWebCoreFrame()->editor()->isSpellCheckingEnabledInFocusedNode()) {
                 data.misspelledWord = selectMisspelledWord(defaultMenu, selectedFrame);

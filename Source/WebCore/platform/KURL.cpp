@@ -28,6 +28,7 @@
 #include "KURL.h"
 
 #include "DecodeEscapeSequences.h"
+#include "MIMETypeRegistry.h"
 #include "PlatformMemoryInstrumentation.h"
 #include "TextEncoding.h"
 #include <stdio.h>
@@ -43,11 +44,6 @@
 
 #if USE(ICU_UNICODE)
 #include <unicode/uidna.h>
-#elif USE(QT4_UNICODE)
-#include <QUrl>
-#elif USE(GLIB_UNICODE)
-#include <glib.h>
-#include <wtf/gobject/GOwnPtr.h>
 #endif
 
 // FIXME: This file makes too much use of the + operator on String.
@@ -562,11 +558,6 @@ KURL KURL::copy() const
     KURL result = *this;
     result.m_string = result.m_string.isolatedCopy();
     return result;
-}
-
-bool KURL::hasPath() const
-{
-    return m_pathEnd != m_portEnd;
 }
 
 String KURL::lastPathComponent() const
@@ -1486,22 +1477,6 @@ static void appendEncodedHostname(UCharBuffer& buffer, const UChar* str, unsigne
         hostnameBufferLength, UIDNA_ALLOW_UNASSIGNED, 0, &error);
     if (error == U_ZERO_ERROR)
         buffer.append(hostnameBuffer, numCharactersConverted);
-#elif USE(QT4_UNICODE)
-    QByteArray result = QUrl::toAce(String(str, strLen));
-    buffer.append(result.constData(), result.length());
-#elif USE(GLIB_UNICODE)
-    GOwnPtr<gchar> utf8Hostname;
-    GOwnPtr<GError> utf8Err;
-    utf8Hostname.set(g_utf16_to_utf8(str, strLen, 0, 0, &utf8Err.outPtr()));
-    if (utf8Err)
-        return;
-
-    GOwnPtr<gchar> encodedHostname;
-    encodedHostname.set(g_hostname_to_ascii(utf8Hostname.get()));
-    if (!encodedHostname) 
-        return;
-
-    buffer.append(encodedHostname.get(), strlen(encodedHostname.get()));
 #endif
 }
 
@@ -1918,16 +1893,44 @@ String mimeTypeFromDataURL(const String& url)
     return "";
 }
 
+String mimeTypeFromURL(const KURL& url)
+{
+    String decodedPath = decodeURLEscapeSequences(url.path());
+    String extension = decodedPath.substring(decodedPath.reverseFind('.') + 1);
+
+    // We don't use MIMETypeRegistry::getMIMETypeForPath() because it returns "application/octet-stream" upon failure
+    return MIMETypeRegistry::getMIMETypeForExtension(extension);
+}
+
 void KURL::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this);
 #if USE(GOOGLEURL)
-    info.addMember(m_url);
+    info.addMember(m_url, "url");
 #elif USE(WTFURL)
-    info.addMember(m_urlImpl);
+    info.addMember(m_urlImpl, "urlImpl");
 #else // !USE(GOOGLEURL)
-    info.addMember(m_string);
+    info.addMember(m_string, "string");
 #endif
+}
+
+bool KURL::isSafeToSendToAnotherThread() const
+{
+#if USE(GOOGLEURL)
+    return m_url.isSafeToSendToAnotherThread();
+#elif USE(WTFURL)
+    return m_urlImpl->isSafeToSendToAnotherThread();
+#else // !USE(GOOGLEURL)
+    return m_string.isSafeToSendToAnotherThread();
+#endif
+}
+
+String KURL::elidedString() const
+{
+    if (string().length() <= 1024)
+        return string();
+
+    return string().left(511) + "..." + string().right(510);
 }
 
 }

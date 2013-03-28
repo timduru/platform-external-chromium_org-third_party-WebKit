@@ -58,15 +58,25 @@ protected:
 #endif
 
 protected:
+    virtual void attach() OVERRIDE;
     virtual bool needsContainer() const;
     virtual bool shouldHaveSpinButton() const;
     virtual void createShadowSubtree() OVERRIDE;
     virtual void destroyShadowSubtree() OVERRIDE;
+    virtual void attributeChanged() OVERRIDE;
     virtual void disabledAttributeChanged() OVERRIDE;
     virtual void readonlyAttributeChanged() OVERRIDE;
+    virtual bool supportsReadOnly() const OVERRIDE;
     virtual void handleBlurEvent() OVERRIDE;
     virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) OVERRIDE;
     virtual void updateInnerTextValue() OVERRIDE;
+
+    virtual String convertFromVisibleValue(const String&) const;
+    enum ValueChangeState {
+        ValueChangeStateNone,
+        ValueChangeStateChanged
+    };
+    virtual void didSetValueByUserEdit(ValueChangeState);
 
 private:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
@@ -83,7 +93,7 @@ private:
     virtual HTMLElement* placeholderElement() const OVERRIDE;
     virtual void updatePlaceholderText() OVERRIDE;
     virtual bool appendFormData(FormDataList&, bool multipart) const OVERRIDE;
-    virtual void attach() OVERRIDE;
+    virtual void subtreeHasChanged() OVERRIDE;
 
     // SpinButtonElement::SpinButtonOwner functions.
     virtual void focusAndSelectSpinButtonOwner() OVERRIDE;

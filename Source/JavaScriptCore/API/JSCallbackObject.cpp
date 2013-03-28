@@ -28,6 +28,7 @@
 #include "JSCallbackObject.h"
 
 #include "Heap.h"
+#include "Operations.h"
 #include <wtf/text/StringHash.h>
 
 namespace JSC {
@@ -58,12 +59,6 @@ template <>
 Structure* JSCallbackObject<JSGlobalObject>::createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue proto)
 { 
     return Structure::create(globalData, globalObject, proto, TypeInfo(GlobalObjectType, StructureFlags), &s_info); 
-}
-
-template <class Parent>
-void JSCallbackObject<Parent>::destroy(JSCell* cell)
-{
-    static_cast<JSCallbackObject*>(cell)->JSCallbackObject::~JSCallbackObject();
 }
 
 void JSCallbackObjectData::finalize(Handle<Unknown> handle, void* context)

@@ -63,9 +63,9 @@ void GraphicsSurface::copyFromTexture(uint32_t texture, const IntRect& sourceRec
     platformCopyFromTexture(texture, sourceRect);
 }
 
-void GraphicsSurface::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& transform, float opacity, BitmapTexture* mask)
+void GraphicsSurface::paintToTextureMapper(TextureMapper* textureMapper, const FloatRect& targetRect, const TransformationMatrix& transform, float opacity)
 {
-    platformPaintToTextureMapper(textureMapper, targetRect, transform, opacity, mask);
+    platformPaintToTextureMapper(textureMapper, targetRect, transform, opacity);
 }
 
 uint32_t GraphicsSurface::frontBuffer()
@@ -78,11 +78,13 @@ uint32_t GraphicsSurface::swapBuffers()
     return platformSwapBuffers();
 }
 
-GraphicsSurface::GraphicsSurface(const IntSize& size, Flags flags)
+IntSize GraphicsSurface::size() const
+{
+    return platformSize();
+}
+
+GraphicsSurface::GraphicsSurface(const IntSize&, Flags flags)
     : m_flags(flags)
-    , m_size(size)
-    , m_platformSurface(0)
-    , m_texture(0)
     , m_fbo(0)
     , m_private(0)
 {

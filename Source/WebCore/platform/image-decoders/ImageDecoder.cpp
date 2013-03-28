@@ -28,7 +28,9 @@
 #if PLATFORM(QT)
 #include "ImageDecoderQt.h"
 #endif
+#if !PLATFORM(QT) || USE(LIBJPEG)
 #include "JPEGImageDecoder.h"
+#endif
 #include "PNGImageDecoder.h"
 #include "PlatformMemoryInstrumentation.h"
 #include "SharedBuffer.h"
@@ -226,20 +228,10 @@ void ImageFrame::setStatus(FrameStatus status)
     m_status = status;
 }
 
-int ImageFrame::width() const
-{
-    return m_size.width();
-}
-
-int ImageFrame::height() const
-{
-    return m_size.height();
-}
-
 void ImageFrame::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    info.addMember(m_backingStore);
+    info.addMember(m_backingStore, "backingStore");
 }
 
 #endif
@@ -348,11 +340,11 @@ int ImageDecoder::scaledY(int origY, int searchStart)
 void ImageDecoder::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    info.addMember(m_data);
-    info.addMember(m_frameBufferCache);
-    info.addMember(m_colorProfile);
-    info.addMember(m_scaledColumns);
-    info.addMember(m_scaledRows);
+    info.addMember(m_data, "data");
+    info.addMember(m_frameBufferCache, "frameBufferCache");
+    info.addMember(m_colorProfile, "colorProfile");
+    info.addMember(m_scaledColumns, "scaledColumns");
+    info.addMember(m_scaledRows, "scaledRows");
 }
 
 }

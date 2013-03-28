@@ -70,7 +70,7 @@ namespace WebCore {
 // A helper which quickly fills a rectangle with a simple color fill.
 static inline void fillRectWithColor(cairo_t* cr, const FloatRect& rect, const Color& color)
 {
-    if (!color.alpha())
+    if (!color.alpha() && cairo_get_operator(cr) == CAIRO_OPERATOR_OVER)
         return;
     setSourceRGBAFromColor(cr, color);
     cairo_rectangle(cr, rect.x(), rect.y(), rect.width(), rect.height());
@@ -844,29 +844,6 @@ void GraphicsContext::setCTM(const AffineTransform& transform)
     m_data->setCTM(transform);
 }
 
-void GraphicsContext::addInnerRoundedRectClip(const IntRect& rect, int thickness)
-{
-    if (paintingDisabled())
-        return;
-
-    cairo_t* cr = platformContext()->cr();
-    clip(rect);
-
-    Path p;
-    FloatRect r(rect);
-    // Add outer ellipse
-    p.addEllipse(r);
-    // Add inner ellipse
-    r.inflate(-thickness);
-    p.addEllipse(r);
-    appendWebCorePathToCairoContext(cr, p);
-
-    cairo_fill_rule_t savedFillRule = cairo_get_fill_rule(cr);
-    cairo_set_fill_rule(cr, CAIRO_FILL_RULE_EVEN_ODD);
-    cairo_clip(cr);
-    cairo_set_fill_rule(cr, savedFillRule);
-}
-
 void GraphicsContext::setPlatformShadow(FloatSize const& size, float, Color const&, ColorSpace)
 {
     if (paintingDisabled())
@@ -1006,15 +983,21 @@ void GraphicsContext::setAlpha(float alpha)
     platformContext()->setGlobalAlpha(alpha);
 }
 
-void GraphicsContext::setPlatformCompositeOperation(CompositeOperator op)
+void GraphicsContext::setPlatformCompositeOperation(CompositeOperator op, BlendMode blendOp)
 {
     if (paintingDisabled())
         return;
 
-    cairo_set_operator(platformContext()->cr(), toCairoOperator(op));
+    cairo_operator_t cairo_op;
+    if (blendOp == BlendModeNormal)
+        cairo_op = toCairoOperator(op);
+    else
+        cairo_op = toCairoOperator(blendOp);
+
+    cairo_set_operator(platformContext()->cr(), cairo_op);
 }
 
-void GraphicsContext::clip(const Path& path)
+void GraphicsContext::clip(const Path& path, WindRule windRule)
 {
     if (paintingDisabled())
         return;
@@ -1026,15 +1009,18 @@ void GraphicsContext::clip(const Path& path)
         cairo_append_path(cr, pathCopy.get());
     }
     cairo_fill_rule_t savedFillRule = cairo_get_fill_rule(cr);
-    cairo_set_fill_rule(cr, CAIRO_FILL_RULE_WINDING);
+    if (windRule == RULE_NONZERO)
+        cairo_set_fill_rule(cr, CAIRO_FILL_RULE_WINDING);
+    else
+        cairo_set_fill_rule(cr, CAIRO_FILL_RULE_EVEN_ODD);
     cairo_clip(cr);
     cairo_set_fill_rule(cr, savedFillRule);
     m_data->clip(path);
 }
 
-void GraphicsContext::canvasClip(const Path& path)
+void GraphicsContext::canvasClip(const Path& path, WindRule windRule)
 {
-    clip(path);
+    clip(path, windRule);
 }
 
 void GraphicsContext::clipOut(const Path& path)

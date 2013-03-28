@@ -21,6 +21,7 @@
 #define SVGElementRareData_h
 
 #include "CSSParserMode.h"
+#include "StylePropertySet.h"
 #include "StyleResolver.h"
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
@@ -41,7 +42,6 @@ public:
         , m_cursorImageValue(0)
         , m_correspondingElement(0)
         , m_instancesUpdatesBlocked(false)
-        , m_hasPendingResources(false)
         , m_useOverrideComputedStyle(false)
         , m_needsOverrideComputedStyleUpdate(false)
     {
@@ -65,9 +65,6 @@ public:
 
     bool instanceUpdatesBlocked() const { return m_instancesUpdatesBlocked; }
     void setInstanceUpdatesBlocked(bool value) { m_instancesUpdatesBlocked = value; }
-
-    bool hasPendingResources() const { return m_hasPendingResources; }
-    void setHasPendingResources(bool value) { m_hasPendingResources = value; }
 
     SVGCursorElement* cursorElement() const { return m_cursorElement; }
     void setCursorElement(SVGCursorElement* cursorElement) { m_cursorElement = cursorElement; }
@@ -115,7 +112,6 @@ private:
     CSSCursorImageValue* m_cursorImageValue;
     SVGElement* m_correspondingElement;
     bool m_instancesUpdatesBlocked : 1;
-    bool m_hasPendingResources : 1;
     bool m_useOverrideComputedStyle : 1;
     bool m_needsOverrideComputedStyleUpdate : 1;
     RefPtr<StylePropertySet> m_animatedSMILStyleProperties;

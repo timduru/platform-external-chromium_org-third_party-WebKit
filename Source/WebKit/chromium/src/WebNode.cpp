@@ -33,17 +33,23 @@
 
 #include "Document.h"
 #include "Element.h"
+#include "Event.h"
 #include "Frame.h"
 #include "FrameLoaderClientImpl.h"
 #include "Node.h"
 #include "NodeList.h"
 #include "EventListenerWrapper.h"
+#include "RenderObject.h"
+#include "RenderWidget.h"
 #include "WebDOMEvent.h"
 #include "WebDOMEventListener.h"
 #include "WebDocument.h"
 #include "WebElement.h"
 #include "WebFrameImpl.h"
 #include "WebNodeList.h"
+#include "WebPluginContainer.h"
+#include "WebPluginContainerImpl.h"
+#include "Widget.h"
 #include "markup.h"
 #include <public/WebString.h>
 #include <public/WebVector.h>
@@ -172,27 +178,16 @@ bool WebNode::isElementNode() const
     return m_private->isElementNode();
 }
 
-bool WebNode::hasEventListeners(const WebString& eventType) const
-{
-    return m_private->hasEventListeners(eventType);
-}
-
 void WebNode::addEventListener(const WebString& eventType, WebDOMEventListener* listener, bool useCapture)
 {
-    EventListenerWrapper* listenerWrapper =
-        listener->createEventListenerWrapper(eventType, useCapture, m_private.get());
+    // Please do not add more eventTypes to this list without an API review.
+    RELEASE_ASSERT(eventType == "mousedown");
+
+    EventListenerWrapper* listenerWrapper = listener->createEventListenerWrapper(eventType, useCapture, m_private.get());
     // The listenerWrapper is only referenced by the actual Node.  Once it goes
     // away, the wrapper notifies the WebEventListener so it can clear its
     // pointer to it.
     m_private->addEventListener(eventType, adoptRef(listenerWrapper), useCapture);
-}
-
-void WebNode::removeEventListener(const WebString& eventType, WebDOMEventListener* listener, bool useCapture)
-{
-    EventListenerWrapper* listenerWrapper =
-        listener->getEventListenerWrapper(eventType, useCapture, m_private.get());
-    m_private->removeEventListener(eventType, listenerWrapper, useCapture);
-    // listenerWrapper is now deleted.
 }
 
 bool WebNode::dispatchEvent(const WebDOMEvent& event)
@@ -204,13 +199,17 @@ bool WebNode::dispatchEvent(const WebDOMEvent& event)
 
 void WebNode::simulateClick()
 {
-    RefPtr<Event> noEvent;
-    m_private->dispatchSimulatedClick(noEvent);
+    m_private->dispatchSimulatedClick(0);
 }
 
 WebNodeList WebNode::getElementsByTagName(const WebString& tag) const
 {
     return WebNodeList(m_private->getElementsByTagName(tag));
+}
+
+WebElement WebNode::querySelector(const WebString& tag, WebExceptionCode& ec) const
+{
+    return WebElement(m_private->querySelector(tag, ec));
 }
 
 WebElement WebNode::rootEditableElement() const
@@ -234,6 +233,30 @@ bool WebNode::hasNonEmptyBoundingBox() const
 {
     m_private->document()->updateLayoutIgnorePendingStylesheets();
     return m_private->hasNonEmptyBoundingBox();
+}
+
+WebPluginContainer* WebNode::pluginContainer() const
+{
+    if (isNull())
+        return 0;
+    const Node* coreNode = constUnwrap<Node>();
+    if (coreNode->hasTagName(HTMLNames::objectTag) || coreNode->hasTagName(HTMLNames::embedTag)) {
+        RenderObject* object = coreNode->renderer();
+        if (object && object->isWidget()) {
+            Widget* widget = WebCore::toRenderWidget(object)->widget();
+            if (widget && widget->isPluginContainer())
+                return static_cast<WebPluginContainerImpl*>(widget);
+        }
+    }
+    return 0;
+}
+
+WebElement WebNode::shadowHost() const
+{
+    if (isNull())
+        return WebElement();
+    const Node* coreNode = constUnwrap<Node>();
+    return WebElement(coreNode->shadowHost());
 }
 
 WebNode::WebNode(const PassRefPtr<Node>& node)

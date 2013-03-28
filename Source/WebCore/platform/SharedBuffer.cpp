@@ -124,15 +124,36 @@ unsigned SharedBuffer::size() const
     return m_size;
 }
 
+void SharedBuffer::createPurgeableBuffer() const
+{
+    if (m_purgeableBuffer)
+        return;
+
+    if (hasPlatformData())
+        return;
+
+#if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
+    if (singleDataArrayBuffer())
+        return;
+#endif
+
+    m_purgeableBuffer = PurgeableBuffer::create(buffer().data(), m_size);
+}
+
 const char* SharedBuffer::data() const
 {
     if (hasPlatformData())
         return platformData();
+
+#if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
+    if (const char* buffer = singleDataArrayBuffer())
+        return buffer;
+#endif
     
     if (m_purgeableBuffer)
         return m_purgeableBuffer->data();
     
-    return buffer().data();
+    return this->buffer().data();
 }
 
 void SharedBuffer::append(SharedBuffer* data)
@@ -158,6 +179,8 @@ void SharedBuffer::append(const char* data, unsigned length)
 
     if (m_size <= segmentSize) {
         // No need to use segments for small resource data
+        if (m_buffer.isEmpty())
+            m_buffer.reserveInitialCapacity(length);
         m_buffer.append(data, length);
         return;
     }
@@ -254,11 +277,11 @@ const Vector<char>& SharedBuffer::buffer() const
 void SharedBuffer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this);
-    info.addMember(m_buffer);
-    info.addMember(m_segments);
+    info.addMember(m_buffer, "buffer");
     for (unsigned i = 0; i < m_segments.size(); ++i)
-        info.addRawBuffer(m_segments[i], segmentSize);
-    info.addMember(m_purgeableBuffer.get());
+        info.addRawBuffer(m_segments[i], segmentSize, "RawBufferSegment", "segment");
+    info.addMember(m_segments, "segments");
+    info.addMember(m_purgeableBuffer, "purgeableBuffer");
 }
 
 unsigned SharedBuffer::getSomeData(const char*& someData, unsigned position) const
@@ -270,12 +293,12 @@ unsigned SharedBuffer::getSomeData(const char*& someData, unsigned position) con
     }
 
     if (hasPlatformData() || m_purgeableBuffer) {
-        ASSERT(position < size());
+        ASSERT_WITH_SECURITY_IMPLICATION(position < size());
         someData = data() + position;
         return totalSize - position;
     }
 
-    ASSERT(position < m_size);
+    ASSERT_WITH_SECURITY_IMPLICATION(position < m_size);
     unsigned consecutiveSize = m_buffer.size();
     if (position < consecutiveSize) {
         someData = m_buffer.data() + position;

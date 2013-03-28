@@ -25,6 +25,7 @@
 
 // This all-in-one cpp file cuts down on template bloat to allow us to build our Windows release build.
 
+
 #include "AutoTableLayout.cpp"
 #include "BidiRun.cpp"
 #include "CounterNode.cpp"
@@ -33,6 +34,7 @@
 #include "FixedTableLayout.cpp"
 #include "HitTestingTransformState.cpp"
 #include "HitTestResult.cpp"
+#include "HitTestLocation.cpp"
 #include "InlineBox.cpp"
 #include "InlineFlowBox.cpp"
 #include "InlineTextBox.cpp"
@@ -73,6 +75,7 @@
 #include "RenderListMarker.cpp"
 #include "RenderMarquee.cpp"
 #include "RenderMedia.cpp"
+#include "RenderMediaControlElements.cpp"
 #include "RenderMediaControls.cpp"
 #include "RenderMenuList.cpp"
 #include "RenderMeter.cpp"
@@ -107,6 +110,7 @@
 #include "RenderTextControlMultiLine.cpp"
 #include "RenderTextControlSingleLine.cpp"
 #include "RenderTextFragment.cpp"
+#include "RenderTextTrackCue.cpp"
 #include "RenderTheme.cpp"
 #if PLATFORM(WIN)
 #include "RenderThemeWin.cpp"

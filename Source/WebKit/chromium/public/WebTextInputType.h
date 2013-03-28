@@ -48,6 +48,9 @@ enum WebTextInputType {
     WebTextInputTypeNumber,
     WebTextInputTypeTelephone,
     WebTextInputTypeURL,
+
+    // FIXME: Remove these types once Date like types are not
+    // seen as Text. For now they also exist in WebTextInputType
     WebTextInputTypeDate,
     WebTextInputTypeDateTime,
     WebTextInputTypeDateTimeLocal,
@@ -58,6 +61,11 @@ enum WebTextInputType {
 
     // Input caret is in a contenteditable node (not an INPUT field).
     WebTextInputTypeContentEditable,
+
+    // The focused node is date time field. The date time field does not have
+    // input caret but it is necessary to distinguish from WebTextInputTypeNone
+    // for on-screen keyboard.
+    WebTextInputTypeDateTimeField,
 };
 
 } // namespace WebKit

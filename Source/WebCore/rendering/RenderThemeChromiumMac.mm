@@ -20,7 +20,6 @@
 
 #import "config.h"
 
-#import "CalendarPickerMac.h"
 #import "LayoutTestSupport.h"
 #import "LocalCurrentGraphicsContext.h"
 #import "RenderThemeChromiumMac.h"
@@ -99,7 +98,7 @@ int RenderThemeChromiumMac::popupInternalPaddingLeft(RenderStyle* style) const
     if (style->appearance() == TextFieldPart)
         return autofillPopupHorizontalPadding;
 
-    return RenderThemeMac::popupInternalPaddingLeft(style);
+    return RenderThemeMacShared::popupInternalPaddingLeft(style);
 }
 
 int RenderThemeChromiumMac::popupInternalPaddingRight(RenderStyle* style) const
@@ -107,7 +106,7 @@ int RenderThemeChromiumMac::popupInternalPaddingRight(RenderStyle* style) const
     if (style->appearance() == TextFieldPart)
         return autofillPopupHorizontalPadding;
 
-    return RenderThemeMac::popupInternalPaddingRight(style);
+    return RenderThemeMacShared::popupInternalPaddingRight(style);
 }
 
 // Updates the control tint (a.k.a. active state) of |cell| (from |o|).
@@ -171,7 +170,7 @@ String RenderThemeChromiumMac::extraFullScreenStyleSheet()
 
 String RenderThemeChromiumMac::extraDefaultStyleSheet()
 {
-    return RenderThemeMac::extraDefaultStyleSheet() +
+    return RenderThemeMacShared::extraDefaultStyleSheet() +
            String(themeChromiumUserAgentStyleSheet, sizeof(themeChromiumUserAgentStyleSheet));
 }
 
@@ -179,13 +178,6 @@ String RenderThemeChromiumMac::extraDefaultStyleSheet()
 LayoutUnit RenderThemeChromiumMac::sliderTickSnappingThreshold() const
 {
     return RenderThemeChromiumCommon::sliderTickSnappingThreshold();
-}
-#endif
-
-#if ENABLE(CALENDAR_PICKER)
-CString RenderThemeChromiumMac::extraCalendarPickerStyleSheet()
-{
-    return CString(calendarPickerMacCss, WTF_ARRAY_LENGTH(calendarPickerMacCss));
 }
 #endif
 

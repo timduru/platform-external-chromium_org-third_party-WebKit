@@ -154,7 +154,7 @@ void WebDocument::images(WebVector<WebElement>& results)
     for (size_t i = 0; i < sourceLength; ++i) {
         Node* node = images->item(i);
         if (node && node->isHTMLElement())
-            temp.append(WebElement(static_cast<Element*>(node)));
+            temp.append(WebElement(toElement(node)));
     }
     results.assign(temp);
 }
@@ -194,14 +194,17 @@ WebDocumentType WebDocument::doctype() const
     return WebDocumentType(constUnwrap<Document>()->doctype());
 }
 
-void WebDocument::insertUserStyleSheet(const WebString& sourceCode, UserStyleLevel level)
+void WebDocument::insertUserStyleSheet(const WebString& sourceCode, UserStyleLevel styleLevel)
 {
     RefPtr<Document> document = unwrap<Document>();
 
     RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(document.get());
-    parsedSheet->setIsUserStyleSheet(level == UserStyleUserLevel);
+    parsedSheet->setIsUserStyleSheet(styleLevel == UserStyleUserLevel);
     parsedSheet->parseString(sourceCode);
-    document->styleSheetCollection()->addUserSheet(parsedSheet.release());
+    if (parsedSheet->isUserStyleSheet())
+        document->styleSheetCollection()->addUserSheet(parsedSheet);
+    else
+        document->styleSheetCollection()->addAuthorSheet(parsedSheet);
 }
 
 void WebDocument::cancelFullScreen()

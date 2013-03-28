@@ -71,12 +71,13 @@ BitmapImage::BitmapImage(NativeImageCairo* nativeImage, ImageObserver* observer)
     checkForSolidColor();
 }
 
-void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op)
+void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op, BlendMode blendMode)
 {
-    draw(context, dst, src, styleColorSpace, op, DoNotRespectImageOrientation);
+    draw(context, dst, src, styleColorSpace, op, blendMode, DoNotRespectImageOrientation);
 }
 
-void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op, RespectImageOrientationEnum shouldRespectImageOrientation)
+void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const FloatRect& src, ColorSpace styleColorSpace, CompositeOperator op,
+    BlendMode blendMode, RespectImageOrientationEnum shouldRespectImageOrientation)
 {
     if (!dst.width() || !dst.height() || !src.width() || !src.height())
         return;
@@ -95,10 +96,10 @@ void BitmapImage::draw(GraphicsContext* context, const FloatRect& dst, const Flo
     context->save();
 
     // Set the compositing operation.
-    if (op == CompositeSourceOver && !frameHasAlphaAtIndex(m_currentFrame))
+    if (op == CompositeSourceOver && blendMode == BlendModeNormal && !frameHasAlphaAtIndex(m_currentFrame))
         context->setCompositeOperation(CompositeCopy);
     else
-        context->setCompositeOperation(op);
+        context->setCompositeOperation(op, blendMode);
 
 #if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
     cairo_surface_t* surface = nativeImage->surface();

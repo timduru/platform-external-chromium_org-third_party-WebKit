@@ -30,8 +30,6 @@
 
 #include "config.h"
 
-#if ENABLE(MUTATION_OBSERVERS)
-
 #include "V8MutationObserver.h"
 
 #include "ExceptionCode.h"
@@ -43,34 +41,23 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8MutationObserver::constructorCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8MutationObserver::constructorCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.MutationObserver.Constructor");
-
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
-
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
-
     if (args.Length() < 1)
         return throwNotEnoughArgumentsError(args.GetIsolate());
 
     v8::Local<v8::Value> arg = args[0];
-    if (!arg->IsObject())
-        return setDOMException(TYPE_MISMATCH_ERR, args.GetIsolate());
+    if (!arg->IsFunction())
+        return throwTypeError("Callback argument must be a function", args.GetIsolate());
 
     ScriptExecutionContext* context = getScriptExecutionContext();
+    v8::Handle<v8::Object> wrapper = args.Holder();
 
-    RefPtr<MutationCallback> callback = V8MutationCallback::create(arg, context);
+    RefPtr<MutationCallback> callback = V8MutationCallback::create(v8::Handle<v8::Function>::Cast(arg), context, wrapper, args.GetIsolate());
     RefPtr<MutationObserver> observer = MutationObserver::create(callback.release());
 
-    v8::Handle<v8::Object> wrapper = args.Holder();
-    V8DOMWrapper::setDOMWrapper(wrapper, &info, observer.get());
-    V8DOMWrapper::setJSWrapperForDOMObject(observer.release(), wrapper);
+    V8DOMWrapper::associateObjectWithWrapper(observer.release(), &info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     return wrapper;
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(MUTATION_OBSERVERS)

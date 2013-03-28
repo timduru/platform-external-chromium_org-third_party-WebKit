@@ -63,12 +63,44 @@ public:
     static bool webkitIndexedDBEnabled() { return isIndexedDBEnabled; }
     static bool indexedDBEnabled() { return isIndexedDBEnabled; }
 
+#if ENABLE(CANVAS_PATH)
+    static void setCanvasPathEnabled(bool isEnabled) { isCanvasPathEnabled = isEnabled; }
+    static bool canvasPathEnabled() { return isCanvasPathEnabled; }
+#else
+    static void setCanvasPathEnabled(bool) { }
+    static bool canvasPathEnabled() { return false; }
+#endif
+
 #if ENABLE(CSS_EXCLUSIONS)
     static void setCSSExclusionsEnabled(bool isEnabled) { isCSSExclusionsEnabled = isEnabled; }
     static bool cssExclusionsEnabled() { return isCSSExclusionsEnabled; }
 #else
     static void setCSSExclusionsEnabled(bool) { }
     static bool cssExclusionsEnabled() { return false; }
+#endif
+
+#if ENABLE(CSS_REGIONS)
+    static void setCSSRegionsEnabled(bool isEnabled) { isCSSRegionsEnabled = isEnabled; }
+    static bool cssRegionsEnabled() { return isCSSRegionsEnabled; }
+#else
+    static void setCSSRegionsEnabled(bool) { }
+    static bool cssRegionsEnabled() { return false; }
+#endif
+
+#if ENABLE(CSS_COMPOSITING)
+    static void setCSSCompositingEnabled(bool isEnabled) { isCSSCompositingEnabled = isEnabled; }
+    static bool cssCompositingEnabled() { return isCSSCompositingEnabled; }
+#else
+    static void setCSSCompositingEnabled(bool) { }
+    static bool cssCompositingEnabled() { return false; }
+#endif
+
+#if ENABLE(FONT_LOAD_EVENTS)
+    static void setFontLoadEventsEnabled(bool isEnabled) { isFontLoadEventsEnabled = isEnabled; }
+    static bool fontLoadEventsEnabled() { return isFontLoadEventsEnabled; }
+#else
+    static void setFontLoadEventsEnabled(bool) { }
+    static bool fontLoadEventsEnabled() { return false; }
 #endif
 
 #if ENABLE(FULLSCREEN_API)
@@ -86,11 +118,6 @@ public:
     static bool webkitFullscreenElementEnabled() { return isFullScreenAPIEnabled; }
     static bool webkitExitFullscreenEnabled() { return isFullScreenAPIEnabled; }
     static bool webkitRequestFullscreenEnabled() { return isFullScreenAPIEnabled; }
-#endif
-
-#if ENABLE(POINTER_LOCK)
-    static bool pointerLockEnabled() { return isPointerLockEnabled; }
-    static void setPointerLockEnabled(bool isEnabled) { isPointerLockEnabled = isEnabled; }
 #endif
 
 #if ENABLE(VIDEO)
@@ -120,17 +147,12 @@ public:
 #if ENABLE(WEB_AUDIO)
     static void setWebkitAudioContextEnabled(bool isEnabled) { isWebAudioEnabled = isEnabled; }
     static bool webkitAudioContextEnabled() { return isWebAudioEnabled; }
+    static bool webkitOfflineAudioContextEnabled() { return isWebAudioEnabled; }
 #endif
 
 #if ENABLE(TOUCH_EVENTS)
     static bool touchEnabled() { return isTouchEnabled; }
     static void setTouchEnabled(bool isEnabled) { isTouchEnabled = isEnabled; }
-    static bool ontouchstartEnabled() { return isTouchEnabled; }
-    static bool ontouchmoveEnabled() { return isTouchEnabled; }
-    static bool ontouchendEnabled() { return isTouchEnabled; }
-    static bool ontouchcancelEnabled() { return isTouchEnabled; }
-    static bool createTouchEnabled() { return isTouchEnabled; }
-    static bool createTouchListEnabled() { return isTouchEnabled; }
 #endif
 
     static void setDeviceMotionEnabled(bool isEnabled) { isDeviceMotionEnabled = isEnabled; }
@@ -179,6 +201,11 @@ public:
     static bool webkitRTCPeerConnectionEnabled() { return peerConnectionEnabled(); }
 #endif
 
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
+    static void setLegacyCSSVendorPrefixesEnabled(bool isEnabled) { isLegacyCSSVendorPrefixesEnabled = isEnabled; }
+    static bool legacyCSSVendorPrefixesEnabled() { return isLegacyCSSVendorPrefixesEnabled; }
+#endif
+
 #if ENABLE(GAMEPAD)
     static void setWebkitGetGamepadsEnabled(bool isEnabled) { isGamepadEnabled = isEnabled; }
     static bool webkitGetGamepadsEnabled() { return isGamepadEnabled; }
@@ -210,6 +237,11 @@ public:
 
     static bool authorShadowDOMForAnyElementEnabled() { return isAuthorShadowDOMForAnyElementEnabled; }
     static void setAuthorShadowDOMForAnyElementEnabled(bool isEnabled) { isAuthorShadowDOMForAnyElementEnabled = isEnabled; }
+#endif
+
+#if ENABLE(CUSTOM_ELEMENTS)
+    static bool customDOMElementsEnabled() { return isCustomDOMElementsEnabled; }
+    static void setCustomDOMElements(bool isEnabled) { isCustomDOMElementsEnabled = isEnabled; }
 #endif
 
 #if ENABLE(STYLE_SCOPED)
@@ -252,6 +284,16 @@ public:
     static void setDialogElementEnabled(bool isEnabled) { isDialogElementEnabled = isEnabled; }
 #endif
 
+#if ENABLE(CSP_NEXT)
+    static bool experimentalContentSecurityPolicyFeaturesEnabled() { return areExperimentalContentSecurityPolicyFeaturesEnabled; }
+    static void setExperimentalContentSecurityPolicyFeaturesEnabled(bool isEnabled) { areExperimentalContentSecurityPolicyFeaturesEnabled = isEnabled; }
+#endif
+
+#if ENABLE(IFRAME_SEAMLESS)
+    static bool seamlessIFramesEnabled() { return areSeamlessIFramesEnabled; }
+    static void setSeamlessIFramesEnabled(bool isEnabled) { areSeamlessIFramesEnabled = isEnabled; }
+#endif
+
     static bool langAttributeAwareFormControlUIEnabled() { return isLangAttributeAwareFormControlUIEnabled; }
     // The lang attribute support is incomplete and should only be turned on for tests.
     static void setLangAttributeAwareFormControlUIEnabled(bool isEnabled) { isLangAttributeAwareFormControlUIEnabled = isEnabled; }
@@ -260,7 +302,6 @@ public:
     static bool requestAutocompleteEnabled() { return isRequestAutocompleteEnabled; }
     static void setRequestAutocompleteEnabled(bool isEnabled) { isRequestAutocompleteEnabled = isEnabled; }
 #endif
-
 
 private:
     // Never instantiate.
@@ -278,7 +319,10 @@ private:
     static bool isDeviceMotionEnabled;
     static bool isDeviceOrientationEnabled;
     static bool isSpeechInputEnabled;
+    static bool isCanvasPathEnabled;
     static bool isCSSExclusionsEnabled;
+    static bool isCSSRegionsEnabled;
+    static bool isCSSCompositingEnabled;
     WEBCORE_TESTING static bool isLangAttributeAwareFormControlUIEnabled;
 #if ENABLE(SCRIPTED_SPEECH)
     static bool isScriptedSpeechEnabled;
@@ -300,16 +344,16 @@ private:
     static bool isGamepadEnabled;
 #endif
 
+#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
+    static bool isLegacyCSSVendorPrefixesEnabled;
+#endif
+
 #if ENABLE(QUOTA)
     static bool isQuotaEnabled;
 #endif
 
 #if ENABLE(FULLSCREEN_API)
     static bool isFullScreenAPIEnabled;
-#endif
-
-#if ENABLE(POINTER_LOCK)
-    static bool isPointerLockEnabled;
 #endif
 
 #if ENABLE(MEDIA_SOURCE)
@@ -328,6 +372,10 @@ private:
     static bool isShadowDOMEnabled;
 
     static bool isAuthorShadowDOMForAnyElementEnabled;
+#endif
+
+#if ENABLE(CUSTOM_ELEMENTS)
+    static bool isCustomDOMElementsEnabled;
 #endif
 
 #if ENABLE(STYLE_SCOPED)
@@ -365,6 +413,19 @@ private:
 #if ENABLE(REQUEST_AUTOCOMPLETE)
     static bool isRequestAutocompleteEnabled;
 #endif
+
+#if ENABLE(CSP_NEXT)
+    static bool areExperimentalContentSecurityPolicyFeaturesEnabled;
+#endif
+
+#if ENABLE(IFRAME_SEAMLESS)
+    static bool areSeamlessIFramesEnabled;
+#endif
+
+#if ENABLE(FONT_LOAD_EVENTS)
+    static bool isFontLoadEventsEnabled;
+#endif
+
 };
 
 } // namespace WebCore

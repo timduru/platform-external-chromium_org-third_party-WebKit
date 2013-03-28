@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system import executive_mock
 from webkitpy.common.system.systemhost_mock import MockSystemHost
@@ -47,7 +47,7 @@ class ChromiumLinuxPortTest(chromium_port_testcase.ChromiumPortTestCase):
             host.executive = executive_mock.MockExecutive2(file_output)
 
         port = self.make_port(host, port_name=port_name)
-        self.assertEquals(port.architecture(), expected_architecture)
+        self.assertEqual(port.architecture(), expected_architecture)
         if expected_architecture == 'x86':
             self.assertTrue(port.baseline_path().endswith('chromium-linux-x86'))
             self.assertTrue(port.baseline_search_path()[0].endswith('chromium-linux-x86'))
@@ -74,14 +74,14 @@ class ChromiumLinuxPortTest(chromium_port_testcase.ChromiumPortTestCase):
     def test_determine_architecture_fails(self):
         # Test that we default to 'x86' if the driver doesn't exist.
         port = self.make_port()
-        self.assertEquals(port.architecture(), 'x86_64')
+        self.assertEqual(port.architecture(), 'x86_64')
 
         # Test that we default to 'x86' on an unknown architecture.
         host = MockSystemHost()
         host.filesystem.exists = lambda x: True
         host.executive = executive_mock.MockExecutive2('win32')
         port = self.make_port(host=host)
-        self.assertEquals(port.architecture(), 'x86_64')
+        self.assertEqual(port.architecture(), 'x86_64')
 
         # Test that we raise errors if something weird happens.
         host.executive = executive_mock.MockExecutive2(exception=AssertionError)
@@ -99,10 +99,6 @@ class ChromiumLinuxPortTest(chromium_port_testcase.ChromiumPortTestCase):
         options = MockOptions(configuration='Release', build_directory='foo')
         self.assert_build_path(options, ['/mock-checkout/Source/WebKit/chromium/out/Release'], 'foo/Release')
 
-        # Test that we look in a chromium directory before the webkit directory.
-        options = MockOptions(configuration='Release', build_directory=None)
-        self.assert_build_path(options, ['/mock-checkout/Source/WebKit/chromium/out/Release', '/mock-checkout/out/Release'], '/mock-checkout/Source/WebKit/chromium/out/Release')
-
         # Test that we prefer the legacy dir over the new dir.
         options = MockOptions(configuration='Release', build_directory=None)
         self.assert_build_path(options, ['/mock-checkout/Source/WebKit/chromium/sconsbuild/Release', '/mock-checkout/Source/WebKit/chromium/out/Release'], '/mock-checkout/Source/WebKit/chromium/sconsbuild/Release')
@@ -112,7 +108,4 @@ class ChromiumLinuxPortTest(chromium_port_testcase.ChromiumPortTestCase):
         self.assertTrue(self.make_port(options=MockOptions(driver_name='OtherDriver'))._path_to_driver().endswith('OtherDriver'))
 
     def test_path_to_image_diff(self):
-        self.assertEquals(self.make_port()._path_to_image_diff(), '/mock-checkout/out/Release/ImageDiff')
-
-if __name__ == '__main__':
-    port_testcase.main()
+        self.assertEqual(self.make_port()._path_to_image_diff(), '/mock-checkout/out/Release/ImageDiff')

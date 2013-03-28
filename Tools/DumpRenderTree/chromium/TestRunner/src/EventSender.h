@@ -41,23 +41,28 @@
 #include "WebDragOperation.h"
 #include "WebInputEvent.h"
 #include "WebTask.h"
-#include "platform/WebPoint.h"
+#include <memory>
+#include <public/WebPoint.h>
 
 namespace WebKit {
 class WebDragData;
 class WebView;
+struct WebContextMenuData;
 }
 
-class TestDelegate;
-
 namespace WebTestRunner {
+
+class WebTestDelegate;
 
 class EventSender : public CppBoundClass {
 public:
     EventSender();
+    ~EventSender();
 
-    void setDelegate(TestDelegate* delegate) { m_delegate = delegate; }
+    void setDelegate(WebTestDelegate* delegate) { m_delegate = delegate; }
     void setWebView(WebKit::WebView* webView) { m_webView = webView; }
+
+    void setContextMenuData(const WebKit::WebContextMenuData&);
 
     // Resets some static variable state.
     void reset();
@@ -69,6 +74,7 @@ public:
     void dumpFilenameBeingDragged(const CppArgumentList&, CppVariant*);
 
     // JS callback methods.
+    void contextClick(const CppArgumentList&, CppVariant*);
     void mouseDown(const CppArgumentList&, CppVariant*);
     void mouseUp(const CppArgumentList&, CppVariant*);
     void mouseMoveTo(const CppArgumentList&, CppVariant*);
@@ -82,6 +88,7 @@ public:
     void zoomPageOut(const CppArgumentList&, CppVariant*);
     void scalePageBy(const CppArgumentList&, CppVariant*);
 
+    void mouseDragBegin(const CppArgumentList&, CppVariant*);
     void mouseScrollBy(const CppArgumentList&, CppVariant*);
     void continuousMouseScrollBy(const CppArgumentList&, CppVariant*);
     void scheduleAsynchronousClick(const CppArgumentList&, CppVariant*);
@@ -106,15 +113,16 @@ public:
     void gestureScrollEnd(const CppArgumentList&, CppVariant*);
     void gestureScrollFirstPoint(const CppArgumentList&, CppVariant*);
     void gestureScrollUpdate(const CppArgumentList&, CppVariant*);
+    void gestureScrollUpdateWithoutPropagation(const CppArgumentList&, CppVariant*);
     void gestureTap(const CppArgumentList&, CppVariant*);
     void gestureTapDown(const CppArgumentList&, CppVariant*);
     void gestureTapCancel(const CppArgumentList&, CppVariant*);
     void gestureLongPress(const CppArgumentList&, CppVariant*);
+    void gestureLongTap(const CppArgumentList&, CppVariant*);
     void gestureTwoFingerTap(const CppArgumentList&, CppVariant*);
     void gestureEvent(WebKit::WebInputEvent::Type, const CppArgumentList&);
 
     // Unimplemented stubs
-    void contextClick(const CppArgumentList&, CppVariant*);
     void enableDOMUIEventLogging(const CppArgumentList&, CppVariant*);
     void fireKeyboardEventsToElement(const CppArgumentList&, CppVariant*);
     void clearKillRing(const CppArgumentList&, CppVariant*);
@@ -157,6 +165,7 @@ private:
     // modifier to be passed into the generated event.
     bool needsShiftModifier(int);
 
+    void finishDragAndDrop(const WebKit::WebMouseEvent&, WebKit::WebDragOperation);
     void updateClickCountForButton(WebKit::WebMouseEvent::Button);
 
     // Compose a touch event from the current touch points and send it.
@@ -167,8 +176,10 @@ private:
 
     WebTaskList m_taskList;
 
-    TestDelegate* m_delegate;
+    WebTestDelegate* m_delegate;
     WebKit::WebView* m_webView;
+
+    std::auto_ptr<WebKit::WebContextMenuData> m_lastContextMenuData;
 
     // Location of the touch point that initiated a gesture.
     WebKit::WebPoint m_currentGestureLocation;

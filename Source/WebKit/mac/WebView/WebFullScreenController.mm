@@ -56,7 +56,7 @@ static IntRect screenRectOfContents(Element* element)
     ASSERT(element);
     if (element->renderer() && element->renderer()->hasLayer() && element->renderer()->enclosingLayer()->isComposited()) {
         FloatQuad contentsBox = static_cast<FloatRect>(element->renderer()->enclosingLayer()->backing()->contentsBox());
-        contentsBox = element->renderer()->localToAbsoluteQuad(contentsBox, SnapOffsetForTransforms);
+        contentsBox = element->renderer()->localToAbsoluteQuad(contentsBox);
         return element->renderer()->view()->frameView()->contentsToScreen(contentsBox.enclosingBoundingBox());
     }
     return element->screenRect();
@@ -96,7 +96,7 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
 - (id)init
 {
     // Do not defer window creation, to make sure -windowNumber is created (needed by WebWindowScaleAnimation).
-    NSWindow *window = [[WebCoreFullScreenWindow alloc] initWithContentRect:NSZeroRect styleMask:NSBorderlessWindowMask backing:NSBackingStoreBuffered defer:NO];
+    NSWindow *window = [[WebCoreFullScreenWindow alloc] initWithContentRect:NSZeroRect styleMask:NSClosableWindowMask backing:NSBackingStoreBuffered defer:NO];
     self = [super initWithWindow:window];
     [window release];
     if (!self)
@@ -137,6 +137,11 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
     [webView retain];
     [_webView release];
     _webView = webView;
+}
+
+- (NSView*)webViewPlaceholder
+{
+    return _webViewPlaceholder.get();
 }
 
 - (Element*)element
@@ -379,6 +384,12 @@ static NSRect convertRectToScreen(NSWindow *window, NSRect rect)
     [[_webView window] makeKeyAndOrderFront:self];
 
     NSEnableScreenUpdates();
+}
+
+- (void)performClose:(id)sender
+{
+    if (_isFullScreen)
+        [self cancelOperation:sender];
 }
 
 - (void)close

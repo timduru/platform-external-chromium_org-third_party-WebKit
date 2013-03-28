@@ -26,10 +26,11 @@
 #ifndef WebCompositorInputHandlerImpl_h
 #define WebCompositorInputHandlerImpl_h
 
-#include "PlatformGestureCurveTarget.h"
 #include "WebActiveWheelFlingParameters.h"
 #include "WebCompositorInputHandler.h"
 #include "WebInputEvent.h"
+#include <public/WebGestureCurve.h>
+#include <public/WebGestureCurveTarget.h>
 #include <public/WebInputHandler.h>
 #include <wtf/HashSet.h>
 #include <wtf/Noncopyable.h>
@@ -41,14 +42,13 @@ class Mutex;
 
 namespace WebCore {
 class IntPoint;
-class PlatformGestureCurve;
 }
 
 namespace WebKit {
 
 class WebCompositorInputHandlerClient;
 
-class WebCompositorInputHandlerImpl : public WebCompositorInputHandler, public WebInputHandler, public WebCore::PlatformGestureCurveTarget {
+class WebCompositorInputHandlerImpl : public WebCompositorInputHandler, public WebInputHandler, public WebGestureCurveTarget {
     WTF_MAKE_NONCOPYABLE(WebCompositorInputHandlerImpl);
 public:
     static WebCompositorInputHandler* fromIdentifier(int identifier);
@@ -63,11 +63,15 @@ public:
     // WebInputHandler implementation.
     virtual void bindToClient(WebInputHandlerClient*);
     virtual void animate(double monotonicTime);
+    virtual void mainThreadHasStoppedFlinging();
 
-    // WebCore::PlatformGestureCurveTarget implementation.
-    virtual void scrollBy(const WebCore::IntPoint&);
+    // WebGestureCurveTarget implementation.
+    virtual void scrollBy(const WebFloatSize&);
 
     int identifier() const { return m_identifier; }
+
+    // Included for testing purposes. 
+    bool isGestureScrollOnImplThread() const { return m_gestureScrollOnImplThread; }
 
 private:
 
@@ -78,12 +82,15 @@ private:
 
     EventDisposition handleGestureFling(const WebGestureEvent&);
 
+    // Returns true if we scrolled by the increment.
+    bool touchpadFlingScroll(const WebFloatSize& increment);
+
     // Returns true if we actually had an active fling to cancel.
     bool cancelCurrentFling();
 
-    OwnPtr<WebCore::PlatformGestureCurve> m_wheelFlingCurve;
+    OwnPtr<WebGestureCurve> m_flingCurve;
     // Parameters for the active fling animation, stored in case we need to transfer it out later.
-    WebActiveWheelFlingParameters m_wheelFlingParameters;
+    WebActiveWheelFlingParameters m_flingParameters;
 
     WebCompositorInputHandlerClient* m_client;
     int m_identifier;
@@ -93,7 +100,11 @@ private:
     bool m_expectScrollUpdateEnd;
     bool m_expectPinchUpdateEnd;
 #endif
-    bool m_gestureScrollStarted;
+    bool m_gestureScrollOnImplThread;
+    bool m_gesturePinchOnImplThread;
+    // This is always false when there are no flings on the main thread, but conservative in the
+    // sense that we might not be actually flinging when it is true.
+    bool m_flingActiveOnMainThread;
 
     static int s_nextAvailableIdentifier;
     static HashSet<WebCompositorInputHandlerImpl*>* s_compositors;

@@ -34,7 +34,6 @@
 #include "WebProcess.h"
 #include <WebCore/FocusController.h>
 #include <WebCore/KeyboardEvent.h>
-#include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 
 using namespace WebCore;
@@ -60,5 +59,12 @@ void WebEditorClient::handleInputMethodKeydown(KeyboardEvent* event)
     if (handled)
         event->setDefaultHandled();
 }
+
+#if USE(UNIFIED_TEXT_CHECKING)
+void WebEditorClient::checkTextOfParagraph(const UChar* text, int length, WebCore::TextCheckingTypeMask checkingTypes, Vector<TextCheckingResult>& results)
+{
+    m_page->sendSync(Messages::WebPageProxy::CheckTextOfParagraph(String(text, length), checkingTypes), Messages::WebPageProxy::CheckTextOfParagraph::Reply(results));
+}
+#endif
 
 }

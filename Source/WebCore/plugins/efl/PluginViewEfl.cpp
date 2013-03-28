@@ -41,6 +41,7 @@
 #include "PluginPackage.h"
 #include "npruntime_impl.h"
 #include "runtime/JSLock.h"
+#include "runtime/Operations.h"
 #include <Ecore_Evas.h>
 #include <Ecore_X.h>
 #include <Evas.h>
@@ -282,7 +283,7 @@ bool PluginView::platformGetValue(NPNVariable variable, void* value, NPError* re
     }
 
     case NPNVnetscapeWindow: {
-        Evas* evas = m_parentFrame->view()->evas();
+        Evas* evas = evas_object_evas_get(m_parentFrame->view()->evasObject());
         if (!evas)
             return false;
 

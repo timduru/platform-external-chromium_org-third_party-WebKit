@@ -32,6 +32,7 @@
 #define V8PerContextData_h
 
 #include "ScopedPersistent.h"
+#include "V8DOMActivityLogger.h"
 #include "WrapperTypeInfo.h"
 #include <v8.h>
 #include <wtf/HashMap.h>
@@ -43,6 +44,14 @@ namespace WebCore {
 struct V8NPObject;
 typedef WTF::Vector<V8NPObject*> V8NPObjectVector;
 typedef WTF::HashMap<int, V8NPObjectVector> V8NPObjectMap;
+
+enum V8ContextEmbedderDataField {
+    v8ContextDebugIdIndex,
+    v8ContextPerContextDataIndex,
+    v8ContextIsolatedWorld,
+    // Rather than adding more embedder data fields to v8::Context,
+    // consider adding the data to V8PerContextData instead.
+};
 
 class V8PerContextData {
 public:
@@ -58,7 +67,10 @@ public:
 
     bool init();
 
-    static V8PerContextData* from(v8::Handle<v8::Context>);
+    static V8PerContextData* from(v8::Handle<v8::Context> context)
+    {
+        return static_cast<V8PerContextData*>(context->GetAlignedPointerFromEmbedderData(v8ContextPerContextDataIndex));
+    }
 
     // To create JS Wrapper objects, we create a cache of a 'boiler plate'
     // object, and then simply Clone that object each time we need a new one.
@@ -82,6 +94,16 @@ public:
         return &m_v8NPObjectMap;
     }
 
+    V8DOMActivityLogger* activityLogger()
+    {
+        return m_activityLogger;
+    }
+
+    void setActivityLogger(V8DOMActivityLogger* logger)
+    {
+        m_activityLogger = logger;
+    }
+
 private:
     explicit V8PerContextData(v8::Persistent<v8::Context> context)
         : m_context(context)
@@ -102,7 +124,10 @@ private:
     ConstructorMap m_constructorMap;
 
     V8NPObjectMap m_v8NPObjectMap;
-
+    // We cache a pointer to the V8DOMActivityLogger associated with the world
+    // corresponding to this context. The ownership of the pointer is retained
+    // by the DOMActivityLoggerMap in DOMWrapperWorld.
+    V8DOMActivityLogger* m_activityLogger;
     v8::Persistent<v8::Context> m_context;
     ScopedPersistent<v8::Value> m_errorPrototype;
     ScopedPersistent<v8::Value> m_objectPrototype;

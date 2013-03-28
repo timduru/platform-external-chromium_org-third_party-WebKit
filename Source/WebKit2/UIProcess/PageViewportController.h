@@ -22,8 +22,6 @@
 #ifndef PageViewportController_h
 #define PageViewportController_h
 
-#if USE(TILED_BACKING_STORE)
-
 #include <WebCore/FloatPoint.h>
 #include <WebCore/FloatRect.h>
 #include <WebCore/FloatSize.h>
@@ -47,28 +45,30 @@ public:
     PageViewportController(WebKit::WebPageProxy*, PageViewportControllerClient*);
     virtual ~PageViewportController() { }
 
-    void suspendContent();
-    void resumeContent();
-
     float innerBoundedViewportScale(float) const;
     float outerBoundedViewportScale(float) const;
-    WebCore::FloatPoint clampViewportToContents(const WebCore::FloatPoint& viewportPos, float viewportScale);
 
-    bool hasSuspendedContent() const { return m_hasSuspendedContent; }
+    WebCore::FloatPoint pixelAlignedFloatPoint(const WebCore::FloatPoint&);
+
+    WebCore::FloatPoint boundContentsPosition(const WebCore::FloatPoint&);
+    WebCore::FloatPoint boundContentsPositionAtScale(const WebCore::FloatPoint&, float scale);
+
+    WebCore::FloatSize visibleContentsSize() const;
+
     bool hadUserInteraction() const { return m_hadUserInteraction; }
     bool allowsUserScaling() const { return m_allowsUserScaling; }
 
     WebCore::FloatSize contentsLayoutSize() const { return m_rawAttributes.layoutSize; }
-    float devicePixelRatio() const;
-    float minimumContentsScale() const { return m_minimumScaleToFit; }
-    float maximumContentsScale() const { return m_rawAttributes.maximumScale; }
-    float currentContentsScale() const { return fromViewportScale(m_effectiveScale); }
+    float deviceScaleFactor() const;
+    float minimumScale() const { return m_minimumScaleToFit; }
+    float maximumScale() const { return m_rawAttributes.maximumScale; }
+    float currentScale() const { return m_pageScaleFactor; }
 
     void setHadUserInteraction(bool didUserInteract) { m_hadUserInteraction = didUserInteract; }
 
     // Notifications from the viewport.
     void didChangeViewportSize(const WebCore::FloatSize& newSize);
-    void didChangeContentsVisibility(const WebCore::FloatPoint& viewportPos, float viewportScale, const WebCore::FloatPoint& trajectoryVector = WebCore::FloatPoint::zero());
+    void didChangeContentsVisibility(const WebCore::FloatPoint&, float scale, const WebCore::FloatPoint& trajectoryVector = WebCore::FloatPoint::zero());
 
     // Notifications from the WebProcess.
     void didCommitLoad();
@@ -79,13 +79,10 @@ public:
     void pageDidRequestScroll(const WebCore::IntPoint& cssPosition);
 
 private:
-    float fromViewportScale(float scale) const { return scale / devicePixelRatio(); }
-    float toViewportScale(float scale) const { return scale * devicePixelRatio(); }
     void syncVisibleContents(const WebCore::FloatPoint &trajectoryVector = WebCore::FloatPoint::zero());
     void applyScaleAfterRenderingContents(float scale);
     void applyPositionAfterRenderingContents(const WebCore::FloatPoint& pos);
-    void updateMinimumScaleToFit();
-    WebCore::FloatSize viewportSizeInContentsCoordinates() const;
+    bool updateMinimumScaleToFit(bool userInitiatedUpdate);
 
     WebPageProxy* const m_webPageProxy;
     PageViewportControllerClient* m_client;
@@ -94,25 +91,23 @@ private:
 
     bool m_allowsUserScaling;
     float m_minimumScaleToFit;
+    bool m_initiallyFitToViewport;
 
-    bool m_hasSuspendedContent;
     bool m_hadUserInteraction;
 
-    WebCore::FloatPoint m_viewportPos;
-    WebCore::FloatSize m_viewportSize;
+    WebCore::FloatPoint m_contentsPosition;
     WebCore::FloatSize m_contentsSize;
+    WebCore::FloatSize m_viewportSize;
     WebCore::IntSize m_clientContentsSize;
-    float m_effectiveScale; // Should always be cssScale * devicePixelRatio.
+    float m_pageScaleFactor;
 
-    bool m_viewportPosIsLocked;
-    bool m_effectiveScaleIsLocked;
+    bool m_pendingPositionChange;
+    bool m_pendingScaleChange;
     WebCore::FloatRect m_lastFrameCoveredRect;
 };
 
 bool fuzzyCompare(float, float, float epsilon);
 
 } // namespace WebKit
-
-#endif
 
 #endif // PageViewportController_h

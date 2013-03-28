@@ -42,7 +42,6 @@ namespace WebKit {
 class WebAnimationDelegate;
 class WebFilterOperations;
 class WebLayerScrollClient;
-class WebTransformationMatrix;
 struct WebFloatPoint;
 struct WebFloatRect;
 struct WebSize;
@@ -51,9 +50,6 @@ class WebLayerImpl;
 
 class WebLayer {
 public:
-#define WEBLAYER_IS_PURE_VIRTUAL
-    WEBKIT_EXPORT static WebLayer* create();
-
     virtual ~WebLayer() { }
 
     // Returns a positive ID that will be unique across all WebLayers allocated in this process.
@@ -97,11 +93,9 @@ public:
     virtual WebFloatPoint position() const = 0;
 
     virtual void setSublayerTransform(const SkMatrix44&) = 0;
-    virtual void setSublayerTransform(const WebTransformationMatrix&) = 0;
     virtual SkMatrix44 sublayerTransform() const = 0;
 
     virtual void setTransform(const SkMatrix44&) = 0;
-    virtual void setTransform(const WebTransformationMatrix&) = 0;
     virtual SkMatrix44 transform() const = 0;
 
     // Sets whether the layer draws its content when compositing.
@@ -139,8 +133,6 @@ public:
     // (opacity, transforms), it may conflict and hide the background filters.
     virtual void setBackgroundFilters(const WebFilterOperations&) = 0;
 
-    virtual void setDebugBorderColor(const WebColor&) = 0;
-    virtual void setDebugBorderWidth(float) = 0;
     virtual void setDebugName(WebString) = 0;
 
     // An animation delegate is notified when animations are started and
@@ -210,6 +202,9 @@ public:
     // Forces this layer to use a render surface. There is no benefit in doing
     // so, but this is to facilitate benchmarks and tests.
     virtual void setForceRenderSurface(bool) = 0;
+
+    // True if the layer is not part of a tree attached to a WebLayerTreeView.
+    virtual bool isOrphan() const = 0;
 };
 
 } // namespace WebKit

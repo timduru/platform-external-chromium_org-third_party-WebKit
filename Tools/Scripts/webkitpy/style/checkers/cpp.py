@@ -1,4 +1,3 @@
-#!/usr/bin/python
 # -*- coding: utf-8 -*-
 #
 # Copyright (C) 2009, 2010, 2012 Google Inc. All rights reserved.
@@ -1078,7 +1077,7 @@ def check_posix_threading(clean_lines, line_number, error):
     line = clean_lines.elided[line_number]
     for single_thread_function, multithread_safe_function in _THREADING_LIST:
         index = line.find(single_thread_function)
-        # Comparisons made explicit for clarity -- pylint: disable-msg=C6403
+        # Comparisons made explicit for clarity
         if index >= 0 and (index == 0 or (not line[index - 1].isalnum()
                                           and line[index - 1] not in ('_', '.', '>'))):
             error(line_number, 'runtime/threadsafe_fn', 2,
@@ -1209,6 +1208,51 @@ class _FileState(object):
         """Return whether the file extension corresponds to C or Objective-C."""
         return self.is_c() or self.is_objective_c()
 
+
+class _EnumState(object):
+    """Maintains whether currently in an enum declaration, and checks whether
+    enum declarations follow the style guide.
+    """
+
+    def __init__(self):
+        self.in_enum_decl = False
+        self.is_webidl_enum = False
+
+    def process_clean_line(self, line):
+        # FIXME: The regular expressions for expr_all_uppercase and expr_enum_end only accept integers
+        # and identifiers for the value of the enumerator, but do not accept any other constant
+        # expressions. However, this is sufficient for now (11/27/2012).
+        expr_all_uppercase = r'\s*[A-Z0-9_]+\s*(?:=\s*[a-zA-Z0-9]+\s*)?,?\s*$'
+        expr_starts_lowercase = r'\s*[a-z]'
+        expr_enum_end = r'}\s*(?:[a-zA-Z0-9]+\s*(?:=\s*[a-zA-Z0-9]+)?)?\s*;\s*'
+        expr_enum_start = r'\s*enum(?:\s+[a-zA-Z0-9]+)?\s*\{?\s*'
+        if self.in_enum_decl:
+            if match(r'\s*' + expr_enum_end + r'$', line):
+                self.in_enum_decl = False
+                self.is_webidl_enum = False
+            elif match(expr_all_uppercase, line):
+                return self.is_webidl_enum
+            elif match(expr_starts_lowercase, line):
+                return False
+        else:
+            matched = match(expr_enum_start + r'$', line)
+            if matched:
+                self.in_enum_decl = True
+            else:
+                matched = match(expr_enum_start + r'(?P<members>.*)' + expr_enum_end + r'$', line)
+                if matched:
+                    members = matched.group('members').split(',')
+                    found_invalid_member = False
+                    for member in members:
+                        if match(expr_all_uppercase, member):
+                            found_invalid_member = not self.is_webidl_enum
+                        if match(expr_starts_lowercase, member):
+                            found_invalid_member = True
+                        if found_invalid_member:
+                            self.is_webidl_enum = False
+                            return False
+                    return True
+        return True
 
 def check_for_non_standard_constructs(clean_lines, line_number,
                                       class_state, error):
@@ -1793,7 +1837,7 @@ def check_spacing(file_extension, clean_lines, line_number, error):
     comment_position = line.find('//')
     if comment_position != -1:
         # Check if the // may be in quotes.  If so, ignore it
-        # Comparisons made explicit for clarity -- pylint: disable-msg=C6403
+        # Comparisons made explicit for clarity
         if (line.count('"', 0, comment_position) - line.count('\\"', 0, comment_position)) % 2 == 0:   # not in quotes
             # Allow one space before end of line comment.
             if (not match(r'^\s*$', line[:comment_position])
@@ -2039,6 +2083,23 @@ def check_namespace_indentation(clean_lines, line_number, file_extension, file_s
         if current_indentation_level < 0:
             break;
 
+
+def check_enum_casing(clean_lines, line_number, enum_state, error):
+    """Looks for incorrectly named enum values.
+
+    Args:
+      clean_lines: A CleansedLines instance containing the file.
+      line_number: The number of the line to check.
+      enum_state: A _EnumState instance which maintains enum declaration state.
+      error: The function to call with any errors found.
+    """
+
+    enum_state.is_webidl_enum |= bool(match(r'\s*// Web(?:Kit)?IDL enum\s*$', clean_lines.raw_lines[line_number]))
+
+    line = clean_lines.elided[line_number]  # Get rid of comments and strings.
+    if not enum_state.process_clean_line(line):
+        error(line_number, 'readability/enum_casing', 4,
+              'enum members should use InterCaps with an initial capital letter.')
 
 def check_directive_indentation(clean_lines, line_number, file_state, error):
     """Looks for indentation of preprocessor directives.
@@ -2495,8 +2556,8 @@ def check_for_null(clean_lines, line_number, file_state, error):
     if search(r'\bgdk_pixbuf_save_to\w+\b', line):
         return
 
-    # Don't warn about NULL usage in gtk_widget_style_get() or gtk_style_context_get_style. See Bug 51758
-    if search(r'\bgtk_widget_style_get\(\w+\b', line) or search(r'\bgtk_style_context_get_style\(\w+\b', line):
+    # Don't warn about NULL usage in gtk_widget_style_get(), gtk_style_context_get_style(), or gtk_style_context_get(). See Bug 51758
+    if search(r'\bgtk_widget_style_get\(\w+\b', line) or search(r'\bgtk_style_context_get_style\(\w+\b', line) or search(r'\bgtk_style_context_get\(\w+\b', line):
         return
 
     # Don't warn about NULL usage in soup_server_new(). See Bug 77890.
@@ -2535,7 +2596,7 @@ def get_line_width(line):
     return len(line)
 
 
-def check_style(clean_lines, line_number, file_extension, class_state, file_state, error):
+def check_style(clean_lines, line_number, file_extension, class_state, file_state, enum_state, error):
     """Checks rules from the 'C++ style rules' section of cppguide.html.
 
     Most of these rules are hard to test (naming, comment style), but we
@@ -2550,6 +2611,7 @@ def check_style(clean_lines, line_number, file_extension, class_state, file_stat
                    the current stack of nested class declarations being parsed.
       file_state: A _FileState instance which maintains information about
                   the state of things in the file.
+      enum_state: A _EnumState instance which maintains the current enum state.
       error: The function to call with any errors found.
     """
 
@@ -2604,6 +2666,7 @@ def check_style(clean_lines, line_number, file_extension, class_state, file_stat
     check_for_comparisons_to_zero(clean_lines, line_number, error)
     check_for_null(clean_lines, line_number, file_state, error)
     check_indentation_amount(clean_lines, line_number, error)
+    check_enum_casing(clean_lines, line_number, enum_state, error)
 
 
 _RE_PATTERN_INCLUDE_NEW_STYLE = re.compile(r'#include +"[^/]+\.h"')
@@ -3478,7 +3541,7 @@ def check_for_include_what_you_use(filename, clean_lines, include_state, error):
 
 def process_line(filename, file_extension,
                  clean_lines, line, include_state, function_state,
-                 class_state, file_state, error):
+                 class_state, file_state, enum_state, error):
     """Processes a single line in the file.
 
     Args:
@@ -3493,6 +3556,8 @@ def process_line(filename, file_extension,
                    the current stack of nested class declarations being parsed.
       file_state: A _FileState instance which maintains information about
                   the state of things in the file.
+      enum_state: A _EnumState instance which maintains an enum declaration
+                  state.
       error: A callable to which errors are reported, which takes arguments:
              line number, error level, and message
 
@@ -3508,7 +3573,7 @@ def process_line(filename, file_extension,
     check_pass_ptr_usage(clean_lines, line, function_state, error)
     check_for_leaky_patterns(clean_lines, line, function_state, error)
     check_for_multiline_comments_and_strings(clean_lines, line, error)
-    check_style(clean_lines, line, file_extension, class_state, file_state, error)
+    check_style(clean_lines, line, file_extension, class_state, file_state, enum_state, error)
     check_language(filename, clean_lines, line, file_extension, include_state,
                    file_state, error)
     check_for_non_standard_constructs(clean_lines, line, class_state, error)
@@ -3541,9 +3606,11 @@ def _process_lines(filename, file_extension, lines, error, min_confidence):
     remove_multi_line_comments(lines, error)
     clean_lines = CleansedLines(lines)
     file_state = _FileState(clean_lines, file_extension)
+    enum_state = _EnumState()
     for line in xrange(clean_lines.num_lines()):
         process_line(filename, file_extension, clean_lines, line,
-                     include_state, function_state, class_state, file_state, error)
+                     include_state, function_state, class_state, file_state,
+                     enum_state, error)
     class_state.check_finished(error)
 
     check_for_include_what_you_use(filename, clean_lines, include_state, error)
@@ -3585,6 +3652,7 @@ class CppChecker(object):
         'readability/comparison_to_zero',
         'readability/constructors',
         'readability/control_flow',
+        'readability/enum_casing',
         'readability/fn_size',
         'readability/function',
         'readability/multiline_comment',

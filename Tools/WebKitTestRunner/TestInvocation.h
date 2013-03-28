@@ -29,6 +29,8 @@
 #include <string>
 #include <WebKit2/WKRetainPtr.h>
 #include <wtf/Noncopyable.h>
+#include <wtf/OwnPtr.h>
+#include <wtf/text/StringBuilder.h>
 
 namespace WTR {
 
@@ -40,20 +42,23 @@ public:
 
     void setIsPixelTest(const std::string& expectedPixelHash);
 
+    void setCustomTimeout(int duration);
+
     void invoke();
     void didReceiveMessageFromInjectedBundle(WKStringRef messageName, WKTypeRef messageBody);
     WKRetainPtr<WKTypeRef> didReceiveSynchronousMessageFromInjectedBundle(WKStringRef messageName, WKTypeRef messageBody);
 
     void dumpWebProcessUnresponsiveness();
+    void outputText(const WTF::String&);
 private:
     void dumpResults();
     static void dump(const char* textToStdout, const char* textToStderr = 0, bool seenError = false);
     void dumpPixelsAndCompareWithExpected(WKImageRef, WKArrayRef repaintRects);
+    void dumpAudio(WKDataRef);
     bool compareActualHashToExpectedAndDumpResults(const char[33]);
 
-#if PLATFORM(QT)
+#if PLATFORM(QT) || PLATFORM(EFL)
     static void forceRepaintDoneCallback(WKErrorRef, void* context);
-    void forceRepaintDone();
 #endif
     
     WKRetainPtr<WKURLRef> m_url;
@@ -62,17 +67,20 @@ private:
     bool m_dumpPixels;
     std::string m_expectedPixelHash;
 
+    int m_timeout;
+
     // Invocation state
     bool m_gotInitialResponse;
     bool m_gotFinalMessage;
     bool m_gotRepaint;
     bool m_error;
 
-    WKRetainPtr<WKStringRef> m_textOutput;
+    StringBuilder m_textOutput;
+    WKRetainPtr<WKDataRef> m_audioResult;
     WKRetainPtr<WKImageRef> m_pixelResult;
     WKRetainPtr<WKArrayRef> m_repaintRects;
     std::string m_errorMessage;
-    bool m_webProcessIsUnrensponsive;
+    bool m_webProcessIsUnresponsive;
 
 };
 

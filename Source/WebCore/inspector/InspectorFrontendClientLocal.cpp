@@ -140,8 +140,11 @@ void InspectorFrontendClientLocal::windowObjectCleared()
 
 void InspectorFrontendClientLocal::frontendLoaded()
 {
-    bringToFront();
+    // Call setDockingUnavailable before bringToFront. If we display the inspector window via bringToFront first it causes the call to canAttachWindow to return the wrong result on Windows.
+    // Calling bringToFront first causes the visibleHeight of the inspected page to always return 0 immediately after. 
+    // Thus if we call canAttachWindow first we can avoid this problem. This change does not cause any regressions on Mac.
     setDockingUnavailable(!canAttachWindow());
+    bringToFront();
     m_frontendLoaded = true;
     for (Vector<String>::iterator it = m_evaluateOnLoad.begin(); it != m_evaluateOnLoad.end(); ++it)
         evaluateOnLoad(*it);
@@ -163,7 +166,7 @@ bool InspectorFrontendClientLocal::canAttachWindow()
 {
     // Don't allow the attach if the window would be too small to accommodate the minimum inspector height.
     // Also don't allow attaching to another inspector -- two inspectors in one window is too much!
-    bool isInspectorPage = m_inspectorController->inspectedPage()->inspectorController()->hasInspectorFrontendClient();
+    bool isInspectorPage = m_inspectorController->hasInspectorFrontendClient();
     unsigned inspectedPageHeight = m_inspectorController->inspectedPage()->mainFrame()->view()->visibleHeight();
     unsigned maximumAttachedHeight = inspectedPageHeight * maximumAttachedHeightRatio;
     return minimumAttachedHeight <= maximumAttachedHeight && !isInspectorPage;
@@ -184,7 +187,7 @@ void InspectorFrontendClientLocal::changeAttachedWindowHeight(unsigned height)
 
 void InspectorFrontendClientLocal::openInNewTab(const String& url)
 {
-    UserGestureIndicator indicator(DefinitelyProcessingUserGesture);
+    UserGestureIndicator indicator(DefinitelyProcessingNewUserGesture);
     Page* page = m_inspectorController->inspectedPage();
     Frame* mainFrame = page->mainFrame();
     FrameLoadRequest request(mainFrame->document()->securityOrigin(), ResourceRequest(), "_blank");
@@ -292,6 +295,11 @@ unsigned InspectorFrontendClientLocal::constrainedAttachedWindowHeight(unsigned 
 void InspectorFrontendClientLocal::sendMessageToBackend(const String& message)
 {
     m_dispatchTask->dispatch(message);
+}
+
+bool InspectorFrontendClientLocal::isUnderTest()
+{
+    return m_inspectorController->isUnderTest();
 }
 
 bool InspectorFrontendClientLocal::evaluateAsBoolean(const String& expression)

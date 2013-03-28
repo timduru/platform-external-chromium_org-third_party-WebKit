@@ -68,6 +68,16 @@ bool WebInputElement::isImageButton() const
     return constUnwrap<HTMLInputElement>()->isImageButton();
 }
 
+bool WebInputElement::isRadioButton() const
+{
+    return constUnwrap<HTMLInputElement>()->isRadioButton();
+}
+
+bool WebInputElement::isCheckbox() const
+{
+    return constUnwrap<HTMLInputElement>()->isCheckbox();
+}
+
 bool WebInputElement::autoComplete() const
 {
     return constUnwrap<HTMLInputElement>()->shouldAutocomplete();
@@ -125,12 +135,12 @@ WebString WebInputElement::suggestedValue() const
 
 void WebInputElement::setPlaceholder(const WebString& value)
 {
-    unwrap<HTMLInputElement>()->setPlaceholder(value);
+    unwrap<HTMLInputElement>()->setAttribute(HTMLNames::placeholderAttr, value);
 }
 
 WebString WebInputElement::placeholder() const
 {
-    return constUnwrap<HTMLInputElement>()->placeholder();
+    return constUnwrap<HTMLInputElement>()->fastGetAttribute(HTMLNames::placeholderAttr);
 }
 
 bool WebInputElement::isAutofilled() const
@@ -161,6 +171,11 @@ int WebInputElement::selectionEnd() const
 bool WebInputElement::isValidValue(const WebString& value) const
 {
     return constUnwrap<HTMLInputElement>()->isValidValue(value);
+}
+
+void WebInputElement::setChecked(bool nowChecked, bool sendChangeEvent)
+{
+    unwrap<HTMLInputElement>()->setChecked(nowChecked, sendChangeEvent ? DispatchChangeEvent : DispatchNoEvent);
 }
 
 bool WebInputElement::isChecked() const

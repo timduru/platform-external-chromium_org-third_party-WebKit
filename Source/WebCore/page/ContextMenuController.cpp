@@ -43,6 +43,7 @@
 #include "Event.h"
 #include "EventHandler.h"
 #include "EventNames.h"
+#include "ExceptionCodePlaceholder.h"
 #include "FormState.h"
 #include "Frame.h"
 #include "FrameLoadRequest.h"
@@ -142,6 +143,8 @@ void ContextMenuController::showContextMenu(Event* event, PassRefPtr<ContextMenu
 
 PassOwnPtr<ContextMenu> ContextMenuController::createContextMenu(Event* event)
 {
+    ASSERT(event);
+    
     if (!event->isMouseEvent())
         return nullptr;
 
@@ -149,7 +152,7 @@ PassOwnPtr<ContextMenu> ContextMenuController::createContextMenu(Event* event)
     HitTestResult result(mouseEvent->absoluteLocation());
 
     if (Frame* frame = event->target()->toNode()->document()->frame())
-        result = frame->eventHandler()->hitTestResultAtPoint(mouseEvent->absoluteLocation(), false);
+        result = frame->eventHandler()->hitTestResultAtPoint(mouseEvent->absoluteLocation());
 
     if (!result.innerNonSharedNode())
         return nullptr;
@@ -340,15 +343,28 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
         frame->editor()->command("SelectAll").execute();
         break;
 #endif
-    case ContextMenuItemTagSpellingGuess:
-        ASSERT(frame->editor()->selectedText().length());
-        if (frame->editor()->shouldInsertText(item->title(), frame->selection()->toNormalizedRange().get(), EditorInsertActionPasted)) {
+    case ContextMenuItemTagSpellingGuess: {
+        FrameSelection* frameSelection = frame->selection();
+        if (frame->editor()->shouldInsertText(item->title(), frameSelection->toNormalizedRange().get(), EditorInsertActionPasted)) {
             Document* document = frame->document();
-            RefPtr<ReplaceSelectionCommand> command = ReplaceSelectionCommand::create(document, createFragmentFromMarkup(document, item->title(), ""), ReplaceSelectionCommand::SelectReplacement | ReplaceSelectionCommand::MatchStyle | ReplaceSelectionCommand::PreventNesting);
+            ReplaceSelectionCommand::CommandOptions replaceOptions = ReplaceSelectionCommand::MatchStyle | ReplaceSelectionCommand::PreventNesting;
+
+            if (frame->editor()->behavior().shouldAllowSpellingSuggestionsWithoutSelection()) {
+                ASSERT(frameSelection->isCaretOrRange());
+                VisibleSelection wordSelection(frameSelection->base());
+                wordSelection.expandUsingGranularity(WordGranularity);
+                frameSelection->setSelection(wordSelection);
+            } else {
+                ASSERT(frame->editor()->selectedText().length());
+                replaceOptions |= ReplaceSelectionCommand::SelectReplacement;
+            }
+
+            RefPtr<ReplaceSelectionCommand> command = ReplaceSelectionCommand::create(document, createFragmentFromMarkup(document, item->title(), ""), replaceOptions);
             applyCommand(command);
-            frame->selection()->revealSelection(ScrollAlignment::alignToEdgeIfNeeded);
+            frameSelection->revealSelection(ScrollAlignment::alignToEdgeIfNeeded);
         }
         break;
+    }
     case ContextMenuItemTagIgnoreSpelling:
         frame->editor()->ignoreSpelling();
         break;
@@ -385,12 +401,11 @@ void ContextMenuController::contextMenuItemSelected(ContextMenuItem* item)
         // which may make this difficult to implement. Maybe a special case of text-shadow?
         break;
     case ContextMenuItemTagStartSpeaking: {
-        ExceptionCode ec;
         RefPtr<Range> selectedRange = frame->selection()->toNormalizedRange();
-        if (!selectedRange || selectedRange->collapsed(ec)) {
+        if (!selectedRange || selectedRange->collapsed(IGNORE_EXCEPTION)) {
             Document* document = m_hitTestResult.innerNonSharedNode()->document();
             selectedRange = document->createRange();
-            selectedRange->selectNode(document->documentElement(), ec);
+            selectedRange->selectNode(document->documentElement(), IGNORE_EXCEPTION);
         }
         m_client->speak(plainText(selectedRange.get()));
         break;
@@ -702,9 +717,8 @@ static bool selectionContainsPossibleWord(Frame* frame)
     // Current algorithm: look for a character that's not just a separator.
     for (TextIterator it(frame->selection()->toNormalizedRange().get()); !it.atEnd(); it.advance()) {
         int length = it.length();
-        const UChar* characters = it.characters();
         for (int i = 0; i < length; ++i)
-            if (!(category(characters[i]) & (Separator_Space | Separator_Line | Separator_Paragraph)))
+            if (!(category(it.characterAt(i)) & (Separator_Space | Separator_Line | Separator_Paragraph)))
                 return true;
     }
     return false;
@@ -785,7 +799,7 @@ void ContextMenuController::populate()
     if (!node)
         return;
 #if PLATFORM(GTK)
-    if (!m_hitTestResult.isContentEditable() && (node->isElementNode() && static_cast<Element*>(node)->isFormControlElement()))
+    if (!m_hitTestResult.isContentEditable() && (node->isElementNode() && toElement(node)->isFormControlElement()))
         return;
 #endif
     Frame* frame = node->document()->frame();
@@ -876,8 +890,8 @@ void ContextMenuController::populate()
                 if (!(frame->page() && frame->page()->inspectorController()->hasInspectorFrontendClient())) {
 #endif
 
-                // In GTK+ unavailable items are not hidden but insensitive
-#if PLATFORM(GTK)
+                // In GTK+ and EFL, unavailable items are not hidden but insensitive.
+#if PLATFORM(GTK) || PLATFORM(EFL)
                 appendItem(BackItem, m_contextMenu.get());
                 appendItem(ForwardItem, m_contextMenu.get());
                 appendItem(StopItem, m_contextMenu.get());
@@ -915,7 +929,7 @@ void ContextMenuController::populate()
                 // is never considered a misspelling and bad grammar at the same time)
                 bool misspelling;
                 bool badGrammar;
-                Vector<String> guesses = frame->editor()->guessesForMisspelledOrUngrammaticalSelection(misspelling, badGrammar);
+                Vector<String> guesses = frame->editor()->guessesForMisspelledOrUngrammatical(misspelling, badGrammar);
                 if (misspelling || badGrammar) {
                     size_t size = guesses.size();
                     if (!size) {

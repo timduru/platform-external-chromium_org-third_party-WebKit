@@ -205,6 +205,7 @@ PassRefPtr<CustomFilterCompiledProgram> CustomFilterValidatedProgram::compiledPr
     ASSERT(m_isInitialized && m_globalContext && !m_validatedVertexShader.isNull() && !m_validatedFragmentShader.isNull());
     if (!m_compiledProgram) {
         m_compiledProgram = CustomFilterCompiledProgram::create(m_globalContext->context(), m_validatedVertexShader, m_validatedFragmentShader, m_programInfo.programType());
+        ASSERT(m_compiledProgram->isInitialized());
         ASSERT(m_compiledProgram->samplerLocation() != -1 || !needsInputTexture());
     }
     return m_compiledProgram;
@@ -273,9 +274,11 @@ void CustomFilterValidatedProgram::rewriteMixFragmentShader()
         {
             css_main();
             mediump vec4 originalColor = texture2D(css_u_texture, css_v_texCoord);
-            mediump vec4 multipliedColor = css_ColorMatrix * originalColor;
-            mediump vec3 blendedColor = css_BlendColor(multipliedColor.rgb, css_MixColor.rgb);
-            gl_FragColor = css_Composite(multipliedColor.rgb, multipliedColor.a, blendedColor.rgb, css_MixColor.a);
+            mediump vec4 multipliedColor = clamp(css_ColorMatrix * originalColor, 0.0, 1.0);
+            mediump vec4 clampedMixColor = clamp(css_MixColor, 0.0, 1.0);
+            mediump vec3 blendedColor = css_BlendColor(multipliedColor.rgb, clampedMixColor.rgb);
+            mediump vec3 weightedColor = (1.0 - multipliedColor.a) * clampedMixColor.rgb + multipliedColor.a * blendedColor;
+            gl_FragColor = css_Composite(multipliedColor.rgb, multipliedColor.a, weightedColor.rgb, clampedMixColor.a);
         }
     ));
     m_validatedFragmentShader = builder.toString();
@@ -289,6 +292,9 @@ String CustomFilterValidatedProgram::blendFunctionString(BlendMode blendMode)
     // Cb: is the backdrop color in css_BlendColor() and the backdrop color component in css_BlendComponent()
     const char* blendColorExpression = "vec3(css_BlendComponent(Cb.r, Cs.r), css_BlendComponent(Cb.g, Cs.g), css_BlendComponent(Cb.b, Cs.b))";
     const char* blendComponentExpression = "Co = 0.0;";
+    bool needsLuminosityHelperFunctions = false;
+    bool needsSaturationHelperFunctions = false;
+    String blendFunctionString;
     switch (blendMode) {
     case BlendModeNormal:
         blendColorExpression = "Cs";
@@ -403,15 +409,97 @@ String CustomFilterValidatedProgram::blendFunctionString(BlendMode blendMode)
                 Co = Cb + (2.0 * Cs - 1.0) * (D - Cb);
         );
         break;
-    case BlendModeHue:
-    case BlendModeSaturation:
     case BlendModeColor:
+        needsLuminosityHelperFunctions = true;
+        blendColorExpression = "css_SetLum(Cs, css_Lum(Cb))";
+        break;
     case BlendModeLuminosity:
-        notImplemented();
-        return String();
+        needsLuminosityHelperFunctions = true;
+        blendColorExpression = "css_SetLum(Cb, css_Lum(Cs))";
+        break;
+    case BlendModeHue:
+        needsLuminosityHelperFunctions = true;
+        needsSaturationHelperFunctions = true;
+        blendColorExpression = "css_SetLum(css_SetSat(Cs, css_Sat(Cb)), css_Lum(Cb))";
+        break;
+    case BlendModeSaturation:
+        needsLuminosityHelperFunctions = true;
+        needsSaturationHelperFunctions = true;
+        blendColorExpression = "css_SetLum(css_SetSat(Cb, css_Sat(Cs)), css_Lum(Cb))";
+        break;
+    default:
+        ASSERT_NOT_REACHED();
     }
 
-    return String::format(SHADER(
+    if (needsLuminosityHelperFunctions) {
+        blendFunctionString.append(SHADER(
+            mediump float css_Lum(mediump vec3 C)
+            {
+                return 0.3 * C.r + 0.59 * C.g + 0.11 * C.b;
+            }
+            mediump vec3 css_ClipColor(mediump vec3 C)
+            {
+                mediump float L = css_Lum(C);
+                mediump float n = min(min(C.r, C.g), C.b);
+                mediump float x = max(max(C.r, C.g), C.b);
+                if (n < 0.0)
+                    C = L + (((C - L) * L) / (L - n));
+                if (x > 1.0)
+                    C = L + (((C - L) * (1.0 - L) / (x - L)));
+                return C;
+            }
+            mediump vec3 css_SetLum(mediump vec3 C, mediump float l)
+            {
+                C += l - css_Lum(C);
+                return css_ClipColor(C);
+            }
+        ));
+    }
+
+    if (needsSaturationHelperFunctions) {
+        blendFunctionString.append(SHADER(
+            mediump float css_Sat(mediump vec3 C)
+            {
+                mediump float cMin = min(min(C.r, C.g), C.b);
+                mediump float cMax = max(max(C.r, C.g), C.b);
+                return cMax - cMin;
+            }
+            void css_SetSatHelper(inout mediump float cMin, inout mediump float cMid, inout mediump float cMax, mediump float s)
+            {
+                if (cMax > cMin) {
+                    cMid = (((cMid - cMin) * s) / (cMax - cMin));
+                    cMax = s;
+                } else
+                    cMid = cMax = 0.0;
+                cMin = 0.0;
+            }
+            mediump vec3 css_SetSat(mediump vec3 C, mediump float s)
+            {
+                if (C.r <= C.g) {
+                    if (C.g <= C.b)
+                        css_SetSatHelper(C.r, C.g, C.b, s);
+                    else {
+                        if (C.r <= C.b)
+                            css_SetSatHelper(C.r, C.b, C.g, s);
+                        else
+                            css_SetSatHelper(C.b, C.r, C.g, s);
+                    }
+                } else {
+                    if (C.r <= C.b)
+                        css_SetSatHelper(C.g, C.r, C.b, s);
+                    else {
+                        if (C.g <= C.b)
+                            css_SetSatHelper(C.g, C.b, C.r, s);
+                        else
+                            css_SetSatHelper(C.b, C.g, C.r, s);
+                    }
+                }
+                return C;
+            }
+        ));
+    }
+
+    blendFunctionString.append(String::format(SHADER(
         mediump float css_BlendComponent(mediump float Cb, mediump float Cs)
         {
             mediump float Co;
@@ -422,7 +510,9 @@ String CustomFilterValidatedProgram::blendFunctionString(BlendMode blendMode)
         {
             return %s;
         }
-    ), blendComponentExpression, blendColorExpression);
+    ), blendComponentExpression, blendColorExpression));
+
+    return blendFunctionString;
 }
 
 String CustomFilterValidatedProgram::compositeFunctionString(CompositeOperator compositeOperator)
@@ -512,7 +602,13 @@ CustomFilterValidatedProgram::~CustomFilterValidatedProgram()
         m_globalContext->removeValidatedProgram(this);
 }
 
-#if !PLATFORM(BLACKBERRY)
+CustomFilterProgramInfo CustomFilterValidatedProgram::validatedProgramInfo() const
+{
+    ASSERT(m_isInitialized);
+    return CustomFilterProgramInfo(m_validatedVertexShader, m_validatedFragmentShader, m_programInfo.programType(), m_programInfo.mixSettings(), m_programInfo.meshType());
+}
+
+#if !PLATFORM(BLACKBERRY) && !USE(TEXTURE_MAPPER)
 void CustomFilterValidatedProgram::platformInit()
 {
 }

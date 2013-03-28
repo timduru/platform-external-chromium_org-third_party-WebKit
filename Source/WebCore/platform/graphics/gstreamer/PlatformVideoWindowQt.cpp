@@ -19,7 +19,7 @@
 
 #include "config.h"
 #include "PlatformVideoWindow.h"
-#if ENABLE(VIDEO) && USE(GSTREAMER) && !defined(GST_API_VERSION_1)
+#if ENABLE(VIDEO) && USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)
 
 #include "HTMLVideoElement.h"
 #include "PlatformVideoWindowPrivate.h"
@@ -38,7 +38,7 @@ static const int gHideMouseCursorDelay = 3000;
 FullScreenVideoWindow::FullScreenVideoWindow()
     : m_mediaElement(0)
 {
-    setWindowModality(Qt::ApplicationModal);
+    setModality(Qt::ApplicationModal);
 
 #ifndef QT_NO_CURSOR
     m_cursorTimer.setSingleShot(true);
@@ -115,7 +115,7 @@ PlatformVideoWindow::PlatformVideoWindow()
 {
     QWindow* win = new FullScreenVideoWindow();
     m_window = win;
-    win->setWindowFlags(win->windowFlags() | Qt::FramelessWindowHint);
+    win->setFlags(win->flags() | Qt::FramelessWindowHint);
     // FIXME: Port to Qt 5.
     win->showFullScreen();
     m_videoWindowId = win->winId();
@@ -130,4 +130,4 @@ PlatformVideoWindow::~PlatformVideoWindow()
 void PlatformVideoWindow::prepareForOverlay(GstMessage*)
 {
 }
-#endif // ENABLE(VIDEO) && USE(GSTREAMER) && !defined(GST_API_VERSION_1)
+#endif // ENABLE(VIDEO) && USE(GSTREAMER) && USE(NATIVE_FULLSCREEN_VIDEO)

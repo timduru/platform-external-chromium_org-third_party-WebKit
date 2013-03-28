@@ -56,7 +56,7 @@ static Frame* retrieveFrameWithGlobalObjectCheck(v8::Handle<v8::Context> context
     if (global.IsEmpty())
         return 0;
 
-    global = V8DOMWrapper::lookupDOMWrapper(V8DOMWindow::GetTemplate(), global);
+    global = global->FindInstanceInPrototypeChain(V8DOMWindow::GetTemplate(context->GetIsolate(), worldTypeInMainThread(context->GetIsolate())));
     if (global.IsEmpty())
         return 0;
 
@@ -96,8 +96,8 @@ void PageScriptDebugServer::addListener(ScriptDebugListener* listener, Page* pag
     if (!shell || !shell->isContextInitialized())
         return;
     v8::Handle<v8::Context> context = shell->context();
-    v8::Handle<v8::Function> getScriptsFunction = v8::Local<v8::Function>::Cast(m_debuggerScript.get()->Get(v8::String::New("getScripts")));
-    v8::Handle<v8::Value> argv[] = { context->GetData() };
+    v8::Handle<v8::Function> getScriptsFunction = v8::Local<v8::Function>::Cast(m_debuggerScript.get()->Get(v8::String::NewSymbol("getScripts")));
+    v8::Handle<v8::Value> argv[] = { context->GetEmbedderData(0) };
     v8::Handle<v8::Value> value;
     {
         V8RecursionScope::MicrotaskSuppression scope;
@@ -108,7 +108,7 @@ void PageScriptDebugServer::addListener(ScriptDebugListener* listener, Page* pag
     ASSERT(!value->IsUndefined() && value->IsArray());
     v8::Handle<v8::Array> scriptsArray = v8::Handle<v8::Array>::Cast(value);
     for (unsigned i = 0; i < scriptsArray->Length(); ++i)
-        dispatchDidParseSource(listener, v8::Handle<v8::Object>::Cast(scriptsArray->Get(v8Integer(i))));
+        dispatchDidParseSource(listener, v8::Handle<v8::Object>::Cast(scriptsArray->Get(v8Integer(i, context->GetIsolate()))));
 }
 
 void PageScriptDebugServer::removeListener(ScriptDebugListener* listener, Page* page)
@@ -134,7 +134,7 @@ void PageScriptDebugServer::setClientMessageLoop(PassOwnPtr<ClientMessageLoop> c
 void PageScriptDebugServer::compileScript(ScriptState* state, const String& expression, const String& sourceURL, String* scriptId, String* exceptionMessage)
 {
     ScriptExecutionContext* scriptExecutionContext = state->scriptExecutionContext();
-    RefPtr<Frame> protect = static_cast<Document*>(scriptExecutionContext)->frame();
+    RefPtr<Frame> protect = toDocument(scriptExecutionContext)->frame();
     ScriptDebugServer::compileScript(state, expression, sourceURL, scriptId, exceptionMessage);
     if (!scriptId->isNull())
         m_compiledScriptURLs.set(*scriptId, sourceURL);
@@ -151,7 +151,7 @@ void PageScriptDebugServer::runScript(ScriptState* state, const String& scriptId
     String sourceURL = m_compiledScriptURLs.take(scriptId);
 
     ScriptExecutionContext* scriptExecutionContext = state->scriptExecutionContext();
-    Frame* frame = static_cast<Document*>(scriptExecutionContext)->frame();
+    Frame* frame = toDocument(scriptExecutionContext)->frame();
     InspectorInstrumentationCookie cookie;
     if (frame)
         cookie = InspectorInstrumentation::willEvaluateScript(frame, sourceURL, TextPosition::minimumPosition().m_line.oneBasedInt());

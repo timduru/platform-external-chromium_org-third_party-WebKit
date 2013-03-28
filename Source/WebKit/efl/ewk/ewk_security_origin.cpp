@@ -22,7 +22,7 @@
 
 #include "ApplicationCache.h"
 #include "ApplicationCacheStorage.h"
-#include "DatabaseTracker.h"
+#include "DatabaseManager.h"
 #include "SecurityOrigin.h"
 #include "ewk_security_origin_private.h"
 #include "ewk_web_database.h"
@@ -64,22 +64,24 @@ uint32_t ewk_security_origin_port_get(const Ewk_Security_Origin* origin)
 
 uint64_t ewk_security_origin_web_database_usage_get(const Ewk_Security_Origin* origin)
 {
+#if ENABLE(SQL_DATABASE)
     EINA_SAFETY_ON_NULL_RETURN_VAL(origin, 0);
 
-#if ENABLE(SQL_DATABASE)
-    return WebCore::DatabaseTracker::tracker().usageForOrigin(origin->securityOrigin.get());
+    return WebCore::DatabaseManager::manager().usageForOrigin(origin->securityOrigin.get());
 #else
+    UNUSED_PARAM(origin);
     return 0;
 #endif
 }
 
 uint64_t ewk_security_origin_web_database_quota_get(const Ewk_Security_Origin* origin)
 {
+#if ENABLE(SQL_DATABASE)
     EINA_SAFETY_ON_NULL_RETURN_VAL(origin, 0);
 
-#if ENABLE(SQL_DATABASE)
-    return WebCore::DatabaseTracker::tracker().quotaForOrigin(origin->securityOrigin.get());
+    return WebCore::DatabaseManager::manager().quotaForOrigin(origin->securityOrigin.get());
 #else
+    UNUSED_PARAM(origin)
     return 0;
 #endif
 }
@@ -89,7 +91,7 @@ void ewk_security_origin_web_database_quota_set(const Ewk_Security_Origin* origi
     EINA_SAFETY_ON_NULL_RETURN(origin);
 
 #if ENABLE(SQL_DATABASE)
-    WebCore::DatabaseTracker::tracker().setQuota(origin->securityOrigin.get(), quota);
+    WebCore::DatabaseManager::manager().setQuota(origin->securityOrigin.get(), quota);
 #endif
 }
 
@@ -113,7 +115,7 @@ Eina_List* ewk_security_origin_web_database_get_all(const Ewk_Security_Origin* o
 #if ENABLE(SQL_DATABASE)
     Vector<WTF::String> names;
 
-    if (!WebCore::DatabaseTracker::tracker().databaseNamesForOrigin(origin->securityOrigin.get(), names))
+    if (!WebCore::DatabaseManager::manager().databaseNamesForOrigin(origin->securityOrigin.get(), names))
         return 0;
 
     for (unsigned i = 0; i < names.size(); i++) {

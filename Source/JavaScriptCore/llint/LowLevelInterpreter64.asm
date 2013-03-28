@@ -241,17 +241,29 @@ _llint_op_create_arguments:
 
 _llint_op_create_this:
     traceExecution()
-    loadp Callee[cfr], t0
-    loadp JSFunction::m_cachedInheritorID[t0], t2
-    btpz t2, .opCreateThisSlow
-    allocateBasicJSObject(JSFinalObjectSizeClassIndex, t2, t0, t1, t3, .opCreateThisSlow)
+    loadisFromInstruction(2, t0)
+    loadp [cfr, t0, 8], t0
+    loadp JSFunction::m_allocationProfile + ObjectAllocationProfile::m_allocator[t0], t1
+    loadp JSFunction::m_allocationProfile + ObjectAllocationProfile::m_structure[t0], t2
+    btpz t1, .opCreateThisSlow
+    allocateJSObject(t1, t2, t0, t3, .opCreateThisSlow)
     loadisFromInstruction(1, t1)
     storeq t0, [cfr, t1, 8]
-    dispatch(2)
+    dispatch(4)
 
 .opCreateThisSlow:
     callSlowPath(_llint_slow_path_create_this)
-    dispatch(2)
+    dispatch(4)
+
+
+_llint_op_get_callee:
+    traceExecution()
+    loadisFromInstruction(1, t0)
+    loadpFromInstruction(2, t2)
+    loadp Callee[cfr], t1
+    valueProfile(t1, t2)
+    storep t1, [cfr, t0, 8]
+    dispatch(3)
 
 
 _llint_op_convert_this:
@@ -272,17 +284,17 @@ _llint_op_convert_this:
 
 _llint_op_new_object:
     traceExecution()
-    loadp CodeBlock[cfr], t0
-    loadp CodeBlock::m_globalObject[t0], t0
-    loadp JSGlobalObject::m_emptyObjectStructure[t0], t1
-    allocateBasicJSObject(JSFinalObjectSizeClassIndex, t1, t0, t2, t3, .opNewObjectSlow)
+    loadpFromInstruction(3, t0)
+    loadp ObjectAllocationProfile::m_allocator[t0], t1
+    loadp ObjectAllocationProfile::m_structure[t0], t2
+    allocateJSObject(t1, t2, t0, t3, .opNewObjectSlow)
     loadisFromInstruction(1, t1)
     storeq t0, [cfr, t1, 8]
-    dispatch(2)
+    dispatch(4)
 
 .opNewObjectSlow:
     callSlowPath(_llint_slow_path_new_object)
-    dispatch(2)
+    dispatch(4)
 
 
 _llint_op_mov:
@@ -1029,18 +1041,18 @@ _llint_op_get_by_val:
     bineq t2, ContiguousShape, .opGetByValNotContiguous
 .opGetByValIsContiguous:
 
-    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValSlow
+    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValOutOfBounds
     loadisFromInstruction(1, t0)
     loadq [t3, t1, 8], t2
-    btqz t2, .opGetByValSlow
+    btqz t2, .opGetByValOutOfBounds
     jmp .opGetByValDone
 
 .opGetByValNotContiguous:
     bineq t2, DoubleShape, .opGetByValNotDouble
-    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValSlow
+    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t3], .opGetByValOutOfBounds
     loadis 8[PB, PC, 8], t0
     loadd [t3, t1, 8], ft0
-    bdnequn ft0, ft0, .opGetByValSlow
+    bdnequn ft0, ft0, .opGetByValOutOfBounds
     fd2q ft0, t2
     subq tagTypeNumber, t2
     jmp .opGetByValDone
@@ -1048,10 +1060,10 @@ _llint_op_get_by_val:
 .opGetByValNotDouble:
     subi ArrayStorageShape, t2
     bia t2, SlowPutArrayStorageShape - ArrayStorageShape, .opGetByValSlow
-    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t3], .opGetByValSlow
+    biaeq t1, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t3], .opGetByValOutOfBounds
     loadisFromInstruction(1, t0)
     loadq ArrayStorage::m_vector[t3, t1, 8], t2
-    btqz t2, .opGetByValSlow
+    btqz t2, .opGetByValOutOfBounds
 
 .opGetByValDone:
     storeq t2, [cfr, t0, 8]
@@ -1059,6 +1071,11 @@ _llint_op_get_by_val:
     valueProfile(t2, t0)
     dispatch(6)
 
+.opGetByValOutOfBounds:
+    if VALUE_PROFILER
+        loadpFromInstruction(4, t0)
+        storeb 1, ArrayProfile::m_outOfBounds[t0]
+    end
 .opGetByValSlow:
     callSlowPath(_llint_slow_path_get_by_val)
     dispatch(6)
@@ -1129,7 +1146,7 @@ macro contiguousPutByVal(storeCallback)
     dispatch(5)
 
 .outOfBounds:
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
+    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValOutOfBounds
     if VALUE_PROFILER
         loadp 32[PB, PC, 8], t2
         storeb 1, ArrayProfile::m_mayStoreToHole[t2]
@@ -1186,7 +1203,7 @@ _llint_op_put_by_val:
 
 .opPutByValNotContiguous:
     bineq t2, ArrayStorageShape, .opPutByValSlow
-    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValSlow
+    biaeq t3, -sizeof IndexingHeader + IndexingHeader::m_vectorLength[t0], .opPutByValOutOfBounds
     btqz ArrayStorage::m_vector[t0, t3, 8], .opPutByValArrayStorageEmpty
 .opPutByValArrayStorageStoreResult:
     loadisFromInstruction(3, t2)
@@ -1206,6 +1223,11 @@ _llint_op_put_by_val:
     storei t1, -sizeof IndexingHeader + IndexingHeader::m_publicLength[t0]
     jmp .opPutByValArrayStorageStoreResult
 
+.opPutByValOutOfBounds:
+    if VALUE_PROFILER
+        loadpFromInstruction(4, t0)
+        storeb 1, ArrayProfile::m_outOfBounds[t0]
+    end
 .opPutByValSlow:
     callSlowPath(_llint_slow_path_put_by_val)
     dispatch(5)
@@ -1610,6 +1632,67 @@ _llint_throw_during_call_trampoline:
     loadp JSGlobalData::callFrameForThrow[t1], t0
     jmp JSGlobalData::targetMachinePCForThrow[t1]
 
+# Gives you the scope in t0, while allowing you to optionally perform additional checks on the
+# scopes as they are traversed. scopeCheck() is called with two arguments: the register
+# holding the scope, and a register that can be used for scratch. Note that this does not
+# use t3, so you can hold stuff in t3 if need be.
+macro getDeBruijnScope(deBruijinIndexOperand, scopeCheck)
+    loadp ScopeChain[cfr], t0
+    loadis deBruijinIndexOperand, t2
+
+    btiz t2, .done
+
+    loadp CodeBlock[cfr], t1
+    bineq CodeBlock::m_codeType[t1], FunctionCode, .loop
+    btbz CodeBlock::m_needsActivation[t1], .loop
+
+    loadis CodeBlock::m_activationRegister[t1], t1
+
+    # Need to conditionally skip over one scope.
+    btpz [cfr, t1, 8], .noActivation
+    scopeCheck(t0, t1)
+    loadp JSScope::m_next[t0], t0
+.noActivation:
+    subi 1, t2
+
+    btiz t2, .done
+.loop:
+    scopeCheck(t0, t1)
+    loadp JSScope::m_next[t0], t0
+    subi 1, t2
+    btinz t2, .loop
+
+.done:
+end
+
+_llint_op_get_scoped_var:
+    traceExecution()
+    # Operands are as follows:
+    # pc[1]: Destination for the load
+    # pc[2]: Index of register in the scope
+    # 24[PB, PC, 8]  De Bruijin index.
+    getDeBruijnScope(24[PB, PC, 8], macro (scope, scratch) end)
+    loadisFromInstruction(1, t1)
+    loadisFromInstruction(2, t2)
+
+    loadp JSVariableObject::m_registers[t0], t0
+    loadp [t0, t2, 8], t3
+    storep t3, [cfr, t1, 8]
+    loadp 32[PB, PC, 8], t1
+    valueProfile(t3, t1)
+    dispatch(5)
+
+
+_llint_op_put_scoped_var:
+    traceExecution()
+    getDeBruijnScope(16[PB, PC, 8], macro (scope, scratch) end)
+    loadis 24[PB, PC, 8], t1
+    loadConstantOrVariable(t1, t3)
+    loadis 8[PB, PC, 8], t1
+    writeBarrier(t3)
+    loadp JSVariableObject::m_registers[t0], t0
+    storep t3, [t0, t1, 8]
+    dispatch(4)
 
 macro nativeCallTrampoline(executableOffsetToFunction)
     storep 0, CodeBlock[cfr]

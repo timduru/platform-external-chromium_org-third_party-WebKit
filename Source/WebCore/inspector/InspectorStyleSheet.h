@@ -152,6 +152,7 @@ private:
     bool styleText(String* result) const;
     bool populateAllProperties(Vector<InspectorStyleProperty>* result) const;
     PassRefPtr<TypeBuilder::CSS::CSSStyle> styleWithProperties() const;
+    PassRefPtr<CSSRuleSourceData> extractSourceData() const;
     bool applyStyleText(const String&);
     String shorthandValue(const String& shorthandProperty) const;
     String shorthandPriority(const String& shorthandProperty) const;
@@ -185,7 +186,7 @@ public:
     String finalURL() const;
     CSSStyleSheet* pageStyleSheet() const { return m_pageStyleSheet.get(); }
     void reparseStyleSheet(const String&);
-    bool setText(const String&);
+    bool setText(const String&, ExceptionCode&);
     String ruleSelector(const InspectorCSSId&, ExceptionCode&);
     bool setRuleSelector(const InspectorCSSId&, const String& selector, ExceptionCode&);
     CSSStyleRule* addRule(const String& selector, ExceptionCode&);
@@ -220,11 +221,14 @@ protected:
 
     // Also accessed by friend class InspectorStyle.
     virtual bool setStyleText(CSSStyleDeclaration*, const String&);
+    virtual PassOwnPtr<Vector<size_t> > lineEndings() const;
 
 private:
+    typedef Vector<RefPtr<CSSStyleRule> > CSSStyleRuleVector;
     friend class InspectorStyle;
 
-    static void collectFlatRules(PassRefPtr<CSSRuleList>, Vector<CSSStyleRule*>* result);
+    static void collectFlatRules(PassRefPtr<CSSRuleList>, CSSStyleRuleVector* result);
+    bool checkPageStyleSheet(ExceptionCode&) const;
     bool ensureText() const;
     bool ensureSourceData();
     void ensureFlatRules() const;
@@ -244,7 +248,7 @@ private:
     bool m_isRevalidating;
     ParsedStyleSheet* m_parsedStyleSheet;
     InspectorStyleMap m_inspectorStyles;
-    mutable Vector<CSSStyleRule*> m_flatRules;
+    mutable CSSStyleRuleVector m_flatRules;
     Listener* m_listener;
 };
 
@@ -269,6 +273,7 @@ protected:
 
     // Also accessed by friend class InspectorStyle.
     virtual bool setStyleText(CSSStyleDeclaration*, const String&);
+    virtual PassOwnPtr<Vector<size_t> > lineEndings() const;
 
 private:
     CSSStyleDeclaration* inlineStyle() const;

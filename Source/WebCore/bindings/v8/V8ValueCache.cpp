@@ -26,26 +26,42 @@
 #include "config.h"
 #include "V8ValueCache.h"
 
-#include "BindingVisitors.h"
 #include "V8Binding.h"
+#include "WebCoreMemoryInstrumentation.h"
+#include <wtf/MemoryInstrumentationHashMap.h>
+
+namespace WTF {
+
+template<> struct SequenceMemoryInstrumentationTraits<v8::String*> {
+    template <typename I> static void reportMemoryUsage(I, I, MemoryClassInfo&) { }
+};
+
+}
 
 namespace WebCore {
 
 static v8::Local<v8::String> makeExternalString(const String& string)
 {
-    WebCoreStringResource* stringResource = new WebCoreStringResource(string);
+    if (string.is8Bit()) {
+        WebCoreStringResource8* stringResource = new WebCoreStringResource8(string);
+        v8::Local<v8::String> newString = v8::String::NewExternal(stringResource);
+        if (newString.IsEmpty())
+            delete stringResource;
+        return newString;
+    }
+
+    WebCoreStringResource16* stringResource = new WebCoreStringResource16(string);
     v8::Local<v8::String> newString = v8::String::NewExternal(stringResource);
     if (newString.IsEmpty())
         delete stringResource;
-
     return newString;
 }
 
-static void cachedStringCallback(v8::Persistent<v8::Value> wrapper, void* parameter)
+static void cachedStringCallback(v8::Isolate* isolate, v8::Persistent<v8::Value> wrapper, void* parameter)
 {
     StringImpl* stringImpl = static_cast<StringImpl*>(parameter);
     V8PerIsolateData::current()->stringCache()->remove(stringImpl);
-    wrapper.Dispose();
+    wrapper.Dispose(isolate);
     wrapper.Clear();
     stringImpl->deref();
 }
@@ -59,33 +75,32 @@ void StringCache::remove(StringImpl* stringImpl)
     clearOnGC();
 }
 
-v8::Local<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl, v8::Isolate* isolate)
+v8::Handle<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl, ReturnHandleType handleType, v8::Isolate* isolate)
 {
     if (!stringImpl->length())
         return v8::String::Empty(isolate);
 
-    v8::String* cachedV8String = m_stringCache.get(stringImpl);
-    if (cachedV8String) {
-        v8::Persistent<v8::String> handle(cachedV8String);
-        if (handle.IsWeak()) {
-            m_lastStringImpl = stringImpl;
-            m_lastV8String = handle;
-            return v8::Local<v8::String>::New(handle);
-        }
+    v8::Persistent<v8::String> cachedV8String = m_stringCache.get(stringImpl);
+    if (cachedV8String.IsWeak(isolate)) {
+        m_lastStringImpl = stringImpl;
+        m_lastV8String = cachedV8String;
+        if (handleType == ReturnUnsafeHandle)
+            return cachedV8String;
+        return v8::Local<v8::String>::New(cachedV8String);
     }
 
     v8::Local<v8::String> newString = makeExternalString(String(stringImpl));
     if (newString.IsEmpty())
         return newString;
 
-    v8::Persistent<v8::String> wrapper = v8::Persistent<v8::String>::New(newString);
+    v8::Persistent<v8::String> wrapper = v8::Persistent<v8::String>::New(isolate, newString);
     if (wrapper.IsEmpty())
         return newString;
 
     stringImpl->ref();
-    wrapper.MarkIndependent();
-    wrapper.MakeWeak(stringImpl, cachedStringCallback);
-    m_stringCache.set(stringImpl, *wrapper);
+    wrapper.MarkIndependent(isolate);
+    wrapper.MakeWeak(isolate, stringImpl, cachedStringCallback);
+    m_stringCache.set(stringImpl, wrapper);
 
     m_lastStringImpl = stringImpl;
     m_lastV8String = wrapper;
@@ -93,33 +108,19 @@ v8::Local<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl, 
     return newString;
 }
 
-void WebCoreStringResource::visitStrings(ExternalStringVisitor* visitor)
+void StringCache::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
-    visitor->visitJSExternalString(m_plainString.impl());
-    if (m_plainString.impl() != m_atomicString.impl() && !m_atomicString.isNull())
-        visitor->visitJSExternalString(m_atomicString.impl());
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Binding);
+    info.addMember(m_stringCache, "stringCache");
+    info.ignoreMember(m_lastV8String);
+    info.addMember(m_lastStringImpl, "lastStringImpl");
 }
 
-void IntegerCache::createSmallIntegers(v8::Isolate* isolate)
+IntegerCache::IntegerCache()
 {
-    ASSERT(!m_initialized);
-    // We initialize m_smallIntegers not in a constructor but in v8Integer(),
-    // because Integer::New() requires a HandleScope. At the point where
-    // IntegerCache is constructed, a HandleScope might not exist.
+    v8::HandleScope handleScope;
     for (int value = 0; value < numberOfCachedSmallIntegers; value++)
-        m_smallIntegers[value] = v8::Persistent<v8::Integer>::New(v8::Integer::New(value, isolate));
-    m_initialized = true;
-}
-
-IntegerCache::~IntegerCache()
-{
-    if (m_initialized) {
-        for (int value = 0; value < numberOfCachedSmallIntegers; value++) {
-            m_smallIntegers[value].Dispose();
-            m_smallIntegers[value].Clear();
-        }
-        m_initialized = false;
-    }
+        m_smallIntegers[value].set(v8::Integer::New(value));
 }
 
 } // namespace WebCore

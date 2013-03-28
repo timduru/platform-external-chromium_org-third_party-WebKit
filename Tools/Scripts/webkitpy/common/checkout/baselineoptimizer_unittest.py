@@ -27,7 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import sys
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.checkout.baselineoptimizer import BaselineOptimizer
 from webkitpy.common.system.filesystem_mock import MockFileSystem
@@ -81,6 +81,14 @@ class BaselineOptimizerTest(unittest.TestCase):
         }, {
             'LayoutTests/platform/chromium-win': '462d03b9c025db1b0392d7453310dbee5f9a9e74',
         })
+
+    def test_efl(self):
+        self._assertOptimization({
+            'LayoutTests/platform/efl': '462d03b9c025db1b0392d7453310dbee5f9a9e74',
+        }, {
+            'LayoutTests/platform/efl': '462d03b9c025db1b0392d7453310dbee5f9a9e74',
+        })
+
 
     def test_no_add_mac_future(self):
         self._assertOptimization({

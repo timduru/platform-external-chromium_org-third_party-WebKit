@@ -26,16 +26,14 @@
 
 [
     Conditional=SHADOW_DOM,
-    Constructor(in Element host),
-    ConstructorRaisesException,
     JSGenerateToJSObject
 ] interface ShadowRoot : DocumentFragment {
     readonly attribute Element activeElement;
     attribute boolean applyAuthorStyles;
     attribute boolean resetStyleInheritance;
 
-    [TreatNullAs=NullString] attribute DOMString innerHTML
-        setter raises(DOMException);
+    [TreatNullAs=NullString, V8DeliverCustomElementCallbacks]
+    attribute DOMString innerHTML setter raises(DOMException);
 
 #if defined(LANGUAGE_JAVASCRIPT) && LANGUAGE_JAVASCRIPT
     Node cloneNode(in [Optional=DefaultIsUndefined] boolean deep) raises(DOMException);
@@ -46,5 +44,7 @@
     NodeList getElementsByTagName(in [Optional=DefaultIsUndefined] DOMString tagName);
     NodeList getElementsByTagNameNS(in [TreatNullAs=NullString,Optional=DefaultIsUndefined] DOMString namespaceURI,
                                     in [Optional=DefaultIsUndefined] DOMString localName);
-};
 
+    Element elementFromPoint(in [Optional=DefaultIsUndefined] long x, 
+                             in [Optional=DefaultIsUndefined] long y);
+};

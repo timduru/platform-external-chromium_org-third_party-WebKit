@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (c) 2012 Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -123,6 +122,9 @@ class MockDRTPort(object):
         pass
 
     def release_http_lock(self):
+        pass
+
+    def show_results_html_file(self, results_filename):
         pass
 
 

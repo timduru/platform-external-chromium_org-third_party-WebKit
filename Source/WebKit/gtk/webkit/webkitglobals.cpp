@@ -26,7 +26,7 @@
 #include "ContextMenuItem.h"
 #include "FrameNetworkingContextGtk.h"
 #include "IconDatabase.h"
-#include "Logging.h"
+#include "InitializeLogging.h"
 #include "MemoryCache.h"
 #include "Page.h"
 #include "PageCache.h"
@@ -262,7 +262,7 @@ static void webkitExit()
 /**
  * webkit_get_text_checker:
  *
- * Returns: the #WebKitSpellChecker used by WebKit, or %NULL if spell
+ * Returns: (transfer none): the #WebKitSpellChecker used by WebKit, or %NULL if spell
  * checking is not enabled
  *
  * Since: 1.5.1
@@ -569,4 +569,9 @@ void webkitInit()
 #endif
 
     atexit(webkitExit);
+}
+
+const char* webkitPageGroupName()
+{
+    return "org.webkit.gtk.WebKitGTK";
 }

@@ -54,6 +54,7 @@
 #import <WebCore/HTMLNames.h>
 #import <WebCore/HTMLTableCellElement.h>
 #import <WebCore/MIMETypeRegistry.h>
+#import <WebCore/NodeTraversal.h>
 #import <WebCore/Range.h>
 #import <WebCore/RegularExpression.h>
 #import <WebCore/RenderObject.h>
@@ -437,12 +438,12 @@ static NSString* searchForLabelsBeforeElement(Frame* frame, NSArray* labels, Ele
     // walk backwards in the node tree, until another element, or form, or end of tree
     unsigned lengthSearched = 0;
     Node* n;
-    for (n = element->traversePreviousNode();
+    for (n = NodeTraversal::previous(element);
          n && lengthSearched < charsSearchedThreshold;
-         n = n->traversePreviousNode())
+         n = NodeTraversal::previous(n))
     {
         if (n->hasTagName(formTag)
-            || (n->isHTMLElement() && static_cast<Element*>(n)->isFormControlElement()))
+            || (n->isHTMLElement() && toElement(n)->isFormControlElement()))
         {
             // We hit another form element or the start of the form - bail out
             break;

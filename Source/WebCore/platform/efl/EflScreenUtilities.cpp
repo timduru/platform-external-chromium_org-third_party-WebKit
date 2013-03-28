@@ -65,12 +65,12 @@ CursorMap::CursorMap()
     m_cursorStringMap.set(ASCIILiteral("cursor/south_east_resize"), ECORE_X_CURSOR_BOTTOM_RIGHT_CORNER);
     m_cursorStringMap.set(ASCIILiteral("cursor/south_west_resize"), ECORE_X_CURSOR_BOTTOM_LEFT_CORNER);
     m_cursorStringMap.set(ASCIILiteral("cursor/west_resize"), ECORE_X_CURSOR_LEFT_SIDE);
-    m_cursorStringMap.set(ASCIILiteral("cursor/north_south_resize"), ECORE_X_CURSOR_SB_H_DOUBLE_ARROW);
-    m_cursorStringMap.set(ASCIILiteral("cursor/east_west_resize"), ECORE_X_CURSOR_SB_V_DOUBLE_ARROW);
+    m_cursorStringMap.set(ASCIILiteral("cursor/north_south_resize"), ECORE_X_CURSOR_SB_V_DOUBLE_ARROW);
+    m_cursorStringMap.set(ASCIILiteral("cursor/east_west_resize"), ECORE_X_CURSOR_SB_H_DOUBLE_ARROW);
     m_cursorStringMap.set(ASCIILiteral("cursor/north_east_south_west_resize"), ECORE_X_CURSOR_SIZING);
     m_cursorStringMap.set(ASCIILiteral("cursor/north_west_south_east_resize"), ECORE_X_CURSOR_SIZING);
-    m_cursorStringMap.set(ASCIILiteral("cursor/column_resize"), ECORE_X_CURSOR_SB_V_DOUBLE_ARROW);
-    m_cursorStringMap.set(ASCIILiteral("cursor/row_resize"), ECORE_X_CURSOR_SB_H_DOUBLE_ARROW);
+    m_cursorStringMap.set(ASCIILiteral("cursor/column_resize"), ECORE_X_CURSOR_SB_H_DOUBLE_ARROW);
+    m_cursorStringMap.set(ASCIILiteral("cursor/row_resize"), ECORE_X_CURSOR_SB_V_DOUBLE_ARROW);
     m_cursorStringMap.set(ASCIILiteral("cursor/middle_panning"),  ECORE_X_CURSOR_CROSS_REVERSE);
     m_cursorStringMap.set(ASCIILiteral("cursor/east_panning"), ECORE_X_CURSOR_CROSS_REVERSE);
     m_cursorStringMap.set(ASCIILiteral("cursor/north_panning"), ECORE_X_CURSOR_CROSS_REVERSE);
@@ -112,7 +112,15 @@ void applyFallbackCursor(Ecore_Evas* ecoreEvas, const char* cursorString)
                   " c ursor group %s", cursorString);
         shape = ECORE_X_CURSOR_LEFT_PTR;
     }
-    Ecore_X_Window window = ecore_evas_software_x11_window_get(ecoreEvas);
+
+    Ecore_X_Window window;
+#if USE(ACCELERATED_COMPOSITING)
+    window = ecore_evas_gl_x11_window_get(ecoreEvas);
+    // Fallback to software mode if necessary.
+    if (!window)
+#endif
+    window = ecore_evas_software_x11_window_get(ecoreEvas);
+
     Ecore_X_Cursor cursor = ecore_x_cursor_shape_get(shape);
     ecore_x_window_cursor_set(window, cursor);
 #endif
@@ -138,6 +146,7 @@ bool isUsingEcoreX(const Evas* evas)
         || !strcmp(engine, "software_16_x11")
         || !strncmp(engine, "xrender", sizeof("xrender") - 1);
 #else
+    UNUSED_PARAM(evas);
     return false;
 #endif
 }

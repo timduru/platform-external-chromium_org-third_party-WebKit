@@ -31,16 +31,10 @@
 #include "config.h"
 #include "Font.h"
 
-#if USE(HARFBUZZ_NG)
-#include "HarfBuzzShaper.h"
-#else
-#include "ComplexTextControllerHarfBuzz.h"
-#include "HarfBuzzSkia.h"
-#endif
-
 #include "FloatRect.h"
 #include "GlyphBuffer.h"
 #include "GraphicsContext.h"
+#include "HarfBuzzShaper.h"
 #include "NotImplemented.h"
 #include "PlatformContextSkia.h"
 #include "SimpleFontData.h"
@@ -98,7 +92,7 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
         y += SkFloatToScalar(adv[i].height());
     }
 
-    SkCanvas* canvas = gc->platformContext()->canvas();
+    PlatformContextSkia* platformContext = gc->platformContext();
     TextDrawingModeFlags textMode = gc->platformContext()->getTextDrawingMode();
 
     // We draw text up to two times (once for fill, once for stroke).
@@ -115,10 +109,10 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
                 path.reset();
                 path.moveTo(vPosBegin[i]);
                 path.lineTo(vPosEnd[i]);
-                canvas->drawTextOnPath(glyphs + i, 2, path, 0, paint);
+                platformContext->drawTextOnPath(glyphs + i, 2, path, 0, paint);
             }
         } else
-            canvas->drawPosText(glyphs, numGlyphs << 1, pos, paint);
+            platformContext->drawPosText(glyphs, numGlyphs << 1, pos, paint);
     }
 
     if ((textMode & TextModeStroke)
@@ -144,10 +138,10 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
                 path.reset();
                 path.moveTo(vPosBegin[i]);
                 path.lineTo(vPosEnd[i]);
-                canvas->drawTextOnPath(glyphs + i, 2, path, 0, paint);
+                platformContext->drawTextOnPath(glyphs + i, 2, path, 0, paint);
             }
         } else
-            canvas->drawPosText(glyphs, numGlyphs << 1, pos, paint);
+            platformContext->drawPosText(glyphs, numGlyphs << 1, pos, paint);
     }
 }
 
@@ -182,7 +176,6 @@ void Font::drawComplexText(GraphicsContext* gc, const TextRun& run,
         setupForTextPainting(&strokePaint, gc->strokeColor().rgb());
     }
 
-#if USE(HARFBUZZ_NG)
     GlyphBuffer glyphBuffer;
     HarfBuzzShaper shaper(this, run);
     shaper.setDrawRange(from, to);
@@ -190,32 +183,6 @@ void Font::drawComplexText(GraphicsContext* gc, const TextRun& run,
         return;
     FloatPoint adjustedPoint = shaper.adjustStartPoint(point);
     drawGlyphBuffer(gc, run, glyphBuffer, adjustedPoint);
-#else
-    SkCanvas* canvas = gc->platformContext()->canvas();
-    ComplexTextController controller(this, run, point.x(), point.y());
-    if (run.rtl())
-        controller.setupForRTL();
-
-    while (controller.nextScriptRun()) {
-        // Check if there is any glyph found in the current script run.
-        int fromGlyph, glyphLength;
-        controller.glyphsForRange(from, to, fromGlyph, glyphLength);
-        if (fromGlyph < 0 || glyphLength <= 0)
-            continue;
-
-        if (fill) {
-            controller.fontPlatformDataForScriptRun()->setupPaint(&fillPaint);
-            gc->platformContext()->adjustTextRenderMode(&fillPaint);
-            canvas->drawPosText(controller.glyphs() + fromGlyph, glyphLength << 1, controller.positions() + fromGlyph, fillPaint);
-        }
-
-        if (stroke) {
-            controller.fontPlatformDataForScriptRun()->setupPaint(&strokePaint);
-            gc->platformContext()->adjustTextRenderMode(&strokePaint);
-            canvas->drawPosText(controller.glyphs() + fromGlyph, glyphLength << 1, controller.positions() + fromGlyph, strokePaint);
-        }
-    }
-#endif
 }
 
 void Font::drawEmphasisMarksForComplexText(GraphicsContext* /* context */, const TextRun& /* run */, const AtomicString& /* mark */, const FloatPoint& /* point */, int /* from */, int /* to */) const
@@ -225,38 +192,20 @@ void Font::drawEmphasisMarksForComplexText(GraphicsContext* /* context */, const
 
 float Font::floatWidthForComplexText(const TextRun& run, HashSet<const SimpleFontData*>* /* fallbackFonts */, GlyphOverflow* /* glyphOverflow */) const
 {
-#if USE(HARFBUZZ_NG)
     HarfBuzzShaper shaper(this, run);
     if (!shaper.shape())
         return 0;
     return shaper.totalWidth();
-#else
-    ComplexTextController controller(this, run, 0, 0);
-    return controller.widthOfFullRun();
-#endif
 }
 
 // Return the code point index for the given |x| offset into the text run.
 int Font::offsetForPositionForComplexText(const TextRun& run, float xFloat,
                                           bool includePartialGlyphs) const
 {
-    // FIXME: This truncation is not a problem for HTML, but only affects SVG, which passes floating-point numbers
-    // to Font::offsetForPosition(). Bug http://webkit.org/b/40673 tracks fixing this problem.
-    int targetX = static_cast<int>(xFloat);
-
-#if USE(HARFBUZZ_NG)
     HarfBuzzShaper shaper(this, run);
     if (!shaper.shape())
         return 0;
-    return shaper.offsetForPosition(targetX);
-#else
-    // (Mac code ignores includePartialGlyphs, and they don't know what it's
-    // supposed to do, so we just ignore it as well.)
-    ComplexTextController controller(this, run, 0, 0);
-    if (run.rtl())
-        controller.setupForRTL();
-    return controller.offsetForPosition(targetX);
-#endif
+    return shaper.offsetForPosition(xFloat);
 }
 
 // Return the rectangle for selecting the given range of code-points in the TextRun.
@@ -264,17 +213,10 @@ FloatRect Font::selectionRectForComplexText(const TextRun& run,
                                             const FloatPoint& point, int height,
                                             int from, int to) const
 {
-#if USE(HARFBUZZ_NG)
     HarfBuzzShaper shaper(this, run);
     if (!shaper.shape())
         return FloatRect();
     return shaper.selectionRect(point, height, from, to);
-#else
-    ComplexTextController controller(this, run, 0, 0);
-    if (run.rtl())
-        controller.setupForRTL();
-    return controller.selectionRect(point, height, from, to);
-#endif
 }
 
 } // namespace WebCore

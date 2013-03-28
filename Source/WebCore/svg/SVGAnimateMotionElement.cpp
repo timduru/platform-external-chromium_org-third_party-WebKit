@@ -69,7 +69,7 @@ bool SVGAnimateMotionElement::hasValidAttributeType()
     if (targetElement->hasTagName(gTag)
         || targetElement->hasTagName(defsTag)
         || targetElement->hasTagName(useTag)
-        || targetElement->hasTagName(imageTag)
+        || targetElement->hasTagName(SVGNames::imageTag)
         || targetElement->hasTagName(switchTag)
         || targetElement->hasTagName(pathTag)
         || targetElement->hasTagName(rectTag)
@@ -81,7 +81,7 @@ bool SVGAnimateMotionElement::hasValidAttributeType()
         || targetElement->hasTagName(textTag)
         || targetElement->hasTagName(clipPathTag)
         || targetElement->hasTagName(maskTag)
-        || targetElement->hasTagName(aTag)
+        || targetElement->hasTagName(SVGNames::aTag)
         || targetElement->hasTagName(foreignObjectTag)
         )
         return true;
@@ -102,16 +102,16 @@ bool SVGAnimateMotionElement::isSupportedAttribute(const QualifiedName& attrName
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGAnimateMotionElement::parseAttribute(const Attribute& attribute)
+void SVGAnimateMotionElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(attribute.name())) {
-        SVGAnimationElement::parseAttribute(attribute);
+    if (!isSupportedAttribute(name)) {
+        SVGAnimationElement::parseAttribute(name, value);
         return;
     }
 
-    if (attribute.name() == SVGNames::pathAttr) {
+    if (name == SVGNames::pathAttr) {
         m_path = Path();
-        buildPathFromString(attribute.value(), m_path);
+        buildPathFromString(value, m_path);
         updateAnimationPath();
         return;
     }

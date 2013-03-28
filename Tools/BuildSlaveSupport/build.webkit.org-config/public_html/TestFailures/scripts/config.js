@@ -40,6 +40,10 @@ config.kPlatforms = {
             'Apple Lion Debug WK1 (Tests)' : {version: 'lion', debug: true},
             'Apple Lion Release WK2 (Tests)' : {version: 'lion' },
             'Apple Lion Debug WK2 (Tests)' : {version: 'lion', debug: true},
+            'Apple MountainLion Release WK1 (Tests)' : {version: 'mountainlion' },
+            'Apple MountainLion Debug WK1 (Tests)' : {version: 'mountainlion', debug: true},
+            'Apple MountainLion Release WK2 (Tests)' : {version: 'mountainlion' },
+            'Apple MountainLion Debug WK2 (Tests)' : {version: 'mountainlion', debug: true},
             // 'Apple Win XP Debug (Tests)' : {version: 'xp',debug: true},
             // 'Apple Win 7 Release (Tests)' : {version: 'win7'},
         },
@@ -93,7 +97,7 @@ config.kPlatforms = {
             return builderName.indexOf('GPU') == -1 &&
                    builderName.indexOf('deps') == -1 &&
                    builderName.indexOf('ASAN') == -1 &&
-                   builderName.indexOf('Content Shell') == -1 &&
+                   builderName.indexOf('WebKit (Content Shell) Android') == -1 &&
                    builderName.indexOf('Mac10.8 Tests') == -1 &&
                    builderName.indexOf('WebKit Android') == -1;
         },
@@ -169,7 +173,6 @@ config.kPlatforms = {
 
 config.kTracURL = 'http://trac.webkit.org';
 config.kBugzillaURL = 'https://bugs.webkit.org';
-config.kLocalServerURL = 'http://127.0.0.1:8127';
 
 config.kRevisionAttr = 'data-revision';
 config.kTestNameAttr = 'data-test-name';

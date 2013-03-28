@@ -28,6 +28,7 @@
 #include "config.h"
 #include "Pasteboard.h"
 
+#include "CachedImage.h"
 #include "ClipboardQt.h"
 #include "DocumentFragment.h"
 #include "Editor.h"
@@ -58,10 +59,10 @@ Pasteboard* Pasteboard::generalPasteboard()
     return pasteboard;
 }
 
-void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete, Frame* frame)
+void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete, Frame* frame, ShouldSerializeSelectedTextForClipboard shouldSerializeSelectedTextForClipboard)
 {
     QMimeData* md = new QMimeData;
-    QString text = frame->editor()->selectedText();
+    QString text = shouldSerializeSelectedTextForClipboard == IncludeImageAltTextForClipboard ? frame->editor()->selectedTextForClipboard() : frame->editor()->selectedText();
     text.replace(QChar(0xa0), QLatin1Char(' '));
     md->setText(text);
 
@@ -74,11 +75,11 @@ void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete,
     md->setHtml(markup);
 #endif
 
+    if (canSmartCopyOrDelete)
+        md->setData(QLatin1String("application/vnd.qtwebkit.smartpaste"), QByteArray());
 #ifndef QT_NO_CLIPBOARD
     QGuiApplication::clipboard()->setMimeData(md, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
 #endif
-    if (canSmartCopyOrDelete)
-        md->setData(QLatin1String("application/vnd.qtwebkit.smartpaste"), QByteArray());
 }
 
 bool Pasteboard::canSmartReplace()
@@ -111,7 +112,7 @@ PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefP
     if (mimeData->hasHtml()) {
         QString html = mimeData->html();
         if (!html.isEmpty()) {
-            RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(frame->document(), html, "", DisallowScriptingContent);
+            RefPtr<DocumentFragment> fragment = createFragmentFromMarkup(frame->document(), html, "", DisallowScriptingAndPluginContent);
             if (fragment)
                 return fragment.release();
         }
@@ -134,9 +135,9 @@ void Pasteboard::writePlainText(const String& text, SmartReplaceOption smartRepl
     QString qtext = text;
     qtext.replace(QChar(0xa0), QLatin1Char(' '));
     md->setText(qtext);
-    QGuiApplication::clipboard()->setMimeData(md, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
     if (smartReplaceOption == CanSmartReplace)
         md->setData(QLatin1String("application/vnd.qtwebkit.smartpaste"), QByteArray());
+    QGuiApplication::clipboard()->setMimeData(md, m_selectionMode ? QClipboard::Selection : QClipboard::Clipboard);
 #endif
 }
 

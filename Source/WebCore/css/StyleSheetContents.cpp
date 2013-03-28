@@ -148,7 +148,7 @@ void StyleSheetContents::parserAppendRule(PassRefPtr<StyleRuleBase> rule)
 
 StyleRuleBase* StyleSheetContents::ruleAt(unsigned index) const
 {
-    ASSERT(index < ruleCount());
+    ASSERT_WITH_SECURITY_IMPLICATION(index < ruleCount());
     
     unsigned childVectorIndex = index;
     if (hasCharsetRule()) {
@@ -198,7 +198,7 @@ void StyleSheetContents::parserSetEncodingFromCharsetRule(const String& encoding
 bool StyleSheetContents::wrapperInsertRule(PassRefPtr<StyleRuleBase> rule, unsigned index)
 {
     ASSERT(m_isMutable);
-    ASSERT(index <= ruleCount());
+    ASSERT_WITH_SECURITY_IMPLICATION(index <= ruleCount());
     // Parser::parseRule doesn't currently allow @charset so we don't need to deal with it.
     ASSERT(!rule->isCharsetRule());
     
@@ -234,7 +234,7 @@ bool StyleSheetContents::wrapperInsertRule(PassRefPtr<StyleRuleBase> rule, unsig
 void StyleSheetContents::wrapperDeleteRule(unsigned index)
 {
     ASSERT(m_isMutable);
-    ASSERT(index < ruleCount());
+    ASSERT_WITH_SECURITY_IMPLICATION(index < ruleCount());
 
     unsigned childVectorIndex = index;
     if (hasCharsetRule()) {
@@ -285,7 +285,7 @@ void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cached
     String sheetText = cachedStyleSheet->sheetText(enforceMIMEType, &hasValidMIMEType);
 
     CSSParser p(parserContext());
-    p.parseSheet(this, sheetText, 0);
+    p.parseSheet(this, sheetText, 0, 0, true);
 
     // If we're loading a stylesheet cross-origin, and the MIME type is not standard, require the CSS
     // to at least start with a syntactically valid CSS rule.
@@ -310,13 +310,13 @@ void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cached
 
 bool StyleSheetContents::parseString(const String& sheetText)
 {
-    return parseStringAtLine(sheetText, 0);
+    return parseStringAtLine(sheetText, 0, false);
 }
 
-bool StyleSheetContents::parseStringAtLine(const String& sheetText, int startLineNumber)
+bool StyleSheetContents::parseStringAtLine(const String& sheetText, int startLineNumber, bool createdByParser)
 {
     CSSParser p(parserContext());
-    p.parseSheet(this, sheetText, startLineNumber);
+    p.parseSheet(this, sheetText, startLineNumber, 0, createdByParser);
 
     return true;
 }
@@ -443,10 +443,12 @@ static bool childRulesHaveFailedOrCanceledSubresources(const Vector<RefPtr<Style
             if (childRulesHaveFailedOrCanceledSubresources(static_cast<const StyleRuleRegion*>(rule)->childRules()))
                 return true;
             break;
-        case StyleRuleBase::Host:
+#if ENABLE(SHADOW_DOM)
+        case StyleRuleBase::HostInternal:
             if (childRulesHaveFailedOrCanceledSubresources(static_cast<const StyleRuleHost*>(rule)->childRules()))
                 return true;
             break;
+#endif
         case StyleRuleBase::Import:
             ASSERT_NOT_REACHED();
         case StyleRuleBase::Page:
@@ -454,8 +456,14 @@ static bool childRulesHaveFailedOrCanceledSubresources(const Vector<RefPtr<Style
         case StyleRuleBase::Unknown:
         case StyleRuleBase::Charset:
         case StyleRuleBase::Keyframe:
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+        case StyleRuleBase::Supports:
+#endif
 #if ENABLE(CSS_DEVICE_ADAPTATION)
         case StyleRuleBase::Viewport:
+#endif
+#if ENABLE(CSS_SHADERS)
+        case StyleRuleBase::Filter:
 #endif
             break;
         }
@@ -510,12 +518,14 @@ void StyleSheetContents::shrinkToFit()
 void StyleSheetContents::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_originalURL);
-    info.addMember(m_encodingFromCharsetRule);
-    info.addMember(m_importRules);
-    info.addMember(m_childRules);
-    info.addMember(m_namespaces);
-    info.addMember(m_clients);
+    info.addMember(m_ownerRule, "ownerRule");
+    info.addMember(m_originalURL, "originalURL");
+    info.addMember(m_encodingFromCharsetRule, "encodingFromCharsetRule");
+    info.addMember(m_importRules, "importRules");
+    info.addMember(m_childRules, "childRules");
+    info.addMember(m_namespaces, "namespaces");
+    info.addMember(m_parserContext, "parserContext");
+    info.addMember(m_clients, "clients");
 }
 
 }

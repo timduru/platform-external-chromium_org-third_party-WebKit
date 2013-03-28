@@ -38,6 +38,7 @@
 #include "SharedBuffer.h"
 #include <math.h>
 #include <wtf/MainThread.h>
+#include <wtf/MemoryObjectInfo.h>
 #include <wtf/StdLibExtras.h>
 
 #if USE(CG)
@@ -69,11 +70,11 @@ bool Image::supportsType(const String& type)
 
 bool Image::setData(PassRefPtr<SharedBuffer> data, bool allDataReceived)
 {
-    m_data = data;
-    if (!m_data.get())
+    m_encodedImageData = data;
+    if (!m_encodedImageData.get())
         return true;
 
-    int length = m_data->size();
+    int length = m_encodedImageData->size();
     if (!length)
         return true;
     
@@ -91,12 +92,12 @@ void Image::fillWithSolidColor(GraphicsContext* ctxt, const FloatRect& dstRect, 
     ctxt->setCompositeOperation(previousOperator);
 }
 
-void Image::draw(GraphicsContext* ctx, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator op, RespectImageOrientationEnum)
+void Image::draw(GraphicsContext* ctx, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator op, BlendMode blendMode, RespectImageOrientationEnum)
 {
-    draw(ctx, dstRect, srcRect, styleColorSpace, op);
+    draw(ctx, dstRect, srcRect, styleColorSpace, op, blendMode);
 }
 
-void Image::drawTiled(GraphicsContext* ctxt, const FloatRect& destRect, const FloatPoint& srcPoint, const FloatSize& scaledTileSize, ColorSpace styleColorSpace, CompositeOperator op)
+void Image::drawTiled(GraphicsContext* ctxt, const FloatRect& destRect, const FloatPoint& srcPoint, const FloatSize& scaledTileSize, ColorSpace styleColorSpace, CompositeOperator op, BlendMode blendMode)
 {    
     if (mayFillWithSolidColor()) {
         fillWithSolidColor(ctxt, destRect, solidColor(), styleColorSpace, op);
@@ -129,13 +130,13 @@ void Image::drawTiled(GraphicsContext* ctxt, const FloatRect& destRect, const Fl
         visibleSrcRect.setY((destRect.y() - oneTileRect.y()) / scale.height());
         visibleSrcRect.setWidth(destRect.width() / scale.width());
         visibleSrcRect.setHeight(destRect.height() / scale.height());
-        draw(ctxt, destRect, visibleSrcRect, styleColorSpace, op);
+        draw(ctxt, destRect, visibleSrcRect, styleColorSpace, op, blendMode);
         return;
     }
 
     AffineTransform patternTransform = AffineTransform().scaleNonUniform(scale.width(), scale.height());
     FloatRect tileRect(FloatPoint(), intrinsicTileSize);    
-    drawPattern(ctxt, tileRect, patternTransform, oneTileRect.location(), styleColorSpace, op, destRect);
+    drawPattern(ctxt, tileRect, patternTransform, oneTileRect.location(), styleColorSpace, op, destRect, blendMode);
     
     startAnimation();
 }
@@ -201,8 +202,9 @@ void Image::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsic
 void Image::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    info.addMember(m_data);
-    info.addMember(m_imageObserver);
+    memoryObjectInfo->setClassName("Image");
+    info.addMember(m_encodedImageData, "encodedImageData");
+    info.addWeakPointer(m_imageObserver);
 }
 
 }

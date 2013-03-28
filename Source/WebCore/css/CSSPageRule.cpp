@@ -35,7 +35,7 @@
 namespace WebCore {
 
 CSSPageRule::CSSPageRule(StyleRulePage* pageRule, CSSStyleSheet* parent)
-    : CSSRule(parent, CSSRule::PAGE_RULE)
+    : CSSRule(parent)
     , m_pageRule(pageRule)
 {
 }
@@ -73,7 +73,7 @@ void CSSPageRule::setSelectorText(const String& selectorText)
     CSSParser parser(parserContext());
     CSSSelectorList selectorList;
     parser.parseSelector(selectorText, selectorList);
-    if (!selectorList.first())
+    if (!selectorList.isValid())
         return;
 
     CSSStyleSheet::RuleMutationScope mutationScope(this);
@@ -94,20 +94,21 @@ String CSSPageRule::cssText() const
     return result.toString();
 }
 
-void CSSPageRule::reattach(StyleRulePage* rule)
+void CSSPageRule::reattach(StyleRuleBase* rule)
 {
     ASSERT(rule);
-    m_pageRule = rule;
+    ASSERT_WITH_SECURITY_IMPLICATION(rule->isPageRule());
+    m_pageRule = static_cast<StyleRulePage*>(rule);
     if (m_propertiesCSSOMWrapper)
         m_propertiesCSSOMWrapper->reattach(m_pageRule->mutableProperties());
 }
 
-void CSSPageRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void CSSPageRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSRule::reportBaseClassMemoryUsage(memoryObjectInfo);
-    info.addMember(m_pageRule);
-    info.addMember(m_propertiesCSSOMWrapper);
+    CSSRule::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_pageRule, "pageRule");
+    info.addMember(m_propertiesCSSOMWrapper, "propertiesCSSOMWrapper");
 }
 
 } // namespace WebCore

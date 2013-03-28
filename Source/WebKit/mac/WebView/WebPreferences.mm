@@ -31,6 +31,7 @@
 #import "WebPreferenceKeysPrivate.h"
 
 #import "WebApplicationCache.h"
+#import "WebFrameNetworkingContext.h"
 #import "WebKitLogging.h"
 #import "WebKitNSStringExtras.h"
 #import "WebKitSystemBits.h"
@@ -38,9 +39,13 @@
 #import "WebKitVersionChecks.h"
 #import "WebNSDictionaryExtras.h"
 #import "WebNSURLExtras.h"
+#import "WebSystemInterface.h"
 #import <WebCore/ApplicationCacheStorage.h>
-#import <WebCore/CookieStorageCFNet.h>
+#import <WebCore/NetworkStorageSession.h>
 #import <WebCore/ResourceHandle.h>
+#import <WebCore/RunLoop.h>
+#import <runtime/InitializeThreading.h>
+#import <wtf/MainThread.h>
 #import <wtf/RetainPtr.h>
 
 using namespace WebCore;
@@ -302,6 +307,10 @@ public:
 // if we ever have more than one WebPreferences object, this would move to init
 + (void)initialize
 {
+    JSC::initializeThreading();
+    WTF::initializeMainThreadToProcessMainThread();
+    WebCore::RunLoop::initializeMainRunLoop();
+
     NSDictionary *dict = [NSDictionary dictionaryWithObjectsAndKeys:
         @"Times",                       WebKitStandardFontPreferenceKey,
         @"Courier",                     WebKitFixedFontPreferenceKey,
@@ -369,6 +378,7 @@ public:
         // CSS Shaders also need WebGL enabled (which is disabled by default), so we can keep it enabled for now.
         [NSNumber numberWithBool:YES], WebKitCSSCustomFilterEnabledPreferenceKey,
         [NSNumber numberWithBool:YES], WebKitCSSRegionsEnabledPreferenceKey,
+        [NSNumber numberWithBool:YES], WebKitCSSCompositingEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitCSSGridLayoutEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitAcceleratedDrawingEnabledPreferenceKey,
         [NSNumber numberWithBool:NO],  WebKitCanvasUsesAcceleratedDrawingPreferenceKey,
@@ -410,6 +420,9 @@ public:
 
         [NSNumber numberWithLongLong:ApplicationCacheStorage::noQuota()], WebKitApplicationCacheTotalQuota,
         [NSNumber numberWithLongLong:ApplicationCacheStorage::noQuota()], WebKitApplicationCacheDefaultOriginQuota,
+        [NSNumber numberWithBool:YES],  WebKitQTKitEnabledPreferenceKey,
+        [NSNumber numberWithBool:NO], WebKitHiddenPageDOMTimerThrottlingEnabledPreferenceKey,
+        [NSNumber numberWithBool:NO], WebKitHiddenPageCSSAnimationSuspensionEnabledPreferenceKey,
         nil];
 
 
@@ -1068,8 +1081,7 @@ public:
 
 - (NSTimeInterval)_backForwardCacheExpirationInterval
 {
-    // FIXME: There's probably no good reason to read from the standard user defaults instead of self.
-    return (NSTimeInterval)[[NSUserDefaults standardUserDefaults] floatForKey:WebKitBackForwardCacheExpirationIntervalKey];
+    return (NSTimeInterval)[self _floatValueForKey:WebKitBackForwardCacheExpirationIntervalKey];
 }
 
 - (float)PDFScaleFactor
@@ -1285,17 +1297,13 @@ static NSString *classIBCreatorID = nil;
 
 + (void)_switchNetworkLoaderToNewTestingSession
 {
-    // Set a private session for testing to avoid interfering with global cookies. This should be different from private browsing session.
-    RetainPtr<CFURLStorageSessionRef> session = ResourceHandle::createPrivateBrowsingStorageSession(CFSTR("WebKit Testing Session"));
-    ResourceHandle::setDefaultStorageSession(session.get());
+    InitWebCoreSystemInterface();
+    NetworkStorageSession::switchToNewTestingSession();
 }
 
 + (void)_setCurrentNetworkLoaderSessionCookieAcceptPolicy:(NSHTTPCookieAcceptPolicy)policy
 {
-    [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookieAcceptPolicy:policy];
-
-    if (RetainPtr<CFHTTPCookieStorageRef> cookieStorage = currentCFHTTPCookieStorage())
-        WKSetHTTPCookieAcceptPolicy(cookieStorage.get(), policy);
+    WKSetHTTPCookieAcceptPolicy(NetworkStorageSession::defaultStorageSession().cookieStorage().get(), policy);
 }
 
 - (BOOL)isDOMPasteAllowed
@@ -1386,6 +1394,16 @@ static NSString *classIBCreatorID = nil;
 - (void)setCSSRegionsEnabled:(BOOL)enabled
 {
     [self _setBoolValue:enabled forKey:WebKitCSSRegionsEnabledPreferenceKey];
+}
+
+- (BOOL)cssCompositingEnabled
+{
+    return [self _boolValueForKey:WebKitCSSCompositingEnabledPreferenceKey];
+}
+
+- (void)setCSSCompositingEnabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitCSSCompositingEnabledPreferenceKey];
 }
 
 - (BOOL)cssGridLayoutEnabled
@@ -1573,6 +1591,16 @@ static NSString *classIBCreatorID = nil;
     return [self _boolValueForKey:WebKitAVFoundationEnabledKey];
 }
 
+- (void)setQTKitEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitQTKitEnabledPreferenceKey];
+}
+
+- (BOOL)isQTKitEnabled
+{
+    return [self _boolValueForKey:WebKitQTKitEnabledPreferenceKey];
+}
+
 - (void)setHixie76WebSocketProtocolEnabled:(BOOL)flag
 {
 }
@@ -1610,6 +1638,16 @@ static NSString *classIBCreatorID = nil;
 - (void)setMockScrollbarsEnabled:(BOOL)flag
 {
     [self _setBoolValue:flag forKey:WebKitMockScrollbarsEnabledPreferenceKey];
+}
+
+- (BOOL)seamlessIFramesEnabled
+{
+    return [self _boolValueForKey:WebKitSeamlessIFramesEnabledPreferenceKey];
+}
+
+- (void)setSeamlessIFramesEnabled:(BOOL)flag
+{
+    [self _setBoolValue:flag forKey:WebKitSeamlessIFramesEnabledPreferenceKey];
 }
 
 - (NSString *)pictographFontFamily
@@ -1771,6 +1809,26 @@ static NSString *classIBCreatorID = nil;
 - (void)setPlugInSnapshottingEnabled:(BOOL)enabled
 {
     [self _setBoolValue:enabled forKey:WebKitPlugInSnapshottingEnabledPreferenceKey];
+}
+
+- (BOOL)hiddenPageDOMTimerThrottlingEnabled
+{
+    return [self _boolValueForKey:WebKitHiddenPageDOMTimerThrottlingEnabledPreferenceKey];
+}
+
+- (void)setHiddenPageDOMTimerThrottlingEnabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitHiddenPageDOMTimerThrottlingEnabledPreferenceKey];
+}
+
+- (BOOL)hiddenPageCSSAnimationSuspensionEnabled
+{
+    return [self _boolValueForKey:WebKitHiddenPageCSSAnimationSuspensionEnabledPreferenceKey];
+}
+
+- (void)setHiddenPageCSSAnimationSuspensionEnabled:(BOOL)enabled
+{
+    [self _setBoolValue:enabled forKey:WebKitHiddenPageCSSAnimationSuspensionEnabledPreferenceKey];
 }
 
 @end

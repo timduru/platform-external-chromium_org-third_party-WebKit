@@ -41,7 +41,9 @@
 #include "PrerendererClient.h"
 #include "ReferrerPolicy.h"
 #include "SecurityPolicy.h"
+#include "WebCoreMemoryInstrumentation.h"
 
+#include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
@@ -58,7 +60,7 @@ PassOwnPtr<Prerenderer> Prerenderer::create(Document* document)
 }
 
 Prerenderer::Prerenderer(Document* document)
-    : ActiveDOMObject(document, this)
+    : ActiveDOMObject(document)
     , m_initializedClient(false)
     , m_client(0)
 {
@@ -68,7 +70,7 @@ Prerenderer::~Prerenderer()
 {
 }
 
-PassRefPtr<PrerenderHandle> Prerenderer::render(const KURL& url)
+PassRefPtr<PrerenderHandle> Prerenderer::render(PrerenderClient* prerenderClient, const KURL& url)
 {
     // Prerenders are unlike requests in most ways (for instance, they pass down fragments, and they don't return data),
     // but they do have referrers.
@@ -79,7 +81,7 @@ PassRefPtr<PrerenderHandle> Prerenderer::render(const KURL& url)
 
     const String referrer = SecurityPolicy::generateReferrerHeader(referrerPolicy, url, document()->frame()->loader()->outgoingReferrer());
 
-    RefPtr<PrerenderHandle> prerenderHandle = PrerenderHandle::create(url, referrer, referrerPolicy);
+    RefPtr<PrerenderHandle> prerenderHandle = PrerenderHandle::create(prerenderClient, url, referrer, referrerPolicy);
 
     if (client())
         client()->willAddPrerender(prerenderHandle.get());
@@ -128,7 +130,7 @@ void Prerenderer::resume()
 Document* Prerenderer::document()
 {
     ASSERT(scriptExecutionContext()->isDocument());
-    return static_cast<Document*>(scriptExecutionContext());
+    return toDocument(scriptExecutionContext());
 }
 
 PrerendererClient* Prerenderer::client()
@@ -140,6 +142,15 @@ PrerendererClient* Prerenderer::client()
         m_client = PrerendererClient::from(document()->page());
     }
     return m_client;
+}
+
+void Prerenderer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    ActiveDOMObject::reportMemoryUsage(memoryObjectInfo);
+    info.ignoreMember(m_client);
+    info.addMember(m_activeHandles, "activeHandles");
+    info.addMember(m_suspendedHandles, "suspendedHandles");
 }
 
 }

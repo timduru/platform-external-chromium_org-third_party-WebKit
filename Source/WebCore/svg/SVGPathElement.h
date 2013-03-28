@@ -26,6 +26,7 @@
 #include "SVGAnimatedNumber.h"
 #include "SVGExternalResourcesRequired.h"
 #include "SVGLangSpace.h"
+#include "SVGNames.h"
 #include "SVGPathByteStream.h"
 #include "SVGPathSegList.h"
 #include "SVGStyledTransformableElement.h"
@@ -108,13 +109,13 @@ private:
     virtual bool supportsFocus() const { return true; }
 
     bool isSupportedAttribute(const QualifiedName&);
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
     virtual bool supportsMarkers() const { return true; }
 
     // Custom 'd' property
-    static void synchronizeD(void* contextElement);
-    static PassRefPtr<SVGAnimatedProperty> lookupOrCreateDWrapper(void* contextElement);
+    static void synchronizeD(SVGElement* contextElement);
+    static PassRefPtr<SVGAnimatedProperty> lookupOrCreateDWrapper(SVGElement* contextElement);
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGPathElement)
         DECLARE_ANIMATED_NUMBER(PathLength, pathLength)
@@ -138,6 +139,12 @@ private:
     mutable SVGSynchronizableAnimatedProperty<SVGPathSegList> m_pathSegList;
     bool m_isAnimValObserved;
 };
+
+inline SVGPathElement* toSVGPathElement(SVGElement* element)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!element || element->hasTagName(SVGNames::pathTag));
+    return static_cast<SVGPathElement*>(element);
+}
 
 } // namespace WebCore
 

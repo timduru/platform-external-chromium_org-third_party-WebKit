@@ -58,9 +58,14 @@ void IDBDatabaseCallbacksProxy::onVersionChange(int64_t oldVersion, int64_t newV
     m_callbacks->onVersionChange(oldVersion, newVersion);
 }
 
-void IDBDatabaseCallbacksProxy::onVersionChange(const String& requestedVersion)
+void IDBDatabaseCallbacksProxy::onAbort(int64_t transactionId, PassRefPtr<WebCore::IDBDatabaseError> error)
 {
-    m_callbacks->onVersionChange(requestedVersion);
+    m_callbacks->onAbort(transactionId, error);
+}
+
+void IDBDatabaseCallbacksProxy::onComplete(int64_t transactionId)
+{
+    m_callbacks->onComplete(transactionId);
 }
 
 } // namespace WebKit

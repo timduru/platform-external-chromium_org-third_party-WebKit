@@ -39,16 +39,15 @@
 
 namespace WebKit {
 
-NonCompositedContentHost::NonCompositedContentHost(WebViewImpl* webView)
+NonCompositedContentHost::NonCompositedContentHost(WebViewImpl* webView, WebCore::GraphicsLayerFactory* graphicsLayerFactory)
     : m_webView(webView)
     , m_showDebugBorders(false)
 {
-    m_graphicsLayer = WebCore::GraphicsLayer::create(0, this);
+    m_graphicsLayer = WebCore::GraphicsLayer::create(graphicsLayerFactory, this);
 #ifndef NDEBUG
     m_graphicsLayer->setName("non-composited content");
 #endif
     m_graphicsLayer->setDrawsContent(true);
-    m_graphicsLayer->setAppliesPageScale(!m_webView->page()->settings()->applyPageScaleFactorInCompositor());
     m_graphicsLayer->setContentsOpaque(true);
     // FIXME: Remove LCD text setting after it is implemented in chromium.
     WebContentLayer* layer = static_cast<WebCore::GraphicsLayerChromium*>(m_graphicsLayer.get())->contentLayer();
@@ -88,20 +87,6 @@ void NonCompositedContentHost::setScrollLayer(WebCore::GraphicsLayer* layer)
     ASSERT(haveScrollLayer());
 }
 
-static void setScrollbarBoundsContainPageScale(WebCore::GraphicsLayer* layer, WebCore::GraphicsLayer* clipLayer)
-{
-    // Scrollbars are attached outside the root clip rect, so skip the
-    // clipLayer subtree.
-    if (layer == clipLayer)
-        return;
-
-    for (size_t i = 0; i < layer->children().size(); ++i)
-        setScrollbarBoundsContainPageScale(layer->children()[i], clipLayer);
-
-    if (layer->children().isEmpty())
-        layer->setAppliesPageScale(true);
-}
-
 void NonCompositedContentHost::setViewport(const WebCore::IntSize& viewportSize, const WebCore::IntSize& contentsSize, const WebCore::IntPoint& scrollPosition, const WebCore::IntPoint& scrollOrigin)
 {
     if (!haveScrollLayer())
@@ -121,7 +106,7 @@ void NonCompositedContentHost::setViewport(const WebCore::IntSize& viewportSize,
     // In RTL-style pages, the origin of the initial containing block for the
     // root layer may be positive; translate the layer to avoid negative
     // coordinates.
-    m_layerAdjust = -toSize(scrollOrigin);
+    m_layerAdjust = -toIntSize(scrollOrigin);
     if (m_graphicsLayer->transform().m41() != m_layerAdjust.width() || m_graphicsLayer->transform().m42() != m_layerAdjust.height()) {
         WebCore::TransformationMatrix transform = m_graphicsLayer->transform();
         transform.setM41(m_layerAdjust.width());
@@ -133,12 +118,6 @@ void NonCompositedContentHost::setViewport(const WebCore::IntSize& viewportSize,
         m_graphicsLayer->setNeedsDisplay();
     } else if (visibleRectChanged)
         m_graphicsLayer->setNeedsDisplay();
-
-    WebCore::GraphicsLayer* clipLayer = m_graphicsLayer->parent()->parent();
-    WebCore::GraphicsLayer* rootLayer = clipLayer;
-    while (rootLayer->parent())
-        rootLayer = rootLayer->parent();
-    setScrollbarBoundsContainPageScale(rootLayer, clipLayer);
 }
 
 bool NonCompositedContentHost::haveScrollLayer()
@@ -172,13 +151,6 @@ void NonCompositedContentHost::notifyFlushRequired(const WebCore::GraphicsLayer*
 
 void NonCompositedContentHost::paintContents(const WebCore::GraphicsLayer*, WebCore::GraphicsContext& context, WebCore::GraphicsLayerPaintingPhase, const WebCore::IntRect& clipRect)
 {
-    // FIXME: Remove LCD text setting after it is implemented in chromium.
-    // On non-android platforms, we want to render text with subpixel antialiasing on the root layer
-    // so long as the root is opaque. On android all text is grayscale.
-#if !OS(ANDROID)
-    if (m_graphicsLayer->contentsOpaque())
-        context.platformContext()->setDrawingToImageBuffer(false);
-#endif
     context.translate(-m_layerAdjust);
     WebCore::IntRect adjustedClipRect = clipRect;
     adjustedClipRect.move(m_layerAdjust);

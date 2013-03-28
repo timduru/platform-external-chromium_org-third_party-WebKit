@@ -46,6 +46,7 @@
 #include "Settings.h"
 #include "SVGTextRunRenderingContext.h"
 #include "Text.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include "break_lines.h"
 #include <wtf/AlwaysInline.h>
 #include <wtf/text/CString.h>
@@ -428,7 +429,8 @@ static void paintTextWithShadows(GraphicsContext* context, const Font& font, con
                     context->drawText(font, textRun, textOrigin + extraOffset,  0, endOffset);
                 else
                     context->drawEmphasisMarks(font, textRun, emphasisMark, textOrigin + extraOffset + IntSize(0, emphasisMarkOffset),  0, endOffset);
-            } if (startOffset < truncationPoint) {
+            }
+            if (startOffset < truncationPoint) {
                 if (emphasisMark.isEmpty())
                     context->drawText(font, textRun, textOrigin + extraOffset, startOffset, truncationPoint);
                 else
@@ -551,9 +553,9 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     Color textStrokeColor;
     Color emphasisMarkColor;
     float textStrokeWidth = styleToUse->textStrokeWidth();
-    const ShadowData* textShadow = paintInfo.forceBlackText ? 0 : styleToUse->textShadow();
+    const ShadowData* textShadow = paintInfo.forceBlackText() ? 0 : styleToUse->textShadow();
 
-    if (paintInfo.forceBlackText) {
+    if (paintInfo.forceBlackText()) {
         textFillColor = Color::black;
         textStrokeColor = Color::black;
         emphasisMarkColor = Color::black;
@@ -595,14 +597,14 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     const ShadowData* selectionShadow = textShadow;
     if (haveSelection) {
         // Check foreground color first.
-        Color foreground = paintInfo.forceBlackText ? Color::black : renderer()->selectionForegroundColor();
+        Color foreground = paintInfo.forceBlackText() ? Color::black : renderer()->selectionForegroundColor();
         if (foreground.isValid() && foreground != selectionFillColor) {
             if (!paintSelectedTextOnly)
                 paintSelectedTextSeparately = true;
             selectionFillColor = foreground;
         }
 
-        Color emphasisMarkForeground = paintInfo.forceBlackText ? Color::black : renderer()->selectionEmphasisMarkColor();
+        Color emphasisMarkForeground = paintInfo.forceBlackText() ? Color::black : renderer()->selectionEmphasisMarkColor();
         if (emphasisMarkForeground.isValid() && emphasisMarkForeground != selectionEmphasisMarkColor) {
             if (!paintSelectedTextOnly)
                 paintSelectedTextSeparately = true;
@@ -610,7 +612,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         }
 
         if (RenderStyle* pseudoStyle = renderer()->getCachedPseudoStyle(SELECTION)) {
-            const ShadowData* shadow = paintInfo.forceBlackText ? 0 : pseudoStyle->textShadow();
+            const ShadowData* shadow = paintInfo.forceBlackText() ? 0 : pseudoStyle->textShadow();
             if (shadow != selectionShadow) {
                 if (!paintSelectedTextOnly)
                     paintSelectedTextSeparately = true;
@@ -624,7 +626,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
                 selectionStrokeWidth = strokeWidth;
             }
 
-            Color stroke = paintInfo.forceBlackText ? Color::black : pseudoStyle->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
+            Color stroke = paintInfo.forceBlackText() ? Color::black : pseudoStyle->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
             if (stroke != selectionStrokeColor) {
                 if (!paintSelectedTextOnly)
                     paintSelectedTextSeparately = true;
@@ -679,7 +681,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     if (!combinedText) {
         string = textRenderer()->text();
         if (static_cast<unsigned>(length) != string.length() || m_start) {
-            ASSERT(static_cast<unsigned>(m_start + length) <= string.length());
+            ASSERT_WITH_SECURITY_IMPLICATION(static_cast<unsigned>(m_start + length) <= string.length());
             string = string.substringSharingImpl(m_start, length);
         }
         maximumLength = textRenderer()->textLength() - m_start;
@@ -769,7 +771,11 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     ETextDecoration textDecorations = styleToUse->textDecorationsInEffect();
     if (textDecorations != TDNONE && paintInfo.phase != PaintPhaseSelection) {
         updateGraphicsContext(context, textFillColor, textStrokeColor, textStrokeWidth, styleToUse->colorSpace());
+        if (combinedText)
+            context->concatCTM(rotation(boxRect, Clockwise));
         paintDecoration(context, boxOrigin, textDecorations, styleToUse->textDecorationStyle(), textShadow);
+        if (combinedText)
+            context->concatCTM(rotation(boxRect, Counterclockwise));
     }
 
     if (paintInfo.phase == PaintPhaseForeground) {
@@ -859,7 +865,7 @@ void InlineTextBox::paintSelection(GraphicsContext* context, const FloatPoint& b
     String string = textRenderer()->text();
 
     if (string.length() != static_cast<unsigned>(length) || m_start) {
-        ASSERT(static_cast<unsigned>(m_start + length) <= string.length());
+        ASSERT_WITH_SECURITY_IMPLICATION(static_cast<unsigned>(m_start + length) <= string.length());
         string = string.substringSharingImpl(m_start, length);
     }
 
@@ -952,6 +958,33 @@ static StrokeStyle textDecorationStyleToStrokeStyle(TextDecorationStyle decorati
     return strokeStyle;
 }
 
+#if ENABLE(CSS3_TEXT)
+static int computeUnderlineOffset(const TextUnderlinePosition underlinePosition, const FontMetrics& fontMetrics, const InlineTextBox* inlineTextBox, const int textDecorationThickness)
+{
+    // Compute the gap between the font and the underline. Use at least one
+    // pixel gap, if underline is thick then use a bigger gap.
+    const int gap = max<int>(1, ceilf(textDecorationThickness / 2.0));
+
+    // According to the specification TextUnderlinePositionAuto should default to 'alphabetic' for horizontal text
+    // and to 'under Left' for vertical text (e.g. japanese). We support only horizontal text for now.
+    switch (underlinePosition) {
+    case TextUnderlinePositionAlphabetic:
+    case TextUnderlinePositionAuto:
+        return fontMetrics.ascent() + gap; // Position underline near the alphabetic baseline.
+    case TextUnderlinePositionUnder: {
+        // Position underline relative to the under edge of the lowest element's content box.
+        const float offset = inlineTextBox->root()->maxLogicalTop() - inlineTextBox->logicalTop();
+        if (offset > 0)
+            return inlineTextBox->logicalHeight() + gap + offset;
+        return inlineTextBox->logicalHeight() + gap;
+    }
+    }
+
+    ASSERT_NOT_REACHED();
+    return fontMetrics.ascent() + gap;
+}
+#endif // CSS3_TEXT
+
 void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& boxOrigin, ETextDecoration deco, TextDecorationStyle decorationStyle, const ShadowData* shadow)
 {
     // FIXME: We should improve this rule and not always just assume 1.
@@ -1028,11 +1061,16 @@ void InlineTextBox::paintDecoration(GraphicsContext* context, const FloatPoint& 
         context->setStrokeStyle(textDecorationStyleToStrokeStyle(decorationStyle));
         if (deco & UNDERLINE) {
             context->setStrokeColor(underline, colorSpace);
+#if ENABLE(CSS3_TEXT)
+            TextUnderlinePosition underlinePosition = styleToUse->textUnderlinePosition();
+            const int underlineOffset = computeUnderlineOffset(underlinePosition, styleToUse->fontMetrics(), this, textDecorationThickness);
+            context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + underlineOffset), width, isPrinting);
+
+            if (decorationStyle == TextDecorationStyleDouble)
+                context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + underlineOffset + doubleOffset), width, isPrinting);
+#else
             // Leave one pixel of white between the baseline and the underline.
             context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + baseline + 1), width, isPrinting);
-#if ENABLE(CSS3_TEXT)
-            if (decorationStyle == TextDecorationStyleDouble)
-                context->drawLineForText(FloatPoint(localOrigin.x(), localOrigin.y() + baseline + 1 + doubleOffset), width, isPrinting);
 #endif // CSS3_TEXT
         }
         if (deco & OVERLINE) {
@@ -1120,7 +1158,7 @@ void InlineTextBox::paintDocumentMarker(GraphicsContext* pt, const FloatPoint& b
         // display a toolTip. We don't do this for misspelling markers.
         if (grammar || isDictationMarker) {
             markerRect.move(-boxOrigin.x(), -boxOrigin.y());
-            markerRect = renderer()->localToAbsoluteQuad(FloatRect(markerRect), SnapOffsetForTransforms).enclosingBoundingBox();
+            markerRect = renderer()->localToAbsoluteQuad(FloatRect(markerRect)).enclosingBoundingBox();
             toRenderedDocumentMarker(marker)->setRenderedRect(markerRect);
         }
     }
@@ -1158,7 +1196,7 @@ void InlineTextBox::paintTextMatchMarker(GraphicsContext* pt, const FloatPoint& 
 
     // Always compute and store the rect associated with this marker. The computed rect is in absolute coordinates.
     IntRect markerRect = enclosingIntRect(font.selectionRectForText(run, IntPoint(x(), selectionTop()), selHeight, sPos, ePos));
-    markerRect = renderer()->localToAbsoluteQuad(FloatRect(markerRect), SnapOffsetForTransforms).enclosingBoundingBox();
+    markerRect = renderer()->localToAbsoluteQuad(FloatRect(markerRect)).enclosingBoundingBox();
     toRenderedDocumentMarker(marker)->setRenderedRect(markerRect);
     
     // Optionally highlight the text
@@ -1186,7 +1224,7 @@ void InlineTextBox::computeRectForReplacementMarker(DocumentMarker* marker, Rend
     
     // Compute and store the rect associated with this marker.
     IntRect markerRect = enclosingIntRect(font.selectionRectForText(run, startPoint, h, sPos, ePos));
-    markerRect = renderer()->localToAbsoluteQuad(FloatRect(markerRect), SnapOffsetForTransforms).enclosingBoundingBox();
+    markerRect = renderer()->localToAbsoluteQuad(FloatRect(markerRect)).enclosingBoundingBox();
     toRenderedDocumentMarker(marker)->setRenderedRect(markerRect);
 }
     
@@ -1449,5 +1487,13 @@ void InlineTextBox::showBox(int printedCharacters) const
 }
 
 #endif
+
+void InlineTextBox::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Rendering);
+    InlineBox::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_prevTextBox, "prevTextBox");
+    info.addMember(m_nextTextBox, "nextTextBox");
+}
 
 } // namespace WebCore

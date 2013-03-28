@@ -38,13 +38,12 @@
 #include "ExceptionCode.h"
 #include "ScheduledAction.h"
 #include "ScriptCallStack.h"
-#include "ScriptCallStackFactory.h"
 #include "V8Binding.h"
 #include "V8Utilities.h"
 #include "V8WorkerContextEventListener.h"
 #include "WebSocket.h"
 #include "WorkerContext.h"
-#include "WorkerContextExecutionProxy.h"
+#include "WorkerScriptController.h"
 
 namespace WebCore {
 
@@ -60,18 +59,18 @@ v8::Handle<v8::Value> SetTimeoutOrInterval(const v8::Arguments& args, bool singl
     int32_t timeout = argumentCount >= 2 ? args[1]->Int32Value() : 0;
     int timerId;
 
-    WorkerContextExecutionProxy* proxy = workerContext->script()->proxy();
-    if (!proxy)
+    WorkerScriptController* script = workerContext->script();
+    if (!script)
         return v8::Undefined();
 
-    v8::Handle<v8::Context> v8Context = proxy->context();
+    v8::Handle<v8::Context> v8Context = script->context();
     if (function->IsString()) {
         if (ContentSecurityPolicy* policy = workerContext->contentSecurityPolicy()) {
             if (!policy->allowEval())
                 return v8Integer(0, args.GetIsolate());
         }
         WTF::String stringFunction = toWebCoreString(function);
-        timerId = DOMTimer::install(workerContext, adoptPtr(new ScheduledAction(v8Context, stringFunction, workerContext->url())), timeout, singleShot);
+        timerId = DOMTimer::install(workerContext, adoptPtr(new ScheduledAction(v8Context, stringFunction, workerContext->url(), args.GetIsolate())), timeout, singleShot);
     } else if (function->IsFunction()) {
         size_t paramCount = argumentCount >= 2 ? argumentCount - 2 : 0;
         v8::Local<v8::Value>* params = 0;
@@ -81,7 +80,7 @@ v8::Handle<v8::Value> SetTimeoutOrInterval(const v8::Arguments& args, bool singl
                 params[i] = args[i+2];
         }
         // ScheduledAction takes ownership of actual params and releases them in its destructor.
-        OwnPtr<ScheduledAction> action = adoptPtr(new ScheduledAction(v8Context, v8::Handle<v8::Function>::Cast(function), paramCount, params));
+        OwnPtr<ScheduledAction> action = adoptPtr(new ScheduledAction(v8Context, v8::Handle<v8::Function>::Cast(function), paramCount, params, args.GetIsolate()));
         // FIXME: We should use a OwnArrayPtr for params.
         delete [] params;
         timerId = DOMTimer::install(workerContext, action.release(), timeout, singleShot);
@@ -91,17 +90,15 @@ v8::Handle<v8::Value> SetTimeoutOrInterval(const v8::Arguments& args, bool singl
     return v8Integer(timerId, args.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8WorkerContext::importScriptsCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WorkerContext::importScriptsMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WorkerContext.importScripts()");
     if (!args.Length())
         return v8::Undefined();
 
     Vector<String> urls;
     for (int i = 0; i < args.Length(); i++) {
-        v8::TryCatch tryCatch;
-        v8::Handle<v8::String> scriptUrl = args[i]->ToString();
-        if (tryCatch.HasCaught() || scriptUrl.IsEmpty())
+        V8TRYCATCH(v8::Handle<v8::String>, scriptUrl, args[i]->ToString());
+        if (scriptUrl.IsEmpty())
             return v8::Undefined();
         urls.append(toWebCoreString(scriptUrl));
     }
@@ -117,15 +114,13 @@ v8::Handle<v8::Value> V8WorkerContext::importScriptsCallback(const v8::Arguments
     return v8::Undefined();
 }
 
-v8::Handle<v8::Value> V8WorkerContext::setTimeoutCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WorkerContext::setTimeoutMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WorkerContext.setTimeout()");
     return SetTimeoutOrInterval(args, true);
 }
 
-v8::Handle<v8::Value> V8WorkerContext::setIntervalCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WorkerContext::setIntervalMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WorkerContext.setInterval()");
     return SetTimeoutOrInterval(args, false);
 }
 
@@ -136,13 +131,18 @@ v8::Handle<v8::Value> toV8(WorkerContext* impl, v8::Handle<v8::Object> creationC
     if (!impl)
         return v8NullWithCheck(isolate);
 
-    WorkerContextExecutionProxy* proxy = impl->script()->proxy();
-    if (!proxy)
+    WorkerScriptController* script = impl->script();
+    if (!script)
         return v8NullWithCheck(isolate);
 
-    v8::Handle<v8::Object> global = proxy->context()->Global();
+    v8::Handle<v8::Object> global = script->context()->Global();
     ASSERT(!global.IsEmpty());
     return global;
+}
+
+v8::Handle<v8::Value> toV8ForMainWorld(WorkerContext* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+{
+    return toV8(impl, creationContext, isolate);
 }
 
 } // namespace WebCore

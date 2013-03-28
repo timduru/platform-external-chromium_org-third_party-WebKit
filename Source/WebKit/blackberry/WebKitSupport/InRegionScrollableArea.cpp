@@ -52,8 +52,8 @@ InRegionScrollableArea::~InRegionScrollableArea()
 InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLayer* layer)
     : m_webPage(webPage)
     , m_layer(layer)
-    , m_hasWindowVisibleRectCalculated(false)
     , m_document(0)
+    , m_hasWindowVisibleRectCalculated(false)
 {
     ASSERT(webPage);
     ASSERT(layer);
@@ -81,7 +81,8 @@ InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLa
 
         m_scrollPosition = m_webPage->mapToTransformed(view->scrollPosition());
         m_contentsSize = m_webPage->mapToTransformed(view->contentsSize());
-        m_viewportSize = m_webPage->mapToTransformed(view->visibleContentRect(false /*includeScrollbars*/)).size();
+        m_viewportSize = m_webPage->mapToTransformed(view->visibleContentRect(ScrollableArea::ExcludeScrollbars)).size();
+        m_documentViewportRect = view->frameRect();
 
         m_scrollsHorizontally = view->contentsWidth() > view->visibleWidth();
         m_scrollsVertically = view->contentsHeight() > view->visibleHeight();
@@ -104,10 +105,17 @@ InRegionScrollableArea::InRegionScrollableArea(WebPagePrivate* webPage, RenderLa
         ScrollableArea* scrollableArea = static_cast<ScrollableArea*>(m_layer);
         m_scrollPosition = m_webPage->mapToTransformed(scrollableArea->scrollPosition());
         m_contentsSize = m_webPage->mapToTransformed(scrollableArea->contentsSize());
-        m_viewportSize = m_webPage->mapToTransformed(scrollableArea->visibleContentRect(false /*includeScrollbars*/)).size();
+        m_viewportSize = m_webPage->mapToTransformed(scrollableArea->visibleContentRect(ScrollableArea::ExcludeScrollbars)).size();
+        m_documentViewportRect = enclosingIntRect(box->absoluteClippedOverflowRect());
 
-        m_scrollsHorizontally = box->scrollWidth() != box->clientWidth() && box->scrollsOverflowX();
-        m_scrollsVertically = box->scrollHeight() != box->clientHeight() && box->scrollsOverflowY();
+        m_scrollsHorizontally = box->scrollWidth() != box->clientWidth();
+        m_scrollsVertically = box->scrollHeight() != box->clientHeight();
+
+        // Check the overflow if its not an input field because overflow can be set to hidden etc. by the content.
+        if (!box->node() || !box->node()->rendererIsEditable()) {
+            m_scrollsHorizontally = m_scrollsHorizontally && box->scrollsOverflowX();
+            m_scrollsVertically = m_scrollsVertically && box->scrollsOverflowY();
+        }
 
         m_scrollTarget = BlockElement;
 
@@ -149,6 +157,16 @@ Document* InRegionScrollableArea::document() const
 {
     ASSERT(!m_isNull);
     return m_document;
+}
+
+LayerWebKitThread* InRegionScrollableArea::cachedScrollableLayer() const
+{
+    return m_cachedCompositedScrollableLayer.get();
+}
+
+Node* InRegionScrollableArea::cachedScrollableNode() const
+{
+    return m_cachedNonCompositedScrollableNode.get();
 }
 
 }

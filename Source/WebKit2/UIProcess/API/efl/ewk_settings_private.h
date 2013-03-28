@@ -32,29 +32,29 @@
 namespace WebKit {
 class WebPreferences;
 }
-class EwkViewImpl;
+class EwkView;
 /**
  * \struct  Ewk_Settings
  * @brief   Contains the settings data.
  */
-class Ewk_Settings {
+class EwkSettings {
 public:
-    static PassOwnPtr<Ewk_Settings> create(EwkViewImpl* viewImpl)
+    static PassOwnPtr<EwkSettings> create(EwkView* viewImpl)
     {
-        return adoptPtr(new Ewk_Settings(viewImpl));
+        return adoptPtr(new EwkSettings(viewImpl));
     }
 
     const WebKit::WebPreferences* preferences() const;
     WebKit::WebPreferences* preferences();
 
 private:
-    explicit Ewk_Settings(EwkViewImpl* viewImpl)
-        : m_viewImpl(viewImpl)
+    explicit EwkSettings(EwkView* viewImpl)
+        : m_view(viewImpl)
     {
-        ASSERT(m_viewImpl);
+        ASSERT(m_view);
     }
 
-    EwkViewImpl* m_viewImpl;
+    EwkView* m_view;
 };
 
 #endif // ewk_settings_private_h

@@ -36,6 +36,7 @@
 #include "HTMLSelectElement.h"
 #include "NodeRenderStyle.h"
 #include "NodeRenderingContext.h"
+#include "NodeTraversal.h"
 #include "RenderMenuList.h"
 #include "RenderTheme.h"
 #include "ScriptElement.h"
@@ -55,7 +56,7 @@ HTMLOptionElement::HTMLOptionElement(const QualifiedName& tagName, Document* doc
     , m_isSelected(false)
 {
     ASSERT(hasTagName(optionTag));
-    setHasCustomCallbacks();
+    setHasCustomStyleCallbacks();
 }
 
 PassRefPtr<HTMLOptionElement> HTMLOptionElement::create(Document* document)
@@ -190,32 +191,32 @@ int HTMLOptionElement::index() const
     return 0;
 }
 
-void HTMLOptionElement::parseAttribute(const Attribute& attribute)
+void HTMLOptionElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
 #if ENABLE(DATALIST_ELEMENT)
-    if (attribute.name() == valueAttr) {
+    if (name == valueAttr) {
         if (HTMLDataListElement* dataList = ownerDataListElement())
             dataList->optionElementChildrenChanged();
     } else
 #endif
-    if (attribute.name() == disabledAttr) {
+    if (name == disabledAttr) {
         bool oldDisabled = m_disabled;
-        m_disabled = !attribute.isNull();
+        m_disabled = !value.isNull();
         if (oldDisabled != m_disabled) {
-            setNeedsStyleRecalc();
+            didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
             if (renderer() && renderer()->style()->hasAppearance())
                 renderer()->theme()->stateChanged(renderer(), EnabledState);
         }
-    } else if (attribute.name() == selectedAttr) {
+    } else if (name == selectedAttr) {
         // FIXME: This doesn't match what the HTML specification says.
         // The specification implies that removing the selected attribute or
         // changing the value of a selected attribute that is already present
         // has no effect on whether the element is selected. Further, it seems
         // that we need to do more than just set m_isSelected to select in that
         // case; we'd need to do the other work from the setSelected function.
-        m_isSelected = !attribute.isNull();
+        m_isSelected = !value.isNull();
     } else
-        HTMLElement::parseAttribute(attribute);
+        HTMLElement::parseAttribute(name, value);
 }
 
 String HTMLOptionElement::value() const
@@ -255,7 +256,7 @@ void HTMLOptionElement::setSelectedState(bool selected)
         return;
 
     m_isSelected = selected;
-    setNeedsStyleRecalc();
+    didAffectSelector(AffectedSelectorChecked);
 
     if (HTMLSelectElement* select = ownerSelectElement())
         select->invalidateSelectedItems();
@@ -381,9 +382,9 @@ String HTMLOptionElement::collectOptionInnerText() const
             text.append(node->nodeValue());
         // Text nodes inside script elements are not part of the option text.
         if (node->isElementNode() && toScriptElement(toElement(node)))
-            node = node->traverseNextSibling(this);
+            node = NodeTraversal::nextSkippingChildren(node, this);
         else
-            node = node->traverseNextNode(this);
+            node = NodeTraversal::next(node, this);
     }
     return text.toString();
 }
@@ -392,13 +393,13 @@ String HTMLOptionElement::collectOptionInnerText() const
 
 HTMLOptionElement* toHTMLOptionElement(Node* node)
 {
-    ASSERT(!node || node->hasTagName(optionTag));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(optionTag));
     return static_cast<HTMLOptionElement*>(node);
 }
 
 const HTMLOptionElement* toHTMLOptionElement(const Node* node)
 {
-    ASSERT(!node || node->hasTagName(optionTag));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(optionTag));
     return static_cast<const HTMLOptionElement*>(node);
 }
 

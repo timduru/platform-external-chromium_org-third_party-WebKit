@@ -31,13 +31,15 @@
 #ifndef WebWidgetClient_h
 #define WebWidgetClient_h
 
+#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../Platform/chromium/public/WebRect.h"
 #include "WebNavigationPolicy.h"
 #include "WebScreenInfo.h"
-#include "platform/WebCommon.h"
-#include "platform/WebRect.h"
+#include <public/WebLayerTreeView.h>
 
 namespace WebKit {
 
+class WebGestureEvent;
 class WebString;
 class WebWidget;
 struct WebCursorInfo;
@@ -64,6 +66,20 @@ public:
     virtual void didActivateCompositor(int inputHandlerIdentifier) { }
     virtual void didDeactivateCompositor() { }
 
+    // Attempt to initialize compositing for this widget. If this is successful,
+    // layerTreeView() will return a valid WebLayerTreeView.
+    virtual void initializeLayerTreeView() { }
+
+    // Return a compositing view used for this widget. This is owned by the
+    // WebWidgetClient.
+    virtual WebLayerTreeView* layerTreeView() { return 0; }
+
+    // Sometimes the WebWidget enters a state where it will generate a sequence
+    // of invalidations that should not, by themselves, trigger the compositor
+    // to schedule a new frame. This call indicates to the embedder that it
+    // should suppress compositor scheduling temporarily.
+    virtual void suppressCompositorScheduling(bool enable) { }
+
     // Indicates to the embedder that the compositor is about to begin a
     // frame. This is primarily to signal to flow control mechanisms that a
     // frame is beginning, not to perform actual painting work.
@@ -73,6 +89,9 @@ public:
     // input.
     virtual void didBecomeReadyForAdditionalInput() { }
 
+    // Called for compositing mode when a frame commit operation has finished.
+    virtual void didCommitCompositorFrame() { }
+
     // Called for compositing mode when the draw commands for a WebKit-side
     // frame have been issued.
     virtual void didCommitAndDrawCompositorFrame() { }
@@ -80,9 +99,6 @@ public:
     // Called for compositing mode when swapbuffers has been posted in the GPU
     // process.
     virtual void didCompleteSwapBuffers() { }
-
-    // Called when a call to WebWidget::composite is required
-    virtual void scheduleComposite() { }
 
     // Called when a call to WebWidget::animate is required
     virtual void scheduleAnimation() { }
@@ -152,6 +168,9 @@ public:
 
     // Returns true iff the pointer is locked to this widget.
     virtual bool isPointerLocked() { return false; }
+
+    // Called when a gesture event is handled.
+    virtual void didHandleGestureEvent(const WebGestureEvent& event, bool eventCancelled) { }
 
 protected:
     ~WebWidgetClient() { }

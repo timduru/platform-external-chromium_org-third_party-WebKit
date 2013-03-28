@@ -31,9 +31,9 @@
 #ifndef WebInputEvent_h
 #define WebInputEvent_h
 
+#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../Platform/chromium/public/WebRect.h"
 #include "WebTouchPoint.h"
-#include "platform/WebCommon.h"
-#include "platform/WebRect.h"
 
 #include <string.h>
 
@@ -59,10 +59,13 @@ namespace WebKit {
 class WebInputEvent {
 public:
     WebInputEvent(unsigned sizeParam = sizeof(WebInputEvent))
-        : timeStampSeconds(0.0)
-        , size(sizeParam)
-        , type(Undefined)
-        , modifiers(0) { }
+    {
+        memset(this, 0, sizeParam);
+        timeStampSeconds = 0.0;
+        size = sizeParam;
+        type = Undefined;
+        modifiers = 0;
+    }
 
     // When we use an input method (or an input method editor), we receive
     // two events for a keypress. The former event is a keydown, which
@@ -112,6 +115,7 @@ public:
         GestureScrollBegin,
         GestureScrollEnd,
         GestureScrollUpdate,
+        GestureScrollUpdateWithoutPropagation,
         GestureFlingStart,
         GestureFlingCancel,
         GestureTap,
@@ -157,6 +161,14 @@ public:
         // Left/right modifiers for keyboard events.
         IsLeft           = 1 << 11,
         IsRight          = 1 << 12,
+
+        // Last input event to be sent for the current vsync interval. If this
+        // flag is set, the sender guarantees that no more input events will be
+        // delivered until the next vsync and the receiver can schedule
+        // rendering accordingly. If it isn't set, the receiver should not make
+        // any assumptions about the delivery times of future input events
+        // w.r.t. vsync.
+        IsLastInputEventForCurrentVSync = 1 << 13,
     };
 
     static const int InputModifiers = ShiftKey | ControlKey | AltKey | MetaKey;
@@ -195,12 +207,23 @@ public:
             || type == TouchCancel;
     }
 
+    // Returns true if the WebInputEvent |type| should be handled as user gesture.
+    static bool isUserGestureEventType(int type)
+    {
+        return isKeyboardEventType(type)
+            || type == MouseDown
+            || type == MouseUp
+            || type == TouchStart
+            || type == TouchEnd;
+    }
+
     // Returns true if the WebInputEvent is a gesture event.
     static bool isGestureEventType(int type)
     {
         return type == GestureScrollBegin
             || type == GestureScrollEnd
             || type == GestureScrollUpdate
+            || type == GestureScrollUpdateWithoutPropagation
             || type == GestureFlingStart
             || type == GestureFlingCancel
             || type == GesturePinchBegin
@@ -212,10 +235,7 @@ public:
             || type == GestureDoubleTap
             || type == GestureTwoFingerTap
             || type == GestureLongPress
-            || type == GestureLongTap
-            || type == GesturePinchBegin
-            || type == GesturePinchEnd
-            || type == GesturePinchUpdate;
+            || type == GestureLongTap;
     }
 };
 
@@ -344,6 +364,9 @@ public:
     float wheelTicksX;
     float wheelTicksY;
 
+    float accelerationRatioX;
+    float accelerationRatioY;
+
     // See comment at the top of the file for why an int is used here.
     int scrollByPage;
 
@@ -358,6 +381,8 @@ public:
         , deltaY(0.0f)
         , wheelTicksX(0.0f)
         , wheelTicksY(0.0f)
+        , accelerationRatioX(1.0f)
+        , accelerationRatioY(1.0f)
         , scrollByPage(false)
         , hasPreciseScrollingDeltas(false)
         , phase(PhaseNone)
@@ -379,27 +404,28 @@ public:
     int y;
     int globalX;
     int globalY;
+    SourceDevice sourceDevice;
 
     union {
         struct {
             int tapCount;
-            int width;
-            int height;
+            float width;
+            float height;
         } tap;
 
         struct {
-            int width;
-            int height;
+            float width;
+            float height;
         } tapDown;
 
         struct {
-            int width;
-            int height;
+            float width;
+            float height;
         } longPress;
 
         struct {
-            int firstFingerWidth;
-            int firstFingerHeight;
+            float firstFingerWidth;
+            float firstFingerHeight;
         } twoFingerTap;
 
         struct {
@@ -412,13 +438,12 @@ public:
         struct {
             float velocityX;
             float velocityY;
-            SourceDevice sourceDevice;
         } flingStart;
 
         struct {
             float scale;
         } pinchUpdate;
-    } data; 
+    } data;
 
     WebGestureEvent(unsigned sizeParam = sizeof(WebGestureEvent))
         : WebInputEvent(sizeParam)
@@ -427,7 +452,7 @@ public:
         , globalX(0)
         , globalY(0)
     {
-      memset(&data, 0, sizeof(data)); 
+        memset(&data, 0, sizeof(data));
     }
 };
 

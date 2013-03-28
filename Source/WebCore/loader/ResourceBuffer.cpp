@@ -71,6 +71,19 @@ void ResourceBuffer::append(const char* data, unsigned size)
     m_sharedBuffer->append(data, size);
 }
 
+void ResourceBuffer::append(SharedBuffer* buffer)
+{
+    m_sharedBuffer->append(buffer);
+}
+
+#if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
+void ResourceBuffer::append(CFDataRef data)
+{
+    ASSERT(m_sharedBuffer);
+    m_sharedBuffer->append(data);
+}
+#endif
+
 void ResourceBuffer::clear()
 {
     m_sharedBuffer->clear();
@@ -100,6 +113,14 @@ bool ResourceBuffer::hasPurgeableBuffer() const
     return m_sharedBuffer->hasPurgeableBuffer();
 }
 
+void ResourceBuffer::createPurgeableBuffer() const
+{
+    ASSERT(m_sharedBuffer);
+    if (!sharedBuffer()->hasOneRef())
+        return;
+    sharedBuffer()->createPurgeableBuffer();
+}
+
 PassOwnPtr<PurgeableBuffer> ResourceBuffer::releasePurgeableBuffer()
 {
     return m_sharedBuffer->releasePurgeableBuffer();
@@ -112,17 +133,10 @@ CFDataRef ResourceBuffer::createCFData()
 }
 #endif
 
-#if HAVE(NETWORK_CFDATA_ARRAY_CALLBACK)
-void ResourceBuffer::append(CFDataRef dataRef)
-{
-    m_sharedBuffer->append(dataRef);
-}
-#endif
-
 void ResourceBuffer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this);
-    info.addMember(m_sharedBuffer);
+    info.addMember(m_sharedBuffer, "sharedBuffer");
 }
 
 } // namespace WebCore

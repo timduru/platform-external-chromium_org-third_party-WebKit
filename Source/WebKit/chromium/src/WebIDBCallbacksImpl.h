@@ -32,7 +32,12 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
-namespace WebCore { class IDBCallbacks; }
+namespace WebCore {
+
+class IDBCallbacks;
+class IDBDatabaseBackendInterface;
+
+} // namespace WebCore
 
 namespace WebKit {
 
@@ -43,22 +48,20 @@ public:
 
     virtual void onError(const WebIDBDatabaseError&);
     virtual void onSuccess(const WebDOMStringList&);
-    virtual void onSuccess(WebIDBCursor*, const WebIDBKey&, const WebIDBKey& primaryKey, const WebSerializedScriptValue&);
-    virtual void onSuccess(WebIDBDatabase*);
+    virtual void onSuccess(WebIDBCursor*, const WebIDBKey&, const WebIDBKey& primaryKey, const WebData&);
+    virtual void onSuccess(WebIDBDatabase*, const WebIDBMetadata&);
     virtual void onSuccess(const WebIDBKey&);
-    virtual void onSuccess(WebIDBTransaction*);
-    virtual void onSuccess(const WebSerializedScriptValue&);
-    virtual void onSuccess(const WebSerializedScriptValue&, const WebIDBKey&, const WebIDBKeyPath&);
-    virtual void onSuccess(const WebIDBKey&, const WebIDBKey& primaryKey, const WebSerializedScriptValue&);
+    virtual void onSuccess(const WebData&);
+    virtual void onSuccess(const WebData&, const WebIDBKey&, const WebIDBKeyPath&);
+    virtual void onSuccess(const WebIDBKey&, const WebIDBKey& primaryKey, const WebData&);
     virtual void onSuccess(long long);
     virtual void onSuccess();
-    virtual void onBlocked();
     virtual void onBlocked(long long oldVersion);
-    virtual void onUpgradeNeeded(long long oldVersion, WebIDBTransaction*, WebIDBDatabase*);
+    virtual void onUpgradeNeeded(long long oldVersion, WebIDBDatabase*, const WebIDBMetadata&);
 
 private:
     RefPtr<WebCore::IDBCallbacks> m_callbacks;
-    bool m_didCreateDatabaseProxy;
+    RefPtr<WebCore::IDBDatabaseBackendInterface> m_databaseProxy;
 };
 
 } // namespace WebKit

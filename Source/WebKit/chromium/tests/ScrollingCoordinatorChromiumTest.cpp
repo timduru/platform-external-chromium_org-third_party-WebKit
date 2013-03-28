@@ -26,9 +26,9 @@
 
 #include "ScrollingCoordinator.h"
 
-#include "CompositorFakeWebGraphicsContext3D.h"
-#include "FakeWebCompositorOutputSurface.h"
 #include "FrameTestHelpers.h"
+#include "GraphicsLayerChromium.h"
+#include "RenderLayerBacking.h"
 #include "RenderLayerCompositor.h"
 #include "RenderView.h"
 #include "URLTestHelpers.h"
@@ -39,25 +39,31 @@
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include <gtest/gtest.h>
-#include <public/WebCompositorSupport.h>
+#include <public/Platform.h>
 #include <public/WebLayer.h>
-#include <webkit/support/webkit_support.h>
-
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-#include "GraphicsLayerChromium.h"
-#endif
+#include <public/WebLayerTreeView.h>
+#include <public/WebUnitTestSupport.h>
 
 using namespace WebCore;
 using namespace WebKit;
 
 namespace {
 
-class MockWebViewClient : public WebViewClient {
+class FakeWebViewClient : public WebViewClient {
 public:
-    virtual WebCompositorOutputSurface* createOutputSurface() OVERRIDE
+    virtual void initializeLayerTreeView()
     {
-        return FakeWebCompositorOutputSurface::create(CompositorFakeWebGraphicsContext3D::create(WebGraphicsContext3D::Attributes())).leakPtr();
+        m_layerTreeView = adoptPtr(Platform::current()->unitTestSupport()->createLayerTreeViewForTesting(WebUnitTestSupport::TestViewTypeUnitTest));
+        ASSERT(m_layerTreeView);
     }
+
+    virtual WebLayerTreeView* layerTreeView()
+    {
+        return m_layerTreeView.get();
+    }
+
+private:
+    OwnPtr<WebLayerTreeView> m_layerTreeView;
 };
 
 class MockWebFrameClient : public WebFrameClient {
@@ -67,7 +73,7 @@ class ScrollingCoordinatorChromiumTest : public testing::Test {
 public:
     ScrollingCoordinatorChromiumTest()
         : m_baseURL("http://www.test.com/")
-        , m_webCompositorInitializer(0)
+        , m_compositorInitializer(0)
     {
         // We cannot reuse FrameTestHelpers::createWebViewAndLoad here because the compositing
         // settings need to be set before the page is loaded.
@@ -76,6 +82,9 @@ public:
         m_webViewImpl->settings()->setForceCompositingMode(true);
         m_webViewImpl->settings()->setAcceleratedCompositingEnabled(true);
         m_webViewImpl->settings()->setAcceleratedCompositingForFixedPositionEnabled(true);
+        m_webViewImpl->settings()->setAcceleratedCompositingForOverflowScrollEnabled(true);
+        m_webViewImpl->settings()->setAcceleratedCompositingForScrollableFramesEnabled(true);
+        m_webViewImpl->settings()->setCompositedScrollingForFramesEnabled(true);
         m_webViewImpl->settings()->setFixedPositionCreatesStackingContext(true);
         m_webViewImpl->initializeMainFrame(&m_mockWebFrameClient);
         m_webViewImpl->resize(IntSize(320, 240));
@@ -83,14 +92,14 @@ public:
 
     virtual ~ScrollingCoordinatorChromiumTest()
     {
-        webkit_support::UnregisterAllMockedURLs();
+        Platform::current()->unitTestSupport()->unregisterAllMockedURLs();
         m_webViewImpl->close();
     }
 
     void navigateTo(const std::string& url)
     {
         FrameTestHelpers::loadFrame(m_webViewImpl->mainFrame(), url);
-        webkit_support::ServeAsynchronousMockedRequests();
+        Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
     }
 
     void registerMockedHttpURLLoad(const std::string& fileName)
@@ -111,9 +120,9 @@ public:
 protected:
     std::string m_baseURL;
     MockWebFrameClient m_mockWebFrameClient;
-    MockWebViewClient m_mockWebViewClient;
-    WebKitTests::WebCompositorInitializer m_webCompositorInitializer;
+    FakeWebViewClient m_mockWebViewClient;
     WebViewImpl* m_webViewImpl;
+    WebKitTests::WebCompositorInitializer m_compositorInitializer;
 };
 
 TEST_F(ScrollingCoordinatorChromiumTest, fastScrollingByDefault)
@@ -192,11 +201,10 @@ TEST_F(ScrollingCoordinatorChromiumTest, clippedBodyTest)
     ASSERT_EQ(0u, rootScrollLayer->nonFastScrollableRegion().size());
 }
 
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-TEST_F(ScrollingCoordinatorChromiumTest, touchOverflowScrolling)
+TEST_F(ScrollingCoordinatorChromiumTest, overflowScrolling)
 {
-    registerMockedHttpURLLoad("touch-overflow-scrolling.html");
-    navigateTo(m_baseURL + "touch-overflow-scrolling.html");
+    registerMockedHttpURLLoad("overflow-scrolling.html");
+    navigateTo(m_baseURL + "overflow-scrolling.html");
 
     // Verify the properties of the accelerated scrolling element starting from the RenderObject
     // all the way to the WebLayer.
@@ -220,7 +228,95 @@ TEST_F(ScrollingCoordinatorChromiumTest, touchOverflowScrolling)
 
     WebLayer* webScrollLayer = static_cast<WebLayer*>(layerBacking->scrollingContentsLayer()->platformLayer());
     ASSERT_TRUE(webScrollLayer->scrollable());
+
+#if !OS(DARWIN) && !OS(WINDOWS)
+    // Now verify we've attached impl-side scrollbars onto the scrollbar layers
+    ASSERT_TRUE(layerBacking->layerForHorizontalScrollbar());
+    ASSERT_TRUE(layerBacking->layerForHorizontalScrollbar()->hasContentsLayer());
+    ASSERT_TRUE(layerBacking->layerForVerticalScrollbar());
+    ASSERT_TRUE(layerBacking->layerForVerticalScrollbar()->hasContentsLayer());
+#endif
 }
-#endif // ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
+
+TEST_F(ScrollingCoordinatorChromiumTest, iframeScrolling)
+{
+    registerMockedHttpURLLoad("iframe-scrolling.html");
+    registerMockedHttpURLLoad("iframe-scrolling-inner.html");
+    navigateTo(m_baseURL + "iframe-scrolling.html");
+
+    // Verify the properties of the accelerated scrolling element starting from the RenderObject
+    // all the way to the WebLayer.
+    Element* scrollableFrame = m_webViewImpl->mainFrameImpl()->frame()->document()->getElementById("scrollable");
+    ASSERT_TRUE(scrollableFrame);
+
+    RenderObject* renderer = scrollableFrame->renderer();
+    ASSERT_TRUE(renderer);
+    ASSERT_TRUE(renderer->isWidget());
+
+    RenderWidget* renderWidget = toRenderWidget(renderer);
+    ASSERT_TRUE(renderWidget);
+    ASSERT_TRUE(renderWidget->widget());
+    ASSERT_TRUE(renderWidget->widget()->isFrameView());
+
+    FrameView* innerFrameView = toFrameView(renderWidget->widget());
+    RenderView* innerRenderView = innerFrameView->renderView();
+    ASSERT_TRUE(innerRenderView);
+
+    RenderLayerCompositor* innerCompositor = innerRenderView->compositor();
+    ASSERT_TRUE(innerCompositor->inCompositingMode());
+    ASSERT_TRUE(innerCompositor->scrollLayer());
+
+    GraphicsLayerChromium* scrollLayer = static_cast<GraphicsLayerChromium*>(innerCompositor->scrollLayer());
+    ASSERT_EQ(innerFrameView, scrollLayer->scrollableArea());
+
+    WebLayer* webScrollLayer = static_cast<WebLayer*>(scrollLayer->platformLayer());
+    ASSERT_TRUE(webScrollLayer->scrollable());
+
+#if !OS(DARWIN) && !OS(WINDOWS)
+    // Now verify we've attached impl-side scrollbars onto the scrollbar layers
+    ASSERT_TRUE(innerCompositor->layerForHorizontalScrollbar());
+    ASSERT_TRUE(innerCompositor->layerForHorizontalScrollbar()->hasContentsLayer());
+    ASSERT_TRUE(innerCompositor->layerForVerticalScrollbar());
+    ASSERT_TRUE(innerCompositor->layerForVerticalScrollbar()->hasContentsLayer());
+#endif
+}
+
+TEST_F(ScrollingCoordinatorChromiumTest, rtlIframe)
+{
+    registerMockedHttpURLLoad("rtl-iframe.html");
+    registerMockedHttpURLLoad("rtl-iframe-inner.html");
+    navigateTo(m_baseURL + "rtl-iframe.html");
+
+    // Verify the properties of the accelerated scrolling element starting from the RenderObject
+    // all the way to the WebLayer.
+    Element* scrollableFrame = m_webViewImpl->mainFrameImpl()->frame()->document()->getElementById("scrollable");
+    ASSERT_TRUE(scrollableFrame);
+
+    RenderObject* renderer = scrollableFrame->renderer();
+    ASSERT_TRUE(renderer);
+    ASSERT_TRUE(renderer->isWidget());
+
+    RenderWidget* renderWidget = toRenderWidget(renderer);
+    ASSERT_TRUE(renderWidget);
+    ASSERT_TRUE(renderWidget->widget());
+    ASSERT_TRUE(renderWidget->widget()->isFrameView());
+
+    FrameView* innerFrameView = static_cast<FrameView*>(renderWidget->widget());
+    RenderView* innerRenderView = innerFrameView->renderView();
+    ASSERT_TRUE(innerRenderView);
+
+    RenderLayerCompositor* innerCompositor = innerRenderView->compositor();
+    ASSERT_TRUE(innerCompositor->inCompositingMode());
+    ASSERT_TRUE(innerCompositor->scrollLayer());
+
+    GraphicsLayerChromium* scrollLayer = static_cast<GraphicsLayerChromium*>(innerCompositor->scrollLayer());
+    ASSERT_EQ(innerFrameView, scrollLayer->scrollableArea());
+
+    WebLayer* webScrollLayer = static_cast<WebLayer*>(scrollLayer->platformLayer());
+    ASSERT_TRUE(webScrollLayer->scrollable());
+
+    ASSERT_EQ(973, webScrollLayer->scrollPosition().x);
+    ASSERT_EQ(973, webScrollLayer->maxScrollPosition().width);
+}
 
 } // namespace

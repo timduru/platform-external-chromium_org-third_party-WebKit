@@ -31,6 +31,9 @@
 #ifndef WebViewClient_h
 #define WebViewClient_h
 
+#include "../../../Platform/chromium/public/WebColor.h"
+#include "../../../Platform/chromium/public/WebGraphicsContext3D.h"
+#include "../../../Platform/chromium/public/WebString.h"
 #include "WebAccessibilityNotification.h"
 #include "WebContentDetectionResult.h"
 #include "WebDragOperation.h"
@@ -42,9 +45,6 @@
 #include "WebTextAffinity.h"
 #include "WebTextDirection.h"
 #include "WebWidgetClient.h"
-#include "platform/WebColor.h"
-#include "platform/WebGraphicsContext3D.h"
-#include "platform/WebString.h"
 
 namespace WebKit {
 
@@ -53,6 +53,7 @@ class WebBatteryStatusClient;
 class WebColorChooser;
 class WebColorChooserClient;
 class WebCompositorOutputSurface;
+class WebDateTimeChooserCompletion;
 class WebDeviceOrientationClient;
 class WebDragData;
 class WebElement;
@@ -83,6 +84,7 @@ class WebView;
 class WebWidget;
 struct WebConsoleMessage;
 struct WebContextMenuData;
+struct WebDateTimeChooserParams;
 struct WebPoint;
 struct WebPopupMenuInfo;
 struct WebRect;
@@ -121,11 +123,6 @@ public:
     // Create a session storage namespace object associated with this WebView.
     virtual WebStorageNamespace* createSessionStorageNamespace(unsigned quota) { return 0; }
 
-    // DEPRECATED: Creates a graphics context that renders to the client's WebView.
-    virtual WebGraphicsContext3D* createGraphicsContext3D(const WebGraphicsContext3D::Attributes&) { return 0; }
-
-    // Creates the output surface that renders to the client's WebView.
-    virtual WebCompositorOutputSurface* createOutputSurface() { return 0; }
 
     // Misc ----------------------------------------------------------------
 
@@ -141,9 +138,6 @@ public:
 
     // Called to retrieve the provider of desktop notifications.
     virtual WebNotificationPresenter* notificationPresenter() { return 0; }
-
-    // Called when a gesture event is handled.
-    virtual void didHandleGestureEvent(const WebGestureEvent& event, bool eventSwallowed) { }
 
     // Called to request an icon for the specified filenames.
     // The icon is shown in a file upload control.
@@ -187,10 +181,8 @@ public:
     virtual bool shouldDeleteRange(const WebRange&) { return true; }
     virtual bool shouldApplyStyle(const WebString& style, const WebRange&) { return true; }
 
-    virtual bool isSmartInsertDeleteEnabled() { return true; }
-    virtual bool isSelectTrailingWhitespaceEnabled() { return true; }
-
     virtual void didBeginEditing() { }
+    virtual void didCancelCompositionOnSelectionChange() { }
     virtual void didChangeSelection(bool isSelectionEmpty) { }
     virtual void didChangeContents() { }
     virtual void didExecuteCommand(const WebString& commandName) { }
@@ -221,6 +213,13 @@ public:
     // WebFileChooseCompletion will never be called.
     virtual bool runFileChooser(const WebFileChooserParams&,
                                 WebFileChooserCompletion*) { return false; }
+
+    // Ask users to choose date/time for the specified parameters. When a user
+    // chooses a value, an implementation of this function should call
+    // WebDateTimeChooserCompletion::didChooseValue or didCancelChooser. If the
+    // implementation opened date/time chooser UI successfully, it should return
+    // true. This function is used only if ExternalDateTimeChooser is used.
+    virtual bool openDateTimeChooser(const WebDateTimeChooserParams&, WebDateTimeChooserCompletion*) { return false; }
 
     // Displays a modal alert dialog containing the given message.  Returns
     // once the user dismisses the dialog.

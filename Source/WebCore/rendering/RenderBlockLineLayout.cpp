@@ -29,10 +29,12 @@
 #include "Logging.h"
 #include "RenderArena.h"
 #include "RenderCombineText.h"
+#include "RenderCounter.h"
 #include "RenderFlowThread.h"
 #include "RenderInline.h"
 #include "RenderLayer.h"
 #include "RenderListMarker.h"
+#include "RenderRegion.h"
 #include "RenderRubyRun.h"
 #include "RenderView.h"
 #include "Settings.h"
@@ -63,10 +65,27 @@ namespace WebCore {
 // We don't let our line box tree for a single line get any deeper than this.
 const unsigned cMaxLineDepth = 200;
 
-#if ENABLE(CSS_EXCLUSIONS)
-static inline ExclusionShapeInsideInfo* layoutExclusionShapeInsideInfo(const RenderBlock* block)
+static LayoutUnit logicalHeightForLine(const RenderBlock* block, bool isFirstLine, LayoutUnit replacedHeight = 0)
 {
-    return block->view()->layoutState()->exclusionShapeInsideInfo();
+    if (!block->document()->inNoQuirksMode() && replacedHeight)
+        return replacedHeight;
+
+    if (!(block->style(isFirstLine)->lineBoxContain() & LineBoxContainBlock))
+        return 0;
+
+    return max<LayoutUnit>(replacedHeight, block->lineHeight(isFirstLine, block->isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes));
+}
+
+#if ENABLE(CSS_EXCLUSIONS)
+ExclusionShapeInsideInfo* RenderBlock::layoutExclusionShapeInsideInfo() const
+{
+    ExclusionShapeInsideInfo* shapeInsideInfo = view()->layoutState()->exclusionShapeInsideInfo();
+    if (!shapeInsideInfo && flowThreadContainingBlock()) {
+        LayoutUnit offset = logicalHeight() + logicalHeightForLine(this, false);
+        RenderRegion* region = regionAtBlockOffset(offset);
+        return region ? region->exclusionShapeInsideInfo() : 0;
+    }
+    return shapeInsideInfo;
 }
 #endif
 
@@ -87,10 +106,9 @@ public:
     {
         ASSERT(block);
 #if ENABLE(CSS_EXCLUSIONS)
-        ExclusionShapeInsideInfo* exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo(m_block);
-        // FIXME: Bug 91878: Add support for multiple segments, currently we only support one
-        if (exclusionShapeInsideInfo && exclusionShapeInsideInfo->hasSegments())
-            m_segment = &exclusionShapeInsideInfo->segments()[0];
+        ExclusionShapeInsideInfo* exclusionShapeInsideInfo = m_block->layoutExclusionShapeInsideInfo();
+        if (exclusionShapeInsideInfo)
+            m_segment = exclusionShapeInsideInfo->currentSegment();
 #endif
         updateAvailableWidth();
     }
@@ -103,7 +121,7 @@ public:
     float committedWidth() const { return m_committedWidth; }
     float availableWidth() const { return m_availableWidth; }
 
-    void updateAvailableWidth();
+    void updateAvailableWidth(LayoutUnit minimumHeight = 0);
     void shrinkAvailableWidthForNewFloatIfNeeded(RenderBlock::FloatingObject*);
     void addUncommittedWidth(float delta) { m_uncommittedWidth += delta; }
     void commit()
@@ -134,24 +152,10 @@ private:
     bool m_isFirstLine;
 };
 
-static LayoutUnit logicalHeightForLine(RenderBlock* block)
-{
-    InlineFlowBox* lineBox = block->firstRootBox();
-    LayoutUnit logicalHeight = 0;
-    if (!lineBox)
-        return logicalHeight;
-
-    if (lineBox->firstChild() && lineBox->firstChild()->renderer() && lineBox->firstChild()->renderer()->isRenderBlock())
-        logicalHeight = toRenderBlock(lineBox->firstChild()->renderer())->logicalHeight();
-    else
-        logicalHeight = lineBox->height();
-    return logicalHeight;
-}
-
-inline void LineWidth::updateAvailableWidth()
+inline void LineWidth::updateAvailableWidth(LayoutUnit replacedHeight)
 {
     LayoutUnit height = m_block->logicalHeight();
-    LayoutUnit logicalHeight = logicalHeightForLine(m_block);
+    LayoutUnit logicalHeight = logicalHeightForLine(m_block, m_isFirstLine, replacedHeight);
     m_left = m_block->logicalLeftOffsetForLine(height, m_isFirstLine, logicalHeight);
     m_right = m_block->logicalRightOffsetForLine(height, m_isFirstLine, logicalHeight);
 
@@ -171,13 +175,29 @@ inline void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(RenderBlock::Floa
     if (height < m_block->logicalTopForFloat(newFloat) || height >= m_block->logicalBottomForFloat(newFloat))
         return;
 
+#if ENABLE(CSS_EXCLUSIONS)
+    ExclusionShapeOutsideInfo* shapeOutsideInfo = newFloat->renderer()->exclusionShapeOutsideInfo();
+    if (shapeOutsideInfo)
+        shapeOutsideInfo->computeSegmentsForLine(m_block->logicalHeight() - m_block->logicalTopForFloat(newFloat), logicalHeightForLine(m_block, m_isFirstLine));
+#endif
+
     if (newFloat->type() == RenderBlock::FloatingObject::FloatLeft) {
         float newLeft = m_block->logicalRightForFloat(newFloat);
+#if ENABLE(CSS_EXCLUSIONS)
+        if (shapeOutsideInfo)
+            newLeft += shapeOutsideInfo->rightSegmentShapeBoundingBoxDelta();
+#endif
+
         if (m_isFirstLine && m_block->style()->isLeftToRightDirection())
             newLeft += floorToInt(m_block->textIndentOffset());
         m_left = max<float>(m_left, newLeft);
     } else {
         float newRight = m_block->logicalLeftForFloat(newFloat);
+#if ENABLE(CSS_EXCLUSIONS)
+        if (shapeOutsideInfo)
+            newRight += shapeOutsideInfo->leftSegmentShapeBoundingBoxDelta();
+#endif
+
         if (m_isFirstLine && !m_block->style()->isLeftToRightDirection())
             newRight -= floorToInt(m_block->textIndentOffset());
         m_right = min<float>(m_right, newRight);
@@ -355,13 +375,43 @@ static void checkMidpoints(LineMidpointState& lineMidpointState, InlineIterator&
     }
 }
 
-static void addMidpoint(LineMidpointState& lineMidpointState, const InlineIterator& midpoint)
+// Don't call this directly. Use one of the descriptive helper functions below.
+static void deprecatedAddMidpoint(LineMidpointState& lineMidpointState, const InlineIterator& midpoint)
 {
     if (lineMidpointState.midpoints.size() <= lineMidpointState.numMidpoints)
         lineMidpointState.midpoints.grow(lineMidpointState.numMidpoints + 10);
 
     InlineIterator* midpoints = lineMidpointState.midpoints.data();
     midpoints[lineMidpointState.numMidpoints++] = midpoint;
+}
+
+static inline void startIgnoringSpaces(LineMidpointState& lineMidpointState, const InlineIterator& midpoint)
+{
+    ASSERT(!(lineMidpointState.numMidpoints % 2));
+    deprecatedAddMidpoint(lineMidpointState, midpoint);
+}
+
+static inline void stopIgnoringSpaces(LineMidpointState& lineMidpointState, const InlineIterator& midpoint)
+{
+    ASSERT(lineMidpointState.numMidpoints % 2);
+    deprecatedAddMidpoint(lineMidpointState, midpoint);
+}
+
+// When ignoring spaces, this needs to be called for objects that need line boxes such as RenderInlines or
+// hard line breaks to ensure that they're not ignored.
+static inline void ensureLineBoxInsideIgnoredSpaces(LineMidpointState& lineMidpointState, RenderObject* renderer)
+{
+    InlineIterator midpoint(0, renderer, 0);
+    stopIgnoringSpaces(lineMidpointState, midpoint);
+    startIgnoringSpaces(lineMidpointState, midpoint);
+}
+
+// Adding a pair of midpoints before a character will split it out into a new line box.
+static inline void ensureCharacterGetsLineBox(LineMidpointState& lineMidpointState, InlineIterator& textParagraphSeparator)
+{
+    InlineIterator midpoint(0, textParagraphSeparator.m_obj, textParagraphSeparator.m_pos);
+    startIgnoringSpaces(lineMidpointState, InlineIterator(0, textParagraphSeparator.m_obj, textParagraphSeparator.m_pos - 1));
+    stopIgnoringSpaces(lineMidpointState, InlineIterator(0, textParagraphSeparator.m_obj, textParagraphSeparator.m_pos));
 }
 
 static inline BidiRun* createRun(int start, int end, RenderObject* obj, InlineBidiResolver& resolver)
@@ -430,11 +480,20 @@ static inline InlineBox* createInlineBoxForRenderer(RenderObject* obj, bool isRo
     return toRenderInline(obj)->createAndAppendInlineFlowBox();
 }
 
+// FIXME: Don't let counters mark themselves as needing pref width recalcs during layout
+// so we don't need this hack.
+static inline void updateCounterIfNeeded(RenderText* o)
+{
+    if (!o->preferredLogicalWidthsDirty() || !o->isCounter())
+        return;
+    toRenderCounter(o)->updateCounter();
+}
+
 static inline void dirtyLineBoxesForRenderer(RenderObject* o, bool fullLayout)
 {
     if (o->isText()) {
         RenderText* renderText = toRenderText(o);
-        renderText->updateTextIfNeeded(); // FIXME: Counters depend on this hack. No clue why. Should be investigated and removed.
+        updateCounterIfNeeded(renderText);
         renderText->dirtyLineBoxes(fullLayout);
     } else
         toRenderInline(o)->dirtyLineBoxes(fullLayout);
@@ -450,7 +509,7 @@ static bool parentIsConstructedOrHaveNext(InlineFlowBox* parentBox)
     return false;
 }
 
-InlineFlowBox* RenderBlock::createLineBoxes(RenderObject* obj, const LineInfo& lineInfo, InlineBox* childBox)
+InlineFlowBox* RenderBlock::createLineBoxes(RenderObject* obj, const LineInfo& lineInfo, InlineBox* childBox, bool startNewSegment)
 {
     // See if we have an unconstructed line box for this object that is also
     // the last item on the line.
@@ -459,7 +518,7 @@ InlineFlowBox* RenderBlock::createLineBoxes(RenderObject* obj, const LineInfo& l
     InlineFlowBox* result = 0;
     bool hasDefaultLineBoxContain = style()->lineBoxContain() == RenderStyle::initialLineBoxContain();
     do {
-        ASSERT(obj->isRenderInline() || obj == this);
+        ASSERT_WITH_SECURITY_IMPLICATION(obj->isRenderInline() || obj == this);
 
         RenderInline* inlineFlow = (obj != this) ? toRenderInline(obj) : 0;
 
@@ -473,12 +532,13 @@ InlineFlowBox* RenderBlock::createLineBoxes(RenderObject* obj, const LineInfo& l
         // the same line (this can happen with very fancy language mixtures).
         bool constructedNewBox = false;
         bool allowedToConstructNewBox = !hasDefaultLineBoxContain || !inlineFlow || inlineFlow->alwaysCreateLineBoxes();
-        bool canUseExistingParentBox = parentBox && !parentIsConstructedOrHaveNext(parentBox);
+        bool mustCreateBoxesToRoot = startNewSegment && !(parentBox && parentBox->isRootInlineBox());
+        bool canUseExistingParentBox = parentBox && !parentIsConstructedOrHaveNext(parentBox) && !mustCreateBoxesToRoot;
         if (allowedToConstructNewBox && !canUseExistingParentBox) {
             // We need to make a new box for this render object.  Once
             // made, we need to place it at the end of the current line.
             InlineBox* newBox = createInlineBoxForRenderer(obj, obj == this);
-            ASSERT(newBox->isInlineFlowBox());
+            ASSERT_WITH_SECURITY_IMPLICATION(newBox->isInlineFlowBox());
             parentBox = toInlineFlowBox(newBox);
             parentBox->setFirstLineStyleBit(lineInfo.isFirstLine());
             parentBox->setIsHorizontal(isHorizontalWritingMode());
@@ -570,10 +630,16 @@ RootInlineBox* RenderBlock::constructLine(BidiRunList<BidiRun>& bidiRuns, const 
 
         // If we have no parent box yet, or if the run is not simply a sibling,
         // then we need to construct inline boxes as necessary to properly enclose the
-        // run's inline box.
-        if (!parentBox || parentBox->renderer() != r->m_object->parent())
+        // run's inline box. Segments can only be siblings at the root level, as
+        // they are positioned separately.
+#if ENABLE(CSS_EXCLUSIONS)
+        bool runStartsSegment = r->m_startsSegment;
+#else
+        bool runStartsSegment = false;
+#endif
+        if (!parentBox || parentBox->renderer() != r->m_object->parent() || runStartsSegment)
             // Create new inline boxes all the way back to the appropriate insertion point.
-            parentBox = createLineBoxes(r->m_object->parent(), lineInfo, box);
+            parentBox = createLineBoxes(r->m_object->parent(), lineInfo, box, runStartsSegment);
         else {
             // Append the inline box to this line.
             parentBox->addToLine(box);
@@ -763,8 +829,9 @@ static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* ru
 
             lastEndOffset = wordMeasurement.endOffset;
             if (kerningIsEnabled && lastEndOffset == run->m_stop) {
-                measuredWidth += renderer->width(wordMeasurement.startOffset, lastEndOffset - wordMeasurement.startOffset, xPos, lineInfo.isFirstLine());
-                if (i > 0)
+                int wordLength = lastEndOffset - wordMeasurement.startOffset;
+                measuredWidth += renderer->width(wordMeasurement.startOffset, wordLength, xPos, lineInfo.isFirstLine());
+                if (i > 0 && wordLength == 1 && renderer->characterAt(wordMeasurement.startOffset) == ' ')
                     measuredWidth += renderer->style()->wordSpacing();
             } else
                 measuredWidth += wordMeasurement.width;
@@ -808,6 +875,11 @@ static inline void computeExpansionForJustifiedText(BidiRun* firstRun, BidiRun* 
 
     size_t i = 0;
     for (BidiRun* r = firstRun; r; r = r->next()) {
+#if ENABLE(CSS_EXCLUSIONS)
+        // This method is called once per segment, do not move past the current segment.
+        if (r->m_startsSegment)
+            break;
+#endif
         if (!r->m_box || r == trailingSpaceRun)
             continue;
         
@@ -874,26 +946,75 @@ void RenderBlock::updateLogicalWidthForAlignment(const ETextAlign& textAlign, Bi
     }
 }
 
+static void updateLogicalInlinePositions(RenderBlock* block, float& lineLogicalLeft, float& lineLogicalRight, float& availableLogicalWidth, bool firstLine, LayoutUnit boxLogicalHeight)
+{
+    LayoutUnit lineLogicalHeight = logicalHeightForLine(block, firstLine, boxLogicalHeight);
+    lineLogicalLeft = block->pixelSnappedLogicalLeftOffsetForLine(block->logicalHeight(), firstLine, lineLogicalHeight);
+    lineLogicalRight = block->pixelSnappedLogicalRightOffsetForLine(block->logicalHeight(), firstLine, lineLogicalHeight);
+    availableLogicalWidth = lineLogicalRight - lineLogicalLeft;
+}
+
 void RenderBlock::computeInlineDirectionPositionsForLine(RootInlineBox* lineBox, const LineInfo& lineInfo, BidiRun* firstRun, BidiRun* trailingSpaceRun, bool reachedEnd,
                                                          GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache, WordMeasurements& wordMeasurements)
 {
     ETextAlign textAlign = textAlignmentForLine(!reachedEnd && !lineBox->endsWithBreak());
     
-    LayoutUnit lineLogicalHeight = logicalHeightForLine(this);
     // CSS 2.1: "'Text-indent' only affects a line if it is the first formatted line of an element. For example, the first line of an anonymous block 
     // box is only affected if it is the first child of its parent element."
     bool firstLine = lineInfo.isFirstLine() && !(isAnonymousBlock() && parent()->firstChild() != this);
-    float logicalLeft = pixelSnappedLogicalLeftOffsetForLine(logicalHeight(), firstLine, lineLogicalHeight);
-    float logicalRight = pixelSnappedLogicalRightOffsetForLine(logicalHeight(), firstLine, lineLogicalHeight);
+    float lineLogicalLeft;
+    float lineLogicalRight;
+    float availableLogicalWidth;
+    updateLogicalInlinePositions(this, lineLogicalLeft, lineLogicalRight, availableLogicalWidth, firstLine, 0);
+    bool needsWordSpacing;
 #if ENABLE(CSS_EXCLUSIONS)
-    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo(this);
+    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo();
     if (exclusionShapeInsideInfo && exclusionShapeInsideInfo->hasSegments()) {
-        logicalLeft = max<float>(roundToInt(exclusionShapeInsideInfo->segments()[0].logicalLeft), logicalLeft);
-        logicalRight = min<float>(floorToInt(exclusionShapeInsideInfo->segments()[0].logicalRight), logicalRight);
+        BidiRun* segmentStart = firstRun;
+        const SegmentList& segments = exclusionShapeInsideInfo->segments();
+        float logicalLeft = max<float>(roundToInt(segments[0].logicalLeft), lineLogicalLeft);
+        float logicalRight = min<float>(floorToInt(segments[0].logicalRight), lineLogicalRight);
+        float startLogicalLeft = logicalLeft;
+        float endLogicalRight = logicalLeft;
+        float minLogicalLeft = logicalLeft;
+        float maxLogicalRight = logicalLeft;
+        lineBox->beginPlacingBoxRangesInInlineDirection(logicalLeft);
+        for (size_t i = 0; i < segments.size(); i++) {
+            if (i) {
+                logicalLeft = max<float>(roundToInt(segments[i].logicalLeft), lineLogicalLeft);
+                logicalRight = min<float>(floorToInt(segments[i].logicalRight), lineLogicalRight);
+            }
+            availableLogicalWidth = logicalRight - logicalLeft;
+            BidiRun* newSegmentStart = computeInlineDirectionPositionsForSegment(lineBox, lineInfo, textAlign, logicalLeft, availableLogicalWidth, segmentStart, trailingSpaceRun, textBoxDataMap, verticalPositionCache, wordMeasurements);
+            needsWordSpacing = false;
+            endLogicalRight = lineBox->placeBoxRangeInInlineDirection(segmentStart->m_box, newSegmentStart ? newSegmentStart->m_box : 0, logicalLeft, minLogicalLeft, maxLogicalRight, needsWordSpacing, textBoxDataMap);
+            if (!newSegmentStart || !newSegmentStart->next())
+                break;
+            ASSERT(newSegmentStart->m_startsSegment);
+            // Discard the empty segment start marker bidi runs
+            segmentStart = newSegmentStart->next();
+        }
+        lineBox->endPlacingBoxRangesInInlineDirection(startLogicalLeft, endLogicalRight, minLogicalLeft, maxLogicalRight);
+        return;
     }
 #endif
-    float availableLogicalWidth = logicalRight - logicalLeft;
 
+    if (firstRun && firstRun->m_object->isReplaced()) {
+        RenderBox* renderBox = toRenderBox(firstRun->m_object);
+        updateLogicalInlinePositions(this, lineLogicalLeft, lineLogicalRight, availableLogicalWidth, firstLine, renderBox->logicalHeight());
+    }
+
+    computeInlineDirectionPositionsForSegment(lineBox, lineInfo, textAlign, lineLogicalLeft, availableLogicalWidth, firstRun, trailingSpaceRun, textBoxDataMap, verticalPositionCache, wordMeasurements);
+    // The widths of all runs are now known. We can now place every inline box (and
+    // compute accurate widths for the inline flow boxes).
+    needsWordSpacing = false;
+    lineBox->placeBoxesInInlineDirection(lineLogicalLeft, needsWordSpacing, textBoxDataMap);
+}
+
+BidiRun* RenderBlock::computeInlineDirectionPositionsForSegment(RootInlineBox* lineBox, const LineInfo& lineInfo, ETextAlign textAlign, float& logicalLeft, 
+    float& availableLogicalWidth, BidiRun* firstRun, BidiRun* trailingSpaceRun, GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache,
+    WordMeasurements& wordMeasurements)
+{
     bool needsWordSpacing = false;
     float totalLogicalWidth = lineBox->getFlowSpacingLogicalWidth();
     unsigned expansionOpportunityCount = 0;
@@ -901,7 +1022,14 @@ void RenderBlock::computeInlineDirectionPositionsForLine(RootInlineBox* lineBox,
     Vector<unsigned, 16> expansionOpportunities;
     RenderObject* previousObject = 0;
 
-    for (BidiRun* r = firstRun; r; r = r->next()) {
+    BidiRun* r = firstRun;
+    for (; r; r = r->next()) {
+#if ENABLE(CSS_EXCLUSIONS)
+        // Once we have reached the start of the next segment, we have finished
+        // computing the positions for this segment's contents.
+        if (r->m_startsSegment)
+            break;
+#endif
         if (!r->m_box || r->m_object->isOutOfFlowPositioned() || r->m_box->isLineBreak())
             continue; // Positioned objects are only participating to figure out their
                       // correct static x position.  They have no effect on the width.
@@ -951,10 +1079,7 @@ void RenderBlock::computeInlineDirectionPositionsForLine(RootInlineBox* lineBox,
 
     computeExpansionForJustifiedText(firstRun, trailingSpaceRun, expansionOpportunities, expansionOpportunityCount, totalLogicalWidth, availableLogicalWidth);
 
-    // The widths of all runs are now known.  We can now place every inline box (and
-    // compute accurate widths for the inline flow boxes).
-    needsWordSpacing = false;
-    lineBox->placeBoxesInInlineDirection(logicalLeft, needsWordSpacing, textBoxDataMap);
+    return r;
 }
 
 void RenderBlock::computeBlockDirectionPositionsForLine(RootInlineBox* lineBox, BidiRun* firstRun, GlyphOverflowAndFallbackFontsMap& textBoxDataMap,
@@ -1010,11 +1135,7 @@ static void setStaticPositions(RenderBlock* block, RenderBox* child)
         toRenderInline(containerBlock)->layer()->setStaticInlinePosition(block->startAlignedOffsetForLine(blockHeight, false));
         toRenderInline(containerBlock)->layer()->setStaticBlockPosition(blockHeight);
     }
-
-    if (child->style()->isOriginalDisplayInlineType())
-        block->setStaticInlinePositionForChild(child, blockHeight, block->startAlignedOffsetForLine(blockHeight, false));
-    else
-        block->setStaticInlinePositionForChild(child, blockHeight, block->startOffsetForContent(blockHeight));
+    block->updateStaticInlinePositionForChild(child, blockHeight);
     child->layer()->setStaticBlockPosition(blockHeight);
 }
 
@@ -1101,13 +1222,13 @@ static inline BidiStatus statusWithDirection(TextDirection textDirection, bool i
 }
 
 // FIXME: BidiResolver should have this logic.
-static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunList<BidiRun>& bidiRuns, const InlineIterator& endOfLine, VisualDirectionOverride override, bool previousLineBrokeCleanly)
+static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, BidiRunList<BidiRun>& bidiRuns, const InlineIterator& endOfRuns, VisualDirectionOverride override, bool previousLineBrokeCleanly)
 {
     // FIXME: We should pass a BidiRunList into createBidiRunsForLine instead
     // of the resolver owning the runs.
     ASSERT(&topResolver.runs() == &bidiRuns);
     RenderObject* currentRoot = topResolver.position().root();
-    topResolver.createBidiRunsForLine(endOfLine, override, previousLineBrokeCleanly);
+    topResolver.createBidiRunsForLine(endOfRuns, override, previousLineBrokeCleanly);
 
     while (!topResolver.isolatedRuns().isEmpty()) {
         // It does not matter which order we resolve the runs as long as we resolve them all.
@@ -1147,7 +1268,7 @@ static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunLis
         // We stop at the next end of line; we may re-enter this isolate in the next call to constructBidiRuns().
         // FIXME: What should end and previousLineBrokeCleanly be?
         // rniwa says previousLineBrokeCleanly is just a WinIE hack and could always be false here?
-        isolatedResolver.createBidiRunsForLine(endOfLine, NoVisualOverride, previousLineBrokeCleanly);
+        isolatedResolver.createBidiRunsForLine(endOfRuns, NoVisualOverride, previousLineBrokeCleanly);
         // Note that we do not delete the runs from the resolver.
         // We're not guaranteed to get any BidiRuns in the previous step. If we don't, we allow the placeholder
         // itself to be turned into an InlineBox. We can't remove it here without potentially losing track of
@@ -1162,6 +1283,40 @@ static inline void constructBidiRuns(InlineBidiResolver& topResolver, BidiRunLis
             isolatedResolver.isolatedRuns().clear();
         }
     }
+}
+
+static inline void constructBidiRunsForLine(const RenderBlock* block, InlineBidiResolver& topResolver, BidiRunList<BidiRun>& bidiRuns, const InlineIterator& endOfLine, VisualDirectionOverride override, bool previousLineBrokeCleanly)
+{
+#if !ENABLE(CSS_EXCLUSIONS)
+    UNUSED_PARAM(block);
+    constructBidiRunsForSegment(topResolver, bidiRuns, endOfLine, override, previousLineBrokeCleanly);
+#else
+    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = block->layoutExclusionShapeInsideInfo();
+    if (!exclusionShapeInsideInfo || !exclusionShapeInsideInfo->hasSegments()) {
+        constructBidiRunsForSegment(topResolver, bidiRuns, endOfLine, override, previousLineBrokeCleanly);
+        return;
+    }
+
+    const SegmentRangeList& segmentRanges = exclusionShapeInsideInfo->segmentRanges();
+    ASSERT(segmentRanges.size());
+
+    for (size_t i = 0; i < segmentRanges.size(); i++) {
+        LineSegmentIterator iterator = segmentRanges[i].start;
+        InlineIterator segmentStart(iterator.root, iterator.object, iterator.offset);
+        iterator = segmentRanges[i].end;
+        InlineIterator segmentEnd(iterator.root, iterator.object, iterator.offset);
+        if (i) {
+            ASSERT(segmentStart.m_obj);
+            BidiRun* segmentMarker = createRun(segmentStart.m_pos, segmentStart.m_pos, segmentStart.m_obj, topResolver);
+            segmentMarker->m_startsSegment = true;
+            bidiRuns.addRun(segmentMarker);
+            // Do not collapse midpoints between segments
+            topResolver.midpointState().betweenMidpoints = false;
+        }
+        topResolver.setPosition(segmentStart, numberOfIsolateAncestors(segmentStart));
+        constructBidiRunsForSegment(topResolver, bidiRuns, segmentEnd, override, previousLineBrokeCleanly);
+    }
+#endif
 }
 
 // This function constructs line boxes for all of the text runs in the resolver and computes their position.
@@ -1221,7 +1376,7 @@ RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(BidiRunList<BidiRun>& bi
 // during an entire linebox tree layout pass (aka layoutInlineChildren).
 class LineLayoutState {
 public:
-    LineLayoutState(bool fullLayout, LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom)
+    LineLayoutState(bool fullLayout, LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom, RenderFlowThread* flowThread)
         : m_lastFloat(0)
         , m_endLine(0)
         , m_floatIndex(0)
@@ -1232,6 +1387,7 @@ public:
         , m_repaintLogicalTop(repaintLogicalTop)
         , m_repaintLogicalBottom(repaintLogicalBottom)
         , m_usesRepaintBounds(false)
+        , m_flowThread(flowThread)
     { }
 
     void markForFullLayout() { m_isFullLayout = true; }
@@ -1275,6 +1431,9 @@ public:
     unsigned floatIndex() const { return m_floatIndex; }
     void setFloatIndex(unsigned floatIndex) { m_floatIndex = floatIndex; }
     
+    RenderFlowThread* flowThread() const { return m_flowThread; }
+    void setFlowThread(RenderFlowThread* thread) { m_flowThread = thread; }
+
 private:
     Vector<RenderBlock::FloatWithRect> m_floats;
     RenderBlock::FloatingObject* m_lastFloat;
@@ -1292,6 +1451,8 @@ private:
     LayoutUnit& m_repaintLogicalBottom;
 
     bool m_usesRepaintBounds;
+    
+    RenderFlowThread* m_flowThread;
 };
 
 static void deleteLineRange(LineLayoutState& layoutState, RenderArena* arena, RootInlineBox* startLine, RootInlineBox* stopLine = 0)
@@ -1334,7 +1495,7 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
         }
     }
 
-    if (m_floatingObjects && !m_floatingObjects->set().isEmpty())
+    if (containsFloats())
         layoutState.setLastFloat(m_floatingObjects->set().last());
 
     // We also find the first clean line and extract these lines.  We will add them back
@@ -1381,6 +1542,15 @@ RenderBlock::RenderTextInfo::~RenderTextInfo()
 {
 }
 
+// Before restarting the layout loop with a new logicalHeight, remove all floats that were added and reset the resolver.
+inline const InlineIterator& RenderBlock::restartLayoutRunsAndFloatsInRange(LayoutUnit oldLogicalHeight, LayoutUnit newLogicalHeight,  FloatingObject* lastFloatFromPreviousLine, InlineBidiResolver& resolver,  const InlineIterator& oldEnd)
+{
+    removeFloatingObjectsBelow(lastFloatFromPreviousLine, oldLogicalHeight);
+    setLogicalHeight(newLogicalHeight);
+    resolver.setPositionIgnoringNestedIsolates(oldEnd);
+    return oldEnd;
+}
+
 void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines)
 {
     RenderStyle* styleToUse = style();
@@ -1395,8 +1565,9 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
 #if ENABLE(CSS_EXCLUSIONS)
     LayoutUnit absoluteLogicalTop;
-    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo(this);
+    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo();
     if (exclusionShapeInsideInfo) {
+        ASSERT(exclusionShapeInsideInfo->owner() == this || allowsExclusionShapeInsideInfoSharing());
         if (exclusionShapeInsideInfo != this->exclusionShapeInsideInfo()) {
             // FIXME Bug 100284: If subsequent LayoutStates are pushed, we will have to add
             // their offsets from the original shape-inside container.
@@ -1425,10 +1596,12 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
         const InlineIterator oldEnd = end;
         bool isNewUBAParagraph = layoutState.lineInfo().previousLineBrokeCleanly();
-        FloatingObject* lastFloatFromPreviousLine = (m_floatingObjects && !m_floatingObjects->set().isEmpty()) ? m_floatingObjects->set().last() : 0;
+        FloatingObject* lastFloatFromPreviousLine = (containsFloats()) ? m_floatingObjects->set().last() : 0;
 #if ENABLE(CSS_EXCLUSIONS)
         // FIXME: Bug 95361: It is possible for a line to grow beyond lineHeight, in which
         // case these segments may be incorrect.
+        if (layoutState.flowThread())
+            exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo();
         if (exclusionShapeInsideInfo) {
             LayoutUnit lineTop = logicalHeight() + absoluteLogicalTop;
             exclusionShapeInsideInfo->computeSegmentsForLine(lineTop, lineHeight(layoutState.lineInfo().isFirstLine(), isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes));
@@ -1436,6 +1609,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 #endif
         WordMeasurements wordMeasurements;
         end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), renderTextInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, wordMeasurements);
+        renderTextInfo.m_lineBreakIterator.resetLastTwoCharacters();
         if (resolver.position().atEnd()) {
             // FIXME: We shouldn't be creating any runs in nextLineBreak to begin with!
             // Once BidiRunList is separated from BidiResolver this will not be needed.
@@ -1446,6 +1620,13 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             break;
         }
         ASSERT(end != resolver.position());
+
+#if ENABLE(CSS_EXCLUSIONS)
+        if (exclusionShapeInsideInfo && wordMeasurements.size() && exclusionShapeInsideInfo->adjustLogicalLineTop(wordMeasurements[0].width)) {
+            end = restartLayoutRunsAndFloatsInRange(logicalHeight(), exclusionShapeInsideInfo->logicalLineTop() - absoluteLogicalTop, lastFloatFromPreviousLine, resolver, oldEnd);
+            continue;
+        }
+#endif
 
         // This is a short-cut for empty lines.
         if (layoutState.lineInfo().isEmpty()) {
@@ -1461,7 +1642,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             }
             // FIXME: This ownership is reversed. We should own the BidiRunList and pass it to createBidiRunsForLine.
             BidiRunList<BidiRun>& bidiRuns = resolver.runs();
-            constructBidiRuns(resolver, bidiRuns, end, override, layoutState.lineInfo().previousLineBrokeCleanly());
+            constructBidiRunsForLine(this, resolver, bidiRuns, end, override, layoutState.lineInfo().previousLineBrokeCleanly());
             ASSERT(resolver.position() == end);
 
             BidiRun* trailingSpaceRun = !layoutState.lineInfo().previousLineBrokeCleanly() ? handleTrailingSpaces(bidiRuns, resolver.context()) : 0;
@@ -1489,7 +1670,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
                 if (paginated) {
                     LayoutUnit adjustment = 0;
-                    adjustLinePositionForPagination(lineBox, adjustment);
+                    adjustLinePositionForPagination(lineBox, adjustment, layoutState.flowThread());
                     if (adjustment) {
                         LayoutUnit oldLineWidth = availableLogicalWidthForLine(oldLogicalHeight, layoutState.lineInfo().isFirstLine());
                         lineBox->adjustBlockDirectionPosition(adjustment);
@@ -1499,21 +1680,23 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
                         if (availableLogicalWidthForLine(oldLogicalHeight + adjustment, layoutState.lineInfo().isFirstLine()) != oldLineWidth) {
                             // We have to delete this line, remove all floats that got added, and let line layout re-run.
                             lineBox->deleteLine(renderArena());
-                            removeFloatingObjectsBelow(lastFloatFromPreviousLine, oldLogicalHeight);
-                            setLogicalHeight(oldLogicalHeight + adjustment);
-                            resolver.setPositionIgnoringNestedIsolates(oldEnd);
-                            end = oldEnd;
+                            end = restartLayoutRunsAndFloatsInRange(oldLogicalHeight, oldLogicalHeight + adjustment, lastFloatFromPreviousLine, resolver, oldEnd);
                             continue;
                         }
 
                         setLogicalHeight(lineBox->lineBottomWithLeading());
                     }
+
+                    if (layoutState.flowThread())
+                        lineBox->setContainingRegion(regionAtBlockOffset(lineBox->lineTopWithLeading()));
                 }
             }
+        }
 
-            for (size_t i = 0; i < lineBreaker.positionedObjects().size(); ++i)
-                setStaticPositions(this, lineBreaker.positionedObjects()[i]);
+        for (size_t i = 0; i < lineBreaker.positionedObjects().size(); ++i)
+            setStaticPositions(this, lineBreaker.positionedObjects()[i]);
 
+        if (!layoutState.lineInfo().isEmpty()) {
             layoutState.lineInfo().setFirstLine(false);
             newLine(lineBreaker.clear());
         }
@@ -1543,6 +1726,63 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
         lineMidpointState.reset();
         resolver.setPosition(end, numberOfIsolateAncestors(end));
     }
+
+    if (paginated && !style()->hasAutoWidows()) {
+        // Check the line boxes to make sure we didn't create unacceptable widows.
+        // However, we'll prioritize orphans - so nothing we do here should create
+        // a new orphan.
+
+        RootInlineBox* lineBox = lastRootBox();
+
+        // Count from the end of the block backwards, to see how many hanging
+        // lines we have.
+        RootInlineBox* firstLineInBlock = firstRootBox();
+        int numLinesHanging = 1;
+        while (lineBox && lineBox != firstLineInBlock && !lineBox->isFirstAfterPageBreak()) {
+            ++numLinesHanging;
+            lineBox = lineBox->prevRootBox();
+        }
+
+        // If there were no breaks in the block, we didn't create any widows.
+        if (!lineBox || !lineBox->isFirstAfterPageBreak() || lineBox == firstLineInBlock)
+            return;
+
+        if (numLinesHanging < style()->widows()) {
+            // We have detected a widow. Now we need to work out how many
+            // lines there are on the previous page, and how many we need
+            // to steal.
+            int numLinesNeeded = style()->widows() - numLinesHanging;
+            RootInlineBox* currentFirstLineOfNewPage = lineBox;
+
+            // Count the number of lines in the previous page.
+            lineBox = lineBox->prevRootBox();
+            int numLinesInPreviousPage = 1;
+            while (lineBox && lineBox != firstLineInBlock && !lineBox->isFirstAfterPageBreak()) {
+                ++numLinesInPreviousPage;
+                lineBox = lineBox->prevRootBox();
+            }
+
+            // If there was an explicit value for orphans, respect that. If not, we still
+            // shouldn't create a situation where we make an orphan bigger than the initial value.
+            // This means that setting widows implies we also care about orphans, but given
+            // the specification says the initial orphan value is non-zero, this is ok. The
+            // author is always free to set orphans explicitly as well.
+            int orphans = style()->hasAutoOrphans() ? style()->initialOrphans() : style()->orphans();
+            int numLinesAvailable = numLinesInPreviousPage - orphans;
+            if (numLinesAvailable <= 0)
+                return;
+
+            int numLinesToTake = min(numLinesAvailable, numLinesNeeded);
+            // Wind back from our first widowed line.
+            lineBox = currentFirstLineOfNewPage;
+            for (int i = 0; i < numLinesToTake; ++i)
+                lineBox = lineBox->prevRootBox();
+
+            // We now want to break at this line. Remember for next layout and trigger relayout.
+            setBreakAtLineToAvoidWidow(lineBox);
+            markLinesDirtyInBlockRange(lastRootBox()->lineBottomWithLeading(), lineBox->lineBottomWithLeading(), lineBox);
+        }
+    }
 }
 
 void RenderBlock::linkToEndLineIfNeeded(LineLayoutState& layoutState)
@@ -1556,12 +1796,14 @@ void RenderBlock::linkToEndLineIfNeeded(LineLayoutState& layoutState)
                 line->attachLine();
                 if (paginated) {
                     delta -= line->paginationStrut();
-                    adjustLinePositionForPagination(line, delta);
+                    adjustLinePositionForPagination(line, delta, layoutState.flowThread());
                 }
                 if (delta) {
                     layoutState.updateRepaintRangeFromBox(line, delta);
                     line->adjustBlockDirectionPosition(delta);
                 }
+                if (layoutState.flowThread())
+                    line->setContainingRegion(regionAtBlockOffset(line->lineTopWithLeading()));
                 if (Vector<RenderBox*>* cleanLineFloats = line->floatsPtr()) {
                     Vector<RenderBox*>::iterator end = cleanLineFloats->end();
                     for (Vector<RenderBox*>::iterator f = cleanLineFloats->begin(); f != end; ++f) {
@@ -1599,6 +1841,8 @@ void RenderBlock::linkToEndLineIfNeeded(LineLayoutState& layoutState)
             LayoutRect logicalLayoutOverflow(0, blockLogicalHeight, 1, bottomLayoutOverflow - blockLogicalHeight);
             LayoutRect logicalVisualOverflow(0, blockLogicalHeight, 1, bottomVisualOverflow - blockLogicalHeight);
             trailingFloatsLineBox->setOverflowFromLogicalRects(logicalLayoutOverflow, logicalVisualOverflow, trailingFloatsLineBox->lineTop(), trailingFloatsLineBox->lineBottom());
+            if (layoutState.flowThread())
+                trailingFloatsLineBox->setContainingRegion(regionAtBlockOffset(trailingFloatsLineBox->lineTopWithLeading()));
         }
 
         const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
@@ -1633,28 +1877,31 @@ void RenderBlock::repaintDirtyFloats(Vector<FloatWithRect>& floats)
 
 void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom)
 {
-    m_overflow.clear();
-
     setLogicalHeight(borderBefore() + paddingBefore());
     
     // Lay out our hypothetical grid line as though it occurs at the top of the block.
     if (view()->layoutState() && view()->layoutState()->lineGrid() == this)
         layoutLineGridBox();
 
+    RenderFlowThread* flowThread = flowThreadContainingBlock();
+    bool clearLinesForPagination = firstLineBox() && flowThread && !flowThread->hasRegions();
+
     // Figure out if we should clear out our line boxes.
     // FIXME: Handle resize eventually!
-    bool isFullLayout = !firstLineBox() || selfNeedsLayout() || relayoutChildren;
-    LineLayoutState layoutState(isFullLayout, repaintLogicalTop, repaintLogicalBottom);
+    bool isFullLayout = !firstLineBox() || selfNeedsLayout() || relayoutChildren || clearLinesForPagination;
+    LineLayoutState layoutState(isFullLayout, repaintLogicalTop, repaintLogicalBottom, flowThread);
 
     if (isFullLayout)
         lineBoxes()->deleteLineBoxes(renderArena());
 
-    // Text truncation only kicks in if your overflow isn't visible and your text-overflow-mode isn't
-    // clip.
+    // Text truncation kicks in in two cases:
+    //     1) If your overflow isn't visible and your text-overflow-mode isn't clip.
+    //     2) If you're an anonymous block with a block parent that satisfies #1.
     // FIXME: CSS3 says that descendants that are clipped must also know how to truncate.  This is insanely
-    // difficult to figure out (especially in the middle of doing layout), and is really an esoteric pile of nonsense
-    // anyway, so we won't worry about following the draft here.
-    bool hasTextOverflow = style()->textOverflow() && hasOverflowClip();
+    // difficult to figure out in general (especially in the middle of doing layout), so we only handle the
+    // simple case of an anonymous block truncating when it's parent is clipped.
+    bool hasTextOverflow = (style()->textOverflow() && hasOverflowClip())
+        || (isAnonymousBlock() && parent() && parent()->isRenderBlock() && parent()->style()->textOverflow() && parent()->hasOverflowClip());
 
     // Walk all the lines and delete our ellipsis line boxes if they exist.
     if (hasTextOverflow)
@@ -1743,7 +1990,7 @@ void RenderBlock::checkFloatsInCleanLine(RootInlineBox* line, Vector<FloatWithRe
         RenderBox* floatingBox = *it;
         floatingBox->layoutIfNeeded();
         LayoutSize newSize(floatingBox->width() + floatingBox->marginWidth(), floatingBox->height() + floatingBox->marginHeight());
-        ASSERT(floatIndex < floats.size());
+        ASSERT_WITH_SECURITY_IMPLICATION(floatIndex < floats.size());
         if (floats[floatIndex].object != floatingBox) {
             encounteredNewFloat = true;
             return;
@@ -1777,12 +2024,12 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
         size_t floatIndex = 0;
         for (curr = firstRootBox(); curr && !curr->isDirty(); curr = curr->nextRootBox()) {
             if (paginated) {
-                if (lineWidthForPaginatedLineChanged(curr)) {
+                if (lineWidthForPaginatedLineChanged(curr, 0, layoutState.flowThread())) {
                     curr->markDirty();
                     break;
                 }
                 paginationDelta -= curr->paginationStrut();
-                adjustLinePositionForPagination(curr, paginationDelta);
+                adjustLinePositionForPagination(curr, paginationDelta, layoutState.flowThread());
                 if (paginationDelta) {
                     if (containsFloats() || !layoutState.floats().isEmpty()) {
                         // FIXME: Do better eventually.  For now if we ever shift because of pagination and floats are present just go to a full layout.
@@ -1793,6 +2040,8 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
                     layoutState.updateRepaintRangeFromBox(curr, paginationDelta);
                     curr->adjustBlockDirectionPosition(paginationDelta);
                 }
+                if (layoutState.flowThread())
+                    curr->setContainingRegion(regionAtBlockOffset(curr->lineTopWithLeading()));
             }
 
             // If a new float has been inserted before this line or before its last known float, just do a full layout.
@@ -1826,7 +2075,7 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
             // We have a dirty line.
             if (RootInlineBox* prevRootBox = curr->prevRootBox()) {
                 // We have a previous line.
-                if (!dirtiedByFloat && (!prevRootBox->endsWithBreak() || (prevRootBox->lineBreakObj()->isText() && prevRootBox->lineBreakPos() >= toRenderText(prevRootBox->lineBreakObj())->textLength())))
+                if (!dirtiedByFloat && (!prevRootBox->endsWithBreak() || !prevRootBox->lineBreakObj() || (prevRootBox->lineBreakObj()->isText() && prevRootBox->lineBreakPos() >= toRenderText(prevRootBox->lineBreakObj())->textLength())))
                     // The previous line didn't break cleanly or broke at a newline
                     // that has been deleted, so treat it as dirty too.
                     curr = prevRootBox;
@@ -1927,7 +2176,7 @@ bool RenderBlock::checkPaginationAndFloatsAtEndLine(LineLayoutState& layoutState
     LayoutUnit lineDelta = logicalHeight() - layoutState.endLineLogicalTop();
 
     bool paginated = view()->layoutState() && view()->layoutState()->isPaginated();
-    if (paginated && inRenderFlowThread()) {
+    if (paginated && layoutState.flowThread()) {
         // Check all lines from here to the end, and see if the hypothetical new position for the lines will result
         // in a different available line width.
         for (RootInlineBox* lineBox = layoutState.endLine(); lineBox; lineBox = lineBox->nextRootBox()) {
@@ -1936,10 +2185,10 @@ bool RenderBlock::checkPaginationAndFloatsAtEndLine(LineLayoutState& layoutState
                 // strut yet.
                 LayoutUnit oldPaginationStrut = lineBox->paginationStrut();
                 lineDelta -= oldPaginationStrut;
-                adjustLinePositionForPagination(lineBox, lineDelta);
+                adjustLinePositionForPagination(lineBox, lineDelta, layoutState.flowThread());
                 lineBox->setPaginationStrut(oldPaginationStrut);
             }
-            if (lineWidthForPaginatedLineChanged(lineBox, lineDelta))
+            if (lineWidthForPaginatedLineChanged(lineBox, lineDelta, layoutState.flowThread()))
                 return false;
         }
     }
@@ -2041,12 +2290,12 @@ static bool requiresLineBoxForContent(RenderInline* flow, const LineInfo& lineIn
     return false;
 }
 
-static bool alwaysRequiresLineBox(RenderInline* flow)
+static bool alwaysRequiresLineBox(RenderObject* flow)
 {
     // FIXME: Right now, we only allow line boxes for inlines that are truly empty.
     // We need to fix this, though, because at the very least, inlines containing only
     // ignorable whitespace should should also have line boxes.
-    return !flow->firstChild() && flow->hasInlineDirectionBordersPaddingOrMargin();
+    return isEmptyInline(flow) && toRenderInline(flow)->hasInlineDirectionBordersPaddingOrMargin();
 }
 
 static bool requiresLineBox(const InlineIterator& it, const LineInfo& lineInfo = LineInfo(), WhitespacePosition whitespacePosition = LeadingWhitespace)
@@ -2054,15 +2303,15 @@ static bool requiresLineBox(const InlineIterator& it, const LineInfo& lineInfo =
     if (it.m_obj->isFloatingOrOutOfFlowPositioned())
         return false;
 
-    if (it.m_obj->isRenderInline() && !alwaysRequiresLineBox(toRenderInline(it.m_obj)) && !requiresLineBoxForContent(toRenderInline(it.m_obj), lineInfo))
+    if (it.m_obj->isRenderInline() && !alwaysRequiresLineBox(it.m_obj) && !requiresLineBoxForContent(toRenderInline(it.m_obj), lineInfo))
         return false;
 
     if (!shouldCollapseWhiteSpace(it.m_obj->style(), lineInfo, whitespacePosition) || it.m_obj->isBR())
         return true;
 
     UChar current = it.current();
-    return current != ' ' && current != '\t' && current != softHyphen && (current != '\n' || it.m_obj->preservesNewline())
-    && !skipNonBreakingSpace(it, lineInfo);
+    bool notJustWhitespace = current != ' ' && current != '\t' && current != softHyphen && (current != '\n' || it.m_obj->preservesNewline()) && !skipNonBreakingSpace(it, lineInfo);
+    return notJustWhitespace || isEmptyInline(it.m_obj);
 }
 
 bool RenderBlock::generatesLineBoxesForInlineChild(RenderObject* inlineObj)
@@ -2106,9 +2355,15 @@ void RenderBlock::LineBreaker::skipLeadingWhitespace(InlineBidiResolver& resolve
                 resolver.runs().addRun(createRun(0, 1, object, resolver));
                 lineInfo.incrementRunsFromLeadingWhitespace();
             }
-        } else if (object->isFloating())
+        } else if (object->isFloating()) {
+            // The top margin edge of a self-collapsing block that clears a float intrudes up into it by the height of the margin,
+            // so in order to place this first child float at the top content edge of the self-collapsing block add the margin back in before placement.
+            LayoutUnit marginOffset = (!object->previousSibling() && m_block->isSelfCollapsingBlock() && m_block->style()->clear() && m_block->getClearDelta(m_block, LayoutUnit())) ? m_block->collapsedMarginBeforeForChild(m_block) : LayoutUnit();
+            LayoutUnit oldLogicalHeight = m_block->logicalHeight();
+            m_block->setLogicalHeight(oldLogicalHeight + marginOffset);
             m_block->positionNewFloatOnLine(m_block->insertFloatingObject(toRenderBox(object)), lastFloatFromPreviousLine, lineInfo, width);
-        else if (object->isText() && object->style()->hasTextCombine() && object->isCombineText() && !toRenderCombineText(object)->isCombined()) {
+            m_block->setLogicalHeight(oldLogicalHeight);
+        } else if (object->isText() && object->style()->hasTextCombine() && object->isCombineText() && !toRenderCombineText(object)->isCombined()) {
             toRenderCombineText(object)->combineText();
             if (toRenderCombineText(object)->isCombined())
                 continue;
@@ -2127,7 +2382,7 @@ static bool shouldSkipWhitespaceAfterStartObject(RenderBlock* block, RenderObjec
         RenderText* nextText = toRenderText(next);
         UChar nextChar = nextText->characterAt(0);
         if (nextText->style()->isCollapsibleWhiteSpace(nextChar)) {
-            addMidpoint(lineMidpointState, InlineIterator(0, o, 0));
+            startIgnoringSpaces(lineMidpointState, InlineIterator(0, o, 0));
             return true;
         }
     }
@@ -2280,9 +2535,7 @@ void TrailingObjects::updateMidpointsForTrailingBoxes(LineMidpointState& lineMid
         for (size_t i = 0; i < m_boxes.size(); ++i) {
             if (currentMidpoint >= lineMidpointState.numMidpoints) {
                 // We don't have a midpoint for this box yet.
-                InlineIterator ignoreStart(0, m_boxes[i], 0);
-                addMidpoint(lineMidpointState, ignoreStart); // Stop ignoring.
-                addMidpoint(lineMidpointState, ignoreStart); // Start ignoring again.
+                ensureLineBoxInsideIgnoredSpaces(lineMidpointState, m_boxes[i]);
             } else {
                 ASSERT(lineMidpointState.midpoints[currentMidpoint].m_obj == m_boxes[i]);
                 ASSERT(lineMidpointState.midpoints[currentMidpoint + 1].m_obj == m_boxes[i]);
@@ -2296,11 +2549,9 @@ void TrailingObjects::updateMidpointsForTrailingBoxes(LineMidpointState& lineMid
         unsigned length = m_whitespace->textLength();
         unsigned pos = length >= 2 ? length - 2 : UINT_MAX;
         InlineIterator endMid(0, m_whitespace, pos);
-        addMidpoint(lineMidpointState, endMid);
+        startIgnoringSpaces(lineMidpointState, endMid);
         for (size_t i = 0; i < m_boxes.size(); ++i) {
-            InlineIterator ignoreStart(0, m_boxes[i], 0);
-            addMidpoint(lineMidpointState, ignoreStart); // Stop ignoring spaces.
-            addMidpoint(lineMidpointState, ignoreStart); // Start ignoring again.
+            ensureLineBoxInsideIgnoredSpaces(lineMidpointState, m_boxes[i]);
         }
     }
 }
@@ -2313,6 +2564,52 @@ void RenderBlock::LineBreaker::reset()
 }
 
 InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resolver, LineInfo& lineInfo, RenderTextInfo& renderTextInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements& wordMeasurements)
+{
+#if !ENABLE(CSS_EXCLUSIONS)
+    return nextSegmentBreak(resolver, lineInfo, renderTextInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, wordMeasurements);
+#else
+    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = m_block->layoutExclusionShapeInsideInfo();
+    if (!exclusionShapeInsideInfo || !exclusionShapeInsideInfo->hasSegments())
+        return nextSegmentBreak(resolver, lineInfo, renderTextInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, wordMeasurements);
+
+    InlineIterator end = resolver.position();
+    InlineIterator oldEnd = end;
+
+    const SegmentList& segments = exclusionShapeInsideInfo->segments();
+    SegmentRangeList& segmentRanges = exclusionShapeInsideInfo->segmentRanges();
+
+    for (unsigned i = 0; i < segments.size() && !end.atEnd(); i++) {
+        InlineIterator segmentStart = resolver.position();
+        end = nextSegmentBreak(resolver, lineInfo, renderTextInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, wordMeasurements);
+
+        ASSERT(segmentRanges.size() == i);
+        if (resolver.position().atEnd()) {
+            segmentRanges.append(LineSegmentRange(segmentStart, end));
+            break;
+        }
+        if (resolver.position() == end) {
+            // Nothing fit this segment
+            segmentRanges.append(LineSegmentRange(segmentStart, segmentStart));
+            resolver.setPositionIgnoringNestedIsolates(segmentStart);
+        } else {
+            // Note that resolver.position is already skipping some of the white space at the beginning of the line,
+            // so that's why segmentStart might be different than resolver.position().
+            LineSegmentRange range(resolver.position(), end);
+            segmentRanges.append(range);
+            resolver.setPosition(end, numberOfIsolateAncestors(end));
+
+            if (lineInfo.previousLineBrokeCleanly()) {
+                // If we hit a new line break, just stop adding anything to this line.
+                break;
+            }
+        }
+    }
+    resolver.setPositionIgnoringNestedIsolates(oldEnd);
+    return end;
+#endif
+}
+
+InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& resolver, LineInfo& lineInfo, RenderTextInfo& renderTextInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements& wordMeasurements)
 {
     reset();
 
@@ -2401,10 +2698,8 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                 // A <br> with clearance always needs a linebox in case the lines below it get dirtied later and 
                 // need to check for floats to clear - so if we're ignoring spaces, stop ignoring them and add a
                 // run for this object.
-                if (ignoringSpaces && currentStyle->clear() != CNONE) {
-                    addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, 0)); // Stop ignoring spaces.
-                    addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, 0)); // Start ignoring again.
-                }
+                if (ignoringSpaces && currentStyle->clear() != CNONE)
+                    ensureLineBoxInsideIgnoredSpaces(lineMidpointState, current.m_obj);
 
                 if (!lineInfo.isEmpty())
                     m_clear = currentStyle->clear();
@@ -2428,21 +2723,21 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             // If we're ignoring spaces, we have to stop and include this object and
             // then start ignoring spaces again.
             if (isInlineType || current.m_obj->container()->isRenderInline()) {
-                if (ignoringSpaces) {
-                    ignoreStart.m_obj = current.m_obj;
-                    ignoreStart.m_pos = 0;
-                    addMidpoint(lineMidpointState, ignoreStart); // Stop ignoring spaces.
-                    addMidpoint(lineMidpointState, ignoreStart); // Start ignoring again.
-                }
+                if (ignoringSpaces)
+                    ensureLineBoxInsideIgnoredSpaces(lineMidpointState, current.m_obj);
                 trailingObjects.appendBoxIfNeeded(box);
             } else
                 m_positionedObjects.append(box);
+            width.addUncommittedWidth(inlineLogicalWidth(current.m_obj));
+            // Reset prior line break context characters.
+            renderTextInfo.m_lineBreakIterator.resetLastTwoCharacters();
         } else if (current.m_obj->isFloating()) {
             RenderBox* floatBox = toRenderBox(current.m_obj);
             FloatingObject* f = m_block->insertFloatingObject(floatBox);
             // check if it fits in the current line.
             // If it does, position it now, otherwise, position
             // it after moving to next line (in newLine() func)
+            // FIXME: Bug 110372: Properly position multiple stacked floats with non-rectangular shape outside.
             if (floatsFitOnLine && width.fitsOnLine(m_block->logicalWidthForFloat(f))) {
                 m_block->positionNewFloatOnLine(f, lastFloatFromPreviousLine, lineInfo, width);
                 if (lBreak.m_obj == current.m_obj) {
@@ -2451,9 +2746,11 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                 }
             } else
                 floatsFitOnLine = false;
+            // Update prior line break context characters, using U+FFFD (OBJECT REPLACEMENT CHARACTER) for floating element.
+            renderTextInfo.m_lineBreakIterator.updateLastTwoCharacters(replacementCharacter);
         } else if (current.m_obj->isRenderInline()) {
             // Right now, we should only encounter empty inlines here.
-            ASSERT(!current.m_obj->firstChild());
+            ASSERT(isEmptyInline(current.m_obj));
 
             RenderInline* flowBox = toRenderInline(current.m_obj);
 
@@ -2461,7 +2758,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             // to make sure that we stop to include this object and then start ignoring spaces again.
             // If this object is at the start of the line, we need to behave like list markers and
             // start ignoring spaces.
-            bool requiresLineBox = alwaysRequiresLineBox(flowBox);
+            bool requiresLineBox = alwaysRequiresLineBox(current.m_obj);
             if (requiresLineBox || requiresLineBoxForContent(flowBox, lineInfo)) {
                 // An empty inline that only has line-height, vertical-align or font-metrics will only get a
                 // line box to affect the height of the line if the rest of the line is not empty.
@@ -2469,8 +2766,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                     lineInfo.setEmpty(false, m_block, &width);
                 if (ignoringSpaces) {
                     trailingObjects.clear();
-                    addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, 0)); // Stop ignoring spaces.
-                    addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, 0)); // Start ignoring again.
+                    ensureLineBoxInsideIgnoredSpaces(lineMidpointState, current.m_obj);
                 } else if (blockStyle->collapseWhiteSpace() && resolver.position().m_obj == current.m_obj
                     && shouldSkipWhitespaceAfterStartObject(m_block, current.m_obj, lineMidpointState)) {
                     // Like with list markers, we start ignoring spaces to make sure that any
@@ -2481,9 +2777,12 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                 }
             }
 
-            width.addUncommittedWidth(borderPaddingMarginStart(flowBox) + borderPaddingMarginEnd(flowBox));
+            width.addUncommittedWidth(inlineLogicalWidth(current.m_obj) + borderPaddingMarginStart(flowBox) + borderPaddingMarginEnd(flowBox));
         } else if (current.m_obj->isReplaced()) {
             RenderBox* replacedBox = toRenderBox(current.m_obj);
+
+            if (atStart)
+                width.updateAvailableWidth(replacedBox->logicalHeight());
 
             // Break on replaced elements if either has normal white-space.
             if ((autoWrap || RenderStyle::autoWrap(lastWS)) && (!current.m_obj->isImage() || allowImagesToBreak)) {
@@ -2492,7 +2791,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             }
 
             if (ignoringSpaces)
-                addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, 0));
+                stopIgnoringSpaces(lineMidpointState, InlineIterator(0, current.m_obj, 0));
 
             lineInfo.setEmpty(false, m_block, &width);
             ignoringSpaces = false;
@@ -2517,6 +2816,8 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                 width.addUncommittedWidth(replacedLogicalWidth);
             if (current.m_obj->isRubyRun())
                 width.applyOverhang(toRenderRubyRun(current.m_obj), last, next);
+            // Update prior line break context characters, using U+FFFD (OBJECT REPLACEMENT CHARACTER) for replaced element.
+            renderTextInfo.m_lineBreakIterator.updateLastTwoCharacters(replacementCharacter);
         } else if (current.m_obj->isText()) {
             if (!current.m_pos)
                 appliedStartWidth = false;
@@ -2549,6 +2850,12 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             bool midWordBreak = false;
             bool breakAll = currentStyle->wordBreak() == BreakAllWordBreak && autoWrap;
             float hyphenWidth = 0;
+#if ENABLE(SVG)
+            if (isSVGText) {
+                breakWords = false;
+                breakAll = false;
+            }
+#endif
 
             if (t->isWordBreak()) {
                 width.commit();
@@ -2557,7 +2864,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             }
 
             if (renderTextInfo.m_text != t) {
-                t->updateTextIfNeeded();
+                updateCounterIfNeeded(t);
                 renderTextInfo.m_text = t;
                 renderTextInfo.m_font = &f;
                 renderTextInfo.m_layout = f.createLayout(t, width.currentWidth(), collapseWhiteSpace);
@@ -2573,6 +2880,8 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             // words with their trailing space, then subtract its width.
             float wordTrailingSpaceWidth = (f.typesettingFeatures() & Kerning) && !textLayout ? f.width(constructTextRun(t, f, &space, 1, style)) + wordSpacing : 0;
 
+            UChar lastCharacterInNode = renderTextInfo.m_lineBreakIterator.lastCharacter();
+            UChar secondToLastCharacterInNode = renderTextInfo.m_lineBreakIterator.secondToLastCharacter();
             for (; current.m_pos < t->textLength(); current.fastIncrementInTextNode()) {
                 bool previousCharacterIsSpace = currentCharacterIsSpace;
                 bool previousCharacterIsWS = currentCharacterIsWS;
@@ -2604,18 +2913,18 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                 if (betweenWords || midWordBreak) {
                     bool stoppedIgnoringSpaces = false;
                     if (ignoringSpaces) {
+                        lastSpaceWordSpacing = 0;
                         if (!currentCharacterIsSpace) {
                             // Stop ignoring spaces and begin at this
                             // new point.
                             ignoringSpaces = false;
-                            lastSpaceWordSpacing = 0;
                             wordSpacingForWordMeasurement = 0;
                             lastSpace = current.m_pos; // e.g., "Foo    goo", don't add in any of the ignored spaces.
-                            addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos));
+                            stopIgnoringSpaces(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos));
                             stoppedIgnoringSpaces = true;
                         } else {
                             // Just keep ignoring these spaces.
-                            continue;
+                            goto nextCharacter;
                         }
                     }
 
@@ -2627,7 +2936,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                     wordMeasurement.startOffset = lastSpace;
                     
                     float additionalTmpW;
-                    if (wordTrailingSpaceWidth && currentCharacterIsSpace)
+                    if (wordTrailingSpaceWidth && c == ' ')
                         additionalTmpW = textWidth(t, lastSpace, current.m_pos + 1 - lastSpace, f, width.currentWidth(), isFixedPitch, collapseWhiteSpace, &wordMeasurement.fallbackFonts, textLayout) - wordTrailingSpaceWidth;
                     else
                         additionalTmpW = textWidth(t, lastSpace, current.m_pos - lastSpace, f, width.currentWidth(), isFixedPitch, collapseWhiteSpace, &wordMeasurement.fallbackFonts, textLayout);
@@ -2669,11 +2978,8 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                                     goto end;
                             }
                             if (lBreak.atTextParagraphSeparator()) {
-                                if (!stoppedIgnoringSpaces && current.m_pos > 0) {
-                                    // We need to stop right before the newline and then start up again.
-                                    addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos - 1)); // Stop
-                                    addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos)); // Start
-                                }
+                                if (!stoppedIgnoringSpaces && current.m_pos > 0)
+                                    ensureCharacterGetsLineBox(lineMidpointState, current);
                                 lBreak.increment();
                                 lineInfo.setPreviousLineBrokeCleanly(true);
                                 wordMeasurement.endOffset = lBreak.m_pos;
@@ -2686,7 +2992,9 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                                     wordMeasurement.width = charWidth;
                                 }
                             }
-                            goto end; // Didn't fit. Jump to the end.
+                            // Didn't fit. Jump to the end unless there's still an opportunity to collapse whitespace.
+                            if (ignoringSpaces || !collapseWhiteSpace || !currentCharacterIsSpace || !previousCharacterIsSpace)
+                                goto end;
                         } else {
                             if (!betweenWords || (midWordBreak && !autoWrap))
                                 width.addUncommittedWidth(-additionalTmpW);
@@ -2699,11 +3007,8 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                     }
 
                     if (c == '\n' && preserveNewline) {
-                        if (!stoppedIgnoringSpaces && current.m_pos > 0) {
-                            // We need to stop right before the newline and then start up again.
-                            addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos - 1)); // Stop
-                            addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos)); // Start
-                        }
+                        if (!stoppedIgnoringSpaces && current.m_pos > 0)
+                            ensureCharacterGetsLineBox(lineMidpointState, current);
                         lBreak.moveTo(current.m_obj, current.m_pos, current.m_nextBreakablePosition);
                         lBreak.increment();
                         lineInfo.setPreviousLineBrokeCleanly(true);
@@ -2742,7 +3047,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                             // We just entered a mode where we are ignoring
                             // spaces. Create a midpoint to terminate the run
                             // before the second space.
-                            addMidpoint(lineMidpointState, ignoreStart);
+                            startIgnoringSpaces(lineMidpointState, ignoreStart);
                             trailingObjects.updateMidpointsForTrailingBoxes(lineMidpointState, InlineIterator(), TrailingObjects::DoNotCollapseFirstSpace);
                         }
                     }
@@ -2753,16 +3058,14 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                     lastSpaceWordSpacing = applyWordSpacing ? wordSpacing : 0;
                     wordSpacingForWordMeasurement = (applyWordSpacing && wordMeasurements.last().width) ? wordSpacing : 0;
                     lastSpace = current.m_pos; // e.g., "Foo    goo", don't add in any of the ignored spaces.
-                    addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos));
+                    stopIgnoringSpaces(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos));
                 }
 
 #if ENABLE(SVG)
                 if (isSVGText && current.m_pos > 0) {
                     // Force creation of new InlineBoxes for each absolute positioned character (those that start new text chunks).
-                    if (toRenderSVGInlineText(t)->characterStartsNewTextChunk(current.m_pos)) {
-                        addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos - 1));
-                        addMidpoint(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos));
-                    }
+                    if (toRenderSVGInlineText(t)->characterStartsNewTextChunk(current.m_pos))
+                        ensureCharacterGetsLineBox(lineMidpointState, current);
                 }
 #endif
 
@@ -2782,7 +3085,12 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
                     trailingObjects.clear();
 
                 atStart = false;
+            nextCharacter:
+                secondToLastCharacterInNode = lastCharacterInNode;
+                lastCharacterInNode = c;
             }
+
+            renderTextInfo.m_lineBreakIterator.setLastTwoCharacters(lastCharacterInNode, secondToLastCharacterInNode);
 
             wordMeasurements.grow(wordMeasurements.size() + 1);
             WordMeasurement& wordMeasurement = wordMeasurements.last();
@@ -2810,20 +3118,20 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
         } else
             ASSERT_NOT_REACHED();
 
-        bool checkForBreak = autoWrap || blockStyle->autoWrap();
+        bool checkForBreak = autoWrap;
         if (width.committedWidth() && !width.fitsOnLine() && lBreak.m_obj && currWS == NOWRAP)
             checkForBreak = true;
-        else if (next && current.m_obj->isText() && next->isText() && !next->isBR() && (autoWrap || (next->style()->autoWrap()))) {
-            if (currentCharacterIsSpace)
+        else if (next && current.m_obj->isText() && next->isText() && !next->isBR() && (autoWrap || next->style()->autoWrap())) {
+            if (autoWrap && currentCharacterIsSpace)
                 checkForBreak = true;
             else {
                 RenderText* nextText = toRenderText(next);
                 if (nextText->textLength()) {
                     UChar c = nextText->characterAt(0);
-                    checkForBreak = (c == ' ' || c == '\t' || (c == '\n' && !next->preservesNewline()));
                     // If the next item on the line is text, and if we did not end with
                     // a space, then the next text run continues our word (and so it needs to
-                    // keep adding to |tmpW|. Just update and continue.
+                    // keep adding to the uncommitted width. Just update and continue.
+                    checkForBreak = !currentCharacterIsSpace && (c == ' ' || c == '\t' || (c == '\n' && !next->preservesNewline()));
                 } else if (nextText->isWordBreak())
                     checkForBreak = true;
 
@@ -2853,6 +3161,10 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
             // the end label if we still don't fit on the line. -dwh
             if (!width.fitsOnLine())
                 goto end;
+        } else if (blockStyle->autoWrap() && !width.fitsOnLine() && !width.committedWidth()) {
+            // If the container autowraps but the current child does not then we still need to ensure that it
+            // wraps and moves below any floats.
+            width.fitBelowFloats();
         }
 
         if (!current.m_obj->isFloatingOrOutOfFlowPositioned()) {
@@ -2878,15 +3190,8 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
  end:
     if (lBreak == resolver.position() && (!lBreak.m_obj || !lBreak.m_obj->isBR())) {
         // we just add as much as possible
-        if (blockStyle->whiteSpace() == PRE) {
-            // FIXME: Don't really understand this case.
-            if (current.m_pos) {
-                // FIXME: This should call moveTo which would clear m_nextBreakablePosition
-                // this code as-is is likely wrong.
-                lBreak.m_obj = current.m_obj;
-                lBreak.m_pos = current.m_pos - 1;
-            } else
-                lBreak.moveTo(last, last->isText() ? last->length() : 0);
+        if (blockStyle->whiteSpace() == PRE && !current.m_pos) {
+            lBreak.moveTo(last, last->isText() ? last->length() : 0);
         } else if (lBreak.m_obj) {
             // Don't ever break in the middle of a word if we can help it.
             // There's no room at all. We just have to be on this line,
@@ -2895,6 +3200,8 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
         }
     }
 
+    // FIXME Bug 100049: We do not need to consume input in a multi-segment line
+    // unless no segment will.
     // make sure we consume at least one char/object.
     if (lBreak == resolver.position())
         lBreak.increment();
@@ -2971,9 +3278,11 @@ void RenderBlock::checkLinesForTextOverflow()
     ETextAlign textAlign = style()->textAlign();
     bool firstLine = true;
     for (RootInlineBox* curr = firstRootBox(); curr; curr = curr->nextRootBox()) {
-        LayoutUnit blockRightEdge = logicalRightOffsetForLine(curr->lineTop(), firstLine);
-        LayoutUnit blockLeftEdge = logicalLeftOffsetForLine(curr->lineTop(), firstLine);
-        LayoutUnit lineBoxEdge = ltr ? curr->x() + curr->logicalWidth() : curr->x();
+        // FIXME: Use pixelSnappedLogicalRightOffsetForLine instead of snapping it ourselves once the column workaround in said method has been fixed.
+        // https://bugs.webkit.org/show_bug.cgi?id=105461
+        int blockRightEdge = snapSizeToPixel(logicalRightOffsetForLine(curr->lineTop(), firstLine), curr->x());
+        int blockLeftEdge = pixelSnappedLogicalLeftOffsetForLine(curr->lineTop(), firstLine);
+        int lineBoxEdge = ltr ? snapSizeToPixel(curr->x() + curr->logicalWidth(), curr->x()) : snapSizeToPixel(curr->x(), 0);
         if ((ltr && lineBoxEdge > blockRightEdge) || (!ltr && lineBoxEdge < blockLeftEdge)) {
             // This line spills out of our box in the appropriate direction.  Now we need to see if the line
             // can be truncated.  In order for truncation to be possible, the line must have sufficient space to

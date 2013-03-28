@@ -1061,12 +1061,6 @@ void GraphicsContext::setURLForRect(const KURL& link, const IntRect& destRect)
     notImplemented();
 }
 
-void GraphicsContext::addInnerRoundedRectClip(const IntRect& rect, int thickness)
-{
-    // We can only clip rectangles on WINCE
-    clip(rect);
-}
-
 void GraphicsContext::clearRect(const FloatRect& rect)
 {
     if (paintingDisabled())
@@ -1193,19 +1187,19 @@ void GraphicsContext::setAlpha(float alpha)
     m_data->m_opacity = alpha;
 }
 
-void GraphicsContext::setPlatformCompositeOperation(CompositeOperator op)
+void GraphicsContext::setPlatformCompositeOperation(CompositeOperator op, BlendMode blendMode)
 {
     notImplemented();
 }
 
-void GraphicsContext::clip(const Path& path)
+void GraphicsContext::clip(const Path& path, WindRule)
 {
     notImplemented();
 }
 
-void GraphicsContext::canvasClip(const Path& path)
+void GraphicsContext::canvasClip(const Path& path, WindRule fillRule)
 {
-    clip(path);
+    clip(path, fillRule);
 }
 
 void GraphicsContext::clipOut(const Path&)
@@ -1829,7 +1823,7 @@ void GraphicsContext::paintTextField(const IntRect& rect, unsigned state)
     FillRect(dc, &rectWin, reinterpret_cast<HBRUSH>(((state & DFCS_INACTIVE) ? COLOR_BTNFACE : COLOR_WINDOW) + 1));
 }
 
-void GraphicsContext::drawBitmap(SharedBitmap* bmp, const IntRect& dstRectIn, const IntRect& srcRect, ColorSpace styleColorSpace, CompositeOperator compositeOp)
+void GraphicsContext::drawBitmap(SharedBitmap* bmp, const IntRect& dstRectIn, const IntRect& srcRect, ColorSpace styleColorSpace, CompositeOperator compositeOp, BlendMode blendMode)
 {
     if (!m_data->m_opacity)
         return;
@@ -1845,7 +1839,7 @@ void GraphicsContext::drawBitmap(SharedBitmap* bmp, const IntRect& dstRectIn, co
         return;
     dstRect.move(transparentDC.toShift());
 
-    bmp->draw(dc, dstRect, srcRect, compositeOp);
+    bmp->draw(dc, dstRect, srcRect, compositeOp, blendMode);
 
     if (bmp->is16bit())
         transparentDC.fillAlphaChannel();

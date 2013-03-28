@@ -41,12 +41,6 @@ public:
     {
     }
 
-    Attribute(const AtomicString& name, const AtomicString& value)
-        : m_name(nullAtom, name, nullAtom)
-        , m_value(value)
-    {
-    }
-
     // NOTE: The references returned by these functions are only valid for as long
     // as the Attribute stays in place. For example, calling a function that mutates
     // an Element's internal attribute storage may invalidate them.
@@ -57,8 +51,8 @@ public:
 
     const QualifiedName& name() const { return m_name; }
 
-    bool isNull() const { return m_value.isNull(); }
     bool isEmpty() const { return m_value.isEmpty(); }
+    bool matches(const QualifiedName&) const;
 
     void setValue(const AtomicString& value) { m_value = value; }
     void setPrefix(const AtomicString& prefix) { m_name.setPrefix(prefix); }
@@ -71,14 +65,27 @@ public:
     void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     {
         MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-        info.addMember(m_name);
-        info.addMember(m_value);
+        info.addMember(m_name, "name");
+        info.addMember(m_value, "value");
     }
+
+#if COMPILER(MSVC)
+    // NOTE: This constructor is not actually implemented, it's just defined so MSVC
+    // will let us use a zero-length array of Attributes.
+    Attribute();
+#endif
 
 private:
     QualifiedName m_name;
     AtomicString m_value;
 };
+
+inline bool Attribute::matches(const QualifiedName& qualifiedName) const
+{
+    if (qualifiedName.localName() != localName())
+        return false;
+    return qualifiedName.prefix() == starAtom || qualifiedName.namespaceURI() == namespaceURI();
+}
 
 } // namespace WebCore
 

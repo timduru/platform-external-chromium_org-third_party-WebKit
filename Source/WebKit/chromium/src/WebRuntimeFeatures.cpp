@@ -31,7 +31,7 @@
 #include "config.h"
 #include "WebRuntimeFeatures.h"
 
-#include "AbstractDatabase.h"
+#include "DatabaseManager.h"
 #include "RuntimeEnabledFeatures.h"
 #include "WebMediaPlayerClientImpl.h"
 #include "Modules/websockets/WebSocket.h"
@@ -42,17 +42,31 @@ using namespace WebCore;
 
 namespace WebKit {
 
+// FIXME: Remove native validation message things when we finish implementations
+// of all platforms.
+static bool nativeValidationMessageEnabled = false;
+
+void WebRuntimeFeatures::enableNativeValidationMessage(bool enable)
+{
+    nativeValidationMessageEnabled = enable;
+}
+
+bool WebRuntimeFeatures::isNativeValidationMessageEnabled()
+{
+    return nativeValidationMessageEnabled;
+}
+
 void WebRuntimeFeatures::enableDatabase(bool enable)
 {
 #if ENABLE(SQL_DATABASE)
-    AbstractDatabase::setIsAvailable(enable);
+    DatabaseManager::manager().setIsAvailable(enable);
 #endif
 }
 
 bool WebRuntimeFeatures::isDatabaseEnabled()
 {
 #if ENABLE(SQL_DATABASE)
-    return AbstractDatabase::isAvailable();
+    return DatabaseManager::manager().isAvailable();
 #else
     return false;
 #endif
@@ -377,24 +391,6 @@ bool WebRuntimeFeatures::isFullScreenAPIEnabled()
 #endif
 }
 
-void WebRuntimeFeatures::enablePointerLock(bool enable)
-{
-#if ENABLE(POINTER_LOCK)
-    RuntimeEnabledFeatures::setPointerLockEnabled(enable);
-#else
-    UNUSED_PARAM(enable);
-#endif
-}
-
-bool WebRuntimeFeatures::isPointerLockEnabled()
-{
-#if ENABLE(POINTER_LOCK)
-    return RuntimeEnabledFeatures::pointerLockEnabled();
-#else
-    return false;
-#endif
-}
-
 void WebRuntimeFeatures::enableMediaSource(bool enable)
 {
 #if ENABLE(MEDIA_SOURCE)
@@ -484,6 +480,25 @@ bool WebRuntimeFeatures::isShadowDOMEnabled()
     return false;
 #endif
 }
+
+void WebRuntimeFeatures::enableCustomDOMElements(bool enable)
+{
+#if ENABLE(CUSTOM_ELEMENTS)
+    RuntimeEnabledFeatures::setCustomDOMElements(enable);
+#else
+    UNUSED_PARAM(enable);
+#endif
+}
+
+bool WebRuntimeFeatures::isCustomDOMElementsEnabled()
+{
+#if ENABLE(CUSTOM_ELEMENTS)
+    return RuntimeEnabledFeatures::customDOMElementsEnabled();
+#else
+    return false;
+#endif
+}
+
 
 void WebRuntimeFeatures::enableStyleScoped(bool enable)
 {
@@ -629,6 +644,52 @@ bool WebRuntimeFeatures::isDialogElementEnabled()
 #endif
 }
 
+void WebRuntimeFeatures::enableExperimentalContentSecurityPolicyFeatures(bool enable)
+{
+#if ENABLE(CSP_NEXT)
+    RuntimeEnabledFeatures::setExperimentalContentSecurityPolicyFeaturesEnabled(enable);
+#else
+    UNUSED_PARAM(enable);
+#endif
+}
+
+bool WebRuntimeFeatures::isExperimentalContentSecurityPolicyFeaturesEnabled()
+{
+#if ENABLE(CSP_NEXT)
+    return RuntimeEnabledFeatures::experimentalContentSecurityPolicyFeaturesEnabled();
+#else
+    return false;
+#endif
+}
+
+void WebRuntimeFeatures::enableSeamlessIFrames(bool enable)
+{
+#if ENABLE(IFRAME_SEAMLESS)
+    return RuntimeEnabledFeatures::setSeamlessIFramesEnabled(enable);
+#else
+    UNUSED_PARAM(enable);
+#endif
+}
+
+bool WebRuntimeFeatures::areSeamlessIFramesEnabled()
+{
+#if ENABLE(IFRAME_SEAMLESS)
+    return RuntimeEnabledFeatures::seamlessIFramesEnabled();
+#else
+    return false;
+#endif
+}
+
+void WebRuntimeFeatures::enableCanvasPath(bool enable)
+{
+    RuntimeEnabledFeatures::setCanvasPathEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isCanvasPathEnabled()
+{
+    return RuntimeEnabledFeatures::canvasPathEnabled();
+}
+
 void WebRuntimeFeatures::enableCSSExclusions(bool enable)
 {
     RuntimeEnabledFeatures::setCSSExclusionsEnabled(enable);
@@ -637,6 +698,36 @@ void WebRuntimeFeatures::enableCSSExclusions(bool enable)
 bool WebRuntimeFeatures::isCSSExclusionsEnabled()
 {
     return RuntimeEnabledFeatures::cssExclusionsEnabled();
+}
+
+void WebRuntimeFeatures::enableCSSRegions(bool enable)
+{
+    RuntimeEnabledFeatures::setCSSRegionsEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isCSSRegionsEnabled()
+{
+    return RuntimeEnabledFeatures::cssRegionsEnabled();
+}
+
+void WebRuntimeFeatures::enableCSSCompositing(bool enable)
+{
+    RuntimeEnabledFeatures::setCSSCompositingEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isCSSCompositingEnabled()
+{
+    return RuntimeEnabledFeatures::cssCompositingEnabled();
+}
+
+void WebRuntimeFeatures::enableFontLoadEvents(bool enable)
+{
+    RuntimeEnabledFeatures::setFontLoadEventsEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isFontLoadEventsEnabled()
+{
+    return RuntimeEnabledFeatures::fontLoadEventsEnabled();
 }
 
 void WebRuntimeFeatures::enableRequestAutocomplete(bool enable)

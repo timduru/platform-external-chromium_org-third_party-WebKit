@@ -60,7 +60,7 @@ DateTimeChooserImpl::DateTimeChooserImpl(ChromeClientImpl* chromeClient, WebCore
     , m_client(client)
     , m_popup(0)
     , m_parameters(parameters)
-    , m_locale(WebCore::Locale::createDefault())
+    , m_locale(WebCore::Locale::create(parameters.locale))
 {
     ASSERT(m_chromeClient);
     ASSERT(m_client);
@@ -105,48 +105,42 @@ void DateTimeChooserImpl::writeDocument(WebCore::DocumentWriter& writer)
     String stepString = String::number(m_parameters.step);
     String stepBaseString = String::number(m_parameters.stepBase, 11, WTF::TruncateTrailingZeros);
     IntRect anchorRectInScreen = m_chromeClient->rootViewToScreen(m_parameters.anchorRectInRootView);
-    FrameView* view = static_cast<WebViewImpl*>(m_chromeClient->webView())->page()->mainFrame()->view();
-    IntRect rootViewVisibleContentRect = view->visibleContentRect(true /* include scrollbars */);
-    IntRect rootViewRectInScreen = m_chromeClient->rootViewToScreen(rootViewVisibleContentRect);
-    rootViewRectInScreen.move(-view->scrollX(), -view->scrollY());
     String todayLabelString;
-    if (m_parameters.type == WebCore::InputTypeNames::month())
+    String otherDateLabelString;
+    if (m_parameters.type == WebCore::InputTypeNames::month()) {
         todayLabelString = Platform::current()->queryLocalizedString(WebLocalizedString::ThisMonthButtonLabel);
-    else if (m_parameters.type == WebCore::InputTypeNames::week())
+        otherDateLabelString = Platform::current()->queryLocalizedString(WebLocalizedString::OtherMonthLabel);
+    } else if (m_parameters.type == WebCore::InputTypeNames::week()) {
         todayLabelString = Platform::current()->queryLocalizedString(WebLocalizedString::ThisWeekButtonLabel);
-    else
+        otherDateLabelString = Platform::current()->queryLocalizedString(WebLocalizedString::OtherWeekLabel);
+    } else {
         todayLabelString = Platform::current()->queryLocalizedString(WebLocalizedString::CalendarToday);
+        otherDateLabelString = Platform::current()->queryLocalizedString(WebLocalizedString::OtherDateLabel);
+    }
 
     addString("<!DOCTYPE html><head><meta charset='UTF-8'><style>\n", writer);
     writer.addData(WebCore::pickerCommonCss, sizeof(WebCore::pickerCommonCss));
+    writer.addData(WebCore::pickerCommonChromiumCss, sizeof(WebCore::pickerCommonChromiumCss));
     writer.addData(WebCore::suggestionPickerCss, sizeof(WebCore::suggestionPickerCss));
     writer.addData(WebCore::calendarPickerCss, sizeof(WebCore::calendarPickerCss));
-    CString extraStyle = WebCore::RenderTheme::defaultTheme()->extraCalendarPickerStyleSheet();
-    if (extraStyle.length())
-        writer.addData(extraStyle.data(), extraStyle.length());
+    writer.addData(WebCore::calendarPickerChromiumCss, sizeof(WebCore::calendarPickerChromiumCss));
     addString("</style></head><body><div id=main>Loading...</div><script>\n"
                "window.dialogArguments = {\n", writer);
     addProperty("anchorRectInScreen", anchorRectInScreen, writer);
-    addProperty("rootViewRectInScreen", rootViewRectInScreen, writer);
-#if OS(MAC_OS_X)
-    addProperty("confineToRootView", true, writer);
-#else
-    addProperty("confineToRootView", false, writer);
-#endif
     addProperty("min", minDate.toString(), writer);
     addProperty("max", maxDate.toString(), writer);
     addProperty("step", stepString, writer);
     addProperty("stepBase", stepBaseString, writer);
     addProperty("required", m_parameters.required, writer);
     addProperty("currentValue", m_parameters.currentValue, writer);
-    addProperty("locale", WebCore::defaultLanguage(), writer);
+    addProperty("locale", m_parameters.locale.string(), writer);
     addProperty("todayLabel", todayLabelString, writer);
     addProperty("clearLabel", Platform::current()->queryLocalizedString(WebLocalizedString::CalendarClear), writer);
     addProperty("weekLabel", Platform::current()->queryLocalizedString(WebLocalizedString::WeekNumberLabel), writer);
     addProperty("weekStartDay", m_locale->firstDayOfWeek(), writer);
-    addProperty("monthLabels", m_locale->monthLabels(), writer);
+    addProperty("shortMonthLabels", m_locale->shortMonthLabels(), writer);
     addProperty("dayLabels", m_locale->weekDayShortLabels(), writer);
-    addProperty("isCalendarRTL", m_locale->isRTL(), writer);
+    addProperty("isLocaleRTL", m_locale->isRTL(), writer);
     addProperty("isRTL", m_parameters.isAnchorElementRTL, writer);
     addProperty("mode", m_parameters.type.string(), writer);
     if (m_parameters.suggestionValues.size()) {
@@ -154,8 +148,8 @@ void DateTimeChooserImpl::writeDocument(WebCore::DocumentWriter& writer)
         addProperty("suggestionValues", m_parameters.suggestionValues, writer);
         addProperty("localizedSuggestionValues", m_parameters.localizedSuggestionValues, writer);
         addProperty("suggestionLabels", m_parameters.suggestionLabels, writer);
-        addProperty("showOtherDateEntry", m_parameters.type == WebCore::InputTypeNames::date(), writer);
-        addProperty("otherDateLabel", Platform::current()->queryLocalizedString(WebLocalizedString::OtherDateLabel), writer);
+        addProperty("showOtherDateEntry", WebCore::RenderTheme::defaultTheme()->supportsCalendarPicker(m_parameters.type), writer);
+        addProperty("otherDateLabel", otherDateLabelString, writer);
         addProperty("suggestionHighlightColor", WebCore::RenderTheme::defaultTheme()->activeListBoxSelectionBackgroundColor().serialized(), writer);
         addProperty("suggestionHighlightTextColor", WebCore::RenderTheme::defaultTheme()->activeListBoxSelectionForegroundColor().serialized(), writer);
     }
@@ -176,7 +170,17 @@ void DateTimeChooserImpl::setValueAndClosePopup(int numValue, const String& stri
 {
     RefPtr<DateTimeChooserImpl> protector(this);
     if (numValue >= 0)
-        m_client->didChooseValue(stringValue);
+        setValue(stringValue);
+    endChooser();
+}
+
+void DateTimeChooserImpl::setValue(const String& value)
+{
+    m_client->didChooseValue(value);
+}
+
+void DateTimeChooserImpl::closePopup()
+{
     endChooser();
 }
 

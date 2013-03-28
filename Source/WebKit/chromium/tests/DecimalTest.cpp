@@ -897,13 +897,17 @@ TEST_F(DecimalTest, RealWorldExampleRangeStepUpStepDown)
 
 TEST_F(DecimalTest, Remainder)
 {
-    EXPECT_EQ(encode(9, -1, Negative), encode(21, -1, Positive).remainder(3));
+    EXPECT_EQ(encode(21, -1, Positive), encode(21, -1, Positive).remainder(3));
     EXPECT_EQ(Decimal(1), Decimal(10).remainder(3));
+    EXPECT_EQ(Decimal(1), Decimal(10).remainder(-3));
     EXPECT_EQ(encode(1, 0, Negative), Decimal(-10).remainder(3));
+    EXPECT_EQ(Decimal(-1), Decimal(-10).remainder(-3));
     EXPECT_EQ(encode(2, -1, Positive), encode(102, -1, Positive).remainder(1));
     EXPECT_EQ(encode(1, -1, Positive), Decimal(10).remainder(encode(3, -1, Positive)));
-    EXPECT_EQ(encode(3, -1, Negative), encode(36, -1, Positive).remainder(encode(13, -1, Positive)));
+    EXPECT_EQ(Decimal(1), encode(36, -1, Positive).remainder(encode(13, -1, Positive)));
     EXPECT_EQ(encode(1, 87, Positive), (encode(1234, 100, Positive).remainder(Decimal(3))));
+    EXPECT_EQ(Decimal(500), (Decimal(500).remainder(1000)));
+    EXPECT_EQ(Decimal(-500), (Decimal(-500).remainder(1000)));
 }
 
 TEST_F(DecimalTest, RemainderBigExponent)
@@ -1039,15 +1043,15 @@ TEST_F(DecimalTest, ToDouble)
     EXPECT_EQ(1e+308, encode(1, 308, Positive).toDouble());
     EXPECT_EQ(1e-307, encode(1, -307, Positive).toDouble());
 
-    EXPECT_TRUE(isinf(encode(1, 1000, Positive).toDouble()));
+    EXPECT_TRUE(std::isinf(encode(1, 1000, Positive).toDouble()));
     EXPECT_EQ(0.0, encode(1, -1000, Positive).toDouble());
 }
 
 TEST_F(DecimalTest, ToDoubleSpecialValues)
 {
-    EXPECT_TRUE(isinf(Decimal::infinity(Decimal::Positive).toDouble()));
-    EXPECT_TRUE(isinf(Decimal::infinity(Decimal::Negative).toDouble()));
-    EXPECT_TRUE(isnan(Decimal::nan().toDouble()));
+    EXPECT_TRUE(std::isinf(Decimal::infinity(Decimal::Positive).toDouble()));
+    EXPECT_TRUE(std::isinf(Decimal::infinity(Decimal::Negative).toDouble()));
+    EXPECT_TRUE(std::isnan(Decimal::nan().toDouble()));
 }
 
 TEST_F(DecimalTest, ToString)

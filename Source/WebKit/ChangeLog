@@ -1,3 +1,786 @@
+2013-03-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        The second part of the build fix for r146702. This should do it.
+        I had to see the mangled name for the new signature.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-03-22  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Build fix attempt after r146702.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-03-22  Carlos Garcia Campos  <cgarcia@igalia.com>
+
+        [BlackBerry] Add custom BackForwardList client implementation
+        https://bugs.webkit.org/show_bug.cgi?id=113024
+
+        Reviewed by Rob Buis.
+
+        PR 310030
+        Internally reviewed by Joe Mason.
+
+        * PlatformBlackBerry.cmake: Add new files to compilation.
+
+2013-03-21  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Move common props files for VS2010 solution to WebKitLibraries folder and update all projects accordingly.
+
+        * WebKit.vcxproj/FeatureDefines.props: Removed.
+        * WebKit.vcxproj/FeatureDefinesCairo.props: Removed.
+        * WebKit.vcxproj/WebKit/cURL.props: Removed.
+        * WebKit.vcxproj/WinCairo.props: Removed.
+        * WebKit.vcxproj/common.props: Removed.
+        * WebKit.vcxproj/debug.props: Removed.
+        * WebKit.vcxproj/debug_wincairo.props: Removed.
+        * WebKit.vcxproj/debugsuffix.props: Removed.
+        * WebKit.vcxproj/production.props: Removed.
+        * WebKit.vcxproj/release.props: Removed.
+
+2013-03-21  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Windows build fix after r146430.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-03-20  Brent Fulgham  <bfulgham@webkit.org>
+
+        [WinCairo] Top-level solution change to build under VS2010.
+        https://bugs.webkit.org/show_bug.cgi?id=112861.
+
+        Reviewed by Tim Horton.
+
+        * WebKit.vcxproj/WebKit.sln: Add final set of WinCairo build
+        targets.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+        Add #if/def guards around some media-specific exports that
+        are not provided by the WinCairo port.
+
+2013-03-19  Brent Fulgham  <bfulgham@webkit.org>
+
+        [WinCairo] Build the WebKit.dll under VS2010.
+        https://bugs.webkit.org/show_bug.cgi?id=112759
+
+        Reviewed by Tim Horton.
+
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj: Update project to
+        build WinCairo variant using new property sheets.
+        * WebKit.vcxproj/Interfaces/InterfacesDebugWinCairo.props: Added.
+        * WebKit.vcxproj/Interfaces/InterfacesReleaseWinCairo.props: Added.
+        * WebKit.vcxproj/WebKit.sln: Update solution to use WinCairo
+        build targets for WebKit.dll-related projects.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj: Update project to build
+        WinCairo variant using new property sheets.
+        * WebKit.vcxproj/WebKit/cURL.props: Added.
+        * WebKit.vcxproj/WebKit/WebKitDebugWinCairo.props: Added.
+        * WebKit.vcxproj/WebKit/WebKitReleaseWinCairo.props: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGenerator.vcxproj:
+        Update project to build WinCairo variant using new property sheets.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorDebugWinCairo.props: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorReleaseWinCairo.props: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUID.vcxproj: Update project to
+        build WinCairo variant using new property sheets.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDDebugWinCairo.props: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDReleaseWinCairo.props: Added.
+        * WebKit.vcxproj/WinCairo.props: Added.
+        * WebKit.vcxproj/debug_wincairo.props: Added.
+
+2013-03-20  Eric Carlson  <eric.carlson@apple.com>
+
+        Allow ports specific text track menu
+        https://bugs.webkit.org/show_bug.cgi?id=112800
+
+        Reviewed by Dean Jackson.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Add new exports.
+        * win/WebKit.vcproj/WebKitExports.def.in: Ditto.
+
+2013-03-20  Roger Fong  <roger_fong@apple.com>
+
+        AppleWin VS2010 build fix.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-03-18  Brent Fulgham  <bfulgham@webkit.org>
+
+        [WinCairo] Build WinCairo port under VS2010 
+        https://bugs.webkit.org/show_bug.cgi?id=112604
+
+        Reviewed by Tim Horton.
+
+        * WebKit.vcxproj/WebKit.sln: Add Debug_WinCairo and Release_WinCairo
+        build targets. No other changes in this patch.
+        * WebKit.vcxproj/FeatureDefinesCairo.props: Add parallel property
+        sheet for WinCairo version of build.
+
+2013-03-18  Roger Fong  <roger_fong@apple.com>
+
+        AppleWin VS2010 build fix.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-03-14  Simon Hausmann  <simon.hausmann@digia.com>
+
+        [Qt] Improve the handling of mock geolocation, device orientation and motion clients
+
+        Reviewed by Tor Arne Vestbø.
+
+        The mock versions of these web facing features should be instantiated when
+        running in DumpRenderTree only. In order for them to work, no extra Qt modules
+        such as QtLocation are actually needed.
+
+        This patch decouples enabling device orientation/motion and geolocation from
+        the underlying Qt modules and makes them available in developer builds
+        (!production_build) and backed by mock backends when running in drt.
+
+        So if the Qt 5 modules are available, they'll be used (unless drtRun). For
+        developers the web facing features are always enabled (although requests will
+        time out) and the mock backends are enabled inside DRT, allowing for the layout
+        tests to run with less dependencies.
+
+        In addition this also enables the mock device motion client, which was
+        previously never instantiated.
+
+        * WebKit1.pri:
+        * WebKit1.pro:
+
+2013-03-13  Genevieve Mak  <gmak@rim.com>
+
+        [BlackBerry] Add Proximity Detector.
+        https://bugs.webkit.org/show_bug.cgi?id=112278
+
+        Reviewed by Rob Buis.
+
+        Internally Reviewed by Mike Lattanzio.
+        PR #243385
+
+        * PlatformBlackBerry.cmake:
+
+2013-03-08  Roger Fong  <roger_fong@apple.com>
+
+        Build fix for AppleWin VS2010.
+
+        * WebKit.vcxproj/FeatureDefines.props:
+
+2013-03-06  Jer Noble  <jer.noble@apple.com>
+
+        Unreviewed partial roll-out of r145003. Disable
+        ENABLE_CURSOR_VISIBILITY on win.
+
+        * WebKit.vcxproj/FeatureDefines.props:
+
+2013-03-04  Jer Noble  <jer.noble@apple.com>
+
+        Default mouse cursor behavior should be auto-hide for full screen video with custom controls
+        https://bugs.webkit.org/show_bug.cgi?id=107601
+
+        Reviewed by Beth Dakin.
+
+        Enable the CURSOR_VISIBILITY feature.
+
+        * WebKit.vcxproj/FeatureDefines.props:
+
+2013-03-05  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Build break with latest EFL libraries
+        https://bugs.webkit.org/show_bug.cgi?id=111028
+
+        Reviewed by Dirk Pranke.
+
+        * PlatformEfl.cmake: Added ECORE_X_INCLUDE_DIRS.
+
+2013-03-04  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. AppleWin build fix.
+
+        * WebKit.vcxproj/FeatureDefines.props:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-03-03  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r144567.
+        http://trac.webkit.org/changeset/144567
+        https://bugs.webkit.org/show_bug.cgi?id=111266
+
+        Does not compile on apple-win (Requested by abarth on
+        #webkit).
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-02-26  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed AppleWin build fix.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorCommon.props:
+
+2013-02-26  Alberto Garcia  <agarcia@igalia.com>
+
+        [BlackBerry] Upstream the datalist support UI
+        https://bugs.webkit.org/show_bug.cgi?id=110736
+
+        Reviewed by Rob Buis.
+
+        Original code by Otto Derek Cheung <otcheung@rim.com>
+
+        * PlatformBlackBerry.cmake:
+
+2013-02-25  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. VS2010 solution build fix.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-02-22  Aaron Colwell  <acolwell@chromium.org>
+
+        Disable MediaSource on Apple Windows port
+        https://bugs.webkit.org/show_bug.cgi?id=110494
+
+        Reviewed by Tim Horton.
+
+        * WebKit.vcxproj/FeatureDefines.props:
+
+2013-02-20  Roger Fong  <roger_fong@apple.com>
+
+        Get VS2010 Solution B&I ready.
+        <rdar://problem/1322988>
+
+        Rubberstamped by Timothy Horton.        
+        
+        Add Production configuration. 
+        Add a WebKit submit solution with a DebugSuffix configuration. 
+        Modify WebKit.make as necessary.
+        
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj:
+        * WebKit.vcxproj/Interfaces/InterfacesProduction.props: Added.
+        * WebKit.vcxproj/Interfaces/InterfacesRelease.props:
+        * WebKit.vcxproj/WebKit.make: Added.
+        * WebKit.vcxproj/WebKit.sln:
+        * WebKit.vcxproj/WebKit.submit.sln: Added.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj:
+        * WebKit.vcxproj/WebKit/WebKitCommon.props:
+        * WebKit.vcxproj/WebKit/WebKitProduction.props: Added.
+        * WebKit.vcxproj/WebKit/WebKitRelease.props:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGenerator.vcxproj:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorCommon.props:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorPostBuild.cmd:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorPreBuild.cmd:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorProduction.props: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorRelease.props:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+        * WebKit.vcxproj/WebKitGUID/WebKitGUID.vcxproj:
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDProduction.props: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDRelease.props:
+        * WebKit.vcxproj/common.props:
+        * WebKit.vcxproj/debugsuffix.props: Added.
+        * WebKit.vcxproj/production.props: Added.
+        * WebKit.vcxproj/releaseproduction.props: Removed.
+
+2013-02-19  Tony Chang  <tony@chromium.org>
+
+        Unreviewed, include exports for VS2010 as well.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-02-18  Brent Fulgham  <bfulgham@webkit.org>
+
+        [Windows] Unreviewed VS2010 build correction.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Sync
+        export definition with VS2005 version.
+
+2013-02-15  Rik Cabanier  <cabanier@adobe.com>
+
+        Add platform support for -webkit-background-blend-mode to CG context
+        https://bugs.webkit.org/show_bug.cgi?id=108549
+
+        Reviewed by Dean Jackson.
+
+        Fixed build issue.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-02-14  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Touch-ups to the VS2010 WebKit solution.
+        Remove un-needed include directories and force includes. 
+        Update exports file.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+        * WebKit.vcxproj/common.props:
+        * DumpRenderTree/DumpRenderTree.vcxproj/DumpRenderTree/DumpRenderTreeLauncherCommon.props:
+        * DumpRenderTree/DumpRenderTree.vcxproj/ImageDiff/ImageDiffLauncherCommon.props:
+        * DumpRenderTree/DumpRenderTree.vcxproj/TestNetscapePlugin/TestNetscapePlugin.vcxproj:
+        * DumpRenderTree/DumpRenderTree.vcxproj/TestNetscapePlugin/TestNetscapePlugin.vcxproj.filters:
+        * TestWebKitAPI/TestWebKitAPI.vcxproj/TestWebKitAPI.vcxproj:
+        * TestWebKitAPI/TestWebKitAPI.vcxproj/TestWebKitAPI.vcxproj.filters:
+        * WinLauncher/WinLauncher.vcxproj/WinLauncherCommon.props:
+        * win/record-memory/record-memoryCommon.props:
+        * WebCore.vcxproj/WebCore.vcxproj:
+        * WebCore.vcxproj/WebCore.vcxproj.filters:
+        * JavaScriptCore.vcxproj/JavaScriptCoreCommon.props:
+        * JavaScriptCore.vcxproj/JavaScriptCoreExportGenerator/JavaScriptCoreExports.def.in:
+        * JavaScriptCore.vcxproj/jsc/jscCommon.props:
+        * JavaScriptCore.vcxproj/testRegExp/testRegExp.vcxproj:
+        * JavaScriptCore.vcxproj/testapi/testapi.vcxproj:
+        * WTF.vcxproj/WTFCommon.props:
+
+2013-02-14  Tony Chang  <tony@chromium.org>
+
+        Unreviewed, set svn:eol-style native for .sln, .vcproj, and .vsprops files.
+        https://bugs.webkit.org/show_bug.cgi?id=96934
+
+        * WebKit.vcxproj/WebKit.sln: Modified property svn:eol-style.
+
+2013-02-14  Tony Chang  <tony@chromium.org>
+
+        Unreviewed, set svn:eol-style CRLF for .sln files.
+
+        * WebKit.vcxproj/WebKit.sln: Modified property svn:eol-style.
+
+2013-02-14  Roger Fong  <roger_fong@apple.com>
+
+        Add TestWebKitAPI, gtest-md and record-memory projects to VS2010 WebKit solution.
+        https://bugs.webkit.org/show_bug.cgi?id=107034.
+
+        Reviewed by Brent Fulgham.
+
+        * WebKit.vcxproj/WebKit.sln:
+
+2013-02-12  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Build fix for VS2010 WebKit solution.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-02-11  Adenilson Cavalcanti  <cavalcantii@gmail.com>
+
+        Build fix: r142549 broke EFL build
+        https://bugs.webkit.org/show_bug.cgi?id=109527
+
+        Reviewed by Kentaro Hara.
+
+        Build fix.
+
+        * CMakeLists.txt:
+
+2013-02-11  Brent Fulgham  <bfulgham@webkit.org>
+
+        Rename Visual Studio solution folders to avoid conflicts with project names
+        https://bugs.webkit.org/show_bug.cgi?id=109484
+
+        Reviewed by Tim Horton.
+
+        * WebKit.vcxproj/WebKit.sln: Rename several solution folders (e.g.,
+        WTF, WebCore, WebKit, JavaScriptCore) so that they do not conflict
+        with projects using the same name.
+
+2013-02-08  Benjamin Poulain  <bpoulain@apple.com>
+
+        Move workerThreadCount from TestRunner to WebCore Internals
+        https://bugs.webkit.org/show_bug.cgi?id=109239
+
+        Reviewed by Darin Adler.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2013-02-07  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Corrections the exports definition file.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-02-07  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. More VS2010 WebKit solution touchups.
+        Make WebKitExports.def.in be treated as a custom build file so that changes to it cause the exports to be rebuilt.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGenerator.vcxproj:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGenerator.vcxproj.filters:
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-02-06  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Touchups to VS2010 WebKit solution.
+        Add WinLauncher projects to solution.
+
+        * WebKit.vcxproj/WebKit.sln:
+
+2013-02-05  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Get rid of redundant exports in export definitions file.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+
+2013-02-05  Brent Fulgham  <bfulgham@webkit.org>
+
+        Unreviewed Visual Studio 2010 build correction.
+
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in:
+        Link export definitions out of date with ToT.  Corrected.
+
+2013-02-05  Roger Fong  <roger_fong@apple.com>
+
+        Add a JavaScriptCore Export Generator project.
+        https://bugs.webkit.org/show_bug.cgi?id=108971.
+
+        Reviewed by Brent Fulgham.
+
+        * WebKit.vcxproj/WebKit.sln:
+
+2013-02-05  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Delete some errant preprocessor definitions.
+
+        * WebKit.vcxproj/WebKit/WebKitCommon.props:
+
+2013-02-05  Roger Fong  <roger_fong@apple.com>
+
+        VS2010 WebKit projects, scripts, and property sheets.
+        https://bugs.webkit.org/show_bug.cgi?id=106989.
+
+        Reviewed by Brent Fulgham.
+
+        * WebKit.vcxproj/Interfaces: Added.
+        * WebKit.vcxproj/Interfaces/FixMIDLHeaders.pl: Copied from win/WebKit.vcproj/FixMIDLHeaders.pl.
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj: Added.
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj.filters: Added.
+        * WebKit.vcxproj/Interfaces/Interfaces.vcxproj.user: Added.
+        * WebKit.vcxproj/Interfaces/InterfacesCommon.props: Added.
+        * WebKit.vcxproj/Interfaces/InterfacesDebug.props: Added.
+        * WebKit.vcxproj/Interfaces/InterfacesPostBuild.cmd: Added.
+        * WebKit.vcxproj/Interfaces/InterfacesPreBuild.cmd: Added.
+        * WebKit.vcxproj/Interfaces/InterfacesRelease.props: Added.
+        * WebKit.vcxproj/WebKit: Added.
+        * WebKit.vcxproj/WebKit.sln:
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj: Added.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.filters: Added.
+        * WebKit.vcxproj/WebKit/WebKit.vcxproj.user: Added.
+        * WebKit.vcxproj/WebKit/WebKitApple.props: Added.
+        * WebKit.vcxproj/WebKit/WebKitCFLite.props: Added.
+        * WebKit.vcxproj/WebKit/WebKitCommon.props: Added.
+        * WebKit.vcxproj/WebKit/WebKitDebug.props: Added.
+        * WebKit.vcxproj/WebKit/WebKitDirectX.props: Added.
+        * WebKit.vcxproj/WebKit/WebKitPostBuild.cmd: Added.
+        * WebKit.vcxproj/WebKit/WebKitPreBuild.cmd: Added.
+        * WebKit.vcxproj/WebKit/WebKitPreLink.cmd: Added.
+        * WebKit.vcxproj/WebKit/WebKitRelease.props: Added.
+        * WebKit.vcxproj/WebKit/resource.h: Copied from win/WebKit.vcproj/resource.h.
+        * WebKit.vcxproj/WebKitExportGenerator: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGenerator.vcxproj: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGenerator.vcxproj.filters: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGenerator.vcxproj.user: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorBuildCmd.cmd: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorCommon.props: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorDebug.props: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorPostBuild.cmd: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorPreBuild.cmd: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExportGeneratorRelease.props: Added.
+        * WebKit.vcxproj/WebKitExportGenerator/WebKitExports.def.in: Copied from win/WebKit.vcproj/WebKitExports.def.in.
+        * WebKit.vcxproj/WebKitGUID: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUID.vcxproj: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUID.vcxproj.filters: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUID.vcxproj.user: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDCommon.props: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDDebug.props: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDPostBuild.cmd: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDPreBuild.cmd: Added.
+        * WebKit.vcxproj/WebKitGUID/WebKitGUIDRelease.props: Added.
+
+2013-01-31  Christophe Dumez  <dchris@gmail.com>
+
+        [EFL] Disable Web Intents
+        https://bugs.webkit.org/show_bug.cgi?id=108457
+
+        Reviewed by Alexey Proskuryakov.
+
+        Remove intents files from EFL CMake project.
+
+        * PlatformEfl.cmake:
+
+2013-01-25  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Rename LLInt projects folder and make appropriate changes to solutions.
+
+        * WebKit.vcxproj/WebKit.sln:
+
+2013-01-23  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Add svn:eol-style to solution file, not eol-style.
+
+        * WebKit.vcxproj/WebKit.sln: Added property svn:eol-style. Removed property eol-style.
+
+2013-01-23  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Added eol-style=native to solution file.
+
+        * WebKit.vcxproj/WebKit.sln: Added property eol-style.
+
+2013-01-23  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Checkin the OpenSource WebKit solution.
+
+        * WebKit.vcxproj/WebKit.sln:
+
+2013-01-23  Tony Chang  <tony@chromium.org>
+
+        Unreviewed, set svn:eol-style to CRLF on Windows .sln files.
+
+        * WebKit.vcxproj/WebKit.sln: Added property svn:eol-style.
+
+2013-01-23  Roger Fong  <roger_fong@apple.com>
+
+        Add the VS2010 WebKit solution folder and solution file.
+        The solution of course will not load until the dependent projects are all completed.
+        https://bugs.webkit.org/show_bug.cgi?id=106949.
+
+        Reviewed by Brent Fulgham.
+
+        * WebKit.vcxproj: Added.
+        * WebKit.vcxproj/WebKit.sln: Added.
+
+2013-01-22  Krzysztof Czech  <k.czech@samsung.com>
+
+        [EFL] Adds Accessibility support to wk1
+        https://bugs.webkit.org/show_bug.cgi?id=107440
+
+        Reviewed by Gyuyoung Kim.
+
+        * PlatformEfl.cmake: Adds ATK headers and libraries.
+
+2013-01-17  Poul Sysolyatin  <psytonx@gmail.com>
+
+        32-bit build for Qt5 on Mac OS fails.
+        https://bugs.webkit.org/show_bug.cgi?id=107094
+
+        We need to define NS_BUILD_32_LIKE_64 for 32-bit build for Mac OS.
+        Fixed 32-bit build detection for support Qt5.
+
+        Reviewed by Benjamin Poulain.
+
+        * WebKit1.pro:
+
+2013-01-14  Dean Jackson  <dino@apple.com>
+
+        [ANGLE] Update ANGLE in WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=106274
+
+        Unreviewed attempted build fix.
+
+        The khrplatform.h file is now a public header without a directory
+        prefix. Update the include path to look in the right place.
+
+        * PlatformEfl.cmake:
+
+2013-01-14  Max Vujovic  <mvujovic@adobe.com>
+
+        [ANGLE] Update ANGLE in WebKit
+        https://bugs.webkit.org/show_bug.cgi?id=106274
+
+        Reviewed by Dean Jackson.
+
+        Update ANGLE to r1641.
+
+        * PlatformEfl.cmake: Add ANGLE/include to the include directories list because ShaderLang.h
+        now includes "KHR/khrplatform.h", which is located in ANGLE/include/KHR/khrplatform.h.
+
+2013-01-10  Christophe Dumez  <christophe.dumez@intel.com>
+
+        [EFL] Add gstreamer 1.0.5 to jhbuild
+        https://bugs.webkit.org/show_bug.cgi?id=106178
+
+        Reviewed by Laszlo Gombos.
+
+        Remove GSTREAMER_INTERFACES_LIBRARIES from EFL
+        CMake configuration.
+
+        * PlatformEfl.cmake:
+
+2013-01-07  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Sorted the xcodeproj file.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2012-12-20  Ryuan Choi  <ryuan.choi@samsung.com>
+
+        [EFL] Build break with latest EFL libraries.
+        https://bugs.webkit.org/show_bug.cgi?id=104827
+
+        Reviewed by Laszlo Gombos.
+
+        * PlatformEfl.cmake: Includes eo EFL library.
+
+2012-12-18  Joseph Pecoraro  <pecoraro@apple.com>
+
+        [Mac] Add Build Phase to Check Headers for Inappropriate Macros (Platform.h macros)
+        https://bugs.webkit.org/show_bug.cgi?id=104279
+
+        Reviewed by David Kilzer.
+
+        Add a build phase to check the public WebKit headers for
+        inappropriate macros. Also set the executable as an input
+        path on the other check-* build phases.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2012-12-12  Mark Lam  <mark.lam@apple.com>
+
+        Encapsulate externally used webdatabase APIs in DatabaseManager.
+        https://bugs.webkit.org/show_bug.cgi?id=104741.
+
+        Reviewed by Sam Weinig.
+
+        Use DatabaseManager instead of accessing DatabaseTracker, AbstractDatabase,
+        and DatabaseContext directly. This is to prepare for upcoming webkit2
+        refactoring.
+
+        * WebKit.xcodeproj/project.pbxproj:
+
+2012-12-05  Halton Huo  <halton.huo@intel.com>
+
+        [CMake] Unify coding style for CMake files
+        https://bugs.webkit.org/show_bug.cgi?id=103605
+
+        Reviewed by Laszlo Gombos.
+
+        Update cmake files(.cmake, CMakeLists.txt) with following style rules:
+        1. Indentation
+        1.1 Use spaces, not tabs.
+        1.2 Four spaces as indent.
+        2. Spacing
+        2.1 Place one space between control statements and their parentheses.
+            For eg, if (), else (), elseif (), endif (), foreach (),
+            endforeach (), while (), endwhile (), break ().
+        2.2 Do not place spaces between function and macro statements and
+            their parentheses. For eg, macro(), endmacro(), function(),
+            endfunction().
+        2.3 Do not place spaces between a command or function or macro and its
+            parentheses, or between a parenthesis and its content. For eg,
+            message("testing") not message( "testing") or message ("testing" )
+        2.4 No space at line ending.
+        3. Lowercase when call commands macros and functions. For eg,
+           add_executable() not ADD_EXECUTABLE(), set() not SET().
+
+        * CMakeLists.txt:
+        * PlatformBlackBerry.cmake:
+        * PlatformEfl.cmake:
+        * PlatformWinCE.cmake:
+
+2012-12-03  Pierre Rossi  <pierre.rossi@digia.com>
+
+        [Qt] another stab at fixing the windows build 
+
+        It seems the QT_BUILD_{TARGET}_LIB are not set as they should by qt_module.prf.
+        Define them by hand to be on the safe side.
+
+        * WebKit1.pro:
+
+2012-11-30  Simon Hausmann  <simon.hausmann@digia.com>, Pierre Rossi  <pierre.rossi@digia.com>
+
+        [Qt] Separate Qt WebKit into Qt WebKit and Qt WebKit Widgets
+        https://bugs.webkit.org/show_bug.cgi?id=99314
+
+        Reviewed by Tor Arne Vestbø.
+
+        This big change separates QtWebKit into QtWebKit and QtWebKitWidgets as
+        shared libraries.
+
+        It's a big refactoring that mostly involves moving WebCore dependent
+        code into QtWebKit and accessing it through exported QWebFrameAdapter
+        and QWebPageAdapter classes.
+
+        * WebKit1.pro:
+        * WebKitWidgets.pri: Removed.
+        * WebKitWidgets.pro: Removed.
+
+2012-11-22  Jeff Rogers  <jrogers@rim.com>
+
+        [BlackBerry] Update Web Notifications Implementation
+        https://bugs.webkit.org/show_bug.cgi?id=102621
+
+        Reviewed by George Staikos.
+
+        Reviewed internally by George Staikos and Joe Mason.
+        Internal PR 172120
+        Add new Notification files and remove obsolete ones.
+
+        * PlatformBlackBerry.cmake:
+
+2012-11-22  Simon Hausmann  <simon.hausmann@digia.com>, Pierre Rossi <pierre.rossi@digia.com>
+
+        [Qt] Separate QWidget dependant code into separate WebKitWidgets static library
+        https://bugs.webkit.org/show_bug.cgi?id=102800
+
+        Reviewed by Tor Arne Vestbø.
+
+        This patch separates code that needs to use QWidget related APIs in
+        WebKit/qt/WebCoreSupport and Api from code that doesn't. This means for
+        example FrameLoaderClientQt.cpp remains in the WebKit1 static library,
+        while qwebpage.cpp and qwebframe.cpp become part of the WebKitWidgets
+        static library. WebKit1 is compiled without QT += widgets and therefore
+        any widget related dependency has been moved "up" and out of WebKit1 into
+        the WebKitWidgets library.
+
+        Between the code in WebKit.a and WebKitWidgets.a new adapters and
+        interfaces have been introduced, such as QWebPageAdapter and
+        QWebFrameAdapter. QWebPageAdapter, when used from WebKit1, is a way to
+        call out into the API layer, implemented by QWebPage (QWebPagePrivate).
+        The other way around if QWebPage wants to access WebCore or
+        WebCoreSupport related functionality, it will go through
+        QWebPageAdapater (as base class). The separation in the direction up
+        into the API layer is complete with this patch, no code in WebKit1
+        depends on QtWidgets. The separation the other way around, code in the
+        API layer not using any WebCore types, is not complete yet.
+
+        Some classes such as QWebSettings, QWebElement or
+        DumpRenderTreeSupportQt remain in WebKit1. While they are API layer,
+        they do not depend on widget related Qt APIs and they make much more
+        use of WebCore internal APIs and therefore are easier to keep in
+        WebKit1.
+
+        In the future we plan to place a real shared library boundary between
+        WebKit1 and WebKitWidgets, by keeping the WebKit1 static library as
+        part of the QtWebKit shared library and by turning the WebKitWidgets
+        static library into a shared one.
+
+        * WebKit1.pri:
+        * WebKit1.pro:
+        * WebKitWidgets.pri: Copied from Source/WebKit/WebKit1.pri.
+        * WebKitWidgets.pro: Added.
+
+2012-11-21  Kai Koehne  <kai.koehne@digia.com>
+
+        [Qt] MinGW: Don't add OpenGL library dependencies here
+        https://bugs.webkit.org/show_bug.cgi?id=102924
+
+        Reviewed by Simon Hausmann.
+
+        As the comment suggests the dependency is already for WebCore, so add it there instead.
+
+        * WebKit1.pri:
+
+2012-11-18  Laszlo Gombos  <l.gombos@samsung.com>
+
+        [CMake] Consolidate common input files
+        https://bugs.webkit.org/show_bug.cgi?id=101632
+
+        Reviewed by Rob Buis.
+
+        Consolidate and sort the list of files.
+
+        * PlatformEfl.cmake:
+
+2012-11-12  Timothy Hatcher  <timothy@apple.com>
+
+        Add a dock button to the top right corner of the Web Inspector window (similar to the full screen button).
+
+        https://bugs.webkit.org/show_bug.cgi?id=102025
+
+        Reviewed by Joseph Pecoraro.
+
+        * WebKit.xcodeproj/project.pbxproj: Added Dock.pdf.
+
 2012-11-08  Laszlo Gombos  <l.gombos@samsung.com>
 
         [EFL] Remove non-variable options from the build system

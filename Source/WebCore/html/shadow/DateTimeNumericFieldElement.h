@@ -41,52 +41,62 @@ namespace WebCore {
 class DateTimeNumericFieldElement : public DateTimeFieldElement {
     WTF_MAKE_NONCOPYABLE(DateTimeNumericFieldElement);
 
-protected:
-    struct Range {
-        Range(int minimum, int maximum);
-        int clampValue(int) const;
-        bool isInRange(int) const;
-
-        int maximum;
-        int minimum;
+public:
+    struct Step {
+        Step(int step = 1, int stepBase = 0) : step(step), stepBase(stepBase) { }
+        int step;
+        int stepBase;
     };
 
-    DateTimeNumericFieldElement(Document*, FieldOwner&, int minimum, int maximum, const String& placeholder);
+    struct Range {
+        Range(int minimum, int maximum) : minimum(minimum), maximum(maximum) { }
+        int clampValue(int) const;
+        bool isInRange(int) const;
+        bool isSingleton() const { return minimum == maximum; }
+
+        int minimum;
+        int maximum;
+    };
+
+protected:
+    DateTimeNumericFieldElement(Document*, FieldOwner&, const Range&, const Range& hardLimits, const String& placeholder, const Step& = Step());
 
     int clampValue(int value) const { return m_range.clampValue(value); }
-    virtual int clampValueForHardLimits(int) const;
     virtual int defaultValueForStepDown() const;
     virtual int defaultValueForStepUp() const;
     const Range& range() const { return m_range; }
 
     // DateTimeFieldElement functions.
     virtual bool hasValue() const OVERRIDE FINAL;
-    virtual int maximum() const OVERRIDE FINAL;
-    virtual void setEmptyValue(const DateComponents& dateForReadOnlyField, EventBehavior = DispatchNoEvent) OVERRIDE FINAL;
+    void initialize(const AtomicString& pseudo, const String& axHelpText);
+    int maximum() const;
+    virtual void setEmptyValue(EventBehavior = DispatchNoEvent) OVERRIDE FINAL;
     virtual void setValueAsInteger(int, EventBehavior = DispatchNoEvent) OVERRIDE;
-    virtual int valueAsInteger() const OVERRIDE;
+    virtual int valueAsInteger() const OVERRIDE FINAL;
     virtual String visibleValue() const OVERRIDE FINAL;
 
 private:
-    // Element function.
-    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
-
     // DateTimeFieldElement functions.
     virtual void didBlur() OVERRIDE FINAL;
     virtual void handleKeyboardEvent(KeyboardEvent*) OVERRIDE FINAL;
-    virtual int minimum() const OVERRIDE FINAL;
+    virtual float maximumWidth(const Font&) OVERRIDE;
     virtual void stepDown() OVERRIDE FINAL;
     virtual void stepUp() OVERRIDE FINAL;
     virtual String value() const OVERRIDE FINAL;
 
     String formatValue(int) const;
-    Locale& localeForOwner() const;
+    int roundUp(int) const;
+    int roundDown(int) const;
+    int typeAheadValue() const;
 
     DOMTimeStamp m_lastDigitCharTime;
     const String m_placeholder;
     const Range m_range;
+    const Range m_hardLimits;
+    const Step m_step;
     int m_value;
     bool m_hasValue;
+    mutable StringBuilder m_typeAheadBuffer;
 };
 
 } // namespace WebCore

@@ -31,8 +31,8 @@
 #include "config.h"
 #include "WebSettingsImpl.h"
 
+#include "DeferredImageDecoder.h"
 #include "FontRenderingMode.h"
-#include "ImageDecodingStore.h"
 #include "Settings.h"
 #include <public/WebString.h>
 #include <public/WebURL.h>
@@ -49,17 +49,14 @@ namespace WebKit {
 WebSettingsImpl::WebSettingsImpl(Settings* settings)
     : m_settings(settings)
     , m_showFPSCounter(false)
-    , m_showPlatformLayerTree(false)
     , m_showPaintRects(false)
-    , m_renderVSyncEnabled(true)
+    , m_renderVSyncNotificationEnabled(false)
     , m_viewportEnabled(false)
-    , m_applyDefaultDeviceScaleFactorInCompositor(false)
+    , m_initializeAtMinimumPageScale(true)
     , m_gestureTapHighlightEnabled(true)
     , m_autoZoomFocusedNodeToLegibleScale(false)
     , m_deferredImageDecodingEnabled(false)
     , m_doubleTapToZoomEnabled(false)
-    , m_defaultTileSize(WebSize(256, 256))
-    , m_maxUntiledLayerSize(WebSize(512, 512))
 {
     ASSERT(settings);
 }
@@ -114,6 +111,11 @@ void WebSettingsImpl::setDefaultFixedFontSize(int size)
     m_settings->setDefaultFixedFontSize(size);
 }
 
+void WebSettingsImpl::setDefaultVideoPosterURL(const WebString& url)
+{
+    m_settings->setDefaultVideoPosterURL(url);
+}
+
 void WebSettingsImpl::setMinimumFontSize(int size)
 {
     m_settings->setMinimumFontSize(size);
@@ -139,9 +141,9 @@ bool WebSettingsImpl::deviceSupportsTouch()
     return m_settings->deviceSupportsTouch();
 }
 
-void WebSettingsImpl::setApplyDefaultDeviceScaleFactorInCompositor(bool applyDefaultDeviceScaleFactorInCompositor)
+void WebSettingsImpl::setApplyDeviceScaleFactorInCompositor(bool applyDeviceScaleFactorInCompositor)
 {
-    m_applyDefaultDeviceScaleFactorInCompositor = applyDefaultDeviceScaleFactorInCompositor;
+    m_settings->setApplyDeviceScaleFactorInCompositor(applyDeviceScaleFactorInCompositor);
 }
 
 void WebSettingsImpl::setApplyPageScaleFactorInCompositor(bool applyPageScaleFactorInCompositor)
@@ -205,6 +207,11 @@ void WebSettingsImpl::setLoadsImagesAutomatically(bool loadsImagesAutomatically)
 void WebSettingsImpl::setImagesEnabled(bool enabled)
 {
     m_settings->setImagesEnabled(enabled);
+}
+
+void WebSettingsImpl::setInitializeAtMinimumPageScale(bool enabled)
+{
+    m_initializeAtMinimumPageScale = enabled;
 }
 
 void WebSettingsImpl::setPluginsEnabled(bool enabled)
@@ -292,6 +299,11 @@ void WebSettingsImpl::setXSSAuditorEnabled(bool enabled)
     m_settings->setXSSAuditorEnabled(enabled);
 }
 
+void WebSettingsImpl::setUnsafePluginPastingEnabled(bool enabled)
+{
+    m_settings->setUnsafePluginPastingEnabled(enabled);
+}
+
 void WebSettingsImpl::setDNSPrefetchingEnabled(bool enabled)
 {
     m_settings->setDNSPrefetchingEnabled(enabled);
@@ -346,6 +358,18 @@ void WebSettingsImpl::setTextDirectionSubmenuInclusionBehaviorNeverIncluded()
     m_settings->setTextDirectionSubmenuInclusionBehavior(WebCore::TextDirectionSubmenuNeverIncluded);
 }
 
+void WebSettingsImpl::setTouchDragDropEnabled(bool enabled)
+{
+    m_settings->setTouchDragDropEnabled(enabled);
+}
+
+void WebSettingsImpl::setThreadedHTMLParser(bool enabled)
+{
+#if ENABLE(THREADED_HTML_PARSER)
+    m_settings->setThreadedHTMLParser(enabled);
+#endif
+}
+
 void WebSettingsImpl::setOfflineWebApplicationCacheEnabled(bool enabled)
 {
     m_settings->setOfflineWebApplicationCacheEnabled(enabled);
@@ -364,11 +388,6 @@ void WebSettingsImpl::setExperimentalWebGLEnabled(bool enabled)
 void WebSettingsImpl::setCSSStickyPositionEnabled(bool enabled)
 {
     m_settings->setCSSStickyPositionEnabled(enabled);
-}
-
-void WebSettingsImpl::setExperimentalCSSRegionsEnabled(bool enabled)
-{
-    m_settings->setCSSRegionsEnabled(enabled);
 }
 
 void WebSettingsImpl::setExperimentalCSSGridLayoutEnabled(bool enabled)
@@ -396,9 +415,9 @@ void WebSettingsImpl::setPrivilegedWebGLExtensionsEnabled(bool enabled)
     m_settings->setPrivilegedWebGLExtensionsEnabled(enabled);
 }
 
-void WebSettingsImpl::setRenderVSyncEnabled(bool enabled)
+void WebSettingsImpl::setRenderVSyncNotificationEnabled(bool enabled)
 {
-    m_renderVSyncEnabled = enabled;
+    m_renderVSyncNotificationEnabled = enabled;
 }
 
 void WebSettingsImpl::setWebGLErrorsToConsoleEnabled(bool enabled)
@@ -414,11 +433,6 @@ void WebSettingsImpl::setShowDebugBorders(bool show)
 void WebSettingsImpl::setShowFPSCounter(bool show)
 {
     m_showFPSCounter = show;
-}
-
-void WebSettingsImpl::setShowPlatformLayerTree(bool show)
-{
-    m_showPlatformLayerTree = show;
 }
 
 void WebSettingsImpl::setShowPaintRects(bool show)
@@ -478,6 +492,11 @@ void WebSettingsImpl::setAcceleratedCompositingForAnimationEnabled(bool enabled)
     m_settings->setAcceleratedCompositingForAnimationEnabled(enabled);
 }
 
+void WebSettingsImpl::setAcceleratedCompositingForScrollableFramesEnabled(bool enabled)
+{
+    m_settings->setAcceleratedCompositingForScrollableFramesEnabled(enabled);
+}
+
 void WebSettingsImpl::setAcceleratedFiltersEnabled(bool enabled)
 {
     m_settings->setAcceleratedFiltersEnabled(enabled);
@@ -488,17 +507,18 @@ void WebSettingsImpl::setAccelerated2dCanvasEnabled(bool enabled)
     m_settings->setAccelerated2dCanvasEnabled(enabled);
 }
 
+void WebSettingsImpl::setAntialiased2dCanvasEnabled(bool enabled)
+{
+    m_settings->setAntialiased2dCanvasEnabled(enabled);
+}
+
 void WebSettingsImpl::setDeferred2dCanvasEnabled(bool enabled)
 {
-    m_settings->setDeferred2dCanvasEnabled(enabled);
 }
 
 void WebSettingsImpl::setDeferredImageDecodingEnabled(bool enabled)
 {
-    if (!m_deferredImageDecodingEnabled && enabled)
-        ImageDecodingStore::initializeOnMainThread();
-    if (m_deferredImageDecodingEnabled && !enabled)
-        ImageDecodingStore::shutdown();
+    DeferredImageDecoder::setEnabled(enabled);
     m_deferredImageDecodingEnabled = enabled;
 }
 
@@ -586,6 +606,11 @@ void WebSettingsImpl::setPasswordEchoDurationInSeconds(double durationInSeconds)
     m_settings->setPasswordEchoDurationInSeconds(durationInSeconds);
 }
 
+void WebSettingsImpl::setPerTilePaintingEnabled(bool enabled)
+{
+    m_perTilePaintingEnabled = enabled;
+}
+
 void WebSettingsImpl::setShouldPrintBackgrounds(bool enabled)
 {
     m_settings->setShouldPrintBackgrounds(enabled);
@@ -598,6 +623,11 @@ void WebSettingsImpl::setEnableScrollAnimator(bool enabled)
 #else
     UNUSED_PARAM(enabled);
 #endif
+}
+
+void WebSettingsImpl::setEnableTouchAdjustment(bool enabled)
+{
+    m_settings->setTouchAdjustmentEnabled(enabled);
 }
 
 bool WebSettingsImpl::scrollAnimatorEnabled() const
@@ -646,11 +676,6 @@ void WebSettingsImpl::setShouldRespectImageOrientation(bool enabled)
     m_settings->setShouldRespectImageOrientation(enabled);
 }
 
-void WebSettingsImpl::setAcceleratedPaintingEnabled(bool enabled)
-{
-    m_settings->setAcceleratedDrawingEnabled(enabled);
-}
-
 void WebSettingsImpl::setMediaPlaybackRequiresUserGesture(bool required)
 {
     m_settings->setMediaPlaybackRequiresUserGesture(required);
@@ -664,16 +689,6 @@ void WebSettingsImpl::setFixedPositionCreatesStackingContext(bool creates)
 void WebSettingsImpl::setViewportEnabled(bool enabled)
 {
     m_viewportEnabled = enabled;
-}
-
-void WebSettingsImpl::setDefaultTileSize(WebSize size)
-{
-    m_defaultTileSize = size;
-}
-
-void WebSettingsImpl::setMaxUntiledLayerSize(WebSize size)
-{
-    m_maxUntiledLayerSize = size;
 }
 
 void WebSettingsImpl::setSyncXHRInDocumentsEnabled(bool enabled)
@@ -691,9 +706,34 @@ void WebSettingsImpl::setGestureTapHighlightEnabled(bool enableHighlight)
     m_gestureTapHighlightEnabled = enableHighlight;
 }
 
+bool WebSettingsImpl::applyDeviceScaleFactorInCompositor() const
+{
+    return m_settings->applyDeviceScaleFactorInCompositor();
+}
+
 bool WebSettingsImpl::applyPageScaleFactorInCompositor() const
 {
     return m_settings->applyPageScaleFactorInCompositor();
+}
+
+void WebSettingsImpl::setAllowCustomScrollbarInMainFrame(bool enabled)
+{
+    m_settings->setAllowCustomScrollbarInMainFrame(enabled);
+}
+
+void WebSettingsImpl::setCompositedScrollingForFramesEnabled(bool enabled)
+{
+    m_settings->setCompositedScrollingForFramesEnabled(enabled);
+}
+
+void WebSettingsImpl::setSelectTrailingWhitespaceEnabled(bool enabled)
+{
+    m_settings->setSelectTrailingWhitespaceEnabled(enabled);
+}
+
+void WebSettingsImpl::setSmartInsertDeleteEnabled(bool enabled)
+{
+    m_settings->setSmartInsertDeleteEnabled(enabled);
 }
 
 } // namespace WebKit

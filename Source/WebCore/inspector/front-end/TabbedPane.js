@@ -40,7 +40,7 @@ WebInspector.TabbedPane = function()
     this._headerElement = this.element.createChild("div", "tabbed-pane-header");
     this._headerContentsElement = this._headerElement.createChild("div", "tabbed-pane-header-contents");
     this._tabsElement = this._headerContentsElement.createChild("div", "tabbed-pane-header-tabs");
-    this._contentElement = this.element.createChild("div", "tabbed-pane-content");
+    this._contentElement = this.element.createChild("div", "tabbed-pane-content scroll-target");
     this._tabs = [];
     this._tabsHistory = [];
     this._tabsById = {};
@@ -78,6 +78,14 @@ WebInspector.TabbedPane.prototype = {
     set shrinkableTabs(shrinkableTabs)
     {
         this._shrinkableTabs = shrinkableTabs;
+    },
+
+    /**
+     * @type {boolean} verticalTabLayout
+     */
+    set verticalTabLayout(verticalTabLayout)
+    {
+        this._verticalTabLayout = verticalTabLayout;
     },
 
     /**
@@ -130,11 +138,21 @@ WebInspector.TabbedPane.prototype = {
      */
     closeTab: function(id, userGesture)
     {
-        this._innerCloseTab(id, userGesture);
-        this._updateTabElements();
-        if (this._tabsHistory.length)
-            this.selectTab(this._tabsHistory[0].id, userGesture);
+        this.closeTabs([id], userGesture);
     },
+
+     /**
+      * @param {Array.<string>} ids
+      * @param {boolean=} userGesture
+      */
+     closeTabs: function(ids, userGesture)
+     {
+         for (var i = 0; i < ids.length; ++i)
+             this._innerCloseTab(ids[i], userGesture);
+         this._updateTabElements();
+         if (this._tabsHistory.length)
+             this.selectTab(this._tabsHistory[0].id, userGesture);
+     },
 
     /**
      * @param {string} id
@@ -394,7 +412,7 @@ WebInspector.TabbedPane.prototype = {
         var i = 0;
         for (var tabId in this._tabs) {
             var tab = this._tabs[tabId];
-            tab.setWidth(Math.min(maxWidth, measuredWidths[i++]));
+            tab.setWidth(this._verticalTabLayout ? -1 : Math.min(maxWidth, measuredWidths[i++]));
         }
     },
 
@@ -475,7 +493,7 @@ WebInspector.TabbedPane.prototype = {
             var minimalRequiredWidth = totalTabsWidth;
             if (i !== tabsHistory.length - 1)
                 minimalRequiredWidth += measuredDropDownButtonWidth;
-            if (minimalRequiredWidth > totalWidth)
+            if (!this._verticalTabLayout && minimalRequiredWidth > totalWidth)
                 break;
             tabsToShowIndexes.push(tabsOrdered.indexOf(tabsHistory[i]));
         }
@@ -590,6 +608,8 @@ WebInspector.TabbedPaneTab.prototype = {
 
     set title(title)
     {
+        if (title === this._title)
+            return;
         this._title = title;
         if (this._titleElement)
             this._titleElement.textContent = title;
@@ -649,7 +669,7 @@ WebInspector.TabbedPaneTab.prototype = {
      */
     setWidth: function(width)
     {
-        this.tabElement.style.width = width + "px";
+        this.tabElement.style.width = width === -1 ? "" : (width + "px");
         this._width = width;
     },
 
@@ -660,6 +680,7 @@ WebInspector.TabbedPaneTab.prototype = {
     {
         var tabElement = document.createElement("div");
         tabElement.addStyleClass("tabbed-pane-header-tab");
+        tabElement.id = "tab-" + this._id;
         tabElement.tabIndex = -1;
 
         var titleElement = tabElement.createChild("span", "tabbed-pane-header-tab-title");
@@ -726,8 +747,8 @@ WebInspector.TabbedPaneTab.prototype = {
   
         var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendItem(WebInspector.UIString("Close"), close.bind(this));
-        contextMenu.appendItem(WebInspector.UIString("Close Others"), closeOthers.bind(this));
-        contextMenu.appendItem(WebInspector.UIString("Close All"), closeAll.bind(this));
+        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Close others" : "Close Others"), closeOthers.bind(this));
+        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Close all" : "Close All"), closeAll.bind(this));
         contextMenu.show();
     },
 

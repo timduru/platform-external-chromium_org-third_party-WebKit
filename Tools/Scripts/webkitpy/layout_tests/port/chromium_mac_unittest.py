@@ -26,7 +26,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.layout_tests.port import chromium_mac
 from webkitpy.layout_tests.port import chromium_port_testcase
@@ -41,7 +41,7 @@ class ChromiumMacPortTest(chromium_port_testcase.ChromiumPortTestCase):
 
     def assert_name(self, port_name, os_version_string, expected):
         port = self.make_port(os_version=os_version_string, port_name=port_name)
-        self.assertEquals(expected, port.name())
+        self.assertEqual(expected, port.name())
 
     def test_versions(self):
         self.assertTrue(self.make_port().name() in ('chromium-mac-snowleopard', 'chromium-mac-lion', 'chromium-mac-mountainlion', 'chromium-mac-future'))
@@ -64,16 +64,16 @@ class ChromiumMacPortTest(chromium_port_testcase.ChromiumPortTestCase):
 
     def test_baseline_path(self):
         port = self.make_port(port_name='chromium-mac-snowleopard')
-        self.assertEquals(port.baseline_path(), port._webkit_baseline_path('chromium-mac-snowleopard'))
+        self.assertEqual(port.baseline_path(), port._webkit_baseline_path('chromium-mac-snowleopard'))
 
         port = self.make_port(port_name='chromium-mac-lion')
-        self.assertEquals(port.baseline_path(), port._webkit_baseline_path('chromium-mac-lion'))
+        self.assertEqual(port.baseline_path(), port._webkit_baseline_path('chromium-mac-lion'))
 
         port = self.make_port(port_name='chromium-mac-mountainlion')
-        self.assertEquals(port.baseline_path(), port._webkit_baseline_path('chromium-mac'))
+        self.assertEqual(port.baseline_path(), port._webkit_baseline_path('chromium-mac'))
 
         port = self.make_port(port_name='chromium-mac-future')
-        self.assertEquals(port.baseline_path(), port._webkit_baseline_path('chromium-mac'))
+        self.assertEqual(port.baseline_path(), port._webkit_baseline_path('chromium-mac'))
 
     def test_operating_system(self):
         self.assertEqual('mac', self.make_port().operating_system())
@@ -87,24 +87,25 @@ class ChromiumMacPortTest(chromium_port_testcase.ChromiumPortTestCase):
         options = MockOptions(configuration='Release', build_directory='foo')
         self.assert_build_path(options, ['/mock-checkout/Source/WebKit/chromium/out/Release'], 'foo/Release')
 
-        # Test that we look in a chromium directory before the webkit directory.
-        options = MockOptions(configuration='Release', build_directory=None)
-        self.assert_build_path(options, ['/mock-checkout/Source/WebKit/chromium/out/Release', '/mock-checkout/out/Release'], '/mock-checkout/Source/WebKit/chromium/out/Release')
-
         # Test that we prefer the legacy dir over the new dir.
         options = MockOptions(configuration='Release', build_directory=None)
         self.assert_build_path(options, ['/mock-checkout/Source/WebKit/chromium/xcodebuild/Release', '/mock-checkout/Source/WebKit/chromium/out/Release'], '/mock-checkout/Source/WebKit/chromium/xcodebuild/Release')
+
+    def test_build_path_timestamps(self):
+        options = MockOptions(configuration='Release', build_directory=None)
+        port = self.make_port(options=options)
+        port.host.filesystem.maybe_make_directory('/mock-checkout/out/Release')
+        port.host.filesystem.maybe_make_directory('/mock-checkout/xcodebuild/Release')
+        # Check with 'out' being newer.
+        port.host.filesystem.mtime = lambda f: 5 if '/out/' in f else 4
+        self.assertEqual(port._build_path(), '/mock-checkout/out/Release')
+        # Check with 'xcodebuild' being newer.
+        port.host.filesystem.mtime = lambda f: 5 if '/xcodebuild/' in f else 4
+        self.assertEqual(port._build_path(), '/mock-checkout/xcodebuild/Release')
 
     def test_driver_name_option(self):
         self.assertTrue(self.make_port()._path_to_driver().endswith('DumpRenderTree'))
         self.assertTrue(self.make_port(options=MockOptions(driver_name='OtherDriver'))._path_to_driver().endswith('OtherDriver'))
 
     def test_path_to_image_diff(self):
-        self.assertEquals(self.make_port()._path_to_image_diff(), '/mock-checkout/out/Release/ImageDiff')
-
-    def test_ml_expectations(self):
-        self.assertTrue(self.make_port(port_name='chromium-mac-mountainlion').expectations_files()[-1].endswith('-mountainlion/TestExpectations'))
-        self.assertFalse(self.make_port(port_name='chromium-mac-lion').expectations_files()[-1].endswith('-mountainlion/TestExpectations'))
-
-if __name__ == '__main__':
-    port_testcase.main()
+        self.assertEqual(self.make_port()._path_to_image_diff(), '/mock-checkout/out/Release/ImageDiff')

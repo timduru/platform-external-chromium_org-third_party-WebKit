@@ -24,14 +24,18 @@
  */
 
 #include "config.h"
+
+#include "IDBDatabase.h"
+
 #include "IDBBackingStore.h"
 #include "IDBCursorBackendInterface.h"
 #include "IDBDatabaseBackendImpl.h"
 #include "IDBDatabaseCallbacksProxy.h"
 #include "IDBFactoryBackendImpl.h"
 #include "IDBFakeBackingStore.h"
-#include "IDBIndexBackendImpl.h"
-#include "IDBObjectStoreBackendImpl.h"
+#include "IDBTransactionBackendImpl.h"
+#include "IndexedDB.h"
+#include "SharedBuffer.h"
 #include "WebIDBDatabaseCallbacksImpl.h"
 #include "WebIDBDatabaseImpl.h"
 
@@ -56,20 +60,7 @@ TEST(IDBDatabaseBackendTest, BackingStoreRetention)
     RefPtr<IDBDatabaseBackendImpl> db = IDBDatabaseBackendImpl::create("db", backingStore.get(), factory, "uniqueid");
     EXPECT_GT(backingStore->refCount(), 1);
 
-    const bool autoIncrement = false;
-    RefPtr<IDBObjectStoreBackendImpl> store = IDBObjectStoreBackendImpl::create(db.get(), IDBObjectStoreMetadata("store", 1, IDBKeyPath("keyPath"), autoIncrement, 0));
-    EXPECT_GT(backingStore->refCount(), 1);
-
-    const bool unique = false;
-    const bool multiEntry = false;
-    RefPtr<IDBIndexBackendImpl> index = IDBIndexBackendImpl::create(db.get(), store.get(), IDBIndexMetadata("index", -1, IDBKeyPath("keyPath"), unique, multiEntry));
-    EXPECT_GT(backingStore->refCount(), 1);
-
     db.clear();
-    EXPECT_TRUE(backingStore->hasOneRef());
-    store.clear();
-    EXPECT_TRUE(backingStore->hasOneRef());
-    index.clear();
     EXPECT_TRUE(backingStore->hasOneRef());
 }
 
@@ -82,20 +73,18 @@ public:
     }
     virtual void onError(PassRefPtr<IDBDatabaseError>) OVERRIDE { }
     virtual void onSuccess(PassRefPtr<DOMStringList>) OVERRIDE { }
-    virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SerializedScriptValue>) OVERRIDE { }
-    virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>) OVERRIDE
+    virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SharedBuffer>) OVERRIDE { }
+    virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>, const IDBDatabaseMetadata&) OVERRIDE
     {
         m_wasSuccessDBCalled = true;
     }
     virtual void onSuccess(PassRefPtr<IDBKey>) OVERRIDE { }
-    virtual void onSuccess(PassRefPtr<IDBTransactionBackendInterface>) OVERRIDE { }
-    virtual void onSuccess(PassRefPtr<SerializedScriptValue>) OVERRIDE { }
-    virtual void onSuccess(PassRefPtr<SerializedScriptValue>, PassRefPtr<IDBKey>, const IDBKeyPath&) OVERRIDE { };
+    virtual void onSuccess(PassRefPtr<SharedBuffer>) OVERRIDE { }
+    virtual void onSuccess(PassRefPtr<SharedBuffer>, PassRefPtr<IDBKey>, const IDBKeyPath&) OVERRIDE { };
     virtual void onSuccess(int64_t) OVERRIDE { }
     virtual void onSuccess() OVERRIDE { }
-    virtual void onSuccess(PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SerializedScriptValue>) OVERRIDE { };
-    virtual void onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<SerializedScriptValue> >&) OVERRIDE { }
-    virtual void onBlocked() OVERRIDE { }
+    virtual void onSuccess(PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SharedBuffer>) OVERRIDE { };
+    virtual void onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<SharedBuffer> >&) OVERRIDE { }
 private:
     MockIDBCallbacks()
         : m_wasSuccessDBCalled(false) { }
@@ -106,9 +95,10 @@ class FakeIDBDatabaseCallbacks : public IDBDatabaseCallbacks {
 public:
     static PassRefPtr<FakeIDBDatabaseCallbacks> create() { return adoptRef(new FakeIDBDatabaseCallbacks()); }
     virtual ~FakeIDBDatabaseCallbacks() { }
-    virtual void onVersionChange(const String& version) OVERRIDE { }
     virtual void onVersionChange(int64_t oldVersion, int64_t newVersion) OVERRIDE { }
     virtual void onForcedClose() OVERRIDE { }
+    virtual void onAbort(int64_t transactionId, PassRefPtr<IDBDatabaseError> error) OVERRIDE { }
+    virtual void onComplete(int64_t transactionId) OVERRIDE { }
 private:
     FakeIDBDatabaseCallbacks() { }
 };
@@ -124,11 +114,11 @@ TEST(IDBDatabaseBackendTest, ConnectionLifecycle)
 
     RefPtr<MockIDBCallbacks> request1 = MockIDBCallbacks::create();
     RefPtr<FakeIDBDatabaseCallbacks> connection1 = FakeIDBDatabaseCallbacks::create();
-    db->openConnectionWithVersion(request1, connection1, IDBDatabaseMetadata::NoIntVersion);
+    db->openConnection(request1, connection1, 1, IDBDatabaseMetadata::DefaultIntVersion);
 
     RefPtr<MockIDBCallbacks> request2 = MockIDBCallbacks::create();
     RefPtr<FakeIDBDatabaseCallbacks> connection2 = FakeIDBDatabaseCallbacks::create();
-    db->openConnectionWithVersion(request2, connection2, IDBDatabaseMetadata::NoIntVersion);
+    db->openConnection(request2, connection2, 2, IDBDatabaseMetadata::DefaultIntVersion);
 
     db->close(connection1);
     EXPECT_GT(backingStore->refCount(), 1);
@@ -150,18 +140,31 @@ public:
     }
 
     virtual IDBDatabaseMetadata metadata() const { return IDBDatabaseMetadata(); }
-    virtual PassRefPtr<IDBObjectStoreBackendInterface> createObjectStore(int64_t, const String& name, const IDBKeyPath&, bool autoIncrement, IDBTransactionBackendInterface*, ExceptionCode&) { return 0; }
-    virtual void deleteObjectStore(const String& name, IDBTransactionBackendInterface*, ExceptionCode&) { }
-    virtual void deleteObjectStore(int64_t, IDBTransactionBackendInterface*, ExceptionCode&) { }
-    virtual void setVersion(const String& version, PassRefPtr<IDBCallbacks>, PassRefPtr<IDBDatabaseCallbacks>, ExceptionCode&) { }
-    virtual PassRefPtr<IDBTransactionBackendInterface> transaction(DOMStringList* storeNames, unsigned short mode, ExceptionCode&) { return 0; }
-    virtual PassRefPtr<IDBTransactionBackendInterface> transaction(const Vector<int64_t>&, unsigned short mode) { return 0; }
+    virtual void createObjectStore(int64_t transactionId, int64_t objectStoreId, const String& name, const IDBKeyPath&, bool autoIncrement) OVERRIDE { };
+    virtual void deleteObjectStore(int64_t transactionId, int64_t objectStoreId) OVERRIDE { }
+    virtual void createTransaction(int64_t, PassRefPtr<IDBDatabaseCallbacks>, const Vector<int64_t>&, unsigned short mode) OVERRIDE { }
 
-    virtual void close(PassRefPtr<IDBDatabaseCallbacks>)
+    virtual void close(PassRefPtr<IDBDatabaseCallbacks>) OVERRIDE
     {
         m_wasCloseCalled = true;
         m_webDatabase.close();
     }
+
+    virtual void abort(int64_t transactionId) OVERRIDE { }
+    virtual void abort(int64_t transactionId, PassRefPtr<IDBDatabaseError>) OVERRIDE { }
+    virtual void commit(int64_t transactionId) OVERRIDE { }
+
+    virtual void openCursor(int64_t transactionId, int64_t objectStoreId, int64_t indexId, PassRefPtr<IDBKeyRange>, IndexedDB::CursorDirection, bool keyOnly, TaskType, PassRefPtr<IDBCallbacks>) OVERRIDE { }
+    virtual void count(int64_t objectStoreId, int64_t indexId, int64_t transactionId, PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>) OVERRIDE { }
+    virtual void get(int64_t objectStoreId, int64_t indexId, int64_t transactionId, PassRefPtr<IDBKeyRange>, bool keyOnly, PassRefPtr<IDBCallbacks>) OVERRIDE { }
+    virtual void put(int64_t transactionId, int64_t objectStoreId, PassRefPtr<SharedBuffer>, PassRefPtr<IDBKey>, PutMode, PassRefPtr<IDBCallbacks>, const Vector<int64_t>& indexIds, const Vector<IndexKeys>&) OVERRIDE { }
+    virtual void setIndexKeys(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBKey> prpPrimaryKey, const Vector<int64_t>& indexIds, const Vector<IndexKeys>&) OVERRIDE { }
+    virtual void setIndexesReady(int64_t transactionId, int64_t objectStoreId, const Vector<int64_t>& indexIds) OVERRIDE { }
+    virtual void deleteRange(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBKeyRange>, PassRefPtr<IDBCallbacks>) OVERRIDE { }
+    virtual void clear(int64_t transactionId, int64_t objectStoreId, PassRefPtr<IDBCallbacks>) OVERRIDE { }
+
+    virtual void createIndex(int64_t transactionId, int64_t objectStoreId, int64_t indexId, const String& name, const IDBKeyPath&, bool unique, bool multiEntry) OVERRIDE { ASSERT_NOT_REACHED(); }
+    virtual void deleteIndex(int64_t transactionId, int64_t objectStoreId, int64_t indexId) OVERRIDE { ASSERT_NOT_REACHED(); }
 
 private:
     MockIDBDatabaseBackendProxy(WebIDBDatabaseImpl& webDatabase)
@@ -188,7 +191,7 @@ TEST(IDBDatabaseBackendTest, ForcedClose)
 
     RefPtr<MockIDBDatabaseBackendProxy> proxy = MockIDBDatabaseBackendProxy::create(webDatabase);
     RefPtr<MockIDBCallbacks> request = MockIDBCallbacks::create();
-    backend->openConnectionWithVersion(request, connectionProxy, IDBDatabaseMetadata::NoIntVersion);
+    backend->openConnection(request, connectionProxy, 3, IDBDatabaseMetadata::DefaultIntVersion);
 
     ScriptExecutionContext* context = 0;
     RefPtr<IDBDatabase> idbDatabase = IDBDatabase::create(context, proxy, connection);

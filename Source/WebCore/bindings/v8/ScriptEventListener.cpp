@@ -31,7 +31,6 @@
 #include "config.h"
 #include "ScriptEventListener.h"
 
-#include "Attribute.h"
 #include "Document.h"
 #include "EventListener.h"
 #include "Frame.h"
@@ -49,10 +48,10 @@ static const String& eventParameterName(bool isSVGEvent)
     return isSVGEvent ? evtString : eventString;
 }
 
-PassRefPtr<V8LazyEventListener> createAttributeEventListener(Node* node, const Attribute& attribute)
+PassRefPtr<V8LazyEventListener> createAttributeEventListener(Node* node, const QualifiedName& name, const AtomicString& value)
 {
     ASSERT(node);
-    if (attribute.isNull())
+    if (value.isNull())
         return 0;
 
     // FIXME: Very strange: we initialize zero-based number with '1'.
@@ -67,15 +66,15 @@ PassRefPtr<V8LazyEventListener> createAttributeEventListener(Node* node, const A
         sourceURL = node->document()->url().string();
     }
 
-    return V8LazyEventListener::create(attribute.localName().string(), eventParameterName(node->isSVGElement()), attribute.value(), sourceURL, position, node, WorldContextHandle(UseMainWorld));
+    return V8LazyEventListener::create(name.localName().string(), eventParameterName(node->isSVGElement()), value, sourceURL, position, node, WorldContextHandle(UseMainWorld));
 }
 
-PassRefPtr<V8LazyEventListener> createAttributeEventListener(Frame* frame, const Attribute& attribute)
+PassRefPtr<V8LazyEventListener> createAttributeEventListener(Frame* frame, const QualifiedName& name, const AtomicString& value)
 {
     if (!frame)
         return 0;
 
-    if (attribute.isNull())
+    if (value.isNull())
         return 0;
 
     ScriptController* scriptController = frame->script();
@@ -85,7 +84,7 @@ PassRefPtr<V8LazyEventListener> createAttributeEventListener(Frame* frame, const
     TextPosition position = scriptController->eventHandlerPosition();
     String sourceURL = frame->document()->url().string();
 
-    return V8LazyEventListener::create(attribute.localName().string(), eventParameterName(frame->document()->isSVGDocument()), attribute.value(), sourceURL, position, 0, WorldContextHandle(UseMainWorld));
+    return V8LazyEventListener::create(name.localName().string(), eventParameterName(frame->document()->isSVGDocument()), value, sourceURL, position, 0, WorldContextHandle(UseMainWorld));
 }
 
 String eventListenerHandlerBody(Document* document, EventListener* listener)
@@ -104,6 +103,31 @@ String eventListenerHandlerBody(Document* document, EventListener* listener)
     return toWebCoreStringWithNullCheck(function);
 }
 
+ScriptValue eventListenerHandler(Document* document, EventListener* listener)
+{
+    if (listener->type() != EventListener::JSEventListenerType)
+        return ScriptValue();
+
+    v8::HandleScope scope;
+    V8AbstractEventListener* v8Listener = static_cast<V8AbstractEventListener*>(listener);
+    v8::Handle<v8::Context> context = toV8Context(document, v8Listener->worldContext());
+    v8::Context::Scope contextScope(context);
+    v8::Handle<v8::Object> function = v8Listener->getListenerObject(document);
+    if (function.IsEmpty())
+        return ScriptValue();
+    return ScriptValue(function);
+}
+
+ScriptState* eventListenerHandlerScriptState(Frame* frame, EventListener* listener)
+{
+    if (listener->type() != EventListener::JSEventListenerType)
+        return 0;
+    V8AbstractEventListener* v8Listener = static_cast<V8AbstractEventListener*>(listener);
+    v8::HandleScope scope;
+    v8::Handle<v8::Context> v8Context = v8Listener->worldContext().adjustedContext(frame->script());
+    return ScriptState::forContext(*v8Context);
+}
+
 bool eventListenerHandlerLocation(Document* document, EventListener* listener, String& sourceName, String& scriptId, int& lineNumber)
 {
     if (listener->type() != EventListener::JSEventListenerType)
@@ -119,7 +143,7 @@ bool eventListenerHandlerLocation(Document* document, EventListener* listener, S
 
     v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(object);
     v8::Handle<v8::Value> scriptIdValue = function->GetScriptId();
-    scriptId = toWebCoreStringWithNullOrUndefinedCheck(scriptIdValue);
+    scriptId = toWebCoreStringWithUndefinedOrNullCheck(scriptIdValue);
     v8::ScriptOrigin origin = function->GetScriptOrigin();
     if (origin.ResourceName()->IsString() && !origin.ResourceName().IsEmpty())
         sourceName = toWebCoreString(origin.ResourceName());

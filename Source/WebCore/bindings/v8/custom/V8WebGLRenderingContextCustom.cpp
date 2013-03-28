@@ -38,6 +38,7 @@
 #include "NotImplemented.h"
 #include "V8ArrayBufferView.h"
 #include "V8Binding.h"
+#include "V8EXTDrawBuffers.h"
 #include "V8EXTTextureFilterAnisotropic.h"
 #include "V8Float32Array.h"
 #include "V8HTMLCanvasElement.h"
@@ -50,11 +51,14 @@
 #include "V8OESElementIndexUint.h"
 #include "V8OESStandardDerivatives.h"
 #include "V8OESTextureFloat.h"
+#include "V8OESTextureHalfFloat.h"
 #include "V8OESVertexArrayObject.h"
 #include "V8Uint16Array.h"
 #include "V8Uint32Array.h"
 #include "V8Uint8Array.h"
 #include "V8WebGLBuffer.h"
+#include "V8WebGLCompressedTextureATC.h"
+#include "V8WebGLCompressedTexturePVRTC.h"
 #include "V8WebGLCompressedTextureS3TC.h"
 #include "V8WebGLDebugRendererInfo.h"
 #include "V8WebGLDebugShaders.h"
@@ -132,9 +136,9 @@ static v8::Handle<v8::Value> toV8Object(const WebGLGetInfo& info, v8::Handle<v8:
     case WebGLGetInfo::kTypeInt:
         return v8Integer(info.getInt(), isolate);
     case WebGLGetInfo::kTypeNull:
-        return v8::Null(isolate);
+        return v8Null(isolate);
     case WebGLGetInfo::kTypeString:
-        return v8String(info.getString());
+        return v8String(info.getString(), isolate);
     case WebGLGetInfo::kTypeUnsignedInt:
         return v8UnsignedInteger(info.getUnsignedInt(), isolate);
     case WebGLGetInfo::kTypeWebGLBuffer:
@@ -168,13 +172,17 @@ static v8::Handle<v8::Value> toV8Object(const WebGLGetInfo& info, v8::Handle<v8:
 static v8::Handle<v8::Value> toV8Object(WebGLExtension* extension, v8::Handle<v8::Object> contextObject, v8::Isolate* isolate)
 {
     if (!extension)
-        return v8::Null(isolate);
+        return v8Null(isolate);
     v8::Handle<v8::Value> extensionObject;
     const char* referenceName = 0;
     switch (extension->getName()) {
-    case WebGLExtension::WebKitWebGLLoseContextName:
+    case WebGLExtension::WebGLLoseContextName:
         extensionObject = toV8(static_cast<WebGLLoseContext*>(extension), contextObject, isolate);
-        referenceName = "webKitWebGLLoseContextName";
+        referenceName = "webGLLoseContextName";
+        break;
+    case WebGLExtension::EXTDrawBuffersName:
+        extensionObject = toV8(static_cast<EXTDrawBuffers*>(extension), contextObject, isolate);
+        referenceName = "extDrawBuffersName";
         break;
     case WebGLExtension::EXTTextureFilterAnisotropicName:
         extensionObject = toV8(static_cast<EXTTextureFilterAnisotropic*>(extension), contextObject, isolate);
@@ -187,6 +195,10 @@ static v8::Handle<v8::Value> toV8Object(WebGLExtension* extension, v8::Handle<v8
     case WebGLExtension::OESTextureFloatName:
         extensionObject = toV8(static_cast<OESTextureFloat*>(extension), contextObject, isolate);
         referenceName = "oesTextureFloatName";
+        break;
+    case WebGLExtension::OESTextureHalfFloatName:
+        extensionObject = toV8(static_cast<OESTextureHalfFloat*>(extension), contextObject, isolate);
+        referenceName = "oesTextureHalfFloatName";
         break;
     case WebGLExtension::OESVertexArrayObjectName:
         extensionObject = toV8(static_cast<OESVertexArrayObject*>(extension), contextObject, isolate);
@@ -204,17 +216,24 @@ static v8::Handle<v8::Value> toV8Object(WebGLExtension* extension, v8::Handle<v8
         extensionObject = toV8(static_cast<WebGLDebugShaders*>(extension), contextObject, isolate);
         referenceName = "webGLDebugShadersName";
         break;
-    case WebGLExtension::WebKitWebGLCompressedTextureS3TCName:
-        extensionObject = toV8(static_cast<WebGLCompressedTextureS3TC*>(extension), contextObject, isolate);
-        referenceName = "webKitWebGLCompressedTextureS3TCName";
+    case WebGLExtension::WebGLCompressedTextureATCName:
+        extensionObject = toV8(static_cast<WebGLCompressedTextureATC*>(extension), contextObject, isolate);
+        referenceName = "webGLCompressedTextureATCName";
+    case WebGLExtension::WebGLCompressedTexturePVRTCName:
+        extensionObject = toV8(static_cast<WebGLCompressedTexturePVRTC*>(extension), contextObject, isolate);
+        referenceName = "webGLCompressedTexturePVRTCName";
         break;
-    case WebGLExtension::WebKitWebGLDepthTextureName:
+    case WebGLExtension::WebGLCompressedTextureS3TCName:
+        extensionObject = toV8(static_cast<WebGLCompressedTextureS3TC*>(extension), contextObject, isolate);
+        referenceName = "webGLCompressedTextureS3TCName";
+        break;
+    case WebGLExtension::WebGLDepthTextureName:
         extensionObject = toV8(static_cast<WebGLDepthTexture*>(extension), contextObject, isolate);
-        referenceName = "webKitWebGLDepthTextureName";
+        referenceName = "webGLDepthTextureName";
         break;
     }
     ASSERT(!extensionObject.IsEmpty());
-    V8DOMWrapper::setNamedHiddenReference(contextObject, referenceName, extensionObject);
+    V8HiddenPropertyName::setNamedHiddenReference(contextObject, referenceName, extensionObject);
     return extensionObject;
 }
 
@@ -255,11 +274,11 @@ static v8::Handle<v8::Value> getObjectParameter(const v8::Arguments& args, Objec
     return toV8Object(info, args.Holder(), args.GetIsolate());
 }
 
-static WebGLUniformLocation* toWebGLUniformLocation(v8::Handle<v8::Value> value, bool& ok)
+static WebGLUniformLocation* toWebGLUniformLocation(v8::Handle<v8::Value> value, bool& ok, v8::Isolate* isolate)
 {
     ok = false;
     WebGLUniformLocation* location = 0;
-    if (V8WebGLUniformLocation::HasInstance(value)) {
+    if (V8WebGLUniformLocation::HasInstance(value, isolate, worldType(isolate))) {
         location = V8WebGLUniformLocation::toNative(value->ToObject());
         ok = true;
     }
@@ -270,53 +289,47 @@ enum WhichProgramCall {
     kProgramParameter, kUniform
 };
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getAttachedShadersCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getAttachedShadersMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getAttachedShaders()");
-
     if (args.Length() < 1)
         return throwNotEnoughArgumentsError(args.GetIsolate());
 
     ExceptionCode ec = 0;
     WebGLRenderingContext* context = V8WebGLRenderingContext::toNative(args.Holder());
-    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLProgram::HasInstance(args[0]))
+    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLProgram::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
         return throwTypeError(0, args.GetIsolate());
-    WebGLProgram* program = V8WebGLProgram::HasInstance(args[0]) ? V8WebGLProgram::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
+    WebGLProgram* program = V8WebGLProgram::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8WebGLProgram::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
     Vector<RefPtr<WebGLShader> > shaders;
     bool succeed = context->getAttachedShaders(program, shaders, ec);
     if (ec) {
         setDOMException(ec, args.GetIsolate());
-        return v8::Null(args.GetIsolate());
+        return v8Null(args.GetIsolate());
     }
     if (!succeed)
-        return v8::Null(args.GetIsolate());
+        return v8Null(args.GetIsolate());
     v8::Local<v8::Array> array = v8::Array::New(shaders.size());
     for (size_t ii = 0; ii < shaders.size(); ++ii)
         array->Set(v8Integer(ii, args.GetIsolate()), toV8(shaders[ii].get(), args.Holder(), args.GetIsolate()));
     return array;
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getBufferParameterCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getBufferParameterMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getBufferParameter()");
     return getObjectParameter(args, kBuffer);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getExtensionCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getExtensionMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getExtensionCallback()");
     WebGLRenderingContext* imp = V8WebGLRenderingContext::toNative(args.Holder());
     if (args.Length() < 1)
         return throwNotEnoughArgumentsError(args.GetIsolate());
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, name, args[0]);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, name, args[0]);
     WebGLExtension* extension = imp->getExtension(name);
     return toV8Object(extension, args.Holder(), args.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getFramebufferAttachmentParameterCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getFramebufferAttachmentParameterMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getFramebufferAttachmentParameter()");
-
     if (args.Length() != 3)
         return throwNotEnoughArgumentsError(args.GetIsolate());
 
@@ -331,10 +344,8 @@ v8::Handle<v8::Value> V8WebGLRenderingContext::getFramebufferAttachmentParameter
     return toV8Object(info, args.Holder(), args.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getParameterCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getParameterMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getParameter()");
-
     if (args.Length() != 1)
         return throwNotEnoughArgumentsError(args.GetIsolate());
 
@@ -347,18 +358,16 @@ v8::Handle<v8::Value> V8WebGLRenderingContext::getParameterCallback(const v8::Ar
     return toV8Object(info, args.Holder(), args.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getProgramParameterCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getProgramParameterMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getProgramParameter()");
-
     if (args.Length() != 2)
         return throwNotEnoughArgumentsError(args.GetIsolate());
 
     ExceptionCode ec = 0;
     WebGLRenderingContext* context = V8WebGLRenderingContext::toNative(args.Holder());
-    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLProgram::HasInstance(args[0]))
+    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLProgram::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
         return throwTypeError(0, args.GetIsolate());
-    WebGLProgram* program = V8WebGLProgram::HasInstance(args[0]) ? V8WebGLProgram::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
+    WebGLProgram* program = V8WebGLProgram::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8WebGLProgram::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
     unsigned pname = toInt32(args[1]);
     WebGLGetInfo info = context->getProgramParameter(program, pname, ec);
     if (ec)
@@ -366,24 +375,21 @@ v8::Handle<v8::Value> V8WebGLRenderingContext::getProgramParameterCallback(const
     return toV8Object(info, args.Holder(), args.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getRenderbufferParameterCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getRenderbufferParameterMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getRenderbufferParameter()");
     return getObjectParameter(args, kRenderbuffer);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getShaderParameterCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getShaderParameterMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getShaderParameter()");
-
     if (args.Length() != 2)
         return throwNotEnoughArgumentsError(args.GetIsolate());
 
     ExceptionCode ec = 0;
     WebGLRenderingContext* context = V8WebGLRenderingContext::toNative(args.Holder());
-    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLShader::HasInstance(args[0]))
+    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLShader::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
         return throwTypeError(0, args.GetIsolate());
-    WebGLShader* shader = V8WebGLShader::HasInstance(args[0]) ? V8WebGLShader::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
+    WebGLShader* shader = V8WebGLShader::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8WebGLShader::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
     unsigned pname = toInt32(args[1]);
     WebGLGetInfo info = context->getShaderParameter(shader, pname, ec);
     if (ec)
@@ -391,43 +397,39 @@ v8::Handle<v8::Value> V8WebGLRenderingContext::getShaderParameterCallback(const 
     return toV8Object(info, args.Holder(), args.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getSupportedExtensionsCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getSupportedExtensionsMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getSupportedExtensionsCallback()");
     WebGLRenderingContext* imp = V8WebGLRenderingContext::toNative(args.Holder());
     if (imp->isContextLost())
-        return v8::Null(args.GetIsolate());
+        return v8Null(args.GetIsolate());
 
     Vector<String> value = imp->getSupportedExtensions();
     v8::Local<v8::Array> array = v8::Array::New(value.size());
     for (size_t ii = 0; ii < value.size(); ++ii)
-        array->Set(v8Integer(ii, args.GetIsolate()), v8String(value[ii]));
+        array->Set(v8Integer(ii, args.GetIsolate()), v8String(value[ii], args.GetIsolate()));
     return array;
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getTexParameterCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getTexParameterMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getTexParameter()");
     return getObjectParameter(args, kTexture);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getUniformCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getUniformMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getUniform()");
-
     if (args.Length() != 2)
         return throwNotEnoughArgumentsError(args.GetIsolate());
 
     ExceptionCode ec = 0;
     WebGLRenderingContext* context = V8WebGLRenderingContext::toNative(args.Holder());
-    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLProgram::HasInstance(args[0]))
+    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLProgram::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
         return throwTypeError(0, args.GetIsolate());
-    WebGLProgram* program = V8WebGLProgram::HasInstance(args[0]) ? V8WebGLProgram::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
+    WebGLProgram* program = V8WebGLProgram::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8WebGLProgram::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0;
 
-    if (args.Length() > 1 && !isUndefinedOrNull(args[1]) && !V8WebGLUniformLocation::HasInstance(args[1]))
+    if (args.Length() > 1 && !isUndefinedOrNull(args[1]) && !V8WebGLUniformLocation::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate())))
         return throwTypeError(0, args.GetIsolate());
     bool ok = false;
-    WebGLUniformLocation* location = toWebGLUniformLocation(args[1], ok);
+    WebGLUniformLocation* location = toWebGLUniformLocation(args[1], ok, args.GetIsolate());
 
     WebGLGetInfo info = context->getUniform(program, location, ec);
     if (ec)
@@ -435,9 +437,8 @@ v8::Handle<v8::Value> V8WebGLRenderingContext::getUniformCallback(const v8::Argu
     return toV8Object(info, args.Holder(), args.GetIsolate());
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::getVertexAttribCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::getVertexAttribMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.getVertexAttrib()");
     return getObjectParameter(args, kVertexAttrib);
 }
 
@@ -490,14 +491,14 @@ static v8::Handle<v8::Value> vertexAttribAndUniformHelperf(const v8::Arguments& 
     if (isFunctionToCallForAttribute(functionToCall))
         index = toInt32(args[0]);
     else {
-        if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLUniformLocation::HasInstance(args[0]))
+        if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLUniformLocation::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
             return throwTypeError(0, args.GetIsolate());
-        location = toWebGLUniformLocation(args[0], ok);
+        location = toWebGLUniformLocation(args[0], ok, args.GetIsolate());
     }
 
     WebGLRenderingContext* context = V8WebGLRenderingContext::toNative(args.Holder());
 
-    if (V8Float32Array::HasInstance(args[1])) {
+    if (V8Float32Array::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate()))) {
         Float32Array* array = V8Float32Array::toNative(args[1]->ToObject());
         ASSERT(array != NULL);
         ExceptionCode ec = 0;
@@ -561,12 +562,12 @@ static v8::Handle<v8::Value> uniformHelperi(const v8::Arguments& args,
         return throwNotEnoughArgumentsError(args.GetIsolate());
 
     WebGLRenderingContext* context = V8WebGLRenderingContext::toNative(args.Holder());
-    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLUniformLocation::HasInstance(args[0]))
+    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLUniformLocation::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
         return throwTypeError(0, args.GetIsolate());
     bool ok = false;
-    WebGLUniformLocation* location = toWebGLUniformLocation(args[0], ok);
+    WebGLUniformLocation* location = toWebGLUniformLocation(args[0], ok, args.GetIsolate());
 
-    if (V8Int32Array::HasInstance(args[1])) {
+    if (V8Int32Array::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate()))) {
         Int32Array* array = V8Int32Array::toNative(args[1]->ToObject());
         ASSERT(array != NULL);
         ExceptionCode ec = 0;
@@ -606,51 +607,43 @@ static v8::Handle<v8::Value> uniformHelperi(const v8::Arguments& args,
     return v8::Undefined();
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniform1fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniform1fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniform1fv()");
     return vertexAttribAndUniformHelperf(args, kUniform1v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniform1ivCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniform1ivMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniform1iv()");
     return uniformHelperi(args, kUniform1v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniform2fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniform2fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniform2fv()");
     return vertexAttribAndUniformHelperf(args, kUniform2v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniform2ivCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniform2ivMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniform2iv()");
     return uniformHelperi(args, kUniform2v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniform3fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniform3fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniform3fv()");
     return vertexAttribAndUniformHelperf(args, kUniform3v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniform3ivCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniform3ivMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniform3iv()");
     return uniformHelperi(args, kUniform3v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniform4fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniform4fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniform4fv()");
     return vertexAttribAndUniformHelperf(args, kUniform4v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniform4ivCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniform4ivMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniform4iv()");
     return uniformHelperi(args, kUniform4v);
 }
 
@@ -671,13 +664,13 @@ static v8::Handle<v8::Value> uniformMatrixHelper(const v8::Arguments& args,
 
     WebGLRenderingContext* context = V8WebGLRenderingContext::toNative(args.Holder());
 
-    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLUniformLocation::HasInstance(args[0]))
+    if (args.Length() > 0 && !isUndefinedOrNull(args[0]) && !V8WebGLUniformLocation::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
         return throwTypeError(0, args.GetIsolate());
     bool ok = false;
-    WebGLUniformLocation* location = toWebGLUniformLocation(args[0], ok);
+    WebGLUniformLocation* location = toWebGLUniformLocation(args[0], ok, args.GetIsolate());
     
     bool transpose = args[1]->BooleanValue();
-    if (V8Float32Array::HasInstance(args[2])) {
+    if (V8Float32Array::HasInstance(args[2], args.GetIsolate(), worldType(args.GetIsolate()))) {
         Float32Array* array = V8Float32Array::toNative(args[2]->ToObject());
         ASSERT(array != NULL);
         ExceptionCode ec = 0;
@@ -715,45 +708,38 @@ static v8::Handle<v8::Value> uniformMatrixHelper(const v8::Arguments& args,
     return v8::Undefined();
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniformMatrix2fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniformMatrix2fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniformMatrix2fv()");
     return uniformMatrixHelper(args, 2);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniformMatrix3fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniformMatrix3fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniformMatrix3fv()");
     return uniformMatrixHelper(args, 3);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::uniformMatrix4fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::uniformMatrix4fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.uniformMatrix4fv()");
     return uniformMatrixHelper(args, 4);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::vertexAttrib1fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::vertexAttrib1fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.vertexAttrib1fv()");
     return vertexAttribAndUniformHelperf(args, kVertexAttrib1v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::vertexAttrib2fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::vertexAttrib2fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.vertexAttrib2fv()");
     return vertexAttribAndUniformHelperf(args, kVertexAttrib2v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::vertexAttrib3fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::vertexAttrib3fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.vertexAttrib3fv()");
     return vertexAttribAndUniformHelperf(args, kVertexAttrib3v);
 }
 
-v8::Handle<v8::Value> V8WebGLRenderingContext::vertexAttrib4fvCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8WebGLRenderingContext::vertexAttrib4fvMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.WebGLRenderingContext.vertexAttrib4fv()");
     return vertexAttribAndUniformHelperf(args, kVertexAttrib4v);
 }
 

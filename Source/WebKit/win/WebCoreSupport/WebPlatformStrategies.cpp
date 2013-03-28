@@ -26,9 +26,15 @@
 #include "config.h"
 #include "WebPlatformStrategies.h"
 
+#include "FrameLoader.h"
+#include "WebFrameNetworkingContext.h"
 #include <WebCore/Page.h>
 #include <WebCore/PageGroup.h>
+#include <WebCore/PlatformCookieJar.h>
 #include <WebCore/PluginDatabase.h>
+#if USE(CFNETWORK)
+#include <WebKitSystemInterface/WebKitSystemInterface.h>
+#endif
 
 using namespace WebCore;
 
@@ -43,6 +49,11 @@ WebPlatformStrategies::WebPlatformStrategies()
 }
 
 CookiesStrategy* WebPlatformStrategies::createCookiesStrategy()
+{
+    return this;
+}
+
+DatabaseStrategy* WebPlatformStrategies::createDatabaseStrategy()
 {
     return this;
 }
@@ -67,13 +78,44 @@ SharedWorkerStrategy* WebPlatformStrategies::createSharedWorkerStrategy()
     return this;
 }
 
+StorageStrategy* WebPlatformStrategies::createStorageStrategy()
+{
+    return this;
+}
+
 VisitedLinkStrategy* WebPlatformStrategies::createVisitedLinkStrategy()
 {
     return this;
 }
 
-void WebPlatformStrategies::notifyCookiesChanged()
+String WebPlatformStrategies::cookiesForDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
 {
+    return WebCore::cookiesForDOM(session, firstParty, url);
+}
+
+void WebPlatformStrategies::setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, const String& cookieString)
+{
+    WebCore::setCookiesFromDOM(session, firstParty, url, cookieString);
+}
+
+bool WebPlatformStrategies::cookiesEnabled(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+{
+    return WebCore::cookiesEnabled(session, firstParty, url);
+}
+
+String WebPlatformStrategies::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+{
+    return WebCore::cookieRequestHeaderFieldValue(session, firstParty, url);
+}
+
+bool WebPlatformStrategies::getRawCookies(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
+{
+    return WebCore::getRawCookies(session, firstParty, url, rawCookies);
+}
+
+void WebPlatformStrategies::deleteCookie(const NetworkStorageSession& session, const KURL& url, const String& cookieName)
+{
+    WebCore::deleteCookie(session, url, cookieName);
 }
 
 void WebPlatformStrategies::refreshPlugins()

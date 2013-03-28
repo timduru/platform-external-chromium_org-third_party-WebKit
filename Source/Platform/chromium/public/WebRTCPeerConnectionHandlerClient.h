@@ -32,38 +32,50 @@
 #define WebRTCPeerConnectionHandlerClient_h
 
 namespace WebKit {
-class WebMediaStreamDescriptor;
+class WebMediaStream;
+class WebRTCDataChannelHandler;
 class WebRTCICECandidate;
 
 class WebRTCPeerConnectionHandlerClient {
 public:
-    enum ReadyState {
-        ReadyStateNew = 1,
-        ReadyStateOpening = 2,
-        ReadyStateActive = 3,
-        ReadyStateClosing = 4,
-        ReadyStateClosed = 5
+    enum SignalingState {
+        SignalingStateStable = 1,
+        SignalingStateHaveLocalOffer = 2,
+        SignalingStateHaveRemoteOffer = 3,
+        SignalingStateHaveLocalPrAnswer = 4,
+        SignalingStateHaveRemotePrAnswer = 5,
+        SignalingStateClosed = 6,
     };
 
-    enum ICEState {
-        ICEStateNew = 1,
-        ICEStateGathering = 2,
-        ICEStateWaiting = 3,
-        ICEStateChecking = 4,
-        ICEStateConnected = 5,
-        ICEStateCompleted = 6,
-        ICEStateFailed = 7,
-        ICEStateClosed = 8
+    enum ICEConnectionState {
+        ICEConnectionStateNew = 1,
+        ICEConnectionStateChecking = 2,
+        ICEConnectionStateConnected = 3,
+        ICEConnectionStateCompleted = 4,
+        ICEConnectionStateFailed = 5,
+        ICEConnectionStateDisconnected = 6,
+        ICEConnectionStateClosed = 7,
+
+        // DEPRECATED
+        ICEConnectionStateStarting = 1,
+    };
+
+    enum ICEGatheringState {
+        ICEGatheringStateNew = 1,
+        ICEGatheringStateGathering = 2,
+        ICEGatheringStateComplete = 3
     };
 
     virtual ~WebRTCPeerConnectionHandlerClient() { }
 
     virtual void negotiationNeeded() = 0;
     virtual void didGenerateICECandidate(const WebRTCICECandidate&) = 0;
-    virtual void didChangeReadyState(ReadyState) = 0;
-    virtual void didChangeICEState(ICEState) = 0;
-    virtual void didAddRemoteStream(const WebMediaStreamDescriptor&) = 0;
-    virtual void didRemoveRemoteStream(const WebMediaStreamDescriptor&) = 0;
+    virtual void didChangeSignalingState(SignalingState) = 0;
+    virtual void didChangeICEGatheringState(ICEGatheringState) = 0;
+    virtual void didChangeICEConnectionState(ICEConnectionState) = 0;
+    virtual void didAddRemoteStream(const WebMediaStream&) = 0;
+    virtual void didRemoveRemoteStream(const WebMediaStream&) = 0;
+    virtual void didAddRemoteDataChannel(WebRTCDataChannelHandler*) = 0;
 };
 
 } // namespace WebKit

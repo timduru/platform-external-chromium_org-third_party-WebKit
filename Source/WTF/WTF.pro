@@ -61,6 +61,8 @@ HEADERS += \
     ExportMacros.h \
     FastAllocBase.h \
     FastMalloc.h \
+    FeatureDefines.h \
+    FilePrintStream.h \
     FixedArray.h \
     Float32Array.h \
     Float64Array.h \
@@ -97,6 +99,7 @@ HEADERS += \
     MemoryInstrumentationSequence.h \
     MemoryInstrumentationString.h \
     MemoryInstrumentationVector.h \
+    MemoryObjectInfo.h \
     MessageQueue.h \
     MetaAllocator.h \
     MetaAllocatorHandle.h \
@@ -126,8 +129,10 @@ HEADERS += \
     PassTraits.h \
     Platform.h \
     PossiblyNull.h \
+    PrintStream.h \
     RandomNumber.h \
     RandomNumberSeed.h \
+    RawPointer.h \
     RedBlackTree.h \
     RefCounted.h \
     RefCountedLeakCounter.h \
@@ -142,6 +147,7 @@ HEADERS += \
     StdLibExtras.h \
     StringExtras.h \
     StringHasher.h \
+    StringPrintStream.h \
     TCPackedCache.h \
     TCSpinLock.h \
     TCSystemAlloc.h \
@@ -173,7 +179,6 @@ HEADERS += \
     unicode/CharacterNames.h \
     unicode/Collator.h \
     unicode/icu/UnicodeIcu.h \
-    unicode/qt4/UnicodeQt4.h \
     unicode/ScriptCodesFromICU.h \
     unicode/Unicode.h \
     unicode/UnicodeMacrosFromICU.h \
@@ -183,7 +188,8 @@ HEADERS += \
     Vector.h \
     VectorTraits.h \
     VMTags.h \
-    WTFThreadData.h
+    WTFThreadData.h \
+    WeakPtr.h
 
 unix: HEADERS += ThreadIdentifierDataPthreads.h
 
@@ -191,6 +197,7 @@ SOURCES += \
     ArrayBuffer.cpp \
     ArrayBufferView.cpp \
     Assertions.cpp \
+    Atomics.cpp \
     BitVector.cpp \
     CryptographicallyRandomNumber.cpp \
     CurrentTime.cpp \
@@ -207,6 +214,7 @@ SOURCES += \
     dtoa/fixed-dtoa.cc \
     dtoa/strtod.cc \
     FastMalloc.cpp \
+    FilePrintStream.cpp \
     GregorianDateTime.cpp \
     gobject/GOwnPtr.cpp \
     gobject/GRefPtr.cpp \
@@ -214,6 +222,7 @@ SOURCES += \
     MD5.cpp \
     MainThread.cpp \
     MediaTime.cpp \
+    MemoryInstrumentation.cpp \
     MetaAllocator.cpp \
     NullPtr.cpp \
     NumberOfCores.cpp \
@@ -224,10 +233,12 @@ SOURCES += \
     PageAllocationAligned.cpp \
     PageBlock.cpp \
     ParallelJobsGeneric.cpp \
+    PrintStream.cpp \
     RandomNumber.cpp \
     RefCountedLeakCounter.cpp \
     SHA1.cpp \
     StackBounds.cpp \
+    StringPrintStream.cpp \
     TCSystemAlloc.cpp \
     Threading.cpp \
     TypeTraits.cpp \

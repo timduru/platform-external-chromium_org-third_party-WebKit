@@ -39,6 +39,7 @@
 #include "HTMLParserIdioms.h"
 #include "InputTypeNames.h"
 #include "KeyboardEvent.h"
+#include "LocalizedStrings.h"
 #include "PlatformLocale.h"
 #include "RenderTextControl.h"
 #include <limits>
@@ -100,9 +101,22 @@ PassOwnPtr<InputType> NumberInputType::create(HTMLInputElement* element)
     return adoptPtr(new NumberInputType(element));
 }
 
+void NumberInputType::attach()
+{
+    TextFieldInputType::attach();
+    observeFeatureIfVisible(FeatureObserver::InputTypeNumber);
+}
+
 const AtomicString& NumberInputType::formControlType() const
 {
     return InputTypeNames::number();
+}
+
+void NumberInputType::setValue(const String& sanitizedValue, bool valueChanged, TextFieldEventBehavior eventBehavior)
+{
+    if (!valueChanged && sanitizedValue.isEmpty() && !element()->innerTextValue().isEmpty())
+        updateInnerTextValue();
+    TextFieldInputType::setValue(sanitizedValue, valueChanged, eventBehavior);
 }
 
 double NumberInputType::valueAsDouble() const
@@ -142,7 +156,7 @@ void NumberInputType::setValueAsDecimal(const Decimal& newValue, TextFieldEventB
 
 bool NumberInputType::typeMismatchFor(const String& value) const
 {
-    return !value.isEmpty() && !isfinite(parseToDoubleForNumberType(value));
+    return !value.isEmpty() && !std::isfinite(parseToDoubleForNumberType(value));
 }
 
 bool NumberInputType::typeMismatch() const
@@ -213,16 +227,6 @@ String NumberInputType::serialize(const Decimal& value) const
     return serializeForNumberType(value);
 }
 
-void NumberInputType::handleBlurEvent()
-{
-    // Reset the renderer value, which might be unmatched with the element value.
-    element()->setFormControlValueMatchesRenderer(false);
-
-    // We need to reset the renderer value explicitly because an unacceptable
-    // renderer value should be purged before style calculation.
-    updateInnerTextValue();
-}
-
 static bool isE(UChar ch)
 {
     return ch == 'e' || ch == 'E';
@@ -253,22 +257,22 @@ String NumberInputType::convertFromVisibleValue(const String& visibleValue) cons
     return element()->locale().convertFromLocalizedNumber(visibleValue);
 }
 
-bool NumberInputType::isAcceptableValue(const String& proposedValue)
-{
-    String standardValue = convertFromVisibleValue(proposedValue);
-    return standardValue.isEmpty() || isfinite(parseToDoubleForNumberType(standardValue));
-}
-
 String NumberInputType::sanitizeValue(const String& proposedValue) const
 {
     if (proposedValue.isEmpty())
         return proposedValue;
-    return isfinite(parseToDoubleForNumberType(proposedValue)) ? proposedValue : emptyString();
+    return std::isfinite(parseToDoubleForNumberType(proposedValue)) ? proposedValue : emptyString();
 }
 
-bool NumberInputType::hasUnacceptableValue()
+bool NumberInputType::hasBadInput() const
 {
-    return element()->renderer() && !isAcceptableValue(element()->innerTextValue());
+    String standardValue = convertFromVisibleValue(element()->innerTextValue());
+    return !standardValue.isEmpty() && !std::isfinite(parseToDoubleForNumberType(standardValue));
+}
+
+String NumberInputType::badInputText() const
+{
+    return validationMessageBadInputForNumberText();
 }
 
 bool NumberInputType::shouldRespectSpeechAttribute()

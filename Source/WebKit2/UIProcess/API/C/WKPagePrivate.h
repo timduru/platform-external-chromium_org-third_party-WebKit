@@ -93,9 +93,16 @@ WK_EXPORT WKImageRef WKPageCreateSnapshotOfVisibleContent(WKPageRef page);
 WK_EXPORT void WKPageSetShouldSendEventsSynchronously(WKPageRef page, bool sync);
 
 WK_EXPORT void WKPageSetMediaVolume(WKPageRef page, float volume);
+WK_EXPORT void WKPageSetMayStartMediaWhenInWindow(WKPageRef page, bool mayStartMedia);
 
 WK_EXPORT WKArrayRef WKPageCopyRelatedPages(WKPageRef page);
 
+typedef void (*WKPageInvalidMessageFunction)(uint32_t messageID);
+WK_EXPORT void WKPageSetInvalidMessageFunction(WKPageInvalidMessageFunction function);
+
+WK_EXPORT void WKPageSetOverridePrivateBrowsingEnabled(WKPageRef page, bool enabled);
+WK_EXPORT bool WKPageGetOverridePrivateBrowsingEnabled(WKPageRef page);
+    
 #ifdef __cplusplus
 }
 #endif

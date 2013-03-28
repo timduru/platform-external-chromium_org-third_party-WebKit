@@ -89,6 +89,7 @@
 #include <WebCore/PluginView.h>
 #include <WebCore/PrintContext.h>
 #include <WebCore/ResourceHandle.h>
+#include <WebCore/ResourceLoader.h>
 #include <WebCore/ResourceRequest.h>
 #include <WebCore/RenderView.h>
 #include <WebCore/RenderTreeAsText.h>
@@ -99,9 +100,9 @@
 #include <WebCore/ScriptValue.h>
 #include <WebCore/SecurityOrigin.h>
 #include <JavaScriptCore/APICast.h>
+#include <JavaScriptCore/JSCJSValue.h>
 #include <JavaScriptCore/JSLock.h>
 #include <JavaScriptCore/JSObject.h>
-#include <JavaScriptCore/JSValue.h>
 #include <wtf/MathExtras.h>
 
 #if USE(CG)
@@ -556,7 +557,7 @@ HRESULT STDMETHODCALLTYPE WebFrame::loadRequest(
     if (!coreFrame)
         return E_FAIL;
 
-    coreFrame->loader()->load(requestImpl->resourceRequest(), false);
+    coreFrame->loader()->load(FrameLoadRequest(coreFrame, requestImpl->resourceRequest()));
     return S_OK;
 }
 
@@ -580,7 +581,7 @@ void WebFrame::loadData(PassRefPtr<WebCore::SharedBuffer> data, BSTR mimeType, B
 
     // This method is only called from IWebFrame methods, so don't ASSERT that the Frame pointer isn't null.
     if (Frame* coreFrame = core(this))
-        coreFrame->loader()->load(request, substituteData, false);
+        coreFrame->loader()->load(FrameLoadRequest(coreFrame, request, substituteData));
 }
 
 
@@ -1263,7 +1264,7 @@ HRESULT WebFrame::visibleContentRect(RECT* rect)
     if (!view)
         return E_FAIL;
 
-    *rect = view->visibleContentRect(false);
+    *rect = view->visibleContentRect();
     return S_OK;
 }
 
@@ -1790,7 +1791,7 @@ void WebFrame::dispatchUnableToImplementPolicy(const ResourceError& error)
     policyDelegate->unableToImplementPolicyWithError(d->webView, webError.get(), this);
 }
 
-void WebFrame::download(ResourceHandle* handle, const ResourceRequest& request, const ResourceResponse& response)
+void WebFrame::convertMainResourceLoadToDownload(DocumentLoader* documentLoader, const ResourceRequest& request, const ResourceResponse& response)
 {
     COMPtr<IWebDownloadDelegate> downloadDelegate;
     COMPtr<IWebView> webView;
@@ -1806,7 +1807,7 @@ void WebFrame::download(ResourceHandle* handle, const ResourceRequest& request, 
     // Its the delegate's job to ref the WebDownload to keep it alive - otherwise it will be destroyed
     // when this method returns
     COMPtr<WebDownload> download;
-    download.adoptRef(WebDownload::createInstance(handle, request, response, downloadDelegate.get()));
+    download.adoptRef(WebDownload::createInstance(documentLoader->mainResourceLoader()->handle(), request, response, downloadDelegate.get()));
 }
 
 bool WebFrame::dispatchDidLoadResourceFromMemoryCache(DocumentLoader*, const ResourceRequest&, const ResourceResponse&, int /*length*/)
@@ -2470,7 +2471,7 @@ HRESULT STDMETHODCALLTYPE WebFrame::frameBounds(
     if (!view)
         return E_FAIL;
 
-    FloatRect bounds = view->visibleContentRect(true);
+    FloatRect bounds = view->visibleContentRect(ScrollableArea::IncludeScrollbars);
     result->bottom = (LONG) bounds.height();
     result->right = (LONG) bounds.width();
     return S_OK;

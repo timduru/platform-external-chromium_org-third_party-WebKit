@@ -16,6 +16,7 @@ INCLUDEPATH += \
     $$PWD/.. \
     $${ROOT_WEBKIT_DIR}/Source/WebCore/platform/qt \
     $${ROOT_WEBKIT_DIR}/Source/WebKit/qt/WebCoreSupport \
+    $${ROOT_WEBKIT_DIR}/Source/WebKit/qt/WidgetSupport \
     $${ROOT_WEBKIT_DIR}/Source/WTF
 
 QT = core gui network testlib webkitwidgets widgets
@@ -25,17 +26,20 @@ macx: QT += xml
 HEADERS += \
     $$PWD/../WorkQueue.h \
     $$PWD/../DumpRenderTree.h \
+    $$PWD/../GCController.h \
+    $$PWD/../TestRunner.h \
     DumpRenderTreeQt.h \
     EventSenderQt.h \
     TextInputControllerQt.h \
     WorkQueueItemQt.h \
     TestRunnerQt.h \
-    GCControllerQt.h \
     testplugin.h
 
 SOURCES += \
     $$PWD/../WorkQueue.cpp \
     $$PWD/../DumpRenderTreeCommon.cpp \
+    $$PWD/../GCController.cpp \
+    $$PWD/../TestRunner.cpp \
     DumpRenderTreeQt.cpp \
     EventSenderQt.cpp \
     TextInputControllerQt.cpp \
@@ -46,7 +50,7 @@ SOURCES += \
     DumpRenderTreeMain.cpp
 
 wince*: {
-    INCLUDEPATH += $$QT.core.sources/../3rdparty/ce-compat $$WCECOMPAT/include
+    INCLUDEPATH += $$WCECOMPAT/include
     LIBS += $$WCECOMPAT/lib/wcecompat.lib
 }
 

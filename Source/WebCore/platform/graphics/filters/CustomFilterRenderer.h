@@ -53,7 +53,7 @@ class GraphicsContext3D;
 class CustomFilterRenderer : public RefCounted<CustomFilterRenderer> {
 public:
     static PassRefPtr<CustomFilterRenderer> create(PassRefPtr<GraphicsContext3D>, CustomFilterProgramType, const CustomFilterParameterList&,
-        unsigned meshRows, unsigned meshColumns, CustomFilterMeshBoxType, CustomFilterMeshType);
+        unsigned meshRows, unsigned meshColumns, CustomFilterMeshType);
     ~CustomFilterRenderer();
 
     bool premultipliedAlpha() const;
@@ -68,7 +68,7 @@ public:
 
 private:
     CustomFilterRenderer(PassRefPtr<GraphicsContext3D>, CustomFilterProgramType, const CustomFilterParameterList&,
-        unsigned meshRows, unsigned meshColumns, CustomFilterMeshBoxType, CustomFilterMeshType);
+        unsigned meshRows, unsigned meshColumns, CustomFilterMeshType);
 
     void initializeCompiledProgramIfNeeded();
     void initializeMeshIfNeeded();
@@ -84,7 +84,7 @@ private:
 
     RefPtr<GraphicsContext3D> m_context;
     RefPtr<CustomFilterCompiledProgram> m_compiledProgram;
-    CustomFilterProgramType m_programType;    
+    CustomFilterProgramType m_programType;
     RefPtr<CustomFilterMesh> m_mesh;
     IntSize m_contextSize;
 

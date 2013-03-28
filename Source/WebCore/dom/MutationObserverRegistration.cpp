@@ -30,8 +30,6 @@
 
 #include "config.h"
 
-#if ENABLE(MUTATION_OBSERVERS)
-
 #include "MutationObserverRegistration.h"
 
 #include "Document.h"
@@ -124,6 +122,13 @@ bool MutationObserverRegistration::shouldReceiveMutationFrom(Node* node, Mutatio
     return m_attributeFilter.contains(attributeName->localName());
 }
 
-} // namespace WebCore
+void MutationObserverRegistration::addRegistrationNodesToSet(HashSet<Node*>& nodes) const
+{
+    nodes.add(m_registrationNode);
+    if (!m_transientRegistrationNodes)
+        return;
+    for (NodeHashSet::const_iterator iter = m_transientRegistrationNodes->begin(); iter != m_transientRegistrationNodes->end(); ++iter)
+        nodes.add(iter->get());
+}
 
-#endif // ENABLE(MUTATION_OBSERVERS)
+} // namespace WebCore

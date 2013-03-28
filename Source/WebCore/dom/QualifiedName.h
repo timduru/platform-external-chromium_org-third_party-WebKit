@@ -44,6 +44,8 @@ public:
             return adoptRef(new QualifiedNameImpl(prefix, localName, namespaceURI));
         }
 
+        ~QualifiedNameImpl();
+
         unsigned computeHash() const;
 
         mutable unsigned m_existingHash;
@@ -142,8 +144,8 @@ struct QualifiedNameHash {
     static const bool safeToCompareToEmptyOrDeleted = false;
 };
 
-void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength);
-void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength, const AtomicString& nameNamespace);
+void createQualifiedName(void* targetAddress, StringImpl* name);
+void createQualifiedName(void* targetAddress, StringImpl* name, const AtomicString& nameNamespace);
 
 }
 

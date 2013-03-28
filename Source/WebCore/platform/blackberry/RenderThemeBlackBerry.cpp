@@ -25,6 +25,7 @@
 #include "Frame.h"
 #include "HTMLMediaElement.h"
 #include "HostWindow.h"
+#include "InputType.h"
 #include "MediaControlElements.h"
 #include "MediaPlayerPrivateBlackBerry.h"
 #include "Page.h"
@@ -36,6 +37,7 @@
 #include "UserAgentStyleSheets.h"
 
 #include <BlackBerryPlatformLog.h>
+#include <BlackBerryPlatformScreen.h>
 
 namespace WebCore {
 
@@ -44,10 +46,16 @@ const unsigned smallRadius = 1;
 const unsigned largeRadius = 3;
 const unsigned lineWidth = 1;
 const float marginSize = 4;
-const float mediaControlsHeight = 32;
-const float mediaSliderThumbWidth = 40;
-const float mediaSliderThumbHeight = 13;
-const float mediaSliderThumbRadius = 5;
+const float mediaControlsHeight = 44;
+const float mediaBackButtonHeight = 33;
+// Scale exit-fullscreen button size.
+const float mediaFullscreenButtonHeightRatio = 5 / 11.0;
+const float mediaFullscreenButtonWidthRatio = 3 / 11.0;
+const float mediaSliderOutlineWidth = 2;
+const float mediaSliderTrackRadius = 3;
+const float mediaSliderThumbWidth = 25;
+const float mediaSliderThumbHeight = 25;
+const float mediaSliderThumbRadius = 3;
 const float sliderThumbWidth = 15;
 const float sliderThumbHeight = 25;
 
@@ -64,7 +72,7 @@ const float checkboxStrokeThickness = 6.5;
 const float radioButtonCheckStateScaler = 7 / 30.0;
 
 // Multipliers
-const unsigned paddingDivisor = 5;
+const unsigned paddingDivisor = 10;
 const unsigned fullScreenEnlargementFactor = 2;
 const float scaleFactorThreshold = 2.0;
 
@@ -121,11 +129,14 @@ const RGBA32 dragRegularDark = 0xffbababa;
 const RGBA32 dragRollLight = 0xfff2f2f2;
 const RGBA32 dragRollDark = 0xff69a8ff;
 
-const RGBA32 selection = 0xff2b8fff;
-
 const RGBA32 blackPen = Color::black;
 const RGBA32 focusRingPen = 0xffa3c8fe;
-const RGBA32 activeTextColor = 0xfffafafa;
+
+const RGBA32 mediaSliderTrackOutline = 0xff848587;
+const RGBA32 mediaSliderTrackPlayed = 0xff2b8fff;
+const RGBA32 mediaSliderTrackBuffered = 0xffbbbdbf;
+
+const RGBA32 selection = 0xff2b8fff;
 
 float RenderThemeBlackBerry::defaultFontSize = 16;
 
@@ -157,18 +168,19 @@ static float determineFullScreenMultiplier(Element* element)
     float fullScreenMultiplier = 1.0;
 #if ENABLE(FULLSCREEN_API) && ENABLE(VIDEO)
     if (element && element->document()->webkitIsFullScreen() && element->document()->webkitCurrentFullScreenElement() == toParentMediaElement(element)) {
-        if (element->document()->page()->deviceScaleFactor() < scaleFactorThreshold)
-            fullScreenMultiplier = fullScreenEnlargementFactor;
+        if (Page* page = element->document()->page()) {
+            if (page->deviceScaleFactor() < scaleFactorThreshold)
+                fullScreenMultiplier = fullScreenEnlargementFactor;
 
-        // The way the BlackBerry port implements the FULLSCREEN_API for media elements
-        // might result in the controls being oversized, proportionally to the current page
-        // scale. That happens because the fullscreen element gets sized to be as big as the
-        // viewport size, and the viewport size might get outstretched to fit to the screen dimensions.
-        // To fix that, lets strips out the Page scale factor from the media controls multiplier.
-        float scaleFactor = element->document()->view()->hostWindow()->platformPageClient()->currentZoomFactor();
-        static ViewportArguments defaultViewportArguments;
-        float scaleFactorFudge = 1 / element->document()->page()->deviceScaleFactor();
-        fullScreenMultiplier /= scaleFactor * scaleFactorFudge;
+            // The way the BlackBerry port implements the FULLSCREEN_API for media elements
+            // might result in the controls being oversized, proportionally to the current page
+            // scale. That happens because the fullscreen element gets sized to be as big as the
+            // viewport size, and the viewport size might get outstretched to fit to the screen dimensions.
+            // To fix that, lets strips out the Page scale factor from the media controls multiplier.
+            float scaleFactor = element->document()->view()->hostWindow()->platformPageClient()->currentZoomFactor();
+            float scaleFactorFudge = 1 / page->deviceScaleFactor();
+            fullScreenMultiplier /= scaleFactor * scaleFactorFudge;
+        }
     }
 #endif
     return fullScreenMultiplier;
@@ -180,6 +192,44 @@ static void drawControl(GraphicsContext* gc, const FloatRect& rect, Image* img)
         return;
     FloatRect srcRect(0, 0, img->width(), img->height());
     gc->drawImage(img, ColorSpaceDeviceRGB, rect, srcRect);
+}
+
+static void drawThreeSliceHorizontal(GraphicsContext* gc, const IntRect& rect, Image* img, int slice)
+{
+    if (!img)
+        return;
+
+    FloatSize dstSlice(rect.height() / 2, rect.height());
+    FloatRect srcRect(0, 0, slice, img->height());
+    FloatRect dstRect(rect.location(), dstSlice);
+
+    gc->drawImage(img, ColorSpaceDeviceRGB, dstRect, srcRect);
+    srcRect.move(img->width() - srcRect.width(), 0);
+    dstRect.move(rect.width() - dstRect.width(), 0);
+    gc->drawImage(img, ColorSpaceDeviceRGB, dstRect, srcRect);
+
+    srcRect = FloatRect(slice, 0, img->width() - 2 * slice, img->height());
+    dstRect = FloatRect(rect.x() + dstSlice.width(), rect.y(), rect.width() - 2 * dstSlice.width(), dstSlice.height());
+    gc->drawImage(img, ColorSpaceDeviceRGB, dstRect, srcRect);
+}
+
+static void drawThreeSliceVertical(GraphicsContext* gc, const IntRect& rect, Image* img, int slice)
+{
+    if (!img)
+        return;
+
+    FloatSize dstSlice(rect.width(), rect.width() / 2);
+    FloatRect srcRect(0, 0, img->width(), slice);
+    FloatRect dstRect(rect.location(), dstSlice);
+
+    gc->drawImage(img, ColorSpaceDeviceRGB, dstRect, srcRect);
+    srcRect.move(0, img->height() - srcRect.height());
+    dstRect.move(0, rect.height() - dstRect.height());
+    gc->drawImage(img, ColorSpaceDeviceRGB, dstRect, srcRect);
+
+    srcRect = FloatRect(0, slice, img->width(), img->height() - 2 * slice);
+    dstRect = FloatRect(rect.x(), rect.y() + dstSlice.height(), dstSlice.width(), rect.height() - 2 * dstSlice.height());
+    gc->drawImage(img, ColorSpaceDeviceRGB, dstRect, srcRect);
 }
 
 static void drawNineSlice(GraphicsContext* gc, const IntRect& rect, double scale, Image* img, int slice)
@@ -261,12 +311,12 @@ String RenderThemeBlackBerry::extraMediaControlsStyleSheet()
 {
     return String(mediaControlsBlackBerryUserAgentStyleSheet, sizeof(mediaControlsBlackBerryUserAgentStyleSheet));
 }
+#endif
 
-String RenderThemeBlackBerry::formatMediaControlsRemainingTime(float, float duration) const
+#if ENABLE(FULLSCREEN_API)
+String RenderThemeBlackBerry::extraFullScreenStyleSheet()
 {
-    // This is a workaround to make the appearance of media time controller in
-    // in-page mode the same as in fullscreen mode.
-    return formatMediaControlsTime(duration);
+    return String(mediaControlsBlackBerryFullscreenUserAgentStyleSheet, sizeof(mediaControlsBlackBerryFullscreenUserAgentStyleSheet));
 }
 #endif
 
@@ -331,7 +381,10 @@ bool RenderThemeBlackBerry::paintTextFieldOrTextAreaOrSearchField(RenderObject* 
 
     static RefPtr<Image> bg, bgDisabled, bgHighlight;
     if (!bg) {
-        bg = loadImage("core_textinput_bg");
+        if (BlackBerry::Platform::Graphics::Screen::primaryScreen()->displayTechnology() == BlackBerry::Platform::Graphics::OledDisplayTechnology)
+            bg = loadImage("core_textinput_bg_oled");
+        else
+            bg = loadImage("core_textinput_bg");
         bgDisabled = loadImage("core_textinput_bg_disabled");
         bgHighlight = loadImage("core_textinput_bg_highlight");
     }
@@ -392,7 +445,7 @@ IntRect RenderThemeBlackBerry::convertToPaintingRect(RenderObject* inputRenderer
 
 bool RenderThemeBlackBerry::paintSearchFieldCancelButton(RenderObject* cancelButtonObject, const PaintInfo& paintInfo, const IntRect& r)
 {
-    Node* input = cancelButtonObject->node()->shadowAncestorNode();
+    Node* input = cancelButtonObject->node()->deprecatedShadowAncestorNode();
     if (!input->renderer()->isBox())
         return false;
 
@@ -425,7 +478,8 @@ void RenderThemeBlackBerry::adjustMenuListButtonStyle(StyleResolver*, RenderStyl
     const int minHeight = style->fontSize() * 2;
 
     style->resetPadding();
-    style->setHeight(Length(Auto));
+    style->setMinHeight(Length(minHeight, Fixed));
+    style->setLineHeight(RenderStyle::initialLineHeight());
 
     style->setPaddingRight(Length(minHeight + paddingRight, Fixed));
     style->setPaddingLeft(Length(paddingLeft, Fixed));
@@ -580,7 +634,6 @@ bool RenderThemeBlackBerry::paintButton(RenderObject* object, const PaintInfo& i
         drawNineSlice(context, rect, ctm.xScale(), disabled.get(), largeSlice);
     } else if (isPressed(object)) {
         drawNineSlice(context, rect, ctm.xScale(), pressed.get(), largeSlice);
-        object->style()->setTextFillColor(activeTextColor);
     } else
         drawNineSlice(context, rect, ctm.xScale(), inactive.get(), largeSlice);
 
@@ -591,26 +644,6 @@ bool RenderThemeBlackBerry::paintButton(RenderObject* object, const PaintInfo& i
 void RenderThemeBlackBerry::adjustMenuListStyle(StyleResolver* css, RenderStyle* style, Element* element) const
 {
     adjustMenuListButtonStyle(css, style, element);
-}
-
-void RenderThemeBlackBerry::adjustCheckboxStyle(StyleResolver*, RenderStyle* style, Element*) const
-{
-    setCheckboxSize(style);
-    style->setBoxShadow(nullptr);
-    Length margin(marginSize, Fixed);
-    style->setMarginBottom(margin);
-    style->setMarginRight(margin);
-    style->setCursor(CURSOR_WEBKIT_GRAB);
-}
-
-void RenderThemeBlackBerry::adjustRadioStyle(StyleResolver*, RenderStyle* style, Element*) const
-{
-    setRadioSize(style);
-    style->setBoxShadow(nullptr);
-    Length margin(marginSize, Fixed);
-    style->setMarginBottom(margin);
-    style->setMarginRight(margin);
-    style->setCursor(CURSOR_WEBKIT_GRAB);
 }
 
 static IntRect computeMenuListArrowButtonRect(const IntRect& rect)
@@ -647,10 +680,9 @@ bool RenderThemeBlackBerry::paintMenuList(RenderObject* object, const PaintInfo&
         drawNineSlice(context, rect, ctm.xScale(), inactive.get(), largeSlice);
         drawNineSlice(context, rect, ctm.xScale(), disabled.get(), largeSlice);
         drawControl(context, tmpRect, arrowUp.get()); // FIXME: should have a disabled image.
-    } else if (isFocused(object)) {
+    } else if (isPressed(object)) {
         drawNineSlice(context, rect, ctm.xScale(), pressed.get(), largeSlice);
         drawControl(context, tmpRect, arrowUpPressed.get());
-        object->style()->setTextFillColor(activeTextColor);
     } else {
         drawNineSlice(context, rect, ctm.xScale(), inactive.get(), largeSlice);
         drawControl(context, tmpRect, arrowUp.get());
@@ -675,10 +707,10 @@ void RenderThemeBlackBerry::adjustSliderThumbSize(RenderStyle* style, Element* e
             fullScreenMultiplier = determineFullScreenMultiplier(toElement(slider->node()));
     }
 
-    if (part == MediaVolumeSliderThumbPart || part == SliderThumbHorizontalPart || part == SliderThumbVerticalPart) {
+    if (part == SliderThumbHorizontalPart || part == SliderThumbVerticalPart) {
         style->setWidth(Length((part == SliderThumbVerticalPart ? sliderThumbHeight : sliderThumbWidth) * fullScreenMultiplier, Fixed));
         style->setHeight(Length((part == SliderThumbVerticalPart ? sliderThumbWidth : sliderThumbHeight) * fullScreenMultiplier, Fixed));
-    } else if (part == MediaSliderThumbPart) {
+    } else if (part == MediaVolumeSliderThumbPart || part == MediaSliderThumbPart) {
         style->setWidth(Length(mediaSliderThumbWidth * fullScreenMultiplier, Fixed));
         style->setHeight(Length(mediaSliderThumbHeight * fullScreenMultiplier, Fixed));
     }
@@ -704,21 +736,24 @@ bool RenderThemeBlackBerry::paintSliderTrack(RenderObject* object, const PaintIn
 
 bool RenderThemeBlackBerry::paintSliderTrackRect(RenderObject* object, const PaintInfo& info, const IntRect& rect)
 {
-    return paintSliderTrackRect(object, info, rect, rangeSliderRegularTopOutline, rangeSliderRegularBottomOutline,
-                rangeSliderRegularTop, rangeSliderRegularBottom);
+    return paintSliderTrackRect(object, info, rect, rangeSliderRegularTopOutline, rangeSliderRegularBottomOutline, rangeSliderRegularTop, rangeSliderRegularBottom);
 }
 
-bool RenderThemeBlackBerry::paintSliderTrackRect(RenderObject* object, const PaintInfo& info, const IntRect& rect,
-        RGBA32 strokeColorStart, RGBA32 strokeColorEnd, RGBA32 fillColorStart, RGBA32 fillColorEnd)
+bool RenderThemeBlackBerry::paintSliderTrackRect(RenderObject* object, const PaintInfo& info, const IntRect& rect, RGBA32 strokeColorStart, RGBA32 strokeColorEnd, RGBA32 fillColorStart, RGBA32 fillColorEnd)
 {
-    FloatSize smallCorner(smallRadius, smallRadius);
+    FloatSize smallCorner(mediaSliderTrackRadius, mediaSliderTrackRadius);
 
     info.context->save();
     info.context->setStrokeStyle(SolidStroke);
     info.context->setStrokeThickness(lineWidth);
 
-    info.context->setStrokeGradient(createLinearGradient(strokeColorStart, strokeColorEnd, rect.maxXMinYCorner(), rect. maxXMaxYCorner()));
+#if USE(SKIA)
+    info.context->setStrokeGradient(createLinearGradient(strokeColorStart, strokeColorEnd, rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
     info.context->setFillGradient(createLinearGradient(fillColorStart, fillColorEnd, rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
+#else
+    info.context->setStrokeColor(strokeColorStart, ColorSpaceDeviceRGB);
+    info.context->setFillColor(fillColorStart, ColorSpaceDeviceRGB);
+#endif
 
     Path path;
     path.addRoundedRect(rect, smallCorner);
@@ -728,54 +763,74 @@ bool RenderThemeBlackBerry::paintSliderTrackRect(RenderObject* object, const Pai
     return false;
 }
 
+bool RenderThemeBlackBerry::paintSliderTrackRect(RenderObject* object, const PaintInfo& info, const IntRect& rect, Image* inactive)
+{
+    ASSERT(info.context);
+    info.context->save();
+    GraphicsContext* context = info.context;
+
+    static RefPtr<Image> disabled;
+    if (!disabled)
+        disabled = loadImage("core_slider_fill_disabled");
+
+    if (rect.width() > rect.height()) {
+        if (isEnabled(object))
+            drawThreeSliceHorizontal(context, rect, inactive, mediumSlice);
+        else
+            drawThreeSliceHorizontal(context, rect, disabled.get(), (smallSlice - 1));
+    } else {
+        if (isEnabled(object))
+            drawThreeSliceVertical(context, rect, inactive, mediumSlice);
+        else
+            drawThreeSliceVertical(context, rect, disabled.get(), (smallSlice - 1));
+    }
+
+    context->restore();
+    return false;
+}
+
 bool RenderThemeBlackBerry::paintSliderThumb(RenderObject* object, const PaintInfo& info, const IntRect& rect)
 {
-    FloatSize largeCorner(largeRadius, largeRadius);
+    ASSERT(info.context);
     info.context->save();
-    info.context->setStrokeStyle(SolidStroke);
-    info.context->setStrokeThickness(lineWidth);
-    if (isPressed(object) || isHovered(object)) {
-        info.context->setStrokeGradient(createLinearGradient(hoverTopOutline, hoverBottomOutline, rect.maxXMinYCorner(), rect. maxXMaxYCorner()));
-        info.context->setFillGradient(createLinearGradient(hoverTop, hoverBottom, rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
+    GraphicsContext* context = info.context;
+
+    static RefPtr<Image> disabled, inactive, pressed, aura;
+    if (!disabled) {
+        disabled = loadImage("core_slider_handle_disabled");
+        inactive = loadImage("core_slider_handle");
+        pressed = loadImage("core_slider_handle_pressed");
+        aura = loadImage("core_slider_aura");
+    }
+
+    FloatRect tmpRect(rect);
+    float length = std::max(tmpRect.width(), tmpRect.height());
+    if (tmpRect.width() > tmpRect.height()) {
+        tmpRect.setY(tmpRect.y() - (length - tmpRect.height()) / 2);
+        tmpRect.setHeight(length);
     } else {
-        info.context->setStrokeGradient(createLinearGradient(regularTopOutline, regularBottomOutline, rect.maxXMinYCorner(), rect. maxXMaxYCorner()));
-        info.context->setFillGradient(createLinearGradient(regularTop, regularBottom, rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
+        tmpRect.setX(tmpRect.x() - (length - tmpRect.width()) / 2);
+        tmpRect.setWidth(length);
     }
-    Path path;
-    path.addRoundedRect(rect, largeCorner);
-    info.context->fillPath(path);
-    bool isVertical = rect.width() > rect.height();
-    IntPoint startPoint(rect.x() + (isVertical ? 5 : 2), rect.y() + (isVertical ? 2 : 5));
-    IntPoint endPoint(rect.x() + (isVertical ? 20 : 2), rect.y() + (isVertical ? 2 : 20));
-    const int lineOffset = 2;
-    const int shadowOffset = 1;
-    for (int i = 0; i < 3; i++) {
-        if (isVertical) {
-            startPoint.setY(startPoint.y() + lineOffset);
-            endPoint.setY(endPoint.y() + lineOffset);
+
+    float auraHeight = length * auraRatio;
+    float auraWidth = auraHeight;
+    float auraX = tmpRect.x() - (auraWidth - tmpRect.width()) / 2;
+    float auraY = tmpRect.y() - (auraHeight - tmpRect.height()) / 2;
+    FloatRect auraRect(auraX, auraY, auraWidth, auraHeight);
+
+    if (!isEnabled(object))
+        drawControl(context, tmpRect, disabled.get());
+    else {
+        if (isPressed(object) || isHovered(object) || isFocused(object)) {
+            drawControl(context, tmpRect, pressed.get());
+            drawControl(context, auraRect, aura.get());
         } else {
-            startPoint.setX(startPoint.x() + lineOffset);
-            endPoint.setX(endPoint.x() + lineOffset);
+            drawControl(context, tmpRect, inactive.get());
         }
-        if (isPressed(object) || isHovered(object))
-            info.context->setStrokeColor(dragRollLight, ColorSpaceDeviceRGB);
-        else
-            info.context->setStrokeColor(dragRegularLight, ColorSpaceDeviceRGB);
-        info.context->drawLine(startPoint, endPoint);
-        if (isVertical) {
-            startPoint.setY(startPoint.y() + shadowOffset);
-            endPoint.setY(endPoint.y() + shadowOffset);
-        } else {
-            startPoint.setX(startPoint.x() + shadowOffset);
-            endPoint.setX(endPoint.x() + shadowOffset);
-        }
-        if (isPressed(object) || isHovered(object))
-            info.context->setStrokeColor(dragRollDark, ColorSpaceDeviceRGB);
-        else
-            info.context->setStrokeColor(dragRegularDark, ColorSpaceDeviceRGB);
-        info.context->drawLine(startPoint, endPoint);
     }
-    info.context->restore();
+
+    context->restore();
     return false;
 }
 
@@ -789,55 +844,50 @@ void RenderThemeBlackBerry::adjustMediaControlStyle(StyleResolver*, RenderStyle*
     // We use multiples of mediaControlsHeight to make all objects scale evenly
     Length zero(0, Fixed);
     Length controlsHeight(mediaControlsHeight * fullScreenMultiplier, Fixed);
-    Length timeWidth(mediaControlsHeight * 3 / 2 * fullScreenMultiplier, Fixed);
-    Length volumeHeight(mediaControlsHeight * 4 * fullScreenMultiplier, Fixed);
-    Length padding(mediaControlsHeight / 8 * fullScreenMultiplier, Fixed);
-    float fontSize = mediaControlsHeight / 2 * fullScreenMultiplier;
+    Length halfControlsWidth(mediaControlsHeight / 2 * fullScreenMultiplier, Fixed);
+    Length displayHeight(mediaControlsHeight / 3 * fullScreenMultiplier, Fixed);
+    Length padding(mediaControlsHeight / 10 * fullScreenMultiplier, Fixed);
+    float fontSize = mediaControlsHeight / 3 * fullScreenMultiplier;
 
     switch (style->appearance()) {
     case MediaPlayButtonPart:
-    case MediaEnterFullscreenButtonPart:
-    case MediaExitFullscreenButtonPart:
+        style->setWidth(controlsHeight);
+        style->setHeight(controlsHeight);
+        break;
     case MediaMuteButtonPart:
+        style->setPaddingLeft(padding);
+        style->setWidth(controlsHeight);
+        style->setHeight(controlsHeight);
+        break;
+    case MediaRewindButtonPart:
+        // We hi-jack the Rewind Button ID to use it for the divider image
+        style->setWidth(halfControlsWidth);
+        style->setHeight(controlsHeight);
+        break;
+    case MediaEnterFullscreenButtonPart:
+        style->setPaddingRight(padding);
+        style->setWidth(controlsHeight);
+        style->setHeight(controlsHeight);
+        break;
+    case MediaExitFullscreenButtonPart:
+        style->setLeft(zero);
         style->setWidth(controlsHeight);
         style->setHeight(controlsHeight);
         break;
     case MediaCurrentTimePart:
     case MediaTimeRemainingPart:
-        style->setWidth(timeWidth);
-        style->setHeight(controlsHeight);
+        style->setHeight(displayHeight);
         style->setPaddingRight(padding);
+        style->setPaddingLeft(padding);
+        style->setPaddingBottom(padding);
         style->setFontSize(static_cast<int>(fontSize));
         break;
     case MediaVolumeSliderContainerPart:
-        style->setWidth(controlsHeight);
-        style->setHeight(volumeHeight);
+        style->setHeight(controlsHeight);
         style->setBottom(controlsHeight);
         break;
     default:
         break;
-    }
-
-    if (!isfinite(mediaElement->duration())) {
-        // Live streams have infinite duration with no timeline. Force the mute
-        // and fullscreen buttons to the right. This is needed when webkit does
-        // not render the timeline container because it has a webkit-box-flex
-        // of 1 and normally allows those buttons to be on the right.
-        switch (style->appearance()) {
-        case MediaEnterFullscreenButtonPart:
-        case MediaExitFullscreenButtonPart:
-            style->setPosition(AbsolutePosition);
-            style->setBottom(zero);
-            style->setRight(controlsHeight);
-            break;
-        case MediaMuteButtonPart:
-            style->setPosition(AbsolutePosition);
-            style->setBottom(zero);
-            style->setRight(zero);
-            break;
-        default:
-            break;
-        }
     }
 }
 
@@ -846,17 +896,12 @@ void RenderThemeBlackBerry::adjustSliderTrackStyle(StyleResolver*, RenderStyle* 
     float fullScreenMultiplier = determineFullScreenMultiplier(element);
 
     // We use multiples of mediaControlsHeight to make all objects scale evenly
-    Length controlsHeight(mediaControlsHeight * fullScreenMultiplier, Fixed);
-    Length volumeHeight(mediaControlsHeight * 4 * fullScreenMultiplier, Fixed);
+    Length controlsHeight(mediaControlsHeight / 2 * fullScreenMultiplier, Fixed);
     switch (style->appearance()) {
     case MediaSliderPart:
+    case MediaVolumeSliderPart:
         style->setHeight(controlsHeight);
         break;
-    case MediaVolumeSliderPart:
-        style->setWidth(controlsHeight);
-        style->setHeight(volumeHeight);
-        break;
-    case MediaFullScreenVolumeSliderPart:
     default:
         break;
     }
@@ -888,6 +933,29 @@ bool RenderThemeBlackBerry::paintMediaPlayButton(RenderObject* object, const Pai
 #endif
 }
 
+// We hi-jack the Rewind Button code to use it for the divider image
+bool RenderThemeBlackBerry::paintMediaRewindButton(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
+{
+#if ENABLE(VIDEO)
+    HTMLMediaElement* mediaElement = toParentMediaElement(object);
+
+    if (!mediaElement)
+        return false;
+
+    if (!mediaElement->isFullscreen())
+        return false;
+
+    static Image* divider = Image::loadPlatformResource("divider").leakRef();
+
+    return paintMediaButton(paintInfo.context, rect, divider);
+#else
+    UNUSED_PARAM(object);
+    UNUSED_PARAM(paintInfo);
+    UNUSED_PARAM(rect);
+    return false;
+#endif
+}
+
 bool RenderThemeBlackBerry::paintMediaMuteButton(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
 #if ENABLE(VIDEO)
@@ -896,10 +964,9 @@ bool RenderThemeBlackBerry::paintMediaMuteButton(RenderObject* object, const Pai
     if (!mediaElement)
         return false;
 
-    static Image* mediaMute = Image::loadPlatformResource("speaker").leakRef();
-    static Image* mediaUnmute = Image::loadPlatformResource("speaker_mute").leakRef();
+    static Image* divider = Image::loadPlatformResource("speaker").leakRef();
 
-    return paintMediaButton(paintInfo.context, rect, mediaElement->muted() || !mediaElement->volume() ? mediaUnmute : mediaMute);
+    return paintMediaButton(paintInfo.context, rect, divider);
 #else
     UNUSED_PARAM(object);
     UNUSED_PARAM(paintInfo);
@@ -916,14 +983,19 @@ bool RenderThemeBlackBerry::paintMediaFullscreenButton(RenderObject* object, con
         return false;
 
     static Image* mediaEnterFullscreen = Image::loadPlatformResource("fullscreen").leakRef();
-    static Image* mediaExitFullscreen = Image::loadPlatformResource("exit_fullscreen").leakRef();
+    static Image* mediaExitFullscreen = Image::loadPlatformResource("back").leakRef();
 
     Image* buttonImage = mediaEnterFullscreen;
+    IntRect currentRect(rect);
 #if ENABLE(FULLSCREEN_API)
-    if (mediaElement->document()->webkitIsFullScreen() && mediaElement->document()->webkitCurrentFullScreenElement() == mediaElement)
+    if (mediaElement->document()->webkitIsFullScreen() && mediaElement->document()->webkitCurrentFullScreenElement() == mediaElement) {
         buttonImage = mediaExitFullscreen;
+        IntRect fullscreenRect(rect.x() + (1 - mediaFullscreenButtonWidthRatio) * rect.width() / 2, rect.y() + (1 - mediaFullscreenButtonHeightRatio) * rect.height() / 2,
+            rect.width() * mediaFullscreenButtonWidthRatio, rect.height() * mediaFullscreenButtonHeightRatio);
+        currentRect = fullscreenRect;
+    }
 #endif
-    return paintMediaButton(paintInfo.context, rect, buttonImage);
+    return paintMediaButton(paintInfo.context, currentRect, buttonImage);
 #else
     UNUSED_PARAM(object);
     UNUSED_PARAM(paintInfo);
@@ -943,10 +1015,11 @@ bool RenderThemeBlackBerry::paintMediaSliderTrack(RenderObject* object, const Pa
     float loaded = mediaElement->percentLoaded();
     float position = mediaElement->duration() > 0 ? (mediaElement->currentTime() / mediaElement->duration()) : 0;
 
-    int x = ceil(rect.x() + 2 * fullScreenMultiplier - fullScreenMultiplier / 2);
-    int y = ceil(rect.y() + 14 * fullScreenMultiplier + fullScreenMultiplier / 2);
-    int w = ceil(rect.width() - 4 * fullScreenMultiplier + fullScreenMultiplier / 2);
-    int h = ceil(2 * fullScreenMultiplier);
+    int intrinsicHeight = ceil(mediaSliderThumbHeight / 4);
+    int x = ceil(rect.x() + (mediaControlsHeight - intrinsicHeight) / 2 * fullScreenMultiplier - fullScreenMultiplier / 2);
+    int y = ceil(rect.y() + (mediaControlsHeight / 2 - intrinsicHeight) / 2 * fullScreenMultiplier + fullScreenMultiplier / 2);
+    int w = ceil(rect.width() - (mediaControlsHeight - intrinsicHeight) * fullScreenMultiplier + fullScreenMultiplier / 2);
+    int h = ceil(intrinsicHeight * fullScreenMultiplier);
     IntRect rect2(x, y, w, h);
 
     int wPlayed = ceil(w * position);
@@ -954,7 +1027,7 @@ bool RenderThemeBlackBerry::paintMediaSliderTrack(RenderObject* object, const Pa
 
     IntRect played(x, y, wPlayed, h);
     IntRect buffered(x, y, wLoaded, h);
-
+#if USE(SKIA)
     // This is to paint main slider bar.
     bool result = paintSliderTrackRect(object, paintInfo, rect2);
 
@@ -965,8 +1038,22 @@ bool RenderThemeBlackBerry::paintMediaSliderTrack(RenderObject* object, const Pa
         // This is to paint played part of bar (left of slider thumb) using selection color.
         paintSliderTrackRect(object, paintInfo, played, selection, selection, selection, selection);
     }
-    return result;
+#else // GL renderer
+    static Image* mediaBackground = Image::loadPlatformResource("core_slider_video_bg").leakRef();
+    static Image* mediaPlayer = Image::loadPlatformResource("core_slider_played_bg").leakRef();
+    static Image* mediaCache = Image::loadPlatformResource("core_slider_cache").leakRef();
 
+    bool result = paintSliderTrackRect(object, paintInfo, rect2, mediaBackground);
+
+    if (loaded > 0 || position > 0) {
+        // This is to paint buffered bar.
+        paintSliderTrackRect(object, paintInfo, buffered, mediaCache);
+
+        // This is to paint played part of bar (left of slider thumb) using selection color.
+        paintSliderTrackRect(object, paintInfo, played, mediaPlayer);
+    }
+#endif // USE(SKIA)
+    return result;
 #else
     UNUSED_PARAM(object);
     UNUSED_PARAM(paintInfo);
@@ -978,6 +1065,7 @@ bool RenderThemeBlackBerry::paintMediaSliderTrack(RenderObject* object, const Pa
 bool RenderThemeBlackBerry::paintMediaSliderThumb(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
 #if ENABLE(VIDEO)
+#if USE(SKIA)
     RenderSlider* slider = determineRenderSlider(object);
     if (!slider)
         return false;
@@ -991,17 +1079,26 @@ bool RenderThemeBlackBerry::paintMediaSliderThumb(RenderObject* object, const Pa
     paintInfo.context->setStrokeThickness(0.5);
     paintInfo.context->setStrokeColor(Color::black, ColorSpaceDeviceRGB);
 
-    if (isPressed(object) || isHovered(object) || slider->inDragMode()) {
-        paintInfo.context->setFillGradient(createLinearGradient(selection, Color(selection).dark().rgb(),
-                rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
-    } else {
-        paintInfo.context->setFillGradient(createLinearGradient(Color::white, Color(Color::white).dark().rgb(),
-                rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
-    }
+    if (isPressed(object) || isHovered(object) || slider->inDragMode())
+        paintInfo.context->setFillGradient(createLinearGradient(selection, Color(selection).dark().rgb(), rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
+    else
+        paintInfo.context->setFillGradient(createLinearGradient(Color::white, Color(Color::white).dark().rgb(), rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
+
     paintInfo.context->fillPath(mediaThumbRoundedRectangle);
     paintInfo.context->restore();
 
     return true;
+#else // GL renderer
+    static Image* disabledMediaSliderThumb = Image::loadPlatformResource("core_slider_handle_disabled").leakRef();
+    static Image* pressedMediaSliderThumb = Image::loadPlatformResource("core_slider_handle_pressed").leakRef();
+    static Image* mediaSliderThumb = Image::loadPlatformResource("core_media_handle").leakRef();
+
+    if (!isEnabled(object))
+        return paintMediaButton(paintInfo.context, rect, disabledMediaSliderThumb);
+    if (isPressed(object) || isHovered(object) || isFocused(object))
+        return paintMediaButton(paintInfo.context, rect, pressedMediaSliderThumb);
+    return paintMediaButton(paintInfo.context, rect, mediaSliderThumb);
+#endif // USE(SKIA)
 #else
     UNUSED_PARAM(object);
     UNUSED_PARAM(paintInfo);
@@ -1013,15 +1110,42 @@ bool RenderThemeBlackBerry::paintMediaSliderThumb(RenderObject* object, const Pa
 bool RenderThemeBlackBerry::paintMediaVolumeSliderTrack(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
 #if ENABLE(VIDEO)
-    float pad = rect.width() * 0.45;
-    float x = rect.x() + pad;
-    float y = rect.y() + pad;
-    float width = rect.width() * 0.1;
-    float height = rect.height() - (2.0 * pad);
+    HTMLMediaElement* mediaElement = toParentMediaElement(object);
+    if (!mediaElement)
+        return false;
 
-    IntRect rect2(x, y, width, height);
+    float fullScreenMultiplier = determineFullScreenMultiplier(mediaElement);
+    float volume = mediaElement->volume() > 0 ? mediaElement->volume() : 0;
 
-    return paintSliderTrackRect(object, paintInfo, rect2);
+    int intrinsicHeight = ceil(mediaSliderThumbHeight / 4);
+    int x = ceil(rect.x() + (mediaControlsHeight - intrinsicHeight) / 2 * fullScreenMultiplier - fullScreenMultiplier / 2);
+    int y = ceil(rect.y() + (mediaControlsHeight / 2 - intrinsicHeight) / 2 * fullScreenMultiplier + fullScreenMultiplier / 2);
+    int w = ceil(rect.width() - (mediaControlsHeight - intrinsicHeight) * fullScreenMultiplier + fullScreenMultiplier / 2);
+    int h = ceil(intrinsicHeight * fullScreenMultiplier);
+    IntRect rect2(x, y, w, h);
+    IntRect volumeRect(x, y, ceil(w * volume), h);
+
+#if USE(SKIA)
+    // This is to paint main volume slider bar.
+    bool result = paintSliderTrackRect(object, paintInfo, rect2, Color(mediaSliderTrackOutline).rgb(), Color(mediaSliderTrackOutline).rgb(), rangeSliderRegularTop, rangeSliderRegularTop);
+
+    if (volume > 0) {
+        // This is to paint volume bar (left of volume slider thumb) using selection color.
+        result |= paintSliderTrackRect(object, paintInfo, volumeRect, Color(mediaSliderTrackOutline).rgb(), Color(mediaSliderTrackOutline).rgb(), selection, selection);
+    }
+#else // GL renderer
+    static Image* volumeBackground = Image::loadPlatformResource("core_slider_video_bg").leakRef();
+    static Image* volumeBar = Image::loadPlatformResource("core_slider_played_bg").leakRef();
+
+    // This is to paint main volume slider bar.
+    bool result = paintSliderTrackRect(object, paintInfo, rect2, volumeBackground);
+
+    if (volume > 0) {
+        // This is to paint volume bar (left of volume slider thumb) using selection color.
+        result |= paintSliderTrackRect(object, paintInfo, volumeRect, volumeBar);
+    }
+#endif // USE(SKIA)
+    return result;
 #else
     UNUSED_PARAM(object);
     UNUSED_PARAM(paintInfo);
@@ -1033,9 +1157,29 @@ bool RenderThemeBlackBerry::paintMediaVolumeSliderTrack(RenderObject* object, co
 bool RenderThemeBlackBerry::paintMediaVolumeSliderThumb(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
 #if ENABLE(VIDEO)
-    static Image* mediaVolumeThumb = Image::loadPlatformResource("volume_thumb").leakRef();
+#if USE(SKIA)
+    RenderSlider* slider = determineRenderSlider(object);
+    if (!slider)
+        return false;
 
-    return paintMediaButton(paintInfo.context, rect, mediaVolumeThumb);
+    float fullScreenMultiplier = determineFullScreenMultiplier(toElement(slider->node()));
+
+    paintInfo.context->save();
+    Path mediaThumbRoundedRectangle;
+    mediaThumbRoundedRectangle.addRoundedRect(rect, FloatSize(mediaSliderThumbHeight / 2 * fullScreenMultiplier, mediaSliderThumbHeight / 2 * fullScreenMultiplier));
+
+    if (isPressed(object) || isHovered(object) || slider->inDragMode())
+        paintInfo.context->setFillGradient(createLinearGradient(selection, Color(selection).dark().rgb(), rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
+    else
+        paintInfo.context->setFillGradient(createLinearGradient(mediaSliderTrackOutline, Color::black, rect.maxXMinYCorner(), rect.maxXMaxYCorner()));
+
+    paintInfo.context->fillPath(mediaThumbRoundedRectangle);
+    paintInfo.context->restore();
+
+    return true;
+#else // GL renderer
+    return paintMediaSliderThumb(object, paintInfo, rect);
+#endif // USE(SKIA)
 #else
     UNUSED_PARAM(object);
     UNUSED_PARAM(paintInfo);
@@ -1125,6 +1269,12 @@ Color RenderThemeBlackBerry::platformActiveTextSearchHighlightColor() const
 Color RenderThemeBlackBerry::platformInactiveTextSearchHighlightColor() const
 {
     return Color(255, 255, 0); // Yellow.
+}
+
+bool RenderThemeBlackBerry::supportsDataListUI(const AtomicString& type) const
+{
+    // TODO: support other input types in the future.
+    return type == InputTypeNames::text();
 }
 
 } // namespace WebCore

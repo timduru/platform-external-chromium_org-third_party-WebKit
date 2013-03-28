@@ -123,9 +123,9 @@ void CSSImageGeneratorValue::putImage(const IntSize& size, PassRefPtr<Image> ima
 void CSSImageGeneratorValue::reportBaseClassMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_sizes);
-    info.addMember(m_clients);
-    info.addMember(m_images); // FIXME: instrument Image
+    info.addMember(m_sizes, "sizes");
+    info.addMember(m_clients, "clients");
+    info.addMember(m_images, "images");
 }
 
 PassRefPtr<Image> CSSImageGeneratorValue::image(RenderObject* renderer, const IntSize& size)
@@ -190,6 +190,23 @@ bool CSSImageGeneratorValue::isPending() const
         return static_cast<const CSSLinearGradientValue*>(this)->isPending();
     case RadialGradientClass:
         return static_cast<const CSSRadialGradientValue*>(this)->isPending();
+    default:
+        ASSERT_NOT_REACHED();
+    }
+    return false;
+}
+
+bool CSSImageGeneratorValue::knownToBeOpaque(const RenderObject* renderer) const
+{
+    switch (classType()) {
+    case CrossfadeClass:
+        return static_cast<const CSSCrossfadeValue*>(this)->knownToBeOpaque(renderer);
+    case CanvasClass:
+        return false;
+    case LinearGradientClass:
+        return static_cast<const CSSLinearGradientValue*>(this)->knownToBeOpaque(renderer);
+    case RadialGradientClass:
+        return static_cast<const CSSRadialGradientValue*>(this)->knownToBeOpaque(renderer);
     default:
         ASSERT_NOT_REACHED();
     }

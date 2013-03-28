@@ -60,6 +60,7 @@ namespace WebCore {
 
         static void clearLocalStorageForAllOrigins();
         static void clearLocalStorageForOrigin(SecurityOrigin*);
+        static void closeIdleLocalStorageDatabases();
         // DumpRenderTree helper that triggers a StorageArea sync.
         static void syncLocalStorage();
 
@@ -108,22 +109,16 @@ namespace WebCore {
         GroupSettings* groupSettings() const { return m_groupSettings.get(); }
 
 #if ENABLE(VIDEO_TRACK)
-        bool userPrefersCaptions();
-        bool userHasCaptionPreferences();
-        float captionFontSizeScale();
-        void registerForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener*);
-        void unregisterForCaptionPreferencesChangedCallbacks(CaptionPreferencesChangedListener*);
+        void captionPreferencesChanged();
+        CaptionUserPreferences* captionPreferences();
 #endif
 
     private:
         PageGroup(Page*);
 
         void addVisitedLink(LinkHash stringHash);
-        void resetUserStyleCacheInAllFrames();
-  
-#if ENABLE(VIDEO_TRACK)
-        CaptionUserPreferences* captionPreferences();
-#endif
+        void invalidatedInjectedStyleSheetCacheInAllFrames();
+
         String m_name;
 
         HashSet<Page*> m_pages;

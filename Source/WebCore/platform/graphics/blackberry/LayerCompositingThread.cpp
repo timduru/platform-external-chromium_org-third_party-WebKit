@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2010, 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2010, 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  * Copyright (C) 2010 Google Inc. All rights reserved.
  * Copyright (C) 2007, 2008, 2009 Apple Inc. All rights reserved.
  *
@@ -39,6 +39,7 @@
 #include "LayerCompositingThreadClient.h"
 #include "LayerMessage.h"
 #include "LayerRenderer.h"
+#include "LayerRendererClient.h"
 #include "LayerWebKitThread.h"
 #if ENABLE(VIDEO)
 #include "MediaPlayer.h"
@@ -47,11 +48,14 @@
 #include "PluginView.h"
 #include "TextureCacheCompositingThread.h"
 
+#include <BlackBerryPlatformGLES2ContextState.h>
 #include <BlackBerryPlatformGraphics.h>
 #include <BlackBerryPlatformLog.h>
 #include <wtf/Assertions.h>
 
 #define DEBUG_VIDEO_CLIPPING 0
+
+using BlackBerry::Platform::Graphics::GLES2Program;
 
 namespace WebCore {
 
@@ -207,7 +211,7 @@ FloatQuad LayerCompositingThread::getTransformedHolePunchRect() const
     return getTransformedRect(m_bounds, drawRect, m_drawTransform);
 }
 
-void LayerCompositingThread::drawTextures(double scale, int positionLocation, int texCoordLocation, const FloatRect& visibleRect)
+void LayerCompositingThread::drawTextures(double scale, const GLES2Program& program, const FloatRect& visibleRect)
 {
     static float texcoords[4 * 2] = { 0, 0,  0, 1,  1, 1,  1, 0 };
 
@@ -226,8 +230,11 @@ void LayerCompositingThread::drawTextures(double scale, int positionLocation, in
 
             m_layerRenderer->addLayerToReleaseTextureResourcesList(this);
 
-            glVertexAttribPointer(positionLocation, 2, GL_FLOAT, GL_FALSE, 0, &m_transformedBounds);
-            glVertexAttribPointer(texCoordLocation, 2, GL_FLOAT, GL_FALSE, 0, texcoords);
+            glEnable(GL_BLEND);
+            glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+            glUniform1f(program.opacityLocation(), drawOpacity());
+            glVertexAttribPointer(program.positionLocation(), 2, GL_FLOAT, GL_FALSE, 0, &m_transformedBounds);
+            glVertexAttribPointer(program.texCoordLocation(), 2, GL_FLOAT, GL_FALSE, 0, texcoords);
             glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
         }
         return;
@@ -235,60 +242,82 @@ void LayerCompositingThread::drawTextures(double scale, int positionLocation, in
 #if ENABLE(VIDEO)
     if (m_mediaPlayer) {
         if (m_isVisible) {
-            // We need to specify the media player location in contents coordinates. The 'visibleRect'
-            // specifies the content region covered by our viewport. So we transform from our
-            // normalized device coordinates [-1, 1] to the 'visibleRect'.
-            float vrw2 = visibleRect.width() / 2.0;
-            float vrh2 = visibleRect.height() / 2.0;
-            float x = m_transformedBounds.p1().x() * vrw2 + vrw2 + visibleRect.x();
-            float y = -m_transformedBounds.p1().y() * vrh2 + vrh2 + visibleRect.y();
-            m_mediaPlayer->paint(0, IntRect((int)(x + 0.5), (int)(y + 0.5), m_bounds.width(), m_bounds.height()));
+            IntRect paintRect;
+            if (m_layerRenderer->client()->shouldChildWindowsUseDocumentCoordinates()) {
+                // We need to specify the media player location in contents coordinates. The 'visibleRect'
+                // specifies the content region covered by our viewport. So we transform from our
+                // normalized device coordinates [-1, 1] to the 'visibleRect'.
+                float vrw2 = visibleRect.width() / 2.0;
+                float vrh2 = visibleRect.height() / 2.0;
+                FloatPoint p(m_transformedBounds.p1().x() * vrw2 + vrw2 + visibleRect.x(),
+                    -m_transformedBounds.p1().y() * vrh2 + vrh2 + visibleRect.y());
+                paintRect = IntRect(roundedIntPoint(p), m_bounds);
+            } else {
+                FloatRect r = m_layerRenderer->toWebKitWindowCoordinates(m_drawRect);
+                paintRect = enclosingIntRect(r);
+            }
+            m_mediaPlayer->paint(0, paintRect);
             MediaPlayerPrivate* mpp = static_cast<MediaPlayerPrivate*>(m_mediaPlayer->platformMedia().media.qnxMediaPlayer);
-            mpp->drawBufferingAnimation(m_drawTransform, positionLocation, texCoordLocation);
+            mpp->drawBufferingAnimation(m_drawTransform, program);
         }
         return;
     }
 #endif
 
     if (m_client)
-        m_client->drawTextures(this, scale, positionLocation, texCoordLocation);
+        m_client->drawTextures(this, scale, program);
 }
 
-void LayerCompositingThread::drawSurface(const TransformationMatrix& drawTransform, LayerCompositingThread* mask, int positionLocation, int texCoordLocation)
+void LayerCompositingThread::drawSurface(const TransformationMatrix& drawTransform, LayerCompositingThread* mask, const GLES2Program& program)
 {
+    using namespace BlackBerry::Platform::Graphics;
+
     if (m_layerRenderer->layerAlreadyOnSurface(this)) {
-        unsigned texID = layerRendererSurface()->texture()->textureId();
-        if (!texID) {
+        Texture* surfaceTexture = layerRendererSurface()->texture();
+        if (!surfaceTexture) {
             ASSERT_NOT_REACHED();
             return;
         }
         textureCacheCompositingThread()->textureAccessed(layerRendererSurface()->texture());
-        glBindTexture(GL_TEXTURE_2D, texID);
+        GLuint surfaceTexID = reinterpret_cast<GLuint>(platformBufferHandle(surfaceTexture->textureId()));
 
-        if (mask) {
-            glActiveTexture(GL_TEXTURE1);
-            mask->bindContentsTexture();
-            glActiveTexture(GL_TEXTURE0);
+        if (!surfaceTexID) {
+            ASSERT_NOT_REACHED();
+            return;
         }
 
+        if (mask) {
+            Texture* maskTexture = mask->contentsTexture();
+            if (maskTexture) {
+                GLuint maskTexID = reinterpret_cast<GLuint>(platformBufferHandle(maskTexture->textureId()));
+
+                // Force creation if it's 0
+                if (!maskTexID) {
+                    // This call will cause display list to render to backing, which can mutate a lot of GL state.
+                    GLES2ContextState::ProgramStateSaver programSaver;
+                    GLES2ContextState::TextureAndFBOStateSaver textureSaver;
+                    lockAndBindBufferGLTexture(maskTexture->textureId(), GL_TEXTURE_2D);
+                    maskTexID = reinterpret_cast<GLuint>(platformBufferHandle(maskTexture->textureId()));
+                }
+
+                glActiveTexture(GL_TEXTURE1);
+                glBindTexture(GL_TEXTURE_2D, maskTexID);
+                glActiveTexture(GL_TEXTURE0);
+            }
+        }
+
+        glEnable(GL_BLEND);
+        glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+        glBindTexture(GL_TEXTURE_2D, surfaceTexID);
+
         FloatQuad surfaceQuad = getTransformedRect(m_bounds, IntRect(IntPoint::zero(), m_bounds), drawTransform);
-        glVertexAttribPointer(positionLocation, 2, GL_FLOAT, GL_FALSE, 0, &surfaceQuad);
+        glUniform1f(program.opacityLocation(), layerRendererSurface()->drawOpacity());
+        glVertexAttribPointer(program.positionLocation(), 2, GL_FLOAT, GL_FALSE, 0, &surfaceQuad);
 
         static float texcoords[4 * 2] = { 0, 0,  0, 1,  1, 1,  1, 0 };
-        glVertexAttribPointer(texCoordLocation, 2, GL_FLOAT, GL_FALSE, 0, texcoords);
+        glVertexAttribPointer(program.texCoordLocation(), 2, GL_FLOAT, GL_FALSE, 0, texcoords);
         glDrawArrays(GL_TRIANGLE_FAN, 0, 4);
     }
-}
-
-bool LayerCompositingThread::hasMissingTextures() const
-{
-    return m_client ? m_client->hasMissingTextures(this) : false;
-}
-
-void LayerCompositingThread::drawMissingTextures(double scale, int positionLocation, int texCoordLocation, const FloatRect& /*visibleRect*/)
-{
-    if (m_client)
-        m_client->drawMissingTextures(this, scale, positionLocation, texCoordLocation);
 }
 
 void LayerCompositingThread::releaseTextureResources()
@@ -397,10 +426,12 @@ void LayerCompositingThread::updateTextureContentsIfNeeded()
         m_client->uploadTexturesIfNeeded(this);
 }
 
-void LayerCompositingThread::bindContentsTexture()
+Texture* LayerCompositingThread::contentsTexture()
 {
     if (m_client)
-        m_client->bindContentsTexture(this);
+        return m_client->contentsTexture(this);
+
+    return 0;
 }
 
 void LayerCompositingThread::setVisible(bool visible)
@@ -438,6 +469,12 @@ void LayerCompositingThread::scheduleCommit()
     m_commitScheduled = false;
 
     m_client->scheduleCommit();
+}
+
+void LayerCompositingThread::commitPendingTextureUploads()
+{
+    if (m_client)
+        m_client->commitPendingTextureUploads(this);
 }
 
 bool LayerCompositingThread::updateAnimations(double currentTime)

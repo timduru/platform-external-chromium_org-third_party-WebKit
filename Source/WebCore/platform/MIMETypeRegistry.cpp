@@ -245,21 +245,29 @@ static void initializeSupportedImageMIMETypes()
     }
 
 #if PLATFORM(QT)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+    QList<QByteArray> mimeTypes = QImageReader::supportedMimeTypes();
+    Q_FOREACH(const QByteArray& mimeType, mimeTypes) {
+        supportedImageMIMETypes->add(mimeType.constData());
+        supportedImageResourceMIMETypes->add(mimeType.constData());
+    }
+#else
     QList<QByteArray> formats = QImageReader::supportedImageFormats();
-    for (size_t i = 0; i < static_cast<size_t>(formats.size()); ++i) {
-#if ENABLE(SVG)
-        // Qt has support for SVG, but we want to use KSVG2
-        if (formats.at(i).toLower().startsWith("svg"))
-            continue;
-#endif // ENABLE(SVG)
+    for (int i = 0; i < formats.size(); ++i) {
         String mimeType = MIMETypeRegistry::getMIMETypeForExtension(formats.at(i).constData());
         if (!mimeType.isEmpty()) {
             supportedImageMIMETypes->add(mimeType);
             supportedImageResourceMIMETypes->add(mimeType);
         }
-     }
-#endif // PLATFORM(QT)
+    }
+#endif // QT_VERSION
+#if ENABLE(SVG)
+    // Do not treat SVG as images directly if WebKit can handle them.
+    supportedImageMIMETypes->remove("image/svg+xml");
+    supportedImageResourceMIMETypes->remove("image/svg+xml");
 #endif
+#endif // PLATFORM(QT)
+#endif // USE(CG)
 }
 
 static void initializeSupportedImageMIMETypesForEncoding()
@@ -284,12 +292,19 @@ static void initializeSupportedImageMIMETypesForEncoding()
     supportedImageMIMETypesForEncoding->add("image/gif");
 #endif
 #elif PLATFORM(QT)
+#if QT_VERSION >= QT_VERSION_CHECK(5, 1, 0)
+    QList<QByteArray> mimeTypes = QImageWriter::supportedMimeTypes();
+    Q_FOREACH(const QByteArray& mimeType, mimeTypes) {
+        supportedImageMIMETypesForEncoding->add(mimeType.constData());
+    }
+#else
     QList<QByteArray> formats = QImageWriter::supportedImageFormats();
     for (int i = 0; i < formats.size(); ++i) {
         String mimeType = MIMETypeRegistry::getMIMETypeForExtension(formats.at(i).constData());
         if (!mimeType.isEmpty())
             supportedImageMIMETypesForEncoding->add(mimeType);
     }
+#endif // QT_VERSION
 #elif PLATFORM(GTK)
     supportedImageMIMETypesForEncoding->add("image/png");
     supportedImageMIMETypesForEncoding->add("image/jpeg");
@@ -491,6 +506,7 @@ String MIMETypeRegistry::getWellKnownMIMETypeForExtension(const String& extensio
     return findMimeType(commonMediaTypes, sizeof(commonMediaTypes) / sizeof(commonMediaTypes[0]), extension);
 }
 
+#if !PLATFORM(QT)
 String MIMETypeRegistry::getMIMETypeForPath(const String& path)
 {
     size_t pos = path.reverseFind('.');
@@ -500,8 +516,9 @@ String MIMETypeRegistry::getMIMETypeForPath(const String& path)
         if (result.length())
             return result;
     }
-    return "application/octet-stream";
+    return defaultMIMEType();
 }
+#endif
 
 bool MIMETypeRegistry::isSupportedImageMIMEType(const String& mimeType)
 {
@@ -638,6 +655,13 @@ const String& defaultMIMEType()
     return defaultMIMEType;
 }
 
+#if !PLATFORM(QT) && !PLATFORM(BLACKBERRY)
+String MIMETypeRegistry::getNormalizedMIMEType(const String& mimeType)
+{
+    return mimeType;
+}
+#endif
+
 #if PLATFORM(BLACKBERRY)
 typedef HashMap<String, String> MIMETypeAssociationMap;
 
@@ -693,21 +717,20 @@ static const MIMETypeAssociationMap& mimeTypeAssociationMap()
     mimeTypeMap->add(ASCIILiteral("application/java"), ASCIILiteral("application/java-archive"));
     mimeTypeMap->add(ASCIILiteral("application/x-java-archive"), ASCIILiteral("application/java-archive"));
     mimeTypeMap->add(ASCIILiteral("application/x-zip-compressed"), ASCIILiteral("application/zip"));
+    mimeTypeMap->add(ASCIILiteral("text/cache-manifest"), ASCIILiteral("text/plain"));
 
     return *mimeTypeMap;
 }
-#endif
 
 String MIMETypeRegistry::getNormalizedMIMEType(const String& mimeType)
 {
-#if PLATFORM(BLACKBERRY)
     MIMETypeAssociationMap::const_iterator it = mimeTypeAssociationMap().find(mimeType);
 
     if (it != mimeTypeAssociationMap().end())
         return it->value;
-#endif
+
     return mimeType;
 }
-
+#endif
 
 } // namespace WebCore

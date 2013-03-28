@@ -269,25 +269,6 @@
         category, name, TRACE_EVENT_FLAG_COPY, arg1_name, arg1_val, \
         arg2_name, arg2_val)
 
-// Time threshold event:
-// Only record the event if the duration is greater than the specified
-// threshold_us (time in microseconds).
-// Records a pair of begin and end events called "name" for the current
-// scope, with 0, 1 or 2 associated arguments. If the category is not
-// enabled, then this does nothing.
-// - category and name strings must have application lifetime (statics or
-//   literals). They may not include " chars.
-#define TRACE_EVENT_IF_LONGER_THAN0(threshold_us, category, name) \
-    INTERNAL_TRACE_EVENT_ADD_SCOPED_IF_LONGER_THAN(threshold_us, category, name)
-#define TRACE_EVENT_IF_LONGER_THAN1( \
-    threshold_us, category, name, arg1_name, arg1_val) \
-    INTERNAL_TRACE_EVENT_ADD_SCOPED_IF_LONGER_THAN( \
-        threshold_us, category, name, arg1_name, arg1_val)
-#define TRACE_EVENT_IF_LONGER_THAN2( \
-    threshold_us, category, name, arg1_name, arg1_val, arg2_name, arg2_val) \
-    INTERNAL_TRACE_EVENT_ADD_SCOPED_IF_LONGER_THAN( \
-        threshold_us, category, name, arg1_name, arg1_val, arg2_name, arg2_val)
-
 // Records the value of a counter called "name" immediately. Value
 // must be representable as a 32 bit integer.
 // - category and name strings must have application lifetime (statics or
@@ -446,6 +427,16 @@
         category, name, id, TRACE_EVENT_FLAG_COPY, \
         arg1_name, arg1_val, arg2_name, arg2_val)
 
+// Updates a global state with 'name'. The sampling thread will read
+// the value periodically. STATE0 is for the main thread.
+// STATE1 and STATE2 will be preserved for other threads.
+#define TRACE_EVENT_SAMPLING_STATE0(name) \
+    INTERNAL_TRACE_EVENT_SAMPLING_STATE(name, 0)
+#define TRACE_EVENT_SAMPLING_STATE1(name) \
+    INTERNAL_TRACE_EVENT_SAMPLING_STATE(name, 1)
+#define TRACE_EVENT_SAMPLING_STATE2(name) \
+    INTERNAL_TRACE_EVENT_SAMPLING_STATE(name, 2)
+
 ////////////////////////////////////////////////////////////////////////////////
 // Implementation specific tracing API definitions.
 
@@ -462,9 +453,8 @@
 #define TRACE_EVENT_API_GET_CATEGORY_ENABLED \
     WebCore::EventTracer::getTraceCategoryEnabledFlag
 
-// Add a trace event to the platform tracing system. Returns thresholdBeginId
-// for use in a corresponding end TRACE_EVENT_API_ADD_TRACE_EVENT call.
-// int TRACE_EVENT_API_ADD_TRACE_EVENT(
+// Add a trace event to the platform tracing system. 
+// void TRACE_EVENT_API_ADD_TRACE_EVENT(
 //                    char phase,
 //                    const unsigned char* category_enabled,
 //                    const char* name,
@@ -473,8 +463,6 @@
 //                    const char** arg_names,
 //                    const unsigned char* arg_types,
 //                    const unsigned long long* arg_values,
-//                    int thresholdBeginID,
-//                    long long threshold,
 //                    unsigned char flags)
 #define TRACE_EVENT_API_ADD_TRACE_EVENT \
     WebCore::EventTracer::addTraceEvent
@@ -538,30 +526,6 @@
     }
 #endif
 
-// Implementation detail: internal macro to create static category and add begin
-// event if the category is enabled. Also adds the end event when the scope
-// ends. If the elapsed time is < threshold time, the begin/end pair is erased.
-#if COMPILER(MSVC7_OR_LOWER)
-#define INTERNAL_TRACE_EVENT_ADD_SCOPED_IF_LONGER_THAN(ignore) ((void)0)
-#else
-#define INTERNAL_TRACE_EVENT_ADD_SCOPED_IF_LONGER_THAN(threshold, \
-        category, name, ...) \
-    INTERNAL_TRACE_EVENT_GET_CATEGORY_INFO(category); \
-    WebCore::TraceEvent::TraceEndOnScopeCloseThreshold \
-        INTERNALTRACEEVENTUID(profileScope); \
-    if (*INTERNALTRACEEVENTUID(catstatic)) { \
-      int INTERNALTRACEEVENTUID(begin_event_id) = \
-        WebCore::TraceEvent::addTraceEvent( \
-            TRACE_EVENT_PHASE_BEGIN, \
-            INTERNALTRACEEVENTUID(catstatic), \
-            name, WebCore::TraceEvent::noEventId, \
-            TRACE_EVENT_FLAG_NONE, ##__VA_ARGS__); \
-      INTERNALTRACEEVENTUID(profileScope).initialize( \
-          INTERNALTRACEEVENTUID(catstatic), name, \
-          INTERNALTRACEEVENTUID(begin_event_id), threshold); \
-    }
-#endif
-
 // Implementation detail: internal macro to create static category and add
 // event if the category is enabled.
 #if COMPILER(MSVC7_OR_LOWER)
@@ -583,6 +547,19 @@
     } while (0)
 #endif
 
+// Implementation detail: internal macro to update a global state for
+// the sampling profiler.
+// FIXME: The current implementation uses only one global variable,
+// and thus cannot trace states of multiple threads.
+#if COMPILER(MSVC7_OR_LOWER)
+#define INTERNAL_TRACE_EVENT_SAMPLING_STATE(ignore) ((void)0)
+#else
+#define INTERNAL_TRACE_EVENT_SAMPLING_STATE(name, threadBucket) \
+    do { \
+        *WebCore::traceSamplingState##threadBucket = reinterpret_cast<TraceEventAPIAtomicWord>("WebKit\0" name); \
+    } while (0);
+#endif
+
 // Notes regarding the following definitions:
 // New values can be added and propagated to third party libraries, but existing
 // definitions must never be changed, because third party libraries may use old
@@ -597,6 +574,7 @@
 #define TRACE_EVENT_PHASE_ASYNC_END   ('F')
 #define TRACE_EVENT_PHASE_METADATA ('M')
 #define TRACE_EVENT_PHASE_COUNTER  ('C')
+#define TRACE_EVENT_PHASE_SAMPLE  ('P')
 
 // Flags for changing the behavior of TRACE_EVENT_API_ADD_TRACE_EVENT.
 #define TRACE_EVENT_FLAG_NONE        (static_cast<unsigned char>(0))
@@ -621,8 +599,6 @@ namespace TraceEvent {
 // Specify these values when the corresponding argument of addTraceEvent is not
 // used.
 const int zeroNumArgs = 0;
-const int noThresholdBeginId = -1;
-const long long noThresholdValue = 0;
 const unsigned long long noEventId = 0;
 
 // TraceID encapsulates an ID that can either be an integer or pointer. Pointers
@@ -735,19 +711,19 @@ static inline void setTraceValue(const WTF::CString& arg,
 // store pointers to the internal c_str and pass through to the tracing API, the
 // arg values must live throughout these procedures.
 
-static inline int addTraceEvent(char phase,
+static inline void addTraceEvent(char phase,
                                 const unsigned char* categoryEnabled,
                                 const char* name,
                                 unsigned long long id,
                                 unsigned char flags) {
-    return TRACE_EVENT_API_ADD_TRACE_EVENT(
+    TRACE_EVENT_API_ADD_TRACE_EVENT(
         phase, categoryEnabled, name, id,
         zeroNumArgs, 0, 0, 0,
-        noThresholdBeginId, noThresholdValue, flags);
+        flags);
 }
 
 template<class ARG1_TYPE>
-static inline int addTraceEvent(char phase,
+static inline void addTraceEvent(char phase,
                                 const unsigned char* categoryEnabled,
                                 const char* name,
                                 unsigned long long id,
@@ -758,14 +734,14 @@ static inline int addTraceEvent(char phase,
     unsigned char argTypes[1];
     unsigned long long argValues[1];
     setTraceValue(arg1Val, &argTypes[0], &argValues[0]);
-    return TRACE_EVENT_API_ADD_TRACE_EVENT(
+    TRACE_EVENT_API_ADD_TRACE_EVENT(
         phase, categoryEnabled, name, id,
         numArgs, &arg1Name, argTypes, argValues,
-        noThresholdBeginId, noThresholdValue, flags);
+        flags);
 }
 
 template<class ARG1_TYPE, class ARG2_TYPE>
-static inline int addTraceEvent(char phase,
+static inline void addTraceEvent(char phase,
                                 const unsigned char* categoryEnabled,
                                 const char* name,
                                 unsigned long long id,
@@ -783,7 +759,7 @@ static inline int addTraceEvent(char phase,
     return TRACE_EVENT_API_ADD_TRACE_EVENT(
         phase, categoryEnabled, name, id,
         numArgs, argNames, argTypes, argValues,
-        noThresholdBeginId, noThresholdValue, flags);
+        flags);
 }
 
 // Used by TRACE_EVENTx macro. Do not use directly.
@@ -816,60 +792,6 @@ private:
                 m_pdata->categoryEnabled,
                 m_pdata->name, noEventId,
                 zeroNumArgs, 0, 0, 0,
-                noThresholdBeginId, noThresholdValue, TRACE_EVENT_FLAG_NONE);
-        }
-    }
-
-    // This Data struct workaround is to avoid initializing all the members
-    // in Data during construction of this object, since this object is always
-    // constructed, even when tracing is disabled. If the members of Data were
-    // members of this class instead, compiler warnings occur about potential
-    // uninitialized accesses.
-    struct Data {
-        const unsigned char* categoryEnabled;
-        const char* name;
-    };
-    Data* m_pdata;
-    Data m_data;
-};
-
-// Used by TRACE_EVENTx macro. Do not use directly.
-class TraceEndOnScopeCloseThreshold {
-public:
-    // Note: members of m_data intentionally left uninitialized. See initialize.
-    TraceEndOnScopeCloseThreshold() : m_pdata(0) { }
-    ~TraceEndOnScopeCloseThreshold()
-    {
-        if (m_pdata)
-            addEventIfEnabled();
-    }
-
-    // Called by macros only when tracing is enabled at the point when the begin
-    // event is added.
-    void initialize(const unsigned char* categoryEnabled,
-                    const char* name,
-                    int thresholdBeginID,
-                    long long threshold)
-    {
-        m_data.categoryEnabled = categoryEnabled;
-        m_data.name = name;
-        m_data.thresholdBeginID = thresholdBeginID;
-        m_data.threshold = threshold;
-        m_pdata = &m_data;
-    }
-
-private:
-    // Add the end event if the category is still enabled.
-    void addEventIfEnabled()
-    {
-        // Only called when m_pdata is non-null.
-        if (*m_pdata->categoryEnabled) {
-            TRACE_EVENT_API_ADD_TRACE_EVENT(
-                TRACE_EVENT_PHASE_END,
-                m_pdata->categoryEnabled,
-                m_pdata->name, noEventId,
-                zeroNumArgs, 0, 0, 0,
-                m_pdata->thresholdBeginID, m_pdata->threshold,
                 TRACE_EVENT_FLAG_NONE);
         }
     }
@@ -880,10 +802,8 @@ private:
     // members of this class instead, compiler warnings occur about potential
     // uninitialized accesses.
     struct Data {
-        long long threshold;
         const unsigned char* categoryEnabled;
         const char* name;
-        int thresholdBeginID;
     };
     Data* m_pdata;
     Data m_data;

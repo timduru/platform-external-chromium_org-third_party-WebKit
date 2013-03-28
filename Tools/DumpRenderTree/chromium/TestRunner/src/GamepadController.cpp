@@ -30,9 +30,11 @@
 
 #include "config.h"
 #include "GamepadController.h"
-#include "TestDelegate.h"
+#include "WebTestDelegate.h"
 
 using namespace WebKit;
+
+namespace WebTestRunner {
 
 GamepadController::GamepadController()
 {
@@ -54,7 +56,7 @@ void GamepadController::bindToJavascript(WebFrame* frame, const WebString& class
     CppBoundClass::bindToJavascript(frame, classname);
 }
 
-void GamepadController::setDelegate(TestDelegate* delegate)
+void GamepadController::setDelegate(WebTestDelegate* delegate)
 {
     m_delegate = delegate;
 }
@@ -192,4 +194,6 @@ void GamepadController::fallbackCallback(const CppArgumentList&, CppVariant* res
 {
     m_delegate->printMessage("CONSOLE MESSAGE: JavaScript ERROR: unknown method called on GamepadController\n");
     result->setNull();
+}
+
 }

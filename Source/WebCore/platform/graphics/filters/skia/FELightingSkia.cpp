@@ -38,7 +38,7 @@ namespace WebCore {
 
 SkImageFilter* FELighting::createImageFilter(SkiaImageFilterBuilder* builder)
 {
-    SkImageFilter* input = builder ? builder->build(inputEffect(0)) : 0;
+    SkAutoTUnref<SkImageFilter> input(builder ? builder->build(inputEffect(0)) : 0);
     switch (m_lightSource->type()) {
     case LS_DISTANT: {
         DistantLightSource* distantLightSource = static_cast<DistantLightSource*>(m_lightSource.get());
@@ -98,12 +98,14 @@ bool FELighting::platformApplySkia()
 
     RefPtr<Image> image = in->asImageBuffer()->copyImage(DontCopyBackingStore);
     NativeImageSkia* nativeImage = image->nativeImageForCurrentFrame();
+    if (!nativeImage)
+        return false;
 
     GraphicsContext* dstContext = resultImage->context();
 
     SkPaint paint;
     paint.setImageFilter(createImageFilter(0))->unref();
-    dstContext->platformContext()->canvas()->drawBitmap(nativeImage->bitmap(), drawingRegion.location().x(), drawingRegion.location().y(), &paint);
+    dstContext->platformContext()->drawBitmap(nativeImage->bitmap(), drawingRegion.location().x(), drawingRegion.location().y(), &paint);
     return true;
 }
 

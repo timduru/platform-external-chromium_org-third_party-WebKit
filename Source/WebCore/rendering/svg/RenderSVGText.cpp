@@ -111,9 +111,9 @@ void RenderSVGText::computeFloatRectForRepaint(const RenderLayerModelObject* rep
     SVGRenderSupport::computeFloatRectForRepaint(this, repaintContainer, repaintRect, fixed);
 }
 
-void RenderSVGText::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags mode, bool* wasFixed) const
+void RenderSVGText::mapLocalToContainer(const RenderLayerModelObject* repaintContainer, TransformState& transformState, MapCoordinatesFlags, bool* wasFixed) const
 {
-    SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, mode & SnapOffsetForTransforms, wasFixed);
+    SVGRenderSupport::mapLocalToContainer(this, repaintContainer, transformState, wasFixed);
 }
 
 const RenderObject* RenderSVGText::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
@@ -472,7 +472,7 @@ VisiblePosition RenderSVGText::positionForPoint(const LayoutPoint& pointInConten
     if (!rootBox)
         return createVisiblePosition(0, DOWNSTREAM);
 
-    ASSERT(rootBox->isSVGRootInlineBox());
+    ASSERT_WITH_SECURITY_IMPLICATION(rootBox->isSVGRootInlineBox());
     ASSERT(!rootBox->nextRootBox());
     ASSERT(childrenInline());
 
@@ -513,7 +513,7 @@ FloatRect RenderSVGText::strokeBoundingBox() const
 
     ASSERT(node());
     ASSERT(node()->isSVGElement());
-    SVGLengthContext lengthContext(static_cast<SVGElement*>(node()));
+    SVGLengthContext lengthContext(toSVGElement(node()));
     strokeBoundaries.inflate(svgStyle->strokeWidth().value(lengthContext));
     return strokeBoundaries;
 }

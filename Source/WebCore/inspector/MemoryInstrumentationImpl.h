@@ -40,8 +40,11 @@
 #include <wtf/text/StringHash.h>
 
 using WTF::MemoryObjectType;
+using WTF::MemberType;
 
 namespace WebCore {
+
+class HeapGraphSerializer;
 
 typedef HashSet<const void*> VisitedObjects;
 typedef HashMap<String, size_t> TypeNameToSizeMap;
@@ -50,9 +53,10 @@ class MemoryInstrumentationClientImpl : public WTF::MemoryInstrumentationClient 
 public:
     typedef HashMap<const void*, size_t> ObjectToSizeMap;
 
-    MemoryInstrumentationClientImpl()
+    explicit MemoryInstrumentationClientImpl(HeapGraphSerializer* serializer)
         : m_totalCountedObjects(0)
         , m_totalObjectsNotInAllocatedSet(0)
+        , m_graphSerializer(serializer)
     { }
 
     size_t totalSize(MemoryObjectType objectType) const
@@ -80,7 +84,12 @@ public:
 
     virtual void countObjectSize(const void*, MemoryObjectType, size_t) OVERRIDE;
     virtual bool visited(const void*) OVERRIDE;
-    virtual void checkCountedObject(const void*) OVERRIDE;
+    virtual bool checkCountedObject(const void*) OVERRIDE;
+    virtual void reportNode(const MemoryObjectInfo&) OVERRIDE;
+    virtual void reportEdge(const void*, const char*, MemberType) OVERRIDE;
+    virtual void reportLeaf(const MemoryObjectInfo&, const char*) OVERRIDE;
+    virtual void reportBaseAddress(const void*, const void*) OVERRIDE;
+    virtual int registerString(const char*) OVERRIDE;
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
@@ -92,6 +101,7 @@ private:
     ObjectToSizeMap m_countedObjects;
     size_t m_totalCountedObjects;
     size_t m_totalObjectsNotInAllocatedSet;
+    HeapGraphSerializer* m_graphSerializer;
 };
 
 class MemoryInstrumentationImpl : public WTF::MemoryInstrumentation {
@@ -106,10 +116,10 @@ public:
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
-    virtual void deferInstrumentedPointer(PassOwnPtr<InstrumentedPointerBase>) OVERRIDE;
-    virtual void processDeferredInstrumentedPointers() OVERRIDE;
+    virtual void deferObject(PassOwnPtr<WrapperBase>) OVERRIDE;
+    virtual void processDeferredObjects() OVERRIDE;
 
-    Vector<OwnPtr<InstrumentedPointerBase> > m_deferredInstrumentedPointers;
+    Vector<OwnPtr<WrapperBase> > m_deferredObjects;
 };
 
 } // namespace WebCore

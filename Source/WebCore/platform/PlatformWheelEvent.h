@@ -45,10 +45,6 @@ class wxMouseEvent;
 class wxPoint;
 #endif
 
-#if PLATFORM(HAIKU)
-class BMessage;
-#endif
-
 namespace WebCore {
 
     class FloatPoint;
@@ -62,7 +58,6 @@ namespace WebCore {
     enum PlatformWheelEventGranularity {
         ScrollByPageWheelEvent,
         ScrollByPixelWheelEvent,
-        ScrollByPixelVelocityWheelEvent
     };
 
 #if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
@@ -87,7 +82,6 @@ namespace WebCore {
             , m_wheelTicksY(0)
             , m_granularity(ScrollByPixelWheelEvent)
             , m_directionInvertedFromDevice(false)
-            , m_useLatchedEventNode(false)
 #if PLATFORM(MAC) || PLATFORM(CHROMIUM)
             , m_hasPreciseScrollingDeltas(false)
 #endif
@@ -111,7 +105,6 @@ namespace WebCore {
             , m_wheelTicksY(wheelTicksY)
             , m_granularity(granularity)
             , m_directionInvertedFromDevice(false)
-            , m_useLatchedEventNode(false)
 #if PLATFORM(MAC) || PLATFORM(CHROMIUM)
             , m_hasPreciseScrollingDeltas(false)
 #endif
@@ -150,8 +143,6 @@ namespace WebCore {
 
         bool directionInvertedFromDevice() const { return m_directionInvertedFromDevice; }
 
-        void setUseLatchedEventNode(bool b) { m_useLatchedEventNode = b; }
-
 #if PLATFORM(GTK)
         explicit PlatformWheelEvent(GdkEventScroll*);
 #endif
@@ -162,6 +153,7 @@ namespace WebCore {
 
 #if PLATFORM(MAC) || PLATFORM(CHROMIUM)
         bool hasPreciseScrollingDeltas() const { return m_hasPreciseScrollingDeltas; }
+        void setHasPreciseScrollingDeltas(bool b) { m_hasPreciseScrollingDeltas = b; }
 #endif
 #if PLATFORM(MAC) || (PLATFORM(CHROMIUM) && OS(DARWIN))
         PlatformWheelEventPhase phase() const { return m_phase; }
@@ -169,9 +161,9 @@ namespace WebCore {
         unsigned scrollCount() const { return m_scrollCount; }
         float unacceleratedScrollingDeltaX() const { return m_unacceleratedScrollingDeltaX; }
         float unacceleratedScrollingDeltaY() const { return m_unacceleratedScrollingDeltaY; }
-        bool useLatchedEventNode() const { return m_useLatchedEventNode || (m_momentumPhase == PlatformWheelEventPhaseBegan || m_momentumPhase == PlatformWheelEventPhaseChanged); }
+        bool useLatchedEventNode() const { return m_momentumPhase == PlatformWheelEventPhaseBegan || m_momentumPhase == PlatformWheelEventPhaseChanged; }
 #else
-        bool useLatchedEventNode() const { return m_useLatchedEventNode; }
+        bool useLatchedEventNode() const { return false; }
 #endif
 
 #if PLATFORM(WIN)
@@ -183,10 +175,6 @@ namespace WebCore {
         PlatformWheelEvent(const wxMouseEvent&, const wxPoint&);
 #endif
 
-#if PLATFORM(HAIKU)
-        explicit PlatformWheelEvent(BMessage*);
-#endif
-
     protected:
         IntPoint m_position;
         IntPoint m_globalPosition;
@@ -196,7 +184,6 @@ namespace WebCore {
         float m_wheelTicksY;
         PlatformWheelEventGranularity m_granularity;
         bool m_directionInvertedFromDevice;
-        bool m_useLatchedEventNode;
 #if PLATFORM(MAC) || PLATFORM(CHROMIUM)
         bool m_hasPreciseScrollingDeltas;
 #endif

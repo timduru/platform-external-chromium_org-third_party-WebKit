@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009, 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2008 Cameron Zwarich <cwzwarich@uwaterloo.ca>
  *
  * Redistribution and use in source and binary forms, with or without
@@ -52,12 +52,12 @@
 #include "JSString.h"
 #include "JSWithScope.h"
 #include "LLIntCLoop.h"
+#include "LegacyProfiler.h"
 #include "LiteralParser.h"
 #include "NameInstance.h"
 #include "ObjectPrototype.h"
 #include "Operations.h"
 #include "Parser.h"
-#include "Profiler.h"
 #include "RegExpObject.h"
 #include "RegExpPrototype.h"
 #include "Register.h"
@@ -67,6 +67,7 @@
 #include <limits.h>
 #include <stdio.h>
 #include <wtf/StackStats.h>
+#include <wtf/StringPrintStream.h>
 #include <wtf/Threading.h>
 #include <wtf/WTFThreadData.h>
 #include <wtf/text/StringBuilder.h>
@@ -380,16 +381,16 @@ void Interpreter::dumpCallFrame(CallFrame*)
 
 void Interpreter::dumpCallFrame(CallFrame* callFrame)
 {
-    callFrame->codeBlock()->dump(callFrame);
+    callFrame->codeBlock()->dumpBytecode();
     dumpRegisters(callFrame);
 }
 
 void Interpreter::dumpRegisters(CallFrame* callFrame)
 {
-    dataLog("Register frame: \n\n");
-    dataLog("-----------------------------------------------------------------------------\n");
-    dataLog("            use            |   address  |                value               \n");
-    dataLog("-----------------------------------------------------------------------------\n");
+    dataLogF("Register frame: \n\n");
+    dataLogF("-----------------------------------------------------------------------------\n");
+    dataLogF("            use            |   address  |                value               \n");
+    dataLogF("-----------------------------------------------------------------------------\n");
 
     CodeBlock* codeBlock = callFrame->codeBlock();
     const Register* it;
@@ -401,32 +402,32 @@ void Interpreter::dumpRegisters(CallFrame* callFrame)
         JSValue v = it->jsValue();
         int registerNumber = it - callFrame->registers();
         String name = codeBlock->nameForRegister(registerNumber);
-        dataLog("[r% 3d %14s]      | %10p | %-16s 0x%lld \n", registerNumber, name.ascii().data(), it, v.description(), (long long)JSValue::encode(v));
+        dataLogF("[r% 3d %14s]      | %10p | %-16s 0x%lld \n", registerNumber, name.ascii().data(), it, toCString(v).data(), (long long)JSValue::encode(v));
         it++;
     }
     
-    dataLog("-----------------------------------------------------------------------------\n");
-    dataLog("[ArgumentCount]            | %10p | %lu \n", it, (unsigned long) callFrame->argumentCount());
+    dataLogF("-----------------------------------------------------------------------------\n");
+    dataLogF("[ArgumentCount]            | %10p | %lu \n", it, (unsigned long) callFrame->argumentCount());
     ++it;
-    dataLog("[CallerFrame]              | %10p | %p \n", it, callFrame->callerFrame());
+    dataLogF("[CallerFrame]              | %10p | %p \n", it, callFrame->callerFrame());
     ++it;
-    dataLog("[Callee]                   | %10p | %p \n", it, callFrame->callee());
+    dataLogF("[Callee]                   | %10p | %p \n", it, callFrame->callee());
     ++it;
-    dataLog("[ScopeChain]               | %10p | %p \n", it, callFrame->scope());
+    dataLogF("[ScopeChain]               | %10p | %p \n", it, callFrame->scope());
     ++it;
 #if ENABLE(JIT)
     AbstractPC pc = callFrame->abstractReturnPC(callFrame->globalData());
     if (pc.hasJITReturnAddress())
-        dataLog("[ReturnJITPC]              | %10p | %p \n", it, pc.jitReturnAddress().value());
+        dataLogF("[ReturnJITPC]              | %10p | %p \n", it, pc.jitReturnAddress().value());
 #endif
     unsigned bytecodeOffset = 0;
     int line = 0;
     getCallerInfo(&callFrame->globalData(), callFrame, line, bytecodeOffset);
-    dataLog("[ReturnVPC]                | %10p | %d (line %d)\n", it, bytecodeOffset, line);
+    dataLogF("[ReturnVPC]                | %10p | %d (line %d)\n", it, bytecodeOffset, line);
     ++it;
-    dataLog("[CodeBlock]                | %10p | %p \n", it, callFrame->codeBlock());
+    dataLogF("[CodeBlock]                | %10p | %p \n", it, callFrame->codeBlock());
     ++it;
-    dataLog("-----------------------------------------------------------------------------\n");
+    dataLogF("-----------------------------------------------------------------------------\n");
 
     int registerCount = 0;
 
@@ -436,23 +437,23 @@ void Interpreter::dumpRegisters(CallFrame* callFrame)
             JSValue v = it->jsValue();
             int registerNumber = it - callFrame->registers();
             String name = codeBlock->nameForRegister(registerNumber);
-            dataLog("[r% 3d %14s]      | %10p | %-16s 0x%lld \n", registerNumber, name.ascii().data(), it, v.description(), (long long)JSValue::encode(v));
+            dataLogF("[r% 3d %14s]      | %10p | %-16s 0x%lld \n", registerNumber, name.ascii().data(), it, toCString(v).data(), (long long)JSValue::encode(v));
             ++it;
             ++registerCount;
         } while (it != end);
     }
-    dataLog("-----------------------------------------------------------------------------\n");
+    dataLogF("-----------------------------------------------------------------------------\n");
 
     end = it + codeBlock->m_numCalleeRegisters - codeBlock->m_numVars;
     if (it != end) {
         do {
             JSValue v = (*it).jsValue();
-            dataLog("[r% 3d]                     | %10p | %-16s 0x%lld \n", registerCount, it, v.description(), (long long)JSValue::encode(v));
+            dataLogF("[r% 3d]                     | %10p | %-16s 0x%lld \n", registerCount, it, toCString(v).data(), (long long)JSValue::encode(v));
             ++it;
             ++registerCount;
         } while (it != end);
     }
-    dataLog("-----------------------------------------------------------------------------\n");
+    dataLogF("-----------------------------------------------------------------------------\n");
 }
 
 #endif
@@ -639,7 +640,7 @@ static CallFrame* getCallerInfo(JSGlobalData* globalData, CallFrame* callFrame, 
         } else if (callerCodeBlock && callerCodeBlock->getJITType() == JITCode::DFGJIT) {
             CodeOrigin origin;
             if (!callerCodeBlock->codeOriginForReturn(callFrame->returnPC(), origin))
-                ASSERT_NOT_REACHED();
+                RELEASE_ASSERT_NOT_REACHED();
             bytecodeOffset = origin.bytecodeIndex;
             if (InlineCallFrame* icf = origin.inlineCallFrame) {
                 FunctionExecutable* executable = static_cast<FunctionExecutable*>(icf->executable.get());
@@ -650,10 +651,14 @@ static CallFrame* getCallerInfo(JSGlobalData* globalData, CallFrame* callFrame, 
             }
         } else
     #endif
+        {
+            RELEASE_ASSERT(callerCodeBlock);
             bytecodeOffset = callerCodeBlock->bytecodeOffset(callerFrame, callFrame->returnPC());
+        }
 #endif
     }
 
+    RELEASE_ASSERT(callerCodeBlock);
     lineNumber = callerCodeBlock->lineNumberForBytecodeOffset(bytecodeOffset);
     return callerFrame;
 }
@@ -676,7 +681,7 @@ static StackFrameCodeType getStackFrameCodeType(CallFrame* callFrame)
     case GlobalCode:
         return StackFrameGlobalCode;
     }
-    ASSERT_NOT_REACHED();
+    RELEASE_ASSERT_NOT_REACHED();
     return StackFrameGlobalCode;
 }
 
@@ -772,22 +777,25 @@ NEVER_INLINE HandlerInfo* Interpreter::throwException(CallFrame*& callFrame, JSV
     HandlerInfo* handler = 0;
     while (isInterrupt || !(handler = codeBlock->handlerForBytecodeOffset(bytecodeOffset))) {
         if (!unwindCallFrame(callFrame, exceptionValue, bytecodeOffset, codeBlock)) {
-            if (Profiler* profiler = callFrame->globalData().enabledProfiler())
+            if (LegacyProfiler* profiler = callFrame->globalData().enabledProfiler())
                 profiler->exceptionUnwind(callFrame);
             return 0;
         }
     }
 
-    if (Profiler* profiler = callFrame->globalData().enabledProfiler())
+    if (LegacyProfiler* profiler = callFrame->globalData().enabledProfiler())
         profiler->exceptionUnwind(callFrame);
 
     // Unwind the scope chain within the exception handler's call frame.
     JSScope* scope = callFrame->scope();
     int scopeDelta = 0;
     if (!codeBlock->needsFullScopeChain() || codeBlock->codeType() != FunctionCode 
-        || callFrame->uncheckedR(codeBlock->activationRegister()).jsValue())
-        scopeDelta = depth(codeBlock, scope) - handler->scopeDepth;
-    ASSERT(scopeDelta >= 0);
+        || callFrame->uncheckedR(codeBlock->activationRegister()).jsValue()) {
+        int currentDepth = depth(codeBlock, scope);
+        int targetDepth = handler->scopeDepth;
+        scopeDelta = currentDepth - targetDepth;
+        RELEASE_ASSERT(scopeDelta >= 0);
+    }
     while (scopeDelta--)
         scope = scope->next();
     callFrame->setScope(scope);
@@ -833,7 +841,7 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, J
     ASSERT(!globalData.exception);
     ASSERT(!globalData.isCollectorBusy());
     if (globalData.isCollectorBusy())
-        CRASH();
+        return jsNull();
 
     StackStats::CheckPoint stackCheckPoint;
     const StackBounds& nativeStack = wtfThreadData().stack();
@@ -901,7 +909,7 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, J
                     continue;
                 }
                 default:
-                    ASSERT_NOT_REACHED();
+                    RELEASE_ASSERT_NOT_REACHED();
                     return jsUndefined();
                 }
             }
@@ -936,7 +944,7 @@ JSValue Interpreter::execute(ProgramExecutable* program, CallFrame* callFrame, J
                 break;
             }
             default:
-                ASSERT_NOT_REACHED();
+                RELEASE_ASSERT_NOT_REACHED();
                     return jsUndefined();
             }
             result = JSONPValue;
@@ -948,7 +956,7 @@ failedJSONP:
     // object.
 
     // Compile source to bytecode if necessary:
-    if (JSObject* error = program->initalizeGlobalProperties(globalData, callFrame, scope))
+    if (JSObject* error = program->initializeGlobalProperties(globalData, callFrame, scope))
         return checkedReturn(throwError(callFrame, error));
 
     if (JSObject* error = program->compile(callFrame, scope))
@@ -965,7 +973,7 @@ failedJSONP:
     // Set the arguments for the callee:
     newCallFrame->setThisValue(thisObj);
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->willExecute(callFrame, program->sourceURL(), program->lineNo());
 
     // Execute the code:
@@ -980,7 +988,7 @@ failedJSONP:
 #endif // ENABLE(JIT)
     }
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->didExecute(callFrame, program->sourceURL(), program->lineNo());
 
     m_stack.popFrame(newCallFrame);
@@ -1036,7 +1044,7 @@ JSValue Interpreter::executeCall(CallFrame* callFrame, JSObject* function, CallT
     for (size_t i = 0; i < args.size(); ++i)
         newCallFrame->setArgument(i, args.at(i));
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->willExecute(callFrame, function);
 
     JSValue result;
@@ -1054,7 +1062,7 @@ JSValue Interpreter::executeCall(CallFrame* callFrame, JSObject* function, CallT
             result = JSValue::decode(callData.native.function(newCallFrame));
     }
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->didExecute(callFrame, function);
 
     m_stack.popFrame(newCallFrame);
@@ -1111,7 +1119,7 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
     for (size_t i = 0; i < args.size(); ++i)
         newCallFrame->setArgument(i, args.at(i));
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->willExecute(callFrame, constructor);
 
     JSValue result;
@@ -1130,7 +1138,7 @@ JSObject* Interpreter::executeConstruct(CallFrame* callFrame, JSObject* construc
         }
     }
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->didExecute(callFrame, constructor);
 
     m_stack.popFrame(newCallFrame);
@@ -1197,7 +1205,7 @@ JSValue Interpreter::execute(CallFrameClosure& closure)
     closure.resetCallFrame();
     m_stack.validateFence(closure.newCallFrame, "STEP 1");
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->willExecute(closure.oldCallFrame, closure.function);
 
     // The code execution below may push more frames and point the topCallFrame
@@ -1222,7 +1230,7 @@ JSValue Interpreter::execute(CallFrameClosure& closure)
 #endif // ENABLE(JIT)
     }
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->didExecute(closure.oldCallFrame, closure.function);
 
     m_stack.validateFence(closure.newCallFrame, "AFTER");
@@ -1262,7 +1270,7 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
 
     JSObject* variableObject;
     for (JSScope* node = scope; ; node = node->next()) {
-        ASSERT(node);
+        RELEASE_ASSERT(node);
         if (node->isVariableObject() && !node->isNameScopeObject()) {
             variableObject = node;
             break;
@@ -1303,7 +1311,7 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
     // Set the arguments for the callee:
     newCallFrame->setThisValue(thisValue);
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->willExecute(callFrame, eval->sourceURL(), eval->lineNo());
 
     // Execute the code:
@@ -1318,7 +1326,7 @@ JSValue Interpreter::execute(EvalExecutable* eval, CallFrame* callFrame, JSValue
 #endif // ENABLE(JIT)
     }
 
-    if (Profiler* profiler = globalData.enabledProfiler())
+    if (LegacyProfiler* profiler = globalData.enabledProfiler())
         profiler->didExecute(callFrame, eval->sourceURL(), eval->lineNo());
 
     m_stack.popFrame(newCallFrame);

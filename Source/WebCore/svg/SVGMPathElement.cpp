@@ -50,6 +50,11 @@ PassRefPtr<SVGMPathElement> SVGMPathElement::create(const QualifiedName& tagName
     return adoptRef(new SVGMPathElement(tagName, document));
 }
 
+SVGMPathElement::~SVGMPathElement()
+{
+    clearResourceReferences();
+}
+
 void SVGMPathElement::buildPendingResource()
 {
     clearResourceReferences();
@@ -59,7 +64,8 @@ void SVGMPathElement::buildPendingResource()
     String id;
     Element* target = SVGURIReference::targetElementFromIRIString(href(), document(), &id);
     if (!target) {
-        if (hasPendingResources())
+        // Do not register as pending if we are already pending this resource.
+        if (document()->accessSVGExtensions()->isElementPendingResource(this, id))
             return;
 
         if (!id.isEmpty()) {
@@ -69,7 +75,7 @@ void SVGMPathElement::buildPendingResource()
     } else if (target->isSVGElement()) {
         // Register us with the target in the dependencies map. Any change of hrefElement
         // that leads to relayout/repainting now informs us, so we can react to it.
-        document()->accessSVGExtensions()->addElementReferencingTarget(this, static_cast<SVGElement*>(target));
+        document()->accessSVGExtensions()->addElementReferencingTarget(this, toSVGElement(target));
     }
 
     targetPathChanged();
@@ -107,16 +113,16 @@ bool SVGMPathElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGMPathElement::parseAttribute(const Attribute& attribute)
+void SVGMPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(attribute.name())) {
-        SVGElement::parseAttribute(attribute);
+    if (!isSupportedAttribute(name)) {
+        SVGElement::parseAttribute(name, value);
         return;
     }
 
-    if (SVGURIReference::parseAttribute(attribute))
+    if (SVGURIReference::parseAttribute(name, value))
         return;
-    if (SVGExternalResourcesRequired::parseAttribute(attribute))
+    if (SVGExternalResourcesRequired::parseAttribute(name, value))
         return;
 
     ASSERT_NOT_REACHED();

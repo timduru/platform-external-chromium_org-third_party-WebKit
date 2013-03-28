@@ -31,10 +31,10 @@
 #ifndef WebAccessibilityObject_h
 #define WebAccessibilityObject_h
 
+#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../Platform/chromium/public/WebPrivatePtr.h"
+#include "../../../Platform/chromium/public/WebVector.h"
 #include "WebAccessibilityRole.h"
-#include "platform/WebCommon.h"
-#include "platform/WebPrivatePtr.h"
-#include "platform/WebVector.h"
 
 #if WEBKIT_IMPLEMENTATION
 namespace WTF { template <typename T> class PassRefPtr; }
@@ -76,6 +76,9 @@ public:
     WEBKIT_EXPORT static void enableAccessibility();
     WEBKIT_EXPORT static bool accessibilityEnabled();
 
+    WEBKIT_EXPORT void startCachingComputedObjectAttributesUntilTreeMutates();
+    WEBKIT_EXPORT void stopCachingComputedObjectAttributes();
+
     WEBKIT_EXPORT int axID() const;
 
     // Update the underlying tree, and return true if this object is
@@ -86,10 +89,6 @@ public:
     WEBKIT_EXPORT bool updateBackingStoreAndCheckValidity();
 
     WEBKIT_EXPORT WebString accessibilityDescription() const;
-    WEBKIT_EXPORT WebString actionVerb() const;
-    WEBKIT_EXPORT bool canSetFocusAttribute() const;
-    WEBKIT_EXPORT bool canSetValueAttribute() const;
-
     WEBKIT_EXPORT unsigned childCount() const;
 
     WEBKIT_EXPORT WebAccessibilityObject childAt(unsigned) const;
@@ -99,8 +98,6 @@ public:
     WEBKIT_EXPORT WebAccessibilityObject nextSibling() const;
     WEBKIT_EXPORT WebAccessibilityObject parentObject() const;
     WEBKIT_EXPORT WebAccessibilityObject previousSibling() const;
-
-    WEBKIT_EXPORT bool canSetSelectedAttribute() const;
 
     WEBKIT_EXPORT bool isAnchor() const;
     WEBKIT_EXPORT bool isAriaReadOnly() const;
@@ -134,6 +131,8 @@ public:
     WEBKIT_EXPORT WebString ariaLiveRegionStatus() const;
     WEBKIT_EXPORT WebRect boundingBoxRect() const;
     WEBKIT_EXPORT bool canvasHasFallbackContent() const;
+    WEBKIT_EXPORT WebPoint clickPoint() const;
+    WEBKIT_EXPORT void colorValue(int& r, int& g, int& b) const;
     WEBKIT_EXPORT double estimatedLoadingProgress() const;
     WEBKIT_EXPORT WebString helpText() const;
     WEBKIT_EXPORT int headingLevel() const;
@@ -164,8 +163,18 @@ public:
     WEBKIT_EXPORT bool lineBreaks(WebVector<int>&) const;
 
     // Actions
-    WEBKIT_EXPORT void setFocused(bool) const;
+    WEBKIT_EXPORT WebString actionVerb() const; // The verb corresponding to performDefaultAction.
+    WEBKIT_EXPORT bool canDecrement() const;
+    WEBKIT_EXPORT bool canIncrement() const;
+    WEBKIT_EXPORT bool canPress() const;
+    WEBKIT_EXPORT bool canSetFocusAttribute() const;
+    WEBKIT_EXPORT bool canSetSelectedAttribute() const;
+    WEBKIT_EXPORT bool canSetValueAttribute() const;
     WEBKIT_EXPORT bool performDefaultAction() const;
+    WEBKIT_EXPORT bool press() const;
+    WEBKIT_EXPORT bool increment() const;
+    WEBKIT_EXPORT bool decrement() const;
+    WEBKIT_EXPORT void setFocused(bool) const;
     WEBKIT_EXPORT void setSelectedTextRange(int selectionStart, int selectionEnd) const;
 
     // For a table

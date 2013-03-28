@@ -26,6 +26,7 @@
 
 #include "Attribute.h"
 #include "CSSValueKeywords.h"
+#include "CachedImage.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
 #include "EventNames.h"
@@ -41,6 +42,7 @@
 #include "HTMLParserIdioms.h"
 #include "MIMETypeRegistry.h"
 #include "NodeList.h"
+#include "NodeTraversal.h"
 #include "Page.h"
 #include "PluginViewBase.h"
 #include "RenderEmbeddedObject.h"
@@ -86,27 +88,27 @@ bool HTMLObjectElement::isPresentationAttribute(const QualifiedName& name) const
     return HTMLPlugInImageElement::isPresentationAttribute(name);
 }
 
-void HTMLObjectElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
+void HTMLObjectElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    if (attribute.name() == borderAttr)
-        applyBorderAttributeToStyle(attribute, style);
+    if (name == borderAttr)
+        applyBorderAttributeToStyle(value, style);
     else
-        HTMLPlugInImageElement::collectStyleForAttribute(attribute, style);
+        HTMLPlugInImageElement::collectStyleForPresentationAttribute(name, value, style);
 }
 
-void HTMLObjectElement::parseAttribute(const Attribute& attribute)
+void HTMLObjectElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == formAttr)
+    if (name == formAttr)
         formAttributeChanged();
-    else if (attribute.name() == typeAttr) {
-        m_serviceType = attribute.value().lower();
+    else if (name == typeAttr) {
+        m_serviceType = value.lower();
         size_t pos = m_serviceType.find(";");
         if (pos != notFound)
             m_serviceType = m_serviceType.left(pos);
         if (renderer())
             setNeedsWidgetUpdate(true);
-    } else if (attribute.name() == dataAttr) {
-        m_url = stripLeadingAndTrailingHTMLSpaces(attribute.value());
+    } else if (name == dataAttr) {
+        m_url = stripLeadingAndTrailingHTMLSpaces(value);
         if (renderer()) {
             setNeedsWidgetUpdate(true);
             if (isImageType()) {
@@ -115,16 +117,16 @@ void HTMLObjectElement::parseAttribute(const Attribute& attribute)
                 m_imageLoader->updateFromElementIgnoringPreviousError();
             }
         }
-    } else if (attribute.name() == classidAttr) {
-        m_classId = attribute.value();
+    } else if (name == classidAttr) {
+        m_classId = value;
         if (renderer())
             setNeedsWidgetUpdate(true);
-    } else if (attribute.name() == onloadAttr)
-        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, attribute));
-    else if (attribute.name() == onbeforeloadAttr)
-        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, attribute));
+    } else if (name == onloadAttr)
+        setAttributeEventListener(eventNames().loadEvent, createAttributeEventListener(this, name, value));
+    else if (name == onbeforeloadAttr)
+        setAttributeEventListener(eventNames().beforeloadEvent, createAttributeEventListener(this, name, value));
     else
-        HTMLPlugInImageElement::parseAttribute(attribute);
+        HTMLPlugInImageElement::parseAttribute(name, value);
 }
 
 static void mapDataParamToSrc(Vector<String>* paramNames, Vector<String>* paramValues)
@@ -282,7 +284,13 @@ void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
     // FIXME: This should ASSERT isFinishedParsingChildren() instead.
     if (!isFinishedParsingChildren())
         return;
-    
+
+    // FIXME: I'm not sure it's ever possible to get into updateWidget during a
+    // removal, but just in case we should avoid loading the frame to prevent
+    // security bugs.
+    if (!SubframeLoadingDisabler::canLoadFrame(this))
+        return;
+
     String url = this->url();
     String serviceType = this->serviceType();
 
@@ -356,9 +364,9 @@ bool HTMLObjectElement::isURLAttribute(const Attribute& attribute) const
     return attribute.name() == dataAttr || (attribute.name() == usemapAttr && attribute.value().string()[0] != '#') || HTMLPlugInImageElement::isURLAttribute(attribute);
 }
 
-const QualifiedName& HTMLObjectElement::imageSourceAttributeName() const
+const AtomicString& HTMLObjectElement::imageSourceURL() const
 {
-    return dataAttr;
+    return getAttribute(dataAttr);
 }
 
 void HTMLObjectElement::renderFallbackContent()
@@ -422,7 +430,7 @@ void HTMLObjectElement::updateDocNamedItem()
     Node* child = firstChild();
     while (child && isNamedItem) {
         if (child->isElementNode()) {
-            Element* element = static_cast<Element*>(child);
+            Element* element = toElement(child);
             // FIXME: Use of isRecognizedTagName is almost certainly wrong here.
             if (isRecognizedTagName(element->tagQName()) && !element->hasTagName(paramTag))
                 isNamedItem = false;
@@ -434,7 +442,7 @@ void HTMLObjectElement::updateDocNamedItem()
         child = child->nextSibling();
     }
     if (isNamedItem != wasNamedItem && document()->isHTMLDocument()) {
-        HTMLDocument* document = static_cast<HTMLDocument*>(this->document());
+        HTMLDocument* document = toHTMLDocument(this->document());
         if (isNamedItem) {
             document->addNamedItem(getNameAttribute());
             document->addExtraNamedItem(getIdAttribute());
@@ -451,7 +459,7 @@ bool HTMLObjectElement::containsJavaApplet() const
     if (MIMETypeRegistry::isJavaAppletMIMEType(getAttribute(typeAttr)))
         return true;
         
-    for (Element* child = firstElementChild(); child; child = child->nextElementSibling()) {
+    for (Element* child = ElementTraversal::firstWithin(this); child; child = ElementTraversal::nextSkippingChildren(child, this)) {
         if (child->hasTagName(paramTag)
                 && equalIgnoringCase(child->getNameAttribute(), "type")
                 && MIMETypeRegistry::isJavaAppletMIMEType(child->getAttribute(valueAttr).string()))
@@ -494,7 +502,7 @@ bool HTMLObjectElement::appendFormData(FormDataList& encoding, bool)
     if (!widget || !widget->isPluginViewBase())
         return false;
     String value;
-    if (!static_cast<PluginViewBase*>(widget)->getFormValue(value))
+    if (!toPluginViewBase(widget)->getFormValue(value))
         return false;
     encoding.appendData(name(), value);
     return true;

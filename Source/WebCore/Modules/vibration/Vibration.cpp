@@ -44,7 +44,7 @@ PassOwnPtr<Vibration> Vibration::create(VibrationClient* client)
     return adoptPtr(new Vibration(client));
 }
 
-void Vibration::vibrate(const unsigned long& time)
+void Vibration::vibrate(const unsigned& time)
 {
     if (!time) {
         cancelVibration();
@@ -126,10 +126,9 @@ void Vibration::timerStopFired(Timer<Vibration>* timer)
     }
 }
 
-const AtomicString& Vibration::supplementName()
+const char* Vibration::supplementName()
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("Vibration", AtomicString::ConstructFromLiteral));
-    return name;
+    return "Vibration";
 }
 
 bool Vibration::isActive(Page* page)

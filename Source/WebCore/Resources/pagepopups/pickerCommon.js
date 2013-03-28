@@ -115,10 +115,7 @@ function adjustWindowRect(width, height, minWidth, minHeight) {
         return windowRect;
 
     var anchorRect = new Rectangle(global.params.anchorRectInScreen);
-    var rootViewRect = new Rectangle(global.params.rootViewRectInScreen);
     var availRect = new Rectangle(window.screen.availLeft, window.screen.availTop, window.screen.availWidth, window.screen.availHeight);
-    if (global.params.confineToRootView)
-        availRect = Rectangle.intersection(availRect, rootViewRect) || new Rectangle(0, 0, 0, 0);
 
     _adjustWindowRectVertically(windowRect, availRect, anchorRect, minHeight);
     _adjustWindowRectHorizontally(windowRect, availRect, anchorRect, minWidth);
@@ -150,9 +147,8 @@ function _adjustWindowRectHorizontally(windowRect, availRect, anchorRect, minWid
     windowRect.width = Math.min(windowRect.width, availRect.width);
     windowRect.width = Math.max(windowRect.width, minWidth);
     windowRect.x = anchorRect.x;
-    var availableSpaceToRight = availRect.maxX - anchorRect.x;
-    if (windowRect.width > availableSpaceToRight)
-        windowRect.x -= (windowRect.width - availableSpaceToRight);
+    if (global.params.isRTL)
+        windowRect.x += anchorRect.width - windowRect.width;
     windowRect.x = Math.min(windowRect.x, availRect.maxX - windowRect.width);
     windowRect.x = Math.max(windowRect.x, availRect.x);
 }
@@ -165,17 +161,29 @@ function setWindowRect(rect) {
         window.frameElement.style.width = rect.width + "px";
         window.frameElement.style.height = rect.height + "px";
     } else {
-        window.moveTo(rect.x - window.screen.availLeft, rect.y - window.screen.availTop);
-        window.resizeTo(rect.width, rect.height);
+        if (isWindowHidden()) {
+            window.moveTo(rect.x - window.screen.availLeft, rect.y - window.screen.availTop);
+            window.resizeTo(rect.width, rect.height);
+        } else {
+            window.resizeTo(rect.width, rect.height);
+            window.moveTo(rect.x - window.screen.availLeft, rect.y - window.screen.availTop);
+        }
     }
 }
 
 function hideWindow() {
-    setWindowRect(new Rectangle(0, 0, 1, 1));
+    resizeWindow(1, 1);
+}
+
+/**
+ * @return {!boolean}
+ */
+function isWindowHidden() {
+    return window.innerWidth === 1 && window.innerHeight === 1;
 }
 
 window.addEventListener("resize", function() {
-    if (window.innerWidth === 1 && window.innerHeight === 1)
+    if (isWindowHidden())
         window.dispatchEvent(new CustomEvent("didHide"));
     else
         window.dispatchEvent(new CustomEvent("didOpenPicker"));
@@ -234,11 +242,12 @@ Picker.Actions = {
  * @param {!string} value
  */
 Picker.prototype.submitValue = function(value) {
-    window.pagePopupController.setValueAndClosePopup(Picker.Actions.SetValue, value);
+    window.pagePopupController.setValue(value);
+    window.pagePopupController.closePopup();
 }
 
 Picker.prototype.handleCancel = function() {
-    window.pagePopupController.setValueAndClosePopup(Picker.Actions.Cancel, "");
+    window.pagePopupController.closePopup();
 }
 
 Picker.prototype.chooseOtherColor = function() {

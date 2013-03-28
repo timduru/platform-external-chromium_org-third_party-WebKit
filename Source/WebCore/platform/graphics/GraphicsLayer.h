@@ -49,7 +49,8 @@ enum LayerTreeAsTextBehaviorFlags {
     LayerTreeAsTextDebug = 1 << 0, // Dump extra debugging info like layer addresses.
     LayerTreeAsTextIncludeVisibleRects = 1 << 1,
     LayerTreeAsTextIncludeTileCaches = 1 << 2,
-    LayerTreeAsTextIncludeRepaintRects = 1 << 3
+    LayerTreeAsTextIncludeRepaintRects = 1 << 3,
+    LayerTreeAsTextIncludePaintingPhases = 1 << 4
 };
 typedef unsigned LayerTreeAsTextBehavior;
 
@@ -242,9 +243,14 @@ public:
     const FloatPoint& replicatedLayerPosition() const { return m_replicatedLayerPosition; }
     void setReplicatedLayerPosition(const FloatPoint& p) { m_replicatedLayerPosition = p; }
 
+    enum ShouldSetNeedsDisplay {
+        DontSetNeedsDisplay,
+        SetNeedsDisplay
+    };
+
     // Offset is origin of the renderer minus origin of the graphics layer (so either zero or negative).
     IntSize offsetFromRenderer() const { return m_offsetFromRenderer; }
-    void setOffsetFromRenderer(const IntSize&);
+    void setOffsetFromRenderer(const IntSize&, ShouldSetNeedsDisplay = SetNeedsDisplay);
 
     // The position of the layer (the location of its top-left corner in its parent)
     const FloatPoint& position() const { return m_position; }
@@ -287,11 +293,11 @@ public:
     bool acceleratesDrawing() const { return m_acceleratesDrawing; }
     virtual void setAcceleratesDrawing(bool b) { m_acceleratesDrawing = b; }
 
-    // The color used to paint the layer backgrounds
+    // The color used to paint the layer background. Pass an invalid color to remove it.
+    // Note that this covers the entire layer. Use setContentsToSolidColor() if the color should
+    // only cover the contentsRect.
     const Color& backgroundColor() const { return m_backgroundColor; }
     virtual void setBackgroundColor(const Color&);
-    virtual void clearBackgroundColor();
-    bool backgroundColorSet() const { return m_backgroundColorSet; }
 
     // opaque means that we know the layer contents have no alpha
     bool contentsOpaque() const { return m_contentsOpaque; }
@@ -341,8 +347,12 @@ public:
     virtual void setContentsToImage(Image*) { }
     virtual bool shouldDirectlyCompositeImage(Image*) const { return true; }
     virtual void setContentsToMedia(PlatformLayer*) { } // video or plug-in
-    virtual void setContentsToBackgroundColor(const Color&) { }
+    // Pass an invalid color to remove the contents layer.
+    virtual void setContentsToSolidColor(const Color&) { }
     virtual void setContentsToCanvas(PlatformLayer*) { }
+    // FIXME: webkit.org/b/109658
+    // Should unify setContentsToMedia and setContentsToCanvas
+    virtual void setContentsToPlatformLayer(PlatformLayer* layer) { setContentsToMedia(layer); }
     virtual bool hasContentsLayer() const { return false; }
 
     // Callback from the underlying graphics system to draw layer contents.
@@ -367,6 +377,7 @@ public:
     virtual void setShowRepaintCounter(bool show) { m_showRepaintCounter = show; }
     bool isShowingRepaintCounter() const { return m_showRepaintCounter; }
 
+    // FIXME: this is really a paint count.
     int repaintCount() const { return m_repaintCount; }
     int incrementRepaintCount() { return ++m_repaintCount; }
 
@@ -405,21 +416,24 @@ public:
     // Return an estimate of the backing store memory cost (in bytes). May be incorrect for tiled layers.
     virtual double backingStoreMemoryEstimate() const;
 
-    bool usingTiledLayer() const { return m_usingTiledLayer; }
-
+    bool usingTiledBacking() const { return m_usingTiledBacking; }
     virtual TiledBacking* tiledBacking() const { return 0; }
 
     void resetTrackedRepaints();
     void addRepaintRect(const FloatRect&);
 
-#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
-    // This allows several alternative GraphicsLayer implementations in the same port,
-    // e.g. if a different GraphicsLayer implementation is needed in WebKit1 vs. WebKit2.
-    typedef PassOwnPtr<GraphicsLayer> GraphicsLayerFactoryCallback(GraphicsLayerClient*);
-    static void setGraphicsLayerFactory(GraphicsLayerFactoryCallback);
+    static bool supportsBackgroundColorContent()
+    {
+#if USE(CA) || USE(TEXTURE_MAPPER) || PLATFORM(CHROMIUM)
+        return true;
+#else
+        return false;
 #endif
+    }
 
     void updateDebugIndicators();
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     // Should be called from derived class destructors. Should call willBeDestroyed() on super.
@@ -480,11 +494,10 @@ protected:
     FilterOperations m_filters;
 #endif
 
-    bool m_backgroundColorSet : 1;
     bool m_contentsOpaque : 1;
     bool m_preserves3D: 1;
     bool m_backfaceVisibility : 1;
-    bool m_usingTiledLayer : 1;
+    bool m_usingTiledBacking : 1;
     bool m_masksToBounds : 1;
     bool m_drawsContent : 1;
     bool m_contentsVisible : 1;
@@ -510,10 +523,6 @@ protected:
     IntRect m_contentsRect;
 
     int m_repaintCount;
-
-#if PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
-    static GraphicsLayer::GraphicsLayerFactoryCallback* s_graphicsLayerFactory;
-#endif
 };
 
 

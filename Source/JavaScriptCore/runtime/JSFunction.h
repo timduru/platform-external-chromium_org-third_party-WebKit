@@ -25,7 +25,10 @@
 #define JSFunction_h
 
 #include "InternalFunction.h"
+#include "JSDestructibleObject.h"
 #include "JSScope.h"
+#include "ObjectAllocationProfile.h"
+#include "Watchpoint.h"
 
 namespace JSC {
 
@@ -46,14 +49,14 @@ namespace JSC {
 
     JS_EXPORT_PRIVATE String getCalculatedDisplayName(CallFrame*, JSObject*);
     
-    class JSFunction : public JSNonFinalObject {
+    class JSFunction : public JSDestructibleObject {
         friend class JIT;
         friend class DFG::SpeculativeJIT;
         friend class DFG::JITCompiler;
         friend class JSGlobalData;
 
     public:
-        typedef JSNonFinalObject Base;
+        typedef JSDestructibleObject Base;
 
         JS_EXPORT_PRIVATE static JSFunction* create(ExecState*, JSGlobalObject*, int length, const String& name, NativeFunction, Intrinsic = NoIntrinsic, NativeFunction nativeConstructor = callHostFunctionAsConstructor);
 
@@ -65,6 +68,8 @@ namespace JSC {
             function->finishCreation(globalData);
             return function;
         }
+        
+        static void destroy(JSCell*);
         
         JS_EXPORT_PRIVATE String name(ExecState*);
         JS_EXPORT_PRIVATE String displayName(ExecState*);
@@ -112,26 +117,41 @@ namespace JSC {
         static ConstructType getConstructData(JSCell*, ConstructData&);
         static CallType getCallData(JSCell*, CallData&);
 
-        static inline size_t offsetOfScopeChain()
+        static inline ptrdiff_t offsetOfScopeChain()
         {
             return OBJECT_OFFSETOF(JSFunction, m_scope);
         }
 
-        static inline size_t offsetOfExecutable()
+        static inline ptrdiff_t offsetOfExecutable()
         {
             return OBJECT_OFFSETOF(JSFunction, m_executable);
         }
 
-        Structure* cachedInheritorID(ExecState* exec)
+        static inline ptrdiff_t offsetOfAllocationProfile()
         {
-            if (UNLIKELY(!m_cachedInheritorID))
-                return cacheInheritorID(exec);
-            return m_cachedInheritorID.get();
+            return OBJECT_OFFSETOF(JSFunction, m_allocationProfile);
         }
 
-        static size_t offsetOfCachedInheritorID()
+        ObjectAllocationProfile* allocationProfile(ExecState* exec, unsigned inlineCapacity)
         {
-            return OBJECT_OFFSETOF(JSFunction, m_cachedInheritorID);
+            if (UNLIKELY(m_allocationProfile.isNull()))
+                return createAllocationProfile(exec, inlineCapacity);
+            return &m_allocationProfile;
+        }
+
+        ObjectAllocationProfile* tryGetAllocationProfile()
+        {
+            if (m_allocationProfile.isNull())
+                return 0;
+            if (m_allocationProfileWatchpoint.hasBeenInvalidated())
+                return 0;
+            return &m_allocationProfile;
+        }
+        
+        void addAllocationProfileWatchpoint(Watchpoint* watchpoint)
+        {
+            ASSERT(tryGetAllocationProfile());
+            m_allocationProfileWatchpoint.add(watchpoint);
         }
 
     protected:
@@ -143,7 +163,7 @@ namespace JSC {
         void finishCreation(ExecState*, NativeExecutable*, int length, const String& name);
         using Base::finishCreation;
 
-        Structure* cacheInheritorID(ExecState*);
+        ObjectAllocationProfile* createAllocationProfile(ExecState*, size_t inlineCapacity);
 
         static bool getOwnPropertySlot(JSCell*, ExecState*, PropertyName, PropertySlot&);
         static bool getOwnPropertyDescriptor(JSObject*, ExecState*, PropertyName, PropertyDescriptor&);
@@ -168,13 +188,9 @@ namespace JSC {
 
         WriteBarrier<ExecutableBase> m_executable;
         WriteBarrier<JSScope> m_scope;
-        WriteBarrier<Structure> m_cachedInheritorID;
+        ObjectAllocationProfile m_allocationProfile;
+        InlineWatchpointSet m_allocationProfileWatchpoint;
     };
-
-    inline bool JSValue::isFunction() const
-    {
-        return isCell() && (asCell()->inherits(&JSFunction::s_info) || asCell()->inherits(&InternalFunction::s_info));
-    }
 
 } // namespace JSC
 

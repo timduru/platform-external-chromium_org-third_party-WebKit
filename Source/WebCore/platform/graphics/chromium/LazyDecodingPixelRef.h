@@ -30,14 +30,22 @@
 #include "SkPixelRef.h"
 #include "SkRect.h"
 #include "SkSize.h"
+#include "SkTypes.h"
+#include "skia/ext/lazy_pixel_ref.h"
 
 #include <wtf/RefPtr.h>
+#include <wtf/ThreadingPrimitives.h>
+
+using skia::LazyPixelRef;
+
+class SkData;
 
 namespace WebCore {
 
 class ImageFrameGenerator;
+class ScaledImageFragment;
 
-class LazyDecodingPixelRef : public SkPixelRef {
+class LazyDecodingPixelRef : public LazyPixelRef {
 public:
     LazyDecodingPixelRef(PassRefPtr<ImageFrameGenerator>, const SkISize& scaledSize, const SkIRect& scaledSubset);
     virtual ~LazyDecodingPixelRef();
@@ -48,16 +56,24 @@ public:
     bool isScaled(const SkISize& fullSize) const;
     bool isClipped() const;
 
+    virtual bool PrepareToDecode(const LazyPixelRef::PrepareParams&);
+    virtual void Decode();
+
 protected:
     // SkPixelRef implementation.
     virtual void* onLockPixels(SkColorTable**);
     virtual void onUnlockPixels();
     virtual bool onLockPixelsAreWritable() const;
 
+    virtual SkData* onRefEncodedData() SK_OVERRIDE;
+
 private:
     RefPtr<ImageFrameGenerator> m_frameGenerator;
     SkISize m_scaledSize;
     SkIRect m_scaledSubset;
+
+    const ScaledImageFragment* m_lockedCachedImage;
+    Mutex m_mutex;
 };
 
 } // namespace WebCore

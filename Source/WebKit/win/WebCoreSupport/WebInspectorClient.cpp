@@ -42,7 +42,6 @@
 #include <WebCore/FloatRect.h>
 #include <WebCore/FrameView.h>
 #include <WebCore/InspectorController.h>
-#include <WebCore/NotImplemented.h>
 #include <WebCore/Page.h>
 #include <WebCore/RenderObject.h>
 #include <WebCore/WindowMessageBroadcaster.h>
@@ -254,6 +253,9 @@ void WebInspectorFrontendClient::frontendLoaded()
 {
     InspectorFrontendClientLocal::frontendLoaded();
 
+    if (m_attached)
+        restoreAttachedWindowHeight();
+
     setAttachedWindow(m_attached);
 }
 
@@ -264,12 +266,6 @@ String WebInspectorFrontendClient::localizedStringsURL()
         return String();
 
     return CFURLGetString(url.get());
-}
-
-String WebInspectorFrontendClient::hiddenPanels()
-{
-    // FIXME: implement this
-    return String();
 }
 
 void WebInspectorFrontendClient::bringToFront()
@@ -290,6 +286,13 @@ void WebInspectorFrontendClient::attachWindow()
     m_inspectorClient->setInspectorStartsAttached(true);
 
     closeWindowWithoutNotifications();
+    // We need to set the attached window's height before we actually attach the window.
+    // Make sure that m_attached is true so that calling setAttachedWindowHeight from restoreAttachedWindowHeight doesn't return early. 
+    m_attached = true;
+    // Immediately after calling showWindowWithoutNotifications(), the parent frameview's visibleHeight incorrectly returns 0 always (Windows only).
+    // We are expecting this value to be just the height of the parent window when we call restoreAttachedWindowHeight, which it is before
+    // calling showWindowWithoutNotifications().
+    restoreAttachedWindowHeight();
     showWindowWithoutNotifications();
 }
 

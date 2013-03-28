@@ -48,7 +48,6 @@
 #include "Scrollbar.h"
 #include "Settings.h"
 #include "WebCoreSystemInterface.h"
-#include <objc/objc-runtime.h>
 #include <wtf/MainThread.h>
 #include <wtf/ObjcRuntimeExtras.h>
 #include <wtf/StdLibExtras.h>
@@ -432,7 +431,7 @@ bool EventHandler::passWheelEventToWidget(const PlatformWheelEvent& wheelEvent, 
         if (!widget->isFrameView())
             return false;
 
-        return static_cast<FrameView*>(widget)->frame()->eventHandler()->handleWheelEvent(wheelEvent);
+        return toFrameView(widget)->frame()->eventHandler()->handleWheelEvent(wheelEvent);
     }
 
     if ([currentNSEvent() type] != NSScrollWheel || m_sendingEventToSubview) 

@@ -54,14 +54,21 @@ public:
 #if ENABLE(WEBGL)
     ScriptObject wrapWebGLContext(const ScriptObject&);
 #endif
+    void markFrameEnd();
 
-    void captureFrame(ErrorString*, String*);
-    void dropTraceLog(ErrorString*, const String&);
-    void traceLog(ErrorString*, const String&, RefPtr<TypeBuilder::Canvas::TraceLog>*);
-    void replayTraceLog(ErrorString*, const String&, int, String*);
+    void captureFrame(ErrorString*, TypeBuilder::Canvas::TraceLogId*);
+    void startCapturing(ErrorString*, TypeBuilder::Canvas::TraceLogId*);
+    void stopCapturing(ErrorString*, const TypeBuilder::Canvas::TraceLogId&);
+    void dropTraceLog(ErrorString*, const TypeBuilder::Canvas::TraceLogId&);
+    void traceLog(ErrorString*, const String&, const int*, const int*, RefPtr<TypeBuilder::Canvas::TraceLog>*);
+    void replayTraceLog(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, int, RefPtr<TypeBuilder::Canvas::ResourceState>*);
+    void resourceInfo(ErrorString*, const TypeBuilder::Canvas::ResourceId&, RefPtr<TypeBuilder::Canvas::ResourceInfo>*);
+    void resourceState(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, const TypeBuilder::Canvas::ResourceId&, RefPtr<TypeBuilder::Canvas::ResourceState>*);
 
 private:
     ScriptObject callWrapContextFunction(const String&, const ScriptObject&);
+    void callStartCapturingFunction(const String&, ErrorString*, String*);
+    void callVoidFunctionWithTraceLogIdArgument(const String&, ErrorString*, const String&);
 };
 
 #endif

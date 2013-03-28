@@ -218,31 +218,31 @@ bool SVGPathElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGPathElement::parseAttribute(const Attribute& attribute)
+void SVGPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(attribute.name())) {
-        SVGStyledTransformableElement::parseAttribute(attribute);
+    if (!isSupportedAttribute(name)) {
+        SVGStyledTransformableElement::parseAttribute(name, value);
         return;
     }
 
-    if (attribute.name() == SVGNames::dAttr) {
-        if (!buildSVGPathByteStreamFromString(attribute.value(), m_pathByteStream.get(), UnalteredParsing))
-            document()->accessSVGExtensions()->reportError("Problem parsing d=\"" + attribute.value() + "\"");
+    if (name == SVGNames::dAttr) {
+        if (!buildSVGPathByteStreamFromString(value, m_pathByteStream.get(), UnalteredParsing))
+            document()->accessSVGExtensions()->reportError("Problem parsing d=\"" + value + "\"");
         return;
     }
 
-    if (attribute.name() == SVGNames::pathLengthAttr) {
-        setPathLengthBaseValue(attribute.value().toFloat());
+    if (name == SVGNames::pathLengthAttr) {
+        setPathLengthBaseValue(value.toFloat());
         if (pathLengthBaseValue() < 0)
             document()->accessSVGExtensions()->reportError("A negative value for path attribute <pathLength> is not allowed");
         return;
     }
 
-    if (SVGTests::parseAttribute(attribute))
+    if (SVGTests::parseAttribute(name, value))
         return;
-    if (SVGLangSpace::parseAttribute(attribute))
+    if (SVGLangSpace::parseAttribute(name, value))
         return;
-    if (SVGExternalResourcesRequired::parseAttribute(attribute))
+    if (SVGExternalResourcesRequired::parseAttribute(name, value))
         return;
 
     ASSERT_NOT_REACHED();
@@ -260,7 +260,7 @@ void SVGPathElement::svgAttributeChanged(const QualifiedName& attrName)
     if (SVGTests::handleAttributeChange(this, attrName))
         return;
 
-    RenderSVGPath* renderer = static_cast<RenderSVGPath*>(this->renderer());
+    RenderSVGPath* renderer = toRenderSVGPath(this->renderer());
 
     if (attrName == SVGNames::dAttr) {
         if (m_pathSegList.shouldSynchronize && !SVGAnimatedProperty::lookupWrapper<SVGPathElement, SVGAnimatedPathSegListPropertyTearOff>(this, dPropertyInfo())->isAnimating()) {
@@ -314,10 +314,10 @@ SVGPathByteStream* SVGPathElement::pathByteStream() const
     return static_cast<SVGAnimatedPathSegListPropertyTearOff*>(property)->animatedPathByteStream();
 }
 
-PassRefPtr<SVGAnimatedProperty> SVGPathElement::lookupOrCreateDWrapper(void* contextElement)
+PassRefPtr<SVGAnimatedProperty> SVGPathElement::lookupOrCreateDWrapper(SVGElement* contextElement)
 {
     ASSERT(contextElement);
-    SVGPathElement* ownerType = static_cast<SVGPathElement*>(contextElement);
+    SVGPathElement* ownerType = toSVGPathElement(contextElement);
 
     if (SVGAnimatedProperty* property = SVGAnimatedProperty::lookupWrapper<SVGPathElement, SVGAnimatedPathSegListPropertyTearOff>(ownerType, dPropertyInfo()))
         return property;
@@ -329,10 +329,10 @@ PassRefPtr<SVGAnimatedProperty> SVGPathElement::lookupOrCreateDWrapper(void* con
            (ownerType, dPropertyInfo(), ownerType->m_pathSegList.value);
 }
 
-void SVGPathElement::synchronizeD(void* contextElement)
+void SVGPathElement::synchronizeD(SVGElement* contextElement)
 {
     ASSERT(contextElement);
-    SVGPathElement* ownerType = static_cast<SVGPathElement*>(contextElement);
+    SVGPathElement* ownerType = toSVGPathElement(contextElement);
     if (!ownerType->m_pathSegList.shouldSynchronize)
         return;
     ownerType->m_pathSegList.synchronize(ownerType, dPropertyInfo()->attributeName, ownerType->m_pathSegList.value.valueAsString());
@@ -382,7 +382,7 @@ void SVGPathElement::pathSegListChanged(SVGPathSegRole role, ListModification li
 
     invalidateSVGAttributes();
     
-    RenderSVGPath* renderer = static_cast<RenderSVGPath*>(this->renderer());
+    RenderSVGPath* renderer = toRenderSVGPath(this->renderer());
     if (!renderer)
         return;
 
@@ -395,7 +395,7 @@ FloatRect SVGPathElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
     if (styleUpdateStrategy == AllowStyleUpdate)
         this->document()->updateLayoutIgnorePendingStylesheets();
 
-    RenderSVGPath* renderer = static_cast<RenderSVGPath*>(this->renderer());
+    RenderSVGPath* renderer = toRenderSVGPath(this->renderer());
 
     // FIXME: Eventually we should support getBBox for detached elements.
     if (!renderer)

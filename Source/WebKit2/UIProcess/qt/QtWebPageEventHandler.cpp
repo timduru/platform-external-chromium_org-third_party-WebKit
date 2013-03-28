@@ -435,6 +435,12 @@ void QtWebPageEventHandler::updateTextInputState()
     setInputPanelVisible(editor.isContentEditable);
 }
 
+void QtWebPageEventHandler::handleWillSetInputMethodState()
+{
+    if (qApp->inputMethod()->isVisible())
+        qApp->inputMethod()->commit();
+}
+
 void QtWebPageEventHandler::doneWithGestureEvent(const WebGestureEvent& event, bool wasEventHandled)
 {
     if (event.type() != WebEvent::GestureSingleTap)
@@ -454,8 +460,6 @@ void QtWebPageEventHandler::handleInputEvent(const QInputEvent* event)
         switch (event->type()) {
         case QEvent::MouseButtonPress:
         case QEvent::TouchBegin:
-            ASSERT(!m_viewportController->panGestureActive());
-            ASSERT(!m_viewportController->pinchGestureActive());
             m_viewportController->touchBegin();
 
             // The page viewport controller might still be animating kinetic scrolling or a scale animation

@@ -30,9 +30,9 @@
 #ifndef WebDOMMessageEvent_h
 #define WebDOMMessageEvent_h
 
+#include "../../../Platform/chromium/public/WebMessagePortChannel.h"
 #include "WebDOMEvent.h"
-#include "WebMessagePortChannel.h"
-#include "platform/WebSerializedScriptValue.h"
+#include "WebSerializedScriptValue.h"
 
 #if WEBKIT_IMPLEMENTATION
 #include "Event.h"

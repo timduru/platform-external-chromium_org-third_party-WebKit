@@ -53,7 +53,7 @@ public:
 
     virtual bool isBitmapImage() const;
 
-    virtual bool currentFrameHasAlpha();
+    virtual bool currentFrameKnownToBeOpaque() OVERRIDE;
 
     virtual IntSize size() const;
 
@@ -70,7 +70,7 @@ public:
 #endif
 
 protected:
-    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator);
+    virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode);
 
 private:
     NativeImageSkia m_nativeImage;

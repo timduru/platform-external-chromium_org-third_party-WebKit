@@ -33,13 +33,13 @@ class TestObj;
 class WebDOMDictionary;
 class WebDOMDocument;
 class WebDOMEventListener;
-class WebDOMIDBKey;
 class WebDOMNode;
+class WebDOMObject;
 class WebDOMSVGPoint;
 class WebDOMString;
+class WebDOMTestEnumType;
 class WebDOMTestObj;
 class WebDOMa;
-class WebDOMany;
 class WebDOMb;
 class WebDOMbool;
 class WebDOMd;
@@ -130,8 +130,8 @@ public:
     int conditionalAttr3() const;
     void setConditionalAttr3(int);
 #endif
-    WebDOMany anyAttribute() const;
-    void setAnyAttribute(const WebDOMany&);
+    WebDOMObject anyAttribute() const;
+    void setAnyAttribute(const WebDOMObject&);
     WebDOMDocument contentDocument() const;
     WebDOMSVGPoint mutablePoint() const;
     void setMutablePoint(const WebDOMSVGPoint&);
@@ -146,6 +146,14 @@ public:
     void setId(int);
     WebDOMString hash() const;
     int replaceableAttribute() const;
+    double nullableDoubleAttribute() const;
+    int nullableLongAttribute() const;
+    bool nullableBooleanAttribute() const;
+    WebDOMString nullableStringAttribute() const;
+    int nullableLongSettableAttribute() const;
+    void setNullableLongSettableAttribute(int);
+    int nullableStringValue() const;
+    void setNullableStringValue(int);
 
     void voidMethod();
     void voidMethodWithArgs(int longArg, const WebDOMString& strArg, const WebDOMTestObj& objArg);
@@ -153,9 +161,9 @@ public:
     int longMethodWithArgs(int longArg, const WebDOMString& strArg, const WebDOMTestObj& objArg);
     WebDOMTestObj objMethod();
     WebDOMTestObj objMethodWithArgs(int longArg, const WebDOMString& strArg, const WebDOMTestObj& objArg);
+    void methodWithEnumArg(const WebDOMTestEnumType& enumArg);
     WebDOMTestObj methodThatRequiresAllArgsAndThrows(const WebDOMString& strArg, const WebDOMTestObj& objArg);
     void serializedValue(const WebDOMString& serializedArg);
-    void idbKey(const WebDOMIDBKey& key);
     void optionsObject(const WebDOMDictionary& oo, const WebDOMDictionary& ooo);
     void methodWithException();
     void addEventListener(const WebDOMString& type, const WebDOMEventListener& listener, bool useCapture);

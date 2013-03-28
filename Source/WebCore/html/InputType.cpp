@@ -40,6 +40,7 @@
 #include "ElementShadow.h"
 #include "EmailInputType.h"
 #include "ExceptionCode.h"
+#include "ExceptionCodePlaceholder.h"
 #include "FileInputType.h"
 #include "FileList.h"
 #include "FormController.h"
@@ -55,6 +56,7 @@
 #include "KeyboardEvent.h"
 #include "LocalizedStrings.h"
 #include "MonthInputType.h"
+#include "NodeRenderStyle.h"
 #include "NumberInputType.h"
 #include "Page.h"
 #include "PasswordInputType.h"
@@ -85,7 +87,7 @@ using namespace HTMLNames;
 using namespace std;
 
 typedef PassOwnPtr<InputType> (*InputTypeFactoryFunction)(HTMLInputElement*);
-typedef HashMap<String, InputTypeFactoryFunction, CaseFoldingHash> InputTypeFactoryMap;
+typedef HashMap<AtomicString, InputTypeFactoryFunction, CaseFoldingHash> InputTypeFactoryMap;
 
 static PassOwnPtr<InputTypeFactoryMap> createInputTypeFactoryMap()
 {
@@ -136,7 +138,7 @@ static PassOwnPtr<InputTypeFactoryMap> createInputTypeFactoryMap()
     return map.release();
 }
 
-PassOwnPtr<InputType> InputType::create(HTMLInputElement* element, const String& typeName)
+PassOwnPtr<InputType> InputType::create(HTMLInputElement* element, const AtomicString& typeName)
 {
     static const InputTypeFactoryMap* factoryMap = createInputTypeFactoryMap().leakPtr();
     PassOwnPtr<InputType> (*factory)(HTMLInputElement*) = typeName.isEmpty() ? 0 : factoryMap->get(typeName);
@@ -258,6 +260,11 @@ bool InputType::valueMissing(const String&) const
     return false;
 }
 
+bool InputType::hasBadInput() const
+{
+    return false;
+}
+
 bool InputType::patternMismatch(const String&) const
 {
     return false;
@@ -346,6 +353,12 @@ bool InputType::stepMismatch(const String& value) const
     return createStepRange(RejectAny).stepMismatch(numericValue);
 }
 
+String InputType::badInputText() const
+{
+    ASSERT_NOT_REACHED();
+    return validationMessageTypeMismatchText();
+}
+
 String InputType::typeMismatchText() const
 {
     return validationMessageTypeMismatchText();
@@ -361,7 +374,10 @@ String InputType::validationMessage() const
     const String value = element()->value();
 
     // The order of the following checks is meaningful. e.g. We'd like to show the
-    // valueMissing message even if the control has other validation errors.
+    // badInput message even if the control has other validation errors.
+    if (hasBadInput())
+        return badInputText();
+
     if (valueMissing(value))
         return valueMissingText();
 
@@ -450,14 +466,14 @@ RenderObject* InputType::createRenderer(RenderArena*, RenderStyle* style) const
     return RenderObject::createObject(element(), style);
 }
 
+PassRefPtr<RenderStyle> InputType::customStyleForRenderer(PassRefPtr<RenderStyle> originalStyle)
+{
+    return originalStyle;
+}
+
 void InputType::blur()
 {
     element()->defaultBlur();
-}
-
-void InputType::focus(bool restorePreviousSelection)
-{
-    element()->defaultFocus(restorePreviousSelection);
 }
 
 void InputType::createShadowSubtree()
@@ -470,14 +486,18 @@ void InputType::destroyShadowSubtree()
     if (!root)
         return;
 
-    root->removeAllChildren();
+    root->removeChildren();
 
     // It's ok to clear contents of all other ShadowRoots because they must have
     // been created by TextFieldDecorationElement, and we don't allow adding
     // AuthorShadowRoot to HTMLInputElement.
     while ((root = root->youngerShadowRoot())) {
-        root->removeAllChildren();
+#if ENABLE(SHADOW_DOM)
+        root->removeChildren();
         root->appendChild(HTMLShadowElement::create(shadowTag, element()->document()));
+#else
+        ASSERT_NOT_REACHED();
+#endif
     }
 }
 
@@ -543,7 +563,7 @@ bool InputType::shouldUseInputMethod() const
     return false;
 }
 
-void InputType::handleFocusEvent()
+void InputType::handleFocusEvent(Node*, FocusDirection)
 {
 }
 
@@ -573,10 +593,6 @@ void InputType::altAttributeChanged()
 }
 
 void InputType::srcAttributeChanged()
-{
-}
-
-void InputType::willMoveToNewOwnerDocument()
 {
 }
 
@@ -656,8 +672,19 @@ void InputType::setValue(const String& sanitizedValue, bool valueChanged, TextFi
 {
     element()->setValueInternal(sanitizedValue, eventBehavior);
     element()->setNeedsStyleRecalc();
-    if (valueChanged && eventBehavior != DispatchNoEvent)
+    if (!valueChanged)
+        return;
+    switch (eventBehavior) {
+    case DispatchChangeEvent:
         element()->dispatchFormControlChangeEvent();
+        break;
+    case DispatchInputAndChangeEvent:
+        element()->dispatchFormControlInputEvent();
+        element()->dispatchFormControlChangeEvent();
+        break;
+    case DispatchNoEvent:
+        break;
+    }
 }
 
 bool InputType::canSetValue(const String&)
@@ -684,24 +711,9 @@ String InputType::visibleValue() const
     return element()->value();
 }
 
-String InputType::convertFromVisibleValue(const String& visibleValue) const
-{
-    return visibleValue;
-}
-
-bool InputType::isAcceptableValue(const String&)
-{
-    return true;
-}
-
 String InputType::sanitizeValue(const String& proposedValue) const
 {
     return proposedValue;
-}
-
-bool InputType::hasUnacceptableValue()
-{
-    return false;
 }
 
 bool InputType::receiveDroppedFiles(const DragData*)
@@ -871,11 +883,20 @@ bool InputType::supportsPlaceholder() const
     return false;
 }
 
+bool InputType::supportsReadOnly() const
+{
+    return false;
+}
+
 void InputType::updateInnerTextValue()
 {
 }
 
 void InputType::updatePlaceholderText()
+{
+}
+
+void InputType::attributeChanged()
 {
 }
 
@@ -891,8 +912,17 @@ void InputType::readonlyAttributeChanged()
 {
 }
 
+void InputType::requiredAttributeChanged()
+{
+}
+
+void InputType::valueAttributeChanged()
+{
+}
+
 void InputType::subtreeHasChanged()
 {
+    ASSERT_NOT_REACHED();
 }
 
 #if ENABLE(TOUCH_EVENTS)
@@ -918,6 +948,10 @@ Decimal InputType::findClosestTickMarkValue(const Decimal&)
     return Decimal::nan();
 }
 #endif
+
+void InputType::updateClearButtonVisibility()
+{
+}
 
 bool InputType::supportsIndeterminateAppearance() const
 {
@@ -979,8 +1013,8 @@ void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldE
 
     setValueAsDecimal(newValue, eventBehavior, ec);
 
-    if (AXObjectCache::accessibilityEnabled())
-         element()->document()->axObjectCache()->postNotification(element(), AXObjectCache::AXValueChanged, true);
+    if (AXObjectCache* cache = element()->document()->existingAXObjectCache())
+        cache->postNotification(element(), AXObjectCache::AXValueChanged, true);
 }
 
 bool InputType::getAllowedValueStep(Decimal* step) const
@@ -1069,20 +1103,17 @@ void InputType::stepUpFromRenderer(int n)
     String currentStringValue = element()->value();
     Decimal current = parseToNumberOrNaN(currentStringValue);
     if (!current.isFinite()) {
-        ExceptionCode ec;
         current = defaultValueForStepUp();
         const Decimal nextDiff = step * n;
         if (current < stepRange.minimum() - nextDiff)
             current = stepRange.minimum() - nextDiff;
         if (current > stepRange.maximum() - nextDiff)
             current = stepRange.maximum() - nextDiff;
-        setValueAsDecimal(current, DispatchInputAndChangeEvent, ec);
+        setValueAsDecimal(current, DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
     }
-    if ((sign > 0 && current < stepRange.minimum()) || (sign < 0 && current > stepRange.maximum())) {
-        ExceptionCode ec;
-        setValueAsDecimal(sign > 0 ? stepRange.minimum() : stepRange.maximum(), DispatchInputAndChangeEvent, ec);
-    } else {
-        ExceptionCode ec;
+    if ((sign > 0 && current < stepRange.minimum()) || (sign < 0 && current > stepRange.maximum()))
+        setValueAsDecimal(sign > 0 ? stepRange.minimum() : stepRange.maximum(), DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
+    else {
         if (stepMismatch(element()->value())) {
             ASSERT(!step.isZero());
             const Decimal base = stepRange.stepBase();
@@ -1099,13 +1130,21 @@ void InputType::stepUpFromRenderer(int n)
             if (newValue > stepRange.maximum())
                 newValue = stepRange.maximum();
 
-            setValueAsDecimal(newValue, n == 1 || n == -1 ? DispatchInputAndChangeEvent : DispatchNoEvent, ec);
+            setValueAsDecimal(newValue, n == 1 || n == -1 ? DispatchInputAndChangeEvent : DispatchNoEvent, IGNORE_EXCEPTION);
             if (n > 1)
-                applyStep(n - 1, AnyIsDefaultStep, DispatchInputAndChangeEvent, ec);
+                applyStep(n - 1, AnyIsDefaultStep, DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
             else if (n < -1)
-                applyStep(n + 1, AnyIsDefaultStep, DispatchInputAndChangeEvent, ec);
+                applyStep(n + 1, AnyIsDefaultStep, DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
         } else
-            applyStep(n, AnyIsDefaultStep, DispatchInputAndChangeEvent, ec);
+            applyStep(n, AnyIsDefaultStep, DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
+    }
+}
+
+void InputType::observeFeatureIfVisible(FeatureObserver::Feature feature) const
+{
+    if (RenderStyle* style = element()->renderStyle()) {
+        if (style->visibility() != HIDDEN)
+            FeatureObserver::observe(element()->document(), feature);
     }
 }
 

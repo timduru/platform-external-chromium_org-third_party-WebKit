@@ -30,8 +30,10 @@
 #include "config.h"
 #include "V8CustomXPathNSResolver.h"
 
-#include "Console.h"
 #include "DOMWindow.h"
+#include "Frame.h"
+#include "Page.h"
+#include "PageConsole.h"
 #include "ScriptCallStack.h"
 #include "ScriptController.h"
 #include "ScriptExecutionContext.h"
@@ -41,13 +43,14 @@
 
 namespace WebCore {
 
-PassRefPtr<V8CustomXPathNSResolver> V8CustomXPathNSResolver::create(v8::Handle<v8::Object> resolver)
+PassRefPtr<V8CustomXPathNSResolver> V8CustomXPathNSResolver::create(v8::Handle<v8::Object> resolver, v8::Isolate* isolate)
 {
-    return adoptRef(new V8CustomXPathNSResolver(resolver));
+    return adoptRef(new V8CustomXPathNSResolver(resolver, isolate));
 }
 
-V8CustomXPathNSResolver::V8CustomXPathNSResolver(v8::Handle<v8::Object> resolver)
+V8CustomXPathNSResolver::V8CustomXPathNSResolver(v8::Handle<v8::Object> resolver, v8::Isolate* isolate)
     : m_resolver(resolver)
+    , m_isolate(isolate)
 {
 }
 
@@ -58,7 +61,7 @@ V8CustomXPathNSResolver::~V8CustomXPathNSResolver()
 String V8CustomXPathNSResolver::lookupNamespaceURI(const String& prefix)
 {
     v8::Handle<v8::Function> lookupNamespaceURIFunc;
-    v8::Handle<v8::String> lookupNamespaceURIName = v8::String::New("lookupNamespaceURI");
+    v8::Handle<v8::String> lookupNamespaceURIName = v8::String::NewSymbol("lookupNamespaceURI");
 
     // Check if the resolver has a function property named lookupNamespaceURI.
     if (m_resolver->Has(lookupNamespaceURIName)) {
@@ -68,7 +71,9 @@ String V8CustomXPathNSResolver::lookupNamespaceURI(const String& prefix)
     }
 
     if (lookupNamespaceURIFunc.IsEmpty() && !m_resolver->IsFunction()) {
-        activeDOMWindow(BindingState::instance())->console()->addMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "XPathNSResolver does not have a lookupNamespaceURI method.");
+        Frame* frame = activeDOMWindow(BindingState::instance())->frame();
+        if (frame && frame->page())
+            frame->page()->console()->addMessage(JSMessageSource, ErrorMessageLevel, "XPathNSResolver does not have a lookupNamespaceURI method.");
         return String();
     }
 
@@ -77,7 +82,7 @@ String V8CustomXPathNSResolver::lookupNamespaceURI(const String& prefix)
     tryCatch.SetVerbose(true); // Print exceptions to console.
 
     const int argc = 1;
-    v8::Handle<v8::Value> argv[argc] = { v8String(prefix) };
+    v8::Handle<v8::Value> argv[argc] = { v8String(prefix, m_isolate) };
     v8::Handle<v8::Function> function = lookupNamespaceURIFunc.IsEmpty() ? v8::Handle<v8::Function>::Cast(m_resolver) : lookupNamespaceURIFunc;
 
     v8::Handle<v8::Value> retval = ScriptController::callFunctionWithInstrumentation(0, function, m_resolver, argc, argv);

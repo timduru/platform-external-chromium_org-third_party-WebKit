@@ -54,12 +54,12 @@ Color SkPMColorToWebCoreColor(SkPMColor);
 // Skia has problems when passed infinite, etc floats, filter them to 0.
 inline SkScalar WebCoreFloatToSkScalar(float f)
 {
-    return SkFloatToScalar(isfinite(f) ? f : 0);
+    return SkFloatToScalar(std::isfinite(f) ? f : 0);
 }
 
 inline SkScalar WebCoreDoubleToSkScalar(double d)
 {
-    return SkDoubleToScalar(isfinite(d) ? d : 0);
+    return SkDoubleToScalar(std::isfinite(d) ? d : 0);
 }
 
 // Computes the smallest rectangle that, which when drawn to the given canvas,
@@ -67,7 +67,7 @@ inline SkScalar WebCoreDoubleToSkScalar(double d)
 // clip, doing the necessary coordinate transforms.
 //
 // srcRect and destRect can be the same.
-void ClipRectToCanvas(const SkCanvas&, const SkRect& srcRect, SkRect* destRect);
+void ClipRectToCanvas(const PlatformContextSkia*, const SkRect& srcRect, SkRect* destRect);
 
 // Determine if a given WebKit point is contained in a path
 bool SkPathContainsPoint(SkPath*, const FloatPoint&, SkPath::FillType);

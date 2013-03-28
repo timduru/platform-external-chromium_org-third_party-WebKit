@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All Rights Reserved.
+ * Copyright (C) 2012 Apple Inc. All Rights Reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,9 +35,11 @@ namespace WebCore {
 
 class ContainerNode;
 class DOMSelection;
+class Document;
 class Element;
 class HTMLLabelElement;
 class HTMLMapElement;
+class LayoutPoint;
 class IdTargetObserverRegistry;
 class Node;
 
@@ -45,6 +48,7 @@ class Node;
 // the destructor.
 class TreeScope {
     friend class Document;
+    friend class TreeScopeAdopter;
 
 public:
     TreeScope* parentTreeScope() const { return m_parentTreeScope; }
@@ -57,14 +61,18 @@ public:
     void addElementById(const AtomicString& elementId, Element*);
     void removeElementById(const AtomicString& elementId, Element*);
 
+    Document* documentScope() const { return m_documentScope; }
+
     Node* ancestorInThisScope(Node*) const;
 
     void addImageMap(HTMLMapElement*);
     void removeImageMap(HTMLMapElement*);
     HTMLMapElement* getImageMap(const String& url) const;
 
+    Element* elementFromPoint(int x, int y) const;
+
     // For accessibility.
-    bool shouldCacheLabelsByForAttribute() const { return m_shouldCacheLabelsByForAttribute; }
+    bool shouldCacheLabelsByForAttribute() const { return m_labelsByForAttribute; }
     void addLabel(const AtomicString& forAttributeValue, HTMLLabelElement*);
     void removeLabel(const AtomicString& forAttributeValue, HTMLLabelElement*);
     HTMLLabelElement* labelElementForId(const AtomicString& forAttributeValue);
@@ -84,27 +92,79 @@ public:
     // Used by the basic DOM mutation methods (e.g., appendChild()).
     void adoptIfNeeded(Node*);
 
-    ContainerNode* rootNode() const { return m_rootNode; }
+    Node* rootNode() const { return m_rootNode; }
 
     IdTargetObserverRegistry& idTargetObserverRegistry() const { return *m_idTargetObserverRegistry.get(); }
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
+    static TreeScope* noDocumentInstance()
+    {
+        DEFINE_STATIC_LOCAL(TreeScope, instance, ());
+        return &instance;
+    }
+
+    // Nodes belonging to this scope hold guard references -
+    // these are enough to keep the scope from being destroyed, but
+    // not enough to keep it from removing its children. This allows a
+    // node that outlives its scope to still have a valid document
+    // pointer without introducing reference cycles.
+    void guardRef()
+    {
+        ASSERT(!deletionHasBegun());
+        ++m_guardRefCount;
+    }
+
+    void guardDeref()
+    {
+        ASSERT(!deletionHasBegun());
+        --m_guardRefCount;
+        if (!m_guardRefCount && !refCount() && this != noDocumentInstance()) {
+            beginDeletion();
+            delete this;
+        }
+    }
+
+    void removedLastRefToScope();
+
 protected:
-    explicit TreeScope(ContainerNode*);
+    TreeScope(ContainerNode*, Document*);
+    TreeScope(Document*);
     virtual ~TreeScope();
 
     void destroyTreeScopeData();
+    void clearDocumentScope();
+    void setDocumentScope(Document* document)
+    {
+        ASSERT(document);
+        ASSERT(this != noDocumentInstance());
+        m_documentScope = document;
+    }
+
+    bool hasGuardRefCount() const { return m_guardRefCount; }
 
 private:
-    ContainerNode* m_rootNode;
+    TreeScope();
+
+    virtual void dispose() { }
+
+    int refCount() const;
+#ifndef NDEBUG
+    bool deletionHasBegun();
+    void beginDeletion();
+#else
+    bool deletionHasBegun() { return false; }
+    void beginDeletion() { }
+#endif
+
+    Node* m_rootNode;
+    Document* m_documentScope;
     TreeScope* m_parentTreeScope;
+    int m_guardRefCount;
 
-    DocumentOrderedMap m_elementsById;
-    DocumentOrderedMap m_imageMapsByName;
-
-    DocumentOrderedMap m_labelsByForAttribute;
-    bool m_shouldCacheLabelsByForAttribute;
+    OwnPtr<DocumentOrderedMap> m_elementsById;
+    OwnPtr<DocumentOrderedMap> m_imageMapsByName;
+    OwnPtr<DocumentOrderedMap> m_labelsByForAttribute;
 
     OwnPtr<IdTargetObserverRegistry> m_idTargetObserverRegistry;
 
@@ -114,14 +174,15 @@ private:
 inline bool TreeScope::hasElementWithId(AtomicStringImpl* id) const
 {
     ASSERT(id);
-    return m_elementsById.contains(id);
+    return m_elementsById && m_elementsById->contains(id);
 }
 
 inline bool TreeScope::containsMultipleElementsWithId(const AtomicString& id) const
 {
-    return m_elementsById.containsMultiple(id.impl());
+    return m_elementsById && m_elementsById->containsMultiple(id.impl());
 }
 
+Node* nodeFromPoint(Document*, int x, int y, LayoutPoint* localPoint = 0);
 TreeScope* commonTreeScope(Node*, Node*);
 
 } // namespace WebCore

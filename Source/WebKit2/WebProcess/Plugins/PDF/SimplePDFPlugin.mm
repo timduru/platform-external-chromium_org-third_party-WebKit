@@ -54,6 +54,8 @@
 using namespace WebCore;
 using namespace std;
 
+static const char* postScriptMIMEType = "application/postscript";
+
 static void appendValuesInPDFNameSubtreeToVector(CGPDFDictionaryRef subtree, Vector<CGPDFObjectRef>& values)
 {
     CGPDFArrayRef names;
@@ -163,6 +165,8 @@ PassRefPtr<SimplePDFPlugin> SimplePDFPlugin::create(WebFrame* frame)
 
 SimplePDFPlugin::SimplePDFPlugin(WebFrame* frame)
     : m_frame(frame)
+    , m_isPostScript(false)
+    , m_pdfDocumentWasMutated(false)
 {
 }
 
@@ -175,12 +179,18 @@ PluginInfo SimplePDFPlugin::pluginInfo()
     PluginInfo info;
     info.name = builtInPDFPluginName();
 
-    MimeClassInfo mimeClassInfo;
-    mimeClassInfo.type ="application/pdf";
-    mimeClassInfo.desc = pdfDocumentTypeDescription();
-    mimeClassInfo.extensions.append("pdf");
+    MimeClassInfo pdfMimeClassInfo;
+    pdfMimeClassInfo.type = "application/pdf";
+    pdfMimeClassInfo.desc = pdfDocumentTypeDescription();
+    pdfMimeClassInfo.extensions.append("pdf");
+    info.mimes.append(pdfMimeClassInfo);
 
-    info.mimes.append(mimeClassInfo);
+    MimeClassInfo postScriptMimeClassInfo;
+    postScriptMimeClassInfo.type = postScriptMIMEType;
+    postScriptMimeClassInfo.desc = postScriptDocumentTypeDescription();
+    postScriptMimeClassInfo.extensions.append("ps");
+    info.mimes.append(postScriptMimeClassInfo);
+
     return info;
 }
 
@@ -341,6 +351,22 @@ JSObjectRef SimplePDFPlugin::makeJSPDFDoc(JSContextRef ctx)
     static JSClassRef jsPDFDocClass = JSClassCreate(&jsPDFDocClassDefinition);
     
     return JSObjectMake(ctx, jsPDFDocClass, this);
+}
+
+static RetainPtr<CFMutableDataRef> convertPostScriptDataToPDF(RetainPtr<CFDataRef> postScriptData)
+{
+    // Convert PostScript to PDF using the Quartz 2D API.
+    // http://developer.apple.com/documentation/GraphicsImaging/Conceptual/drawingwithquartz2d/dq_ps_convert/chapter_16_section_1.html
+
+    CGPSConverterCallbacks callbacks = { 0, 0, 0, 0, 0, 0, 0, 0 };
+    RetainPtr<CGPSConverterRef> converter = adoptCF(CGPSConverterCreate(0, &callbacks, 0));
+    RetainPtr<CGDataProviderRef> provider = adoptCF(CGDataProviderCreateWithCFData(postScriptData.get()));
+    RetainPtr<CFMutableDataRef> pdfData = adoptCF(CFDataCreateMutable(kCFAllocatorDefault, 0));
+    RetainPtr<CGDataConsumerRef> consumer = adoptCF(CGDataConsumerCreateWithCFData(pdfData.get()));
+
+    CGPSConverterConvert(converter.get(), provider.get(), consumer.get(), 0);
+
+    return pdfData;
 }
 
 void SimplePDFPlugin::pdfDocumentDidLoad()
@@ -581,11 +607,23 @@ void SimplePDFPlugin::didEvaluateJavaScript(uint64_t, const WTF::String&)
     ASSERT_NOT_REACHED();
 }
 
-void SimplePDFPlugin::streamDidReceiveResponse(uint64_t streamID, const KURL&, uint32_t, uint32_t, const String&, const String&, const String& suggestedFilename)
+void SimplePDFPlugin::convertPostScriptDataIfNeeded()
+{
+    if (!m_isPostScript)
+        return;
+
+    m_suggestedFilename = String(m_suggestedFilename + ".pdf");
+    m_data = convertPostScriptDataToPDF(m_data);
+}
+
+void SimplePDFPlugin::streamDidReceiveResponse(uint64_t streamID, const KURL&, uint32_t, uint32_t, const String& mimeType, const String&, const String& suggestedFilename)
 {
     ASSERT_UNUSED(streamID, streamID == pdfDocumentRequestID);
 
     m_suggestedFilename = suggestedFilename;
+
+    if (equalIgnoringCase(mimeType, postScriptMIMEType))
+        m_isPostScript = true;
 }
                                            
 void SimplePDFPlugin::streamDidReceiveData(uint64_t streamID, const char* bytes, int length)
@@ -602,6 +640,7 @@ void SimplePDFPlugin::streamDidFinishLoading(uint64_t streamID)
 {
     ASSERT_UNUSED(streamID, streamID == pdfDocumentRequestID);
 
+    convertPostScriptDataIfNeeded();
     pdfDocumentDidLoad();
 }
 
@@ -615,6 +654,9 @@ void SimplePDFPlugin::streamDidFail(uint64_t streamID, bool wasCancelled)
 void SimplePDFPlugin::manualStreamDidReceiveResponse(const KURL& responseURL, uint32_t streamLength,  uint32_t lastModifiedTime, const String& mimeType, const String& headers, const String& suggestedFilename)
 {
     m_suggestedFilename = suggestedFilename;
+
+    if (equalIgnoringCase(mimeType, postScriptMIMEType))
+        m_isPostScript = true;
 }
 
 void SimplePDFPlugin::manualStreamDidReceiveData(const char* bytes, int length)
@@ -627,7 +669,28 @@ void SimplePDFPlugin::manualStreamDidReceiveData(const char* bytes, int length)
 
 void SimplePDFPlugin::manualStreamDidFinishLoading()
 {
+    convertPostScriptDataIfNeeded();
     pdfDocumentDidLoad();
+}
+
+NSData *SimplePDFPlugin::liveData() const
+{
+    // Save data straight from the resource instead of PDFKit if the document is
+    // untouched by the user, so that PDFs which PDFKit can't display will still be downloadable.
+    if (pdfDocumentWasMutated())
+        return [m_pdfDocument.get() dataRepresentation];
+    else
+        return rawData();
+}
+
+PassRefPtr<SharedBuffer> SimplePDFPlugin::liveResourceData() const
+{
+    NSData *pdfData = liveData();
+
+    if (!pdfData)
+        return 0;
+
+    return SharedBuffer::wrapNSData(pdfData);
 }
 
 void SimplePDFPlugin::manualStreamDidFail(bool)

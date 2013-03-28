@@ -43,8 +43,8 @@ namespace WebCore {
 // come before and after the span.
 class RenderMultiColumnSet : public RenderRegionSet {
 public:
-    RenderMultiColumnSet(Node*, RenderFlowThread*);
-    
+    static RenderMultiColumnSet* createAnonymous(RenderFlowThread*);
+
     virtual bool isRenderMultiColumnSet() const OVERRIDE { return true; }
 
     unsigned computedColumnCount() const { return m_computedColumnCount; }
@@ -61,13 +61,41 @@ public:
         m_computedColumnHeight = height;
     }
 
-private:
+    void updateMinimumColumnHeight(LayoutUnit height) { m_minimumColumnHeight = std::max(height, m_minimumColumnHeight); }
+    LayoutUnit minimumColumnHeight() const { return m_minimumColumnHeight; }
+
+    unsigned forcedBreaksCount() const { return m_forcedBreaksCount; }
+    LayoutUnit forcedBreakOffset() const { return m_forcedBreakOffset; }
+    LayoutUnit maximumDistanceBetweenForcedBreaks() const { return m_maximumDistanceBetweenForcedBreaks; }
+    void clearForcedBreaks()
+    { 
+        m_forcedBreaksCount = 0;
+        m_maximumDistanceBetweenForcedBreaks = 0;
+        m_forcedBreakOffset = 0;
+    }
+    void addForcedBreak(LayoutUnit offsetFromFirstPage)
+    { 
+        ASSERT(!computedColumnHeight());
+        LayoutUnit distanceFromLastBreak = offsetFromFirstPage - m_forcedBreakOffset;
+        if (!distanceFromLastBreak)
+            return;
+        m_forcedBreaksCount++;
+        m_maximumDistanceBetweenForcedBreaks = std::max(m_maximumDistanceBetweenForcedBreaks, distanceFromLastBreak);
+        m_forcedBreakOffset = offsetFromFirstPage;
+    }
+
+    bool requiresBalancing() const { return m_requiresBalancing; }
+    void setRequiresBalancing(bool balancing) { m_requiresBalancing = balancing; }
+
     virtual void updateLogicalWidth() OVERRIDE;
     virtual void updateLogicalHeight() OVERRIDE;
+    
+private:
+    RenderMultiColumnSet(RenderFlowThread*);
+
     virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
 
-    virtual void paintReplaced(PaintInfo&, const LayoutPoint& paintOffset) OVERRIDE;
-    virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation&, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
+    virtual void paintObject(PaintInfo&, const LayoutPoint& paintOffset) OVERRIDE;
 
     virtual LayoutUnit pageLogicalWidth() const OVERRIDE { return m_computedColumnWidth; }
     virtual LayoutUnit pageLogicalHeight() const OVERRIDE { return m_computedColumnHeight; }
@@ -76,27 +104,54 @@ private:
     
     // FIXME: This will change once we have column sets constrained by enclosing pages, etc.
     virtual LayoutUnit logicalHeightOfAllFlowThreadContent() const OVERRIDE { return m_computedColumnHeight; }
+
+    // FIXME: For now we return false, but it's likely we will leverage the auto height region code to do column
+    // balancing. That's why we have an override of this function that is distinct from RenderRegionSet's override.
+    virtual bool shouldHaveAutoLogicalHeight() const OVERRIDE { return false; }
     
     virtual void repaintFlowThreadContent(const LayoutRect& repaintRect, bool immediate) const OVERRIDE;
+
+    virtual void collectLayerFragments(LayerFragments&, const LayoutRect& layerBoundingBox, const LayoutRect& dirtyRect) OVERRIDE;
 
     virtual const char* renderName() const;
     
     void paintColumnRules(PaintInfo&, const LayoutPoint& paintOffset);
-    void paintColumnContents(PaintInfo&, const LayoutPoint& paintOffset);
 
     LayoutUnit columnGap() const;
     LayoutRect columnRectAt(unsigned index) const;
     unsigned columnCount() const;
 
     LayoutRect flowThreadPortionRectAt(unsigned index) const;
-    LayoutRect flowThreadPortionOverflowRect(const LayoutRect& flowThreadPortion, unsigned index, unsigned colCount, int colGap) const;
+    LayoutRect flowThreadPortionOverflowRect(const LayoutRect& flowThreadPortion, unsigned index, unsigned colCount, LayoutUnit colGap) const;
     
     unsigned columnIndexAtOffset(LayoutUnit) const;
     
     unsigned m_computedColumnCount;
     LayoutUnit m_computedColumnWidth;
     LayoutUnit m_computedColumnHeight;
+    
+    // The following variables are used when balancing the column set.
+    bool m_requiresBalancing; // Whether or not the columns in the column set have to be balanced, i.e., made to be similar logical heights.
+    LayoutUnit m_minimumColumnHeight;
+    unsigned m_forcedBreaksCount; // FIXME: We will ultimately need to cache more information to balance around forced breaks properly.
+    LayoutUnit m_maximumDistanceBetweenForcedBreaks;
+    LayoutUnit m_forcedBreakOffset;
 };
+
+inline RenderMultiColumnSet* toRenderMultiColumnSet(RenderObject* object)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderMultiColumnSet());
+    return static_cast<RenderMultiColumnSet*>(object);
+}
+
+inline const RenderMultiColumnSet* toRenderMultiColumnSet(const RenderObject* object)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderMultiColumnSet());
+    return static_cast<const RenderMultiColumnSet*>(object);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toRenderMultiColumnSet(const RenderMultiColumnSet*);
 
 } // namespace WebCore
 

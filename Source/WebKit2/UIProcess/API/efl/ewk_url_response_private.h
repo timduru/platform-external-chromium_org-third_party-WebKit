@@ -30,14 +30,13 @@
 #include "WKEinaSharedString.h"
 #include "WKURLResponse.h"
 #include "ewk_object_private.h"
-#include <WebCore/ResourceResponse.h>
 #include <wtf/PassRefPtr.h>
 
 /**
  * \struct  EwkUrlResponse
  * @brief   Contains the URL response data.
  */
-class EwkUrlResponse : public Ewk_Object {
+class EwkUrlResponse : public EwkObject {
 public:
     EWK_OBJECT_DECLARE(EwkUrlResponse)
 
@@ -46,7 +45,7 @@ public:
         if (!wkResponse)
             return 0;
 
-        return adoptRef(new EwkUrlResponse(WebKit::toImpl(wkResponse)->resourceResponse()));
+        return adoptRef(new EwkUrlResponse(wkResponse));
     }
 
     int httpStatusCode() const;
@@ -55,9 +54,9 @@ public:
     unsigned long contentLength() const;
 
 private:
-    explicit EwkUrlResponse(const WebCore::ResourceResponse& coreResponse);
+    explicit EwkUrlResponse(WKURLResponseRef response);
 
-    WebCore::ResourceResponse m_coreResponse;
+    WKRetainPtr<WKURLResponseRef> m_response;
     WKEinaSharedString m_url;
     WKEinaSharedString m_mimeType;
 };

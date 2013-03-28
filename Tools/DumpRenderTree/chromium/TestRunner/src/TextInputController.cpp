@@ -31,18 +31,21 @@
 #include "config.h"
 #include "TextInputController.h"
 
+#include "TestCommon.h"
 #include "WebBindings.h"
 #include "WebCompositionUnderline.h"
 #include "WebFrame.h"
 #include "WebInputEvent.h"
 #include "WebRange.h"
 #include "WebView.h"
-#include "platform/WebString.h"
-#include "platform/WebVector.h"
+#include <public/WebString.h>
+#include <public/WebVector.h>
 #include <string>
-#include <wtf/StringExtras.h>
 
 using namespace WebKit;
+using namespace std;
+
+namespace WebTestRunner {
 
 TextInputController::TextInputController()
 {
@@ -144,7 +147,7 @@ void TextInputController::markedRange(const CppArgumentList&, CppVariant* result
         return;
 
     WebRange range = mainFrame->markedRange();
-    Vector<int> intArray(2);
+    vector<int> intArray(2);
     intArray[0] = range.startOffset();
     intArray[1] = range.endOffset();
     result->set(WebBindings::makeIntArray(intArray));
@@ -159,7 +162,7 @@ void TextInputController::selectedRange(const CppArgumentList&, CppVariant* resu
         return;
 
     WebRange range = mainFrame->selectionRange();
-    Vector<int> intArray(2);
+    vector<int> intArray(2);
     intArray[0] = range.startOffset();
     intArray[1] = range.endOffset();
     result->set(WebBindings::makeIntArray(intArray));
@@ -180,7 +183,7 @@ void TextInputController::firstRectForCharacterRange(const CppArgumentList& argu
     if (!frame->firstRectForCharacterRange(arguments[0].toInt32(), arguments[1].toInt32(), rect))
         return;
 
-    Vector<int> intArray(4);
+    vector<int> intArray(4);
     intArray[0] = rect.x;
     intArray[1] = rect.y;
     intArray[2] = rect.width;
@@ -230,4 +233,6 @@ void TextInputController::setComposition(const CppArgumentList& arguments, CppVa
     WebVector<WebCompositionUnderline> underlines;
     WebString text(WebString::fromUTF8(arguments[0].toString()));
     m_webView->setComposition(text, underlines, 0, text.length());
+}
+
 }

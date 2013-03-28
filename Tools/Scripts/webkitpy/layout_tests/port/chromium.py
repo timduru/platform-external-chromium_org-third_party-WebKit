@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) 2010 Google Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
@@ -42,6 +41,7 @@ from webkitpy.common.system import executive
 from webkitpy.common.system.path import cygpath
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port.base import Port, VirtualTestSuite
+from webkitpy.layout_tests.port.http_lock import HttpLock
 
 
 _log = logging.getLogger(__name__)
@@ -77,20 +77,30 @@ class ChromiumPort(Port):
 
     DEFAULT_BUILD_DIRECTORIES = ('out',)
 
+    # overridden in subclasses.
+    FALLBACK_PATHS = {}
+
     @classmethod
     def _static_build_path(cls, filesystem, build_directory, chromium_base, webkit_base, configuration, comps):
         if build_directory:
             return filesystem.join(build_directory, configuration, *comps)
 
+        hits = []
         for directory in cls.DEFAULT_BUILD_DIRECTORIES:
             base_dir = filesystem.join(chromium_base, directory, configuration)
-            if filesystem.exists(base_dir):
-                return filesystem.join(base_dir, *comps)
+            path = filesystem.join(base_dir, *comps)
+            if filesystem.exists(path):
+                hits.append((filesystem.mtime(path), path))
 
         for directory in cls.DEFAULT_BUILD_DIRECTORIES:
             base_dir = filesystem.join(webkit_base, directory, configuration)
-            if filesystem.exists(base_dir):
-                return filesystem.join(base_dir, *comps)
+            path = filesystem.join(base_dir, *comps)
+            if filesystem.exists(path):
+                hits.append((filesystem.mtime(path), path))
+
+        if hits:
+            hits.sort(reverse=True)
+            return hits[0][1]  # Return the newest file found.
 
         # We have to default to something, so pick the last one.
         return filesystem.join(base_dir, *comps)
@@ -275,11 +285,8 @@ class ChromiumPort(Port):
             "ff_aac_decoder": ["webaudio/codec-tests/aac"],
         }
 
-    def skipped_layout_tests(self, test_list):
-        # FIXME: Merge w/ WebKitPort.skipped_layout_tests()
-        return set(self._skipped_tests_for_unsupported_features(test_list))
-
     def setup_test_run(self):
+        super(ChromiumPort, self).setup_test_run()
         # Delete the disk cache if any to ensure a clean test run.
         dump_render_tree_binary_path = self._path_to_driver()
         cachedir = self._filesystem.dirname(dump_render_tree_binary_path)
@@ -343,7 +350,7 @@ class ChromiumPort(Port):
     def warn_if_bug_missing_in_test_expectations(self):
         return True
 
-    def expectations_files(self):
+    def _port_specific_expectations_files(self):
         paths = [self.path_to_test_expectations_file()]
         skia_expectations_path = self.path_from_chromium_base('skia', 'skia_test_expectations.txt')
         # FIXME: we should probably warn if this file is missing in some situations.
@@ -358,15 +365,24 @@ class ChromiumPort(Port):
 
     def repository_paths(self):
         repos = super(ChromiumPort, self).repository_paths()
-        repos.append(('chromium', self.path_from_chromium_base('build')))
+        repos.append(('Chromium', self.path_from_chromium_base('build')))
         return repos
 
     def _get_crash_log(self, name, pid, stdout, stderr, newer_than):
         if stderr and 'AddressSanitizer' in stderr:
-            asan_filter_path = self.path_from_chromium_base('tools', 'valgrind', 'asan', 'asan_symbolize.py')
-            if self._filesystem.exists(asan_filter_path):
-                output = self._executive.run_command([asan_filter_path], input=stderr, decode_output=False)
-                stderr = self._executive.run_command(['c++filt'], input=output, decode_output=False)
+            # Running the AddressSanitizer take a lot of memory, so we need to
+            # serialize access to it across all the concurrently running drivers.
+            lock = HttpLock(lock_path=None, lock_file_prefix='WebKitASAN.lock.',
+                            filesystem=self._filesystem, executive=self._executive,
+                            name='ASAN')
+            try:
+                lock.wait_for_httpd_lock()
+                asan_filter_path = self.path_from_chromium_base('tools', 'valgrind', 'asan', 'asan_symbolize.py')
+                if self._filesystem.exists(asan_filter_path):
+                    output = self._executive.run_command([asan_filter_path], input=stderr, decode_output=False)
+                    stderr = self._executive.run_command(['c++filt'], input=output, decode_output=False)
+            finally:
+                lock.cleanup_http_lock()
 
         return super(ChromiumPort, self)._get_crash_log(name, pid, stdout, stderr, newer_than)
 
@@ -393,6 +409,12 @@ class ChromiumPort(Port):
             VirtualTestSuite('platform/chromium/virtual/deferred/fast/images',
                              'fast/images',
                              ['--enable-deferred-image-decoding', '--enable-per-tile-painting', '--force-compositing-mode']),
+            VirtualTestSuite('platform/chromium/virtual/gpu/compositedscrolling/overflow',
+                             'compositing/overflow',
+                             ['--enable-accelerated-overflow-scroll']),
+            VirtualTestSuite('platform/chromium/virtual/gpu/compositedscrolling/scrollbars',
+                             'scrollbars',
+                             ['--enable-accelerated-overflow-scroll']),
         ]
 
     #

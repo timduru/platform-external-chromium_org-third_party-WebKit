@@ -53,6 +53,8 @@ namespace WebCore {
         // to events like moving a tab to the background.
         void adjustMinimumTimerInterval(double oldMinimumTimerInterval);
 
+        virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
     private:
         DOMTimer(ScriptExecutionContext*, PassOwnPtr<ScheduledAction>, int interval, bool singleShot);
         virtual void fired();
@@ -66,7 +68,7 @@ namespace WebCore {
         int m_nestingLevel;
         OwnPtr<ScheduledAction> m_action;
         int m_originalInterval;
-        RefPtr<UserGestureIndicator::Token> m_userGestureToken;
+        RefPtr<UserGestureToken> m_userGestureToken;
     };
 
 } // namespace WebCore

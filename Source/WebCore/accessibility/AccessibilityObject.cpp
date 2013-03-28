@@ -40,6 +40,7 @@
 #include "HTMLNames.h"
 #include "LocalizedStrings.h"
 #include "NodeList.h"
+#include "NodeTraversal.h"
 #include "NotImplemented.h"
 #include "Page.h"
 #include "RenderImage.h"
@@ -55,8 +56,9 @@
 #include "TextCheckerClient.h"
 #include "TextCheckingHelper.h"
 #include "TextIterator.h"
+#include "UserGestureIndicator.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
-#include "visible_units.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/WTFString.h>
@@ -72,8 +74,8 @@ AccessibilityObject::AccessibilityObject()
     : m_id(0)
     , m_haveChildren(false)
     , m_role(UnknownRole)
-    , m_cachedIsIgnoredValue(DefaultBehavior)
-#if PLATFORM(GTK)
+    , m_lastKnownIsIgnoredValue(DefaultBehavior)
+#if PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
     , m_wrapper(0)
 #elif PLATFORM(CHROMIUM)
     , m_detached(false)
@@ -88,6 +90,10 @@ AccessibilityObject::~AccessibilityObject()
 
 void AccessibilityObject::detach()
 {
+    // Clear any children and call detachFromParent on them so that
+    // no children are left with dangling pointers to their parent.
+    clearChildren();
+
 #if HAVE(ACCESSIBILITY) && PLATFORM(CHROMIUM)
     m_detached = true;
 #elif HAVE(ACCESSIBILITY)
@@ -266,6 +272,18 @@ bool AccessibilityObject::isBlockquote() const
     return node() && node()->hasTagName(blockquoteTag);
 }
 
+bool AccessibilityObject::isTextControl() const
+{
+    switch (roleValue()) {
+    case TextAreaRole:
+    case TextFieldRole:
+    case ComboBoxRole:
+        return true;
+    default:
+        return false;
+    }
+}
+    
 bool AccessibilityObject::isARIATextControl() const
 {
     return ariaRoleAttribute() == TextAreaRole || ariaRoleAttribute() == TextFieldRole;
@@ -359,10 +377,10 @@ AccessibilityObject* AccessibilityObject::firstAccessibleObjectFromNode(const No
 
     AccessibilityObject* accessibleObject = cache->getOrCreate(node->renderer());
     while (accessibleObject && accessibleObject->accessibilityIsIgnored()) {
-        node = node->traverseNextNode();
+        node = NodeTraversal::next(node);
 
         while (node && !node->renderer())
-            node = node->traverseNextSibling();
+            node = NodeTraversal::nextSkippingChildren(node);
 
         if (!node)
             return 0;
@@ -381,7 +399,7 @@ static void appendAccessibilityObject(AccessibilityObject* object, Accessibility
         if (!widget || !widget->isFrameView())
             return;
         
-        Document* doc = static_cast<FrameView*>(widget)->frame()->document();
+        Document* doc = toFrameView(widget)->frame()->document();
         if (!doc || !doc->renderer())
             return;
         
@@ -445,6 +463,8 @@ void AccessibilityObject::findMatchingObjects(AccessibilitySearchCriteria* crite
     
     if (!criteria)
         return;
+
+    axObjectCache()->startCachingComputedObjectAttributesUntilTreeMutates();
 
     // This search mechanism only searches the elements before/after the starting object.
     // It does this by stepping up the parent chain and at each level doing a DFS.
@@ -540,6 +560,8 @@ bool AccessibilityObject::press() const
         return false;
     if (Frame* f = actionElem->document()->frame())
         f->loader()->resetMultipleFormSubmissionProtection();
+    
+    UserGestureIndicator gestureIndicator(DefinitelyProcessingNewUserGesture);
     actionElem->accessKeyAction(true);
     return true;
 }
@@ -812,14 +834,7 @@ String AccessibilityObject::listMarkerTextForNodeAndPosition(Node* node, const V
     // If this is in a list item, we need to manually add the text for the list marker 
     // because a RenderListMarker does not have a Node equivalent and thus does not appear
     // when iterating text.
-    const String& markerText = listItem->markerText();
-    if (markerText.isEmpty())
-        return String();
-                
-    // Append text, plus the period that follows the text.
-    // FIXME: Not all list marker styles are followed by a period, but this
-    // sounds much better when there is a synthesized pause because of a period.
-    return markerText + ". ";
+    return listItem->markerTextWithSuffix();
 }
     
 String AccessibilityObject::stringForVisiblePositionRange(const VisiblePositionRange& visiblePositionRange) const
@@ -837,7 +852,7 @@ String AccessibilityObject::stringForVisiblePositionRange(const VisiblePositionR
             if (!listMarkerText.isEmpty())
                 builder.append(listMarkerText);
 
-            builder.append(it.characters(), it.length());
+            it.appendTextToStringBuilder(builder);
         } else {
             // locate the node and starting offset for this replaced range
             int exception = 0;
@@ -1305,7 +1320,7 @@ bool AccessibilityObject::hasAttribute(const QualifiedName& attribute) const
     if (!elementNode->isElementNode())
         return false;
     
-    Element* element = static_cast<Element*>(elementNode);
+    Element* element = toElement(elementNode);
     return element->fastHasAttribute(attribute);
 }
     
@@ -1318,7 +1333,7 @@ const AtomicString& AccessibilityObject::getAttribute(const QualifiedName& attri
     if (!elementNode->isElementNode())
         return nullAtom;
     
-    Element* element = static_cast<Element*>(elementNode);
+    Element* element = toElement(elementNode);
     return element->fastGetAttribute(attribute);
 }
     
@@ -1389,7 +1404,7 @@ static ARIARoleMap* createARIARoleMap()
         { "gridcell", CellRole },
         { "columnheader", ColumnHeaderRole },
         { "combobox", ComboBoxRole },
-        { "definition", DefinitionListDefinitionRole },
+        { "definition", DefinitionRole },
         { "document", DocumentRole },
         { "rowheader", RowHeaderRole },
         { "group", GroupRole },
@@ -1518,7 +1533,7 @@ AccessibilityObject* AccessibilityObject::elementAccessibilityHitTest(const IntP
         Widget* widget = widgetForAttachmentView();
         // Normalize the point for the widget's bounds.
         if (widget && widget->isFrameView())
-            return axObjectCache()->getOrCreate(widget)->accessibilityHitTest(toPoint(point - widget->frameRect().location()));
+            return axObjectCache()->getOrCreate(widget)->accessibilityHitTest(IntPoint(point - widget->frameRect().location()));
     }
     
     // Check if there are any mock elements that need to be handled.
@@ -1569,6 +1584,26 @@ bool AccessibilityObject::supportsRangeValue() const
         || isSlider()
         || isScrollbar()
         || isSpinButton();
+}
+    
+bool AccessibilityObject::supportsARIASetSize() const
+{
+    return hasAttribute(aria_setsizeAttr);
+}
+
+bool AccessibilityObject::supportsARIAPosInSet() const
+{
+    return hasAttribute(aria_posinsetAttr);
+}
+    
+int AccessibilityObject::ariaSetSize() const
+{
+    return getAttribute(aria_setsizeAttr).toInt();
+}
+
+int AccessibilityObject::ariaPosInSet() const
+{
+    return getAttribute(aria_posinsetAttr).toInt();
 }
     
 bool AccessibilityObject::supportsARIAExpanded() const
@@ -1771,25 +1806,25 @@ void AccessibilityObject::scrollToGlobalPoint(const IntPoint& globalPoint) const
     }
 }
 
-bool AccessibilityObject::cachedIsIgnoredValue()
+bool AccessibilityObject::lastKnownIsIgnoredValue()
 {
-    if (m_cachedIsIgnoredValue == DefaultBehavior)
-        m_cachedIsIgnoredValue = accessibilityIsIgnored() ? IgnoreObject : IncludeObject;
+    if (m_lastKnownIsIgnoredValue == DefaultBehavior)
+        m_lastKnownIsIgnoredValue = accessibilityIsIgnored() ? IgnoreObject : IncludeObject;
 
-    return m_cachedIsIgnoredValue == IgnoreObject;
+    return m_lastKnownIsIgnoredValue == IgnoreObject;
 }
 
-void AccessibilityObject::setCachedIsIgnoredValue(bool isIgnored)
+void AccessibilityObject::setLastKnownIsIgnoredValue(bool isIgnored)
 {
-    m_cachedIsIgnoredValue = isIgnored ? IgnoreObject : IncludeObject;
+    m_lastKnownIsIgnoredValue = isIgnored ? IgnoreObject : IncludeObject;
 }
 
 void AccessibilityObject::notifyIfIgnoredValueChanged()
 {
     bool isIgnored = accessibilityIsIgnored();
-    if (cachedIsIgnoredValue() != isIgnored) {
+    if (lastKnownIsIgnoredValue() != isIgnored) {
         axObjectCache()->childrenChanged(parentObject());
-        setCachedIsIgnoredValue(isIgnored);
+        setLastKnownIsIgnoredValue(isIgnored);
     }
 }
 
@@ -1830,6 +1865,58 @@ bool AccessibilityObject::isButton() const
     AccessibilityRole role = roleValue();
 
     return role == ButtonRole || role == PopUpButtonRole || role == ToggleButtonRole;
+}
+
+bool AccessibilityObject::accessibilityIsIgnoredByDefault() const
+{
+    return defaultObjectInclusion() == IgnoreObject;
+}
+
+bool AccessibilityObject::ariaIsHidden() const
+{
+    if (equalIgnoringCase(getAttribute(aria_hiddenAttr), "true"))
+        return true;
+    
+    for (AccessibilityObject* object = parentObject(); object; object = object->parentObject()) {
+        if (equalIgnoringCase(object->getAttribute(aria_hiddenAttr), "true"))
+            return true;
+    }
+    
+    return false;
+}
+
+AccessibilityObjectInclusion AccessibilityObject::defaultObjectInclusion() const
+{
+    if (ariaIsHidden())
+        return IgnoreObject;
+    
+    if (isPresentationalChildOfAriaRole())
+        return IgnoreObject;
+    
+    return accessibilityPlatformIncludesObject();
+}
+    
+bool AccessibilityObject::accessibilityIsIgnored() const
+{
+    AXComputedObjectAttributeCache* attributeCache = axObjectCache()->computedObjectAttributeCache();
+    if (attributeCache) {
+        AccessibilityObjectInclusion ignored = attributeCache->getIgnored(axObjectID());
+        switch (ignored) {
+        case IgnoreObject:
+            return true;
+        case IncludeObject:
+            return false;
+        case DefaultBehavior:
+            break;
+        }
+    }
+
+    bool result = computeAccessibilityIsIgnored();
+
+    if (attributeCache)
+        attributeCache->setIgnored(axObjectID(), result ? IgnoreObject : IncludeObject);
+
+    return result;
 }
 
 } // namespace WebCore

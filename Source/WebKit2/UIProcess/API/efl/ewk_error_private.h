@@ -27,29 +27,28 @@
 #define ewk_error_private_h
 
 #include "WKEinaSharedString.h"
-#include <WKError.h>
 #include <WKRetainPtr.h>
+#include <WebKit2/WKBase.h>
 #include <wtf/PassOwnPtr.h>
-#include <wtf/text/WTFString.h>
 
-class Ewk_Error {
+class EwkError {
 public:
-    static PassOwnPtr<Ewk_Error> create(WKErrorRef errorRef)
+    static PassOwnPtr<EwkError> create(WKErrorRef errorRef)
     {
         if (!errorRef)
             return nullptr;
 
-        return adoptPtr(new Ewk_Error(errorRef));
+        return adoptPtr(new EwkError(errorRef));
     }
 
     const char* url() const;
     const char* description() const;
-    String domain() const;
+    WKRetainPtr<WKStringRef> domain() const;
     int errorCode() const;
     bool isCancellation() const;
 
 private:
-    explicit Ewk_Error(WKErrorRef errorRef);
+    explicit EwkError(WKErrorRef errorRef);
 
     WKRetainPtr<WKErrorRef> m_wkError;
     WKEinaSharedString m_url;

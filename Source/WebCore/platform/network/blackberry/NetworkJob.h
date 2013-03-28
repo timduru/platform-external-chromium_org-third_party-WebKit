@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2011 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2009, 2010, 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -21,7 +21,7 @@
 
 #include "AuthenticationChallengeManager.h"
 #include "DeferredData.h"
-#include "PlatformString.h"
+#include "FrameDestructionObserver.h"
 #include "ResourceHandle.h"
 #include "ResourceResponse.h"
 #include "Timer.h"
@@ -47,7 +47,7 @@ class KURL;
 class ProtectionSpace;
 class ResourceRequest;
 
-class NetworkJob : public AuthenticationChallengeClient, public BlackBerry::Platform::FilterStream {
+class NetworkJob : public AuthenticationChallengeClient, public BlackBerry::Platform::FilterStream, public FrameDestructionObserver {
 public:
     NetworkJob();
     ~NetworkJob();
@@ -58,7 +58,7 @@ public:
                     const BlackBerry::Platform::NetworkRequest&,
                     PassRefPtr<ResourceHandle>,
                     BlackBerry::Platform::NetworkStreamFactory*,
-                    const Frame&,
+                    Frame*,
                     int deferLoadingCount,
                     int redirectCount);
     PassRefPtr<ResourceHandle> handle() const { return m_handle; }
@@ -71,9 +71,13 @@ public:
     void updateDeferLoadingCount(int delta);
     virtual void notifyStatusReceived(int status, const BlackBerry::Platform::String& message);
     void handleNotifyStatusReceived(int status, const String& message);
-    virtual void notifyHeadersReceived(BlackBerry::Platform::NetworkRequest::HeaderList& headers);
+    virtual void notifyHeadersReceived(const BlackBerry::Platform::NetworkRequest::HeaderList& headers);
     virtual void notifyMultipartHeaderReceived(const char* key, const char* value);
-    virtual void notifyAuthReceived(BlackBerry::Platform::NetworkRequest::AuthType, const char* realm, bool success, bool requireCredentials);
+    virtual void notifyAuthReceived(BlackBerry::Platform::NetworkRequest::AuthType,
+        BlackBerry::Platform::NetworkRequest::AuthProtocol,
+        BlackBerry::Platform::NetworkRequest::AuthScheme,
+        const char* realm,
+        AuthResult);
     // notifyStringHeaderReceived exists only to resolve ambiguity between char* and String parameters
     void notifyStringHeaderReceived(const String& key, const String& value);
     void handleNotifyHeaderReceived(const String& key, const String& value);
@@ -86,8 +90,13 @@ public:
     virtual void notifyClose(int status);
     void handleNotifyClose(int status);
     virtual int status() const { return m_extendedStatusCode; }
+    virtual const BlackBerry::Platform::String mimeType() const;
 
     virtual void notifyChallengeResult(const KURL&, const ProtectionSpace&, AuthenticationChallengeResult, const Credential&);
+
+    // Implementation of FrameDestructionObserver pure virtuals.
+    virtual void frameDestroyed();
+    virtual void willDetachPage();
 
 private:
     bool isClientAvailable() const { return !m_cancelled && m_handle && m_handle->client(); }
@@ -114,7 +123,7 @@ private:
 
     bool retryAsFTPDirectory();
 
-    bool startNewJobWithRequest(ResourceRequest& newRequest, bool increasRedirectCount = false);
+    bool startNewJobWithRequest(ResourceRequest& newRequest, bool increasRedirectCount = false, bool rereadCookies = false);
 
     bool handleRedirect();
 
@@ -128,16 +137,24 @@ private:
 
     // The server needs authentication credentials. Search in the CredentialStorage
     // or prompt the user via dialog, then resend the request with the credentials.
-    bool sendRequestWithCredentials(ProtectionSpaceServerType, ProtectionSpaceAuthenticationScheme, const String& realm, bool requireCredentials = true);
+    enum SendRequestResult {
+        SendRequestSucceeded,
+        SendRequestCancelled,
+        SendRequestWaiting
+    };
+    SendRequestResult sendRequestWithCredentials(ProtectionSpaceServerType, ProtectionSpaceAuthenticationScheme, const String& realm, bool requireCredentials = true);
 
     void storeCredentials();
-
+    void storeCredentials(AuthenticationChallenge&);
     void purgeCredentials();
+    void purgeCredentials(AuthenticationChallenge&);
 
     bool isError(int statusCode) const
     {
         return statusCode < 0 || (400 <= statusCode && statusCode < 600);
     }
+
+    void updateCurrentWebChallenge(const AuthenticationChallenge&, bool allowOverwrite = true);
 
 private:
     int m_playerId;
@@ -164,6 +181,7 @@ private:
     bool m_needsRetryAsFTPDirectory;
     bool m_isOverrideContentType;
     bool m_newJobWithCredentialsStarted;
+    bool m_isHeadMethod;
 
     // If an HTTP status code is received, m_extendedStatusCode and m_response.httpStatusCode will both be set to it.
     // If a platform error code is received, m_extendedStatusCode will be set to it and m_response.httpStatusCode will be set to 404.
@@ -173,7 +191,6 @@ private:
 
     DeferredData m_deferredData;
     int m_deferLoadingCount;
-    const Frame* m_frame;
 
     bool m_isAuthenticationChallenging;
 };

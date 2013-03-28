@@ -42,12 +42,12 @@
 #include <gtk/gtkx.h>
 #endif
 #include <gdk/gdkx.h>
-#include <WebCore/GtkVersioning.h>
+#include <Platform/GtkVersioning.h>
 #elif PLATFORM(EFL) && defined(HAVE_ECORE_X)
 #include <Ecore_X.h>
 #endif
 
-#if USE(CAIRO) && !PLATFORM(WIN_CAIRO)
+#if USE(CAIRO)
 #include "PlatformContextCairo.h"
 #include "RefPtrCairo.h"
 #include <cairo/cairo-xlib.h>
@@ -246,6 +246,10 @@ bool NetscapePlugin::platformPostInitializeWindowless()
     callSetWindow();
 
     return true;
+}
+
+void NetscapePlugin::platformPreInitialize()
+{
 }
 
 bool NetscapePlugin::platformPostInitialize()

@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2006, 2007, 2008, 2009, 2010, 2011 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2006, 2007, 2008, 2009, 2010, 2011, 2013 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -30,8 +30,10 @@
 #include "Lexer.h"
 #include "Nodes.h"
 #include "ParserArena.h"
+#include "ParserError.h"
 #include "ParserTokens.h"
 #include "SourceProvider.h"
+#include "SourceProviderCache.h"
 #include "SourceProviderCacheItem.h"
 #include <wtf/Forward.h>
 #include <wtf/Noncopyable.h>
@@ -75,49 +77,6 @@ COMPILE_ASSERT(LastUntaggedToken < 64, LessThan64UntaggedTokens);
 
 enum SourceElementsMode { CheckForStrictMode, DontCheckForStrictMode };
 enum FunctionRequirements { FunctionNoRequirements, FunctionNeedsName };
-
-struct ParserError {
-    enum ErrorType { ErrorNone, StackOverflow, SyntaxError, EvalError, OutOfMemory } m_type;
-    String m_message;
-    int m_line;
-    ParserError()
-        : m_type(ErrorNone)
-        , m_line(-1)
-    {
-    }
-
-    ParserError(ErrorType type)
-        : m_type(type)
-        , m_line(-1)
-    {
-    }
-
-    ParserError(ErrorType type, String msg, int line)
-        : m_type(type)
-        , m_message(msg)
-        , m_line(line)
-    {
-    }
-
-    JSObject* toErrorObject(JSGlobalObject* globalObject, const SourceCode& source)
-    {
-        switch (m_type) {
-        case ErrorNone:
-            return 0;
-        case SyntaxError:
-            return addErrorInfo(globalObject->globalExec(), createSyntaxError(globalObject, m_message), m_line, source);
-        case EvalError:
-            return createSyntaxError(globalObject, m_message);
-        case StackOverflow:
-            return createStackOverflowError(globalObject);
-        case OutOfMemory:
-            return createOutOfMemoryError(globalObject);
-        }
-        CRASH();
-        return createOutOfMemoryError(globalObject); // Appease Qt bot
-    }
-
-};
 
 template <typename T> inline bool isEvalNode() { return false; }
 template <> inline bool isEvalNode<EvalNode>() { return true; }
@@ -328,31 +287,28 @@ struct Scope {
                 continue;
             vector.append(*it);
         }
-        vector.shrinkToFit();
     }
 
-    void saveFunctionInfo(SourceProviderCacheItem* info)
+    void fillParametersForSourceProviderCache(SourceProviderCacheItemCreationParameters& parameters)
     {
         ASSERT(m_isFunction);
-        info->usesEval = m_usesEval;
-        info->strictMode = m_strictMode;
-        info->needsFullActivation = m_needsFullActivation;
-        copyCapturedVariablesToVector(m_writtenVariables, info->writtenVariables);
-        copyCapturedVariablesToVector(m_usedVariables, info->usedVariables);
+        parameters.usesEval = m_usesEval;
+        parameters.strictMode = m_strictMode;
+        parameters.needsFullActivation = m_needsFullActivation;
+        copyCapturedVariablesToVector(m_writtenVariables, parameters.writtenVariables);
+        copyCapturedVariablesToVector(m_usedVariables, parameters.usedVariables);
     }
 
-    void restoreFunctionInfo(const SourceProviderCacheItem* info)
+    void restoreFromSourceProviderCache(const SourceProviderCacheItem* info)
     {
         ASSERT(m_isFunction);
         m_usesEval = info->usesEval;
         m_strictMode = info->strictMode;
         m_needsFullActivation = info->needsFullActivation;
-        unsigned size = info->usedVariables.size();
-        for (unsigned i = 0; i < size; ++i)
-            m_usedVariables.add(info->usedVariables[i]);
-        size = info->writtenVariables.size();
-        for (unsigned i = 0; i < size; ++i)
-            m_writtenVariables.add(info->writtenVariables[i]);
+        for (unsigned i = 0; i < info->usedVariablesCount; ++i)
+            m_usedVariables.add(info->usedVariables()[i]);
+        for (unsigned i = 0; i < info->writtenVariablesCount; ++i)
+            m_writtenVariables.add(info->writtenVariables()[i]);
     }
 
 private:
@@ -756,7 +712,7 @@ private:
         case LastUntaggedToken: 
             break;
         }
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         return "internal error";
     }
     
@@ -788,7 +744,7 @@ private:
             m_errorMessage = ASCIILiteral("Return statements are only valid inside functions");
             return;
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
             m_errorMessage = ASCIILiteral("internal error");
             return;
         }
@@ -952,7 +908,7 @@ private:
     int m_statementDepth;
     int m_nonTrivialExpressionCount;
     const Identifier* m_lastIdentifier;
-    SourceProviderCache* m_functionCache;
+    RefPtr<SourceProviderCache> m_functionCache;
     SourceElements* m_sourceElements;
     ParserArenaData<DeclarationStacks::VarStack>* m_varDeclarations;
     ParserArenaData<DeclarationStacks::FunctionStack>* m_funcDeclarations;
@@ -994,6 +950,8 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
     errLine = -1;
     errMsg = String();
 
+    JSTokenLocation startLocation(tokenLocation());
+
     String parseError = parseInner();
 
     int lineNumber = m_lexer->lineNumber();
@@ -1010,11 +968,12 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
 
     RefPtr<ParsedNode> result;
     if (m_sourceElements) {
-        JSTokenLocation location;
-        location.line = m_lexer->lastLineNumber();
-        location.column = m_lexer->currentColumnNumber();
+        JSTokenLocation endLocation;
+        endLocation.line = m_lexer->lastLineNumber();
+        endLocation.charPosition = m_lexer->currentCharPosition();
         result = ParsedNode::create(m_globalData,
-                                    location,
+                                    startLocation,
+                                    endLocation,
                                     m_sourceElements,
                                     m_varDeclarations ? &m_varDeclarations->data : 0,
                                     m_funcDeclarations ? &m_funcDeclarations->data : 0,
@@ -1022,7 +981,7 @@ PassRefPtr<ParsedNode> Parser<LexerType>::parse(ParserError& error)
                                     *m_source,
                                     m_features,
                                     m_numConstants);
-        result->setLoc(m_source->firstLine(), m_lastLine, m_lexer->currentColumnNumber());
+        result->setLoc(m_source->firstLine(), m_lastLine, m_lexer->currentCharPosition());
     } else {
         // We can never see a syntax error when reparsing a function, since we should have
         // reported the error when parsing the containing program or eval code. So if we're

@@ -29,6 +29,7 @@
  */
 
 #include "config.h"
+#if ENABLE(INPUT_TYPE_DATETIMELOCAL)
 #include "DateTimeLocalInputType.h"
 
 #include "DateComponents.h"
@@ -36,8 +37,6 @@
 #include "HTMLNames.h"
 #include "InputTypeNames.h"
 #include <wtf/PassOwnPtr.h>
-
-#if ENABLE(INPUT_TYPE_DATETIMELOCAL)
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "DateTimeFieldsState.h"
@@ -58,6 +57,11 @@ static const int dateTimeLocalStepScaleFactor = 1000;
 PassOwnPtr<InputType> DateTimeLocalInputType::create(HTMLInputElement* element)
 {
     return adoptPtr(new DateTimeLocalInputType(element));
+}
+
+void DateTimeLocalInputType::attach()
+{
+    observeFeatureIfVisible(FeatureObserver::InputTypeDateTimeLocal);
 }
 
 const AtomicString& DateTimeLocalInputType::formControlType() const
@@ -123,7 +127,7 @@ String DateTimeLocalInputType::formatDateTimeFieldsState(const DateTimeFieldsSta
     if (dateTimeFieldsState.hasMillisecond() && dateTimeFieldsState.millisecond()) {
         return String::format("%04u-%02u-%02uT%02u:%02u:%02u.%03u",
             dateTimeFieldsState.year(),
-            dateTimeFieldsState.month() + 1,
+            dateTimeFieldsState.month(),
             dateTimeFieldsState.dayOfMonth(),
             dateTimeFieldsState.hour23(),
             dateTimeFieldsState.minute(),
@@ -134,7 +138,7 @@ String DateTimeLocalInputType::formatDateTimeFieldsState(const DateTimeFieldsSta
     if (dateTimeFieldsState.hasSecond() && dateTimeFieldsState.second()) {
         return String::format("%04u-%02u-%02uT%02u:%02u:%02u",
             dateTimeFieldsState.year(),
-            dateTimeFieldsState.month() + 1,
+            dateTimeFieldsState.month(),
             dateTimeFieldsState.dayOfMonth(),
             dateTimeFieldsState.hour23(),
             dateTimeFieldsState.minute(),
@@ -143,7 +147,7 @@ String DateTimeLocalInputType::formatDateTimeFieldsState(const DateTimeFieldsSta
 
     return String::format("%04u-%02u-%02uT%02u:%02u",
         dateTimeFieldsState.year(),
-        dateTimeFieldsState.month() + 1,
+        dateTimeFieldsState.month(),
         dateTimeFieldsState.dayOfMonth(),
         dateTimeFieldsState.hour23(),
         dateTimeFieldsState.minute());
@@ -153,16 +157,23 @@ void DateTimeLocalInputType::setupLayoutParameters(DateTimeEditElement::LayoutPa
 {
     if (shouldHaveSecondField(date)) {
         layoutParameters.dateTimeFormat = layoutParameters.locale.dateTimeFormatWithSeconds();
-        layoutParameters.fallbackDateTimeFormat = "dd/MM/yyyy HH:mm:ss";
+        layoutParameters.fallbackDateTimeFormat = "yyyy-MM-dd'T'HH:mm:ss";
     } else {
         layoutParameters.dateTimeFormat = layoutParameters.locale.dateTimeFormatWithoutSeconds();
-        layoutParameters.fallbackDateTimeFormat = "dd/MM/yyyy HH:mm";
+        layoutParameters.fallbackDateTimeFormat = "yyyy-MM-dd'T'HH:mm";
     }
-    layoutParameters.minimumYear = fullYear(element()->fastGetAttribute(minAttr));
-    layoutParameters.maximumYear = fullYear(element()->fastGetAttribute(maxAttr));
+    if (!parseToDateComponents(element()->fastGetAttribute(minAttr), &layoutParameters.minimum))
+        layoutParameters.minimum = DateComponents();
+    if (!parseToDateComponents(element()->fastGetAttribute(maxAttr), &layoutParameters.maximum))
+        layoutParameters.maximum = DateComponents();
     layoutParameters.placeholderForDay = placeholderForDayOfMonthField();
     layoutParameters.placeholderForMonth = placeholderForMonthField();
     layoutParameters.placeholderForYear = placeholderForYearField();
+}
+
+bool DateTimeLocalInputType::isValidFormat(bool hasYear, bool hasMonth, bool hasWeek, bool hasDay, bool hasAMPM, bool hasHour, bool hasMinute, bool hasSecond) const
+{
+    return hasYear && hasMonth && hasDay && hasAMPM && hasHour && hasMinute;
 }
 #endif
 

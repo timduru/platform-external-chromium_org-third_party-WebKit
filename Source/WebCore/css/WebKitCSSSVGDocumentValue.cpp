@@ -30,6 +30,8 @@
 #include "CSSParser.h"
 #include "CachedResourceLoader.h"
 #include "CachedResourceRequest.h"
+#include "CachedResourceRequestInitiators.h"
+#include "CachedSVGDocument.h"
 #include "Document.h"
 #include "WebCoreMemoryInstrumentation.h"
 
@@ -54,6 +56,7 @@ CachedSVGDocument* WebKitCSSSVGDocumentValue::load(CachedResourceLoader* loader)
         m_loadRequested = true;
 
         CachedResourceRequest request(ResourceRequest(loader->document()->completeURL(m_url)));
+        request.setInitiator(cachedResourceRequestInitiators().css);
         m_document = loader->requestSVGDocument(request);
     }
 
@@ -65,10 +68,15 @@ String WebKitCSSSVGDocumentValue::customCssText() const
     return quoteCSSStringIfNeeded(m_url);
 }
 
+bool WebKitCSSSVGDocumentValue::equals(const WebKitCSSSVGDocumentValue& other) const
+{
+    return m_url == other.m_url;
+}
+
 void WebKitCSSSVGDocumentValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_url);
+    info.addMember(m_url, "url");
     // FIXME: add m_document when cached resources are instrumented.
 }
 

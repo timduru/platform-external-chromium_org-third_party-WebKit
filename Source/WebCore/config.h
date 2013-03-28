@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2004, 2005, 2006 Apple Inc.
+ * Copyright (C) 2004, 2005, 2006, 2013 Apple Inc.
  * Copyright (C) 2009 Google Inc. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
@@ -29,7 +29,11 @@
 
 #include <wtf/Platform.h>
 
-#if OS(WINDOWS) && !OS(WINCE) && !PLATFORM(QT) && !PLATFORM(CHROMIUM) && !PLATFORM(GTK) && !PLATFORM(WX)
+#if PLATFORM(MAC) || PLATFORM(IOS)
+#define WTF_USE_FILE_LOCK 1
+#endif
+
+#if PLATFORM(WIN) && !OS(WINCE)
 #include <WebCore/WebCoreHeaderDetection.h>
 #endif
 
@@ -45,11 +49,11 @@
 #if OS(WINDOWS)
 
 #ifndef _WIN32_WINNT
-#define _WIN32_WINNT 0x0500
+#define _WIN32_WINNT 0x0502
 #endif
 
 #ifndef WINVER
-#define WINVER 0x0500
+#define WINVER 0x0502
 #endif
 
 // If we don't define these, they get defined in windef.h.

@@ -84,6 +84,7 @@ protected:
 };
 
 class JSTestInterfaceOwner : public JSC::WeakHandleOwner {
+public:
     virtual bool isReachableFromOpaqueRoots(JSC::Handle<JSC::Unknown>, void* context, JSC::SlotVisitor&);
     virtual void finalize(JSC::Handle<JSC::Unknown>, void* context);
 };
@@ -151,7 +152,9 @@ public:
 protected:
     static const unsigned StructureFlags = JSC::OverridesGetOwnPropertySlot | JSC::ImplementsHasInstance | DOMConstructorObject::StructureFlags;
     static JSC::EncodedJSValue JSC_HOST_CALL constructJSTestInterface(JSC::ExecState*);
+#if ENABLE(TEST_INTERFACE)
     static JSC::ConstructType getConstructData(JSC::JSCell*, JSC::ConstructData&);
+#endif // ENABLE(TEST_INTERFACE)
 };
 
 // Functions

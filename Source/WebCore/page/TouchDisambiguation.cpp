@@ -38,6 +38,8 @@
 #include "FrameView.h"
 #include "HTMLNames.h"
 #include "HitTestResult.h"
+#include "NodeTraversal.h"
+#include "RenderBlock.h"
 #include <algorithm>
 #include <cmath>
 
@@ -55,11 +57,11 @@ static IntRect boundingBoxForEventNodes(Node* eventNode)
     while (node) {
         // Skip the whole sub-tree if the node doesn't propagate events.
         if (node != eventNode && node->willRespondToMouseClickEvents()) {
-            node = node->traverseNextSibling(eventNode);
+            node = NodeTraversal::nextSkippingChildren(node, eventNode);
             continue;
         }
         result.unite(node->pixelSnappedBoundingBox());
-        node = node->traverseNextNode(eventNode);
+        node = NodeTraversal::next(node, eventNode);
     }
     return eventNode->document()->view()->contentsToWindow(result);
 }
@@ -84,25 +86,47 @@ struct TouchTargetData {
     float score;
 };
 
-void findGoodTouchTargets(const IntRect& touchBox, Frame* mainFrame, float pageScaleFactor, Vector<IntRect>& goodTargets)
+void findGoodTouchTargets(const IntRect& touchBox, Frame* mainFrame, Vector<IntRect>& goodTargets)
 {
     goodTargets.clear();
 
     int touchPointPadding = ceil(max(touchBox.width(), touchBox.height()) * 0.5);
     // FIXME: Rect-based hit test doesn't transform the touch point size.
-    //        We have to pre-apply page scale factor here.
-    int padding = ceil(touchPointPadding / pageScaleFactor);
+    //        We have to pre-apply frame scale factor here.
+    int padding = ceil(touchPointPadding / mainFrame->frameScaleFactor());
 
     IntPoint touchPoint = touchBox.center();
     IntPoint contentsPoint = mainFrame->view()->windowToContents(touchPoint);
 
-    HitTestResult result = mainFrame->eventHandler()->hitTestResultAtPoint(contentsPoint, false, false, DontHitTestScrollbars, HitTestRequest::Active | HitTestRequest::ReadOnly, IntSize(padding, padding));
+    HitTestResult result = mainFrame->eventHandler()->hitTestResultAtPoint(contentsPoint, HitTestRequest::ReadOnly | HitTestRequest::Active, IntSize(padding, padding));
     const ListHashSet<RefPtr<Node> >& hitResults = result.rectBasedTestResult();
+
+    // Blacklist nodes that are container of disambiguated nodes.
+    // It is not uncommon to have a clickable <div> that contains other clickable objects.
+    // This heuristic avoids excessive disambiguation in that case.
+    HashSet<Node*> blackList;
+    for (ListHashSet<RefPtr<Node> >::const_iterator it = hitResults.begin(); it != hitResults.end(); ++it) {
+        // Ignore any Nodes that can't be clicked on.
+        RenderObject* renderer = it->get()->renderer();
+        if (!renderer || !it->get()->willRespondToMouseClickEvents())
+            continue;
+
+        // Blacklist all of the Node's containers.
+        for (RenderBlock* container = renderer->containingBlock(); container; container = container->containingBlock()) {
+            Node* containerNode = container->node();
+            if (!containerNode)
+                continue;
+            if (!blackList.add(containerNode).isNewEntry)
+                break;
+        }
+    }
 
     HashMap<Node*, TouchTargetData> touchTargets;
     float bestScore = 0;
     for (ListHashSet<RefPtr<Node> >::const_iterator it = hitResults.begin(); it != hitResults.end(); ++it) {
         for (Node* node = it->get(); node; node = node->parentNode()) {
+            if (blackList.contains(node))
+                continue;
             if (node->isDocumentNode() || node->hasTagName(HTMLNames::htmlTag) || node->hasTagName(HTMLNames::bodyTag))
                 break;
             if (node->willRespondToMouseClickEvents()) {

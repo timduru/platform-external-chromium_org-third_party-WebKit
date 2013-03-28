@@ -29,12 +29,39 @@
 
 namespace WebCore {
 
+class MockImageDecoderClient {
+public:
+    virtual void decoderBeingDestroyed() = 0;
+    virtual void frameBufferRequested() = 0;
+    virtual void frameBuffersLocked() { }
+    virtual void frameBuffersUnlocked() { }
+    virtual ImageFrame::FrameStatus frameStatus() = 0;
+};
+
 class MockImageDecoder : public ImageDecoder {
 public:
-    MockImageDecoder()
+    static PassOwnPtr<MockImageDecoder> create(MockImageDecoderClient* client) { return adoptPtr(new MockImageDecoder(client)); }
+
+    MockImageDecoder(MockImageDecoderClient* client)
         : ImageDecoder(ImageSource::AlphaPremultiplied, ImageSource::GammaAndColorProfileApplied)
         , m_frameBufferRequestCount(0)
+        , m_client(client)
     { }
+
+    ~MockImageDecoder()
+    {
+        m_client->decoderBeingDestroyed();
+    }
+
+    virtual bool setSize(unsigned width, unsigned height)
+    {
+        ImageDecoder::setSize(width, height);
+        m_frameBufferCache.resize(1);
+        m_frameBufferCache[0].setSize(width, height);
+        return true;
+    }
+
+    virtual void setFrameHasAlpha(bool hasAlpha) { m_frameBufferCache[0].setHasAlpha(hasAlpha); }
 
     virtual String filenameExtension() const
     {
@@ -44,16 +71,24 @@ public:
     virtual ImageFrame* frameBufferAtIndex(size_t)
     {
         ++m_frameBufferRequestCount;
+        m_client->frameBufferRequested();
 
-        m_frameBufferCache.resize(1);
-        m_frameBufferCache[0].setSize(size().width(), size().height());
+        m_frameBufferCache[0].setStatus(m_client->frameStatus());
         return &m_frameBufferCache[0];
     }
+
+    virtual bool lockFrameBuffers()
+    {
+        m_client->frameBuffersLocked();
+        return true;
+    }
+    virtual void unlockFrameBuffers() { m_client->frameBuffersUnlocked(); }
 
     int frameBufferRequestCount() const { return m_frameBufferRequestCount; }
 
 private:
     int m_frameBufferRequestCount;
+    MockImageDecoderClient* m_client;
 };
 
 } // namespace WebCore

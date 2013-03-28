@@ -24,20 +24,27 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
+from webkitpy.common.system.executive_mock import MockExecutive
 from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.layout_tests.port.efl import EflPort
+from webkitpy.layout_tests.port.pulseaudio_sanitizer_mock import PulseAudioSanitizerMock
 from webkitpy.layout_tests.port import port_testcase
-from webkitpy.common.system.executive_mock import MockExecutive
 
 
 class EflPortTest(port_testcase.PortTestCase):
     port_name = 'efl'
     port_maker = EflPort
 
+    # Additionally mocks out the PulseAudioSanitizer methods.
+    def make_port(self, host=None, port_name=None, options=None, os_name=None, os_version=None, **kwargs):
+        port = super(EflPortTest, self).make_port(host, port_name, options, os_name, os_version, **kwargs)
+        port._pulseaudio_sanitizer = PulseAudioSanitizerMock()
+        return port
+
     def test_show_results_html_file(self):
         port = self.make_port()
         port._executive = MockExecutive(should_log=True)
-        expected_stderr = "MOCK run_command: ['Tools/Scripts/run-launcher', '--release', '--efl', 'file://test.html'], cwd=/mock-checkout\n"
-        OutputCapture().assert_outputs(self, port.show_results_html_file, ["test.html"], expected_stderr=expected_stderr)
+        expected_logs = "MOCK run_command: ['Tools/Scripts/run-launcher', '--release', '--efl', 'file://test.html'], cwd=/mock-checkout\n"
+        OutputCapture().assert_outputs(self, port.show_results_html_file, ["test.html"], expected_logs=expected_logs)

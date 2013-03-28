@@ -1,4 +1,3 @@
-#!/usr/bin/env python
 # Copyright (C) 2010 Gabor Rapcsanyi (rgabor@inf.u-szeged.hu), University of Szeged
 #
 # All rights reserved.
@@ -26,7 +25,7 @@
 
 from http_lock import HttpLock
 import os  # Used for os.getpid()
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 from webkitpy.common.system.executive_mock import MockExecutive
@@ -88,7 +87,7 @@ class HttpLockTest(unittest.TestCase):
         # FIXME: Once Executive wraps getpid, we can mock this and not use a real pid.
         current_pid = os.getpid()
         self.http_lock._filesystem.write_text_file(self.lock_file_name, str(current_pid))
-        self.assertEquals(self.http_lock._current_lock_pid(), current_pid)
+        self.assertEqual(self.http_lock._current_lock_pid(), current_pid)
 
     def test_extract_lock_number(self):
         lock_file_list = (

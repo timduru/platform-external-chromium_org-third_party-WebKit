@@ -124,12 +124,7 @@ static CSSPropertyInfo* cssPropertyInfo(v8::Handle<v8::String>v8PropertyName)
         } else if (hasCSSPropertyNamePrefix(propertyName, "pos")) {
             i += 3;
             hadPixelOrPosPrefix = true;
-        } else if (hasCSSPropertyNamePrefix(propertyName, "webkit")
-#if ENABLE(LEGACY_CSS_VENDOR_PREFIXES)
-                || hasCSSPropertyNamePrefix(propertyName, "khtml")
-                || hasCSSPropertyNamePrefix(propertyName, "apple")
-#endif
-                  )
+        } else if (hasCSSPropertyNamePrefix(propertyName, "webkit"))
             builder.append('-');
         else if (isASCIIUpper(propertyName[0]))
             return 0;
@@ -181,8 +176,6 @@ v8::Handle<v8::Array> V8CSSStyleDeclaration::namedPropertyEnumerator(const v8::A
 
 v8::Handle<v8::Integer> V8CSSStyleDeclaration::namedPropertyQuery(v8::Local<v8::String> v8Name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.CSSStyleDeclaration.NamedPropertyQuery");
-
     if (cssPropertyInfo(v8Name))
         return v8Integer(0, info.GetIsolate());
 
@@ -191,7 +184,6 @@ v8::Handle<v8::Integer> V8CSSStyleDeclaration::namedPropertyQuery(v8::Local<v8::
 
 v8::Handle<v8::Value> V8CSSStyleDeclaration::namedPropertyGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.CSSStyleDeclaration.NamedPropertyGetter");
     // First look for API defined attributes on the style declaration object.
     if (info.Holder()->HasRealNamedCallbackProperty(name))
         return v8Undefined();
@@ -223,7 +215,6 @@ v8::Handle<v8::Value> V8CSSStyleDeclaration::namedPropertyGetter(v8::Local<v8::S
 
 v8::Handle<v8::Value> V8CSSStyleDeclaration::namedPropertySetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.CSSStyleDeclaration.NamedPropertySetter");
     CSSStyleDeclaration* imp = V8CSSStyleDeclaration::toNative(info.Holder());
     CSSPropertyInfo* propInfo = cssPropertyInfo(name);
     if (!propInfo)

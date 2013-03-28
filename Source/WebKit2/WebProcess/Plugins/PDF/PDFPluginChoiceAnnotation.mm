@@ -56,12 +56,14 @@ void PDFPluginChoiceAnnotation::updateGeometry()
     PDFPluginAnnotation::updateGeometry();
 
     StyledElement* styledElement = static_cast<StyledElement*>(element());
-    styledElement->setInlineStyleProperty(CSSPropertyFontSize, choiceAnnotation().font.pointSize * pdfLayerController().tileScaleFactor, CSSPrimitiveValue::CSS_PX);
+    styledElement->setInlineStyleProperty(CSSPropertyFontSize, choiceAnnotation().font.pointSize * pdfLayerController().contentScaleFactor, CSSPrimitiveValue::CSS_PX);
 }
 
 void PDFPluginChoiceAnnotation::commit()
 {
     choiceAnnotation().stringValue = static_cast<HTMLSelectElement*>(element())->value();
+
+    PDFPluginAnnotation::commit();
 }
 
 PassRefPtr<Element> PDFPluginChoiceAnnotation::createAnnotationElement()

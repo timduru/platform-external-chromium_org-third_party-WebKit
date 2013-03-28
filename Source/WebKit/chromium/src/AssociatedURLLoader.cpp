@@ -35,6 +35,7 @@
 #include "DocumentThreadableLoader.h"
 #include "DocumentThreadableLoaderClient.h"
 #include "HTTPValidation.h"
+#include "ResourceError.h"
 #include "SubresourceLoader.h"
 #include "Timer.h"
 #include "WebApplicationCacheHost.h"
@@ -344,7 +345,7 @@ void AssociatedURLLoader::loadAsynchronously(const WebURLRequest& request, WebUR
         options.allowCredentials = m_options.allowCredentials ? AllowStoredCredentials : DoNotAllowStoredCredentials;
         options.preflightPolicy = m_options.forcePreflight ? ForcePreflight : ConsiderPreflight;
         options.crossOriginRequestPolicy = static_cast<WebCore::CrossOriginRequestPolicy>(m_options.crossOriginRequestPolicy);
-        options.shouldBufferData = DoNotBufferData;
+        options.dataBufferingPolicy = DoNotBufferData;
 
         const ResourceRequest& webcoreRequest = newRequest.toResourceRequest();
         Document* webcoreDocument = m_frameImpl->frame()->document();

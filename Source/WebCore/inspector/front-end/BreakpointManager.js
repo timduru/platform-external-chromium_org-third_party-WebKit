@@ -41,16 +41,14 @@ WebInspector.BreakpointManager = function(breakpointStorage, debuggerModel, work
     this._debuggerModel = debuggerModel;
     this._workspace = workspace;
 
-    this._breakpoints = [];
+    this._breakpoints = new Map();
     this._breakpointForDebuggerId = {};
     this._breakpointsForUISourceCode = new Map();
     this._sourceFilesWithRestoredBreakpoints = {};
 
     this._debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.BreakpointResolved, this._breakpointResolved, this);
-    this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._workspaceReset, this);
+    this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._projectWillReset, this);
     this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
-    this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.TemporaryUISourceCodeAdded, this._uiSourceCodeAdded, this);
-    this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.TemporaryUISourceCodeRemoved, this._uiSourceCodeRemoved, this);
 }
 
 WebInspector.BreakpointManager.Events = {
@@ -60,7 +58,10 @@ WebInspector.BreakpointManager.Events = {
 
 WebInspector.BreakpointManager.sourceFileId = function(uiSourceCode)
 {
-    return uiSourceCode.formatted() ? "deobfuscated:" + uiSourceCode.url : uiSourceCode.url;
+    if (!uiSourceCode.url)
+        return "";
+    var deobfuscatedPrefix = uiSourceCode.formatted() ? "deobfuscated:" : "";
+    return deobfuscatedPrefix + uiSourceCode.uri();
 }
 
 WebInspector.BreakpointManager.prototype = {
@@ -79,9 +80,7 @@ WebInspector.BreakpointManager.prototype = {
             var breakpoint = this._breakpointForDebuggerId[debuggerId];
             if (breakpoint._sourceFileId !== sourceFileId)
                 continue;
-            this._debuggerModel.removeBreakpoint(debuggerId);
-            delete this._breakpointForDebuggerId[debuggerId];
-            delete breakpoint._debuggerId;
+            breakpoint.remove(true);
         }
         this._storage._restoreBreakpoints(uiSourceCode);
     },
@@ -93,7 +92,7 @@ WebInspector.BreakpointManager.prototype = {
     {
         var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (event.data);
         if (uiSourceCode.contentType() === WebInspector.resourceTypes.Script || uiSourceCode.contentType() === WebInspector.resourceTypes.Document) {
-            this._restoreBreakpoints(uiSourceCode);
+            uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.SourceMappingChanged, this._uiSourceCodeMappingChanged, this);
             uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.FormattedChanged, this._uiSourceCodeFormatted, this);
         }
     },
@@ -110,33 +109,10 @@ WebInspector.BreakpointManager.prototype = {
     /**
      * @param {WebInspector.Event} event
      */
-    _uiSourceCodeRemoved: function(event)
+    _uiSourceCodeMappingChanged: function(event)
     {
-        var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (event.data);
-        if (uiSourceCode.contentType() !== WebInspector.resourceTypes.Script && uiSourceCode.contentType() !== WebInspector.resourceTypes.Document)
-            return;
-        if (uiSourceCode.divergedVersion)
-            return;
-
-        var sourceFileId = WebInspector.BreakpointManager.sourceFileId(uiSourceCode);
-        if (!sourceFileId)
-            return;
-
-        var breakpoints = this._breakpoints.slice();
-        for (var i = 0; i < breakpoints.length; ++i) {
-            var breakpoint = breakpoints[i];
-            for (var stringifiedLocation in breakpoint._uiLocations) {
-                var uiLocation = breakpoint._uiLocations[stringifiedLocation];
-                if (uiLocation.uiSourceCode === uiSourceCode)
-                    breakpoint.remove(true);
-            }
-        }
-
-        delete this._sourceFilesWithRestoredBreakpoints[sourceFileId];
-
-        var uiSourceCodes = this._workspace.uiSourceCodes();
-        for (var i = 0; i < uiSourceCodes.length; ++i)
-            this._restoreBreakpoints(uiSourceCodes[i]);
+        var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (event.target);
+        this._restoreBreakpoints(uiSourceCode);
     },
 
     /**
@@ -167,7 +143,7 @@ WebInspector.BreakpointManager.prototype = {
             return breakpoint;
         }
         breakpoint = new WebInspector.BreakpointManager.Breakpoint(this, uiSourceCode, lineNumber, condition, enabled);
-        this._breakpoints.push(breakpoint);
+        this._breakpoints.put(breakpoint);
         return breakpoint;
     },
 
@@ -190,8 +166,9 @@ WebInspector.BreakpointManager.prototype = {
     _filteredBreakpointLocations: function(filter)
     {
         var result = [];
-        for (var i = 0; i < this._breakpoints.length; ++i) {
-            var breakpoint = this._breakpoints[i];
+        var breakpoints = /** @type {Array.<WebInspector.BreakpointManager.Breakpoint>} */(this._breakpoints.keys());
+        for (var i = 0; i < breakpoints.length; ++i) {
+            var breakpoint = breakpoints[i];
             for (var stringifiedLocation in breakpoint._uiLocations) {
                 var uiLocation = breakpoint._uiLocations[stringifiedLocation];
                 if (filter(breakpoint, uiLocation))
@@ -228,8 +205,9 @@ WebInspector.BreakpointManager.prototype = {
      */
     toggleAllBreakpoints: function(toggleState)
     {
-        for (var i = 0; i < this._breakpoints.length; ++i) {
-            var breakpoint = this._breakpoints[i];
+        var breakpoints = /** @type {Array.<WebInspector.BreakpointManager.Breakpoint>} */(this._breakpoints.keys());
+        for (var i = 0; i < breakpoints.length; ++i) {
+            var breakpoint = breakpoints[i];
             if (breakpoint.enabled() != toggleState)
                 breakpoint.setEnabled(toggleState);
         }
@@ -237,7 +215,7 @@ WebInspector.BreakpointManager.prototype = {
 
     removeAllBreakpoints: function()
     {
-        var breakpoints = this._breakpoints.slice();
+        var breakpoints = /** @type {Array.<WebInspector.BreakpointManager.Breakpoint>} */(this._breakpoints.keys());
         for (var i = 0; i < breakpoints.length; ++i)
             breakpoints[i].remove();
     },
@@ -256,16 +234,25 @@ WebInspector.BreakpointManager.prototype = {
         this._sourceFilesWithRestoredBreakpoints = {};
     },
 
-    _workspaceReset: function()
+    _projectWillReset: function(event)
     {
-        var breakpoints = this._breakpoints.slice();
-        for (var i = 0; i < breakpoints.length; ++i) {
-            breakpoints[i]._resetLocations();
-            breakpoints[i]._isProvisional = true;
+        var project = /** @type {WebInspector.Project} */ (event.data);
+        var uiSourceCodes = project.uiSourceCodes();
+        for (var i = 0; i < uiSourceCodes.length; ++i) {
+            var uiSourceCode = uiSourceCodes[i];
+            var breakpoints = this._breakpointsForUISourceCode.get(uiSourceCode) || [];
+            for (var lineNumber in breakpoints) {
+                var lineBreakpoints = breakpoints[lineNumber];
+                for (var j = 0; j < lineBreakpoints.length; ++j) {
+                    var breakpoint = lineBreakpoints[j];
+                    this._breakpoints.remove(breakpoint);
+                    breakpoint._resetLocations();
+                }
+            }
+            this._breakpointsForUISourceCode.remove(uiSourceCode);
+            var sourceFileId = WebInspector.BreakpointManager.sourceFileId(uiSourceCode);
+            delete this._sourceFilesWithRestoredBreakpoints[sourceFileId];
         }
-        this._breakpoints = [];
-        this._breakpointsForUISourceCode.clear();
-        this._sourceFilesWithRestoredBreakpoints = {};
     },
 
     _breakpointResolved: function(event)
@@ -273,8 +260,10 @@ WebInspector.BreakpointManager.prototype = {
         var breakpointId = /** @type {DebuggerAgent.BreakpointId} */ (event.data.breakpointId);
         var location = /** @type {WebInspector.DebuggerModel.Location} */ (event.data.location);
         var breakpoint = this._breakpointForDebuggerId[breakpointId];
-        if (!breakpoint || breakpoint._isProvisional)
+        if (!breakpoint)
             return;
+        if (!this._breakpoints.contains(breakpoint))
+            this._breakpoints.put(breakpoint);
         breakpoint._addResolvedLocation(location);
     },
 
@@ -534,6 +523,8 @@ WebInspector.BreakpointManager.Breakpoint.prototype = {
      */
     _breakpointStorageId: function()
     {
+        if (!this._sourceFileId)
+            return "";
         return this._sourceFileId + ":" + this._primaryUILocation.lineNumber;
     },
 

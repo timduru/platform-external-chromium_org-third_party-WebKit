@@ -24,20 +24,20 @@
 #include "Dictionary.h"
 #include "Document.h"
 #include "HTMLNames.h"
-#include "IDBKey.h"
 #include "KURL.h"
 #include "Node.h"
 #include "SVGPoint.h"
 #include "SerializedScriptValue.h"
-#include "TestObj.h"
+#include "TestEnumType.h"
 #include "WebDOMDictionary.h"
 #include "WebDOMDocument.h"
-#include "WebDOMIDBKey.h"
 #include "WebDOMNode.h"
+#include "WebDOMObject.h"
 #include "WebDOMSVGPoint.h"
 #include "WebDOMString.h"
+#include "WebDOMTestEnumType.h"
+#include "WebDOMTestObj.h"
 #include "WebDOMa.h"
-#include "WebDOMany.h"
 #include "WebDOMb.h"
 #include "WebDOMbool.h"
 #include "WebDOMd.h"
@@ -45,7 +45,6 @@
 #include "WebExceptionHandler.h"
 #include "WebNativeEventListener.h"
 #include "a.h"
-#include "any.h"
 #include "b.h"
 #include "bool.h"
 #include "d.h"
@@ -272,7 +271,7 @@ WebDOMString WebDOMTestObj::reflectedStringAttr() const
     if (!impl())
         return WebDOMString();
 
-    return static_cast<const WTF::String&>(impl()->getAttribute(WebCore::HTMLNames::reflectedstringattrAttr));
+    return static_cast<const WTF::String&>(impl()->fastGetAttribute(WebCore::HTMLNames::reflectedstringattrAttr));
 }
 
 void WebDOMTestObj::setReflectedStringAttr(const WebDOMString& newReflectedStringAttr)
@@ -320,7 +319,7 @@ bool WebDOMTestObj::reflectedBooleanAttr() const
     if (!impl())
         return false;
 
-    return impl()->hasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr);
+    return impl()->fastHasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr);
 }
 
 void WebDOMTestObj::setReflectedBooleanAttr(bool newReflectedBooleanAttr)
@@ -352,7 +351,7 @@ WebDOMString WebDOMTestObj::reflectedStringAttr() const
     if (!impl())
         return WebDOMString();
 
-    return static_cast<const WTF::String&>(impl()->getAttribute(WebCore::HTMLNames::customContentStringAttrAttr));
+    return static_cast<const WTF::String&>(impl()->fastGetAttribute(WebCore::HTMLNames::customContentStringAttrAttr));
 }
 
 void WebDOMTestObj::setReflectedStringAttr(const WebDOMString& newReflectedStringAttr)
@@ -384,7 +383,7 @@ bool WebDOMTestObj::reflectedCustomBooleanAttr() const
     if (!impl())
         return false;
 
-    return impl()->hasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr);
+    return impl()->fastHasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr);
 }
 
 void WebDOMTestObj::setReflectedCustomBooleanAttr(bool newReflectedCustomBooleanAttr)
@@ -539,15 +538,15 @@ void WebDOMTestObj::setConditionalAttr3(int newConditionalAttr3)
 }
 
 #endif
-WebDOMany WebDOMTestObj::anyAttribute() const
+WebDOMObject WebDOMTestObj::anyAttribute() const
 {
     if (!impl())
-        return WebDOMany();
+        return WebDOMObject();
 
     return toWebKit(WTF::getPtr(impl()->anyAttribute()));
 }
 
-void WebDOMTestObj::setAnyAttribute(const WebDOMany& newAnyAttribute)
+void WebDOMTestObj::setAnyAttribute(const WebDOMObject& newAnyAttribute)
 {
     if (!impl())
         return;
@@ -667,6 +666,79 @@ int WebDOMTestObj::replaceableAttribute() const
     return impl()->replaceableAttribute();
 }
 
+double WebDOMTestObj::nullableDoubleAttribute() const
+{
+    if (!impl())
+        return 0;
+
+    bool isNull = false;
+    return impl()->nullableDoubleAttribute(isNull);
+}
+
+int WebDOMTestObj::nullableLongAttribute() const
+{
+    if (!impl())
+        return 0;
+
+    bool isNull = false;
+    return impl()->nullableLongAttribute(isNull);
+}
+
+bool WebDOMTestObj::nullableBooleanAttribute() const
+{
+    if (!impl())
+        return false;
+
+    bool isNull = false;
+    return impl()->nullableBooleanAttribute(isNull);
+}
+
+WebDOMString WebDOMTestObj::nullableStringAttribute() const
+{
+    if (!impl())
+        return WebDOMString();
+
+    bool isNull = false;
+    return static_cast<const WTF::String&>(impl()->nullableStringAttribute(isNull));
+}
+
+int WebDOMTestObj::nullableLongSettableAttribute() const
+{
+    if (!impl())
+        return 0;
+
+    bool isNull = false;
+    return impl()->nullableLongSettableAttribute(isNull);
+}
+
+void WebDOMTestObj::setNullableLongSettableAttribute(int newNullableLongSettableAttribute)
+{
+    if (!impl())
+        return;
+
+    impl()->setNullableLongSettableAttribute(newNullableLongSettableAttribute);
+}
+
+int WebDOMTestObj::nullableStringValue() const
+{
+    if (!impl())
+        return 0;
+
+    bool isNull = false;
+    WebCore::ExceptionCode ec = 0;
+    int result = impl()->nullableStringValue(isNull, ec);
+    webDOMRaiseError(static_cast<WebDOMExceptionCode>(ec));
+    return result;
+}
+
+void WebDOMTestObj::setNullableStringValue(int newNullableStringValue)
+{
+    if (!impl())
+        return;
+
+    impl()->setNullableStringValue(newNullableStringValue);
+}
+
 void WebDOMTestObj::voidMethod()
 {
     if (!impl())
@@ -715,6 +787,14 @@ WebDOMTestObj WebDOMTestObj::objMethodWithArgs(int longArg, const WebDOMString& 
     return toWebKit(WTF::getPtr(impl()->objMethodWithArgs(longArg, strArg, toWebCore(objArg))));
 }
 
+void WebDOMTestObj::methodWithEnumArg(const WebDOMTestEnumType& enumArg)
+{
+    if (!impl())
+        return;
+
+    impl()->methodWithEnumArg(toWebCore(enumArg));
+}
+
 WebDOMTestObj WebDOMTestObj::methodThatRequiresAllArgsAndThrows(const WebDOMString& strArg, const WebDOMTestObj& objArg)
 {
     if (!impl())
@@ -732,14 +812,6 @@ void WebDOMTestObj::serializedValue(const WebDOMString& serializedArg)
         return;
 
     impl()->serializedValue(WebCore::SerializedScriptValue::create(WTF::String(serializedArg)));
-}
-
-void WebDOMTestObj::idbKey(const WebDOMIDBKey& key)
-{
-    if (!impl())
-        return;
-
-    impl()->idbKey(toWebCore(key));
 }
 
 void WebDOMTestObj::optionsObject(const WebDOMDictionary& oo, const WebDOMDictionary& ooo)

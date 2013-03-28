@@ -31,6 +31,11 @@
 #ifndef WebFrameClient_h
 #define WebFrameClient_h
 
+#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../Platform/chromium/public/WebFileSystem.h"
+#include "../../../Platform/chromium/public/WebFileSystemType.h"
+#include "../../../Platform/chromium/public/WebURLError.h"
+#include "../../../Platform/chromium/public/WebURLRequest.h"
 #include "WebDOMMessageEvent.h"
 #include "WebIconURL.h"
 #include "WebNavigationPolicy.h"
@@ -38,26 +43,18 @@
 #include "WebSecurityOrigin.h"
 #include "WebStorageQuotaType.h"
 #include "WebTextDirection.h"
-#include "platform/WebCommon.h"
-#include "platform/WebFileSystem.h"
-#include "platform/WebURLError.h"
-
-#if WEBKIT_USING_V8
 #include <v8.h>
-#endif
 
 namespace WebKit {
 
 class WebApplicationCacheHost;
 class WebApplicationCacheHostClient;
+class WebCachedURLRequest;
 class WebCookieJar;
 class WebDataSource;
 class WebDOMEvent;
 class WebFormElement;
 class WebFrame;
-class WebIntent;
-class WebIntentRequest;
-class WebIntentServiceInfo;
 class WebMediaPlayer;
 class WebMediaPlayerClient;
 class WebNode;
@@ -70,7 +67,6 @@ class WebStorageQuotaCallbacks;
 class WebString;
 class WebURL;
 class WebURLLoader;
-class WebURLRequest;
 class WebURLResponse;
 class WebWorker;
 struct WebPluginParams;
@@ -104,9 +100,18 @@ public:
 
     // General notifications -----------------------------------------------
 
+    // Indicates that another page has accessed the DOM of the initial empty
+    // document of a main frame. After this, it is no longer safe to show a
+    // pending navigation's URL, because a URL spoof is possible.
+    virtual void didAccessInitialDocument(WebFrame*) { }
+
     // A child frame was created in this frame. This is called when the frame
     // is created and initialized.
     virtual void didCreateFrame(WebFrame* parent, WebFrame* child) { }
+
+    // This frame set its opener to null, disowning it.
+    // See http://html.spec.whatwg.org/#dom-opener.
+    virtual void didDisownOpener(WebFrame*) { }
 
     // This frame has been detached from the view, but has not been closed yet.
     virtual void frameDetached(WebFrame*) { }
@@ -114,6 +119,9 @@ public:
     // This frame is about to be closed. This is called after frameDetached,
     // when the document is being unloaded, due to new one committing.
     virtual void willClose(WebFrame*) { }
+
+    // This frame's name has changed.
+    virtual void didChangeName(WebFrame*, const WebString&) { }
 
     // Load commands -------------------------------------------------------
 
@@ -251,6 +259,9 @@ public:
      // the client keeps such an association.
      virtual void removeIdentifierForRequest(unsigned identifier) { }
 
+    // An element will request a resource.
+    virtual void willRequestResource(WebFrame*, const WebCachedURLRequest&) { }
+
     // A request is about to be sent out, and the client may modify it.  Request
     // is writable, and changes to the URL, for example, will change the request
     // made.  If this request is the result of a redirect, then redirectResponse
@@ -263,6 +274,9 @@ public:
     // by identifier.
     virtual void didReceiveResponse(
         WebFrame*, unsigned identifier, const WebURLResponse&) { }
+
+    virtual void didChangeResourcePriority(
+        WebFrame*, unsigned identifier, const WebKit::WebURLRequest::Priority&) { }
 
     // The resource request given by identifier succeeded.
     virtual void didFinishResourceLoad(
@@ -293,7 +307,6 @@ public:
     // Script in the page tried to allocate too much memory.
     virtual void didExhaustMemoryAvailableForScript(WebFrame*) { }
 
-#if WEBKIT_USING_V8
     // Notifies that a new script context has been created for this frame.
     // This is similar to didClearWindowObject but only called once per
     // frame context.
@@ -301,7 +314,6 @@ public:
 
     // WebKit is about to release its reference to a v8 context for a frame.
     virtual void willReleaseScriptContext(WebFrame*, v8::Handle<v8::Context>, int worldId) { }
-#endif
 
     // Geometry notifications ----------------------------------------------
 
@@ -317,6 +329,9 @@ public:
     // The main frame scrolled.
     virtual void didChangeScrollOffset(WebFrame*) { }
 
+    // If the frame is loading an HTML document, this will be called to
+    // notify that the <body> will be attached soon.
+    virtual void willInsertBody(WebFrame*) { }
 
     // Find-in-page notifications ------------------------------------------
 
@@ -346,7 +361,7 @@ public:
     // called otherwise. The create bool is for indicating whether or not to
     // create root path for file systems if it do not exist.
     virtual void openFileSystem(
-        WebFrame*, WebFileSystem::Type, long long size,
+        WebFrame*, WebFileSystemType, long long size,
         bool create, WebFileSystemCallbacks*) { }
 
     // Deletes FileSystem.
@@ -356,7 +371,7 @@ public:
     // All in-flight operations and following operations may fail after the
     // FileSystem is deleted.
     virtual void deleteFileSystem(
-        WebFrame*, WebFileSystem::Type, WebFileSystemCallbacks*) { }
+        WebFrame*, WebFileSystemType, WebFileSystemCallbacks*) { }
 
     // Quota ---------------------------------------------------------
 
@@ -385,15 +400,6 @@ public:
         unsigned long long newQuotaInBytes,
         WebStorageQuotaCallbacks*) { }
 
-    // Web Intents ---------------------------------------------------
-
-    // Register a service to handle Web Intents.
-    virtual void registerIntentService(WebFrame*, const WebIntentServiceInfo&) { }
-
-    // Start a Web Intents activity. The callee uses the |WebIntentRequest|
-    // object to coordinate replies to the intent invocation.
-    virtual void dispatchIntent(WebFrame*, const WebIntentRequest&) { }
-
     // WebSocket -----------------------------------------------------
 
     // A WebSocket object is going to open new stream connection.
@@ -419,6 +425,19 @@ public:
     // URL. Non-empty strings indicate an override should be used. Otherwise,
     // Platform::current()->userAgent() will be called to provide one.
     virtual WebString userAgentOverride(WebFrame*, const WebURL& url) { return WebString(); }
+
+    // WebGL ------------------------------------------------------
+
+    // Asks the embedder whether WebGL is allowed for the given WebFrame.
+    // This call is placed here instead of WebPermissionClient because this
+    // class is implemented in content/, and putting it here avoids adding
+    // more public content/ APIs.
+    virtual bool allowWebGL(WebFrame*, bool defaultValue) { return defaultValue; }
+
+    // Notifies the client that a WebGL context was lost on this page with the
+    // given reason (one of the GL_ARB_robustness status codes; see
+    // Extensions3D.h in WebCore/platform/graphics).
+    virtual void didLoseWebGLContext(WebFrame*, int) { }
 
 protected:
     ~WebFrameClient() { }

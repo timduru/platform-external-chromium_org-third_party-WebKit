@@ -41,8 +41,11 @@
 #include "WebGamepads.h"
 #include "WebGraphicsContext3D.h"
 #include "WebLocalizedString.h"
+#include "WebSpeechSynthesizer.h"
 #include "WebString.h"
 #include "WebVector.h"
+
+class GrContext;
 
 namespace WebKit {
 
@@ -51,27 +54,33 @@ class WebBlobRegistry;
 class WebClipboard;
 class WebCompositorSupport;
 class WebCookieJar;
+class WebDiscardableMemory;
 class WebFileSystem;
 class WebFileUtilities;
 class WebFlingAnimator;
 class WebGestureCurveTarget;
 class WebGestureCurve;
+class WebHyphenator;
 class WebMediaStreamCenter;
 class WebMediaStreamCenterClient;
 class WebMessagePortChannel;
 class WebMimeRegistry;
+class WebPluginListBuilder;
 class WebRTCPeerConnectionHandler;
 class WebRTCPeerConnectionHandlerClient;
 class WebSandboxSupport;
 class WebSocketStreamHandle;
+class WebSpeechSynthesizer;
+class WebSpeechSynthesizerClient;
 class WebStorageNamespace;
+class WebUnitTestSupport;
 class WebThemeEngine;
 class WebThread;
 class WebURL;
 class WebURLLoader;
 class WebWorkerRunLoop;
-struct WebLocalizedString;
 struct WebFloatPoint;
+struct WebLocalizedString;
 struct WebSize;
 
 class Platform {
@@ -106,12 +115,25 @@ public:
     // May return null on some platforms.
     virtual WebThemeEngine* themeEngine() { return 0; }
 
+    // Must return non-null.
+    virtual WebHyphenator* hyphenator() { return 0; }
+
+    // May return null.
+    virtual WebSpeechSynthesizer* createSpeechSynthesizer(WebSpeechSynthesizerClient*) { return 0; }
 
     // Audio --------------------------------------------------------------
 
     virtual double audioHardwareSampleRate() { return 0; }
     virtual size_t audioHardwareBufferSize() { return 0; }
+    virtual unsigned audioHardwareOutputChannels() { return 0; }
+
+    // Creates a device for audio I/O.
+    // Pass in (numberOfInputChannels > 0) if live/local audio input is desired.
+    virtual WebAudioDevice* createAudioDevice(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, WebAudioDevice::RenderCallback*, const WebString& deviceId) { return 0; }
+
+    // FIXME: remove deprecated APIs once chromium switches over to new method.
     virtual WebAudioDevice* createAudioDevice(size_t bufferSize, unsigned numberOfChannels, double sampleRate, WebAudioDevice::RenderCallback*) { return 0; }
+    virtual WebAudioDevice* createAudioDevice(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, WebAudioDevice::RenderCallback*) { return 0; }
 
 
     // Blob ----------------------------------------------------------------
@@ -168,15 +190,6 @@ public:
     virtual bool isLinkVisited(unsigned long long linkHash) { return false; }
 
 
-    // Hyphenation ---------------------------------------------------------
-
-    // Returns whether we can support hyphenation for the given locale.
-    virtual bool canHyphenate(const WebString& locale) { return false; }
-
-    // Returns the last position where we can add a hyphen before the given position.
-    virtual size_t computeLastHyphenLocation(const WebUChar* characters, size_t length, size_t beforeIndex, const WebString& locale) { return 0; }
-
-
     // Keygen --------------------------------------------------------------
 
     // Handle the <keygen> tag for generating client certificates
@@ -211,6 +224,29 @@ public:
     // false on platform specific error conditions.
     virtual bool processMemorySizesInBytes(size_t* privateBytes, size_t* sharedBytes) { return false; }
 
+    // A callback interface for requestProcessMemorySizes
+    class ProcessMemorySizesCallback {
+    public:
+        virtual ~ProcessMemorySizesCallback() { }
+        virtual void dataReceived(size_t privateBytes, size_t sharedBytes) = 0;
+    };
+
+    // Requests private and shared usage, in bytes. Private bytes is the amount of
+    // memory currently allocated to this process that cannot be shared.
+    // The callback ownership is passed to the callee.
+    virtual void requestProcessMemorySizes(ProcessMemorySizesCallback* requestCallback) { }
+
+    // Reports number of bytes used by memory allocator for internal needs.
+    // Returns true if the size has been reported, or false otherwise.
+    virtual bool memoryAllocatorWasteInBytes(size_t*) { return false; }
+
+    // Allocates discardable memory. May return 0, even if the platform supports
+    // discardable memory. If nonzero, however, then the WebDiscardableMmeory is
+    // returned in an locked state. You may use its underlying data() member
+    // directly, taking care to unlock it when you are ready to let it become
+    // discardable.
+    virtual WebDiscardableMemory* allocateAndLockDiscardableMemory(size_t bytes) { return 0; }
+
 
     // Message Ports -------------------------------------------------------
 
@@ -235,6 +271,13 @@ public:
 
     // A suggestion to cache this metadata in association with this URL.
     virtual void cacheMetadata(const WebURL&, double responseTime, const char* data, size_t dataSize) { }
+
+
+    // Plugins -------------------------------------------------------------
+
+    // If refresh is true, then cached information should not be used to
+    // satisfy this call.
+    virtual void getPluginList(bool refresh, WebPluginListBuilder*) { }
 
 
     // Resources -----------------------------------------------------------
@@ -321,6 +364,16 @@ public:
     // Callable from a background WebKit thread.
     virtual void callOnMainThread(void (*func)(void*), void* context) { }
 
+    // Checks the partition/volume where fileName resides.
+    virtual long long availableDiskSpaceInBytes(const WebString& fileName) { return 0; }
+
+
+    // Testing -------------------------------------------------------------
+
+#define HAVE_WEBUNITTESTSUPPORT 1
+    // Get a pointer to testing support interfaces. Will not be available in production builds.
+    virtual WebUnitTestSupport* unitTestSupport() { return 0; }
+
 
     // Tracing -------------------------------------------------------------
 
@@ -333,9 +386,16 @@ public:
     // addTraceEvent is expected to be called by the trace event macros.
     virtual const unsigned char* getTraceCategoryEnabledFlag(const char* categoryName) { return 0; }
 
+    typedef long int TraceEventAPIAtomicWord;
+
+    // Get a pointer to a global state of the given thread. An embedder is
+    // expected to update the global state as the state of the embedder changes.
+    // A sampling thread in the Chromium side reads the global state periodically
+    // and reflects the sampling profiled results into about:tracing.
+    virtual TraceEventAPIAtomicWord* getTraceSamplingState(const unsigned bucketName) { return 0; }
+
     // Add a trace event to the platform tracing system. Depending on the actual
-    // enabled state, this event may be recorded or dropped. Returns
-    // thresholdBeginId for use in a corresponding end addTraceEvent call.
+    // enabled state, this event may be recorded or dropped. 
     // - phase specifies the type of event:
     //   - BEGIN ('B'): Marks the beginning of a scoped event.
     //   - END ('E'): Marks the end of a scoped event.
@@ -381,7 +441,7 @@ public:
     //     matching with other events of the same name.
     //   - MANGLE_ID (0x4): specify this flag if the id parameter is the value
     //     of a pointer.
-    virtual int addTraceEvent(
+    virtual void addTraceEvent(
         char phase,
         const unsigned char* categoryEnabledFlag,
         const char* name,
@@ -390,9 +450,7 @@ public:
         const char** argNames,
         const unsigned char* argTypes,
         const unsigned long long* argValues,
-        int thresholdBeginId,
-        long long threshold,
-        unsigned char flags) { return -1; }
+        unsigned char flags) { }
 
     // Callbacks for reporting histogram data.
     // CustomCounts histogram has exponential bucket sizes, so that min=1, max=1000000, bucketCount=50 would do.
@@ -407,12 +465,28 @@ public:
     // Returns newly allocated and initialized offscreen WebGraphicsContext3D instance.
     virtual WebGraphicsContext3D* createOffscreenGraphicsContext3D(const WebGraphicsContext3D::Attributes&) { return 0; }
 
+    // May return null if GPU is not supported.
+    // Returns the shared WebGraphicsContext3D. This is a singleton object for
+    // the entire process. Calling this function may destroy both the shared
+    // offscreen WebGraphicsContext3D and GrContext pointers last returned, so
+    // it should only be called from a single site. The implementor should
+    // create a new context before destroying its current context, if required,
+    // to ensure the same pointer can not be returned twice in a row for two
+    // different contexts.
+    virtual WebGraphicsContext3D* sharedOffscreenGraphicsContext3D() { return 0; }
+
+    // May return null if GPU is not supported.
+    // Returns the shared GrContext. This is a singleton object for the entire process.
+    virtual GrContext* sharedOffscreenGrContext() { return 0; }
+
     // Returns true if the platform is capable of producing an offscreen context suitable for accelerating 2d canvas.
     // This will return false if the platform cannot promise that contexts will be preserved across operations like
     // locking the screen or if the platform cannot provide a context with suitable performance characteristics.
     //
     // This value must be checked again after a context loss event as the platform's capabilities may have changed.
     virtual bool canAccelerate2dCanvas() { return false; }
+
+    virtual bool isThreadedCompositingEnabled() { return false; }
 
     virtual WebCompositorSupport* compositorSupport() { return 0; }
 

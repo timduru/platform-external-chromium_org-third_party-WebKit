@@ -31,6 +31,7 @@
 #include "config.h"
 #include "Pasteboard.h"
 
+#include "CachedImage.h"
 #include "ClipboardChromium.h"
 #include "ClipboardUtilitiesChromium.h"
 #include "Document.h"
@@ -84,12 +85,11 @@ void Pasteboard::setSelectionMode(bool selectionMode)
     m_selectionMode = selectionMode;
 }
 
-void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete, Frame* frame)
+void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete, Frame* frame, ShouldSerializeSelectedTextForClipboard shouldSerializeSelectedTextForClipboard)
 {
     String html = createMarkup(selectedRange, 0, AnnotateForInterchange, false, ResolveNonLocalURLs);
-    ExceptionCode ec = 0;
-    KURL url = selectedRange->startContainer(ec)->document()->url();
-    String plainText = frame->editor()->selectedText();
+    KURL url = selectedRange->startContainer()->document()->url();
+    String plainText = shouldSerializeSelectedTextForClipboard == IncludeImageAltTextForClipboard ? frame->editor()->selectedTextForClipboard() : frame->editor()->selectedText();
 #if OS(WINDOWS)
     replaceNewlinesWithWindowsStyleNewlines(plainText);
 #endif
@@ -146,14 +146,14 @@ void Pasteboard::writeImage(Node* node, const KURL&, const String& title)
     // link.  This isn't useful to us, so get the actual image URL.
     AtomicString urlString;
     if (node->hasTagName(HTMLNames::imgTag) || node->hasTagName(HTMLNames::inputTag))
-        urlString = static_cast<Element*>(node)->getAttribute(HTMLNames::srcAttr);
+        urlString = toElement(node)->getAttribute(HTMLNames::srcAttr);
 #if ENABLE(SVG)
     else if (node->hasTagName(SVGNames::imageTag))
-        urlString = static_cast<Element*>(node)->getAttribute(XLinkNames::hrefAttr);
+        urlString = toElement(node)->getAttribute(XLinkNames::hrefAttr);
 #endif
     else if (node->hasTagName(HTMLNames::embedTag) || node->hasTagName(HTMLNames::objectTag)) {
-        Element* element = static_cast<Element*>(node);
-        urlString = element->getAttribute(element->imageSourceAttributeName());
+        Element* element = toElement(node);
+        urlString = element->imageSourceURL();
     }
     KURL url = urlString.isEmpty() ? KURL() : node->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(urlString));
     WebKit::WebImage webImage = bitmap->bitmap();
@@ -182,16 +182,13 @@ PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefP
     WebKit::WebClipboard::Buffer buffer = m_selectionMode ? WebKit::WebClipboard::BufferSelection : WebKit::WebClipboard::BufferStandard;
 
     if (WebKit::Platform::current()->clipboard()->isFormatAvailable(WebKit::WebClipboard::FormatHTML, buffer)) {
-        WebKit::WebString markup;
         unsigned fragmentStart = 0;
         unsigned fragmentEnd = 0;
         WebKit::WebURL url;
-        markup = WebKit::Platform::current()->clipboard()->readHTML(buffer, &url, &fragmentStart, &fragmentEnd);
+        WebKit::WebString markup = WebKit::Platform::current()->clipboard()->readHTML(buffer, &url, &fragmentStart, &fragmentEnd);
         if (!markup.isEmpty()) {
-          RefPtr<DocumentFragment> fragment =
-              createFragmentFromMarkupWithContext(frame->document(), markup, fragmentStart, fragmentEnd, KURL(url), DisallowScriptingContent);
-          if (fragment)
-              return fragment.release();
+            if (RefPtr<DocumentFragment> fragment = createFragmentFromMarkupWithContext(frame->document(), markup, fragmentStart, fragmentEnd, KURL(url), DisallowScriptingAndPluginContent))
+                return fragment.release();
         }
     }
 
@@ -199,10 +196,7 @@ PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefP
         String markup = WebKit::Platform::current()->clipboard()->readPlainText(buffer);
         if (!markup.isEmpty()) {
             chosePlainText = true;
-
-            RefPtr<DocumentFragment> fragment =
-                createFragmentFromText(context.get(), markup);
-            if (fragment)
+            if (RefPtr<DocumentFragment> fragment = createFragmentFromText(context.get(), markup))
                 return fragment.release();
         }
     }

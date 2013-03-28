@@ -102,10 +102,12 @@ void QualifiedName::deref()
         return;
 #endif
     ASSERT(!isHashTableDeletedValue());
-
-    if (m_impl->hasOneRef())
-        gNameCache->remove(m_impl);
     m_impl->deref();
+}
+
+QualifiedName::QualifiedNameImpl::~QualifiedNameImpl()
+{
+    gNameCache->remove(this);
 }
 
 String QualifiedName::toString() const
@@ -151,17 +153,17 @@ const AtomicString& QualifiedName::localNameUpper() const
 void QualifiedName::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_impl);
+    info.addMember(m_impl, "impl");
 }
 
 
 void QualifiedName::QualifiedNameImpl::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_prefix);
-    info.addMember(m_localName);
-    info.addMember(m_namespace);
-    info.addMember(m_localNameUpper);
+    info.addMember(m_prefix, "prefix");
+    info.addMember(m_localName, "localName");
+    info.addMember(m_namespace, "namespace");
+    info.addMember(m_localNameUpper, "localNameUpper");
 }
 
 unsigned QualifiedName::QualifiedNameImpl::computeHash() const
@@ -170,16 +172,14 @@ unsigned QualifiedName::QualifiedNameImpl::computeHash() const
     return hashComponents(components);
 }
 
-void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength, const AtomicString& nameNamespace)
+void createQualifiedName(void* targetAddress, StringImpl* name, const AtomicString& nameNamespace)
 {
-    AtomicString atomicName(name, nameLength, AtomicString::ConstructFromLiteral);
-    new (reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, atomicName, nameNamespace);
+    new (reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, AtomicString(name), nameNamespace);
 }
 
-void createQualifiedName(void* targetAddress, const char* name, unsigned nameLength)
+void createQualifiedName(void* targetAddress, StringImpl* name)
 {
-    AtomicString atomicName(name, nameLength, AtomicString::ConstructFromLiteral);
-    new (reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, atomicName, nullAtom);
+    new (reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, AtomicString(name), nullAtom);
 }
 
 }

@@ -81,15 +81,17 @@ void PageWidgetDelegate::layout(Page* page)
     view->updateLayoutAndStyleIfNeededRecursive();
 }
 
-void PageWidgetDelegate::paint(Page* page, PageOverlayList* overlays, WebCanvas* canvas, const WebRect& rect, CanvasBackground background)
+void PageWidgetDelegate::paint(Page* page, PageOverlayList* overlays, WebCanvas* canvas, const WebRect& rect, CanvasBackground background, bool applyDeviceScale)
 {
     if (rect.isEmpty())
         return;
     GraphicsContextBuilder builder(canvas);
     GraphicsContext& gc = builder.context();
-    gc.platformContext()->setDrawingToImageBuffer(background == Opaque ? false : true);
-    gc.applyDeviceScaleFactor(page->deviceScaleFactor());
-    gc.platformContext()->setDeviceScaleFactor(page->deviceScaleFactor());
+    gc.setShouldSmoothFonts(background == Opaque);
+    if (applyDeviceScale) {
+        gc.applyDeviceScaleFactor(page->deviceScaleFactor());
+        gc.platformContext()->setDeviceScaleFactor(page->deviceScaleFactor());
+    }
     IntRect dirtyRect(rect);
     gc.save();
     FrameView* view = mainFrameView(page);
@@ -150,6 +152,7 @@ bool PageWidgetDelegate::handleInputEvent(Page* page, PageWidgetEventHandler& ha
     case WebInputEvent::GestureScrollBegin:
     case WebInputEvent::GestureScrollEnd:
     case WebInputEvent::GestureScrollUpdate:
+    case WebInputEvent::GestureScrollUpdateWithoutPropagation:
     case WebInputEvent::GestureFlingStart:
     case WebInputEvent::GestureFlingCancel:
     case WebInputEvent::GestureTap:

@@ -82,9 +82,14 @@ public:
         return 0u;
     }
 
+    virtual bool currentFrameKnownToBeOpaque()
+    {
+        return false;
+    }
+
     virtual void draw(WebCore::GraphicsContext*, const WebCore::FloatRect&,
                       const WebCore::FloatRect&, WebCore::ColorSpace,
-                      WebCore::CompositeOperator)
+                      WebCore::CompositeOperator, WebCore::BlendMode)
     {
     }
 

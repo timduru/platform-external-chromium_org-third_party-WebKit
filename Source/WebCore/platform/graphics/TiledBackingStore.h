@@ -46,7 +46,12 @@ public:
 
     TiledBackingStoreClient* client() { return m_client; }
 
-    void coverWithTilesIfNeeded(const FloatPoint& panningTrajectoryVector = FloatPoint());
+    // Used when class methods cannot be called asynchronously by client.
+    // Updates of tiles are committed as soon as all the events in event queue have been processed.
+    void setCommitTileUpdatesOnIdleEventLoop(bool enable) { m_commitTileUpdatesOnIdleEventLoop = enable; }
+
+    void setTrajectoryVector(const FloatPoint&);
+    void coverWithTilesIfNeeded();
 
     float contentsScale() { return m_contentsScale; }
     void setContentsScale(float);
@@ -62,9 +67,6 @@ public:
     IntSize tileSize() { return m_tileSize; }
     void setTileSize(const IntSize&);
 
-    double tileCreationDelay() const { return m_tileCreationDelay; }
-    void setTileCreationDelay(double delay);
-
     IntRect mapToContents(const IntRect&) const;
     IntRect mapFromContents(const IntRect&) const;
 
@@ -72,17 +74,15 @@ public:
     Tile::Coordinate tileCoordinateForPoint(const IntPoint&) const;
     double tileDistance(const IntRect& viewport, const Tile::Coordinate&) const;
 
-    IntRect rect() const { return m_rect; }
     IntRect coverRect() const { return m_coverRect; }
     bool visibleAreaIsCovered() const;
     void removeAllNonVisibleTiles();
 
     void setSupportsAlpha(bool);
-    bool supportsAlpha() const { return m_supportsAlpha; }
 
 private:
     void startTileBufferUpdateTimer();
-    void startBackingStoreUpdateTimer();
+    void startBackingStoreUpdateTimer(double = 0);
 
     void tileBufferUpdateTimerFired(Timer<TiledBackingStore>*);
     void backingStoreUpdateTimerFired(Timer<TiledBackingStore>*);
@@ -121,10 +121,10 @@ private:
     Timer<TiledBackingStore> m_backingStoreUpdateTimer;
 
     IntSize m_tileSize;
-    double m_tileCreationDelay;
     float m_coverAreaMultiplier;
 
     FloatPoint m_trajectoryVector;
+    FloatPoint m_pendingTrajectoryVector;
     IntRect m_visibleRect;
 
     IntRect m_coverRect;
@@ -134,8 +134,10 @@ private:
     float m_contentsScale;
     float m_pendingScale;
 
+    bool m_commitTileUpdatesOnIdleEventLoop;
     bool m_contentsFrozen;
     bool m_supportsAlpha;
+    bool m_pendingTileCreation;
 
     friend class Tile;
 };

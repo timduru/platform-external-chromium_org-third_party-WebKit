@@ -46,6 +46,7 @@ class ColorChooser;
 class ColorChooserClient;
 class Element;
 class FileChooser;
+class GraphicsLayerFactory;
 class PopupContainer;
 class PopupMenuClient;
 class RenderBox;
@@ -97,7 +98,7 @@ public:
     virtual bool menubarVisible();
     virtual void setResizable(bool);
     virtual void addMessageToConsole(
-        WebCore::MessageSource, WebCore::MessageType, WebCore::MessageLevel,
+        WebCore::MessageSource, WebCore::MessageLevel,
         const WTF::String& message, unsigned lineNumber,
         const WTF::String& sourceID);
     virtual bool canRunBeforeUnloadConfirmPanel();
@@ -135,8 +136,10 @@ public:
     virtual void setToolTip(const WTF::String& tooltipText, WebCore::TextDirection);
     virtual void dispatchViewportPropertiesDidChange(const WebCore::ViewportArguments&) const;
     virtual void print(WebCore::Frame*);
+#if ENABLE(SQL_DATABASE)
     virtual void exceededDatabaseQuota(
-        WebCore::Frame*, const WTF::String& databaseName);
+        WebCore::Frame*, const WTF::String& databaseName, WebCore::DatabaseDetails);
+#endif
     virtual void reachedMaxAppCacheSize(int64_t spaceNeeded);
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t totalSpaceNeeded);
 #if ENABLE(DRAGGABLE_REGION)
@@ -163,6 +166,8 @@ public:
 #endif
 
 #if USE(ACCELERATED_COMPOSITING)
+    virtual WebCore::GraphicsLayerFactory* graphicsLayerFactory() const OVERRIDE;
+
     // Pass 0 as the GraphicsLayer to detatch the root layer.
     virtual void attachRootGraphicsLayer(WebCore::Frame*, WebCore::GraphicsLayer*);
 
@@ -221,11 +226,16 @@ public:
     virtual bool shouldRubberBandInDirection(WebCore::ScrollDirection) const;
     virtual void numWheelEventHandlersChanged(unsigned);
 
+    virtual bool shouldAutoscrollForDragAndDrop(WebCore::RenderBox* scrollable) const OVERRIDE;
+
 #if ENABLE(POINTER_LOCK)
     virtual bool requestPointerLock();
     virtual void requestPointerUnlock();
     virtual bool isPointerLocked();
 #endif
+
+    virtual void didAssociateFormControls(const Vector<WebCore::Element*>&) OVERRIDE;
+    virtual bool shouldNotifyOnFormChanges() OVERRIDE;
 
 private:
     WebNavigationPolicy getNavigationPolicy();
@@ -246,6 +256,7 @@ private:
 #endif
 };
 
+#if ENABLE(NAVIGATOR_CONTENT_UTILS)
 class NavigatorContentUtilsClientImpl : public WebCore::NavigatorContentUtilsClient {
 public:
     static PassOwnPtr<NavigatorContentUtilsClientImpl> create(WebViewImpl*);
@@ -258,6 +269,7 @@ private:
 
     WebViewImpl* m_webView;
 };
+#endif
 
 } // namespace WebKit
 

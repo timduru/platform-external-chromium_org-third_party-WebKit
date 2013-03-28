@@ -39,10 +39,7 @@ public:
     WebInspectorFrontendClient(WebPage* page, WebPage* inspectorPage);
 
 private:
-    virtual void frontendLoaded() OVERRIDE;
-
     virtual String localizedStringsURL() OVERRIDE;
-    virtual String hiddenPanels() OVERRIDE;
 
     virtual void bringToFront() OVERRIDE;
     virtual void closeWindow() OVERRIDE;

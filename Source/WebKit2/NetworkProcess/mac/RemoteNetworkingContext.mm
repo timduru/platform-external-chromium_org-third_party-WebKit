@@ -26,16 +26,32 @@
 #import "config.h"
 #import "RemoteNetworkingContext.h"
 
-#import "WebCore/ResourceError.h"
 #import "WebErrors.h"
+#import <WebCore/ResourceError.h>
+#import <WebKitSystemInterface.h>
+#import <wtf/MainThread.h>
 
 using namespace WebCore;
 
 namespace WebKit {
 
-RemoteNetworkingContext::RemoteNetworkingContext(bool needsSiteSpecificQuirks, bool localFileContentSniffingEnabled)
+static OwnPtr<NetworkStorageSession>& privateBrowsingStorageSession()
+{
+    ASSERT(isMainThread());
+    DEFINE_STATIC_LOCAL(OwnPtr<NetworkStorageSession>, session, ());
+    return session;
+}
+
+bool RemoteNetworkingContext::shouldClearReferrerOnHTTPSToHTTPRedirect() const
+{
+    return m_shouldClearReferrerOnHTTPSToHTTPRedirect;
+}
+
+RemoteNetworkingContext::RemoteNetworkingContext(bool needsSiteSpecificQuirks, bool localFileContentSniffingEnabled, bool privateBrowsingEnabled, bool shouldClearReferrerOnHTTPSToHTTPRedirect)
     : m_needsSiteSpecificQuirks(needsSiteSpecificQuirks)
     , m_localFileContentSniffingEnabled(localFileContentSniffingEnabled)
+    , m_privateBrowsingEnabled(privateBrowsingEnabled)
+    , m_shouldClearReferrerOnHTTPSToHTTPRedirect(shouldClearReferrerOnHTTPSToHTTPRedirect)
 {
 }
 
@@ -58,20 +74,58 @@ bool RemoteNetworkingContext::localFileContentSniffingEnabled() const
     return m_localFileContentSniffingEnabled;
 }
 
-NSOperationQueue *RemoteNetworkingContext::scheduledOperationQueue() const
+NetworkStorageSession& RemoteNetworkingContext::storageSession() const
 {
-    static NSOperationQueue *queue;
-    if (!queue) {
-        queue = [[NSOperationQueue alloc] init];
-        // Default concurrent operation count depends on current system workload, but delegate methods are mostly idling in IPC, so we can run as many as needed.
-        [queue setMaxConcurrentOperationCount:NSIntegerMax];
+    if (m_privateBrowsingEnabled) {
+        ASSERT(privateBrowsingStorageSession());
+        return *privateBrowsingStorageSession();
     }
-    return queue;
+
+    return NetworkStorageSession::defaultStorageSession();
+}
+
+NetworkStorageSession& RemoteNetworkingContext::privateBrowsingSession()
+{
+    ASSERT(privateBrowsingStorageSession());
+    return *privateBrowsingStorageSession();
+}
+
+RetainPtr<CFDataRef> RemoteNetworkingContext::sourceApplicationAuditData() const
+{
+    return nil;
 }
 
 ResourceError RemoteNetworkingContext::blockedError(const ResourceRequest& request) const
 {
     return WebKit::blockedError(request);
+}
+
+static String& privateBrowsingStorageSessionIdentifierBase()
+{
+    ASSERT(isMainThread());
+    DEFINE_STATIC_LOCAL(String, base, ());
+    return base;
+}
+
+void RemoteNetworkingContext::setPrivateBrowsingStorageSessionIdentifierBase(const String& identifier)
+{
+    privateBrowsingStorageSessionIdentifierBase() = identifier;
+}
+
+void RemoteNetworkingContext::ensurePrivateBrowsingSession()
+{
+    if (privateBrowsingStorageSession())
+        return;
+
+    ASSERT(!privateBrowsingStorageSessionIdentifierBase().isNull());
+    RetainPtr<CFStringRef> cfIdentifier = String(privateBrowsingStorageSessionIdentifierBase() + ".PrivateBrowsing").createCFString();
+
+    privateBrowsingStorageSession() = NetworkStorageSession::createPrivateBrowsingSession(privateBrowsingStorageSessionIdentifierBase());
+}
+
+void RemoteNetworkingContext::destroyPrivateBrowsingSession()
+{
+    privateBrowsingStorageSession() = nullptr;
 }
 
 }

@@ -30,7 +30,7 @@ include(yarr/yarr.pri)
 
 INSTALLDEPS += all
 
-debug_and_release: INCLUDEPATH += $$JAVASCRIPTCORE_GENERATED_SOURCES_DIR/$$activeBuildConfig()
+debug_and_release: INCLUDEPATH += $$JAVASCRIPTCORE_GENERATED_SOURCES_DIR/$$targetSubDir()
 
 SOURCES += \
     API/JSBase.cpp \
@@ -40,7 +40,9 @@ SOURCES += \
     API/JSClassRef.cpp \
     API/JSContextRef.cpp \
     API/JSObjectRef.cpp \
+    API/JSScriptRef.cpp \
     API/JSStringRef.cpp \
+    API/JSStringRefQt.cpp \
     API/JSValueRef.cpp \
     API/JSWeakObjectMapRefPrivate.cpp \
     API/OpaqueJSString.cpp \
@@ -55,15 +57,21 @@ SOURCES += \
     bytecode/CallLinkInfo.cpp \
     bytecode/CallLinkStatus.cpp \
     bytecode/CodeBlock.cpp \
+    bytecode/CodeBlockHash.cpp \
+    bytecode/CodeOrigin.cpp \
+    bytecode/CodeType.cpp \
     bytecode/DFGExitProfile.cpp \
     bytecode/ExecutionCounter.cpp \
+    bytecode/ExitKind.cpp \
     bytecode/GetByIdStatus.cpp \
     bytecode/JumpTable.cpp \
     bytecode/LazyOperandValueProfile.cpp \
     bytecode/MethodOfGettingAValueProfile.cpp \
     bytecode/Opcode.cpp \
     bytecode/PolymorphicPutByIdList.cpp \
+    bytecode/PreciseJumpTargets.cpp \
     bytecode/PutByIdStatus.cpp \
+    bytecode/ReduceWhitespace.cpp \
     bytecode/ResolveGlobalStatus.cpp \
     bytecode/SamplingTool.cpp \
     bytecode/SpecialPointer.cpp \
@@ -106,20 +114,26 @@ SOURCES += \
     dfg/DFGArgumentsSimplificationPhase.cpp \
     dfg/DFGArrayMode.cpp \
     dfg/DFGAssemblyHelpers.cpp \
+    dfg/DFGBackwardsPropagationPhase.cpp \
     dfg/DFGByteCodeParser.cpp \
     dfg/DFGCapabilities.cpp \
+    dfg/DFGCommon.cpp \
     dfg/DFGCFAPhase.cpp \
     dfg/DFGCFGSimplificationPhase.cpp \
+    dfg/DFGCPSRethreadingPhase.cpp \
     dfg/DFGConstantFoldingPhase.cpp \
-    dfg/DFGCorrectableJumpPoint.cpp \
     dfg/DFGCSEPhase.cpp \
+    dfg/DFGDCEPhase.cpp \
     dfg/DFGDisassembler.cpp \
     dfg/DFGDominators.cpp \
     dfg/DFGDriver.cpp \
+    dfg/DFGEdge.cpp \
     dfg/DFGFixupPhase.cpp \
     dfg/DFGGraph.cpp \
     dfg/DFGJITCompiler.cpp \
+    dfg/DFGLongLivedState.cpp \
     dfg/DFGMinifiedNode.cpp \
+    dfg/DFGNode.cpp \
     dfg/DFGNodeFlags.cpp \
     dfg/DFGOperations.cpp \
     dfg/DFGOSREntry.cpp \
@@ -127,23 +141,30 @@ SOURCES += \
     dfg/DFGOSRExitCompiler.cpp \
     dfg/DFGOSRExitCompiler64.cpp \
     dfg/DFGOSRExitCompiler32_64.cpp \
+    dfg/DFGOSRExitJumpPlaceholder.cpp \
     dfg/DFGPhase.cpp \
     dfg/DFGPredictionPropagationPhase.cpp \
+    dfg/DFGPredictionInjectionPhase.cpp \
     dfg/DFGRepatch.cpp \
     dfg/DFGSpeculativeJIT.cpp \
     dfg/DFGSpeculativeJIT32_64.cpp \
     dfg/DFGSpeculativeJIT64.cpp \
     dfg/DFGStructureCheckHoistingPhase.cpp \
     dfg/DFGThunks.cpp \
+    dfg/DFGUnificationPhase.cpp \
+    dfg/DFGUseKind.cpp \
     dfg/DFGValueSource.cpp \
+    dfg/DFGVariableAccessDataDump.cpp \
     dfg/DFGVariableEvent.cpp \
     dfg/DFGVariableEventStream.cpp \
     dfg/DFGValidate.cpp \
     dfg/DFGVirtualRegisterAllocationPhase.cpp \
+    disassembler/Disassembler.cpp \
     interpreter/AbstractPC.cpp \
     interpreter/CallFrame.cpp \
     interpreter/Interpreter.cpp \
     interpreter/JSStack.cpp \
+    jit/ClosureCallStubRoutine.cpp \
     jit/ExecutableAllocatorFixedVMPool.cpp \
     jit/ExecutableAllocator.cpp \
     jit/HostCallReturnValue.cpp \
@@ -152,7 +173,9 @@ SOURCES += \
     jit/JITArithmetic32_64.cpp \
     jit/JITCall.cpp \
     jit/JITCall32_64.cpp \
+    jit/JITCode.cpp \
     jit/JIT.cpp \
+    jit/JITDisassembler.cpp \
     jit/JITExceptions.cpp \
     jit/JITOpcodes.cpp \
     jit/JITOpcodes32_64.cpp \
@@ -160,6 +183,7 @@ SOURCES += \
     jit/JITPropertyAccess32_64.cpp \
     jit/JITStubRoutine.cpp \
     jit/JITStubs.cpp \
+    jit/JITThunks.cpp \
     jit/JumpReplacementWatchpoint.cpp \
     jit/ThunkGenerators.cpp \
     llint/LLIntCLoop.cpp \
@@ -173,11 +197,33 @@ SOURCES += \
     parser/Nodes.cpp \
     parser/ParserArena.cpp \
     parser/Parser.cpp \
+    parser/SourceProvider.cpp \
     parser/SourceProviderCache.cpp \
+    profiler/ProfilerBytecode.cpp \
+    profiler/ProfilerBytecode.h \
+    profiler/ProfilerBytecodeSequence.cpp \
+    profiler/ProfilerBytecodes.cpp \
+    profiler/ProfilerBytecodes.h \
+    profiler/ProfilerCompilation.cpp \
+    profiler/ProfilerCompilation.h \
+    profiler/ProfilerCompilationKind.cpp \
+    profiler/ProfilerCompilationKind.h \
+    profiler/ProfilerCompiledBytecode.cpp \
+    profiler/ProfilerCompiledBytecode.h \
+    profiler/ProfilerDatabase.cpp \
+    profiler/ProfilerDatabase.h \
+    profiler/ProfilerExecutionCounter.h \
+    profiler/ProfilerOrigin.cpp \
+    profiler/ProfilerOrigin.h \
+    profiler/ProfilerOriginStack.cpp \
+    profiler/ProfilerOriginStack.h \
+    profiler/ProfilerOSRExit.cpp \
+    profiler/ProfilerOSRExitSite.cpp \
+    profiler/ProfilerProfiledBytecodes.cpp \
     profiler/Profile.cpp \
     profiler/ProfileGenerator.cpp \
     profiler/ProfileNode.cpp \
-    profiler/Profiler.cpp \
+    profiler/LegacyProfiler.cpp \
     runtime/ArgList.cpp \
     runtime/Arguments.cpp \
     runtime/ArrayConstructor.cpp \
@@ -187,6 +233,7 @@ SOURCES += \
     runtime/BooleanPrototype.cpp \
     runtime/CallData.cpp \
     runtime/CodeCache.cpp \
+    runtime/CodeSpecializationKind.cpp \
     runtime/CommonIdentifiers.cpp \
     runtime/Completion.cpp \
     runtime/ConstructData.cpp \
@@ -201,6 +248,7 @@ SOURCES += \
     runtime/ExceptionHelpers.cpp \
     runtime/Executable.cpp \
     runtime/FunctionConstructor.cpp \
+    runtime/FunctionExecutableDump.cpp \
     runtime/FunctionPrototype.cpp \
     runtime/GCActivityCallback.cpp \
     runtime/GetterSetter.cpp \
@@ -232,7 +280,7 @@ SOURCES += \
     runtime/JSString.cpp \
     runtime/JSStringJoiner.cpp \
     runtime/JSSymbolTableObject.cpp \
-    runtime/JSValue.cpp \
+    runtime/JSCJSValue.cpp \
     runtime/JSVariableObject.cpp \
     runtime/JSWrapperObject.cpp \
     runtime/LiteralParser.cpp \
@@ -253,6 +301,8 @@ SOURCES += \
     runtime/PropertyDescriptor.cpp \
     runtime/PropertyNameArray.cpp \
     runtime/PropertySlot.cpp \
+    runtime/PropertyTable.cpp \
+    runtime/PrototypeMap.cpp \
     runtime/RegExpConstructor.cpp \
     runtime/RegExpCachedResult.cpp \
     runtime/RegExpMatchesArray.cpp \
@@ -270,6 +320,7 @@ SOURCES += \
     runtime/StringRecursionChecker.cpp \
     runtime/StructureChain.cpp \
     runtime/Structure.cpp \
+    runtime/StructureRareData.cpp \
     runtime/SymbolTable.cpp \
     runtime/TimeoutChecker.cpp \
     tools/CodeProfile.cpp \
@@ -286,6 +337,19 @@ linux-*:if(isEqual(QT_ARCH, "i386")|isEqual(QT_ARCH, "x86_64")) {
         disassembler/udis86/udis86_syn-att.c \
         disassembler/udis86/udis86_syn-intel.c \
         disassembler/udis86/udis86_syn.c \
+}
+
+win32:!win32-g++*:isEqual(QT_ARCH, "x86_64"):{
+    asm_compiler.commands = ml64 /c
+    asm_compiler.commands +=  /Fo ${QMAKE_FILE_OUT} ${QMAKE_FILE_IN}
+    asm_compiler.output = ${QMAKE_VAR_OBJECTS_DIR}${QMAKE_FILE_BASE}$${first(QMAKE_EXT_OBJ)}
+    asm_compiler.input = ASM_SOURCES
+    asm_compiler.variable_out = OBJECTS
+    asm_compiler.name = compiling[asm] ${QMAKE_FILE_IN}
+    silent:asm_compiler.commands = @echo compiling[asm] ${QMAKE_FILE_IN} && $$asm_compiler.commands
+    QMAKE_EXTRA_COMPILERS += asm_compiler
+
+    ASM_SOURCES += jit/JITStubsMSVC64.asm
 }
 
 HEADERS += $$files(*.h, true)

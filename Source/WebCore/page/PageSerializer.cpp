@@ -52,6 +52,7 @@
 #include "Page.h"
 #include "StyleCachedImage.h"
 #include "StyleImage.h"
+#include "StylePropertySet.h"
 #include "StyleRule.h"
 #include "StyleSheetContents.h"
 #include "Text.h"
@@ -149,7 +150,7 @@ void SerializerMarkupAccumulator::appendCustomAttributes(StringBuilder& out, Ele
     if (!element->isFrameOwnerElement())
         return;
 
-    HTMLFrameOwnerElement* frameOwner = static_cast<HTMLFrameOwnerElement*>(element);
+    HTMLFrameOwnerElement* frameOwner = toFrameOwnerElement(element);
     Frame* frame = frameOwner->contentFrame();
     if (!frame)
         return;
@@ -266,16 +267,16 @@ void PageSerializer::serializeCSSStyleSheet(CSSStyleSheet* styleSheet, const KUR
         }
         Document* document = styleSheet->ownerDocument();
         // Some rules have resources associated with them that we need to retrieve.
-        if (rule->isImportRule()) {
+        if (rule->type() == CSSRule::IMPORT_RULE) {
             CSSImportRule* importRule = static_cast<CSSImportRule*>(rule);
             KURL importURL = document->completeURL(importRule->href());
             if (m_resourceURLs.contains(importURL))
                 continue;
             serializeCSSStyleSheet(importRule->styleSheet(), importURL);
-        } else if (rule->isFontFaceRule()) {
+        } else if (rule->type() == CSSRule::FONT_FACE_RULE) {
             // FIXME: Add support for font face rule. It is not clear to me at this point if the actual otf/eot file can
             // be retrieved from the CSSFontFaceRule object.
-        } else if (rule->isStyleRule())
+        } else if (rule->type() == CSSRule::STYLE_RULE)
             retrieveResourcesForRule(static_cast<CSSStyleRule*>(rule)->styleRule(), document);
     }
 

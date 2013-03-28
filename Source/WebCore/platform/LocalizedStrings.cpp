@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006, 2009, 2010, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2003, 2006, 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2010 Igalia S.L
  *
  * Redistribution and use in source and binary forms, with or without
@@ -557,19 +557,29 @@ String AXHeadingText()
     return WEB_UI_STRING("heading", "accessibility role description for headings");
 }
 
-String AXDefinitionListTermText()
+String AXDefinitionText()
 {
-    return WEB_UI_STRING("term", "term word of a definition");
+    return WEB_UI_STRING("definition", "role description of ARIA definition role");
 }
 
-String AXDefinitionListDefinitionText()
+String AXDescriptionListTermText()
 {
-    return WEB_UI_STRING("definition", "definition phrase");
+    return WEB_UI_STRING("term", "term word of a description list");
+}
+
+String AXDescriptionListDetailText()
+{
+    return WEB_UI_STRING("description", "description detail");
 }
 
 String AXFooterRoleDescriptionText()
 {
     return WEB_UI_STRING("footer", "accessibility role description for a footer");
+}
+
+String AXFileUploadButtonText()
+{
+    return WEB_UI_STRING("file upload button", "accessibility role description for a file upload button");
 }
 
 #if PLATFORM(MAC)
@@ -695,7 +705,7 @@ String multipleFileUploadText(unsigned numberOfFiles)
 
 String unknownFileSizeText()
 {
-    return WEB_UI_STRING("Unknown", "Unknown filesize FTP directory listing item");
+    return WEB_UI_STRING_KEY("Unknown", "Unknown (filesize)", "Unknown filesize FTP directory listing item");
 }
 
 #if PLATFORM(WIN)
@@ -716,13 +726,19 @@ String allFilesText()
 String builtInPDFPluginName()
 {
     // Also exposed to DOM.
-    return WEB_UI_STRING("WebKit built-in PDF", "Pseudo plug-in name, visible in Installed Plug-ins page in Safari.");
+    return WEB_UI_STRING("WebKit built-in PDF", "Pseudo plug-in name, visible in the Installed Plug-ins page in Safari.");
 }
 
 String pdfDocumentTypeDescription()
 {
     // Also exposed to DOM.
-    return WEB_UI_STRING("Portable Document Format", "Description of the (only) type supported by PDF pseudo plug-in. Visible in Installed Plug-ins page in Safari.");
+    return WEB_UI_STRING("Portable Document Format", "Description of the primary type supported by the PDF pseudo plug-in. Visible in the Installed Plug-ins page in Safari.");
+}
+
+String postScriptDocumentTypeDescription()
+{
+    // Also exposed to DOM.
+    return WEB_UI_STRING("PostScript", "Description of the PostScript type supported by the PDF pseudo plug-in. Visible in the Installed Plug-ins page in Safari.");
 }
 
 String keygenMenuItem512()
@@ -894,7 +910,7 @@ String localizedMediaControlElementHelpText(const String& name)
 
 String localizedMediaTimeDescription(float time)
 {
-    if (!isfinite(time))
+    if (!std::isfinite(time))
         return WEB_UI_STRING("indefinite time", "accessibility help text for an indefinite media controller time value");
 
     int seconds = static_cast<int>(fabsf(time));
@@ -985,6 +1001,72 @@ String validationMessageRangeOverflowText(const String&)
 String validationMessageStepMismatchText(const String&, const String&)
 {
     return WEB_UI_STRING("step mismatch", "Validation message for input form controls with value not respecting the step attribute");
+}
+
+String validationMessageBadInputForNumberText()
+{
+    notImplemented();
+    return validationMessageTypeMismatchText();
+}
+
+String clickToExitFullScreenText()
+{
+    return WEB_UI_STRING("Click to exit full screen mode", "Message to display in browser window when in webkit full screen mode.");
+}
+
+#if ENABLE(VIDEO_TRACK)
+String textTrackSubtitlesText()
+{
+    return WEB_UI_STRING("Subtitles", "Menu section heading for subtitles");
+}
+
+String textTrackOffText()
+{
+    return WEB_UI_STRING("Off", "Menu item label for the track that represents disabling closed captions");
+}
+
+String textTrackNoLabelText()
+{
+    return WEB_UI_STRING_KEY("Unknown", "Unknown (text track)", "Menu item label for a text track that has no other name");
+}
+    
+#if PLATFORM(MAC)
+String textTrackCountryAndLanguageMenuItemText(const String& title, const String& country, const String& language)
+{
+    return formatLocalizedString(WEB_UI_STRING("%@ (%@-%@)", "Text track display name format that includes the country and language of the subtitle, in the form of 'Title (Language-Country)'"), title.createCFString().get(), language.createCFString().get(), country.createCFString().get());
+}
+
+String textTrackLanguageMenuItemText(const String& title, const String& language)
+{
+    return formatLocalizedString(WEB_UI_STRING("%@ (%@)", "Text track display name format that includes the language of the subtitle, in the form of 'Title (Language)'"), title.createCFString().get(), language.createCFString().get());
+}
+
+String closedCaptionTrackMenuItemText(const String& title)
+{
+    return formatLocalizedString(WEB_UI_STRING("%@ CC", "Text track contains closed captions"), title.createCFString().get());
+}
+
+String sdhTrackMenuItemText(const String& title)
+{
+    return formatLocalizedString(WEB_UI_STRING("%@ SDH", "Text track contains subtitles for the deaf and hard of hearing"), title.createCFString().get());
+}
+
+String easyReaderTrackMenuItemText(const String& title)
+{
+    return formatLocalizedString(WEB_UI_STRING("%@ Easy Reader", "Text track contains simplified (3rd grade level) subtitles"), title.createCFString().get());
+}
+#endif
+
+#endif
+
+String snapshottedPlugInLabelTitle()
+{
+    return WEB_UI_STRING("Snapshotted Plug-In", "Title of the label to show on a snapshotted plug-in");
+}
+
+String snapshottedPlugInLabelSubtitle()
+{
+    return WEB_UI_STRING("Click to restart", "Subtitle of the label to show on a snapshotted plug-in");
 }
 
 } // namespace WebCore

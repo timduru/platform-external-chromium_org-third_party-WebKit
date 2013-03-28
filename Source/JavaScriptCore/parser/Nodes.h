@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2000 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009, 2013 Apple Inc. All rights reserved.
  *  Copyright (C) 2007 Cameron Zwarich (cwzwarich@uwaterloo.ca)
  *  Copyright (C) 2007 Maks Orlovich
  *  Copyright (C) 2007 Eric Seidel <eric@webkit.org>
@@ -30,6 +30,7 @@
 #include "JITCode.h"
 #include "Opcode.h"
 #include "ParserArena.h"
+#include "ParserTokens.h"
 #include "ResultType.h"
 #include "SourceCode.h"
 #include "SymbolTable.h"
@@ -46,19 +47,6 @@ namespace JSC {
     class RegisterID;
     class JSScope;
     class ScopeNode;
-
-    typedef unsigned CodeFeatures;
-
-    const CodeFeatures NoFeatures = 0;
-    const CodeFeatures EvalFeature = 1 << 0;
-    const CodeFeatures ArgumentsFeature = 1 << 1;
-    const CodeFeatures WithFeature = 1 << 2;
-    const CodeFeatures CatchFeature = 1 << 3;
-    const CodeFeatures ThisFeature = 1 << 4;
-    const CodeFeatures StrictModeFeature = 1 << 5;
-    const CodeFeatures ShadowsArgumentsFeature = 1 << 6;
-    
-    const CodeFeatures AllFeatures = EvalFeature | ArgumentsFeature | WithFeature | CatchFeature | ThisFeature | StrictModeFeature | ShadowsArgumentsFeature;
 
     enum Operator {
         OpEqual,
@@ -139,11 +127,11 @@ namespace JSC {
 
         int lineNo() const { return m_lineNumber; }
 
-        int columnNo() const { return m_columnNumber; }
+        int charPosition() const { return m_charPosition; }
 
     protected:
         int m_lineNumber;
-        int m_columnNumber;
+        int m_charPosition;
     };
 
     class ExpressionNode : public Node {
@@ -166,7 +154,7 @@ namespace JSC {
         virtual bool isSubtract() const { return false; }
         virtual bool hasConditionContextCodegen() const { return false; }
 
-        virtual void emitBytecodeInConditionContext(BytecodeGenerator&, Label*, Label*, bool) { ASSERT_NOT_REACHED(); }
+        virtual void emitBytecodeInConditionContext(BytecodeGenerator&, Label*, Label*, bool) { RELEASE_ASSERT_NOT_REACHED(); }
 
         virtual ExpressionNode* stripUnaryPlus() { return this; }
 
@@ -181,11 +169,9 @@ namespace JSC {
         StatementNode(const JSTokenLocation&);
 
     public:
-        JS_EXPORT_PRIVATE void setLoc(int firstLine, int lastLine);
-        void setLoc(int firstLine, int lastLine, int column);
+        void setLoc(int firstLine, int lastLine, int charPosition);
         int firstLine() const { return lineNo(); }
         int lastLine() const { return m_lastLine; }
-        int column() const { return columnNo();}
 
         virtual bool isEmptyStatement() const { return false; }
         virtual bool isReturnNode() const { return false; }
@@ -1307,8 +1293,8 @@ namespace JSC {
         typedef DeclarationStacks::VarStack VarStack;
         typedef DeclarationStacks::FunctionStack FunctionStack;
 
-        ScopeNode(JSGlobalData*, const JSTokenLocation&, bool inStrictContext);
-        ScopeNode(JSGlobalData*, const JSTokenLocation&, const SourceCode&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, CodeFeatures, int numConstants);
+        ScopeNode(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, bool inStrictContext);
+        ScopeNode(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, const SourceCode&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, CodeFeatures, int numConstants);
 
         using ParserArenaRefCounted::operator new;
 
@@ -1324,6 +1310,9 @@ namespace JSC {
         const SourceCode& source() const { return m_source; }
         const String& sourceURL() const { return m_source.provider()->url(); }
         intptr_t sourceID() const { return m_source.providerID(); }
+
+        int startLine() const { return m_startLineNumber; }
+        int startCharPosition() const { return m_startCharPosition;}
 
         void setFeatures(CodeFeatures features) { m_features = features; }
         CodeFeatures features() { return m_features; }
@@ -1357,6 +1346,9 @@ namespace JSC {
         void setSource(const SourceCode& source) { m_source = source; }
         ParserArena m_arena;
 
+        int m_startLineNumber;
+        int m_startCharPosition;
+
     private:
         CodeFeatures m_features;
         SourceCode m_source;
@@ -1370,12 +1362,12 @@ namespace JSC {
     class ProgramNode : public ScopeNode {
     public:
         static const bool isFunctionNode = false;
-        static PassRefPtr<ProgramNode> create(JSGlobalData*, const JSTokenLocation&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
+        static PassRefPtr<ProgramNode> create(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         static const bool scopeIsFunction = false;
 
     private:
-        ProgramNode(JSGlobalData*, const JSTokenLocation&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
+        ProgramNode(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
     };
@@ -1383,31 +1375,40 @@ namespace JSC {
     class EvalNode : public ScopeNode {
     public:
         static const bool isFunctionNode = false;
-        static PassRefPtr<EvalNode> create(JSGlobalData*, const JSTokenLocation&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
+        static PassRefPtr<EvalNode> create(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         static const bool scopeIsFunction = false;
 
     private:
-        EvalNode(JSGlobalData*, const JSTokenLocation&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
+        EvalNode(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         virtual RegisterID* emitBytecode(BytecodeGenerator&, RegisterID* = 0);
     };
 
-    class FunctionParameters : public Vector<Identifier>, public RefCounted<FunctionParameters> {
+    class FunctionParameters : public RefCounted<FunctionParameters> {
         WTF_MAKE_FAST_ALLOCATED;
     public:
-        static PassRefPtr<FunctionParameters> create(ParameterNode* firstParameter) { return adoptRef(new FunctionParameters(firstParameter)); }
+        static PassRefPtr<FunctionParameters> create(ParameterNode*);
+        ~FunctionParameters();
+
+        unsigned size() const { return m_size; }
+        const Identifier& at(unsigned index) const { ASSERT(index < m_size); return identifiers()[index]; }
 
     private:
-        FunctionParameters(ParameterNode*);
+        FunctionParameters(ParameterNode*, unsigned size);
+
+        Identifier* identifiers() { return reinterpret_cast<Identifier*>(&m_storage); }
+        const Identifier* identifiers() const { return reinterpret_cast<const Identifier*>(&m_storage); }
+
+        unsigned m_size;
+        void* m_storage;
     };
 
-    enum FunctionNameIsInScopeToggle { FunctionNameIsNotInScope, FunctionNameIsInScope };
     class FunctionBodyNode : public ScopeNode {
     public:
         static const bool isFunctionNode = true;
-        static FunctionBodyNode* create(JSGlobalData*, const JSTokenLocation&, bool isStrictMode);
-        static PassRefPtr<FunctionBodyNode> create(JSGlobalData*, const JSTokenLocation&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
+        static FunctionBodyNode* create(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, bool isStrictMode);
+        static PassRefPtr<FunctionBodyNode> create(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         FunctionParameters* parameters() const { return m_parameters.get(); }
         size_t parameterCount() const { return m_parameters->size(); }
@@ -1424,16 +1425,20 @@ namespace JSC {
         bool functionNameIsInScope() { return m_functionNameIsInScopeToggle == FunctionNameIsInScope; }
         FunctionNameIsInScopeToggle functionNameIsInScopeToggle() { return m_functionNameIsInScopeToggle; }
 
+        void setFunctionStart(int functionStart) { m_functionStart = functionStart; }
+        int functionStart() const { return m_functionStart; }
+
         static const bool scopeIsFunction = true;
 
     private:
-        FunctionBodyNode(JSGlobalData*, const JSTokenLocation&, bool inStrictContext);
-        FunctionBodyNode(JSGlobalData*, const JSTokenLocation&, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
+        FunctionBodyNode(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, bool inStrictContext);
+        FunctionBodyNode(JSGlobalData*, const JSTokenLocation& start, const JSTokenLocation& end, SourceElements*, VarStack*, FunctionStack*, IdentifierSet&, const SourceCode&, CodeFeatures, int numConstants);
 
         Identifier m_ident;
         Identifier m_inferredName;
         FunctionNameIsInScopeToggle m_functionNameIsInScopeToggle;
         RefPtr<FunctionParameters> m_parameters;
+        int m_functionStart;
     };
 
     class FuncExprNode : public ExpressionNode {
@@ -1495,7 +1500,8 @@ namespace JSC {
         RegisterID* emitBytecodeForBlock(BytecodeGenerator&, RegisterID* input, RegisterID* destination);
 
     private:
-        SwitchInfo::SwitchType tryOptimizedSwitch(Vector<ExpressionNode*, 8>& literalVector, int32_t& min_num, int32_t& max_num);
+        SwitchInfo::SwitchType tryTableSwitch(Vector<ExpressionNode*, 8>& literalVector, int32_t& min_num, int32_t& max_num);
+        static const size_t s_tableSwitchMinimum = 10;
         ClauseListNode* m_list1;
         CaseClauseNode* m_defaultClause;
         ClauseListNode* m_list2;

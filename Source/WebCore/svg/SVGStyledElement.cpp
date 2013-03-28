@@ -28,6 +28,7 @@
 #include "Document.h"
 #include "EventNames.h"
 #include "HTMLNames.h"
+#include "NodeTraversal.h"
 #include "RenderObject.h"
 #include "RenderSVGResource.h"
 #include "RenderSVGResourceClipper.h"
@@ -100,8 +101,8 @@ String SVGStyledElement::title() const
 
     // If we aren't an instance in a <use> or the <use> title was not found, then find the first
     // <title> child of this element.
-    Element* titleElement = firstElementChild();
-    for (; titleElement; titleElement = titleElement->nextElementSibling()) {
+    Element* titleElement = ElementTraversal::firstWithin(this);
+    for (; titleElement; titleElement = ElementTraversal::nextSkippingChildren(titleElement, this)) {
         if (titleElement->hasTagName(SVGNames::titleTag) && titleElement->isSVGElement())
             break;
     }
@@ -121,7 +122,7 @@ bool SVGStyledElement::rendererIsNeeded(const NodeRenderingContext& context)
     // Spec: SVG allows inclusion of elements from foreign namespaces anywhere
     // with the SVG content. In general, the SVG user agent will include the unknown
     // elements in the DOM but will otherwise ignore unknown elements. 
-    if (!parentOrHostElement() || parentOrHostElement()->isSVGElement())
+    if (!parentOrShadowHostElement() || parentOrShadowHostElement()->isSVGElement())
         return StyledElement::rendererIsNeeded(context);
 
     return false;
@@ -291,26 +292,26 @@ bool SVGStyledElement::isPresentationAttribute(const QualifiedName& name) const
     return SVGElement::isPresentationAttribute(name);
 }
 
-void SVGStyledElement::collectStyleForAttribute(const Attribute& attribute, StylePropertySet* style)
+void SVGStyledElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
 {
-    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attribute.name());
+    CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(name);
     if (propertyID > 0)
-        addPropertyToAttributeStyle(style, propertyID, attribute.value());
+        addPropertyToPresentationAttributeStyle(style, propertyID, value);
 }
 
-void SVGStyledElement::parseAttribute(const Attribute& attribute)
+void SVGStyledElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     // SVG animation has currently requires special storage of values so we set
     // the className here.  svgAttributeChanged actually causes the resulting
     // style updates (instead of StyledElement::parseAttribute). We don't
     // tell StyledElement about the change to avoid parsing the class list twice
-    if (attribute.name() == HTMLNames::classAttr) {
-        setClassNameBaseValue(attribute.value());
+    if (name == HTMLNames::classAttr) {
+        setClassNameBaseValue(value);
         return;
     }
 
     // id is handled by StyledElement which SVGElement inherits from
-    SVGElement::parseAttribute(attribute);
+    SVGElement::parseAttribute(name, value);
 }
 
 bool SVGStyledElement::isKnownAttribute(const QualifiedName& attrName)
@@ -355,7 +356,7 @@ Node::InsertionNotificationRequest SVGStyledElement::insertedInto(ContainerNode*
 void SVGStyledElement::buildPendingResourcesIfNeeded()
 {
     Document* document = this->document();
-    if (!needsPendingResourceHandling() || !document)
+    if (!needsPendingResourceHandling() || !document || !inDocument() || isInShadowTree())
         return;
 
     SVGDocumentExtensions* extensions = document->accessSVGExtensions();
@@ -367,11 +368,11 @@ void SVGStyledElement::buildPendingResourcesIfNeeded()
     extensions->markPendingResourcesForRemoval(resourceId);
 
     // Rebuild pending resources for each client of a pending resource that is being removed.
-    while (SVGElement* clientElement = extensions->removeElementFromPendingResourcesForRemoval(resourceId)) {
+    while (Element* clientElement = extensions->removeElementFromPendingResourcesForRemoval(resourceId)) {
         ASSERT(clientElement->hasPendingResources());
         if (clientElement->hasPendingResources()) {
             clientElement->buildPendingResource();
-            clientElement->clearHasPendingResourcesIfPossible();
+            extensions->clearHasPendingResourcesIfPossible(clientElement);
         }
     }
 }
@@ -399,7 +400,7 @@ PassRefPtr<CSSValue> SVGStyledElement::getPresentationAttribute(const String& na
         return 0;
 
     QualifiedName attributeName(nullAtom, name, nullAtom);
-    Attribute* attr = getAttributeItem(attributeName);
+    const Attribute* attr = getAttributeItem(attributeName);
     if (!attr)
         return 0;
 
@@ -454,14 +455,14 @@ void SVGStyledElement::updateRelativeLengthsInformation(bool hasRelativeLengths,
         if (!node->isSVGElement())
             break;
 
-        SVGElement* element = static_cast<SVGElement*>(node);
-        if (!element->isStyled()) {
+        SVGElement* element = toSVGElement(node);
+        if (!element->isSVGStyledElement()) {
             node = node->parentNode();
             continue;
         }
 
         // Register us in the parent element map.
-        static_cast<SVGStyledElement*>(element)->updateRelativeLengthsInformation(hasRelativeLengths, this);
+        toSVGStyledElement(element)->updateRelativeLengthsInformation(hasRelativeLengths, this);
         break;
     }
 }

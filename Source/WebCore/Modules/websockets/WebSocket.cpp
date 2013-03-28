@@ -39,11 +39,13 @@
 #include "CloseEvent.h"
 #include "ContentSecurityPolicy.h"
 #include "DOMWindow.h"
+#include "Document.h"
 #include "Event.h"
 #include "EventException.h"
 #include "EventListener.h"
 #include "EventNames.h"
 #include "ExceptionCode.h"
+#include "Frame.h"
 #include "Logging.h"
 #include "MessageEvent.h"
 #include "ScriptCallStack.h"
@@ -141,7 +143,7 @@ const char* WebSocket::subProtocolSeperator()
 }
 
 WebSocket::WebSocket(ScriptExecutionContext* context)
-    : ActiveDOMObject(context, this)
+    : ActiveDOMObject(context)
     , m_state(CONNECTING)
     , m_bufferedAmount(0)
     , m_bufferedAmountAfterClose(0)
@@ -164,6 +166,36 @@ PassRefPtr<WebSocket> WebSocket::create(ScriptExecutionContext* context)
     return webSocket.release();
 }
 
+PassRefPtr<WebSocket> WebSocket::create(ScriptExecutionContext* context, const String& url, ExceptionCode& ec)
+{
+    Vector<String> protocols;
+    return WebSocket::create(context, url, protocols, ec);
+}
+
+PassRefPtr<WebSocket> WebSocket::create(ScriptExecutionContext* context, const String& url, const Vector<String>& protocols, ExceptionCode& ec)
+{
+    if (url.isNull()) {
+        ec = SYNTAX_ERR;
+        return 0;
+    }
+
+    RefPtr<WebSocket> webSocket(adoptRef(new WebSocket(context)));
+    webSocket->suspendIfNeeded();
+
+    webSocket->connect(context->completeURL(url), protocols, ec);
+    if (ec)
+        return 0;
+
+    return webSocket.release();
+}
+
+PassRefPtr<WebSocket> WebSocket::create(ScriptExecutionContext* context, const String& url, const String& protocol, ExceptionCode& ec)
+{
+    Vector<String> protocols;
+    protocols.append(protocol);
+    return WebSocket::create(context, url, protocols, ec);
+}
+
 void WebSocket::connect(const String& url, ExceptionCode& ec)
 {
     Vector<String> protocols;
@@ -183,32 +215,38 @@ void WebSocket::connect(const String& url, const Vector<String>& protocols, Exce
     m_url = KURL(KURL(), url);
 
     if (!m_url.isValid()) {
-        scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "Invalid url for WebSocket " + m_url.string(), scriptExecutionContext()->securityOrigin()->toString());
+        scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Invalid url for WebSocket " + m_url.elidedString());
         m_state = CLOSED;
         ec = SYNTAX_ERR;
         return;
     }
 
     if (!m_url.protocolIs("ws") && !m_url.protocolIs("wss")) {
-        scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "Wrong url scheme for WebSocket " + m_url.string(), scriptExecutionContext()->securityOrigin()->toString());
+        scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Wrong url scheme for WebSocket " + m_url.elidedString());
         m_state = CLOSED;
         ec = SYNTAX_ERR;
         return;
     }
     if (m_url.hasFragmentIdentifier()) {
-        scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "URL has fragment component " + m_url.string(), scriptExecutionContext()->securityOrigin()->toString());
+        scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "URL has fragment component " + m_url.elidedString());
         m_state = CLOSED;
         ec = SYNTAX_ERR;
         return;
     }
     if (!portAllowed(m_url)) {
-        scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "WebSocket port " + String::number(m_url.port()) + " blocked", scriptExecutionContext()->securityOrigin()->toString());
+        scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "WebSocket port " + String::number(m_url.port()) + " blocked");
         m_state = CLOSED;
         ec = SECURITY_ERR;
         return;
     }
 
-    if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(m_url)) {
+    // FIXME: Convert this to check the isolated world's Content Security Policy once webkit.org/b/104520 is solved.
+    bool shouldBypassMainWorldContentSecurityPolicy = false;
+    if (scriptExecutionContext()->isDocument()) {
+        Document* document = toDocument(scriptExecutionContext());
+        shouldBypassMainWorldContentSecurityPolicy = document->frame()->script()->shouldBypassMainWorldContentSecurityPolicy();
+    }
+    if (!shouldBypassMainWorldContentSecurityPolicy && !scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(m_url)) {
         m_state = CLOSED;
 
         // FIXME: Should this be throwing an exception?
@@ -227,7 +265,7 @@ void WebSocket::connect(const String& url, const Vector<String>& protocols, Exce
     // comply with WebSocket API specification, but it seems to be the only reasonable way to handle this conflict.
     for (size_t i = 0; i < protocols.size(); ++i) {
         if (!isValidProtocolString(protocols[i])) {
-            scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "Wrong protocol for WebSocket '" + encodeProtocolString(protocols[i]) + "'", scriptExecutionContext()->securityOrigin()->toString());
+            scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Wrong protocol for WebSocket '" + encodeProtocolString(protocols[i]) + "'");
             m_state = CLOSED;
             ec = SYNTAX_ERR;
             return;
@@ -236,7 +274,7 @@ void WebSocket::connect(const String& url, const Vector<String>& protocols, Exce
     HashSet<String> visited;
     for (size_t i = 0; i < protocols.size(); ++i) {
         if (visited.contains(protocols[i])) {
-            scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "WebSocket protocols contain duplicates: '" + encodeProtocolString(protocols[i]) + "'", scriptExecutionContext()->securityOrigin()->toString());
+            scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "WebSocket protocols contain duplicates: '" + encodeProtocolString(protocols[i]) + "'");
             m_state = CLOSED;
             ec = SYNTAX_ERR;
             return;
@@ -269,7 +307,7 @@ bool WebSocket::send(const String& message, ExceptionCode& ec)
     ASSERT(m_channel);
     ThreadableWebSocketChannel::SendResult result = m_channel->send(message);
     if (result == ThreadableWebSocketChannel::InvalidMessage) {
-        scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "Websocket message contains invalid character(s).");
+        scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Websocket message contains invalid character(s).");
         ec = SYNTAX_ERR;
         return false;
     }
@@ -315,7 +353,7 @@ bool WebSocket::send(ArrayBufferView* arrayBufferView, ExceptionCode& ec)
 
 bool WebSocket::send(Blob* binaryData, ExceptionCode& ec)
 {
-    LOG(Network, "WebSocket %p send blob %s", this, binaryData->url().string().utf8().data());
+    LOG(Network, "WebSocket %p send blob %s", this, binaryData->url().elidedString().utf8().data());
     ASSERT(binaryData);
     if (m_state == CONNECTING) {
         ec = INVALID_STATE_ERR;
@@ -341,15 +379,9 @@ void WebSocket::close(int code, const String& reason, ExceptionCode& ec)
             ec = INVALID_ACCESS_ERR;
             return;
         }
-        CString utf8 = reason.utf8(String::StrictConversion);
+        CString utf8 = reason.utf8(String::StrictConversionReplacingUnpairedSurrogatesWithFFFD);
         if (utf8.length() > maxReasonSizeInBytes) {
-            scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "WebSocket close message is too long.");
-            ec = SYNTAX_ERR;
-            return;
-        }
-        // Checks whether reason is valid utf8.
-        if (utf8.isNull() && reason.length()) {
-            scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "WebSocket close message contains invalid character(s).");
+            scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "WebSocket close message is too long.");
             ec = SYNTAX_ERR;
             return;
         }
@@ -414,7 +446,7 @@ void WebSocket::setBinaryType(const String& binaryType)
         m_binaryType = BinaryTypeArrayBuffer;
         return;
     }
-    scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, "'" + binaryType + "' is not a valid value for binaryType; binaryType remains unchanged.");
+    scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "'" + binaryType + "' is not a valid value for binaryType; binaryType remains unchanged.");
 }
 
 const AtomicString& WebSocket::interfaceName() const
@@ -484,7 +516,7 @@ void WebSocket::didReceiveMessage(const String& msg)
     if (m_state != OPEN && m_state != CLOSING)
         return;
     ASSERT(scriptExecutionContext());
-    dispatchEvent(MessageEvent::create(msg));
+    dispatchEvent(MessageEvent::create(msg, SecurityOrigin::create(m_url)->toString()));
 }
 
 void WebSocket::didReceiveBinaryData(PassOwnPtr<Vector<char> > binaryData)
@@ -497,12 +529,12 @@ void WebSocket::didReceiveBinaryData(PassOwnPtr<Vector<char> > binaryData)
         OwnPtr<BlobData> blobData = BlobData::create();
         blobData->appendData(rawData.release(), 0, BlobDataItem::toEndOfFile);
         RefPtr<Blob> blob = Blob::create(blobData.release(), size);
-        dispatchEvent(MessageEvent::create(blob.release()));
+        dispatchEvent(MessageEvent::create(blob.release(), SecurityOrigin::create(m_url)->toString()));
         break;
     }
 
     case BinaryTypeArrayBuffer:
-        dispatchEvent(MessageEvent::create(ArrayBuffer::create(binaryData->data(), binaryData->size())));
+        dispatchEvent(MessageEvent::create(ArrayBuffer::create(binaryData->data(), binaryData->size()), SecurityOrigin::create(m_url)->toString()));
         break;
     }
 }

@@ -39,6 +39,7 @@
 namespace WebCore {
 
 class ContextMenuItem;
+class DOMFileSystem;
 class Event;
 class FrontendMenuProvider;
 class InspectorClient;
@@ -68,7 +69,6 @@ public:
     void setInjectedScriptForOrigin(const String& origin, const String& script);
 
     String localizedStringsURL();
-    String hiddenPanels();
 
     void copyText(const String& text);
     void openInNewTab(const String& url);
@@ -77,13 +77,25 @@ public:
     void append(const String& url, const String& content);
     void close(const String& url);
 
-    bool canInspectWorkers();
-
     // Called from [Custom] implementations.
     void showContextMenu(Event*, const Vector<ContextMenuItem>& items);
     void sendMessageToBackend(const String& message);
 
     String loadResourceSynchronously(const String& url);
+
+    bool supportsFileSystems();
+    void requestFileSystems();
+    void addFileSystem();
+    void removeFileSystem(const String& fileSystemPath);
+#if ENABLE(FILE_SYSTEM)
+    PassRefPtr<DOMFileSystem> isolatedFileSystem(const String& fileSystemName, const String& rootURL);
+#endif
+
+    bool isUnderTest();
+
+    bool canInspectWorkers();
+    bool canSaveAs();
+    String hiddenPanels();
 
 private:
 #if ENABLE(CONTEXT_MENUS)

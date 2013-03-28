@@ -33,6 +33,7 @@
 #include "WebCoreMemoryInstrumentation.h"
 #include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/MemoryObjectInfo.h>
 
 namespace WebCore {
 
@@ -51,8 +52,8 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_pageSize()
     , m_shapeInside(RenderStyle::initialShapeInside())
     , m_shapeOutside(RenderStyle::initialShapeOutside())
-    , m_wrapMargin(RenderStyle::initialWrapMargin())
-    , m_wrapPadding(RenderStyle::initialWrapPadding())
+    , m_shapeMargin(RenderStyle::initialShapeMargin())
+    , m_shapePadding(RenderStyle::initialShapePadding())
     , m_clipPath(RenderStyle::initialClipPath())
     , m_visitedLinkBackgroundColor(RenderStyle::initialBackgroundColor())
     , m_order(RenderStyle::initialOrder())
@@ -125,9 +126,13 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_pageSize(o.m_pageSize)
     , m_shapeInside(o.m_shapeInside)
     , m_shapeOutside(o.m_shapeOutside)
-    , m_wrapMargin(o.m_wrapMargin)
-    , m_wrapPadding(o.m_wrapPadding)
+    , m_shapeMargin(o.m_shapeMargin)
+    , m_shapePadding(o.m_shapePadding)
     , m_clipPath(o.m_clipPath)
+#if ENABLE(CSS3_TEXT)
+    , m_textDecorationColor(o.m_textDecorationColor)
+    , m_visitedLinkTextDecorationColor(o.m_visitedLinkTextDecorationColor)
+#endif // CSS3_TEXT
     , m_visitedLinkBackgroundColor(o.m_visitedLinkBackgroundColor)
     , m_visitedLinkOutlineColor(o.m_visitedLinkOutlineColor)
     , m_visitedLinkBorderLeftColor(o.m_visitedLinkBorderLeftColor)
@@ -210,9 +215,13 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_pageSize == o.m_pageSize
         && m_shapeInside == o.m_shapeInside
         && m_shapeOutside == o.m_shapeOutside
-        && m_wrapMargin == o.m_wrapMargin
-        && m_wrapPadding == o.m_wrapPadding
+        && m_shapeMargin == o.m_shapeMargin
+        && m_shapePadding == o.m_shapePadding
         && m_clipPath == o.m_clipPath
+#if ENABLE(CSS3_TEXT)
+        && m_textDecorationColor == o.m_textDecorationColor
+        && m_visitedLinkTextDecorationColor == o.m_visitedLinkTextDecorationColor
+#endif // CSS3_TEXT
         && m_visitedLinkBackgroundColor == o.m_visitedLinkBackgroundColor
         && m_visitedLinkOutlineColor == o.m_visitedLinkOutlineColor
         && m_visitedLinkBorderLeftColor == o.m_visitedLinkBorderLeftColor
@@ -319,29 +328,35 @@ void StyleRareNonInheritedData::reportMemoryUsage(MemoryObjectInfo* memoryObject
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
 #if ENABLE(DASHBOARD_SUPPORT)
-    info.addMember(m_dashboardRegions);
+    info.addMember(m_dashboardRegions, "dashboardRegions");
 #endif
-    info.addMember(m_deprecatedFlexibleBox);
-    info.addMember(m_flexibleBox);
-    info.addMember(m_marquee);
-    info.addMember(m_multiCol);
-    info.addMember(m_transform);
+    info.addMember(m_deprecatedFlexibleBox, "deprecatedFlexibleBox");
+    info.addMember(m_flexibleBox, "flexibleBox");
+    info.addMember(m_marquee, "marquee");
+    info.addMember(m_multiCol, "multiCol");
+    info.addMember(m_transform, "transform");
 #if ENABLE(CSS_FILTERS)
-    info.addMember(m_filter);
+    info.addMember(m_filter, "filter");
 #endif
-    info.addMember(m_grid);
-    info.addMember(m_gridItem);
-    info.addMember(m_content);
-    info.addMember(m_counterDirectives);
-    info.addMember(m_boxShadow);
-    info.addMember(m_boxReflect);
-    info.addMember(m_animations);
-    info.addMember(m_transitions);
-    info.addMember(m_shapeInside);
-    info.addMember(m_shapeOutside);
-    info.addMember(m_clipPath);
-    info.addMember(m_flowThread);
-    info.addMember(m_regionThread);
+    info.addMember(m_grid, "grid");
+    info.addMember(m_gridItem, "gridItem");
+    info.addMember(m_content, "content");
+    info.addMember(m_counterDirectives, "counterDirectives");
+    info.addMember(m_boxShadow, "boxShadow");
+    info.addMember(m_boxReflect, "boxReflect");
+    info.addMember(m_animations, "animations");
+    info.addMember(m_transitions, "transitions");
+    info.addMember(m_shapeInside, "shapeInside");
+    info.addMember(m_shapeOutside, "shapeOutside");
+    info.addMember(m_clipPath, "clipPath");
+    info.addMember(m_flowThread, "flowThread");
+    info.addMember(m_regionThread, "regionThread");
+
+    info.ignoreMember(m_perspectiveOriginX);
+    info.ignoreMember(m_perspectiveOriginY);
+    info.ignoreMember(m_pageSize);
+    info.ignoreMember(m_shapeMargin);
+    info.ignoreMember(m_shapePadding);
 }
 
 } // namespace WebCore

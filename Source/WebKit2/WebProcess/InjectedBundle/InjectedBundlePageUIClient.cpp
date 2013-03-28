@@ -163,4 +163,31 @@ uint64_t InjectedBundlePageUIClient::didExceedDatabaseQuota(WebPage* page, WebSe
     return m_client.didExceedDatabaseQuota(toAPI(page), toAPI(origin), toAPI(databaseName.impl()), toAPI(databaseDisplayName.impl()), currentQuotaBytes, currentOriginUsageBytes, currentDatabaseUsageBytes, expectedUsageBytes, m_client.clientInfo);
 }
 
+String InjectedBundlePageUIClient::plugInStartLabelTitle() const
+{
+    if (!m_client.createPlugInStartLabelTitle)
+        return String();
+
+    RefPtr<WebString> title = adoptRef(toImpl(m_client.createPlugInStartLabelTitle(m_client.clientInfo)));
+    return title ? title->string() : String();
+}
+
+String InjectedBundlePageUIClient::plugInStartLabelSubtitle() const
+{
+    if (!m_client.createPlugInStartLabelSubtitle)
+        return String();
+
+    RefPtr<WebString> subtitle = adoptRef(toImpl(m_client.createPlugInStartLabelSubtitle(m_client.clientInfo)));
+    return subtitle ? subtitle->string() : String();
+}
+
+String InjectedBundlePageUIClient::plugInExtraStyleSheet() const
+{
+    if (!m_client.createPlugInExtraStyleSheet)
+        return String();
+
+    RefPtr<WebString> styleSheet = adoptRef(toImpl(m_client.createPlugInExtraStyleSheet(m_client.clientInfo)));
+    return styleSheet ? styleSheet->string() : String();
+}
+
 } // namespace WebKit

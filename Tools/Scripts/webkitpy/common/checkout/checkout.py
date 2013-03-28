@@ -35,7 +35,6 @@ from webkitpy.common.checkout.scm import CommitMessage
 from webkitpy.common.checkout.deps import DEPS
 from webkitpy.common.memoized import memoized
 from webkitpy.common.system.executive import ScriptError
-from webkitpy.common.system.deprecated_logging import log
 
 
 # This class represents the WebKit-specific parts of the checkout (like ChangeLogs).
@@ -136,10 +135,10 @@ class Checkout(object):
 
     def suggested_reviewers(self, git_commit, changed_files=None):
         changed_files = self.modified_non_changelogs(git_commit, changed_files)
-        commit_infos = self.recent_commit_infos_for_files(changed_files)
-        reviewers = [commit_info.reviewer() for commit_info in commit_infos if commit_info.reviewer()]
-        reviewers.extend([commit_info.author() for commit_info in commit_infos if commit_info.author() and commit_info.author().can_review])
-        return sorted(set(reviewers))
+        commit_infos = sorted(self.recent_commit_infos_for_files(changed_files), key=lambda info: info.revision(), reverse=True)
+        reviewers = filter(lambda person: person and person.can_review, sum(map(lambda info: [info.reviewer(), info.author()], commit_infos), []))
+        unique_reviewers = reduce(lambda suggestions, reviewer: suggestions + [reviewer if reviewer not in suggestions else None], reviewers, [])
+        return filter(lambda reviewer: reviewer, unique_reviewers)
 
     def bug_id_for_this_commit(self, git_commit, changed_files=None):
         try:

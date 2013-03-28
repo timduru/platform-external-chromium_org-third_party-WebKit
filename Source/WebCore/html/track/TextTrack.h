@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc.  All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,12 +35,20 @@
 #include <wtf/RefCounted.h>
 #include <wtf/text/WTFString.h>
 
+#if USE(PLATFORM_TEXT_TRACK_MENU)
+#include "PlatformTextTrack.h"
+#endif
+
 namespace WebCore {
 
 class HTMLMediaElement;
 class TextTrack;
 class TextTrackCue;
 class TextTrackCueList;
+#if ENABLE(WEBVTT_REGIONS)
+class TextTrackRegion;
+class TextTrackRegionList;
+#endif
 
 class TextTrackClient {
 public:
@@ -52,7 +61,11 @@ public:
     virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>) = 0;
 };
 
-class TextTrack : public TrackBase {
+class TextTrack : public TrackBase
+#if USE(PLATFORM_TEXT_TRACK_MENU)
+    , public PlatformTextTrackClient
+#endif
+    {
 public:
     static PassRefPtr<TextTrack> create(ScriptExecutionContext* context, TextTrackClient* client, const AtomicString& kind, const AtomicString& label, const AtomicString& language)
     {
@@ -83,11 +96,8 @@ public:
     static const AtomicString& hiddenKeyword();
     static const AtomicString& showingKeyword();
 
-    AtomicString mode() const;
-    void setMode(const AtomicString&);
-
-    bool showingByDefault() const { return m_showingByDefault; }
-    void setShowingByDefault(bool showing) { m_showingByDefault = showing; }
+    AtomicString mode() const { return m_mode; }
+    virtual void setMode(const AtomicString&);
 
     enum ReadinessState { NotLoaded = 0, Loading = 1, Loaded = 2, FailedToLoad = 3 };
     ReadinessState readinessState() const { return m_readinessState; }
@@ -96,11 +106,18 @@ public:
     TextTrackCueList* cues();
     TextTrackCueList* activeCues() const;
 
-    virtual void clearClient() { m_client = 0; }
+    void clearClient() { m_client = 0; }
     TextTrackClient* client() { return m_client; }
 
-    void addCue(PassRefPtr<TextTrackCue>, ExceptionCode&);
+    void addCue(PassRefPtr<TextTrackCue>);
     void removeCue(TextTrackCue*, ExceptionCode&);
+    bool hasCue(TextTrackCue*);
+
+#if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
+    TextTrackRegionList* regions();
+    void addRegion(PassRefPtr<TextTrackRegion>);
+    void removeRegion(TextTrackRegion*, ExceptionCode&);
+#endif
 
     void cueWillChange(TextTrackCue*);
     void cueDidChange(TextTrackCue*);
@@ -110,10 +127,29 @@ public:
     enum TextTrackType { TrackElement, AddTrack, InBand };
     TextTrackType trackType() const { return m_trackType; }
 
+    virtual bool isClosedCaptions() const { return false; }
+
+    virtual bool containsOnlyForcedSubtitles() const { return false; }
+    virtual bool isMainProgramContent() const;
+    virtual bool isEasyToRead() const { return false; }
+
     int trackIndex();
     void invalidateTrackIndex();
 
     bool isRendered();
+    int trackIndexRelativeToRenderedTracks();
+
+    bool hasBeenConfigured() const { return m_hasBeenConfigured; }
+    void setHasBeenConfigured(bool flag) { m_hasBeenConfigured = flag; }
+
+    virtual bool isDefault() const { return false; }
+    virtual void setIsDefault(bool) { }
+
+    void removeAllCues();
+
+#if USE(PLATFORM_TEXT_TRACK_MENU)
+    PassRefPtr<PlatformTextTrack> platformTextTrack();
+#endif
 
 protected:
     TextTrack(ScriptExecutionContext*, TextTrackClient*, const AtomicString& kind, const AtomicString& label, const AtomicString& language, TextTrackType);
@@ -121,7 +157,19 @@ protected:
     RefPtr<TextTrackCueList> m_cues;
 
 private:
+#if ENABLE(VIDEO_TRACK) && ENABLE(WEBVTT_REGIONS)
+    TextTrackRegionList* ensureTextTrackRegionList();
+    RefPtr<TextTrackRegionList> m_regions;
+#endif
+
+#if USE(PLATFORM_TEXT_TRACK_MENU)
+    virtual TextTrack* publicTrack() OVERRIDE { return this; }
+
+    RefPtr<PlatformTextTrack> m_platformTextTrack;
+#endif
+
     TextTrackCueList* ensureTextTrackCueList();
+
     HTMLMediaElement* m_mediaElement;
     AtomicString m_kind;
     AtomicString m_label;
@@ -130,8 +178,9 @@ private:
     TextTrackClient* m_client;
     TextTrackType m_trackType;
     ReadinessState m_readinessState;
-    bool m_showingByDefault;
     int m_trackIndex;
+    int m_renderedTrackIndex;
+    bool m_hasBeenConfigured;
 };
 
 } // namespace WebCore

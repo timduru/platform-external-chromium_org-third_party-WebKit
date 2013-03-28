@@ -29,8 +29,10 @@
 #import "DOMInternal.h" // import first to make the private/public trick work
 #import "DOM.h"
 
+#import "CachedImage.h"
 #import "DOMElementInternal.h"
 #import "DOMHTMLCanvasElement.h"
+#import "DOMHTMLTableCellElementInternal.h"
 #import "DOMNodeInternal.h"
 #import "DOMPrivate.h"
 #import "DOMRangeInternal.h"
@@ -39,10 +41,13 @@
 #import "HTMLElement.h"
 #import "HTMLNames.h"
 #import "HTMLParserIdioms.h"
+#import "HTMLTableCellElement.h"
 #import "Image.h"
+#import "JSNode.h"
 #import "NodeFilter.h"
 #import "RenderImage.h"
 #import "WebScriptObjectPrivate.h"
+#import <JavaScriptCore/APICast.h>
 #import <wtf/HashMap.h>
 
 #if ENABLE(SVG_DOM_OBJC_BINDINGS)
@@ -290,7 +295,7 @@ Class kitClass(WebCore::Node* impl)
     switch (impl->nodeType()) {
         case WebCore::Node::ELEMENT_NODE:
             if (impl->isHTMLElement())
-                return WebCore::elementClass(static_cast<WebCore::HTMLElement*>(impl)->tagQName(), [DOMHTMLElement class]);
+                return WebCore::elementClass(toHTMLElement(impl)->tagQName(), [DOMHTMLElement class]);
 #if ENABLE(SVG_DOM_OBJC_BINDINGS)
             if (impl->isSVGElement())
                 return WebCore::elementClass(static_cast<WebCore::SVGElement*>(impl)->tagQName(), [DOMSVGElement class]);
@@ -385,6 +390,21 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
     Vector<WebCore::IntRect> rects;
     core(self)->textRects(rects);
     return kit(rects);
+}
+
+@end
+
+@implementation DOMNode (WebPrivate)
+
++ (id)_nodeFromJSWrapper:(JSObjectRef)jsWrapper
+{
+    JSObject* object = toJS(jsWrapper);
+
+    if (!object->inherits(&JSNode::s_info))
+        return nil;
+
+    WebCore::Node* node = jsCast<JSNode*>(object)->impl();
+    return kit(node);
 }
 
 @end
@@ -521,6 +541,15 @@ id <DOMEventTarget> kit(WebCore::EventTarget* eventTarget)
 
 @end
 
+
+@implementation DOMHTMLTableCellElement (WebPrivate)
+
+- (DOMHTMLTableCellElement *)_cellAbove
+{
+    return kit(core(self)->cellAbove());
+}
+
+@end
 
 //------------------------------------------------------------------------------------------
 // DOMNodeFilter

@@ -28,11 +28,9 @@
 #if ENABLE(FULLSCREEN_API)
 
 #include "Connection.h"
-#include "MessageID.h"
 #include "WebCoreArgumentCoders.h"
 #include "WebFullScreenManagerProxyMessages.h"
 #include "WebPage.h"
-#include "WebProcess.h"
 #include <WebCore/Color.h>
 #include <WebCore/Element.h>
 #include <WebCore/Page.h>
@@ -52,7 +50,7 @@ static IntRect screenRectOfContents(Element* element)
 #if USE(ACCELERATED_COMPOSITING)
     if (element->renderer() && element->renderer()->hasLayer() && element->renderer()->enclosingLayer()->isComposited()) {
         FloatQuad contentsBox = static_cast<FloatRect>(element->renderer()->enclosingLayer()->backing()->contentsBox());
-        contentsBox = element->renderer()->localToAbsoluteQuad(contentsBox, SnapOffsetForTransforms);
+        contentsBox = element->renderer()->localToAbsoluteQuad(contentsBox);
         return element->renderer()->view()->frameView()->contentsToScreen(contentsBox.enclosingBoundingBox());
     }
 #endif
@@ -78,9 +76,9 @@ WebCore::Element* WebFullScreenManager::element()
     return m_element.get(); 
 }
 
-void WebFullScreenManager::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void WebFullScreenManager::didReceiveMessage(CoreIPC::Connection* connection, CoreIPC::MessageDecoder& decoder)
 {
-    didReceiveWebFullScreenManagerMessage(connection, messageID, decoder);
+    didReceiveWebFullScreenManagerMessage(connection, decoder);
 }
 
 bool WebFullScreenManager::supportsFullScreen(bool withKeyboard)

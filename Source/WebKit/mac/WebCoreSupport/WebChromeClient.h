@@ -74,7 +74,7 @@ public:
     
     virtual void setResizable(bool) OVERRIDE;
     
-    virtual void addMessageToConsole(WebCore::MessageSource, WebCore::MessageType, WebCore::MessageLevel, const WTF::String& message, unsigned int lineNumber, const WTF::String& sourceURL) OVERRIDE;
+    virtual void addMessageToConsole(WebCore::MessageSource, WebCore::MessageLevel, const WTF::String& message, unsigned lineNumber, const WTF::String& sourceURL) OVERRIDE;
 
     virtual bool canRunBeforeUnloadConfirmPanel() OVERRIDE;
     virtual bool runBeforeUnloadConfirmPanel(const WTF::String& message, WebCore::Frame*) OVERRIDE;
@@ -88,6 +88,7 @@ public:
 
     virtual WebCore::IntRect windowResizerRect() const OVERRIDE;
 
+    virtual bool supportsImmediateInvalidation() OVERRIDE;
     virtual void invalidateRootView(const WebCore::IntRect&, bool) OVERRIDE;
     virtual void invalidateContentsAndRootView(const WebCore::IntRect&, bool) OVERRIDE;
     virtual void invalidateContentsForSlowScroll(const WebCore::IntRect&, bool) OVERRIDE;
@@ -110,7 +111,7 @@ public:
 
     virtual void print(WebCore::Frame*) OVERRIDE;
 #if ENABLE(SQL_DATABASE)
-    virtual void exceededDatabaseQuota(WebCore::Frame*, const WTF::String& databaseName) OVERRIDE;
+    virtual void exceededDatabaseQuota(WebCore::Frame*, const WTF::String& databaseName, WebCore::DatabaseDetails) OVERRIDE;
 #endif
     virtual void reachedMaxAppCacheSize(int64_t spaceNeeded) OVERRIDE;
     virtual void reachedApplicationCacheOriginQuota(WebCore::SecurityOrigin*, int64_t totalSpaceNeeded) OVERRIDE;

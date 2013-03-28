@@ -36,8 +36,6 @@
 #include "NotificationClient.h"
 #endif
 
-typedef struct _Evas_Object Evas_Object;
-
 namespace WebCore {
 
 class ChromeClientEfl : public ChromeClient {
@@ -85,7 +83,7 @@ public:
 
     virtual void setResizable(bool);
 
-    virtual void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message,
+    virtual void addMessageToConsole(MessageSource, MessageLevel, const String& message,
                                      unsigned int lineNumber, const String& sourceID);
 
     virtual bool canRunBeforeUnloadConfirmPanel();
@@ -115,7 +113,7 @@ public:
     virtual void print(Frame*);
 
 #if ENABLE(SQL_DATABASE)
-    virtual void exceededDatabaseQuota(Frame*, const String&);
+    virtual void exceededDatabaseQuota(Frame*, const String&, DatabaseDetails);
 #endif
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
@@ -157,6 +155,11 @@ public:
     virtual void setCursor(const Cursor&);
     virtual void setCursorHiddenUntilMouseMoves(bool);
 
+#if ENABLE(REQUEST_ANIMATION_FRAME) && !USE(REQUEST_ANIMATION_FRAME_TIMER)
+    virtual void scheduleAnimation();
+    virtual void serviceScriptedAnimations();
+#endif
+
     virtual void scrollRectIntoView(const IntRect&) const { }
 
     virtual void cancelGeolocationPermissionForFrame(Frame*, Geolocation*);
@@ -182,6 +185,7 @@ public:
 
 #if USE(TILED_BACKING_STORE)
     virtual void delegatedScrollRequested(const IntPoint& scrollPoint);
+    virtual IntRect visibleRectForTiledBackingStore() const;
 #endif
 
     Evas_Object* m_view;

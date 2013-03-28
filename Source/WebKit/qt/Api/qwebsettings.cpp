@@ -20,43 +20,45 @@
 #include "config.h"
 #include "qwebsettings.h"
 
-#include "qwebpage.h"
-#include "qwebpage_p.h"
 #include "qwebplugindatabase_p.h"
 
-#include "AbstractDatabase.h"
-#include "MemoryCache.h"
+#include "ApplicationCacheStorage.h"
 #include "CrossOriginPreflightResultCache.h"
+#include "DatabaseManager.h"
+#include "FileSystem.h"
 #include "FontCache.h"
+#include "GCController.h"
+#include "IconDatabase.h"
+#include "Image.h"
 #if ENABLE(ICONDATABASE)
 #include "IconDatabaseClientQt.h"
 #endif
 #include "InitWebCoreQt.h"
+#include "IntSize.h"
+#include "KURL.h"
+#include "MemoryCache.h"
+#include "NetworkStateNotifier.h"
 #include "Page.h"
 #include "PageCache.h"
-#include "Settings.h"
-#include "KURL.h"
-#include "IconDatabase.h"
 #include "PluginDatabase.h"
-#include "Image.h"
-#include "IntSize.h"
-#include "ApplicationCacheStorage.h"
-#include "DatabaseTracker.h"
-#include "FileSystem.h"
-#include <wtf/text/WTFString.h>
-
-#include <QApplication>
-#include <QStandardPaths>
+#include "RuntimeEnabledFeatures.h"
+#include "Settings.h"
+#include "StorageThread.h"
+#include "WorkerThread.h"
 #include <QDir>
+#include <QFileInfo>
+#include <QFont>
+#include <QGuiApplication>
 #include <QHash>
 #include <QSharedData>
+#include <QStandardPaths>
 #include <QUrl>
-#include <QFileInfo>
-#include <QStyle>
+#include <wtf/FastMalloc.h>
+#include <wtf/text/WTFString.h>
 
-#include "NetworkStateNotifier.h"
 
-void QWEBKIT_EXPORT qt_networkAccessAllowed(bool isAllowed)
+
+QWEBKIT_EXPORT void qt_networkAccessAllowed(bool isAllowed)
 {
 #ifndef QT_NO_BEARERMANAGEMENT
     WebCore::networkStateNotifier().setNetworkAccessAllowed(isAllowed);
@@ -152,6 +154,10 @@ void QWebSettingsPrivate::apply()
         settings->setAcceleratedCompositingForAnimationEnabled(value);
         settings->setAcceleratedCompositingForVideoEnabled(false);
         settings->setAcceleratedCompositingForPluginsEnabled(false);
+
+        bool showDebugVisuals = qgetenv("WEBKIT_SHOW_COMPOSITING_DEBUG_VISUALS") == "1";
+        settings->setShowDebugBorders(showDebugVisuals);
+        settings->setShowRepaintCounter(showDebugVisuals);
 #endif
 #if ENABLE(WEBGL)
         value = attributes.value(QWebSettings::WebGLEnabled,
@@ -166,10 +172,17 @@ void QWebSettingsPrivate::apply()
         settings->setAcceleratedCompositingForCanvasEnabled(value);
 #endif
 #endif
+#if ENABLE(WEB_AUDIO)
+        value = attributes.value(QWebSettings::WebAudioEnabled, global->attributes.value(QWebSettings::WebAudioEnabled));
+        settings->setWebAudioEnabled(value);
+#endif
 
         value = attributes.value(QWebSettings::CSSRegionsEnabled,
                                  global->attributes.value(QWebSettings::CSSRegionsEnabled));
-        settings->setCSSRegionsEnabled(value);
+        WebCore::RuntimeEnabledFeatures::setCSSRegionsEnabled(value);
+        value = attributes.value(QWebSettings::CSSCompositingEnabled,
+                                 global->attributes.value(QWebSettings::CSSCompositingEnabled));
+        WebCore::RuntimeEnabledFeatures::setCSSCompositingEnabled(value);
         value = attributes.value(QWebSettings::CSSGridLayoutEnabled,
                                  global->attributes.value(QWebSettings::CSSGridLayoutEnabled));
         settings->setCSSGridLayoutEnabled(value);
@@ -232,7 +245,7 @@ void QWebSettingsPrivate::apply()
 #if ENABLE(SQL_DATABASE)
         value = attributes.value(QWebSettings::OfflineStorageDatabaseEnabled,
                                       global->attributes.value(QWebSettings::OfflineStorageDatabaseEnabled));
-        WebCore::AbstractDatabase::setIsAvailable(value);
+        WebCore::DatabaseManager::manager().setIsAvailable(value);
 #endif
 
         value = attributes.value(QWebSettings::OfflineWebApplicationCacheEnabled,
@@ -535,8 +548,10 @@ QWebSettings::QWebSettings()
     d->attributes.insert(QWebSettings::LocalContentCanAccessRemoteUrls, false);
     d->attributes.insert(QWebSettings::LocalContentCanAccessFileUrls, true);
     d->attributes.insert(QWebSettings::AcceleratedCompositingEnabled, true);
-    d->attributes.insert(QWebSettings::WebGLEnabled, false);
+    d->attributes.insert(QWebSettings::WebGLEnabled, true);
+    d->attributes.insert(QWebSettings::WebAudioEnabled, false);
     d->attributes.insert(QWebSettings::CSSRegionsEnabled, true);
+    d->attributes.insert(QWebSettings::CSSCompositingEnabled, true);
     d->attributes.insert(QWebSettings::CSSGridLayoutEnabled, false);
     d->attributes.insert(QWebSettings::HyperlinkAuditingEnabled, false);
     d->attributes.insert(QWebSettings::TiledBackingStoreEnabled, false);
@@ -806,7 +821,7 @@ QPixmap QWebSettings::webGraphic(WebGraphic type)
 }
 
 /*!
-    Frees up as much memory as possible by cleaning all memory caches such
+    Frees up as much memory as possible by calling the JavaScript garbage collector and cleaning all memory caches such
     as page, object and font cache.
 
     \since 4.6
@@ -825,7 +840,6 @@ void QWebSettings::clearMemoryCaches()
     int pageCapacity = WebCore::pageCache()->capacity();
     // Setting size to 0, makes all pages be released.
     WebCore::pageCache()->setCapacity(0);
-    WebCore::pageCache()->releaseAutoreleasedPagesNow();
     WebCore::pageCache()->setCapacity(pageCapacity);
 
     // Invalidating the font cache and freeing all inactive font data.
@@ -833,6 +847,18 @@ void QWebSettings::clearMemoryCaches()
 
     // Empty the Cross-Origin Preflight cache
     WebCore::CrossOriginPreflightResultCache::shared().empty();
+
+    // Drop JIT compiled code from ExecutableAllocator.
+    WebCore::gcController().discardAllCompiledCode();
+    // Garbage Collect to release the references of CachedResource from dead objects.
+    WebCore::gcController().garbageCollectNow();
+
+    // FastMalloc has lock-free thread specific caches that can only be cleared from the thread itself.
+    WebCore::StorageThread::releaseFastMallocFreeMemoryInAllThreads();
+#if ENABLE(WORKERS)
+    WebCore::WorkerThread::releaseFastMallocFreeMemoryInAllThreads();
+#endif
+    WTF::releaseFastMallocFreeMemory();        
 }
 
 /*!
@@ -1005,7 +1031,7 @@ void QWebSettings::setOfflineStoragePath(const QString& path)
 {
     WebCore::initializeWebCoreQt();
 #if ENABLE(SQL_DATABASE)
-    WebCore::DatabaseTracker::tracker().setDatabaseDirectoryPath(path);
+    WebCore::DatabaseManager::manager().setDatabaseDirectoryPath(path);
 #endif
 }
 
@@ -1021,7 +1047,7 @@ QString QWebSettings::offlineStoragePath()
 {
     WebCore::initializeWebCoreQt();
 #if ENABLE(SQL_DATABASE)
-    return WebCore::DatabaseTracker::tracker().databaseDirectoryPath();
+    return WebCore::DatabaseManager::manager().databaseDirectoryPath();
 #else
     return QString();
 #endif

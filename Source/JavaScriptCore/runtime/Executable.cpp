@@ -33,6 +33,7 @@
 #include "ExecutionHarness.h"
 #include "JIT.h"
 #include "JITDriver.h"
+#include "Operations.h"
 #include "Parser.h"
 #include <wtf/Vector.h>
 #include <wtf/text/StringBuilder.h>
@@ -65,6 +66,11 @@ Intrinsic ExecutableBase::intrinsic() const
 {
     if (const NativeExecutable* nativeExecutable = jsDynamicCast<const NativeExecutable*>(this))
         return nativeExecutable->intrinsic();
+    return NoIntrinsic;
+}
+#else
+Intrinsic ExecutableBase::intrinsic() const
+{
     return NoIntrinsic;
 }
 #endif
@@ -138,7 +144,7 @@ FunctionExecutable::FunctionExecutable(JSGlobalData& globalData, const SourceCod
     : ScriptExecutable(globalData.functionExecutableStructure.get(), globalData, source, unlinkedExecutable->isInStrictContext())
     , m_unlinkedExecutable(globalData, this, unlinkedExecutable)
 {
-    ASSERT(!source.isNull());
+    RELEASE_ASSERT(!source.isNull());
     ASSERT(source.length());
     m_firstLine = firstLine;
     m_lastLine = lastLine;
@@ -177,7 +183,7 @@ inline const char* samplingDescription(JITCode::JITType jitType)
     case JITCode::DFGJIT:
         return "DFG Compilation (TOTAL)";
     default:
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         return 0;
     }
 }
@@ -205,7 +211,7 @@ JSObject* EvalExecutable::compileInternal(ExecState* exec, JSScope* scope, JITCo
             return throwError(exec, createEvalError(exec, lexicalGlobalObject->evalDisabledErrorMessage()));
 
         JSObject* exception = 0;
-        UnlinkedEvalCodeBlock* unlinkedEvalCode = lexicalGlobalObject->createEvalCodeBlock(exec, this, &exception);
+        UnlinkedEvalCodeBlock* unlinkedEvalCode = lexicalGlobalObject->createEvalCodeBlock(exec, scope, this, &exception);
         if (!unlinkedEvalCode)
             return exception;
 
@@ -256,7 +262,7 @@ void EvalExecutable::unlinkCalls()
 #if ENABLE(JIT)
     if (!m_jitCodeForCall)
         return;
-    ASSERT(m_evalCodeBlock);
+    RELEASE_ASSERT(m_evalCodeBlock);
     m_evalCodeBlock->unlinkCalls();
 #endif
 }
@@ -282,7 +288,7 @@ JSObject* ProgramExecutable::checkSyntax(ExecState* exec)
 
 JSObject* ProgramExecutable::compileOptimized(ExecState* exec, JSScope* scope, unsigned bytecodeIndex)
 {
-    ASSERT(exec->globalData().dynamicGlobalObject);
+    RELEASE_ASSERT(exec->globalData().dynamicGlobalObject);
     ASSERT(!!m_programCodeBlock);
     JSObject* error = 0;
     if (m_programCodeBlock->getJITType() != JITCode::topTierJIT())
@@ -345,7 +351,7 @@ void ProgramExecutable::unlinkCalls()
 #if ENABLE(JIT)
     if (!m_jitCodeForCall)
         return;
-    ASSERT(m_programCodeBlock);
+    RELEASE_ASSERT(m_programCodeBlock);
     m_programCodeBlock->unlinkCalls();
 #endif
 }
@@ -367,11 +373,11 @@ int ProgramExecutable::addGlobalVar(JSGlobalObject* globalObject, const Identifi
     return index;
 }
 
-JSObject* ProgramExecutable::initalizeGlobalProperties(JSGlobalData& globalData, CallFrame* callFrame, JSScope* scope)
+JSObject* ProgramExecutable::initializeGlobalProperties(JSGlobalData& globalData, CallFrame* callFrame, JSScope* scope)
 {
-    ASSERT(scope);
+    RELEASE_ASSERT(scope);
     JSGlobalObject* globalObject = scope->globalObject();
-    ASSERT(globalObject);
+    RELEASE_ASSERT(globalObject);
     ASSERT(&globalObject->globalData() == &globalData);
 
     JSObject* exception = 0;
@@ -436,21 +442,21 @@ FunctionCodeBlock* FunctionExecutable::baselineCodeBlockFor(CodeSpecializationKi
     if (kind == CodeForCall)
         result = m_codeBlockForCall.get();
     else {
-        ASSERT(kind == CodeForConstruct);
+        RELEASE_ASSERT(kind == CodeForConstruct);
         result = m_codeBlockForConstruct.get();
     }
     if (!result)
         return 0;
     while (result->alternative())
         result = static_cast<FunctionCodeBlock*>(result->alternative());
-    ASSERT(result);
+    RELEASE_ASSERT(result);
     ASSERT(JITCode::isBaselineCode(result->getJITType()));
     return result;
 }
 
 JSObject* FunctionExecutable::compileOptimizedForCall(ExecState* exec, JSScope* scope, unsigned bytecodeIndex)
 {
-    ASSERT(exec->globalData().dynamicGlobalObject);
+    RELEASE_ASSERT(exec->globalData().dynamicGlobalObject);
     ASSERT(!!m_codeBlockForCall);
     JSObject* error = 0;
     if (m_codeBlockForCall->getJITType() != JITCode::topTierJIT())
@@ -461,7 +467,7 @@ JSObject* FunctionExecutable::compileOptimizedForCall(ExecState* exec, JSScope* 
 
 JSObject* FunctionExecutable::compileOptimizedForConstruct(ExecState* exec, JSScope* scope, unsigned bytecodeIndex)
 {
-    ASSERT(exec->globalData().dynamicGlobalObject);
+    RELEASE_ASSERT(exec->globalData().dynamicGlobalObject);
     ASSERT(!!m_codeBlockForConstruct);
     JSObject* error = 0;
     if (m_codeBlockForConstruct->getJITType() != JITCode::topTierJIT())
@@ -482,11 +488,6 @@ bool FunctionExecutable::jitCompileForConstruct(ExecState* exec)
 }
 #endif
 
-FunctionCodeBlock* FunctionExecutable::codeBlockWithBytecodeFor(CodeSpecializationKind kind)
-{
-    return baselineCodeBlockFor(kind);
-}
-
 PassOwnPtr<FunctionCodeBlock> FunctionExecutable::produceCodeBlockFor(JSScope* scope, CodeSpecializationKind specializationKind, JSObject*& exception)
 {
     if (!!codeBlockFor(specializationKind))
@@ -497,7 +498,7 @@ PassOwnPtr<FunctionCodeBlock> FunctionExecutable::produceCodeBlockFor(JSScope* s
     ParserError error;
     DebuggerMode debuggerMode = globalObject->hasDebugger() ? DebuggerOn : DebuggerOff;
     ProfilerMode profilerMode = globalObject->hasProfiler() ? ProfilerOn : ProfilerOff;
-    UnlinkedFunctionCodeBlock* unlinkedCodeBlock = m_unlinkedExecutable->codeBlockFor(*globalData, m_source, specializationKind, debuggerMode, profilerMode, error);
+    UnlinkedFunctionCodeBlock* unlinkedCodeBlock = m_unlinkedExecutable->codeBlockFor(*globalData, scope, m_source, specializationKind, debuggerMode, profilerMode, error);
     recordParse(m_unlinkedExecutable->features(), m_unlinkedExecutable->hasCapturedVariables(), lineNo(), lastLine());
 
     if (!unlinkedCodeBlock) {
@@ -531,7 +532,7 @@ JSObject* FunctionExecutable::compileForCallInternal(ExecState* exec, JSScope* s
     m_codeBlockForCall = newCodeBlock.release();
     
     m_numParametersForCall = m_codeBlockForCall->numParameters();
-    ASSERT(m_numParametersForCall);
+    RELEASE_ASSERT(m_numParametersForCall);
 
 #if ENABLE(JIT)
     if (!prepareFunctionForExecution(exec, m_codeBlockForCall, m_jitCodeForCall, m_jitCodeForCallWithArityCheck, jitType, bytecodeIndex, CodeForCall))
@@ -567,7 +568,7 @@ JSObject* FunctionExecutable::compileForConstructInternal(ExecState* exec, JSSco
     m_codeBlockForConstruct = newCodeBlock.release();
     
     m_numParametersForConstruct = m_codeBlockForConstruct->numParameters();
-    ASSERT(m_numParametersForConstruct);
+    RELEASE_ASSERT(m_numParametersForConstruct);
 
 #if ENABLE(JIT)
     if (!prepareFunctionForExecution(exec, m_codeBlockForConstruct, m_jitCodeForConstruct, m_jitCodeForConstructWithArityCheck, jitType, bytecodeIndex, CodeForConstruct))
@@ -638,11 +639,11 @@ void FunctionExecutable::unlinkCalls()
 {
 #if ENABLE(JIT)
     if (!!m_jitCodeForCall) {
-        ASSERT(m_codeBlockForCall);
+        RELEASE_ASSERT(m_codeBlockForCall);
         m_codeBlockForCall->unlinkCalls();
     }
     if (!!m_jitCodeForConstruct) {
-        ASSERT(m_codeBlockForConstruct);
+        RELEASE_ASSERT(m_codeBlockForConstruct);
         m_codeBlockForConstruct->unlinkCalls();
     }
 #endif
@@ -663,6 +664,28 @@ FunctionExecutable* FunctionExecutable::fromGlobalCode(const Identifier& name, E
 String FunctionExecutable::paramString() const
 {
     return m_unlinkedExecutable->paramString();
+}
+
+CodeBlockHash ExecutableBase::hashFor(CodeSpecializationKind kind) const
+{
+    if (this->classInfo() == &NativeExecutable::s_info)
+        return jsCast<const NativeExecutable*>(this)->hashFor(kind);
+    
+    return jsCast<const ScriptExecutable*>(this)->hashFor(kind);
+}
+
+CodeBlockHash NativeExecutable::hashFor(CodeSpecializationKind kind) const
+{
+    if (kind == CodeForCall)
+        return CodeBlockHash(static_cast<unsigned>(bitwise_cast<size_t>(m_function)));
+    
+    RELEASE_ASSERT(kind == CodeForConstruct);
+    return CodeBlockHash(static_cast<unsigned>(bitwise_cast<size_t>(m_constructor)));
+}
+
+CodeBlockHash ScriptExecutable::hashFor(CodeSpecializationKind kind) const
+{
+    return CodeBlockHash(source(), kind);
 }
 
 }

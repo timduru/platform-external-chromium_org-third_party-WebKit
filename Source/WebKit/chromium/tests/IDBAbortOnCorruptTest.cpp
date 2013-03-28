@@ -31,6 +31,8 @@
 #include "IDBDatabaseCallbacks.h"
 #include "IDBFactoryBackendImpl.h"
 #include "IDBFakeBackingStore.h"
+#include "IDBKey.h"
+#include "IndexedDB.h"
 #include "SecurityOrigin.h"
 #include <gtest/gtest.h>
 #include <wtf/Vector.h>
@@ -43,8 +45,10 @@ namespace {
 
 class MockIDBCallbacks : public IDBCallbacks {
 public:
-    MockIDBCallbacks() : m_wasErrorCalled(false) { }
-
+    static PassRefPtr<MockIDBCallbacks> create()
+    {
+        return adoptRef(new MockIDBCallbacks());
+    }
     virtual ~MockIDBCallbacks()
     {
         EXPECT_TRUE(m_wasErrorCalled);
@@ -54,21 +58,21 @@ public:
         m_wasErrorCalled = true;
     }
     virtual void onSuccess(PassRefPtr<DOMStringList>) { }
-    virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SerializedScriptValue>) { }
-    virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>)
+    virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SharedBuffer>) { }
+    virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>, const IDBDatabaseMetadata&)
     {
         EXPECT_TRUE(false);
     }
     virtual void onSuccess(PassRefPtr<IDBKey>) { }
-    virtual void onSuccess(PassRefPtr<IDBTransactionBackendInterface>) { }
-    virtual void onSuccess(PassRefPtr<SerializedScriptValue>) { }
-    virtual void onSuccess(PassRefPtr<SerializedScriptValue>, PassRefPtr<IDBKey>, const IDBKeyPath&) { }
+    virtual void onSuccess(PassRefPtr<SharedBuffer>) OVERRIDE { }
+    virtual void onSuccess(PassRefPtr<SharedBuffer>, PassRefPtr<IDBKey>, const IDBKeyPath&) OVERRIDE { }
     virtual void onSuccess(int64_t) OVERRIDE { }
     virtual void onSuccess() OVERRIDE { }
-    virtual void onSuccess(PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SerializedScriptValue>) { };
-    virtual void onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<SerializedScriptValue> >&) { }
-    virtual void onBlocked() { }
+    virtual void onSuccess(PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SharedBuffer>) OVERRIDE { };
+    virtual void onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<IDBKey> >&, const Vector<RefPtr<SharedBuffer> >&) OVERRIDE { }
 private:
+    MockIDBCallbacks() : m_wasErrorCalled(false) { }
+
     bool m_wasErrorCalled;
 };
 
@@ -105,9 +109,10 @@ class FakeIDBDatabaseCallbacks : public IDBDatabaseCallbacks {
 public:
     static PassRefPtr<FakeIDBDatabaseCallbacks> create() { return adoptRef(new FakeIDBDatabaseCallbacks()); }
     virtual ~FakeIDBDatabaseCallbacks() { }
-    virtual void onVersionChange(const String& version) OVERRIDE { }
     virtual void onVersionChange(int64_t oldVersion, int64_t newVersion) OVERRIDE { }
     virtual void onForcedClose() OVERRIDE { }
+    virtual void onAbort(int64_t transactionId, PassRefPtr<IDBDatabaseError> error) OVERRIDE { }
+    virtual void onComplete(int64_t transactionId) OVERRIDE { }
 private:
     FakeIDBDatabaseCallbacks() { }
 };
@@ -116,11 +121,11 @@ TEST(IDBAbortTest, TheTest)
 {
     RefPtr<IDBFactoryBackendImpl> factory = FailingIDBFactoryBackendImpl::create();
     const String& name = "db name";
-    MockIDBCallbacks callbacks;
+    RefPtr<MockIDBCallbacks> callbacks = MockIDBCallbacks::create();
     RefPtr<FakeIDBDatabaseCallbacks> databaseCallbacks = FakeIDBDatabaseCallbacks::create();
     RefPtr<SecurityOrigin> origin = SecurityOrigin::create("http", "localhost", 81);
     const int64_t DummyVersion = 2;
-    factory->open(name, DummyVersion, &callbacks, databaseCallbacks, origin, 0 /*Frame*/, String() /*path*/);
+    factory->open(name, DummyVersion, 1, callbacks.get(), databaseCallbacks, origin, 0 /*Frame*/, String() /*path*/);
 }
 
 } // namespace

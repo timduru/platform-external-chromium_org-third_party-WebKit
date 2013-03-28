@@ -33,6 +33,10 @@
 
 #if ENABLE(NETWORK_PROCESS)
 
+namespace CoreIPC {
+class DataReference;
+}
+
 namespace WebCore {
 class ResourceError;
 class ResourceRequest;
@@ -53,21 +57,19 @@ public:
     
     CoreIPC::Connection* connection() const { return m_connection.get(); }
 
+    void didReceiveNetworkProcessConnectionMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+
 private:
     NetworkProcessConnection(CoreIPC::Connection::Identifier);
 
     // CoreIPC::Connection::Client
-    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
-    virtual void didClose(CoreIPC::Connection*);
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
+    virtual void didReceiveSyncMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&) OVERRIDE;
+    virtual void didClose(CoreIPC::Connection*) OVERRIDE;
     virtual void didReceiveInvalidMessage(CoreIPC::Connection*, CoreIPC::StringReference messageReceiverName, CoreIPC::StringReference messageName) OVERRIDE;
 
-    void didReceiveNetworkProcessConnectionMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-
-    void willSendRequest(uint64_t requestID, ResourceLoadIdentifier, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&);
-    void didReceiveResponse(ResourceLoadIdentifier, const WebCore::ResourceResponse&);
-    void didReceiveResource(ResourceLoadIdentifier, const ShareableResource::Handle&, double finishTime);
-    void didFailResourceLoad(ResourceLoadIdentifier, const WebCore::ResourceError&);
+    // Message handlers.
+    void didCacheResource(const WebCore::ResourceRequest&, const ShareableResource::Handle&);
 
     // The connection from the web process to the network process.
     RefPtr<CoreIPC::Connection> m_connection;

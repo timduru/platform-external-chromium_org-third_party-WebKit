@@ -22,20 +22,21 @@
 #define CSSStyleDeclaration_h
 
 #include "CSSPropertyNames.h"
-#include "CSSRule.h"
-#include "StylePropertySet.h"
+#include "ScriptWrappable.h"
 #include <wtf/Forward.h>
 
 namespace WebCore {
 
 class CSSProperty;
+class CSSRule;
 class CSSStyleSheet;
 class CSSValue;
+class StylePropertySet;
 class StyledElement;
 
 typedef int ExceptionCode;
 
-class CSSStyleDeclaration {
+class CSSStyleDeclaration : public ScriptWrappable {
     WTF_MAKE_NONCOPYABLE(CSSStyleDeclaration); WTF_MAKE_FAST_ALLOCATED;
 public:
     virtual ~CSSStyleDeclaration() { }
@@ -66,7 +67,7 @@ public:
     virtual PassRefPtr<StylePropertySet> copy() const = 0;
     virtual PassRefPtr<StylePropertySet> makeMutable() = 0;
 
-    virtual bool cssPropertyMatches(const StylePropertySet::PropertyReference&) const = 0;
+    virtual bool cssPropertyMatches(CSSPropertyID, const CSSValue*) const = 0;
     virtual CSSStyleSheet* parentStyleSheet() const { return 0; }
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const = 0;

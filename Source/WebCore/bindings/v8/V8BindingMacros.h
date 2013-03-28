@@ -33,18 +33,7 @@
 
 namespace WebCore {
 
-#if defined(ENABLE_DOM_STATS_COUNTERS) && PLATFORM(CHROMIUM)
-#define INC_STATS(name) StatsCounter::incrementStatsCounter(name)
-#else
-#define INC_STATS(name)
-#endif
-
-enum ParameterDefaultPolicy {
-    DefaultIsUndefined,
-    DefaultIsNullString
-};
-
-#define EXCEPTION_BLOCK(type, var, value) \
+#define V8TRYCATCH(type, var, value) \
     type var;                             \
     {                                     \
         v8::TryCatch block;               \
@@ -53,18 +42,47 @@ enum ParameterDefaultPolicy {
             return block.ReThrow();       \
     }
 
-#define STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(type, var, value) \
+#define V8TRYCATCH_WITH_TYPECHECK(type, var, value, isolate) \
+    type var;                                                \
+    {                                                        \
+        bool ok = true;                                      \
+        {                                                    \
+            v8::TryCatch block;                              \
+            var = (value);                                   \
+            if (block.HasCaught())                           \
+                return block.ReThrow();                      \
+        }                                                    \
+        if (UNLIKELY(!ok))                                   \
+            return throwTypeError(0, isolate);               \
+    }
+
+#define V8TRYCATCH_WITH_TYPECHECK_VOID(type, var, value, isolate) \
+    type var;                                                     \
+    {                                                             \
+        bool ok = true;                                           \
+        {                                                         \
+            v8::TryCatch block;                                   \
+            var = (value);                                        \
+            if (block.HasCaught()) {                              \
+                block.ReThrow();                                  \
+                return;                                           \
+            }                                                     \
+        }                                                         \
+        if (UNLIKELY(!ok)) {                                      \
+            throwTypeError(0, isolate);                           \
+            return;                                               \
+        }                                                         \
+    }
+
+#define V8TRYCATCH_FOR_V8STRINGRESOURCE(type, var, value) \
     type var(value);                                            \
     if (!var.prepare())                                         \
         return v8::Undefined();
 
-#define STRING_TO_V8PARAMETER_EXCEPTION_BLOCK_VOID(type, var, value) \
+#define V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(type, var, value) \
     type var(value);                                                 \
     if (!var.prepare())                                              \
         return;
-
-#define MAYBE_MISSING_PARAMETER(args, index, policy) \
-    (((policy) == DefaultIsNullString && (index) >= (args).Length()) ? (v8::Local<v8::Value>()) : ((args)[(index)]))
 
 } // namespace WebCore
 

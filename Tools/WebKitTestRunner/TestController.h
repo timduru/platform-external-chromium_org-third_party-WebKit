@@ -60,10 +60,12 @@ public:
     void ensureViewSupportsOptions(WKDictionaryRef options);
     
     // Runs the run loop until `done` is true or the timeout elapses.
-    enum TimeoutDuration { ShortTimeout, LongTimeout, NoTimeout };
+    enum TimeoutDuration { ShortTimeout, LongTimeout, NoTimeout, CustomTimeout };
     bool useWaitToDumpWatchdogTimer() { return m_useWaitToDumpWatchdogTimer; }
     void runUntil(bool& done, TimeoutDuration);
     void notifyDone();
+
+    int getCustomTimeout();
     
     bool beforeUnloadReturnValue() const { return m_beforeUnloadReturnValue; }
     void setBeforeUnloadReturnValue(bool value) { m_beforeUnloadReturnValue = value; }
@@ -79,9 +81,16 @@ public:
     // Policy delegate.
     void setCustomPolicyDelegate(bool enabled, bool permissive);
 
+    // Page Visibility.
+    void setVisibilityState(WKPageVisibilityState, bool isInitialState);
+
     bool resetStateToConsistentValues();
 
     WorkQueueManager& workQueueManager() { return m_workQueueManager; }
+
+    void setHandlesAuthenticationChallenges(bool value) { m_handlesAuthenticationChallenges = value; }
+    void setAuthenticationUsername(String username) { m_authenticationUsername = username; }
+    void setAuthenticationPassword(String password) { m_authenticationPassword = password; }
 
 private:
     void initialize(int argc, const char* argv[]);
@@ -92,6 +101,7 @@ private:
     bool runTest(const char* pathOrURL);
 
     void platformInitialize();
+    void platformDestroy();
     void platformInitializeContext();
     void platformRunUntil(bool& done, double timeout);
     void platformDidCommitLoadForFrame(WKPageRef, WKFrameRef);
@@ -106,6 +116,8 @@ private:
     void didReceiveMessageFromInjectedBundle(WKStringRef messageName, WKTypeRef messageBody);
     WKRetainPtr<WKTypeRef> didReceiveSynchronousMessageFromInjectedBundle(WKStringRef messageName, WKTypeRef messageBody);
 
+    void didReceiveKeyDownMessageFromInjectedBundle(WKDictionaryRef messageBodyDictionary, bool synchronous);
+
     // WKPageLoaderClient
     static void didCommitLoadForFrame(WKPageRef, WKFrameRef, WKTypeRef userData, const void*);
     void didCommitLoadForFrame(WKPageRef, WKFrameRef);
@@ -118,6 +130,11 @@ private:
 
     static void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef, const void*);
     void decidePolicyForNotificationPermissionRequest(WKPageRef, WKSecurityOriginRef, WKNotificationPermissionRequestRef);
+
+    static void unavailablePluginButtonClicked(WKPageRef, WKPluginUnavailabilityReason, WKDictionaryRef, const void*);
+
+    static void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef, const void *clientInfo);
+    void didReceiveAuthenticationChallengeInFrame(WKPageRef, WKFrameRef, WKAuthenticationChallengeRef);
 
     // WKPagePolicyClient
     static void decidePolicyForNavigationAction(WKPageRef, WKFrameRef, WKFrameNavigationType, WKEventModifiers, WKEventMouseButton, WKURLRequestRef, WKFramePolicyListenerRef, WKTypeRef, const void*);
@@ -165,6 +182,8 @@ private:
     bool m_useWaitToDumpWatchdogTimer;
     bool m_forceNoTimeout;
 
+    int m_timeout;
+
     bool m_didPrintWebProcessCrashedMessage;
     bool m_shouldExitWhenWebProcessCrashes;
     
@@ -178,8 +197,17 @@ private:
     bool m_policyDelegateEnabled;
     bool m_policyDelegatePermissive;
 
+    bool m_handlesAuthenticationChallenges;
+    String m_authenticationUsername;
+    String m_authenticationPassword;
+
 #if PLATFORM(MAC) || PLATFORM(QT) || PLATFORM(GTK) || PLATFORM(EFL)
     OwnPtr<EventSenderProxy> m_eventSenderProxy;
+#endif
+
+#if PLATFORM(QT)
+    class RunLoop;
+    RunLoop* m_runLoop;
 #endif
 
     WorkQueueManager m_workQueueManager;

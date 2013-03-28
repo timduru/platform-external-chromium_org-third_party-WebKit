@@ -67,6 +67,15 @@ WebInspector.NetworkRequest.Events = {
     ResponseHeadersChanged: "ResponseHeadersChanged",
 }
 
+WebInspector.NetworkRequest.InitiatorType = {
+    Parser: "parser",
+    Script: "script",
+    Other: "other",
+}
+
+/** @typedef {{name: string, value: string}} */
+WebInspector.NetworkRequest.NameValue;
+
 WebInspector.NetworkRequest.prototype = {
     /**
      * @return {NetworkAgent.RequestId}
@@ -424,7 +433,15 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {WebInspector.Resource|undefined}
+     * @return {string}
+     */
+    get domain()
+    {
+        return this._parsedURL.host;
+    },
+
+    /**
+     * @return {?WebInspector.NetworkRequest}
      */
     get redirectSource()
     {
@@ -439,7 +456,7 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {Array.<Object>}
+     * @return {!Array.<!WebInspector.NetworkRequest.NameValue>}
      */
     get requestHeaders()
     {
@@ -484,7 +501,7 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {Array.<Object>}
+     * @return {!Array.<!WebInspector.NetworkRequest.NameValue>}
      */
     get sortedRequestHeaders()
     {
@@ -493,7 +510,7 @@ WebInspector.NetworkRequest.prototype = {
 
         this._sortedRequestHeaders = [];
         this._sortedRequestHeaders = this.requestHeaders.slice();
-        this._sortedRequestHeaders.sort(function(a,b) { return a.name.toLowerCase().localeCompare(b.name.toLowerCase()) });
+        this._sortedRequestHeaders.sort(function(a,b) { return a.name.toLowerCase().compareTo(b.name.toLowerCase()) });
         return this._sortedRequestHeaders;
     },
 
@@ -541,7 +558,7 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {Array.<Object>}
+     * @return {!Array.<!WebInspector.NetworkRequest.NameValue>}
      */
     get responseHeaders()
     {
@@ -586,16 +603,16 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {Array.<Object>}
+     * @return {!Array.<!WebInspector.NetworkRequest.NameValue>}
      */
     get sortedResponseHeaders()
     {
         if (this._sortedResponseHeaders !== undefined)
             return this._sortedResponseHeaders;
-        
+
         this._sortedResponseHeaders = [];
         this._sortedResponseHeaders = this.responseHeaders.slice();
-        this._sortedResponseHeaders.sort(function(a,b) { return a.name.toLowerCase().localeCompare(b.name.toLowerCase()) });
+        this._sortedResponseHeaders.sort(function(a, b) { return a.name.toLowerCase().compareTo(b.name.toLowerCase()); });
         return this._sortedResponseHeaders;
     },
 
@@ -633,7 +650,7 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {?Array.<Object>}
+     * @return {?Array.<!WebInspector.NetworkRequest.NameValue>}
      */
     get queryParameters()
     {
@@ -647,7 +664,7 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {?Array.<Object>}
+     * @return {?Array.<!WebInspector.NetworkRequest.NameValue>}
      */
     get formParameters()
     {
@@ -673,39 +690,34 @@ WebInspector.NetworkRequest.prototype = {
 
     /**
      * @param {string} queryString
-     * @return {Array.<Object>}
+     * @return {!Array.<!WebInspector.NetworkRequest.NameValue>}
      */
     _parseParameters: function(queryString)
     {
         function parseNameValue(pair)
         {
-            var parameter = {};
             var splitPair = pair.split("=", 2);
-
-            parameter.name = splitPair[0];
-            if (splitPair.length === 1)
-                parameter.value = "";
-            else
-                parameter.value = splitPair[1];
-            return parameter;
+            return {name: splitPair[0], value: splitPair[1] || ""};
         }
         return queryString.split("&").map(parseNameValue);
     },
 
     /**
-     * @param {Object} headers
+     * @param {!Array.<!WebInspector.NetworkRequest.NameValue>} headers
      * @param {string} headerName
      * @return {string|undefined}
      */
     _headerValue: function(headers, headerName)
     {
         headerName = headerName.toLowerCase();
-        
+
         var values = [];
         for (var i = 0; i < headers.length; ++i) {
             if (headers[i].name.toLowerCase() === headerName)
                 values.push(headers[i].value);
         }
+        if (!values.length)
+            return undefined;
         // Set-Cookie values should be separated by '\n', not comma, otherwise cookies could not be parsed.
         if (headerName === "set-cookie")
             return values.join("\n");
@@ -757,7 +769,7 @@ WebInspector.NetworkRequest.prototype = {
             return;
         }
         if (typeof this._content !== "undefined") {
-            callback(this.content || null, this._contentEncoded, this._mimeType);
+            callback(this.content || null, this._contentEncoded, this.type.canonicalMimeType());
             return;
         }
         this._pendingContentCallbacks.push(callback);
@@ -863,7 +875,7 @@ WebInspector.NetworkRequest.prototype = {
     },
 
     /**
-     * @return {Object}
+     * @return {!Array.<!Object>}
      */
     frames: function()
     {
@@ -872,7 +884,7 @@ WebInspector.NetworkRequest.prototype = {
 
     /**
      * @param {number} position
-     * @return {Object}
+     * @return {Object|undefined}
      */
     frame: function(position)
     {
@@ -885,14 +897,11 @@ WebInspector.NetworkRequest.prototype = {
      */
     addFrameError: function(errorMessage, time)
     {
-        var errorObject = {};
-        errorObject.errorMessage = errorMessage;
-        errorObject.time = time;
-        this._pushFrame(errorObject);
+        this._pushFrame({errorMessage: errorMessage, time: time});
     },
 
     /**
-     * @param {Object} response
+     * @param {!NetworkAgent.WebSocketFrame} response
      * @param {number} time
      * @param {boolean} sent
      */
@@ -900,16 +909,18 @@ WebInspector.NetworkRequest.prototype = {
     {
         response.time = time;
         if (sent)
-            response.sent = true;
+            response.sent = sent;
         this._pushFrame(response);
     },
 
-    _pushFrame: function(object)
+    /**
+     * @param {!Object} frameOrError
+     */
+    _pushFrame: function(frameOrError)
     {
-        if (this._frames.length >= 100) {
+        if (this._frames.length >= 100)
             this._frames.splice(0, 10);
-        }
-        this._frames.push(object);
+        this._frames.push(frameOrError);
     },
 
     __proto__: WebInspector.Object.prototype

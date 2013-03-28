@@ -50,6 +50,7 @@ namespace BlackBerry {
 namespace Platform {
 namespace Graphics {
 class Buffer;
+class GLES2Program;
 }
 }
 }
@@ -119,6 +120,7 @@ class LayerCompositingThread : public ThreadSafeRefCounted<LayerCompositingThrea
 public:
     static PassRefPtr<LayerCompositingThread> create(LayerType, LayerCompositingThreadClient*);
 
+    LayerCompositingThreadClient* client() const { return m_client; }
     void setClient(LayerCompositingThreadClient* client) { m_client = client; }
 
     // Thread safe
@@ -142,10 +144,12 @@ public:
     void removeFromSuperlayer();
     void setNeedsTexture(bool needsTexture) { m_needsTexture = needsTexture; }
 
+    void commitPendingTextureUploads();
+
     // Returns true if we have an animation
     bool updateAnimations(double currentTime);
     void updateTextureContentsIfNeeded();
-    void bindContentsTexture();
+    Texture* contentsTexture();
 
     const LayerCompositingThread* rootLayer() const;
     void setSublayers(const Vector<RefPtr<LayerCompositingThread> >&);
@@ -154,6 +158,7 @@ public:
     LayerCompositingThread* superlayer() const { return m_superlayer; }
 
     // The layer renderer must be set if the layer has been rendered
+    LayerRenderer* layerRenderer() const { return m_layerRenderer; }
     void setLayerRenderer(LayerRenderer*);
 
     void setDrawTransform(double scale, const TransformationMatrix&);
@@ -178,10 +183,8 @@ public:
 
     void deleteTextures();
 
-    void drawTextures(double scale, int positionLocation, int texCoordLocation, const FloatRect& visibleRect);
-    bool hasMissingTextures() const;
-    void drawMissingTextures(double scale, int positionLocation, int texCoordLocation, const FloatRect& visibleRect);
-    void drawSurface(const TransformationMatrix&, LayerCompositingThread* mask, int positionLocation, int texCoordLocation);
+    void drawTextures(double scale, const BlackBerry::Platform::Graphics::GLES2Program&, const FloatRect& visibleRect);
+    void drawSurface(const TransformationMatrix&, LayerCompositingThread* mask, const BlackBerry::Platform::Graphics::GLES2Program&);
 
     void releaseTextureResources();
 

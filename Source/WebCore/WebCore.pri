@@ -18,6 +18,7 @@ INCLUDEPATH += \
     $$SOURCE_DIR/Modules/indexeddb \
     $$SOURCE_DIR/Modules/navigatorcontentutils \
     $$SOURCE_DIR/Modules/notifications \
+    $$SOURCE_DIR/Modules/proximity \
     $$SOURCE_DIR/Modules/quota \
     $$SOURCE_DIR/Modules/webaudio \
     $$SOURCE_DIR/Modules/webdatabase \
@@ -49,17 +50,21 @@ INCLUDEPATH += \
     $$SOURCE_DIR/page/animation \
     $$SOURCE_DIR/page/qt \
     $$SOURCE_DIR/page/scrolling \
+    $$SOURCE_DIR/page/scrolling/coordinatedgraphics \
     $$SOURCE_DIR/platform \
     $$SOURCE_DIR/platform/animation \
     $$SOURCE_DIR/platform/audio \
     $$SOURCE_DIR/platform/graphics \
+    $$SOURCE_DIR/platform/graphics/cpu/arm \
+    $$SOURCE_DIR/platform/graphics/cpu/arm/filters \
     $$SOURCE_DIR/platform/graphics/filters \
-    $$SOURCE_DIR/platform/graphics/filters/arm \
+    $$SOURCE_DIR/platform/graphics/filters/texmap \
     $$SOURCE_DIR/platform/graphics/opengl \
     $$SOURCE_DIR/platform/graphics/opentype \
     $$SOURCE_DIR/platform/graphics/qt \
     $$SOURCE_DIR/platform/graphics/surfaces \
     $$SOURCE_DIR/platform/graphics/texmap \
+    $$SOURCE_DIR/platform/graphics/texmap/coordinated \
     $$SOURCE_DIR/platform/graphics/transforms \
     $$SOURCE_DIR/platform/image-decoders \
     $$SOURCE_DIR/platform/image-decoders/bmp \
@@ -105,17 +110,15 @@ INCLUDEPATH += $$WEBCORE_GENERATED_SOURCES_DIR
 enable?(XSLT) {
     use?(LIBXML2) {
         mac {
-            INCLUDEPATH += /usr/include/libxml2
+            INCLUDEPATH += /usr/include/libxslt /usr/include/libxml2
             LIBS += -lxml2 -lxslt
         } else {
-            PKGCONFIG += libxslt
+            PKGCONFIG += libxslt libxml-2.0
         }
     } else {
         QT *= xmlpatterns
     }
-}
-
-use?(LIBXML2) {
+} else:!mac:use?(LIBXML2) {
     PKGCONFIG += libxml-2.0
 }
 
@@ -149,9 +152,7 @@ enable?(NETSCAPE_PLUGIN_API) {
     }
 }
 
-enable?(ORIENTATION_EVENTS)|enable?(DEVICE_ORIENTATION) {
-    QT += sensors
-}
+have?(qtsensors):if(enable?(ORIENTATION_EVENTS)|enable?(DEVICE_ORIENTATION)): QT += sensors
 
 use?(QT_MOBILITY_SYSTEMINFO) {
      CONFIG *= mobility
@@ -166,8 +167,14 @@ enable?(GAMEPAD) {
 }
 
 use?(GSTREAMER) {
-    DEFINES += ENABLE_GLIB_SUPPORT=1
-    PKGCONFIG += glib-2.0 gio-2.0 gstreamer-0.10 gstreamer-app-0.10 gstreamer-base-0.10 gstreamer-interfaces-0.10 gstreamer-pbutils-0.10 gstreamer-plugins-base-0.10 gstreamer-video-0.10
+    DEFINES += WTF_USE_GLIB=1
+    use?(GSTREAMER010) {
+        PKGCONFIG += glib-2.0 gio-2.0 gstreamer-0.10 gstreamer-app-0.10 gstreamer-base-0.10 gstreamer-interfaces-0.10 gstreamer-pbutils-0.10 gstreamer-plugins-base-0.10 gstreamer-video-0.10
+    } else {
+        DEFINES += GST_API_VERSION=1.0
+        DEFINES += GST_API_VERSION_1
+        PKGCONFIG += glib-2.0 gio-2.0 gstreamer-1.0 gstreamer-app-1.0 gstreamer-base-1.0 gstreamer-pbutils-1.0 gstreamer-plugins-base-1.0 gstreamer-video-1.0 gstreamer-audio-1.0
+    }
 }
 
 enable?(VIDEO) {
@@ -179,18 +186,25 @@ enable?(VIDEO) {
                 -framework QuartzCore -framework QTKit \
                 -framework Security -framework IOKit
 
-        # We can know the Mac OS version by using the Darwin major version
         DARWIN_VERSION = $$split(QMAKE_HOST.version, ".")
         DARWIN_MAJOR_VERSION = $$first(DARWIN_VERSION)
-        equals(DARWIN_MAJOR_VERSION, "12") {
-            LIBS += $${ROOT_WEBKIT_DIR}/WebKitLibraries/libWebKitSystemInterfaceMountainLion.a
-        } else:equals(DARWIN_MAJOR_VERSION, "11") {
-            LIBS += $${ROOT_WEBKIT_DIR}/WebKitLibraries/libWebKitSystemInterfaceLion.a
-        } else:equals(DARWIN_MAJOR_VERSION, "10") {
-            LIBS += $${ROOT_WEBKIT_DIR}/WebKitLibraries/libWebKitSystemInterfaceSnowLeopard.a
-        } else:equals(DARWIN_MAJOR_VERSION, "9") {
-            LIBS += $${ROOT_WEBKIT_DIR}/WebKitLibraries/libWebKitSystemInterfaceLeopard.a
+
+        # We first check if a specific SDK is set to be used for the build.
+        contains(QMAKE_MAC_SDK, ".*MacOSX10.7.sdk.*") {
+            SYSTEM_LIBRARY_PATH = $${ROOT_WEBKIT_DIR}/WebKitLibraries/libWebKitSystemInterfaceLion.a
+        } else:contains(QMAKE_MAC_SDK, ".*MacOSX10.8.sdk.*") {
+            SYSTEM_LIBRARY_PATH = $${ROOT_WEBKIT_DIR}/WebKitLibraries/libWebKitSystemInterfaceMountainLion.a
         }
+
+        # If the previous check did not yield a result, we resort to the Darwin version.
+        isEmpty(SYSTEM_LIBRARY_PATH) {
+            equals(DARWIN_MAJOR_VERSION, "11") {
+                SYSTEM_LIBRARY_PATH = $${ROOT_WEBKIT_DIR}/WebKitLibraries/libWebKitSystemInterfaceLion.a
+            } else:equals(DARWIN_MAJOR_VERSION, "12") {
+                SYSTEM_LIBRARY_PATH = $${ROOT_WEBKIT_DIR}/WebKitLibraries/libWebKitSystemInterfaceMountainLion.a
+            }
+        }
+        LIBS += $$SYSTEM_LIBRARY_PATH
     } else:use?(GSTREAMER) {
         INCLUDEPATH += $$SOURCE_DIR/platform/graphics/gstreamer
     } else:use?(QT_MULTIMEDIA) {
@@ -202,12 +216,31 @@ enable?(WEB_AUDIO) {
     use?(GSTREAMER) {
         DEFINES += WTF_USE_WEBAUDIO_GSTREAMER=1
         INCLUDEPATH += $$SOURCE_DIR/platform/audio/gstreamer
-        PKGCONFIG += gstreamer-audio-0.10 gstreamer-fft-0.10
+        use?(GSTREAMER010) {
+            PKGCONFIG += gstreamer-audio-0.10 gstreamer-fft-0.10
+        } else {
+            PKGCONFIG += gstreamer-audio-1.0 gstreamer-fft-1.0
+        }
     }
 }
 
 use?(3D_GRAPHICS) {
-    contains(QT_CONFIG, opengles2):!win32: LIBS += -lEGL
+    win32: {
+        win32-g++: {
+            # Make sure OpenGL libs are after the webcore lib so MinGW can resolve symbols
+            contains(QT_CONFIG, opengles2) {
+                CONFIG(debug, debug|release):contains(QT_CONFIG, angle) {
+                    LIBS += $$QMAKE_LIBS_OPENGL_ES2_DEBUG
+                } else {
+                    LIBS += $$QMAKE_LIBS_OPENGL_ES2
+                }
+            } else {
+                LIBS += $$QMAKE_LIBS_OPENGL
+            }
+        }
+    } else {
+        contains(QT_CONFIG, opengles2): CONFIG += egl
+    }
 }
 
 use?(GRAPHICS_SURFACE) {
@@ -218,17 +251,32 @@ use?(GRAPHICS_SURFACE) {
     }
 }
 
-!system-sqlite:exists( $${SQLITE3SRCDIR}/sqlite3.c ) {
-    INCLUDEPATH += $${SQLITE3SRCDIR}
-    DEFINES += SQLITE_CORE SQLITE_OMIT_LOAD_EXTENSION SQLITE_OMIT_COMPLETE
+have?(sqlite3) {
+    mac {
+        LIBS += -lsqlite3
+    } else {
+        PKGCONFIG += sqlite3
+    }
 } else {
-    INCLUDEPATH += $${SQLITE3SRCDIR}
-    LIBS += -lsqlite3
+    SQLITE3SRCDIR = $$(SQLITE3SRCDIR)
+    isEmpty(SQLITE3SRCDIR): SQLITE3SRCDIR = ../../../qtbase/src/3rdparty/sqlite/
+    exists($${SQLITE3SRCDIR}/sqlite3.c) {
+        INCLUDEPATH += $${SQLITE3SRCDIR}
+        DEFINES += SQLITE_CORE SQLITE_OMIT_LOAD_EXTENSION SQLITE_OMIT_COMPLETE
+    } else {
+        INCLUDEPATH += $${SQLITE3SRCDIR}
+        LIBS += -lsqlite3
+    }
 }
 
 use?(libjpeg): LIBS += -ljpeg
 use?(libpng): LIBS += -lpng
 use?(webp): LIBS += -lwebp
+
+enable?(opencl) {
+    LIBS += -lOpenCL
+    INCLUDEPATH += $$SOURCE_DIR/platform/graphics/gpu/opencl
+}
 
 mac {
     LIBS += -framework Carbon -framework AppKit -framework IOKit
@@ -276,13 +324,6 @@ mac {
 unix:!mac:*-g++*:QMAKE_CXXFLAGS += -fdata-sections
 unix:!mac:*-g++*:QMAKE_LFLAGS += -Wl,--gc-sections
 linux*-g++*:QMAKE_LFLAGS += $$QMAKE_LFLAGS_NOUNDEF
-
-unix|win32-g++* {
-    QMAKE_PKGCONFIG_REQUIRES = QtCore QtGui QtNetwork QtWidgets
-}
-
-# Disable C++0x mode in WebCore for those who enabled it in their Qt's mkspec
-*-g++*:QMAKE_CXXFLAGS -= -std=c++0x -std=gnu++0x
 
 enable_fast_mobile_scrolling: DEFINES += ENABLE_FAST_MOBILE_SCROLLING=1
 

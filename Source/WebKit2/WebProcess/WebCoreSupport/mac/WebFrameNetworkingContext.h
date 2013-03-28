@@ -20,9 +20,9 @@
 #ifndef WebFrameNetworkingContext_h
 #define WebFrameNetworkingContext_h
 
+#include "HTTPCookieAcceptPolicy.h"
 #include "WebFrame.h"
-
-#import <WebCore/FrameNetworkingContext.h>
+#include <WebCore/FrameNetworkingContext.h>
 
 namespace WebKit {
 
@@ -33,16 +33,23 @@ public:
         return adoptRef(new WebFrameNetworkingContext(frame));
     }
 
+    static void setPrivateBrowsingStorageSessionIdentifierBase(const String&);
+    static void ensurePrivateBrowsingSession();
+    static void destroyPrivateBrowsingSession();
+    static void setCookieAcceptPolicyForAllContexts(HTTPCookieAcceptPolicy);
+
 private:
     WebFrameNetworkingContext(WebFrame* frame)
         : WebCore::FrameNetworkingContext(frame->coreFrame())
     {
     }
 
-    virtual bool needsSiteSpecificQuirks() const;
-    virtual bool localFileContentSniffingEnabled() const;
-    virtual WebCore::SchedulePairHashSet* scheduledRunLoopPairs() const;
-    virtual WebCore::ResourceError blockedError(const WebCore::ResourceRequest&) const;
+    virtual bool needsSiteSpecificQuirks() const OVERRIDE;
+    virtual bool localFileContentSniffingEnabled() const OVERRIDE;
+    virtual WebCore::NetworkStorageSession& storageSession() const OVERRIDE;
+    virtual SchedulePairHashSet* scheduledRunLoopPairs() const OVERRIDE;
+    virtual RetainPtr<CFDataRef> sourceApplicationAuditData() const OVERRIDE;
+    virtual WebCore::ResourceError blockedError(const WebCore::ResourceRequest&) const OVERRIDE;
 };
 
 }

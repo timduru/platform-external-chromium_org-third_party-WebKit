@@ -30,7 +30,7 @@ import logging
 import optparse
 import sys
 import tempfile
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system.executive import Executive, ScriptError
 from webkitpy.common.system import executive_mock
@@ -45,22 +45,19 @@ from webkitpy.common.system.systemhost_mock import MockSystemHost
 from webkitpy.layout_tests.port import Port, Driver, DriverOutput
 from webkitpy.layout_tests.port.test import add_unit_tests_to_mock_filesystem, TestPort
 
-import config
-import config_mock
-
 class PortTest(unittest.TestCase):
-    def make_port(self, executive=None, with_tests=False, **kwargs):
+    def make_port(self, executive=None, with_tests=False, port_name=None, **kwargs):
         host = MockSystemHost()
         if executive:
             host.executive = executive
         if with_tests:
             add_unit_tests_to_mock_filesystem(host.filesystem)
             return TestPort(host, **kwargs)
-        return Port(host, **kwargs)
+        return Port(host, port_name or 'baseport', **kwargs)
 
     def test_default_child_processes(self):
         port = self.make_port()
-        self.assertNotEquals(port.default_child_processes(), None)
+        self.assertIsNotNone(port.default_child_processes())
 
     def test_format_wdiff_output_as_html(self):
         output = "OUTPUT %s %s %s" % (Port._WDIFF_DEL, Port._WDIFF_ADD, Port._WDIFF_END)
@@ -183,16 +180,11 @@ class PortTest(unittest.TestCase):
 
         # And make sure we actually get diff output.
         diff = port.diff_text('foo', 'bar', 'exp.txt', 'act.txt')
-        self.assertTrue('foo' in diff)
-        self.assertTrue('bar' in diff)
-        self.assertTrue('exp.txt' in diff)
-        self.assertTrue('act.txt' in diff)
-        self.assertFalse('nosuchthing' in diff)
-
-    def test_default_configuration_notfound(self):
-        # Test that we delegate to the config object properly.
-        port = self.make_port(config=config_mock.MockConfig(default_configuration='default'))
-        self.assertEqual(port.default_configuration(), 'default')
+        self.assertIn('foo', diff)
+        self.assertIn('bar', diff)
+        self.assertIn('exp.txt', diff)
+        self.assertIn('act.txt', diff)
+        self.assertNotIn('nosuchthing', diff)
 
     def test_setup_test_run(self):
         port = self.make_port()
@@ -204,8 +196,8 @@ class PortTest(unittest.TestCase):
         port.host.filesystem.write_text_file(port.layout_tests_dir() + '/canvas/test', '')
         port.host.filesystem.write_text_file(port.layout_tests_dir() + '/css2.1/test', '')
         dirs = port.test_dirs()
-        self.assertTrue('canvas' in dirs)
-        self.assertTrue('css2.1' in dirs)
+        self.assertIn('canvas', dirs)
+        self.assertIn('css2.1', dirs)
 
     def test_skipped_perf_tests(self):
         port = self.make_port()
@@ -231,7 +223,7 @@ class PortTest(unittest.TestCase):
 
     def test_get_option__unset(self):
         port = self.make_port()
-        self.assertEqual(port.get_option('foo'), None)
+        self.assertIsNone(port.get_option('foo'))
 
     def test_get_option__default(self):
         port = self.make_port()
@@ -268,7 +260,7 @@ class PortTest(unittest.TestCase):
         port = self.make_port(port_name='foo')
         port.expectations_files = lambda: ['/mock-checkout/LayoutTests/platform/exists/TestExpectations', '/mock-checkout/LayoutTests/platform/nonexistant/TestExpectations']
         port._filesystem.write_text_file('/mock-checkout/LayoutTests/platform/exists/TestExpectations', '')
-        self.assertEquals('\n'.join(port.expectations_dict().keys()), '/mock-checkout/LayoutTests/platform/exists/TestExpectations')
+        self.assertEqual('\n'.join(port.expectations_dict().keys()), '/mock-checkout/LayoutTests/platform/exists/TestExpectations')
 
     def test_additional_expectations(self):
         port = self.make_port(port_name='foo')
@@ -279,19 +271,19 @@ class PortTest(unittest.TestCase):
         port._filesystem.write_text_file(
             '/tmp/additional-expectations-2.txt', 'content2\n')
 
-        self.assertEquals('\n'.join(port.expectations_dict().values()), '')
+        self.assertEqual('\n'.join(port.expectations_dict().values()), '')
 
         port._options.additional_expectations = [
             '/tmp/additional-expectations-1.txt']
-        self.assertEquals('\n'.join(port.expectations_dict().values()), '\ncontent1\n')
+        self.assertEqual('\n'.join(port.expectations_dict().values()), '\ncontent1\n')
 
         port._options.additional_expectations = [
             '/tmp/nonexistent-file', '/tmp/additional-expectations-1.txt']
-        self.assertEquals('\n'.join(port.expectations_dict().values()), '\ncontent1\n')
+        self.assertEqual('\n'.join(port.expectations_dict().values()), '\ncontent1\n')
 
         port._options.additional_expectations = [
             '/tmp/additional-expectations-1.txt', '/tmp/additional-expectations-2.txt']
-        self.assertEquals('\n'.join(port.expectations_dict().values()), '\ncontent1\n\ncontent2\n')
+        self.assertEqual('\n'.join(port.expectations_dict().values()), '\ncontent1\n\ncontent2\n')
 
     def test_additional_env_var(self):
         port = self.make_port(options=optparse.Values({'additional_env_var': ['FOO=BAR', 'BAR=FOO']}))
@@ -328,12 +320,12 @@ class PortTest(unittest.TestCase):
     def test_find_with_skipped_directories(self):
         port = self.make_port(with_tests=True)
         tests = port.tests(['userscripts'])
-        self.assertTrue('userscripts/resources/iframe.html' not in tests)
+        self.assertNotIn('userscripts/resources/iframe.html', tests)
 
     def test_find_with_skipped_directories_2(self):
         port = self.make_port(with_tests=True)
         tests = port.tests(['userscripts/resources'])
-        self.assertEqual(tests, set([]))
+        self.assertEqual(tests, [])
 
     def test_is_test_file(self):
         filesystem = MockFileSystem()
@@ -440,20 +432,20 @@ class PortTest(unittest.TestCase):
     def test_tests(self):
         port = self.make_port(with_tests=True)
         tests = port.tests([])
-        self.assertTrue('passes/text.html' in tests)
-        self.assertTrue('virtual/passes/text.html' in tests)
+        self.assertIn('passes/text.html', tests)
+        self.assertIn('virtual/passes/text.html', tests)
 
         tests = port.tests(['passes'])
-        self.assertTrue('passes/text.html' in tests)
-        self.assertTrue('passes/passes/test-virtual-passes.html' in tests)
-        self.assertFalse('virtual/passes/text.html' in tests)
+        self.assertIn('passes/text.html', tests)
+        self.assertIn('passes/passes/test-virtual-passes.html', tests)
+        self.assertNotIn('virtual/passes/text.html', tests)
 
         tests = port.tests(['virtual/passes'])
-        self.assertFalse('passes/text.html' in tests)
-        self.assertTrue('virtual/passes/test-virtual-passes.html' in tests)
-        self.assertTrue('virtual/passes/passes/test-virtual-passes.html' in tests)
-        self.assertFalse('virtual/passes/test-virtual-virtual/passes.html' in tests)
-        self.assertFalse('virtual/passes/virtual/passes/test-virtual-passes.html' in tests)
+        self.assertNotIn('passes/text.html', tests)
+        self.assertIn('virtual/passes/test-virtual-passes.html', tests)
+        self.assertIn('virtual/passes/passes/test-virtual-passes.html', tests)
+        self.assertNotIn('virtual/passes/test-virtual-virtual/passes.html', tests)
+        self.assertNotIn('virtual/passes/virtual/passes/test-virtual-passes.html', tests)
 
     def test_build_path(self):
         port = self.make_port(options=optparse.Values({'build_directory': '/my-build-directory/'}))
@@ -463,5 +455,45 @@ class PortTest(unittest.TestCase):
         port = self.make_port()
         self.assertEqual(port.requires_http_server(), False)
 
-if __name__ == '__main__':
-    unittest.main()
+
+class NaturalCompareTest(unittest.TestCase):
+    def setUp(self):
+        self._port = TestPort(MockSystemHost())
+
+    def assert_cmp(self, x, y, result):
+        self.assertEqual(cmp(self._port._natural_sort_key(x), self._port._natural_sort_key(y)), result)
+
+    def test_natural_compare(self):
+        self.assert_cmp('a', 'a', 0)
+        self.assert_cmp('ab', 'a', 1)
+        self.assert_cmp('a', 'ab', -1)
+        self.assert_cmp('', '', 0)
+        self.assert_cmp('', 'ab', -1)
+        self.assert_cmp('1', '2', -1)
+        self.assert_cmp('2', '1', 1)
+        self.assert_cmp('1', '10', -1)
+        self.assert_cmp('2', '10', -1)
+        self.assert_cmp('foo_1.html', 'foo_2.html', -1)
+        self.assert_cmp('foo_1.1.html', 'foo_2.html', -1)
+        self.assert_cmp('foo_1.html', 'foo_10.html', -1)
+        self.assert_cmp('foo_2.html', 'foo_10.html', -1)
+        self.assert_cmp('foo_23.html', 'foo_10.html', 1)
+        self.assert_cmp('foo_23.html', 'foo_100.html', -1)
+
+
+class KeyCompareTest(unittest.TestCase):
+    def setUp(self):
+        self._port = TestPort(MockSystemHost())
+
+    def assert_cmp(self, x, y, result):
+        self.assertEqual(cmp(self._port.test_key(x), self._port.test_key(y)), result)
+
+    def test_test_key(self):
+        self.assert_cmp('/a', '/a', 0)
+        self.assert_cmp('/a', '/b', -1)
+        self.assert_cmp('/a2', '/a10', -1)
+        self.assert_cmp('/a2/foo', '/a10/foo', -1)
+        self.assert_cmp('/a/foo11', '/a/foo2', 1)
+        self.assert_cmp('/ab', '/a/a/b', -1)
+        self.assert_cmp('/a/a/b', '/ab', 1)
+        self.assert_cmp('/foo-bar/baz', '/foo/baz', -1)

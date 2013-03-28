@@ -35,13 +35,13 @@
 #include <qdir.h>
 #include <qfont.h>
 #include <qstringlist.h>
+#include <qstylefactory.h>
 #include <qtimer.h>
 #include <qurl.h>
 #include <qwebdatabase.h>
-#include <qwindowsstyle.h>
+
 
 #include <wtf/AlwaysInline.h>
-#include <wtf/ExportMacros.h>
 
 #ifdef Q_WS_X11
 #include <qx11info_x11.h>
@@ -116,7 +116,7 @@ int main(int argc, char* argv[])
 
     WebKit::QtTestSupport::initializeTestFonts();
 
-    QApplication::setStyle(new QWindowsStyle);
+    QApplication::setStyle(QStyleFactory::create(QLatin1String("windows")));
     QApplication::setDesktopSettingsAware(false);
 
     QApplication app(argc, argv);
@@ -135,7 +135,7 @@ int main(int argc, char* argv[])
     // Remove the first arguments, it is application name itself
     args.removeAt(0);
 
-    WebCore::DumpRenderTree dumper;
+    DumpRenderTree dumper;
 
     int index = args.indexOf(QLatin1String("--stdout"));
     if (index != -1) {

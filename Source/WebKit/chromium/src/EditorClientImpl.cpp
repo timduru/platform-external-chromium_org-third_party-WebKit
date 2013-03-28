@@ -36,6 +36,8 @@
 #include "HTMLNames.h"
 #include "KeyboardCodes.h"
 #include "KeyboardEvent.h"
+#include "NotImplemented.h"
+#include "Page.h"
 #include "PlatformKeyboardEvent.h"
 #include "RenderObject.h"
 #include "Settings.h"
@@ -92,31 +94,18 @@ void EditorClientImpl::frameWillDetachPage(WebCore::Frame* frame)
 {
 }
 
-bool EditorClientImpl::shouldShowDeleteInterface(HTMLElement* elem)
-{
-    // Normally, we don't care to show WebCore's deletion UI, so we only enable
-    // it if in testing mode and the test specifically requests it by using this
-    // magic class name.
-    return layoutTestMode()
-           && elem->getAttribute(HTMLNames::classAttr) == "needsDeletionUI";
-}
-
 bool EditorClientImpl::smartInsertDeleteEnabled()
 {
-    if (m_webView->client())
-        return m_webView->client()->isSmartInsertDeleteEnabled();
-    return true;
+    if (m_webView->page())
+        return m_webView->page()->settings()->smartInsertDeleteEnabled();
+    return false;
 }
 
 bool EditorClientImpl::isSelectTrailingWhitespaceEnabled()
 {
-    if (m_webView->client())
-        return m_webView->client()->isSelectTrailingWhitespaceEnabled();
-#if OS(WINDOWS)
-    return true;
-#else
+    if (m_webView->page())
+        return m_webView->page()->settings()->selectTrailingWhitespaceEnabled();
     return false;
-#endif
 }
 
 bool EditorClientImpl::shouldSpellcheckByDefault()
@@ -268,8 +257,11 @@ void EditorClientImpl::didBeginEditing()
 void EditorClientImpl::respondToChangedSelection(Frame* frame)
 {
     if (m_webView->client()) {
-        if (frame)
+        if (frame) {
             m_webView->client()->didChangeSelection(!frame->selection()->isRange());
+            if (frame->editor()->cancelCompositionIfSelectionIsInvalid())
+                m_webView->client()->didCancelCompositionOnSelectionChange();
+        }
     }
 }
 
@@ -286,6 +278,14 @@ void EditorClientImpl::didEndEditing()
 }
 
 void EditorClientImpl::didWriteSelectionToPasteboard()
+{
+}
+
+void EditorClientImpl::willWriteSelectionToPasteboard(WebCore::Range*)
+{
+}
+
+void EditorClientImpl::getClientPasteboardDataForRange(WebCore::Range*, Vector<String>&, Vector<RefPtr<WebCore::SharedBuffer> >&)
 {
 }
 
@@ -726,7 +726,7 @@ void EditorClientImpl::checkSpellingOfString(const UChar* text, int length,
     int spellLength = 0;
 
     // Check to see if the provided text is spelled correctly.
-    if (isContinuousSpellCheckingEnabled() && m_webView->spellCheckClient())
+    if (m_webView->spellCheckClient())
         m_webView->spellCheckClient()->spellCheck(WebString(text, length), spellLocation, spellLength, 0);
     else {
         spellLocation = 0;
@@ -744,7 +744,7 @@ void EditorClientImpl::checkSpellingOfString(const UChar* text, int length,
 void EditorClientImpl::requestCheckingOfString(WTF::PassRefPtr<WebCore::TextCheckingRequest> request)
 {
     if (m_webView->spellCheckClient()) {
-        String text = request->text();
+        String text = request->data().text();
         m_webView->spellCheckClient()->requestCheckingOfText(text, new WebTextCheckingCompletionImpl(request));
     }
 }

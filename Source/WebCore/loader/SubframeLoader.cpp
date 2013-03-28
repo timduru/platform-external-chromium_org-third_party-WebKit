@@ -38,6 +38,7 @@
 #include "ContentSecurityPolicy.h"
 #include "DiagnosticLoggingKeys.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "HTMLAppletElement.h"
 #include "HTMLFrameElementBase.h"
@@ -198,7 +199,8 @@ static void logPluginRequest(Page* page, const String& mimeType, const String& u
             return;
     }
 
-    String pluginFile = page->pluginData()->pluginFileForMimeType(newMIMEType);
+    PluginData* pluginData = page->pluginData();
+    String pluginFile = pluginData ? pluginData->pluginFileForMimeType(newMIMEType) : String();
     String description = !pluginFile ? newMIMEType : pluginFile;
 
     ChromeClient* client = page->chrome()->client();
@@ -362,9 +364,6 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement* ownerElement, const K
         return 0;
     }
 
-    if (!ownerElement->document()->contentSecurityPolicy()->allowChildFrameFromSource(url))
-        return 0;
-
     String referrerToUse = SecurityPolicy::generateReferrerHeader(ownerElement->document()->referrerPolicy(), url, referrer);
     RefPtr<Frame> frame = m_frame->loader()->client()->createFrame(url, name, ownerElement, referrerToUse, allowsScrolling, marginWidth, marginHeight);
 
@@ -449,6 +448,8 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement* pluginElement, const KUR
     if (!renderer || useFallback)
         return false;
 
+    pluginElement->subframeLoaderWillCreatePlugIn(url);
+
     IntSize contentSize = roundedIntSize(LayoutSize(renderer->contentWidth(), renderer->contentHeight()));
     bool loadManually = document()->isPluginDocument() && !m_containsPlugins && toPluginDocument(document())->shouldLoadPluginManually();
     RefPtr<Widget> widget = m_frame->loader()->client()->createPlugin(contentSize,
@@ -460,6 +461,7 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement* pluginElement, const KUR
         return false;
     }
 
+    pluginElement->subframeLoaderDidCreatePlugIn(widget.get());
     renderer->setWidget(widget);
     m_containsPlugins = true;
  

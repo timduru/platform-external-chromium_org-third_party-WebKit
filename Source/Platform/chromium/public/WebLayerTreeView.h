@@ -33,46 +33,15 @@
 #include "WebPrivateOwnPtr.h"
 #include "WebSize.h"
 
-class SkBitmap;
-
 namespace WebKit {
 class WebGraphicsContext3D;
 class WebLayer;
-class WebLayerTreeViewClient;
 struct WebPoint;
 struct WebRect;
 struct WebRenderingStats;
 
 class WebLayerTreeView {
 public:
-    struct Settings {
-        Settings()
-            : acceleratePainting(false)
-            , showFPSCounter(false)
-            , showPlatformLayerTree(false)
-            , showPaintRects(false)
-            , renderVSyncEnabled(true)
-            , refreshRate(0)
-            , defaultTileSize(WebSize(256, 256))
-            , maxUntiledLayerSize(WebSize(512, 512))
-        {
-        }
-
-        bool acceleratePainting;
-        bool showFPSCounter;
-        bool showPlatformLayerTree;
-        bool showPaintRects;
-        bool renderVSyncEnabled;
-        double refreshRate;
-        WebSize defaultTileSize;
-        WebSize maxUntiledLayerSize;
-    };
-
-#define WEBLAYERTREEVIEW_IS_PURE_VIRTUAL
-    // Attempts to initialize this WebLayerTreeView with the given client, root layer, and settings.
-    // If initialization fails, this will return nil.
-    WEBKIT_EXPORT static WebLayerTreeView* create(WebLayerTreeViewClient*, const WebLayer& root, const Settings&);
-
     virtual ~WebLayerTreeView() { }
 
     // Initialization and lifecycle --------------------------------------
@@ -89,17 +58,13 @@ public:
 
     // View properties ---------------------------------------------------
 
-    virtual void setViewportSize(const WebSize& layoutViewportSize, const WebSize& deviceViewportSize = WebSize()) = 0;
+    virtual void setViewportSize(const WebSize& layoutViewportSize, const WebSize& deviceViewportSize) = 0;
     // Gives the viewport size in layer space.
     virtual WebSize layoutViewportSize() const = 0;
     // Gives the viewport size in physical device pixels (may be different
     // from the above if there exists page scale, device scale or fixed layout
     // mode).
     virtual WebSize deviceViewportSize() const = 0;
-
-    // Gives the corrected location for an event, accounting for the pinch-zoom transformation
-    // in the compositor.
-    virtual WebFloatPoint adjustEventPointForPinchZoom(const WebFloatPoint&) const = 0;
 
     virtual void setDeviceScaleFactor(float) = 0;
     virtual float deviceScaleFactor() const = 0;
@@ -125,7 +90,7 @@ public:
 
     // Flow control and scheduling ---------------------------------------
 
-    // Requests an updateAnimations() call.
+    // Indicates that an animation needs to be updated.
     virtual void setNeedsAnimate() = 0;
 
     // Indicates that the view needs to be redrawn. This is typically used when the frontbuffer is damaged.
@@ -134,19 +99,8 @@ public:
     // Indicates whether a commit is pending.
     virtual bool commitRequested() const = 0;
 
-    // Triggers a compositing pass. If the compositor thread was not
-    // enabled via WebCompositorSupport::initialize, the compositing pass happens
-    // immediately. If it is enabled, the compositing pass will happen at a
-    // later time. Before the compositing pass happens (i.e. before composite()
-    // returns when the compositor thread is disabled), WebContentLayers will be
-    // asked to paint their dirty region, through
-    // WebContentLayerClient::paintContents.
-    virtual void composite() = 0;
-
-    // Immediately update animations. This should only be used when frame scheduling is handled by
-    // the WebLayerTreeView user and not internally by the compositor, meaning only in single-threaded
-    // mode.
-    virtual void updateAnimations(double frameBeginTime) = 0;
+    // Relays the end of a fling animation.
+    virtual void didStopFlinging() { }
 
     // Composites and attempts to read back the result into the provided
     // buffer. If it wasn't possible, e.g. due to context lost, will return
@@ -163,18 +117,24 @@ public:
     // Prevents updates to layer tree from becoming visible.
     virtual void setDeferCommits(bool deferCommits) { }
 
+    // Take responsiblity for this layer's animations, even if this layer hasn't yet
+    // been added to the tree.
+    virtual void registerForAnimations(WebLayer* layer) { }
+
+
     // Debugging / dangerous ---------------------------------------------
 
-    // Fills in a WebRenderingStats struct containing information about the state of the compositor.
-    // This call is relatively expensive in threaded mode as it blocks on the compositor thread.
-    virtual void renderingStats(WebRenderingStats&) const = 0;
+    // Toggles the FPS counter in the HUD layer
+    virtual void setShowFPSCounter(bool) { }
 
-    // Provides a font atlas to use for debug visualizations. The atlas must be a bitmap containing glyph data, a table of
-    // ASCII character values to a subrectangle of the atlas representing the corresponding glyph, and the glyph height.
-    virtual void setFontAtlas(WebRect asciiToRectTable[128], const SkBitmap&, int fontHeight) { }
+    // Toggles the paint rects in the HUD layer
+    virtual void setShowPaintRects(bool) { }
 
-    // Simulates a lost context. For testing only.
-    virtual void loseCompositorContext(int numTimes) = 0;
+    // Toggles the debug borders on layers
+    virtual void setShowDebugBorders(bool) { }
+
+    // Toggles continuous painting
+    virtual void setContinuousPaintingEnabled(bool) { }
 };
 
 } // namespace WebKit

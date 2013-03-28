@@ -86,7 +86,7 @@ void RenderSVGResourceContainer::idChanged()
     // Remove old id, that is guaranteed to be present in cache.
     SVGDocumentExtensions* extensions = svgExtensionsFromNode(node());
     extensions->removeResource(m_id);
-    m_id = static_cast<Element*>(node())->getIdAttribute();
+    m_id = toElement(node())->getIdAttribute();
 
     registerResource();
 }
@@ -114,13 +114,18 @@ void RenderSVGResourceContainer::markAllClientsForInvalidation(InvalidationMode 
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(client, needsLayout);
     }
 
+    markAllClientLayersForInvalidation();
+
+    m_isInvalidating = false;
+}
+
+void RenderSVGResourceContainer::markAllClientLayersForInvalidation()
+{
 #if ENABLE(CSS_FILTERS)
     HashSet<RenderLayer*>::iterator layerEnd = m_clientLayers.end();
     for (HashSet<RenderLayer*>::iterator it = m_clientLayers.begin(); it != layerEnd; ++it)
         (*it)->filterNeedsRepaint();
 #endif
-
-    m_isInvalidating = false;
 }
 
 void RenderSVGResourceContainer::markClientForInvalidation(RenderObject* client, InvalidationMode mode)
@@ -151,6 +156,7 @@ void RenderSVGResourceContainer::addClient(RenderObject* client)
 void RenderSVGResourceContainer::removeClient(RenderObject* client)
 {
     ASSERT(client);
+    removeClientFromCache(client, false);
     m_clients.remove(client);
 }
 
@@ -183,7 +189,7 @@ void RenderSVGResourceContainer::registerResource()
     const SVGDocumentExtensions::SVGPendingElements::const_iterator end = clients->end();
     for (SVGDocumentExtensions::SVGPendingElements::const_iterator it = clients->begin(); it != end; ++it) {
         ASSERT((*it)->hasPendingResources());
-        (*it)->clearHasPendingResourcesIfPossible();
+        extensions->clearHasPendingResourcesIfPossible(*it);
         RenderObject* renderer = (*it)->renderer();
         if (!renderer)
             continue;
@@ -219,7 +225,7 @@ AffineTransform RenderSVGResourceContainer::transformOnNonScalingStroke(RenderOb
     if (!object->isSVGShape())
         return resourceTransform;
 
-    SVGStyledTransformableElement* element = static_cast<SVGStyledTransformableElement*>(object->node());
+    SVGStyledTransformableElement* element = toSVGStyledTransformableElement(object->node());
     AffineTransform transform = element->getScreenCTM(SVGLocatable::DisallowStyleUpdate);
     transform *= resourceTransform;
     return transform;

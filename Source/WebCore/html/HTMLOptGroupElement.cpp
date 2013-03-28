@@ -42,7 +42,7 @@ inline HTMLOptGroupElement::HTMLOptGroupElement(const QualifiedName& tagName, Do
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(optgroupTag));
-    setHasCustomCallbacks();
+    setHasCustomStyleCallbacks();
 }
 
 PassRefPtr<HTMLOptGroupElement> HTMLOptGroupElement::create(const QualifiedName& tagName, Document* document)
@@ -78,10 +78,13 @@ void HTMLOptGroupElement::childrenChanged(bool changedByParser, Node* beforeChan
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
 
-void HTMLOptGroupElement::parseAttribute(const Attribute& attribute)
+void HTMLOptGroupElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    HTMLElement::parseAttribute(attribute);
+    HTMLElement::parseAttribute(name, value);
     recalcSelectOptions();
+
+    if (name == disabledAttr)
+        didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
 }
 
 void HTMLOptGroupElement::recalcSelectOptions()

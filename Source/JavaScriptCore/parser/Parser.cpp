@@ -1,7 +1,7 @@
 /*
  *  Copyright (C) 1999-2001 Harri Porten (porten@kde.org)
  *  Copyright (C) 2001 Peter Kelly (pmk@post.com)
- *  Copyright (C) 2003, 2006, 2007, 2008, 2009, 2010 Apple Inc. All rights reserved.
+ *  Copyright (C) 2003, 2006, 2007, 2008, 2009, 2010, 2013 Apple Inc. All rights reserved.
  *
  *  This library is free software; you can redistribute it and/or
  *  modify it under the terms of the GNU Library General Public
@@ -84,7 +84,7 @@ Parser<LexerType>::Parser(JSGlobalData* globalData, const SourceCode& source, Fu
     m_arena = m_globalData->parserArena.get();
     m_lexer->setCode(source, m_arena);
 
-    m_functionCache = source.provider()->cache();
+    m_functionCache = globalData->addSourceProviderCache(source.provider());
     ScopeRef scope = pushScope();
     if (parserMode == JSParseFunctionCode)
         scope->setIsFunction();
@@ -97,7 +97,6 @@ Parser<LexerType>::Parser(JSGlobalData* globalData, const SourceCode& source, Fu
     if (!name.isNull())
         scope->declareCallee(&name);
     next();
-    m_lexer->setLastLineNumber(tokenLine());
 }
 
 template <typename LexerType>
@@ -110,7 +109,6 @@ String Parser<LexerType>::parseInner()
 {
     String parseError = String();
     
-    unsigned oldFunctionCacheSize = m_functionCache ? m_functionCache->byteSize() : 0;
     ASTBuilder context(const_cast<JSGlobalData*>(m_globalData), const_cast<SourceCode*>(m_source));
     if (m_lexer->isReparsing())
         m_statementDepth--;
@@ -126,9 +124,6 @@ String Parser<LexerType>::parseInner()
         features |= StrictModeFeature;
     if (scope->shadowsArguments())
         features |= ShadowsArgumentsFeature;
-    unsigned functionCacheSize = m_functionCache ? m_functionCache->byteSize() : 0;
-    if (functionCacheSize != oldFunctionCacheSize)
-        m_lexer->sourceProvider()->notifyCacheSizeChanged(functionCacheSize - oldFunctionCacheSize);
 
     didFinishParsing(sourceElements, context.varDeclarations(), context.funcDeclarations(), features,
                      m_lastLine, context.numConstants(), capturedVariables);
@@ -798,13 +793,16 @@ template <class TreeBuilder> TreeFormalParameterList Parser<LexerType>::parseFor
 template <typename LexerType>
 template <class TreeBuilder> TreeFunctionBody Parser<LexerType>::parseFunctionBody(TreeBuilder& context)
 {
+    JSTokenLocation startLocation(tokenLocation());
+    next();
+
     if (match(CLOSEBRACE))
-        return context.createFunctionBody(tokenLocation(), strictMode());
+        return context.createFunctionBody(startLocation, tokenLocation(), strictMode());
     DepthManager statementDepth(&m_statementDepth);
     m_statementDepth = 0;
     typename TreeBuilder::FunctionBodyBuilder bodyBuilder(const_cast<JSGlobalData*>(m_globalData), m_lexer.get());
     failIfFalse(parseSourceElements<CheckForStrictMode>(bodyBuilder));
-    return context.createFunctionBody(tokenLocation(), strictMode());
+    return context.createFunctionBody(startLocation, tokenLocation(), strictMode());
 }
 
 template <typename LexerType>
@@ -812,6 +810,7 @@ template <FunctionRequirements requirements, bool nameIsInContainingScope, class
 {
     AutoPopScopeRef functionScope(this, pushScope());
     functionScope->setIsFunction();
+    int functionStart = m_token.m_location.startOffset;
     if (match(IDENT)) {
         name = m_token.m_data.ident;
         next();
@@ -829,18 +828,22 @@ template <FunctionRequirements requirements, bool nameIsInContainingScope, class
     
     openBracePos = m_token.m_data.intValue;
     bodyStartLine = tokenLine();
-    JSTokenLocation location(tokenLocation());
+    JSTokenLocation startLocation(tokenLocation());
     
     // If we know about this function already, we can use the cached info and skip the parser to the end of the function.
     if (const SourceProviderCacheItem* cachedInfo = TreeBuilder::CanUseFunctionCache ? findCachedFunctionInfo(openBracePos) : 0) {
         // If we're in a strict context, the cached function info must say it was strict too.
         ASSERT(!strictMode() || cachedInfo->strictMode);
-        body = context.createFunctionBody(location, cachedInfo->strictMode);
+        JSTokenLocation endLocation;
+        endLocation.line = cachedInfo->closeBraceLine;
+        endLocation.charPosition = cachedInfo->closeBracePos;
+        body = context.createFunctionBody(startLocation, endLocation, cachedInfo->strictMode);
         
-        functionScope->restoreFunctionInfo(cachedInfo);
+        functionScope->restoreFromSourceProviderCache(cachedInfo);
         failIfFalse(popScope(functionScope, TreeBuilder::NeedsFreeVariableInfo));
         
         closeBracePos = cachedInfo->closeBracePos;
+        context.setFunctionStart(body, functionStart);
         m_token = cachedInfo->closeBraceToken();
         m_lexer->setOffset(m_token.m_location.endOffset);
         m_lexer->setLineNumber(m_token.m_location.line);
@@ -848,8 +851,6 @@ template <FunctionRequirements requirements, bool nameIsInContainingScope, class
         next();
         return true;
     }
-    
-    next();
     
     body = parseFunctionBody(context);
     failIfFalse(body);
@@ -861,21 +862,24 @@ template <FunctionRequirements requirements, bool nameIsInContainingScope, class
     
     // Cache the tokenizer state and the function scope the first time the function is parsed.
     // Any future reparsing can then skip the function.
-    static const int minimumFunctionLengthToCache = 64;
+    static const int minimumFunctionLengthToCache = 16;
     OwnPtr<SourceProviderCacheItem> newInfo;
     int functionLength = closeBracePos - openBracePos;
     if (TreeBuilder::CanUseFunctionCache && m_functionCache && functionLength > minimumFunctionLengthToCache) {
-        newInfo = adoptPtr(new SourceProviderCacheItem(m_token.m_location.line, closeBracePos));
-        functionScope->saveFunctionInfo(newInfo.get());
+        SourceProviderCacheItemCreationParameters parameters;
+        parameters.functionStart = functionStart;
+        parameters.closeBraceLine = m_token.m_location.line;
+        parameters.closeBracePos = closeBracePos;
+        functionScope->fillParametersForSourceProviderCache(parameters);
+        newInfo = SourceProviderCacheItem::create(parameters);
     }
+    context.setFunctionStart(body, functionStart);
     
     failIfFalse(popScope(functionScope, TreeBuilder::NeedsFreeVariableInfo));
     matchOrFail(CLOSEBRACE);
     
-    if (newInfo) {
-        unsigned approximateByteSize = newInfo->approximateByteSize();
-        m_functionCache->add(openBracePos, newInfo.release(), approximateByteSize);
-    }
+    if (newInfo)
+        m_functionCache->add(openBracePos, newInfo.release());
     
     next();
     return true;

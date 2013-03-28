@@ -24,12 +24,17 @@
 
 #include "CSSCharsetRule.h"
 #include "CSSFontFaceRule.h"
+#include "CSSHostRule.h"
 #include "CSSImportRule.h"
 #include "CSSMediaRule.h"
 #include "CSSPageRule.h"
 #include "CSSStyleRule.h"
+#include "CSSSupportsRule.h"
+#include "CSSUnknownRule.h"
+#include "StylePropertySet.h"
 #include "StyleRuleImport.h"
 #include "WebCoreMemoryInstrumentation.h"
+#include "WebKitCSSFilterRule.h"
 #include "WebKitCSSKeyframeRule.h"
 #include "WebKitCSSKeyframesRule.h"
 #include "WebKitCSSRegionRule.h"
@@ -80,12 +85,22 @@ void StyleRuleBase::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     case Keyframes:
         static_cast<const StyleRuleKeyframes*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
         return;
-    case Host:
-        static_cast<const StyleRuleBlock*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+    case Supports:
+#endif
+#if ENABLE(SHADOW_DOM)
+    case HostInternal:
+        static_cast<const StyleRuleHost*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
         return;
+#endif
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     case Viewport:
         static_cast<const StyleRuleViewport*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
+        return;
+#endif
+#if ENABLE(CSS_SHADERS)
+    case Filter:
+        static_cast<const StyleRuleFilter*>(this)->reportDescendantMemoryUsage(memoryObjectInfo);
         return;
 #endif
     case Unknown:
@@ -115,6 +130,11 @@ void StyleRuleBase::destroy()
     case Media:
         delete static_cast<StyleRuleMedia*>(this);
         return;
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+    case Supports:
+        delete static_cast<StyleRuleSupports*>(this);
+        return;
+#endif
 #if ENABLE(CSS_REGIONS)
     case Region:
         delete static_cast<StyleRuleRegion*>(this);
@@ -126,12 +146,19 @@ void StyleRuleBase::destroy()
     case Keyframes:
         delete static_cast<StyleRuleKeyframes*>(this);
         return;
-    case Host:
+#if ENABLE(SHADOW_DOM)
+    case HostInternal:
         delete static_cast<StyleRuleHost*>(this);
         return;
+#endif
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     case Viewport:
         delete static_cast<StyleRuleViewport*>(this);
+        return;
+#endif
+#if ENABLE(CSS_SHADERS)
+    case Filter:
+        delete static_cast<StyleRuleFilter*>(this);
         return;
 #endif
     case Unknown:
@@ -157,6 +184,10 @@ PassRefPtr<StyleRuleBase> StyleRuleBase::copy() const
         return static_cast<const StyleRuleFontFace*>(this)->copy();
     case Media:
         return static_cast<const StyleRuleMedia*>(this)->copy();
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+    case Supports:
+        return static_cast<const StyleRuleSupports*>(this)->copy();
+#endif
 #if ENABLE(CSS_REGIONS)
     case Region:
         return static_cast<const StyleRuleRegion*>(this)->copy();
@@ -167,11 +198,17 @@ PassRefPtr<StyleRuleBase> StyleRuleBase::copy() const
         return 0;
     case Keyframes:
         return static_cast<const StyleRuleKeyframes*>(this)->copy();
-    case Host:
+#if ENABLE(SHADOW_DOM)
+    case HostInternal:
         return static_cast<const StyleRuleHost*>(this)->copy();
+#endif
 #if ENABLE(CSS_DEVICE_ADAPTATION)
     case Viewport:
         return static_cast<const StyleRuleViewport*>(this)->copy();
+#endif
+#if ENABLE(CSS_SHADERS)
+    case Filter:
+        return static_cast<const StyleRuleFilter*>(this)->copy();
 #endif
     case Unknown:
     case Charset:
@@ -203,6 +240,11 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
     case Media:
         rule = CSSMediaRule::create(static_cast<StyleRuleMedia*>(self), parentSheet);
         break;
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+    case Supports:
+        rule = CSSSupportsRule::create(static_cast<StyleRuleSupports*>(self), parentSheet);
+        break;
+#endif
 #if ENABLE(CSS_REGIONS)
     case Region:
         rule = WebKitCSSRegionRule::create(static_cast<StyleRuleRegion*>(self), parentSheet);
@@ -219,7 +261,16 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
         rule = WebKitCSSViewportRule::create(static_cast<StyleRuleViewport*>(self), parentSheet);
         break;
 #endif
-    case Host:
+#if ENABLE(SHADOW_DOM)
+    case HostInternal:
+        rule = CSSHostRule::create(static_cast<StyleRuleHost*>(self), parentSheet);
+        break;
+#endif
+#if ENABLE(CSS_SHADERS)
+    case Filter:
+        rule = WebKitCSSFilterRule::create(static_cast<StyleRuleFilter*>(self), parentSheet);
+        break;
+#endif
     case Unknown:
     case Charset:
     case Keyframe:
@@ -236,14 +287,14 @@ PassRefPtr<CSSRule> StyleRuleBase::createCSSOMWrapper(CSSStyleSheet* parentSheet
 
 unsigned StyleRule::averageSizeInBytes()
 {
-    return sizeof(StyleRule) + StylePropertySet::averageSizeInBytes();
+    return sizeof(StyleRule) + sizeof(CSSSelector) + StylePropertySet::averageSizeInBytes();
 }
 
 void StyleRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_properties);
-    info.addMember(m_selectorList);
+    info.addMember(m_properties, "properties");
+    info.addMember(m_selectorList, "selectorList");
 }
 
 StyleRule::StyleRule(int sourceLine)
@@ -305,8 +356,8 @@ void StyleRulePage::setProperties(PassRefPtr<StylePropertySet> properties)
 void StyleRulePage::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_properties);
-    info.addMember(m_selectorList);
+    info.addMember(m_properties, "properties");
+    info.addMember(m_selectorList, "selectorList");
 }
 
 StyleRuleFontFace::StyleRuleFontFace()
@@ -339,17 +390,17 @@ void StyleRuleFontFace::setProperties(PassRefPtr<StylePropertySet> properties)
 void StyleRuleFontFace::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_properties);
+    info.addMember(m_properties, "properties");
 }
 
 
-StyleRuleBlock::StyleRuleBlock(Type type, Vector<RefPtr<StyleRuleBase> >& adoptRule)
+StyleRuleGroup::StyleRuleGroup(Type type, Vector<RefPtr<StyleRuleBase> >& adoptRule)
     : StyleRuleBase(type, 0)
 {
     m_childRules.swap(adoptRule);
 }
 
-StyleRuleBlock::StyleRuleBlock(const StyleRuleBlock& o)
+StyleRuleGroup::StyleRuleGroup(const StyleRuleGroup& o)
     : StyleRuleBase(o)
     , m_childRules(o.m_childRules.size())
 {
@@ -357,30 +408,30 @@ StyleRuleBlock::StyleRuleBlock(const StyleRuleBlock& o)
         m_childRules[i] = o.m_childRules[i]->copy();
 }
 
-void StyleRuleBlock::wrapperInsertRule(unsigned index, PassRefPtr<StyleRuleBase> rule)
+void StyleRuleGroup::wrapperInsertRule(unsigned index, PassRefPtr<StyleRuleBase> rule)
 {
     m_childRules.insert(index, rule);
 }
     
-void StyleRuleBlock::wrapperRemoveRule(unsigned index)
+void StyleRuleGroup::wrapperRemoveRule(unsigned index)
 {
     m_childRules.remove(index);
 }
 
-void StyleRuleBlock::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void StyleRuleGroup::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_childRules);
+    info.addMember(m_childRules, "childRules");
 }
 
 StyleRuleMedia::StyleRuleMedia(PassRefPtr<MediaQuerySet> media, Vector<RefPtr<StyleRuleBase> >& adoptRules)
-    : StyleRuleBlock(Media, adoptRules)
+    : StyleRuleGroup(Media, adoptRules)
     , m_mediaQueries(media)
 {
 }
 
 StyleRuleMedia::StyleRuleMedia(const StyleRuleMedia& o)
-    : StyleRuleBlock(o)
+    : StyleRuleGroup(o)
 {
     if (o.m_mediaQueries)
         m_mediaQueries = o.m_mediaQueries->copy();
@@ -389,17 +440,34 @@ StyleRuleMedia::StyleRuleMedia(const StyleRuleMedia& o)
 void StyleRuleMedia::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_mediaQueries);
+    info.addMember(m_mediaQueries, "mediaQueries");
 }
 
-StyleRuleRegion::StyleRuleRegion(CSSSelectorVector* selectors, Vector<RefPtr<StyleRuleBase> >& adoptRules)
-    : StyleRuleBlock(Region, adoptRules)
+
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+StyleRuleSupports::StyleRuleSupports(const String& conditionText, bool conditionIsSupported, Vector<RefPtr<StyleRuleBase> >& adoptRules)
+    : StyleRuleGroup(Supports, adoptRules)
+    , m_conditionText(conditionText)
+    , m_conditionIsSupported(conditionIsSupported)
+{
+}
+
+StyleRuleSupports::StyleRuleSupports(const StyleRuleSupports& o)
+    : StyleRuleGroup(o)
+    , m_conditionText(o.m_conditionText)
+    , m_conditionIsSupported(o.m_conditionIsSupported)
+{
+}
+#endif
+
+StyleRuleRegion::StyleRuleRegion(Vector<OwnPtr<CSSParserSelector> >* selectors, Vector<RefPtr<StyleRuleBase> >& adoptRules)
+    : StyleRuleGroup(Region, adoptRules)
 {
     m_selectorList.adoptSelectorVector(*selectors);
 }
 
 StyleRuleRegion::StyleRuleRegion(const StyleRuleRegion& o)
-    : StyleRuleBlock(o)
+    : StyleRuleGroup(o)
     , m_selectorList(o.m_selectorList)
 {
 }
@@ -407,7 +475,7 @@ StyleRuleRegion::StyleRuleRegion(const StyleRuleRegion& o)
 void StyleRuleRegion::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_selectorList);
+    info.addMember(m_selectorList, "selectorList");
 }
 
 #if ENABLE(CSS_DEVICE_ADAPTATION)
@@ -441,8 +509,46 @@ void StyleRuleViewport::setProperties(PassRefPtr<StylePropertySet> properties)
 void StyleRuleViewport::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_properties);
+    info.addMember(m_properties, "properties");
 }
 #endif // ENABLE(CSS_DEVICE_ADAPTATION)
+
+#if ENABLE(CSS_SHADERS)
+StyleRuleFilter::StyleRuleFilter(const String& filterName)
+    : StyleRuleBase(Filter, 0)
+    , m_filterName(filterName)
+{
+}
+
+StyleRuleFilter::StyleRuleFilter(const StyleRuleFilter& o)
+    : StyleRuleBase(o)
+    , m_filterName(o.m_filterName)
+    , m_properties(o.m_properties->copy())
+{
+}
+
+StyleRuleFilter::~StyleRuleFilter()
+{
+}
+
+StylePropertySet* StyleRuleFilter::mutableProperties()
+{
+    if (!m_properties->isMutable())
+        m_properties = m_properties->copy();
+    return m_properties.get();
+}
+
+void StyleRuleFilter::setProperties(PassRefPtr<StylePropertySet> properties)
+{
+    m_properties = properties;
+}
+
+void StyleRuleFilter::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
+    info.addMember(m_filterName);
+    info.addMember(m_properties);
+}
+#endif // ENABLE(CSS_SHADERS)
 
 } // namespace WebCore

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2007, 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2007, 2008, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -28,11 +28,18 @@
 
 #include "PropertySetCSSStyleDeclaration.h"
 #include "StylePropertySet.h"
-#include "WebCoreMemoryInstrumentation.h"
 #include "WebKitCSSKeyframesRule.h"
 #include <wtf/text/StringBuilder.h>
 
 namespace WebCore {
+
+StyleKeyframe::StyleKeyframe()
+{
+}
+
+StyleKeyframe::~StyleKeyframe()
+{
+}
 
 StylePropertySet* StyleKeyframe::mutableProperties()
 {
@@ -92,12 +99,12 @@ String StyleKeyframe::cssText() const
 void StyleKeyframe::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_properties);
-    info.addMember(m_key);
+    info.addMember(m_properties, "properties");
+    info.addMember(m_key, "key");
 }
 
 WebKitCSSKeyframeRule::WebKitCSSKeyframeRule(StyleKeyframe* keyframe, WebKitCSSKeyframesRule* parent)
-    : CSSRule(0, CSSRule::WEBKIT_KEYFRAME_RULE)
+    : CSSRule(0)
     , m_keyframe(keyframe)
 {
     setParentRule(parent);
@@ -116,12 +123,18 @@ CSSStyleDeclaration* WebKitCSSKeyframeRule::style() const
     return m_propertiesCSSOMWrapper.get();
 }
 
-void WebKitCSSKeyframeRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void WebKitCSSKeyframeRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSRule::reportBaseClassMemoryUsage(memoryObjectInfo);
-    info.addMember(m_keyframe);
-    info.addMember(m_propertiesCSSOMWrapper);
+    CSSRule::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_keyframe, "keyframe");
+    info.addMember(m_propertiesCSSOMWrapper, "propertiesCSSOMWrapper");
+}
+
+void WebKitCSSKeyframeRule::reattach(StyleRuleBase*)
+{
+    // No need to reattach, the underlying data is shareable on mutation.
+    ASSERT_NOT_REACHED();
 }
 
 } // namespace WebCore

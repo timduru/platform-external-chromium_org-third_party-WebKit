@@ -28,6 +28,7 @@
 #if defined(__LP64__) && defined(__clang__)
 
 #import "WKWebProcessPlugIn.h"
+#import "WKWebProcessPlugInPrivate.h"
 #import "WKWebProcessPlugInInternal.h"
 
 #import "InjectedBundle.h"
@@ -123,6 +124,12 @@ static WKWebProcessPlugInController *sharedInstance;
     return self;
 }
 
+- (WKWebProcessPlugInBrowserContextController *)_browserContextControllerForBundlePageRef:(WKBundlePageRef)pageRef
+{
+    ASSERT(_bundlePageWrapperCache.contains(pageRef));
+    return _bundlePageWrapperCache.get(pageRef).get();
+}
+
 @end
 
 @implementation WKWebProcessPlugInController
@@ -130,6 +137,15 @@ static WKWebProcessPlugInController *sharedInstance;
 - (WKConnection *)connection
 {
     return _connectionWrapper.get();
+}
+
+@end
+
+@implementation WKWebProcessPlugInController (Private)
+
+- (WKBundleRef)_bundleRef
+{
+    return _bundleRef.get();
 }
 
 @end

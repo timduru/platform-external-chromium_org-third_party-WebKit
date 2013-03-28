@@ -24,15 +24,15 @@
 #include "RegExp.h"
 
 #include "Lexer.h"
+#include "Operations.h"
 #include "RegExpCache.h"
-#include "yarr/Yarr.h"
-#include "yarr/YarrJIT.h"
+#include "Yarr.h"
+#include "YarrJIT.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <wtf/Assertions.h>
 #include <wtf/OwnArrayPtr.h>
-
 
 #define REGEXP_FUNC_TEST_DATA_GEN 0
 
@@ -266,7 +266,7 @@ void RegExp::compile(JSGlobalData* globalData, Yarr::YarrCharSize charSize)
 {
     Yarr::YarrPattern pattern(m_patternString, ignoreCase(), multiline(), &m_constructionError);
     if (m_constructionError) {
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         m_state = ParseError;
         return;
     }
@@ -388,7 +388,7 @@ void RegExp::compileMatchOnly(JSGlobalData* globalData, Yarr::YarrCharSize charS
 {
     Yarr::YarrPattern pattern(m_patternString, ignoreCase(), multiline(), &m_constructionError);
     if (m_constructionError) {
-        ASSERT_NOT_REACHED();
+        RELEASE_ASSERT_NOT_REACHED();
         m_state = ParseError;
         return;
     }
@@ -520,24 +520,24 @@ void RegExp::matchCompareWithInterpreter(const String& s, int startOffset, int* 
             differences++;
 
     if (differences) {
-        dataLog("RegExp Discrepency for /%s/\n    string input ", pattern().utf8().data());
+        dataLogF("RegExp Discrepency for /%s/\n    string input ", pattern().utf8().data());
         unsigned segmentLen = s.length() - static_cast<unsigned>(startOffset);
 
-        dataLog((segmentLen < 150) ? "\"%s\"\n" : "\"%148s...\"\n", s.utf8().data() + startOffset);
+        dataLogF((segmentLen < 150) ? "\"%s\"\n" : "\"%148s...\"\n", s.utf8().data() + startOffset);
 
         if (jitResult != interpreterResult) {
-            dataLog("    JIT result = %d, blah interpreted result = %d\n", jitResult, interpreterResult);
+            dataLogF("    JIT result = %d, blah interpreted result = %d\n", jitResult, interpreterResult);
             differences--;
         } else {
-            dataLog("    Correct result = %d\n", jitResult);
+            dataLogF("    Correct result = %d\n", jitResult);
         }
 
         if (differences) {
             for (unsigned j = 2, i = 0; i < m_numSubpatterns; j +=2, i++) {
                 if (offsetVector[j] != interpreterOffsetVector[j])
-                    dataLog("    JIT offset[%d] = %d, interpreted offset[%d] = %d\n", j, offsetVector[j], j, interpreterOffsetVector[j]);
+                    dataLogF("    JIT offset[%d] = %d, interpreted offset[%d] = %d\n", j, offsetVector[j], j, interpreterOffsetVector[j]);
                 if ((offsetVector[j] >= 0) && (offsetVector[j+1] != interpreterOffsetVector[j+1]))
-                    dataLog("    JIT offset[%d] = %d, interpreted offset[%d] = %d\n", j+1, offsetVector[j+1], j+1, interpreterOffsetVector[j+1]);
+                    dataLogF("    JIT offset[%d] = %d, interpreted offset[%d] = %d\n", j+1, offsetVector[j+1], j+1, interpreterOffsetVector[j+1]);
             }
         }
     }

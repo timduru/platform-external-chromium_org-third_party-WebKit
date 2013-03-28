@@ -61,13 +61,12 @@ namespace WebKit {
 - (BOOL)_interpretKeyEvent:(NSEvent *)theEvent savingCommandsTo:(Vector<WebCore::KeypressCommand>&)commands;
 - (void)_doneWithKeyEvent:(NSEvent *)event eventWasHandled:(BOOL)eventWasHandled;
 - (bool)_executeSavedCommandBySelector:(SEL)selector;
+- (void)_setIntrinsicContentSize:(NSSize)intrinsicContentSize;
 - (NSRect)_convertToDeviceSpace:(NSRect)rect;
 - (NSRect)_convertToUserSpace:(NSRect)rect;
 - (void)_setFindIndicator:(PassRefPtr<WebKit::FindIndicator>)findIndicator fadeOut:(BOOL)fadeOut animate:(BOOL)animate;
 
-- (void)_enterAcceleratedCompositingMode:(const WebKit::LayerTreeContext&)layerTreeContext;
-- (void)_exitAcceleratedCompositingMode;
-- (void)_updateAcceleratedCompositingMode:(const WebKit::LayerTreeContext&)layerTreeContext;
+- (void)_setAcceleratedCompositingModeRootLayer:(CALayer *)rootLayer;
 
 - (void)_setAccessibilityWebProcessToken:(NSData *)data;
 
@@ -86,8 +85,6 @@ namespace WebKit {
 - (void)_updateTextInputStateIncludingSecureInputState:(BOOL)updateSecureInputState;
 - (void)_resetTextInputState;
 
-- (void)_didChangeScrollbarsForMainFrame;
-
 - (WebKit::ColorSpaceData)_colorSpace;
 
 #if ENABLE(FULLSCREEN_API)
@@ -103,5 +100,7 @@ namespace WebKit {
 
 - (void)_setSuppressVisibilityUpdates:(BOOL)suppressVisibilityUpdates;
 - (BOOL)_suppressVisibilityUpdates;
+
+- (BOOL)_isWindowOccluded;
 
 @end

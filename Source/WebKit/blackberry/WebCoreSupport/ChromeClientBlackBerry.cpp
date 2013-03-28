@@ -24,7 +24,7 @@
 #include "BackingStoreClient.h"
 #include "BackingStore_p.h"
 #include "ColorChooser.h"
-#include "DatabaseTracker.h"
+#include "DatabaseManager.h"
 #include "Document.h"
 #include "DumpRenderTreeClient.h"
 #include "DumpRenderTreeSupport.h"
@@ -54,6 +54,7 @@
 #include "SVGZoomAndPan.h"
 #include "SearchPopupMenuBlackBerry.h"
 #include "SecurityOrigin.h"
+#include "Settings.h"
 #include "SharedPointer.h"
 #include "ViewportArguments.h"
 #include "WebPage.h"
@@ -67,6 +68,7 @@
 #include <BlackBerryPlatformSettings.h>
 #include <BlackBerryPlatformString.h>
 #include <BlackBerryPlatformWindow.h>
+#include <network/DomainTools.h>
 
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -89,7 +91,7 @@ ChromeClientBlackBerry::ChromeClientBlackBerry(WebPagePrivate* pagePrivate)
 {
 }
 
-void ChromeClientBlackBerry::addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned int lineNumber, const String& sourceID)
+void ChromeClientBlackBerry::addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, const String& sourceID)
 {
 #if !defined(PUBLIC_BUILD) || !PUBLIC_BUILD
     if (m_webPagePrivate->m_dumpRenderTree) {
@@ -165,7 +167,11 @@ FloatRect ChromeClientBlackBerry::windowRect()
     if (Window* window = m_webPagePrivate->m_client->window())
         windowSize = window->windowSize();
 
-    return FloatRect(0, 0, windowSize.width(), windowSize.height());
+    // Use logical (density-independent) pixels instead of physical screen pixels.
+    FloatRect rect = FloatRect(0, 0, windowSize.width(), windowSize.height());
+    if (!m_webPagePrivate->m_page->settings()->applyDeviceScaleFactorInCompositor())
+        rect.scale(1 / m_webPagePrivate->m_page->deviceScaleFactor());
+    return rect;
 }
 
 FloatRect ChromeClientBlackBerry::pageRect()
@@ -215,15 +221,21 @@ bool ChromeClientBlackBerry::shouldForceDocumentStyleSelectorUpdate()
     return !m_webPagePrivate->m_webSettings->isJavaScriptEnabled() && !m_webPagePrivate->m_inputHandler->processingChange();
 }
 
-Page* ChromeClientBlackBerry::createWindow(Frame*, const FrameLoadRequest& request, const WindowFeatures& features, const NavigationAction&)
+Page* ChromeClientBlackBerry::createWindow(Frame* frame, const FrameLoadRequest& request, const WindowFeatures& features, const NavigationAction&)
 {
+    // Bail out early when we aren't allowed to display the target origin, otherwise,
+    // it would be harmful and the window would be useless. This is the same check
+    // as the one in FrameLoader::loadFrameRequest().
+    const KURL& url = request.resourceRequest().url();
+    if (!request.requester()->canDisplay(url)) {
+        frame->loader()->reportLocalLoadFailed(frame, url.string());
+        return 0;
+    }
+
 #if !defined(PUBLIC_BUILD) || !PUBLIC_BUILD
     if (m_webPagePrivate->m_dumpRenderTree && !m_webPagePrivate->m_dumpRenderTree->allowsOpeningWindow())
         return 0;
 #endif
-
-    PageGroupLoadDeferrer deferrer(m_webPagePrivate->m_page, true);
-    TimerBase::fireTimersInNestedEventLoop();
 
     int x = features.xSet ? features.x : 0;
     int y = features.ySet ? features.y : 0;
@@ -248,7 +260,7 @@ Page* ChromeClientBlackBerry::createWindow(Frame*, const FrameLoadRequest& reque
     if (features.dialog)
         flags |= WebPageClient::FlagWindowIsDialog;
 
-    WebPage* webPage = m_webPagePrivate->m_client->createWindow(x, y, width, height, flags, request.resourceRequest().url().string(), request.frameName());
+    WebPage* webPage = m_webPagePrivate->m_client->createWindow(x, y, width, height, flags, url.string(), request.frameName());
     if (!webPage)
         return 0;
 
@@ -471,7 +483,7 @@ void ChromeClientBlackBerry::print(Frame*)
     notImplemented();
 }
 
-void ChromeClientBlackBerry::exceededDatabaseQuota(Frame* frame, const String& name)
+void ChromeClientBlackBerry::exceededDatabaseQuota(Frame* frame, const String& name, DatabaseDetails details)
 {
 #if ENABLE(SQL_DATABASE)
     Document* document = frame->document();
@@ -487,21 +499,19 @@ void ChromeClientBlackBerry::exceededDatabaseQuota(Frame* frame, const String& n
     }
 #endif
 
-    DatabaseTracker& tracker = DatabaseTracker::tracker();
+    DatabaseManager& manager = DatabaseManager::manager();
 
-    unsigned long long totalUsage = tracker.totalDatabaseUsage();
-    unsigned long long originUsage = tracker.usageForOrigin(origin);
+    unsigned long long originUsage = manager.usageForOrigin(origin);
+    unsigned long long currentQuota = manager.quotaForOrigin(origin);
 
-    DatabaseDetails details = tracker.detailsForNameAndOrigin(name, origin);
     unsigned long long estimatedSize = details.expectedUsage();
     const String& nameStr = details.displayName();
 
-    String originStr = origin->databaseIdentifier();
+    String originStr = origin->toString();
 
-    unsigned long long quota = m_webPagePrivate->m_client->databaseQuota(originStr.characters(), originStr.length(),
-        nameStr.characters(), nameStr.length(), totalUsage, originUsage, estimatedSize);
+    unsigned long long quota = m_webPagePrivate->m_client->databaseQuota(originStr, nameStr, originUsage, currentQuota, estimatedSize);
 
-    tracker.setQuota(origin, quota);
+    manager.setQuota(origin, quota);
 #endif
 }
 
@@ -606,6 +616,9 @@ void ChromeClientBlackBerry::scroll(const IntSize& delta, const IntRect& scrollV
     backingStoreClient->checkOriginOfCurrentScrollOperation();
 
     m_webPagePrivate->m_backingStore->d->scroll(delta, scrollViewRect, clipRect);
+
+    // Shift the spell check dialog box as we scroll.
+    m_webPagePrivate->m_inputHandler->redrawSpellCheckDialogIfRequired();
 }
 
 void ChromeClientBlackBerry::scrollableAreasDidChange()
@@ -656,7 +669,6 @@ PlatformPageClient ChromeClientBlackBerry::platformPageClient() const
 #if ENABLE(TOUCH_EVENTS)
 void ChromeClientBlackBerry::needTouchEvents(bool value)
 {
-    m_webPagePrivate->setNeedTouchEvents(value);
 }
 #endif
 
@@ -679,11 +691,11 @@ void ChromeClientBlackBerry::overflowExceedsContentsSize(Frame* frame) const
         return;
 
 #if DEBUG_OVERFLOW_DETECTION
-    BBLOG(BlackBerry::Platform::LogLevelInfo, "ChromeClientBlackBerry::overflowExceedsContentsSize contents=%dx%d overflow=%dx%d",
-                           frame->contentRenderer()->rightLayoutOverflow(),
-                           frame->contentRenderer()->bottomLayoutOverflow(),
-                           frame->contentRenderer()->rightAbsoluteVisibleOverflow(),
-                           frame->contentRenderer()->bottomAbsoluteVisibleOverflow());
+    BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelInfo,
+        "ChromeClientBlackBerry::overflowExceedsContentsSize contents=%s overflow=%f x %f",
+        BlackBerry::Platform::IntRect(frame->contentRenderer()->documentRect()).toString().c_str(),
+        frame->contentRenderer()->rightAbsoluteVisibleOverflow().toFloat(),
+        frame->contentRenderer()->bottomAbsoluteVisibleOverflow().toFloat());
 #endif
     m_webPagePrivate->overflowExceedsContentsSize();
 }
@@ -729,9 +741,9 @@ void ChromeClientBlackBerry::exitFullscreenForNode(Node* node)
 }
 
 #if ENABLE(FULLSCREEN_API)
-bool ChromeClientBlackBerry::supportsFullScreenForElement(const WebCore::Element* element, bool withKeyboard)
+bool ChromeClientBlackBerry::supportsFullScreenForElement(const WebCore::Element*, bool)
 {
-    return !withKeyboard;
+    return true;
 }
 
 void ChromeClientBlackBerry::enterFullScreenForElement(WebCore::Element* element)
@@ -754,14 +766,9 @@ void ChromeClientBlackBerry::exitFullScreenForElement(WebCore::Element*)
     m_fullScreenElement.clear();
 }
 
-void ChromeClientBlackBerry::fullScreenRendererChanged(RenderBox* fullScreenRenderer)
+void ChromeClientBlackBerry::fullScreenRendererChanged(RenderBox*)
 {
-    // Once we go fullscreen using the new FULLSCREEN_API code path, we have to take into account
-    // our port specific page scaling.
-    if (fullScreenRenderer) {
-        int width = m_webPagePrivate->m_mainFrame->view()->visibleContentRect().size().width();
-        fullScreenRenderer->style()->setWidth(Length(width, Fixed));
-    }
+    m_webPagePrivate->adjustFullScreenElementDimensionsIfNeeded();
 }
 #endif
 
@@ -775,10 +782,10 @@ void ChromeClientBlackBerry::didSetSVGZoomAndPan(Frame* frame, unsigned short zo
         ViewportArguments arguments;
         switch (zoomAndPan) {
         case SVGZoomAndPan::SVG_ZOOMANDPAN_DISABLE:
-            arguments.userScalable = 0;
+            arguments.userZoom = 0;
             break;
         case SVGZoomAndPan::SVG_ZOOMANDPAN_MAGNIFY:
-            arguments.userScalable = 1;
+            arguments.userZoom = 1;
             break;
         default:
             return;
@@ -817,45 +824,29 @@ PassOwnPtr<ColorChooser> ChromeClientBlackBerry::createColorChooser(ColorChooser
     return nullptr;
 }
 
-#if ENABLE(NAVIGATOR_CONTENT_UTILS)
-void ChromeClientBlackBerry::registerProtocolHandler(const String& scheme, const String& baseURL, const String& url, const String& title)
-{
-    m_webPagePrivate->m_client->registerProtocolHandler(scheme, baseURL, url, title);
-}
-
-#if ENABLE(CUSTOM_SCHEME_HANDLER)
-ChromeClient::CustomHandlersState ChromeClientBlackBerry::isProtocolHandlerRegistered(const String& scheme, const String& baseURL, const String& url)
-{
-    return static_cast<CustomHandlersState>(m_webPagePrivate->m_client->isProtocolHandlerRegistered(scheme, baseURL, url));
-}
-
-void ChromeClientBlackBerry::unregisterProtocolHandler(const String& scheme, const String& baseURL, const String& url)
-{
-    m_webPagePrivate->m_client->unregisterProtocolHandler(scheme, baseURL, url);
-}
-#endif
-#endif
-
 void ChromeClientBlackBerry::addSearchProvider(const BlackBerry::Platform::String& originURL, const BlackBerry::Platform::String& newURL)
 {
-    // See if the input URL host matches of the origin host.
-    KURL originHost = KURL(KURL(), originURL);
+    // Early return if this function is not triggered by a user gesture.
+    if (!ScriptController::processingUserGesture())
+        return;
+
+    // Security origin host & target host must share a common registered domain
     KURL url = KURL(KURL(), newURL);
-    if (url.isValid() && originHost.host() == url.host())
+    String originHost = KURL(KURL(), originURL).host();
+
+    if (url.isValid() && BlackBerry::Platform::getRegisteredDomain(originHost) == BlackBerry::Platform::getRegisteredDomain(url.host()))
         m_webPagePrivate->client()->addSearchProvider(newURL);
 }
 
-int ChromeClientBlackBerry::isSearchProviderInstalled(const BlackBerry::Platform::String& originURL, const BlackBerry::Platform::String& newURL)
+int ChromeClientBlackBerry::isSearchProviderInstalled(const BlackBerry::Platform::String& newURL)
 {
 //    Returns a value based on comparing url to the URLs of the results pages of the installed search engines.
 //    0 - None of the installed search engines match url.
 //    1 - One or more installed search engines match url, but none are the user's default search engine.
 //    2 - The user's default search engine matches url.
 
-    // See if the input URL host matches of the origin host.
-    KURL originHost = KURL(KURL(), originURL);
     KURL url = KURL(KURL(), newURL);
-    if (url.isValid() && originHost.host() == url.host())
+    if (url.isValid())
         return m_webPagePrivate->client()->isSearchProviderInstalled(newURL);
     return 0;
 }

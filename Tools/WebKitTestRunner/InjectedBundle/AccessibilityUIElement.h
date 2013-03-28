@@ -49,7 +49,7 @@ typedef struct objc_object* PlatformUIElement;
 #include <oleacc.h>
 
 typedef COMPtr<IAccessible> PlatformUIElement;
-#elif PLATFORM(GTK)
+#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
 #include <atk/atk.h>
 typedef AtkObject* PlatformUIElement;
 #else
@@ -112,7 +112,9 @@ public:
     bool boolAttributeValue(JSStringRef attribute);
     bool isAttributeSupported(JSStringRef attribute);
     bool isAttributeSettable(JSStringRef attribute);
-    bool isActionSupported(JSStringRef action);
+    bool isPressActionSupported();
+    bool isIncrementActionSupported();
+    bool isDecrementActionSupported();
     JSRetainPtr<JSStringRef> role();
     JSRetainPtr<JSStringRef> subrole();
     JSRetainPtr<JSStringRef> roleDescription();
@@ -209,6 +211,8 @@ public:
     PassRefPtr<AccessibilityUIElement> horizontalScrollbar() const;
     PassRefPtr<AccessibilityUIElement> verticalScrollbar() const;
 
+    void scrollToMakeVisible();
+    
     // Text markers.
     PassRefPtr<AccessibilityTextMarkerRange> textMarkerRangeForElement(AccessibilityUIElement*);    
     PassRefPtr<AccessibilityTextMarkerRange> textMarkerRangeForMarkers(AccessibilityTextMarker* startMarker, AccessibilityTextMarker* endMarker);
@@ -224,6 +228,9 @@ public:
     int indexForTextMarker(AccessibilityTextMarker*);
     bool isTextMarkerValid(AccessibilityTextMarker*);
     PassRefPtr<AccessibilityTextMarker> textMarkerForIndex(int);
+
+    // Returns an ordered list of supported actions for an element.
+    JSRetainPtr<JSStringRef> supportedActions() const;
 
     // Notifications
     // Function callback should take one argument, the name of the notification.
@@ -245,7 +252,7 @@ private:
     void getDocumentLinks(Vector<RefPtr<AccessibilityUIElement> >&);
 #endif
 
-#if PLATFORM(MAC) || PLATFORM(GTK)
+#if PLATFORM(MAC) || PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
     void getChildren(Vector<RefPtr<AccessibilityUIElement> >&);
     void getChildrenWithRange(Vector<RefPtr<AccessibilityUIElement> >&, unsigned location, unsigned length);
 #endif

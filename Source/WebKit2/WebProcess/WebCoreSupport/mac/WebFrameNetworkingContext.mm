@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
+    Copyright (C) 2012 Apple Inc. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -20,14 +21,22 @@
 #import "config.h"
 #import "WebFrameNetworkingContext.h"
 
+#import <WebCore/FrameLoader.h>
 #import <WebCore/FrameLoaderClient.h>
 #import <WebCore/Page.h>
 #import <WebCore/ResourceError.h>
 #import <WebCore/Settings.h>
+#import <WebKitSystemInterface.h>
 
 using namespace WebCore;
 
 namespace WebKit {
+
+static OwnPtr<NetworkStorageSession>& privateBrowsingStorageSession()
+{
+    DEFINE_STATIC_LOCAL(OwnPtr<NetworkStorageSession>, session, ());
+    return session;
+}
 
 bool WebFrameNetworkingContext::needsSiteSpecificQuirks() const
 {
@@ -44,9 +53,69 @@ SchedulePairHashSet* WebFrameNetworkingContext::scheduledRunLoopPairs() const
     return frame() && frame()->page() ? frame()->page()->scheduledRunLoopPairs() : 0;
 }
 
+RetainPtr<CFDataRef> WebFrameNetworkingContext::sourceApplicationAuditData() const
+{
+    return nil;
+}
+
 ResourceError WebFrameNetworkingContext::blockedError(const ResourceRequest& request) const
 {
     return frame()->loader()->client()->blockedError(request);
+}
+
+static String& privateBrowsingStorageSessionIdentifierBase()
+{
+    ASSERT(isMainThread());
+    DEFINE_STATIC_LOCAL(String, base, ());
+    return base;
+}
+
+void WebFrameNetworkingContext::setPrivateBrowsingStorageSessionIdentifierBase(const String& identifier)
+{
+    privateBrowsingStorageSessionIdentifierBase() = identifier;
+}
+
+void WebFrameNetworkingContext::ensurePrivateBrowsingSession()
+{
+    // FIXME (NetworkProcess): Don't create an unnecessary session when using network process.
+
+    ASSERT(isMainThread());
+    if (privateBrowsingStorageSession())
+        return;
+
+    String identifierBase = privateBrowsingStorageSessionIdentifierBase().isNull() ? String([[NSBundle mainBundle] bundleIdentifier]) : privateBrowsingStorageSessionIdentifierBase();
+
+    privateBrowsingStorageSession() = NetworkStorageSession::createPrivateBrowsingSession(identifierBase);
+}
+
+void WebFrameNetworkingContext::destroyPrivateBrowsingSession()
+{
+    if (!privateBrowsingStorageSession)
+        return;
+
+    privateBrowsingStorageSession() = nullptr;
+}
+
+NetworkStorageSession& WebFrameNetworkingContext::storageSession() const
+{
+    bool inPrivateBrowsingMode = frame() && frame()->settings() && frame()->settings()->privateBrowsingEnabled();
+    if (inPrivateBrowsingMode) {
+        ASSERT(privateBrowsingStorageSession());
+        return *privateBrowsingStorageSession();
+    }
+    return NetworkStorageSession::defaultStorageSession();
+}
+
+void WebFrameNetworkingContext::setCookieAcceptPolicyForAllContexts(HTTPCookieAcceptPolicy policy)
+{
+    [[NSHTTPCookieStorage sharedHTTPCookieStorage] setCookieAcceptPolicy:static_cast<NSHTTPCookieAcceptPolicy>(policy)];
+
+    if (RetainPtr<CFHTTPCookieStorageRef> cookieStorage = NetworkStorageSession::defaultStorageSession().cookieStorage())
+        WKSetHTTPCookieAcceptPolicy(cookieStorage.get(), policy);
+
+    if (privateBrowsingStorageSession()) {
+        WKSetHTTPCookieAcceptPolicy(privateBrowsingStorageSession()->cookieStorage().get(), policy);
+    }
 }
 
 }

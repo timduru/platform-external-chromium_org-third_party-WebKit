@@ -37,16 +37,16 @@
 #include "IDBDatabaseBackendProxy.h"
 #include "IDBDatabaseCallbacksProxy.h"
 #include "IDBDatabaseError.h"
-#include "IDBObjectStoreBackendInterface.h"
-#include "IDBTransactionBackendInterface.h"
+#include "IDBMetadata.h"
 #include "WebIDBCallbacks.h"
 #include "WebIDBCursorImpl.h"
 #include "WebIDBDatabaseCallbacks.h"
 #include "WebIDBDatabaseError.h"
+#include "WebIDBDatabaseException.h"
 #include "WebIDBDatabaseImpl.h"
 #include "WebIDBKey.h"
-#include "WebIDBTransactionImpl.h"
-#include "platform/WebSerializedScriptValue.h"
+#include "WebIDBMetadata.h"
+#include <public/WebData.h>
 
 using namespace WebCore;
 
@@ -59,89 +59,96 @@ PassRefPtr<IDBCallbacksProxy> IDBCallbacksProxy::create(PassOwnPtr<WebIDBCallbac
 
 IDBCallbacksProxy::IDBCallbacksProxy(PassOwnPtr<WebIDBCallbacks> callbacks)
     : m_callbacks(callbacks)
+    , m_didComplete(false)
+    , m_didCreateProxy(false)
 {
 }
 
 IDBCallbacksProxy::~IDBCallbacksProxy()
 {
+    // This cleans up the request's IPC id.
+    if (!m_didComplete)
+        m_callbacks->onError(WebIDBDatabaseError(WebIDBDatabaseExceptionAbortError, WebString()));
 }
 
 void IDBCallbacksProxy::onError(PassRefPtr<IDBDatabaseError> idbDatabaseError)
 {
+    m_didComplete = true;
     m_callbacks->onError(WebIDBDatabaseError(idbDatabaseError));
 }
 
-void IDBCallbacksProxy::onSuccess(PassRefPtr<IDBCursorBackendInterface> idbCursorBackend, PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue> value)
+void IDBCallbacksProxy::onSuccess(PassRefPtr<IDBCursorBackendInterface> idbCursorBackend, PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SharedBuffer> value)
 {
-    m_callbacks->onSuccess(new WebIDBCursorImpl(idbCursorBackend), key, primaryKey, value);
+    m_didComplete = true;
+    m_callbacks->onSuccess(new WebIDBCursorImpl(idbCursorBackend), key, primaryKey, WebData(value));
 }
 
-void IDBCallbacksProxy::onSuccess(PassRefPtr<IDBDatabaseBackendInterface> backend)
+void IDBCallbacksProxy::onSuccess(PassRefPtr<IDBDatabaseBackendInterface> backend, const IDBDatabaseMetadata& metadata)
 {
     ASSERT(m_databaseCallbacks.get());
-    m_callbacks->onSuccess(new WebIDBDatabaseImpl(backend, m_databaseCallbacks.release()));
+    m_didComplete = true;
+    WebIDBDatabaseImpl* impl = m_didCreateProxy ? 0 : new WebIDBDatabaseImpl(backend, m_databaseCallbacks.release());
+    m_callbacks->onSuccess(impl, metadata);
 }
 
 void IDBCallbacksProxy::onSuccess(PassRefPtr<IDBKey> idbKey)
 {
+    m_didComplete = true;
     m_callbacks->onSuccess(WebIDBKey(idbKey));
-}
-
-void IDBCallbacksProxy::onSuccess(PassRefPtr<IDBTransactionBackendInterface> backend)
-{
-    m_callbacks->onSuccess(new WebIDBTransactionImpl(backend));
 }
 
 void IDBCallbacksProxy::onSuccess(PassRefPtr<DOMStringList> domStringList)
 {
+    m_didComplete = true;
     m_callbacks->onSuccess(WebDOMStringList(domStringList));
 }
 
-void IDBCallbacksProxy::onSuccess(PassRefPtr<SerializedScriptValue> serializedScriptValue)
+void IDBCallbacksProxy::onSuccess(PassRefPtr<SharedBuffer> value)
 {
-    m_callbacks->onSuccess(WebSerializedScriptValue(serializedScriptValue));
+    m_didComplete = true;
+    m_callbacks->onSuccess(WebData(value));
 }
 
-void IDBCallbacksProxy::onSuccess(PassRefPtr<SerializedScriptValue> serializedScriptValue, PassRefPtr<IDBKey> key, const IDBKeyPath& keyPath)
+void IDBCallbacksProxy::onSuccess(PassRefPtr<SharedBuffer> value, PassRefPtr<IDBKey> key, const IDBKeyPath& keyPath)
 {
-    m_callbacks->onSuccess(serializedScriptValue, key, keyPath);
+    m_callbacks->onSuccess(WebData(value), key, keyPath);
+    m_didComplete = true;
 }
 
 void IDBCallbacksProxy::onSuccess(int64_t value)
 {
+    m_didComplete = true;
     m_callbacks->onSuccess(value);
 }
 
 void IDBCallbacksProxy::onSuccess()
 {
+    m_didComplete = true;
     m_callbacks->onSuccess();
 }
 
-void IDBCallbacksProxy::onSuccess(PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SerializedScriptValue> value)
+void IDBCallbacksProxy::onSuccess(PassRefPtr<IDBKey> key, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SharedBuffer> value)
 {
-    m_callbacks->onSuccess(key, primaryKey, value);
+    m_didComplete = true;
+    m_callbacks->onSuccess(key, primaryKey, WebData(value));
 }
 
-void IDBCallbacksProxy::onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >& keys, const Vector<RefPtr<IDBKey> >& primaryKeys, const Vector<RefPtr<SerializedScriptValue> >& values)
+void IDBCallbacksProxy::onSuccessWithPrefetch(const Vector<RefPtr<IDBKey> >& keys, const Vector<RefPtr<IDBKey> >& primaryKeys, const Vector<RefPtr<SharedBuffer> >& values)
 {
+    m_didComplete = true;
     const size_t n = keys.size();
 
     WebVector<WebIDBKey> webKeys(n);
     WebVector<WebIDBKey> webPrimaryKeys(n);
-    WebVector<WebSerializedScriptValue> webValues(n);
+    WebVector<WebData> webValues(n);
 
     for (size_t i = 0; i < n; ++i) {
         webKeys[i] = WebIDBKey(keys[i]);
         webPrimaryKeys[i] = WebIDBKey(primaryKeys[i]);
-        webValues[i] = WebSerializedScriptValue(values[i]);
+        webValues[i] = WebData(values[i]);
     }
 
     m_callbacks->onSuccessWithPrefetch(webKeys, webPrimaryKeys, webValues);
-}
-
-void IDBCallbacksProxy::onBlocked()
-{
-    m_callbacks->onBlocked();
 }
 
 void IDBCallbacksProxy::onBlocked(int64_t existingVersion)
@@ -149,10 +156,11 @@ void IDBCallbacksProxy::onBlocked(int64_t existingVersion)
     m_callbacks->onBlocked(existingVersion);
 }
 
-void IDBCallbacksProxy::onUpgradeNeeded(int64_t oldVersion, PassRefPtr<IDBTransactionBackendInterface> transaction, PassRefPtr<IDBDatabaseBackendInterface> database)
+void IDBCallbacksProxy::onUpgradeNeeded(int64_t oldVersion, PassRefPtr<IDBDatabaseBackendInterface> database, const IDBDatabaseMetadata& metadata)
 {
     ASSERT(m_databaseCallbacks);
-    m_callbacks->onUpgradeNeeded(oldVersion, new WebIDBTransactionImpl(transaction), new WebIDBDatabaseImpl(database, m_databaseCallbacks));
+    m_didCreateProxy = true;
+    m_callbacks->onUpgradeNeeded(oldVersion, new WebIDBDatabaseImpl(database, m_databaseCallbacks), metadata);
 }
 
 void IDBCallbacksProxy::setDatabaseCallbacks(PassRefPtr<IDBDatabaseCallbacksProxy> databaseCallbacks)

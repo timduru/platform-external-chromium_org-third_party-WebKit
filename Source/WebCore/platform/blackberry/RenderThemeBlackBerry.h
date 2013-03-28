@@ -32,7 +32,10 @@ public:
 
 #if ENABLE(VIDEO)
     virtual String extraMediaControlsStyleSheet();
-    virtual String formatMediaControlsRemainingTime(float currentTime, float duration) const;
+    virtual bool usesVerticalVolumeSlider() const { return false; }
+#endif
+#if ENABLE(FULLSCREEN_API)
+    virtual String extraFullScreenStyleSheet();
 #endif
     virtual bool supportsHover(const RenderStyle*) const { return true; }
 
@@ -71,8 +74,6 @@ public:
     virtual bool paintSearchFieldCancelButton(RenderObject*, const PaintInfo&, const IntRect&);
 
     virtual void adjustMenuListButtonStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual void adjustCheckboxStyle(StyleResolver*, RenderStyle*, Element*) const;
-    virtual void adjustRadioStyle(StyleResolver*, RenderStyle*, Element*) const;
     virtual bool paintMenuList(RenderObject*, const PaintInfo&, const IntRect&);
 
     virtual void adjustMediaControlStyle(StyleResolver*, RenderStyle*, Element*) const;
@@ -84,6 +85,7 @@ public:
     virtual bool paintMediaVolumeSliderThumb(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaPlayButton(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintMediaMuteButton(RenderObject*, const PaintInfo&, const IntRect&);
+    virtual bool paintMediaRewindButton(RenderObject*, const PaintInfo&, const IntRect&);
     virtual bool paintProgressBar(RenderObject*, const PaintInfo&, const IntRect&);
     virtual double animationRepeatIntervalForProgressBar(RenderProgress*) const;
     virtual double animationDurationForProgressBar(RenderProgress*) const;
@@ -93,6 +95,8 @@ public:
     // Highlighting colors for TextMatches.
     virtual Color platformActiveTextSearchHighlightColor() const;
     virtual Color platformInactiveTextSearchHighlightColor() const;
+
+    virtual bool supportsDataListUI(const AtomicString&) const;
 
 private:
     static const String& defaultGUIFont();
@@ -106,9 +110,14 @@ private:
     void setButtonStyle(RenderStyle*) const;
 
     bool paintTextFieldOrTextAreaOrSearchField(RenderObject*, const PaintInfo&, const IntRect&);
+
     bool paintSliderTrackRect(RenderObject*, const PaintInfo&, const IntRect&);
-    bool paintSliderTrackRect(RenderObject*, const PaintInfo&, const IntRect&, RGBA32 strokeColorStart,
-                RGBA32 strokeColorEnd, RGBA32 fillColorStart, RGBA32 fillColorEnd);
+
+    bool paintSliderTrackRect(RenderObject*, const PaintInfo&, const IntRect&, RGBA32, RGBA32, RGBA32, RGBA32);
+
+    bool paintSliderTrackRect(RenderObject*, const PaintInfo&, const IntRect&, Image*);
+
+    IntRect convertToPaintingRect(RenderObject* inputRenderer, const RenderObject* partRenderer, LayoutRect partRect, const IntRect& localOffset) const;
 
 };
 

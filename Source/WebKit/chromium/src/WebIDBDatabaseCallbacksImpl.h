@@ -30,7 +30,7 @@
 
 #include "WebDOMStringList.h"
 #include "WebIDBDatabaseCallbacks.h"
-#include "platform/WebString.h"
+#include <public/WebString.h>
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 
@@ -45,7 +45,8 @@ public:
 
     virtual void onForcedClose();
     virtual void onVersionChange(long long oldVersion, long long newVersion);
-    virtual void onVersionChange(const WebString& version);
+    virtual void onAbort(long long transactionId, const WebIDBDatabaseError&);
+    virtual void onComplete(long long transactionId);
 
 private:
     RefPtr<WebCore::IDBDatabaseCallbacks> m_callbacks;

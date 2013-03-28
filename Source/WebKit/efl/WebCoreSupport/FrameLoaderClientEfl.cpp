@@ -46,7 +46,6 @@
 #include "FrameView.h"
 #include "HTMLFormElement.h"
 #include "HTTPStatusCodes.h"
-#include "IntentRequest.h"
 #include "MIMETypeRegistry.h"
 #include "NotImplemented.h"
 #include "Page.h"
@@ -58,7 +57,6 @@
 #include "Settings.h"
 #include "WebKitVersion.h"
 #include "ewk_frame_private.h"
-#include "ewk_intent_private.h"
 #include "ewk_private.h"
 #include "ewk_settings_private.h"
 #include "ewk_view_private.h"
@@ -378,7 +376,7 @@ PassRefPtr<Frame> FrameLoaderClientEfl::createFrame(const KURL& url, const Strin
 
 void FrameLoaderClientEfl::redirectDataToPlugin(Widget* pluginWidget)
 {
-    m_pluginView = static_cast<PluginView*>(pluginWidget);
+    m_pluginView = toPluginView(pluginWidget);
     if (pluginWidget)
         m_hasSentResponseToPlugin = false;
 }
@@ -859,7 +857,7 @@ void FrameLoaderClientEfl::dispatchDidFailLoad(const ResourceError& err)
                             err.failingURL().utf8().data());
 }
 
-void FrameLoaderClientEfl::download(ResourceHandle*, const ResourceRequest& request, const ResourceResponse&)
+void FrameLoaderClientEfl::convertMainResourceLoadToDownload(DocumentLoader*, const ResourceRequest& request, const ResourceResponse&)
 {
     if (!m_view)
         return;
@@ -1023,30 +1021,6 @@ void FrameLoaderClientEfl::didRestoreFromPageCache()
 void FrameLoaderClientEfl::dispatchDidBecomeFrameset(bool)
 {
 }
-
-#if ENABLE(WEB_INTENTS)
-void FrameLoaderClientEfl::dispatchIntent(PassRefPtr<WebCore::IntentRequest> intentRequest)
-{
-    Ewk_Intent_Request* ewkRequest = ewk_intent_request_new(intentRequest);
-    ewk_frame_intent_new(m_frame, ewkRequest);
-    ewk_intent_request_unref(ewkRequest);
-}
-#endif
-
-#if ENABLE(WEB_INTENTS_TAG)
-void FrameLoaderClientEfl::registerIntentService(const String& action, const String& type, const KURL& href, const String& title, const String& disposition)
-{
-    CString actionStr = action.utf8();
-    CString typeStr = type.utf8();
-    CString hrefStr = href.string().utf8();
-    CString titleStr = title.utf8();
-    CString dispositionStr = disposition.utf8();
-
-    Ewk_Intent_Service_Info serviceInfo = { actionStr.data(), typeStr.data(), hrefStr.data(), titleStr.data(), dispositionStr.data() };
-
-    ewk_frame_intent_service_register(m_frame, &serviceInfo);
-}
-#endif
 
 PassRefPtr<FrameNetworkingContext> FrameLoaderClientEfl::createNetworkingContext()
 {

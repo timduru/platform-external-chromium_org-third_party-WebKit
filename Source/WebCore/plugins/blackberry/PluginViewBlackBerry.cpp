@@ -67,8 +67,8 @@
 #include <BlackBerryPlatformIntRectRegion.h>
 #include <BlackBerryPlatformWindow.h>
 
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSLock.h>
-#include <runtime/JSValue.h>
 #include <sys/keycodes.h>
 #include <vector>
 
@@ -101,15 +101,18 @@ void PluginView::updatePluginWidget()
         return;
 
     ASSERT(parent()->isFrameView());
-    FrameView* frameView = static_cast<FrameView*>(parent());
+    FrameView* frameView = toFrameView(parent());
 
     IntRect oldWindowRect = m_windowRect;
     IntRect oldClipRect = m_clipRect;
 
     m_windowRect = IntRect(frameView->contentsToWindow(frameRect().location()), frameRect().size());
 
+    ScrollView* theRoot = root();
+    if (!theRoot)
+        return; // ASSERT(parent()->isFrameView()) should prevent this but check just in case
     // Map rect to content coordinate space of main frame.
-    m_windowRect.move(root()->scrollOffset());
+    m_windowRect.move(theRoot->scrollOffset());
 
     m_clipRect = calculateClipRect();
 
@@ -176,7 +179,7 @@ void PluginView::updateBuffer(const IntRect& bufferRect)
     // Update the zoom factor here, it happens right before setNPWindowIfNeeded
     // ensuring that the plugin has every opportunity to get the zoom factor before
     // it paints anything.
-    if (FrameView* frameView = static_cast<FrameView*>(parent()))
+    if (FrameView* frameView = toFrameView(parent()))
         m_private->setZoomFactor(frameView->hostWindow()->platformPageClient()->currentZoomFactor());
 
     setNPWindowIfNeeded();
@@ -194,11 +197,11 @@ void PluginView::updateBuffer(const IntRect& bufferRect)
         std::vector<BlackBerry::Platform::IntRect> exposedRects = exposedRegion.rects();
         for (unsigned i = 0; i < exposedRects.size(); ++i) {
             NPDrawEvent draw;
+            NPRect tempRect = toNPRect(exposedRects.at(i));
             draw.pluginRect = toNPRect(m_windowRect);
             draw.clipRect = toNPRect(m_clipRect);
-            draw.drawRect = (NPRect*)alloca(sizeof(NPRect));
+            draw.drawRect = &tempRect;
             draw.drawRectCount = 1;
-            *draw.drawRect = toNPRect(exposedRects.at(i));
             draw.zoomFactor = ((NPSetWindowCallbackStruct*)m_npWindow.ws_info)->zoomFactor;
 
             NPEvent npEvent;
@@ -221,7 +224,7 @@ void PluginView::paint(GraphicsContext* context, const IntRect& rect)
     // Update the zoom factor here, it happens right before setNPWindowIfNeeded
     // ensuring that the plugin has every opportunity to get the zoom factor before
     // it paints anything.
-    if (FrameView* frameView = static_cast<FrameView*>(parent()))
+    if (FrameView* frameView = toFrameView(parent()))
         m_private->setZoomFactor(frameView->hostWindow()->platformPageClient()->currentZoomFactor());
 
     if (context->paintingDisabled())
@@ -490,22 +493,15 @@ void PluginView::handleTouchEvent(TouchEvent* event)
         npTouchEvent.type = TOUCH_EVENT_DOUBLETAP;
     else if (event->isTouchHold())
         npTouchEvent.type = TOUCH_EVENT_TOUCHHOLD;
-    else if (event->type() == eventNames().touchstartEvent)
-        npTouchEvent.type = TOUCH_EVENT_START;
-    else if (event->type() == eventNames().touchendEvent)
-        npTouchEvent.type = TOUCH_EVENT_END;
-    else if (event->type() == eventNames().touchmoveEvent)
-        npTouchEvent.type = TOUCH_EVENT_MOVE;
     else if (event->type() == eventNames().touchcancelEvent)
         npTouchEvent.type = TOUCH_EVENT_CANCEL;
-    else {
-        ASSERT_NOT_REACHED();
+    else
         return;
-    }
 
     TouchList* touchList;
-    // The touches list is empty if in a touch end event. Use changedTouches instead.
-    if (npTouchEvent.type == TOUCH_EVENT_DOUBLETAP || npTouchEvent.type == TOUCH_EVENT_END)
+    // The touches list is empty if in a touch end event.
+    // Since DoubleTap is ususally a TouchEnd Use changedTouches instead.
+    if (npTouchEvent.type == TOUCH_EVENT_DOUBLETAP)
         touchList = event->changedTouches();
     else
         touchList = event->touches();
@@ -536,13 +532,6 @@ void PluginView::handleTouchEvent(TouchEvent* event)
 
     if (dispatchNPEvent(npEvent))
         event->setDefaultHandled();
-    else if (npTouchEvent.type == TOUCH_EVENT_DOUBLETAP) {
-        // Send Touch Up if double tap not consumed
-        npTouchEvent.type = TOUCH_EVENT_END;
-        npEvent.data = &npTouchEvent;
-        if (dispatchNPEvent(npEvent))
-            event->setDefaultHandled();
-    }
 }
 
 void PluginView::handleMouseEvent(MouseEvent* event)
@@ -559,19 +548,17 @@ void PluginView::handleMouseEvent(MouseEvent* event)
     mouseEvent.x = event->offsetX();
     mouseEvent.y = event->offsetY();
 
-    if (event->type() == eventNames().mousedownEvent) {
+    if (event->type() == eventNames().mousedownEvent)
         mouseEvent.type = MOUSE_BUTTON_DOWN;
-        parentFrame()->eventHandler()->setCapturingMouseEventsNode(node());
-    } else if (event->type() == eventNames().mousemoveEvent)
+    else if (event->type() == eventNames().mousemoveEvent)
         mouseEvent.type = MOUSE_MOTION;
     else if (event->type() == eventNames().mouseoutEvent)
         mouseEvent.type = MOUSE_OUTBOUND;
     else if (event->type() == eventNames().mouseoverEvent)
         mouseEvent.type = MOUSE_OVER;
-    else if (event->type() == eventNames().mouseupEvent) {
+    else if (event->type() == eventNames().mouseupEvent)
         mouseEvent.type = MOUSE_BUTTON_UP;
-        parentFrame()->eventHandler()->setCapturingMouseEventsNode(0);
-    } else
+    else
         return;
 
     mouseEvent.button = event->button();
@@ -634,7 +621,7 @@ void PluginView::handleResumeEvent()
 
 void PluginView::handleScrollEvent()
 {
-    FrameView* frameView = static_cast<FrameView*>(parent());
+    FrameView* frameView = toFrameView(parent());
 
     // As a special case, if the frameView extent in either dimension is
     // empty, then send an on screen event. This is important for sites like
@@ -652,7 +639,7 @@ void PluginView::handleScrollEvent()
 
 IntRect PluginView::calculateClipRect() const
 {
-    FrameView* frameView = static_cast<FrameView*>(parent());
+    FrameView* frameView = toFrameView(parent());
     bool visible = frameView && isVisible();
 
     if (visible && frameView->width() && frameView->height()) {
@@ -760,7 +747,7 @@ void PluginView::handleFullScreenAllowedEvent()
     npEvent.type = NP_FullScreenReadyEvent;
     npEvent.data = 0;
 
-    if (FrameView* frameView = static_cast<FrameView*>(parent())) {
+    if (FrameView* frameView = toFrameView(parent())) {
         frameView->hostWindow()->platformPageClient()->didPluginEnterFullScreen(this, m_private->m_pluginUniquePrefix.c_str());
 
         if (!dispatchNPEvent(npEvent))
@@ -781,7 +768,7 @@ void PluginView::handleFullScreenExitEvent()
 
     dispatchNPEvent(npEvent);
 
-    if (FrameView* frameView = static_cast<FrameView*>(parent()))
+    if (FrameView* frameView = toFrameView(parent()))
         frameView->hostWindow()->platformPageClient()->didPluginExitFullScreen(this, m_private->m_pluginUniquePrefix.c_str());
 
     m_private->m_isFullScreen = false;
@@ -873,7 +860,7 @@ void PluginView::setParent(ScrollView* parentWidget)
 {
     // If parentWidget is 0, lets unregister the plugin with the current parent.
     if (m_private && (!parentWidget || parentWidget != parent())) {
-        if (FrameView* frameView = static_cast<FrameView*>(parent())) {
+        if (FrameView* frameView = toFrameView(parent())) {
             if (m_private->m_isBackgroundPlaying)
                 frameView->hostWindow()->platformPageClient()->onPluginStopBackgroundPlay(this, m_private->m_pluginUniquePrefix.c_str());
 
@@ -900,7 +887,7 @@ void PluginView::setParent(ScrollView* parentWidget)
     if (parentWidget) {
         init();
 
-        FrameView* frameView = static_cast<FrameView*>(parentWidget);
+        FrameView* frameView = toFrameView(parentWidget);
 
         if (frameView && m_private) {
             frameView->hostWindow()->platformPageClient()->registerPlugin(this, true /*shouldRegister*/);
@@ -925,7 +912,7 @@ void PluginView::setNPWindowIfNeeded()
     if (!m_private || !m_isStarted || !parent() || !m_plugin->pluginFuncs()->setwindow)
         return;
 
-    FrameView* frameView = static_cast<FrameView*>(parent());
+    FrameView* frameView = toFrameView(parent());
     if (!frameView->hostWindow()->platformPageClient()->isActive())
         return;
 
@@ -1081,7 +1068,7 @@ bool PluginView::platformGetValue(NPNVariable variable, void* value, NPError* re
         return true;
 
     case NPNVRootWindowGroup: {
-        FrameView* frameView = static_cast<FrameView*>(parent());
+        FrameView* frameView = toFrameView(parent());
         if (frameView) {
             BlackBerry::Platform::Graphics::Window *window = frameView->hostWindow()->platformPageClient()->platformWindow();
             if (window) {
@@ -1099,7 +1086,7 @@ bool PluginView::platformGetValue(NPNVariable variable, void* value, NPError* re
     }
 
     case NPNVBrowserWindowGroup: {
-        FrameView* frameView = static_cast<FrameView*>(parent());
+        FrameView* frameView = toFrameView(parent());
         if (frameView) {
             BlackBerry::Platform::Graphics::Window* window = frameView->hostWindow()->platformPageClient()->platformWindow();
             if (window) {
@@ -1117,7 +1104,7 @@ bool PluginView::platformGetValue(NPNVariable variable, void* value, NPError* re
     }
 
     case NPNVBrowserDisplayContext: {
-        FrameView* frameView = static_cast<FrameView*>(parent());
+        FrameView* frameView = toFrameView(parent());
         if (frameView) {
             BlackBerry::Platform::Graphics::PlatformDisplayContextHandle context = BlackBerry::Platform::Graphics::platformDisplayContext();
             if (context) {
@@ -1248,7 +1235,7 @@ bool PluginView::platformStart()
 
     show();
 
-    if (FrameView* frameView = static_cast<FrameView*>(parent()))
+    if (FrameView* frameView = toFrameView(parent()))
         handleOrientationEvent(frameView->hostWindow()->platformPageClient()->orientation());
 
     if (!(m_plugin->quirks().contains(PluginQuirkDeferFirstSetWindowCall))) {
@@ -1271,7 +1258,7 @@ void PluginView::platformDestroy()
     m_private->clearVisibleRects();
 
     // This will ensure that we unregistered the plugin.
-    if (FrameView* frameView = static_cast<FrameView*>(parent())) {
+    if (FrameView* frameView = toFrameView(parent())) {
         if (m_private->m_isBackgroundPlaying)
             frameView->hostWindow()->platformPageClient()->onPluginStopBackgroundPlay(this, m_private->m_pluginUniquePrefix.c_str());
 
@@ -1363,7 +1350,7 @@ void PluginView::setBackgroundPlay(bool value)
     if (!m_private || m_private->m_isBackgroundPlaying == value)
         return;
 
-    FrameView* frameView = static_cast<FrameView*>(m_private->m_view->parent());
+    FrameView* frameView = toFrameView(m_private->m_view->parent());
     m_private->m_isBackgroundPlaying = value;
     if (m_private->m_isBackgroundPlaying)
         frameView->hostWindow()->platformPageClient()->onPluginStartBackgroundPlay(this, m_private->m_pluginUniquePrefix.c_str());

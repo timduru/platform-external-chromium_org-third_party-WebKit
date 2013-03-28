@@ -34,44 +34,101 @@ namespace WebCore {
 class V8TestObj {
 public:
     static const bool hasDependentLifetime = false;
-    static bool HasInstance(v8::Handle<v8::Value>);
-    static v8::Persistent<v8::FunctionTemplate> GetRawTemplate();
-    static v8::Persistent<v8::FunctionTemplate> GetTemplate();
+    static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
+    static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
+    static v8::Persistent<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static TestObj* toNative(v8::Handle<v8::Object> object)
     {
-        return reinterpret_cast<TestObj*>(object->GetPointerFromInternalField(v8DOMWrapperObjectIndex));
+        return reinterpret_cast<TestObj*>(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
-    inline static v8::Handle<v8::Object> wrap(TestObj*, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* = 0);
     static void derefObject(void*);
     static WrapperTypeInfo info;
-    static v8::Handle<v8::Value> customMethodCallback(const v8::Arguments&);
-    static v8::Handle<v8::Value> customMethodWithArgsCallback(const v8::Arguments&);
-    static v8::Handle<v8::Value> classMethod2Callback(const v8::Arguments&);
+    static v8::Handle<v8::Value> customMethodMethodCustom(const v8::Arguments&);
+    static v8::Handle<v8::Value> customMethodWithArgsMethodCustom(const v8::Arguments&);
+    static v8::Handle<v8::Value> classMethod2MethodCustom(const v8::Arguments&);
     static v8::Handle<v8::Value> constructorCallback(const v8::Arguments&);
-    static v8::Handle<v8::Value> customAttrAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo&);
-    static void customAttrAccessorSetter(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::AccessorInfo&);
+    static v8::Handle<v8::Value> customAttrAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo&);
+    static void customAttrAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::AccessorInfo&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
-    static void installPerContextProperties(v8::Handle<v8::Object>, TestObj*);
-    static void installPerContextPrototypeProperties(v8::Handle<v8::Object>);
+    static void installPerContextProperties(v8::Handle<v8::Object>, TestObj*, v8::Isolate*);
+    static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*);
 private:
-    static v8::Handle<v8::Object> wrapSlow(PassRefPtr<TestObj>, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+    friend v8::Handle<v8::Object> wrap(TestObj*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+    static v8::Handle<v8::Object> createWrapper(PassRefPtr<TestObj>, v8::Handle<v8::Object> creationContext, v8::Isolate*);
 };
 
-v8::Handle<v8::Object> V8TestObj::wrap(TestObj* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+template<>
+class WrapperTypeTraits<TestObj > {
+public:
+    static WrapperTypeInfo* info() { return &V8TestObj::info; }
+};
+
+
+inline v8::Handle<v8::Object> wrap(TestObj* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-        v8::Handle<v8::Object> wrapper = DOMDataStore::current(isolate)->get(impl);
-        if (!wrapper.IsEmpty())
-            return wrapper;
-    return V8TestObj::wrapSlow(impl, creationContext, isolate);
+    ASSERT(impl);
+    ASSERT(DOMDataStore::getWrapper(impl, isolate).IsEmpty());
+    return V8TestObj::createWrapper(impl, creationContext, isolate);
 }
 
-inline v8::Handle<v8::Value> toV8(TestObj* impl, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* isolate = 0)
+inline v8::Handle<v8::Value> toV8(TestObj* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    if (!impl)
+    if (UNLIKELY(!impl))
         return v8NullWithCheck(isolate);
-    return V8TestObj::wrap(impl, creationContext, isolate);
+    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapper(impl, isolate);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, creationContext, isolate);
 }
-inline v8::Handle<v8::Value> toV8(PassRefPtr< TestObj > impl, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* isolate = 0)
+
+inline v8::Handle<v8::Value> toV8ForMainWorld(TestObj* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+{
+    ASSERT(worldType(isolate) == MainWorld);
+    if (UNLIKELY(!impl))
+        return v8NullWithCheck(isolate);
+    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapperForMainWorld(impl);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, creationContext, isolate);
+}
+
+template<class HolderContainer, class Wrappable>
+inline v8::Handle<v8::Value> toV8Fast(TestObj* impl, const HolderContainer& container, Wrappable* wrappable)
+{
+    if (UNLIKELY(!impl))
+        return v8Null(container.GetIsolate());
+    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperFast(impl, container, wrappable);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, container.Holder(), container.GetIsolate());
+}
+
+template<class HolderContainer, class Wrappable>
+inline v8::Handle<v8::Value> toV8FastForMainWorld(TestObj* impl, const HolderContainer& container, Wrappable* wrappable)
+{
+    ASSERT(worldType(container.GetIsolate()) == MainWorld);
+    if (UNLIKELY(!impl))
+        return v8Null(container.GetIsolate());
+    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperForMainWorld(impl);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, container.Holder(), container.GetIsolate());
+}
+
+template<class HolderContainer, class Wrappable>
+inline v8::Handle<v8::Value> toV8FastForMainWorld(PassRefPtr< TestObj > impl, const HolderContainer& container, Wrappable* wrappable)
+{
+    return toV8FastForMainWorld(impl.get(), container, wrappable);
+}
+
+
+template<class HolderContainer, class Wrappable>
+inline v8::Handle<v8::Value> toV8Fast(PassRefPtr< TestObj > impl, const HolderContainer& container, Wrappable* wrappable)
+{
+    return toV8Fast(impl.get(), container, wrappable);
+}
+
+inline v8::Handle<v8::Value> toV8(PassRefPtr< TestObj > impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     return toV8(impl.get(), creationContext, isolate);
 }

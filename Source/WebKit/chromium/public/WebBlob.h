@@ -31,16 +31,14 @@
 #ifndef WebBlob_h
 #define WebBlob_h
 
-#include "platform/WebCommon.h"
-#include "platform/WebPrivatePtr.h"
-#include "platform/WebString.h"
+#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../Platform/chromium/public/WebPrivatePtr.h"
+#include "../../../Platform/chromium/public/WebString.h"
 
-#if WEBKIT_USING_V8
 namespace v8 {
 class Value;
 template <class T> class Handle;
 }
-#endif
 
 namespace WebCore { class Blob; }
 
@@ -65,9 +63,7 @@ public:
 
     bool isNull() const { return m_private.isNull(); }
 
-#if WEBKIT_USING_V8
     WEBKIT_EXPORT v8::Handle<v8::Value>  toV8Value();
-#endif
 
 #if WEBKIT_IMPLEMENTATION
     WebBlob(const WTF::PassRefPtr<WebCore::Blob>&);

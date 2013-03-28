@@ -38,6 +38,9 @@ from webkitpy.common.system.executive import Executive
 class DeprecatedPort(object):
     results_directory = "/tmp/layout-test-results"
 
+    # Subclasses must override
+    port_flag_name = None
+
     # FIXME: This is only used by BotInfo.
     def name(self):
         return self.__class__
@@ -63,6 +66,7 @@ class DeprecatedPort(object):
             "chromium-xvfb": ChromiumXVFBPort,
             "gtk": GtkPort,
             "mac": MacPort,
+            "mac-wk2": MacWK2Port,
             "win": WinPort,
             "qt": QtPort,
             "efl": EflPort,
@@ -113,19 +117,28 @@ class DeprecatedPort(object):
     def run_perl_unittests_command(self):
         return self.script_shell_command("test-webkitperl")
 
-    def layout_tests_results_path(self):
-        return os.path.join(self.results_directory, "full_results.json")
-
-    def unit_tests_results_path(self):
-        return os.path.join(self.results_directory, "webkit_unit_tests_output.xml")
+    def run_bindings_tests_command(self):
+        return self.script_shell_command("run-bindings-tests")
 
 
 class MacPort(DeprecatedPort):
     port_flag_name = "mac"
 
 
+class MacWK2Port(DeprecatedPort):
+    port_flag_name = "mac-wk2"
+
+    def run_webkit_tests_command(self):
+        command = super(MacWK2Port, self).run_webkit_tests_command()
+        command.append("-2")
+        return command
+
+
 class WinPort(DeprecatedPort):
     port_flag_name = "win"
+
+    def run_bindings_tests_command(self):
+        return None
 
 
 class GtkPort(DeprecatedPort):
@@ -135,6 +148,7 @@ class GtkPort(DeprecatedPort):
         command = super(GtkPort, self).build_webkit_command(build_style=build_style)
         command.append("--gtk")
         command.append("--update-gtk")
+        command.append("--no-webkit2")
         command.append(super(GtkPort, self).makeArgs())
         return command
 

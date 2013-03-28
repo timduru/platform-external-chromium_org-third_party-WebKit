@@ -42,7 +42,7 @@ enum SkipEmptySectionsValue { DoNotSkipEmptySections, SkipEmptySections };
 
 class RenderTable : public RenderBlock {
 public:
-    explicit RenderTable(Node*);
+    explicit RenderTable(Element*);
     virtual ~RenderTable();
 
     // Per CSS 3 writing-mode: "The first and second values of the 'border-spacing' property represent spacing between columns
@@ -194,6 +194,10 @@ public:
         return 0;
     }
 
+    // Override paddingStart/End to return pixel values to match behavor of RenderTableCell.
+    virtual LayoutUnit paddingEnd() const OVERRIDE { return static_cast<int>(RenderBlock::paddingEnd()); }
+    virtual LayoutUnit paddingStart() const OVERRIDE { return static_cast<int>(RenderBlock::paddingStart()); }
+
     LayoutUnit bordersPaddingAndSpacingInRowDirection() const
     {
         // 'border-spacing' only applies to separate borders (see 17.6.1 The separated borders model).
@@ -273,7 +277,8 @@ private:
     virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&);
     virtual void paintMask(PaintInfo&, const LayoutPoint&);
     virtual void layout();
-    virtual void computePreferredLogicalWidths();
+    virtual void computeIntrinsicLogicalWidths(LayoutUnit& minWidth, LayoutUnit& maxWidth) const OVERRIDE;
+    virtual void computePreferredLogicalWidths() OVERRIDE;
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction) OVERRIDE;
 
     virtual int baselinePosition(FontBaseline, bool firstLine, LineDirectionMode, LinePositionMode = PositionOnContainingLine) const OVERRIDE;
@@ -291,6 +296,7 @@ private:
     virtual void updateLogicalWidth() OVERRIDE;
 
     LayoutUnit convertStyleLogicalWidthToComputedWidth(const Length& styleLogicalWidth, LayoutUnit availableWidth);
+    LayoutUnit convertStyleLogicalHeightToComputedHeight(const Length& styleLogicalHeight);
 
     virtual LayoutRect overflowClipRect(const LayoutPoint& location, RenderRegion*, OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize);
 
@@ -343,13 +349,13 @@ inline RenderTableSection* RenderTable::topSection() const
 
 inline RenderTable* toRenderTable(RenderObject* object)
 {
-    ASSERT(!object || object->isTable());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTable());
     return static_cast<RenderTable*>(object);
 }
 
 inline const RenderTable* toRenderTable(const RenderObject* object)
 {
-    ASSERT(!object || object->isTable());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTable());
     return static_cast<const RenderTable*>(object);
 }
 

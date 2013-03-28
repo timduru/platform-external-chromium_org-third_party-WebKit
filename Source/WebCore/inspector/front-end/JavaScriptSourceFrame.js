@@ -30,7 +30,7 @@
 
 /**
  * @constructor
- * @extends {WebInspector.SourceFrame}
+ * @extends {WebInspector.UISourceCodeFrame}
  * @param {WebInspector.ScriptsPanel} scriptsPanel
  * @param {WebInspector.UISourceCode} uiSourceCode
  */
@@ -40,11 +40,9 @@ WebInspector.JavaScriptSourceFrame = function(scriptsPanel, uiSourceCode)
     this._breakpointManager = WebInspector.breakpointManager;
     this._uiSourceCode = uiSourceCode;
 
-    var locations = this._breakpointManager.breakpointLocationsForUISourceCode(this._uiSourceCode);
-    for (var i = 0; i < locations.length; ++i)
-        this._breakpointAdded({data:locations[i]});
-
-    WebInspector.SourceFrame.call(this, uiSourceCode);
+    WebInspector.UISourceCodeFrame.call(this, uiSourceCode);
+    if (uiSourceCode.project().type() === WebInspector.projectTypes.Debugger)
+        this.element.addStyleClass("source-frame-debugger-script");
 
     this._popoverHelper = new WebInspector.ObjectPopoverHelper(this.textEditor.element,
             this._getPopoverAnchor.bind(this), this._resolveObjectForPopover.bind(this), this._onHidePopover.bind(this), true);
@@ -56,8 +54,6 @@ WebInspector.JavaScriptSourceFrame = function(scriptsPanel, uiSourceCode)
     this._breakpointManager.addEventListener(WebInspector.BreakpointManager.Events.BreakpointAdded, this._breakpointAdded, this);
     this._breakpointManager.addEventListener(WebInspector.BreakpointManager.Events.BreakpointRemoved, this._breakpointRemoved, this);
 
-    this._uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.FormattedChanged, this._onFormattedChanged, this);
-    this._uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.WorkingCopyChanged, this._onWorkingCopyChanged, this);
     this._uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.ConsoleMessageAdded, this._consoleMessageAdded, this);
     this._uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.ConsoleMessageRemoved, this._consoleMessageRemoved, this);
     this._uiSourceCode.addEventListener(WebInspector.UISourceCode.Events.ConsoleMessagesCleared, this._consoleMessagesCleared, this);
@@ -70,60 +66,24 @@ WebInspector.JavaScriptSourceFrame.prototype = {
     // View events
     wasShown: function()
     {
-        WebInspector.SourceFrame.prototype.wasShown.call(this);
+        WebInspector.UISourceCodeFrame.prototype.wasShown.call(this);
     },
 
     willHide: function()
     {
-        WebInspector.SourceFrame.prototype.willHide.call(this);
+        WebInspector.UISourceCodeFrame.prototype.willHide.call(this);
         this._popoverHelper.hidePopover();
     },
 
     /**
-     * @return {boolean}
+     * @param {string} content
      */
-    canEditSource: function()
+    onUISourceCodeContentChanged: function(content, contentEncoded, mimeType)
     {
-        return this._uiSourceCode.isEditable();
-    },
-
-    /**
-     * @param {string} text
-     */
-    commitEditing: function(text)
-    {
-        if (!this._uiSourceCode.isDirty())
-            return;
-
-        this._isCommittingEditing = true;
-        this._uiSourceCode.commitWorkingCopy(function() { });
-        delete this._isCommittingEditing;
-    },
-
-    /**
-     * @param {WebInspector.Event} event
-     */
-    _onFormattedChanged: function(event)
-    {
-        var content = /** @type {string} */ (event.data.content);
-        this._textEditor.setReadOnly(this._uiSourceCode.formatted());
-        this._innerSetContent(content);
-    },
-
-    /**
-     * @param {WebInspector.Event} event
-     */
-    _onWorkingCopyChanged: function(event)
-    {
-        this._innerSetContent(this._uiSourceCode.workingCopy());
-    },
-
-    _innerSetContent: function(content)
-    {
-        if (this._isSettingWorkingCopy || this._isCommittingEditing)
-            return;
-
-        this.setContent(content, false, this._uiSourceCode.mimeType());
+        var breakpointLocations = this._breakpointManager.breakpointLocationsForUISourceCode(this._uiSourceCode);
+        for (var i = 0; i < breakpointLocations.length; ++i)
+            breakpointLocations[i].breakpoint.remove();
+        WebInspector.UISourceCodeFrame.prototype.onUISourceCodeContentChanged.call(this, content);
     },
 
     populateLineGutterContextMenu: function(contextMenu, lineNumber)
@@ -148,7 +108,6 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
     populateTextAreaContextMenu: function(contextMenu, lineNumber)
     {
-        WebInspector.SourceFrame.prototype.populateTextAreaContextMenu.call(this, contextMenu, lineNumber);
         var selection = window.getSelection();
         if (selection.type === "Range" && !selection.isCollapsed) {
             var addToWatchLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Add to watch" : "Add to Watch");
@@ -156,16 +115,20 @@ WebInspector.JavaScriptSourceFrame.prototype = {
             var evaluateLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Evaluate in console" : "Evaluate in Console");
             contextMenu.appendItem(evaluateLabel, WebInspector.evaluateInConsole.bind(WebInspector, selection.toString()));
             contextMenu.appendSeparator();
-        }
-        contextMenu.appendApplicableItems(this._uiSourceCode);
-    },
+        } else if (!this._uiSourceCode.isEditable() && this._uiSourceCode.contentType() === WebInspector.resourceTypes.Script) {
+            function liveEdit(event)
+            {
+                var liveEditUISourceCode = WebInspector.liveEditSupport.uiSourceCodeForLiveEdit(this._uiSourceCode);
+                this._scriptsPanel.showUISourceCode(liveEditUISourceCode, lineNumber)
+            }
 
-    onTextChanged: function(oldRange, newRange)
-    {
-        WebInspector.SourceFrame.prototype.onTextChanged.call(this, oldRange, newRange);
-        this._isSettingWorkingCopy = true;
-        this._uiSourceCode.setWorkingCopy(this._textEditor.text());
-        delete this._isSettingWorkingCopy;
+            // FIXME: Change condition above to explicitly check that current uiSourceCode is created by default debugger mapping
+            // and move the code adding this menu item to generic context menu provider for UISourceCode.
+            var liveEditLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Live edit" : "Live Edit");
+            contextMenu.appendItem(liveEditLabel, liveEdit.bind(this));
+            contextMenu.appendSeparator();
+        }
+        WebInspector.UISourceCodeFrame.prototype.populateTextAreaContextMenu.call(this, contextMenu, lineNumber);
     },
 
     _willMergeToVM: function()
@@ -211,7 +174,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
     _supportsEnabledBreakpointsWhileEditing: function()
     {
-        return this._uiSourceCode.isSnippet;
+        return this._uiSourceCode.project().type() === WebInspector.projectTypes.Snippets;
     },
 
     _restoreBreakpointsAfterEditing: function()
@@ -278,7 +241,7 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
         // 2. 'highlight' them with artificial style to detect word boundaries
         var changes = [];
-        WebInspector.highlightRangesWithStyleClass(lineElement, ranges, "source-frame-token", changes);
+        this.textEditor.highlightRangesWithStyleClass(lineElement, ranges, "source-frame-token", changes);
         var lineOffsetLeft = lineElement.totalOffsetLeft();
         for (var child = lineElement.firstChild; child; child = child.nextSibling) {
             if (child.nodeType !== Node.ELEMENT_NODE || !child.hasStyleClass("source-frame-token"))
@@ -327,38 +290,17 @@ WebInspector.JavaScriptSourceFrame.prototype = {
             return;
         // FIXME: the text editor should maintain highlight on its own. The check below is a workaround for
         // the case when highlight element is detached from DOM by the TextEditor when re-building the DOM.
-        var parentElement = highlightElement.parentElement;
-        if (parentElement) {
-            var child = highlightElement.firstChild;
-            while (child) {
-                var nextSibling = child.nextSibling;
-                parentElement.insertBefore(child, highlightElement);
-                child = nextSibling;
-            }
-            parentElement.removeChild(highlightElement);
-        }
+        this.textEditor.hideHighlightedExpression(highlightElement);
         delete this._highlightElement;
     },
 
+    /**
+     * @param {Element} element
+     * @return {Element}
+     */
     _highlightExpression: function(element)
     {
-        // Collect tokens belonging to evaluated expression.
-        var tokens = [ element ];
-        var token = element.previousSibling;
-        while (token && (token.className === "webkit-javascript-ident" || token.className === "source-frame-token" || token.className === "webkit-javascript-keyword" || token.textContent.trim() === ".")) {
-            tokens.push(token);
-            token = token.previousSibling;
-        }
-        tokens.reverse();
-
-        // Wrap them with highlight element.
-        var parentElement = element.parentElement;
-        var nextElement = element.nextSibling;
-        var container = document.createElement("span");
-        for (var i = 0; i < tokens.length; ++i)
-            container.appendChild(tokens[i]);
-        parentElement.insertBefore(container, nextElement);
-        return container;
+        return this.textEditor.highlightExpression(element, { "webkit-javascript-ident": true, "source-frame-token": true, "webkit-javascript-keyword": true }, { ".": true });
     },
 
     /**
@@ -610,6 +552,9 @@ WebInspector.JavaScriptSourceFrame.prototype = {
 
     toggleBreakpointOnCurrentLine: function()
     {
+        if (this._uiSourceCode.isDirty() && !this._supportsEnabledBreakpointsWhileEditing())
+            return;
+
         var selection = this.textEditor.selection();
         if (!selection)
             return;
@@ -624,6 +569,13 @@ WebInspector.JavaScriptSourceFrame.prototype = {
     _setBreakpoint: function(lineNumber, condition, enabled)
     {
         this._breakpointManager.setBreakpoint(this._uiSourceCode, lineNumber, condition, enabled);
+
+        WebInspector.notifications.dispatchEventToListeners(WebInspector.UserMetrics.UserAction, {
+            action: WebInspector.UserMetrics.UserActionNames.SetBreakpoint,
+            url: this._uiSourceCode.originURL(),
+            line: lineNumber,
+            enabled: enabled
+        });
     },
 
     /**
@@ -635,5 +587,12 @@ WebInspector.JavaScriptSourceFrame.prototype = {
         WebInspector.debuggerModel.continueToLocation(rawLocation);
     },
 
-    __proto__: WebInspector.SourceFrame.prototype
+    dispose: function()
+    {
+        this._breakpointManager.removeEventListener(WebInspector.BreakpointManager.Events.BreakpointAdded, this._breakpointAdded, this);
+        this._breakpointManager.removeEventListener(WebInspector.BreakpointManager.Events.BreakpointRemoved, this._breakpointRemoved, this);
+        WebInspector.UISourceCodeFrame.prototype.dispose.call(this);
+    },
+
+    __proto__: WebInspector.UISourceCodeFrame.prototype
 }

@@ -37,6 +37,8 @@ namespace JSC {
 
 class BlockAllocator;
 class CopiedBlock;
+class CopyWorkListSegment;
+class HandleBlock;
 class MarkStackSegment;
 class MarkedBlock;
 class Region;
@@ -67,6 +69,7 @@ public:
     size_t blockSize() const { return m_blockSize; }
     bool isFull() const { return m_blocksInUse == m_totalBlocks; }
     bool isEmpty() const { return !m_blocksInUse; }
+    bool isCustomSize() const { return m_isCustomSize; }
 
     DeadBlock* allocate();
     void deallocate(void*);
@@ -80,6 +83,7 @@ private:
     size_t m_totalBlocks;
     size_t m_blocksInUse;
     size_t m_blockSize;
+    bool m_isCustomSize;
     Region* m_prev;
     Region* m_next;
     DoublyLinkedList<DeadBlock> m_deadBlocks;
@@ -90,17 +94,17 @@ inline Region* Region::create(size_t blockSize)
     ASSERT(blockSize <= s_regionSize);
     ASSERT(!(s_regionSize % blockSize));
     PageAllocationAligned allocation = PageAllocationAligned::allocate(s_regionSize, s_regionSize, OSAllocator::JSGCHeapPages);
-    if (!static_cast<bool>(allocation))
-        CRASH();
+    RELEASE_ASSERT(static_cast<bool>(allocation));
     return new Region(allocation, blockSize, s_regionSize / blockSize);
 }
 
 inline Region* Region::createCustomSize(size_t blockSize, size_t blockAlignment)
 {
     PageAllocationAligned allocation = PageAllocationAligned::allocate(blockSize, blockAlignment, OSAllocator::JSGCHeapPages);
-    if (!static_cast<bool>(allocation))
-        CRASH();
-    return new Region(allocation, blockSize, 1);
+    RELEASE_ASSERT(static_cast<bool>(allocation));
+    Region* region = new Region(allocation, blockSize, 1);
+    region->m_isCustomSize = true;
+    return region;
 }
 
 inline Region::Region(PageAllocationAligned& allocation, size_t blockSize, size_t totalBlocks)
@@ -109,6 +113,7 @@ inline Region::Region(PageAllocationAligned& allocation, size_t blockSize, size_
     , m_totalBlocks(totalBlocks)
     , m_blocksInUse(0)
     , m_blockSize(blockSize)
+    , m_isCustomSize(false)
     , m_prev(0)
     , m_next(0)
 {
@@ -187,7 +192,8 @@ private:
     RegionSet m_copiedRegionSet;
     RegionSet m_markedRegionSet;
     // WeakBlocks and MarkStackSegments use the same RegionSet since they're the same size.
-    RegionSet m_weakAndMarkStackRegionSet;
+    RegionSet m_fourKBBlockRegionSet;
+    RegionSet m_workListRegionSet;
 
     DoublyLinkedList<Region> m_emptyRegions;
     size_t m_numberOfEmptyRegions;
@@ -298,6 +304,7 @@ template<typename T>
 inline void BlockAllocator::deallocateCustomSize(T* block)
 {
     Region* region = block->region();
+    ASSERT(region->isCustomSize());
     region->deallocate(block);
     delete region;
 }
@@ -317,13 +324,25 @@ inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<MarkedBlock>()
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<WeakBlock>()
 {
-    return m_weakAndMarkStackRegionSet;
+    return m_fourKBBlockRegionSet;
 }
 
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<MarkStackSegment>()
 {
-    return m_weakAndMarkStackRegionSet;
+    return m_fourKBBlockRegionSet;
+}
+
+template <>
+inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<CopyWorkListSegment>()
+{
+    return m_workListRegionSet;
+}
+
+template <>
+inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HandleBlock>()
+{
+    return m_fourKBBlockRegionSet;
 }
 
 template <>
@@ -341,19 +360,31 @@ inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<MarkedB
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<WeakBlock> >()
 {
-    return m_weakAndMarkStackRegionSet;
+    return m_fourKBBlockRegionSet;
 }
 
 template <>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<MarkStackSegment> >()
 {
-    return m_weakAndMarkStackRegionSet;
+    return m_fourKBBlockRegionSet;
+}
+
+template <>
+inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<CopyWorkListSegment> >()
+{
+    return m_workListRegionSet;
+}
+
+template <>
+inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor<HeapBlock<HandleBlock> >()
+{
+    return m_fourKBBlockRegionSet;
 }
 
 template <typename T>
 inline BlockAllocator::RegionSet& BlockAllocator::regionSetFor()
 {
-    ASSERT_NOT_REACHED();
+    RELEASE_ASSERT_NOT_REACHED();
     return *(RegionSet*)0;
 }
 

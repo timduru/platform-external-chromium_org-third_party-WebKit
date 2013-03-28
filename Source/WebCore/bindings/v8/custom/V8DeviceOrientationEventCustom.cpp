@@ -35,50 +35,46 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8DeviceOrientationEvent::alphaAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+v8::Handle<v8::Value> V8DeviceOrientationEvent::alphaAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.DeviceOrientationEvent.alpha._get");
     v8::Handle<v8::Object> holder = info.Holder();
     DeviceOrientationEvent* imp = V8DeviceOrientationEvent::toNative(holder);
     if (!imp->orientation()->canProvideAlpha())
-        return v8::Null(info.GetIsolate());
+        return v8Null(info.GetIsolate());
     return v8::Number::New(imp->orientation()->alpha());
 }
 
-v8::Handle<v8::Value> V8DeviceOrientationEvent::betaAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+v8::Handle<v8::Value> V8DeviceOrientationEvent::betaAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.DeviceOrientationEvent.beta._get");
     v8::Handle<v8::Object> holder = info.Holder();
     DeviceOrientationEvent* imp = V8DeviceOrientationEvent::toNative(holder);
     if (!imp->orientation()->canProvideBeta())
-        return v8::Null(info.GetIsolate());
+        return v8Null(info.GetIsolate());
     return v8::Number::New(imp->orientation()->beta());
 }
 
-v8::Handle<v8::Value> V8DeviceOrientationEvent::gammaAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+v8::Handle<v8::Value> V8DeviceOrientationEvent::gammaAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.DeviceOrientationEvent.gamma._get");
     v8::Handle<v8::Object> holder = info.Holder();
     DeviceOrientationEvent* imp = V8DeviceOrientationEvent::toNative(holder);
     if (!imp->orientation()->canProvideGamma())
-        return v8::Null(info.GetIsolate());
+        return v8Null(info.GetIsolate());
     return v8::Number::New(imp->orientation()->gamma());
 }
 
-v8::Handle<v8::Value> V8DeviceOrientationEvent::absoluteAccessorGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+v8::Handle<v8::Value> V8DeviceOrientationEvent::absoluteAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.DeviceOrientationEvent.absolute._get");
     v8::Handle<v8::Object> holder = info.Holder();
     DeviceOrientationEvent* imp = V8DeviceOrientationEvent::toNative(holder);
     if (!imp->orientation()->canProvideAbsolute())
-        return v8::Null(info.GetIsolate());
+        return v8Null(info.GetIsolate());
     return v8::Boolean::New(imp->orientation()->absolute());
 }
 
-v8::Handle<v8::Value> V8DeviceOrientationEvent::initDeviceOrientationEventCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8DeviceOrientationEvent::initDeviceOrientationEventMethodCustom(const v8::Arguments& args)
 {
     DeviceOrientationEvent* imp = V8DeviceOrientationEvent::toNative(args.Holder());
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, type, args[0]);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, type, args[0]);
     bool bubbles = args[1]->BooleanValue();
     bool cancelable = args[2]->BooleanValue();
     // If alpha, beta, gamma or absolute are null or undefined, mark them as not provided.

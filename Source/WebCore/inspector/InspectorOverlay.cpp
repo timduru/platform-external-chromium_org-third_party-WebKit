@@ -211,13 +211,7 @@ void InspectorOverlay::paint(GraphicsContext& context)
     GraphicsContextStateSaver stateSaver(context);
     FrameView* view = overlayPage()->mainFrame()->view();
     ASSERT(!view->needsLayout());
-
-    context.beginTransparencyLayer(1);
-    context.setCompositeOperation(CompositeCopy);
-
     view->paint(&context, IntRect(0, 0, view->width(), view->height()));
-
-    context.endTransparencyLayer();
 }
 
 void InspectorOverlay::drawOutline(GraphicsContext* context, const LayoutRect& rect, const Color& color)
@@ -289,8 +283,10 @@ void InspectorOverlay::update()
 
     FrameView* overlayView = overlayPage()->mainFrame()->view();
     IntSize viewportSize = enclosingIntRect(view->visibleContentRect()).size();
-    IntSize frameViewFullSize = enclosingIntRect(view->visibleContentRect(true)).size();
+    IntSize frameViewFullSize = enclosingIntRect(view->visibleContentRect(ScrollableArea::IncludeScrollbars)).size();
     IntSize size = m_size.isEmpty() ? frameViewFullSize : m_size;
+    overlayPage()->setPageScaleFactor(m_page->pageScaleFactor(), IntPoint());
+    size.scale(m_page->pageScaleFactor());
     overlayView->resize(size);
 
     // Clear canvas and paint things.
@@ -504,15 +500,20 @@ void InspectorOverlay::evaluateInOverlay(const String& method, PassRefPtr<Inspec
 void InspectorOverlay::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::InspectorOverlay);
-    info.addMember(m_page);
+    info.addMember(m_page, "page");
     info.addWeakPointer(m_client);
-    info.addMember(m_pausedInDebuggerMessage);
-    info.addMember(m_highlightNode);
-    info.addMember(m_nodeHighlightConfig);
-    info.addMember(m_highlightRect);
-    info.addMember(m_overlayPage);
-    info.addMember(m_rectHighlightConfig);
-    info.addMember(m_size);
+    info.addMember(m_pausedInDebuggerMessage, "pausedInDebuggerMessage");
+    info.addMember(m_highlightNode, "highlightNode");
+    info.addMember(m_nodeHighlightConfig, "nodeHighlightConfig");
+    info.addMember(m_highlightRect, "highlightRect");
+    info.addMember(m_overlayPage, "overlayPage");
+    info.addMember(m_rectHighlightConfig, "rectHighlightConfig");
+    info.addMember(m_size, "size");
+}
+
+void InspectorOverlay::freePage()
+{
+    m_overlayPage.clear();
 }
 
 } // namespace WebCore

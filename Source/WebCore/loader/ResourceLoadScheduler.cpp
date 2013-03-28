@@ -132,11 +132,6 @@ PassRefPtr<NetscapePlugInStreamLoader> ResourceLoadScheduler::schedulePluginStre
     return loader;
 }
 
-void ResourceLoadScheduler::addMainResourceLoad(ResourceLoader* resourceLoader)
-{
-    hostForURL(resourceLoader->url(), CreateIfNotFound)->addLoadInProgress(resourceLoader);
-}
-
 void ResourceLoadScheduler::scheduleLoad(ResourceLoader* resourceLoader, ResourceLoadPriority priority)
 {
     ASSERT(resourceLoader);
@@ -335,12 +330,6 @@ bool ResourceLoadScheduler::HostInformation::limitRequests(ResourceLoadPriority 
     if (priority == ResourceLoadPriorityVeryLow && !m_requestsLoading.isEmpty())
         return true;
     return m_requestsLoading.size() >= (resourceLoadScheduler()->isSerialLoadingEnabled() ? 1 : m_maxRequestsInFlight);
-}
-
-void ResourceLoadScheduler::startResourceLoader(ResourceLoader* loader)
-{
-    ASSERT(loader);
-    loader->start();
 }
 
 } // namespace WebCore

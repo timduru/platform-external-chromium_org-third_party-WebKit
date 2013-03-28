@@ -40,8 +40,8 @@
 #include "DOMWindow.h"
 #include "CachedResourceLoader.h"
 #include "DocumentType.h"
-#include "EditingText.h"
 #include "EditorClient.h"
+#include "Event.h"
 #include "EventNames.h"
 #include "FloatQuad.h"
 #include "FocusController.h"
@@ -64,6 +64,7 @@
 #include "MediaFeatureNames.h"
 #include "Navigator.h"
 #include "NodeList.h"
+#include "NodeTraversal.h"
 #include "Page.h"
 #include "PageCache.h"
 #include "PageGroup.h"
@@ -77,19 +78,21 @@
 #include "ScriptController.h"
 #include "ScriptSourceCode.h"
 #include "ScriptValue.h"
+#include "ScrollingCoordinator.h"
 #include "Settings.h"
 #include "StylePropertySet.h"
 #include "TextIterator.h"
 #include "TextResourceDecoder.h"
 #include "UserContentURLPattern.h"
 #include "UserTypingGestureIndicator.h"
+#include "VisibleUnits.h"
 #include "WebKitFontFamilyNames.h"
 #include "XMLNSNames.h"
 #include "XMLNames.h"
 #include "htmlediting.h"
 #include "markup.h"
 #include "npruntime_impl.h"
-#include "visible_units.h"
+#include <wtf/PassOwnPtr.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 
@@ -184,11 +187,7 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
 #endif
     } else {
         page->incrementSubframeCount();
-
-        // Make sure we will not end up with two frames referencing the same owner element.
-        Frame*& contentFrameSlot = ownerElement->m_contentFrame;
-        ASSERT(!contentFrameSlot || contentFrameSlot->ownerElement() != ownerElement);
-        contentFrameSlot = this;
+        ownerElement->setContentFrame(this);
     }
 
 #ifndef NDEBUG
@@ -225,11 +224,6 @@ Frame::~Frame()
     HashSet<FrameDestructionObserver*>::iterator stop = m_destructionObservers.end();
     for (HashSet<FrameDestructionObserver*>::iterator it = m_destructionObservers.begin(); it != stop; ++it)
         (*it)->frameDestroyed();
-
-    if (m_view) {
-        m_view->hide();
-        m_view->clearFrame();
-    }
 }
 
 bool Frame::inScope(TreeScope* scope) const
@@ -260,7 +254,7 @@ void Frame::setView(PassRefPtr<FrameView> view)
     // from messing with the view such that its scroll bars won't be torn down.
     // FIXME: We should revisit this.
     if (m_view)
-        m_view->detachCustomScrollbars();
+        m_view->prepareForDetach();
 
     // Prepare for destruction now, so any unload event handlers get run and the DOMWindow is
     // notified. If we wait until the view is destroyed, then things won't be hooked up enough for
@@ -313,7 +307,7 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
     if (m_page && m_page->mainFrame() == this) {
         notifyChromeClientWheelEventHandlerCountChanged();
 #if ENABLE(TOUCH_EVENTS)
-        if (m_doc && m_doc->touchEventHandlerCount())
+        if (m_doc && m_doc->hasTouchEventHandlers())
             m_page->chrome()->client()->needTouchEvents(true);
 #endif
     }
@@ -380,7 +374,7 @@ String Frame::searchForLabelsAboveCell(RegularExpression* regExp, HTMLTableCellE
     if (aboveCell) {
         // search within the above cell we found for a match
         size_t lengthSearched = 0;    
-        for (Node* n = aboveCell->firstChild(); n; n = n->traverseNextNode(aboveCell)) {
+        for (Node* n = aboveCell->firstChild(); n; n = NodeTraversal::next(n, aboveCell)) {
             if (n->isTextNode() && n->renderer() && n->renderer()->style()->visibility() == VISIBLE) {
                 // For each text chunk, run the regexp
                 String nodeString = n->nodeValue();
@@ -421,12 +415,9 @@ String Frame::searchForLabelsBeforeElement(const Vector<String>& labels, Element
     // walk backwards in the node tree, until another element, or form, or end of tree
     int unsigned lengthSearched = 0;
     Node* n;
-    for (n = element->traversePreviousNode();
-         n && lengthSearched < charsSearchedThreshold;
-         n = n->traversePreviousNode())
-    {
+    for (n = NodeTraversal::previous(element); n && lengthSearched < charsSearchedThreshold; n = NodeTraversal::previous(n)) {
         if (n->hasTagName(formTag)
-            || (n->isHTMLElement() && static_cast<Element*>(n)->isFormControlElement()))
+            || (n->isHTMLElement() && toElement(n)->isFormControlElement()))
         {
             // We hit another form element or the start of the form - bail out
             break;
@@ -637,8 +628,8 @@ Frame* Frame::frameForWidget(const Widget* widget)
 
     // Assume all widgets are either a FrameView or owned by a RenderWidget.
     // FIXME: That assumption is not right for scroll bars!
-    ASSERT(widget->isFrameView());
-    return static_cast<const FrameView*>(widget)->frame();
+    ASSERT_WITH_SECURITY_IMPLICATION(widget->isFrameView());
+    return toFrameView(widget)->frame();
 }
 
 void Frame::clearTimers(FrameView *view, Document *document)
@@ -662,16 +653,25 @@ void Frame::dispatchVisibilityStateChangeEvent()
 {
     if (m_doc)
         m_doc->dispatchVisibilityStateChangeEvent();
+
+    Vector<RefPtr<Frame> > childFrames;
     for (Frame* child = tree()->firstChild(); child; child = child->tree()->nextSibling())
-        child->dispatchVisibilityStateChangeEvent();
+        childFrames.append(child);
+
+    for (size_t i = 0; i < childFrames.size(); ++i)
+        childFrames[i]->dispatchVisibilityStateChangeEvent();
 }
 #endif
 
 void Frame::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_doc.get());
-    info.addMember(m_loader);
+    info.addMember(m_doc, "doc");
+    info.ignoreMember(m_view);
+    info.addMember(m_ownerElement, "ownerElement");
+    info.addMember(m_page, "page");
+    info.addMember(m_loader, "loader");
+    info.ignoreMember(m_destructionObservers);
 }
 
 void Frame::willDetachPage()
@@ -688,6 +688,9 @@ void Frame::willDetachPage()
     if (page() && page()->focusController()->focusedFrame() == this)
         page()->focusController()->setFocusedFrame(0);
 
+    if (page() && page()->scrollingCoordinator() && m_view)
+        page()->scrollingCoordinator()->willDestroyScrollableArea(m_view.get());
+
     script()->clearScriptObjects();
     script()->updatePlatformScriptObjects();
 }
@@ -696,8 +699,8 @@ void Frame::disconnectOwnerElement()
 {
     if (m_ownerElement) {
         if (Document* doc = document())
-            doc->clearAXObjectCache();
-        m_ownerElement->m_contentFrame = 0;
+            doc->topDocument()->clearAXObjectCache();
+        m_ownerElement->clearContentFrame();
         if (m_page)
             m_page->decrementSubframeCount();
     }
@@ -719,7 +722,7 @@ String Frame::displayStringModifiedByEncoding(const String& str) const
 
 VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
 {
-    HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint, true);
+    HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::AllowShadowContent);
     Node* node = result.innerNonSharedNode();
     if (!node)
         return VisiblePosition();
@@ -741,7 +744,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     HitTestResult result = HitTestResult(pt);
 
     if (contentRenderer())
-        result = eventHandler()->hitTestResultAtPoint(pt, false);
+        result = eventHandler()->hitTestResultAtPoint(pt);
     return result.innerNode() ? result.innerNode()->document() : 0;
 }
 
@@ -820,6 +823,7 @@ void Frame::setTiledBackingStoreEnabled(bool enabled)
     if (m_tiledBackingStore)
         return;
     m_tiledBackingStore = adoptPtr(new TiledBackingStore(this));
+    m_tiledBackingStore->setCommitTileUpdatesOnIdleEventLoop(true);
     if (m_view)
         m_view->setPaintsEntireContents(true);
 }
@@ -922,7 +926,7 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
     // Respect SVGs zoomAndPan="disabled" property in standalone SVG documents.
     // FIXME: How to handle compound documents + zoomAndPan="disabled"? Needs SVG WG clarification.
     if (document->isSVGDocument()) {
-        if (!static_cast<SVGDocument*>(document)->zoomAndPanEnabled())
+        if (!toSVGDocument(document)->zoomAndPanEnabled())
             return;
     }
 #endif
@@ -1021,6 +1025,23 @@ void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
     m_page->chrome()->client()->numWheelEventHandlersChanged(count);
 }
 
+bool Frame::isURLAllowed(const KURL& url) const
+{
+    // We allow one level of self-reference because some sites depend on that,
+    // but we don't allow more than one.
+    if (m_page->subframeCount() >= Page::maxNumberOfFrames)
+        return false;
+    bool foundSelfReference = false;
+    for (const Frame* frame = this; frame; frame = frame->tree()->parent()) {
+        if (equalIgnoringFragmentIdentifier(frame->document()->url(), url)) {
+            if (foundSelfReference)
+                return false;
+            foundSelfReference = true;
+        }
+    }
+    return true;
+}
+
 #if !PLATFORM(MAC) && !PLATFORM(WIN)
 struct ScopedFramePaintingState {
     ScopedFramePaintingState(Frame* frame, Node* node)
@@ -1059,7 +1080,7 @@ DragImageRef Frame::nodeImage(Node* node)
     m_view->setPaintBehavior(state.paintBehavior | PaintBehaviorFlattenCompositingLayers);
 
     // When generating the drag image for an element, ignore the document background.
-    m_view->setBaseBackgroundColor(colorWithOverrideAlpha(Color::white, 1.0));
+    m_view->setBaseBackgroundColor(Color::transparent);
     m_doc->updateLayout();
     m_view->setNodeToDraw(node); // Enable special sub-tree drawing mode.
 

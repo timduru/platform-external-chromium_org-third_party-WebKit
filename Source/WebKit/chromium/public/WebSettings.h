@@ -31,11 +31,9 @@
 #ifndef WebSettings_h
 #define WebSettings_h
 
-#include "platform/WebCommon.h"
-#include "platform/WebSize.h"
+#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../Platform/chromium/public/WebSize.h"
 #include <unicode/uscript.h>
-
-#define HAS_WEBAUDIO_FEATURE_ENABLE 1
 
 namespace WebKit {
 
@@ -50,7 +48,8 @@ public:
     enum EditingBehavior {
         EditingBehaviorMac,
         EditingBehaviorWin,
-        EditingBehaviorUnix
+        EditingBehaviorUnix,
+        EditingBehaviorAndroid
     };
 
     virtual bool scrollAnimatorEnabled() const = 0;
@@ -63,20 +62,23 @@ public:
     virtual void setAcceleratedCompositingForFixedPositionEnabled(bool)  = 0;
     virtual void setAcceleratedCompositingForOverflowScrollEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForPluginsEnabled(bool) = 0;
+    virtual void setAcceleratedCompositingForScrollableFramesEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForVideoEnabled(bool) = 0;
     virtual void setAcceleratedFiltersEnabled(bool) = 0;
-    virtual void setAcceleratedPaintingEnabled(bool) = 0;
     virtual void setAllowDisplayOfInsecureContent(bool) = 0;
     virtual void setAllowFileAccessFromFileURLs(bool) = 0;
+    virtual void setAllowCustomScrollbarInMainFrame(bool) = 0;
     virtual void setAllowRunningOfInsecureContent(bool) = 0;
     virtual void setAllowScriptsToCloseWindows(bool) = 0;
     virtual void setAllowUniversalAccessFromFileURLs(bool) = 0;
-    virtual void setApplyDefaultDeviceScaleFactorInCompositor(bool) = 0;
+    virtual void setAntialiased2dCanvasEnabled(bool) = 0;
+    virtual void setApplyDeviceScaleFactorInCompositor(bool) = 0;
     virtual void setApplyPageScaleFactorInCompositor(bool) = 0;
     virtual void setAsynchronousSpellCheckingEnabled(bool) = 0;
     virtual void setAutoZoomFocusedNodeToLegibleScale(bool) = 0;
     virtual void setAuthorAndUserStylesEnabled(bool) = 0;
     virtual void setCaretBrowsingEnabled(bool) = 0;
+    virtual void setCompositedScrollingForFramesEnabled(bool) = 0;
     virtual void setCookieEnabled(bool) = 0;
     virtual void setCursiveFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setDNSPrefetchingEnabled(bool) = 0;
@@ -84,8 +86,8 @@ public:
     virtual void setDefaultFixedFontSize(int) = 0;
     virtual void setDefaultFontSize(int) = 0;
     virtual void setDefaultTextEncodingName(const WebString&) = 0;
-    virtual void setDefaultTileSize(WebSize) = 0;
-    virtual void setDeferred2dCanvasEnabled(bool) = 0;
+    virtual void setDefaultVideoPosterURL(const WebString&) = 0;
+    void setDeferred2dCanvasEnabled(bool) { } // temporary stub
     virtual void setDeferredImageDecodingEnabled(bool) = 0;
     virtual void setDeveloperExtrasEnabled(bool) = 0;
     virtual void setDeviceSupportsMouse(bool) = 0;
@@ -95,10 +97,10 @@ public:
     virtual void setEditableLinkBehaviorNeverLive() = 0;
     virtual void setEditingBehavior(EditingBehavior) = 0;
     virtual void setEnableScrollAnimator(bool) = 0;
+    virtual void setEnableTouchAdjustment(bool) = 0;
     virtual void setExperimentalCSSCustomFilterEnabled(bool) = 0;
     virtual void setExperimentalCSSGridLayoutEnabled(bool) = 0;
     virtual void setCSSStickyPositionEnabled(bool) = 0;
-    virtual void setExperimentalCSSRegionsEnabled(bool) = 0;
     virtual void setExperimentalCSSVariablesEnabled(bool) = 0;
     virtual void setExperimentalWebGLEnabled(bool) = 0;
     virtual void setFantasyFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
@@ -112,6 +114,7 @@ public:
     virtual void setGestureTapHighlightEnabled(bool) = 0;
     virtual void setHyperlinkAuditingEnabled(bool) = 0;
     virtual void setImagesEnabled(bool) = 0;
+    virtual void setInitializeAtMinimumPageScale(bool) = 0;
     virtual void setInteractiveFormValidationEnabled(bool) = 0;
     virtual void setJavaEnabled(bool) = 0;
     virtual void setJavaScriptCanAccessClipboard(bool) = 0;
@@ -120,7 +123,6 @@ public:
     virtual void setLayoutFallbackWidth(int) = 0;
     virtual void setLoadsImagesAutomatically(bool) = 0;
     virtual void setLocalStorageEnabled(bool) = 0;
-    virtual void setMaxUntiledLayerSize(WebSize) = 0;
     virtual void setMediaPlaybackRequiresUserGesture(bool) = 0;
     virtual void setMemoryInfoEnabled(bool) = 0;
     virtual void setMinimumAccelerated2dCanvasSize(int) = 0;
@@ -134,19 +136,21 @@ public:
     virtual void setPageCacheSupportsPlugins(bool) = 0;
     virtual void setPasswordEchoDurationInSeconds(double) = 0;
     virtual void setPasswordEchoEnabled(bool) = 0;
+    virtual void setPerTilePaintingEnabled(bool) = 0;
     virtual void setPictographFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setPluginsEnabled(bool) = 0;
     virtual void setPrivilegedWebGLExtensionsEnabled(bool) = 0;
-    virtual void setRenderVSyncEnabled(bool) = 0;
+    virtual void setRenderVSyncNotificationEnabled(bool) = 0;
     virtual void setSansSerifFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
+    virtual void setSelectTrailingWhitespaceEnabled(bool) = 0;
     virtual void setSerifFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setShouldPrintBackgrounds(bool) = 0;
     virtual void setShouldRespectImageOrientation(bool) = 0;
     virtual void setShowDebugBorders(bool) = 0;
     virtual void setShowFPSCounter(bool) = 0;
     virtual void setShowPaintRects(bool) = 0;
-    virtual void setShowPlatformLayerTree(bool) = 0;
     virtual void setShrinksStandaloneImagesToFit(bool) = 0;
+    virtual void setSmartInsertDeleteEnabled(bool) = 0;
     virtual void setStandardFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setSupportsMultipleWindows(bool) = 0;
     virtual void setSyncXHRInDocumentsEnabled(bool) = 0;
@@ -154,7 +158,10 @@ public:
     virtual void setTextAutosizingEnabled(bool) = 0;
     virtual void setTextAutosizingFontScaleFactor(float) = 0;
     virtual void setTextDirectionSubmenuInclusionBehaviorNeverIncluded() = 0;
+    virtual void setThreadedHTMLParser(bool) = 0;
+    virtual void setTouchDragDropEnabled(bool) = 0;
     virtual void setUnifiedTextCheckerEnabled(bool) = 0;
+    virtual void setUnsafePluginPastingEnabled(bool) = 0;
     virtual void setUserStyleSheetLocation(const WebURL&) = 0;
     virtual void setUsesEncodingDetector(bool) = 0;
     virtual void setUsesPageCache(bool) = 0;
@@ -166,8 +173,8 @@ public:
     virtual void setWebSecurityEnabled(bool) = 0;
     virtual void setXSSAuditorEnabled(bool) = 0;
 
-    // DEPRECATED
-    virtual void setDefaultDeviceScaleFactor(int) { }
+    // DEPRECATED (renamed. remove this after all call sites changed to the new name)
+    void setApplyDefaultDeviceScaleFactorInCompositor(bool enabled) { setApplyDeviceScaleFactorInCompositor(enabled); }
 
 protected:
     ~WebSettings() { }

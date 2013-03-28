@@ -26,12 +26,16 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+import logging
+import sys
 import urllib2
 
 from webkitpy.tool.steps.abstractstep import AbstractStep
 from webkitpy.tool.steps.options import Options
 from webkitpy.common.config import urls
-from webkitpy.common.system.deprecated_logging import log, error
+from webkitpy.common.net.networktransaction import NetworkTimeout
+
+_log = logging.getLogger(__name__)
 
 
 class UpdateChromiumDEPS(AbstractStep):
@@ -43,31 +47,54 @@ class UpdateChromiumDEPS(AbstractStep):
 
     # Notice that this method throws lots of exciting exceptions!
     def _fetch_last_known_good_revision(self):
-        return int(urllib2.urlopen(urls.chromium_lkgr_url).read())
+        return int(self._tool.web.get_binary(urls.chromium_lkgr_url))
+
+    @classmethod
+    def _parse_revision_number(cls, revision):
+        try:
+            if isinstance(revision, int):
+                return revision
+            if isinstance(revision, str):
+                return int(revision.lstrip('r'))
+            return None
+        except ValueError:
+            return None
 
     def _validate_revisions(self, current_chromium_revision, new_chromium_revision):
         if new_chromium_revision < current_chromium_revision:
             message = "Current Chromium DEPS revision %s is newer than %s." % (current_chromium_revision, new_chromium_revision)
             if self._options.non_interactive:
-                error(message)  # Causes the process to terminate.
-            log(message)
+                _log.error(message)
+                sys.exit(1)
+            _log.info(message)
             new_chromium_revision = self._tool.user.prompt("Enter new chromium revision (enter nothing to cancel):\n")
             try:
                 new_chromium_revision = int(new_chromium_revision)
             except ValueError, TypeError:
                 new_chromium_revision = None
             if not new_chromium_revision:
-                error("Unable to update Chromium DEPS")
-
+                _log.error("Unable to update Chromium DEPS.")
+                sys.exit(1)
 
     def run(self, state):
-        # Note that state["chromium_revision"] must be defined, but can be None.
         new_chromium_revision = state["chromium_revision"]
-        if not new_chromium_revision:
-            new_chromium_revision = self._fetch_last_known_good_revision()
+        if new_chromium_revision == "LKGR":
+            try:
+                new_chromium_revision = self._fetch_last_known_good_revision()
+            except ValueError:
+                _log.error("Unable to parse LKGR from: ", urls.chromium_lkgr_url)
+                sys.exit(1)
+            except NetworkTimeout:
+                _log.error("Unable to reach LKGR source: ", urls.chromium_lkgr_url)
+                sys.exit(1)
+        else:
+            new_chromium_revision = self._parse_revision_number(new_chromium_revision)
+            if not new_chromium_revision:
+                _log.error("Invalid revision number.")
+                sys.exit(1)
 
         deps = self._tool.checkout().chromium_deps()
         current_chromium_revision = deps.read_variable("chromium_rev")
         self._validate_revisions(current_chromium_revision, new_chromium_revision)
-        log("Updating Chromium DEPS to %s" % new_chromium_revision)
+        _log.info("Updating Chromium DEPS to %s" % new_chromium_revision)
         deps.write_variable("chromium_rev", new_chromium_revision)

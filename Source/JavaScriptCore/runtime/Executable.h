@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010 Apple Inc. All rights reserved.
+ * Copyright (C) 2009, 2010, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -27,14 +27,16 @@
 #define Executable_h
 
 #include "CallData.h"
+#include "CodeBlockHash.h"
 #include "CodeSpecializationKind.h"
 #include "HandlerInfo.h"
 #include "JSFunction.h"
 #include "Interpreter.h"
+#include "JITCode.h"
 #include "JSGlobalObject.h"
 #include "LLIntCLoop.h"
-#include "Nodes.h"
 #include "SamplingTool.h"
+#include "SourceCode.h"
 #include "UnlinkedCodeBlock.h"
 #include <wtf/PassOwnPtr.h>
 
@@ -86,6 +88,8 @@ namespace JSC {
         static const bool hasImmortalStructure = true;
         static void destroy(JSCell*);
 #endif
+        
+        CodeBlockHash hashFor(CodeSpecializationKind) const;
 
         bool isFunctionExecutable()
         {
@@ -173,16 +177,6 @@ namespace JSC {
             return hasJITCodeForConstruct();
         }
 
-        // Intrinsics are only for calls, currently.
-        Intrinsic intrinsic() const;
-        
-        Intrinsic intrinsicFor(CodeSpecializationKind kind) const
-        {
-            if (isCall(kind))
-                return intrinsic();
-            return NoIntrinsic;
-        }
-        
         static ptrdiff_t offsetOfJITCodeFor(CodeSpecializationKind kind)
         {
             if (kind == CodeForCall)
@@ -208,6 +202,16 @@ namespace JSC {
         }
 #endif // ENABLE(JIT)
 
+        // Intrinsics are only for calls, currently.
+        Intrinsic intrinsic() const;
+        
+        Intrinsic intrinsicFor(CodeSpecializationKind kind) const
+        {
+            if (isCall(kind))
+                return intrinsic();
+            return NoIntrinsic;
+        }
+        
 #if ENABLE(JIT) || ENABLE(LLINT_C_LOOP)
         MacroAssemblerCodePtr hostCodeEntryFor(CodeSpecializationKind kind)
         {
@@ -295,8 +299,26 @@ namespace JSC {
         static void destroy(JSCell*);
 #endif
 
+        CodeBlockHash hashFor(CodeSpecializationKind) const;
+
         NativeFunction function() { return m_function; }
         NativeFunction constructor() { return m_constructor; }
+        
+        NativeFunction nativeFunctionFor(CodeSpecializationKind kind)
+        {
+            if (kind == CodeForCall)
+                return function();
+            ASSERT(kind == CodeForConstruct);
+            return constructor();
+        }
+        
+        static ptrdiff_t offsetOfNativeFunctionFor(CodeSpecializationKind kind)
+        {
+            if (kind == CodeForCall)
+                return OBJECT_OFFSETOF(NativeExecutable, m_function);
+            ASSERT(kind == CodeForConstruct);
+            return OBJECT_OFFSETOF(NativeExecutable, m_constructor);
+        }
 
         static Structure* createStructure(JSGlobalData& globalData, JSGlobalObject* globalObject, JSValue proto) { return Structure::create(globalData, globalObject, proto, TypeInfo(LeafType, StructureFlags), &s_info); }
         
@@ -352,8 +374,10 @@ namespace JSC {
 #if ENABLE(JIT)
         static void destroy(JSCell*);
 #endif
+        
+        CodeBlockHash hashFor(CodeSpecializationKind) const;
 
-        const SourceCode& source() { return m_source; }
+        const SourceCode& source() const { return m_source; }
         intptr_t sourceID() const { return m_source.providerID(); }
         const String& sourceURL() const { return m_source.provider()->url(); }
         int lineNo() const { return m_firstLine; }
@@ -406,7 +430,7 @@ namespace JSC {
 
         JSObject* compile(ExecState* exec, JSScope* scope)
         {
-            ASSERT(exec->globalData().dynamicGlobalObject);
+            RELEASE_ASSERT(exec->globalData().dynamicGlobalObject);
             JSObject* error = 0;
             if (!m_evalCodeBlock)
                 error = compileInternal(exec, scope, JITCode::bottomTierJIT());
@@ -477,13 +501,13 @@ namespace JSC {
         }
 
 
-        JSObject* initalizeGlobalProperties(JSGlobalData&, CallFrame*, JSScope*);
+        JSObject* initializeGlobalProperties(JSGlobalData&, CallFrame*, JSScope*);
 
         static void destroy(JSCell*);
 
         JSObject* compile(ExecState* exec, JSScope* scope)
         {
-            ASSERT(exec->globalData().dynamicGlobalObject);
+            RELEASE_ASSERT(exec->globalData().dynamicGlobalObject);
             JSObject* error = 0;
             if (!m_programCodeBlock)
                 error = compileInternal(exec, scope, JITCode::bottomTierJIT());
@@ -557,6 +581,11 @@ namespace JSC {
         static FunctionExecutable* fromGlobalCode(const Identifier& name, ExecState*, Debugger*, const SourceCode&, JSObject** exception);
 
         static void destroy(JSCell*);
+        
+        UnlinkedFunctionExecutable* unlinkedExecutable()
+        {
+            return m_unlinkedExecutable.get();
+        }
 
         // Returns either call or construct bytecode. This can be appropriate
         // for answering questions that that don't vary between call and construct --
@@ -569,13 +598,11 @@ namespace JSC {
             return *m_codeBlockForConstruct;
         }
         
-        FunctionCodeBlock* codeBlockWithBytecodeFor(CodeSpecializationKind);
-        
         PassOwnPtr<FunctionCodeBlock> produceCodeBlockFor(JSScope*, CodeSpecializationKind, JSObject*& exception);
 
         JSObject* compileForCall(ExecState* exec, JSScope* scope)
         {
-            ASSERT(exec->globalData().dynamicGlobalObject);
+            RELEASE_ASSERT(exec->globalData().dynamicGlobalObject);
             JSObject* error = 0;
             if (!m_codeBlockForCall)
                 error = compileForCallInternal(exec, scope, JITCode::bottomTierJIT());
@@ -603,7 +630,7 @@ namespace JSC {
 
         JSObject* compileForConstruct(ExecState* exec, JSScope* scope)
         {
-            ASSERT(exec->globalData().dynamicGlobalObject);
+            RELEASE_ASSERT(exec->globalData().dynamicGlobalObject);
             JSObject* error = 0;
             if (!m_codeBlockForConstruct)
                 error = compileForConstructInternal(exec, scope, JITCode::bottomTierJIT());
@@ -752,6 +779,7 @@ namespace JSC {
         : Base(globalData, scope->globalObject()->functionStructure())
         , m_executable(globalData, this, executable)
         , m_scope(globalData, this, scope)
+        , m_allocationProfileWatchpoint(InitializedBlind) // See comment in JSFunction.cpp concerning the reason for using InitializedBlind as opposed to InitializedWatching.
     {
     }
 
@@ -811,7 +839,7 @@ namespace JSC {
         case FunctionExecutableType:
             return jsCast<FunctionExecutable*>(this)->unlinkCalls();
         default:
-            ASSERT_NOT_REACHED();
+            RELEASE_ASSERT_NOT_REACHED();
         }
     }
 

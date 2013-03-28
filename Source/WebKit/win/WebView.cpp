@@ -45,6 +45,7 @@
 #include "WebEditorClient.h"
 #include "WebElementPropertyBag.h"
 #include "WebFrame.h"
+#include "WebFrameNetworkingContext.h"
 #include "WebGeolocationClient.h"
 #include "WebGeolocationPosition.h"
 #include "WebIconDatabase.h"
@@ -63,10 +64,9 @@
 #include "resource.h"
 #include <JavaScriptCore/APICast.h>
 #include <JavaScriptCore/InitializeThreading.h>
+#include <JavaScriptCore/JSCJSValue.h>
 #include <JavaScriptCore/JSLock.h>
-#include <JavaScriptCore/JSValue.h>
 #include <WebCore/AXObjectCache.h>
-#include <WebCore/AbstractDatabase.h>
 #include <WebCore/ApplicationCacheStorage.h>
 #include <WebCore/BString.h>
 #include <WebCore/BackForwardListImpl.h>
@@ -75,6 +75,7 @@
 #include <WebCore/ContextMenu.h>
 #include <WebCore/ContextMenuController.h>
 #include <WebCore/Cursor.h>
+#include <WebCore/DatabaseManager.h>
 #include <WebCore/Document.h>
 #include <WebCore/DocumentMarkerController.h>
 #include <WebCore/DragController.h>
@@ -102,10 +103,10 @@
 #include <WebCore/HistoryItem.h>
 #include <WebCore/HitTestRequest.h>
 #include <WebCore/HitTestResult.h>
+#include <WebCore/InitializeLogging.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/JSElement.h>
 #include <WebCore/KeyboardEvent.h>
-#include <WebCore/Logging.h>
 #include <WebCore/MIMETypeRegistry.h>
 #include <WebCore/MemoryCache.h>
 #include <WebCore/Page.h>
@@ -128,6 +129,7 @@
 #include <WebCore/ResourceHandle.h>
 #include <WebCore/ResourceHandleClient.h>
 #include <WebCore/ResourceRequest.h>
+#include <WebCore/RuntimeEnabledFeatures.h>
 #include <WebCore/SchemeRegistry.h>
 #include <WebCore/ScriptValue.h>
 #include <WebCore/Scrollbar.h>
@@ -152,7 +154,6 @@
 #if USE(CFNETWORK)
 #include <CFNetwork/CFURLCachePriv.h>
 #include <CFNetwork/CFURLProtocolPriv.h>
-#include <WebCore/CookieStorageCFNet.h>
 #include <WebKitSystemInterface/WebKitSystemInterface.h> 
 #endif
 
@@ -364,7 +365,6 @@ WebView::WebView()
     , m_isBeingDestroyed(false)
     , m_paintCount(0)
     , m_hasSpellCheckerDocumentTag(false)
-    , m_smartInsertDeleteEnabled(false)
     , m_didClose(false)
     , m_inIMEComposition(0)
     , m_toolTipHwnd(0)
@@ -372,7 +372,6 @@ WebView::WebView()
     , m_topLevelParent(0)
     , m_deleteBackingStoreTimerActive(false)
     , m_transparent(false)
-    , m_selectTrailingWhitespaceEnabled(false)
     , m_lastPanX(0)
     , m_lastPanY(0)
     , m_xOverpan(0)
@@ -1285,7 +1284,7 @@ bool WebView::canHandleRequest(const WebCore::ResourceRequest& request)
         return true;
 
 #if USE(CFNETWORK)
-    if (CFURLProtocolCanHandleRequest(request.cfURLRequest()))
+    if (CFURLProtocolCanHandleRequest(request.cfURLRequest(UpdateHTTPBody)))
         return true;
 
     // FIXME: Mac WebKit calls _representationExistsForURLScheme here
@@ -1333,7 +1332,7 @@ bool WebView::handleContextMenuEvent(WPARAM wParam, LPARAM lParam)
     m_page->contextMenuController()->clearContextMenu();
 
     IntPoint documentPoint(m_page->mainFrame()->view()->windowToContents(coords));
-    HitTestResult result = m_page->mainFrame()->eventHandler()->hitTestResultAtPoint(documentPoint, false);
+    HitTestResult result = m_page->mainFrame()->eventHandler()->hitTestResultAtPoint(documentPoint);
     Frame* targetFrame = result.innerNonSharedNode() ? result.innerNonSharedNode()->document()->frame() : m_page->focusController()->focusedOrMainFrame();
 
     targetFrame->view()->setCursor(pointerCursor());
@@ -1349,11 +1348,7 @@ bool WebView::handleContextMenuEvent(WPARAM wParam, LPARAM lParam)
     if (!coreMenu)
         return false;
 
-    Node* node = contextMenuController->hitTestResult().innerNonSharedNode();
-    if (!node)
-        return false;
-
-    Frame* frame = node->document()->frame();
+    Frame* frame = contextMenuController->hitTestResult().innerNodeFrame();
     if (!frame)
         return false;
 
@@ -1361,7 +1356,7 @@ bool WebView::handleContextMenuEvent(WPARAM wParam, LPARAM lParam)
     if (!view)
         return false;
 
-    POINT point(view->contentsToWindow(contextMenuController->hitTestResult().roundedPoint()));
+    POINT point(view->contentsToWindow(contextMenuController->hitTestResult().roundedPointInInnerNodeFrame()));
 
     // Translate the point to screen coordinates
     if (!::ClientToScreen(m_viewWindow, &point))
@@ -1372,12 +1367,12 @@ bool WebView::handleContextMenuEvent(WPARAM wParam, LPARAM lParam)
         m_uiDelegate->hasCustomMenuImplementation(&hasCustomMenus);
 
     if (hasCustomMenus)
-        m_uiDelegate->trackCustomPopupMenu((IWebView*)this, (OLE_HANDLE)(ULONG64)coreMenu->nativeMenu(), &point);
+        m_uiDelegate->trackCustomPopupMenu((IWebView*)this, (OLE_HANDLE)(ULONG64)coreMenu->platformContextMenu(), &point);
     else {
         // Surprisingly, TPM_RIGHTBUTTON means that items are selectable with either the right OR left mouse button
         UINT flags = TPM_RIGHTBUTTON | TPM_TOPALIGN | TPM_VERPOSANIMATION | TPM_HORIZONTAL
             | TPM_LEFTALIGN | TPM_HORPOSANIMATION;
-        ::TrackPopupMenuEx(coreMenu->nativeMenu(), flags, point.x, point.y, m_viewWindow, 0);
+        ::TrackPopupMenuEx(coreMenu->platformContextMenu(), flags, point.x, point.y, m_viewWindow, 0);
     }
 
     return true;
@@ -2655,11 +2650,15 @@ HRESULT STDMETHODCALLTYPE WebView::initWithFrame(
 #if !LOG_DISABLED
         initializeLoggingChannelsIfNecessary();
 #endif // !LOG_DISABLED
+
+        // Initialize our platform strategies first before invoking the rest
+        // of the initialization code which may depend on the strategies.
+        WebPlatformStrategies::initialize();
+
 #if ENABLE(SQL_DATABASE)
         WebKitInitializeWebDatabasesIfNecessary();
 #endif
         WebKitSetApplicationCachePathIfNecessary();
-        WebPlatformStrategies::initialize();
         Settings::setDefaultMinDOMTimerInterval(0.004);
 
         didOneTimeInitialization = true;
@@ -3602,7 +3601,7 @@ HRESULT STDMETHODCALLTYPE WebView::elementAtPoint(
     IntPoint webCorePoint = IntPoint(point->x, point->y);
     HitTestResult result = HitTestResult(webCorePoint);
     if (frame->contentRenderer())
-        result = frame->eventHandler()->hitTestResultAtPoint(webCorePoint, false);
+        result = frame->eventHandler()->hitTestResultAtPoint(webCorePoint);
     *elementDictionary = WebElementPropertyBag::createInstance(result);
     return S_OK;
 }
@@ -4081,32 +4080,34 @@ HRESULT STDMETHODCALLTYPE WebView::typingStyle(
 HRESULT STDMETHODCALLTYPE WebView::setSmartInsertDeleteEnabled( 
         /* [in] */ BOOL flag)
 {
-    m_smartInsertDeleteEnabled = !!flag;
-    if (m_smartInsertDeleteEnabled)
-        setSelectTrailingWhitespaceEnabled(false);
+    if (m_page->settings()->smartInsertDeleteEnabled() != !!flag) {
+        m_page->settings()->setSmartInsertDeleteEnabled(!!flag);
+        setSelectTrailingWhitespaceEnabled(!flag);
+    }
     return S_OK;
 }
     
 HRESULT STDMETHODCALLTYPE WebView::smartInsertDeleteEnabled( 
         /* [retval][out] */ BOOL* enabled)
 {
-    *enabled = m_smartInsertDeleteEnabled ? TRUE : FALSE;
+    *enabled = m_page->settings()->smartInsertDeleteEnabled() ? TRUE : FALSE;
     return S_OK;
 }
  
 HRESULT STDMETHODCALLTYPE WebView::setSelectTrailingWhitespaceEnabled( 
         /* [in] */ BOOL flag)
 {
-    m_selectTrailingWhitespaceEnabled = !!flag;
-    if (m_selectTrailingWhitespaceEnabled)
-        setSmartInsertDeleteEnabled(false);
+    if (m_page->settings()->selectTrailingWhitespaceEnabled() != !!flag) {
+        m_page->settings()->setSelectTrailingWhitespaceEnabled(!!flag);
+        setSmartInsertDeleteEnabled(!flag);
+    }
     return S_OK;
 }
     
 HRESULT STDMETHODCALLTYPE WebView::isSelectTrailingWhitespaceEnabled( 
         /* [retval][out] */ BOOL* enabled)
 {
-    *enabled = m_selectTrailingWhitespaceEnabled ? TRUE : FALSE;
+    *enabled = m_page->settings()->selectTrailingWhitespaceEnabled() ? TRUE : FALSE;
     return S_OK;
 }
 
@@ -4674,11 +4675,22 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
     hr = preferences->isCSSRegionsEnabled(&enabled);
     if (FAILED(hr))
         return hr;
-    settings->setCSSRegionsEnabled(!!enabled);
+    RuntimeEnabledFeatures::setCSSRegionsEnabled(!!enabled);
+
+    hr = preferences->areSeamlessIFramesEnabled(&enabled);
+    if (FAILED(hr))
+        return hr;
+    RuntimeEnabledFeatures::setSeamlessIFramesEnabled(!!enabled);
 
     hr = preferences->privateBrowsingEnabled(&enabled);
     if (FAILED(hr))
         return hr;
+#if PLATFORM(WIN) || USE(CFNETWORK)
+    if (enabled)
+        WebFrameNetworkingContext::ensurePrivateBrowsingSession();
+    else
+        WebFrameNetworkingContext::destroyPrivateBrowsingSession();
+#endif
     settings->setPrivateBrowsingEnabled(!!enabled);
 
     hr = preferences->sansSerifFontFamily(&str);
@@ -4806,7 +4818,7 @@ HRESULT WebView::notifyPreferencesChanged(IWebNotification* notification)
     hr = prefsPrivate->databasesEnabled(&enabled);
     if (FAILED(hr))
         return hr;
-    AbstractDatabase::setIsAvailable(enabled);
+    DatabaseManager::manager().setIsAvailable(enabled);
 #endif
 
     hr = prefsPrivate->localStorageEnabled(&enabled);
@@ -4960,9 +4972,7 @@ HRESULT updateSharedSettingsFromPreferencesIfNeeded(IWebPreferences* preferences
         return hr;
 
 #if USE(CFNETWORK)
-    // Set cookie storage accept policy
-    if (RetainPtr<CFHTTPCookieStorageRef> cookieStorage = currentCFHTTPCookieStorage())
-        CFHTTPCookieStorageSetCookieAcceptPolicy(cookieStorage.get(), acceptPolicy);
+    WebFrameNetworkingContext::setCookieAcceptPolicyForAllContexts(acceptPolicy);
 #endif
 
     return S_OK;
@@ -5471,15 +5481,11 @@ void WebView::resetIME(Frame* targetFrame)
 void WebView::updateSelectionForIME()
 {
     Frame* targetFrame = m_page->focusController()->focusedOrMainFrame();
-    if (!targetFrame || !targetFrame->editor()->hasComposition())
-        return;
     
-    if (targetFrame->editor()->ignoreCompositionSelectionChange())
+    if (!targetFrame)
         return;
 
-    unsigned start;
-    unsigned end;
-    if (!targetFrame->editor()->getCompositionSelection(start, end))
+    if (!targetFrame->editor()->cancelCompositionIfSelectionIsInvalid())
         resetIME(targetFrame);
 }
 
@@ -6191,7 +6197,7 @@ void WebView::enterFullscreenForNode(Node* node)
         return;
 
 #if ENABLE(VIDEO)
-    if (!static_cast<Element*>(node)->isMediaElement())
+    if (!toElement(node)->isMediaElement())
         return;
     HTMLMediaElement* videoElement = static_cast<HTMLMediaElement*>(node);
 
@@ -7001,3 +7007,4 @@ HRESULT STDMETHODCALLTYPE WebView::selectedRangeForTesting(/* [out] */ UINT* loc
 
     return S_OK;
 }
+

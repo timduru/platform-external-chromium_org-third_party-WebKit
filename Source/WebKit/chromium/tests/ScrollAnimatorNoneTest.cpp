@@ -65,7 +65,7 @@ public:
     MOCK_CONST_METHOD0(enclosingScrollableArea, ScrollableArea*());
     MOCK_CONST_METHOD0(minimumScrollPosition, IntPoint());
     MOCK_CONST_METHOD0(maximumScrollPosition, IntPoint());
-    MOCK_CONST_METHOD1(visibleContentRect, IntRect(bool));
+    MOCK_CONST_METHOD1(visibleContentRect, IntRect(VisibleContentRectIncludesScrollbars));
     MOCK_CONST_METHOD0(contentsSize, IntSize());
     MOCK_CONST_METHOD0(overhangAmount, IntSize());
     MOCK_CONST_METHOD0(scrollbarsCanBeActive, bool());
@@ -145,30 +145,6 @@ TEST(ScrollAnimatorEnabled, Enabled)
     EXPECT_EQ(0, scrollAnimatorNone.currentY());
     scrollAnimatorNone.reset();
 }
-
-TEST(ScrollAnimatorEnabled, flingScrollEncoding)
-{
-    MockScrollableArea scrollableArea(true);
-    MockScrollAnimatorNone scrollAnimatorNone(&scrollableArea);
-
-    scrollAnimatorNone.reset();
-
-    scrollAnimatorNone.scroll(HorizontalScrollbar, ScrollByPixelVelocity, 111, -42);
-    scrollAnimatorNone.scroll(VerticalScrollbar, ScrollByPixelVelocity, 222, 42);
-    EXPECT_EQ(-42, scrollAnimatorNone.m_fp.x());
-    EXPECT_EQ(42, scrollAnimatorNone.m_fp.y());
-    EXPECT_EQ(1, scrollAnimatorNone.m_count);
-    scrollAnimatorNone.reset();
-
-    scrollAnimatorNone.scroll(VerticalScrollbar, ScrollByPixelVelocity, 222, 42);
-    scrollAnimatorNone.scroll(HorizontalScrollbar, ScrollByPixelVelocity, 111, -42);
-    EXPECT_EQ(-42, scrollAnimatorNone.m_fp.x());
-    EXPECT_EQ(42, scrollAnimatorNone.m_fp.y());
-    EXPECT_EQ(1, scrollAnimatorNone.m_count);
-    scrollAnimatorNone.reset();
-}
-
-
 
 TEST(ScrollAnimatorEnabled, Disabled)
 {

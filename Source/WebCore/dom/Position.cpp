@@ -28,17 +28,19 @@
 
 #include "CSSComputedStyleDeclaration.h"
 #include "HTMLNames.h"
+#include "InlineIterator.h"
 #include "InlineTextBox.h"
 #include "Logging.h"
 #include "PositionIterator.h"
 #include "RenderBlock.h"
+#include "RenderInline.h"
 #include "RenderText.h"
 #include "RuntimeEnabledFeatures.h"
 #include "Text.h"
 #include "TextIterator.h"
 #include "VisiblePosition.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
-#include "visible_units.h"
 #include <stdio.h>
 #include <wtf/text/CString.h>
 #include <wtf/unicode/CharacterNames.h>
@@ -87,6 +89,7 @@ Position::Position(PassRefPtr<Node> anchorNode, LegacyEditingOffset offset)
 #else
     ASSERT(!m_anchorNode || !m_anchorNode->isShadowRoot());
 #endif
+    ASSERT(!m_anchorNode || !m_anchorNode->isPseudoElement());
 }
 
 Position::Position(PassRefPtr<Node> anchorNode, AnchorType anchorType)
@@ -101,6 +104,8 @@ Position::Position(PassRefPtr<Node> anchorNode, AnchorType anchorType)
 #else
     ASSERT(!m_anchorNode || !m_anchorNode->isShadowRoot());
 #endif
+
+    ASSERT(!m_anchorNode || !m_anchorNode->isPseudoElement());
 
     ASSERT(anchorType != PositionIsOffsetInAnchor);
     ASSERT(!((anchorType == PositionIsBeforeChildren || anchorType == PositionIsAfterChildren)
@@ -119,6 +124,8 @@ Position::Position(PassRefPtr<Node> anchorNode, int offset, AnchorType anchorTyp
 #else
     ASSERT(!m_anchorNode || !editingIgnoresContent(m_anchorNode.get()) || !m_anchorNode->isShadowRoot());
 #endif
+
+    ASSERT(!m_anchorNode || !m_anchorNode->isPseudoElement());
 
     ASSERT(anchorType == PositionIsOffsetInAnchor);
 }
@@ -293,7 +300,7 @@ Element* Position::element() const
     Node* n = anchorNode();
     while (n && !n->isElementNode())
         n = n->parentNode();
-    return static_cast<Element*>(n);
+    return toElement(n);
 }
 
 PassRefPtr<CSSComputedStyleDeclaration> Position::computedStyle() const
@@ -836,13 +843,19 @@ Position Position::downstream(EditingBoundaryCrossingRule rule) const
     return lastVisible;
 }
 
+static int boundingBoxLogicalHeight(RenderObject *o, const IntRect &rect)
+{
+    return o->style()->isHorizontalWritingMode() ? rect.height() : rect.width();
+}
+
 bool Position::hasRenderedNonAnonymousDescendantsWithHeight(RenderObject* renderer)
 {
     RenderObject* stop = renderer->nextInPreOrderAfterChildren();
     for (RenderObject *o = renderer->firstChild(); o && o != stop; o = o->nextInPreOrder())
-        if (o->node()) {
-            if ((o->isText() && toRenderText(o)->linesBoundingBox().height()) ||
-                (o->isBox() && toRenderBox(o)->borderBoundingBox().height()))
+        if (o->nonPseudoNode()) {
+            if ((o->isText() && boundingBoxLogicalHeight(o, toRenderText(o)->linesBoundingBox()))
+                || (o->isBox() && toRenderBox(o)->pixelSnappedLogicalHeight())
+                || (o->isRenderInline() && isEmptyInline(o) && boundingBoxLogicalHeight(o, toRenderInline(o)->linesBoundingBox())))
                 return true;
         }
     return false;
@@ -920,7 +933,7 @@ bool Position::isCandidate() const
         return false;
         
     if (renderer->isBlockFlow()) {
-        if (toRenderBlock(renderer)->height() || m_anchorNode->hasTagName(bodyTag)) {
+        if (toRenderBlock(renderer)->logicalHeight() || m_anchorNode->hasTagName(bodyTag)) {
             if (!Position::hasRenderedNonAnonymousDescendantsWithHeight(renderer))
                 return atFirstEditingPositionForNode() && !Position::nodeIsUserSelectNone(deprecatedNode());
             return m_anchorNode->rendererIsEditable() && !Position::nodeIsUserSelectNone(deprecatedNode()) && atEditingBoundary();

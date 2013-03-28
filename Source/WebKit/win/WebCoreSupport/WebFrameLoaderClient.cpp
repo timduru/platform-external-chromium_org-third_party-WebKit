@@ -419,14 +419,15 @@ void WebFrameLoaderClient::dispatchDidFinishLoad()
 void WebFrameLoaderClient::dispatchDidLayout(LayoutMilestones milestones)
 {
     WebView* webView = m_webFrame->webView();
-    COMPtr<IWebFrameLoadDelegatePrivate> frameLoadDelegatePrivate;
 
     if (milestones & DidFirstLayout) {
+        COMPtr<IWebFrameLoadDelegatePrivate> frameLoadDelegatePrivate;
         if (SUCCEEDED(webView->frameLoadDelegatePrivate(&frameLoadDelegatePrivate)) && frameLoadDelegatePrivate)
             frameLoadDelegatePrivate->didFirstLayoutInFrame(webView, m_webFrame);
     }
 
     if (milestones & DidFirstVisuallyNonEmptyLayout) {
+        COMPtr<IWebFrameLoadDelegatePrivate> frameLoadDelegatePrivate;
         if (SUCCEEDED(webView->frameLoadDelegatePrivate(&frameLoadDelegatePrivate)) && frameLoadDelegatePrivate)
             frameLoadDelegatePrivate->didFirstVisuallyNonEmptyLayoutInFrame(webView, m_webFrame);
     }
@@ -882,7 +883,7 @@ void WebFrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
 {
     // Ideally, this function shouldn't be necessary, see <rdar://problem/4852889>
     if (!pluginWidget || pluginWidget->isPluginView())
-        m_manualLoader = static_cast<PluginView*>(pluginWidget);
+        m_manualLoader = toPluginView(pluginWidget);
     else 
         m_manualLoader = static_cast<EmbeddedWidget*>(pluginWidget);
 }

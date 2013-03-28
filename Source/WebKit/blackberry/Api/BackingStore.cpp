@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2009, 2010, 2011, 2012 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2009, 2010, 2011, 2012, 2013 Research In Motion Limited. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Lesser General Public
@@ -48,8 +48,6 @@
 #include <BlackBerryPlatformSettings.h>
 #include <BlackBerryPlatformViewportAccessor.h>
 #include <BlackBerryPlatformWindow.h>
-
-#include <SkImageDecoder.h>
 
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
@@ -121,7 +119,7 @@ static Divisor bestDivisor(Platform::IntSize size, int tileWidth, int tileHeight
     ASSERT(!surfacePool->isEmpty());
 
     // Store a static list of possible divisors.
-    static DivisorList divisorList = divisors(surfacePool->size());
+    static DivisorList divisorList = divisors(surfacePool->numberOfBackingStoreFrontBuffers());
 
     // The ratio we're looking to best imitate.
     float ratio = static_cast<float>(size.width()) / static_cast<float>(size.height());
@@ -140,9 +138,10 @@ static Divisor bestDivisor(Platform::IntSize size, int tileWidth, int tileHeight
         if (isPerfectWidth || isPerfectHeight) {
             bestDivisor = divisor; // Found a perfect fit!
 #if DEBUG_TILEMATRIX
-            BBLOG(BlackBerry::Platform::LogLevelCritical, "bestDivisor found perfect size isPerfectWidth=%s isPerfectHeight=%s",
-                                   isPerfectWidth ? "true" : "false",
-                                   isPerfectHeight ? "true" : "false");
+            Platform::logAlways(Platform::LogLevelCritical,
+                "bestDivisor found perfect size isPerfectWidth=%s isPerfectHeight=%s",
+                isPerfectWidth ? "true" : "false",
+                isPerfectHeight ? "true" : "false");
 #endif
             break;
         }
@@ -168,22 +167,6 @@ static Divisor bestDivisor(Platform::IntSize size, int tileWidth, int tileHeight
     return bestDivisor;
 }
 
-struct BackingStoreMutexLocker {
-    BackingStoreMutexLocker(BackingStorePrivate* backingStorePrivate)
-        : m_backingStorePrivate(backingStorePrivate)
-    {
-        m_backingStorePrivate->lockBackingStore();
-    }
-
-    ~BackingStoreMutexLocker()
-    {
-        m_backingStorePrivate->unlockBackingStore();
-    }
-
-private:
-    BackingStorePrivate* m_backingStorePrivate;
-};
-
 Platform::IntRect BackingStoreGeometry::backingStoreRect() const
 {
     return Platform::IntRect(backingStoreOffset(), backingStoreSize());
@@ -194,34 +177,33 @@ Platform::IntSize BackingStoreGeometry::backingStoreSize() const
     return Platform::IntSize(numberOfTilesWide() * BackingStorePrivate::tileWidth(), numberOfTilesHigh() * BackingStorePrivate::tileHeight());
 }
 
+bool BackingStoreGeometry::isTileCorrespondingToBuffer(TileIndex index, TileBuffer* tileBuffer) const
+{
+    return tileBuffer
+        && scale() == tileBuffer->lastRenderScale()
+        && originOfTile(index) == tileBuffer->lastRenderOrigin();
+}
+
 BackingStorePrivate::BackingStorePrivate()
-    : m_suspendScreenUpdates(0)
+    : m_suspendScreenUpdateCounterWebKitThread(0)
     , m_suspendBackingStoreUpdates(0)
+    , m_suspendGeometryUpdates(0)
     , m_resumeOperation(BackingStore::None)
+    , m_suspendScreenUpdatesWebKitThread(true)
+    , m_suspendScreenUpdatesUserInterfaceThread(true)
     , m_suspendRenderJobs(false)
     , m_suspendRegularRenderJobs(false)
+    , m_tileMatrixContainsUsefulContent(false)
+    , m_tileMatrixNeedsUpdate(false)
     , m_isScrollingOrZooming(false)
     , m_webPage(0)
     , m_client(0)
     , m_renderQueue(adoptPtr(new RenderQueue(this)))
-    , m_defersBlit(true)
     , m_hasBlitJobs(false)
     , m_webPageBackgroundColor(WebCore::Color::white)
-    , m_currentWindowBackBuffer(0)
     , m_preferredTileMatrixDimension(Vertical)
-#if USE(ACCELERATED_COMPOSITING)
-    , m_isDirectRenderingAnimationMessageScheduled(false)
-#endif
 {
     m_frontState = reinterpret_cast<unsigned>(new BackingStoreGeometry);
-    m_backState = reinterpret_cast<unsigned>(new BackingStoreGeometry);
-
-    // Need a recursive mutex to achieve a global lock.
-    pthread_mutexattr_t attr;
-    pthread_mutexattr_init(&attr);
-    pthread_mutexattr_settype(&attr, PTHREAD_MUTEX_RECURSIVE);
-    pthread_mutex_init(&m_mutex, &attr);
-    pthread_mutexattr_destroy(&attr);
 }
 
 BackingStorePrivate::~BackingStorePrivate()
@@ -229,45 +211,20 @@ BackingStorePrivate::~BackingStorePrivate()
     BackingStoreGeometry* front = reinterpret_cast<BackingStoreGeometry*>(m_frontState);
     delete front;
     m_frontState = 0;
-
-    BackingStoreGeometry* back = reinterpret_cast<BackingStoreGeometry*>(m_backState);
-    delete back;
-    m_backState = 0;
-
-    pthread_mutex_destroy(&m_mutex);
 }
 
 void BackingStorePrivate::instrumentBeginFrame()
 {
-    WebCore::InspectorInstrumentation::didBeginFrame(WebPagePrivate::core(m_webPage));
+#if ENABLE(INSPECTOR)
+    WebPagePrivate::core(m_webPage)->inspectorController()->didBeginFrame();
+#endif
 }
 
 void BackingStorePrivate::instrumentCancelFrame()
 {
-    WebCore::InspectorInstrumentation::didCancelFrame(WebPagePrivate::core(m_webPage));
-}
-
-bool BackingStorePrivate::shouldDirectRenderingToWindow() const
-{
-    // Direct rendering doesn't work with OpenGL compositing code paths due to
-    // a race condition on which thread's EGL context gets to make the surface
-    // current, see PR 105750.
-    // As a workaround, we will be using compositor to draw the root layer.
-    if (isOpenGLCompositing())
-        return false;
-
-    if (m_webPage->settings()->isDirectRenderingToWindowEnabled())
-        return true;
-
-    // If the BackingStore is inactive, see if there's a compositor to do the
-    // work of rendering the root layer.
-    if (!isActive())
-        return !m_webPage->d->compositorDrawsRootLayer();
-
-    const BackingStoreGeometry* currentState = frontState();
-    const unsigned tilesNecessary = minimumNumberOfTilesWide() * minimumNumberOfTilesHigh();
-    const unsigned tilesAvailable = currentState->numberOfTilesWide() * currentState->numberOfTilesHigh();
-    return tilesAvailable < tilesNecessary;
+#if ENABLE(INSPECTOR)
+    WebPagePrivate::core(m_webPage)->inspectorController()->didCancelFrame();
+#endif
 }
 
 bool BackingStorePrivate::isOpenGLCompositing() const
@@ -279,34 +236,99 @@ bool BackingStorePrivate::isOpenGLCompositing() const
     return true;
 }
 
-void BackingStorePrivate::suspendScreenAndBackingStoreUpdates()
+void BackingStorePrivate::suspendBackingStoreUpdates()
 {
-    if (m_suspendScreenUpdates) {
-        BBLOG(BlackBerry::Platform::LogLevelInfo,
-            "Screen and backingstore already suspended, increasing suspend counter.");
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
+
+    if (m_suspendBackingStoreUpdates) {
+        BBLOG(Platform::LogLevelInfo,
+            "Backingstore already suspended, increasing suspend counter.");
     }
 
     ++m_suspendBackingStoreUpdates;
+}
+
+void BackingStorePrivate::suspendGeometryUpdates()
+{
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
+
+    if (m_suspendGeometryUpdates) {
+        BBLOG(Platform::LogLevelInfo,
+            "Backingstore geometry already suspended, increasing suspend counter.");
+    }
+
+    ++m_suspendGeometryUpdates;
+}
+
+void BackingStorePrivate::suspendScreenUpdates()
+{
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
+
+    if (m_suspendScreenUpdateCounterWebKitThread) {
+        BBLOG(Platform::LogLevelInfo,
+            "Screen already suspended, increasing suspend counter.");
+    }
 
     // Make sure the user interface thread gets the message before we proceed
     // because blitVisibleContents() can be called from the user interface
     // thread and it must honor this flag.
-    ++m_suspendScreenUpdates;
-
-    BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
+    ++m_suspendScreenUpdateCounterWebKitThread;
+    updateSuspendScreenUpdateState();
 }
 
-void BackingStorePrivate::resumeScreenAndBackingStoreUpdates(BackingStore::ResumeUpdateOperation op)
+void BackingStorePrivate::resumeBackingStoreUpdates()
 {
-    ASSERT(m_suspendScreenUpdates);
-    ASSERT(m_suspendBackingStoreUpdates);
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
 
-    // Both variables are similar except for the timing of setting them.
-    ASSERT(m_suspendScreenUpdates == m_suspendBackingStoreUpdates);
+    ASSERT(m_suspendBackingStoreUpdates >= 1);
+    if (m_suspendBackingStoreUpdates < 1) {
+        Platform::logAlways(Platform::LogLevelCritical,
+            "Call mismatch: Backingstore hasn't been suspended, therefore won't resume!");
+        return;
+    }
 
-    if (!m_suspendScreenUpdates || !m_suspendBackingStoreUpdates) {
-        BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical,
-            "Call mismatch: Screen and backingstore haven't been suspended, therefore won't resume!");
+    // Set a flag indicating that we're about to resume backingstore updates and
+    // the tile matrix should be updated as a consequence by the first render
+    // job that happens after this resumption of backingstore updates.
+    if (m_suspendBackingStoreUpdates == 1)
+        setTileMatrixNeedsUpdate();
+
+    --m_suspendBackingStoreUpdates;
+
+    dispatchRenderJob();
+}
+
+
+void BackingStorePrivate::resumeGeometryUpdates()
+{
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
+
+    ASSERT(m_suspendGeometryUpdates >= 1);
+    if (m_suspendGeometryUpdates < 1) {
+        Platform::logAlways(Platform::LogLevelCritical,
+            "Call mismatch: Backingstore geometry hasn't been suspended, therefore won't resume!");
+        return;
+    }
+
+    // Set a flag indicating that we're about to resume geometry updates and
+    // the tile matrix should be updated as a consequence by the first render
+    // job that happens after this resumption of geometry updates.
+    if (m_suspendGeometryUpdates == 1)
+        setTileMatrixNeedsUpdate();
+
+    --m_suspendGeometryUpdates;
+
+    dispatchRenderJob();
+}
+
+void BackingStorePrivate::resumeScreenUpdates(BackingStore::ResumeUpdateOperation op)
+{
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
+    ASSERT(m_suspendScreenUpdateCounterWebKitThread);
+
+    if (!m_suspendScreenUpdateCounterWebKitThread) {
+        Platform::logAlways(Platform::LogLevelCritical,
+            "Call mismatch: Screen hasn't been suspended, therefore won't resume!");
         return;
     }
 
@@ -315,15 +337,12 @@ void BackingStorePrivate::resumeScreenAndBackingStoreUpdates(BackingStore::Resum
         || (m_resumeOperation == BackingStore::None && op == BackingStore::Blit))
         m_resumeOperation = op;
 
-    if (m_suspendScreenUpdates >= 2 && m_suspendBackingStoreUpdates >= 2) { // we're still suspended
-        BBLOG(BlackBerry::Platform::LogLevelInfo,
+    if (m_suspendScreenUpdateCounterWebKitThread >= 2) { // we're still suspended
+        BBLOG(Platform::LogLevelInfo,
             "Screen and backingstore still suspended, decreasing suspend counter.");
-        --m_suspendBackingStoreUpdates;
-        --m_suspendScreenUpdates;
+        --m_suspendScreenUpdateCounterWebKitThread;
         return;
     }
-
-    --m_suspendBackingStoreUpdates;
 
     op = m_resumeOperation;
     m_resumeOperation = BackingStore::None;
@@ -333,8 +352,8 @@ void BackingStorePrivate::resumeScreenAndBackingStoreUpdates(BackingStore::Resum
         if (isOpenGLCompositing() && !isActive()) {
             m_webPage->d->setCompositorDrawsRootLayer(true);
             m_webPage->d->setNeedsOneShotDrawingSynchronization();
-            --m_suspendScreenUpdates;
-            BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
+            --m_suspendScreenUpdateCounterWebKitThread;
+            updateSuspendScreenUpdateState();
             return;
         }
 
@@ -342,20 +361,28 @@ void BackingStorePrivate::resumeScreenAndBackingStoreUpdates(BackingStore::Resum
     }
 #endif
 
-    // For the direct rendering case, there is no such operation as blit,
-    // we have to render to get anything to the screen.
-    if (shouldDirectRenderingToWindow() && op == BackingStore::Blit)
-        op = BackingStore::RenderAndBlit;
+    // Render visible contents if necessary.
+    if (op == BackingStore::RenderAndBlit) {
+        updateTileMatrixIfNeeded();
+        TileIndexList visibleTiles = visibleTileIndexes(frontState());
+        TileIndexList renderedTiles = render(visibleTiles);
 
-    // Do some rendering if necessary.
-    if (op == BackingStore::RenderAndBlit)
-        renderVisibleContents();
+        if (renderedTiles.size() != visibleTiles.size()) {
+            // Add unrendered leftover tiles to the render queue.
+            for (unsigned i = 0; i < visibleTiles.size(); ++i) {
+                if (!renderedTiles.contains(visibleTiles[i])) {
+                    Platform::IntRect tileRect(frontState()->originOfTile(visibleTiles[i]), tileSize());
+                    m_renderQueue->addToQueue(RenderQueue::VisibleZoom, tileRect);
+                }
+            }
+        }
+    }
 
     // Make sure the user interface thread gets the message before we proceed
     // because blitVisibleContents() can be called from the user interface
     // thread and it must honor this flag.
-    --m_suspendScreenUpdates;
-    BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
+    --m_suspendScreenUpdateCounterWebKitThread;
+    updateSuspendScreenUpdateState();
 
     if (op == BackingStore::None)
         return;
@@ -368,17 +395,41 @@ void BackingStorePrivate::resumeScreenAndBackingStoreUpdates(BackingStore::Resum
     m_webPage->d->commitRootLayerIfNeeded();
 #else
     // Do some blitting if necessary.
-    if ((op == BackingStore::Blit || op == BackingStore::RenderAndBlit) && !shouldDirectRenderingToWindow())
+    if (op == BackingStore::Blit || op == BackingStore::RenderAndBlit)
         blitVisibleContents();
 #endif
+}
+
+void BackingStorePrivate::updateSuspendScreenUpdateState(bool* hasSyncedToUserInterfaceThread)
+{
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
+
+    bool isBackingStoreUsable = isActive() && m_tileMatrixContainsUsefulContent
+        && (m_suspendBackingStoreUpdates || !m_renderQueue->hasCurrentVisibleZoomJob()); // Backingstore is not usable while we're waiting for an ("atomic") zoom job to finish.
+
+    bool shouldSuspend = m_suspendScreenUpdateCounterWebKitThread
+        || !m_webPage->isVisible()
+        || (!isBackingStoreUsable && !m_webPage->d->compositorDrawsRootLayer());
+
+    if (m_suspendScreenUpdatesWebKitThread == shouldSuspend) {
+        if (hasSyncedToUserInterfaceThread)
+            *hasSyncedToUserInterfaceThread = false;
+        return;
+    }
+
+    m_suspendScreenUpdatesWebKitThread = shouldSuspend;
+
+    // FIXME: If we change the backingstore to dispatch geometries, this
+    //   assignment should be moved to a dispatched setter function instead.
+    m_suspendScreenUpdatesUserInterfaceThread = shouldSuspend;
+    BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
+    if (hasSyncedToUserInterfaceThread)
+        *hasSyncedToUserInterfaceThread = true;
 }
 
 void BackingStorePrivate::repaint(const Platform::IntRect& windowRect,
                                   bool contentChanged, bool immediate)
 {
-    if (m_suspendBackingStoreUpdates)
-        return;
-
      // If immediate is true, then we're being asked to perform synchronously.
      // NOTE: WebCore::ScrollView will call this method with immediate:true and contentChanged:false.
      // This is a special case introduced specifically for the Apple's windows port and can be safely ignored I believe.
@@ -399,20 +450,16 @@ void BackingStorePrivate::repaint(const Platform::IntRect& windowRect,
             return;
 
 #if DEBUG_WEBCORE_REQUESTS
-        BBLOG(BlackBerry::Platform::LogLevelCritical,
-                                  "BackingStorePrivate::repaint rect=%d,%d %dx%d contentChanged=%s immediate=%s",
-                                  rect.x(), rect.y(), rect.width(), rect.height(),
-                                  (contentChanged ? "true" : "false"),
-                                  (immediate ? "true" : "false"));
+        Platform::logAlways(Platform::LogLevelCritical,
+            "BackingStorePrivate::repaint rect=%s contentChanged=%s immediate=%s",
+            rect.toString().c_str(),
+            contentChanged ? "true" : "false",
+            immediate ? "true" : "false");
 #endif
 
-        if (immediate) {
-            if (render(rect)) {
-                if (!shouldDirectRenderingToWindow() && !m_webPage->d->commitRootLayerIfNeeded())
-                    blitVisibleContents();
-                m_webPage->d->m_client->notifyPixelContentRendered(rect);
-            }
-        } else
+        if (immediate)
+            renderAndBlitImmediately(rect);
+        else
             m_renderQueue->addToQueue(RenderQueue::RegularRender, rect);
     }
 }
@@ -432,21 +479,20 @@ void BackingStorePrivate::slowScroll(const Platform::IntSize& delta, const Platf
     // it needs to be transformed coordinates relative to the transformed contents.
     Platform::IntRect rect = m_webPage->d->mapToTransformed(m_client->mapFromViewportToContents(windowRect));
 
-    if (immediate) {
-        if (render(rect) && !isSuspended() && !shouldDirectRenderingToWindow() && !m_webPage->d->commitRootLayerIfNeeded())
-            blitVisibleContents();
-    } else {
+    if (immediate)
+        renderAndBlitImmediately(rect);
+    else {
         m_renderQueue->addToQueue(RenderQueue::VisibleScroll, rect);
-        // We only blit here if the client did not generate the scroll as the client
-        // now supports blitting asynchronously during scroll operations.
-        if (!m_client->isClientGeneratedScroll() && !shouldDirectRenderingToWindow())
+        // We only blit here if the client did not generate the scroll as the
+        // client supports blitting asynchronously during scroll operations.
+        if (!m_client->isClientGeneratedScroll())
             blitVisibleContents();
     }
 
 #if DEBUG_BACKINGSTORE
     // Stop the time measurement.
     double elapsed = WTF::currentTime() - time;
-    BBLOG(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::slowScroll elapsed=%f", elapsed);
+    Platform::logAlways(Platform::LogLevelCritical, "BackingStorePrivate::slowScroll elapsed=%f", elapsed);
 #endif
 }
 
@@ -455,14 +501,6 @@ void BackingStorePrivate::scroll(const Platform::IntSize& delta,
                                  const Platform::IntRect& clipRect)
 {
     ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
-
-    // If we are direct rendering then we are forced to go down the slow path
-    // to scrolling.
-    if (shouldDirectRenderingToWindow()) {
-        Platform::IntRect viewportRect(Platform::IntPoint(0, 0), m_webPage->d->transformedViewportSize());
-        slowScroll(delta, m_webPage->d->mapFromTransformed(viewportRect), true /*immediate*/);
-        return;
-    }
 
 #if DEBUG_BACKINGSTORE
     // Start the time measurement...
@@ -479,7 +517,7 @@ void BackingStorePrivate::scroll(const Platform::IntSize& delta,
 #if DEBUG_BACKINGSTORE
     // Stop the time measurement.
     double elapsed = WTF::currentTime() - time;
-    BBLOG(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::scroll dx=%d, dy=%d elapsed=%f", delta.width(), delta.height(), elapsed);
+    Platform::logAlways(Platform::LogLevelCritical, "BackingStorePrivate::scroll dx=%d, dy=%d elapsed=%f", delta.width(), delta.height(), elapsed);
 #endif
 }
 
@@ -510,7 +548,7 @@ bool BackingStorePrivate::shouldSuppressNonVisibleRegularRenderJobs() const
 
 bool BackingStorePrivate::shouldPerformRenderJobs() const
 {
-    return (m_webPage->isVisible() || shouldDirectRenderingToWindow()) && !m_suspendRenderJobs && !m_suspendBackingStoreUpdates && !m_renderQueue->isEmpty(!m_suspendRegularRenderJobs);
+    return isActive() && !m_suspendRenderJobs && !m_suspendBackingStoreUpdates && !m_renderQueue->isEmpty(!m_suspendRegularRenderJobs);
 }
 
 bool BackingStorePrivate::shouldPerformRegularRenderJobs() const
@@ -540,14 +578,10 @@ void BackingStorePrivate::renderJob()
     instrumentBeginFrame();
 
 #if DEBUG_BACKINGSTORE
-    BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::renderJob");
+    Platform::logAlways(Platform::LogLevelCritical, "BackingStorePrivate::renderJob");
 #endif
 
     m_renderQueue->render(!m_suspendRegularRenderJobs);
-
-#if USE(ACCELERATED_COMPOSITING)
-    m_webPage->d->commitRootLayerIfNeeded();
-#endif
 
     if (shouldPerformRenderJobs())
         dispatchRenderJob();
@@ -702,88 +736,55 @@ void BackingStorePrivate::setBackingStoreRect(const Platform::IntRect& backingSt
         return;
     }
 
-    Platform::IntRect currentBackingStoreRect = frontState()->backingStoreRect();
+    if (m_suspendBackingStoreUpdates || m_suspendGeometryUpdates)
+        return;
+
+    Platform::IntRect oldBackingStoreRect = frontState()->backingStoreRect();
     double currentScale = frontState()->scale();
 
-    if (backingStoreRect == currentBackingStoreRect && scale == currentScale)
+    if (backingStoreRect == oldBackingStoreRect && scale == currentScale)
         return;
 
 #if DEBUG_TILEMATRIX
-    BBLOG(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::setBackingStoreRect changed from (%d,%d %dx%d) to (%d,%d %dx%d)",
-                           currentBackingStoreRect.x(),
-                           currentBackingStoreRect.y(),
-                           currentBackingStoreRect.width(),
-                           currentBackingStoreRect.height(),
-                           backingStoreRect.x(),
-                           backingStoreRect.y(),
-                           backingStoreRect.width(),
-                           backingStoreRect.height());
+    Platform::logAlways(Platform::LogLevelCritical,
+        "BackingStorePrivate::setBackingStoreRect changed from %s to %s",
+        oldBackingStoreRect.toString().c_str(),
+        backingStoreRect.toString().c_str());
 #endif
 
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
+    BackingStoreGeometry* oldGeometry = frontState();
+    TileMap oldTileMap = oldGeometry->tileMap();
 
     TileIndexList indexesToFill = indexesForBackingStoreRect(backingStoreRect);
 
-    ASSERT(static_cast<int>(indexesToFill.size()) == currentMap.size());
+    ASSERT(static_cast<int>(indexesToFill.size()) == oldTileMap.size());
+
+    m_renderQueue->clear(oldBackingStoreRect, RenderQueue::DontClearRegularRenderJobs);
+    m_renderQueue->backingStoreRectChanging(oldBackingStoreRect, backingStoreRect);
 
     TileMap newTileMap;
     TileMap leftOverTiles;
 
     // Iterate through our current tile map and add tiles that are rendered with
     // our new backing store rect.
-    TileMap::const_iterator tileMapEnd = currentMap.end();
-    for (TileMap::const_iterator it = currentMap.begin(); it != tileMapEnd; ++it) {
+    TileMap::const_iterator tileMapEnd = oldTileMap.end();
+    for (TileMap::const_iterator it = oldTileMap.begin(); it != tileMapEnd; ++it) {
         TileIndex oldIndex = it->key;
-        BackingStoreTile* tile = it->value;
-
-        // Reset the old index.
-        resetTile(oldIndex, tile, false /*resetBackground*/);
-
-        // Origin of last committed render for tile in transformed content coordinates.
-        Platform::IntPoint origin = originOfLastRenderForTile(oldIndex, tile, currentBackingStoreRect);
+        TileBuffer* oldTileBuffer = it->value;
 
         // If the new backing store rect contains this origin, then insert the tile there
         // and mark it as no longer shifted. Note: Platform::IntRect::contains checks for a 1x1 rect
         // below and to the right of the origin so it is correct usage here.
-        if (backingStoreRect.contains(origin)) {
-            TileIndex newIndex = indexOfTile(origin, backingStoreRect);
-            Platform::IntRect rect(origin, tileSize());
-            if (m_renderQueue->regularRenderJobsPreviouslyAttemptedButNotRendered(rect)) {
-                // If the render queue previously tried to render this tile, but the
-                // backingstore wasn't in the correct place or the tile wasn't visible
-                // at the time then we can't simply restore the tile since the content
-                // is now invalid as far as WebKit is concerned. Instead, we clear
-                // the tile here of the region and then put the tile in the render
-                // queue again.
-
-                // Intersect the tile with the not rendered region to get the areas
-                // of the tile that we need to clear.
-                Platform::IntRectRegion tileNotRenderedRegion = Platform::IntRectRegion::intersectRegions(m_renderQueue->regularRenderJobsNotRenderedRegion(), rect);
-                clearAndUpdateTileOfNotRenderedRegion(newIndex, tile, tileNotRenderedRegion, backingStoreRect);
-#if DEBUG_BACKINGSTORE
-                Platform::IntRect extents = tileNotRenderedRegion.extents();
-                BBLOG(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::setBackingStoreRect did clear tile %d,%d %dx%d",
-                                       extents.x(), extents.y(), extents.width(), extents.height());
-#endif
-            } else {
-                // Mark as needing update.
-                if (!tile->frontBuffer()->isRendered(currentState->scale())
-                    && !isCurrentVisibleJob(newIndex, tile, backingStoreRect))
-                    updateTile(origin, false /*immediate*/);
-            }
-
-            // Do some bookkeeping with shifting tiles...
-            tile->clearShift();
-            tile->setCommitted(true);
+        if (oldTileBuffer && backingStoreRect.contains(oldTileBuffer->lastRenderOrigin())) {
+            TileIndex newIndex = indexOfTile(oldTileBuffer->lastRenderOrigin(), backingStoreRect);
 
             size_t i = indexesToFill.find(newIndex);
             ASSERT(i != WTF::notFound);
             indexesToFill.remove(i);
-            newTileMap.add(newIndex, tile);
+            newTileMap.add(newIndex, oldTileBuffer);
         } else {
             // Store this tile and index so we can add it to the remaining left over spots...
-            leftOverTiles.add(oldIndex, tile);
+            leftOverTiles.add(oldIndex, oldTileBuffer);
         }
     }
 
@@ -791,46 +792,74 @@ void BackingStorePrivate::setBackingStoreRect(const Platform::IntRect& backingSt
     size_t i = 0;
     TileMap::const_iterator leftOverEnd = leftOverTiles.end();
     for (TileMap::const_iterator it = leftOverTiles.begin(); it != leftOverEnd; ++it) {
-        TileIndex oldIndex = it->key;
-        BackingStoreTile* tile = it->value;
+        TileBuffer* oldTileBuffer = it->value;
         if (i >= indexesToFill.size()) {
             ASSERT_NOT_REACHED();
             break;
         }
 
         TileIndex newIndex = indexesToFill.at(i);
-
-        // Origin of last committed render for tile in transformed content coordinates.
-        Platform::IntPoint originOfOld = originOfLastRenderForTile(oldIndex, tile, currentBackingStoreRect);
-        // Origin of the new index for the new backing store rect.
-        Platform::IntPoint originOfNew = originOfTile(newIndex, backingStoreRect);
-
-        // Mark as needing update.
-        updateTile(originOfNew, false /*immediate*/);
-
-        tile->clearShift();
-        tile->setCommitted(false);
-        tile->setHorizontalShift((originOfOld.x() - originOfNew.x()) / tileWidth());
-        tile->setVerticalShift((originOfOld.y() - originOfNew.y()) / tileHeight());
-
-        newTileMap.add(newIndex, tile);
+        newTileMap.add(newIndex, oldTileBuffer);
 
         ++i;
     }
 
     // Checks to make sure we haven't lost any tiles.
-    ASSERT(currentMap.size() == newTileMap.size());
+    ASSERT(oldTileMap.size() == newTileMap.size());
 
-    backState()->setScale(scale);
-    backState()->setNumberOfTilesWide(backingStoreRect.width() / tileWidth());
-    backState()->setNumberOfTilesHigh(backingStoreRect.height() / tileHeight());
-    backState()->setBackingStoreOffset(backingStoreRect.location());
-    backState()->setTileMap(newTileMap);
+    BackingStoreGeometry* newGeometry = new BackingStoreGeometry;
+    newGeometry->setScale(scale);
+    newGeometry->setNumberOfTilesWide(backingStoreRect.width() / tileWidth());
+    newGeometry->setNumberOfTilesHigh(backingStoreRect.height() / tileHeight());
+    newGeometry->setBackingStoreOffset(backingStoreRect.location());
+    newGeometry->setTileMap(newTileMap);
+    adoptAsFrontState(newGeometry); // swap into UI thread
 
-    swapState();
+    // Mark tiles as needing update.
+    updateTilesAfterBackingStoreRectChange();
 }
 
-BackingStorePrivate::TileIndexList BackingStorePrivate::indexesForBackingStoreRect(const Platform::IntRect& backingStoreRect) const
+void BackingStorePrivate::updateTilesAfterBackingStoreRectChange()
+{
+    BackingStoreGeometry* geometry = frontState();
+    TileMap currentMap = geometry->tileMap();
+
+    TileMap::const_iterator end = currentMap.end();
+    for (TileMap::const_iterator it = currentMap.begin(); it != end; ++it) {
+        TileIndex index = it->key;
+        TileBuffer* tileBuffer = it->value;
+        Platform::IntPoint tileOrigin = geometry->originOfTile(index);
+        // The rect in transformed contents coordinates.
+        Platform::IntRect rect(tileOrigin, tileSize());
+
+        if (geometry->isTileCorrespondingToBuffer(index, tileBuffer)) {
+            if (m_renderQueue->regularRenderJobsPreviouslyAttemptedButNotRendered(rect)) {
+                // If the render queue previously tried to render this tile, but the
+                // tile wasn't visible at the time we can't simply restore the tile
+                // since the content is now invalid as far as WebKit is concerned.
+                // Instead, we clear that part of the tile if it is visible and then
+                // put the tile in the render queue again.
+
+                // Intersect the tile with the not rendered region to get the areas
+                // of the tile that we need to clear.
+                Platform::IntRectRegion tileNotRenderedRegion = Platform::IntRectRegion::intersectRegions(m_renderQueue->regularRenderJobsNotRenderedRegion(), rect);
+                clearAndUpdateTileOfNotRenderedRegion(index, tileBuffer, tileNotRenderedRegion, geometry);
+#if DEBUG_BACKINGSTORE
+                Platform::logAlways(Platform::LogLevelCritical,
+                    "BackingStorePrivate::updateTilesAfterBackingStoreRectChange did clear tile %s",
+                    tileNotRenderedRegion.extents().toString().c_str());
+#endif
+            } else {
+                if (!tileBuffer || !tileBuffer->isRendered(tileVisibleContentsRect(index, geometry), geometry->scale())
+                    && !isCurrentVisibleJob(index, geometry))
+                    updateTile(tileOrigin, false /*immediate*/);
+            }
+        } else if (rect.intersects(expandedContentsRect()))
+            updateTile(tileOrigin, false /*immediate*/);
+    }
+}
+
+TileIndexList BackingStorePrivate::indexesForBackingStoreRect(const Platform::IntRect& backingStoreRect) const
 {
     TileIndexList indexes;
     int numberOfTilesWide = backingStoreRect.width() / tileWidth();
@@ -842,18 +871,6 @@ BackingStorePrivate::TileIndexList BackingStorePrivate::indexesForBackingStoreRe
         }
     }
     return indexes;
-}
-
-Platform::IntPoint BackingStorePrivate::originOfLastRenderForTile(const TileIndex& index,
-                                                                 BackingStoreTile* tile,
-                                                                 const Platform::IntRect& backingStoreRect) const
-{
-    return originOfTile(indexOfLastRenderForTile(index, tile), backingStoreRect);
-}
-
-TileIndex BackingStorePrivate::indexOfLastRenderForTile(const TileIndex& index, BackingStoreTile* tile) const
-{
-    return TileIndex(index.i() + tile->horizontalShift(), index.j() + tile->verticalShift());
 }
 
 TileIndex BackingStorePrivate::indexOfTile(const Platform::IntPoint& origin,
@@ -868,37 +885,27 @@ TileIndex BackingStorePrivate::indexOfTile(const Platform::IntPoint& origin,
     return TileIndex(offsetX, offsetY);
 }
 
-void BackingStorePrivate::clearAndUpdateTileOfNotRenderedRegion(const TileIndex& index, BackingStoreTile* tile,
+void BackingStorePrivate::clearAndUpdateTileOfNotRenderedRegion(const TileIndex& index, TileBuffer* tileBuffer,
                                                                 const Platform::IntRectRegion& tileNotRenderedRegion,
-                                                                const Platform::IntRect& backingStoreRect,
+                                                                BackingStoreGeometry* geometry,
                                                                 bool update)
 {
     if (tileNotRenderedRegion.isEmpty())
         return;
 
-    // Intersect the tile with the not rendered region to get the areas
-    // of the tile that we need to clear.
-    IntRectList tileNotRenderedRegionRects = tileNotRenderedRegion.rects();
-    for (size_t i = 0; i < tileNotRenderedRegionRects.size(); ++i) {
-        Platform::IntRect tileNotRenderedRegionRect = tileNotRenderedRegionRects.at(i);
-        // Clear the render queue of this rect.
-        m_renderQueue->clear(tileNotRenderedRegionRect, true /*clearRegularRenderJobs*/);
+    // Clear the render queue of this region.
+    m_renderQueue->clear(tileNotRenderedRegion, RenderQueue::ClearAnyJobs);
 
-        if (update) {
-            // Add it again as a regular render job.
-            m_renderQueue->addToQueue(RenderQueue::RegularRender, tileNotRenderedRegionRect);
-        }
+    if (update) {
+        // Add it again as a regular render job.
+        m_renderQueue->addToQueue(RenderQueue::RegularRender, tileNotRenderedRegion);
     }
 
-    // Find the origin of this tile.
-    Platform::IntPoint origin = originOfTile(index, backingStoreRect);
-
-    // Map to tile coordinates.
-    Platform::IntRectRegion translatedRegion(tileNotRenderedRegion);
-    translatedRegion.move(-origin.x(), -origin.y());
+    if (!tileBuffer)
+        return;
 
     // If the region in question is already marked as not rendered, return early
-    if (Platform::IntRectRegion::intersectRegions(tile->frontBuffer()->renderedRegion(), translatedRegion).isEmpty())
+    if (Platform::IntRectRegion::intersectRegions(tileBuffer->renderedRegion(), tileNotRenderedRegion).isEmpty())
         return;
 
     // Clear the tile of this region. The back buffer region is invalid anyway, but the front
@@ -915,39 +922,27 @@ void BackingStorePrivate::clearAndUpdateTileOfNotRenderedRegion(const TileIndex&
 
     Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
         Platform::createMethodCallMessage(&BackingStorePrivate::clearRenderedRegion,
-            this, tile, translatedRegion));
+            this, tileBuffer, tileNotRenderedRegion));
 }
 
-void BackingStorePrivate::clearRenderedRegion(BackingStoreTile* tile, const Platform::IntRectRegion& region)
+void BackingStorePrivate::clearRenderedRegion(TileBuffer* tileBuffer, const Platform::IntRectRegion& region)
 {
     ASSERT(Platform::userInterfaceThreadMessageClient()->isCurrentThread());
     if (!Platform::userInterfaceThreadMessageClient()->isCurrentThread())
         return;
+    if (!tileBuffer)
+        return;
 
-    tile->frontBuffer()->clearRenderedRegion(region);
+    tileBuffer->clearRenderedRegion(region);
 }
 
-bool BackingStorePrivate::isCurrentVisibleJob(const TileIndex& index, BackingStoreTile* tile, const Platform::IntRect& backingStoreRect) const
+bool BackingStorePrivate::isCurrentVisibleJob(const TileIndex& index, BackingStoreGeometry* geometry) const
 {
-    // First check if the whole rect is in the queue.
-    Platform::IntRect wholeRect = Platform::IntRect(originOfTile(index, backingStoreRect), tileSize());
-    if (m_renderQueue->isCurrentVisibleScrollJob(wholeRect) || m_renderQueue->isCurrentVisibleScrollJobCompleted(wholeRect))
-        return true;
-
-    // Second check if the individual parts of the non-rendered region are in the regular queue.
-    IntRectList tileNotRenderedRegionRects = tile->frontBuffer()->notRenderedRegion().rects();
-    for (size_t i = 0; i < tileNotRenderedRegionRects.size(); ++i) {
-        Platform::IntRect tileNotRenderedRegionRect = tileNotRenderedRegionRects.at(i);
-        Platform::IntPoint origin = originOfTile(index, backingStoreRect);
-
-        // Map to transformed contents coordinates.
-        tileNotRenderedRegionRect.move(origin.x(), origin.y());
-
-        if (!m_renderQueue->isCurrentRegularRenderJob(tileNotRenderedRegionRect))
-            return false;
-    }
-
-    return true;
+    return m_renderQueue->isCurrentVisibleZoomJob(index)
+        || m_renderQueue->isCurrentVisibleScrollJob(index)
+        || m_renderQueue->isCurrentVisibleZoomJobCompleted(index)
+        || m_renderQueue->isCurrentVisibleScrollJobCompleted(index)
+        || m_renderQueue->isCurrentRegularRenderJob(index, geometry);
 }
 
 void BackingStorePrivate::scrollBackingStore(int deltaX, int deltaY)
@@ -973,9 +968,9 @@ void BackingStorePrivate::scrollBackingStore(int deltaX, int deltaY)
                                   m_preferredTileMatrixDimension);
 
 #if DEBUG_TILEMATRIX
-    BBLOG(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::scrollBackingStore divisor %dx%d",
-                           divisor.first,
-                           divisor.second);
+    Platform::logAlways(Platform::LogLevelCritical,
+        "BackingStorePrivate::scrollBackingStore divisor %dx%d",
+        divisor.first, divisor.second);
 #endif
 
     // Initialize a rect with that new geometry.
@@ -989,153 +984,126 @@ void BackingStorePrivate::scrollBackingStore(int deltaX, int deltaY)
     setBackingStoreRect(backingStoreRect, m_webPage->d->currentScale());
 }
 
-bool BackingStorePrivate::renderDirectToWindow(const Platform::IntRect& rect)
-{
-    requestLayoutIfNeeded();
-
-    Platform::IntRect dirtyRect = rect;
-    dirtyRect.intersect(unclippedVisibleContentsRect());
-
-    if (dirtyRect.isEmpty())
-        return false;
-
-    Platform::IntRect screenRect = m_client->mapFromTransformedContentsToTransformedViewport(dirtyRect);
-    windowFrontBufferState()->clearBlittedRegion(screenRect);
-
-    paintDefaultBackground(dirtyRect, m_webPage->webkitThreadViewportAccessor(), true /*flush*/);
-
-    const Platform::IntPoint origin = unclippedVisibleContentsRect().location();
-    // We don't need a buffer since we're direct rendering to window.
-    renderContents(0, origin, dirtyRect);
-    windowBackBufferState()->addBlittedRegion(screenRect);
-
-#if USE(ACCELERATED_COMPOSITING)
-    m_isDirectRenderingAnimationMessageScheduled = false;
-
-    if (m_webPage->d->isAcceleratedCompositingActive()) {
-        BlackBerry::Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
-            BlackBerry::Platform::createMethodCallMessage(
-                &BackingStorePrivate::drawAndBlendLayersForDirectRendering,
-                this, dirtyRect));
-    }
-#endif
-
-    invalidateWindow(screenRect);
-    return true;
-}
-
-bool BackingStorePrivate::render(const Platform::IntRect& rect)
+TileIndexList BackingStorePrivate::render(const TileIndexList& tileIndexList)
 {
     if (!m_webPage->isVisible())
-        return false;
+        return TileIndexList();
 
     requestLayoutIfNeeded();
 
-    if (shouldDirectRenderingToWindow())
-        return renderDirectToWindow(rect);
-
-    // If direct rendering is off, even though we're not active, someone else
-    // has to render the root layer. There are no tiles available for us to
-    // draw to.
+    // If no tiles available for us to draw to, someone else has to render the root layer.
     if (!isActive())
-        return false;
-
-    TileRectList tileRectList = mapFromTransformedContentsToTiles(rect);
-    if (tileRectList.isEmpty())
-        return false;
+        return TileIndexList();
 
 #if DEBUG_BACKINGSTORE
-    BBLOG(BlackBerry::Platform::LogLevelCritical,
-                           "BackingStorePrivate::render rect=(%d,%d %dx%d), m_suspendBackingStoreUpdates = %s",
-                           rect.x(), rect.y(), rect.width(), rect.height(),
-                           m_suspendBackingStoreUpdates ? "true" : "false");
+    Platform::logAlways(Platform::LogLevelInfo,
+        "BackingStorePrivate::render %d tiles, m_suspendBackingStoreUpdates = %s",
+        tileIndexList.size(),
+        m_suspendBackingStoreUpdates ? "true" : "false");
 #endif
 
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
-    double currentScale = currentState->scale();
+    ASSERT(!m_tileMatrixNeedsUpdate);
 
-    for (size_t i = 0; i < tileRectList.size(); ++i) {
-        TileRect tileRect = tileRectList[i];
-        TileIndex index = tileRect.first;
-        Platform::IntRect dirtyTileRect = tileRect.second;
-        BackingStoreTile* tile = currentMap.get(index);
+    if (tileIndexList.isEmpty())
+        return tileIndexList;
 
-        // This dirty tile rect is in tile coordinates, but it needs to be in
-        // transformed contents coordinates.
-        Platform::IntRect dirtyRect = mapFromTilesToTransformedContents(tileRect);
+    Platform::ViewportAccessor* viewportAccessor = m_webPage->webkitThreadViewportAccessor();
 
-        // If the tile has been created, but this is the first time we are painting on it
-        // then it hasn't been given a default background yet so that we can save time during
-        // startup. That's why we are doing it here instead...
-        if (!tile->backgroundPainted())
-            tile->paintBackground();
+    BackingStoreGeometry* geometry = frontState();
+    TileMap oldTileMap = geometry->tileMap();
+    double currentScale = geometry->scale();
 
-        tile->backBuffer()->setScale(currentScale);
+    BackingStoreGeometry* newGeometry = new BackingStoreGeometry;
+    newGeometry->setScale(geometry->scale());
+    newGeometry->setNumberOfTilesWide(geometry->numberOfTilesWide());
+    newGeometry->setNumberOfTilesHigh(geometry->numberOfTilesHigh());
+    newGeometry->setBackingStoreOffset(geometry->backingStoreOffset());
+    TileMap newTileMap(oldTileMap); // copy a new, writable version
+    TileIndexList renderedTiles;
+
+    for (size_t i = 0; i < tileIndexList.size(); ++i) {
+        if (!SurfacePool::globalSurfacePool()->numberOfAvailableBackBuffers()) {
+            newGeometry->setTileMap(newTileMap);
+            adoptAsFrontState(newGeometry); // this should get us at least one more.
+
+            // newGeometry is now the front state and shouldn't be messed with.
+            // Let's create a new one. (The old one will be automatically
+            // destroyed by adoptAsFrontState() on being swapped out again.)
+            geometry = frontState();
+            newGeometry = new BackingStoreGeometry;
+            newGeometry->setScale(geometry->scale());
+            newGeometry->setNumberOfTilesWide(geometry->numberOfTilesWide());
+            newGeometry->setNumberOfTilesHigh(geometry->numberOfTilesHigh());
+            newGeometry->setBackingStoreOffset(geometry->backingStoreOffset());
+        }
+
+        TileIndex index = tileIndexList[i];
+        Platform::IntPoint tileOrigin = newGeometry->originOfTile(index);
+        Platform::IntRect dirtyRect(tileOrigin, tileSize());
 
         // Paint default background if contents rect is empty.
         if (!expandedContentsRect().isEmpty()) {
             // Otherwise we should clip the contents size and render the content.
             dirtyRect.intersect(expandedContentsRect());
 
-            dirtyTileRect.intersect(tileContentsRect(index, expandedContentsRect(), currentState));
-
             // We probably have extra tiles since the contents size is so small.
             // Save some cycles here...
-            if (dirtyRect.isEmpty())
+            if (dirtyRect.isEmpty()) {
+#if DEBUG_BACKINGSTORE
+                Platform::logAlways(Platform::LogLevelInfo,
+                    "BackingStorePrivate::render skipping tile at %s, it's outside the expanded contents rect of %s",
+                    newGeometry->originOfTile(index).toString().c_str(),
+                    expandedContentsRect().toString().c_str());
+#endif
                 continue;
+            }
         }
 
-        BlackBerry::Platform::Graphics::Buffer* nativeBuffer
-            = tile->backBuffer()->nativeBuffer();
+        TileBuffer* backBuffer = SurfacePool::globalSurfacePool()->takeBackBuffer();
+        ASSERT(backBuffer);
+
+        backBuffer->paintBackground();
+        backBuffer->setLastRenderScale(currentScale);
+        backBuffer->setLastRenderOrigin(tileOrigin);
+        backBuffer->clearRenderedRegion();
+
+        BlackBerry::Platform::Graphics::Buffer* nativeBuffer = backBuffer->nativeBuffer();
+        BlackBerry::Platform::Graphics::setBufferOpaqueHint(nativeBuffer, !Color(m_webPage->settings()->backgroundColor()).hasAlpha());
 
         // TODO: This code is only needed for EGLImage code path, but preferrably BackingStore
         // should not know that, and the synchronization should be in BlackBerry::Platform::Graphics
         // if possible.
         if (isOpenGLCompositing())
-            SurfacePool::globalSurfacePool()->waitForBuffer(tile->backBuffer());
+            SurfacePool::globalSurfacePool()->waitForBuffer(backBuffer);
 
-        // Modify the buffer only after we've waited for the buffer to become available above.
+        const Platform::FloatPoint documentDirtyRectOrigin = viewportAccessor->toDocumentContents(dirtyRect.location(), currentScale);
+        const Platform::IntRect dstRect(dirtyRect.location() - tileOrigin, dirtyRect.size());
 
-        // If we're not yet committed, then commit only after the tile has back buffer has been
-        // swapped in so it has some valid content.
-        // Otherwise the compositing thread could pick up the tile while its front buffer is still invalid.
-        bool wasCommitted = tile->isCommitted();
-        if (wasCommitted)
-            copyPreviousContentsToBackSurfaceOfTile(dirtyTileRect, tile);
-        else
-            tile->backBuffer()->clearRenderedRegion();
-
-        // FIXME: modify render to take a Vector<IntRect> parameter so we're not recreating
-        // GraphicsContext on the stack each time.
-        renderContents(nativeBuffer, originOfTile(index), dirtyRect);
+        if (!renderContents(nativeBuffer, dstRect, currentScale, documentDirtyRectOrigin))
+            continue;
 
         // Add the newly rendered region to the tile so it can keep track for blits.
-        tile->backBuffer()->addRenderedRegion(dirtyTileRect);
+        backBuffer->addRenderedRegion(dirtyRect);
 
-        // Thanks to the copyPreviousContentsToBackSurfaceOfTile() call above, we know that
-        // the rendered region of the back buffer contains the rendered region of the front buffer.
-        // Assert this just to make sure.
-        // For previously uncommitted tiles, the front buffer's rendered region is not relevant.
-        ASSERT(!wasCommitted || tile->backBuffer()->isRendered(tile->frontBuffer()->renderedRegion(), currentScale));
-
-        // We will need a swap here because of the shared back buffer.
-        tile->swapBuffers();
-
-        if (!wasCommitted) {
-            // Commit the tile only after it has valid front buffer contents. Now, the compositing thread
-            // can finally start blitting this tile.
-            tile->clearShift();
-            tile->setCommitted(true);
-        }
-
-        // Before clearing the render region, wait for the compositing thread to stop using the
-        // buffer, in order to avoid a race on its rendered region.
-        BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
-        tile->backBuffer()->clearRenderedRegion();
+        renderedTiles.append(index);
+        newTileMap.set(index, backBuffer);
     }
 
-    return true;
+    // Let the render queue know that the tile contents are up to date now.
+    m_renderQueue->clear(renderedTiles, frontState(), RenderQueue::DontClearCompletedJobs);
+
+    // If we couldn't render all requested jobs, suspend blitting until we do.
+    updateSuspendScreenUpdateState();
+
+    newGeometry->setTileMap(newTileMap);
+    adoptAsFrontState(newGeometry);
+
+#if DEBUG_BACKINGSTORE
+    Platform::logAlways(Platform::LogLevelInfo,
+        "BackingStorePrivate::render done rendering %d tiles.",
+        renderedTiles.size());
+#endif
+    return renderedTiles;
 }
 
 void BackingStorePrivate::requestLayoutIfNeeded() const
@@ -1143,49 +1111,16 @@ void BackingStorePrivate::requestLayoutIfNeeded() const
     m_webPage->d->requestLayoutIfNeeded();
 }
 
-bool BackingStorePrivate::renderVisibleContents()
+void BackingStorePrivate::renderAndBlitVisibleContentsImmediately()
 {
-    Platform::IntRect renderRect = shouldDirectRenderingToWindow() ? visibleContentsRect() : visibleTilesRect();
-    if (render(renderRect)) {
-        m_renderQueue->clear(renderRect, true /*clearRegularRenderJobs*/);
-        return true;
-    }
-    return false;
+    renderAndBlitImmediately(visibleContentsRect());
 }
 
-bool BackingStorePrivate::renderBackingStore()
+void BackingStorePrivate::renderAndBlitImmediately(const Platform::IntRect& rect)
 {
-    return render(frontState()->backingStoreRect());
-}
-
-void BackingStorePrivate::copyPreviousContentsToBackSurfaceOfWindow()
-{
-    Platform::IntRectRegion previousContentsRegion
-        = Platform::IntRectRegion::subtractRegions(windowFrontBufferState()->blittedRegion(), windowBackBufferState()->blittedRegion());
-
-    if (previousContentsRegion.isEmpty())
-        return;
-
-    if (Window* window = m_webPage->client()->window())
-        window->copyFromFrontToBack(previousContentsRegion);
-    windowBackBufferState()->addBlittedRegion(previousContentsRegion);
-}
-
-void BackingStorePrivate::copyPreviousContentsToBackSurfaceOfTile(const Platform::IntRect& rect,
-                                                                  BackingStoreTile* tile)
-{
-    Platform::IntRectRegion previousContentsRegion
-        = Platform::IntRectRegion::subtractRegions(tile->frontBuffer()->renderedRegion(), rect);
-
-    IntRectList previousContentsRects = previousContentsRegion.rects();
-    for (size_t i = 0; i < previousContentsRects.size(); ++i) {
-        Platform::IntRect previousContentsRect = previousContentsRects.at(i);
-        tile->backBuffer()->addRenderedRegion(previousContentsRect);
-
-        BlackBerry::Platform::Graphics::blitToBuffer(
-            tile->backBuffer()->nativeBuffer(), previousContentsRect,
-            tile->frontBuffer()->nativeBuffer(), previousContentsRect);
-    }
+    updateTileMatrixIfNeeded();
+    m_renderQueue->addToQueue(RenderQueue::VisibleZoom, rect);
+    renderJob();
 }
 
 void BackingStorePrivate::paintDefaultBackground(const Platform::IntRect& dstRect, Platform::ViewportAccessor* viewportAccessor, bool flush)
@@ -1206,7 +1141,7 @@ void BackingStorePrivate::paintDefaultBackground(const Platform::IntRect& dstRec
     Platform::IntRectRegion overScrollRegion = Platform::IntRectRegion::subtractRegions(
         clippedDstRect, viewportAccessor->pixelViewportFromContents(pixelContentsRect));
 
-    IntRectList overScrollRects = overScrollRegion.rects();
+    std::vector<Platform::IntRect> overScrollRects = overScrollRegion.rects();
     for (size_t i = 0; i < overScrollRects.size(); ++i) {
         Platform::IntRect overScrollRect = overScrollRects.at(i);
 
@@ -1222,22 +1157,6 @@ void BackingStorePrivate::paintDefaultBackground(const Platform::IntRect& dstRec
 
 void BackingStorePrivate::blitVisibleContents(bool force)
 {
-    // Blitting must never happen for direct rendering case.
-    // Use invalidateWindow() instead.
-    ASSERT(!shouldDirectRenderingToWindow());
-    if (shouldDirectRenderingToWindow()) {
-        BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical,
-            "BackingStore::blitVisibleContents operation not supported in direct rendering mode");
-        return;
-    }
-
-    if (!m_webPage->isVisible() || m_suspendScreenUpdates) {
-        // Avoid client going into busy loop while blit is impossible.
-        if (force)
-            m_hasBlitJobs = false;
-        return;
-    }
-
     if (!BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread()) {
         BlackBerry::Platform::userInterfaceThreadMessageClient()->dispatchMessage(
             BlackBerry::Platform::createMethodCallMessage(
@@ -1245,7 +1164,14 @@ void BackingStorePrivate::blitVisibleContents(bool force)
         return;
     }
 
-    if (m_defersBlit && !force) {
+    if (m_suspendScreenUpdatesUserInterfaceThread) {
+        // Avoid client going into busy loop while blit is impossible.
+        if (force)
+            m_hasBlitJobs = false;
+        return;
+    }
+
+    if (!force) {
 #if USE(ACCELERATED_COMPOSITING)
         // If there's a WebPageCompositorClient, let it schedule the blit.
         if (WebPageCompositorPrivate* compositor = m_webPage->d->compositor()) {
@@ -1263,6 +1189,8 @@ void BackingStorePrivate::blitVisibleContents(bool force)
     m_hasBlitJobs = false;
 
     Platform::ViewportAccessor* viewportAccessor = m_webPage->client()->userInterfaceViewportAccessor();
+    if (!viewportAccessor)
+        return;
     const Platform::IntRect dstRect = viewportAccessor->destinationSurfaceRect();
 
     const Platform::IntRect pixelViewportRect = viewportAccessor->pixelViewportRect();
@@ -1283,11 +1211,25 @@ void BackingStorePrivate::blitVisibleContents(bool force)
 #endif
 
 #if DEBUG_BACKINGSTORE
-    BlackBerry::Platform::logAlways(BlackBerry::Platform::LogLevelCritical,
-        "BackingStorePrivate::blitVisibleContents(): dstRect=(%d,%d) %dx%d, documentSrcRect=(%f, %f) %f x %f, scale=%f",
-        dstRect.x(), dstRect.y(), dstRect.width(), dstRect.height(),
-        documentSrcRect.x(), documentSrcRect.y(), documentSrcRect.width(), documentSrcRect.height(),
-        viewportAccessor->scale());
+    Platform::logAlways(Platform::LogLevelCritical,
+        "BackingStorePrivate::blitVisibleContents(): dstRect=%s, documentSrcRect=%s, scale=%f",
+        dstRect.toString().c_str(), documentSrcRect.toString().c_str(), viewportAccessor->scale());
+#endif
+
+    BlackBerry::Platform::Graphics::Buffer* dstBuffer = buffer();
+    ASSERT(dstBuffer);
+    if (dstBuffer) {
+        // On the GPU, clearing is free and allows for optimizations,
+        // so we always want to do this first for the whole surface.
+        // Don't call clearWindow() as we don't want to add it to the posted rect.
+        BlackBerry::Platform::Graphics::clearBuffer(dstBuffer,
+            m_webPageBackgroundColor.red(), m_webPageBackgroundColor.green(),
+            m_webPageBackgroundColor.blue(), m_webPageBackgroundColor.alpha());
+    } else
+        Platform::logAlways(Platform::LogLevelWarn, "Empty window buffer, can't blit contents.");
+
+#if DEBUG_CHECKERBOARD
+    bool blitCheckered = false;
 #endif
 
     Vector<TileBuffer*> blittedTiles;
@@ -1295,9 +1237,9 @@ void BackingStorePrivate::blitVisibleContents(bool force)
     if (isActive() && !m_webPage->d->compositorDrawsRootLayer()) {
         paintDefaultBackground(dstRect, viewportAccessor, false /*flush*/);
 
-        BackingStoreGeometry* currentState = frontState();
-        TileMap currentMap = currentState->tileMap();
-        double currentScale = currentState->scale();
+        BackingStoreGeometry* geometry = frontState();
+        TileMap currentMap = geometry->tileMap();
+        double currentScale = geometry->scale();
 
         const Platform::IntRect transformedContentsRect = Platform::IntRect(Platform::IntPoint(0, 0), m_client->transformedContentsSize());
 
@@ -1316,25 +1258,21 @@ void BackingStorePrivate::blitVisibleContents(bool force)
         if (!transformedSrcRect.isEmpty())
             transformation = TransformationMatrix::rectToRect(FloatRect(FloatPoint(0.0, 0.0), WebCore::IntSize(transformedSrcRect.size())), WebCore::IntRect(dstRect));
 
-#if DEBUG_CHECKERBOARD
-        bool blitCheckered = false;
-#endif
-
         // Don't clip to contents if it is empty so we can still paint default background.
         if (!transformedContentsRect.isEmpty()) {
             clippedTransformedSrcRect.intersect(transformedContentsRect);
             if (clippedTransformedSrcRect.isEmpty()) {
-                invalidateWindow(dstRect);
+                m_webPage->client()->postToSurface(dstRect);
                 return;
             }
 
             Platform::IntRectRegion transformedSrcRegion = clippedTransformedSrcRect;
-            Platform::IntRectRegion backingStoreRegion = currentState->backingStoreRect();
+            Platform::IntRectRegion backingStoreRegion = geometry->backingStoreRect();
             Platform::IntRectRegion checkeredRegion
                 = Platform::IntRectRegion::subtractRegions(transformedSrcRegion, backingStoreRegion);
 
             // Blit checkered to those parts that are not covered by the backingStoreRect.
-            IntRectList checkeredRects = checkeredRegion.rects();
+            std::vector<Platform::IntRect> checkeredRects = checkeredRegion.rects();
             for (size_t i = 0; i < checkeredRects.size(); ++i) {
                 Platform::IntRect clippedDstRect = transformation.mapRect(Platform::IntRect(
                     Platform::IntPoint(checkeredRects.at(i).x() - origin.x(), checkeredRects.at(i).y() - origin.y()),
@@ -1351,46 +1289,32 @@ void BackingStorePrivate::blitVisibleContents(bool force)
         }
 
         // Get the list of tile rects that makeup the content.
-        TileRectList tileRectList = mapFromTransformedContentsToTiles(clippedTransformedSrcRect, currentState);
+        TileRectList tileRectList = mapFromPixelContentsToTiles(clippedTransformedSrcRect, geometry);
         for (size_t i = 0; i < tileRectList.size(); ++i) {
             TileRect tileRect = tileRectList[i];
             TileIndex index = tileRect.first;
-            Platform::IntRect dirtyTileRect = tileRect.second;
-            BackingStoreTile* tile = currentMap.get(index);
-            TileBuffer* tileBuffer = tile->frontBuffer();
-
-            // This dirty rect is in tile coordinates, but it needs to be in
-            // transformed contents coordinates.
-            Platform::IntRect dirtyRect
-                = mapFromTilesToTransformedContents(tileRect, currentState->backingStoreRect());
+            Platform::IntRect dirtyRect = tileRect.second;
 
             // Don't clip to contents if it is empty so we can still paint default background.
             if (!transformedContentsRect.isEmpty()) {
                 // Otherwise we should clip the contents size and blit.
                 dirtyRect.intersect(transformedContentsRect);
-
-                // We probably have extra tiles since the contents size is so small.
-                // Save some cycles here...
-                if (dirtyRect.isEmpty())
-                    continue;
             }
+
+            // Save some cycles here...
+            if (dirtyRect.isEmpty())
+                continue;
 
             // Now, this dirty rect is in transformed coordinates relative to the
             // transformed contents, but ultimately it needs to be transformed
             // coordinates relative to the viewport.
             dirtyRect.move(-origin.x(), -origin.y());
 
-            // Save some cycles here...
-            if (dirtyRect.isEmpty() || dirtyTileRect.isEmpty())
-                continue;
+            TileBuffer* tileBuffer = currentMap.get(index);
 
-            TileRect wholeTileRect;
-            wholeTileRect.first = index;
-            wholeTileRect.second = this->tileRect();
-
-            bool committed = tile->isCommitted();
-            bool rendered = tileBuffer->isRendered(dirtyTileRect, currentScale);
-            bool paintCheckered = !committed || !rendered;
+            bool isTileCorrespondingToBuffer = geometry->isTileCorrespondingToBuffer(index, tileBuffer);
+            bool rendered = tileBuffer && tileBuffer->isRendered(tileRect.second, currentScale);
+            bool paintCheckered = !isTileCorrespondingToBuffer || !rendered;
 
             if (paintCheckered) {
                 Platform::IntRect dirtyRectT = transformation.mapRect(dirtyRect);
@@ -1410,57 +1334,16 @@ void BackingStorePrivate::blitVisibleContents(bool force)
             }
 
             // Blit the visible buffer here if we have visible zoom jobs.
-            if (m_renderQueue->hasCurrentVisibleZoomJob()) {
-
-                // Needs to be in same coordinate system as dirtyRect.
-                Platform::IntRect visibleTileBufferRect = m_visibleTileBufferRect;
-                visibleTileBufferRect.move(-origin.x(), -origin.y());
-
-                // Clip to the visibleTileBufferRect.
-                dirtyRect.intersect(visibleTileBufferRect);
-
-                // Clip to the dirtyRect.
-                visibleTileBufferRect.intersect(dirtyRect);
-
-                if (!dirtyRect.isEmpty() && !visibleTileBufferRect.isEmpty()) {
-                    BackingStoreTile* visibleTileBuffer
-                        = SurfacePool::globalSurfacePool()->visibleTileBuffer();
-                    ASSERT(visibleTileBuffer->size() == visibleContentsRect().size());
-
-                    // The offset of the current viewport with the visble tile buffer.
-                    Platform::IntPoint difference = origin - m_visibleTileBufferRect.location();
-                    Platform::IntSize offset = Platform::IntSize(difference.x(), difference.y());
-
-                    // Map to the visibleTileBuffer coordinates.
-                    Platform::IntRect dirtyTileRect = visibleTileBufferRect;
-                    dirtyTileRect.move(offset.width(), offset.height());
-
-                    Platform::IntRect dirtyRectT = transformation.mapRect(dirtyRect);
-
-                    if (!transformation.isIdentity()) {
-                        // Because of rounding it is possible that dirtyRect could be off-by-one larger
-                        // than the surface size of the dst buffer. We prevent this here, by clamping
-                        // it to ensure that can't happen.
-                        dirtyRectT.intersect(Platform::IntRect(Platform::IntPoint(0, 0), surfaceSize()));
-                    }
-
-                    blitToWindow(dirtyRectT,
-                                 visibleTileBuffer->frontBuffer()->nativeBuffer(),
-                                 dirtyTileRect,
-                                 false /*blend*/, 255);
-                }
-            } else if (committed) {
+            if (isTileCorrespondingToBuffer) {
                 // Intersect the rendered region.
                 Platform::IntRectRegion renderedRegion = tileBuffer->renderedRegion();
-                IntRectList dirtyRenderedRects = renderedRegion.rects();
-                for (size_t i = 0; i < dirtyRenderedRects.size(); ++i) {
-                    TileRect tileRect;
-                    tileRect.first = index;
-                    tileRect.second = intersection(dirtyTileRect, dirtyRenderedRects.at(i));
-                    if (tileRect.second.isEmpty())
+                std::vector<Platform::IntRect> dirtyRenderedRects = renderedRegion.rects();
+                for (size_t j = 0; j < dirtyRenderedRects.size(); ++j) {
+                    Platform::IntRect dirtyRenderedRect = intersection(tileRect.second, dirtyRenderedRects.at(j));
+                    if (dirtyRenderedRect.isEmpty())
                         continue;
                     // Blit the rendered parts.
-                    blitTileRect(tileBuffer, tileRect, origin, transformation, currentState);
+                    blitTileRect(tileBuffer, dirtyRenderedRect, origin, transformation, geometry);
                 }
                 blittedTiles.append(tileBuffer);
             }
@@ -1478,13 +1361,6 @@ void BackingStorePrivate::blitVisibleContents(bool force)
         compositor->drawLayers(dstRect, documentSrcRect);
         if (compositor->drawsRootLayer())
             paintDefaultBackground(dstRect, viewportAccessor, false /*flush*/);
-    }
-#endif
-
-#if ENABLE_SCROLLBARS
-    if (isScrollingOrZooming() && m_client->isMainFrame()) {
-        blitHorizontalScrollbar();
-        blitVerticalScrollbar();
     }
 #endif
 
@@ -1517,20 +1393,20 @@ void BackingStorePrivate::blitVisibleContents(bool force)
 
     if (blitCheckered && !lastCheckeredTime) {
         lastCheckeredTime = WTF::currentTime();
-        BBLOG(BlackBerry::Platform::LogLevelCritical,
-            "Blitting checkered pattern at %f\n", lastCheckeredTime);
+        Platform::logAlways(Platform::LogLevelCritical,
+            "Blitting checkered pattern at %f", lastCheckeredTime);
     } else if (blitCheckered && lastCheckeredTime) {
-        BBLOG(BlackBerry::Platform::LogLevelCritical,
-            "Blitting checkered pattern at %f\n", WTF::currentTime());
+        Platform::logAlways(Platform::LogLevelCritical,
+            "Blitting checkered pattern at %f", WTF::currentTime());
     } else if (!blitCheckered && lastCheckeredTime) {
         double time = WTF::currentTime();
-        BBLOG(BlackBerry::Platform::LogLevelCritical,
-            "Blitting over checkered pattern at %f took %f\n", time, time - lastCheckeredTime);
+        Platform::logAlways(Platform::LogLevelCritical,
+            "Blitting over checkered pattern at %f took %f", time, time - lastCheckeredTime);
         lastCheckeredTime = 0;
     }
 #endif
 
-    invalidateWindow(dstRect);
+    m_webPage->client()->postToSurface(dstRect);
 }
 
 #if USE(ACCELERATED_COMPOSITING)
@@ -1548,54 +1424,46 @@ void BackingStorePrivate::compositeContents(WebCore::LayerRenderer* layerRendere
     if (m_webPage->d->compositorDrawsRootLayer())
         return;
 
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
+    BackingStoreGeometry* geometry = frontState();
+    TileMap currentMap = geometry->tileMap();
     Vector<TileBuffer*> compositedTiles;
 
     Platform::IntRectRegion transformedContentsRegion = transformedContents;
-    Platform::IntRectRegion backingStoreRegion = currentState->backingStoreRect();
-    Platform::IntRectRegion checkeredRegion
+    Platform::IntRectRegion backingStoreRegion = geometry->backingStoreRect();
+    Platform::IntRectRegion clearRegion
         = Platform::IntRectRegion::subtractRegions(transformedContentsRegion, backingStoreRegion);
 
-    // Blit checkered to those parts that are not covered by the backingStoreRect.
-    IntRectList checkeredRects = checkeredRegion.rects();
-    for (size_t i = 0; i < checkeredRects.size(); ++i)
-        layerRenderer->drawCheckerboardPattern(transform, m_webPage->d->mapFromTransformedFloatRect(WebCore::IntRect(checkeredRects.at(i))));
+    // Clear those parts that are not covered by the backingStoreRect.
+    Color clearColor(Color::white);
+    std::vector<Platform::IntRect> clearRects = clearRegion.rects();
+    for (size_t i = 0; i < clearRects.size(); ++i)
+        layerRenderer->drawColor(transform, m_webPage->d->mapFromTransformedFloatRect(WebCore::IntRect(clearRects.at(i))), clearColor);
 
     // Get the list of tile rects that makeup the content.
-    TileRectList tileRectList = mapFromTransformedContentsToTiles(transformedContents, currentState);
+    TileRectList tileRectList = mapFromPixelContentsToTiles(transformedContents, geometry);
     for (size_t i = 0; i < tileRectList.size(); ++i) {
         TileRect tileRect = tileRectList[i];
         TileIndex index = tileRect.first;
-        Platform::IntRect dirtyTileRect = tileRect.second;
-        BackingStoreTile* tile = currentMap.get(index);
-        TileBuffer* tileBuffer = tile->frontBuffer();
+        Platform::IntRect dirtyRect = tileRect.second;
+        TileBuffer* tileBuffer = currentMap.get(index);
 
-        // This dirty rect is in tile coordinates, but it needs to be in
-        // transformed contents coordinates.
-        Platform::IntRect dirtyRect = mapFromTilesToTransformedContents(tileRect, currentState->backingStoreRect());
-
-        if (!dirtyRect.intersects(transformedContents))
-            continue;
-
-        TileRect wholeTileRect;
-        wholeTileRect.first = index;
-        wholeTileRect.second = this->tileRect();
-
-        Platform::IntRect wholeRect = mapFromTilesToTransformedContents(wholeTileRect, currentState->backingStoreRect());
-
-        bool committed = tile->isCommitted();
-
-        if (!committed)
-            layerRenderer->drawCheckerboardPattern(transform, m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(dirtyRect)));
+        if (!tileBuffer || !geometry->isTileCorrespondingToBuffer(index, tileBuffer))
+            layerRenderer->drawColor(transform, m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(dirtyRect)), clearColor);
         else {
-            layerRenderer->compositeBuffer(transform, m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(wholeRect)), tileBuffer->nativeBuffer(), contentsOpaque, 1.0f);
+            Platform::IntPoint tileOrigin = tileBuffer->lastRenderOrigin();
+            Platform::FloatRect tileDocumentContentsRect = m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(tileBuffer->pixelContentsRect()));
+
+            layerRenderer->compositeBuffer(transform, tileDocumentContentsRect, tileBuffer->nativeBuffer(), contentsOpaque, 1.0f);
             compositedTiles.append(tileBuffer);
-            // Intersect the rendered region.
-            Platform::IntRectRegion notRenderedRegion = Platform::IntRectRegion::subtractRegions(dirtyTileRect, tileBuffer->renderedRegion());
-            IntRectList notRenderedRects = notRenderedRegion.rects();
-            for (size_t i = 0; i < notRenderedRects.size(); ++i)
-                layerRenderer->drawCheckerboardPattern(transform, m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(notRenderedRects.at(i))));
+
+            // Intersect the rendered region and clear unrendered parts.
+            Platform::IntRectRegion notRenderedRegion = Platform::IntRectRegion::subtractRegions(dirtyRect, tileBuffer->renderedRegion());
+            std::vector<Platform::IntRect> notRenderedRects = notRenderedRegion.rects();
+            for (size_t i = 0; i < notRenderedRects.size(); ++i) {
+                Platform::IntRect tileSurfaceRect = notRenderedRects.at(i);
+                tileSurfaceRect.move(-tileOrigin.x(), -tileOrigin.y());
+                layerRenderer->drawColor(transform, m_webPage->d->mapFromTransformedFloatRect(Platform::FloatRect(tileSurfaceRect)), clearColor);
+            }
         }
     }
 
@@ -1604,65 +1472,44 @@ void BackingStorePrivate::compositeContents(WebCore::LayerRenderer* layerRendere
 #endif
 
 Platform::IntRect BackingStorePrivate::blitTileRect(TileBuffer* tileBuffer,
-                                                   const TileRect& tileRect,
-                                                   const Platform::IntPoint& origin,
-                                                   const WebCore::TransformationMatrix& matrix,
-                                                   BackingStoreGeometry* state)
+    const Platform::IntRect& tilePixelContentsRect,
+    const Platform::IntPoint& origin,
+    const WebCore::TransformationMatrix& matrix,
+    BackingStoreGeometry* geometry)
 {
-    if (!m_webPage->isVisible() || !isActive())
+    if (!m_webPage->isVisible() || !isActive() || !tileBuffer)
         return Platform::IntRect();
 
-    Platform::IntRect dirtyTileRect = tileRect.second;
-
-    // This dirty rect is in tile coordinates, but it needs to be in
-    // transformed contents coordinates.
-    Platform::IntRect dirtyRect = mapFromTilesToTransformedContents(tileRect, state->backingStoreRect());
+    Platform::IntRect srcRect = tilePixelContentsRect;
+    Platform::IntPoint tileOrigin = tileBuffer->lastRenderOrigin();
+    srcRect.move(-tileOrigin.x(), -tileOrigin.y());
 
     // Now, this dirty rect is in transformed coordinates relative to the
     // transformed contents, but ultimately it needs to be transformed
     // coordinates relative to the viewport.
-    dirtyRect.move(-origin.x(), -origin.y());
-    dirtyRect = matrix.mapRect(dirtyRect);
+    Platform::IntRect dstRect = tilePixelContentsRect;
+    dstRect.move(-origin.x(), -origin.y());
+    dstRect = matrix.mapRect(dstRect);
 
     if (!matrix.isIdentity()) {
-        // Because of rounding it is possible that dirtyRect could be off-by-one larger
+        // Because of rounding it is possible that dstRect could be off-by-one larger
         // than the surface size of the dst buffer. We prevent this here, by clamping
         // it to ensure that can't happen.
-        dirtyRect.intersect(Platform::IntRect(Platform::IntPoint(0, 0), surfaceSize()));
+        dstRect.intersect(Platform::IntRect(Platform::IntPoint(0, 0), surfaceSize()));
     }
 
-    ASSERT(!dirtyRect.isEmpty());
-    ASSERT(!dirtyTileRect.isEmpty());
-    if (dirtyRect.isEmpty() || dirtyTileRect.isEmpty())
+    ASSERT(!dstRect.isEmpty());
+    ASSERT(!srcRect.isEmpty());
+    if (dstRect.isEmpty() || srcRect.isEmpty())
         return Platform::IntRect();
 
-    blitToWindow(dirtyRect, tileBuffer->nativeBuffer(), dirtyTileRect,
-                 false /*blend*/, 255);
-    return dirtyRect;
+    blitToWindow(dstRect, tileBuffer->nativeBuffer(), srcRect, BlackBerry::Platform::Graphics::SourceCopy, 255);
+    return dstRect;
 }
 
-void BackingStorePrivate::blitHorizontalScrollbar()
+bool BackingStorePrivate::isTileVisible(const TileIndex& index, BackingStoreGeometry* geometry) const
 {
-    if (!m_webPage->isVisible())
-        return;
-
-    m_webPage->client()->drawHorizontalScrollbar();
-}
-
-void BackingStorePrivate::blitVerticalScrollbar()
-{
-    if (!m_webPage->isVisible())
-        return;
-
-    m_webPage->client()->drawVerticalScrollbar();
-}
-
-bool BackingStorePrivate::isTileVisible(const TileIndex& index) const
-{
-    TileRect tileRect;
-    tileRect.first = index;
-    tileRect.second = this->tileRect();
-    return mapFromTilesToTransformedContents(tileRect).intersects(visibleContentsRect());
+    return isTileVisible(geometry->originOfTile(index));
 }
 
 bool BackingStorePrivate::isTileVisible(const Platform::IntPoint& origin) const
@@ -1670,51 +1517,31 @@ bool BackingStorePrivate::isTileVisible(const Platform::IntPoint& origin) const
     return Platform::IntRect(origin, tileSize()).intersects(visibleContentsRect());
 }
 
-Platform::IntRect BackingStorePrivate::visibleTilesRect() const
+TileIndexList BackingStorePrivate::visibleTileIndexes(BackingStoreGeometry* geometry) const
 {
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
+    TileMap tileMap = geometry->tileMap();
+    TileIndexList visibleTiles;
 
-    Platform::IntRect rect;
-    TileMap::const_iterator end = currentMap.end();
-    for (TileMap::const_iterator it = currentMap.begin(); it != end; ++it) {
-        TileRect tileRect;
-        tileRect.first = it->key;
-        tileRect.second = this->tileRect();
-        Platform::IntRect tile = mapFromTilesToTransformedContents(tileRect);
-        if (tile.intersects(visibleContentsRect()))
-            rect = Platform::unionOfRects(rect, tile);
+    TileMap::const_iterator end = tileMap.end();
+    for (TileMap::const_iterator it = tileMap.begin(); it != end; ++it) {
+        Platform::IntRect tilePixelContentsRect(geometry->originOfTile(it->key), tileSize());
+        if (tilePixelContentsRect.intersects(visibleContentsRect()))
+            visibleTiles.append(it->key);
     }
-    return rect;
+    return visibleTiles;
 }
 
-Platform::IntRect BackingStorePrivate::tileVisibleContentsRect(const TileIndex& index) const
+Platform::IntRect BackingStorePrivate::tileVisibleContentsRect(const TileIndex& index, BackingStoreGeometry* geometry) const
 {
-    if (!isTileVisible(index))
+    if (!isTileVisible(index, geometry))
         return Platform::IntRect();
 
-    return tileContentsRect(index, visibleContentsRect());
+    return tileContentsRect(index, visibleContentsRect(), geometry);
 }
 
-Platform::IntRect BackingStorePrivate::tileUnclippedVisibleContentsRect(const TileIndex& index) const
+Platform::IntRect BackingStorePrivate::tileContentsRect(const TileIndex& index, const Platform::IntRect& pixelContentsRect, BackingStoreGeometry* state) const
 {
-    if (!isTileVisible(index))
-        return Platform::IntRect();
-
-    return tileContentsRect(index, unclippedVisibleContentsRect());
-}
-
-Platform::IntRect BackingStorePrivate::tileContentsRect(const TileIndex& index,
-                                                       const Platform::IntRect& contents) const
-{
-    return tileContentsRect(index, contents, frontState());
-}
-
-Platform::IntRect BackingStorePrivate::tileContentsRect(const TileIndex& index,
-                                                       const Platform::IntRect& contents,
-                                                       BackingStoreGeometry* state) const
-{
-    TileRectList tileRectList = mapFromTransformedContentsToTiles(contents, state);
+    TileRectList tileRectList = mapFromPixelContentsToTiles(pixelContentsRect, state);
     for (size_t i = 0; i < tileRectList.size(); ++i) {
         TileRect tileRect = tileRectList[i];
         if (index == tileRect.first)
@@ -1728,19 +1555,27 @@ void BackingStorePrivate::resetRenderQueue()
     m_renderQueue->reset();
 }
 
-void BackingStorePrivate::clearVisibleZoom()
+void BackingStorePrivate::resetTiles()
 {
-    m_renderQueue->clearVisibleZoom();
-}
+    BackingStoreGeometry* geometry = frontState();
 
-void BackingStorePrivate::resetTiles(bool resetBackground)
-{
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
+    m_renderQueue->clear(geometry->backingStoreRect(), RenderQueue::ClearAnyJobs);
+
+    BackingStoreGeometry* newGeometry = new BackingStoreGeometry;
+    newGeometry->setScale(geometry->scale());
+    newGeometry->setNumberOfTilesWide(geometry->numberOfTilesWide());
+    newGeometry->setNumberOfTilesHigh(geometry->numberOfTilesHigh());
+    newGeometry->setBackingStoreOffset(geometry->backingStoreOffset());
+
+    TileMap currentMap = geometry->tileMap();
+    TileMap newTileMap;
 
     TileMap::const_iterator end = currentMap.end();
     for (TileMap::const_iterator it = currentMap.begin(); it != end; ++it)
-        resetTile(it->key, it->value, resetBackground);
+        newTileMap.add(it->key, 0); // clear all buffer info from the tile
+
+    newGeometry->setTileMap(newTileMap);
+    adoptAsFrontState(newGeometry); // swap into UI thread
 }
 
 void BackingStorePrivate::updateTiles(bool updateVisible, bool immediate)
@@ -1748,15 +1583,15 @@ void BackingStorePrivate::updateTiles(bool updateVisible, bool immediate)
     if (!isActive())
         return;
 
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
+    BackingStoreGeometry* geometry = frontState();
+    TileMap currentMap = geometry->tileMap();
 
     TileMap::const_iterator end = currentMap.end();
     for (TileMap::const_iterator it = currentMap.begin(); it != end; ++it) {
-        bool isVisible = isTileVisible(it->key);
+        bool isVisible = isTileVisible(it->key, geometry);
         if (!updateVisible && isVisible)
             continue;
-        updateTile(it->key, immediate);
+        updateTile(geometry->originOfTile(it->key), immediate);
     }
 }
 
@@ -1768,21 +1603,21 @@ void BackingStorePrivate::updateTilesForScrollOrNotRenderedRegion(bool checkLoad
     // render job, but they were not visible at the time, then update them and if
     // they are currently visible, reset them.
 
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
-    Platform::IntRect backingStoreRect = currentState->backingStoreRect();
+    BackingStoreGeometry* geometry = frontState();
+    TileMap currentMap = geometry->tileMap();
 
     bool isLoading = m_client->loadState() == WebPagePrivate::Committed;
-    bool forceVisible = checkLoading && isLoading;
+    bool updateNonVisibleTiles = !checkLoading || !isLoading;
 
     TileMap::const_iterator end = currentMap.end();
     for (TileMap::const_iterator it = currentMap.begin(); it != end; ++it) {
         TileIndex index = it->key;
-        BackingStoreTile* tile = it->value;
-        bool isVisible = isTileVisible(index);
+        TileBuffer* tileBuffer = it->value;
+        bool isVisible = isTileVisible(index, geometry);
+        Platform::IntPoint tileOrigin = geometry->originOfTile(index);
         // The rect in transformed contents coordinates.
-        Platform::IntRect rect(originOfTile(index), tileSize());
-        if (tile->isCommitted()
+        Platform::IntRect rect(tileOrigin, tileSize());
+        if (geometry->isTileCorrespondingToBuffer(index, tileBuffer)
             && m_renderQueue->regularRenderJobsPreviouslyAttemptedButNotRendered(rect)) {
             // If the render queue previously tried to render this tile, but the
             // tile wasn't visible at the time we can't simply restore the tile
@@ -1792,63 +1627,20 @@ void BackingStorePrivate::updateTilesForScrollOrNotRenderedRegion(bool checkLoad
             if (isVisible) {
                 // Intersect the tile with the not rendered region to get the areas
                 // of the tile that we need to clear.
-                Platform::IntRectRegion tileNotRenderedRegion
-                    = Platform::IntRectRegion::intersectRegions(
-                        m_renderQueue->regularRenderJobsNotRenderedRegion(),
-                        rect);
-                clearAndUpdateTileOfNotRenderedRegion(index,
-                                                      tile,
-                                                      tileNotRenderedRegion,
-                                                      backingStoreRect,
-                                                      false /*update*/);
+                Platform::IntRectRegion tileNotRenderedRegion = Platform::IntRectRegion::intersectRegions(m_renderQueue->regularRenderJobsNotRenderedRegion(), rect);
+                clearAndUpdateTileOfNotRenderedRegion(index, tileBuffer, tileNotRenderedRegion, geometry, false /*update*/);
 #if DEBUG_BACKINGSTORE
-                Platform::IntRect extents = tileNotRenderedRegion.extents();
-                BBLOG(BlackBerry::Platform::LogLevelCritical,
-                    "BackingStorePrivate::updateTilesForScroll did clear tile %d,%d %dx%d",
-                    extents.x(), extents.y(), extents.width(), extents.height());
+                Platform::logAlways(Platform::LogLevelCritical,
+                    "BackingStorePrivate::updateTilesForScroll did clear tile %s",
+                    tileNotRenderedRegion.extents().toString().c_str());
 #endif
             }
-            updateTile(index, false /*immediate*/);
-        } else if (isVisible
-            && (forceVisible || !tile->frontBuffer()->isRendered(tileVisibleContentsRect(index), currentState->scale()))
-            && !isCurrentVisibleJob(index, tile, backingStoreRect))
-            updateTile(index, false /*immediate*/);
+            updateTile(tileOrigin, false /*immediate*/);
+        } else if ((isVisible || updateNonVisibleTiles)
+            && (!tileBuffer || !tileBuffer->isRendered(tileVisibleContentsRect(index, geometry), geometry->scale()))
+            && !isCurrentVisibleJob(index, geometry))
+            updateTile(tileOrigin, false /*immediate*/);
     }
-}
-
-void BackingStorePrivate::resetTile(const TileIndex& index, BackingStoreTile* tile, bool resetBackground)
-{
-    if (!m_webPage->isVisible())
-        return;
-
-    if (!isActive()) {
-        m_webPage->d->setShouldResetTilesWhenShown(true);
-        return;
-    }
-
-    TileRect tileRect;
-    tileRect.first = index;
-    tileRect.second = this->tileRect();
-    // Only clear regular render jobs if we're clearing the background too.
-    m_renderQueue->clear(mapFromTilesToTransformedContents(tileRect), resetBackground /*clearRegularRenderJobs*/);
-    if (resetBackground)
-        tile->reset();
-}
-
-void BackingStorePrivate::updateTile(const TileIndex& index, bool immediate)
-{
-    if (!isActive())
-        return;
-
-    TileRect tileRect;
-    tileRect.first = index;
-    tileRect.second = this->tileRect();
-    Platform::IntRect updateRect = mapFromTilesToTransformedContents(tileRect);
-    RenderQueue::JobType jobType = isTileVisible(index) ? RenderQueue::VisibleScroll : RenderQueue::NonVisibleScroll;
-    if (immediate)
-        render(updateRect);
-    else
-        m_renderQueue->addToQueue(jobType, updateRect);
 }
 
 void BackingStorePrivate::updateTile(const Platform::IntPoint& origin, bool immediate)
@@ -1857,83 +1649,28 @@ void BackingStorePrivate::updateTile(const Platform::IntPoint& origin, bool imme
         return;
 
     Platform::IntRect updateRect = Platform::IntRect(origin, tileSize());
-    RenderQueue::JobType jobType = isTileVisible(origin) ? RenderQueue::VisibleScroll : RenderQueue::NonVisibleScroll;
     if (immediate)
-        render(updateRect);
-    else
+        renderAndBlitImmediately(updateRect);
+    else {
+        RenderQueue::JobType jobType = isTileVisible(origin) ? RenderQueue::VisibleScroll : RenderQueue::NonVisibleScroll;
         m_renderQueue->addToQueue(jobType, updateRect);
-}
-
-Platform::IntRect BackingStorePrivate::mapFromTilesToTransformedContents(const BackingStorePrivate::TileRect& tileRect) const
-{
-    return mapFromTilesToTransformedContents(tileRect, frontState()->backingStoreRect());
-}
-
-Platform::IntRect BackingStorePrivate::mapFromTilesToTransformedContents(const BackingStorePrivate::TileRect& tileRect, const Platform::IntRect& backingStoreRect) const
-{
-    TileIndex index = tileRect.first;
-    Platform::IntRect rect = tileRect.second;
-    // The origin of the tile including the backing store offset.
-    const Platform::IntPoint originOfTile = this->originOfTile(index, backingStoreRect);
-    rect.move(originOfTile.x(), originOfTile.y());
-    return rect;
-}
-
-BackingStorePrivate::TileRectList BackingStorePrivate::mapFromTransformedContentsToAbsoluteTileBoundaries(const Platform::IntRect& rect) const
-{
-    if (!m_webPage->isVisible() || !isActive()) {
-        ASSERT_NOT_REACHED();
-        return TileRectList();
     }
-
-    TileRectList tileRectList;
-    int firstXOffset = rect.x() / tileWidth();
-    int firstYOffset = rect.y() / tileHeight();
-    int lastXOffset = (rect.right() - 1) / tileWidth();
-    int lastYOffset = (rect.bottom() - 1) / tileHeight();
-    for (int i = firstXOffset; i <= lastXOffset; ++i) {
-        for (int j = firstYOffset; j <= lastYOffset; ++j) {
-            const int dstX = (i == firstXOffset) ? rect.x() : i * tileWidth();
-            const int dstY = (j == firstYOffset) ? rect.y() : j * tileHeight();
-            const int dstRight = (i == lastXOffset) ? rect.right() : (i + 1) * tileWidth();
-            const int dstBottom = (j == lastYOffset) ? rect.bottom() : (j + 1) * tileHeight();
-            const int srcX = dstX % tileWidth();
-            const int srcY = dstY % tileHeight();
-            TileRect tileRect;
-            tileRect.first = TileIndex(i, j);
-            tileRect.second = Platform::IntRect(srcX, srcY, dstRight - dstX, dstBottom - dstY);
-            tileRectList.append(tileRect);
-        }
-    }
-    return tileRectList;
 }
 
-
-BackingStorePrivate::TileRectList BackingStorePrivate::mapFromTransformedContentsToTiles(const Platform::IntRect& rect) const
+BackingStorePrivate::TileRectList BackingStorePrivate::mapFromPixelContentsToTiles(const Platform::IntRect& rect, BackingStoreGeometry* geometry) const
 {
-    return mapFromTransformedContentsToTiles(rect, frontState());
-}
-
-BackingStorePrivate::TileRectList BackingStorePrivate::mapFromTransformedContentsToTiles(const Platform::IntRect& rect, BackingStoreGeometry* state) const
-{
-    TileMap tileMap = state->tileMap();
+    TileMap tileMap = geometry->tileMap();
 
     TileRectList tileRectList;
     TileMap::const_iterator end = tileMap.end();
     for (TileMap::const_iterator it = tileMap.begin(); it != end; ++it) {
         TileIndex index = it->key;
-        BackingStoreTile* tile = it->value;
 
         // Need to map the rect to tile coordinates.
         Platform::IntRect r = rect;
 
-        // The origin of the tile including the backing store offset.
-        const Platform::IntPoint originOfTile = this->originOfTile(index, state->backingStoreRect());
-
-        r.move(-(originOfTile.x()), -(originOfTile.y()));
-
         // Do we intersect the current tile or no?
-        r.intersect(tile->rect());
+        r.intersect(Platform::IntRect(geometry->originOfTile(index), tileSize()));
         if (r.isEmpty())
             continue;
 
@@ -1950,12 +1687,18 @@ void BackingStorePrivate::updateTileMatrixIfNeeded()
 {
     ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
 
+    if (!m_tileMatrixNeedsUpdate)
+        return;
+
+    m_tileMatrixNeedsUpdate = false;
+
     // This will update the tile matrix.
     scrollBackingStore(0, 0);
 }
 
 void BackingStorePrivate::contentsSizeChanged(const Platform::IntSize&)
 {
+    setTileMatrixNeedsUpdate();
     updateTileMatrixIfNeeded();
 }
 
@@ -1969,82 +1712,32 @@ void BackingStorePrivate::transformChanged()
     if (!m_webPage->isVisible())
         return;
 
+    m_renderQueue->reset();
+
     if (!isActive()) {
-        m_renderQueue->reset();
-        m_renderQueue->addToQueue(RenderQueue::VisibleZoom, visibleContentsRect());
         m_webPage->d->setShouldResetTilesWhenShown(true);
         return;
     }
-
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
-
-    bool hasCurrentVisibleZoomJob = m_renderQueue->hasCurrentVisibleZoomJob();
-    bool isLoading = m_client->isLoading();
-    if (isLoading) {
-        if (!hasCurrentVisibleZoomJob)
-            m_visibleTileBufferRect = visibleContentsRect(); // Cache this for blitVisibleContents.
-
-        // Add the currently visible tiles to the render queue as visible zoom jobs.
-        TileRectList tileRectList = mapFromTransformedContentsToTiles(visibleContentsRect());
-        for (size_t i = 0; i < tileRectList.size(); ++i) {
-            TileRect tileRect = tileRectList[i];
-            TileIndex index = tileRect.first;
-            Platform::IntRect dirtyTileRect = tileRect.second;
-            BackingStoreTile* tile = currentMap.get(index);
-
-            // Invalidate the whole rect.
-            tileRect.second = this->tileRect();
-            Platform::IntRect wholeRect = mapFromTilesToTransformedContents(tileRect);
-            m_renderQueue->addToQueue(RenderQueue::VisibleZoom, wholeRect);
-
-            // Copy the visible contents into the visibleTileBuffer if we don't have
-            // any current visible zoom jobs.
-            if (!hasCurrentVisibleZoomJob) {
-                // Map to the destination's coordinate system.
-                Platform::IntPoint difference = this->originOfTile(index) - m_visibleTileBufferRect.location();
-                Platform::IntSize offset = Platform::IntSize(difference.x(), difference.y());
-                Platform::IntRect dirtyRect = dirtyTileRect;
-                dirtyRect.move(offset.width(), offset.height());
-
-                BackingStoreTile* visibleTileBuffer
-                    = SurfacePool::globalSurfacePool()->visibleTileBuffer();
-                ASSERT(visibleTileBuffer->size() == Platform::IntSize(m_webPage->d->transformedViewportSize()));
-                BlackBerry::Platform::Graphics::blitToBuffer(
-                    visibleTileBuffer->frontBuffer()->nativeBuffer(), dirtyRect,
-                    tile->frontBuffer()->nativeBuffer(), dirtyTileRect);
-            }
-        }
-    }
-
-    m_renderQueue->reset();
-    resetTiles(true /*resetBackground*/);
+    resetTiles();
 }
 
 void BackingStorePrivate::orientationChanged()
 {
     ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
+    setTileMatrixNeedsUpdate();
     updateTileMatrixIfNeeded();
-    createVisibleTileBuffer();
 }
 
 void BackingStorePrivate::actualVisibleSizeChanged(const Platform::IntSize& size)
 {
 }
 
-static void createVisibleTileBufferForWebPage(WebPagePrivate* page)
-{
-    ASSERT(page);
-    SurfacePool* surfacePool = SurfacePool::globalSurfacePool();
-    surfacePool->initializeVisibleTileBuffer(page->transformedViewportSize());
-}
-
 void BackingStorePrivate::createSurfaces()
 {
-    BackingStoreGeometry* currentState = frontState();
-    TileMap currentMap = currentState->tileMap();
+    BackingStoreGeometry* geometry = frontState();
+    TileMap initialMap = geometry->tileMap();
 
-    ASSERT(currentMap.isEmpty());
+    ASSERT(initialMap.isEmpty());
 
     if (m_webPage->isVisible()) {
         // This method is only to be called as part of setting up a new web page instance and
@@ -2053,6 +1746,10 @@ void BackingStorePrivate::createSurfaces()
         ASSERT_NOT_REACHED();
         return;
     }
+
+    // Don't try to blit to screen unless we have a buffer.
+    if (!buffer())
+        suspendScreenUpdates();
 
     SurfacePool* surfacePool = SurfacePool::globalSurfacePool();
     surfacePool->initialize(tileSize());
@@ -2065,50 +1762,27 @@ void BackingStorePrivate::createSurfaces()
     int numberOfTilesWide = divisor.first;
     int numberOfTilesHigh = divisor.second;
 
-    const SurfacePool::TileList tileList = surfacePool->tileList();
-    ASSERT(static_cast<int>(tileList.size()) >= (numberOfTilesWide * numberOfTilesHigh));
-
     TileMap newTileMap;
     for (int y = 0; y < numberOfTilesHigh; ++y) {
         for (int x = 0; x < numberOfTilesWide; ++x) {
             TileIndex index(x, y);
-            newTileMap.add(index, tileList.at(x + y * numberOfTilesWide));
+            newTileMap.add(index, 0); // no buffers initially assigned.
         }
     }
 
     // Set the initial state of the backingstore geometry.
-    backState()->setScale(m_webPage->d->currentScale());
-    backState()->setNumberOfTilesWide(divisor.first);
-    backState()->setNumberOfTilesHigh(divisor.second);
-    backState()->setTileMap(newTileMap);
-
-    // Swap back/front state.
-    swapState();
-
-    createVisibleTileBufferForWebPage(m_webPage->d);
-
-    // Don't try to blit to screen unless we have a buffer.
-    if (!buffer())
-        suspendScreenAndBackingStoreUpdates();
+    BackingStoreGeometry* newGeometry = new BackingStoreGeometry;
+    newGeometry->setScale(m_webPage->d->currentScale());
+    newGeometry->setNumberOfTilesWide(divisor.first);
+    newGeometry->setNumberOfTilesHigh(divisor.second);
+    newGeometry->setTileMap(newTileMap);
+    adoptAsFrontState(newGeometry); // swap into UI thread
 }
 
-void BackingStorePrivate::createVisibleTileBuffer()
+Platform::IntPoint BackingStoreGeometry::originOfTile(const TileIndex& index) const
 {
-    if (!m_webPage->isVisible() || !isActive())
-        return;
-
-    createVisibleTileBufferForWebPage(m_webPage->d);
-}
-
-Platform::IntPoint BackingStorePrivate::originOfTile(const TileIndex& index) const
-{
-    return originOfTile(index, frontState()->backingStoreRect());
-}
-
-Platform::IntPoint BackingStorePrivate::originOfTile(const TileIndex& index, const Platform::IntRect& backingStoreRect) const
-{
-    return Platform::IntPoint(backingStoreRect.x() + (index.i() * tileWidth()),
-                              backingStoreRect.y() + (index.j() * tileHeight()));
+    return Platform::IntPoint(backingStoreRect().x() + (index.i() * BackingStorePrivate::tileWidth()),
+                              backingStoreRect().y() + (index.j() * BackingStorePrivate::tileHeight()));
 }
 
 int BackingStorePrivate::minimumNumberOfTilesWide() const
@@ -2130,181 +1804,117 @@ Platform::IntSize BackingStorePrivate::expandedContentsSize() const
 
 int BackingStorePrivate::tileWidth()
 {
-    static int tileWidth = BlackBerry::Platform::Graphics::Screen::primaryScreen()->landscapeWidth();
-    return tileWidth;
+    return tileSize().width();
 }
 
 int BackingStorePrivate::tileHeight()
 {
-    static int tileHeight = BlackBerry::Platform::Graphics::Screen::primaryScreen()->landscapeHeight();
-    return tileHeight;
+    return tileSize().height();
 }
 
 Platform::IntSize BackingStorePrivate::tileSize()
 {
-    return Platform::IntSize(tileWidth(), tileHeight());
+    static Platform::IntSize tileSize = Platform::Settings::instance()->tileSize();
+    return tileSize;
 }
 
-Platform::IntRect BackingStorePrivate::tileRect()
+bool BackingStorePrivate::renderContents(BlackBerry::Platform::Graphics::Buffer* targetBuffer, const Platform::IntRect& dstRect, double scale, const Platform::FloatPoint& documentRenderOrigin) const
 {
-    return Platform::IntRect(0, 0, tileWidth(), tileHeight());
-}
-
-void BackingStorePrivate::renderContents(Platform::Graphics::Drawable* drawable,
-                                         const Platform::IntRect& contentsRect,
-                                         const Platform::IntSize& destinationSize) const
-{
-    if (!drawable || contentsRect.isEmpty())
-        return;
-
-    requestLayoutIfNeeded();
-
-    PlatformGraphicsContext* platformGraphicsContext = SurfacePool::globalSurfacePool()->createPlatformGraphicsContext(drawable);
-    GraphicsContext graphicsContext(platformGraphicsContext);
-
-    graphicsContext.translate(-contentsRect.x(), -contentsRect.y());
-
-    WebCore::IntRect transformedContentsRect(contentsRect.x(), contentsRect.y(), contentsRect.width(), contentsRect.height());
-
-    float widthScale = static_cast<float>(destinationSize.width()) / contentsRect.width();
-    float heightScale = static_cast<float>(destinationSize.height()) / contentsRect.height();
-
-    if (widthScale != 1.0 && heightScale != 1.0) {
-        TransformationMatrix matrix;
-        matrix.scaleNonUniform(1.0 / widthScale, 1.0 / heightScale);
-        transformedContentsRect = matrix.mapRect(transformedContentsRect);
-
-        // We extract from the contentsRect but draw a slightly larger region than
-        // we were told to, in order to avoid pixels being rendered only partially.
-        const int atLeastOneDevicePixel = static_cast<int>(ceilf(std::max(1.0 / widthScale, 1.0 / heightScale)));
-        transformedContentsRect.inflate(atLeastOneDevicePixel);
-        graphicsContext.scale(FloatSize(widthScale, heightScale));
-    }
-
-    graphicsContext.clip(transformedContentsRect);
-    m_client->frame()->view()->paintContents(&graphicsContext, transformedContentsRect);
-
-    delete platformGraphicsContext;
-}
-
-void BackingStorePrivate::renderContents(BlackBerry::Platform::Graphics::Buffer* tileBuffer,
-                                         const Platform::IntPoint& surfaceOffset,
-                                         const Platform::IntRect& contentsRect) const
-{
-    // If tileBuffer == 0, we render directly to the window.
-    if (!m_webPage->isVisible() && tileBuffer)
-        return;
-
 #if DEBUG_BACKINGSTORE
-    BBLOG(BlackBerry::Platform::LogLevelCritical,
-                           "BackingStorePrivate::renderContents tileBuffer=0x%x surfaceOffset=(%d,%d) contentsRect=(%d,%d %dx%d)",
-                           tileBuffer, surfaceOffset.x(), surfaceOffset.y(),
-                           contentsRect.x(), contentsRect.y(), contentsRect.width(), contentsRect.height());
+    Platform::logAlways(Platform::LogLevelCritical,
+        "BackingStorePrivate::renderContents targetBuffer=0x%p dstRect=%s scale=%f documentRenderOrigin=%s",
+        targetBuffer, dstRect.toString().c_str(), scale, documentRenderOrigin.toString().c_str());
 #endif
 
     // It is up to callers of this method to perform layout themselves!
     ASSERT(!m_webPage->d->mainFrame()->view()->needsLayout());
+    ASSERT(targetBuffer);
 
-    Platform::IntSize contentsSize = m_client->contentsSize();
+    Platform::ViewportAccessor* viewportAccessor = m_webPage->webkitThreadViewportAccessor();
+    WebCore::FloatRect renderedFloatRect(documentRenderOrigin, viewportAccessor->toDocumentContents(dstRect.size(), scale));
+    WebCore::IntRect contentsRect(WebCore::IntPoint::zero(), m_client->contentsSize());
     Color backgroundColor(m_webPage->settings()->backgroundColor());
 
-    BlackBerry::Platform::Graphics::Buffer* targetBuffer = tileBuffer
-        ? tileBuffer
-        : buffer();
-
-    if (contentsSize.isEmpty()
-        || !Platform::IntRect(Platform::IntPoint(0, 0), m_client->transformedContentsSize()).contains(contentsRect)
-        || backgroundColor.hasAlpha()) {
+    if (contentsRect.isEmpty()
+        || backgroundColor.hasAlpha()
+        || !WebCore::FloatRect(contentsRect).contains(renderedFloatRect)) {
         // Clear the area if it's not fully covered by (opaque) contents.
-        BlackBerry::Platform::IntRect clearRect = BlackBerry::Platform::IntRect(
-            contentsRect.x() - surfaceOffset.x(), contentsRect.y() - surfaceOffset.y(),
-            contentsRect.width(), contentsRect.height());
-
-        BlackBerry::Platform::Graphics::clearBuffer(targetBuffer, clearRect,
+        BlackBerry::Platform::Graphics::clearBuffer(targetBuffer, dstRect,
             backgroundColor.red(), backgroundColor.green(),
             backgroundColor.blue(), backgroundColor.alpha());
     }
 
-    if (contentsSize.isEmpty())
-        return;
+    if (contentsRect.isEmpty())
+        return true;
 
-    BlackBerry::Platform::Graphics::Drawable* bufferDrawable =
-        BlackBerry::Platform::Graphics::lockBufferDrawable(targetBuffer);
+    Platform::Graphics::Drawable* bufferDrawable = Platform::Graphics::lockBufferDrawable(targetBuffer);
+    Platform::Graphics::Buffer* drawingBuffer = 0;
 
-    PlatformGraphicsContext* bufferPlatformGraphicsContext = bufferDrawable
-        ? SurfacePool::globalSurfacePool()->createPlatformGraphicsContext(bufferDrawable)
-        : 0;
-    PlatformGraphicsContext* targetPlatformGraphicsContext = bufferPlatformGraphicsContext
-        ? bufferPlatformGraphicsContext
-        : SurfacePool::globalSurfacePool()->lockTileRenderingSurface();
+    if (bufferDrawable)
+        drawingBuffer = targetBuffer;
+    else {
+        BBLOG(Platform::LogLevelWarn, "Using temporary buffer to paint contents, look into avoiding this.");
 
-    ASSERT(targetPlatformGraphicsContext);
+        drawingBuffer = Platform::Graphics::createBuffer(dstRect.size(), Platform::Graphics::BackedWhenNecessary);
+        if (!drawingBuffer) {
+            Platform::logAlways(Platform::LogLevelWarn, "Could not create temporary buffer, expect bad things to happen.");
+            return false;
+        }
+        bufferDrawable = Platform::Graphics::lockBufferDrawable(drawingBuffer);
+        if (!bufferDrawable) {
+            Platform::logAlways(Platform::LogLevelWarn, "Could not lock temporary buffer drawable, expect bad things to happen.");
+            Platform::Graphics::destroyBuffer(drawingBuffer);
+            return false;
+        }
+    }
+
+    PlatformGraphicsContext* platformGraphicsContext = SurfacePool::globalSurfacePool()->createPlatformGraphicsContext(bufferDrawable);
+    ASSERT(platformGraphicsContext);
 
     {
-        GraphicsContext graphicsContext(targetPlatformGraphicsContext);
+        GraphicsContext graphicsContext(platformGraphicsContext);
 
-        // Believe it or not this is important since the WebKit Skia backend
-        // doesn't store the original state unless you call save first :P
+        // Clip the output to the destination pixels.
         graphicsContext.save();
+        graphicsContext.clip(dstRect);
 
         // Translate context according to offset.
-        graphicsContext.translate(-surfaceOffset.x(), -surfaceOffset.y());
+        if (targetBuffer == drawingBuffer)
+            graphicsContext.translate(-dstRect.x(), -dstRect.y());
 
         // Add our transformation matrix as the global transform.
-        AffineTransform affineTransform(
-            m_webPage->d->transformationMatrix()->a(),
-            m_webPage->d->transformationMatrix()->b(),
-            m_webPage->d->transformationMatrix()->c(),
-            m_webPage->d->transformationMatrix()->d(),
-            m_webPage->d->transformationMatrix()->e(),
-            m_webPage->d->transformationMatrix()->f());
-        graphicsContext.concatCTM(affineTransform);
+        graphicsContext.scale(WebCore::FloatSize(scale, scale));
+        graphicsContext.translate(-documentRenderOrigin.x(), -documentRenderOrigin.y());
 
-        // Now that the matrix is applied we need untranformed contents coordinates.
-        Platform::IntRect untransformedContentsRect = m_webPage->d->mapFromTransformed(contentsRect);
-
-        // We extract from the contentsRect but draw a slightly larger region than
-        // we were told to, in order to avoid pixels being rendered only partially.
-        const int atLeastOneDevicePixel =
-            static_cast<int>(ceilf(1.0 / m_webPage->d->transformationMatrix()->a()));
-        untransformedContentsRect.inflate(atLeastOneDevicePixel, atLeastOneDevicePixel);
-
-        // Make sure the untransformed rectangle for the (slightly larger than
-        // initially requested) repainted region is within the bounds of the page.
-        untransformedContentsRect.intersect(Platform::IntRect(Platform::IntPoint(0, 0), contentsSize));
-
-        // Some WebKit painting backends *cough* Skia *cough* don't set this automatically
-        // to the dirtyRect so do so here explicitly.
-        graphicsContext.clip(untransformedContentsRect);
+        // Make sure the rectangle for the rendered rectangle is within the
+        // bounds of the page.
+        WebCore::IntRect renderedRect = enclosingIntRect(renderedFloatRect);
+        renderedRect.intersect(contentsRect);
 
         // Take care of possible left overflow on RTL page.
         if (int leftOverFlow = m_client->frame()->view()->minimumScrollPosition().x()) {
-            untransformedContentsRect.move(leftOverFlow, 0);
+            renderedRect.move(leftOverFlow, 0);
             graphicsContext.translate(-leftOverFlow, 0);
         }
 
         // Let WebCore render the page contents into the drawing surface.
-        m_client->frame()->view()->paintContents(&graphicsContext, untransformedContentsRect);
+        m_client->frame()->view()->paintContents(&graphicsContext, renderedRect);
 
         graphicsContext.restore();
     }
 
-    // Grab the requested region from the drawing surface into the tile image.
+    SurfacePool::globalSurfacePool()->destroyPlatformGraphicsContext(platformGraphicsContext);
+    Platform::Graphics::releaseBufferDrawable(drawingBuffer);
 
-    delete bufferPlatformGraphicsContext;
-
-    if (bufferDrawable)
-        releaseBufferDrawable(targetBuffer);
-    else {
-        const Platform::IntPoint dstPoint(contentsRect.x() - surfaceOffset.x(),
-                                          contentsRect.y() - surfaceOffset.y());
-        const Platform::IntRect dstRect(dstPoint, contentsRect.size());
-        const Platform::IntRect srcRect = dstRect;
-
+    if (targetBuffer != drawingBuffer) {
         // If we couldn't directly draw to the buffer, copy from the drawing surface.
-        SurfacePool::globalSurfacePool()->releaseTileRenderingSurface(targetPlatformGraphicsContext);
-        BlackBerry::Platform::Graphics::blitToBuffer(targetBuffer, dstRect, BlackBerry::Platform::Graphics::drawingSurface(), srcRect);
+        const Platform::IntRect srcRect(Platform::IntPoint::zero(), dstRect.size());
+
+        Platform::Graphics::blitToBuffer(targetBuffer, dstRect, drawingBuffer, srcRect);
+        Platform::Graphics::destroyBuffer(drawingBuffer);
     }
+
+    return true;
 }
 
 #if DEBUG_FAT_FINGERS
@@ -2318,27 +1928,18 @@ static void drawDebugRect(BlackBerry::Platform::Graphics::Buffer* dstBuffer, con
 #endif
 
 void BackingStorePrivate::blitToWindow(const Platform::IntRect& dstRect,
-                                       const BlackBerry::Platform::Graphics::Buffer* srcBuffer,
-                                       const Platform::IntRect& srcRect,
-                                       bool blend,
-                                       unsigned char globalAlpha)
+    const Platform::Graphics::Buffer* srcBuffer,
+    const Platform::IntRect& srcRect,
+    Platform::Graphics::BlendMode blendMode,
+    unsigned char globalAlpha)
 {
     ASSERT(BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread());
-
-    windowFrontBufferState()->clearBlittedRegion(dstRect);
-    windowBackBufferState()->addBlittedRegion(dstRect);
 
     BlackBerry::Platform::Graphics::Buffer* dstBuffer = buffer();
     ASSERT(dstBuffer);
     ASSERT(srcBuffer);
-    if (!dstBuffer) {
-        BBLOG(BlackBerry::Platform::LogLevelWarn,
-            "Empty window buffer, couldn't blitToWindow");
-    }
-
-    BlackBerry::Platform::Graphics::BlendMode blendMode = blend
-        ? BlackBerry::Platform::Graphics::SourceOver
-        : BlackBerry::Platform::Graphics::SourceCopy;
+    if (!dstBuffer)
+        Platform::logAlways(Platform::LogLevelWarn, "Empty window buffer, couldn't blitToWindow");
 
     BlackBerry::Platform::Graphics::blitToBuffer(dstBuffer, dstRect, srcBuffer, srcRect, blendMode, globalAlpha);
 
@@ -2357,15 +1958,10 @@ void BackingStorePrivate::fillWindow(Platform::Graphics::FillPattern pattern,
 {
     ASSERT(BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread());
 
-    windowFrontBufferState()->clearBlittedRegion(dstRect);
-    windowBackBufferState()->addBlittedRegion(dstRect);
-
     BlackBerry::Platform::Graphics::Buffer* dstBuffer = buffer();
     ASSERT(dstBuffer);
-    if (!dstBuffer) {
-        BBLOG(BlackBerry::Platform::LogLevelWarn,
-            "Empty window buffer, couldn't fillWindow");
-    }
+    if (!dstBuffer)
+        Platform::logAlways(Platform::LogLevelWarn, "Empty window buffer, couldn't fillWindow");
 
     if (pattern == BlackBerry::Platform::Graphics::CheckerboardPattern && BlackBerry::Platform::Settings::isPublicBuild()) {
         // For public builds, convey the impression of less checkerboard.
@@ -2399,66 +1995,13 @@ void BackingStorePrivate::setWebPageBackgroundColor(const WebCore::Color& color)
     m_webPageBackgroundColor = color;
 }
 
-void BackingStorePrivate::invalidateWindow()
-{
-    // Grab a rect appropriate for the current thread.
-    if (BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread())
-        invalidateWindow(m_webPage->client()->userInterfaceViewportAccessor()->destinationSurfaceRect());
-    else
-        invalidateWindow(Platform::IntRect(Platform::IntPoint(0, 0), m_client->transformedViewportSize()));
-}
-
-void BackingStorePrivate::invalidateWindow(const Platform::IntRect& dst)
-{
-    if (dst.isEmpty())
-        return;
-
-    if (!BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread() && !shouldDirectRenderingToWindow()) {
-        // This needs to be sync in order to swap the recently drawn thing...
-        // This will only be called from WebKit thread during direct rendering.
-        typedef void (BlackBerry::WebKit::BackingStorePrivate::*FunctionType)(const Platform::IntRect&);
-        BlackBerry::Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
-            BlackBerry::Platform::createMethodCallMessage<FunctionType, BackingStorePrivate, Platform::IntRect>(
-                &BackingStorePrivate::invalidateWindow, this, dst));
-        return;
-    }
-
-#if DEBUG_BACKINGSTORE
-    BBLOG(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::invalidateWindow dst = %s", dst.toString().c_str());
-#endif
-
-    // Since our window may also be double buffered, we need to also copy the
-    // front buffer's contents to the back buffer before we swap them. It is
-    // analogous to what we do with our double buffered tiles by calling
-    // copyPreviousContentsToBackingSurfaceOfTile(). It only affects partial
-    // screen updates since when we are scrolling or zooming, the whole window
-    // is invalidated anyways and no copying is needed.
-    copyPreviousContentsToBackSurfaceOfWindow();
-
-    Platform::IntRect dstRect = dst;
-
-    Platform::IntRect viewportRect(Platform::IntPoint(0, 0), m_client->transformedViewportSize());
-    dstRect.intersect(viewportRect);
-
-    if (dstRect.width() <= 0 || dstRect.height() <= 0)
-        return;
-
-#if DEBUG_BACKINGSTORE
-    BBLOG(BlackBerry::Platform::LogLevelCritical, "BackingStorePrivate::invalidateWindow posting = %s", dstRect.toString().c_str());
-#endif
-
-    m_currentWindowBackBuffer = (m_currentWindowBackBuffer + 1) % 2;
-    if (Window* window = m_webPage->client()->window())
-        window->post(dstRect);
-}
-
 void BackingStorePrivate::clearWindow(const Platform::IntRect& rect,
                                       unsigned char red,
                                       unsigned char green,
                                       unsigned char blue,
                                       unsigned char alpha)
 {
-    if (!BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread() && !shouldDirectRenderingToWindow()) {
+    if (!BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread()) {
         typedef void (BlackBerry::WebKit::BackingStorePrivate::*FunctionType)(const Platform::IntRect&,
                                                                            unsigned char,
                                                                            unsigned char,
@@ -2478,29 +2021,26 @@ void BackingStorePrivate::clearWindow(const Platform::IntRect& rect,
 
     BlackBerry::Platform::Graphics::Buffer* dstBuffer = buffer();
     ASSERT(dstBuffer);
-    if (!dstBuffer) {
-        BBLOG(BlackBerry::Platform::LogLevelWarn,
-            "Empty window buffer, couldn't clearWindow");
-    }
-
-    windowFrontBufferState()->clearBlittedRegion(rect);
-    windowBackBufferState()->addBlittedRegion(rect);
+    if (!dstBuffer)
+        Platform::logAlways(Platform::LogLevelWarn, "Empty window buffer, couldn't clearWindow");
 
     BlackBerry::Platform::Graphics::clearBuffer(dstBuffer, rect, red, green, blue, alpha);
 }
 
 bool BackingStorePrivate::isScrollingOrZooming() const
 {
-    BackingStoreMutexLocker locker(const_cast<BackingStorePrivate*>(this));
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
     return m_isScrollingOrZooming;
 }
 
 void BackingStorePrivate::setScrollingOrZooming(bool scrollingOrZooming, bool shouldBlit)
 {
-    {
-        BackingStoreMutexLocker locker(this);
-        m_isScrollingOrZooming = scrollingOrZooming;
-    }
+    ASSERT(BlackBerry::Platform::webKitThreadMessageClient()->isCurrentThread());
+
+    if (m_isScrollingOrZooming == scrollingOrZooming)
+        return;
+
+    m_isScrollingOrZooming = scrollingOrZooming;
 
 #if !ENABLE_REPAINTONSCROLL
     m_suspendRenderJobs = scrollingOrZooming; // Suspend the rendering of everything.
@@ -2517,19 +2057,11 @@ void BackingStorePrivate::setScrollingOrZooming(bool scrollingOrZooming, bool sh
     if (scrollingOrZooming)
         m_renderQueue->setCurrentRegularRenderJobBatchUnderPressure(false);
 #if ENABLE_SCROLLBARS
-    else if (shouldBlit && !shouldDirectRenderingToWindow())
+    else if (shouldBlit)
         blitVisibleContents();
 #endif
-}
-
-void BackingStorePrivate::lockBackingStore()
-{
-    pthread_mutex_lock(&m_mutex);
-}
-
-void BackingStorePrivate::unlockBackingStore()
-{
-    pthread_mutex_unlock(&m_mutex);
+    if (!scrollingOrZooming && shouldPerformRegularRenderJobs())
+        dispatchRenderJob();
 }
 
 BackingStoreGeometry* BackingStorePrivate::frontState() const
@@ -2537,70 +2069,95 @@ BackingStoreGeometry* BackingStorePrivate::frontState() const
     return reinterpret_cast<BackingStoreGeometry*>(m_frontState);
 }
 
-BackingStoreGeometry* BackingStorePrivate::backState() const
+void BackingStorePrivate::adoptAsFrontState(BackingStoreGeometry* newFrontState)
 {
-    return reinterpret_cast<BackingStoreGeometry*>(m_backState);
-}
+    bool hasValidBuffers = false;
 
-void BackingStorePrivate::swapState()
-{
-    unsigned front = reinterpret_cast<unsigned>(frontState());
-    unsigned back = reinterpret_cast<unsigned>(backState());
+    // Remember the buffers we'll use in the new front state for comparison.
+    WTF::Vector<TileBuffer*> newTileBuffers;
+    TileMap newTileMap = newFrontState->tileMap();
+    TileMap::const_iterator end = newTileMap.end();
+    for (TileMap::const_iterator it = newTileMap.begin(); it != end; ++it) {
+        if (it->value) {
+            hasValidBuffers = true;
+            newTileBuffers.append(it->value);
+        }
+    }
+
+    if (!hasValidBuffers) {
+        m_tileMatrixContainsUsefulContent = false;
+        updateSuspendScreenUpdateState();
+    }
+
+    unsigned newFront = reinterpret_cast<unsigned>(newFrontState);
+    BackingStoreGeometry* oldFrontState = frontState();
 
     // Atomic change.
-    _smp_xchg(&m_frontState, back);
-    _smp_xchg(&m_backState, front);
-    BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
+    _smp_xchg(&m_frontState, newFront);
+
+    bool hasSynced = false;
+
+    if (hasValidBuffers) {
+        m_tileMatrixContainsUsefulContent = true;
+        updateSuspendScreenUpdateState(&hasSynced);
+    }
+
+    if (!hasSynced) {
+        // Wait until the user interface thread won't access the old front state anymore.
+        BlackBerry::Platform::userInterfaceThreadMessageClient()->syncToCurrentMessage();
+    }
+
+    // Reclaim unused old tile buffers as back buffers.
+    TileMap oldTileMap = oldFrontState->tileMap();
+    end = oldTileMap.end();
+    for (TileMap::const_iterator it = oldTileMap.begin(); it != end; ++it) {
+        TileBuffer* tileBuffer = it->value;
+        if (tileBuffer && !newTileBuffers.contains(tileBuffer))
+            SurfacePool::globalSurfacePool()->addBackBuffer(tileBuffer);
+    }
+
+    delete oldFrontState;
 }
 
-BackingStoreWindowBufferState* BackingStorePrivate::windowFrontBufferState() const
+// static
+void BackingStorePrivate::setCurrentBackingStoreOwner(WebPage* webPage)
 {
-    return &m_windowBufferState[(m_currentWindowBackBuffer + 1) % 2];
+    // Let the previously active backingstore release its tile buffers so
+    // the new one (e.g. another tab) can use the buffers to render contents.
+    if (BackingStorePrivate::s_currentBackingStoreOwner && BackingStorePrivate::s_currentBackingStoreOwner != webPage)
+        BackingStorePrivate::s_currentBackingStoreOwner->d->m_backingStore->d->resetTiles();
+
+    BackingStorePrivate::s_currentBackingStoreOwner = webPage;
+    if (webPage)
+        webPage->backingStore()->d->updateSuspendScreenUpdateState(); // depends on isActive()
 }
-
-BackingStoreWindowBufferState* BackingStorePrivate::windowBackBufferState() const
-{
-    return &m_windowBufferState[m_currentWindowBackBuffer];
-}
-
-#if USE(ACCELERATED_COMPOSITING)
-void BackingStorePrivate::drawAndBlendLayersForDirectRendering(const Platform::IntRect& dirtyRect)
-{
-    ASSERT(BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread());
-    if (!BlackBerry::Platform::userInterfaceThreadMessageClient()->isCurrentThread())
-        return;
-
-    // Because we're being called sync from the WebKit thread, we can use
-    // regular WebPage size and transformation functions without concerns.
-    WebCore::IntRect contentsRect = visibleContentsRect();
-    WebCore::FloatRect untransformedContentsRect = m_webPage->d->mapFromTransformedFloatRect(WebCore::FloatRect(contentsRect));
-    WebCore::IntRect contentsScreenRect = m_client->mapFromTransformedContentsToTransformedViewport(contentsRect);
-    WebCore::IntRect dstRect = intersection(contentsScreenRect,
-        WebCore::IntRect(WebCore::IntPoint(0, 0), m_webPage->d->transformedViewportSize()));
-
-    // Check if rendering caused a commit and we need to redraw the layers.
-    if (WebPageCompositorPrivate* compositor = m_webPage->d->compositor())
-        compositor->drawLayers(dstRect, untransformedContentsRect);
-}
-#endif
 
 bool BackingStorePrivate::isActive() const
 {
     return BackingStorePrivate::s_currentBackingStoreOwner == m_webPage && SurfacePool::globalSurfacePool()->isActive();
 }
 
-void BackingStorePrivate::didRenderContent(const Platform::IntRect& renderedRect)
+void BackingStorePrivate::didRenderContent(const Platform::IntRectRegion& renderedRegion)
 {
-    if (isScrollingOrZooming())
-        return;
+#if USE(ACCELERATED_COMPOSITING)
+    if (m_webPage->d->needsOneShotDrawingSynchronization())
+        m_webPage->d->commitRootLayerIfNeeded();
+    else
+#endif
+    {
+        if (isScrollingOrZooming())
+            return; // don't drag down framerates by double-blitting.
 
-    if (!shouldDirectRenderingToWindow()) {
-        if (!m_webPage->d->needsOneShotDrawingSynchronization())
-            blitVisibleContents();
-    } else
-        invalidateWindow();
+        blitVisibleContents();
+    }
 
-    m_webPage->client()->notifyPixelContentRendered(renderedRect);
+    // Don't issue content rendered calls when all we rendered was filler
+    // background color before the page is committed.
+    if (!m_client->contentsSize().isEmpty()) {
+        std::vector<Platform::IntRect> renderedRects = renderedRegion.rects();
+        for (size_t i = 0; i < renderedRects.size(); ++i)
+            m_webPage->client()->notifyPixelContentRendered(renderedRects[i]);
+    }
 }
 
 BackingStore::BackingStore(WebPage* webPage, BackingStoreClient* client)
@@ -2632,14 +2189,34 @@ void BackingStore::createSurface()
     d->m_webPage->setFocused(true);
 }
 
-void BackingStore::suspendScreenAndBackingStoreUpdates()
+void BackingStore::suspendBackingStoreUpdates()
 {
-    d->suspendScreenAndBackingStoreUpdates();
+    d->suspendBackingStoreUpdates();
 }
 
-void BackingStore::resumeScreenAndBackingStoreUpdates(ResumeUpdateOperation op)
+void BackingStore::resumeBackingStoreUpdates()
 {
-    d->resumeScreenAndBackingStoreUpdates(op);
+    d->resumeBackingStoreUpdates();
+}
+
+void BackingStore::suspendGeometryUpdates()
+{
+    d->suspendGeometryUpdates();
+}
+
+void BackingStore::resumeGeometryUpdates()
+{
+    d->resumeGeometryUpdates();
+}
+
+void BackingStore::suspendScreenUpdates()
+{
+    d->suspendScreenUpdates();
+}
+
+void BackingStore::resumeScreenUpdates(ResumeUpdateOperation op)
+{
+    d->resumeScreenUpdates(op);
 }
 
 bool BackingStore::isScrollingOrZooming() const
@@ -2663,32 +2240,20 @@ void BackingStore::repaint(int x, int y, int width, int height,
     d->repaint(Platform::IntRect(x, y, width, height), contentChanged, immediate);
 }
 
-bool BackingStore::isDirectRenderingToWindow() const
+void BackingStore::acquireBackingStoreMemory()
 {
-    BackingStoreMutexLocker locker(d);
-    return d->shouldDirectRenderingToWindow();
+    SurfacePool::globalSurfacePool()->createBuffers();
 }
 
-void BackingStore::createBackingStoreMemory()
+void BackingStore::releaseOwnedBackingStoreMemory()
 {
-    if (BackingStorePrivate::s_currentBackingStoreOwner == d->m_webPage)
-        SurfacePool::globalSurfacePool()->createBuffers();
-}
-
-void BackingStore::releaseBackingStoreMemory()
-{
-    if (BackingStorePrivate::s_currentBackingStoreOwner == d->m_webPage)
+    if (BackingStorePrivate::s_currentBackingStoreOwner == d->m_webPage) {
+        // Call resetTiles() (hopefully) after suspendScreenUpdates()
+        // so we will not cause checkerboard to be shown before suspending.
+        // This causes the tiles in use to be given back to the SurfacePool.
+        d->resetTiles();
         SurfacePool::globalSurfacePool()->releaseBuffers();
-}
-
-bool BackingStore::defersBlit() const
-{
-        return d->m_defersBlit;
-}
-
-void BackingStore::setDefersBlit(bool b)
-{
-        d->m_defersBlit = b;
+    }
 }
 
 bool BackingStore::hasBlitJobs() const
@@ -2744,9 +2309,14 @@ Platform::Graphics::Buffer* BackingStorePrivate::buffer() const
     return 0;
 }
 
-void BackingStore::drawContents(Platform::Graphics::Drawable* drawable, const Platform::IntRect& contentsRect, const Platform::IntSize& destinationSize)
+bool BackingStore::drawContents(Platform::Graphics::Buffer* buffer, const Platform::IntRect& dstRect, double scale, const Platform::FloatPoint& documentScrollPosition)
 {
-    d->renderContents(drawable, contentsRect, destinationSize);
+    if (!buffer || dstRect.isEmpty())
+        return false;
+
+    d->requestLayoutIfNeeded();
+
+    return d->renderContents(buffer, dstRect, scale, documentScrollPosition);
 }
 
 }

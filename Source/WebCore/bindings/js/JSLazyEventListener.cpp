@@ -56,6 +56,8 @@ JSLazyEventListener::JSLazyEventListener(const String& functionName, const Strin
     if (m_position == TextPosition::belowRangePosition())
         m_position = TextPosition::minimumPosition();
 
+    ASSERT(m_eventParameterName == "evt" || m_eventParameterName == "event");
+
 #ifndef NDEBUG
     eventListenerCounter.increment();
 #endif
@@ -75,7 +77,12 @@ JSObject* JSLazyEventListener::initializeJSFunction(ScriptExecutionContext* exec
     if (!executionContext)
         return 0;
 
-    Document* document = static_cast<Document*>(executionContext);
+    ASSERT(!m_code.isNull());
+    ASSERT(!m_eventParameterName.isNull());
+    if (m_code.isNull() || m_eventParameterName.isNull())
+        return 0;
+
+    Document* document = toDocument(executionContext);
 
     if (!document->frame())
         return 0;
@@ -117,12 +124,6 @@ JSObject* JSLazyEventListener::initializeJSFunction(ScriptExecutionContext* exec
         // (and the document, and the form - see JSHTMLElement::eventHandlerScope)
         listenerAsFunction->setScope(exec->globalData(), jsCast<JSNode*>(wrapper())->pushEventHandlerScope(exec, listenerAsFunction->scope()));
     }
-
-    // Since we only parse once, there's no need to keep data used for parsing around anymore.
-    m_functionName = String();
-    m_code = String();
-    m_eventParameterName = String();
-    m_sourceURL = String();
     return jsFunction;
 }
 

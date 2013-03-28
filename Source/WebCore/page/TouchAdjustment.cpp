@@ -25,6 +25,7 @@
 #include "FloatPoint.h"
 #include "FloatQuad.h"
 #include "FrameView.h"
+#include "HTMLFrameOwnerElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLLabelElement.h"
 #include "HTMLNames.h"
@@ -75,9 +76,14 @@ bool nodeRespondsToTapGesture(Node* node)
         return true;
     if (node->willRespondToMouseClickEvents() || node->willRespondToMouseMoveEvents())
         return true;
-    if (node->renderStyle()) {
-        // Accept nodes that has a CSS effect when touched.
-        if (node->renderStyle()->affectedByActiveRules() || node->renderStyle()->affectedByHoverRules())
+    // Accept nodes that has a CSS effect when touched.
+    if (node->isElementNode()) {
+        Element* element = toElement(node);
+        if (element->childrenAffectedByActive() || element->childrenAffectedByHover())
+            return true;
+    }
+    if (RenderStyle* renderStyle = node->renderStyle()) {
+        if (renderStyle->affectedByActive() || renderStyle->affectedByHover())
             return true;
     }
     return false;
@@ -216,6 +222,15 @@ static inline void appendZoomableSubtargets(Node* node, SubtargetGeometryList& s
         subtargets.append(SubtargetGeometry(node, *it));
 }
 
+static inline Node* parentShadowHostOrOwner(const Node* node)
+{
+    if (Node* ancestor = node->parentOrShadowHostNode())
+        return ancestor;
+    if (node->isDocumentNode())
+        return toDocument(node)->ownerElement();
+    return 0;
+}
+
 // Compiles a list of subtargets of all the relevant target nodes.
 void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryList& subtargets, NodeFilter nodeFilter, AppendSubtargetsForNode appendSubtargetsForNode)
 {
@@ -233,7 +248,7 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
         Node* const node = intersectedNodes.item(i);
         Vector<Node*> visitedNodes;
         Node* respondingNode = 0;
-        for (Node* visitedNode = node; visitedNode; visitedNode = visitedNode->parentOrHostNode()) {
+        for (Node* visitedNode = node; visitedNode; visitedNode = visitedNode->parentOrShadowHostNode()) {
             // Check if we already have a result for a common ancestor from another candidate.
             respondingNode = responderMap.get(visitedNode);
             if (respondingNode)
@@ -243,7 +258,7 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
             if (nodeFilter(visitedNode)) {
                 respondingNode = visitedNode;
                 // Continue the iteration to collect the ancestors of the responder, which we will need later.
-                for (visitedNode = visitedNode->parentOrHostNode(); visitedNode; visitedNode = visitedNode->parentOrHostNode()) {
+                for (visitedNode = parentShadowHostOrOwner(visitedNode); visitedNode; visitedNode = parentShadowHostOrOwner(visitedNode)) {
                     HashSet<Node*>::AddResult addResult = ancestorsToRespondersSet.add(visitedNode);
                     if (!addResult.isNewEntry)
                         break;
@@ -276,7 +291,7 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
             continue;
         if (candidate->isContentEditable()) {
             Node* replacement = candidate;
-            Node* parent = candidate->parentOrHostNode();
+            Node* parent = candidate->parentOrShadowHostNode();
             while (parent && parent->isContentEditable()) {
                 replacement = parent;
                 if (editableAncestors.contains(replacement)) {
@@ -284,7 +299,7 @@ void compileSubtargetList(const NodeList& intersectedNodes, SubtargetGeometryLis
                     break;
                 }
                 editableAncestors.add(replacement);
-                parent = parent->parentOrHostNode();
+                parent = parent->parentOrShadowHostNode();
             }
             candidate = replacement;
         }

@@ -34,12 +34,8 @@ select[size],
 select[multiple],
 select[size][multiple] {
     -webkit-appearance: menulist;
-    -webkit-box-align: center;
+    -webkit-align-items: center;
     border: 1px solid;
-    border-radius: 5px;
+    border-radius: initial;
     white-space: pre;
-}
-
-input[type="date"], input[type="datetime"], input[type="datetime-local"], input[type="time"], input[type="month"] {
-    -webkit-appearance: menulist-button;
 }

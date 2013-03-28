@@ -26,12 +26,19 @@
 #include "ChromeClientGtk.h"
 #include "Frame.h"
 #include "FrameView.h"
+#include "GraphicsLayerTextureMapper.h"
 #include "PlatformContextCairo.h"
 #include "Settings.h"
 #include "TextureMapperGL.h"
 #include "TextureMapperLayer.h"
 #include "webkitwebviewprivate.h"
+
+#if USE(OPENGL_ES_2)
+#include <GLES2/gl2.h>
+#else
 #include <GL/gl.h>
+#endif
+
 #include <cairo.h>
 #include <gdk/gdk.h>
 #include <gtk/gtk.h>
@@ -188,6 +195,7 @@ void AcceleratedCompositingContext::compositeLayersToContext(CompositePurpose pu
 
     m_textureMapper->beginPainting();
     toTextureMapperLayer(m_rootLayer.get())->paint();
+    m_fpsCounter.updateFPSAndDisplay(m_textureMapper.get());
     m_textureMapper->endPainting();
 
     context->swapBuffers();

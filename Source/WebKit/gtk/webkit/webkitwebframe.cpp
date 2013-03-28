@@ -33,6 +33,7 @@
 #include "DocumentFragment.h"
 #include "DocumentLoader.h"
 #include "DocumentLoaderGtk.h"
+#include "FrameLoadRequest.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClientGtk.h"
 #include "FrameSelection.h"
@@ -55,9 +56,9 @@
 #include "SubstituteData.h"
 #include "TextIterator.h"
 #include "WebKitAccessibleWrapperAtk.h"
+#include "WebKitDOMDocumentPrivate.h"
+#include "WebKitDOMRangePrivate.h"
 #include "markup.h"
-#include "webkit/WebKitDOMDocumentPrivate.h"
-#include "webkit/WebKitDOMRangePrivate.h"
 #include "webkitenumtypes.h"
 #include "webkitglobalsprivate.h"
 #include "webkitmarshal.h"
@@ -205,16 +206,16 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * signals
      */
     webkit_web_frame_signals[CLEARED] = g_signal_new("cleared",
-            G_TYPE_FROM_CLASS(frameClass),
-            (GSignalFlags)G_SIGNAL_RUN_LAST,
-            0,
-            0,
-            0,
-            g_cclosure_marshal_VOID__VOID,
-            G_TYPE_NONE, 0);
+        G_TYPE_FROM_CLASS(frameClass),
+        (GSignalFlags)G_SIGNAL_RUN_LAST,
+        0,
+        0,
+        0,
+        g_cclosure_marshal_VOID__VOID,
+        G_TYPE_NONE, 0);
 
     /**
-     * WebKitWebFrame::load-committed
+     * WebKitWebFrame::load-committed:
      * @web_frame: the object on which the signal is emitted
      *
      * Emitted when frame loading is done.
@@ -222,32 +223,13 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Deprecated: Use the "load-status" property instead.
      */
     webkit_web_frame_signals[LOAD_COMMITTED] = g_signal_new("load-committed",
-            G_TYPE_FROM_CLASS(frameClass),
-            (GSignalFlags)G_SIGNAL_RUN_LAST,
-            0,
-            0,
-            0,
-            g_cclosure_marshal_VOID__VOID,
-            G_TYPE_NONE, 0);
-
-    /**
-     * WebKitWebFrame::load-done
-     * @web_frame: the object on which the signal is emitted
-     *
-     * Emitted when frame loading is done.
-     *
-     * Deprecated: Use the "load-status" property instead, and/or
-     * WebKitWebView::load-error to be notified of load errors
-     */
-    webkit_web_frame_signals[LOAD_DONE] = g_signal_new("load-done",
-            G_TYPE_FROM_CLASS(frameClass),
-            (GSignalFlags)G_SIGNAL_RUN_LAST,
-            0,
-            0,
-            0,
-            g_cclosure_marshal_VOID__BOOLEAN,
-            G_TYPE_NONE, 1,
-            G_TYPE_BOOLEAN);
+        G_TYPE_FROM_CLASS(frameClass),
+        (GSignalFlags)G_SIGNAL_RUN_LAST,
+        0,
+        0,
+        0,
+        g_cclosure_marshal_VOID__VOID,
+        G_TYPE_NONE, 0);
 
     /**
      * WebKitWebFrame::title-changed:
@@ -259,24 +241,24 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Deprecated: 1.1.18: Use "notify::title" instead.
      */
     webkit_web_frame_signals[TITLE_CHANGED] = g_signal_new("title-changed",
-            G_TYPE_FROM_CLASS(frameClass),
-            (GSignalFlags)G_SIGNAL_RUN_LAST,
-            0,
-            0,
-            0,
-            webkit_marshal_VOID__STRING,
-            G_TYPE_NONE, 1,
-            G_TYPE_STRING);
+        G_TYPE_FROM_CLASS(frameClass),
+        (GSignalFlags)G_SIGNAL_RUN_LAST,
+        0,
+        0,
+        0,
+        webkit_marshal_VOID__STRING,
+        G_TYPE_NONE, 1,
+        G_TYPE_STRING);
 
     webkit_web_frame_signals[HOVERING_OVER_LINK] = g_signal_new("hovering-over-link",
-            G_TYPE_FROM_CLASS(frameClass),
-            (GSignalFlags)G_SIGNAL_RUN_LAST,
-            0,
-            0,
-            0,
-            webkit_marshal_VOID__STRING_STRING,
-            G_TYPE_NONE, 2,
-            G_TYPE_STRING, G_TYPE_STRING);
+        G_TYPE_FROM_CLASS(frameClass),
+        (GSignalFlags)G_SIGNAL_RUN_LAST,
+        0,
+        0,
+        0,
+        webkit_marshal_VOID__STRING_STRING,
+        G_TYPE_NONE, 2,
+        G_TYPE_STRING, G_TYPE_STRING);
 
     /**
      * WebKitWebFrame::scrollbars-policy-changed:
@@ -304,13 +286,13 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Since: 1.1.14
      */
     webkit_web_frame_signals[SCROLLBARS_POLICY_CHANGED] = g_signal_new("scrollbars-policy-changed",
-            G_TYPE_FROM_CLASS(frameClass),
-            (GSignalFlags)(G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION),
-            0,
-            g_signal_accumulator_true_handled,
-            0,
-            webkit_marshal_BOOLEAN__VOID,
-            G_TYPE_BOOLEAN, 0);
+        G_TYPE_FROM_CLASS(frameClass),
+        (GSignalFlags)(G_SIGNAL_RUN_LAST | G_SIGNAL_ACTION),
+        0,
+        g_signal_accumulator_true_handled,
+        0,
+        webkit_marshal_BOOLEAN__VOID,
+        G_TYPE_BOOLEAN, 0);
 
 
     /**
@@ -342,15 +324,15 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Since: 1.7.5
      */
     webkit_web_frame_signals[RESOURCE_REQUEST_STARTING] = g_signal_new("resource-request-starting",
-            G_TYPE_FROM_CLASS(frameClass),
-            G_SIGNAL_RUN_LAST,
-            0,
-            0, 0,
-            webkit_marshal_VOID__OBJECT_OBJECT_OBJECT,
-            G_TYPE_NONE, 3,
-            WEBKIT_TYPE_WEB_RESOURCE,
-            WEBKIT_TYPE_NETWORK_REQUEST,
-            WEBKIT_TYPE_NETWORK_RESPONSE);
+        G_TYPE_FROM_CLASS(frameClass),
+        G_SIGNAL_RUN_LAST,
+        0,
+        0, 0,
+        webkit_marshal_VOID__OBJECT_OBJECT_OBJECT,
+        G_TYPE_NONE, 3,
+        WEBKIT_TYPE_WEB_RESOURCE,
+        WEBKIT_TYPE_NETWORK_REQUEST,
+        WEBKIT_TYPE_NETWORK_RESPONSE);
 
     /**
      * WebKitWebFrame::resource-response-received:
@@ -363,14 +345,14 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Since: 1.7.5
      */
     webkit_web_frame_signals[RESOURCE_RESPONSE_RECEIVED] = g_signal_new("resource-response-received",
-            G_TYPE_FROM_CLASS(frameClass),
-            G_SIGNAL_RUN_LAST,
-            0,
-            0, 0,
-            webkit_marshal_VOID__OBJECT_OBJECT,
-            G_TYPE_NONE, 2,
-            WEBKIT_TYPE_WEB_RESOURCE,
-            WEBKIT_TYPE_NETWORK_RESPONSE);
+        G_TYPE_FROM_CLASS(frameClass),
+        G_SIGNAL_RUN_LAST,
+        0,
+        0, 0,
+        webkit_marshal_VOID__OBJECT_OBJECT,
+        G_TYPE_NONE, 2,
+        WEBKIT_TYPE_WEB_RESOURCE,
+        WEBKIT_TYPE_NETWORK_RESPONSE);
 
     /**
      * WebKitWebFrame::resource-load-finished:
@@ -382,13 +364,13 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Since: 1.7.5
      */
     webkit_web_frame_signals[RESOURCE_LOAD_FINISHED] = g_signal_new("resource-load-finished",
-            G_TYPE_FROM_CLASS(frameClass),
-            G_SIGNAL_RUN_LAST,
-            0,
-            0, 0,
-            g_cclosure_marshal_VOID__OBJECT,
-            G_TYPE_NONE, 1,
-            WEBKIT_TYPE_WEB_RESOURCE);
+        G_TYPE_FROM_CLASS(frameClass),
+        G_SIGNAL_RUN_LAST,
+        0,
+        0, 0,
+        g_cclosure_marshal_VOID__OBJECT,
+        G_TYPE_NONE, 1,
+        WEBKIT_TYPE_WEB_RESOURCE);
 
     /**
      * WebKitWebFrame::resource-content-length-received:
@@ -404,14 +386,14 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Since: 1.7.5
      */
     webkit_web_frame_signals[RESOURCE_CONTENT_LENGTH_RECEIVED] = g_signal_new("resource-content-length-received",
-            G_TYPE_FROM_CLASS(frameClass),
-            G_SIGNAL_RUN_LAST,
-            0,
-            0, 0,
-            webkit_marshal_VOID__OBJECT_INT,
-            G_TYPE_NONE, 2,
-            WEBKIT_TYPE_WEB_RESOURCE,
-            G_TYPE_INT);
+        G_TYPE_FROM_CLASS(frameClass),
+        G_SIGNAL_RUN_LAST,
+        0,
+        0, 0,
+        webkit_marshal_VOID__OBJECT_INT,
+        G_TYPE_NONE, 2,
+        WEBKIT_TYPE_WEB_RESOURCE,
+        G_TYPE_INT);
 
     /**
      * WebKitWebFrame::resource-load-failed:
@@ -424,14 +406,14 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Since: 1.7.5
      */
     webkit_web_frame_signals[RESOURCE_LOAD_FAILED] = g_signal_new("resource-load-failed",
-            G_TYPE_FROM_CLASS(frameClass),
-            G_SIGNAL_RUN_LAST,
-            0,
-            0, 0,
-            webkit_marshal_VOID__OBJECT_POINTER,
-            G_TYPE_NONE, 2,
-            WEBKIT_TYPE_WEB_RESOURCE,
-            G_TYPE_POINTER);
+        G_TYPE_FROM_CLASS(frameClass),
+        G_SIGNAL_RUN_LAST,
+        0,
+        0, 0,
+        webkit_marshal_VOID__OBJECT_POINTER,
+        G_TYPE_NONE, 2,
+        WEBKIT_TYPE_WEB_RESOURCE,
+        G_TYPE_POINTER);
 
     /**
      * WebKitWebFrame::insecure-content-run:
@@ -446,14 +428,14 @@ static void webkit_web_frame_class_init(WebKitWebFrameClass* frameClass)
      * Since: 1.10.0
      */
     webkit_web_frame_signals[INSECURE_CONTENT_RUN] = g_signal_new("insecure-content-run",
-            G_TYPE_FROM_CLASS(frameClass),
-            G_SIGNAL_RUN_LAST,
-            0,
-            0, 0,
-            webkit_marshal_VOID__OBJECT_STRING,
-            G_TYPE_NONE, 2,
-            WEBKIT_TYPE_SECURITY_ORIGIN,
-            G_TYPE_STRING);
+        G_TYPE_FROM_CLASS(frameClass),
+        G_SIGNAL_RUN_LAST,
+        0,
+        0, 0,
+        webkit_marshal_VOID__OBJECT_STRING,
+        G_TYPE_NONE, 2,
+        WEBKIT_TYPE_SECURITY_ORIGIN,
+        G_TYPE_STRING);
 
     /*
      * implementations of virtual methods
@@ -693,7 +675,7 @@ void webkit_web_frame_load_uri(WebKitWebFrame* frame, const gchar* uri)
     if (!coreFrame)
         return;
 
-    coreFrame->loader()->load(ResourceRequest(KURL(KURL(), String::fromUTF8(uri))), false);
+    coreFrame->loader()->load(FrameLoadRequest(coreFrame, ResourceRequest(KURL(KURL(), String::fromUTF8(uri)))));
 }
 
 static void webkit_web_frame_load_data(WebKitWebFrame* frame, const gchar* content, const gchar* mimeType, const gchar* encoding, const gchar* baseURL, const gchar* unreachableURL)
@@ -712,7 +694,7 @@ static void webkit_web_frame_load_data(WebKitWebFrame* frame, const gchar* conte
                                   KURL(KURL(), String::fromUTF8(unreachableURL)),
                                   KURL(KURL(), String::fromUTF8(unreachableURL)));
 
-    coreFrame->loader()->load(request, substituteData, false);
+    coreFrame->loader()->load(FrameLoadRequest(coreFrame, request, substituteData));
 }
 
 /**
@@ -781,7 +763,7 @@ void webkit_web_frame_load_request(WebKitWebFrame* frame, WebKitNetworkRequest* 
     if (!coreFrame)
         return;
 
-    coreFrame->loader()->load(core(request), false);
+    coreFrame->loader()->load(FrameLoadRequest(coreFrame->document()->securityOrigin(), core(request)));
 }
 
 /**
@@ -855,7 +837,7 @@ WebKitWebFrame* webkit_web_frame_find_frame(WebKitWebFrame* frame, const gchar* 
  * Gets the global JavaScript execution context. Use this function to bridge
  * between the WebKit and JavaScriptCore APIs.
  *
- * Return value: (transfer none): the global JavaScript context
+ * Return value: (transfer none): the global JavaScript context #JSGlobalContextRef
  */
 JSGlobalContextRef webkit_web_frame_get_global_context(WebKitWebFrame* frame)
 {
@@ -1161,7 +1143,7 @@ void webkit_web_frame_replace_selection(WebKitWebFrame* frame, const char* text)
  * Returns a #WebKitDOMRange for the word where the caret is currently
  * positioned.
  *
- * Returns: a #WebKitDOMRange spanning the word where the caret
+ * Returns: (transfer none): a #WebKitDOMRange spanning the word where the caret
  * currently is positioned. If there is no caret %NULL will be
  * returned.
  *
@@ -1184,7 +1166,7 @@ WebKitDOMRange* webkit_web_frame_get_range_for_word_around_caret(WebKitWebFrame*
 /**
  * webkit_web_frame_get_dom_document:
  * @frame: a #WebKitWebFrame
- * 
+ *
  * Returns: (transfer none): the #WebKitDOMDocument currently loaded
  * in the @frame or %NULL if no document is loaded
  *

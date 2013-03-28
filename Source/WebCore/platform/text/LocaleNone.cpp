@@ -42,8 +42,11 @@ private:
 #if ENABLE(DATE_AND_TIME_INPUT_TYPES)
     virtual String dateFormat() OVERRIDE;
     virtual String monthFormat() OVERRIDE;
+    virtual String shortMonthFormat() OVERRIDE;
     virtual String timeFormat() OVERRIDE;
     virtual String shortTimeFormat() OVERRIDE;
+    virtual String dateTimeFormatWithSeconds() OVERRIDE;
+    virtual String dateTimeFormatWithoutSeconds() OVERRIDE;
     virtual const Vector<String>& monthLabels() OVERRIDE;
     virtual const Vector<String>& shortMonthLabels() OVERRIDE;
     virtual const Vector<String>& standAloneMonthLabels() OVERRIDE;
@@ -89,10 +92,15 @@ const Vector<String>& LocaleNone::monthLabels()
 
 String LocaleNone::dateFormat()
 {
-    return ASCIILiteral("dd/MM/yyyyy");
+    return ASCIILiteral("yyyy-MM-dd");
 }
 
 String LocaleNone::monthFormat()
+{
+    return ASCIILiteral("yyyy-MM");
+}
+
+String LocaleNone::shortMonthFormat()
 {
     return ASCIILiteral("yyyy-MM");
 }
@@ -105,6 +113,16 @@ String LocaleNone::timeFormat()
 String LocaleNone::shortTimeFormat()
 {
     return ASCIILiteral("HH:mm");
+}
+
+String LocaleNone::dateTimeFormatWithSeconds()
+{
+    return ASCIILiteral("yyyy-MM-dd'T'HH:mm:ss");
+}
+
+String LocaleNone::dateTimeFormatWithoutSeconds()
+{
+    return ASCIILiteral("yyyy-MM-dd'T'HH:mm");
 }
 
 const Vector<String>& LocaleNone::shortMonthLabels()

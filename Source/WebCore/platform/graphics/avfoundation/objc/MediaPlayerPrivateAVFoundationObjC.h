@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,24 +34,25 @@
 OBJC_CLASS AVURLAsset;
 OBJC_CLASS AVPlayer;
 OBJC_CLASS AVPlayerItem;
+OBJC_CLASS AVPlayerItemLegibleOutput;
 OBJC_CLASS AVPlayerItemVideoOutput;
 OBJC_CLASS AVPlayerLayer;
 OBJC_CLASS AVAssetImageGenerator;
 OBJC_CLASS WebCoreAVFMovieObserver;
 
-#if ENABLE(ENCRYPTED_MEDIA) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
 OBJC_CLASS WebCoreAVFLoaderDelegate;
 OBJC_CLASS AVAssetResourceLoadingRequest;
 #endif
 
-#ifndef __OBJC__
-typedef struct objc_object *id;
-#endif
-
 typedef struct CGImage *CGImageRef;
 typedef struct __CVBuffer *CVPixelBufferRef;
+typedef struct OpaqueVTPixelTransferSession* VTPixelTransferSessionRef;
 
 namespace WebCore {
+
+class WebCoreAVFResourceLoader;
+class InbandTextTrackPrivateAVFObjC;
 
 class MediaPlayerPrivateAVFoundationObjC : public MediaPlayerPrivateAVFoundation {
 public:
@@ -62,8 +63,22 @@ public:
     void setAsset(id);
     virtual void tracksChanged();
 
-#if ENABLE(ENCRYPTED_MEDIA) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if HAVE(AVFOUNDATION_TEXT_TRACK_SUPPORT)
+    RetainPtr<AVPlayerItem> playerItem() const { return m_avPlayerItem; }
+    void processCue(NSArray *, double);
+#endif
+    
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     bool shouldWaitForLoadingOfResource(AVAssetResourceLoadingRequest*);
+    void didCancelLoadingRequest(AVAssetResourceLoadingRequest*);
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA) || ENABLE(ENCRYPTED_MEDIA_V2)
+    static bool extractKeyURIKeyIDAndCertificateFromInitData(Uint8Array* initData, String& keyURI, String& keyID, RefPtr<Uint8Array>& certificate);
+#endif
+
+#if ENABLE(ENCRYPTED_MEDIA_V2)
+    static RetainPtr<AVAssetResourceLoadingRequest> takeRequestForPlayerAndKeyURI(MediaPlayer*, const String&);
 #endif
 
 private:
@@ -73,7 +88,7 @@ private:
     static PassOwnPtr<MediaPlayerPrivateInterface> create(MediaPlayer*);
     static void getSupportedTypes(HashSet<String>& types);
     static MediaPlayer::SupportsType supportsType(const String& type, const String& codecs, const KURL&);
-#if ENABLE(ENCRYPTED_MEDIA)
+#if ENABLE(ENCRYPTED_MEDIA) || ENABLE(ENCRYPTED_MEDIA_V2)
     static MediaPlayer::SupportsType extendedSupportsType(const String& type, const String& codecs, const String& keySystem, const KURL&);
 #endif
 
@@ -125,7 +140,7 @@ private:
     virtual bool hasLayerRenderer() const;
 
     virtual bool hasSingleSecurityOrigin() const;
-
+    
 #if __MAC_OS_X_VERSION_MIN_REQUIRED < 1080
     void createImageGenerator();
     void destroyImageGenerator();
@@ -144,6 +159,13 @@ private:
     virtual MediaPlayer::MediaKeyException cancelKeyRequest(const String&, const String&);
 #endif
 
+#if HAVE(AVFOUNDATION_TEXT_TRACK_SUPPORT)
+    virtual void setCurrentTrack(InbandTextTrackPrivateAVF*) OVERRIDE;
+    virtual InbandTextTrackPrivateAVF* currentTrack() OVERRIDE;
+    void processTextTracks();
+    void clearTextTracks();
+#endif
+
     RetainPtr<AVURLAsset> m_avAsset;
     RetainPtr<AVPlayer> m_avPlayer;
     RetainPtr<AVPlayerItem> m_avPlayerItem;
@@ -160,10 +182,19 @@ private:
     RetainPtr<CVPixelBufferRef> m_lastImage;
 #endif
 
-#if ENABLE(ENCRYPTED_MEDIA) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    RetainPtr<VTPixelTransferSessionRef> m_pixelTransferSession;
+
+    friend class WebCoreAVFResourceLoader;
+    OwnPtr<WebCoreAVFResourceLoader> m_resourceLoader;
     RetainPtr<WebCoreAVFLoaderDelegate> m_loaderDelegate;
     HashMap<String, RetainPtr<AVAssetResourceLoadingRequest> > m_keyURIToRequestMap;
     HashMap<String, RetainPtr<AVAssetResourceLoadingRequest> > m_sessionIDToRequestMap;
+#endif
+
+#if HAVE(AVFOUNDATION_TEXT_TRACK_SUPPORT)
+    RetainPtr<AVPlayerItemLegibleOutput> m_legibleOutput;
+    InbandTextTrackPrivateAVFObjC* m_currentTrack;
 #endif
 };
 

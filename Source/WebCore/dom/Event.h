@@ -26,6 +26,7 @@
 
 #include "DOMTimeStamp.h"
 #include "EventNames.h"
+#include "ScriptWrappable.h"
 #include <wtf/HashMap.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/RefCounted.h>
@@ -45,7 +46,7 @@ struct EventInit {
     bool cancelable;
 };
 
-class Event : public RefCounted<Event> {
+class Event : public ScriptWrappable, public RefCounted<Event> {
 public:
     enum PhaseType { 
         NONE                = 0,
@@ -123,6 +124,7 @@ public:
     // These events are general classes of events.
     virtual bool isUIEvent() const;
     virtual bool isMouseEvent() const;
+    virtual bool isFocusEvent() const;
     virtual bool isKeyboardEvent() const;
     virtual bool isTouchEvent() const;
 

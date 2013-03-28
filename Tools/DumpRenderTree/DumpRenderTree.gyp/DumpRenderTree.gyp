@@ -44,6 +44,11 @@
                 # WebKit is checked out in src/chromium/third_party/WebKit
                 'chromium_src_dir': '<(tools_dir)/../../..',
             }],
+            ['OS=="linux"', {
+                'use_custom_freetype%': 1,
+            }, {
+                'use_custom_freetype%': 0,
+            }],
         ],
     },
     'includes': [
@@ -64,12 +69,12 @@
                 '<(tools_dir)/DumpRenderTree/chromium/ImageDiff.cpp',
             ],
             'conditions': [
-                ['OS=="android" and android_build_type==0', {
+                ['OS=="android" and android_webview_build==0', {
                     # The Chromium Android port will compare images on host rather
                     # than target (a device or emulator) for performance reasons.
                     'toolsets': ['host'],
                 }],
-                ['OS=="android" and android_build_type!=0', {
+                ['OS=="android" and android_webview_build==1', {
                     'type': 'none',
                 }],
             ],
@@ -84,8 +89,6 @@
                 'TestRunner_resources',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit_test_support',
-                '<(source_dir)/WTF/WTF.gyp/WTF.gyp:wtf',
-                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
             ],
             'include_dirs': [
                 '<(chromium_src_dir)',
@@ -105,6 +108,41 @@
                 '<@(test_runner_files)',
             ],
             'conditions': [
+                ['inside_chromium_build == 1', {
+                    'type': '<(component)',
+                    'conditions': [
+                        ['component=="shared_library"', {
+                            'defines': [
+                                'WEBTESTRUNNER_DLL',
+                                'WEBTESTRUNNER_IMPLEMENTATION=1',
+                            ],
+                            'dependencies': [
+                                '<(chromium_src_dir)/base/base.gyp:base',
+                                '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
+                                '<(chromium_src_dir)/skia/skia.gyp:skia',
+                                '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
+                            ],
+                            'direct_dependent_settings': {
+                                'defines': [
+                                    'WEBTESTRUNNER_DLL',
+                                ],
+                            },
+                            'export_dependent_settings': [
+                                '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
+                                '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
+                            ],
+                            'msvs_settings': {
+                                'VCLinkerTool': {
+                                    'conditions': [
+                                        ['incremental_chrome_dll==1', {
+                                            'UseLibraryDependencyInputs': 'true',
+                                        }],
+                                    ],
+                                },
+                            },
+                        }],
+                    ],
+                }],
                 ['toolkit_uses_gtk == 1', {
                     'defines': [
                         'WTF_USE_GTK=1',
@@ -116,13 +154,14 @@
                         '<(source_dir)/WebKit/chromium/public/gtk',
                     ],
                 }],
-                ['inside_chromium_build==1 and component=="shared_library"', {
-                    'sources': [
-                        '<(source_dir)/WebKit/chromium/src/ChromiumCurrentTime.cpp',
-                        '<(source_dir)/WebKit/chromium/src/ChromiumThreading.cpp',
+                ['OS!="win"', {
+                    'sources/': [
+                        ['exclude', 'Win\\.cpp$'],
                     ],
                 }],
             ],
+            # Disable c4267 warnings until we fix size_t to int truncations. 
+            'msvs_disabled_warnings': [ 4267, ],
         },
         {
             'target_name': 'TestRunner_resources',
@@ -163,6 +202,9 @@
                     },
                 }],
                 ['use_x11 == 1', {
+                    'dependencies': [
+                        '<(chromium_src_dir)/tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
+                    ],
                     'copies': [{
                         'destination': '<(PRODUCT_DIR)',
                         'files': [
@@ -185,7 +227,7 @@
                         ]
                     }],
                 }],
-                ['OS=="android" and android_build_type==0', {
+                ['OS=="android" and android_webview_build==0', {
                     'dependencies': [
                         'ImageDiff#host',
                     ],
@@ -198,8 +240,10 @@
             'mac_bundle': 1,
             'dependencies': [
                 'TestRunner',
+                'DumpRenderTree_resources',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:inspector_resources',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit',
+                '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit_wtf_support',
                 '<(source_dir)/WTF/WTF.gyp/WTF.gyp:wtf',
                 '<(chromium_src_dir)/base/base.gyp:test_support_base',
                 '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
@@ -237,6 +281,7 @@
                     ],
                     'resource_include_dirs': ['<(SHARED_INTERMEDIATE_DIR)/webkit'],
                     'sources': [
+                        # FIXME: We should just use the resources in the .pak file.
                         '<(SHARED_INTERMEDIATE_DIR)/net/net_resources.rc',
                         '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_chromium_resources.rc',
                         '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources.rc',
@@ -259,29 +304,6 @@
                     'sources/': [
                         ['exclude', 'Win\\.cpp$'],
                     ],
-                    'actions': [
-                        {
-                            'action_name': 'repack_locale',
-                            'variables': {
-                                'repack_path': '<(chromium_src_dir)/tools/grit/grit/format/repack.py',
-                                'pak_inputs': [
-                                    '<(SHARED_INTERMEDIATE_DIR)/net/net_resources.pak',
-                                    '<(SHARED_INTERMEDIATE_DIR)/ui/gfx/gfx_resources.pak',
-                                    '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_chromium_resources.pak',
-                                    '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_strings_en-US.pak',
-                                    '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources_100_percent.pak',
-                            ]},
-                            'inputs': [
-                                '<(repack_path)',
-                                '<@(pak_inputs)',
-                            ],
-                            'outputs': [
-                                '<(INTERMEDIATE_DIR)/repack/DumpRenderTree.pak',
-                            ],
-                            'action': ['python', '<(repack_path)', '<@(_outputs)', '<@(pak_inputs)'],
-                            'process_outputs_as_mac_bundle_resources': 1,
-                        },
-                    ], # actions
                 }],
                 ['OS=="mac"', {
                     'dependencies': [
@@ -302,12 +324,6 @@
                     'dependencies': [
                         '<(chromium_src_dir)/build/linux/system.gyp:fontconfig',
                     ],
-                    'copies': [{
-                        'destination': '<(PRODUCT_DIR)',
-                        'files': [
-                            '<(INTERMEDIATE_DIR)/repack/DumpRenderTree.pak',
-                        ]
-                    }],
                     'variables': {
                         # FIXME: Enable warnings on other platforms.
                         'chromium_code': 1,
@@ -343,16 +359,15 @@
                         '<(chromium_src_dir)/tools/android/forwarder/forwarder.gyp:forwarder',
                         '<(chromium_src_dir)/tools/android/md5sum/md5sum.gyp:md5sum',
                     ],
-                    'copies': [{
-                        'destination': '<(PRODUCT_DIR)',
-                        'files': [
-                            '<(INTERMEDIATE_DIR)/repack/DumpRenderTree.pak',
-                        ]
-                    }],
                 }, { # OS!="android"
                     'sources/': [
                         ['exclude', 'Android\\.cpp$'],
                     ],
+                }],
+                ['use_custom_freetype==1', {
+                   'dependencies': [
+                       '<(chromium_src_dir)/third_party/freetype2/freetype2.gyp:freetype2',
+                   ],
                 }],
                 ['inside_chromium_build==0', {
                     'dependencies': [
@@ -360,6 +375,45 @@
                     ]
                 }],
             ],
+        },
+        {
+            'target_name': 'DumpRenderTree_resources',
+            'type': 'none',
+            'dependencies': [
+                '<(chromium_src_dir)/net/net.gyp:net_resources',
+                '<(chromium_src_dir)/ui/ui.gyp:ui_resources',
+                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_resources',
+                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_strings',
+            ],
+            'actions': [{
+                'action_name': 'repack_local',
+                'variables': {
+                    'repack_path': '<(chromium_src_dir)/tools/grit/grit/format/repack.py',
+                    'pak_inputs': [
+                        '<(SHARED_INTERMEDIATE_DIR)/net/net_resources.pak',
+                        '<(SHARED_INTERMEDIATE_DIR)/ui/gfx/gfx_resources.pak',
+                        '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_chromium_resources.pak',
+                        '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_strings_en-US.pak',
+                        '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources_100_percent.pak',
+                ]},
+                'inputs': [
+                    '<(repack_path)',
+                    '<@(pak_inputs)',
+                ],
+                'outputs': [
+                    '<(PRODUCT_DIR)/DumpRenderTree.pak',
+                ],
+                'action': ['python', '<(repack_path)', '<@(_outputs)', '<@(pak_inputs)'],
+            }],
+            'conditions': [
+                ['OS=="mac"', {
+                    'all_dependent_settings': {
+                        'mac_bundle_resources': [
+                            '<(PRODUCT_DIR)/DumpRenderTree.pak',
+                        ],
+                    },
+                }],
+            ]
         },
         {
             'target_name': 'TestNetscapePlugIn',
@@ -405,6 +459,8 @@
                     ],
                     # The .rc file requires that the name of the dll is npTestNetscapePlugIn.dll.
                     'product_name': 'npTestNetscapePlugIn',
+                    # Disable c4267 warnings until we fix size_t to int truncations. 
+                    'msvs_disabled_warnings': [ 4267, ],
                 }],
             ],
         },
@@ -470,18 +526,13 @@
                 'target_name': 'DumpRenderTree_apk',
                 'type': 'none',
                 'dependencies': [
-                    '<(chromium_src_dir)/base/base.gyp:base',
+                    '<(chromium_src_dir)/base/base.gyp:base_java',
                     '<(chromium_src_dir)/media/media.gyp:media_java',
-                    '<(chromium_src_dir)/net/net.gyp:net',
+                    '<(chromium_src_dir)/net/net.gyp:net_java',
                     'DumpRenderTree',
                 ],
                 'variables': {
                     'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)DumpRenderTree<(SHARED_LIB_SUFFIX)',
-                    'input_jars_paths': [
-                        '<(PRODUCT_DIR)/lib.java/chromium_base.jar',
-                        '<(PRODUCT_DIR)/lib.java/chromium_net.jar',
-                        '<(PRODUCT_DIR)/lib.java/chromium_media.jar',
-                    ],
                     'conditions': [
                         ['inside_chromium_build==1', {
                             'ant_build_to_chromium_src': '<(ant_build_out)/../../',
@@ -500,7 +551,7 @@
                         '<(chromium_src_dir)/testing/android/AndroidManifest.xml',
                         '<(chromium_src_dir)/testing/android/generate_native_test.py',
                         '<(input_shlib_path)',
-                        '<@(input_jars_paths)',
+                        '>@(input_jars_paths)',
                     ],
                     'outputs': [
                         '<(PRODUCT_DIR)/DumpRenderTree_apk/DumpRenderTree-debug.apk',
@@ -509,11 +560,11 @@
                         '<(chromium_src_dir)/testing/android/generate_native_test.py',
                         '--native_library',
                         '<(input_shlib_path)',
-                        '--jars',
-                        '"<@(input_jars_paths)"',
                         '--output',
                         '<(PRODUCT_DIR)/DumpRenderTree_apk',
                         '--strip-binary=<(android_strip)',
+                        '--ant-args',
+                        '-quiet',
                         '--ant-args',
                         '-DANDROID_SDK=<(android_sdk)',
                         '--ant-args',
@@ -530,6 +581,8 @@
                         '-DPRODUCT_DIR=<(ant_build_out)',
                         '--ant-args',
                         '-DCHROMIUM_SRC=<(ant_build_to_chromium_src)',
+                        '--ant-args',
+                        '-DINPUT_JARS_PATHS=>@(input_jars_paths)',
                         '--app_abi',
                         '<(android_app_abi)',
                     ],

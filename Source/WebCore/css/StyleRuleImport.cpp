@@ -26,6 +26,7 @@
 #include "CachedCSSStyleSheet.h"
 #include "CachedResourceLoader.h"
 #include "CachedResourceRequest.h"
+#include "CachedResourceRequestInitiators.h"
 #include "Document.h"
 #include "SecurityOrigin.h"
 #include "StyleSheetContents.h"
@@ -117,6 +118,7 @@ void StyleRuleImport::requestStyleSheet()
     }
 
     CachedResourceRequest request(ResourceRequest(absURL), m_parentStyleSheet->charset());
+    request.setInitiator(cachedResourceRequestInitiators().css);
     if (m_parentStyleSheet->isUserStyleSheet())
         m_cachedSheet = cachedResourceLoader->requestUserCSSStyleSheet(request);
     else
@@ -135,9 +137,9 @@ void StyleRuleImport::requestStyleSheet()
 void StyleRuleImport::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_strHref);
-    info.addMember(m_mediaQueries);
-    info.addMember(m_styleSheet);
+    info.addMember(m_strHref, "strHref");
+    info.addMember(m_mediaQueries, "mediaQueries");
+    info.addMember(m_styleSheet, "styleSheet");
 }
 
 } // namespace WebCore

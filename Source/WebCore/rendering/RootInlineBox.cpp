@@ -33,6 +33,7 @@
 #include "PaintInfo.h"
 #include "RenderArena.h"
 #include "RenderBlock.h"
+#include "RenderFlowThread.h"
 #include "RenderView.h"
 #include "VerticalPositionCache.h"
 #include <wtf/unicode/Unicode.h>
@@ -52,8 +53,9 @@ RootInlineBox::RootInlineBox(RenderBlock* block)
     , m_lineBottom(0)
     , m_lineTopWithLeading(0)
     , m_lineBottomWithLeading(0)
-    , m_paginationStrut(0)
-    , m_paginatedLineWidth(0)
+#if ENABLE(CSS3_TEXT)
+    , m_maxLogicalTop(0)
+#endif // CSS3_TEXT
 {
     setIsHorizontal(block->isHorizontalWritingMode());
 }
@@ -251,12 +253,37 @@ void RootInlineBox::childRemoved(InlineBox* box)
     }
 }
 
+RenderRegion* RootInlineBox::containingRegion() const
+{
+    RenderRegion* region = m_fragmentationData ? m_fragmentationData->m_containingRegion : 0;
+
+#ifndef NDEBUG
+    if (region) {
+        RenderFlowThread* flowThread = block()->flowThreadContainingBlock();
+        const RenderRegionList& regionList = flowThread->renderRegionList();
+        ASSERT(regionList.contains(region));
+    }
+#endif
+
+    return region;
+}
+
+void RootInlineBox::setContainingRegion(RenderRegion* region)
+{
+    ASSERT(!isDirty());
+    ASSERT(block()->flowThreadContainingBlock());
+    LineFragmentationData* fragmentationData  = ensureLineFragmentationData();
+    fragmentationData->m_containingRegion = region;
+}
+
 LayoutUnit RootInlineBox::alignBoxesInBlockDirection(LayoutUnit heightOfBlock, GlyphOverflowAndFallbackFontsMap& textBoxDataMap, VerticalPositionCache& verticalPositionCache)
 {
 #if ENABLE(SVG)
     // SVG will handle vertical alignment on its own.
     if (isSVGRootInlineBox())
         return 0;
+
+    // FIXME: figure out how to call computeMaxLogicalTop() when SVG is enabled.
 #endif
 
     LayoutUnit maxPositionTop = 0;
@@ -308,6 +335,11 @@ LayoutUnit RootInlineBox::alignBoxesInBlockDirection(LayoutUnit heightOfBlock, G
         adjustBlockDirectionPosition(gridSnapAdjustment);
         heightOfBlock += gridSnapAdjustment;
     }
+
+#if ENABLE(CSS3_TEXT)
+    m_maxLogicalTop = 0;
+    computeMaxLogicalTop(m_maxLogicalTop);
+#endif // CSS3_TEXT
 
     return heightOfBlock + maxHeight;
 }

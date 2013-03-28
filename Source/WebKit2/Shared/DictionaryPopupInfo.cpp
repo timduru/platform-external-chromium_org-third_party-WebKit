@@ -37,10 +37,9 @@ namespace WebKit {
 void DictionaryPopupInfo::encode(CoreIPC::ArgumentEncoder& encoder) const
 {
     encoder << origin;
-    encoder << fontInfo;
     encoder.encodeEnum(type);
 
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+#if PLATFORM(MAC)
     bool hadOptions = options;
     encoder << hadOptions;
     if (hadOptions)
@@ -48,17 +47,15 @@ void DictionaryPopupInfo::encode(CoreIPC::ArgumentEncoder& encoder) const
 #endif
 }
 
-bool DictionaryPopupInfo::decode(CoreIPC::ArgumentDecoder* decoder, DictionaryPopupInfo& result)
+bool DictionaryPopupInfo::decode(CoreIPC::ArgumentDecoder& decoder, DictionaryPopupInfo& result)
 {
-    if (!decoder->decode(result.origin))
+    if (!decoder.decode(result.origin))
         return false;
-    if (!decoder->decode(result.fontInfo))
+    if (!decoder.decodeEnum(result.type))
         return false;
-    if (!decoder->decodeEnum(result.type))
-        return false;
-#if PLATFORM(MAC) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
+#if PLATFORM(MAC)
     bool hadOptions;
-    if (!decoder->decodeBool(hadOptions))
+    if (!decoder.decode(hadOptions))
         return false;
     if (hadOptions) {
         if (!CoreIPC::decode(decoder, result.options))

@@ -29,15 +29,17 @@
 #include "ImageDecoder.h"
 #include "ImageDecodingStore.h"
 #include "ImageFrameGenerator.h"
+#include "SkData.h"
+#include "TraceEvent.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
 
 LazyDecodingPixelRef::LazyDecodingPixelRef(PassRefPtr<ImageFrameGenerator> frameGenerator, const SkISize& scaledSize, const SkIRect& scaledSubset)
-    : SkPixelRef(0)
-    , m_frameGenerator(frameGenerator)
+    : m_frameGenerator(frameGenerator)
     , m_scaledSize(scaledSize)
     , m_scaledSubset(scaledSubset)
+    , m_lockedCachedImage(0)
 {
 }
 
@@ -55,21 +57,75 @@ bool LazyDecodingPixelRef::isClipped() const
     return m_scaledSize.width() != m_scaledSubset.width() || m_scaledSize.height() != m_scaledSubset.height();
 }
 
+SkData* LazyDecodingPixelRef::onRefEncodedData()
+{
+    RefPtr<SharedBuffer> buffer = 0;
+    bool allDataReceived = false;
+    m_frameGenerator->copyData(&buffer, &allDataReceived);
+    if (buffer && allDataReceived) {
+        SkData* skdata = SkData::NewWithCopy((void*)buffer->data(), buffer->size());
+        return skdata;
+    }
+    return 0;
+}
+
 void* LazyDecodingPixelRef::onLockPixels(SkColorTable**)
 {
-    ASSERT(isMainThread());
-    return ImageDecodingStore::instanceOnMainThread()->lockPixels(m_frameGenerator, m_scaledSize, m_scaledSubset);
+    TRACE_EVENT_ASYNC_BEGIN0("webkit", "LazyDecodingPixelRef::lockPixels", this);
+
+    m_mutex.lock();
+    ASSERT(!m_lockedCachedImage);
+
+    if (!ImageDecodingStore::instance()->lockCache(m_frameGenerator.get(), m_scaledSize, ImageDecodingStore::CacheMustBeComplete, &m_lockedCachedImage))
+        m_lockedCachedImage = 0;
+
+    // Use ImageFrameGenerator to generate the image. It will lock the cache
+    // entry for us.
+    if (!m_lockedCachedImage)
+        m_lockedCachedImage = m_frameGenerator->decodeAndScale(m_scaledSize);
+
+    if (!m_lockedCachedImage)
+        return 0;
+
+    ASSERT(!m_lockedCachedImage->bitmap().isNull());
+    ASSERT(m_lockedCachedImage->scaledSize() == m_scaledSize);
+    return m_lockedCachedImage->bitmap().getAddr(m_scaledSubset.x(), m_scaledSubset.y());
 }
 
 void LazyDecodingPixelRef::onUnlockPixels()
 {
-    ASSERT(isMainThread());
-    ImageDecodingStore::instanceOnMainThread()->unlockPixels();
+    if (m_lockedCachedImage) {
+        ImageDecodingStore::instance()->unlockCache(m_frameGenerator.get(), m_lockedCachedImage);
+        m_lockedCachedImage = 0;
+    }
+    m_mutex.unlock();
+
+    TRACE_EVENT_ASYNC_END0("webkit", "LazyDecodingPixelRef::lockPixels", this);
 }
 
 bool LazyDecodingPixelRef::onLockPixelsAreWritable() const
 {
     return false;
 }
+
+bool LazyDecodingPixelRef::PrepareToDecode(const LazyPixelRef::PrepareParams& params)
+{
+    TRACE_EVENT0("webkit", "LazyDecodingPixelRef::PrepareToDecode");
+
+    // TODO: check if only a particular rect is available in image cache.
+    UNUSED_PARAM(params);
+    const ScaledImageFragment* cachedImage = 0;
+    bool cached = ImageDecodingStore::instance()->lockCache(m_frameGenerator.get(), m_scaledSize, ImageDecodingStore::CacheMustBeComplete, &cachedImage);
+    if (cached)
+        ImageDecodingStore::instance()->unlockCache(m_frameGenerator.get(), cachedImage);
+    return cached;
+}
+
+void LazyDecodingPixelRef::Decode()
+{
+    lockPixels();
+    unlockPixels();
+}
+
 
 } // namespace WebKit

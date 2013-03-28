@@ -29,6 +29,7 @@
 #include "Image.h"
 #include "NativeImageSkia.h"
 #include <gtest/gtest.h>
+#include <public/WebImageLayer.h>
 #include <wtf/PassOwnPtr.h>
 
 using namespace WebCore;
@@ -66,9 +67,9 @@ public:
         return true;
     }
 
-    virtual bool currentFrameHasAlpha()
+    virtual bool currentFrameKnownToBeOpaque()
     {
-        return !m_nativeImage->bitmap().isOpaque();
+        return m_nativeImage->bitmap().isOpaque();
     }
 
     virtual IntSize size() const
@@ -96,7 +97,7 @@ public:
 
     virtual void draw(WebCore::GraphicsContext*, const WebCore::FloatRect&,
                       const WebCore::FloatRect&, WebCore::ColorSpace,
-                      WebCore::CompositeOperator)
+                      WebCore::CompositeOperator, WebCore::BlendMode)
     {
     }
 
@@ -110,7 +111,7 @@ private:
 TEST(ImageLayerChromiumTest, opaqueImages)
 {
     MockGraphicsLayerClient client;
-    OwnPtr<GraphicsLayerChromium> graphicsLayer = static_pointer_cast<GraphicsLayerChromium>(GraphicsLayer::create(&client));
+    OwnPtr<GraphicsLayerChromium> graphicsLayer = adoptPtr(new GraphicsLayerChromium(&client));
     ASSERT_TRUE(graphicsLayer.get());
 
     RefPtr<Image> opaqueImage = TestImage::create(IntSize(100, 100), true);

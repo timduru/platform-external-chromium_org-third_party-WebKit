@@ -36,7 +36,7 @@
 namespace WebCore {
 
 CSSImportRule::CSSImportRule(StyleRuleImport* importRule, CSSStyleSheet* parent)
-    : CSSRule(parent, CSSRule::IMPORT_RULE)
+    : CSSRule(parent)
     , m_importRule(importRule)
 {
 }
@@ -80,13 +80,13 @@ String CSSImportRule::cssText() const
     return result.toString();
 }
 
-void CSSImportRule::reportDescendantMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void CSSImportRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    CSSRule::reportBaseClassMemoryUsage(memoryObjectInfo);
-    info.addMember(m_importRule);
-    info.addMember(m_mediaCSSOMWrapper);
-    info.addMember(m_styleSheetCSSOMWrapper);
+    CSSRule::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_importRule, "importRule");
+    info.addMember(m_mediaCSSOMWrapper, "mediaCSSOMWrapper");
+    info.addMember(m_styleSheetCSSOMWrapper, "styleSheetCSSOMWrapper");
 }
 
 CSSStyleSheet* CSSImportRule::styleSheet() const
@@ -97,6 +97,12 @@ CSSStyleSheet* CSSImportRule::styleSheet() const
     if (!m_styleSheetCSSOMWrapper)
         m_styleSheetCSSOMWrapper = CSSStyleSheet::create(m_importRule->styleSheet(), const_cast<CSSImportRule*>(this));
     return m_styleSheetCSSOMWrapper.get(); 
+}
+
+void CSSImportRule::reattach(StyleRuleBase*)
+{
+    // FIXME: Implement when enabling caching for stylesheets with import rules.
+    ASSERT_NOT_REACHED();
 }
 
 } // namespace WebCore

@@ -101,16 +101,19 @@ void SpeechRecognitionClientProxy::didEndAudio(const WebSpeechRecognitionHandle&
     recognition->didEndAudio();
 }
 
-void SpeechRecognitionClientProxy::didReceiveResult(const WebSpeechRecognitionHandle& handle, const WebSpeechRecognitionResult& result, unsigned long resultIndex, const WebVector<WebSpeechRecognitionResult>& resultHistory)
+void SpeechRecognitionClientProxy::didReceiveResults(const WebSpeechRecognitionHandle& handle, const WebVector<WebSpeechRecognitionResult>& newFinalResults, const WebVector<WebSpeechRecognitionResult>& currentInterimResults)
 {
     RefPtr<SpeechRecognition> recognition = PassRefPtr<SpeechRecognition>(handle);
 
-    Vector<RefPtr<SpeechRecognitionResult> > resultHistoryVector(resultHistory.size());
-    for (size_t i = 0; i < resultHistory.size(); ++i)
-        resultHistoryVector[i] = static_cast<PassRefPtr<SpeechRecognitionResult> >(resultHistory[i]);
+    Vector<RefPtr<SpeechRecognitionResult> > finalResultsVector(newFinalResults.size());
+    for (size_t i = 0; i < newFinalResults.size(); ++i)
+        finalResultsVector[i] = static_cast<PassRefPtr<SpeechRecognitionResult> >(newFinalResults[i]);
 
-    recognition->didReceiveResult(result, resultIndex, SpeechRecognitionResultList::create(resultHistoryVector));
+    Vector<RefPtr<SpeechRecognitionResult> > interimResultsVector(currentInterimResults.size());
+    for (size_t i = 0; i < currentInterimResults.size(); ++i)
+        interimResultsVector[i] = static_cast<PassRefPtr<SpeechRecognitionResult> >(currentInterimResults[i]);
 
+    recognition->didReceiveResults(finalResultsVector, interimResultsVector);
 }
 
 void SpeechRecognitionClientProxy::didReceiveNoMatch(const WebSpeechRecognitionHandle& handle, const WebSpeechRecognitionResult& result)
@@ -122,7 +125,7 @@ void SpeechRecognitionClientProxy::didReceiveNoMatch(const WebSpeechRecognitionH
 void SpeechRecognitionClientProxy::didReceiveError(const WebSpeechRecognitionHandle& handle, const WebString& message, WebSpeechRecognizerClient::ErrorCode code)
 {
     RefPtr<SpeechRecognition> recognition = PassRefPtr<SpeechRecognition>(handle);
-    SpeechRecognitionError::Code errorCode = static_cast<SpeechRecognitionError::Code>(code);
+    SpeechRecognitionError::ErrorCode errorCode = static_cast<SpeechRecognitionError::ErrorCode>(code);
     recognition->didReceiveError(SpeechRecognitionError::create(errorCode, message));
 }
 

@@ -40,7 +40,8 @@
 #include "ExceptionCode.h"
 #include "InspectorInstrumentation.h"
 #include "MessagePortChannel.h"
-#include "PlatformMessagePortChannel.h"
+#include "PlatformMessagePortChannelChromium.h"
+#include "ResourceResponse.h"
 #include "ScriptExecutionContext.h"
 #include "SharedWorker.h"
 #include "WebContentSecurityPolicy.h"
@@ -49,7 +50,6 @@
 #include "WebKit.h"
 #include "WebSharedWorker.h"
 #include "WebSharedWorkerRepository.h"
-#include "platform/WebKitPlatformSupport.h"
 #include "WorkerScriptLoader.h"
 #include "WorkerScriptLoaderClient.h"
 
@@ -69,15 +69,8 @@ void setSharedWorkerRepository(WebSharedWorkerRepository* repository)
 
 static WebSharedWorkerRepository* sharedWorkerRepository()
 {
-    WebSharedWorkerRepository* repository;
-
-    repository = s_sharedWorkerRepository;
-    if (!repository) {
-        repository = webKitPlatformSupport()->sharedWorkerRepository();
-        setSharedWorkerRepository(repository);
-    }
-
-    return repository;
+    // Will only be non-zero if the embedder has set the shared worker repository upon initialization. Nothing in WebKit sets this.
+    return s_sharedWorkerRepository;
 }
 
 }
@@ -218,8 +211,6 @@ void SharedWorkerScriptLoader::connected()
 
 bool SharedWorkerRepository::isAvailable()
 {
-    // Allow the WebKitPlatformSupport to determine if SharedWorkers
-    // are available.
     return WebKit::sharedWorkerRepository();
 }
 

@@ -35,6 +35,7 @@
 #include "NamedNodeMap.h"
 #include "RenderBoxModelObject.h"
 #include "RenderObject.h"
+#include "ShadowRoot.h"
 #include <public/WebRect.h>
 #include <wtf/PassRefPtr.h>
 
@@ -80,6 +81,11 @@ bool WebElement::hasAttribute(const WebString& attrName) const
     return constUnwrap<Element>()->hasAttribute(attrName);
 }
 
+void WebElement::removeAttribute(const WebString& attrName)
+{
+    unwrap<Element>()->removeAttribute(attrName);
+}
+
 WebString WebElement::getAttribute(const WebString& attrName) const
 {
     return constUnwrap<Element>()->getAttribute(attrName);
@@ -97,6 +103,12 @@ unsigned WebElement::attributeCount() const
     if (!constUnwrap<Element>()->hasAttributes())
         return 0;
     return constUnwrap<Element>()->attributeCount();
+}
+
+WebNode WebElement::shadowRoot() const
+{
+    Node* shadowRoot = constUnwrap<Element>()->shadowRoot()->toNode();
+    return WebNode(shadowRoot);
 }
 
 WebString WebElement::attributeLocalName(unsigned index) const
@@ -153,7 +165,7 @@ WebElement& WebElement::operator=(const PassRefPtr<Element>& elem)
 
 WebElement::operator PassRefPtr<Element>() const
 {
-    return static_cast<Element*>(m_private.get());
+    return toElement(m_private.get());
 }
 
 } // namespace WebKit

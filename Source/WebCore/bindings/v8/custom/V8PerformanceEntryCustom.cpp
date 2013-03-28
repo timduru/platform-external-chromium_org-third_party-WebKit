@@ -34,26 +34,36 @@
 #if ENABLE(PERFORMANCE_TIMELINE)
 
 #include "Performance.h"
+#include "PerformanceMark.h"
+#include "PerformanceMeasure.h"
 #include "PerformanceResourceTiming.h"
 
 #include "V8PerformanceEntry.h"
+#include "V8PerformanceMark.h"
+#include "V8PerformanceMeasure.h"
 #include "V8PerformanceResourceTiming.h"
 
 #include <wtf/RefPtr.h>
 
 namespace WebCore {
 
-v8::Handle<v8::Value> toV8(PerformanceEntry* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+v8::Handle<v8::Object> wrap(PerformanceEntry* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    if (!impl)
-        return v8::Null();
-
+    ASSERT(impl);
 #if ENABLE(RESOURCE_TIMING)
     if (impl->isResource())
-        return toV8(static_cast<PerformanceResourceTiming*>(impl), creationContext, isolate);
+        return wrap(static_cast<PerformanceResourceTiming*>(impl), creationContext, isolate);
 #endif
 
-    return V8PerformanceEntry::wrap(impl, creationContext, isolate);
+#if ENABLE(USER_TIMING)
+    if (impl->isMark())
+        return wrap(static_cast<PerformanceMark*>(impl), creationContext, isolate);
+
+    if (impl->isMeasure())
+        return wrap(static_cast<PerformanceMeasure*>(impl), creationContext, isolate);
+#endif
+
+    return V8PerformanceEntry::createWrapper(impl, creationContext, isolate);
 }
 
 } // namespace WebCore

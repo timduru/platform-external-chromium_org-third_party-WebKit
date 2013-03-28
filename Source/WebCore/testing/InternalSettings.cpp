@@ -1,5 +1,6 @@
 /*
  * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -26,18 +27,18 @@
 #include "config.h"
 #include "InternalSettings.h"
 
-#include "Chrome.h"
-#include "ChromeClient.h"
+#include "CaptionUserPreferences.h"
 #include "Document.h"
 #include "ExceptionCode.h"
 #include "Frame.h"
 #include "FrameView.h"
 #include "Language.h"
 #include "LocaleToScriptMapping.h"
-#include "MockPagePopupDriver.h"
 #include "Page.h"
+#include "PageGroup.h"
 #include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
+#include "Supplementable.h"
 #include "TextRun.h"
 
 #if ENABLE(INPUT_TYPE_COLOR)
@@ -64,11 +65,8 @@
 
 namespace WebCore {
 
-InternalSettings::Backup::Backup(Page* page, Settings* settings)
-    : m_originalPasswordEchoDurationInSeconds(settings->passwordEchoDurationInSeconds())
-    , m_originalPasswordEchoEnabled(settings->passwordEchoEnabled())
-    , m_originalFixedElementsLayoutRelativeToFrame(settings->fixedElementsLayoutRelativeToFrame())
-    , m_originalCSSExclusionsEnabled(RuntimeEnabledFeatures::cssExclusionsEnabled())
+InternalSettings::Backup::Backup(Settings* settings)
+    : m_originalCSSExclusionsEnabled(RuntimeEnabledFeatures::cssExclusionsEnabled())
     , m_originalCSSVariablesEnabled(settings->cssVariablesEnabled())
 #if ENABLE(SHADOW_DOM)
     , m_originalShadowDOMEnabled(RuntimeEnabledFeatures::shadowDOMEnabled())
@@ -78,12 +76,6 @@ InternalSettings::Backup::Backup(Page* page, Settings* settings)
     , m_originalStyleScoped(RuntimeEnabledFeatures::styleScopedEnabled())
 #endif
     , m_originalEditingBehavior(settings->editingBehaviorType())
-    , m_originalUnifiedSpellCheckerEnabled(settings->unifiedTextCheckerEnabled())
-    , m_originalFixedPositionCreatesStackingContext(settings->fixedPositionCreatesStackingContext())
-    , m_originalSyncXHRInDocumentsEnabled(settings->syncXHRInDocumentsEnabled())
-    , m_originalWindowFocusRestricted(settings->windowFocusRestricted())
-    , m_originalDeviceSupportsTouch(settings->deviceSupportsTouch())
-    , m_originalDeviceSupportsMouse(settings->deviceSupportsMouse())
 #if ENABLE(TEXT_AUTOSIZING)
     , m_originalTextAutosizingEnabled(settings->textAutosizingEnabled())
     , m_originalTextAutosizingWindowSizeOverride(settings->textAutosizingWindowSizeOverride())
@@ -94,28 +86,23 @@ InternalSettings::Backup::Backup(Page* page, Settings* settings)
 #if ENABLE(DIALOG_ELEMENT)
     , m_originalDialogElementEnabled(RuntimeEnabledFeatures::dialogElementEnabled())
 #endif
-    , m_canStartMedia(page->canStartMedia())
-    , m_originalForceCompositingMode(settings->forceCompositingMode())
-    , m_originalCompositingForFixedPositionEnabled(settings->acceleratedCompositingForFixedPositionEnabled())
-    , m_originalCompositingForScrollableFramesEnabled(settings->acceleratedCompositingForScrollableFramesEnabled())
-    , m_originalAcceleratedDrawingEnabled(settings->acceleratedDrawingEnabled())
+    , m_originalCanvasUsesAcceleratedDrawing(settings->canvasUsesAcceleratedDrawing())
     , m_originalMockScrollbarsEnabled(settings->mockScrollbarsEnabled())
     , m_langAttributeAwareFormControlUIEnabled(RuntimeEnabledFeatures::langAttributeAwareFormControlUIEnabled())
     , m_imagesEnabled(settings->areImagesEnabled())
+    , m_minimumTimerInterval(settings->minDOMTimerInterval())
 #if ENABLE(VIDEO_TRACK)
     , m_shouldDisplaySubtitles(settings->shouldDisplaySubtitles())
     , m_shouldDisplayCaptions(settings->shouldDisplayCaptions())
     , m_shouldDisplayTextDescriptions(settings->shouldDisplayTextDescriptions())
 #endif
+    , m_defaultVideoPosterURL(settings->defaultVideoPosterURL())
+    , m_originalTimeWithoutMouseMovementBeforeHidingControls(settings->timeWithoutMouseMovementBeforeHidingControls())
 {
 }
 
-
-void InternalSettings::Backup::restoreTo(Page* page, Settings* settings)
+void InternalSettings::Backup::restoreTo(Settings* settings)
 {
-    settings->setPasswordEchoDurationInSeconds(m_originalPasswordEchoDurationInSeconds);
-    settings->setPasswordEchoEnabled(m_originalPasswordEchoEnabled);
-    settings->setFixedElementsLayoutRelativeToFrame(m_originalFixedElementsLayoutRelativeToFrame);
     RuntimeEnabledFeatures::setCSSExclusionsEnabled(m_originalCSSExclusionsEnabled);
     settings->setCSSVariablesEnabled(m_originalCSSVariablesEnabled);
 #if ENABLE(SHADOW_DOM)
@@ -126,12 +113,6 @@ void InternalSettings::Backup::restoreTo(Page* page, Settings* settings)
     RuntimeEnabledFeatures::setStyleScopedEnabled(m_originalStyleScoped);
 #endif
     settings->setEditingBehaviorType(m_originalEditingBehavior);
-    settings->setUnifiedTextCheckerEnabled(m_originalUnifiedSpellCheckerEnabled);
-    settings->setFixedPositionCreatesStackingContext(m_originalFixedPositionCreatesStackingContext);
-    settings->setSyncXHRInDocumentsEnabled(m_originalSyncXHRInDocumentsEnabled);
-    settings->setWindowFocusRestricted(m_originalWindowFocusRestricted);
-    settings->setDeviceSupportsTouch(m_originalDeviceSupportsTouch);
-    settings->setDeviceSupportsMouse(m_originalDeviceSupportsMouse);
 #if ENABLE(TEXT_AUTOSIZING)
     settings->setTextAutosizingEnabled(m_originalTextAutosizingEnabled);
     settings->setTextAutosizingWindowSizeOverride(m_originalTextAutosizingWindowSizeOverride);
@@ -142,27 +123,47 @@ void InternalSettings::Backup::restoreTo(Page* page, Settings* settings)
 #if ENABLE(DIALOG_ELEMENT)
     RuntimeEnabledFeatures::setDialogElementEnabled(m_originalDialogElementEnabled);
 #endif
-    page->setCanStartMedia(m_canStartMedia);
-    settings->setForceCompositingMode(m_originalForceCompositingMode);
-    settings->setAcceleratedCompositingForFixedPositionEnabled(m_originalCompositingForFixedPositionEnabled);
-    settings->setAcceleratedCompositingForScrollableFramesEnabled(m_originalCompositingForScrollableFramesEnabled);
-    settings->setAcceleratedDrawingEnabled(m_originalAcceleratedDrawingEnabled);
+    settings->setCanvasUsesAcceleratedDrawing(m_originalCanvasUsesAcceleratedDrawing);
     settings->setMockScrollbarsEnabled(m_originalMockScrollbarsEnabled);
     RuntimeEnabledFeatures::setLangAttributeAwareFormControlUIEnabled(m_langAttributeAwareFormControlUIEnabled);
     settings->setImagesEnabled(m_imagesEnabled);
+    settings->setMinDOMTimerInterval(m_minimumTimerInterval);
 #if ENABLE(VIDEO_TRACK)
     settings->setShouldDisplaySubtitles(m_shouldDisplaySubtitles);
     settings->setShouldDisplayCaptions(m_shouldDisplayCaptions);
     settings->setShouldDisplayTextDescriptions(m_shouldDisplayTextDescriptions);
 #endif
+    settings->setDefaultVideoPosterURL(m_defaultVideoPosterURL);
+    settings->setTimeWithoutMouseMovementBeforeHidingControls(m_originalTimeWithoutMouseMovementBeforeHidingControls);
+}
+
+// We can't use RefCountedSupplement because that would try to make InternalSettings RefCounted
+// and InternalSettings is already RefCounted via its base class, InternalSettingsGenerated.
+// Instead, we manually make InternalSettings supplement Page.
+class InternalSettingsWrapper : public Supplement<Page> {
+public:
+    explicit InternalSettingsWrapper(Page* page)
+        : m_internalSettings(InternalSettings::create(page)) { }
+    virtual ~InternalSettingsWrapper() { m_internalSettings->hostDestroyed(); }
+#if !ASSERT_DISABLED
+    virtual bool isRefCountedWrapper() const OVERRIDE { return true; }
+#endif
+    InternalSettings* internalSettings() const { return m_internalSettings.get(); }
+
+private:
+    RefPtr<InternalSettings> m_internalSettings;
+};
+
+const char* InternalSettings::supplementName()
+{
+    return "InternalSettings";
 }
 
 InternalSettings* InternalSettings::from(Page* page)
 {
-    DEFINE_STATIC_LOCAL(AtomicString, name, ("InternalSettings", AtomicString::ConstructFromLiteral));
-    if (!SuperType::from(page, name))
-        SuperType::provideTo(page, name, adoptRef(new InternalSettings(page)));
-    return static_cast<InternalSettings*>(SuperType::from(page, name));
+    if (!Supplement<Page>::from(page, supplementName()))
+        Supplement<Page>::provideTo(page, supplementName(), adoptPtr(new InternalSettingsWrapper(page)));
+    return static_cast<InternalSettingsWrapper*>(Supplement<Page>::from(page, supplementName()))->internalSettings();
 }
 
 InternalSettings::~InternalSettings()
@@ -170,33 +171,21 @@ InternalSettings::~InternalSettings()
 }
 
 InternalSettings::InternalSettings(Page* page)
-    : m_page(page)
-    , m_backup(page, page->settings())
+    : InternalSettingsGenerated(page)
+    , m_page(page)
+    , m_backup(page->settings())
 {
 }
 
-#if ENABLE(PAGE_POPUP)
-PagePopupController* InternalSettings::pagePopupController()
+void InternalSettings::resetToConsistentState()
 {
-    return m_pagePopupDriver ? m_pagePopupDriver->pagePopupController() : 0;
-}
-#endif
-
-void InternalSettings::reset()
-{
-    TextRun::setAllowsRoundingHacks(false);
-    setUserPreferredLanguages(Vector<String>());
-    page()->setPagination(Pagination());
     page()->setPageScaleFactor(1, IntPoint(0, 0));
-    setUsesOverlayScrollbars(false);
-#if ENABLE(PAGE_POPUP)
-    m_pagePopupDriver.clear();
-    if (page()->chrome())
-        page()->chrome()->client()->resetPagePopupDriver();
-#endif
+    page()->setCanStartMedia(true);
 
-    m_backup.restoreTo(page(), settings());
-    m_backup = Backup(page(), settings());
+    m_backup.restoreTo(settings());
+    m_backup = Backup(settings());
+
+    InternalSettingsGenerated::resetToConsistentState();
 }
 
 Settings* InternalSettings::settings() const
@@ -206,87 +195,28 @@ Settings* InternalSettings::settings() const
     return page()->settings();
 }
 
-void InternalSettings::setForceCompositingMode(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setForceCompositingMode(enabled);
-}
-
-void InternalSettings::setAcceleratedFiltersEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setAcceleratedFiltersEnabled(enabled);
-}
-
-void InternalSettings::setEnableCompositingForFixedPosition(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setAcceleratedCompositingForFixedPositionEnabled(enabled);
-}
-
-void InternalSettings::setEnableCompositingForScrollableFrames(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setAcceleratedCompositingForScrollableFramesEnabled(enabled);
-}
-
-void InternalSettings::setAcceleratedDrawingEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setAcceleratedDrawingEnabled(enabled);
-}
-
 void InternalSettings::setMockScrollbarsEnabled(bool enabled, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
     settings()->setMockScrollbarsEnabled(enabled);
 }
 
-void InternalSettings::setUsesOverlayScrollbars(bool flag)
+static bool urlIsWhitelistedForSetShadowDOMEnabled(const String& url)
 {
-    settings()->setUsesOverlayScrollbars(flag);
-}
-
-void InternalSettings::setPasswordEchoEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setPasswordEchoEnabled(enabled);
-}
-
-void InternalSettings::setPasswordEchoDurationInSeconds(double durationInSeconds, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setPasswordEchoDurationInSeconds(durationInSeconds);
-}
-
-void InternalSettings::setFixedElementsLayoutRelativeToFrame(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setFixedElementsLayoutRelativeToFrame(enabled);
-}
-
-void InternalSettings::setUnifiedTextCheckingEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setUnifiedTextCheckerEnabled(enabled);
-}
-
-bool InternalSettings::unifiedTextCheckingEnabled(ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettingsReturn(false);
-    return settings()->unifiedTextCheckerEnabled();
-}
-
-void InternalSettings::setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode& ec)
-{
-    InternalSettingsGuardForPage();
-    page()->setPageScaleFactor(scaleFactor, IntPoint(x, y));
+    // This check is just for preventing fuzzers from crashing because of unintended API calls.
+    // You can list your test if needed.
+    return notFound != url.find("fast/dom/shadow/content-shadow-unknown.html")
+        || notFound != url.find("fast/dom/shadow/insertion-points-with-shadow-disabled.html");
 }
 
 void InternalSettings::setShadowDOMEnabled(bool enabled, ExceptionCode& ec)
 {
+    if (!urlIsWhitelistedForSetShadowDOMEnabled(page()->mainFrame()->document()->url().string())) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
 #if ENABLE(SHADOW_DOM)
-    UNUSED_PARAM(ec);
     RuntimeEnabledFeatures::setShadowDOMEnabled(enabled);
 #else
     // Even SHADOW_DOM is off, InternalSettings allows setShadowDOMEnabled(false) to
@@ -323,18 +253,6 @@ void InternalSettings::setTouchEventEmulationEnabled(bool enabled, ExceptionCode
     UNUSED_PARAM(enabled);
     UNUSED_PARAM(ec);
 #endif
-}
-
-void InternalSettings::setDeviceSupportsTouch(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setDeviceSupportsTouch(enabled);
-}
-
-void InternalSettings::setDeviceSupportsMouse(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setDeviceSupportsMouse(enabled);
 }
 
 typedef void (Settings::*SetFontFamilyFunction)(const AtomicString&, UScriptCode);
@@ -480,12 +398,6 @@ void InternalSettings::setCanStartMedia(bool enabled, ExceptionCode& ec)
     m_page->setCanStartMedia(enabled);
 }
 
-void InternalSettings::setMediaPlaybackRequiresUserGesture(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setMediaPlaybackRequiresUserGesture(enabled);
-}
-
 void InternalSettings::setEditingBehavior(const String& editingBehavior, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
@@ -495,26 +407,10 @@ void InternalSettings::setEditingBehavior(const String& editingBehavior, Excepti
         settings()->setEditingBehaviorType(EditingMacBehavior);
     else if (equalIgnoringCase(editingBehavior, "unix"))
         settings()->setEditingBehaviorType(EditingUnixBehavior);
+    else if (equalIgnoringCase(editingBehavior, "android"))
+        settings()->setEditingBehaviorType(EditingAndroidBehavior);
     else
         ec = SYNTAX_ERR;
-}
-
-void InternalSettings::setFixedPositionCreatesStackingContext(bool creates, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setFixedPositionCreatesStackingContext(creates);
-}
-
-void InternalSettings::setSyncXHRInDocumentsEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setSyncXHRInDocumentsEnabled(enabled);
-}
-
-void InternalSettings::setWindowFocusRestricted(bool restricted, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setWindowFocusRestricted(restricted);
 }
 
 void InternalSettings::setDialogElementEnabled(bool enabled, ExceptionCode& ec)
@@ -527,32 +423,21 @@ void InternalSettings::setDialogElementEnabled(bool enabled, ExceptionCode& ec)
 #endif
 }
 
-void InternalSettings::allowRoundingHacks() const
-{
-    TextRun::setAllowsRoundingHacks(true);
-}
-
-Vector<String> InternalSettings::userPreferredLanguages() const
-{
-    return WebCore::userPreferredLanguages();
-}
-
-void InternalSettings::setUserPreferredLanguages(const Vector<String>& languages)
-{
-    WebCore::overrideUserPreferredLanguages(languages);
-}
-
 void InternalSettings::setShouldDisplayTrackKind(const String& kind, bool enabled, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
 
 #if ENABLE(VIDEO_TRACK)
+    if (!page())
+        return;
+    CaptionUserPreferences* captionPreferences = page()->group().captionPreferences();
+
     if (equalIgnoringCase(kind, "Subtitles"))
-        settings()->setShouldDisplaySubtitles(enabled);
+        captionPreferences->setUserPrefersSubtitles(enabled);
     else if (equalIgnoringCase(kind, "Captions"))
-        settings()->setShouldDisplayCaptions(enabled);
+        captionPreferences->setUserPrefersCaptions(enabled);
     else if (equalIgnoringCase(kind, "TextDescriptions"))
-        settings()->setShouldDisplayTextDescriptions(enabled);
+        captionPreferences->setUserPrefersTextDescriptions(enabled);
     else
         ec = SYNTAX_ERR;
 #else
@@ -566,12 +451,16 @@ bool InternalSettings::shouldDisplayTrackKind(const String& kind, ExceptionCode&
     InternalSettingsGuardForSettingsReturn(false);
 
 #if ENABLE(VIDEO_TRACK)
+    if (!page())
+        return false;
+    CaptionUserPreferences* captionPreferences = page()->group().captionPreferences();
+
     if (equalIgnoringCase(kind, "Subtitles"))
-        return settings()->shouldDisplaySubtitles();
+        return captionPreferences->userPrefersSubtitles();
     if (equalIgnoringCase(kind, "Captions"))
-        return settings()->shouldDisplayCaptions();
+        return captionPreferences->userPrefersCaptions();
     if (equalIgnoringCase(kind, "TextDescriptions"))
-        return settings()->shouldDisplayTextDescriptions();
+        return captionPreferences->userPrefersTextDescriptions();
 
     ec = SYNTAX_ERR;
     return false;
@@ -579,76 +468,6 @@ bool InternalSettings::shouldDisplayTrackKind(const String& kind, ExceptionCode&
     UNUSED_PARAM(kind);
     return false;
 #endif
-}
-
-void InternalSettings::setPagination(const String& mode, int gap, int pageLength, ExceptionCode& ec)
-{
-    if (!page()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    Pagination pagination;
-    if (mode == "Unpaginated")
-        pagination.mode = Pagination::Unpaginated;
-    else if (mode == "LeftToRightPaginated")
-        pagination.mode = Pagination::LeftToRightPaginated;
-    else if (mode == "RightToLeftPaginated")
-        pagination.mode = Pagination::RightToLeftPaginated;
-    else if (mode == "TopToBottomPaginated")
-        pagination.mode = Pagination::TopToBottomPaginated;
-    else if (mode == "BottomToTopPaginated")
-        pagination.mode = Pagination::BottomToTopPaginated;
-    else {
-        ec = SYNTAX_ERR;
-        return;
-    }
-
-    pagination.gap = gap;
-    pagination.pageLength = pageLength;
-    page()->setPagination(pagination);
-}
-
-void InternalSettings::setEnableMockPagePopup(bool enabled, ExceptionCode& ec)
-{
-#if ENABLE(PAGE_POPUP)
-    InternalSettingsGuardForPage();
-    if (!page()->chrome())
-        return;
-    if (!enabled) {
-        page()->chrome()->client()->resetPagePopupDriver();
-        return;
-    }
-    if (!m_pagePopupDriver)
-        m_pagePopupDriver = MockPagePopupDriver::create(page()->mainFrame());
-    page()->chrome()->client()->setPagePopupDriver(m_pagePopupDriver.get());
-#else
-    UNUSED_PARAM(enabled);
-    UNUSED_PARAM(ec);
-#endif
-}
-
-String InternalSettings::configurationForViewport(float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode& ec)
-{
-    if (!page()) {
-        ec = INVALID_ACCESS_ERR;
-        return String();
-    }
-
-    const int defaultLayoutWidthForNonMobilePages = 980;
-
-    ViewportArguments arguments = page()->viewportArguments();
-    ViewportAttributes attributes = computeViewportAttributes(arguments, defaultLayoutWidthForNonMobilePages, deviceWidth, deviceHeight, devicePixelRatio, IntSize(availableWidth, availableHeight));
-    restrictMinimumScaleFactorToViewportSize(attributes, IntSize(availableWidth, availableHeight), devicePixelRatio);
-    restrictScaleFactorToInitialScaleIfNotUserScalable(attributes);
-
-    return "viewport size " + String::number(attributes.layoutSize.width()) + "x" + String::number(attributes.layoutSize.height()) + " scale " + String::number(attributes.initialScale) + " with limits [" + String::number(attributes.minimumScale) + ", " + String::number(attributes.maximumScale) + "] and userScalable " + (attributes.userScalable ? "true" : "false");
-}
-
-void InternalSettings::setMemoryInfoEnabled(bool enabled, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    settings()->setMemoryInfoEnabled(enabled);
 }
 
 void InternalSettings::setStorageBlockingPolicy(const String& mode, ExceptionCode& ec)
@@ -674,6 +493,24 @@ void InternalSettings::setImagesEnabled(bool enabled, ExceptionCode& ec)
 {
     InternalSettingsGuardForSettings();
     settings()->setImagesEnabled(enabled);
+}
+
+void InternalSettings::setMinimumTimerInterval(double intervalInSeconds, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setMinDOMTimerInterval(intervalInSeconds);
+}
+
+void InternalSettings::setDefaultVideoPosterURL(const String& url, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setDefaultVideoPosterURL(url);
+}
+
+void InternalSettings::setTimeWithoutMouseMovementBeforeHidingControls(double time, ExceptionCode& ec)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setTimeWithoutMouseMovementBeforeHidingControls(time);
 }
 
 }

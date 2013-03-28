@@ -26,8 +26,9 @@
 #ifndef WebIDBDatabaseCallbacks_h
 #define WebIDBDatabaseCallbacks_h
 
-#include "platform/WebCommon.h"
-#include "platform/WebString.h"
+#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../Platform/chromium/public/WebString.h"
+#include "WebIDBDatabaseError.h"
 
 namespace WebKit {
 
@@ -37,7 +38,9 @@ public:
 
     virtual void onForcedClose() { WEBKIT_ASSERT_NOT_REACHED(); }
     virtual void onVersionChange(long long oldVersion, long long newVersion) { WEBKIT_ASSERT_NOT_REACHED(); }
-    virtual void onVersionChange(const WebString& requestedVersion) { WEBKIT_ASSERT_NOT_REACHED(); }
+
+    virtual void onAbort(long long transactionId, const WebIDBDatabaseError&) { WEBKIT_ASSERT_NOT_REACHED(); }
+    virtual void onComplete(long long transactionId) { WEBKIT_ASSERT_NOT_REACHED(); }
 };
 
 } // namespace WebKit

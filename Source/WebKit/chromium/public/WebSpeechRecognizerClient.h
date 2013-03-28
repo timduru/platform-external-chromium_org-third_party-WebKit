@@ -26,7 +26,7 @@
 #ifndef WebSpeechRecognizerClient_h
 #define WebSpeechRecognizerClient_h
 
-#include "platform/WebVector.h"
+#include "../../../Platform/chromium/public/WebVector.h"
 
 namespace WebKit {
 
@@ -67,8 +67,13 @@ public:
     // This is expected to be called after didEndSound.
     virtual void didEndAudio(const WebSpeechRecognitionHandle&) = 0;
 
-    // To be called when the speech recognizer returns a result.
-    virtual void didReceiveResult(const WebSpeechRecognitionHandle&, const WebSpeechRecognitionResult&, unsigned long resultIndex, const WebVector<WebSpeechRecognitionResult>& resultHistory) = 0;
+    // To be called when the speech recognizer provides new results.
+    // - newFinalResults contains zero or more final results that are new since
+    // the last time the function was called.
+    // - currentInterimResults contains zero or more inteirm results that
+    // replace the interim results that were reported the last time this
+    // function was called.
+    virtual void didReceiveResults(const WebSpeechRecognitionHandle&, const WebVector<WebSpeechRecognitionResult>& newFinalResults, const WebVector<WebSpeechRecognitionResult>& currentInterimResults) = 0;
 
     // To be called when the speech recognizer returns a final result with no
     // recognizion hypothesis.

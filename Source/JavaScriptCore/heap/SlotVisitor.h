@@ -36,6 +36,7 @@ namespace JSC {
 class ConservativeRoots;
 class GCThreadSharedData;
 class Heap;
+template<typename T> class Weak;
 template<typename T> class WriteBarrierBase;
 template<typename T> class JITWriteBarrier;
 
@@ -56,9 +57,12 @@ public:
     template<typename T>
     void appendUnbarrieredPointer(T**);
     void appendUnbarrieredValue(JSValue*);
+    template<typename T>
+    void appendUnbarrieredWeak(Weak<T>*);
     
     void addOpaqueRoot(void*);
     bool containsOpaqueRoot(void*);
+    TriState containsOpaqueRootTriState(void*);
     int opaqueRootCount();
 
     GCThreadSharedData& sharedData() { return m_shared; }
@@ -79,7 +83,7 @@ public:
     void harvestWeakReferences();
     void finalizeUnconditionalFinalizers();
 
-    void copyLater(void*, size_t);
+    void copyLater(JSCell*, void*, size_t);
     
 #if ENABLE(SIMPLE_HEAP_PROFILING)
     VTableSpectrum m_visitedTypeCounts;
@@ -121,7 +125,7 @@ private:
     
     GCThreadSharedData& m_shared;
 
-    bool m_shouldHashConst; // Local per-thread copy of shared flag for performance reasons
+    bool m_shouldHashCons; // Local per-thread copy of shared flag for performance reasons
     typedef HashMap<StringImpl*, JSValue> UniqueStringMap;
     UniqueStringMap m_uniqueStrings;
 

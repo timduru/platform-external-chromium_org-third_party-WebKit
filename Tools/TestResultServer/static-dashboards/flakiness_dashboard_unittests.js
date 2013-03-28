@@ -26,30 +26,57 @@
 // (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 // OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
+// FIXME(jparent): Rename this once it isn't globals.
 function resetGlobals()
 {
     allExpectations = null;
     allTests = null;
     g_expectationsByPlatform = {};
     g_resultsByBuilder = {};
-    g_builders = {};
     g_allExpectations = null;
     g_allTestsTrie = null;
-    g_currentState = {};
-    g_crossDashboardState = {};
-    for (var key in g_defaultCrossDashboardStateValues)
-        g_crossDashboardState[key] = g_defaultCrossDashboardStateValues[key];
+    var historyInstance = new history.History();
+    // FIXME(jparent): Remove this once global isn't used.
+    g_history = historyInstance;
+    g_testToResultsMap = {};
+
+    for (var key in history.DEFAULT_CROSS_DASHBOARD_STATE_VALUES)
+        historyInstance.crossDashboardState[key] = history.DEFAULT_CROSS_DASHBOARD_STATE_VALUES[key];
+
+    LOAD_BUILDBOT_DATA([{
+        name: 'ChromiumWebkit',
+        url: 'dummyurl', 
+        tests: {'layout-tests': {'builders': ['WebKit Linux', 'WebKit Linux (dbg)', 'WebKit Mac10.7', 'WebKit Win', 'WebKit Win (dbg)']}}
+    },
+    {
+        name: 'webkit.org',
+        url: 'dummyurl',
+        tests: {'layout-tests': {'builders': ['Apple SnowLeopard Tests', 'Qt Linux Tests', 'Chromium Mac10.7 Tests', 'GTK Win']}}
+    }]);
+ 
+    for (var group in LAYOUT_TESTS_BUILDER_GROUPS)
+        LAYOUT_TESTS_BUILDER_GROUPS[group] = null;
+
+    return historyInstance;
+}
+
+function stubResultsByBuilder(data)
+{
+    for (var builder in currentBuilders())
+    {
+        g_resultsByBuilder[builder] = data[builder] || {'tests': []};
+    };
 }
 
 function runExpectationsTest(builder, test, expectations, modifiers)
 {
-    g_builders[builder] = true;
-
     // Put in some dummy results. processExpectations expects the test to be
     // there.
     var tests = {};
     tests[test] = {'results': [[100, 'F']], 'times': [[100, 0]]};
-    g_resultsByBuilder[builder] = {'tests': tests};
+    var results = {};
+    results[builder] = {'tests': tests};
+    stubResultsByBuilder(results);
 
     processExpectations();
     var resultsForTest = createResultsObjectForTest(test, builder);
@@ -60,25 +87,10 @@ function runExpectationsTest(builder, test, expectations, modifiers)
     equal(resultsForTest.modifiers, modifiers, message);
 }
 
-test('flattenTrie', 1, function() {
-    resetGlobals();
-    var tests = {
-        'bar.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
-        'foo': {
-            'bar': {
-                'baz.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
-            }
-        }
-    };
-    var expectedFlattenedTests = {
-        'bar.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
-        'foo/bar/baz.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
-    };
-    equal(JSON.stringify(flattenTrie(tests)), JSON.stringify(expectedFlattenedTests))
-});
-
 test('releaseFail', 2, function() {
     resetGlobals();
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
+
     var builder = 'WebKit Win';
     var test = 'foo/1.html';
     var expectationsArray = [
@@ -90,6 +102,7 @@ test('releaseFail', 2, function() {
 
 test('releaseFailDebugCrashReleaseBuilder', 2, function() {
     resetGlobals();
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
     var builder = 'WebKit Win';
     var test = 'foo/1.html';
     var expectationsArray = [
@@ -103,6 +116,7 @@ test('releaseFailDebugCrashReleaseBuilder', 2, function() {
 
 test('releaseFailDebugCrashDebugBuilder', 2, function() {
     resetGlobals();
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
     var builder = 'WebKit Win (dbg)';
     var test = 'foo/1.html';
     var expectationsArray = [
@@ -116,6 +130,7 @@ test('releaseFailDebugCrashDebugBuilder', 2, function() {
 
 test('overrideJustBuildType', 12, function() {
     resetGlobals();
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
     var test = 'bar/1.html';
     g_expectationsByPlatform['CHROMIUM'] = getParsedExpectations('bar [ WontFix Failure Pass Timeout ]\n' +
         '[ Mac ] ' + test + ' [ WontFix Failure ]\n' +
@@ -130,6 +145,11 @@ test('overrideJustBuildType', 12, function() {
 });
 
 test('platformAndBuildType', 78, function() {
+    var historyInstance = new history.History();
+    // FIXME(jparent): Change to use the flakiness_db's history object
+    // once it exists, rather than tracking global.
+    g_history = historyInstance;
+
     var runPlatformAndBuildTypeTest = function(builder, expectedPlatform, expectedBuildType) {
         g_perBuilderPlatformAndBuildType = {};
         buildInfo = platformAndBuildType(builder);
@@ -159,8 +179,8 @@ test('platformAndBuildType', 78, function() {
     runPlatformAndBuildTypeTest('XP Tests', 'CHROMIUM_XP', 'RELEASE');
     runPlatformAndBuildTypeTest('Interactive Tests (dbg)', 'CHROMIUM_XP', 'DEBUG');
     
-    g_crossDashboardState.group = '@ToT - webkit.org';
-    g_crossDashboardState.testType = 'layout-tests';
+    historyInstance.crossDashboardState.group = '@ToT - webkit.org';
+    historyInstance.crossDashboardState.testType = 'layout-tests';
     runPlatformAndBuildTypeTest('Chromium Win Release (Tests)', 'CHROMIUM_XP', 'RELEASE');
     runPlatformAndBuildTypeTest('Chromium Linux Release (Tests)', 'CHROMIUM_LUCID', 'RELEASE');
     runPlatformAndBuildTypeTest('Chromium Mac Release (Tests)', 'CHROMIUM_SNOWLEOPARD', 'RELEASE');
@@ -212,9 +232,10 @@ test('filterBugs',4, function() {
 
 test('getExpectations', 16, function() {
     resetGlobals();
-    g_builders['WebKit Win'] = true;
-    g_resultsByBuilder = {
-        'WebKit Win': {
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
+ 
+    stubResultsByBuilder({
+        'WebKit Win' : {
             'tests': {
                 'foo/test1.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
                 'foo/test2.html': {'results': [[100, 'F']], 'times': [[100, 0]]},
@@ -222,7 +243,7 @@ test('getExpectations', 16, function() {
                 'test1.html': {'results': [[100, 'F']], 'times': [[100, 0]]}
             }
         }
-    }
+    });
 
     g_expectationsByPlatform['CHROMIUM'] = getParsedExpectations('Bug(123) foo [ Failure Pass Crash ]\n' +
         'Bug(Foo) [ Release ] foo/test1.html [ Failure ]\n' +
@@ -291,34 +312,41 @@ test('getExpectations', 16, function() {
 });
 
 test('substringList', 2, function() {
-    g_crossDashboardState.testType = 'gtest';
-    g_currentState.tests = 'test.FLAKY_foo test.FAILS_foo1 test.DISABLED_foo2 test.MAYBE_foo3 test.foo4';
+    var historyInstance = new history.History();
+    // FIXME(jparent): Remove this once global isn't used.
+    g_history = historyInstance;
+    historyInstance.crossDashboardState.testType = 'gtest';
+    historyInstance.dashboardSpecificState.tests = 'test.FLAKY_foo test.FAILS_foo1 test.DISABLED_foo2 test.MAYBE_foo3 test.foo4';
     equal(substringList().toString(), 'test.foo,test.foo1,test.foo2,test.foo3,test.foo4');
 
-    g_crossDashboardState.testType = 'layout-tests';
-    g_currentState.tests = 'foo/bar.FLAKY_foo.html';
+    historyInstance.crossDashboardState.testType = 'layout-tests';
+    historyInstance.dashboardSpecificState.tests = 'foo/bar.FLAKY_foo.html';
     equal(substringList().toString(), 'foo/bar.FLAKY_foo.html');
 });
 
 test('htmlForTestsWithExpectationsButNoFailures', 4, function() {
+    var historyInstance = new history.History();
+    // FIXME(jparent): Remove this once global isn't used.
+    g_history = historyInstance;
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
     var builder = 'WebKit Win';
     g_perBuilderWithExpectationsButNoFailures[builder] = ['passing-test1.html', 'passing-test2.html'];
     g_perBuilderSkippedPaths[builder] = ['skipped-test1.html'];
     g_resultsByBuilder[builder] = { buildNumbers: [5, 4, 3, 1] };
 
-    g_currentState.showUnexpectedPasses = true;
-    g_currentState.showSkipped = true;
+    historyInstance.dashboardSpecificState.showUnexpectedPasses = true;
+    historyInstance.dashboardSpecificState.showSkipped = true;
 
-    g_crossDashboardState.group = '@ToT - chromium.org';
-    g_crossDashboardState.testType = 'layout-tests';
+    historyInstance.crossDashboardState.group = '@ToT - chromium.org';
+    historyInstance.crossDashboardState.testType = 'layout-tests';
     
     var container = document.createElement('div');
     container.innerHTML = htmlForTestsWithExpectationsButNoFailures(builder);
     equal(container.querySelectorAll('#passing-tests > div').length, 2);
     equal(container.querySelectorAll('#skipped-tests > div').length, 1);
     
-    g_currentState.showUnexpectedPasses = false;
-    g_currentState.showSkipped = false;
+    historyInstance.dashboardSpecificState.showUnexpectedPasses = false;
+    historyInstance.dashboardSpecificState.showSkipped = false;
     
     var container = document.createElement('div');
     container.innerHTML = htmlForTestsWithExpectationsButNoFailures(builder);
@@ -333,17 +361,20 @@ test('headerForTestTableHtml', 1, function() {
 });
 
 test('htmlForTestTypeSwitcherGroup', 6, function() {
+    var historyInstance = new history.History();
+    // FIXME(jparent): Remove this once global isn't used.
+    g_history = historyInstance;
     var container = document.createElement('div');
-    g_crossDashboardState.testType = 'ui_tests';
-    container.innerHTML = htmlForTestTypeSwitcher(true);
+    historyInstance.crossDashboardState.testType = 'ui_tests';
+    container.innerHTML = ui.html.testTypeSwitcher(true);
     var selects = container.querySelectorAll('select');
     equal(selects.length, 2);
     var group = selects[1];
     equal(group.parentNode.textContent.indexOf('Group:'), 0);
     equal(group.children.length, 3);
 
-    g_crossDashboardState.testType = 'layout-tests';
-    container.innerHTML = htmlForTestTypeSwitcher(true);
+    historyInstance.crossDashboardState.testType = 'layout-tests';
+    container.innerHTML = ui.html.testTypeSwitcher(true);
     var selects = container.querySelectorAll('select');
     equal(selects.length, 2);
     var group = selects[1];
@@ -353,17 +384,19 @@ test('htmlForTestTypeSwitcherGroup', 6, function() {
 
 test('htmlForIndividualTestOnAllBuilders', 1, function() {
     resetGlobals();
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
     equal(htmlForIndividualTestOnAllBuilders('foo/nonexistant.html'), '<div class="not-found">Test not found. Either it does not exist, is skipped or passes on all platforms.</div>');
 });
 
 test('htmlForIndividualTestOnAllBuildersWithResultsLinksNonexistant', 1, function() {
     resetGlobals();
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
     equal(htmlForIndividualTestOnAllBuildersWithResultsLinks('foo/nonexistant.html'),
         '<div class="not-found">Test not found. Either it does not exist, is skipped or passes on all platforms.</div>' +
         '<div class=expectations test=foo/nonexistant.html>' +
             '<div>' +
-                '<span class=link onclick="setQueryParameter(\'showExpectations\', true)">Show results</span> | ' +
-                '<span class=link onclick="setQueryParameter(\'showLargeExpectations\', true)">Show large thumbnails</span> | ' +
+                '<span class=link onclick="g_history.setQueryParameter(\'showExpectations\', true)">Show results</span> | ' +
+                '<span class=link onclick="g_history.setQueryParameter(\'showLargeExpectations\', true)">Show large thumbnails</span> | ' +
                 '<b>Only shows actual results/diffs from the most recent *failure* on each bot.</b>' +
             '</div>' +
         '</div>');
@@ -371,9 +404,10 @@ test('htmlForIndividualTestOnAllBuildersWithResultsLinksNonexistant', 1, functio
 
 test('htmlForIndividualTestOnAllBuildersWithResultsLinks', 1, function() {
     resetGlobals();
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
+
+    var builderName = 'WebKit Linux';
     var test = 'dummytest.html';
-    var builderName = 'dummyBuilder';
-    BUILDER_TO_MASTER[builderName] = CHROMIUM_BUILDER_MASTER;
     g_testToResultsMap[test] = [createResultsObjectForTest(test, builderName)];
 
     equal(htmlForIndividualTestOnAllBuildersWithResultsLinks(test),
@@ -389,21 +423,22 @@ test('htmlForIndividualTestOnAllBuildersWithResultsLinks', 1, function() {
         '</table>' +
         '<div>The following builders either don\'t run this test (e.g. it\'s skipped) or all runs passed:</div>' +
         '<div class=skipped-builder-list>' +
-            '<div class=skipped-builder>WebKit Linux</div><div class=skipped-builder>WebKit Linux (dbg)</div>' +
-            '<div class=skipped-builder>WebKit Mac10.7</div><div class=skipped-builder>WebKit Win</div>' +
+            '<div class=skipped-builder>WebKit Linux (dbg)</div><div class=skipped-builder>WebKit Mac10.7</div><div class=skipped-builder>WebKit Win</div><div class=skipped-builder>WebKit Win (dbg)</div>' +
         '</div>' +
         '<div class=expectations test=dummytest.html>' +
-            '<div><span class=link onclick="setQueryParameter(\'showExpectations\', true)">Show results</span> | ' +
-            '<span class=link onclick="setQueryParameter(\'showLargeExpectations\', true)">Show large thumbnails</span> | ' +
+            '<div><span class=link onclick="g_history.setQueryParameter(\'showExpectations\', true)">Show results</span> | ' +
+            '<span class=link onclick="g_history.setQueryParameter(\'showLargeExpectations\', true)">Show large thumbnails</span> | ' +
             '<b>Only shows actual results/diffs from the most recent *failure* on each bot.</b></div>' +
         '</div>');
 });
 
 test('htmlForIndividualTestOnAllBuildersWithResultsLinksWebkitMaster', 1, function() {
-    resetGlobals();
+    var historyInstance = resetGlobals();
+    historyInstance.crossDashboardState.group = '@ToT - webkit.org';
+    loadBuildersList('@ToT - webkit.org', 'layout-tests');
+
+    var builderName = 'Apple SnowLeopard Tests';
     var test = 'dummytest.html';
-    var builderName = 'dummyBuilder';
-    BUILDER_TO_MASTER[builderName] = WEBKIT_BUILDER_MASTER;
     g_testToResultsMap[test] = [createResultsObjectForTest(test, builderName)];
 
     equal(htmlForIndividualTestOnAllBuildersWithResultsLinks(test),
@@ -419,52 +454,52 @@ test('htmlForIndividualTestOnAllBuildersWithResultsLinksWebkitMaster', 1, functi
         '</table>' +
         '<div>The following builders either don\'t run this test (e.g. it\'s skipped) or all runs passed:</div>' +
         '<div class=skipped-builder-list>' +
-            '<div class=skipped-builder>WebKit Linux</div><div class=skipped-builder>WebKit Linux (dbg)</div>' +
-            '<div class=skipped-builder>WebKit Mac10.7</div><div class=skipped-builder>WebKit Win</div>' +
+            '<div class=skipped-builder>Qt Linux Tests</div><div class=skipped-builder>Chromium Mac10.7 Tests</div><div class=skipped-builder>GTK Win</div>' +
         '</div>' +
         '<div class=expectations test=dummytest.html>' +
-            '<div><span class=link onclick="setQueryParameter(\'showExpectations\', true)">Show results</span> | ' +
-            '<span class=link onclick="setQueryParameter(\'showLargeExpectations\', true)">Show large thumbnails</span>' +
-            '<form onsubmit="setQueryParameter(\'revision\', revision.value);return false;">' +
+            '<div><span class=link onclick="g_history.setQueryParameter(\'showExpectations\', true)">Show results</span> | ' +
+            '<span class=link onclick="g_history.setQueryParameter(\'showLargeExpectations\', true)">Show large thumbnails</span>' +
+            '<form onsubmit="g_history.setQueryParameter(\'revision\', revision.value);return false;">' +
                 'Show results for WebKit revision: <input name=revision placeholder="e.g. 65540" value="" id=revision-input>' +
             '</form></div>' +
         '</div>');
 });
 
 test('htmlForIndividualTests', 4, function() {
-    resetGlobals();
+    var historyInstance = resetGlobals();
+    loadBuildersList('@ToT - chromium.org', 'layout-tests');
     var test1 = 'foo/nonexistant.html';
     var test2 = 'bar/nonexistant.html';
 
-    g_currentState.showChrome = false;
+    historyInstance.dashboardSpecificState.showChrome = false;
 
     var tests = [test1, test2];
     equal(htmlForIndividualTests(tests),
         '<h2><a href="http://trac.webkit.org/browser/trunk/LayoutTests/foo/nonexistant.html" target="_blank">foo/nonexistant.html</a></h2>' +
         htmlForIndividualTestOnAllBuilders(test1) + 
         '<div class=expectations test=foo/nonexistant.html>' +
-            '<div><span class=link onclick=\"setQueryParameter(\'showExpectations\', true)\">Show results</span> | ' +
-            '<span class=link onclick=\"setQueryParameter(\'showLargeExpectations\', true)\">Show large thumbnails</span> | ' +
+            '<div><span class=link onclick=\"g_history.setQueryParameter(\'showExpectations\', true)\">Show results</span> | ' +
+            '<span class=link onclick=\"g_history.setQueryParameter(\'showLargeExpectations\', true)\">Show large thumbnails</span> | ' +
             '<b>Only shows actual results/diffs from the most recent *failure* on each bot.</b></div>' +
         '</div>' +
         '<hr>' +
         '<h2><a href="http://trac.webkit.org/browser/trunk/LayoutTests/bar/nonexistant.html" target="_blank">bar/nonexistant.html</a></h2>' +
         htmlForIndividualTestOnAllBuilders(test2) +
         '<div class=expectations test=bar/nonexistant.html>' +
-            '<div><span class=link onclick=\"setQueryParameter(\'showExpectations\', true)\">Show results</span> | ' +
-            '<span class=link onclick=\"setQueryParameter(\'showLargeExpectations\', true)\">Show large thumbnails</span> | ' +
+            '<div><span class=link onclick=\"g_history.setQueryParameter(\'showExpectations\', true)\">Show results</span> | ' +
+            '<span class=link onclick=\"g_history.setQueryParameter(\'showLargeExpectations\', true)\">Show large thumbnails</span> | ' +
             '<b>Only shows actual results/diffs from the most recent *failure* on each bot.</b></div>' +
         '</div>');
 
     tests = [test1];
     equal(htmlForIndividualTests(tests), htmlForIndividualTestOnAllBuilders(test1) +
         '<div class=expectations test=foo/nonexistant.html>' +
-            '<div><span class=link onclick=\"setQueryParameter(\'showExpectations\', true)\">Show results</span> | ' +
-            '<span class=link onclick=\"setQueryParameter(\'showLargeExpectations\', true)\">Show large thumbnails</span> | ' +
+            '<div><span class=link onclick=\"g_history.setQueryParameter(\'showExpectations\', true)\">Show results</span> | ' +
+            '<span class=link onclick=\"g_history.setQueryParameter(\'showLargeExpectations\', true)\">Show large thumbnails</span> | ' +
             '<b>Only shows actual results/diffs from the most recent *failure* on each bot.</b></div>' +
         '</div>');
 
-    g_currentState.showChrome = true;
+    historyInstance.dashboardSpecificState.showChrome = true;
 
     equal(htmlForIndividualTests(tests),
         '<h2><a href="http://trac.webkit.org/browser/trunk/LayoutTests/foo/nonexistant.html" target="_blank">foo/nonexistant.html</a></h2>' +
@@ -479,16 +514,16 @@ test('htmlForIndividualTests', 4, function() {
 });
 
 test('htmlForSingleTestRow', 1, function() {
-    resetGlobals();
+    var historyInstance = resetGlobals();
     var builder = 'dummyBuilder';
     BUILDER_TO_MASTER[builder] = CHROMIUM_WEBKIT_BUILDER_MASTER;
     var test = createResultsObjectForTest('foo/exists.html', builder);
-    g_currentState.showCorrectExpectations = true;
+    historyInstance.dashboardSpecificState.showCorrectExpectations = true;
     g_resultsByBuilder[builder] = {buildNumbers: [2, 1], webkitRevision: [1234, 1233]};
     test.rawResults = [[1, 'F'], [2, 'I']];
     test.rawTimes = [[1, 0], [2, 5]];
     var expected = '<tr>' +
-        '<td class="test-link"><span class="link" onclick="setQueryParameter(\'tests\',\'foo/exists.html\');">foo/exists.html</span>' +
+        '<td class="test-link"><span class="link" onclick="g_history.setQueryParameter(\'tests\',\'foo/exists.html\');">foo/exists.html</span>' +
         '<td class=options-container><a href="https://bugs.webkit.org/enter_bug.cgi?assigned_to=webkit-unassigned%40lists.webkit.org&product=WebKit&form_name=enter_bug&component=Tools%20%2F%20Tests&short_desc=Layout%20Test%20foo%2Fexists.html%20is%20failing&comment=The%20following%20layout%20test%20is%20failing%20on%20%5Binsert%20platform%5D%0A%0Afoo%2Fexists.html%0A%0AProbable%20cause%3A%0A%0A%5Binsert%20probable%20cause%5D" class="file-bug">FILE BUG</a>' +
         '<td class=options-container>' +
             '<td class=options-container>' +
@@ -509,191 +544,46 @@ test('baseTest', 2, function() {
 });
 
 // FIXME: Create builders_tests.js and move this there.
-test('generateChromiumDepsFyiGpuBuildersFromBuilderList', 1, function() {
-    var builderList = ["Linux Audio", "Linux Release (ATI)", "Linux Release (Intel)", "Mac Release (ATI)", "Win7 Audio", "Win7 Release (ATI)", "Win7 Release (Intel)", "WinXP Debug (NVIDIA)", "WinXP Release (NVIDIA)"];
-    var expectedBuilders = [["Linux Release (ATI)", 2], ["Linux Release (Intel)"], ["Mac Release (ATI)"], ["Win7 Release (ATI)"], ["Win7 Release (Intel)"], ["WinXP Debug (NVIDIA)"], ["WinXP Release (NVIDIA)"] ];
-    deepEqual(generateBuildersFromBuilderList(builderList, isChromiumDepsFyiGpuTestRunner), expectedBuilders);
+
+test('isChromiumWebkitTipOfTreeTestRunner', 1, function() {
+    var builderList = ["WebKit Linux", "WebKit Linux (dbg)", "WebKit Linux 32", "WebKit Mac10.6", "WebKit Mac10.6 (dbg)",
+        "WebKit Mac10.6 (deps)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)", "WebKit Win (deps)",
+        "WebKit Win7", "Linux (Content Shell)"];
+    var expectedBuilders = ["WebKit Linux", "WebKit Linux (dbg)", "WebKit Linux 32", "WebKit Mac10.6",
+        "WebKit Mac10.6 (dbg)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)", "WebKit Win7"];
+    deepEqual(builderList.filter(isChromiumWebkitTipOfTreeTestRunner), expectedBuilders);
 });
 
-test('generateChromiumTipOfTreeGpuBuildersFromBuilderList', 1, function() {
-    var builderList = ["Chrome Frame Tests", "GPU Linux (NVIDIA)", "GPU Linux (dbg) (NVIDIA)", "GPU Mac", "GPU Mac (dbg)", "GPU Win7 (NVIDIA)", "GPU Win7 (dbg) (NVIDIA)", "Linux Perf",
-        "Linux Tests", "Linux Valgrind", "Mac Builder (dbg)", "Mac10.6 Perf", "Mac10.6 Tests", "Vista Perf", "Vista Tests", "WebKit Linux", "WebKit Linux ASAN", "WebKit Linux (dbg)", "WebKit Linux (deps)",
-        "WebKit Linux 32", "WebKit Mac Builder", "WebKit Mac Builder (dbg)", "WebKit Mac Builder (deps)",
-        "WebKit Mac10.6", "WebKit Mac10.6 (dbg)", "WebKit Mac10.6 (deps)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)",
-        "WebKit Win (deps)", "WebKit Win Builder", "WebKit Win Builder (dbg)", "WebKit Win Builder (deps)", "WebKit Win7", "Win (dbg)", "Win Builder"];
-    var expectedBuilders = [["GPU Linux (NVIDIA)", 2], ["GPU Linux (dbg) (NVIDIA)"], ["GPU Mac"], ["GPU Mac (dbg)"], ["GPU Win7 (NVIDIA)"], ["GPU Win7 (dbg) (NVIDIA)"]];
-    deepEqual(generateBuildersFromBuilderList(builderList, isChromiumTipOfTreeGpuTestRunner), expectedBuilders);
-});
-
-test('generateWebkitBuildersFromBuilderList', 1, function() {
-    var builderList = ["Chromium Android Release", "Chromium Linux Release", "Chromium Linux Release (Grid Layout)", "Chromium Linux Release (Perf)", "Chromium Linux Release (Tests)",
-        "Chromium Mac Release", "Chromium Mac Release (Perf)", "Chromium Mac Release (Tests)", "Chromium Win Release", "Chromium Win Release (Perf)", "Chromium Win Release (Tests)",
-        "EFL Linux Release", "GTK Linux 32-bit Release", "GTK Linux 64-bit Debug", "GTK Linux 64-bit Release", "Lion Debug (Build)", "Lion Debug (Tests)", "Lion Debug (WebKit2 Tests)",
-        "Lion Leaks", "Lion Release (Build)", "Lion Release (Perf)", "Lion Release (Tests)", "Lion Release (WebKit2 Tests)", "Qt Linux 64-bit Release (Perf)",
-        "Qt Linux 64-bit Release (WebKit2 Perf)", "Qt Linux ARMv7 Release", "Qt Linux MIPS Release", "Qt Linux Release", "Qt Linux Release minimal", "Qt Linux SH4 Release",
-        "Qt SnowLeopard Release", "Qt Windows 32-bit Debug", "Qt Windows 32-bit Release", "SnowLeopard Intel Debug (Build)", "SnowLeopard Intel Debug (Tests)",
-        "SnowLeopard Intel Debug (WebKit2 Tests)", "SnowLeopard Intel Release (Build)", "SnowLeopard Intel Release (Tests)", "SnowLeopard Intel Release (WebKit2 Tests)",
-        "WinCE Release (Build)", "WinCairo Release", "Windows 7 Release (Tests)", "Windows 7 Release (WebKit2 Tests)", "Windows Debug (Build)", "Windows Release (Build)", "Windows XP Debug (Tests)",
-        "EFL Linux 32-bit Release (Build)", "EFL Linux 64-bit Debug"];
-    var expectedBuilders = [["Chromium Linux Release (Tests)", 2], ["Chromium Mac Release (Tests)"], ["EFL Linux Release"], ["GTK Linux 32-bit Release"], ["GTK Linux 64-bit Debug"],
-        ["GTK Linux 64-bit Release"], ["Lion Debug (Tests)"], ["Lion Debug (WebKit2 Tests)"], ["Lion Release (Tests)"], ["Lion Release (WebKit2 Tests)"], ["Qt Linux Release"],
-        ["SnowLeopard Intel Debug (Tests)"], ["SnowLeopard Intel Debug (WebKit2 Tests)"], ["SnowLeopard Intel Release (Tests)"], ["SnowLeopard Intel Release (WebKit2 Tests)"], ["EFL Linux 64-bit Debug"]];
-    deepEqual(generateBuildersFromBuilderList(builderList, isWebkitTestRunner), expectedBuilders);
-});
-
-test('generateChromiumWebkitTipOfTreeBuildersFromBuilderList', 1, function() {
+test('isChromiumWebkitDepsTestRunner', 1, function() {
     var builderList = ["Chrome Frame Tests", "GPU Linux (NVIDIA)", "GPU Linux (dbg) (NVIDIA)", "GPU Mac", "GPU Mac (dbg)", "GPU Win7 (NVIDIA)", "GPU Win7 (dbg) (NVIDIA)", "Linux Perf", "Linux Tests",
         "Linux Valgrind", "Mac Builder (dbg)", "Mac10.6 Perf", "Mac10.6 Tests", "Vista Perf", "Vista Tests", "WebKit Linux", "WebKit Linux ASAN",  "WebKit Linux (dbg)", "WebKit Linux (deps)", "WebKit Linux 32",
-        "WebKit Mac Builder", "WebKit Mac Builder (dbg)", "WebKit Mac Builder (deps)", "WebKit Mac10.6", "WebKit Mac10.6 (dbg)",
-        "WebKit Mac10.6 (deps)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)", "WebKit Win (deps)", "WebKit Win Builder", "WebKit Win Builder (dbg)",
-        "WebKit Win Builder (deps)", "WebKit Win7", "Win (dbg)", "Win Builder",
-        "Linux (Content Shell)"];
-    var expectedBuilders = [["WebKit Linux", 2], ["WebKit Linux (dbg)"], ["WebKit Linux 32"], ["WebKit Mac10.6"],
-        ["WebKit Mac10.6 (dbg)"], ["WebKit Mac10.7"], ["WebKit Win"], ["WebKit Win (dbg)(1)"], ["WebKit Win (dbg)(2)"], ["WebKit Win7"]];
-    deepEqual(generateBuildersFromBuilderList(builderList, isChromiumWebkitTipOfTreeTestRunner), expectedBuilders);
-});
-
-test('generateChromiumWebkitDepsBuildersFromBuilderList', 1, function() {
-    var builderList = ["Chrome Frame Tests", "GPU Linux (NVIDIA)", "GPU Linux (dbg) (NVIDIA)", "GPU Mac", "GPU Mac (dbg)", "GPU Win7 (NVIDIA)", "GPU Win7 (dbg) (NVIDIA)", "Linux Perf", "Linux Tests",
-        "Linux Valgrind", "Mac Builder (dbg)", "Mac10.6 Perf", "Mac10.6 Tests", "Vista Perf", "Vista Tests", "WebKit Linux", "WebKit Linux ASAN",  "WebKit Linux (dbg)", "WebKit Linux (deps)", "WebKit Linux 32",
-        "WebKit Mac Builder", "WebKit Mac Builder (dbg)", "WebKit Mac Builder (deps)", "WebKit Mac10.6", "WebKit Mac10.6 (dbg)",
-        "WebKit Mac10.6 (deps)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)", "WebKit Win (deps)", "WebKit Win Builder", "WebKit Win Builder (dbg)",
-        "WebKit Win Builder (deps)", "WebKit Win7", "Win (dbg)", "Win Builder"];
-    var expectedBuilders = [["WebKit Linux (deps)", 2], ["WebKit Mac10.6 (deps)"], ["WebKit Win (deps)"]];
-    deepEqual(generateBuildersFromBuilderList(builderList, isChromiumWebkitDepsTestRunner), expectedBuilders);
-});
-
-test('generateChromiumDepsGTestBuildersFromBuilderList', 1, function() {
-    var builderList = ["Android Builder", "Chrome Frame Tests (ie6)", "Chrome Frame Tests (ie7)", "Chrome Frame Tests (ie8)", "Interactive Tests (dbg)", "Linux", "Linux Builder (dbg)",
-        "Linux Builder (dbg)(shared)", "Linux Builder x64", "Linux Clang (dbg)", "Linux Sync", "Linux Tests (dbg)(1)", "Linux Tests (dbg)(2)", "Linux Tests (dbg)(shared)", "Linux Tests x64",
-        "Linux x64", "Mac", "Mac 10.6 Tests (dbg)(1)", "Mac 10.6 Tests (dbg)(2)",
-        "Mac 10.6 Tests (dbg)(3)", "Mac 10.6 Tests (dbg)(4)", "Mac Builder", "Mac Builder (dbg)", "Mac10.6 Sync",
-        "Mac10.6 Tests (1)", "Mac10.6 Tests (2)", "Mac10.6 Tests (3)", "NACL Tests", "NACL Tests (x64)", "Vista Tests (1)", "Vista Tests (2)", "Vista Tests (3)", "Win", "Win Aura",
-        "Win Builder", "Win Builder (dbg)", "Win Builder 2010 (dbg)", "Win7 Sync", "Win7 Tests (1)", "Win7 Tests (2)", "Win7 Tests (3)", "Win7 Tests (dbg)(1)", "Win7 Tests (dbg)(2)",
-        "Win7 Tests (dbg)(3)", "Win7 Tests (dbg)(4)", "Win7 Tests (dbg)(5)", "Win7 Tests (dbg)(6)", "XP Tests (1)", "XP Tests (2)", "XP Tests (3)", "XP Tests (dbg)(1)", "XP Tests (dbg)(2)",
-        "XP Tests (dbg)(3)", "XP Tests (dbg)(4)", "XP Tests (dbg)(5)", "XP Tests (dbg)(6)"];
-    var expectedBuilders = [["Interactive Tests (dbg)", 2], ["Linux Sync"], ["Linux Tests (dbg)(1)"], ["Linux Tests (dbg)(2)"], ["Linux Tests (dbg)(shared)"], ["Linux Tests x64"],
-        ["Mac 10.6 Tests (dbg)(1)"], ["Mac 10.6 Tests (dbg)(2)"], ["Mac 10.6 Tests (dbg)(3)"],
-        ["Mac 10.6 Tests (dbg)(4)"], ["Mac10.6 Sync"], ["Mac10.6 Tests (1)"], ["Mac10.6 Tests (2)"], ["Mac10.6 Tests (3)"], ["NACL Tests"],
-        ["NACL Tests (x64)"], ["Vista Tests (1)"], ["Vista Tests (2)"], ["Vista Tests (3)"], ["Win7 Sync"], ["Win7 Tests (1)"], ["Win7 Tests (2)"], ["Win7 Tests (3)"], ["Win7 Tests (dbg)(1)"],
-        ["Win7 Tests (dbg)(2)"], ["Win7 Tests (dbg)(3)"], ["Win7 Tests (dbg)(4)"], ["Win7 Tests (dbg)(5)"], ["Win7 Tests (dbg)(6)"], ["XP Tests (1)"], ["XP Tests (2)"], ["XP Tests (3)"],
-        ["XP Tests (dbg)(1)"], ["XP Tests (dbg)(2)"], ["XP Tests (dbg)(3)"], ["XP Tests (dbg)(4)"], ["XP Tests (dbg)(5)"], ["XP Tests (dbg)(6)"]];
-    deepEqual(generateBuildersFromBuilderList(builderList, isChromiumDepsGTestRunner), expectedBuilders);
-});
-
-test('generateChromiumDepsCrosGTestBuildersFromBuilderList', 1, function() {
-    var builderList = ["ChromiumOS (amd64)", "ChromiumOS (arm)", "ChromiumOS (tegra2)", "ChromiumOS (x86)", "Linux ChromiumOS (Clang dbg)", "Linux ChromiumOS Builder", "Linux ChromiumOS Builder (dbg)",
-        "Linux ChromiumOS Tests (1)", "Linux ChromiumOS Tests (2)", "Linux ChromiumOS Tests (dbg)(1)", "Linux ChromiumOS Tests (dbg)(2)", "Linux ChromiumOS Tests (dbg)(3)"];
-    var expectedBuilders = [["Linux ChromiumOS Tests (1)", 2], ["Linux ChromiumOS Tests (2)"], ["Linux ChromiumOS Tests (dbg)(1)"], ["Linux ChromiumOS Tests (dbg)(2)"], ["Linux ChromiumOS Tests (dbg)(3)"]];
-    deepEqual(generateBuildersFromBuilderList(builderList, isChromiumDepsCrosGTestRunner), expectedBuilders);
-});
-
-test('generateChromiumTipOfTreeGTestBuildersFromBuilderList', 1, function() {
-    var builderList = ["Chrome Frame Tests", "GPU Linux (NVIDIA)", "GPU Linux (dbg) (NVIDIA)", "GPU Mac", "GPU Mac (dbg)", "GPU Win7 (NVIDIA)", "GPU Win7 (dbg) (NVIDIA)", "Linux Perf",
-        "Linux Tests", "Linux Valgrind", "Mac Builder (dbg)", "Mac10.6 Perf", "Mac10.6 Tests", "Vista Perf", "Vista Tests", "WebKit Linux", "WebKit Linux (dbg)", "WebKit Linux (deps)",
-        "WebKit Linux 32", "WebKit Mac Builder", "WebKit Mac Builder (dbg)", "WebKit Mac Builder (deps)",
-        "WebKit Mac10.6", "WebKit Mac10.6 (dbg)", "WebKit Mac10.6 (deps)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)",
-        "WebKit Win (deps)", "WebKit Win Builder", "WebKit Win Builder (dbg)", "WebKit Win Builder (deps)", "WebKit Win7", "Win (dbg)", "Win Builder"];
-    var expectedBuilders = [['Linux Tests', BuilderGroup.DEFAULT_BUILDER], ['Mac10.6 Tests'], ['Vista Tests'], ['Win (dbg)']];
-    deepEqual(generateBuildersFromBuilderList(builderList, isChromiumTipOfTreeGTestRunner), expectedBuilders);
-});
-
-test('queryHashAsMap', 2, function() {
-    equal(window.location.hash, '#useTestData=true');
-    deepEqual(queryHashAsMap(), {useTestData: 'true'});
-});
-
-test('parseCrossDashboardParameters', 2, function() {
-    equal(window.location.hash, '#useTestData=true');
-    parseCrossDashboardParameters();
-
-    var expectedParameters = {};
-    for (var key in g_defaultCrossDashboardStateValues)
-        expectedParameters[key] = g_defaultCrossDashboardStateValues[key];
-    expectedParameters.useTestData = true;
-
-    deepEqual(g_crossDashboardState, expectedParameters);
-});
-
-test('diffStates', 5, function() {
-    var newState = {a: 1, b: 2};
-    deepEqual(diffStates(null, newState), newState);
-
-    var oldState = {a: 1};
-    deepEqual(diffStates(oldState, newState), {b: 2});
-
-    // FIXME: This is kind of weird. I think the existing users of this code work correctly, but it's a confusing result.
-    var oldState = {c: 1};
-    deepEqual(diffStates(oldState, newState), {a:1, b: 2});
-
-    var oldState = {a: 1, b: 2};
-    deepEqual(diffStates(oldState, newState), {});
-
-    var oldState = {a: 2, b: 3};
-    deepEqual(diffStates(oldState, newState), {a: 1, b: 2});
-});
-
-test('addBuilderLoadErrors', 1, function() {
-    clearErrors();
-    g_hasDoneInitialPageGeneration = false;
-    g_buildersThatFailedToLoad = ['builder1', 'builder2'];
-    g_staleBuilders = ['staleBuilder1'];
-    addBuilderLoadErrors();
-    equal(g_errorMessages, 'ERROR: Failed to get data from builder1,builder2.<br>ERROR: Data from staleBuilder1 is more than 1 day stale.<br>');
+        "WebKit Mac10.6", "WebKit Mac10.6 (dbg)", "WebKit Mac10.6 (deps)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)", "WebKit Win (deps)",
+        "WebKit Win7", "Win (dbg)", "Win Builder"];
+    var expectedBuilders = ["WebKit Linux (deps)", "WebKit Mac10.6 (deps)", "WebKit Win (deps)"];
+    deepEqual(builderList.filter(isChromiumWebkitDepsTestRunner), expectedBuilders);
 });
 
 test('builderGroupIsToTWebKitAttribute', 2, function() {
-    var dummyMaster = new BuilderMaster('dummy.org', 'http://build.dummy.org');
+    var dummyMaster = new builders.BuilderMaster('Chromium', 'dummyurl', {'layout-tests': {'builders': ['WebKit Linux', 'WebKit Linux (dbg)', 'WebKit Mac10.7', 'WebKit Win']}});
     var testBuilderGroups = {
         '@ToT - dummy.org': new BuilderGroup(BuilderGroup.TOT_WEBKIT),
         '@DEPS - dummy.org': new BuilderGroup(BuilderGroup.DEPS_WEBKIT),
     }
-    testBuilderGroups['@ToT - dummy.org'].expectedGroups = 1;
-    testBuilderGroups['@DEPS - dummy.org'].expectedGroups = 1;
 
     var testJSONData = "{ \"Dummy Builder 1\": null, \"Dummy Builder 2\": null }";
-    onBuilderListLoad(testBuilderGroups, function() { return true; }, dummyMaster, '@ToT - dummy.org', {responseText: testJSONData});
+    requestBuilderList(testBuilderGroups, 'ChromiumWebkit', '@ToT - dummy.org', testBuilderGroups['@ToT - dummy.org'], 'layout-tests');
     equal(testBuilderGroups['@ToT - dummy.org'].isToTWebKit, true);
-    onBuilderListLoad(testBuilderGroups, function() { return true; }, dummyMaster, '@DEPS - dummy.org', {responseText: testJSONData});
+    requestBuilderList(testBuilderGroups, 'ChromiumWebkit', '@DEPS - dummy.org', testBuilderGroups['@DEPS - dummy.org'], 'layout-tests');
     equal(testBuilderGroups['@DEPS - dummy.org'].isToTWebKit, false);
 });
 
-test('builderGroupExpectedGroups', 4, function() {
-    var dummyMaster = new BuilderMaster('dummy.org', 'http://build.dummy.org');
-    var testBuilderGroups = {
-        '@ToT - dummy.org': new BuilderGroup(BuilderGroup.TOT_WEBKIT),
-    }
-    testBuilderGroups['@ToT - dummy.org'].expectedGroups = 3;
-
-    var testJSONData = "{ \"Dummy Builder 1\": null }";
-    equal(testBuilderGroups['@ToT - dummy.org'].expectedGroups, 3);
-    onBuilderListLoad(testBuilderGroups,  function() { return true; }, dummyMaster, '@ToT - dummy.org', {responseText: testJSONData});
-    equal(testBuilderGroups['@ToT - dummy.org'].groups, 1);
-    var testJSONData = "{ \"Dummy Builder 2\": null }";
-    onBuilderListLoad(testBuilderGroups,  function() { return true; }, dummyMaster, '@ToT - dummy.org', {responseText: testJSONData});
-    equal(testBuilderGroups['@ToT - dummy.org'].groups, 2);
-    onErrorLoadingBuilderList('http://build.dummy.org', testBuilderGroups,  '@ToT - dummy.org');
-    equal(testBuilderGroups['@ToT - dummy.org'].groups, 3);
-});
-
-test('requestBuilderListAddsBuilderGroupEntry', 2, function() {
+test('requestBuilderListAddsBuilderGroupEntry', 1, function() {
     var testBuilderGroups = { '@ToT - dummy.org': null };
+    var builderGroup = new BuilderGroup(BuilderGroup.TOT_WEBKIT);
+    var groupName = '@ToT - dummy.org';
+    requestBuilderList(testBuilderGroups, 'ChromiumWebkit', groupName, builderGroup, 'layout-tests');
 
-    var requestFunction = loader.request;
-    loader.request = function() {};
-
-    try {
-        var builderFilter = null;
-        var master = { builderJsonPath: function() {} };
-        var groupName = '@ToT - dummy.org';
-        var builderGroup = { expectedGroups: 0 };
-        requestBuilderList(testBuilderGroups, builderFilter, master, groupName, builderGroup);
-
-        equal(testBuilderGroups['@ToT - dummy.org'], builderGroup);
-        equal(testBuilderGroups['@ToT - dummy.org'].expectedGroups, 1);
-    } finally {
-        loader.request = requestFunction;
-    }
+    equal(testBuilderGroups['@ToT - dummy.org'], builderGroup);
 })
 
 test('sortTests', 4, function() {
@@ -722,9 +612,9 @@ test('sortTests', 4, function() {
 });
 
 test('popup', 2, function() {
-    showPopup(document.body, 'dummy content');
+    ui.popup.show(document.body, 'dummy content');
     ok(document.querySelector('#popup'));
-    hidePopup();
+    ui.popup.hide();
     ok(!document.querySelector('#popup'));
 });
 
@@ -796,4 +686,16 @@ test('TestTrie', 3, function() {
         leafsOfPartialTrieTraversal.push(triePath);
     }, "foo/bar");
     deepEqual(leafsOfPartialTrieTraversal, expectedLeafs);
+});
+
+test('changeTestTypeInvalidatesGroup', 1, function() {
+    var historyInstance = resetGlobals();
+    var originalGroup = '@ToT - chromium.org';
+    var originalTestType = 'layout-tests';
+    loadBuildersList(originalGroup, originalTestType);
+    historyInstance.crossDashboardState.group = originalGroup;
+    historyInstance.crossDashboardState.testType = originalTestType;
+
+    historyInstance.invalidateQueryParameters({'testType': 'ui_tests'});
+    notEqual(historyInstance.crossDashboardState.group, originalGroup, "group should have been invalidated");   
 });

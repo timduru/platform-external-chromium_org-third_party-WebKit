@@ -26,6 +26,7 @@
 #include "CachePolicy.h"
 #include "FrameLoaderTypes.h"
 #include "PurgePriority.h"
+#include "ResourceError.h"
 #include "ResourceLoadPriority.h"
 #include "ResourceLoaderOptions.h"
 #include "ResourceRequest.h"
@@ -49,6 +50,7 @@ class InspectorResource;
 class PurgeableBuffer;
 class ResourceBuffer;
 class SecurityOrigin;
+class SharedBuffer;
 class SubresourceLoader;
 
 // A resource that is held in the cache. Classes who want to use this object should derive
@@ -110,6 +112,9 @@ public:
 
     ResourceRequest& resourceRequest() { return m_resourceRequest; }
     const KURL& url() const { return m_resourceRequest.url();}
+#if ENABLE(CACHE_PARTITIONING)
+    const String& cachePartition() const { return m_resourceRequest.cachePartition(); }
+#endif
     Type type() const { return static_cast<Type>(m_type); }
     
     ResourceLoadPriority loadPriority() const { return m_loadPriority; }
@@ -185,7 +190,8 @@ public:
     ResourceBuffer* resourceBuffer() const { ASSERT(!m_purgeableData); return m_data.get(); }
 
     virtual void willSendRequest(ResourceRequest&, const ResourceResponse&) { m_requestedFromNetworkingLayer = true; }
-    virtual void setResponse(const ResourceResponse&);
+    virtual void responseReceived(const ResourceResponse&);
+    void setResponse(const ResourceResponse& response) { m_response = response; }
     const ResourceResponse& response() const { return m_response; }
 
     // Sets the serialized metadata retrieved from the platform's cache.
@@ -214,6 +220,7 @@ public:
     bool loadFailedOrCanceled() { return !m_error.isNull(); }
 
     bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks == SendCallbacks; }
+    DataBufferingPolicy dataBufferingPolicy() const { return m_options.dataBufferingPolicy; }
     
     virtual void destroyDecodedData() { }
 
@@ -241,7 +248,7 @@ public:
     
     // HTTP revalidation support methods for CachedResourceLoader.
     void setResourceToRevalidate(CachedResource*);
-    void switchClientsToRevalidatedResource();
+    virtual void switchClientsToRevalidatedResource();
     void clearResourceToRevalidate();
     void updateResponseAfterRevalidation(const ResourceResponse& validatingResponse);
     
@@ -254,6 +261,12 @@ public:
     double loadFinishTime() const { return m_loadFinishTime; }
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+
+    virtual bool canReuse(const ResourceRequest&) const { return true; }
+
+#if PLATFORM(MAC)
+    void tryReplaceEncodedData(PassRefPtr<SharedBuffer>);
+#endif
 
 protected:
     virtual void checkNotify();
@@ -306,6 +319,8 @@ private:
 
     void addAdditionalRequestHeaders(CachedResourceLoader*);
     void failBeforeStarting();
+
+    String m_fragmentIdentifierForRequest;
 
     RefPtr<CachedMetadata> m_cachedMetadata;
 

@@ -26,13 +26,14 @@
 #include "PluginDocument.h"
 
 #include "DocumentLoader.h"
+#include "ExceptionCodePlaceholder.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "FrameLoaderClient.h"
 #include "FrameView.h"
 #include "HTMLEmbedElement.h"
 #include "HTMLHtmlElement.h"
 #include "HTMLNames.h"
-#include "MainResourceLoader.h"
 #include "NodeList.h"
 #include "Page.h"
 #include "RawDataDocumentParser.h"
@@ -67,9 +68,8 @@ private:
 
 void PluginDocumentParser::createDocumentStructure()
 {
-    ExceptionCode ec;
     RefPtr<Element> rootElement = document()->createElement(htmlTag, false);
-    document()->appendChild(rootElement, ec);
+    document()->appendChild(rootElement, IGNORE_EXCEPTION);
     static_cast<HTMLHtmlElement*>(rootElement.get())->insertedByParser();
 
     if (document()->frame() && document()->frame()->loader())
@@ -80,7 +80,7 @@ void PluginDocumentParser::createDocumentStructure()
     body->setAttribute(marginheightAttr, "0");
     body->setAttribute(styleAttr, "background-color: rgb(38,38,38)");
 
-    rootElement->appendChild(body, ec);
+    rootElement->appendChild(body, IGNORE_EXCEPTION);
         
     RefPtr<Element> embedElement = document()->createElement(embedTag, false);
         
@@ -96,9 +96,9 @@ void PluginDocumentParser::createDocumentStructure()
     if (loader)
         m_embedElement->setAttribute(typeAttr, loader->writer()->mimeType());
 
-    static_cast<PluginDocument*>(document())->setPluginNode(m_embedElement);
+    toPluginDocument(document())->setPluginNode(m_embedElement);
 
-    body->appendChild(embedElement, ec);    
+    body->appendChild(embedElement, IGNORE_EXCEPTION);
 }
 
 void PluginDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
@@ -130,11 +130,9 @@ void PluginDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
             // In a plugin document, the main resource is the plugin. If we have a null widget, that means
             // the loading of the plugin was cancelled, which gives us a null mainResourceLoader(), so we
             // need to have this call in a null check of the widget or of mainResourceLoader().
-            frame->loader()->activeDocumentLoader()->mainResourceLoader()->setShouldBufferData(DoNotBufferData);
+            frame->loader()->activeDocumentLoader()->setMainResourceDataBufferingPolicy(DoNotBufferData);
         }
     }
-
-    finish();
 }
 
 PluginDocument::PluginDocument(Frame* frame, const KURL& url)
@@ -180,7 +178,8 @@ void PluginDocument::cancelManualPluginLoad()
     if (!shouldLoadPluginManually())
         return;
 
-    frame()->loader()->activeDocumentLoader()->mainResourceLoader()->cancel();
+    DocumentLoader* documentLoader = frame()->loader()->activeDocumentLoader();
+    documentLoader->cancelMainResourceLoad(frame()->loader()->cancelledError(documentLoader->request()));
     setShouldLoadPluginManually(false);
 }
 

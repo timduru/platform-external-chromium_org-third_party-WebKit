@@ -139,13 +139,6 @@ static void notifyStatus(WebKitWebFrame* frame, WebKitLoadStatus loadStatus)
     }
 }
 
-static void loadDone(WebKitWebFrame* frame, bool didSucceed)
-{
-    // FIXME: load-done is deprecated. Please remove when signal's been removed.
-    g_signal_emit_by_name(frame, "load-done", didSucceed);
-    notifyStatus(frame, WEBKIT_LOAD_FINISHED);
-}
-
 WTF::PassRefPtr<WebCore::DocumentLoader> FrameLoaderClient::createDocumentLoader(const WebCore::ResourceRequest& request, const SubstituteData& substituteData)
 {
     RefPtr<WebKit::DocumentLoader> loader = WebKit::DocumentLoader::create(request, substituteData);
@@ -192,23 +185,36 @@ void FrameLoaderClient::committedLoad(WebCore::DocumentLoader* loader, const cha
     }
 }
 
-bool
-FrameLoaderClient::shouldUseCredentialStorage(WebCore::DocumentLoader*, unsigned long  identifier)
+bool FrameLoaderClient::shouldUseCredentialStorage(WebCore::DocumentLoader*, unsigned long  identifier)
 {
-    notImplemented();
-    return false;
+    return true;
 }
 
 void FrameLoaderClient::dispatchDidReceiveAuthenticationChallenge(WebCore::DocumentLoader*, unsigned long  identifier, const AuthenticationChallenge& challenge)
 {
     if (DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled()) {
-        challenge.authenticationClient()->receivedRequestToContinueWithoutCredential(challenge);
+        CString username;
+        CString password;
+        if (!DumpRenderTreeSupportGtk::s_authenticationCallback || !DumpRenderTreeSupportGtk::s_authenticationCallback(username, password)) {
+            challenge.authenticationClient()->receivedRequestToContinueWithoutCredential(challenge);
+            return;
+        }
+
+        challenge.authenticationClient()->receivedCredential(challenge, Credential(String::fromUTF8(username.data()), String::fromUTF8(password.data()), CredentialPersistenceForSession));
         return;
     }
 
-    GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(webkit_web_frame_get_web_view(m_frame)));
+    WebKitWebView* view = webkit_web_frame_get_web_view(m_frame);
+    GtkAuthenticationDialog::CredentialStorageMode credentialStorageMode;
+
+    if (core(view)->settings()->privateBrowsingEnabled())
+        credentialStorageMode = GtkAuthenticationDialog::DisallowPersistentStorage;
+    else
+        credentialStorageMode = GtkAuthenticationDialog::AllowPersistentStorage;
+
+    GtkWidget* toplevel = gtk_widget_get_toplevel(GTK_WIDGET(view));
     GtkWindow* toplevelWindow = widgetIsOnscreenToplevelWindow(toplevel) ? GTK_WINDOW(toplevel) : 0;
-    GtkAuthenticationDialog* dialog = new GtkAuthenticationDialog(toplevelWindow, challenge);
+    GtkAuthenticationDialog* dialog = new GtkAuthenticationDialog(toplevelWindow, challenge, credentialStorageMode);
     dialog->show();
 }
 
@@ -545,7 +551,7 @@ PassRefPtr<Frame> FrameLoaderClient::createFrame(const KURL& url, const String& 
 
 void FrameLoaderClient::redirectDataToPlugin(Widget* pluginWidget)
 {
-    m_pluginView = static_cast<PluginView*>(pluginWidget);
+    m_pluginView = toPluginView(pluginWidget);
     if (pluginWidget)
         m_hasSentResponseToPlugin = false;
 }
@@ -628,8 +634,7 @@ void FrameLoaderClient::dispatchDidFinishLoad()
         m_loadingErrorPage = false;
         return;
     }
-
-    loadDone(m_frame, true);
+    notifyStatus(m_frame, WEBKIT_LOAD_FINISHED);
 }
 
 void FrameLoaderClient::frameLoadCompleted()
@@ -662,7 +667,9 @@ bool FrameLoaderClient::shouldStopLoadingForHistoryItem(HistoryItem* item) const
 
 void FrameLoaderClient::didDisplayInsecureContent()
 {
-    notImplemented();
+    if (!DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled() || !DumpRenderTreeSupportGtk::s_frameLoadEventCallback)
+        return;
+    DumpRenderTreeSupportGtk::s_frameLoadEventCallback(m_frame, DumpRenderTreeSupportGtk::DidDisplayInsecureContent, 0);
 }
 
 void FrameLoaderClient::didRunInsecureContent(SecurityOrigin* coreOrigin, const KURL& url)
@@ -672,7 +679,9 @@ void FrameLoaderClient::didRunInsecureContent(SecurityOrigin* coreOrigin, const 
 
 void FrameLoaderClient::didDetectXSS(const KURL&, bool)
 {
-    notImplemented();
+    if (!DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled() || !DumpRenderTreeSupportGtk::s_frameLoadEventCallback)
+        return;
+    DumpRenderTreeSupportGtk::s_frameLoadEventCallback(m_frame, DumpRenderTreeSupportGtk::DidDetectXSS, 0);
 }
 
 void FrameLoaderClient::forceLayout()
@@ -709,17 +718,23 @@ void FrameLoaderClient::dispatchDidHandleOnloadEvents()
 
 void FrameLoaderClient::dispatchDidReceiveServerRedirectForProvisionalLoad()
 {
-    notImplemented();
+    if (!DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled() || !DumpRenderTreeSupportGtk::s_frameLoadEventCallback)
+        return;
+    DumpRenderTreeSupportGtk::s_frameLoadEventCallback(m_frame, DumpRenderTreeSupportGtk::DidReceiveServerRedirectForProvisionalLoad, 0);
 }
 
 void FrameLoaderClient::dispatchDidCancelClientRedirect()
 {
-    notImplemented();
+    if (!DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled() || !DumpRenderTreeSupportGtk::s_frameLoadEventCallback)
+        return;
+    DumpRenderTreeSupportGtk::s_frameLoadEventCallback(m_frame, DumpRenderTreeSupportGtk::DidCancelClientRedirect, 0);
 }
 
-void FrameLoaderClient::dispatchWillPerformClientRedirect(const KURL&, double, double)
+void FrameLoaderClient::dispatchWillPerformClientRedirect(const KURL& url, double, double)
 {
-    notImplemented();
+    if (!DumpRenderTreeSupportGtk::dumpRenderTreeModeEnabled() || !DumpRenderTreeSupportGtk::s_frameLoadEventCallback)
+        return;
+    DumpRenderTreeSupportGtk::s_frameLoadEventCallback(m_frame, DumpRenderTreeSupportGtk::WillPerformClientRedirectToURL, url.string().utf8().data());
 }
 
 void FrameLoaderClient::dispatchDidChangeLocationWithinPage()
@@ -750,7 +765,7 @@ void FrameLoaderClient::dispatchDidNavigateWithinPage()
     // FIXME: this is not ideal, but it seems safer than changing our
     // current contract with the clients about provisional data
     // sources not being '0' during the provisional load stage.
-    dispatchDidCommitLoad();
+    dispatchDidCommitLoad(true);
     dispatchDidFinishLoad();
 }
 
@@ -825,6 +840,11 @@ void FrameLoaderClient::dispatchDidChangeIcons(WebCore::IconType)
 
 void FrameLoaderClient::dispatchDidCommitLoad()
 {
+    FrameLoaderClient::dispatchDidCommitLoad(false);
+}
+
+void FrameLoaderClient::dispatchDidCommitLoad(bool isNavigatingWithinPage)
+{
     if (m_loadingErrorPage)
         return;
 
@@ -836,10 +856,12 @@ void FrameLoaderClient::dispatchDidCommitLoad()
     WebKitWebFramePrivate* priv = m_frame->priv;
     g_free(priv->uri);
     priv->uri = g_strdup(core(m_frame)->loader()->activeDocumentLoader()->url().string().utf8().data());
-    g_free(priv->title);
-    priv->title = NULL;
     g_object_notify(G_OBJECT(m_frame), "uri");
-    g_object_notify(G_OBJECT(m_frame), "title");
+    if (!isNavigatingWithinPage) {
+        g_free(priv->title);
+        priv->title = 0;
+        g_object_notify(G_OBJECT(m_frame), "title");
+    }
 
     g_signal_emit_by_name(m_frame, "load-committed");
     notifyStatus(m_frame, WEBKIT_LOAD_COMMITTED);
@@ -848,8 +870,9 @@ void FrameLoaderClient::dispatchDidCommitLoad()
     if (m_frame == webkit_web_view_get_main_frame(webView)) {
         g_object_freeze_notify(G_OBJECT(webView));
         g_object_notify(G_OBJECT(webView), "uri");
-        g_object_notify(G_OBJECT(webView), "title");
         g_object_thaw_notify(G_OBJECT(webView));
+        if (!isNavigatingWithinPage)
+            g_object_notify(G_OBJECT(webView), "title");
         g_signal_emit_by_name(webView, "load-committed", m_frame);
     }
 
@@ -996,6 +1019,8 @@ void FrameLoaderClient::dispatchDidFinishLoading(WebCore::DocumentLoader* loader
     g_signal_emit_by_name(webResource, "load-finished");
     g_signal_emit_by_name(m_frame, "resource-load-finished", webResource);
     g_signal_emit_by_name(webView, "resource-load-finished", m_frame, webResource);
+
+    webkitWebViewRemoveSubresource(webView, identifierString.get());
 }
 
 void FrameLoaderClient::dispatchDidFailLoading(WebCore::DocumentLoader* loader, unsigned long identifier, const ResourceError& error)
@@ -1018,6 +1043,8 @@ void FrameLoaderClient::dispatchDidFailLoading(WebCore::DocumentLoader* loader, 
     g_signal_emit_by_name(webResource, "load-failed", webError.get());
     g_signal_emit_by_name(m_frame, "resource-load-failed", webResource, webError.get());
     g_signal_emit_by_name(webView, "resource-load-failed", m_frame, webResource, webError.get());
+
+    webkitWebViewRemoveSubresource(webView, identifierString.get());
 }
 
 bool FrameLoaderClient::dispatchDidLoadResourceFromMemoryCache(WebCore::DocumentLoader*, const ResourceRequest&, const ResourceResponse&, int length)
@@ -1085,12 +1112,12 @@ void FrameLoaderClient::dispatchDidFailLoad(const ResourceError& error)
     g_error_free(webError);
 }
 
-void FrameLoaderClient::download(ResourceHandle* handle, const ResourceRequest& request, const ResourceResponse& response)
+void FrameLoaderClient::convertMainResourceLoadToDownload(WebCore::DocumentLoader* documentLoader, const ResourceRequest& request, const ResourceResponse& response)
 {
     GRefPtr<WebKitNetworkRequest> networkRequest(adoptGRef(kitNew(request)));
     WebKitWebView* view = getViewFromFrame(m_frame);
 
-    webkit_web_view_request_download(view, networkRequest.get(), response, handle);
+    webkit_web_view_request_download(view, networkRequest.get(), response, documentLoader->mainResourceLoader()->handle());
 }
 
 ResourceError FrameLoaderClient::cancelledError(const ResourceRequest& request)

@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2012 Research In Motion Limited. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -31,9 +31,9 @@
 #define Interpreter_h
 
 #include "ArgList.h"
+#include "JSCJSValue.h"
 #include "JSCell.h"
 #include "JSFunction.h"
-#include "JSValue.h"
 #include "JSObject.h"
 #include "JSStack.h"
 #include "LLIntData.h"

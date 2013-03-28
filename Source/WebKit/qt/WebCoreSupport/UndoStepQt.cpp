@@ -20,9 +20,10 @@
 #include "config.h"
 #include "UndoStepQt.h"
 
+#include <qobject.h>
+
 using namespace WebCore;
 
-#ifndef QT_NO_UNDOCOMMAND
 static QString undoNameForEditAction(const EditAction editAction)
 {
     switch (editAction) {
@@ -68,6 +69,10 @@ static QString undoNameForEditAction(const EditAction editAction)
         return QObject::tr("Set Writing Direction");
     case EditActionSubscript:
         return QObject::tr("Subscript");
+    case EditActionBold:
+        return QObject::tr("Bold");
+    case EditActionItalics:
+        return QObject::tr("Italic");
     case EditActionSuperscript:
         return QObject::tr("Superscript");
     case EditActionUnderline:
@@ -106,25 +111,17 @@ static QString undoNameForEditAction(const EditAction editAction)
     return QString();
 }
 
-UndoStepQt::UndoStepQt(WTF::RefPtr<UndoStep> step, QUndoCommand *parent)
-    : QUndoCommand(parent)
-    , m_step(step)
-    , m_first(true)
-{
-    setText(undoNameForEditAction(step->editingAction()));
-}
-#else
 UndoStepQt::UndoStepQt(WTF::RefPtr<UndoStep> step)
     : m_step(step)
     , m_first(true)
 {
+    m_text = undoNameForEditAction(step->editingAction());
 }
-#endif
+
 
 UndoStepQt::~UndoStepQt()
 {
 }
-
 
 void UndoStepQt::redo()
 {
@@ -143,5 +140,9 @@ void UndoStepQt::undo()
         m_step->unapply();
 }
 
+QString UndoStepQt::text() const
+{
+    return m_text;
+}
 
 // vim: ts=4 sw=4 et

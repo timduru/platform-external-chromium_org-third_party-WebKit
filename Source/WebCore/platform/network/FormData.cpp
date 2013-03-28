@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2004, 2006, 2008, 2011 Apple Inc. All rights reserved.
  * Copyright (C) 2009 Google Inc. All rights reserved.
+ * Copyright (C) 2012 Digia Plc. and/or its subsidiary(-ies)
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -23,6 +24,7 @@
 #include "FormData.h"
 
 #include "BlobData.h"
+#include "BlobRegistryImpl.h"
 #include "BlobURL.h"
 #include "Chrome.h"
 #include "ChromeClient.h"
@@ -240,9 +242,13 @@ void FormData::appendKeyValuePairItems(const FormDataList& list, const TextEncod
                                 name = generatedFileName;
                         }
                     }
+
+                    // If a filename is passed in FormData.append(), use it instead of the file blob's name.
+                    if (!value.filename().isNull())
+                        name = value.filename();
                 } else {
                     // For non-file blob, use the filename if it is passed in FormData.append().
-                    if (!value.filename().isEmpty())
+                    if (!value.filename().isNull())
                         name = value.filename();
                     else
                         name = "blob";
@@ -317,6 +323,70 @@ String FormData::flattenToString() const
     return Latin1Encoding().decode(reinterpret_cast<const char*>(bytes.data()), bytes.size());
 }
 
+#if ENABLE(BLOB)
+static void appendBlobResolved(FormData* formData, const KURL& url)
+{
+    if (!blobRegistry().isBlobRegistryImpl()) {
+        LOG_ERROR("Tried to resolve a blob without a usable registry");
+        return;
+    }
+    BlobStorageData* blobData = static_cast<BlobRegistryImpl&>(blobRegistry()).getBlobDataFromURL(KURL(ParsedURLString, url));
+    if (!blobData) {
+        LOG_ERROR("Could not get blob data from a registry");
+        return;
+    }
+
+    BlobDataItemList::const_iterator it = blobData->items().begin();
+    const BlobDataItemList::const_iterator itend = blobData->items().end();
+    for (; it != itend; ++it) {
+        const BlobDataItem& blobItem = *it;
+        if (blobItem.type == BlobDataItem::Data)
+            formData->appendData(blobItem.data->data() + static_cast<int>(blobItem.offset), static_cast<int>(blobItem.length));
+        else if (blobItem.type == BlobDataItem::File)
+            formData->appendFileRange(blobItem.path, blobItem.offset, blobItem.length, blobItem.expectedModificationTime);
+        else if (blobItem.type == BlobDataItem::Blob)
+            appendBlobResolved(formData, blobItem.url);
+        else
+            ASSERT_NOT_REACHED();
+    }
+}
+
+PassRefPtr<FormData> FormData::resolveBlobReferences()
+{
+    // First check if any blobs needs to be resolved, or we can take the fast path.
+    bool hasBlob = false;
+    Vector<FormDataElement>::const_iterator it = elements().begin();
+    const Vector<FormDataElement>::const_iterator itend = elements().end();
+    for (; it != itend; ++it) {
+        if (it->m_type == FormDataElement::encodedBlob) {
+            hasBlob = true;
+            break;
+        }
+    }
+
+    if (!hasBlob)
+        return this;
+
+    // Create a copy to append the result into.
+    RefPtr<FormData> newFormData = FormData::create();
+    newFormData->setAlwaysStream(alwaysStream());
+    newFormData->setIdentifier(identifier());
+    it = elements().begin();
+    for (; it != itend; ++it) {
+        const FormDataElement& element = *it;
+        if (element.m_type == FormDataElement::data)
+            newFormData->appendData(element.m_data.data(), element.m_data.size());
+        else if (element.m_type == FormDataElement::encodedFile)
+            newFormData->appendFileRange(element.m_filename, element.m_fileStart, element.m_fileLength, element.m_expectedFileModificationTime, element.m_shouldGenerateFile);
+        else if (element.m_type == FormDataElement::encodedBlob)
+            appendBlobResolved(newFormData.get(), element.m_url);
+        else
+            ASSERT_NOT_REACHED();
+    }
+    return newFormData.release();
+}
+#endif
+
 void FormData::generateFiles(Document* document)
 {
     ASSERT(!m_hasGeneratedFiles);
@@ -361,10 +431,22 @@ void FormData::removeGeneratedFilesIfNeeded()
 void FormData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Loader);
-    info.addMember(m_boundary);
+    info.addMember(m_boundary, "boundary");
+    info.addMember(m_elements, "elements");
 }
 
-static void encode(Encoder& encoder, const FormDataElement& element)
+void FormDataElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Loader);
+    info.addMember(m_data, "data");
+    info.addMember(m_filename, "filename");
+#if ENABLE(BLOB)
+    info.addMember(m_url, "url");
+#endif
+    info.addMember(m_generatedFilename, "generatedFilename");
+}
+
+static void encodeElement(Encoder& encoder, const FormDataElement& element)
 {
     encoder.encodeUInt32(element.m_type);
 
@@ -375,6 +457,7 @@ static void encode(Encoder& encoder, const FormDataElement& element)
 
     case FormDataElement::encodedFile:
         encoder.encodeString(element.m_filename);
+        encoder.encodeString(element.m_generatedFilename);
         encoder.encodeBool(element.m_shouldGenerateFile);
 #if ENABLE(BLOB)
         encoder.encodeInt64(element.m_fileStart);
@@ -406,7 +489,7 @@ static void encode(Encoder& encoder, const FormDataElement& element)
     ASSERT_NOT_REACHED();
 }
 
-static bool decode(Decoder& decoder, FormDataElement& element)
+static bool decodeElement(Decoder& decoder, FormDataElement& element)
 {
     uint32_t type;
     if (!decoder.decodeUInt32(type))
@@ -433,8 +516,12 @@ static bool decode(Decoder& decoder, FormDataElement& element)
         String filenameOrURL;
         if (!decoder.decodeString(filenameOrURL))
             return false;
-        if (type == FormDataElement::encodedFile && !decoder.decodeBool(element.m_shouldGenerateFile))
-            return false;
+        if (type == FormDataElement::encodedFile) {
+            if (!decoder.decodeString(element.m_generatedFilename))
+                return false;
+            if (!decoder.decodeBool(element.m_shouldGenerateFile))
+                return false;
+        }
         int64_t fileStart;
         if (!decoder.decodeInt64(fileStart))
             return false;
@@ -443,7 +530,7 @@ static bool decode(Decoder& decoder, FormDataElement& element)
         int64_t fileLength;
         if (!decoder.decodeInt64(fileLength))
             return false;
-        if (fileLength < fileStart)
+        if (fileLength != BlobDataItem::toEndOfFile && fileLength < fileStart)
             return false;
         double expectedFileModificationTime;
         if (!decoder.decodeDouble(expectedFileModificationTime))
@@ -479,7 +566,7 @@ static bool decode(Decoder& decoder, FormDataElement& element)
     return false;
 }
 
-void FormData::encodeForBackForward(Encoder& encoder) const
+void FormData::encode(Encoder& encoder) const
 {
     encoder.encodeBool(m_alwaysStream);
 
@@ -488,14 +575,14 @@ void FormData::encodeForBackForward(Encoder& encoder) const
     size_t size = m_elements.size();
     encoder.encodeUInt64(size);
     for (size_t i = 0; i < size; ++i)
-        encode(encoder, m_elements[i]);
+        encodeElement(encoder, m_elements[i]);
 
     encoder.encodeBool(m_hasGeneratedFiles);
 
     encoder.encodeInt64(m_identifier);
 }
 
-PassRefPtr<FormData> FormData::decodeForBackForward(Decoder& decoder)
+PassRefPtr<FormData> FormData::decode(Decoder& decoder)
 {
     RefPtr<FormData> data = FormData::create();
 
@@ -514,7 +601,7 @@ PassRefPtr<FormData> FormData::decodeForBackForward(Decoder& decoder)
         return 0;
     for (size_t i = 0; i < elementsSize; ++i) {
         FormDataElement element;
-        if (!decode(decoder, element))
+        if (!decodeElement(decoder, element))
             return 0;
         data->m_elements.append(element);
     }

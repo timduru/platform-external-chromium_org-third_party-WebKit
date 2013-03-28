@@ -27,14 +27,13 @@
 #define ewk_form_submission_request_private_h
 
 #include "WKDictionary.h"
+#include "WKEinaSharedString.h"
 #include "WKFormSubmissionListener.h"
 #include "WKRetainPtr.h"
 #include "ewk_object_private.h"
 #include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/text/WTFString.h>
 
-class EwkFormSubmissionRequest : public Ewk_Object {
+class EwkFormSubmissionRequest : public EwkObject {
 public:
     EWK_OBJECT_DECLARE(EwkFormSubmissionRequest)
 
@@ -46,7 +45,7 @@ public:
     }
 
     WKRetainPtr<WKArrayRef> fieldNames() const;
-    String fieldValue(const String& fieldName) const;
+    Eina_Stringshare* copyFieldValue(const char* fieldName) const;
 
     void submit();
 

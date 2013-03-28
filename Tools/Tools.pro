@@ -10,7 +10,6 @@ CONFIG += ordered
 build?(webkit1) {
     build?(testbrowser): SUBDIRS += QtTestBrowser/QtTestBrowser.pro
     build?(drt): SUBDIRS += DumpRenderTree/qt/DumpRenderTree.pro
-    build?(imagediff): SUBDIRS += DumpRenderTree/qt/ImageDiff.pro
 }
 
 build?(webkit2) {
@@ -21,7 +20,16 @@ build?(webkit2) {
         have?(QTQUICK): SUBDIRS += MiniBrowser/qt/MiniBrowser.pro
         SUBDIRS += MiniBrowser/qt/raw/MiniBrowserRaw.pro
     }
+
+    !production_build {
+        # Only tested on Linux so far.
+        linux* {
+            SUBDIRS += TestWebKitAPI
+        }
+    }
 }
+
+build?(imagediff): SUBDIRS += ImageDiff/ImageDiff.pro
 
 build?(test_npapi): SUBDIRS += DumpRenderTree/qt/TestNetscapePlugin/TestNetscapePlugin.pro
 
@@ -34,6 +42,7 @@ OTHER_FILES = \
     qmake/config.tests/README \
     qmake/config.tests/fontconfig/* \
     qmake/config.tests/gccdepends/* \
+    qmake/config.tests/libexecdir/* \
     qmake/mkspecs/modules/* \
     qmake/mkspecs/features/*.prf \
     qmake/mkspecs/features/*.pri \

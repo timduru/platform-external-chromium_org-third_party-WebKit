@@ -36,6 +36,7 @@
 #include "GraphicsContext3DPrivate.h"
 #include "ImageBuffer.h"
 #include "ImageData.h"
+#include "SkTypes.h"
 #include <public/Platform.h>
 #include <public/WebGraphicsContext3D.h>
 #include <wtf/text/CString.h>
@@ -76,6 +77,7 @@ PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attri
     webAttributes.noExtensions = attrs.noExtensions;
     webAttributes.shareResources = attrs.shareResources;
     webAttributes.preferDiscreteGPU = attrs.preferDiscreteGPU;
+    webAttributes.topDocumentURL = attrs.topDocumentURL.string();
 
     OwnPtr<WebKit::WebGraphicsContext3D> webContext = adoptPtr(WebKit::Platform::current()->createOffscreenGraphicsContext3D(webAttributes));
     if (!webContext)
@@ -528,8 +530,11 @@ PassRefPtr<ImageData> GraphicsContext3D::paintRenderingResultsToImageData(Drawin
 
     m_private->webContext()->readBackFramebuffer(pixels, bufferSize, framebufferId, width, height);
 
+#if (SK_R32_SHIFT == 16) && !SK_B32_SHIFT
+    // If the implementation swapped the red and blue channels, un-swap them.
     for (size_t i = 0; i < bufferSize; i += 4)
         std::swap(pixels[i], pixels[i + 2]);
+#endif
 
     return imageData.release();
 }

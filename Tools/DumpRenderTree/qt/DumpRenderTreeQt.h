@@ -41,27 +41,28 @@
 #endif
 
 #include "DumpRenderTreeSupportQt.h"
+#include "TestRunner.h"
 #include <qgraphicsview.h>
 #include <qgraphicswebview.h>
 #include <qwebframe.h>
 #include <qwebinspector.h>
 #include <qwebpage.h>
 #include <qwebview.h>
+#include <wtf/RefPtr.h>
 
 QT_BEGIN_NAMESPACE
 class QUrl;
 class QFile;
 QT_END_NAMESPACE
 
-class QWebFrame;
+class QWebFrameAdapter;
+class QWebPageAdapter;
 
-class TestRunner;
+class TestRunnerQt;
 class DumpRenderTreeSupportQt;
 class EventSender;
 class TextInputController;
 class GCController;
-
-namespace WebCore {
 
 class WebPage;
 class NetworkAccessManager;
@@ -72,6 +73,8 @@ Q_OBJECT
 public:
     DumpRenderTree();
     virtual ~DumpRenderTree();
+
+    static DumpRenderTree* instance();
 
     // Initialize in single-file mode.
     void open(const QUrl& url);
@@ -85,7 +88,7 @@ public:
     void closeRemainingWindows();
     void resetToConsistentStateBeforeTesting(const QUrl&);
 
-    TestRunner *testRunner() const { return m_controller; }
+    TestRunnerQt *testRunner() const { return m_controller; }
     EventSender *eventSender() const { return m_eventSender; }
     TextInputController *textInputController() const { return m_textInputController; }
     QString persistentStoragePath() const { return m_persistentStoragePath; }
@@ -97,6 +100,9 @@ public:
     void switchFocus(bool focused);
 
     WebPage *webPage() const { return m_page; }
+    QWebPageAdapter *pageAdapter() const;
+    QWebFrameAdapter *mainFrameAdapter() const;
+
     QList<WebPage*> getAllPages() const;
 
     void processArgsLine(const QStringList&);
@@ -139,7 +145,8 @@ private:
     QString dumpFramesAsText(QWebFrame* frame);
     QString dumpBackForwardList(QWebPage* page);
     QString dumpFrameScrollPosition(QWebFrame* frame);
-    TestRunner *m_controller;
+    TestRunnerQt *m_controller;
+    RefPtr<TestRunner> m_jscController;
 
     bool m_dumpPixelsForCurrentTest;
     bool m_dumpPixelsForAllTests;
@@ -151,7 +158,7 @@ private:
 
     EventSender *m_eventSender;
     TextInputController *m_textInputController;
-    GCController* m_gcController;
+    QScopedPointer<GCController> m_gcController;
     NetworkAccessManager* m_networkAccessManager;
 
     QFile *m_stdin;
@@ -200,8 +207,9 @@ public:
 
     void permissionSet(QWebPage::Feature feature);
 
+    virtual bool shouldInterruptJavaScript() { return false; }
+
 public Q_SLOTS:
-    bool shouldInterruptJavaScript() { return false; }
     void requestPermission(QWebFrame* frame, QWebPage::Feature feature);
     void cancelPermission(QWebFrame* frame, QWebPage::Feature feature);
 
@@ -229,7 +237,5 @@ public:
 private:
     QGraphicsWebView* m_item;
 };
-
-}
 
 #endif

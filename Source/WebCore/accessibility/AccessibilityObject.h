@@ -61,7 +61,7 @@ OBJC_CLASS WebAccessibilityObjectWrapper;
 
 typedef WebAccessibilityObjectWrapper AccessibilityObjectWrapper;
 
-#elif PLATFORM(GTK)
+#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
 typedef struct _AtkObject AtkObject;
 typedef struct _AtkObject AccessibilityObjectWrapper;
 #elif PLATFORM(CHROMIUM)
@@ -111,8 +111,9 @@ enum AccessibilityRole {
     ColumnRole,
     ColumnHeaderRole,
     ComboBoxRole,
-    DefinitionListTermRole,
-    DefinitionListDefinitionRole,
+    DefinitionRole,
+    DescriptionListTermRole,
+    DescriptionListDetailRole,
     DirectoryRole,
     DisclosureTriangleRole,
     DivRole,
@@ -151,6 +152,7 @@ enum AccessibilityRole {
     ListBoxOptionRole,
     ListItemRole,
     ListMarkerRole,
+    MathElementRole,
     MatteRole,
     MenuRole,
     MenuBarRole,
@@ -171,6 +173,7 @@ enum AccessibilityRole {
     RulerMarkerRole,
     ScrollAreaRole,
     ScrollBarRole,
+    SeamlessWebAreaRole,
     SheetRole,
     SliderRole,
     SliderThumbRole,
@@ -353,6 +356,15 @@ protected:
     
 public:
     virtual ~AccessibilityObject();
+
+    // After constructing an AccessibilityObject, it must be given a
+    // unique ID, then added to AXObjectCache, and finally init() must
+    // be called last.
+    void setAXObjectID(AXID axObjectID) { m_id = axObjectID; }
+    virtual void init() { }
+
+    // When the corresponding WebCore object that this AccessibilityObject
+    // wraps is deleted, it must be detached.
     virtual void detach();
     virtual bool isDetached() const;
 
@@ -376,7 +388,8 @@ public:
     virtual bool isPasswordField() const { return false; }
     virtual bool isNativeTextControl() const { return false; }
     virtual bool isSearchField() const { return false; }
-    virtual bool isWebArea() const { return false; }
+    bool isWebArea() const { return roleValue() == WebAreaRole; }
+    bool isSeamlessWebArea() const { return roleValue() == SeamlessWebAreaRole; }
     virtual bool isCheckbox() const { return roleValue() == CheckBoxRole; }
     virtual bool isRadioButton() const { return roleValue() == RadioButtonRole; }
     virtual bool isListBox() const { return roleValue() == ListBoxRole; }
@@ -406,10 +419,11 @@ public:
     virtual bool isMenuListPopup() const { return false; }
     virtual bool isMenuListOption() const { return false; }
     virtual bool isSpinButton() const { return roleValue() == SpinButtonRole; }
+    virtual bool isNativeSpinButton() const { return false; }
     virtual bool isSpinButtonPart() const { return false; }
     virtual bool isMockObject() const { return false; }
     virtual bool isMediaControlLabel() const { return false; }
-    bool isTextControl() const { return roleValue() == TextAreaRole || roleValue() == TextFieldRole; }
+    bool isTextControl() const;
     bool isARIATextControl() const;
     bool isTabList() const { return roleValue() == TabListRole; }
     bool isTabItem() const { return roleValue() == TabRole; }
@@ -423,8 +437,10 @@ public:
     bool isCheckboxOrRadio() const { return isCheckbox() || isRadioButton(); }
     bool isScrollView() const { return roleValue() == ScrollAreaRole; }
     bool isCanvas() const { return roleValue() == CanvasRole; }
+    bool isPopUpButton() const { return roleValue() == PopUpButtonRole; }
     bool isBlockquote() const;
     bool isLandmark() const;
+    bool isColorWell() const { return roleValue() == ColorWellRole; }
     
     virtual bool isChecked() const { return false; }
     virtual bool isEnabled() const { return false; }
@@ -470,8 +486,10 @@ public:
     
     virtual Node* node() const { return 0; }
     virtual RenderObject* renderer() const { return 0; }
-    virtual bool accessibilityIsIgnored() const  { return true; }
-
+    virtual bool accessibilityIsIgnored() const;
+    virtual AccessibilityObjectInclusion defaultObjectInclusion() const;
+    bool accessibilityIsIgnoredByDefault() const;
+    
     int blockquoteLevel() const;
     virtual int headingLevel() const { return 0; }
     virtual int tableLevel() const { return 0; }
@@ -499,6 +517,11 @@ public:
     AccessibilitySortDirection sortDirection() const;
     virtual bool canvasHasFallbackContent() const { return false; }
     bool supportsRangeValue() const;
+
+    bool supportsARIASetSize() const;
+    bool supportsARIAPosInSet() const;
+    int ariaSetSize() const;
+    int ariaPosInSet() const;
     
     // ARIA drag and drop
     virtual bool supportsARIADropping() const { return false; }
@@ -556,12 +579,14 @@ public:
     virtual String ariaDescribedByAttribute() const { return String(); }
     const AtomicString& placeholderValue() const;
 
+    // Only if isColorWell()
+    virtual void colorValue(int& r, int& g, int& b) const { r = 0; g = 0; b = 0; }
+
     void setRoleValue(AccessibilityRole role) { m_role = role; }
     virtual AccessibilityRole roleValue() const { return m_role; }
 
     virtual AXObjectCache* axObjectCache() const;
     AXID axObjectID() const { return m_id; }
-    void setAXObjectID(AXID axObjectID) { m_id = axObjectID; }
     
     static AccessibilityObject* anchorElementForNode(Node*);
     virtual Element* anchorElement() const { return 0; }
@@ -592,6 +617,7 @@ public:
     virtual FrameView* topDocumentFrameView() const { return 0; }
     virtual FrameView* documentFrameView() const;
     String language() const;
+    // 1-based, to match the aria-level spec.
     virtual unsigned hierarchicalLevel() const { return 0; }
     
     virtual void setFocused(bool) { }
@@ -730,14 +756,54 @@ public:
     // Scroll this object to a given point in global coordinates of the top-level window.
     virtual void scrollToGlobalPoint(const IntPoint&) const;
 
-    bool cachedIsIgnoredValue();
-    void setCachedIsIgnoredValue(bool);
+    bool lastKnownIsIgnoredValue();
+    void setLastKnownIsIgnoredValue(bool);
 
     // Fires a children changed notification on the parent if the isIgnored value changed.
     void notifyIfIgnoredValueChanged();
 
+    // All math elements return true for isMathElement().
+    virtual bool isMathElement() const { return false; }
+    virtual bool isMathFraction() const { return false; }
+    virtual bool isMathFenced() const { return false; }
+    virtual bool isMathSubscriptSuperscript() const { return false; }
+    virtual bool isMathRow() const { return false; }
+    virtual bool isMathUnderOver() const { return false; }
+    virtual bool isMathRoot() const { return false; }
+    virtual bool isMathSquareRoot() const { return false; }
+    virtual bool isMathText() const { return false; }
+    virtual bool isMathNumber() const { return false; }
+    virtual bool isMathOperator() const { return false; }
+    virtual bool isMathFenceOperator() const { return false; }
+    virtual bool isMathSeparatorOperator() const { return false; }
+    virtual bool isMathIdentifier() const { return false; }
+    virtual bool isMathTable() const { return false; }
+    virtual bool isMathTableRow() const { return false; }
+    virtual bool isMathTableCell() const { return false; }
+    
+    // Root components.
+    virtual AccessibilityObject* mathRadicandObject() { return 0; }
+    virtual AccessibilityObject* mathRootIndexObject() { return 0; }
+    
+    // Under over components.
+    virtual AccessibilityObject* mathUnderObject() { return 0; }
+    virtual AccessibilityObject* mathOverObject() { return 0; }
+
+    // Fraction components.
+    virtual AccessibilityObject* mathNumeratorObject() { return 0; }
+    virtual AccessibilityObject* mathDenominatorObject() { return 0; }
+
+    // Subscript/superscript components.
+    virtual AccessibilityObject* mathBaseObject() { return 0; }
+    virtual AccessibilityObject* mathSubscriptObject() { return 0; }
+    virtual AccessibilityObject* mathSuperscriptObject() { return 0; }
+    
+    // Fenced components.
+    virtual String mathFencedOpenString() const { return String(); }
+    virtual String mathFencedCloseString() const { return String(); }
+    
 #if HAVE(ACCESSIBILITY)
-#if PLATFORM(GTK)
+#if PLATFORM(GTK) || PLATFORM(EFL)
     AccessibilityObjectWrapper* wrapper() const;
     void setWrapper(AccessibilityObjectWrapper*);
 #elif !PLATFORM(CHROMIUM)
@@ -774,8 +840,10 @@ protected:
     AccessibilityChildrenVector m_children;
     mutable bool m_haveChildren;
     AccessibilityRole m_role;
-    AccessibilityObjectInclusion m_cachedIsIgnoredValue;
-    
+    AccessibilityObjectInclusion m_lastKnownIsIgnoredValue;
+
+    virtual bool computeAccessibilityIsIgnored() const { return true; }
+
     // If this object itself scrolls, return its ScrollableArea.
     virtual ScrollableArea* getScrollableAreaIfScrollable() const { return 0; }
     virtual void scrollTo(const IntPoint&) const { }
@@ -784,8 +852,9 @@ protected:
     static bool isAccessibilityTextSearchMatch(AccessibilityObject*, AccessibilitySearchCriteria*);
     static bool objectMatchesSearchCriteriaWithResultLimit(AccessibilityObject*, AccessibilitySearchCriteria*, AccessibilityChildrenVector&);
     virtual AccessibilityRole buttonRoleType() const;
-    
-#if PLATFORM(GTK)
+    bool ariaIsHidden() const;
+
+#if PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
     bool allowsTextRanges() const;
     unsigned getLengthForTextRange() const;
 #else
@@ -797,7 +866,7 @@ protected:
     RetainPtr<WebAccessibilityObjectWrapper> m_wrapper;
 #elif PLATFORM(WIN) && !OS(WINCE)
     COMPtr<AccessibilityObjectWrapper> m_wrapper;
-#elif PLATFORM(GTK)
+#elif PLATFORM(GTK) || (PLATFORM(EFL) && HAVE(ACCESSIBILITY))
     AtkObject* m_wrapper;
 #elif PLATFORM(CHROMIUM)
     bool m_detached;

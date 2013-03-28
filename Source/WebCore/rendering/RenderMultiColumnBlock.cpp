@@ -33,13 +33,21 @@ using namespace std;
 
 namespace WebCore {
 
-RenderMultiColumnBlock::RenderMultiColumnBlock(Node* node)
-    : RenderBlock(node)
+RenderMultiColumnBlock::RenderMultiColumnBlock(Element* element)
+    : RenderBlock(element)
     , m_flowThread(0)
     , m_columnCount(1)
     , m_columnWidth(0)
     , m_columnHeight(0)
+    , m_requiresBalancing(false)
 {
+}
+
+void RenderMultiColumnBlock::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle)
+{
+    RenderBlock::styleDidChange(diff, oldStyle);
+    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox())
+        child->setStyle(RenderStyle::createAnonymousStyleWithDisplay(style(), BLOCK));
 }
 
 void RenderMultiColumnBlock::computeColumnCountAndWidth()
@@ -83,16 +91,14 @@ void RenderMultiColumnBlock::checkForPaginationLogicalHeightChange(LayoutUnit& /
     // We don't actually update any of the variables. We just subclassed to adjust our column height.
     updateLogicalHeight();
     LayoutUnit newContentLogicalHeight = contentLogicalHeight();
-    if (newContentLogicalHeight > 0) {
+    m_requiresBalancing = !newContentLogicalHeight;
+    if (!m_requiresBalancing) {
         // The regions will be invalidated when we lay them out and they change size to
         // the new column height.
         if (columnHeight() != newContentLogicalHeight)
             setColumnHeight(newContentLogicalHeight);
     }
     setLogicalHeight(0);
-
-    // Set up our column sets.
-    ensureColumnSets();
 }
 
 bool RenderMultiColumnBlock::relayoutForPagination(bool, LayoutUnit, LayoutStateMaintainer&)
@@ -106,52 +112,55 @@ void RenderMultiColumnBlock::addChild(RenderObject* newChild, RenderObject* befo
     if (!m_flowThread) {
         m_flowThread = new (renderArena()) RenderMultiColumnFlowThread(document());
         m_flowThread->setStyle(RenderStyle::createAnonymousStyleWithDisplay(style(), BLOCK));
-        RenderBlock::addChild(m_flowThread); // Always put the flow thread at the end.
+        RenderBlock::addChild(m_flowThread);
     }
-
-    // Column sets are siblings of the flow thread. All children designed to be in the columns, however, are part
-    // of the flow thread itself.
-    if (newChild->isRenderMultiColumnSet())
-        RenderBlock::addChild(newChild, beforeChild);
-    else
-        m_flowThread->addChild(newChild, beforeChild);
+    m_flowThread->addChild(newChild, beforeChild);
 }
-
-void RenderMultiColumnBlock::ensureColumnSets()
+    
+RenderObject* RenderMultiColumnBlock::layoutSpecialExcludedChild(bool relayoutChildren)
 {
-    // This function ensures we have the correct column set information before we get into layout.
-    // For a simple multi-column layout in continuous media, only one column set child is required.
-    // Once a column is nested inside an enclosing pagination context, the number of column sets
-    // required becomes 2n-1, where n is the total number of nested pagination contexts. For example:
-    //
-    // Column layout with no enclosing pagination model = 2 * 1 - 1 = 1 column set.
-    // Columns inside pages = 2 * 2 - 1 = 3 column sets (bottom of first page, all the subsequent pages, then the last page).
-    // Columns inside columns inside pages = 2 * 3 - 1 = 5 column sets.
-    //
-    // In addition, column spans will force a column set to "split" into before/after sets around the spanning region.
-    //
-    // Finally, we will need to deal with columns inside regions. If regions have variable widths, then there will need
-    // to be unique column sets created inside any region whose width is different from its surrounding regions. This is
-    // actually pretty similar to the spanning case, in that we break up the column sets whenever the width varies.
-    //
-    // FIXME: For now just make one column set. This matches the old multi-column code.
-    // Right now our goal is just feature parity with the old multi-column code so that we can switch over to the
-    // new code as soon as possible.
-    if (flowThread() && !firstChild()->isRenderMultiColumnSet()) {
-        RenderMultiColumnSet* columnSet = new (renderArena()) RenderMultiColumnSet(document(), flowThread());
-        columnSet->setStyle(RenderStyle::createAnonymousStyleWithDisplay(style(), BLOCK));
-        RenderBlock::addChild(columnSet, firstChild());
+    if (!m_flowThread)
+        return 0;
+    
+    // Update the sizes of our regions (but not the placement) before we lay out the flow thread.
+    // FIXME: Eventually this is going to get way more complicated, and we will be destroying regions
+    // instead of trying to keep them around.
+    bool shouldInvalidateRegions = false;
+    for (RenderBox* childBox = firstChildBox(); childBox; childBox = childBox->nextSiblingBox()) {
+        if (childBox == m_flowThread)
+            continue;
+        
+        if (relayoutChildren || childBox->needsLayout()) {
+            childBox->updateLogicalWidth();
+            childBox->updateLogicalHeight();
+            shouldInvalidateRegions = true;
+        }
     }
+    
+    if (shouldInvalidateRegions)
+        m_flowThread->invalidateRegions();
+
+    if (relayoutChildren)
+        m_flowThread->setChildNeedsLayout(true, MarkOnlyThis);
+    
+    setLogicalTopForChild(m_flowThread, borderBefore() + paddingBefore());
+    m_flowThread->layoutIfNeeded();
+    determineLogicalLeftPositionForChild(m_flowThread);
+    
+    return m_flowThread;
 }
 
 const char* RenderMultiColumnBlock::renderName() const
-{    
+{
     if (isFloating())
         return "RenderMultiColumnBlock (floating)";
     if (isOutOfFlowPositioned())
         return "RenderMultiColumnBlock (positioned)";
     if (isAnonymousBlock())
         return "RenderMultiColumnBlock (anonymous)";
+    // FIXME: Temporary hack while the new generated content system is being implemented.
+    if (isPseudoElement())
+        return "RenderMultiColumnBlock (generated)";
     if (isAnonymous())
         return "RenderMultiColumnBlock (generated)";
     if (isRelPositioned())

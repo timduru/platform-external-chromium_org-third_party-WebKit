@@ -281,10 +281,12 @@ String KURL::baseAsString() const
 }
 
 // FIXME: Get rid of this function from KURL.
+#if PLATFORM(MAC) || PLATFORM(WIN)
 String KURL::fileSystemPath() const
 {
     return string();
 }
+#endif
 
 bool KURL::protocolIs(const char* testProtocol) const
 {
@@ -408,11 +410,11 @@ void KURL::print() const
         m_urlImpl->m_parsedURL.print();
     else {
         if (isNull())
-            dataLog("Null KURL");
+            dataLogF("Null KURL");
         else if (isEmpty())
-            dataLog("Empty KURL");
+            dataLogF("Empty KURL");
         else {
-            dataLog("Invalid KURL from string =");
+            dataLogF("Invalid KURL from string =");
             m_urlImpl->m_invalidUrlString.show();
         }
     }

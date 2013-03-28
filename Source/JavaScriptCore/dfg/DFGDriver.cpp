@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011, 2012 Apple Inc. All rights reserved.
+ * Copyright (C) 2011, 2012, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -33,17 +33,23 @@
 #if ENABLE(DFG_JIT)
 
 #include "DFGArgumentsSimplificationPhase.h"
+#include "DFGBackwardsPropagationPhase.h"
 #include "DFGByteCodeParser.h"
 #include "DFGCFAPhase.h"
 #include "DFGCFGSimplificationPhase.h"
+#include "DFGCPSRethreadingPhase.h"
 #include "DFGCSEPhase.h"
 #include "DFGConstantFoldingPhase.h"
+#include "DFGDCEPhase.h"
 #include "DFGFixupPhase.h"
 #include "DFGJITCompiler.h"
+#include "DFGPredictionInjectionPhase.h"
 #include "DFGPredictionPropagationPhase.h"
 #include "DFGStructureCheckHoistingPhase.h"
+#include "DFGUnificationPhase.h"
 #include "DFGValidate.h"
 #include "DFGVirtualRegisterAllocationPhase.h"
+#include "Operations.h"
 #include "Options.h"
 
 namespace JSC { namespace DFG {
@@ -71,9 +77,8 @@ inline bool compile(CompileMode compileMode, ExecState* exec, CodeBlock* codeBlo
     if (!Options::useDFGJIT())
         return false;
     
-#if DFG_ENABLE(DEBUG_VERBOSE)
-    dataLog("DFG compiling code block %p(%p) for executable %p, number of instructions = %u.\n", codeBlock, codeBlock->alternative(), codeBlock->ownerExecutable(), codeBlock->instructionCount());
-#endif
+    if (logCompilationChanges())
+        dataLog("DFG compiling ", *codeBlock, ", number of instructions = ", codeBlock->instructionCount(), "\n");
     
     // Derive our set of must-handle values. The compilation must be at least conservative
     // enough to allow for OSR entry with these values.
@@ -102,50 +107,51 @@ inline bool compile(CompileMode compileMode, ExecState* exec, CodeBlock* codeBlo
     if (!parse(exec, dfg))
         return false;
     
-    if (compileMode == CompileFunction)
-        dfg.predictArgumentTypes();
-    
     // By this point the DFG bytecode parser will have potentially mutated various tables
     // in the CodeBlock. This is a good time to perform an early shrink, which is more
     // powerful than a late one. It's safe to do so because we haven't generated any code
     // that references any of the tables directly, yet.
     codeBlock->shrinkToFit(CodeBlock::EarlyShrink);
 
-    validate(dfg);
+    if (validationEnabled())
+        validate(dfg);
+    
+    performCPSRethreading(dfg);
+    performUnification(dfg);
+    performPredictionInjection(dfg);
+    
+    if (validationEnabled())
+        validate(dfg);
+    
+    performBackwardsPropagation(dfg);
     performPredictionPropagation(dfg);
     performFixup(dfg);
     performStructureCheckHoisting(dfg);
-    unsigned cnt = 1;
+    
     dfg.m_fixpointState = FixpointNotConverged;
-    for (;; ++cnt) {
-#if DFG_ENABLE(DEBUG_VERBOSE)
-        dataLog("DFG beginning optimization fixpoint iteration #%u.\n", cnt);
-#endif
-        bool changed = false;
-        performCFA(dfg);
-        changed |= performConstantFolding(dfg);
-        changed |= performArgumentsSimplification(dfg);
-        changed |= performCFGSimplification(dfg);
-        changed |= performCSE(dfg);
-        if (!changed)
-            break;
-        dfg.resetExitStates();
-        performFixup(dfg);
-    }
-    dfg.m_fixpointState = FixpointConverged;
+
     performCSE(dfg);
-#if DFG_ENABLE(DEBUG_VERBOSE)
-    dataLog("DFG optimization fixpoint converged in %u iterations.\n", cnt);
-#endif
+    performArgumentsSimplification(dfg);
+    performCPSRethreading(dfg); // This should usually be a no-op since CSE rarely dethreads, and arguments simplification rarely does anything.
+    performCFA(dfg);
+    performConstantFolding(dfg);
+    performCFGSimplification(dfg);
+
+    dfg.m_fixpointState = FixpointConverged;
+
+    performStoreElimination(dfg);
+    performCPSRethreading(dfg);
+    performDCE(dfg);
     performVirtualRegisterAllocation(dfg);
 
     GraphDumpMode modeForFinalValidate = DumpGraph;
-#if DFG_ENABLE(DEBUG_VERBOSE)
-    dataLog("Graph after optimization:\n");
-    dfg.dump();
-    modeForFinalValidate = DontDumpGraph;
-#endif
-    validate(dfg, modeForFinalValidate);
+    if (verboseCompilationEnabled()) {
+        dataLogF("Graph after optimization:\n");
+        dfg.dump();
+        modeForFinalValidate = DontDumpGraph;
+    }
+    if (validationEnabled())
+        validate(dfg, modeForFinalValidate);
     
     JITCompiler dataFlowJIT(dfg);
     bool result;

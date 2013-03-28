@@ -37,7 +37,7 @@
 #include <WebCore/Region.h>
 
 #if USE(COORDINATED_GRAPHICS)
-#include "LayerTreeCoordinatorProxy.h"
+#include "CoordinatedLayerTreeHostProxy.h"
 #endif
 
 using namespace WebCore;
@@ -61,7 +61,7 @@ DrawingAreaProxyImpl::DrawingAreaProxyImpl(WebPageProxy* webPageProxy)
 #if USE(COORDINATED_GRAPHICS)
     // Construct the proxy early to allow messages to be sent to the web process while AC is entered there.
     if (webPageProxy->pageGroup()->preferences()->forceCompositingMode())
-        m_layerTreeCoordinatorProxy = adoptPtr(new LayerTreeCoordinatorProxy(this));
+        m_coordinatedLayerTreeHostProxy = adoptPtr(new CoordinatedLayerTreeHostProxy(this));
 #endif
 }
 
@@ -280,10 +280,14 @@ void DrawingAreaProxyImpl::incorporateUpdate(const UpdateInfo& updateInfo)
 
     if (shouldScroll)
         m_webPageProxy->scrollView(updateInfo.scrollRect, updateInfo.scrollOffset);
-
-    for (size_t i = 0; i < updateInfo.updateRects.size(); ++i)
-        m_webPageProxy->setViewNeedsDisplay(updateInfo.updateRects[i]);
-
+    
+    if (shouldScroll && !m_webPageProxy->canScrollView())
+        m_webPageProxy->setViewNeedsDisplay(IntRect(IntPoint(), m_webPageProxy->viewSize()));
+    else {
+        for (size_t i = 0; i < updateInfo.updateRects.size(); ++i)
+            m_webPageProxy->setViewNeedsDisplay(updateInfo.updateRects[i]);
+    }
+    
     if (WebPageProxy::debugPaintFlags() & kWKDebugFlashBackingStoreUpdates)
         m_webPageProxy->flashBackingStoreUpdates(updateInfo.updateRects);
 
@@ -360,24 +364,17 @@ void DrawingAreaProxyImpl::enterAcceleratedCompositingMode(const LayerTreeContex
     m_layerTreeContext = layerTreeContext;
     m_webPageProxy->enterAcceleratedCompositingMode(layerTreeContext);
 #if USE(COORDINATED_GRAPHICS)
-    if (!m_layerTreeCoordinatorProxy)
-        m_layerTreeCoordinatorProxy = adoptPtr(new LayerTreeCoordinatorProxy(this));
+    if (!m_coordinatedLayerTreeHostProxy)
+        m_coordinatedLayerTreeHostProxy = adoptPtr(new CoordinatedLayerTreeHostProxy(this));
 #endif
 }
 
 #if USE(COORDINATED_GRAPHICS)
-void DrawingAreaProxyImpl::didReceiveLayerTreeCoordinatorProxyMessage(CoreIPC::Connection* connection, CoreIPC::MessageID messageID, CoreIPC::MessageDecoder& decoder)
+void DrawingAreaProxyImpl::setVisibleContentsRect(const WebCore::FloatRect& visibleContentsRect, const WebCore::FloatPoint& trajectoryVector)
 {
-    if (m_layerTreeCoordinatorProxy)
-        m_layerTreeCoordinatorProxy->didReceiveLayerTreeCoordinatorProxyMessage(connection, messageID, decoder);
+    if (m_coordinatedLayerTreeHostProxy)
+        m_coordinatedLayerTreeHostProxy->setVisibleContentsRect(visibleContentsRect, trajectoryVector);
 }
-
-void DrawingAreaProxyImpl::setVisibleContentsRect(const WebCore::FloatRect& visibleContentsRect, float scale, const WebCore::FloatPoint& trajectoryVector)
-{
-    if (m_layerTreeCoordinatorProxy)
-        m_layerTreeCoordinatorProxy->setVisibleContentsRect(visibleContentsRect, scale, trajectoryVector);
-}
-
 #endif
 
 void DrawingAreaProxyImpl::exitAcceleratedCompositingMode()

@@ -1,3 +1,503 @@
+2013-03-25  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r146816, r146821, and r146830.
+        http://trac.webkit.org/changeset/146816
+        http://trac.webkit.org/changeset/146821
+        http://trac.webkit.org/changeset/146830
+        https://bugs.webkit.org/show_bug.cgi?id=113262
+
+        Broke all the Windows tests (Requested by rfong on #webkit).
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2013-03-25  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Also enable CSS_REGIONS and EXCLUSIONS for VS2010 solution.
+
+        * win/tools/vsprops/FeatureDefines.props:
+
+2013-03-25  Roger Fong  <roger_fong@apple.com>
+
+        Enable CSS_REGIONS and CSS_EXCLUSIONS.
+        https://bugs.webkit.org/show_bug.cgi?id=87519
+
+        Reviewed by Timothy Horton.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2013-03-21  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Move common props files for VS2010 solution to WebKitLibraries folder and update all projects accordingly.
+
+        * win/tools/vsprops/FeatureDefines.props: Copied from ../Source/WebKit/WebKit.vcxproj/FeatureDefines.props.
+        * win/tools/vsprops/FeatureDefinesCairo.props: Copied from ../Source/WebKit/WebKit.vcxproj/FeatureDefinesCairo.props.
+        * win/tools/vsprops/WinCairo.props: Copied from ../Source/WebKit/WebKit.vcxproj/WinCairo.props.
+        * win/tools/vsprops/cURL.props: Copied from ../Source/WebKit/WebKit.vcxproj/WebKit/cURL.props.
+        * win/tools/vsprops/common.props: Copied from ../Source/WebKit/WebKit.vcxproj/common.props.
+        * win/tools/vsprops/debug.props: Copied from ../Source/WebKit/WebKit.vcxproj/debug.props.
+        * win/tools/vsprops/debug_wincairo.props: Copied from ../Source/WebKit/WebKit.vcxproj/debug_wincairo.props.
+        * win/tools/vsprops/debugsuffix.props: Copied from ../Source/WebKit/WebKit.vcxproj/debugsuffix.props.
+        * win/tools/vsprops/production.props: Copied from ../Source/WebKit/WebKit.vcxproj/production.props.
+        * win/tools/vsprops/release.props: Copied from ../Source/WebKit/WebKit.vcxproj/release.props.
+
+2013-03-19  Brent Fulgham  <bfulgham@webkit.org>
+
+        [WinCairo] Unreviewed build fix.
+
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops: This file was out
+        of sync with the main Windows build, and the VS2010 version of the
+        WinCairo port, preventing consistent builds.
+
+2013-03-13  Ryosuke Niwa  <rniwa@webkit.org>
+
+        Threaded HTML Parser is missing feature define flags in all but Chromium port's build files
+        https://bugs.webkit.org/show_bug.cgi?id=112277
+
+        Reviewed by Adam Barth.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2013-03-06  Jer Noble  <jer.noble@apple.com>
+
+        Unreviewed roll-out of r145011.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2013-03-06  Jer Noble  <jer.noble@apple.com>
+
+        Unreviewed build fix.  Add ENABLE_CURSOR_VISIBILITY to the list of FEATURE_DEFINES for
+        (non-Cairo) Windows builds.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2013-03-05  Kiran Muppala  <cmuppala@apple.com>
+
+        Remove deprecated process suppression assertion SPI from WebKitSystemInterface
+        https://bugs.webkit.org/show_bug.cgi?id=111501
+
+        Reviewed by Alexey Proskuryakov.
+
+        https://bugs.webkit.org/show_bug.cgi?id=111387 replaced all usage of
+        WKNSProcessInfoProcessAssertionWithTypes() with
+        -[NSProcessInfo beginSuspensionOfSystemBehaviors:].  Hence, remove
+        the now deprecated SPI.
+
+        * WebKitSystemInterface.h: Remove
+        WKNSProcessInfoProcessAssertionWithTypes and associated declarations.
+
+2013-03-05  Kiran Muppala  <cmuppala@apple.com>
+
+        Use new assertion API for process suppression on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=111387
+
+        Reviewed by Alexey Proskuryakov.
+
+        Add WKProcessSuppressionSystemBehaviors constant for use in WebKit2 to
+        take a process suppression assertion.
+
+        * WebKitSystemInterface.h:
+
+2013-03-05  Jeffrey Pfau  <jpfau@apple.com>
+
+        Clear associated cache partitions when deleting origins' cache
+        https://bugs.webkit.org/show_bug.cgi?id=111383
+
+        Reviewed by Maciej Stachowiak.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+2013-03-04  Kunihiko Sakamoto  <ksakamoto@chromium.org>
+
+        Add build flag for FontLoader
+        https://bugs.webkit.org/show_bug.cgi?id=111289
+
+        Reviewed by Benjamin Poulain.
+
+        Add ENABLE_FONT_LOAD_EVENTS build flag (disabled by default).
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2013-02-27  Glenn Adams  <glenn@skynav.com>
+
+        Add ENABLE_CSS3_TEXT_LINE_BREAK flag.
+        https://bugs.webkit.org/show_bug.cgi?id=110944
+
+        Reviewed by Dean Jackson.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2013-02-21  Jeffrey Pfau  <jpfau@apple.com>
+
+        Optionally partition cache to prevent using cache for tracking
+        https://bugs.webkit.org/show_bug.cgi?id=110269
+
+        Reviewed by Maciej Stachowiak.
+
+        Update WKSI bindings.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+2013-02-22  Aaron Colwell  <acolwell@chromium.org>
+
+        Disable MediaSource on Apple Windows port
+        https://bugs.webkit.org/show_bug.cgi?id=110494
+
+        Reviewed by Tim Horton.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2013-02-22  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. Make WinTools.make stop copying vsprops into nested vsprops folders.
+
+        * win/tools/WinTools.make:
+
+2013-02-14  Anders Carlsson  <andersca@apple.com>
+
+        Add WKContextIsPlugInUpdateAvailable
+        https://bugs.webkit.org/show_bug.cgi?id=109862
+        <rdar://problem/13173140>
+
+        Reviewed by Sam Weinig.
+
+        Roll WebKitSystemInterface DEPS.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+2013-02-13  Roger Fong  <roger_fong@apple.com>
+
+        Move all .props files from WebKitLibraries folder to WebKit Source folder.
+        https://bugs.webkit.org/show_bug.cgi?id=109761
+
+        Reviewed by Brent Fulgham.
+
+        * win/tools/vsprops/FeatureDefines.props: Removed.
+        * win/tools/vsprops/common.props: Removed.
+        * win/tools/vsprops/debug.props: Removed.
+        * win/tools/vsprops/release.props: Removed.
+        * win/tools/vsprops/releaseproduction.props: Removed.
+
+2013-02-07  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. More VS2010 WebKit solution touchups.
+        Move an ignored warning from a project to common properties.
+
+        * win/tools/vsprops/common.props:
+
+2013-02-06  Mike West  <mkwst@chromium.org>
+
+        Add an ENABLE_NOSNIFF feature flag.
+        https://bugs.webkit.org/show_bug.cgi?id=109029
+
+        Reviewed by Jochen Eisinger.
+
+        This new flag will control the behavior of 'X-Content-Type-Options: nosniff'
+        when processing script and other resource types.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2013-02-01  Alexis Menard  <alexis@webkit.org>
+
+        Enable unprefixed CSS transitions by default.
+        https://bugs.webkit.org/show_bug.cgi?id=108216
+
+        Reviewed by Dean Jackson.
+
+        Rename the flag CSS_TRANSFORMS_ANIMATIONS_TRANSITIONS_UNPREFIXED
+        to CSS_TRANSFORMS_ANIMATIONS_UNPREFIXED which will be used later to 
+        guard the unprefixing work for CSS Transforms and animations.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2013-01-30  Alexey Proskuryakov  <ap@apple.com>
+
+        Update WebKitSystemInterface for <rdar://problem/13111288>.
+
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+        * WebKitSystemInterface.h: Removed WKEnterPluginSandbox, which has been unused now.
+
+2013-01-28  Kiran Muppala  <cmuppala@apple.com>
+
+        Add window occlusion criteria to determine page visibility on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=107494
+
+        Reviewed by Simon Fraser.
+
+        Add enum constants to specify window occlusion notification type to
+        notification registration/unregistration methods.  Add typedef for
+        window ID data passed to the window occlusion notification handler.
+        Add method to enable occlusion notifications for a particular window.
+
+        * WebKitSystemInterface.h: Add
+        WKOcclusionNotificationTypeWindowBecameVisible,
+        WKOcclusionNotificationTypeWindowBecameOccluded,
+        WKWindowID,
+        WKEnableWindowOcclusionNotifications().
+
+2013-01-25  Andy Estes  <aestes@apple.com>
+
+        Update WKSI header and libraries after r140875.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+2013-01-24  Brent Fulgham  <bfulgham@webkit.org>
+
+        Get WTF compiling in VS2010 (32bit)
+        https://bugs.webkit.org/show_bug.cgi?id=106986
+
+        Reviewed by Tim Horton.
+
+        If you do not have Cygwin in the overall operating system
+        PATH, the project will not build.  In VS2005 we had logic
+        in the build system to guard against this.  We should
+        retain this in the VS2010 work.
+
+        Furthermore, VS2010 has a nasty bug where to Visual Studio
+        tools path is not defined when performing a 'clean' phase
+        on an NMAKE-based build.  This is corrected here as well.
+
+        * win/tools/vsprops/common.props: Revise environment setup
+        to ensure proper tools are in path during build.
+
+2013-01-19  Roger Fong  <roger_fong@apple.com>
+
+        Add WebKitLibraries property sheets for compiling WebKit in VS2010.
+        https://bugs.webkit.org/show_bug.cgi?id=106949
+
+        Reviewed by Brent Fulgham.
+
+        * win/tools/vsprops/FeatureDefines.props: Added.
+        * win/tools/vsprops/common.props: Added.
+        * win/tools/vsprops/debug.props: Added.
+        * win/tools/vsprops/release.props: Added.
+        * win/tools/vsprops/releaseproduction.props: Added.
+
+2013-01-21  Dirk Schulze  <dschulze@adobe.com>
+
+        Add build flag for Canvas's Path object (disabled by default)
+        https://bugs.webkit.org/show_bug.cgi?id=107473
+
+        Reviewed by Dean Jackson.
+
+        Add CANVAS_PATH build flag to build systems.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2013-01-10  Roger Fong  <roger_fong@apple.com>
+
+        Update WebkitSystemInterface lib for Windows port.
+        This hasn't been done in a while and the current one is out of date.
+        In addition I believe it will fix:
+        <rdar://problem/12990844>
+
+        Rubberstamped by Timothy Horton.
+
+        * win/lib/WebKitSystemInterface.lib:
+
+2013-01-08  Kiran Muppala  <cmuppala@apple.com>
+
+        Add WebKitSystemInterface needed for overriding system proxies on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=106410
+
+        Reviewed by Stephanie Lewis.
+
+        This patch is in anticipation of the fix for https://bugs.webkit.org/show_bug.cgi?id=104197,
+        Add user defaults to override system proxy settings for NetworkProcess on Mac, which
+        is awaiting the approval of a WebKit2 committer.  Commiting the WKSI portion separately,
+        so that the internal repository commit for generating the WKSI libraries does not have to
+        be rolled back every time the rest of the patch changes.
+
+        Add WKCFNetworkSetOverrideSystemProxySettings(), needed by NetworkProcess to set
+        custom proxies during initialization.
+
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+2013-01-04  Adam Klein  <adamk@chromium.org>
+
+        Remove ENABLE_MUTATION_OBSERVERS #define
+        https://bugs.webkit.org/show_bug.cgi?id=105459
+
+        Reviewed by Ryosuke Niwa.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2013-01-01  Dan Bernstein  <mitz@apple.com>
+
+        <rdar://problem/12942239> Update copyright strings
+
+        Reviewed by Sam Weinig.
+
+        * win/tools/scripts/COPYRIGHT-END-YEAR:
+
+2012-12-28  Mark Rowe  <mrowe@apple.com>
+
+        Move logic for extracting the OS X marketing version in to WebCore
+        <http://webkit.org/b/105841> / <rdar://problem/10736041>
+
+        Reviewed by Dan Bernstein.
+
+        * WebKitSystemInterface.h:
+
+2012-12-19  Kiran Muppala  <cmuppala@apple.com>
+
+        Adopt new assertion SPI for process suppression on Mac
+        https://bugs.webkit.org/show_bug.cgi?id=105378
+
+        Reviewed by Mark Rowe.
+
+        Add WKNSProcessInfoProcessAssertionWithTypes().
+
+        * WebKitSystemInterface.h:
+
+2012-12-19  Alexis Menard  <alexis@webkit.org>
+
+        Implement CSS parsing for CSS transitions unprefixed.
+        https://bugs.webkit.org/show_bug.cgi?id=104804
+
+        Reviewed by Dean Jackson.
+
+        Add a new flag ENABLE_CSS_TRANSFORMS_ANIMATIONS_TRANSITIONS_UNPREFIXED
+        to cover the work of unprefixing Transforms, Animations and 
+        Transitions. It will let the possibility of each ports to turn it off 
+        in their release branches until we're confident that these CSS 
+        properties are ready to be unprefixed.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-12-12  Roger Fong  <roger_fong@apple.com>
+
+        Enable VIDEO_TRACK on Windows.
+        https://bugs.webkit.org/show_bug.cgi?id=104706.
+
+        Reviewed by Timothy Horton.
+
+        Enable VIDEO_TRACK on Windows and update project property files.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2012-12-12  Sheriff Bot  <webkit.review.bot@gmail.com>
+
+        Unreviewed, rolling out r137491.
+        http://trac.webkit.org/changeset/137491
+        https://bugs.webkit.org/show_bug.cgi?id=104828
+
+        broke the builtd (Requested by rfong on #webkit).
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2012-12-11  Roger Fong  <roger_fong@apple.com>
+
+        Enable VIDEO_TRACK on Windows.
+        https://bugs.webkit.org/show_bug.cgi?id=104706.
+
+        Reviewed by Timothy Horton.
+
+        Enable VIDEO_TRACK on Windows and update project property files.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2012-12-10  Alexis Menard  <alexis@webkit.org>
+
+        [CSS3 Backgrounds and Borders] Remove CSS3_BACKGROUND feature flag.
+        https://bugs.webkit.org/show_bug.cgi?id=104539
+
+        Reviewed by Antonio Gomes.
+
+        As discussed on webkit-dev it is not needed to keep this feature flag 
+        as support for <position> type is a small feature that is already 
+        implemented by three other UAs. It was useful while landing this 
+        feature as partial bits were landed one after one.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-12-06  Rick Byers  <rbyers@chromium.org>
+
+        CSS cursor property should support webkit-image-set
+        https://bugs.webkit.org/show_bug.cgi?id=99493
+
+        Reviewed by Beth Dakin.
+
+        Add ENABLE_MOUSE_CURSOR_SCALE - disabled by default
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-11-26  Roger Fong  <roger_fong@apple.com>
+
+        Unreviewed. ENABLE_ACCELERATED_OVERFLOW_SCROLLING not enabled on Windows.
+        Add a feature flag and skip some failing tests.
+        https://bugs.webkit.org/show_bug.cgi?id=103294
+
+        Tests skipped:
+        compositing/overflow/scrolling-without-painting.html
+        compositing/overflow/updating-scrolling-content.html
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+
+2012-11-23  Alexis Menard  <alexis@webkit.org>
+
+        [CSS3 Backgrounds and Borders] Implement new CSS3 background-position parsing.
+        https://bugs.webkit.org/show_bug.cgi?id=102104
+
+        Reviewed by Julien Chaffraix.
+
+        Protect the new feature behind a feature flag.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-11-19  Kihong Kwon  <kihong.kwon@samsung.com>
+
+        Add PROXIMITY_EVENTS feature
+        https://bugs.webkit.org/show_bug.cgi?id=102658
+
+        Reviewed by Kentaro Hara.
+
+        Add PROXIMITY_EVENTS feature to win and win-cairo prot.
+
+        * win/tools/vsprops/FeatureDefines.vsprops:
+        * win/tools/vsprops/FeatureDefinesCairo.vsprops:
+
+2012-11-12  Beth Dakin  <bdakin@apple.com>
+
+        Build fix. Forgot these bits last time.
+
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
+2012-11-12  Beth Dakin  <bdakin@apple.com>
+
+        Zoomed-in scrolling is very slow when deviceScaleFactor > 1
+        https://bugs.webkit.org/show_bug.cgi?id=101787
+
+        Reviewed by Simon Fraser.
+
+        wkSetCGFontRenderingMode now takes a BOOL parameter.
+        * WebKitSystemInterface.h:
+        * libWebKitSystemInterfaceLion.a:
+        * libWebKitSystemInterfaceMountainLion.a:
+
 2012-11-08  Anders Carlsson  <andersca@apple.com>
 
         Roll WebKitSystemInterface DEPS.

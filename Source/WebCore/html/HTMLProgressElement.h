@@ -36,8 +36,6 @@ public:
 
     static PassRefPtr<HTMLProgressElement> create(const QualifiedName&, Document*);
 
-    bool hasAuthorShadowRoot() const { return m_hasAuthorShadowRoot; }
-
     double value() const;
     void setValue(double, ExceptionCode&);
 
@@ -54,26 +52,22 @@ private:
     HTMLProgressElement(const QualifiedName&, Document*);
     virtual ~HTMLProgressElement();
 
-    virtual void willAddAuthorShadowRoot() OVERRIDE;
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
     virtual bool supportLabels() const OVERRIDE { return true; }
-
-    virtual bool supportsFocus() const;
 
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
     RenderProgress* renderProgress() const;
 
-    virtual void parseAttribute(const Attribute&) OVERRIDE;
+    virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
     virtual void attach();
 
     void didElementStateChange();
-    void createShadowSubtree();
+    virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
 
     ProgressValueElement* m_value;
-    bool m_hasAuthorShadowRoot;
 };
 
 inline bool isHTMLProgressElement(Node* node)
@@ -84,7 +78,7 @@ inline bool isHTMLProgressElement(Node* node)
 
 inline HTMLProgressElement* toHTMLProgressElement(Node* node)
 {
-    ASSERT(!node || isHTMLProgressElement(node));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLProgressElement(node));
     return static_cast<HTMLProgressElement*>(node);
 }
 

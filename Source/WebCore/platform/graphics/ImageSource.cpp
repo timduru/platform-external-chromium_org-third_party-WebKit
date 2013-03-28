@@ -121,9 +121,9 @@ IntSize ImageSource::frameSizeAtIndex(size_t index, RespectImageOrientationEnum 
     return size;
 }
 
-bool ImageSource::getHotSpot(IntPoint&) const
+bool ImageSource::getHotSpot(IntPoint& hotSpot) const
 {
-    return false;
+    return m_decoder ? m_decoder->hotSpot(hotSpot) : false;
 }
 
 size_t ImageSource::bytesDecodedToDetermineProperties() const
@@ -210,7 +210,7 @@ unsigned ImageSource::frameBytesAtIndex(size_t index) const
 void ImageSource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Image);
-    info.addMember(m_decoder);
+    info.addMember(m_decoder, "decoder");
 }
 
 }

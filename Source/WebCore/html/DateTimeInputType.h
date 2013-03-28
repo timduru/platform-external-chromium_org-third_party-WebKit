@@ -31,10 +31,9 @@
 #ifndef DateTimeInputType_h
 #define DateTimeInputType_h
 
-#include "BaseDateAndTimeInputType.h"
-
 #if ENABLE(INPUT_TYPE_DATETIME)
 #include "BaseChooserOnlyDateAndTimeInputType.h"
+#include "BaseDateAndTimeInputType.h"
 #include "BaseMultipleFieldsDateAndTimeInputType.h"
 
 namespace WebCore {
@@ -51,6 +50,7 @@ public:
 
 private:
     DateTimeInputType(HTMLInputElement* element) : BaseDateTimeInputType(element) { }
+    virtual void attach() OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual DateComponents::Type dateType() const OVERRIDE;
     virtual StepRange createStepRange(AnyStepHandling) const OVERRIDE;
@@ -64,6 +64,7 @@ private:
     // BaseMultipleFieldsDateAndTimeInputType functions
     virtual String formatDateTimeFieldsState(const DateTimeFieldsState&) const OVERRIDE FINAL;
     virtual void setupLayoutParameters(DateTimeEditElement::LayoutParameters&, const DateComponents&) const OVERRIDE FINAL;
+    virtual bool isValidFormat(bool hasYear, bool hasMonth, bool hasWeek, bool hasDay, bool hasAMPM, bool hasHour, bool hasMinute, bool hasSecond) const;
 #endif
 };
 

@@ -43,7 +43,6 @@
 #include "Node.h"
 #include "PlatformKeyboardEvent.h"
 #include "RenderStyle.h"
-#include "UserGestureIndicator.h"
 #include "WebDocument.h"
 #include "WebNode.h"
 #include <public/WebPoint.h>
@@ -83,6 +82,16 @@ bool WebAccessibilityObject::accessibilityEnabled()
     return AXObjectCache::accessibilityEnabled();
 }
 
+void WebAccessibilityObject::startCachingComputedObjectAttributesUntilTreeMutates()
+{
+    m_private->axObjectCache()->startCachingComputedObjectAttributesUntilTreeMutates();
+}
+
+void WebAccessibilityObject::stopCachingComputedObjectAttributes()
+{
+    m_private->axObjectCache()->stopCachingComputedObjectAttributes();
+}
+
 bool WebAccessibilityObject::isDetached() const
 {
     if (m_private.isNull())
@@ -120,6 +129,30 @@ WebString WebAccessibilityObject::actionVerb() const
         return WebString();
 
     return m_private->actionVerb();
+}
+
+bool WebAccessibilityObject::canDecrement() const
+{
+    if (isDetached())
+        return false;
+
+    return m_private->isSlider();
+}
+
+bool WebAccessibilityObject::canIncrement() const
+{
+    if (isDetached())
+        return false;
+
+    return m_private->isSlider();
+}
+
+bool WebAccessibilityObject::canPress() const
+{
+    if (isDetached())
+        return false;
+
+    return m_private->actionElement() || m_private->isButton() || m_private->isMenuRelated();
 }
 
 bool WebAccessibilityObject::canSetFocusAttribute() const
@@ -467,6 +500,22 @@ bool WebAccessibilityObject::canvasHasFallbackContent() const
     return m_private->canvasHasFallbackContent();
 }
 
+WebPoint WebAccessibilityObject::clickPoint() const
+{
+    if (isDetached())
+        return WebPoint();
+
+    return WebPoint(m_private->clickPoint());
+}
+
+void WebAccessibilityObject::colorValue(int& r, int& g, int& b) const
+{
+    if (isDetached())
+        return;
+
+    m_private->colorValue(r, g, b);
+}
+
 double WebAccessibilityObject::estimatedLoadingProgress() const
 {
     if (isDetached())
@@ -551,9 +600,39 @@ bool WebAccessibilityObject::performDefaultAction() const
     if (isDetached())
         return false;
 
-    UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
-
     return m_private->performDefaultAction();
+}
+
+bool WebAccessibilityObject::increment() const
+{
+    if (isDetached())
+        return false;
+
+    if (canIncrement()) {
+        m_private->increment();
+        return true;
+    }
+    return false;
+}
+
+bool WebAccessibilityObject::decrement() const
+{
+    if (isDetached())
+        return false;
+
+    if (canDecrement()) {
+        m_private->decrement();
+        return true;
+    }
+    return false;
+}
+
+bool WebAccessibilityObject::press() const
+{
+    if (isDetached())
+        return false;
+
+    return m_private->press();
 }
 
 WebAccessibilityRole WebAccessibilityObject::roleValue() const
@@ -637,6 +716,9 @@ WebString WebAccessibilityObject::title() const
 WebAccessibilityObject WebAccessibilityObject::titleUIElement() const
 {
     if (isDetached())
+        return WebAccessibilityObject();
+
+    if (!m_private->exposesTitleUIElement())
         return WebAccessibilityObject();
 
     return WebAccessibilityObject(m_private->titleUIElement());
@@ -817,7 +899,7 @@ unsigned WebAccessibilityObject::cellColumnIndex() const
     if (!m_private->isTableCell())
        return 0;
 
-    pair<int, int> columnRange;
+    pair<unsigned, unsigned> columnRange;
     static_cast<WebCore::AccessibilityTableCell*>(m_private.get())->columnIndexRange(columnRange);
     return columnRange.first;
 }
@@ -830,7 +912,7 @@ unsigned WebAccessibilityObject::cellColumnSpan() const
     if (!m_private->isTableCell())
        return 0;
 
-    pair<int, int> columnRange;
+    pair<unsigned, unsigned> columnRange;
     static_cast<WebCore::AccessibilityTableCell*>(m_private.get())->columnIndexRange(columnRange);
     return columnRange.second;
 }
@@ -843,7 +925,7 @@ unsigned WebAccessibilityObject::cellRowIndex() const
     if (!m_private->isTableCell())
        return 0;
 
-    pair<int, int> rowRange;
+    pair<unsigned, unsigned> rowRange;
     static_cast<WebCore::AccessibilityTableCell*>(m_private.get())->rowIndexRange(rowRange);
     return rowRange.first;
 }
@@ -856,7 +938,7 @@ unsigned WebAccessibilityObject::cellRowSpan() const
     if (!m_private->isTableCell())
        return 0;
 
-    pair<int, int> rowRange;
+    pair<unsigned, unsigned> rowRange;
     static_cast<WebCore::AccessibilityTableCell*>(m_private.get())->rowIndexRange(rowRange);
     return rowRange.second;
 }

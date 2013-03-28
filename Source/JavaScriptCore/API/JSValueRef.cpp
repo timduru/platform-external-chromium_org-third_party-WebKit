@@ -28,15 +28,16 @@
 
 #include "APICast.h"
 #include "APIShims.h"
+#include "JSAPIWrapperObject.h"
 #include "JSCallbackObject.h"
 
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSGlobalObject.h>
 #include <runtime/JSONObject.h>
 #include <runtime/JSString.h>
 #include <runtime/LiteralParser.h>
 #include <runtime/Operations.h>
 #include <runtime/Protect.h>
-#include <runtime/JSValue.h>
 
 #include <wtf/Assertions.h>
 #include <wtf/text/StringHash.h>
@@ -44,7 +45,22 @@
 
 #include <algorithm> // for std::min
 
+#if PLATFORM(MAC)
+#include <mach-o/dyld.h>
+#endif
+
 using namespace JSC;
+
+#if PLATFORM(MAC)
+static bool evernoteHackNeeded()
+{
+    static const int32_t webkitLastVersionWithEvernoteHack = 35133959;
+    static bool hackNeeded = CFEqual(CFBundleGetIdentifier(CFBundleGetMainBundle()), CFSTR("com.evernote.Evernote"))
+        && NSVersionOfLinkTimeLibrary("JavaScriptCore") <= webkitLastVersionWithEvernoteHack;
+
+    return hackNeeded;
+}
+#endif
 
 ::JSType JSValueGetType(JSContextRef ctx, JSValueRef value)
 {
@@ -133,6 +149,10 @@ bool JSValueIsObjectOfClass(JSContextRef ctx, JSValueRef value, JSClassRef jsCla
             return jsCast<JSCallbackObject<JSGlobalObject>*>(o)->inherits(jsClass);
         if (o->inherits(&JSCallbackObject<JSDestructibleObject>::s_info))
             return jsCast<JSCallbackObject<JSDestructibleObject>*>(o)->inherits(jsClass);
+#if JSC_OBJC_API_ENABLED
+        if (o->inherits(&JSCallbackObject<JSAPIWrapperObject>::s_info))
+            return jsCast<JSCallbackObject<JSAPIWrapperObject>*>(o)->inherits(jsClass);
+#endif
     }
     return false;
 }
@@ -216,7 +236,7 @@ JSValueRef JSValueMakeNumber(JSContextRef ctx, double value)
     // Our JSValue representation relies on a standard bit pattern for NaN. NaNs
     // generated internally to JavaScriptCore naturally have that representation,
     // but an external NaN might not.
-    if (isnan(value))
+    if (std::isnan(value))
         value = QNaN;
 
     return toRef(exec, jsNumber(value));
@@ -332,6 +352,11 @@ void JSValueProtect(JSContextRef ctx, JSValueRef value)
 
 void JSValueUnprotect(JSContextRef ctx, JSValueRef value)
 {
+#if PLATFORM(MAC)
+    if ((!value || !ctx) && evernoteHackNeeded())
+        return;
+#endif
+
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
 

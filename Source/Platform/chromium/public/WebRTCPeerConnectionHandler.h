@@ -33,9 +33,11 @@
 
 namespace WebKit {
 class WebMediaConstraints;
-class WebMediaStreamDescriptor;
+class WebMediaStream;
+class WebMediaStreamTrack;
 class WebRTCConfiguration;
-class WebRTCDataChannel;
+class WebRTCDTMFSenderHandler;
+class WebRTCDataChannelHandler;
 class WebRTCICECandidate;
 class WebRTCPeerConnectionHandlerClient;
 class WebRTCSessionDescription;
@@ -58,17 +60,12 @@ public:
     virtual WebRTCSessionDescription remoteDescription() = 0;
     virtual bool updateICE(const WebRTCConfiguration&, const WebMediaConstraints&) = 0;
     virtual bool addICECandidate(const WebRTCICECandidate&) = 0;
-    virtual bool addStream(const WebMediaStreamDescriptor&, const WebMediaConstraints&) = 0;
-    virtual void removeStream(const WebMediaStreamDescriptor&) = 0;
-    // FIXME: Remove default implementation when clients have changed.
-    virtual void getStats(const WebRTCStatsRequest&) { }
+    virtual bool addStream(const WebMediaStream&, const WebMediaConstraints&) = 0;
+    virtual void removeStream(const WebMediaStream&) = 0;
+    virtual void getStats(const WebRTCStatsRequest&) = 0;
+    virtual WebRTCDataChannelHandler* createDataChannel(const WebString& label, bool reliable) = 0;
+    virtual WebRTCDTMFSenderHandler* createDTMFSender(const WebMediaStreamTrack&) = 0;
     virtual void stop() = 0;
-
-    // RTCDataChannel
-    virtual bool openDataChannel(const WebRTCDataChannel&) { return false; }
-    virtual bool sendStringData(const WebRTCDataChannel&, const WebString&) { return false; }
-    virtual bool sendRawData(const WebRTCDataChannel&, const char*, size_t) { return false; }
-    virtual void closeDataChannel(const WebRTCDataChannel&) { }
 };
 
 } // namespace WebKit

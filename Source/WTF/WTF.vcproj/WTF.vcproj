@@ -613,6 +613,18 @@
 			>
 		</File>
 		<File
+			RelativePath="..\wtf\AutodrainedPool.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\SchedulePair.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\SchedulePairCF.cpp"
+			>
+		</File>
+		<File
 			RelativePath="..\wtf\Bitmap.h"
 			>
 		</File>
@@ -781,6 +793,18 @@
 			>
 		</File>
 		<File
+			RelativePath="..\wtf\FeatureDefines.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\FilePrintStream.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\FilePrintStream.h"
+			>
+		</File>
+		<File
 			RelativePath="..\wtf\FixedArray.h"
 			>
 		</File>
@@ -905,6 +929,10 @@
 			>
 		</File>
 		<File
+		        RelativePath="..\wtf\MemoryInstrumentation.cpp"
+			>
+		</File>
+		<File
 		        RelativePath="..\wtf\MemoryInstrumentation.h"
 			>
 		</File>
@@ -938,6 +966,10 @@
 		</File>
 		<File
 		        RelativePath="..\wtf\MemoryInstrumentationVector.h"
+			>
+		</File>
+		<File
+		        RelativePath="..\wtf\MemoryObjectInfo.h"
 			>
 		</File>
 		<File
@@ -1089,6 +1121,14 @@
 			>
 		</File>
 		<File
+			RelativePath="..\wtf\PrintStream.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\PrintStream.h"
+			>
+		</File>
+		<File
 			RelativePath="..\wtf\RandomNumber.cpp"
 			>
 		</File>
@@ -1098,6 +1138,10 @@
 		</File>
 		<File
 			RelativePath="..\wtf\RandomNumberSeed.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\RawPointer.h"
 			>
 		</File>
 		<File
@@ -1173,15 +1217,19 @@
 			>
 		</File>
 		<File
-			RelativePath="..\wtf\StringExtras.cpp"
-			>
-		</File>
-		<File
 			RelativePath="..\wtf\StringExtras.h"
 			>
 		</File>
 		<File
 			RelativePath="..\wtf\StringHasher.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\StringPrintStream.cpp"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\StringPrintStream.h"
 			>
 		</File>
 		<File
@@ -1290,6 +1338,10 @@
 		</File>
 		<File
 			RelativePath="..\wtf\WTFThreadData.h"
+			>
+		</File>
+		<File
+			RelativePath="..\wtf\WeakPtr.h"
 			>
 		</File>
 	</Files>

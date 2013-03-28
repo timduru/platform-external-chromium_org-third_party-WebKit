@@ -61,6 +61,7 @@ struct WebRect;
         // namespace. Tag name matching is case-insensitive.
         WEBKIT_EXPORT bool hasHTMLTagName(const WebString&) const;
         WEBKIT_EXPORT bool hasAttribute(const WebString&) const;
+        WEBKIT_EXPORT void removeAttribute(const WebString&);
         WEBKIT_EXPORT WebString getAttribute(const WebString&) const;
         WEBKIT_EXPORT bool setAttribute(const WebString& name, const WebString& value);
         WEBKIT_EXPORT WebString innerText();
@@ -69,6 +70,7 @@ struct WebRect;
         WEBKIT_EXPORT WebString attributeLocalName(unsigned index) const;
         WEBKIT_EXPORT WebString attributeValue(unsigned index) const;
         WEBKIT_EXPORT unsigned attributeCount() const;
+        WEBKIT_EXPORT WebNode shadowRoot() const;
 
         // Returns the language code specified for this element.  This attribute
         // is inherited, so the returned value is drawn from the closest parent

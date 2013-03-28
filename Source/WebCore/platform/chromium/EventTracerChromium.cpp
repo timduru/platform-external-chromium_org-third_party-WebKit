@@ -35,12 +35,23 @@
 
 namespace WebCore {
 
+TraceEventAPIAtomicWord* traceSamplingState0;
+TraceEventAPIAtomicWord* traceSamplingState1;
+TraceEventAPIAtomicWord* traceSamplingState2;
+
+void EventTracer::initialize()
+{
+    traceSamplingState0 = WebKit::Platform::current()->getTraceSamplingState(0);
+    traceSamplingState1 = WebKit::Platform::current()->getTraceSamplingState(1);
+    traceSamplingState2 = WebKit::Platform::current()->getTraceSamplingState(2);
+}
+    
 const unsigned char* EventTracer::getTraceCategoryEnabledFlag(const char* categoryName)
 {
     return WebKit::Platform::current()->getTraceCategoryEnabledFlag(categoryName);
 }
     
-int EventTracer::addTraceEvent(char phase,
+void EventTracer::addTraceEvent(char phase,
                                      const unsigned char* categoryEnabledFlag,
                                      const char* name,
                                      unsigned long long id,
@@ -48,11 +59,9 @@ int EventTracer::addTraceEvent(char phase,
                                      const char** argNames,
                                      const unsigned char* argTypes,
                                      const unsigned long long* argValues,
-                                     int thresholdBeginId,
-                                     long long threshold,
                                      unsigned char flags)
 {
-    return WebKit::Platform::current()->addTraceEvent(phase, categoryEnabledFlag, name, id, numArgs, argNames, argTypes, argValues, thresholdBeginId, threshold, flags);
+    return WebKit::Platform::current()->addTraceEvent(phase, categoryEnabledFlag, name, id, numArgs, argNames, argTypes, argValues, flags);
 }
 
 } // namespace WebCore

@@ -27,6 +27,7 @@
 #include "Frame.h"
 #include "KeyboardEvent.h"
 #include "NotImplemented.h"
+#include "Page.h"
 #include "PlatformKeyboardEvent.h"
 #include "UndoStep.h"
 #include "Settings.h"
@@ -53,11 +54,6 @@ bool EditorClientWinCE::shouldDeleteRange(Range*)
 {
     notImplemented();
     return true;
-}
-
-bool EditorClientWinCE::shouldShowDeleteInterface(HTMLElement*)
-{
-    return false;
 }
 
 bool EditorClientWinCE::isContinuousSpellCheckingEnabled()
@@ -139,6 +135,16 @@ void EditorClientWinCE::didWriteSelectionToPasteboard()
     notImplemented();
 }
 
+void EditorClientWinCE::willWriteSelectionToPasteboard(WebCore::Range*)
+{
+    notImplemented();
+}
+
+void EditorClientWinCE::getClientPasteboardDataForRange(WebCore::Range*, Vector<String>&, Vector<RefPtr<WebCore::SharedBuffer> >&)
+{
+    notImplemented();
+}
+
 void EditorClientWinCE::didSetSelectionTypesForPasteboard()
 {
     notImplemented();
@@ -204,14 +210,18 @@ void EditorClientWinCE::pageDestroyed()
 
 bool EditorClientWinCE::smartInsertDeleteEnabled()
 {
-    notImplemented();
-    return false;
+    Page* page = m_webView->page();
+    if (!page)
+        return false;
+    return page->settings()->smartInsertDeleteEnabled();
 }
 
 bool EditorClientWinCE::isSelectTrailingWhitespaceEnabled()
 {
-    notImplemented();
-    return false;
+    Page* page = m_webView->page();
+    if (!page)
+        return false;
+    return page->settings()->selectTrailingWhitespaceEnabled();
 }
 
 void EditorClientWinCE::toggleContinuousSpellChecking()

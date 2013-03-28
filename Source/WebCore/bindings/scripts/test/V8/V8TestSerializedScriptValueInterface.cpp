@@ -19,9 +19,8 @@
 */
 
 #include "config.h"
-#include "V8TestSerializedScriptValueInterface.h"
-
 #if ENABLE(Condition1) || ENABLE(Condition2)
+#include "V8TestSerializedScriptValueInterface.h"
 
 #include "BindingState.h"
 #include "ContextFeatures.h"
@@ -36,9 +35,41 @@
 #include <wtf/ArrayBuffer.h>
 #include <wtf/UnusedParam.h>
 
+#if ENABLE(BINDING_INTEGRITY)
+#if defined(OS_WIN)
+#pragma warning(disable: 4483)
+extern "C" { extern void (*const __identifier("??_7TestSerializedScriptValueInterface@WebCore@@6B@")[])(); }
+#else
+extern "C" { extern void* _ZTVN7WebCore34TestSerializedScriptValueInterfaceE[]; }
+#endif
+#endif // ENABLE(BINDING_INTEGRITY)
+
 namespace WebCore {
 
-WrapperTypeInfo V8TestSerializedScriptValueInterface::info = { V8TestSerializedScriptValueInterface::GetTemplate, V8TestSerializedScriptValueInterface::derefObject, 0, 0, V8TestSerializedScriptValueInterface::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
+#if ENABLE(BINDING_INTEGRITY)
+// This checks if a DOM object that is about to be wrapped is valid.
+// Specifically, it checks that a vtable of the DOM object is equal to
+// a vtable of an expected class.
+// Due to a dangling pointer, the DOM object you are wrapping might be
+// already freed or realloced. If freed, the check will fail because
+// a free list pointer should be stored at the head of the DOM object.
+// If realloced, the check will fail because the vtable of the DOM object
+// differs from the expected vtable (unless the same class of DOM object
+// is realloced on the slot).
+inline void checkTypeOrDieTrying(TestSerializedScriptValueInterface* object)
+{
+    void* actualVTablePointer = *(reinterpret_cast<void**>(object));
+#if defined(OS_WIN)
+    void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestSerializedScriptValueInterface@WebCore@@6B@"));
+#else
+    void* expectedVTablePointer = &_ZTVN7WebCore34TestSerializedScriptValueInterfaceE[2];
+#endif
+    if (actualVTablePointer != expectedVTablePointer)
+        CRASH();
+}
+#endif // ENABLE(BINDING_INTEGRITY)
+
+WrapperTypeInfo V8TestSerializedScriptValueInterface::info = { V8TestSerializedScriptValueInterface::GetTemplate, V8TestSerializedScriptValueInterface::derefObject, 0, 0, 0, V8TestSerializedScriptValueInterface::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace TestSerializedScriptValueInterfaceV8Internal {
 
@@ -46,44 +77,59 @@ template <typename T> void V8_USE(T) { }
 
 static v8::Handle<v8::Value> valueAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.value._get");
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
-    return imp->value() ? imp->value()->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
+    return imp->value() ? imp->value()->deserialize() : v8::Handle<v8::Value>(v8Null(info.GetIsolate()));
+}
+
+static v8::Handle<v8::Value> valueAttrGetterCallback(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    return TestSerializedScriptValueInterfaceV8Internal::valueAttrGetter(name, info);
 }
 
 static void valueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.value._set");
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
     RefPtr<SerializedScriptValue> v = SerializedScriptValue::create(value, info.GetIsolate());
     imp->setValue(WTF::getPtr(v));
     return;
 }
 
+static void valueAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+{
+    TestSerializedScriptValueInterfaceV8Internal::valueAttrSetter(name, value, info);
+}
+
 static v8::Handle<v8::Value> readonlyValueAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.readonlyValue._get");
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
-    return imp->readonlyValue() ? imp->readonlyValue()->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
+    return imp->readonlyValue() ? imp->readonlyValue()->deserialize() : v8::Handle<v8::Value>(v8Null(info.GetIsolate()));
+}
+
+static v8::Handle<v8::Value> readonlyValueAttrGetterCallback(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    return TestSerializedScriptValueInterfaceV8Internal::readonlyValueAttrGetter(name, info);
 }
 
 static v8::Handle<v8::Value> cachedValueAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.cachedValue._get");
     v8::Handle<v8::String> propertyName = v8::String::NewSymbol("cachedValue");
     v8::Handle<v8::Value> value = info.Holder()->GetHiddenValue(propertyName);
     if (!value.IsEmpty())
         return value;
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
-    SerializedScriptValue* serialized = imp->cachedValue();
-    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
+    RefPtr<SerializedScriptValue> serialized = imp->cachedValue();
+    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8Null(info.GetIsolate()));
     info.Holder()->SetHiddenValue(propertyName, value);
     return value;
 }
 
+static v8::Handle<v8::Value> cachedValueAttrGetterCallback(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    return TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrGetter(name, info);
+}
+
 static void cachedValueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.cachedValue._set");
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
     RefPtr<SerializedScriptValue> v = SerializedScriptValue::create(value, info.GetIsolate());
     imp->setCachedValue(WTF::getPtr(v));
@@ -91,9 +137,13 @@ static void cachedValueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Valu
     return;
 }
 
+static void cachedValueAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+{
+    TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetter(name, value, info);
+}
+
 static v8::Handle<v8::Value> portsAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.ports._get");
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
     MessagePortArray* ports = imp->ports();
     if (!ports)
@@ -101,27 +151,35 @@ static v8::Handle<v8::Value> portsAttrGetter(v8::Local<v8::String> name, const v
     MessagePortArray portsCopy(*ports);
     v8::Local<v8::Array> portArray = v8::Array::New(portsCopy.size());
     for (size_t i = 0; i < portsCopy.size(); ++i)
-        portArray->Set(v8Integer(i, info.GetIsolate()), toV8(portsCopy[i].get(), info.Holder(), info.GetIsolate()));
+        portArray->Set(v8Integer(i, info.GetIsolate()), toV8Fast(portsCopy[i].get(), info, imp));
     return portArray;
+}
+
+static v8::Handle<v8::Value> portsAttrGetterCallback(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    return TestSerializedScriptValueInterfaceV8Internal::portsAttrGetter(name, info);
 }
 
 static v8::Handle<v8::Value> cachedReadonlyValueAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.cachedReadonlyValue._get");
     v8::Handle<v8::String> propertyName = v8::String::NewSymbol("cachedReadonlyValue");
     v8::Handle<v8::Value> value = info.Holder()->GetHiddenValue(propertyName);
     if (!value.IsEmpty())
         return value;
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
-    SerializedScriptValue* serialized = imp->cachedReadonlyValue();
-    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
+    RefPtr<SerializedScriptValue> serialized = imp->cachedReadonlyValue();
+    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8Null(info.GetIsolate()));
     info.Holder()->SetHiddenValue(propertyName, value);
     return value;
 }
 
-static v8::Handle<v8::Value> acceptTransferListCallback(const v8::Arguments& args)
+static v8::Handle<v8::Value> cachedReadonlyValueAttrGetterCallback(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.acceptTransferList");
+    return TestSerializedScriptValueInterfaceV8Internal::cachedReadonlyValueAttrGetter(name, info);
+}
+
+static v8::Handle<v8::Value> acceptTransferListMethod(const v8::Arguments& args)
+{
     if (args.Length() < 1)
         return throwNotEnoughArgumentsError(args.GetIsolate());
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(args.Holder());
@@ -129,7 +187,7 @@ static v8::Handle<v8::Value> acceptTransferListCallback(const v8::Arguments& arg
     ArrayBufferArray arrayBufferArrayTransferList;
     if (args.Length() > 1) {
         if (!extractTransferables(args[1], messagePortArrayTransferList, arrayBufferArrayTransferList, args.GetIsolate()))
-            return throwTypeError("Could not extract transferables");
+            return throwTypeError("Could not extract transferables", args.GetIsolate());
     }
     bool dataDidThrow = false;
     RefPtr<SerializedScriptValue> data = SerializedScriptValue::create(args[0], &messagePortArrayTransferList, &arrayBufferArrayTransferList, dataDidThrow, args.GetIsolate());
@@ -143,9 +201,13 @@ static v8::Handle<v8::Value> acceptTransferListCallback(const v8::Arguments& arg
     return v8Undefined();
 }
 
-static v8::Handle<v8::Value> multiTransferListCallback(const v8::Arguments& args)
+static v8::Handle<v8::Value> acceptTransferListMethodCallback(const v8::Arguments& args)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.multiTransferList");
+    return TestSerializedScriptValueInterfaceV8Internal::acceptTransferListMethod(args);
+}
+
+static v8::Handle<v8::Value> multiTransferListMethod(const v8::Arguments& args)
+{
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(args.Holder());
     if (args.Length() <= 0) {
         imp->multiTransferList();
@@ -155,7 +217,7 @@ static v8::Handle<v8::Value> multiTransferListCallback(const v8::Arguments& args
     ArrayBufferArray arrayBufferArrayTx;
     if (args.Length() > 1) {
         if (!extractTransferables(args[1], messagePortArrayTx, arrayBufferArrayTx, args.GetIsolate()))
-            return throwTypeError("Could not extract transferables");
+            return throwTypeError("Could not extract transferables", args.GetIsolate());
     }
     bool firstDidThrow = false;
     RefPtr<SerializedScriptValue> first = SerializedScriptValue::create(args[0], &messagePortArrayTx, &arrayBufferArrayTx, firstDidThrow, args.GetIsolate());
@@ -173,7 +235,7 @@ static v8::Handle<v8::Value> multiTransferListCallback(const v8::Arguments& args
     ArrayBufferArray arrayBufferArrayTxx;
     if (args.Length() > 3) {
         if (!extractTransferables(args[3], messagePortArrayTxx, arrayBufferArrayTxx, args.GetIsolate()))
-            return throwTypeError("Could not extract transferables");
+            return throwTypeError("Could not extract transferables", args.GetIsolate());
     }
     bool secondDidThrow = false;
     RefPtr<SerializedScriptValue> second = SerializedScriptValue::create(args[2], &messagePortArrayTxx, &arrayBufferArrayTxx, secondDidThrow, args.GetIsolate());
@@ -187,43 +249,21 @@ static v8::Handle<v8::Value> multiTransferListCallback(const v8::Arguments& args
     return v8Undefined();
 }
 
-} // namespace TestSerializedScriptValueInterfaceV8Internal
-
-static const V8DOMConfiguration::BatchedAttribute V8TestSerializedScriptValueInterfaceAttrs[] = {
-    // Attribute 'value' (Type: 'attribute' ExtAttr: '')
-    {"value", TestSerializedScriptValueInterfaceV8Internal::valueAttrGetter, TestSerializedScriptValueInterfaceV8Internal::valueAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'readonlyValue' (Type: 'readonly attribute' ExtAttr: '')
-    {"readonlyValue", TestSerializedScriptValueInterfaceV8Internal::readonlyValueAttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'cachedValue' (Type: 'attribute' ExtAttr: 'CachedAttribute')
-    {"cachedValue", TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrGetter, TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetter, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'ports' (Type: 'readonly attribute' ExtAttr: '')
-    {"ports", TestSerializedScriptValueInterfaceV8Internal::portsAttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'cachedReadonlyValue' (Type: 'readonly attribute' ExtAttr: 'CachedAttribute')
-    {"cachedReadonlyValue", TestSerializedScriptValueInterfaceV8Internal::cachedReadonlyValueAttrGetter, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-};
-
-static const V8DOMConfiguration::BatchedCallback V8TestSerializedScriptValueInterfaceCallbacks[] = {
-    {"acceptTransferList", TestSerializedScriptValueInterfaceV8Internal::acceptTransferListCallback},
-    {"multiTransferList", TestSerializedScriptValueInterfaceV8Internal::multiTransferListCallback},
-};
-
-v8::Handle<v8::Value> V8TestSerializedScriptValueInterface::constructorCallback(const v8::Arguments& args)
+static v8::Handle<v8::Value> multiTransferListMethodCallback(const v8::Arguments& args)
 {
-    INC_STATS("DOM.TestSerializedScriptValueInterface.Constructor");
-    
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.");
+    return TestSerializedScriptValueInterfaceV8Internal::multiTransferListMethod(args);
+}
 
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
+static v8::Handle<v8::Value> constructor(const v8::Arguments& args)
+{
     if (args.Length() < 2)
         return throwNotEnoughArgumentsError(args.GetIsolate());
-    STRING_TO_V8PARAMETER_EXCEPTION_BLOCK(V8Parameter<>, hello, MAYBE_MISSING_PARAMETER(args, 0, DefaultIsUndefined));
+    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, hello, args[0]);
     MessagePortArray messagePortArrayTransferList;
     ArrayBufferArray arrayBufferArrayTransferList;
     if (args.Length() > 2) {
         if (!extractTransferables(args[2], messagePortArrayTransferList, arrayBufferArrayTransferList, args.GetIsolate()))
-            return throwTypeError("Could not extract transferables");
+            return throwTypeError("Could not extract transferables", args.GetIsolate());
     }
     bool dataDidThrow = false;
     RefPtr<SerializedScriptValue> data = SerializedScriptValue::create(args[1], &messagePortArrayTransferList, &arrayBufferArrayTransferList, dataDidThrow, args.GetIsolate());
@@ -233,19 +273,49 @@ v8::Handle<v8::Value> V8TestSerializedScriptValueInterface::constructorCallback(
     RefPtr<TestSerializedScriptValueInterface> impl = TestSerializedScriptValueInterface::create(hello, data, messagePortArrayTransferList);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
-    V8DOMWrapper::setDOMWrapper(wrapper, &info, impl.get());
-    V8DOMWrapper::setJSWrapperForDOMObject(impl.release(), wrapper, args.GetIsolate());
+    V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestSerializedScriptValueInterface::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     return wrapper;
 }
 
-static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestSerializedScriptValueInterfaceTemplate(v8::Persistent<v8::FunctionTemplate> desc)
+} // namespace TestSerializedScriptValueInterfaceV8Internal
+
+static const V8DOMConfiguration::BatchedAttribute V8TestSerializedScriptValueInterfaceAttrs[] = {
+    // Attribute 'value' (Type: 'attribute' ExtAttr: '')
+    {"value", TestSerializedScriptValueInterfaceV8Internal::valueAttrGetterCallback, TestSerializedScriptValueInterfaceV8Internal::valueAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'readonlyValue' (Type: 'readonly attribute' ExtAttr: '')
+    {"readonlyValue", TestSerializedScriptValueInterfaceV8Internal::readonlyValueAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'cachedValue' (Type: 'attribute' ExtAttr: 'CachedAttribute')
+    {"cachedValue", TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrGetterCallback, TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'ports' (Type: 'readonly attribute' ExtAttr: '')
+    {"ports", TestSerializedScriptValueInterfaceV8Internal::portsAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'cachedReadonlyValue' (Type: 'readonly attribute' ExtAttr: 'CachedAttribute')
+    {"cachedReadonlyValue", TestSerializedScriptValueInterfaceV8Internal::cachedReadonlyValueAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+};
+
+static const V8DOMConfiguration::BatchedMethod V8TestSerializedScriptValueInterfaceMethods[] = {
+    {"acceptTransferList", TestSerializedScriptValueInterfaceV8Internal::acceptTransferListMethodCallback, 0},
+    {"multiTransferList", TestSerializedScriptValueInterfaceV8Internal::multiTransferListMethodCallback, 0},
+};
+
+v8::Handle<v8::Value> V8TestSerializedScriptValueInterface::constructorCallback(const v8::Arguments& args)
+{
+    if (!args.IsConstructCall())
+        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+
+    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
+        return args.Holder();
+
+    return TestSerializedScriptValueInterfaceV8Internal::constructor(args);
+}
+
+static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestSerializedScriptValueInterfaceTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     desc->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
     defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestSerializedScriptValueInterface", v8::Persistent<v8::FunctionTemplate>(), V8TestSerializedScriptValueInterface::internalFieldCount,
         V8TestSerializedScriptValueInterfaceAttrs, WTF_ARRAY_LENGTH(V8TestSerializedScriptValueInterfaceAttrs),
-        V8TestSerializedScriptValueInterfaceCallbacks, WTF_ARRAY_LENGTH(V8TestSerializedScriptValueInterfaceCallbacks));
+        V8TestSerializedScriptValueInterfaceMethods, WTF_ARRAY_LENGTH(V8TestSerializedScriptValueInterfaceMethods), isolate, currentWorldType);
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
     desc->SetCallHandler(V8TestSerializedScriptValueInterface::constructorCallback);
     v8::Local<v8::ObjectTemplate> instance = desc->InstanceTemplate();
@@ -259,70 +329,50 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestSerializedScriptValue
     return desc;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8TestSerializedScriptValueInterface::GetRawTemplate()
+v8::Persistent<v8::FunctionTemplate> V8TestSerializedScriptValueInterface::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
-    V8PerIsolateData* data = V8PerIsolateData::current();
-    V8PerIsolateData::TemplateMap::iterator result = data->rawTemplateMap().find(&info);
-    if (result != data->rawTemplateMap().end())
-        return result->value;
-
-    v8::HandleScope handleScope;
-    v8::Persistent<v8::FunctionTemplate> templ = createRawTemplate();
-    data->rawTemplateMap().add(&info, templ);
-    return templ;
-}
-
-v8::Persistent<v8::FunctionTemplate> V8TestSerializedScriptValueInterface::GetTemplate()
-{
-    V8PerIsolateData* data = V8PerIsolateData::current();
-    V8PerIsolateData::TemplateMap::iterator result = data->templateMap().find(&info);
-    if (result != data->templateMap().end())
+    V8PerIsolateData* data = V8PerIsolateData::from(isolate);
+    V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&info);
+    if (result != data->templateMap(currentWorldType).end())
         return result->value;
 
     v8::HandleScope handleScope;
     v8::Persistent<v8::FunctionTemplate> templ =
-        ConfigureV8TestSerializedScriptValueInterfaceTemplate(GetRawTemplate());
-    data->templateMap().add(&info, templ);
+        ConfigureV8TestSerializedScriptValueInterfaceTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
+    data->templateMap(currentWorldType).add(&info, templ);
     return templ;
 }
 
-bool V8TestSerializedScriptValueInterface::HasInstance(v8::Handle<v8::Value> value)
+bool V8TestSerializedScriptValueInterface::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
-    return GetRawTemplate()->HasInstance(value);
+    return V8PerIsolateData::from(isolate)->hasInstance(&info, value, currentWorldType);
+}
+
+bool V8TestSerializedScriptValueInterface::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Isolate* isolate)
+{
+    return V8PerIsolateData::from(isolate)->hasInstance(&info, value, MainWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&info, value, IsolatedWorld)
+        || V8PerIsolateData::from(isolate)->hasInstance(&info, value, WorkerWorld);
 }
 
 
-v8::Handle<v8::Object> V8TestSerializedScriptValueInterface::wrapSlow(PassRefPtr<TestSerializedScriptValueInterface> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+v8::Handle<v8::Object> V8TestSerializedScriptValueInterface::createWrapper(PassRefPtr<TestSerializedScriptValueInterface> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    v8::Handle<v8::Object> wrapper;
-    // Please don't add any more uses of this variable.
-    Document* deprecatedDocument = 0;
-    UNUSED_PARAM(deprecatedDocument);
+    ASSERT(impl.get());
+    ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
 
-    v8::Handle<v8::Context> context;
-    if (!creationContext.IsEmpty() && creationContext->CreationContext() != v8::Context::GetCurrent()) {
-        // For performance, we enter the context only if the currently running context
-        // is different from the context that we are about to enter.
-        context = v8::Local<v8::Context>::New(creationContext->CreationContext());
-        ASSERT(!context.IsEmpty());
-        context->Enter();
-    }
+#if ENABLE(BINDING_INTEGRITY)
+    checkTypeOrDieTrying(impl.get());
+#endif
 
-    wrapper = V8DOMWrapper::instantiateV8Object(deprecatedDocument, &info, impl.get());
-
-    if (!context.IsEmpty())
-        context->Exit();
-
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
-    installPerContextProperties(wrapper, impl.get());
-    v8::Persistent<v8::Object> wrapperHandle = V8DOMWrapper::setJSWrapperForDOMObject(impl, wrapper, isolate);
-    if (!hasDependentLifetime)
-        wrapperHandle.MarkIndependent();
+    installPerContextProperties(wrapper, impl.get(), isolate);
+    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, hasDependentLifetime ? WrapperConfiguration::Dependent : WrapperConfiguration::Independent);
     return wrapper;
 }
-
 void V8TestSerializedScriptValueInterface::derefObject(void* object)
 {
     static_cast<TestSerializedScriptValueInterface*>(object)->deref();

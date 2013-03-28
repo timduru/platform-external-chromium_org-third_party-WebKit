@@ -22,6 +22,7 @@
 #include "NotImplemented.h"
 #include "Page.h"
 #include "PageGroup.h"
+#include "PlatformCookieJar.h"
 #include "PluginDatabase.h"
 #include "PluginPackage.h"
 
@@ -38,6 +39,11 @@ PlatformStrategiesGtk::PlatformStrategiesGtk()
 }
 
 CookiesStrategy* PlatformStrategiesGtk::createCookiesStrategy()
+{
+    return this;
+}
+
+DatabaseStrategy* PlatformStrategiesGtk::createDatabaseStrategy()
 {
     return this;
 }
@@ -64,14 +70,45 @@ SharedWorkerStrategy* PlatformStrategiesGtk::createSharedWorkerStrategy()
     return this;
 }
 
+StorageStrategy* PlatformStrategiesGtk::createStorageStrategy()
+{
+    return this;
+}
+
 VisitedLinkStrategy* PlatformStrategiesGtk::createVisitedLinkStrategy()
 {
     return this;
 }
 
 // CookiesStrategy
-void PlatformStrategiesGtk::notifyCookiesChanged()
+String PlatformStrategiesGtk::cookiesForDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
 {
+    return WebCore::cookiesForDOM(session, firstParty, url);
+}
+
+void PlatformStrategiesGtk::setCookiesFromDOM(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, const String& cookieString)
+{
+    WebCore::setCookiesFromDOM(session, firstParty, url, cookieString);
+}
+
+bool PlatformStrategiesGtk::cookiesEnabled(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+{
+    return WebCore::cookiesEnabled(session, firstParty, url);
+}
+
+String PlatformStrategiesGtk::cookieRequestHeaderFieldValue(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url)
+{
+    return WebCore::cookieRequestHeaderFieldValue(session, firstParty, url);
+}
+
+bool PlatformStrategiesGtk::getRawCookies(const NetworkStorageSession& session, const KURL& firstParty, const KURL& url, Vector<Cookie>& rawCookies)
+{
+    return WebCore::getRawCookies(session, firstParty, url, rawCookies);
+}
+
+void PlatformStrategiesGtk::deleteCookie(const NetworkStorageSession& session, const KURL& url, const String& cookieName)
+{
+    WebCore::deleteCookie(session, url, cookieName);
 }
 
 // PluginStrategy
@@ -84,7 +121,6 @@ void PlatformStrategiesGtk::getPluginInfo(const Page* page, Vector<PluginInfo>& 
 {
     PluginDatabase* database = PluginDatabase::installedPlugins();
     const Vector<PluginPackage*> &plugins = database->plugins();
-    outPlugins.resize(plugins.size());
 
     for (size_t i = 0; i < plugins.size(); ++i) {
         PluginPackage* package = plugins[i];

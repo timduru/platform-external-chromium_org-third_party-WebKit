@@ -42,12 +42,10 @@ public:
     virtual void didFinishLoadingDataForCustomRepresentation(const String& suggestedFilename, const CoreIPC::DataReference&) { }
     virtual double customRepresentationZoomFactor() { return 1; }
     virtual void setCustomRepresentationZoomFactor(double) { }
-    virtual void didChangeScrollbarsForMainFrame() const { }
     virtual void findStringInCustomRepresentation(const String&, WebKit::FindOptions, unsigned maxMatchCount) { }
     virtual void countStringMatchesInCustomRepresentation(const String&, WebKit::FindOptions, unsigned maxMatchCount) { }
     virtual void clearAllEditCommands() { }
 
-    virtual void didReceiveMessageFromNavigatorQtObject(const String& message);
     virtual void didChangeViewportProperties(const WebCore::ViewportAttributes& attr);
     virtual void handleDownloadRequest(WebKit::DownloadProxy* download);
 
@@ -71,10 +69,12 @@ public:
 #endif // USE(ACCELERATED_COMPOSITING)
 
     virtual void updateTextInputState();
+    virtual void handleWillSetInputMethodState();
 #if ENABLE(GESTURE_EVENTS)
     virtual void doneWithGestureEvent(const WebKit::WebGestureEvent& event, bool wasEventHandled);
 #endif
     virtual void displayView();
+    virtual bool canScrollView() { return false; }
     virtual void scrollView(const WebCore::IntRect& scrollRect, const WebCore::IntSize& scrollOffset);
 
     virtual void flashBackingStoreUpdates(const Vector<WebCore::IntRect>&);

@@ -67,6 +67,7 @@
 #include <runtime/JSArray.h>
 #include <runtime/JSFunction.h>
 #include <runtime/JSLock.h>
+#include <runtime/ObjectConstructor.h>
 #include <runtime/RegExpObject.h>
 
 using namespace JSC;
@@ -82,6 +83,9 @@ Node* InjectedScriptHost::scriptValueAsNode(ScriptValue value)
 
 ScriptValue InjectedScriptHost::nodeAsScriptValue(ScriptState* state, Node* node)
 {
+    if (!shouldAllowAccessToNode(state, node))
+        return ScriptValue(state->globalData(), jsNull());
+
     JSLockHolder lock(state);
     return ScriptValue(state->globalData(), toJS(state, deprecatedGlobalObjectForPrototype(state), node));
 }
@@ -281,26 +285,17 @@ JSValue JSInjectedScriptHost::storageId(ExecState* exec)
     return jsUndefined();
 }
 
-JSValue JSInjectedScriptHost::evaluate(ExecState* exec)
+JSValue JSInjectedScriptHost::evaluate(ExecState* exec) const
 {
-    JSValue expression = exec->argument(0);
-    if (!expression.isString())
-        return throwError(exec, createError(exec, "String argument expected."));
     JSGlobalObject* globalObject = exec->lexicalGlobalObject();
-    JSFunction* evalFunction = globalObject->evalFunction();
-    CallData callData;
-    CallType callType = evalFunction->methodTable()->getCallData(evalFunction, callData);
-    if (callType == CallTypeNone)
-        return jsUndefined();
-    MarkedArgumentBuffer args;
-    args.append(expression);
+    return globalObject->evalFunction();
+}
 
-    bool wasEvalEnabled = globalObject->evalEnabled();
-    globalObject->setEvalEnabled(true);
-    JSValue result = JSC::call(exec, evalFunction, callType, callData, exec->globalThisValue(), args);
-    globalObject->setEvalEnabled(wasEvalEnabled);
-
-    return result;
+JSValue JSInjectedScriptHost::setFunctionVariableValue(JSC::ExecState* exec)
+{
+    // FIXME: implement this. https://bugs.webkit.org/show_bug.cgi?id=107830
+    throwError(exec, createTypeError(exec, "Variable value mutation is not supported"));
+    return jsUndefined();
 }
 
 } // namespace WebCore

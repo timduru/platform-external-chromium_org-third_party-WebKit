@@ -28,7 +28,6 @@
 
 #include "AutoTableLayout.h"
 #include "CollapsedBorderValue.h"
-#include "DeleteButtonController.h"
 #include "Document.h"
 #include "FixedTableLayout.h"
 #include "FrameView.h"
@@ -49,8 +48,8 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderTable::RenderTable(Node* node)
-    : RenderBlock(node)
+RenderTable::RenderTable(Element* element)
+    : RenderBlock(element)
     , m_head(0)
     , m_foot(0)
     , m_firstBody(0)
@@ -113,10 +112,6 @@ static inline void resetSectionPointerIfNotBefore(RenderTableSection*& ptr, Rend
 
 void RenderTable::addChild(RenderObject* child, RenderObject* beforeChild)
 {
-    // Make sure we don't append things after :after-generated content if we have it.
-    if (!beforeChild)
-        beforeChild = afterPseudoElementRenderer();
-
     bool wrapInAnonymousSection = !child->isOutOfFlowPositioned();
 
     if (child->isTableCaption())
@@ -158,6 +153,9 @@ void RenderTable::addChild(RenderObject* child, RenderObject* beforeChild)
         wrapInAnonymousSection = true;
     else
         wrapInAnonymousSection = true;
+
+    if (child->isTableSection())
+        setNeedsSectionRecalc();
 
     if (!wrapInAnonymousSection) {
         if (beforeChild && beforeChild->parent() != this)
@@ -255,7 +253,7 @@ void RenderTable::updateLogicalWidth()
     LayoutUnit containerWidthInInlineDirection = hasPerpendicularContainingBlock ? perpendicularContainingBlockLogicalHeight() : availableLogicalWidth;
 
     Length styleLogicalWidth = style()->logicalWidth();
-    if (styleLogicalWidth.isSpecified() && styleLogicalWidth.isPositive())
+    if ((styleLogicalWidth.isSpecified() && styleLogicalWidth.isPositive()) || styleLogicalWidth.isIntrinsic())
         setLogicalWidth(convertStyleLogicalWidthToComputedWidth(styleLogicalWidth, containerWidthInInlineDirection));
     else {
         // Subtract out any fixed margins from our available width for auto width tables.
@@ -280,14 +278,14 @@ void RenderTable::updateLogicalWidth()
     
     // Ensure we aren't bigger than our max-width style.
     Length styleMaxLogicalWidth = style()->logicalMaxWidth();
-    if (styleMaxLogicalWidth.isSpecified() && !styleMaxLogicalWidth.isNegative()) {
+    if ((styleMaxLogicalWidth.isSpecified() && !styleMaxLogicalWidth.isNegative()) || styleMaxLogicalWidth.isIntrinsic()) {
         LayoutUnit computedMaxLogicalWidth = convertStyleLogicalWidthToComputedWidth(styleMaxLogicalWidth, availableLogicalWidth);
         setLogicalWidth(min<int>(logicalWidth(), computedMaxLogicalWidth));
     }
 
     // Ensure we aren't smaller than our min-width style.
     Length styleMinLogicalWidth = style()->logicalMinWidth();
-    if (styleMinLogicalWidth.isSpecified() && !styleMinLogicalWidth.isNegative()) {
+    if ((styleMinLogicalWidth.isSpecified() && !styleMinLogicalWidth.isNegative()) || styleMinLogicalWidth.isIntrinsic()) {
         LayoutUnit computedMinLogicalWidth = convertStyleLogicalWidthToComputedWidth(styleMinLogicalWidth, availableLogicalWidth);
         setLogicalWidth(max<int>(logicalWidth(), computedMinLogicalWidth));
     }
@@ -315,15 +313,38 @@ void RenderTable::updateLogicalWidth()
 // This method takes a RenderStyle's logical width, min-width, or max-width length and computes its actual value.
 LayoutUnit RenderTable::convertStyleLogicalWidthToComputedWidth(const Length& styleLogicalWidth, LayoutUnit availableWidth)
 {
+    if (styleLogicalWidth.isIntrinsic())
+        return computeIntrinsicLogicalWidthUsing(styleLogicalWidth, availableWidth, bordersPaddingAndSpacingInRowDirection());
+
     // HTML tables' width styles already include borders and paddings, but CSS tables' width styles do not.
     LayoutUnit borders = 0;
     bool isCSSTable = !node() || !node()->hasTagName(tableTag);
-    if (isCSSTable && styleLogicalWidth.isFixed() && styleLogicalWidth.isPositive()) {
-        recalcBordersInRowDirection();
-        if (style()->boxSizing() == CONTENT_BOX)
-            borders = borderStart() + borderEnd() + (collapseBorders() ? LayoutUnit() : paddingStart() + paddingEnd());
-    }
+    if (isCSSTable && styleLogicalWidth.isSpecified() && styleLogicalWidth.isPositive() && style()->boxSizing() == CONTENT_BOX)
+        borders = borderStart() + borderEnd() + (collapseBorders() ? LayoutUnit() : paddingStart() + paddingEnd());
+
     return minimumValueForLength(styleLogicalWidth, availableWidth, view()) + borders;
+}
+
+LayoutUnit RenderTable::convertStyleLogicalHeightToComputedHeight(const Length& styleLogicalHeight)
+{
+    LayoutUnit computedLogicalHeight = 0;
+    if (styleLogicalHeight.isFixed()) {
+        // HTML tables size as though CSS height includes border/padding, CSS tables do not.
+        LayoutUnit borders = LayoutUnit();
+        // FIXME: We cannot apply box-sizing: content-box on <table> which other browsers allow.
+        if ((node() && node()->hasTagName(tableTag)) || style()->boxSizing() == BORDER_BOX) {
+            LayoutUnit borderAndPaddingBefore = borderBefore() + (collapseBorders() ? LayoutUnit() : paddingBefore());
+            LayoutUnit borderAndPaddingAfter = borderAfter() + (collapseBorders() ? LayoutUnit() : paddingAfter());
+            borders = borderAndPaddingBefore + borderAndPaddingAfter;
+        }
+        computedLogicalHeight = styleLogicalHeight.value() - borders;
+    } else if (styleLogicalHeight.isPercent())
+        computedLogicalHeight = computePercentageLogicalHeight(styleLogicalHeight);
+    else if (styleLogicalHeight.isViewportPercentage())
+        computedLogicalHeight = minimumValueForLength(styleLogicalHeight, 0, view());
+    else
+        ASSERT_NOT_REACHED();
+    return max<LayoutUnit>(0, computedLogicalHeight);
 }
 
 void RenderTable::layoutCaption(RenderTableCaption* caption)
@@ -369,12 +390,14 @@ void RenderTable::layout()
         return;
 
     recalcSectionsIfNeeded();
+    // FIXME: We should do this recalc lazily in borderStart/borderEnd so that we don't have to make sure
+    // to call this before we call borderStart/borderEnd to avoid getting a stale value.
+    recalcBordersInRowDirection();
         
     LayoutRepainter repainter(*this, checkForRepaintDuringLayout());
     LayoutStateMaintainer statePusher(view(), this, locationOffset(), style()->isFlippedBlocksWritingMode());
 
     setLogicalHeight(0);
-    m_overflow.clear();
 
     initMaxMarginValues();
     
@@ -442,18 +465,23 @@ void RenderTable::layout()
     if (!isOutOfFlowPositioned())
         updateLogicalHeight();
 
-    Length logicalHeightLength = style()->logicalHeight();
     LayoutUnit computedLogicalHeight = 0;
-    if (logicalHeightLength.isFixed()) {
-        // HTML tables size as though CSS height includes border/padding, CSS tables do not.
-        LayoutUnit borders = 0;
-        // FIXME: We cannot apply box-sizing: content-box on <table> which other browsers allow.
-        if ((node() && node()->hasTagName(tableTag)) || style()->boxSizing() == BORDER_BOX)
-            borders = borderAndPaddingBefore + borderAndPaddingAfter;
-        computedLogicalHeight = logicalHeightLength.value() - borders;
-    } else if (logicalHeightLength.isPercent())
-        computedLogicalHeight = computePercentageLogicalHeight(logicalHeightLength);
-    computedLogicalHeight = max<LayoutUnit>(0, computedLogicalHeight);
+    
+    Length logicalHeightLength = style()->logicalHeight();
+    if (logicalHeightLength.isSpecified() && logicalHeightLength.isPositive())
+        computedLogicalHeight = convertStyleLogicalHeightToComputedHeight(logicalHeightLength);
+    
+    Length logicalMaxHeightLength = style()->logicalMaxHeight();
+    if (logicalMaxHeightLength.isSpecified() && !logicalMaxHeightLength.isNegative()) {
+        LayoutUnit computedMaxLogicalHeight = convertStyleLogicalHeightToComputedHeight(logicalMaxHeightLength);
+        computedLogicalHeight = min(computedLogicalHeight, computedMaxLogicalHeight);
+    }
+
+    Length logicalMinHeightLength = style()->logicalMinHeight();
+    if (logicalMinHeightLength.isSpecified() && !logicalMinHeightLength.isNegative()) {
+        LayoutUnit computedMinLogicalHeight = convertStyleLogicalHeightToComputedHeight(logicalMinHeightLength);
+        computedLogicalHeight = max(computedLogicalHeight, computedMinLogicalHeight);
+    }
 
     distributeExtraLogicalHeight(floorToInt(computedLogicalHeight - totalSectionLogicalHeight));
 
@@ -643,7 +671,7 @@ void RenderTable::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOffs
 
     // Paint outline.
     if ((paintPhase == PaintPhaseOutline || paintPhase == PaintPhaseSelfOutline) && hasOutline() && style()->visibility() == VISIBLE)
-        paintOutline(paintInfo.context, LayoutRect(paintOffset, size()));
+        paintOutline(paintInfo, LayoutRect(paintOffset, size()));
 }
 
 void RenderTable::subtractCaptionRect(LayoutRect& rect) const
@@ -671,9 +699,10 @@ void RenderTable::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint& p
     LayoutRect rect(paintOffset, size());
     subtractCaptionRect(rect);
 
-    if (!boxShadowShouldBeAppliedToBackground(determineBackgroundBleedAvoidance(paintInfo.context)))
+    BackgroundBleedAvoidance bleedAvoidance = determineBackgroundBleedAvoidance(paintInfo.context);
+    if (!boxShadowShouldBeAppliedToBackground(bleedAvoidance))
         paintBoxShadow(paintInfo, rect, style(), Normal);
-    paintBackground(paintInfo, rect);
+    paintBackground(paintInfo, rect, bleedAvoidance);
     paintBoxShadow(paintInfo, rect, style(), Inset);
 
     if (style()->hasBorder() && !collapseBorders())
@@ -691,18 +720,49 @@ void RenderTable::paintMask(PaintInfo& paintInfo, const LayoutPoint& paintOffset
     paintMaskImages(paintInfo, rect);
 }
 
+void RenderTable::computeIntrinsicLogicalWidths(LayoutUnit& minWidth, LayoutUnit& maxWidth) const
+{
+    recalcSectionsIfNeeded();
+    // FIXME: Do the recalc in borderStart/borderEnd and make those const_cast this call.
+    // Then m_borderStart/m_borderEnd will be transparent a cache and it removes the possibility
+    // of reading out stale values.
+    const_cast<RenderTable*>(this)->recalcBordersInRowDirection();
+    // FIXME: Restructure the table layout code so that we can make this method const.
+    const_cast<RenderTable*>(this)->m_tableLayout->computeIntrinsicLogicalWidths(minWidth, maxWidth);
+
+    // FIXME: We should include captions widths here like we do in computePreferredLogicalWidths.
+}
+
 void RenderTable::computePreferredLogicalWidths()
 {
     ASSERT(preferredLogicalWidthsDirty());
 
-    recalcSectionsIfNeeded();
-    recalcBordersInRowDirection();
+    computeIntrinsicLogicalWidths(m_minPreferredLogicalWidth, m_maxPreferredLogicalWidth);
 
-    m_tableLayout->computePreferredLogicalWidths(m_minPreferredLogicalWidth, m_maxPreferredLogicalWidth);
+    int bordersPaddingAndSpacing = bordersPaddingAndSpacingInRowDirection();
+    m_minPreferredLogicalWidth += bordersPaddingAndSpacing;
+    m_maxPreferredLogicalWidth += bordersPaddingAndSpacing;
+
+    m_tableLayout->applyPreferredLogicalWidthQuirks(m_minPreferredLogicalWidth, m_maxPreferredLogicalWidth);
 
     for (unsigned i = 0; i < m_captions.size(); i++)
         m_minPreferredLogicalWidth = max(m_minPreferredLogicalWidth, m_captions[i]->minPreferredLogicalWidth());
 
+    RenderStyle* styleToUse = style();
+    // FIXME: This should probably be checking for isSpecified since you should be able to use percentage, calc or viewport relative values for min-width.
+    if (styleToUse->logicalMinWidth().isFixed() && styleToUse->logicalMinWidth().value() > 0) {
+        m_maxPreferredLogicalWidth = std::max(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalMinWidth().value()));
+        m_minPreferredLogicalWidth = std::max(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalMinWidth().value()));
+    }
+
+    // FIXME: This should probably be checking for isSpecified since you should be able to use percentage, calc or viewport relative values for maxWidth.
+    if (styleToUse->logicalMaxWidth().isFixed()) {
+        m_maxPreferredLogicalWidth = std::min(m_maxPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalMaxWidth().value()));
+        m_minPreferredLogicalWidth = std::min(m_minPreferredLogicalWidth, adjustContentBoxLogicalWidthForBoxSizing(styleToUse->logicalMaxWidth().value()));
+    }
+
+    // FIXME: We should be adding borderAndPaddingLogicalWidth here, but m_tableLayout->computePreferredLogicalWidths already does,
+    // so a bunch of tests break doing this naively.
     setPreferredLogicalWidthsDirty(false);
 }
 
@@ -735,7 +795,6 @@ void RenderTable::splitColumn(unsigned position, unsigned firstSpan)
     }
 
     m_columnPos.grow(numEffCols() + 1);
-    setNeedsLayoutAndPrefWidthsRecalc();
 }
 
 void RenderTable::appendColumn(unsigned span)
@@ -757,7 +816,6 @@ void RenderTable::appendColumn(unsigned span)
     }
 
     m_columnPos.grow(numEffCols() + 1);
-    setNeedsLayoutAndPrefWidthsRecalc();
 }
 
 RenderTableCol* RenderTable::firstColumn() const
@@ -1341,7 +1399,8 @@ bool RenderTable::nodeAtPoint(const HitTestRequest& request, HitTestResult& resu
 RenderTable* RenderTable::createAnonymousWithParentRenderer(const RenderObject* parent)
 {
     RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parent->style(), TABLE);
-    RenderTable* newTable = new (parent->renderArena()) RenderTable(parent->document() /* is anonymous */);
+    RenderTable* newTable = new (parent->renderArena()) RenderTable(0);
+    newTable->setDocumentForAnonymous(parent->document());
     newTable->setStyle(newStyle.release());
     return newTable;
 }

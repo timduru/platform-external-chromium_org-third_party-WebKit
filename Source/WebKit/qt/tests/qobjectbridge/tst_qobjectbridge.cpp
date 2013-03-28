@@ -33,7 +33,6 @@ Q_DECLARE_METATYPE(CustomType)
 Q_DECLARE_METATYPE(QBrush*)
 Q_DECLARE_METATYPE(QObjectList)
 Q_DECLARE_METATYPE(QList<int>)
-Q_DECLARE_METATYPE(Qt::BrushStyle)
 Q_DECLARE_METATYPE(QVariantList)
 Q_DECLARE_METATYPE(QVariantMap)
 
@@ -377,7 +376,8 @@ public:
     Q_INVOKABLE void myInvokableWithBrushStyleArg(Qt::BrushStyle style)
     {
         m_qtFunctionInvoked = 43;
-        m_actuals << QVariant::fromValue(style);
+        // Qt::BrushStyle isn't registered and this shouldn't be reached.
+        QVERIFY(false);
     }
     Q_INVOKABLE void myInvokableWithVoidStarArg(void* arg)
     {
@@ -1572,26 +1572,26 @@ void tst_QObjectBridge::connectAndDisconnect()
         QString type;
         QString ret = evalJS("(function() { }).connect()", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: 'undefined' is not a function"));
+        QCOMPARE(ret, QLatin1String("TypeError: 'undefined' is not a function (evaluating '(function() { }).connect()')"));
     }
     {
         QString type;
         QString ret = evalJS("var o = { }; o.connect = Function.prototype.connect;  o.connect()", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: 'undefined' is not a function"));
+        QCOMPARE(ret, QLatin1String("TypeError: 'undefined' is not a function (evaluating 'o.connect()')"));
     }
 
     {
         QString type;
         QString ret = evalJS("(function() { }).connect(123)", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: 'undefined' is not a function"));
+        QCOMPARE(ret, QLatin1String("TypeError: 'undefined' is not a function (evaluating '(function() { }).connect(123)')"));
     }
     {
         QString type;
         QString ret = evalJS("var o = { }; o.connect = Function.prototype.connect;  o.connect(123)", type);
         QCOMPARE(type, sError);
-        QCOMPARE(ret, QLatin1String("TypeError: 'undefined' is not a function"));
+        QCOMPARE(ret, QLatin1String("TypeError: 'undefined' is not a function (evaluating 'o.connect(123)')"));
     }
 
     {

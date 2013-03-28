@@ -41,6 +41,7 @@
 namespace WebCore {
     class HTTPHeaderMap;
     class ProtectionSpace;
+    class SharedBuffer;
 }
 
 namespace WebKit {
@@ -82,8 +83,6 @@ public:
     static unsigned buttonState();
 #endif
 
-#elif PLATFORM(WIN)
-    HWND containingWindow();
 #endif
 
     PluginQuirks quirks() const { return m_pluginModule->pluginQuirks(); }
@@ -154,6 +153,7 @@ private:
 
     const char* userAgent();
 
+    void platformPreInitialize();
     bool platformPostInitialize();
     void platformDestroy();
     bool platformInvalidate(const WebCore::IntRect&);
@@ -208,10 +208,14 @@ private:
     virtual bool isEditingCommandEnabled(const String&) OVERRIDE;
 
     virtual bool shouldAllowScripting() OVERRIDE;
+    virtual bool shouldAllowNavigationFromDrags() OVERRIDE;
     
     virtual bool handlesPageScaleFactor() OVERRIDE;
 
     virtual NPObject* pluginScriptableNPObject();
+    
+    virtual unsigned countFindMatches(const String&, WebCore::FindOptions, unsigned maxMatchCount) OVERRIDE;
+    virtual bool findString(const String&, WebCore::FindOptions, unsigned maxMatchCount) OVERRIDE;
 
 #if PLATFORM(MAC)
     virtual void windowFocusChanged(bool);
@@ -239,11 +243,17 @@ private:
     bool supportsSnapshotting() const;
 
     // Convert the given point from plug-in coordinates to root view coordinates.
-    WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const;
+    virtual WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const OVERRIDE;
 
     // Convert the given point from root view coordinates to plug-in coordinates. Returns false if the point can't be
     // converted (if the transformation matrix isn't invertible).
     bool convertFromRootView(const WebCore::IntPoint& pointInRootViewCoordinates, WebCore::IntPoint& pointInPluginCoordinates);
+
+    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const OVERRIDE;
+
+    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) OVERRIDE { return false; }
+
+    virtual String getSelectionString() const OVERRIDE { return String(); }
 
     void updateNPNPrivateMode();
 

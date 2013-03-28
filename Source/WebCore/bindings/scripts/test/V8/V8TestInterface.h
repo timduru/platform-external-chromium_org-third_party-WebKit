@@ -18,11 +18,10 @@
     Boston, MA 02111-1307, USA.
 */
 
-#if ENABLE(Condition1) || ENABLE(Condition2)
-
 #ifndef V8TestInterface_h
 #define V8TestInterface_h
 
+#if ENABLE(Condition1) || ENABLE(Condition2)
 #include "TestInterface.h"
 #include "V8Binding.h"
 #include "V8DOMWrapper.h"
@@ -36,41 +35,98 @@ namespace WebCore {
 class V8TestInterface {
 public:
     static const bool hasDependentLifetime = true;
-    static bool HasInstance(v8::Handle<v8::Value>);
-    static v8::Persistent<v8::FunctionTemplate> GetRawTemplate();
-    static v8::Persistent<v8::FunctionTemplate> GetTemplate();
+    static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
+    static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
+    static v8::Persistent<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static TestInterface* toNative(v8::Handle<v8::Object> object)
     {
-        return reinterpret_cast<TestInterface*>(object->GetPointerFromInternalField(v8DOMWrapperObjectIndex));
+        return reinterpret_cast<TestInterface*>(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
-    inline static v8::Handle<v8::Object> wrap(TestInterface*, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* = 0);
     static void derefObject(void*);
     static WrapperTypeInfo info;
     static ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object>);
     static v8::Handle<v8::Value> constructorCallback(const v8::Arguments&);
     static v8::Handle<v8::Value> namedPropertySetter(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::AccessorInfo&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
-    static void installPerContextProperties(v8::Handle<v8::Object>, TestInterface*) { }
-    static void installPerContextPrototypeProperties(v8::Handle<v8::Object>) { }
+    static void installPerContextProperties(v8::Handle<v8::Object>, TestInterface*, v8::Isolate*) { }
+    static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
 private:
-    static v8::Handle<v8::Object> wrapSlow(PassRefPtr<TestInterface>, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+    friend v8::Handle<v8::Object> wrap(TestInterface*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+    static v8::Handle<v8::Object> createWrapper(PassRefPtr<TestInterface>, v8::Handle<v8::Object> creationContext, v8::Isolate*);
 };
 
-v8::Handle<v8::Object> V8TestInterface::wrap(TestInterface* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+template<>
+class WrapperTypeTraits<TestInterface > {
+public:
+    static WrapperTypeInfo* info() { return &V8TestInterface::info; }
+};
+
+
+inline v8::Handle<v8::Object> wrap(TestInterface* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-        v8::Handle<v8::Object> wrapper = DOMDataStore::current(isolate)->get(impl);
-        if (!wrapper.IsEmpty())
-            return wrapper;
-    return V8TestInterface::wrapSlow(impl, creationContext, isolate);
+    ASSERT(impl);
+    ASSERT(DOMDataStore::getWrapper(impl, isolate).IsEmpty());
+    return V8TestInterface::createWrapper(impl, creationContext, isolate);
 }
 
-inline v8::Handle<v8::Value> toV8(TestInterface* impl, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* isolate = 0)
+inline v8::Handle<v8::Value> toV8(TestInterface* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
-    if (!impl)
+    if (UNLIKELY(!impl))
         return v8NullWithCheck(isolate);
-    return V8TestInterface::wrap(impl, creationContext, isolate);
+    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapper(impl, isolate);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, creationContext, isolate);
 }
-inline v8::Handle<v8::Value> toV8(PassRefPtr< TestInterface > impl, v8::Handle<v8::Object> creationContext = v8::Handle<v8::Object>(), v8::Isolate* isolate = 0)
+
+inline v8::Handle<v8::Value> toV8ForMainWorld(TestInterface* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+{
+    ASSERT(worldType(isolate) == MainWorld);
+    if (UNLIKELY(!impl))
+        return v8NullWithCheck(isolate);
+    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapperForMainWorld(impl);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, creationContext, isolate);
+}
+
+template<class HolderContainer, class Wrappable>
+inline v8::Handle<v8::Value> toV8Fast(TestInterface* impl, const HolderContainer& container, Wrappable* wrappable)
+{
+    if (UNLIKELY(!impl))
+        return v8Null(container.GetIsolate());
+    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperFast(impl, container, wrappable);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, container.Holder(), container.GetIsolate());
+}
+
+template<class HolderContainer, class Wrappable>
+inline v8::Handle<v8::Value> toV8FastForMainWorld(TestInterface* impl, const HolderContainer& container, Wrappable* wrappable)
+{
+    ASSERT(worldType(container.GetIsolate()) == MainWorld);
+    if (UNLIKELY(!impl))
+        return v8Null(container.GetIsolate());
+    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperForMainWorld(impl);
+    if (!wrapper.IsEmpty())
+        return wrapper;
+    return wrap(impl, container.Holder(), container.GetIsolate());
+}
+
+template<class HolderContainer, class Wrappable>
+inline v8::Handle<v8::Value> toV8FastForMainWorld(PassRefPtr< TestInterface > impl, const HolderContainer& container, Wrappable* wrappable)
+{
+    return toV8FastForMainWorld(impl.get(), container, wrappable);
+}
+
+
+template<class HolderContainer, class Wrappable>
+inline v8::Handle<v8::Value> toV8Fast(PassRefPtr< TestInterface > impl, const HolderContainer& container, Wrappable* wrappable)
+{
+    return toV8Fast(impl.get(), container, wrappable);
+}
+
+inline v8::Handle<v8::Value> toV8(PassRefPtr< TestInterface > impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     return toV8(impl.get(), creationContext, isolate);
 }

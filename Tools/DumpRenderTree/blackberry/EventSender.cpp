@@ -26,6 +26,7 @@
 #include "DumpRenderTreeSupport.h"
 #include "IntPoint.h"
 #include "NotImplemented.h"
+#include "WebKitThreadViewportAccessor.h"
 #include "WebPage.h"
 
 #include <BlackBerryPlatformKeyboardEvent.h>
@@ -70,17 +71,34 @@ static JSValueRef contextClickCallback(JSContextRef context, JSObjectRef functio
     return JSValueMakeUndefined(context);
 }
 
+void setMouseEventDocumentPos(BlackBerry::Platform::MouseEvent &event, const BlackBerry::WebKit::WebPage* page)
+{
+    // We have added document viewport position and document content position as members of the mouse event, when we create the event, we should initialize them as well.
+    BlackBerry::Platform::ViewportAccessor* viewportAccessor = page->webkitThreadViewportAccessor();
+    IntPoint documentContentPos = viewportAccessor->roundToDocumentFromPixelContents(BlackBerry::Platform::FloatPoint(viewportAccessor->pixelContentsFromViewport(lastMousePosition)));
+    IntPoint documentViewportMousePos = viewportAccessor->roundToDocumentFromPixelContents(BlackBerry::Platform::FloatPoint(lastMousePosition));
+    event.populateDocumentPosition(documentViewportMousePos, documentContentPos);
+}
+
 static JSValueRef mouseDownCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     BlackBerry::WebKit::WebPage* page = BlackBerry::WebKit::DumpRenderTree::currentInstance()->page();
-    page->mouseEvent(BlackBerry::Platform::MouseEvent(BlackBerry::Platform::MouseEvent::ScreenLeftMouseButton, 0, lastMousePosition, IntPoint::zero(), 0, 0));
+    BlackBerry::Platform::MouseEvent event(BlackBerry::Platform::MouseEvent::ScreenLeftMouseButton, 0, lastMousePosition, IntPoint::zero(), 0, 0, 0);
+
+    setMouseEventDocumentPos(event, page);
+
+    page->mouseEvent(event);
     return JSValueMakeUndefined(context);
 }
 
 static JSValueRef mouseUpCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     BlackBerry::WebKit::WebPage* page = BlackBerry::WebKit::DumpRenderTree::currentInstance()->page();
-    page->mouseEvent(BlackBerry::Platform::MouseEvent(0, BlackBerry::Platform::MouseEvent::ScreenLeftMouseButton, lastMousePosition, IntPoint::zero(), 0, 0));
+    BlackBerry::Platform::MouseEvent event(0, BlackBerry::Platform::MouseEvent::ScreenLeftMouseButton, lastMousePosition, IntPoint::zero(), 0, 0, 0);
+
+    setMouseEventDocumentPos(event, page);
+
+    page->mouseEvent(event);
     return JSValueMakeUndefined(context);
 }
 
@@ -96,8 +114,11 @@ static JSValueRef mouseMoveToCallback(JSContextRef context, JSObjectRef function
 
     lastMousePosition = IntPoint(x, y);
     BlackBerry::WebKit::WebPage* page = BlackBerry::WebKit::DumpRenderTree::currentInstance()->page();
-    page->mouseEvent(BlackBerry::Platform::MouseEvent(BlackBerry::Platform::MouseEvent::ScreenLeftMouseButton, BlackBerry::Platform::MouseEvent::ScreenLeftMouseButton, lastMousePosition, IntPoint::zero(), 0, 0));
+    BlackBerry::Platform::MouseEvent event(BlackBerry::Platform::MouseEvent::ScreenLeftMouseButton, BlackBerry::Platform::MouseEvent::ScreenLeftMouseButton, lastMousePosition, IntPoint::zero(), 0, 0, 0);
 
+    setMouseEventDocumentPos(event, page);
+
+    page->mouseEvent(event);
 
     return JSValueMakeUndefined(context);
 }
@@ -121,7 +142,7 @@ static JSValueRef keyDownCallback(JSContextRef context, JSObjectRef function, JS
 
     JSStringRef character = JSValueToStringCopy(context, arguments[0], exception);
     ASSERT(!*exception);
-    short charCode = 0;
+    unsigned charCode = 0;
     bool needsShiftKeyModifier = false;
     if (JSStringIsEqualToUTF8CString(character, "leftArrow"))
         charCode = KEYCODE_LEFT;
@@ -221,12 +242,16 @@ static JSValueRef addTouchPointCallback(JSContextRef context, JSObjectRef functi
     int y = static_cast<int>(JSValueToNumber(context, arguments[1], exception));
     ASSERT(!exception || !*exception);
 
-    BlackBerry::Platform::TouchPoint touch;
-    touch.m_id = touches.isEmpty() ? 0 : touches.last().m_id + 1;
+    int id = touches.isEmpty() ? 0 : touches.last().id() + 1;
+
+    // pixelViewportPosition is unused in the WebKit layer, so use this for screen position
     IntPoint pos(x, y);
-    touch.m_pos = pos;
-    touch.m_screenPos = pos;
-    touch.m_state = BlackBerry::Platform::TouchPoint::TouchPressed;
+
+    BlackBerry::Platform::TouchPoint touch(id, BlackBerry::Platform::TouchPoint::TouchPressed, pos, pos, 0);
+
+    // Unfortunately we don't know the scroll position at this point, so use pos for the content position too.
+    // This assumes scroll position is 0,0
+    touch.populateDocumentPosition(pos, pos);
 
     touches.append(touch);
 
@@ -249,10 +274,15 @@ static JSValueRef updateTouchPointCallback(JSContextRef context, JSObjectRef fun
         return JSValueMakeUndefined(context);
 
     BlackBerry::Platform::TouchPoint& touch = touches[index];
+
+    // pixelViewportPosition is unused in the WebKit layer
     IntPoint pos(x, y);
-    touch.m_pos = pos;
-    touch.m_screenPos = pos;
-    touch.m_state = BlackBerry::Platform::TouchPoint::TouchMoved;
+
+    // Unfortunately we don't know the scroll position at this point, so use pos for the content position too.
+    // This assumes scroll position is 0,0
+    touch.populateDocumentPosition(pos, pos);
+    touch.setScreenPosition(pos);
+    touch.updateState(BlackBerry::Platform::TouchPoint::TouchMoved);
 
     return JSValueMakeUndefined(context);
 }
@@ -288,7 +318,7 @@ static JSValueRef touchMoveCallback(JSContextRef context, JSObjectRef function, 
 static JSValueRef touchEndCallback(JSContextRef context, JSObjectRef function, JSObjectRef thisObject, size_t argumentCount, const JSValueRef arguments[], JSValueRef* exception)
 {
     for (unsigned i = 0; i < touches.size(); ++i)
-        if (touches[i].m_state != BlackBerry::Platform::TouchPoint::TouchReleased) {
+        if (touches[i].state() != BlackBerry::Platform::TouchPoint::TouchReleased) {
             sendTouchEvent(BlackBerry::Platform::TouchEvent::TouchMove);
             return JSValueMakeUndefined(context);
         }
@@ -320,7 +350,7 @@ static JSValueRef releaseTouchPointCallback(JSContextRef context, JSObjectRef fu
     if (index < 0 || index >= (int)touches.size())
         return JSValueMakeUndefined(context);
 
-    touches[index].m_state = BlackBerry::Platform::TouchPoint::TouchReleased;
+    touches[index].updateState(BlackBerry::Platform::TouchPoint::TouchReleased);
     return JSValueMakeUndefined(context);
 }
 
@@ -334,8 +364,8 @@ void sendTouchEvent(BlackBerry::Platform::TouchEvent::Type type)
     Vector<BlackBerry::Platform::TouchPoint> t;
 
     for (Vector<BlackBerry::Platform::TouchPoint>::iterator it = touches.begin(); it != touches.end(); ++it) {
-        if (it->m_state != BlackBerry::Platform::TouchPoint::TouchReleased) {
-            it->m_state = BlackBerry::Platform::TouchPoint::TouchStationary;
+        if (it->state() != BlackBerry::Platform::TouchPoint::TouchReleased) {
+            it->updateState(BlackBerry::Platform::TouchPoint::TouchStationary);
             t.append(*it);
         }
     }

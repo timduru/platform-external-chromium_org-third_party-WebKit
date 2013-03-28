@@ -26,6 +26,7 @@
 #include "HTMLFormElement.h"
 
 #include "Attribute.h"
+#include "AutocompleteErrorEvent.h"
 #include "DOMFormData.h"
 #include "DOMWindow.h"
 #include "Document.h"
@@ -40,13 +41,14 @@
 #include "Frame.h"
 #include "FrameLoader.h"
 #include "FrameLoaderClient.h"
+#include "HTMLCollection.h"
 #include "HTMLDocument.h"
-#include "HTMLFormCollection.h"
 #include "HTMLImageElement.h"
 #include "HTMLInputElement.h"
 #include "HTMLNames.h"
 #include "MIMETypeRegistry.h"
 #include "NodeRenderingContext.h"
+#include "NodeTraversal.h"
 #include "Page.h"
 #include "RenderTextControl.h"
 #include "ScriptEventListener.h"
@@ -137,6 +139,8 @@ bool HTMLFormElement::rendererIsNeeded(const NodeRenderingContext& context)
 Node::InsertionNotificationRequest HTMLFormElement::insertedInto(ContainerNode* insertionPoint)
 {
     HTMLElement::insertedInto(insertionPoint);
+    if (insertionPoint->inDocument())
+        this->document()->didAssociateFormControl(this);
     return InsertionDone;
 }
 
@@ -203,13 +207,11 @@ void HTMLFormElement::submitImplicitly(Event* event, bool fromImplicitSubmission
 
 static inline HTMLFormControlElement* submitElementFromEvent(const Event* event)
 {
-    Node* targetNode = event->target()->toNode();
-    if (!targetNode || !targetNode->isElementNode())
-        return 0;
-    Element* targetElement = static_cast<Element*>(targetNode);
-    if (!targetElement->isFormControlElement())
-        return 0;
-    return static_cast<HTMLFormControlElement*>(targetElement);
+    for (Node* node = event->target()->toNode(); node; node = node->parentNode()) {
+        if (node->isElementNode() && toElement(node)->isFormControlElement())
+            return static_cast<HTMLFormControlElement*>(node);
+    }
+    return 0;
 }
 
 bool HTMLFormElement::validateInteractively(Event* event)
@@ -259,7 +261,7 @@ bool HTMLFormElement::validateInteractively(Event* event)
                 continue;
             String message("An invalid form control with name='%name' is not focusable.");
             message.replace("%name", unhandledAssociatedElement->name());
-            document()->addConsoleMessage(HTMLMessageSource, LogMessageType, ErrorMessageLevel, message, document()->url().string());
+            document()->addConsoleMessage(RenderingMessageSource, ErrorMessageLevel, message);
         }
     }
     return false;
@@ -397,8 +399,8 @@ void HTMLFormElement::requestAutocomplete()
     if (!frame)
         return;
 
-    if (!shouldAutocomplete()) {
-        finishRequestAutocomplete(AutocompleteResultError);
+    if (!shouldAutocomplete() || !ScriptController::processingUserGesture()) {
+        finishRequestAutocomplete(AutocompleteResultErrorDisabled);
         return;
     }
 
@@ -410,7 +412,16 @@ void HTMLFormElement::requestAutocomplete()
 
 void HTMLFormElement::finishRequestAutocomplete(AutocompleteResult result)
 {
-    RefPtr<Event> event(Event::create(result == AutocompleteResultSuccess ? eventNames().autocompleteEvent : eventNames().autocompleteerrorEvent, false, false));
+    RefPtr<Event> event;
+    if (result == AutocompleteResultSuccess)
+        event = Event::create(eventNames().autocompleteEvent, false, false);
+    else if (result == AutocompleteResultErrorDisabled)
+        event = AutocompleteErrorEvent::create("disabled");
+    else if (result == AutocompleteResultErrorCancel)
+        event = AutocompleteErrorEvent::create("cancel");
+    else if (result == AutocompleteResultErrorInvalid)
+        event = AutocompleteErrorEvent::create("invalid");
+
     event->setTarget(this);
     m_pendingAutocompleteEvents.append(event.release());
 
@@ -428,35 +439,35 @@ void HTMLFormElement::requestAutocompleteTimerFired(Timer<HTMLFormElement>*)
 }
 #endif
 
-void HTMLFormElement::parseAttribute(const Attribute& attribute)
+void HTMLFormElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == actionAttr)
-        m_attributes.parseAction(attribute.value());
-    else if (attribute.name() == targetAttr)
-        m_attributes.setTarget(attribute.value());
-    else if (attribute.name() == methodAttr)
-        m_attributes.updateMethodType(attribute.value());
-    else if (attribute.name() == enctypeAttr)
-        m_attributes.updateEncodingType(attribute.value());
-    else if (attribute.name() == accept_charsetAttr)
-        m_attributes.setAcceptCharset(attribute.value());
-    else if (attribute.name() == autocompleteAttr) {
+    if (name == actionAttr)
+        m_attributes.parseAction(value);
+    else if (name == targetAttr)
+        m_attributes.setTarget(value);
+    else if (name == methodAttr)
+        m_attributes.updateMethodType(value);
+    else if (name == enctypeAttr)
+        m_attributes.updateEncodingType(value);
+    else if (name == accept_charsetAttr)
+        m_attributes.setAcceptCharset(value);
+    else if (name == autocompleteAttr) {
         if (!shouldAutocomplete())
             document()->registerForPageCacheSuspensionCallbacks(this);
         else
             document()->unregisterForPageCacheSuspensionCallbacks(this);
-    } else if (attribute.name() == onsubmitAttr)
-        setAttributeEventListener(eventNames().submitEvent, createAttributeEventListener(this, attribute));
-    else if (attribute.name() == onresetAttr)
-        setAttributeEventListener(eventNames().resetEvent, createAttributeEventListener(this, attribute));
+    } else if (name == onsubmitAttr)
+        setAttributeEventListener(eventNames().submitEvent, createAttributeEventListener(this, name, value));
+    else if (name == onresetAttr)
+        setAttributeEventListener(eventNames().resetEvent, createAttributeEventListener(this, name, value));
 #if ENABLE(REQUEST_AUTOCOMPLETE)
-    else if (attribute.name() == onautocompleteAttr)
-        setAttributeEventListener(eventNames().autocompleteEvent, createAttributeEventListener(this, attribute));
-    else if (attribute.name() == onautocompleteerrorAttr)
-        setAttributeEventListener(eventNames().autocompleteerrorEvent, createAttributeEventListener(this, attribute));
+    else if (name == onautocompleteAttr)
+        setAttributeEventListener(eventNames().autocompleteEvent, createAttributeEventListener(this, name, value));
+    else if (name == onautocompleteerrorAttr)
+        setAttributeEventListener(eventNames().autocompleteerrorEvent, createAttributeEventListener(this, name, value));
 #endif
     else
-        HTMLElement::parseAttribute(attribute);
+        HTMLElement::parseAttribute(name, value);
 }
 
 template<class T, size_t n> static void removeFromVector(Vector<T*, n> & vec, T* item)
@@ -504,36 +515,36 @@ unsigned HTMLFormElement::formElementIndexWithFormAttribute(Element* element, un
 
 unsigned HTMLFormElement::formElementIndex(FormAssociatedElement* associatedElement)
 {
-    HTMLElement* element = toHTMLElement(associatedElement);
+    HTMLElement* associatedHTMLElement = toHTMLElement(associatedElement);
     // Treats separately the case where this element has the form attribute
     // for performance consideration.
-    if (element->fastHasAttribute(formAttr)) {
-        unsigned short position = compareDocumentPosition(element);
+    if (associatedHTMLElement->fastHasAttribute(formAttr)) {
+        unsigned short position = compareDocumentPosition(associatedHTMLElement);
         if (position & DOCUMENT_POSITION_PRECEDING) {
             ++m_associatedElementsBeforeIndex;
             ++m_associatedElementsAfterIndex;
-            return HTMLFormElement::formElementIndexWithFormAttribute(element, 0, m_associatedElementsBeforeIndex - 1);
+            return HTMLFormElement::formElementIndexWithFormAttribute(associatedHTMLElement, 0, m_associatedElementsBeforeIndex - 1);
         }
         if (position & DOCUMENT_POSITION_FOLLOWING && !(position & DOCUMENT_POSITION_CONTAINED_BY))
-            return HTMLFormElement::formElementIndexWithFormAttribute(element, m_associatedElementsAfterIndex, m_associatedElements.size());
+            return HTMLFormElement::formElementIndexWithFormAttribute(associatedHTMLElement, m_associatedElementsAfterIndex, m_associatedElements.size());
     }
 
     // Check for the special case where this element is the very last thing in
     // the form's tree of children; we don't want to walk the entire tree in that
     // common case that occurs during parsing; instead we'll just return a value
     // that says "add this form element to the end of the array".
-    if (element->traverseNextNode(this)) {
+    if (ElementTraversal::next(associatedHTMLElement, this)) {
         unsigned i = m_associatedElementsBeforeIndex;
-        for (Node* node = this; node; node = node->traverseNextNode(this)) {
-            if (node == element) {
+        for (Element* element = this; element; element = ElementTraversal::next(element, this)) {
+            if (element == associatedHTMLElement) {
                 ++m_associatedElementsAfterIndex;
                 return i;
             }
-            if (node->isHTMLElement()
-                    && (static_cast<Element*>(node)->isFormControlElement()
-                        || node->hasTagName(objectTag))
-                    && toHTMLElement(node)->form() == this)
-                ++i;
+            if (!element->isFormControlElement() && !element->hasTagName(objectTag))
+                continue;
+            if (!element->isHTMLElement() || toHTMLElement(element)->form() != this)
+                continue;
+            ++i;
         }
     }
     return m_associatedElementsAfterIndex++;
@@ -551,7 +562,7 @@ void HTMLFormElement::removeFormElement(FormAssociatedElement* e)
         if (m_associatedElements[index] == e)
             break;
     }
-    ASSERT(index < m_associatedElements.size());
+    ASSERT_WITH_SECURITY_IMPLICATION(index < m_associatedElements.size());
     if (index < m_associatedElementsBeforeIndex)
         --m_associatedElementsBeforeIndex;
     if (index < m_associatedElementsAfterIndex)

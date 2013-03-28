@@ -89,4 +89,9 @@ PassRefPtr<Image> StyleGeneratedImage::image(RenderObject* renderer, const IntSi
     return m_imageGeneratorValue->image(renderer, size);
 }
 
+bool StyleGeneratedImage::knownToBeOpaque(const RenderObject* renderer) const
+{
+    return m_imageGeneratorValue->knownToBeOpaque(renderer);
+}
+
 }

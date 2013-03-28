@@ -4,7 +4,6 @@
 // found in the LICENSE file.
 //
 
-#include "compiler/ArrayBoundsClamper.h"
 #include "compiler/BuiltInFunctionEmulator.h"
 #include "compiler/DetectRecursion.h"
 #include "compiler/ForLoopUnroll.h"
@@ -15,10 +14,12 @@
 #include "compiler/RenameFunction.h"
 #include "compiler/ShHandle.h"
 #include "compiler/ValidateLimitations.h"
+#include "compiler/VariablePacker.h"
 #include "compiler/depgraph/DependencyGraph.h"
 #include "compiler/depgraph/DependencyGraphOutput.h"
 #include "compiler/timing/RestrictFragmentShaderTiming.h"
 #include "compiler/timing/RestrictVertexShaderTiming.h"
+#include "third_party/compiler/ArrayBoundsClamper.h"
 
 bool isWebGLBasedSpec(ShShaderSpec spec)
 {
@@ -37,6 +38,7 @@ bool InitializeSymbolTable(
     // The builtins deliberately don't specify precisions for the function
     // arguments and return types. For that reason we don't try to check them.
     TParseContext parseContext(symbolTable, extBehavior, intermediate, type, spec, 0, false, NULL, infoSink);
+    parseContext.fragmentPrecisionHigh = resources.FragmentPrecisionHigh == 1;
 
     GlobalParseContext = &parseContext;
 
@@ -101,6 +103,8 @@ TShHandleBase::~TShHandleBase() {
 TCompiler::TCompiler(ShShaderType type, ShShaderSpec spec)
     : shaderType(type),
       shaderSpec(spec),
+      fragmentPrecisionHigh(false),
+      clampingStrategy(SH_CLAMP_WITH_CLAMP_INTRINSIC),
       builtInFunctionEmulator(type)
 {
     longNameMap = LongNameMap::GetInstance();
@@ -114,18 +118,27 @@ TCompiler::~TCompiler()
 
 bool TCompiler::Init(const ShBuiltInResources& resources)
 {
+    maxUniformVectors = (shaderType == SH_VERTEX_SHADER) ?
+        resources.MaxVertexUniformVectors :
+        resources.MaxFragmentUniformVectors;
     TScopedPoolAllocator scopedAlloc(&allocator, false);
 
     // Generate built-in symbol table.
     if (!InitBuiltInSymbolTable(resources))
         return false;
     InitExtensionBehavior(resources, extensionBehavior);
+    fragmentPrecisionHigh = resources.FragmentPrecisionHigh == 1;
+
+    arrayBoundsClamper.SetClampingStrategy(resources.ArrayIndexClampingStrategy);
+    clampingStrategy = resources.ArrayIndexClampingStrategy;
+
+    hashFunction = resources.HashFunction;
 
     return true;
 }
 
 bool TCompiler::compile(const char* const shaderStrings[],
-                        const int numStrings,
+                        size_t numStrings,
                         int compileOptions)
 {
     TScopedPoolAllocator scopedAlloc(&allocator, true);
@@ -140,7 +153,7 @@ bool TCompiler::compile(const char* const shaderStrings[],
 
     // First string is path of source file if flag is set. The actual source follows.
     const char* sourcePath = NULL;
-    int firstSource = 0;
+    size_t firstSource = 0;
     if (compileOptions & SH_SOURCE_PATH)
     {
         sourcePath = shaderStrings[0];
@@ -151,6 +164,7 @@ bool TCompiler::compile(const char* const shaderStrings[],
     TParseContext parseContext(symbolTable, extensionBehavior, intermediate,
                                shaderType, shaderSpec, compileOptions, true,
                                sourcePath, infoSink);
+    parseContext.fragmentPrecisionHigh = fragmentPrecisionHigh;
     GlobalParseContext = &parseContext;
 
     // We preserve symbols at the built-in level from compile-to-compile.
@@ -194,11 +208,19 @@ bool TCompiler::compile(const char* const shaderStrings[],
         // Call mapLongVariableNames() before collectAttribsUniforms() so in
         // collectAttribsUniforms() we already have the mapped symbol names and
         // we could composite mapped and original variable names.
-        if (success && (compileOptions & SH_MAP_LONG_VARIABLE_NAMES))
+        // Also, if we hash all the names, then no need to do this for long names.
+        if (success && (compileOptions & SH_MAP_LONG_VARIABLE_NAMES) && hashFunction == NULL)
             mapLongVariableNames(root);
 
-        if (success && (compileOptions & SH_ATTRIBUTES_UNIFORMS))
+        if (success && (compileOptions & SH_ATTRIBUTES_UNIFORMS)) {
             collectAttribsUniforms(root);
+            if (compileOptions & SH_ENFORCE_PACKING_RESTRICTIONS) {
+                success = enforcePackingRestrictions();
+                if (!success) {
+                    infoSink.info.message(EPrefixError, "too many uniforms");
+                }
+            }
+        }
 
         if (success && (compileOptions & SH_INTERMEDIATE_TREE))
             intermediate.outputTree(root);
@@ -228,6 +250,7 @@ bool TCompiler::InitBuiltInSymbolTable(const ShBuiltInResources& resources)
 
 void TCompiler::clearResults()
 {
+    arrayBoundsClamper.Cleanup();
     infoSink.info.erase();
     infoSink.obj.erase();
     infoSink.debug.erase();
@@ -236,7 +259,8 @@ void TCompiler::clearResults()
     uniforms.clear();
 
     builtInFunctionEmulator.Cleanup();
-    arrayBoundsClamper.Cleanup();
+
+    nameMap.clear();
 }
 
 bool TCompiler::detectRecursion(TIntermNode* root)
@@ -312,8 +336,14 @@ bool TCompiler::enforceVertexShaderTimingRestrictions(TIntermNode* root)
 
 void TCompiler::collectAttribsUniforms(TIntermNode* root)
 {
-    CollectAttribsUniforms collect(attribs, uniforms);
+    CollectAttribsUniforms collect(attribs, uniforms, hashFunction);
     root->traverse(&collect);
+}
+
+bool TCompiler::enforcePackingRestrictions()
+{
+    VariablePacker packer;
+    return packer.CheckVariablesWithinPackingLimits(maxUniformVectors, uniforms);
 }
 
 void TCompiler::mapLongVariableNames(TIntermNode* root)
@@ -333,13 +363,17 @@ const TExtensionBehavior& TCompiler::getExtensionBehavior() const
     return extensionBehavior;
 }
 
-const BuiltInFunctionEmulator& TCompiler::getBuiltInFunctionEmulator() const
-{
-    return builtInFunctionEmulator;
-}
-
 const ArrayBoundsClamper& TCompiler::getArrayBoundsClamper() const
 {
     return arrayBoundsClamper;
 }
 
+ShArrayIndexClampingStrategy TCompiler::getArrayIndexClampingStrategy() const
+{
+    return clampingStrategy;
+}
+
+const BuiltInFunctionEmulator& TCompiler::getBuiltInFunctionEmulator() const
+{
+    return builtInFunctionEmulator;
+}

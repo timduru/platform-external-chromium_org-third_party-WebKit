@@ -44,7 +44,7 @@ inline void unconsumeCharacters(SegmentedString& source, const StringBuilder& co
         source.push(consumedCharacters[0]);
         source.push(consumedCharacters[1]);
     } else
-        source.prepend(SegmentedString(String(consumedCharacters.characters(), consumedCharacters.length())));
+        source.prepend(SegmentedString(consumedCharacters.toStringPreserveCapacity()));
 }
 
 template <typename ParserFunctions>
@@ -128,10 +128,10 @@ bool consumeCharacterReference(SegmentedString& source, StringBuilder& decodedCh
                 result = result * 16 + 10 + cc - 'A';
             else if (cc == ';') {
                 source.advanceAndASSERT(cc);
-                ParserFunctions::convertToUTF16(ParserFunctions::legalEntityFor(result), decodedCharacter);
+                decodedCharacter.append(ParserFunctions::legalEntityFor(result));
                 return true;
             } else if (ParserFunctions::acceptMalformed()) {
-                ParserFunctions::convertToUTF16(ParserFunctions::legalEntityFor(result), decodedCharacter);
+                decodedCharacter.append(ParserFunctions::legalEntityFor(result));
                 return true;
             } else {
                 unconsumeCharacters(source, consumedCharacters);
@@ -144,10 +144,10 @@ bool consumeCharacterReference(SegmentedString& source, StringBuilder& decodedCh
                 result = result * 10 + cc - '0';
             else if (cc == ';') {
                 source.advanceAndASSERT(cc);
-                ParserFunctions::convertToUTF16(ParserFunctions::legalEntityFor(result), decodedCharacter);
+                decodedCharacter.append(ParserFunctions::legalEntityFor(result));
                 return true;
             } else if (ParserFunctions::acceptMalformed()) {
-                ParserFunctions::convertToUTF16(ParserFunctions::legalEntityFor(result), decodedCharacter);
+                decodedCharacter.append(ParserFunctions::legalEntityFor(result));
                 return true;
             } else {
                 unconsumeCharacters(source, consumedCharacters);

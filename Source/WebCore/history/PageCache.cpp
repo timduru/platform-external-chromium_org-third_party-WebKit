@@ -31,9 +31,10 @@
 #include "MemoryCache.h"
 #include "CachedPage.h"
 #include "DOMWindow.h"
-#include "DatabaseContext.h"
+#include "DatabaseManager.h"
 #include "DeviceMotionController.h"
 #include "DeviceOrientationController.h"
+#include "DeviceProximityController.h"
 #include "Document.h"
 #include "DocumentLoader.h"
 #include "Frame.h"
@@ -142,7 +143,7 @@ static unsigned logCanCacheFrameDecision(Frame* frame, int indentLevel)
         rejectReasons |= 1 << HasUnloadListener;
     }
 #if ENABLE(SQL_DATABASE)
-    if (DatabaseContext::hasOpenDatabases(frame->document())) {
+    if (DatabaseManager::manager().hasOpenDatabases(frame->document())) {
         PCLOG("   -Frame has open database handles");
         rejectReasons |= 1 << HasDatabaseHandles;
     }
@@ -251,6 +252,12 @@ static void logCanCachePageDecision(Page* page)
         rejectReasons |= 1 << UsesDeviceOrientation;
     }
 #endif
+#if ENABLE(PROXIMITY_EVENTS)
+    if (DeviceProximityController::isActiveAt(page)) {
+        PCLOG("   -Page is using DeviceProximity");
+        rejectReasons |= 1 << UsesDeviceMotion;
+    }
+#endif
     FrameLoadType loadType = page->mainFrame()->loader()->loadType();
     if (loadType == FrameLoadTypeReload) {
         PCLOG("   -Load type is: Reload");
@@ -319,7 +326,6 @@ PageCache::PageCache()
     , m_size(0)
     , m_head(0)
     , m_tail(0)
-    , m_autoreleaseTimer(this, &PageCache::releaseAutoreleasedPagesNowDueToTimer)
 #if USE(ACCELERATED_COMPOSITING)
     , m_shouldClearBackingStores(false)
 #endif
@@ -345,7 +351,7 @@ bool PageCache::canCachePageContainingThisFrame(Frame* frame)
         && (!document->url().protocolIs("https") || (!documentLoader->response().cacheControlContainsNoCache() && !documentLoader->response().cacheControlContainsNoStore()))
         && (!document->domWindow() || !document->domWindow()->hasEventListeners(eventNames().unloadEvent))
 #if ENABLE(SQL_DATABASE)
-        && !DatabaseContext::hasOpenDatabases(document)
+        && !DatabaseManager::manager().hasOpenDatabases(document)
 #endif
 #if ENABLE(SHARED_WORKERS)
         && !SharedWorkerRepository::hasSharedWorkers(document)
@@ -385,6 +391,9 @@ bool PageCache::canCache(Page* page) const
         && !DeviceMotionController::isActiveAt(page)
         && !DeviceOrientationController::isActiveAt(page)
 #endif
+#if ENABLE(PROXIMITY_EVENTS)
+        && !DeviceProximityController::isActiveAt(page)
+#endif
         && loadType != FrameLoadTypeReload
         && loadType != FrameLoadTypeReloadFromOrigin
         && loadType != FrameLoadTypeSame;
@@ -410,11 +419,6 @@ int PageCache::frameCount() const
     return frameCount;
 }
 
-int PageCache::autoreleasedPageCount() const
-{
-    return m_autoreleaseSet.size();
-}
-
 void PageCache::markPagesForVistedLinkStyleRecalc()
 {
     for (HistoryItem* current = m_head; current; current = current->m_next)
@@ -431,6 +435,14 @@ void PageCache::markPagesForFullStyleRecalc(Page* page)
             cachedPage->markForFullStyleRecalc();
     }
 }
+
+#if ENABLE(VIDEO_TRACK)
+void PageCache::markPagesForCaptionPreferencesChanged()
+{
+    for (HistoryItem* current = m_head; current; current = current->m_next)
+        current->m_cachedPage->markForCaptionPreferencesChanged();
+}
+#endif
 
 void PageCache::add(PassRefPtr<HistoryItem> prpItem, Page* page)
 {
@@ -457,10 +469,7 @@ CachedPage* PageCache::get(HistoryItem* item)
         return 0;
 
     if (CachedPage* cachedPage = item->m_cachedPage.get()) {
-        // FIXME: 1800 should not be hardcoded, it should come from
-        // WebKitBackForwardCacheExpirationIntervalKey in WebKit.
-        // Or we should remove WebKitBackForwardCacheExpirationIntervalKey.
-        if (currentTime() - cachedPage->timeStamp() <= 1800)
+        if (!cachedPage->hasExpired())
             return cachedPage;
         
         LOG(PageCache, "Not restoring page for %s from back/forward cache because cache entry has expired", item->url().string().ascii().data());
@@ -475,7 +484,7 @@ void PageCache::remove(HistoryItem* item)
     if (!item || !item->m_cachedPage)
         return;
 
-    autorelease(item->m_cachedPage.release());
+    item->m_cachedPage.clear();
     removeFromLRUList(item);
     --m_size;
 
@@ -523,40 +532,6 @@ void PageCache::removeFromLRUList(HistoryItem* item)
         ASSERT(item != m_head);
         item->m_prev->m_next = item->m_next;
     }
-}
-
-void PageCache::releaseAutoreleasedPagesNowDueToTimer(Timer<PageCache>*)
-{
-    LOG(PageCache, "WebCorePageCache: Releasing page caches - %i objects pending release", m_autoreleaseSet.size());
-    releaseAutoreleasedPagesNow();
-}
-
-void PageCache::releaseAutoreleasedPagesNow()
-{
-    m_autoreleaseTimer.stop();
-
-    // Postpone dead pruning until all our resources have gone dead.
-    memoryCache()->setPruneEnabled(false);
-
-    CachedPageSet tmp;
-    tmp.swap(m_autoreleaseSet);
-
-    CachedPageSet::iterator end = tmp.end();
-    for (CachedPageSet::iterator it = tmp.begin(); it != end; ++it)
-        (*it)->destroy();
-
-    // Now do the prune.
-    memoryCache()->setPruneEnabled(true);
-    memoryCache()->prune();
-}
-
-void PageCache::autorelease(PassRefPtr<CachedPage> page)
-{
-    ASSERT(page);
-    ASSERT(!m_autoreleaseSet.contains(page.get()));
-    m_autoreleaseSet.add(page);
-    if (!m_autoreleaseTimer.isActive())
-        m_autoreleaseTimer.startOneShot(0);
 }
 
 } // namespace WebCore

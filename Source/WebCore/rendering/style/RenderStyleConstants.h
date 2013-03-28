@@ -81,7 +81,7 @@ enum PseudoId {
     PUBLIC_PSEUDOID_MASK = ((1 << FIRST_INTERNAL_PSEUDOID) - 1) & ~((1 << FIRST_PUBLIC_PSEUDOID) - 1)
 };
 
-enum ColumnSpan { ColumnSpanOne = 0, ColumnSpanAll};
+enum ColumnSpan { ColumnSpanNone = 0, ColumnSpanAll };
 
 enum EBorderCollapse { BSEPARATE = 0, BCOLLAPSE = 1 };
 
@@ -94,7 +94,12 @@ enum EBorderPrecedence { BOFF, BTABLE, BCOLGROUP, BCOL, BROWGROUP, BROW, BCELL }
 enum OutlineIsAuto { AUTO_OFF = 0, AUTO_ON };
 
 enum EPosition {
-    StaticPosition, RelativePosition, AbsolutePosition, FixedPosition, StickyPosition
+    StaticPosition = 0,
+    RelativePosition = 1,
+    AbsolutePosition = 2,
+    StickyPosition = 3,
+    // This value is required to pack our bits efficiently in RenderObject.
+    FixedPosition = 6
 };
 
 enum EFloat {
@@ -152,6 +157,9 @@ enum EFillLayerType {
 
 // CSS3 Background Values
 enum EFillSizeType { Contain, Cover, SizeLength, SizeNone };
+
+// CSS3 Background Position
+enum BackgroundEdgeOrigin { TopEdge, RightEdge, BottomEdge, LeftEdge };
 
 // CSS3 Marquee Properties
 
@@ -346,6 +354,17 @@ enum TextDecorationStyle {
 #endif // CSS3_TEXT
 };
 
+#if ENABLE(CSS3_TEXT)
+enum TextAlignLast {
+    TextAlignLastAuto, TextAlignLastStart, TextAlignLastEnd, TextAlignLastLeft, TextAlignLastRight, TextAlignLastCenter, TextAlignLastJustify
+};
+
+enum TextUnderlinePosition {
+    // FIXME: Implement support for 'under left' and 'under right' values.
+    TextUnderlinePositionAuto = 0x1, TextUnderlinePositionAlphabetic = 0x2, TextUnderlinePositionUnder = 0x4
+};
+#endif // CSS3_TEXT
+
 enum EPageBreak {
     PBAUTO, PBALWAYS, PBAVOID
 };
@@ -404,6 +423,13 @@ enum ECursor {
     CURSOR_NONE
 };
 
+#if ENABLE(CURSOR_VISIBILITY)
+enum CursorVisibility {
+    CursorVisibilityAuto,
+    CursorVisibilityAutoHide,
+};
+#endif
+
 // The order of this enum must match the order of the display values in CSSValueKeywords.in.
 enum EDisplay {
     INLINE, BLOCK, LIST_ITEM, RUN_IN, COMPACT, INLINE_BLOCK,
@@ -445,6 +471,8 @@ enum TextEmphasisMark { TextEmphasisMarkNone, TextEmphasisMarkAuto, TextEmphasis
 
 enum TextEmphasisPosition { TextEmphasisPositionOver, TextEmphasisPositionUnder };
 
+enum TextOrientation { TextOrientationVerticalRight, TextOrientationUpright, TextOrientationSideways, TextOrientationSidewaysRight };
+
 enum TextOverflow { TextOverflowClip = 0, TextOverflowEllipsis };
 
 enum EImageRendering { ImageRenderingAuto, ImageRenderingOptimizeSpeed, ImageRenderingOptimizeQuality, ImageRenderingOptimizeContrast };
@@ -469,8 +497,19 @@ enum WrapFlow { WrapFlowAuto, WrapFlowBoth, WrapFlowStart, WrapFlowEnd, WrapFlow
 
 enum WrapThrough { WrapThroughWrap, WrapThroughNone };
 
+enum RubyPosition { RubyPositionBefore, RubyPositionAfter };
+
+enum GridAutoFlow { AutoFlowNone, AutoFlowColumn, AutoFlowRow };
+
 #if ENABLE(DRAGGABLE_REGION)
 enum DraggableRegionMode { DraggableRegionNone, DraggableRegionDrag, DraggableRegionNoDrag };
+#endif
+
+// Reasonable maximum to prevent insane font sizes from causing crashes on some platforms (such as Windows).
+static const float maximumAllowedFontSize = 1000000.0f;
+
+#if ENABLE(CSS3_TEXT)
+enum TextIndentLine { TextIndentFirstLine, TextIndentEachLine };
 #endif
 
 } // namespace WebCore

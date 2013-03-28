@@ -39,40 +39,29 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8DOMFormData::constructorCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8DOMFormData::constructorCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.FormData.Constructor");
-
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
-
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
-
     HTMLFormElement* form = 0;
-    if (args.Length() > 0 && V8HTMLFormElement::HasInstance(args[0]))
+    if (args.Length() > 0 && V8HTMLFormElement::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))
         form = V8HTMLFormElement::toNative(args[0]->ToObject());
     RefPtr<DOMFormData> domFormData = DOMFormData::create(form);
 
     v8::Handle<v8::Object> wrapper = args.Holder();
-    V8DOMWrapper::setDOMWrapper(wrapper, &info, domFormData.get());
-    V8DOMWrapper::setJSWrapperForDOMObject(domFormData.release(), wrapper);
+    V8DOMWrapper::associateObjectWithWrapper(domFormData.release(), &info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     return wrapper;
 }
 
-v8::Handle<v8::Value> V8DOMFormData::appendCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8DOMFormData::appendMethodCustom(const v8::Arguments& args)
 {
-    INC_STATS("DOM.FormData.append()");
-    
     if (args.Length() < 2)
-        return throwError(SyntaxError, "Not enough arguments", args.GetIsolate());
+        return throwError(v8SyntaxError, "Not enough arguments", args.GetIsolate());
 
     DOMFormData* domFormData = V8DOMFormData::toNative(args.Holder());
 
     String name = toWebCoreStringWithNullCheck(args[0]);
 
     v8::Handle<v8::Value> arg = args[1];
-    if (V8Blob::HasInstance(arg)) {
+    if (V8Blob::HasInstance(arg, args.GetIsolate(), worldType(args.GetIsolate()))) {
         v8::Handle<v8::Object> object = v8::Handle<v8::Object>::Cast(arg);
         Blob* blob = V8Blob::toNative(object);
         ASSERT(blob);

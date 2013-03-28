@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2003, 2006, 2009, 2011 Apple Inc.  All rights reserved.
+ * Copyright (C) 2003, 2006, 2009, 2011, 2012, 2013 Apple Inc.  All rights reserved.
  * Copyright (C) 2010 Igalia S.L
  *
  * Redistribution and use in source and binary forms, with or without
@@ -152,9 +152,11 @@ namespace WebCore {
     String AXListMarkerText();
     String AXImageMapText();
     String AXHeadingText();
-    String AXDefinitionListTermText();
-    String AXDefinitionListDefinitionText();
+    String AXDefinitionText();
+    String AXDescriptionListTermText();
+    String AXDescriptionListDetailText();
     String AXFooterRoleDescriptionText();
+    String AXFileUploadButtonText();
 #if PLATFORM(MAC)
     String AXARIAContentGroupText(const String& ariaType);
 #endif
@@ -218,6 +220,7 @@ namespace WebCore {
 #if PLATFORM(MAC)
     String builtInPDFPluginName();
     String pdfDocumentTypeDescription();
+    String postScriptDocumentTypeDescription();
     String keygenMenuItem512();
     String keygenMenuItem1024();
     String keygenMenuItem2048();
@@ -251,9 +254,31 @@ namespace WebCore {
     String validationMessageRangeUnderflowText(const String& minimum);
     String validationMessageRangeOverflowText(const String& maximum);
     String validationMessageStepMismatchText(const String& base, const String& step);
+    String validationMessageBadInputForNumberText();
+#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+    String validationMessageBadInputForDateTimeText();
+#endif
 #if USE(SOUP)
     String unacceptableTLSCertificate();
 #endif
+
+    String clickToExitFullScreenText();
+
+#if ENABLE(VIDEO_TRACK)
+    String textTrackSubtitlesText();
+    String textTrackOffText();
+    String textTrackNoLabelText();
+#if PLATFORM(MAC)
+    String textTrackCountryAndLanguageMenuItemText(const String& title, const String& country, const String& language);
+    String textTrackLanguageMenuItemText(const String& title, const String& language);
+    String closedCaptionTrackMenuItemText(const String&);
+    String sdhTrackMenuItemText(const String&);
+    String easyReaderTrackMenuItemText(const String&);
+#endif
+#endif
+
+    String snapshottedPlugInLabelTitle();
+    String snapshottedPlugInLabelSubtitle();
 
 #if !PLATFORM(CHROMIUM)
 #define WEB_UI_STRING(string, description) WebCore::localizedString(string)

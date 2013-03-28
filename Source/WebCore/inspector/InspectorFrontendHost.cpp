@@ -37,6 +37,7 @@
 #include "ContextMenuItem.h"
 #include "ContextMenuController.h"
 #include "ContextMenuProvider.h"
+#include "DOMFileSystem.h"
 #include "Element.h"
 #include "Frame.h"
 #include "FrameLoader.h"
@@ -47,10 +48,11 @@
 #include "InspectorFrontendClient.h"
 #include "Page.h"
 #include "Pasteboard.h"
+#include "ResourceError.h"
+#include "ResourceRequest.h"
+#include "ResourceResponse.h"
 #include "ScriptFunctionCall.h"
 #include "UserGestureIndicator.h"
-
-#include <wtf/RefPtr.h>
 #include <wtf/StdLibExtras.h>
 
 using namespace std;
@@ -93,7 +95,7 @@ private:
     virtual void contextMenuItemSelected(ContextMenuItem* item)
     {
         if (m_frontendHost) {
-            UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
+            UserGestureIndicator gestureIndicator(DefinitelyProcessingNewUserGesture);
             int itemNumber = item->action() - ContextMenuItemBaseCustomTag;
 
             ScriptFunctionCall function(m_frontendApiObject, "contextMenuItemSelected");
@@ -209,11 +211,6 @@ String InspectorFrontendHost::localizedStringsURL()
     return m_client ? m_client->localizedStringsURL() : "";
 }
 
-String InspectorFrontendHost::hiddenPanels()
-{
-    return m_client ? m_client->hiddenPanels() : "";
-}
-
 void InspectorFrontendHost::copyText(const String& text)
 {
     Pasteboard::generalPasteboard()->writePlainText(text, Pasteboard::CannotSmartReplace);
@@ -248,17 +245,6 @@ void InspectorFrontendHost::close(const String&)
 {
 }
 
-bool InspectorFrontendHost::canInspectWorkers()
-{
-#if ENABLE(WORKERS)
-    if (m_client)
-        return m_client->canInspectWorkers();
-    return false;
-#else
-    return false;
-#endif
-}
-
 void InspectorFrontendHost::sendMessageToBackend(const String& message)
 {
     if (m_client)
@@ -268,6 +254,9 @@ void InspectorFrontendHost::sendMessageToBackend(const String& message)
 #if ENABLE(CONTEXT_MENUS)
 void InspectorFrontendHost::showContextMenu(Event* event, const Vector<ContextMenuItem>& items)
 {
+    if (!event)
+        return;
+
     ASSERT(m_frontendPage);
     ScriptState* frontendScriptState = scriptStateFromPage(debuggerWorld(), m_frontendPage);
     ScriptObject frontendApiObject;
@@ -292,6 +281,59 @@ String InspectorFrontendHost::loadResourceSynchronously(const String& url)
     ResourceResponse response;
     m_frontendPage->mainFrame()->loader()->loadResourceSynchronously(request, DoNotAllowStoredCredentials, error, response, data);
     return String(data.data(), data.size());
+}
+
+bool InspectorFrontendHost::supportsFileSystems()
+{
+    if (m_client)
+        return m_client->supportsFileSystems();
+    return false;
+}
+
+void InspectorFrontendHost::requestFileSystems()
+{
+    if (m_client)
+        m_client->requestFileSystems();
+}
+
+void InspectorFrontendHost::addFileSystem()
+{
+    if (m_client)
+        m_client->addFileSystem();
+}
+
+void InspectorFrontendHost::removeFileSystem(const String& fileSystemPath)
+{
+    if (m_client)
+        m_client->removeFileSystem(fileSystemPath);
+}
+
+#if ENABLE(FILE_SYSTEM)
+PassRefPtr<DOMFileSystem> InspectorFrontendHost::isolatedFileSystem(const String& fileSystemName, const String& rootURL)
+{
+    ScriptExecutionContext* context = m_frontendPage->mainFrame()->document();
+    return DOMFileSystem::create(context, fileSystemName, FileSystemTypeIsolated, KURL(ParsedURLString, rootURL), AsyncFileSystem::create());
+}
+#endif
+
+bool InspectorFrontendHost::isUnderTest()
+{
+    return m_client && m_client->isUnderTest();
+}
+
+bool InspectorFrontendHost::canSaveAs()
+{
+    return false;
+}
+
+bool InspectorFrontendHost::canInspectWorkers()
+{
+    return false;
+}
+
+String InspectorFrontendHost::hiddenPanels()
+{
+    return "";
 }
 
 } // namespace WebCore

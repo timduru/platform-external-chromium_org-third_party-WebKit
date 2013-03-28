@@ -107,12 +107,12 @@ private:
 
 int InspectorWorkerAgent::WorkerFrontendChannel::s_nextId = 1;
 
-PassOwnPtr<InspectorWorkerAgent> InspectorWorkerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorState* inspectorState)
+PassOwnPtr<InspectorWorkerAgent> InspectorWorkerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState)
 {
     return adoptPtr(new InspectorWorkerAgent(instrumentingAgents, inspectorState));
 }
 
-InspectorWorkerAgent::InspectorWorkerAgent(InstrumentingAgents* instrumentingAgents, InspectorState* inspectorState)
+InspectorWorkerAgent::InspectorWorkerAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState)
     : InspectorBaseAgent<InspectorWorkerAgent>("Worker", instrumentingAgents, inspectorState)
     , m_inspectorFrontend(0)
 {
@@ -156,6 +156,15 @@ void InspectorWorkerAgent::disable(ErrorString*)
     if (!m_inspectorFrontend)
         return;
     destroyWorkerFrontendChannels();
+}
+
+void InspectorWorkerAgent::canInspectWorkers(ErrorString*, bool* result)
+{
+#if ENABLE(WORKERS)
+    *result = true;
+#else
+    *result = false;
+#endif
 }
 
 void InspectorWorkerAgent::connectToWorker(ErrorString* error, int workerId)

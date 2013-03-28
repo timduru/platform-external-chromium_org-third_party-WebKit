@@ -47,6 +47,7 @@
 #include "FunctionPrototype.h"
 #include "GetterSetter.h"
 #include "Interpreter.h"
+#include "JSAPIWrapperObject.h"
 #include "JSActivation.h"
 #include "JSBoundFunction.h"
 #include "JSCallbackConstructor.h"
@@ -58,6 +59,7 @@
 #include "JSNameScope.h"
 #include "JSONObject.h"
 #include "JSWithScope.h"
+#include "LegacyProfiler.h"
 #include "Lookup.h"
 #include "MathObject.h"
 #include "NameConstructor.h"
@@ -67,9 +69,11 @@
 #include "NativeErrorPrototype.h"
 #include "NumberConstructor.h"
 #include "NumberPrototype.h"
+#include "ObjCCallbackFunction.h"
 #include "ObjectConstructor.h"
 #include "ObjectPrototype.h"
-#include "Profiler.h"
+#include "Operations.h"
+#include "ParserError.h"
 #include "RegExpConstructor.h"
 #include "RegExpMatchesArray.h"
 #include "RegExpObject.h"
@@ -122,7 +126,7 @@ JSGlobalObject::~JSGlobalObject()
     if (m_debugger)
         m_debugger->detach(this);
 
-    if (Profiler* profiler = globalData().enabledProfiler())
+    if (LegacyProfiler* profiler = globalData().enabledProfiler())
         profiler->stopProfiling(this);
 }
 
@@ -221,13 +225,16 @@ void JSGlobalObject::reset(JSValue prototype)
     m_strictEvalActivationStructure.set(exec->globalData(), this, StrictEvalActivation::createStructure(exec->globalData(), this, jsNull()));
     m_withScopeStructure.set(exec->globalData(), this, JSWithScope::createStructure(exec->globalData(), this, jsNull()));
 
-    m_emptyObjectStructure.set(exec->globalData(), this, m_objectPrototype->inheritorID(exec->globalData()));
-    m_nullPrototypeObjectStructure.set(exec->globalData(), this, createEmptyObjectStructure(exec->globalData(), this, jsNull()));
+    m_nullPrototypeObjectStructure.set(exec->globalData(), this, JSFinalObject::createStructure(globalData(), this, jsNull(), JSFinalObject::defaultInlineCapacity()));
 
     m_callbackFunctionStructure.set(exec->globalData(), this, JSCallbackFunction::createStructure(exec->globalData(), this, m_functionPrototype.get()));
     m_argumentsStructure.set(exec->globalData(), this, Arguments::createStructure(exec->globalData(), this, m_objectPrototype.get()));
     m_callbackConstructorStructure.set(exec->globalData(), this, JSCallbackConstructor::createStructure(exec->globalData(), this, m_objectPrototype.get()));
     m_callbackObjectStructure.set(exec->globalData(), this, JSCallbackObject<JSDestructibleObject>::createStructure(exec->globalData(), this, m_objectPrototype.get()));
+#if JSC_OBJC_API_ENABLED
+    m_objcCallbackFunctionStructure.set(exec->globalData(), this, ObjCCallbackFunction::createStructure(exec->globalData(), this, m_functionPrototype.get()));
+    m_objcWrapperObjectStructure.set(exec->globalData(), this, JSCallbackObject<JSAPIWrapperObject>::createStructure(exec->globalData(), this, m_objectPrototype.get()));
+#endif
 
     m_arrayPrototype.set(exec->globalData(), this, ArrayPrototype::create(exec, this, ArrayPrototype::createStructure(exec->globalData(), this, m_objectPrototype.get())));
     
@@ -258,8 +265,6 @@ void JSGlobalObject::reset(JSValue prototype)
     
     m_regExpPrototype.set(exec->globalData(), this, RegExpPrototype::create(exec, this, RegExpPrototype::createStructure(exec->globalData(), this, m_objectPrototype.get()), emptyRegex));
     m_regExpStructure.set(exec->globalData(), this, RegExpObject::createStructure(exec->globalData(), this, m_regExpPrototype.get()));
-
-    m_methodCallDummy.set(exec->globalData(), this, constructEmptyObject(exec));
 
     m_errorPrototype.set(exec->globalData(), this, ErrorPrototype::create(exec, this, ErrorPrototype::createStructure(exec->globalData(), this, m_objectPrototype.get())));
     m_errorStructure.set(exec->globalData(), this, ErrorInstance::createStructure(exec->globalData(), this, m_errorPrototype.get()));
@@ -474,7 +479,6 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     Base::visitChildren(thisObject, visitor);
 
     visitor.append(&thisObject->m_globalThis);
-    visitor.append(&thisObject->m_methodCallDummy);
 
     visitor.append(&thisObject->m_regExpConstructor);
     visitor.append(&thisObject->m_errorConstructor);
@@ -513,8 +517,11 @@ void JSGlobalObject::visitChildren(JSCell* cell, SlotVisitor& visitor)
     visitor.append(&thisObject->m_callbackConstructorStructure);
     visitor.append(&thisObject->m_callbackFunctionStructure);
     visitor.append(&thisObject->m_callbackObjectStructure);
+#if JSC_OBJC_API_ENABLED
+    visitor.append(&thisObject->m_objcCallbackFunctionStructure);
+    visitor.append(&thisObject->m_objcWrapperObjectStructure);
+#endif
     visitor.append(&thisObject->m_dateStructure);
-    visitor.append(&thisObject->m_emptyObjectStructure);
     visitor.append(&thisObject->m_nullPrototypeObjectStructure);
     visitor.append(&thisObject->m_errorStructure);
     visitor.append(&thisObject->m_functionStructure);
@@ -594,8 +601,7 @@ DynamicGlobalObjectScope::DynamicGlobalObjectScope(JSGlobalData& globalData, JSG
 
 void slowValidateCell(JSGlobalObject* globalObject)
 {
-    if (!globalObject->isGlobalObject())
-        CRASH();
+    RELEASE_ASSERT(globalObject->isGlobalObject());
     ASSERT_GC_OBJECT_INHERITS(globalObject, &JSGlobalObject::s_info);
 }
 
@@ -618,13 +624,13 @@ UnlinkedProgramCodeBlock* JSGlobalObject::createProgramCodeBlock(CallFrame* call
     return unlinkedCode;
 }
 
-UnlinkedEvalCodeBlock* JSGlobalObject::createEvalCodeBlock(CallFrame* callFrame, EvalExecutable* executable, JSObject** exception)
+UnlinkedEvalCodeBlock* JSGlobalObject::createEvalCodeBlock(CallFrame* callFrame, JSScope* scope, EvalExecutable* executable, JSObject** exception)
 {
     ParserError error;
     JSParserStrictness strictness = executable->isStrictMode() ? JSParseStrict : JSParseNormal;
     DebuggerMode debuggerMode = hasDebugger() ? DebuggerOn : DebuggerOff;
     ProfilerMode profilerMode = hasProfiler() ? ProfilerOn : ProfilerOff;
-    UnlinkedEvalCodeBlock* unlinkedCode = globalData().codeCache()->getEvalCodeBlock(globalData(), executable, executable->source(), strictness, debuggerMode, profilerMode, error);
+    UnlinkedEvalCodeBlock* unlinkedCode = globalData().codeCache()->getEvalCodeBlock(globalData(), scope, executable, executable->source(), strictness, debuggerMode, profilerMode, error);
 
     if (hasDebugger())
         debugger()->sourceParsed(callFrame, executable->source().provider(), error.m_line, error.m_message);
@@ -636,21 +642,5 @@ UnlinkedEvalCodeBlock* JSGlobalObject::createEvalCodeBlock(CallFrame* callFrame,
 
     return unlinkedCode;
 }
-
-UnlinkedFunctionExecutable* JSGlobalObject::createFunctionExecutableFromGlobalCode(CallFrame* callFrame, const Identifier& name, const SourceCode& code, JSObject** exception)
-{
-    ParserError error;
-    UnlinkedFunctionExecutable* executable = globalData().codeCache()->getFunctionExecutableFromGlobalCode(globalData(), name, code, error);
-    if (hasDebugger())
-        debugger()->sourceParsed(callFrame, code.provider(), error.m_line, error.m_message);
-
-    if (error.m_type != ParserError::ErrorNone) {
-        *exception = error.toErrorObject(this, code);
-        return 0;
-    }
-
-    return executable;
-}
-
 
 } // namespace JSC

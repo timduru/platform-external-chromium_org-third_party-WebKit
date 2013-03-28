@@ -27,6 +27,7 @@
 #define DateTimeEditElement_h
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
+#include "DateComponents.h"
 #include "DateTimeFieldElement.h"
 #include "StepRange.h"
 
@@ -65,8 +66,8 @@ public:
         String fallbackDateTimeFormat;
         Locale& locale;
         const StepRange stepRange;
-        int minimumYear;
-        int maximumYear;
+        DateComponents minimum;
+        DateComponents maximum;
         String placeholderForDay;
         String placeholderForMonth;
         String placeholderForYear;
@@ -74,30 +75,31 @@ public:
         LayoutParameters(Locale& locale, const StepRange& stepRange)
             : locale(locale)
             , stepRange(stepRange)
-            , minimumYear(undefinedYear())
-            , maximumYear(undefinedYear())
         {
         }
-
-        static inline int undefinedYear() { return -1; }
     };
 
     static PassRefPtr<DateTimeEditElement> create(Document*, EditControlOwner&);
 
     virtual ~DateTimeEditElement();
     void addField(PassRefPtr<DateTimeFieldElement>);
+    bool anyEditableFieldsHaveValues() const;
     void blurByOwner();
     virtual void defaultEventHandler(Event*) OVERRIDE;
     void disabledStateChanged();
+    Element* fieldsWrapperElement() const;
     void focusIfNoFocus();
-    void focusByOwner();
+    // If oldFocusedNode is one of sub-fields, focus on it. Otherwise focus on
+    // the first sub-field.
+    void focusByOwner(Node* oldFocusedNode = 0);
     bool hasFocusedField();
     void readOnlyStateChanged();
     void removeEditControlOwner() { m_editControlOwner = 0; }
     void resetFields();
     void setEmptyValue(const LayoutParameters&, const DateComponents& dateForReadOnlyField);
     void setValueAsDate(const LayoutParameters&, const DateComponents&);
-    void setValueAsDateTimeFieldsState(const DateTimeFieldsState&, const DateComponents& dateForReadOnlyField);
+    void setValueAsDateTimeFieldsState(const DateTimeFieldsState&);
+    void setOnlyYearMonthDay(const DateComponents&);
     void stepDown();
     void stepUp();
     String value() const;
@@ -123,10 +125,14 @@ private:
     size_t fieldIndexOf(const DateTimeFieldElement&) const;
     DateTimeFieldElement* focusedField() const;
     size_t focusedFieldIndex() const;
+    bool focusOnNextFocusableField(size_t startIndex);
     bool isDisabled() const;
     bool isReadOnly() const;
     void layout(const LayoutParameters&, const DateComponents&);
     void updateUIState();
+
+    // Element function.
+    virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
 
     // DateTimeFieldElement::FieldOwner functions.
     virtual void didBlurFromField() OVERRIDE FINAL;
@@ -134,7 +140,8 @@ private:
     virtual void fieldValueChanged() OVERRIDE FINAL;
     virtual bool focusOnNextField(const DateTimeFieldElement&) OVERRIDE FINAL;
     virtual bool focusOnPreviousField(const DateTimeFieldElement&) OVERRIDE FINAL;
-    virtual bool isFieldOwnerDisabledOrReadOnly() const OVERRIDE FINAL;
+    virtual bool isFieldOwnerDisabled() const OVERRIDE FINAL;
+    virtual bool isFieldOwnerReadOnly() const OVERRIDE FINAL;
     virtual AtomicString localeIdentifier() const OVERRIDE FINAL;
 
     Vector<DateTimeFieldElement*, maximumNumberOfFields> m_fields;

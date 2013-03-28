@@ -59,6 +59,7 @@ namespace WebCore {
     class Navigator;
     class Node;
     class Page;
+    class PageConsole;
     class Performance;
     class PostMessageTimer;
     class ScheduledAction;
@@ -69,6 +70,7 @@ namespace WebCore {
     class Storage;
     class StyleMedia;
     class WebKitPoint;
+    class DOMWindowCSS;
 
 #if ENABLE(REQUEST_ANIMATION_FRAME)
     class RequestAnimationFrameCallback;
@@ -120,10 +122,7 @@ namespace WebCore {
         static bool dispatchAllPendingBeforeUnloadEvents();
         static void dispatchAllPendingUnloadEvents();
 
-        void adjustWindowRect(const FloatRect& screen, FloatRect& window, const FloatRect& pendingChanges) const;
-
-        // FIXME: We can remove this function once V8 showModalDialog is changed to use DOMWindow.
-        static void parseModalDialogFeatures(const String&, HashMap<String, String>&);
+        static FloatRect adjustWindowRect(Page*, const FloatRect& pendingChanges);
 
         bool allowPopUp(); // Call on first window, not target window.
         static bool allowPopUp(Frame* firstFrame);
@@ -235,12 +234,13 @@ namespace WebCore {
         PassRefPtr<WebKitPoint> webkitConvertPointFromNodeToPage(Node*, const WebKitPoint*) const;        
 
         Console* console() const;
+        PageConsole* pageConsole() const;
 
         void printErrorMessage(const String&);
         String crossDomainAccessErrorMessage(DOMWindow* activeWindow);
 
         void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, const String& targetOrigin, DOMWindow* source, ExceptionCode&);
-        // FIXME: remove this when we update the ObjC bindings (bug #28774).
+        // Needed for Objective-C bindings (see bug 28774).
         void postMessage(PassRefPtr<SerializedScriptValue> message, MessagePort*, const String& targetOrigin, DOMWindow* source, ExceptionCode&);
         void postMessageTimerFired(PassOwnPtr<PostMessageTimer>);
         void dispatchMessageEventWithOriginCheck(SecurityOrigin* intendedTargetOrigin, PassRefPtr<Event>, PassRefPtr<ScriptCallStack>);
@@ -264,7 +264,12 @@ namespace WebCore {
         // WebKit animation extensions
 #if ENABLE(REQUEST_ANIMATION_FRAME)
         int requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
+        int webkitRequestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback>);
         void cancelAnimationFrame(int id);
+#endif
+
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+        DOMWindowCSS* css();
 #endif
 
         // Events
@@ -275,6 +280,7 @@ namespace WebCore {
 
         using EventTarget::dispatchEvent;
         bool dispatchEvent(PassRefPtr<Event> prpEvent, PassRefPtr<EventTarget> prpTarget);
+
         void dispatchLoadEvent();
 
         DEFINE_ATTRIBUTE_EVENT_LISTENER(abort);
@@ -347,6 +353,7 @@ namespace WebCore {
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkitanimationiteration, webkitAnimationIteration);
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkitanimationend, webkitAnimationEnd);
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkittransitionend, webkitTransitionEnd);
+        DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(transitionend, transitionend);
 
         void captureEvents();
         void releaseEvents();
@@ -456,6 +463,10 @@ namespace WebCore {
 
 #if ENABLE(WEB_TIMING)
         mutable RefPtr<Performance> m_performance;
+#endif
+
+#if ENABLE(CSS3_CONDITIONAL_RULES)
+        mutable RefPtr<DOMWindowCSS> m_css;
 #endif
     };
 

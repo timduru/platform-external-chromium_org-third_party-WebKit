@@ -89,12 +89,12 @@ public:
     explicit Color(const String&);
     explicit Color(const char*);
 
-    static Color createUnCheked(int r, int g, int b) 
+    static Color createUnchecked(int r, int g, int b)
     {
         RGBA32 color = 0xFF000000 | r << 16 | g << 8 | b;
         return Color(color);
     }
-    static Color createUnCheked(int r, int g, int b, int a) 
+    static Color createUnchecked(int r, int g, int b, int a)
     {
         RGBA32 color = a << 24 | r << 16 | g << 8 | b;
         return Color(color);
@@ -182,8 +182,8 @@ inline bool operator!=(const Color& a, const Color& b)
     return !(a == b);
 }
 
-Color colorFromPremultipliedARGB(unsigned);
-unsigned premultipliedARGBFromColor(const Color&);
+Color colorFromPremultipliedARGB(RGBA32);
+RGBA32 premultipliedARGBFromColor(const Color&);
 
 inline Color blend(const Color& from, const Color& to, double progress, bool blendPremultiplied = true)
 {

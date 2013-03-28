@@ -33,12 +33,11 @@
 
 namespace WebCore {
 
-void V8HTMLMediaElement::controllerAccessorSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+void V8HTMLMediaElement::controllerAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
 {
-    INC_STATS("DOM.HTMLMediaElement.mediaController._set");
     HTMLMediaElement* imp = V8HTMLMediaElement::toNative(info.Holder());
     MediaController* controller = 0;
-    if (V8MediaController::HasInstance(value))
+    if (V8MediaController::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())))
         controller = V8MediaController::toNative(value->ToObject());
     
     if (!controller) {
@@ -56,4 +55,3 @@ void V8HTMLMediaElement::controllerAccessorSetter(v8::Local<v8::String> name, v8
 }
 
 #endif
-

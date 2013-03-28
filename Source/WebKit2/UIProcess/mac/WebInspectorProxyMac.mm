@@ -50,6 +50,11 @@ using namespace WebKit;
 // The height needed to match a typical NSToolbar.
 static const CGFloat windowContentBorderThickness = 55;
 
+// The margin from the top and right of the dock button (same as the full screen button).
+static const CGFloat dockButtonMargin = 3;
+
+static const NSUInteger windowStyleMask = NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask | NSTexturedBackgroundWindowMask;
+
 // WKWebInspectorProxyObjCAdapter is a helper ObjC object used as a delegate or notification observer
 // for the sole purpose of getting back into the C++ code from an ObjC caller.
 
@@ -79,9 +84,24 @@ static const CGFloat windowContentBorderThickness = 55;
     return self;
 }
 
+- (IBAction)attach:(id)sender
+{
+    static_cast<WebInspectorProxy*>(_inspectorProxy)->attach();
+}
+
 - (void)close
 {
     _inspectorProxy = 0;
+}
+
+- (void)windowDidMove:(NSNotification *)notification
+{
+    static_cast<WebInspectorProxy*>(_inspectorProxy)->windowFrameDidChange();
+}
+
+- (void)windowDidResize:(NSNotification *)notification
+{
+    static_cast<WebInspectorProxy*>(_inspectorProxy)->windowFrameDidChange();
 }
 
 - (void)windowWillClose:(NSNotification *)notification
@@ -115,6 +135,49 @@ static const CGFloat windowContentBorderThickness = 55;
     return WKInspectorViewTag;
 }
 
+- (BOOL)_shouldUseTiledDrawingArea
+{
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1080
+    return YES;
+#else
+    return NO;
+#endif
+}
+
+@end
+
+@interface NSWindow (AppKitDetails)
+- (NSCursor *)_cursorForResizeDirection:(NSInteger)direction;
+- (NSRect)_customTitleFrame;
+@end
+
+@interface WKWebInspectorWindow : NSWindow {
+@public
+    RetainPtr<NSButton> _dockButton;
+}
+@end
+
+@implementation WKWebInspectorWindow
+
+- (NSCursor *)_cursorForResizeDirection:(NSInteger)direction
+{
+    // Don't show a resize cursor for the northeast (top right) direction if the dock button is visible.
+    // This matches what happens when the full screen button is visible.
+    if (direction == 1 && ![_dockButton isHidden])
+        return nil;
+    return [super _cursorForResizeDirection:direction];
+}
+
+- (NSRect)_customTitleFrame
+{
+    // Adjust the title frame if needed to prevent it from intersecting the dock button.
+    NSRect titleFrame = [super _customTitleFrame];
+    NSRect dockButtonFrame = _dockButton.get().frame;
+    if (NSMaxX(titleFrame) > NSMinX(dockButtonFrame) - dockButtonMargin)
+        titleFrame.size.width -= (NSMaxX(titleFrame) - NSMinX(dockButtonFrame)) + dockButtonMargin;
+    return titleFrame;
+}
+
 @end
 
 namespace WebKit {
@@ -135,12 +198,51 @@ static bool inspectorReallyUsesWebKitUserInterface(WebPreferences* preferences)
     return preferences->inspectorUsesWebKitUserInterface();
 }
 
+static WKRect getWindowFrame(WKPageRef, const void* clientInfo)
+{
+    WebInspectorProxy* webInspectorProxy = static_cast<WebInspectorProxy*>(const_cast<void*>(clientInfo));
+    ASSERT(webInspectorProxy);
+
+    return webInspectorProxy->inspectorWindowFrame();
+}
+
+static void setWindowFrame(WKPageRef, WKRect frame, const void* clientInfo)
+{
+    WebInspectorProxy* webInspectorProxy = static_cast<WebInspectorProxy*>(const_cast<void*>(clientInfo));
+    ASSERT(webInspectorProxy);
+
+    webInspectorProxy->setInspectorWindowFrame(frame);
+}
+
+void WebInspectorProxy::setInspectorWindowFrame(WKRect& frame)
+{
+    if (m_isAttached)
+        return;
+    [m_inspectorWindow setFrame:NSMakeRect(frame.origin.x, frame.origin.y, frame.size.width, frame.size.height) display:YES];
+}
+
+WKRect WebInspectorProxy::inspectorWindowFrame()
+{
+    if (m_isAttached)
+        return WKRectMake(0, 0, 0, 0);
+
+    NSRect frame = m_inspectorWindow.get().frame;
+    return WKRectMake(frame.origin.x, frame.origin.y, frame.size.width, frame.size.height);
+}
+
 void WebInspectorProxy::createInspectorWindow()
 {
     ASSERT(!m_inspectorWindow);
 
-    NSUInteger styleMask = (NSTitledWindowMask | NSClosableWindowMask | NSMiniaturizableWindowMask | NSResizableWindowMask | NSTexturedBackgroundWindowMask);
-    NSWindow *window = [[NSWindow alloc] initWithContentRect:NSMakeRect(0, 0, initialWindowWidth, initialWindowHeight) styleMask:styleMask backing:NSBackingStoreBuffered defer:NO];
+    NSRect windowFrame = NSMakeRect(0, 0, initialWindowWidth, initialWindowHeight);
+
+    // Restore the saved window frame, if there was one.
+    NSString *savedWindowFrameString = page()->pageGroup()->preferences()->inspectorWindowFrame();
+    NSRect savedWindowFrame = NSRectFromString(savedWindowFrameString);
+    if (!NSIsEmptyRect(savedWindowFrame))
+        windowFrame = savedWindowFrame;
+
+    WKWebInspectorWindow *window = [[WKWebInspectorWindow alloc] initWithContentRect:windowFrame styleMask:windowStyleMask backing:NSBackingStoreBuffered defer:NO];
     [window setDelegate:m_inspectorProxyObjCAdapter.get()];
     [window setMinSize:NSMakeSize(minimumWindowWidth, minimumWindowHeight)];
     [window setReleasedWhenClosed:NO];
@@ -148,17 +250,55 @@ void WebInspectorProxy::createInspectorWindow()
     [window setContentBorderThickness:windowContentBorderThickness forEdge:NSMaxYEdge];
     WKNSWindowMakeBottomCornersSquare(window);
 
+    m_inspectorWindow.adoptNS(window);
+
     NSView *contentView = [window contentView];
+
+    // Create a full screen button so we can turn it into a dock button.
+    m_dockButton = [NSWindow standardWindowButton:NSWindowFullScreenButton forStyleMask:windowStyleMask];
+    m_dockButton.get().target = m_inspectorProxyObjCAdapter.get();
+    m_dockButton.get().action = @selector(attach:);
+
+    // Store the dock button on the window too so it can check its visibility.
+    window->_dockButton = m_dockButton;
+
+    // Get the dock image and make it a template so the button cell effects will apply.
+    NSImage *dockImage = [[NSBundle bundleForClass:[WKWebInspectorWKView class]] imageForResource:@"Dock"];
+    [dockImage setTemplate:YES];
+
+    // Set the dock image on the button cell.
+    NSCell *dockButtonCell = m_dockButton.get().cell;
+    dockButtonCell.image = dockImage;
+
+    // Get the frame view, the superview of the content view, and its frame.
+    // This will be the superview of the dock button too.
+    NSView *frameView = contentView.superview;
+    NSRect frameViewBounds = frameView.bounds;
+    NSSize dockButtonSize = m_dockButton.get().frame.size;
+
+    ASSERT(!frameView.isFlipped);
+
+    // Position the dock button in the corner to match where the full screen button is normally.
+    NSPoint dockButtonOrigin;
+    dockButtonOrigin.x = NSMaxX(frameViewBounds) - dockButtonSize.width - dockButtonMargin;
+    dockButtonOrigin.y = NSMaxY(frameViewBounds) - dockButtonSize.height - dockButtonMargin;
+    m_dockButton.get().frameOrigin = dockButtonOrigin;
+
+    // Set the autoresizing mask to keep the dock button pinned to the top right corner.
+    m_dockButton.get().autoresizingMask = NSViewMinXMargin | NSViewMinYMargin;
+
+    [frameView addSubview:m_dockButton.get()];
+
+    // Hide the dock button if we can't attach.
+    m_dockButton.get().hidden = !canAttach();
+
     [m_inspectorView.get() setFrame:[contentView bounds]];
     [m_inspectorView.get() setAutoresizingMask:NSViewWidthSizable | NSViewHeightSizable];
     [contentView addSubview:m_inspectorView.get()];
 
-    // Center the window initially before setting the frame autosave name so that the window will be in a good
-    // position if there is no saved frame yet.
-    [window center];
-    [window setFrameAutosaveName:@"Web Inspector 2"];
-
-    m_inspectorWindow.adoptNS(window);
+    // Center the window if the saved frame was empty.
+    if (NSIsEmptyRect(savedWindowFrame))
+        [window center];
 
     updateInspectorWindowTitle();
 }
@@ -177,31 +317,92 @@ WebPageProxy* WebInspectorProxy::platformCreateInspectorPage()
     ASSERT(m_page);
     ASSERT(!m_inspectorView);
 
-    m_inspectorView.adoptNS([[WKWebInspectorWKView alloc] initWithFrame:NSMakeRect(0, 0, initialWindowWidth, initialWindowHeight) contextRef:toAPI(page()->process()->context()) pageGroupRef:toAPI(inspectorPageGroup()) relatedToPage:toAPI(m_page)]);
+    NSRect initialRect;
+    if (m_isAttached) {
+        NSRect inspectedViewFrame = m_page->wkView().frame;
+        initialRect = NSMakeRect(NSMinX(inspectedViewFrame), 0, NSWidth(inspectedViewFrame), inspectorPageGroup()->preferences()->inspectorAttachedHeight());
+    } else {
+        initialRect = NSMakeRect(0, 0, initialWindowWidth, initialWindowHeight);
+
+        NSString *windowFrameString = page()->pageGroup()->preferences()->inspectorWindowFrame();
+        NSRect windowFrame = NSRectFromString(windowFrameString);
+        if (!NSIsEmptyRect(windowFrame))
+            initialRect = [NSWindow contentRectForFrameRect:windowFrame styleMask:windowStyleMask];
+    }
+
+    m_inspectorView.adoptNS([[WKWebInspectorWKView alloc] initWithFrame:initialRect contextRef:toAPI(page()->process()->context()) pageGroupRef:toAPI(inspectorPageGroup()) relatedToPage:toAPI(m_page)]);
     ASSERT(m_inspectorView);
 
     [m_inspectorView.get() setDrawsBackground:NO];
 
     m_inspectorProxyObjCAdapter.adoptNS([[WKWebInspectorProxyObjCAdapter alloc] initWithWebInspectorProxy:this]);
 
+    WebPageProxy* inspectorPage = toImpl(m_inspectorView.get().pageRef);
+
+    WKPageUIClient uiClient = {
+        kWKPageUIClientCurrentVersion,
+        this,   /* clientInfo */
+        0, // createNewPage_deprecatedForUseWithV0
+        0, // showPage
+        0, // closePage
+        0, // takeFocus
+        0, // focus
+        0, // unfocus
+        0, // runJavaScriptAlert
+        0, // runJavaScriptConfirm
+        0, // runJavaScriptPrompt
+        0, // setStatusText
+        0, // mouseDidMoveOverElement_deprecatedForUseWithV0
+        0, // missingPluginButtonClicked_deprecatedForUseWithV0
+        0, // didNotHandleKeyEvent
+        0, // didNotHandleWheelEvent
+        0, // areToolbarsVisible
+        0, // setToolbarsVisible
+        0, // isMenuBarVisible
+        0, // setMenuBarVisible
+        0, // isStatusBarVisible
+        0, // setStatusBarVisible
+        0, // isResizable
+        0, // setResizable
+        getWindowFrame,
+        setWindowFrame,
+        0, // runBeforeUnloadConfirmPanel
+        0, // didDraw
+        0, // pageDidScroll
+        0, // exceededDatabaseQuota
+        0, // runOpenPanel
+        0, // decidePolicyForGeolocationPermissionRequest
+        0, // headerHeight
+        0, // footerHeight
+        0, // drawHeader
+        0, // drawFooter
+        0, // printFrame
+        0, // runModal
+        0, // unused
+        0, // saveDataToFileInDownloadsFolder
+        0, // shouldInterruptJavaScript
+        0, // createPage
+        0, // mouseDidMoveOverElement
+        0, // decidePolicyForNotificationPermissionRequest
+        0, // unavailablePluginButtonClicked_deprecatedForUseWithV1
+        0, // showColorPicker
+        0, // hideColorPicker
+        0, // unavailablePluginButtonClicked
+    };
+
+    inspectorPage->initializeUIClient(&uiClient);
+
+    return inspectorPage;
+}
+
+void WebInspectorProxy::platformOpen()
+{
     if (m_isAttached)
         platformAttach();
     else
         createInspectorWindow();
 
-    return toImpl(m_inspectorView.get().pageRef);
-}
-
-void WebInspectorProxy::platformOpen()
-{
-    if (m_isAttached) {
-        // Make the inspector view visible since it was hidden while loading.
-        [m_inspectorView.get() setHidden:NO];
-
-        // Adjust the frames now that we are visible and inspectedViewFrameDidChange wont return early.
-        inspectedViewFrameDidChange();
-    } else
-        [m_inspectorWindow.get() makeKeyAndOrderFront:nil];
+    platformBringToFront();
 }
 
 void WebInspectorProxy::platformDidClose()
@@ -218,6 +419,20 @@ void WebInspectorProxy::platformDidClose()
     m_inspectorProxyObjCAdapter = 0;
 }
 
+void WebInspectorProxy::platformHide()
+{
+    if (m_isAttached) {
+        platformDetach();
+        return;
+    }
+
+    if (m_inspectorWindow) {
+        [m_inspectorWindow.get() setDelegate:nil];
+        [m_inspectorWindow.get() orderOut:nil];
+        m_inspectorWindow = 0;
+    }
+}
+
 void WebInspectorProxy::platformBringToFront()
 {
     // FIXME <rdar://problem/10937688>: this will not bring a background tab in Safari to the front, only its window.
@@ -231,11 +446,29 @@ bool WebInspectorProxy::platformIsFront()
     return m_isVisible && [m_inspectorView.get().window isMainWindow];
 }
 
+void WebInspectorProxy::platformAttachAvailabilityChanged(bool available)
+{
+    m_dockButton.get().hidden = !available;
+}
+
 void WebInspectorProxy::platformInspectedURLChanged(const String& urlString)
 {
     m_urlString = urlString;
 
     updateInspectorWindowTitle();
+}
+
+void WebInspectorProxy::windowFrameDidChange()
+{
+    ASSERT(!m_isAttached);
+    ASSERT(m_isVisible);
+    ASSERT(m_inspectorWindow);
+
+    if (m_isAttached || !m_isVisible || !m_inspectorWindow)
+        return;
+
+    NSString *frameString = NSStringFromRect([m_inspectorWindow frame]);
+    page()->pageGroup()->preferences()->setInspectorWindowFrame(frameString);
 }
 
 void WebInspectorProxy::inspectedViewFrameDidChange()
@@ -278,9 +511,6 @@ void WebInspectorProxy::platformAttach()
 
     [m_inspectorView.get() setAutoresizingMask:NSViewWidthSizable | NSViewMaxYMargin];
 
-    // Start out hidden if we are not visible yet. When platformOpen is called, hidden will be set to NO.
-    [m_inspectorView.get() setHidden:!m_isVisible];
-
     [[inspectedView superview] addSubview:m_inspectorView.get() positioned:NSWindowBelow relativeTo:inspectedView];
     [[inspectedView window] makeFirstResponder:m_inspectorView.get()];
 
@@ -314,10 +544,7 @@ void WebInspectorProxy::platformDetach()
 
     createInspectorWindow();
 
-    // Make the inspector view visible in case it is still hidden from loading while attached.
-    [m_inspectorView.get() setHidden:NO];
-
-    [m_inspectorWindow.get() makeKeyAndOrderFront:nil];
+    platformBringToFront();
 }
 
 void WebInspectorProxy::platformSetAttachedWindowHeight(unsigned height)

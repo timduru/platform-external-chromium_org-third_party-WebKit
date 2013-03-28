@@ -34,6 +34,7 @@
 #include "Editor.h"
 #include "HTMLElement.h"
 #include "HTMLNames.h"
+#include "HTMLTemplateElement.h"
 #include "KURL.h"
 #include "ProcessingInstruction.h"
 #include "XLinkNames.h"
@@ -141,7 +142,12 @@ void MarkupAccumulator::serializeNodesWithNamespaces(Node* targetNode, Node* nod
         appendStartTag(targetNode, &namespaceHash);
 
     if (!(targetNode->document()->isHTMLDocument() && elementCannotHaveEndTag(targetNode))) {
-        for (Node* current = targetNode->firstChild(); current; current = current->nextSibling())
+#if ENABLE(TEMPLATE_ELEMENT)
+        Node* current = targetNode->hasTagName(templateTag) ? toHTMLTemplateElement(targetNode)->content()->firstChild() : targetNode->firstChild();
+#else
+        Node* current = targetNode->firstChild();
+#endif
+        for ( ; current; current = current->nextSibling())
             serializeNodesWithNamespaces(current, nodeToSkip, IncludeNode, &namespaceHash, tagNamesToSkip);
     }
 
@@ -239,11 +245,10 @@ void MarkupAccumulator::appendNodeValue(StringBuilder& result, const Node* node,
     unsigned start = 0;
 
     if (range) {
-        ExceptionCode ec;
-        if (node == range->endContainer(ec))
-            length = range->endOffset(ec);
-        if (node == range->startContainer(ec)) {
-            start = range->startOffset(ec);
+        if (node == range->endContainer())
+            length = range->endOffset();
+        if (node == range->startContainer()) {
+            start = range->startOffset();
             length -= start;
         }
     }
@@ -310,7 +315,7 @@ EntityMask MarkupAccumulator::entityMaskForText(Text* text) const
 {
     const QualifiedName* parentName = 0;
     if (text->parentElement())
-        parentName = &static_cast<Element*>(text->parentElement())->tagQName();
+        parentName = &(text->parentElement())->tagQName();
 
     if (parentName && (*parentName == scriptTag || *parentName == styleTag || *parentName == xmpTag))
         return EntityMaskInCDATA;
@@ -449,13 +454,13 @@ void MarkupAccumulator::appendAttribute(StringBuilder& result, Element* element,
     else {
         QualifiedName prefixedName = attribute.name();
         if (attribute.namespaceURI() == XLinkNames::xlinkNamespaceURI) {
-            if (attribute.prefix() != xlinkAtom)
+            if (!attribute.prefix())
                 prefixedName.setPrefix(xlinkAtom);
         } else if (attribute.namespaceURI() == XMLNames::xmlNamespaceURI) {
-            if (attribute.prefix() != xmlAtom)
+            if (!attribute.prefix())
                 prefixedName.setPrefix(xmlAtom);
         } else if (attribute.namespaceURI() == XMLNSNames::xmlnsNamespaceURI) {
-            if (attribute.name() != XMLNSNames::xmlnsAttr && attribute.prefix() != xmlnsAtom)
+            if (attribute.name() != XMLNSNames::xmlnsAttr && !attribute.prefix())
                 prefixedName.setPrefix(xmlnsAtom);
         }
         result.append(prefixedName.toString());
@@ -496,7 +501,7 @@ void MarkupAccumulator::appendStartMarkup(StringBuilder& result, const Node* nod
         appendComment(result, static_cast<const Comment*>(node)->data());
         break;
     case Node::DOCUMENT_NODE:
-        appendXMLDeclaration(result, static_cast<const Document*>(node));
+        appendXMLDeclaration(result, toDocument(node));
         break;
     case Node::DOCUMENT_FRAGMENT_NODE:
         break;
@@ -507,7 +512,7 @@ void MarkupAccumulator::appendStartMarkup(StringBuilder& result, const Node* nod
         appendProcessingInstruction(result, static_cast<const ProcessingInstruction*>(node)->target(), static_cast<const ProcessingInstruction*>(node)->data());
         break;
     case Node::ELEMENT_NODE:
-        appendElement(result, static_cast<Element*>(const_cast<Node*>(node)), namespaces);
+        appendElement(result, toElement(const_cast<Node*>(node)), namespaces);
         break;
     case Node::CDATA_SECTION_NODE:
         appendCDATASection(result, static_cast<const CDATASection*>(node)->data());
@@ -557,7 +562,7 @@ void MarkupAccumulator::appendEndMarkup(StringBuilder& result, const Node* node)
 
     result.append('<');
     result.append('/');
-    result.append(static_cast<const Element*>(node)->nodeNamePreservingCase());
+    result.append(toElement(node)->nodeNamePreservingCase());
     result.append('>');
 }
 

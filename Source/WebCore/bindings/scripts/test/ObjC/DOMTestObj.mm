@@ -35,11 +35,11 @@
 #import "DOMDictionaryInternal.h"
 #import "DOMDocumentInternal.h"
 #import "DOMEventInternal.h"
-#import "DOMIDBKeyInternal.h"
 #import "DOMNodeInternal.h"
 #import "DOMSVGDocumentInternal.h"
 #import "DOMSVGPointInternal.h"
 #import "DOMStyleSheetInternal.h"
+#import "DOMTestEnumTypeInternal.h"
 #import "DOMTestObjInternal.h"
 #import "DOMTestObjectAConstructorInternal.h"
 #import "DOMTestObjectBConstructorInternal.h"
@@ -55,7 +55,6 @@
 #import "EventListener.h"
 #import "ExceptionHandlers.h"
 #import "HTMLNames.h"
-#import "IDBKey.h"
 #import "JSMainThreadExecState.h"
 #import "KURL.h"
 #import "Node.h"
@@ -63,6 +62,7 @@
 #import "SVGDocument.h"
 #import "SVGStaticPropertyTearOff.h"
 #import "SerializedScriptValue.h"
+#import "TestEnumType.h"
 #import "TestObj.h"
 #import "TestObjectAConstructor.h"
 #import "TestObjectBConstructor.h"
@@ -232,7 +232,7 @@
 - (NSString *)reflectedStringAttr
 {
     WebCore::JSMainThreadNullState state;
-    return IMPL->getAttribute(WebCore::HTMLNames::reflectedstringattrAttr);
+    return IMPL->fastGetAttribute(WebCore::HTMLNames::reflectedstringattrAttr);
 }
 
 - (void)setReflectedStringAttr:(NSString *)newReflectedStringAttr
@@ -268,7 +268,7 @@
 - (BOOL)reflectedBooleanAttr
 {
     WebCore::JSMainThreadNullState state;
-    return IMPL->hasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr);
+    return IMPL->fastHasAttribute(WebCore::HTMLNames::reflectedbooleanattrAttr);
 }
 
 - (void)setReflectedBooleanAttr:(BOOL)newReflectedBooleanAttr
@@ -292,7 +292,7 @@
 - (NSString *)reflectedStringAttr
 {
     WebCore::JSMainThreadNullState state;
-    return IMPL->getAttribute(WebCore::HTMLNames::customContentStringAttrAttr);
+    return IMPL->fastGetAttribute(WebCore::HTMLNames::customContentStringAttrAttr);
 }
 
 - (void)setReflectedStringAttr:(NSString *)newReflectedStringAttr
@@ -316,7 +316,7 @@
 - (BOOL)reflectedCustomBooleanAttr
 {
     WebCore::JSMainThreadNullState state;
-    return IMPL->hasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr);
+    return IMPL->fastHasAttribute(WebCore::HTMLNames::customContentBooleanAttrAttr);
 }
 
 - (void)setReflectedCustomBooleanAttr:(BOOL)newReflectedCustomBooleanAttr
@@ -718,6 +718,57 @@
     return IMPL->replaceableAttribute();
 }
 
+- (double)nullableDoubleAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableDoubleAttribute(isNull);
+}
+
+- (int)nullableLongAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableLongAttribute(isNull);
+}
+
+- (BOOL)nullableBooleanAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableBooleanAttribute(isNull);
+}
+
+- (NSString *)nullableStringAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableStringAttribute(isNull);
+}
+
+- (int)nullableLongSettableAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    return IMPL->nullableLongSettableAttribute(isNull);
+}
+
+- (void)setNullableLongSettableAttribute:(int)newNullableLongSettableAttribute
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->setNullableLongSettableAttribute(newNullableLongSettableAttribute);
+}
+
+- (int)nullableStringValue
+{
+    WebCore::JSMainThreadNullState state;
+    WebCore::ExceptionCode ec = 0;
+    int result = IMPL->nullableStringValue(isNull, ec);
+    WebCore::raiseOnDOMError(ec);
+    return result;
+}
+
+- (void)setNullableStringValue:(int)newNullableStringValue
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->setNullableStringValue(newNullableStringValue);
+}
+
 - (void)voidMethod
 {
     WebCore::JSMainThreadNullState state;
@@ -754,6 +805,12 @@
     return kit(WTF::getPtr(IMPL->objMethodWithArgs(longArg, strArg, core(objArg))));
 }
 
+- (void)methodWithEnumArg:(DOMTestEnumType *)enumArg
+{
+    WebCore::JSMainThreadNullState state;
+    IMPL->methodWithEnumArg(core(enumArg));
+}
+
 - (DOMTestObj *)methodThatRequiresAllArgsAndThrows:(NSString *)strArg objArg:(DOMTestObj *)objArg
 {
     WebCore::JSMainThreadNullState state;
@@ -767,12 +824,6 @@
 {
     WebCore::JSMainThreadNullState state;
     IMPL->serializedValue(WebCore::SerializedScriptValue::create(WTF::String(serializedArg)));
-}
-
-- (void)idbKey:(DOMIDBKey *)key
-{
-    WebCore::JSMainThreadNullState state;
-    IMPL->idbKey(core(key));
 }
 
 - (void)optionsObject:(DOMDictionary *)oo ooo:(DOMDictionary *)ooo

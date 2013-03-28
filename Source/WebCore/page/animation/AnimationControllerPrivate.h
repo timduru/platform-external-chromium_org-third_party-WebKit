@@ -49,7 +49,6 @@ class Frame;
 class Node;
 class RenderObject;
 class RenderStyle;
-class WebKitAnimationList;
 
 enum SetChanged {
     DoNotCallSetChanged = 0,
@@ -88,7 +87,7 @@ public:
     bool isRunningAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
     bool isRunningAcceleratedAnimationOnRenderer(RenderObject*, CSSPropertyID, bool isRunningNow) const;
 
-    bool pauseAnimationAtTime(RenderObject*, const String& name, double t);
+    bool pauseAnimationAtTime(RenderObject*, const AtomicString& name, double t);
     bool pauseTransitionAtTime(RenderObject*, const String& property, double t);
     unsigned numberOfActiveAnimations(Document*) const;
 
@@ -106,8 +105,6 @@ public:
     void removeFromAnimationsWaitingForStartTimeResponse(AnimationBase*);
 
     void animationWillBeRemoved(AnimationBase*);
-
-    PassRefPtr<WebKitAnimationList> animationsForRenderer(RenderObject*) const;
 
     void updateAnimationTimerForRenderer(RenderObject*);
     
@@ -142,7 +139,6 @@ private:
     WaitingAnimationsSet m_animationsWaitingForStyle;
     WaitingAnimationsSet m_animationsWaitingForStartTimeResponse;
     bool m_waitingForAsyncStartNotification;
-    double m_previousTimeToNextService;
 };
 
 } // namespace WebCore

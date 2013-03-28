@@ -21,8 +21,7 @@
 #include "config.h"
 #include "qquickwebpage_p.h"
 
-#include "LayerTreeCoordinatorProxy.h"
-#include "LayerTreeRenderer.h"
+#include "CoordinatedLayerTreeHostProxy.h"
 #include "QtWebPageEventHandler.h"
 #include "QtWebPageSGNode.h"
 #include "TransformationMatrix.h"
@@ -30,6 +29,8 @@
 #include "qquickwebpage_p_p.h"
 #include "qquickwebview_p.h"
 #include "qwebkittest_p.h"
+#include <QQuickWindow>
+#include <WebCore/CoordinatedGraphicsScene.h>
 
 using namespace WebKit;
 
@@ -70,9 +71,16 @@ void QQuickWebPagePrivate::paint(QPainter* painter)
     if (!webPageProxy->drawingArea())
         return;
 
-    LayerTreeCoordinatorProxy* layerTreeCoordinatorProxy = webPageProxy->drawingArea()->layerTreeCoordinatorProxy();
-    if (layerTreeCoordinatorProxy->layerTreeRenderer())
-        layerTreeCoordinatorProxy->layerTreeRenderer()->paintToGraphicsContext(painter);
+    if (coordinatedLayerTreeHostProxy()->coordinatedGraphicsScene())
+        coordinatedLayerTreeHostProxy()->coordinatedGraphicsScene()->paintToGraphicsContext(painter);
+}
+
+CoordinatedLayerTreeHostProxy* QQuickWebPagePrivate::coordinatedLayerTreeHostProxy()
+{
+    if (webPageProxy->drawingArea())
+        return webPageProxy->drawingArea()->coordinatedLayerTreeHostProxy();
+
+    return 0;
 }
 
 QSGNode* QQuickWebPage::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
@@ -80,16 +88,27 @@ QSGNode* QQuickWebPage::updatePaintNode(QSGNode* oldNode, UpdatePaintNodeData*)
     if (!d->webPageProxy->drawingArea())
         return oldNode;
 
-    LayerTreeCoordinatorProxy* layerTreeCoordinatorProxy = d->webPageProxy->drawingArea()->layerTreeCoordinatorProxy();
-    LayerTreeRenderer* renderer = layerTreeCoordinatorProxy->layerTreeRenderer();
+    WebCore::CoordinatedGraphicsScene* scene = d->coordinatedLayerTreeHostProxy()->coordinatedGraphicsScene();
 
     QtWebPageSGNode* node = static_cast<QtWebPageSGNode*>(oldNode);
+
+    const QWindow* window = this->window();
+    ASSERT(window);
+
+    if (window && d->webPageProxy->deviceScaleFactor() != window->devicePixelRatio()) {
+        d->webPageProxy->setIntrinsicDeviceScaleFactor(window->devicePixelRatio());
+        // This signal is queued since if we are running a threaded renderer. This might cause failures
+        // if tests are reading the new value between the property change and the signal emission.
+        emit d->viewportItem->experimental()->test()->devicePixelRatioChanged();
+    }
+
     if (!node)
-        node = new QtWebPageSGNode();
-    node->setRenderer(renderer);
-    renderer->syncRemoteContent();
+        node = new QtWebPageSGNode;
+
+    node->setCoordinatedGraphicsScene(scene);
 
     node->setScale(d->contentsScale);
+    node->setDevicePixelRatio(window->devicePixelRatio());
     QColor backgroundColor = d->webPageProxy->drawsTransparentBackground() ? Qt::transparent : Qt::white;
     QRectF backgroundRect(QPointF(0, 0), d->contentsSize);
     node->setBackground(backgroundRect, backgroundColor);
@@ -155,10 +174,6 @@ QTransform QQuickWebPage::transformToItem() const
 void QQuickWebPagePrivate::updateSize()
 {
     QSizeF scaledSize = contentsSize * contentsScale;
-
-    DrawingAreaProxy* drawingArea = webPageProxy->drawingArea();
-    if (drawingArea && drawingArea->layerTreeCoordinatorProxy())
-        drawingArea->layerTreeCoordinatorProxy()->setContentsSize(WebCore::FloatSize(contentsSize));
 
     q->setSize(scaledSize);
 

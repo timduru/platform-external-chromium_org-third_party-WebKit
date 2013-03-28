@@ -32,6 +32,7 @@
 #include "SimplePDFPlugin.h"
 #include "WebEvent.h"
 #include <WebCore/AffineTransform.h>
+#include <WebCore/FindOptions.h>
 #include <WebCore/ScrollableArea.h>
 #include <wtf/RetainPtr.h>
 
@@ -41,7 +42,12 @@ typedef const struct OpaqueJSValue* JSValueRef;
 
 OBJC_CLASS PDFAnnotation;
 OBJC_CLASS PDFLayerController;
+OBJC_CLASS PDFSelection;
 OBJC_CLASS WKPDFLayerControllerDelegate;
+
+namespace CoreIPC {
+class DataReference;
+}
 
 namespace WebCore {
 class Element;
@@ -63,8 +69,20 @@ public:
     void setActiveAnnotation(PDFAnnotation *);
     
     using ScrollableArea::notifyScrollPositionChanged;
+    void notifyContentScaleFactorChanged(CGFloat scaleFactor);
+    void notifyDisplayModeChanged(int);
+
+    void notifySelectionChanged(PDFSelection *);
 
     void clickedLink(NSURL *);
+    void saveToPDF();
+    void openWithNativeApplication();
+    void writeItemsToPasteboard(NSArray *items, NSArray *types);
+    void showDefinitionForAttributedString(NSAttributedString *, CGPoint);
+    void performWebSearch(NSString *);
+
+    void focusNextAnnotation();
+    void focusPreviousAnnotation();
 
 private:
     explicit PDFPlugin(WebFrame*);
@@ -80,18 +98,40 @@ private:
     virtual PassRefPtr<ShareableBitmap> snapshot() OVERRIDE;
     virtual PlatformLayer* pluginLayer() OVERRIDE;
     virtual void geometryDidChange(const WebCore::IntSize& pluginSize, const WebCore::IntRect& clipRect, const WebCore::AffineTransform& pluginToRootViewTransform) OVERRIDE;
+    virtual void contentsScaleFactorChanged(float) OVERRIDE;
     virtual bool handleMouseEvent(const WebMouseEvent&) OVERRIDE;
+    virtual bool handleContextMenuEvent(const WebMouseEvent&) OVERRIDE;
     virtual bool handleKeyboardEvent(const WebKeyboardEvent&) OVERRIDE;
     virtual bool handleEditingCommand(const String& commandName, const String& argument) OVERRIDE;
     virtual bool isEditingCommandEnabled(const String&) OVERRIDE;
     virtual bool handlesPageScaleFactor() OVERRIDE;
 
+    virtual unsigned countFindMatches(const String& target, WebCore::FindOptions, unsigned maxMatchCount) OVERRIDE;
+    virtual bool findString(const String& target, WebCore::FindOptions, unsigned maxMatchCount) OVERRIDE;
+
+    PDFSelection *nextMatchForString(const String& target, BOOL searchForward, BOOL caseSensitive, BOOL wrapSearch, PDFSelection *initialSelection, BOOL startInSelection);
+
+    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) OVERRIDE;
+    virtual String getSelectionString() const OVERRIDE;
+
+    virtual bool handleWheelEvent(const WebWheelEvent& event) OVERRIDE;
+
     // ScrollableArea functions.
     virtual void setScrollOffset(const WebCore::IntPoint&) OVERRIDE;
     virtual void invalidateScrollbarRect(WebCore::Scrollbar*, const WebCore::IntRect&) OVERRIDE;
     virtual void invalidateScrollCornerRect(const WebCore::IntRect&) OVERRIDE;
-
+    virtual WebCore::IntPoint lastKnownMousePosition() const OVERRIDE { return m_lastMousePositionInPluginCoordinates; }
+    
+    NSEvent *nsEventForWebMouseEvent(const WebMouseEvent&);
+    WebCore::IntPoint convertFromPluginToPDFView(const WebCore::IntPoint&) const;
+    WebCore::IntPoint convertFromRootViewToPlugin(const WebCore::IntPoint&) const;
+    
     bool supportsForms();
+    bool isFullFramePlugin();
+
+    void updatePageAndDeviceScaleFactors();
+
+    WebCore::IntPoint convertFromPDFViewToRootView(const WebCore::IntPoint&) const;
 
     RetainPtr<CALayer> m_containerLayer;
     RetainPtr<CALayer> m_contentLayer;
@@ -104,8 +144,12 @@ private:
     RefPtr<WebCore::Element> m_annotationContainer;
 
     WebCore::AffineTransform m_rootViewToPluginTransform;
-    WebCore::IntPoint m_lastMousePoint;
     WebMouseEvent m_lastMouseEvent;
+    WebCore::IntPoint m_lastMousePositionInPluginCoordinates;
+
+    String m_temporaryPDFUUID;
+
+    String m_lastFoundString;
     
     RetainPtr<WKPDFLayerControllerDelegate> m_pdfLayerControllerDelegate;
 };

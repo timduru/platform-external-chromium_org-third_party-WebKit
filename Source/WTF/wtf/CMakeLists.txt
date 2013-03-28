@@ -1,4 +1,4 @@
-SET(WTF_HEADERS
+set(WTF_HEADERS
     ASCIICType.h
     AVLTree.h
     Alignment.h
@@ -26,6 +26,8 @@ SET(WTF_HEADERS
     Encoder.h
     FastAllocBase.h
     FastMalloc.h
+    FeatureDefines.h
+    FilePrintStream.h
     FixedArray.h
     Forward.h
     GetPtr.h
@@ -46,6 +48,17 @@ SET(WTF_HEADERS
     MallocZoneSupport.h
     MathExtras.h
     MediaTime.h
+    MemoryInstrumentation.h
+    MemoryInstrumentationArrayBufferView.h
+    MemoryInstrumentationHashCountedSet.h
+    MemoryInstrumentationHashMap.h
+    MemoryInstrumentationHashSet.h
+    MemoryInstrumentationListHashSet.h
+    MemoryInstrumentationParsedURL.h
+    MemoryInstrumentationSequence.h
+    MemoryInstrumentationString.h
+    MemoryInstrumentationVector.h
+    MemoryObjectInfo.h
     MessageQueue.h
     MetaAllocator.h
     MetaAllocatorHandle.h
@@ -75,8 +88,10 @@ SET(WTF_HEADERS
     ParallelJobsOpenMP.h
     Platform.h
     PossiblyNull.h
+    PrintStream.h
     RandomNumber.h
     RandomNumberSeed.h
+    RawPointer.h
     RedBlackTree.h
     RefCounted.h
     RefCountedLeakCounter.h
@@ -91,6 +106,7 @@ SET(WTF_HEADERS
     StdLibExtras.h
     StringExtras.h
     StringHasher.h
+    StringPrintStream.h
     TCPackedCache.h
     TCPageMap.h
     TCSpinLock.h
@@ -107,6 +123,7 @@ SET(WTF_HEADERS
     Vector.h
     VectorTraits.h
     WTFThreadData.h
+    WeakPtr.h
     dtoa.h
 
     dtoa/bignum-dtoa.h
@@ -138,10 +155,11 @@ SET(WTF_HEADERS
     unicode/Unicode.h
 )
 
-SET(WTF_SOURCES
+set(WTF_SOURCES
     ArrayBuffer.cpp
     ArrayBufferView.cpp
     Assertions.cpp
+    Atomics.cpp
     BitVector.cpp
     CryptographicallyRandomNumber.cpp
     CurrentTime.cpp
@@ -150,6 +168,7 @@ SET(WTF_SOURCES
     DecimalNumber.cpp
     DynamicAnnotations.cpp
     FastMalloc.cpp
+    FilePrintStream.cpp
     GregorianDateTime.cpp
     HashTable.cpp
     MD5.cpp
@@ -157,16 +176,18 @@ SET(WTF_SOURCES
     MediaTime.cpp
     MetaAllocator.cpp
     OSRandomSource.cpp
+    MemoryInstrumentation.cpp
     NumberOfCores.cpp
     RAMSize.cpp
     PageAllocationAligned.cpp
     PageBlock.cpp
     ParallelJobsGeneric.cpp
+    PrintStream.cpp
     RandomNumber.cpp
     RefCountedLeakCounter.cpp
     SHA1.cpp
     StackBounds.cpp
-    StringExtras.cpp
+    StringPrintStream.cpp
     Threading.cpp
     TypeTraits.cpp
     WTFThreadData.cpp
@@ -194,7 +215,7 @@ SET(WTF_SOURCES
     unicode/UTF8.cpp
 )
 
-SET(WTF_INCLUDE_DIRECTORIES
+set(WTF_INCLUDE_DIRECTORIES
     "${WTF_DIR}"
     "${WTF_DIR}/wtf"
     "${WTF_DIR}/wtf/dtoa"
@@ -204,17 +225,17 @@ SET(WTF_INCLUDE_DIRECTORIES
     "${CMAKE_BINARY_DIR}"
 )
 
-IF (NOT USE_SYSTEM_MALLOC)
-    LIST(APPEND WTF_SOURCES
+if (NOT USE_SYSTEM_MALLOC)
+    list(APPEND WTF_SOURCES
         TCSystemAlloc.cpp
     )
-ENDIF()
+endif ()
 
 WEBKIT_INCLUDE_CONFIG_FILES_IF_EXISTS()
 
 WEBKIT_WRAP_SOURCELIST(${WTF_SOURCES})
-INCLUDE_DIRECTORIES(${WTF_INCLUDE_DIRECTORIES})
-ADD_DEFINITIONS(-DBUILDING_WTF)
-ADD_LIBRARY(${WTF_LIBRARY_NAME} STATIC ${WTF_HEADERS} ${WTF_SOURCES})
-TARGET_LINK_LIBRARIES(${WTF_LIBRARY_NAME} ${WTF_LIBRARIES})
-SET_TARGET_PROPERTIES(${WTF_LIBRARY_NAME} PROPERTIES FOLDER "JavaScriptCore")
+include_directories(${WTF_INCLUDE_DIRECTORIES})
+add_definitions(-DBUILDING_WTF)
+add_library(${WTF_LIBRARY_NAME} STATIC ${WTF_HEADERS} ${WTF_SOURCES})
+target_link_libraries(${WTF_LIBRARY_NAME} ${WTF_LIBRARIES})
+set_target_properties(${WTF_LIBRARY_NAME} PROPERTIES FOLDER "JavaScriptCore")

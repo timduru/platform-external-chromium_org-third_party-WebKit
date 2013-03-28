@@ -108,9 +108,9 @@ class MockFileSystem(object):
         if not self.exists(source):
             self._raise_not_found(source)
         if self.isdir(source):
-            raise IOError(errno.EISDIR, source, os.strerror(errno.ISDIR))
+            raise IOError(errno.EISDIR, source, os.strerror(errno.EISDIR))
         if self.isdir(destination):
-            raise IOError(errno.EISDIR, destination, os.strerror(errno.ISDIR))
+            raise IOError(errno.EISDIR, destination, os.strerror(errno.EISDIR))
         if not self.exists(self.dirname(destination)):
             raise IOError(errno.ENOENT, destination, os.strerror(errno.ENOENT))
 
@@ -395,7 +395,7 @@ class MockFileSystem(object):
     def splitext(self, path):
         idx = path.rfind('.')
         if idx == -1:
-            idx = 0
+            idx = len(path)
         return (path[0:idx], path[idx:])
 
 
@@ -452,7 +452,7 @@ class ReadableBinaryFileObject(object):
 
 class ReadableTextFileObject(ReadableBinaryFileObject):
     def __init__(self, fs, path, data):
-        super(ReadableTextFileObject, self).__init__(fs, path, StringIO.StringIO(data))
+        super(ReadableTextFileObject, self).__init__(fs, path, StringIO.StringIO(data.decode("utf-8")))
 
     def close(self):
         self.data.close()

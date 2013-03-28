@@ -37,10 +37,12 @@
 #import <wtf/text/WTFString.h>
 
 #ifdef __OBJC__
+@class NSURL;
 @class WebInspectorWindowController;
 @class WebNodeHighlighter;
 @class WebView;
 #else
+class NSURL;
 class WebInspectorWindowController;
 class WebNodeHighlighter;
 class WebView;
@@ -57,7 +59,7 @@ class WebInspectorFrontendClient;
 
 class WebInspectorClient : public WebCore::InspectorClient, public WebCore::InspectorFrontendChannel {
 public:
-    WebInspectorClient(WebView *);
+    explicit WebInspectorClient(WebView *);
 
     virtual void inspectorDestroyed() OVERRIDE;
 
@@ -90,10 +92,11 @@ class WebInspectorFrontendClient : public WebCore::InspectorFrontendClientLocal 
 public:
     WebInspectorFrontendClient(WebView*, WebInspectorWindowController*, WebCore::InspectorController*, WebCore::Page*, PassOwnPtr<Settings>);
 
+    void attachAvailabilityChanged(bool);
+
     virtual void frontendLoaded();
 
     virtual String localizedStringsURL();
-    virtual String hiddenPanels();
 
     virtual void bringToFront();
     virtual void closeWindow();
@@ -108,7 +111,12 @@ public:
 private:
     void updateWindowTitle() const;
 
+    virtual bool canSave() OVERRIDE { return true; }
+    virtual void save(const String& url, const String& content, bool forceSaveAs) OVERRIDE;
+    virtual void append(const String& url, const String& content) OVERRIDE;
+
     WebView* m_inspectedWebView;
     RetainPtr<WebInspectorWindowController> m_windowController;
     String m_inspectedURL;
+    HashMap<String, RetainPtr<NSURL>> m_saveURLs;
 };

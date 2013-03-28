@@ -88,6 +88,7 @@ public:
     virtual void dispatchDidCancelAuthenticationChallenge(WebCore::DocumentLoader*, unsigned long identifier, const WebCore::AuthenticationChallenge&);
     virtual void dispatchDidReceiveResponse(WebCore::DocumentLoader*, unsigned long identifier, const WebCore::ResourceResponse&);
     virtual void dispatchDidReceiveContentLength(WebCore::DocumentLoader*, unsigned long identifier, int dataLength);
+    virtual void dispatchDidChangeResourcePriority(unsigned long identifier, WebCore::ResourceLoadPriority);
     virtual void dispatchDidFinishLoading(WebCore::DocumentLoader*, unsigned long identifier);
     virtual void dispatchDidFailLoading(WebCore::DocumentLoader*, unsigned long identifier, const WebCore::ResourceError&);
     virtual bool dispatchDidLoadResourceFromMemoryCache(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, int length);
@@ -118,6 +119,7 @@ public:
     virtual void dispatchDecidePolicyForNavigationAction(WebCore::FramePolicyFunction function, const WebCore::NavigationAction& action, const WebCore::ResourceRequest& request, PassRefPtr<WebCore::FormState> form_state);
     virtual void cancelPolicyCheck();
     virtual void dispatchUnableToImplementPolicy(const WebCore::ResourceError&);
+    virtual void dispatchWillRequestResource(WebCore::CachedResourceRequest*);
     virtual void dispatchWillSendSubmitEvent(PassRefPtr<WebCore::FormState>);
     virtual void dispatchWillSubmitForm(WebCore::FramePolicyFunction, PassRefPtr<WebCore::FormState>);
     virtual void revertToProvisionalState(WebCore::DocumentLoader*) { }
@@ -137,6 +139,8 @@ public:
     virtual void updateGlobalHistoryRedirectLinks();
     virtual bool shouldGoToHistoryItem(WebCore::HistoryItem*) const;
     virtual bool shouldStopLoadingForHistoryItem(WebCore::HistoryItem*) const;
+    virtual void didAccessInitialDocument();
+    virtual void didDisownOpener();
     virtual void didDisplayInsecureContent();
     virtual void didRunInsecureContent(WebCore::SecurityOrigin*, const WebCore::KURL& insecureURL);
     virtual void didDetectXSS(const WebCore::KURL&, bool didBlockEntirePage);
@@ -170,8 +174,8 @@ public:
     virtual void didRestoreFromPageCache();
     virtual void dispatchDidBecomeFrameset(bool);
     virtual bool canCachePage() const;
-    virtual void download(
-        WebCore::ResourceHandle*, const WebCore::ResourceRequest&,
+    virtual void convertMainResourceLoadToDownload(
+        WebCore::DocumentLoader*, const WebCore::ResourceRequest&,
         const WebCore::ResourceResponse&);
     virtual PassRefPtr<WebCore::Frame> createFrame(
         const WebCore::KURL& url, const WTF::String& name,
@@ -207,17 +211,7 @@ public:
 
     virtual PassRefPtr<WebCore::FrameNetworkingContext> createNetworkingContext();
     virtual bool willCheckAndDispatchMessageEvent(WebCore::SecurityOrigin* target, WebCore::MessageEvent*) const;
-
-#if ENABLE(WEB_INTENTS_TAG)
-    virtual void registerIntentService(const String& action,
-                                       const String& type,
-                                       const WebCore::KURL& href,
-                                       const String& title,
-                                       const String& disposition);
-#endif
-#if ENABLE(WEB_INTENTS)
-    virtual void dispatchIntent(PassRefPtr<WebCore::IntentRequest>) OVERRIDE;
-#endif
+    virtual void didChangeName(const String&);
 
     virtual void dispatchWillOpenSocketStream(WebCore::SocketStreamHandle*) OVERRIDE;
 
@@ -228,6 +222,13 @@ public:
 #if ENABLE(REQUEST_AUTOCOMPLETE)
     virtual void didRequestAutocomplete(PassRefPtr<WebCore::FormState>) OVERRIDE;
 #endif
+
+#if ENABLE(WEBGL)
+    virtual bool allowWebGL(bool enabledPerSettings) OVERRIDE;
+    virtual void didLoseWebGLContext(int arbRobustnessContextLostReason) OVERRIDE;
+#endif
+
+    virtual void dispatchWillInsertBody() OVERRIDE;
 
 private:
     void makeDocumentView();

@@ -40,6 +40,7 @@
 #include "HTMLInterchange.h"
 #include "HTMLNames.h"
 #include "Node.h"
+#include "NodeTraversal.h"
 #include "Position.h"
 #include "QualifiedName.h"
 #include "RenderStyle.h"
@@ -47,8 +48,8 @@
 #include "StyleResolver.h"
 #include "StyleRule.h"
 #include "StyledElement.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
-#include "visible_units.h"
 #include <wtf/HashSet.h>
 
 namespace WebCore {
@@ -77,7 +78,6 @@ static const CSSPropertyID editingProperties[] = {
     CSSPropertyWordSpacing,
     CSSPropertyWebkitTextDecorationsInEffect,
     CSSPropertyWebkitTextFillColor,
-    CSSPropertyWebkitTextSizeAdjust,
     CSSPropertyWebkitTextStrokeColor,
     CSSPropertyWebkitTextStrokeWidth,
 };
@@ -127,7 +127,7 @@ public:
     virtual ~HTMLElementEquivalent() { }
     virtual bool matches(const Element* element) const { return !m_tagName || element->hasTagName(*m_tagName); }
     virtual bool hasAttribute() const { return false; }
-    virtual bool propertyExistsInStyle(const StylePropertySet* style) const { return style && style->getPropertyCSSValue(m_propertyID); }
+    virtual bool propertyExistsInStyle(const StylePropertySet* style) const { return style->getPropertyCSSValue(m_propertyID); }
     virtual bool valueIsPresentInStyle(Element*, StylePropertySet*) const;
     virtual void addToStyle(Element*, EditingStyle*) const;
 
@@ -244,9 +244,7 @@ bool HTMLAttributeEquivalent::valueIsPresentInStyle(Element* element, StylePrope
     RefPtr<CSSValue> value = attributeValueAsCSSValue(element);
     RefPtr<CSSValue> styleValue = style->getPropertyCSSValue(m_propertyID);
     
-    // FIXME: This is very inefficient way of comparing values
-    // but we can't string compare attribute value and CSS property value.
-    return value && styleValue && value->cssText() == styleValue->cssText();
+    return compareCSSValuePtr(value, styleValue);
 }
 
 void HTMLAttributeEquivalent::addToStyle(Element* element, EditingStyle* style) const
@@ -681,7 +679,7 @@ TriState EditingStyle::triStateOfStyle(const VisibleSelection& selection) const
         return triStateOfStyle(EditingStyle::styleAtSelectionStart(selection).get());
 
     TriState state = FalseTriState;
-    for (Node* node = selection.start().deprecatedNode(); node; node = node->traverseNextNode()) {
+    for (Node* node = selection.start().deprecatedNode(); node; node = NodeTraversal::next(node)) {
         RefPtr<CSSComputedStyleDeclaration> nodeStyle = CSSComputedStyleDeclaration::create(node);
         if (nodeStyle) {
             TriState nodeState = triStateOfStyle(nodeStyle.get(), node->isTextNode() ? EditingStyle::DoNotIgnoreTextOnlyProperties : EditingStyle::IgnoreTextOnlyProperties);
@@ -975,7 +973,7 @@ void EditingStyle::mergeInlineStyleOfElement(StyledElement* element, CSSProperty
 static inline bool elementMatchesAndPropertyIsNotInInlineStyleDecl(const HTMLElementEquivalent* equivalent, const StyledElement* element,
     EditingStyle::CSSPropertyOverrideMode mode, StylePropertySet* style)
 {
-    return equivalent->matches(element) && !equivalent->propertyExistsInStyle(element->inlineStyle())
+    return equivalent->matches(element) && (!element->inlineStyle() || !equivalent->propertyExistsInStyle(element->inlineStyle()))
         && (mode == EditingStyle::OverrideValues || !equivalent->propertyExistsInStyle(style));
 }
 
@@ -1222,8 +1220,7 @@ PassRefPtr<EditingStyle> EditingStyle::styleAtSelectionStart(const VisibleSelect
     // and find the background color of the common ancestor.
     if (shouldUseBackgroundColorInEffect && (selection.isRange() || hasTransparentBackgroundColor(style->m_mutableStyle.get()))) {
         RefPtr<Range> range(selection.toNormalizedRange());
-        ExceptionCode ec = 0;
-        if (PassRefPtr<CSSValue> value = backgroundColorInEffect(range->commonAncestorContainer(ec)))
+        if (PassRefPtr<CSSValue> value = backgroundColorInEffect(range->commonAncestorContainer(IGNORE_EXCEPTION)))
             style->setProperty(CSSPropertyBackgroundColor, value->cssText());
     }
 
@@ -1248,7 +1245,7 @@ WritingDirection EditingStyle::textDirectionForSelection(const VisibleSelection&
         end = selection.end().upstream();
 
         Node* pastLast = Range::create(end.document(), position.parentAnchoredEquivalent(), end.parentAnchoredEquivalent())->pastLastNode();
-        for (Node* n = node; n && n != pastLast; n = n->traverseNextNode()) {
+        for (Node* n = node; n && n != pastLast; n = NodeTraversal::next(n)) {
             if (!n->isStyledElement())
                 continue;
 

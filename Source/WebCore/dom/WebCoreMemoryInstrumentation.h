@@ -45,6 +45,7 @@ public:
     static MemoryObjectType DOM;
     static MemoryObjectType CSS;
     static MemoryObjectType Binding;
+    static MemoryObjectType RenderingStructures;
 
     static MemoryObjectType MemoryCacheStructures;
     static MemoryObjectType CachedResource;
@@ -64,7 +65,6 @@ public:
     static MemoryObjectType InspectorController;
     static MemoryObjectType InspectorMemoryAgent;
     static MemoryObjectType InspectorDOMStorageAgent;
-    static MemoryObjectType InspectorDOMStorageResources;
     static MemoryObjectType InspectorOverlay;
     static MemoryObjectType InspectorProfilerAgent;
     static MemoryObjectType InspectorDebuggerAgent;
@@ -80,6 +80,12 @@ public:
 
     static MemoryObjectType ProcessPrivateMemory;
 };
+
+class WebCoreMemoryInstrumentation {
+public:
+    static void reportStaticMembersMemoryUsage(WTF::MemoryInstrumentation*);
+};
+
 
 } // namespace WebCore
 

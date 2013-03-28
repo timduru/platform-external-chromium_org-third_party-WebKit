@@ -424,14 +424,14 @@ QStringList EventSender::contextClick()
         QGraphicsSceneContextMenuEvent ctxEvent(QEvent::GraphicsSceneContextMenu);
         ctxEvent.setReason(QGraphicsSceneContextMenuEvent::Mouse);
         ctxEvent.setPos(m_mousePos);
-        WebCore::WebViewGraphicsBased* view = qobject_cast<WebCore::WebViewGraphicsBased*>(m_page->view());
+        WebViewGraphicsBased* view = qobject_cast<WebViewGraphicsBased*>(m_page->view());
         if (view)
             sendEvent(view->graphicsView(), &ctxEvent);
     } else {
         QContextMenuEvent ctxEvent(QContextMenuEvent::Mouse, m_mousePos);
         sendEvent(m_page->view(), &ctxEvent);
     }
-    return DumpRenderTreeSupportQt::contextMenu(m_page);
+    return DumpRenderTreeSupportQt::contextMenu(m_page->handle());
 }
 
 void EventSender::scheduleAsynchronousClick()
@@ -616,7 +616,7 @@ void EventSender::textZoomOut()
 void EventSender::scalePageBy(float scaleFactor, float x, float y)
 {
     if (QWebFrame* frame = m_page->mainFrame())
-        DumpRenderTreeSupportQt::scalePageBy(frame, scaleFactor, QPoint(x, y));
+        DumpRenderTreeSupportQt::scalePageBy(frame->handle(), scaleFactor, QPoint(x, y));
 }
 
 QWebFrame* EventSender::frameUnderMouse() const
@@ -745,7 +745,7 @@ QGraphicsSceneWheelEvent* EventSender::createGraphicsSceneWheelEvent(QEvent::Typ
 
 void EventSender::sendEvent(QObject* receiver, QEvent* event)
 {
-    if (WebCore::WebViewGraphicsBased* view = qobject_cast<WebCore::WebViewGraphicsBased*>(receiver))
+    if (WebViewGraphicsBased* view = qobject_cast<WebViewGraphicsBased*>(receiver))
         view->scene()->sendEvent(view->graphicsView(), event);
     else
         QApplication::sendEvent(receiver, event);
@@ -755,9 +755,11 @@ void EventSender::postEvent(QObject* receiver, QEvent* event)
 {
     // QGraphicsScene does not have a postEvent method, so send the event in this case
     // and delete it after that.
-    if (WebCore::WebViewGraphicsBased* view = qobject_cast<WebCore::WebViewGraphicsBased*>(receiver)) {
+    if (WebViewGraphicsBased* view = qobject_cast<WebViewGraphicsBased*>(receiver)) {
         view->scene()->sendEvent(view->graphicsView(), event);
         delete event;
     } else
         QApplication::postEvent(receiver, event); // event deleted by the system
 }
+
+#include "moc_EventSenderQt.cpp"

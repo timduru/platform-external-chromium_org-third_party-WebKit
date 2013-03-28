@@ -43,6 +43,7 @@
 #include "TextBreakIterator.h"
 #include "TextResourceDecoder.h"
 #include "VisiblePosition.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include "break_lines.h"
 #include <wtf/AlwaysInline.h>
 #include <wtf/text/StringBuffer.h>
@@ -58,7 +59,7 @@ struct SameSizeAsRenderText : public RenderObject {
     uint32_t bitfields : 16;
     float widths[4];
     String text;
-    void* pointers[3];
+    void* pointers[2];
 };
 
 COMPILE_ASSERT(sizeof(RenderText) == sizeof(SameSizeAsRenderText), RenderText_should_stay_small);
@@ -135,27 +136,26 @@ static void makeCapitalized(String* string, UChar previous)
 }
 
 RenderText::RenderText(Node* node, PassRefPtr<StringImpl> str)
-     : RenderObject(node)
-     , m_hasTab(false)
-     , m_linesDirty(false)
-     , m_containsReversedText(false)
-     , m_knownToHaveNoOverflowAndNoFallbackFonts(false)
-     , m_needsTranscoding(false)
-     , m_minWidth(-1)
-     , m_maxWidth(-1)
-     , m_beginMinWidth(0)
-     , m_endMinWidth(0)
-     , m_text(str)
-     , m_firstTextBox(0)
-     , m_lastTextBox(0)
+    : RenderObject(!node || node->isDocumentNode() ? 0 : node)
+    , m_hasTab(false)
+    , m_linesDirty(false)
+    , m_containsReversedText(false)
+    , m_knownToHaveNoOverflowAndNoFallbackFonts(false)
+    , m_needsTranscoding(false)
+    , m_minWidth(-1)
+    , m_maxWidth(-1)
+    , m_beginMinWidth(0)
+    , m_endMinWidth(0)
+    , m_text(str)
+    , m_firstTextBox(0)
+    , m_lastTextBox(0)
 {
     ASSERT(m_text);
+    // FIXME: Some clients of RenderText (and subclasses) pass Document as node to create anonymous renderer.
+    // They should be switched to passing null and using setDocumentForAnonymous.
+    if (node && node->isDocumentNode())
+        setDocumentForAnonymous(toDocument(node));
 
-    m_is8Bit = m_text.is8Bit();
-    if (is8Bit())
-        m_data.characters8 = m_text.characters8();
-    else
-        m_data.characters16 = m_text.characters16();
     m_isAllASCII = m_text.containsOnlyASCII();
     m_canUseSimpleFontCodePath = computeCanUseSimpleFontCodePath();
     setIsText();
@@ -370,12 +370,12 @@ void RenderText::absoluteRectsForRange(Vector<IntRect>& rects, unsigned start, u
                     r.setX(selectionRect.x());
                 }
             }
-            rects.append(localToAbsoluteQuad(r, SnapOffsetForTransforms, wasFixed).enclosingBoundingBox());
+            rects.append(localToAbsoluteQuad(r, 0, wasFixed).enclosingBoundingBox());
         } else {
             // FIXME: This code is wrong. It's converting local to absolute twice. http://webkit.org/b/65722
             FloatRect rect = localQuadForTextBox(box, start, end, useSelectionHeight);
             if (!rect.isZero())
-                rects.append(localToAbsoluteQuad(rect, SnapOffsetForTransforms, wasFixed).enclosingBoundingBox());
+                rects.append(localToAbsoluteQuad(rect, 0, wasFixed).enclosingBoundingBox());
         }
     }
 }
@@ -418,7 +418,7 @@ void RenderText::absoluteQuads(Vector<FloatQuad>& quads, bool* wasFixed, Clippin
             else
                 boundaries.setHeight(ellipsisRect.maxY() - boundaries.y());
         }
-        quads.append(localToAbsoluteQuad(boundaries, SnapOffsetForTransforms, wasFixed));
+        quads.append(localToAbsoluteQuad(boundaries, 0, wasFixed));
     }
 }
     
@@ -453,11 +453,11 @@ void RenderText::absoluteQuadsForRange(Vector<FloatQuad>& quads, unsigned start,
                     r.setX(selectionRect.x());
                 }
             }
-            quads.append(localToAbsoluteQuad(r, SnapOffsetForTransforms, wasFixed));
+            quads.append(localToAbsoluteQuad(r, 0, wasFixed));
         } else {
             FloatRect rect = localQuadForTextBox(box, start, end, useSelectionHeight);
             if (!rect.isZero())
-                quads.append(localToAbsoluteQuad(rect, SnapOffsetForTransforms, wasFixed));
+                quads.append(localToAbsoluteQuad(rect, 0, wasFixed));
         }
     }
 }
@@ -1184,10 +1184,16 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
 
 bool RenderText::isAllCollapsibleWhitespace()
 {
-    int length = textLength();
-    const UChar* text = characters();
-    for (int i = 0; i < length; i++) {
-        if (!style()->isCollapsibleWhiteSpace(text[i]))
+    unsigned length = textLength();
+    if (is8Bit()) {
+        for (unsigned i = 0; i < length; ++i) {
+            if (!style()->isCollapsibleWhiteSpace(characters8()[i]))
+                return false;
+        }
+        return true;
+    }
+    for (unsigned i = 0; i < length; ++i) {
+        if (!style()->isCollapsibleWhiteSpace(characters16()[i]))
             return false;
     }
     return true;
@@ -1422,11 +1428,6 @@ void RenderText::setTextInternal(PassRefPtr<StringImpl> text)
     ASSERT(m_text);
     ASSERT(!isBR() || (textLength() == 1 && m_text[0] == '\n'));
 
-    m_is8Bit = m_text.is8Bit();
-    if (is8Bit())
-        m_data.characters8 = m_text.characters8();
-    else
-        m_data.characters16 = m_text.characters16();
     m_isAllASCII = m_text.containsOnlyASCII();
     m_canUseSimpleFontCodePath = computeCanUseSimpleFontCodePath();
 }
@@ -1464,9 +1465,8 @@ void RenderText::setText(PassRefPtr<StringImpl> text, bool force)
     setNeedsLayoutAndPrefWidthsRecalc();
     m_knownToHaveNoOverflowAndNoFallbackFonts = false;
     
-    AXObjectCache* axObjectCache = document()->axObjectCache();
-    if (axObjectCache->accessibilityEnabled())
-        axObjectCache->textChanged(this);
+    if (AXObjectCache* cache = document()->existingAXObjectCache())
+        cache->textChanged(this);
 }
 
 String RenderText::textWithoutTranscoding() const
@@ -1928,6 +1928,15 @@ void RenderText::momentarilyRevealLastTypedCharacter(unsigned lastTypedCharacter
         gSecureTextTimers->add(this, secureTextTimer);
     }
     secureTextTimer->restartWithNewText(lastTypedCharacterOffset);
+}
+
+void RenderText::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
+    RenderObject::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_text, "text");
+    info.addMember(m_firstTextBox, "firstTextBox");
+    info.addMember(m_lastTextBox, "lastTextBox");
 }
 
 } // namespace WebCore

@@ -32,6 +32,7 @@
 #define V8GCController_h
 
 #include <v8.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
@@ -41,7 +42,7 @@ class V8GCController {
 public:
     static void gcPrologue(v8::GCType, v8::GCCallbackFlags);
     static void gcEpilogue(v8::GCType, v8::GCCallbackFlags);
-    static void minorGCPrologue();
+    static void minorGCPrologue(v8::Isolate*);
     static void minorGCEpilogue();
     static void majorGCPrologue();
     static void majorGCEpilogue();
@@ -50,7 +51,10 @@ public:
     static void hintForCollectGarbage();
     static void collectGarbage();
 
-    static void* opaqueRootForGC(Node*);
+    static Node* opaqueRootForGC(Node*, v8::Isolate*);
+
+private:
+    static Vector<Node*>* m_edenNodes;
 };
 
 }

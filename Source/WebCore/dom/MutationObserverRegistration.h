@@ -31,8 +31,6 @@
 #ifndef MutationObserverRegistration_h
 #define MutationObserverRegistration_h
 
-#if ENABLE(MUTATION_OBSERVERS)
-
 #include "MutationObserver.h"
 #include <wtf/HashSet.h>
 #include <wtf/text/AtomicString.h>
@@ -60,6 +58,8 @@ public:
     MutationRecordDeliveryOptions deliveryOptions() const { return m_options & (MutationObserver::AttributeOldValue | MutationObserver::CharacterDataOldValue); }
     MutationObserverOptions mutationTypes() const { return m_options & MutationObserver::AllMutationTypes; }
 
+    void addRegistrationNodesToSet(HashSet<Node*>&) const;
+
 private:
     MutationObserverRegistration(PassRefPtr<MutationObserver>, Node*, MutationObserverOptions, const HashSet<AtomicString>& attributeFilter);
 
@@ -74,7 +74,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(MUTATION_OBSERVERS)
 
 #endif // MutationObserverRegistration_h

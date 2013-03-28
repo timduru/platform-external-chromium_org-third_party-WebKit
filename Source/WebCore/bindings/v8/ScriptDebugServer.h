@@ -86,18 +86,23 @@ public:
     void recompileAllJSFunctionsSoon() { }
     void recompileAllJSFunctions(Timer<ScriptDebugServer>* = 0) { }
 
+    void setScriptPreprocessor(const String& preprocessorBody);
+
     class Task {
     public:
         virtual ~Task() { }
         virtual void run() = 0;
     };
-    static void interruptAndRun(PassOwnPtr<Task>, v8::Isolate* = 0);
+    static void interruptAndRun(PassOwnPtr<Task>, v8::Isolate*);
     void runPendingTasks();
 
     bool isPaused();
+    bool runningNestedMessageLoop() { return m_runningNestedMessageLoop; }
 
     v8::Local<v8::Value> functionScopes(v8::Handle<v8::Function>);
     v8::Local<v8::Value> getInternalProperties(v8::Handle<v8::Object>&);
+    v8::Local<v8::Value> setFunctionVariableValue(v8::Handle<v8::Value> functionValue, int scopeNumber, const String& variableName, v8::Handle<v8::Value> newValue);
+
 
     virtual void compileScript(ScriptState*, const String& expression, const String& sourceURL, String* scriptId, String* exceptionMessage);
     virtual void clearCompiledScripts();
@@ -105,7 +110,7 @@ public:
 
 protected:
     ScriptDebugServer();
-    ~ScriptDebugServer() { }
+    virtual ~ScriptDebugServer();
     
     ScriptValue currentCallFrame();
 
@@ -125,14 +130,20 @@ protected:
 
     v8::Local<v8::Value> callDebuggerMethod(const char* functionName, int argc, v8::Handle<v8::Value> argv[]);
 
+    String preprocessSourceCode(const String& sourceCode);
+
     PauseOnExceptionsState m_pauseOnExceptionsState;
     ScopedPersistent<v8::Object> m_debuggerScript;
     ScopedPersistent<v8::Object> m_executionState;
     v8::Local<v8::Context> m_pausedContext;
-
     bool m_breakpointsActivated;
     ScopedPersistent<v8::FunctionTemplate> m_breakProgramCallbackTemplate;
     HashMap<String, OwnPtr<ScopedPersistent<v8::Script> > > m_compiledScripts;
+    
+private:
+    class ScriptPreprocessor;
+    OwnPtr<ScriptPreprocessor> m_scriptPreprocessor;
+    bool m_runningNestedMessageLoop;
 };
 
 } // namespace WebCore

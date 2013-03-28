@@ -71,7 +71,7 @@ WebInspector._elementDragStart = function(elementDragStart, elementDrag, element
     WebInspector._elementEndDraggingEventListener = elementDragEnd;
     WebInspector._mouseOutWhileDraggingTargetDocument = targetDocument;
 
-    targetDocument.addEventListener("mousemove", WebInspector._elementDraggingEventListener, true);
+    targetDocument.addEventListener("mousemove", WebInspector._elementDragMove, true);
     targetDocument.addEventListener("mouseup", WebInspector._elementDragEnd, true);
     targetDocument.addEventListener("mouseout", WebInspector._mouseOutWhileDragging, true);
 
@@ -94,10 +94,16 @@ WebInspector._unregisterMouseOutWhileDragging = function()
     delete WebInspector._mouseOutWhileDraggingTargetDocument;
 }
 
-WebInspector._elementDragEnd = function(event)
+WebInspector._elementDragMove = function(event)
+{
+    if (WebInspector._elementDraggingEventListener(event))
+        WebInspector._cancelDragEvents(event);
+}
+
+WebInspector._cancelDragEvents = function(event)
 {
     var targetDocument = event.target.ownerDocument;
-    targetDocument.removeEventListener("mousemove", WebInspector._elementDraggingEventListener, true);
+    targetDocument.removeEventListener("mousemove", WebInspector._elementDragMove, true);
     targetDocument.removeEventListener("mouseup", WebInspector._elementDragEnd, true);
     WebInspector._unregisterMouseOutWhileDragging();
 
@@ -106,11 +112,16 @@ WebInspector._elementDragEnd = function(event)
     if (WebInspector._elementDraggingGlassPane)
         WebInspector._elementDraggingGlassPane.dispose();
 
-    var elementDragEnd = WebInspector._elementEndDraggingEventListener;
-
     delete WebInspector._elementDraggingGlassPane;
     delete WebInspector._elementDraggingEventListener;
     delete WebInspector._elementEndDraggingEventListener;
+}
+
+WebInspector._elementDragEnd = function(event)
+{
+    var elementDragEnd = WebInspector._elementEndDraggingEventListener;
+
+    WebInspector._cancelDragEvents(event);
 
     event.preventDefault();
     if (elementDragEnd)
@@ -126,119 +137,17 @@ WebInspector.GlassPane = function()
     this.element.style.cssText = "position:absolute;top:0;bottom:0;left:0;right:0;background-color:transparent;z-index:1000;";
     this.element.id = "glass-pane-for-drag";
     document.body.appendChild(this.element);
+    WebInspector._glassPane = this;
 }
 
 WebInspector.GlassPane.prototype = {
     dispose: function()
     {
+        delete WebInspector._glassPane;
+        WebInspector.inspectorView.focus();
         if (this.element.parentElement)
             this.element.parentElement.removeChild(this.element);
     }
-}
-
-WebInspector.animateStyle = function(animations, duration, callback)
-{
-    var interval;
-    var complete = 0;
-    var hasCompleted = false;
-
-    const intervalDuration = (1000 / 30); // 30 frames per second.
-    const animationsLength = animations.length;
-    const propertyUnit = {opacity: ""};
-    const defaultUnit = "px";
-
-    function cubicInOut(t, b, c, d)
-    {
-        if ((t/=d/2) < 1) return c/2*t*t*t + b;
-        return c/2*((t-=2)*t*t + 2) + b;
-    }
-
-    // Pre-process animations.
-    for (var i = 0; i < animationsLength; ++i) {
-        var animation = animations[i];
-        var element = null, start = null, end = null, key = null;
-        for (key in animation) {
-            if (key === "element")
-                element = animation[key];
-            else if (key === "start")
-                start = animation[key];
-            else if (key === "end")
-                end = animation[key];
-        }
-
-        if (!element || !end)
-            continue;
-
-        if (!start) {
-            var computedStyle = element.ownerDocument.defaultView.getComputedStyle(element);
-            start = {};
-            for (key in end)
-                start[key] = parseInt(computedStyle.getPropertyValue(key), 10);
-            animation.start = start;
-        } else
-            for (key in start)
-                element.style.setProperty(key, start[key] + (key in propertyUnit ? propertyUnit[key] : defaultUnit));
-    }
-
-    function animateLoop()
-    {
-        if (hasCompleted)
-            return;
-        
-        // Advance forward.
-        complete += intervalDuration;
-        var next = complete + intervalDuration;
-
-        // Make style changes.
-        for (var i = 0; i < animationsLength; ++i) {
-            var animation = animations[i];
-            var element = animation.element;
-            var start = animation.start;
-            var end = animation.end;
-            if (!element || !end)
-                continue;
-
-            var style = element.style;
-            for (key in end) {
-                var endValue = end[key];
-                if (next < duration) {
-                    var startValue = start[key];
-                    var newValue = cubicInOut(complete, startValue, endValue - startValue, duration);
-                    style.setProperty(key, newValue + (key in propertyUnit ? propertyUnit[key] : defaultUnit));
-                } else
-                    style.setProperty(key, endValue + (key in propertyUnit ? propertyUnit[key] : defaultUnit));
-            }
-        }
-
-        // End condition.
-        if (complete >= duration) {
-            hasCompleted = true;
-            clearInterval(interval);
-            if (callback)
-                callback();
-        }
-    }
-
-    function forceComplete()
-    {
-        if (hasCompleted)
-            return;
-
-        complete = duration;
-        animateLoop();
-    }
-
-    function cancel()
-    {
-        hasCompleted = true;
-        clearInterval(interval);
-    }
-
-    interval = setInterval(animateLoop, intervalDuration);
-    return {
-        cancel: cancel,
-        forceComplete: forceComplete
-    };
 }
 
 WebInspector.isBeingEdited = function(element)
@@ -636,56 +545,59 @@ WebInspector.startEditing = function(element, config)
 }
 
 /**
+ * @param {number} seconds
  * @param {boolean=} higherResolution
+ * @return {string}
  */
 Number.secondsToString = function(seconds, higherResolution)
 {
+    if (!isFinite(seconds))
+        return "-";
+
     if (seconds === 0)
         return "0";
 
     var ms = seconds * 1000;
     if (higherResolution && ms < 1000)
-        return WebInspector.UIString("%.3fms", ms);
+        return WebInspector.UIString("%.3f\u2009ms", ms);
     else if (ms < 1000)
-        return WebInspector.UIString("%.0fms", ms);
+        return WebInspector.UIString("%.0f\u2009ms", ms);
 
     if (seconds < 60)
-        return WebInspector.UIString("%.2fs", seconds);
+        return WebInspector.UIString("%.2f\u2009s", seconds);
 
     var minutes = seconds / 60;
     if (minutes < 60)
-        return WebInspector.UIString("%.1fmin", minutes);
+        return WebInspector.UIString("%.1f\u2009min", minutes);
 
     var hours = minutes / 60;
     if (hours < 24)
-        return WebInspector.UIString("%.1fhrs", hours);
+        return WebInspector.UIString("%.1f\u2009hrs", hours);
 
     var days = hours / 24;
-    return WebInspector.UIString("%.1f days", days);
+    return WebInspector.UIString("%.1f\u2009days", days);
 }
 
 /**
- * @param {boolean=} higherResolution
+ * @param {number} bytes
+ * @return {string}
  */
-Number.bytesToString = function(bytes, higherResolution)
+Number.bytesToString = function(bytes)
 {
-    if (typeof higherResolution === "undefined")
-        higherResolution = true;
-
     if (bytes < 1024)
-        return WebInspector.UIString("%.0fB", bytes);
+        return WebInspector.UIString("%.0f\u2009B", bytes);
 
     var kilobytes = bytes / 1024;
-    if (higherResolution && kilobytes < 1024)
-        return WebInspector.UIString("%.2fKB", kilobytes);
-    else if (kilobytes < 1024)
-        return WebInspector.UIString("%.0fKB", kilobytes);
+    if (kilobytes < 100)
+        return WebInspector.UIString("%.1f\u2009KB", kilobytes);
+    if (kilobytes < 1024)
+        return WebInspector.UIString("%.0f\u2009KB", kilobytes);
 
     var megabytes = kilobytes / 1024;
-    if (higherResolution)
-        return WebInspector.UIString("%.2fMB", megabytes);
+    if (megabytes < 100)
+        return WebInspector.UIString("%.1f\u2009MB", megabytes);
     else
-        return WebInspector.UIString("%.0fMB", megabytes);
+        return WebInspector.UIString("%.0f\u2009MB", megabytes);
 }
 
 Number.withThousandsSeparator = function(num)
@@ -744,7 +656,9 @@ WebInspector.PlatformFlavor = {
     WindowsVista: "windows-vista",
     MacTiger: "mac-tiger",
     MacLeopard: "mac-leopard",
-    MacSnowLeopard: "mac-snowleopard"
+    MacSnowLeopard: "mac-snowleopard",
+    MacLion: "mac-lion",
+    MacMountainLion: "mac-mountain-lion"
 }
 
 WebInspector.platformFlavor = function()
@@ -768,8 +682,13 @@ WebInspector.platformFlavor = function()
                 case 5:
                     return WebInspector.PlatformFlavor.MacLeopard;
                 case 6:
-                default:
                     return WebInspector.PlatformFlavor.MacSnowLeopard;
+                case 7:
+                    return WebInspector.PlatformFlavor.MacLion;
+                case 8:
+                    return WebInspector.PlatformFlavor.MacMountainLion;
+                default:
+                    return "";
             }
         }
     }
@@ -840,6 +759,8 @@ WebInspector._isTextEditingElement = function(element)
 
 WebInspector.setCurrentFocusElement = function(x)
 {
+    if (WebInspector._glassPane && x && !WebInspector._glassPane.element.isAncestor(x))
+        return;
     if (WebInspector._currentFocusElement !== x)
         WebInspector._previousFocusElement = WebInspector._currentFocusElement;
     WebInspector._currentFocusElement = x;

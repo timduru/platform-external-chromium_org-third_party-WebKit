@@ -680,10 +680,10 @@ Decimal Decimal::floor() const
 
 Decimal Decimal::fromDouble(double doubleValue)
 {
-    if (isfinite(doubleValue))
+    if (std::isfinite(doubleValue))
         return fromString(String::numberToStringECMAScript(doubleValue));
 
-    if (isinf(doubleValue))
+    if (std::isinf(doubleValue))
         return infinity(doubleValue < 0 ? Negative : Positive);
 
     return nan();
@@ -902,8 +902,8 @@ Decimal Decimal::nan()
 
 Decimal Decimal::remainder(const Decimal& rhs) const
 {
-    const Decimal quotient = (*this / rhs).round();
-    return quotient.isSpecial() ? quotient : *this - quotient * rhs;
+    const Decimal quotient = *this / rhs;
+    return quotient.isSpecial() ? quotient : *this - (quotient.isNegative() ? quotient.ceiling() : quotient.floor()) * rhs;
 }
 
 Decimal Decimal::round() const

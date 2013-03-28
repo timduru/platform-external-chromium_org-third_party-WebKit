@@ -55,11 +55,10 @@ size_t GCThreadSharedData::childVisitCount()
 GCThreadSharedData::GCThreadSharedData(JSGlobalData* globalData)
     : m_globalData(globalData)
     , m_copiedSpace(&globalData->heap.m_storageSpace)
-    , m_shouldHashConst(false)
+    , m_shouldHashCons(false)
     , m_sharedMarkStack(globalData->heap.blockAllocator())
     , m_numberOfActiveParallelMarkers(0)
     , m_parallelMarkersShouldExit(false)
-    , m_blocksToCopy(globalData->heap.m_blockSnapshot)
     , m_copyIndex(0)
     , m_numberOfActiveGCThreads(0)
     , m_gcThreadsShouldWait(false)
@@ -116,9 +115,9 @@ void GCThreadSharedData::reset()
 #endif
     m_weakReferenceHarvesters.removeAll();
 
-    if (m_shouldHashConst) {
-        m_globalData->resetNewStringsSinceLastHashConst();
-        m_shouldHashConst = false;
+    if (m_shouldHashCons) {
+        m_globalData->resetNewStringsSinceLastHashCons();
+        m_shouldHashCons = false;
     }
 }
 
@@ -166,7 +165,7 @@ void GCThreadSharedData::didStartCopying()
 {
     {
         SpinLockHolder locker(&m_copyLock);
-        m_blocksToCopy = m_globalData->heap.m_blockSnapshot;
+        WTF::copyToVector(m_copiedSpace->m_blockSet, m_blocksToCopy);
         m_copyIndex = 0;
     }
 

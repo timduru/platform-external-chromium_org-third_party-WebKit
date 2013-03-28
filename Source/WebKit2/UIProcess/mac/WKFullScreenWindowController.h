@@ -38,13 +38,14 @@ class IntRect;
 }
 
 @class WKView;
+@class WebCoreFullScreenPlaceholderView;
 @class WebWindowScaleAnimation;
 @class WebWindowFadeAnimation;
 
-@interface WKFullScreenWindowController : NSWindowController {
+@interface WKFullScreenWindowController : NSWindowController<NSWindowDelegate> {
 @private
     WKView *_webView;
-    RetainPtr<NSImageView> _webViewPlaceholder;
+    RetainPtr<WebCoreFullScreenPlaceholderView> _webViewPlaceholder;
     RetainPtr<WebWindowScaleAnimation> _scaleAnimation;
     RetainPtr<WebWindowFadeAnimation> _fadeAnimation;
     RetainPtr<NSWindow> _backgroundWindow;
@@ -56,10 +57,14 @@ class IntRect;
     BOOL _isExitingFullScreen;
     BOOL _isFullScreen;
     BOOL _isPlaying;
+
+    double _savedScale;
 }
 
 - (WKView*)webView;
 - (void)setWebView:(WKView*)webView;
+
+- (WebCoreFullScreenPlaceholderView*)webViewPlaceholder;
 
 - (BOOL)isFullScreen;
 

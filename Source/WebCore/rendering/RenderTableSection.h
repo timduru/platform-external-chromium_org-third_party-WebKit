@@ -62,7 +62,7 @@ class RenderTableRow;
 
 class RenderTableSection : public RenderBox {
 public:
-    RenderTableSection(Node*);
+    RenderTableSection(Element*);
     virtual ~RenderTableSection();
 
     RenderObject* firstChild() const { ASSERT(children() == virtualChildren()); return children()->firstChild(); }
@@ -102,6 +102,8 @@ public:
         }
 
         bool hasCells() const { return cells.size() > 0; }
+
+        void reportMemoryUsage(MemoryObjectInfo*) const;
     };
 
     typedef Vector<CellStruct> Row;
@@ -112,6 +114,8 @@ public:
             , baseline()
         {
         }
+
+        void reportMemoryUsage(MemoryObjectInfo*) const;
 
         Row row;
         RenderTableRow* rowRenderer;
@@ -148,6 +152,8 @@ public:
         CellStruct& c = m_grid[row].row[col];
         return c.primaryCell();
     }
+
+    RenderTableRow* rowRendererAt(unsigned row) const { return m_grid[row].rowRenderer; }
 
     void appendColumn(unsigned pos);
     void splitColumn(unsigned pos, unsigned first);
@@ -195,6 +201,8 @@ public:
     
     virtual void paint(PaintInfo&, const LayoutPoint&) OVERRIDE;
 
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
 protected:
     virtual void styleDidChange(StyleDifference, const RenderStyle* oldStyle);
 
@@ -202,7 +210,7 @@ private:
     virtual RenderObjectChildList* virtualChildren() { return children(); }
     virtual const RenderObjectChildList* virtualChildren() const { return children(); }
 
-    virtual const char* renderName() const { return isAnonymous() ? "RenderTableSection (anonymous)" : "RenderTableSection"; }
+    virtual const char* renderName() const { return (isAnonymous() || isPseudoElement()) ? "RenderTableSection (anonymous)" : "RenderTableSection"; }
 
     virtual bool isTableSection() const { return true; }
 
@@ -272,13 +280,13 @@ private:
 
 inline RenderTableSection* toRenderTableSection(RenderObject* object)
 {
-    ASSERT(!object || object->isTableSection());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableSection());
     return static_cast<RenderTableSection*>(object);
 }
 
 inline const RenderTableSection* toRenderTableSection(const RenderObject* object)
 {
-    ASSERT(!object || object->isTableSection());
+    ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isTableSection());
     return static_cast<const RenderTableSection*>(object);
 }
 

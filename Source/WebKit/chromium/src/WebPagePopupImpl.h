@@ -59,7 +59,7 @@ class WebPagePopupImpl : public WebPagePopup,
 
 public:
     virtual ~WebPagePopupImpl();
-    bool init(WebViewImpl*, WebCore::PagePopupClient*, const WebCore::IntRect& originBoundsInRootView);
+    bool initialize(WebViewImpl*, WebCore::PagePopupClient*, const WebCore::IntRect& originBoundsInRootView);
     bool handleKeyEvent(const WebCore::PlatformKeyboardEvent&);
     void closePopup();
     WebWidgetClient* widgetClient() const { return m_widgetClient; }
@@ -69,8 +69,6 @@ private:
     // WebWidget functions
     virtual WebSize size() OVERRIDE;
     virtual void animate(double) OVERRIDE;
-    virtual void setCompositorSurfaceReady() OVERRIDE;
-    virtual void composite(bool) OVERRIDE;
     virtual void layout() OVERRIDE;
     virtual void paint(WebCanvas*, const WebRect&, PaintOptions = ReadbackFromCompositorIfAvailable) OVERRIDE;
     virtual void resize(const WebSize&) OVERRIDE;
@@ -86,7 +84,8 @@ private:
 #endif
 
     explicit WebPagePopupImpl(WebWidgetClient*);
-    bool initPage();
+    bool initializePage();
+    void destroyPage();
 
     WebWidgetClient* m_widgetClient;
     WebRect m_windowRectInScreen;

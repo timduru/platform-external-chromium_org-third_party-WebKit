@@ -27,12 +27,13 @@
 #include "JSClassRef.h"
 
 #include "APICast.h"
+#include "Identifier.h"
+#include "InitializeThreading.h"
 #include "JSCallbackObject.h"
+#include "JSGlobalObject.h"
 #include "JSObjectRef.h"
-#include <runtime/InitializeThreading.h>
-#include <runtime/JSGlobalObject.h>
-#include <runtime/ObjectPrototype.h>
-#include <runtime/Identifier.h>
+#include "ObjectPrototype.h"
+#include "Operations.h"
 #include <wtf/text/StringHash.h>
 #include <wtf/unicode/UTF8.h>
 
@@ -150,7 +151,7 @@ OpaqueJSClassContextData::OpaqueJSClassContextData(JSC::JSGlobalData&, OpaqueJSC
 
 OpaqueJSClassContextData& OpaqueJSClass::contextData(ExecState* exec)
 {
-    OwnPtr<OpaqueJSClassContextData>& contextData = exec->globalData().opaqueJSClassData.add(this, nullptr).iterator->value;
+    OwnPtr<OpaqueJSClassContextData>& contextData = exec->lexicalGlobalObject()->opaqueJSClassData().add(this, nullptr).iterator->value;
     if (!contextData)
         contextData = adoptPtr(new OpaqueJSClassContextData(exec->globalData(), this));
     return *contextData;

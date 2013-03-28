@@ -31,11 +31,11 @@
 #ifndef WebView_h
 #define WebView_h
 
+#include "../../../Platform/chromium/public/WebString.h"
+#include "../../../Platform/chromium/public/WebVector.h"
 #include "WebDragOperation.h"
 #include "WebPageVisibilityState.h"
 #include "WebWidget.h"
-#include "platform/WebString.h"
-#include "platform/WebVector.h"
 
 namespace WebKit {
 
@@ -229,6 +229,10 @@ public:
     WEBKIT_EXPORT static double zoomLevelToZoomFactor(double zoomLevel);
     WEBKIT_EXPORT static double zoomFactorToZoomLevel(double factor);
 
+    // Sets the initial page scale to the given factor. This scale setting overrides
+    // page scale set in the page's viewport meta tag.
+    virtual void setInitialPageScaleOverride(float) = 0;
+
     // Gets the scale factor of the page, where 1.0 is the normal size, > 1.0
     // is scaled up, < 1.0 is scaled down.
     virtual float pageScaleFactor() const = 0;
@@ -262,8 +266,7 @@ public:
     // state, this function deletes any saved scroll and scale state.
     virtual void restoreScrollAndScaleState() = 0;
 
-    // Reset the scroll and scale state and clobber any previously saved values for
-    // these parameters.
+    // Reset any saved values for the scroll and scale state.
     virtual void resetScrollAndScaleState() = 0;
 
     // Prevent the web page from setting a maximum scale via the viewport meta
@@ -408,6 +411,9 @@ public:
 
     virtual void performCustomContextMenuAction(unsigned action) = 0;
 
+    // Shows a context menu for the currently focused element.
+    virtual void showContextMenu() = 0;
+
 
     // Popup menu ----------------------------------------------------------
 
@@ -455,12 +461,6 @@ public:
     WEBKIT_EXPORT static void willEnterModalLoop();
     WEBKIT_EXPORT static void didExitModalLoop();
 
-    // GPU acceleration support --------------------------------------------
-
-    // Context that's in the compositor's share group, but is not the compositor context itself.
-    // Can be used for allocating resources that the compositor will later access.
-    virtual WebGraphicsContext3D* sharedGraphicsContext3D() = 0;
-
     // Called to inform the WebView that a wheel fling animation was started externally (for instance
     // by the compositor) but must be completed by the WebView.
     virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&) = 0;
@@ -470,6 +470,10 @@ public:
     virtual void extendSelectionAndDelete(int before, int after) = 0;
 
     virtual bool isSelectionEditable() const = 0;
+
+    virtual void setShowPaintRects(bool) = 0;
+    virtual void setShowFPSCounter(bool) = 0;
+    virtual void setContinuousPaintingEnabled(bool) = 0;
 
     // Benchmarking support -------------------------------------------------
 
@@ -502,9 +506,6 @@ public:
     virtual void updateBatteryStatus(const WebBatteryStatus&) { }
 
     // Testing functionality for TestRunner ---------------------------------
-
-    // Simulates a compositor lost context.
-    virtual void loseCompositorContext(int numTimes) = 0;
 
 protected:
     ~WebView() {}

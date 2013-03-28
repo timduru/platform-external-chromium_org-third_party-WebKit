@@ -55,6 +55,7 @@ ScriptDebugServer::ScriptDebugServer()
     , m_pauseOnExceptionsState(DontPauseOnExceptions)
     , m_pauseOnNextStatement(false)
     , m_paused(false)
+    , m_runningNestedMessageLoop(false)
     , m_doneProcessingDebuggerEvents(true)
     , m_breakpointsActivated(true)
     , m_pauseOnCallFrame(0)
@@ -291,14 +292,6 @@ void ScriptDebugServer::dispatchDidParseSource(const ListenerSet& listeners, Sou
     script.startColumn = sourceProvider->startPosition().m_column.zeroBasedInt();
     script.isContentScript = isContentScript;
 
-#if ENABLE(INSPECTOR)
-    if (!script.startLine && !script.startColumn) {
-        String sourceURL = ContentSearchUtils::findSourceURL(script.source);
-        if (!sourceURL.isEmpty())
-            script.url = sourceURL;
-    }
-#endif
-
     int sourceLength = script.source.length();
     int lineCount = 1;
     int lastLineStart = 0;
@@ -395,7 +388,7 @@ void ScriptDebugServer::dispatchFunctionToListeners(JavaScriptExecutionCallback 
     m_callingListeners = false;
 }
 
-void ScriptDebugServer::createCallFrameAndPauseIfNeeded(const DebuggerCallFrame& debuggerCallFrame, intptr_t sourceID, int lineNumber, int columnNumber)
+void ScriptDebugServer::createCallFrame(const DebuggerCallFrame& debuggerCallFrame, intptr_t sourceID, int lineNumber, int columnNumber)
 {
     TextPosition textPosition(OrdinalNumber::fromOneBasedInt(lineNumber), OrdinalNumber::fromZeroBasedInt(columnNumber));
     m_currentCallFrame = JavaScriptCallFrame::create(debuggerCallFrame, m_currentCallFrame, sourceID, textPosition);
@@ -403,7 +396,6 @@ void ScriptDebugServer::createCallFrameAndPauseIfNeeded(const DebuggerCallFrame&
         m_lastExecutedLine = -1;
         m_lastExecutedSourceId = sourceID;
     }
-    pauseIfNeeded(debuggerCallFrame.dynamicGlobalObject());
 }
 
 void ScriptDebugServer::updateCallFrameAndPauseIfNeeded(const DebuggerCallFrame& debuggerCallFrame, intptr_t sourceID, int lineNumber, int columnNumber)
@@ -441,8 +433,10 @@ void ScriptDebugServer::pauseIfNeeded(JSGlobalObject* dynamicGlobalObject)
 
     TimerBase::fireTimersInNestedEventLoop();
 
+    m_runningNestedMessageLoop = true;
     m_doneProcessingDebuggerEvents = false;
     runEventLoopWhilePaused();
+    m_runningNestedMessageLoop = false;
 
     didContinue(dynamicGlobalObject);
     dispatchFunctionToListeners(&ScriptDebugServer::dispatchDidContinue, dynamicGlobalObject);
@@ -452,8 +446,10 @@ void ScriptDebugServer::pauseIfNeeded(JSGlobalObject* dynamicGlobalObject)
 
 void ScriptDebugServer::callEvent(const DebuggerCallFrame& debuggerCallFrame, intptr_t sourceID, int lineNumber, int columnNumber)
 {
-    if (!m_paused)
-        createCallFrameAndPauseIfNeeded(debuggerCallFrame, sourceID, lineNumber, columnNumber);
+    if (!m_paused) {
+        createCallFrame(debuggerCallFrame, sourceID, lineNumber, columnNumber);
+        pauseIfNeeded(debuggerCallFrame.dynamicGlobalObject());
+    }
 }
 
 void ScriptDebugServer::atStatement(const DebuggerCallFrame& debuggerCallFrame, intptr_t sourceID, int lineNumber, int columnNumber)
@@ -492,8 +488,10 @@ void ScriptDebugServer::exception(const DebuggerCallFrame& debuggerCallFrame, in
 
 void ScriptDebugServer::willExecuteProgram(const DebuggerCallFrame& debuggerCallFrame, intptr_t sourceID, int lineNumber, int columnNumber)
 {
-    if (!m_paused)
-        createCallFrameAndPauseIfNeeded(debuggerCallFrame, sourceID, lineNumber, columnNumber);
+    if (!m_paused) {
+        createCallFrame(debuggerCallFrame, sourceID, lineNumber, columnNumber);
+        pauseIfNeeded(debuggerCallFrame.dynamicGlobalObject());
+    }
 }
 
 void ScriptDebugServer::didExecuteProgram(const DebuggerCallFrame& debuggerCallFrame, intptr_t sourceID, int lineNumber, int columnNumber)
@@ -504,8 +502,13 @@ void ScriptDebugServer::didExecuteProgram(const DebuggerCallFrame& debuggerCallF
     updateCallFrameAndPauseIfNeeded(debuggerCallFrame, sourceID, lineNumber, columnNumber);
 
     // Treat stepping over the end of a program like stepping out.
-    if (m_currentCallFrame == m_pauseOnCallFrame)
+    if (!m_currentCallFrame)
+        return;
+    if (m_currentCallFrame == m_pauseOnCallFrame) {
         m_pauseOnCallFrame = m_currentCallFrame->caller();
+        if (!m_currentCallFrame)
+            return;
+    }
     m_currentCallFrame = m_currentCallFrame->caller();
 }
 

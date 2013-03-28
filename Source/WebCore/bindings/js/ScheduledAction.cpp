@@ -32,8 +32,6 @@
 #include "JSDOMBinding.h"
 #include "JSDOMWindow.h"
 #include "JSMainThreadExecState.h"
-#include "ScriptCallStack.h"
-#include "ScriptCallStackFactory.h"
 #include "ScriptController.h"
 #include "ScriptExecutionContext.h"
 #include "ScriptSourceCode.h"
@@ -79,7 +77,7 @@ ScheduledAction::ScheduledAction(ExecState* exec, JSValue function, DOMWrapperWo
 void ScheduledAction::execute(ScriptExecutionContext* context)
 {
     if (context->isDocument())
-        execute(static_cast<Document*>(context));
+        execute(toDocument(context));
 #if ENABLE(WORKERS)
     else {
         ASSERT(context->isWorkerContext());

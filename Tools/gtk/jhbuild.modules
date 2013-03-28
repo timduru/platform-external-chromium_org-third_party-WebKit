@@ -10,25 +10,34 @@
       <dep package="fonts"/>
       <dep package="fontconfig"/>
       <dep package="freetype6"/>
+      <dep package="harfbuzz"/>
       <dep package="libxml2"/>
       <dep package="gdk-pixbuf"/>
       <dep package="gtk+"/>
       <dep package="glib"/>
       <dep package="glib-networking"/>
       <dep package="gnome-icon-theme"/>
+      <dep package="gnome-icon-theme-symbolic"/>
       <dep package="gnome-themes-standard"/>
       <dep package="libsoup"/>
       <dep package="at-spi2-core"/>
       <dep package="at-spi2-atk"/>
+      <dep package="gstreamer"/>
+      <dep package="gst-plugins-base"/>
+      <dep package="gst-plugins-good"/>
+      <dep package="gst-plugins-bad"/>
+      <dep package="gst-libav"/>
     </dependencies>
   </metamodule>
 
+  <include href="jhbuild-optional.modules"/>
+
   <repository type="tarball" name="ftp.gnu.org"
       href="ftp://ftp.gnu.org/gnu/"/>
-  <repository type="tarball" name="github.com"
-      href="https://github.com"/>
-  <repository type="tarball" name="sourceware.org"
-      href="ftp://sourceware.org"/>
+  <repository type="git" name="github.com"
+      href="git://github.com"/>
+  <repository type="tarball" name="sourceware.org-mirror"
+      href="ftp://mirrors.kernel.org/sources.redhat.com/"/>
   <repository type="tarball" name="ftp.gnome.org"
       href="http://ftp.gnome.org"/>
   <repository type="git" name="git.gnome.org"
@@ -39,6 +48,8 @@
       href="http://www.freedesktop.org"/>
   <repository type="tarball" name="xmlsoft.org"
       href="ftp://xmlsoft.org"/>
+  <repository type="git" name="gstreamer"
+      href="git://anongit.freedesktop.org/git/gstreamer/"/>
 
   <autotools id="make" autogen-sh="configure">
     <branch repo="ftp.gnu.org"
@@ -72,11 +83,7 @@
 
   <autotools id="fonts"
              skip-autogen="true">
-    <branch module="downloads/mrobinson/webkitgtk-test-fonts/webkitgtk-test-fonts-0.0.3.tar.gz" version="0.0.3"
-            repo="github.com"
-            hash="sha256:4a0a01f00855997cdcc7201f164b33a4e4144e8eadf40a5e542a1c448e035de5"
-            md5sum="10e74de1a8ba961d9037994d427b1dd2">
-    </branch>
+    <branch repo="github.com" module="mrobinson/webkitgtk-test-fonts.git" checkoutdir="webkitgtk-test-fonts" tag="0.0.4"/>
   </autotools>
 
   <tarball id="freetype6">
@@ -85,9 +92,18 @@
             md5sum="647ee8ed266f9a4117c8d0a4855b3d3e"/>
   </tarball>
 
+  <autotools id="harfbuzz" autogen-sh="configure">
+    <branch module="software/harfbuzz/release/harfbuzz-0.9.14.tar.bz2" version="0.9.14"
+            checkoutdir="harfbuzz-0.9.14"
+            repo="freedesktop.org"
+            hash="sha256:d07c0ffdbbbfdfbb6c65e73fe9c76466e87dbf04b094cbd0abf5fd7d571a4004"
+            md5sum="7e1990b79060e98e2d31f677a0ac9eed">
+    </branch>
+  </autotools>
+
   <autotools id="libffi" autogen-sh="configure">
-    <branch module="/pub/libffi/libffi-3.0.10.tar.gz" version="3.0.10"
-             repo="sourceware.org"
+    <branch module="libffi/libffi-3.0.10.tar.gz" version="3.0.10"
+             repo="sourceware.org-mirror"
              hash="sha256:f01eb9027e9eb56aeaeef636649877756d475d714ef8b47f627f65bc5f3b492f"
              md5sum="79390673f5d07a8fb342bc09b5055b6f"/>
   </autotools>
@@ -97,10 +113,10 @@
     <dependencies>
       <dep package="glib"/>
     </dependencies>
-    <branch module="/pub/GNOME/sources/gdk-pixbuf/2.26/gdk-pixbuf-2.26.0.tar.xz" version="2.26.0"
+    <branch module="/pub/GNOME/sources/gdk-pixbuf/2.26/gdk-pixbuf-2.26.5.tar.xz" version="2.26.5"
             repo="ftp.gnome.org"
-            hash="sha256:a5028d3a33710cbb6c6264bc561b6e252b37f067dff7b5b52473621e064f254d"
-            md5sum="1c186f9903a20e96587b9afb27944b40"/>
+            hash="sha256:77696fd163bca95a130a1883dbd78d0ae4d782de2fc85a9a38556d13681f5c84"
+            md5sum="339329e6d619ee3e1cb93979111b04c0"/>
   </autotools>
 
   <autotools id="librsvg" autogen-sh="configure"
@@ -114,25 +130,11 @@
             md5sum="89d483f30a7c77245b7ee02faaea5a5a"/>
   </autotools>
 
-  <autotools id="pango"
-             autogenargs="--disable-introspection">
-    <dependencies>
-      <dep package="glib"/>
-      <dep package="freetype6"/>
-      <dep package="cairo"/>
-    </dependencies>
-    <branch module="/pub/GNOME/sources/pango/1.30/pango-1.30.0.tar.xz" version="1.30.0"
-            repo="ftp.gnome.org"
-            hash="sha256:7c6d2ab024affaed0e942f9279b818235f9c6a36d9fc50688f48d387f4102dff"
-            md5sum="2a70627ffd9f43c52c04cc0b05fe359f"/>
-  </autotools>
-
   <autotools id="gtk+" autogen-sh="configure"
              autogenargs="--disable-introspection">
     <dependencies>
       <dep package="glib"/>
       <dep package="cairo"/>
-      <dep package="pango"/>
       <dep package="gdk-pixbuf"/>
     </dependencies>
     <branch module="/pub/GNOME/sources/gtk+/3.4/gtk+-3.4.2.tar.xz" version="3.4.2"
@@ -142,14 +144,14 @@
   </autotools>
 
   <autotools id="glib"
+             autogen-sh="configure"
              autogenargs="--disable-dtrace">
     <dependencies>
       <dep package="libffi"/>
     </dependencies>
-    <branch module="/pub/GNOME/sources/glib/2.33/glib-2.33.2.tar.xz" version="2.33.2"
+    <branch module="/pub/GNOME/sources/glib/2.35/glib-2.35.2.tar.xz" version="2.35.2"
             repo="ftp.gnome.org"
-            hash="sha256:b7163e9f159775d13ecfb433d67c3f0883e0e518e85b2e970d4ad9773d7cd0b4"
-            md5sum="06ef0099fed22afcf34ade39ddff9a5b"/>
+            hash="sha256:84fffa2041850352b83a7b27c127f1c4e8b3d169aa3a000b100820ba10f8c19e"/>
   </autotools>
 
   <autotools id="glib-networking">
@@ -167,9 +169,9 @@
     <dependencies>
       <dep package="glib-networking"/>
     </dependencies>
-    <branch module="libsoup" version="2.39.2"
+    <branch module="libsoup" version="2.40.2-r1"
             repo="git.gnome.org"
-            tag="LIBSOUP_2_39_2"/>
+            revision="5651d18eb8c9edff5961a32c488641bf6776ca6b"/>
   </autotools>
 
   <autotools id="fontconfig" autogen-sh="configure">
@@ -188,6 +190,17 @@
             repo="ftp.gnome.org"
             hash="sha256:a7f0a8b17e91ac338fdbc01ac59a8738e9c1e201de492c070d43aacf291a8959"
             md5sum="40be1e5a6eae11181311a6fc432cf892">
+    </branch>
+  </autotools>
+
+  <autotools id="gnome-icon-theme-symbolic" autogen-sh="configure">
+    <dependencies>
+      <dep package="gtk+"/>
+    </dependencies>
+    <branch module="pub/GNOME/sources/gnome-icon-theme-symbolic/3.2/gnome-icon-theme-symbolic-3.2.1.tar.xz" version="3.2.1"
+            repo="ftp.gnome.org"
+            hash="sha256:a558af2f87f761f00421f49c1addd2149b70228158e09327fa861219ac1a63cb"
+            md5sum="94137d3c256f2cc80298a9bef15d68c4">
     </branch>
   </autotools>
 
@@ -228,10 +241,44 @@
   </autotools>
 
   <autotools id="libxml2">
-    <branch module="/libxml2/libxml2-2.8.0.tar.gz" version="2.8.0"
+    <branch module="/libxml2/libxml2-2.9.0.tar.gz" version="2.9.0"
             repo="xmlsoft.org"
-            hash="sha256:f2e2d0e322685193d1affec83b21dc05d599e17a7306d7b90de95bb5b9ac622a"
-            md5sum="c62106f02ee00b6437f0fb9d370c1093"/>
+            hash="sha256:ad25d91958b7212abdc12b9611cfb4dc4e5cddb6d1e9891532f48aacee422b82"
+            md5sum="5b9bebf4f5d2200ae2c4efe8fa6103f7">
+      <patch file="libxml2-2.9.0-dtd.patch" strip="1"/>
+    </branch>
+  </autotools>
+
+  <autotools id="gstreamer">
+    <branch repo="gstreamer" module="gstreamer" checkoutdir="gstreamer" tag="1.0.4"/>
+  </autotools>
+
+  <autotools id="gst-plugins-base" autogenargs="--disable-examples">
+    <dependencies>
+      <dep package="gstreamer"/>
+    </dependencies>
+    <branch repo="gstreamer" module="gst-plugins-base" checkoutdir="gst-plugins-base" tag="1.0.4"/>
+  </autotools>
+
+  <autotools id="gst-plugins-good" autogenargs="--disable-examples">
+    <dependencies>
+      <dep package="gst-plugins-base"/>
+    </dependencies>
+    <branch repo="gstreamer" module="gst-plugins-good" checkoutdir="gst-plugins-good" tag="1.0.4"/>
+  </autotools>
+
+  <autotools id="gst-plugins-bad" autogenargs="--disable-examples">
+    <dependencies>
+      <dep package="gst-plugins-base"/>
+    </dependencies>
+    <branch repo="gstreamer" module="gst-plugins-bad" checkoutdir="gst-plugins-bad" tag="1.0.4"/>
+  </autotools>
+
+  <autotools id="gst-libav" autogenargs="--with-libav-extra-configure='--disable-yasm'">
+    <dependencies>
+      <dep package="gst-plugins-base"/>
+    </dependencies>
+    <branch repo="gstreamer" module="gst-libav" checkoutdir="gst-libav" tag="1.0.4"/>
   </autotools>
 
 </moduleset>

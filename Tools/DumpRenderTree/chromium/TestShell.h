@@ -31,8 +31,6 @@
 #ifndef TestShell_h
 #define TestShell_h
 
-#include "DRTTestRunner.h"
-#include "NotificationPresenter.h"
 #include "TestEventPrinter.h"
 #include "WebPreferences.h"
 #include "WebTestInterfaces.h"
@@ -47,9 +45,9 @@
 namespace WebKit {
 class WebDevToolsAgentClient;
 class WebFrame;
-class WebNotificationPresenter;
 class WebThread;
 class WebView;
+class WebThemeEngine;
 class WebURL;
 }
 
@@ -57,7 +55,7 @@ class DRTDevToolsAgent;
 class DRTDevToolsCallArgs;
 class DRTDevToolsClient;
 class MockWebPrerenderingSupport;
-class WebPermissions;
+class MockPlatform;
 
 struct TestParams {
     bool dumpTree;
@@ -79,24 +77,17 @@ public:
     TestShell();
     ~TestShell();
 
-    void initialize();
+    void initialize(MockPlatform*);
 
     // The main WebView.
     WebKit::WebView* webView() const { return m_webView; }
     // Returns the host for the main WebView.
     WebViewHost* webViewHost() const { return m_webViewHost.get(); }
-    DRTTestRunner* testRunner() const { return m_testRunner.get(); }
-    WebTestRunner::WebEventSender* eventSender() const { return m_testInterfaces->eventSender(); }
-    WebTestRunner::WebAccessibilityController* accessibilityController() const { return m_testInterfaces->accessibilityController(); }
-#if ENABLE(NOTIFICATIONS)
-    NotificationPresenter* notificationPresenter() const { return m_notificationPresenter.get(); }
-#endif
+    WebTestRunner::WebTestRunner* testRunner() const { return m_testInterfaces->testRunner(); }
     const TestEventPrinter* printer() const { return &m_printer; }
 
-    WebPreferences* preferences() { return &m_prefs; }
+    WebTestRunner::WebPreferences* preferences() { return &m_prefs; }
     void applyPreferences() { m_prefs.applyTo(m_webView); }
-
-    WebPermissions* webPermissions() { return m_webPermissions.get(); }
 
     void bindJSObjectsToWindow(WebKit::WebFrame*);
     void runFileTest(const TestParams&, bool shouldDumpPixelTests);
@@ -111,14 +102,9 @@ public:
     int navigationEntryCount() const;
 
     void setFocus(WebKit::WebWidget*, bool enable);
-    bool shouldDumpFrameLoadCallbacks() const { return (m_testIsPreparing || m_testIsPending) && testRunner()->shouldDumpFrameLoadCallbacks(); }
-    bool shouldDumpUserGestureInFrameLoadCallbacks() const { return (m_testIsPreparing || m_testIsPending) && testRunner()->shouldDumpUserGestureInFrameLoadCallbacks(); }
-    bool shouldDumpResourceLoadCallbacks() const  { return (m_testIsPreparing || m_testIsPending) && testRunner()->shouldDumpResourceLoadCallbacks(); }
-    bool shouldDumpResourceResponseMIMETypes() const  { return (m_testIsPreparing || m_testIsPending) && testRunner()->shouldDumpResourceResponseMIMETypes(); }
-    void setIsLoading(bool flag) { m_isLoading = flag; }
 
     // Called by the DRTTestRunner to signal test completion.
-    void testFinished();
+    void testFinished(WebViewHost*);
     // Called by DRTTestRunner when a test hits the timeout, but does not
     // cause a hang. We can avoid killing TestShell in this case and still dump
     // the test results.
@@ -129,15 +115,14 @@ public:
 
     void setAcceleratedCompositingForVideoEnabled(bool enabled) { m_acceleratedCompositingForVideoEnabled = enabled; }
     void setAcceleratedCompositingForFixedPositionEnabled(bool enabled) { m_acceleratedCompositingForFixedPositionEnabled = enabled; }
+    void setAcceleratedCompositingForOverflowScrollEnabled(bool enabled) { m_acceleratedCompositingForOverflowScrollEnabled = enabled; }
     bool softwareCompositingEnabled() { return m_softwareCompositingEnabled; }
     void setSoftwareCompositingEnabled(bool enabled) { m_softwareCompositingEnabled = enabled; }
     void setThreadedCompositingEnabled(bool enabled) { m_threadedCompositingEnabled = enabled; }
     void setForceCompositingMode(bool enabled) { m_forceCompositingMode = enabled; }
+    void setThreadedHTMLParser(bool enabled) { m_threadedHTMLParser = enabled; }
     void setAccelerated2dCanvasEnabled(bool enabled) { m_accelerated2dCanvasEnabled = enabled; }
-    void setDeferred2dCanvasEnabled(bool enabled) { m_deferred2dCanvasEnabled = enabled; }
-    void setAcceleratedPaintingEnabled(bool enabled) { m_acceleratedPaintingEnabled = enabled; }
-    void setPerTilePaintingEnabled(bool);
-    void setAcceleratedAnimationEnabled(bool);
+    void setPerTilePaintingEnabled(bool enabled) { m_perTilePaintingEnabled = enabled; }
     void setDeferredImageDecodingEnabled(bool enabled) { m_deferredImageDecodingEnabled = enabled; }
 #if defined(OS_WIN)
     // Access to the finished event. Used by the static WatchDog thread.
@@ -173,6 +158,7 @@ public:
     void closeWindow(WebViewHost*);
     void closeRemainingWindows();
     int windowCount();
+    void captureHistoryForWindow(size_t windowIndex, WebKit::WebVector<WebKit::WebHistoryItem>*, size_t* currentEntryIndex);
     static void resizeWindowForTest(WebViewHost*, const WebKit::WebURL&);
 
     void showDevTools();
@@ -187,12 +173,10 @@ public:
     typedef Vector<WebViewHost*> WindowList;
     WindowList windowList() const { return m_windowList; }
 
-    // Returns a string representation of an URL's spec that does not depend on
-    // the location of the layout test in the file system.
-    std::string normalizeLayoutTestURL(const std::string&);
+    WebKit::WebThread* webCompositorThread() const { return m_webCompositorThread.get(); }
 
 private:
-    WebViewHost* createNewWindow(const WebKit::WebURL&, DRTDevToolsAgent*);
+    WebViewHost* createNewWindow(const WebKit::WebURL&, DRTDevToolsAgent*, WebTestRunner::WebTestInterfaces*);
     void createMainWindow();
     void createDRTDevToolsClient(DRTDevToolsAgent*);
 
@@ -203,23 +187,19 @@ private:
 
     bool m_testIsPending;
     bool m_testIsPreparing;
-    bool m_isLoading;
     WebKit::WebView* m_webView;
     WebKit::WebWidget* m_focusedWidget;
     WebViewHost* m_devTools;
 
     // Be careful of the destruction order of the following objects.
     TestEventPrinter m_printer;
-    OwnPtr<WebPermissions> m_webPermissions;
     OwnPtr<DRTDevToolsAgent> m_drtDevToolsAgent;
     OwnPtr<DRTDevToolsClient> m_drtDevToolsClient;
     OwnPtr<WebTestRunner::WebTestInterfaces> m_testInterfaces;
-    OwnPtr<DRTTestRunner> m_testRunner;
-#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
-    OwnPtr<NotificationPresenter> m_notificationPresenter;
-#endif
-    OwnPtr<WebViewHost> m_webViewHost;
+    OwnPtr<WebTestRunner::WebTestInterfaces> m_devToolsTestInterfaces;
+    // It's important that this thread is destroyed after the WebViewHost.
     OwnPtr<WebKit::WebThread> m_webCompositorThread;
+    OwnPtr<WebViewHost> m_webViewHost;
 #if ENABLE(LINK_PRERENDER)
     OwnPtr<MockWebPrerenderingSupport> m_prerenderingSupport;
 #endif
@@ -230,15 +210,15 @@ private:
     bool m_allowExternalPages;
     bool m_acceleratedCompositingForVideoEnabled;
     bool m_acceleratedCompositingForFixedPositionEnabled;
+    bool m_acceleratedCompositingForOverflowScrollEnabled;
     bool m_softwareCompositingEnabled;
     bool m_threadedCompositingEnabled;
     bool m_forceCompositingMode;
+    bool m_threadedHTMLParser;
     bool m_accelerated2dCanvasEnabled;
-    bool m_deferred2dCanvasEnabled;
-    bool m_acceleratedPaintingEnabled;
     bool m_perTilePaintingEnabled;
     bool m_deferredImageDecodingEnabled;
-    WebPreferences m_prefs;
+    WebTestRunner::WebPreferences m_prefs;
     bool m_stressOpt;
     bool m_stressDeopt;
     std::string m_javaScriptFlags;

@@ -21,7 +21,7 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-import unittest
+import unittest2 as unittest
 
 from webkitpy.tool.steps.addsvnmimetypeforpng import AddSvnMimetypeForPng
 from webkitpy.common.system.filesystem_mock import MockFileSystem
@@ -55,4 +55,4 @@ class AddSvnMimetypeForPngTest(unittest.TestCase):
         try:
             capture.assert_outputs(self, step.run, [state])
         except SystemExit, e:
-            self.assertEquals(e.code, 1)
+            self.assertEqual(e.code, 1)

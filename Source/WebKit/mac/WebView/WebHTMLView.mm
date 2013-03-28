@@ -80,6 +80,7 @@
 #import <WebCore/ColorMac.h>
 #import <WebCore/ContextMenu.h>
 #import <WebCore/ContextMenuController.h>
+#import <WebCore/CSSStyleDeclaration.h>
 #import <WebCore/Document.h>
 #import <WebCore/DocumentFragment.h>
 #import <WebCore/DocumentMarkerController.h>
@@ -125,7 +126,6 @@
 #import <WebKitSystemInterface.h>
 #import <dlfcn.h>
 #import <limits>
-#import <objc/objc-runtime.h>
 #import <runtime/InitializeThreading.h>
 #import <wtf/MainThread.h>
 #import <wtf/ObjcRuntimeExtras.h>
@@ -4865,14 +4865,14 @@ static PassRefPtr<KeyboardEvent> currentKeyboardEvent(Frame* coreFrame)
 
     WritingDirection direction = RightToLeftWritingDirection;
     switch (coreFrame->editor()->baseWritingDirectionForSelectionStart()) {
-        case NSWritingDirectionLeftToRight:
+        case LeftToRightWritingDirection:
             break;
-        case NSWritingDirectionRightToLeft:
+        case RightToLeftWritingDirection:
             direction = LeftToRightWritingDirection;
             break;
         // The writingDirectionForSelectionStart method will never return "natural". It
         // will always return a concrete direction. So, keep the compiler happy, and assert not reached.
-        case NSWritingDirectionNatural:
+        case NaturalWritingDirection:
             ASSERT_NOT_REACHED();
             break;
     }
@@ -6038,10 +6038,7 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
 
     [self _updateSecureInputState];
 
-    if (!coreFrame->editor()->hasComposition())
-        return;
-
-    if (coreFrame->editor()->ignoreCompositionSelectionChange())
+    if (!coreFrame->editor()->hasComposition() || coreFrame->editor()->ignoreCompositionSelectionChange())
         return;
 
     unsigned start;
@@ -6206,7 +6203,9 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
     Frame* coreFrame = core([self _frame]);
     if (!coreFrame)
         return nil;
-    return [[[WebElementDictionary alloc] initWithHitTestResult:coreFrame->eventHandler()->hitTestResultAtPoint(IntPoint(point), allow)] autorelease];
+    HitTestRequest::HitTestRequestType hitType = HitTestRequest::ReadOnly | HitTestRequest::Active
+        | (allow ? HitTestRequest::AllowShadowContent : 0);
+    return [[[WebElementDictionary alloc] initWithHitTestResult:coreFrame->eventHandler()->hitTestResultAtPoint(IntPoint(point), hitType)] autorelease];
 }
 
 - (NSUInteger)countMatchesForText:(NSString *)string inDOMRange:(DOMRange *)range options:(WebFindOptions)options limit:(NSUInteger)limit markMatches:(BOOL)markMatches
@@ -6215,7 +6214,7 @@ static void extractUnderlines(NSAttributedString *string, Vector<CompositionUnde
     if (!coreFrame)
         return 0;
 
-    return coreFrame->editor()->countMatchesForText(string, core(range), coreOptions(options), limit, markMatches);
+    return coreFrame->editor()->countMatchesForText(string, core(range), coreOptions(options), limit, markMatches, 0);
 }
 
 - (void)setMarkedTextMatchesAreHighlighted:(BOOL)newValue

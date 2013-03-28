@@ -87,6 +87,8 @@ AccessibilityUIElement::~AccessibilityUIElement()
 
 bool AccessibilityUIElement::isEqual(AccessibilityUIElement* otherElement)
 {
+    if (!otherElement)
+        return false;
     return platformUIElement() == otherElement->platformUIElement();
 }
     
@@ -679,11 +681,31 @@ int AccessibilityUIElement::insertionPointLineNumber()
     return -1;
 }
 
-bool AccessibilityUIElement::isActionSupported(JSStringRef action)
+bool AccessibilityUIElement::isPressActionSupported()
 {
     BEGIN_AX_OBJC_EXCEPTIONS
     NSArray* actions = [m_element accessibilityActionNames];
-    return [actions containsObject:[NSString stringWithJSStringRef:action]];
+    return [actions containsObject:NSAccessibilityPressAction];
+    END_AX_OBJC_EXCEPTIONS
+    
+    return false;
+}
+
+bool AccessibilityUIElement::isIncrementActionSupported()
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    NSArray* actions = [m_element accessibilityActionNames];
+    return [actions containsObject:NSAccessibilityIncrementAction];
+    END_AX_OBJC_EXCEPTIONS
+    
+    return false;
+}
+
+bool AccessibilityUIElement::isDecrementActionSupported()
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    NSArray* actions = [m_element accessibilityActionNames];
+    return [actions containsObject:NSAccessibilityDecrementAction];
     END_AX_OBJC_EXCEPTIONS
     
     return false;
@@ -1076,6 +1098,13 @@ PassRefPtr<AccessibilityUIElement> AccessibilityUIElement::verticalScrollbar() c
     return 0;
 }
 
+void AccessibilityUIElement::scrollToMakeVisible()
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    [m_element accessibilityPerformAction:@"AXScrollToVisible"];
+    END_AX_OBJC_EXCEPTIONS
+}
+    
 JSRetainPtr<JSStringRef> AccessibilityUIElement::selectedTextRange()
 {
     NSRange range = NSMakeRange(NSNotFound, 0);
@@ -1416,6 +1445,15 @@ PassRefPtr<AccessibilityTextMarker> AccessibilityUIElement::textMarkerForIndex(i
     return 0;                                                                          
 }
 
+JSRetainPtr<JSStringRef> AccessibilityUIElement::supportedActions() const
+{
+    BEGIN_AX_OBJC_EXCEPTIONS
+    NSArray *names = [m_element accessibilityActionNames];
+    return [[names componentsJoinedByString:@","] createJSStringRef];
+    END_AX_OBJC_EXCEPTIONS
+    
+    return 0;
+}
 
 } // namespace WTR
 

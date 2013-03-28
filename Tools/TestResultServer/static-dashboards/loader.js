@@ -37,7 +37,7 @@ var CHROMIUM_EXPECTATIONS_URL = 'http://svn.webkit.org/repository/webkit/trunk/L
 function pathToBuilderResultsFile(builderName) {
     return TEST_RESULTS_SERVER + 'testfile?builder=' + builderName +
            '&master=' + builderMaster(builderName).name +
-           '&testtype=' + g_crossDashboardState.testType + '&name=';
+           '&testtype=' + g_history.crossDashboardState.testType + '&name=';
 }
 
 loader.request = function(url, success, error, opt_isBinaryData)
@@ -57,13 +57,40 @@ loader.request = function(url, success, error, opt_isBinaryData)
     xhr.send();
 }
 
-loader.Loader = function()
+loader.Loader = function(opt_onLoadingComplete)
 {
     this._loadingSteps = [
         this._loadBuildersList,
         this._loadResultsFiles,
         this._loadExpectationsFiles,
     ];
+
+    this._buildersThatFailedToLoad = [];
+    this._staleBuilders = [];
+    this._errors = new ui.Errors();
+    this._onLoadingComplete = opt_onLoadingComplete || function() {};
+    // TODO(jparent): Pass in the appropriate history obj per db.
+    this._history = g_history;
+}
+
+// TODO(aboxhall): figure out whether this is a performance bottleneck and
+// change calling code to understand the trie structure instead if necessary.
+loader.Loader._flattenTrie = function(trie, prefix)
+{
+    var result = {};
+    for (var name in trie) {
+        var fullName = prefix ? prefix + "/" + name : name;
+        var data = trie[name];
+        if ("results" in data)
+            result[fullName] = data;
+        else {
+            var partialResult = loader.Loader._flattenTrie(data, fullName);
+            for (var key in partialResult) {
+                result[key] = partialResult[key];
+            }
+        }
+    }
+    return result;
 }
 
 loader.Loader.prototype = {
@@ -71,37 +98,36 @@ loader.Loader.prototype = {
     {
         this._loadNext();
     },
-    buildersListLoaded: function()
+    showErrors: function() 
     {
-        initBuilders();
-        this._loadNext();
+        this._errors.show();
     },
     _loadNext: function()
     {
         var loadingStep = this._loadingSteps.shift();
         if (!loadingStep) {
-            resourceLoadingComplete();
+            this._addErrors();
+            this._onLoadingComplete();
             return;
         }
         loadingStep.apply(this);
     },
     _loadBuildersList: function()
     {
-        loadBuildersList(g_crossDashboardState.group, g_crossDashboardState.testType);
+        loadBuildersList(currentBuilderGroupName(), this._history.crossDashboardState.testType);
+        this._loadNext();
     },
     _loadResultsFiles: function()
     {
-        parseParameters();
-
-        for (var builderName in g_builders)
+        for (var builderName in currentBuilders())
             this._loadResultsFileForBuilder(builderName);
     },
     _loadResultsFileForBuilder: function(builderName)
     {
         var resultsFilename;
-        if (isTreeMap())
+        if (history.isTreeMap())
             resultsFilename = 'times_ms.json';
-        else if (g_crossDashboardState.showAllRuns)
+        else if (this._history.crossDashboardState.showAllRuns)
             resultsFilename = 'results.json';
         else
             resultsFilename = 'results-small.json';
@@ -117,7 +143,7 @@ loader.Loader.prototype = {
     },
     _handleResultsFileLoaded: function(builderName, fileData)
     {
-        if (isTreeMap())
+        if (history.isTreeMap())
             this._processTimesJSONData(builderName, fileData);
         else
             this._processResultsJSONData(builderName, fileData);
@@ -154,44 +180,23 @@ loader.Loader.prototype = {
                 continue;
 
             if ((Date.now() / 1000) - lastRunSeconds > ONE_DAY_SECONDS)
-                g_staleBuilders.push(builderName);
+                this._staleBuilders.push(builderName);
 
             if (json_version >= 4)
-                builds[builderName][TESTS_KEY] = flattenTrie(builds[builderName][TESTS_KEY]);
+                builds[builderName][TESTS_KEY] = loader.Loader._flattenTrie(builds[builderName][TESTS_KEY]);
             g_resultsByBuilder[builderName] = builds[builderName];
         }
     },
     _handleResultsFileLoadError: function(builderName)
     {
-        var error = 'Failed to load results file for ' + builderName + '.';
+        console.error('Failed to load results file for ' + builderName + '.');
 
-        if (isLayoutTestResults()) {
-            console.error(error);
-            g_buildersThatFailedToLoad.push(builderName);
-        } else {
-            // Avoid to show error/warning messages for non-layout tests. We may be
-            // checking the builders that are not running the tests.
-            console.info('info:' + error);
-        }
+        // FIXME: loader shouldn't depend on state defined in dashboard_base.js.
+        this._buildersThatFailedToLoad.push(builderName);
 
         // Remove this builder from builders, so we don't try to use the
         // data that isn't there.
-        delete g_builders[builderName];
-
-        // Change the default builder name if it has been deleted.
-        if (g_defaultBuilderName == builderName) {
-            g_defaultBuilderName = null;
-            for (var availableBuilderName in g_builders) {
-                g_defaultBuilderName = availableBuilderName;
-                g_defaultDashboardSpecificStateValues.builder = availableBuilderName;
-                break;
-            }
-            if (!g_defaultBuilderName) {
-                var error = 'No tests results found for ' + g_crossDashboardState.testType + '. Reload the page to try fetching it again.';
-                console.error(error);
-                addError(error);
-            }
-        }
+        delete currentBuilders()[builderName];
 
         // Proceed as if the resource had loaded.
         this._handleResourceLoad();
@@ -203,7 +208,7 @@ loader.Loader.prototype = {
     },
     _haveResultsFilesLoaded: function()
     {
-        for (var builder in g_builders) {
+        for (var builder in currentBuilders()) {
             if (!g_resultsByBuilder[builder])
                 return false;
         }
@@ -211,7 +216,7 @@ loader.Loader.prototype = {
     },
     _loadExpectationsFiles: function()
     {
-        if (!isFlakinessDashboard() && !g_crossDashboardState.useTestData) {
+        if (!isFlakinessDashboard() && !this._history.crossDashboardState.useTestData) {
             this._loadNext();
             return;
         }
@@ -241,6 +246,14 @@ loader.Loader.prototype = {
                     partial(function(platformName, xhr) {
                         console.error('Could not load expectations file for ' + platformName);
                     }, platformWithExpectations));
+    },
+    _addErrors: function()
+    {
+        if (this._buildersThatFailedToLoad.length)
+            this._errors.addError('ERROR: Failed to get data from ' + this._buildersThatFailedToLoad.toString() +'.');
+
+        if (this._staleBuilders.length)
+            this._errors.addError('ERROR: Data from ' + this._staleBuilders.toString() + ' is more than 1 day stale.');
     }
 }
 

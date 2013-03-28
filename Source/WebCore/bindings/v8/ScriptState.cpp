@@ -39,7 +39,6 @@
 #include "V8HiddenPropertyName.h"
 #include "V8WorkerContext.h"
 #include "WorkerContext.h"
-#include "WorkerContextExecutionProxy.h"
 #include "WorkerScriptController.h"
 #include <v8.h>
 #include <wtf/Assertions.h>
@@ -49,7 +48,7 @@ namespace WebCore {
 ScriptState::ScriptState(v8::Handle<v8::Context> context)
     : m_context(context)
 {
-    m_context.get().MakeWeak(this, &ScriptState::weakReferenceCallback);
+    m_context.get().MakeWeak(context->GetIsolate(), this, &ScriptState::weakReferenceCallback);
 }
 
 ScriptState::~ScriptState()
@@ -91,7 +90,7 @@ ScriptState* ScriptState::current()
     return ScriptState::forContext(context);
 }
 
-void ScriptState::weakReferenceCallback(v8::Persistent<v8::Value> object, void* parameter)
+void ScriptState::weakReferenceCallback(v8::Isolate* isolate, v8::Persistent<v8::Value> object, void* parameter)
 {
     ScriptState* scriptState = static_cast<ScriptState*>(parameter);
     delete scriptState;
@@ -142,13 +141,12 @@ ScriptState* scriptStateFromPage(DOMWrapperWorld*, Page* page)
 #if ENABLE(WORKERS)
 ScriptState* scriptStateFromWorkerContext(WorkerContext* workerContext)
 {
-    WorkerContextExecutionProxy* proxy = workerContext->script()->proxy();
-    if (!proxy)
+    WorkerScriptController* script = workerContext->script();
+    if (!script)
         return 0;
 
     v8::HandleScope handleScope;
-    v8::Local<v8::Context> context = proxy->context();
-    return ScriptState::forContext(context);
+    return ScriptState::forContext(script->context());
 }
 #endif
 

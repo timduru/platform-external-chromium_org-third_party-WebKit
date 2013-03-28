@@ -1,5 +1,6 @@
 /*
     Copyright (C) 2010 Nokia Corporation and/or its subsidiary(-ies)
+    Copyright (C) 2012 Apple Inc. All rights reserved.
 
     This library is free software; you can redistribute it and/or
     modify it under the terms of the GNU Library General Public
@@ -18,6 +19,7 @@
 */
 
 #import <WebCore/FrameNetworkingContext.h>
+#import <wtf/SchedulePair.h>
 
 class WebFrameNetworkingContext : public WebCore::FrameNetworkingContext {
 public:
@@ -25,6 +27,9 @@ public:
     {
         return adoptRef(new WebFrameNetworkingContext(frame));
     }
+
+    static void ensurePrivateBrowsingSession();
+    static void destroyPrivateBrowsingSession();
 
 private:
     WebFrameNetworkingContext(WebCore::Frame* frame)
@@ -34,6 +39,8 @@ private:
 
     virtual bool needsSiteSpecificQuirks() const OVERRIDE;
     virtual bool localFileContentSniffingEnabled() const OVERRIDE;
-    virtual WebCore::SchedulePairHashSet* scheduledRunLoopPairs() const OVERRIDE;
+    virtual WebCore::NetworkStorageSession& storageSession() const OVERRIDE;
+    virtual WTF::SchedulePairHashSet* scheduledRunLoopPairs() const OVERRIDE;
+    virtual RetainPtr<CFDataRef> sourceApplicationAuditData() const OVERRIDE;
     virtual WebCore::ResourceError blockedError(const WebCore::ResourceRequest&) const OVERRIDE;
 };

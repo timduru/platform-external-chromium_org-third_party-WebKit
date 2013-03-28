@@ -105,7 +105,7 @@ public:
 
     virtual void setResizable(bool) { }
 
-    virtual void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String&, unsigned, const String&) { }
+    virtual void addMessageToConsole(MessageSource, MessageLevel, const String&, unsigned, const String&) { }
 
     virtual bool canRunBeforeUnloadConfirmPanel() { return false; }
     virtual bool runBeforeUnloadConfirmPanel(const String&, Frame*) { return true; }
@@ -159,7 +159,7 @@ public:
     virtual void print(Frame*) { }
 
 #if ENABLE(SQL_DATABASE)
-    virtual void exceededDatabaseQuota(Frame*, const String&) { }
+    virtual void exceededDatabaseQuota(Frame*, const String&, DatabaseDetails) { }
 #endif
 
     virtual void reachedMaxAppCacheSize(int64_t) { }
@@ -208,6 +208,9 @@ public:
     virtual bool shouldRubberBandInDirection(WebCore::ScrollDirection) const { return false; }
     
     virtual bool isEmptyChromeClient() const { return true; }
+
+    virtual void didAssociateFormControls(const Vector<Element*>&) { }
+    virtual bool shouldNotifyOnFormChanges() { return false; }
 };
 
 class EmptyFrameLoaderClient : public FrameLoaderClient {
@@ -228,7 +231,7 @@ public:
     virtual void detachedFromParent2() { }
     virtual void detachedFromParent3() { }
 
-    virtual void download(ResourceHandle*, const ResourceRequest&, const ResourceResponse&) { }
+    virtual void convertMainResourceLoadToDownload(DocumentLoader*, const ResourceRequest&, const ResourceResponse&) OVERRIDE { }
 
     virtual void assignIdentifierToInitialRequest(unsigned long, DocumentLoader*, const ResourceRequest&) { }
     virtual bool shouldUseCredentialStorage(DocumentLoader*, unsigned long) { return false; }
@@ -381,10 +384,6 @@ public:
 
     virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext() OVERRIDE;
 
-#if ENABLE(WEB_INTENTS)
-    virtual void dispatchIntent(PassRefPtr<IntentRequest>) OVERRIDE;
-#endif
-
 #if ENABLE(REQUEST_AUTOCOMPLETE)
     virtual void didRequestAutocomplete(PassRefPtr<FormState>) OVERRIDE;
 #endif
@@ -416,7 +415,6 @@ public:
     virtual void frameWillDetachPage(Frame*) { }
 
     virtual bool shouldDeleteRange(Range*) { return false; }
-    virtual bool shouldShowDeleteInterface(HTMLElement*) { return false; }
     virtual bool smartInsertDeleteEnabled() { return false; }
     virtual bool isSelectTrailingWhitespaceEnabled() { return false; }
     virtual bool isContinuousSpellCheckingEnabled() { return false; }
@@ -441,7 +439,9 @@ public:
     virtual void respondToChangedContents() { }
     virtual void respondToChangedSelection(Frame*) { }
     virtual void didEndEditing() { }
+    virtual void willWriteSelectionToPasteboard(Range*) { }
     virtual void didWriteSelectionToPasteboard() { }
+    virtual void getClientPasteboardDataForRange(Range*, Vector<String>&, Vector<RefPtr<SharedBuffer> >&) { }
     virtual void didSetSelectionTypesForPasteboard() { }
 
     virtual void registerUndoStep(PassRefPtr<UndoStep>) OVERRIDE;
@@ -481,6 +481,7 @@ public:
     virtual void lowercaseWord() { }
     virtual void capitalizeWord() { }
 #endif
+
 #if USE(AUTOMATIC_TEXT_REPLACEMENT)
     virtual void showSubstitutionsPanel(bool) { }
     virtual bool substitutionsPanelIsShowing() { return false; }
@@ -496,6 +497,11 @@ public:
     virtual bool isAutomaticSpellingCorrectionEnabled() { return false; }
     virtual void toggleAutomaticSpellingCorrection() { }
 #endif
+
+#if ENABLE(DELETION_UI)
+    virtual bool shouldShowDeleteInterface(HTMLElement*) { return false; }
+#endif
+
 #if PLATFORM(GTK)
     virtual bool shouldShowUnicodeMenu() { return false; }
 #endif
@@ -577,11 +583,15 @@ public:
     virtual void hideHighlight() { }
 };
 
+class EmptyDeviceClient : public DeviceClient {
+public:
+    virtual void startUpdating() OVERRIDE { }
+    virtual void stopUpdating() OVERRIDE { }
+};
+
 class EmptyDeviceMotionClient : public DeviceMotionClient {
 public:
     virtual void setController(DeviceMotionController*) { }
-    virtual void startUpdating() { }
-    virtual void stopUpdating() { }
     virtual DeviceMotionData* lastMotion() const { return 0; }
     virtual void deviceMotionControllerDestroyed() { }
 };
@@ -589,8 +599,6 @@ public:
 class EmptyDeviceOrientationClient : public DeviceOrientationClient {
 public:
     virtual void setController(DeviceOrientationController*) { }
-    virtual void startUpdating() { }
-    virtual void stopUpdating() { }
     virtual DeviceOrientationData* lastOrientation() const { return 0; }
     virtual void deviceOrientationControllerDestroyed() { }
 };

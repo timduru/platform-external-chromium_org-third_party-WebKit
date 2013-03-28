@@ -31,7 +31,6 @@
 #import "CachedResourceLoader.h"
 #import "DocumentFragment.h"
 #import "DOMRangeInternal.h"
-#import "EditingText.h"
 #import "Editor.h"
 #import "EditorClient.h"
 #import "Font.h"
@@ -40,6 +39,7 @@
 #import "HTMLConverter.h"
 #import "HTMLNames.h"
 #import "LegacyWebArchive.h"
+#import "NodeTraversal.h"
 #import "Pasteboard.h"
 #import "PasteboardStrategy.h"
 #import "PlatformStrategies.h"
@@ -47,6 +47,8 @@
 #import "RenderBlock.h"
 #import "RuntimeApplicationChecks.h"
 #import "Sound.h"
+#import "StylePropertySet.h"
+#import "Text.h"
 #import "TypingCommand.h"
 #import "htmlediting.h"
 #import "WebNSAttributedStringExtras.h"
@@ -152,11 +154,8 @@ const SimpleFontData* Editor::fontForSelection(bool& hasMultipleFonts) const
         if (style)
             result = style->font().primaryFont();
 
-        if (nodeToRemove) {
-            ExceptionCode ec;
-            nodeToRemove->remove(ec);
-            ASSERT(!ec);
-        }
+        if (nodeToRemove)
+            nodeToRemove->remove(ASSERT_NO_EXCEPTION);
 
         return result;
     }
@@ -168,7 +167,7 @@ const SimpleFontData* Editor::fontForSelection(bool& hasMultipleFonts) const
         Node* pastEnd = range->pastLastNode();
         // In the loop below, n should eventually match pastEnd and not become nil, but we've seen at least one
         // unreproducible case where this didn't happen, so check for null also.
-        for (Node* node = startNode; node && node != pastEnd; node = node->traverseNextNode()) {
+        for (Node* node = startNode; node && node != pastEnd; node = NodeTraversal::next(node)) {
             RenderObject* renderer = node->renderer();
             if (!renderer)
                 continue;
@@ -241,46 +240,8 @@ NSDictionary* Editor::fontAttributesForSelectionStart() const
     if (decoration & UNDERLINE)
         [result setObject:[NSNumber numberWithInt:NSUnderlineStyleSingle] forKey:NSUnderlineStyleAttributeName];
 
-    if (nodeToRemove) {
-        ExceptionCode ec = 0;
-        nodeToRemove->remove(ec);
-        ASSERT(ec == 0);
-    }
-
-    return result;
-}
-
-NSWritingDirection Editor::baseWritingDirectionForSelectionStart() const
-{
-    NSWritingDirection result = NSWritingDirectionLeftToRight;
-
-    Position pos = m_frame->selection()->selection().visibleStart().deepEquivalent();
-    Node* node = pos.deprecatedNode();
-    if (!node)
-        return result;
-
-    RenderObject* renderer = node->renderer();
-    if (!renderer)
-        return result;
-
-    if (!renderer->isBlockFlow()) {
-        renderer = renderer->containingBlock();
-        if (!renderer)
-            return result;
-    }
-
-    RenderStyle* style = renderer->style();
-    if (!style)
-        return result;
-        
-    switch (style->direction()) {
-        case LTR:
-            result = NSWritingDirectionLeftToRight;
-            break;
-        case RTL:
-            result = NSWritingDirectionRightToLeft;
-            break;
-    }
+    if (nodeToRemove)
+        nodeToRemove->remove(ASSERT_NO_EXCEPTION);
 
     return result;
 }
@@ -301,13 +262,13 @@ void Editor::takeFindStringFromSelection()
     Vector<String> types;
     types.append(String(NSStringPboardType));
     platformStrategies()->pasteboardStrategy()->setTypes(types, NSFindPboard);
-    platformStrategies()->pasteboardStrategy()->setStringForType(m_frame->displayStringModifiedByEncoding(selectedText()), NSStringPboardType, NSFindPboard);
+    platformStrategies()->pasteboardStrategy()->setStringForType(m_frame->displayStringModifiedByEncoding(selectedTextForClipboard()), NSStringPboardType, NSFindPboard);
 }
 
 void Editor::writeSelectionToPasteboard(const String& pasteboardName, const Vector<String>& pasteboardTypes)
 {
     Pasteboard pasteboard(pasteboardName);
-    pasteboard.writeSelectionForTypes(pasteboardTypes, true, m_frame);
+    pasteboard.writeSelectionForTypes(pasteboardTypes, true, m_frame, DefaultSelectedTextType);
 }
     
 void Editor::readSelectionFromPasteboard(const String& pasteboardName)
@@ -321,7 +282,7 @@ void Editor::readSelectionFromPasteboard(const String& pasteboardName)
 
 String Editor::stringSelectionForPasteboard()
 {
-    return Pasteboard::getStringSelection(m_frame);
+    return Pasteboard::getStringSelection(m_frame, DefaultSelectedTextType);
 }
 
 PassRefPtr<SharedBuffer> Editor::dataSelectionForPasteboard(const String& pasteboardType)

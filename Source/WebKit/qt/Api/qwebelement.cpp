@@ -39,6 +39,7 @@
 #include "JSHTMLElement.h"
 #include "JSObject.h"
 #include "PropertyNameArray.h"
+#include <QWebFrameAdapter.h>
 #include <parser/SourceCode.h>
 #include "qt_runtime.h"
 #include "NodeList.h"
@@ -47,8 +48,6 @@
 #include "StaticNodeList.h"
 #include "StyleResolver.h"
 #include "markup.h"
-#include "qwebframe.h"
-#include "qwebframe_p.h"
 #include "runtime_root.h"
 #include <JSDocument.h>
 #include <wtf/Vector.h>
@@ -617,7 +616,7 @@ QWebElement QWebElement::firstChild() const
     for (Node* child = m_element->firstChild(); child; child = child->nextSibling()) {
         if (!child->isElementNode())
             continue;
-        Element* e = static_cast<Element*>(child);
+        Element* e = toElement(child);
         return QWebElement(e);
     }
     return QWebElement();
@@ -635,7 +634,7 @@ QWebElement QWebElement::lastChild() const
     for (Node* child = m_element->lastChild(); child; child = child->previousSibling()) {
         if (!child->isElementNode())
             continue;
-        Element* e = static_cast<Element*>(child);
+        Element* e = toElement(child);
         return QWebElement(e);
     }
     return QWebElement();
@@ -653,7 +652,7 @@ QWebElement QWebElement::nextSibling() const
     for (Node* sib = m_element->nextSibling(); sib; sib = sib->nextSibling()) {
         if (!sib->isElementNode())
             continue;
-        Element* e = static_cast<Element*>(sib);
+        Element* e = toElement(sib);
         return QWebElement(e);
     }
     return QWebElement();
@@ -671,7 +670,7 @@ QWebElement QWebElement::previousSibling() const
     for (Node* sib = m_element->previousSibling(); sib; sib = sib->previousSibling()) {
         if (!sib->isElementNode())
             continue;
-        Element* e = static_cast<Element*>(sib);
+        Element* e = toElement(sib);
         return QWebElement(e);
     }
     return QWebElement();
@@ -706,7 +705,8 @@ QWebFrame *QWebElement::webFrame() const
     Frame* frame = document->frame();
     if (!frame)
         return 0;
-    return QWebFramePrivate::kit(frame);
+    QWebFrameAdapter* frameAdapter = QWebFrameAdapter::kit(frame);
+    return frameAdapter->apiHandle();
 }
 
 static bool setupScriptContext(WebCore::Element* element, JSC::JSValue& thisValue, ScriptState*& state, ScriptController*& scriptController)
@@ -807,13 +807,16 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
     if (!propID)
         return QString();
 
-    const StylePropertySet* style = static_cast<StyledElement*>(m_element)->ensureInlineStyle();
-
-    if (strategy == InlineStyle)
+    if (strategy == InlineStyle) {
+        const StylePropertySet* style = static_cast<StyledElement*>(m_element)->inlineStyle();
+        if (!style)
+            return QString();
         return style->getPropertyValue(propID);
+    }
 
     if (strategy == CascadedStyle) {
-        if (style->propertyIsImportant(propID))
+        const StylePropertySet* style = static_cast<StyledElement*>(m_element)->inlineStyle();
+        if (style && style->propertyIsImportant(propID))
             return style->getPropertyValue(propID);
 
         // We are going to resolve the style property by walking through the
@@ -825,18 +828,20 @@ QString QWebElement::styleProperty(const QString &name, StyleResolveStrategy str
         // declarations, as well as embedded and inline style declarations.
 
         Document* doc = m_element->document();
-        if (RefPtr<CSSRuleList> rules = doc->styleResolver()->styleRulesForElement(m_element, /*authorOnly*/ true)) {
+        if (RefPtr<CSSRuleList> rules = doc->styleResolver()->styleRulesForElement(m_element, StyleResolver::AuthorCSSRules | StyleResolver::CrossOriginCSSRules)) {
             for (int i = rules->length(); i > 0; --i) {
                 CSSStyleRule* rule = static_cast<CSSStyleRule*>(rules->item(i - 1));
 
                 if (rule->styleRule()->properties()->propertyIsImportant(propID))
                     return rule->styleRule()->properties()->getPropertyValue(propID);
 
-                if (style->getPropertyValue(propID).isEmpty())
+                if (!style || style->getPropertyValue(propID).isEmpty())
                     style = rule->styleRule()->properties();
             }
         }
 
+        if (!style)
+            return QString();
         return style->getPropertyValue(propID);
     }
 
@@ -869,8 +874,18 @@ void QWebElement::setStyleProperty(const QString &name, const QString &value)
     if (!m_element || !m_element->isStyledElement())
         return;
 
+    // Do the parsing of the token manually since WebCore isn't doing this for us anymore.
+    const QLatin1String importantToken("!important");
+    QString adjustedValue(value);
+    bool important = false;
+    if (adjustedValue.contains(importantToken)) {
+        important = true;
+        adjustedValue.remove(importantToken);
+        adjustedValue = adjustedValue.trimmed();
+    }
+
     CSSPropertyID propID = cssPropertyID(name);
-    static_cast<StyledElement*>(m_element)->setInlineStyleProperty(propID, value);
+    static_cast<StyledElement*>(m_element)->setInlineStyleProperty(propID, adjustedValue, important);
 }
 
 /*!
@@ -1188,7 +1203,7 @@ void QWebElement::removeAllChildren()
     if (!m_element)
         return;
 
-    m_element->removeAllChildren();
+    m_element->removeChildren();
 }
 
 // FIXME: This code, and all callers are wrong, and have no place in a
@@ -1633,7 +1648,7 @@ QWebElement QWebElementCollection::at(int i) const
     if (!d)
         return QWebElement();
     Node* n = d->m_result->item(i);
-    return QWebElement(static_cast<Element*>(n));
+    return QWebElement(toElement(n));
 }
 
 /*!
@@ -1668,7 +1683,7 @@ QList<QWebElement> QWebElementCollection::toList() const
     Node* n = d->m_result->item(i);
     while (n) {
         if (n->isElementNode())
-            elements.append(QWebElement(static_cast<Element*>(n)));
+            elements.append(QWebElement(toElement(n)));
         n = d->m_result->item(++i);
     }
     return elements;

@@ -37,6 +37,7 @@
 #include "FunctionConstructor.h"
 #include "Identifier.h"
 #include "InitializeThreading.h"
+#include "JSAPIWrapperObject.h"
 #include "JSArray.h"
 #include "JSCallbackConstructor.h"
 #include "JSCallbackFunction.h"
@@ -48,7 +49,9 @@
 #include "JSRetainPtr.h"
 #include "JSString.h"
 #include "JSValueRef.h"
+#include "ObjectConstructor.h"
 #include "ObjectPrototype.h"
+#include "Operations.h"
 #include "PropertyNameArray.h"
 #include "RegExpConstructor.h"
 
@@ -343,6 +346,10 @@ void* JSObjectGetPrivate(JSObjectRef object)
         return jsCast<JSCallbackObject<JSGlobalObject>*>(jsObject)->getPrivate();
     if (jsObject->inherits(&JSCallbackObject<JSDestructibleObject>::s_info))
         return jsCast<JSCallbackObject<JSDestructibleObject>*>(jsObject)->getPrivate();
+#if JSC_OBJC_API_ENABLED
+    if (jsObject->inherits(&JSCallbackObject<JSAPIWrapperObject>::s_info))
+        return jsCast<JSCallbackObject<JSAPIWrapperObject>*>(jsObject)->getPrivate();
+#endif
     
     return 0;
 }
@@ -359,6 +366,12 @@ bool JSObjectSetPrivate(JSObjectRef object, void* data)
         jsCast<JSCallbackObject<JSDestructibleObject>*>(jsObject)->setPrivate(data);
         return true;
     }
+#if JSC_OBJC_API_ENABLED
+    if (jsObject->inherits(&JSCallbackObject<JSAPIWrapperObject>::s_info)) {
+        jsCast<JSCallbackObject<JSAPIWrapperObject>*>(jsObject)->setPrivate(data);
+        return true;
+    }
+#endif
         
     return false;
 }
@@ -374,6 +387,10 @@ JSValueRef JSObjectGetPrivateProperty(JSContextRef ctx, JSObjectRef object, JSSt
         result = jsCast<JSCallbackObject<JSGlobalObject>*>(jsObject)->getPrivateProperty(name);
     else if (jsObject->inherits(&JSCallbackObject<JSDestructibleObject>::s_info))
         result = jsCast<JSCallbackObject<JSDestructibleObject>*>(jsObject)->getPrivateProperty(name);
+#if JSC_OBJC_API_ENABLED
+    else if (jsObject->inherits(&JSCallbackObject<JSAPIWrapperObject>::s_info))
+        result = jsCast<JSCallbackObject<JSAPIWrapperObject>*>(jsObject)->getPrivateProperty(name);
+#endif
     return toRef(exec, result);
 }
 
@@ -392,6 +409,12 @@ bool JSObjectSetPrivateProperty(JSContextRef ctx, JSObjectRef object, JSStringRe
         jsCast<JSCallbackObject<JSDestructibleObject>*>(jsObject)->setPrivateProperty(exec->globalData(), name, jsValue);
         return true;
     }
+#if JSC_OBJC_API_ENABLED
+    if (jsObject->inherits(&JSCallbackObject<JSAPIWrapperObject>::s_info)) {
+        jsCast<JSCallbackObject<JSAPIWrapperObject>*>(jsObject)->setPrivateProperty(exec->globalData(), name, jsValue);
+        return true;
+    }
+#endif
     return false;
 }
 
@@ -409,11 +432,19 @@ bool JSObjectDeletePrivateProperty(JSContextRef ctx, JSObjectRef object, JSStrin
         jsCast<JSCallbackObject<JSDestructibleObject>*>(jsObject)->deletePrivateProperty(name);
         return true;
     }
+#if JSC_OBJC_API_ENABLED
+    if (jsObject->inherits(&JSCallbackObject<JSAPIWrapperObject>::s_info)) {
+        jsCast<JSCallbackObject<JSAPIWrapperObject>*>(jsObject)->deletePrivateProperty(name);
+        return true;
+    }
+#endif
     return false;
 }
 
 bool JSObjectIsFunction(JSContextRef, JSObjectRef object)
 {
+    if (!object)
+        return false;
     CallData callData;
     JSCell* cell = toJS(object);
     return cell->methodTable()->getCallData(cell, callData) != CallTypeNone;
@@ -423,6 +454,9 @@ JSValueRef JSObjectCallAsFunction(JSContextRef ctx, JSObjectRef object, JSObject
 {
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
+
+    if (!object)
+        return 0;
 
     JSObject* jsObject = toJS(object);
     JSObject* jsThisObject = toJS(thisObject);
@@ -453,6 +487,8 @@ JSValueRef JSObjectCallAsFunction(JSContextRef ctx, JSObjectRef object, JSObject
 
 bool JSObjectIsConstructor(JSContextRef, JSObjectRef object)
 {
+    if (!object)
+        return false;
     JSObject* jsObject = toJS(object);
     ConstructData constructData;
     return jsObject->methodTable()->getConstructData(jsObject, constructData) != ConstructTypeNone;
@@ -462,6 +498,9 @@ JSObjectRef JSObjectCallAsConstructor(JSContextRef ctx, JSObjectRef object, size
 {
     ExecState* exec = toJS(ctx);
     APIEntryShim entryShim(exec);
+
+    if (!object)
+        return 0;
 
     JSObject* jsObject = toJS(object);
 

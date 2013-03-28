@@ -98,6 +98,7 @@ namespace WebCore {
     class PluginStream;
     class ResourceError;
     class ResourceResponse;
+    class WheelEvent;
 
     enum PluginStatus {
         PluginStatusCanNotFindPlugin,
@@ -209,6 +210,7 @@ namespace WebCore {
         virtual void show();
         virtual void hide();
         virtual void paint(GraphicsContext*, const IntRect&);
+        virtual void clipRectChanged() OVERRIDE;
 
         // This method is used by plugins on all platforms to obtain a clip rect that includes clips set by WebCore,
         // e.g., in overflow:auto sections.  The clip rects coordinates are in the containing window's coordinate space.
@@ -219,7 +221,7 @@ namespace WebCore {
         virtual void setParent(ScrollView*);
         virtual void setParentVisible(bool);
 
-        virtual bool isPluginView() const { return true; }
+        virtual bool isPluginView() const OVERRIDE { return true; }
 
         Frame* parentFrame() const { return m_parentFrame.get(); }
 
@@ -228,6 +230,10 @@ namespace WebCore {
         const String& pluginsPage() const { return m_pluginsPage; }
         const String& mimeType() const { return m_mimeType; }
         const KURL& url() const { return m_url; }
+
+#if defined(XP_MACOSX) && ENABLE(NETSCAPE_PLUGIN_API)
+        bool popUpContextMenu(NPMenu*);
+#endif
 
 #if OS(WINDOWS) && ENABLE(NETSCAPE_PLUGIN_API)
         static LRESULT CALLBACK PluginViewWndProc(HWND, UINT, WPARAM, LPARAM);
@@ -322,6 +328,17 @@ namespace WebCore {
 #if ENABLE(NETSCAPE_PLUGIN_API)
         bool dispatchNPEvent(NPEvent&);
 #endif // ENABLE(NETSCAPE_PLUGIN_API)
+#endif
+#if defined(XP_MACOSX) && ENABLE(NETSCAPE_PLUGIN_API)
+        int16_t dispatchNPCocoaEvent(NPCocoaEvent&);
+        bool m_updatedCocoaTextInputRequested;
+        bool m_keyDownSent;
+        bool m_usePixmap;
+        uint16_t m_disregardKeyUpCounter;
+#endif
+
+#if defined(XP_MACOSX)
+        void handleWheelEvent(WheelEvent*);
 #endif
         void updatePluginWidget();
         void paintMissingPluginIcon(GraphicsContext*, const IntRect&);
@@ -454,6 +471,21 @@ private:
 
         static PluginView* s_currentPluginView;
     };
+
+inline PluginView* toPluginView(Widget* widget)
+{
+    ASSERT(!widget || widget->isPluginView());
+    return static_cast<PluginView*>(widget);
+}
+
+inline const PluginView* toPluginView(const Widget* widget)
+{
+    ASSERT(!widget || widget->isPluginView());
+    return static_cast<const PluginView*>(widget);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toPluginView(const PluginView*);
 
 } // namespace WebCore
 

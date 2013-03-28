@@ -42,6 +42,7 @@
 #include "HistogramSupport.h"
 #include "InspectorInstrumentation.h"
 #include "MemoryCache.h"
+#include "ParsedContentType.h"
 #include "ResourceError.h"
 #include "ResourceRequest.h"
 #include "ScriptCallStack.h"
@@ -51,6 +52,7 @@
 #include "SharedBuffer.h"
 #include "TextResourceDecoder.h"
 #include "ThreadableLoader.h"
+#include "WebCoreMemoryInstrumentation.h"
 #include "XMLHttpRequestException.h"
 #include "XMLHttpRequestProgressEvent.h"
 #include "XMLHttpRequestUpload.h"
@@ -62,11 +64,16 @@
 #include <wtf/UnusedParam.h>
 #include <wtf/text/CString.h>
 
+#if ENABLE(RESOURCE_TIMING)
+#include "CachedResourceRequestInitiators.h"
+#endif
+
 #if USE(JSC)
 #include "JSDOMBinding.h"
 #include "JSDOMWindow.h"
 #include <heap/Strong.h>
 #include <runtime/JSLock.h>
+#include <runtime/Operations.h>
 #endif
 
 namespace WebCore {
@@ -161,7 +168,7 @@ static void logConsoleError(ScriptExecutionContext* context, const String& messa
         return;
     // FIXME: It's not good to report the bad usage without indicating what source line it came from.
     // We should pass additional parameters so we can tell the console where the mistake occurred.
-    context->addConsoleMessage(JSMessageSource, LogMessageType, ErrorMessageLevel, message);
+    context->addConsoleMessage(JSMessageSource, ErrorMessageLevel, message);
 }
 
 PassRefPtr<XMLHttpRequest> XMLHttpRequest::create(ScriptExecutionContext* context, PassRefPtr<SecurityOrigin> securityOrigin)
@@ -173,7 +180,7 @@ PassRefPtr<XMLHttpRequest> XMLHttpRequest::create(ScriptExecutionContext* contex
 }
 
 XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext* context, PassRefPtr<SecurityOrigin> securityOrigin)
-    : ActiveDOMObject(context, this)
+    : ActiveDOMObject(context)
     , m_async(true)
     , m_includeCredentials(false)
 #if ENABLE(XHR_TIMEOUT)
@@ -491,7 +498,13 @@ void XMLHttpRequest::open(const String& method, const KURL& url, bool async, Exc
         return;
     }
 
-    if (!scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
+    // FIXME: Convert this to check the isolated world's Content Security Policy once webkit.org/b/104520 is solved.
+    bool shouldBypassMainWorldContentSecurityPolicy = false;
+    if (scriptExecutionContext()->isDocument()) {
+        Document* document = static_cast<Document*>(scriptExecutionContext());
+        shouldBypassMainWorldContentSecurityPolicy = document->frame()->script()->shouldBypassMainWorldContentSecurityPolicy();
+    }
+    if (!shouldBypassMainWorldContentSecurityPolicy && !scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return;
@@ -642,7 +655,17 @@ void XMLHttpRequest::send(Blob* body, ExceptionCode& ec)
         return;
 
     if (m_method != "GET" && m_method != "HEAD" && m_url.protocolIsInHTTPFamily()) {
-        // FIXME: Should we set a Content-Type if one is not set.
+        const String& contentType = getRequestHeader("Content-Type");
+        if (contentType.isEmpty()) {
+            const String& blobType = body->type();
+            if (!blobType.isEmpty() && isValidContentType(blobType))
+                setRequestHeaderInternal("Content-Type", blobType);
+            else {
+                // From FileAPI spec, whenever media type cannot be determined, empty string must be returned.
+                setRequestHeaderInternal("Content-Type", "");
+            }
+        }
+
         // FIXME: add support for uploading bundles.
         m_requestEntityBody = FormData::create();
         if (body->isFile())
@@ -681,7 +704,7 @@ void XMLHttpRequest::send(DOMFormData* body, ExceptionCode& ec)
 void XMLHttpRequest::send(ArrayBuffer* body, ExceptionCode& ec)
 {
     String consoleMessage("ArrayBuffer is deprecated in XMLHttpRequest.send(). Use ArrayBufferView instead.");
-    scriptExecutionContext()->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, consoleMessage);
+    scriptExecutionContext()->addConsoleMessage(JSMessageSource, WarningMessageLevel, consoleMessage);
 
     HistogramSupport::histogramEnumeration("WebCore.XHR.send.ArrayBufferOrView", XMLHttpRequestSendArrayBuffer, XMLHttpRequestSendArrayBufferOrViewMax);
 
@@ -768,6 +791,9 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.allowCredentials = (m_sameOriginRequest || m_includeCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
     options.crossOriginRequestPolicy = UseAccessControl;
     options.securityOrigin = securityOrigin();
+#if ENABLE(RESOURCE_TIMING)
+    options.initiator = cachedResourceRequestInitiators().xmlhttprequest;
+#endif
 
 #if ENABLE(XHR_TIMEOUT)
     if (m_timeoutMilliseconds)
@@ -1295,6 +1321,32 @@ EventTargetData* XMLHttpRequest::eventTargetData()
 EventTargetData* XMLHttpRequest::ensureEventTargetData()
 {
     return &m_eventTargetData;
+}
+
+void XMLHttpRequest::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    ScriptWrappable::reportMemoryUsage(memoryObjectInfo);
+    ActiveDOMObject::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_upload, "upload");
+    info.addMember(m_url, "url");
+    info.addMember(m_method, "method");
+    info.addMember(m_requestHeaders, "requestHeaders");
+    info.addMember(m_requestEntityBody, "requestEntityBody");
+    info.addMember(m_mimeTypeOverride, "mimeTypeOverride");
+    info.addMember(m_responseBlob, "responseBlob");
+    info.addMember(m_loader, "loader");
+    info.addMember(m_response, "response");
+    info.addMember(m_responseEncoding, "responseEncoding");
+    info.addMember(m_decoder, "decoder");
+    info.addMember(m_responseBuilder, "responseBuilder");
+    info.addMember(m_responseDocument, "responseDocument");
+    info.addMember(m_binaryResponseBuilder, "binaryResponseBuilder");
+    info.addMember(m_responseArrayBuffer, "responseArrayBuffer");
+    info.addMember(m_lastSendURL, "lastSendURL");
+    info.addMember(m_eventTargetData, "eventTargetData");
+    info.addMember(m_progressEventThrottle, "progressEventThrottle");
+    info.addMember(m_securityOrigin, "securityOrigin");
 }
 
 } // namespace WebCore

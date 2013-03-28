@@ -35,7 +35,9 @@
 #include "JSGlobalObject.h"
 #include "JSNotAnObject.h"
 #include "Interpreter.h"
+#include "ObjectConstructor.h"
 #include "ObjectPrototype.h"
+#include "Operations.h"
 #include "Parser.h"
 #include "PropertyNameArray.h"
 
@@ -47,8 +49,6 @@ EncodedJSValue JSC_HOST_CALL callHostFunctionAsConstructor(ExecState* exec)
 {
     return throwVMError(exec, createNotAConstructorError(exec, exec->callee()));
 }
-
-ASSERT_HAS_TRIVIAL_DESTRUCTOR(JSFunction);
 
 const ClassInfo JSFunction::s_info = { "Function", &Base::s_info, 0, 0, CREATE_METHOD_TABLE(JSFunction) };
 
@@ -76,10 +76,25 @@ JSFunction* JSFunction::create(ExecState* exec, JSGlobalObject* globalObject, in
     return function;
 }
 
+void JSFunction::destroy(JSCell* cell)
+{
+    static_cast<JSFunction*>(cell)->JSFunction::~JSFunction();
+}
+
 JSFunction::JSFunction(ExecState* exec, JSGlobalObject* globalObject, Structure* structure)
     : Base(exec->globalData(), structure)
     , m_executable()
     , m_scope(exec->globalData(), this, globalObject)
+    // We initialize blind so that changes to the prototype after function creation but before
+    // the optimizer kicks in don't disable optimizations. Once the optimizer kicks in, the
+    // watchpoint will start watching and any changes will both force deoptimization and disable
+    // future attempts to optimize. This is necessary because we are guaranteed that the
+    // allocation profile is changed exactly once prior to optimizations kicking in. We could be
+    // smarter and count the number of times the prototype is clobbered and only optimize if it
+    // was clobbered exactly once, but that seems like overkill. In almost all cases it will be
+    // clobbered once, and if it's clobbered more than once, that will probably only occur
+    // before we started optimizing, anyway.
+    , m_allocationProfileWatchpoint(InitializedBlind)
 {
 }
 
@@ -92,14 +107,14 @@ void JSFunction::finishCreation(ExecState* exec, NativeExecutable* executable, i
     putDirect(exec->globalData(), exec->propertyNames().length, jsNumber(length), DontDelete | ReadOnly | DontEnum);
 }
 
-Structure* JSFunction::cacheInheritorID(ExecState* exec)
+ObjectAllocationProfile* JSFunction::createAllocationProfile(ExecState* exec, size_t inlineCapacity)
 {
-    JSValue prototype = get(exec, exec->globalData().propertyNames->prototype);
-    if (prototype.isObject())
-        m_cachedInheritorID.set(exec->globalData(), this, asObject(prototype)->inheritorID(exec->globalData()));
-    else
-        m_cachedInheritorID.set(exec->globalData(), this, globalObject()->emptyObjectStructure());
-    return m_cachedInheritorID.get();
+    JSGlobalData& globalData = exec->globalData();
+    JSObject* prototype = jsDynamicCast<JSObject*>(get(exec, globalData.propertyNames->prototype));
+    if (!prototype)
+        prototype = globalObject()->objectPrototype();
+    m_allocationProfile.initialize(globalObject()->globalData(), this, prototype, inlineCapacity);
+    return &m_allocationProfile;
 }
 
 String JSFunction::name(ExecState* exec)
@@ -148,6 +163,7 @@ void JSFunction::visitChildren(JSCell* cell, SlotVisitor& visitor)
 
     visitor.append(&thisObject->m_scope);
     visitor.append(&thisObject->m_executable);
+    thisObject->m_allocationProfile.visitAggregate(visitor);
 }
 
 CallType JSFunction::getCallData(JSCell* cell, CallData& callData)
@@ -205,16 +221,17 @@ bool JSFunction::getOwnPropertySlot(JSCell* cell, ExecState* exec, PropertyName 
         return Base::getOwnPropertySlot(thisObject, exec, propertyName, slot);
 
     if (propertyName == exec->propertyNames().prototype) {
-        WriteBarrierBase<Unknown>* location = thisObject->getDirectLocation(exec->globalData(), propertyName);
-
-        if (!location) {
-            JSObject* prototype = constructEmptyObject(exec, thisObject->globalObject()->emptyObjectStructure());
-            prototype->putDirect(exec->globalData(), exec->propertyNames().constructor, thisObject, DontEnum);
-            thisObject->putDirect(exec->globalData(), exec->propertyNames().prototype, prototype, DontDelete | DontEnum);
-            location = thisObject->getDirectLocation(exec->globalData(), exec->propertyNames().prototype);
+        JSGlobalData& globalData = exec->globalData();
+        PropertyOffset offset = thisObject->getDirectOffset(globalData, propertyName);
+        if (!isValidOffset(offset)) {
+            JSObject* prototype = constructEmptyObject(exec);
+            prototype->putDirect(globalData, exec->propertyNames().constructor, thisObject, DontEnum);
+            thisObject->putDirect(globalData, exec->propertyNames().prototype, prototype, DontDelete | DontEnum);
+            offset = thisObject->getDirectOffset(globalData, exec->propertyNames().prototype);
+            ASSERT(isValidOffset(offset));
         }
 
-        slot.setValue(thisObject, location->get(), thisObject->offsetForLocation(location));
+        slot.setValue(thisObject, thisObject->getDirect(offset), offset);
     }
 
     if (propertyName == exec->propertyNames().arguments) {
@@ -339,8 +356,9 @@ void JSFunction::put(JSCell* cell, ExecState* exec, PropertyName propertyName, J
         // following the rules set out in ECMA-262 8.12.9.
         PropertySlot slot;
         thisObject->methodTable()->getOwnPropertySlot(thisObject, exec, propertyName, slot);
-        thisObject->m_cachedInheritorID.clear();
-        // Don't allow this to be cached, since a [[Put]] must clear m_cachedInheritorID.
+        thisObject->m_allocationProfile.clear();
+        thisObject->m_allocationProfileWatchpoint.notifyWrite();
+        // Don't allow this to be cached, since a [[Put]] must clear m_allocationProfile.
         PutPropertySlot dontCache;
         Base::put(thisObject, exec, propertyName, value, dontCache);
         return;
@@ -385,7 +403,8 @@ bool JSFunction::defineOwnProperty(JSObject* object, ExecState* exec, PropertyNa
         // following the rules set out in ECMA-262 8.12.9.
         PropertySlot slot;
         thisObject->methodTable()->getOwnPropertySlot(thisObject, exec, propertyName, slot);
-        thisObject->m_cachedInheritorID.clear();
+        thisObject->m_allocationProfile.clear();
+        thisObject->m_allocationProfileWatchpoint.notifyWrite();
         return Base::defineOwnProperty(object, exec, propertyName, descriptor, throwException);
     }
 
@@ -451,7 +470,6 @@ ConstructType JSFunction::getConstructData(JSCell* cell, ConstructData& construc
     constructData.js.scope = thisObject->scope();
     return ConstructTypeJS;
 }
-    
 
 String getCalculatedDisplayName(CallFrame* callFrame, JSObject* object)
 {

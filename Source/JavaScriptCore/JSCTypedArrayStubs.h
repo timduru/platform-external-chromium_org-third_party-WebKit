@@ -28,6 +28,7 @@
 
 #include "JSDestructibleObject.h"
 #include "ObjectPrototype.h"
+#include "Operations.h"
 #include <wtf/Float32Array.h>
 #include <wtf/Float64Array.h>
 #include <wtf/Forward.h>
@@ -173,7 +174,7 @@ JSValue JS##name##Array::getByIndex(ExecState*, unsigned index)\
 {\
     ASSERT_GC_OBJECT_INHERITS(this, &s_info);\
     type result = m_impl->item(index);\
-    if (isnan((double)result))\
+    if (std::isnan((double)result))\
         return jsNaN();\
     return JSValue(result);\
 }\
@@ -184,7 +185,10 @@ static EncodedJSValue JSC_HOST_CALL constructJS##name##Array(ExecState* callFram
     if (length < 0) \
         return JSValue::encode(jsUndefined()); \
     Structure* structure = JS##name##Array::createStructure(callFrame->globalData(), callFrame->lexicalGlobalObject(), callFrame->lexicalGlobalObject()->objectPrototype()); \
-    return JSValue::encode(JS##name##Array::create(structure, callFrame->lexicalGlobalObject(), name##Array::create(length)));\
+    RefPtr<name##Array> buffer = name##Array::create(length); \
+    if (!buffer) \
+        return throwVMError(callFrame, createRangeError(callFrame, "ArrayBuffer size is not a small enough positive integer.")); \
+    return JSValue::encode(JS##name##Array::create(structure, callFrame->lexicalGlobalObject(), buffer.release())); \
 }
 
 TYPED_ARRAY(Uint8, uint8_t);

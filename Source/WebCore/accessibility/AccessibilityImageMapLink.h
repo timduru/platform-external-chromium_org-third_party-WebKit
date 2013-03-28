@@ -52,7 +52,6 @@ public:
     virtual Node* node() const { return m_areaElement.get(); }
         
     virtual AccessibilityRole roleValue() const;
-    virtual bool accessibilityIsIgnored() const { return false; }
     virtual bool isEnabled() const { return true; }
     
     virtual Element* anchorElement() const;

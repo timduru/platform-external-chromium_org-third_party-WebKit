@@ -99,8 +99,7 @@ void DOMPatchSupport::patchDocument(const String& markup)
     OwnPtr<Digest> oldInfo = createDigest(m_document->documentElement(), 0);
     OwnPtr<Digest> newInfo = createDigest(newDocument->documentElement(), &m_unusedNodesMap);
 
-    ExceptionCode ec = 0;
-    if (!innerPatchNode(oldInfo.get(), newInfo.get(), ec)) {
+    if (!innerPatchNode(oldInfo.get(), newInfo.get(), IGNORE_EXCEPTION)) {
         // Fall back to rewrite.
         m_document->write(markup);
         m_document->close();
@@ -171,8 +170,8 @@ bool DOMPatchSupport::innerPatchNode(Digest* oldDigest, Digest* newDigest, Excep
         return true;
 
     // Patch attributes
-    Element* oldElement = static_cast<Element*>(oldNode);
-    Element* newElement = static_cast<Element*>(newNode);
+    Element* oldElement = toElement(oldNode);
+    Element* newElement = toElement(newNode);
     if (oldDigest->m_attrsSHA1 != newDigest->m_attrsSHA1) {
         // FIXME: Create a function in Element for removing all properties. Take in account whether did/willModifyAttribute are important.
         if (oldElement->hasAttributesWithoutUpdate()) {
@@ -418,7 +417,7 @@ PassOwnPtr<DOMPatchSupport::Digest> DOMPatchSupport::createDigest(Node* node, Un
             child = child->nextSibling();
             digest->m_children.append(childInfo.release());
         }
-        Element* element = static_cast<Element*>(node);
+        Element* element = toElement(node);
 
         if (element->hasAttributesWithoutUpdate()) {
             size_t numAttrs = element->attributeCount();

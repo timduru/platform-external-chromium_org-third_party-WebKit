@@ -69,12 +69,17 @@ public:
     virtual bool canSave() { return false; }
     virtual void save(const String&, const String&, bool) { }
     virtual void append(const String&, const String&) { }
-    virtual bool canInspectWorkers() { return false; }
 
     virtual void attachWindow() = 0;
     virtual void detachWindow() = 0;
 
     virtual void sendMessageToBackend(const String& message);
+
+    virtual bool supportsFileSystems() { return false; }
+    virtual void requestFileSystems() { }
+    virtual void addFileSystem() { }
+    virtual void removeFileSystem(const String&) { }
+    virtual bool isUnderTest();
 
     bool canAttachWindow();
     void setDockingUnavailable(bool);
@@ -98,9 +103,10 @@ public:
     
     void showResources();
 
+    void setAttachedWindow(bool);
+
 protected:
     virtual void setAttachedWindowHeight(unsigned) = 0;
-    void setAttachedWindow(bool);
     void restoreAttachedWindowHeight();
 
 private:

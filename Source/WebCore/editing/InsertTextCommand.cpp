@@ -28,12 +28,12 @@
 
 #include "Document.h"
 #include "Element.h"
-#include "EditingText.h"
 #include "Editor.h"
 #include "Frame.h"
 #include "HTMLInterchange.h"
+#include "Text.h"
+#include "VisibleUnits.h"
 #include "htmlediting.h"
-#include "visible_units.h"
 #include <wtf/unicode/CharacterNames.h>
 
 namespace WebCore {

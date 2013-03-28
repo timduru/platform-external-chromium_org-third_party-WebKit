@@ -33,34 +33,36 @@ import signal
 import subprocess
 import sys
 import time
-import unittest
 
 # Since we execute this script directly as part of the unit tests, we need to ensure
 # that Tools/Scripts is in sys.path for the next imports to work correctly.
 script_dir = os.path.dirname(os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))))
 if script_dir not in sys.path:
     sys.path.append(script_dir)
+third_party_py = os.path.join(script_dir, "webkitpy", "thirdparty", "autoinstalled")
+if third_party_py not in sys.path:
+    sys.path.append(third_party_py)
+
+import unittest2 as unittest
 
 from webkitpy.common.system.executive import Executive, ScriptError
 from webkitpy.common.system.filesystem_mock import MockFileSystem
 
 
 class ScriptErrorTest(unittest.TestCase):
-    def test_string_from_args(self):
-        error = ScriptError()
-        self.assertEquals(error._string_from_args(None), 'None')
-        self.assertEquals(error._string_from_args([]), '[]')
-        self.assertEquals(error._string_from_args(map(str, range(30))), "['0', '1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12', '13', '14', '15', '16', '17'...")
-
     def test_message_with_output(self):
         error = ScriptError('My custom message!', '', -1)
-        self.assertEquals(error.message_with_output(), 'My custom message!')
+        self.assertEqual(error.message_with_output(), 'My custom message!')
         error = ScriptError('My custom message!', '', -1, 'My output.')
-        self.assertEquals(error.message_with_output(), 'My custom message!\n\nMy output.')
+        self.assertEqual(error.message_with_output(), 'My custom message!\n\nMy output.')
         error = ScriptError('', 'my_command!', -1, 'My output.', '/Users/username/blah')
-        self.assertEquals(error.message_with_output(), 'Failed to run "my_command!" exit_code: -1 cwd: /Users/username/blah\n\nMy output.')
+        self.assertEqual(error.message_with_output(), 'Failed to run "\'my_command!\'" exit_code: -1 cwd: /Users/username/blah\n\nMy output.')
         error = ScriptError('', 'my_command!', -1, 'ab' + '1' * 499)
-        self.assertEquals(error.message_with_output(), 'Failed to run "my_command!" exit_code: -1\n\nLast 500 characters of output:\nb' + '1' * 499)
+        self.assertEqual(error.message_with_output(), 'Failed to run "\'my_command!\'" exit_code: -1\n\nLast 500 characters of output:\nb' + '1' * 499)
+
+    def test_message_with_tuple(self):
+        error = ScriptError('', ('my', 'command'), -1, 'My output.', '/Users/username/blah')
+        self.assertEqual(error.message_with_output(), 'Failed to run "(\'my\', \'command\')" exit_code: -1 cwd: /Users/username/blah\n\nMy output.')
 
 def never_ending_command():
     """Arguments for a command that will never end (useful for testing process
@@ -104,7 +106,7 @@ class ExecutiveTest(unittest.TestCase):
     def test_run_command_with_bad_command(self):
         def run_bad_command():
             Executive().run_command(["foo_bar_command_blah"], error_handler=Executive.ignore_error, return_exit_code=True)
-        self.failUnlessRaises(OSError, run_bad_command)
+        self.assertRaises(OSError, run_bad_command)
 
     def test_run_command_args_type(self):
         executive = Executive()
@@ -112,6 +114,17 @@ class ExecutiveTest(unittest.TestCase):
         self.assertRaises(AssertionError, executive.run_command, u"echo")
         executive.run_command(command_line('echo', 'foo'))
         executive.run_command(tuple(command_line('echo', 'foo')))
+
+    def test_auto_stringify_args(self):
+        executive = Executive()
+        executive.run_command(command_line('echo', 1))
+        executive.popen(command_line('echo', 1), stdout=executive.PIPE).wait()
+        self.assertEqual('echo 1', executive.command_for_printing(['echo', 1]))
+
+    def test_popen_args(self):
+        executive = Executive()
+        # Explicitly naming the 'args' argument should not thow an exception.
+        executive.popen(args=command_line('echo', 1), stdout=executive.PIPE).wait()
 
     def test_run_command_with_unicode(self):
         """Validate that it is safe to pass unicode() objects
@@ -133,24 +146,24 @@ class ExecutiveTest(unittest.TestCase):
         executive = Executive()
 
         output = executive.run_command(command_line('cat'), input=unicode_tor_input)
-        self.assertEquals(output, unicode_tor_output)
+        self.assertEqual(output, unicode_tor_output)
 
         output = executive.run_command(command_line('echo', unicode_tor_input))
-        self.assertEquals(output, unicode_tor_output)
+        self.assertEqual(output, unicode_tor_output)
 
         output = executive.run_command(command_line('echo', unicode_tor_input), decode_output=False)
-        self.assertEquals(output, encoded_tor)
+        self.assertEqual(output, encoded_tor)
 
         # Make sure that str() input also works.
         output = executive.run_command(command_line('cat'), input=encoded_tor, decode_output=False)
-        self.assertEquals(output, encoded_tor)
+        self.assertEqual(output, encoded_tor)
 
         # FIXME: We should only have one run* method to test
         output = executive.run_and_throw_if_fail(command_line('echo', unicode_tor_input), quiet=True)
-        self.assertEquals(output, unicode_tor_output)
+        self.assertEqual(output, unicode_tor_output)
 
         output = executive.run_and_throw_if_fail(command_line('echo', unicode_tor_input), quiet=True, decode_output=False)
-        self.assertEquals(output, encoded_tor)
+        self.assertEqual(output, encoded_tor)
 
     def serial_test_kill_process(self):
         executive = Executive()
@@ -161,11 +174,11 @@ class ExecutiveTest(unittest.TestCase):
         if sys.platform == "win32":
             # FIXME: https://bugs.webkit.org/show_bug.cgi?id=54790
             # We seem to get either 0 or 1 here for some reason.
-            self.assertTrue(process.wait() in (0, 1))
+            self.assertIn(process.wait(), (0, 1))
         elif sys.platform == "cygwin":
             # FIXME: https://bugs.webkit.org/show_bug.cgi?id=98196
             # cygwin seems to give us either SIGABRT or SIGKILL
-            self.assertTrue(process.wait() in (-signal.SIGABRT, -signal.SIGKILL))
+            self.assertIn(process.wait(), (-signal.SIGABRT, -signal.SIGKILL))
         else:
             expected_exit_code = -signal.SIGKILL
             self.assertEqual(process.wait(), expected_exit_code)
@@ -176,7 +189,7 @@ class ExecutiveTest(unittest.TestCase):
     def serial_test_kill_all(self):
         executive = Executive()
         process = subprocess.Popen(never_ending_command(), stdout=subprocess.PIPE)
-        self.assertEqual(process.poll(), None)  # Process is running
+        self.assertIsNone(process.poll())  # Process is running
         executive.kill_all(never_ending_command()[0])
         # Note: Can't use a ternary since signal.SIGTERM is undefined for sys.platform == "win32"
         if sys.platform == "cygwin":
@@ -185,7 +198,7 @@ class ExecutiveTest(unittest.TestCase):
         elif sys.platform == "win32":
             # FIXME: https://bugs.webkit.org/show_bug.cgi?id=54790
             # We seem to get either 0 or 1 here for some reason.
-            self.assertTrue(process.wait() in (0, 1))
+            self.assertIn(process.wait(), (0, 1))
         else:
             expected_exit_code = -signal.SIGTERM
             self.assertEqual(process.wait(), expected_exit_code)
@@ -218,7 +231,7 @@ class ExecutiveTest(unittest.TestCase):
 
         executive = Executive()
         pids = executive.running_pids()
-        self.assertTrue(os.getpid() in pids)
+        self.assertIn(os.getpid(), pids)
 
     def serial_test_run_in_parallel(self):
         # We run this test serially to avoid overloading the machine and throwing off the timing.
@@ -236,8 +249,8 @@ class ExecutiveTest(unittest.TestCase):
         command_outputs = Executive().run_in_parallel(commands, processes=NUM_PROCESSES)
         done = time.time()
         self.assertTrue(done - start < NUM_PROCESSES * DELAY_SECS)
-        self.assertEquals([output[1] for output in command_outputs], ["hello\n"] * NUM_PROCESSES)
-        self.assertEquals([],  multiprocessing.active_children())
+        self.assertEqual([output[1] for output in command_outputs], ["hello\n"] * NUM_PROCESSES)
+        self.assertEqual([],  multiprocessing.active_children())
 
     def test_run_in_parallel_assert_nonempty(self):
         self.assertRaises(AssertionError, Executive().run_in_parallel, [])

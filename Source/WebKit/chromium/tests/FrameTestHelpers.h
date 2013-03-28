@@ -32,6 +32,7 @@
 #define FrameTestHelpers_h
 
 #include <string>
+#include <wtf/PassOwnPtr.h>
 
 namespace WebKit {
 
@@ -44,7 +45,10 @@ namespace FrameTestHelpers {
 
 void loadFrame(WebFrame*, const std::string& url);
 
+WebView* createWebView(bool enableJavascript = false, WebFrameClient* = 0, WebViewClient* = 0);
 WebView* createWebViewAndLoad(const std::string& url, bool enableJavascript = false, WebFrameClient* = 0, WebViewClient* = 0);
+
+void runPendingTasks();
 
 } // namespace FrameTestHelpers
 } // namespace WebKit

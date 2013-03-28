@@ -26,6 +26,7 @@
 #ifndef Plugin_h
 #define Plugin_h
 
+#include <WebCore/FindOptions.h>
 #include <WebCore/GraphicsLayer.h>
 #include <WebCore/KURL.h>
 #include <WebCore/ScrollTypes.h>
@@ -50,9 +51,11 @@ namespace CoreIPC {
 namespace WebCore {
     class AffineTransform;
     class GraphicsContext;
+    class IntPoint;
     class IntRect;
     class IntSize;
     class Scrollbar;
+    class SharedBuffer;
 }
 
 namespace WebKit {
@@ -78,7 +81,7 @@ public:
 #endif
 
         void encode(CoreIPC::ArgumentEncoder&) const;
-        static bool decode(CoreIPC::ArgumentDecoder*, Parameters&);
+        static bool decode(CoreIPC::ArgumentDecoder&, Parameters&);
     };
 
     // Sets the active plug-in controller and initializes the plug-in.
@@ -196,6 +199,9 @@ public:
 
     // Ask the plug-in whether it should be allowed to execute JavaScript or navigate to JavaScript URLs.
     virtual bool shouldAllowScripting() = 0;
+
+    // Ask the plug-in whether it wants URLs and files dragged onto it to cause navigation.
+    virtual bool shouldAllowNavigationFromDrags() = 0;
     
     // Ask the plug-in whether it wants to override full-page zoom.
     virtual bool handlesPageScaleFactor() = 0;
@@ -249,6 +255,20 @@ public:
 #if PLATFORM(MAC)
     virtual RetainPtr<PDFDocument> pdfDocumentForPrinting() const { return 0; }
 #endif
+
+    virtual unsigned countFindMatches(const String& target, WebCore::FindOptions, unsigned maxMatchCount) = 0;
+
+    virtual bool findString(const String& target, WebCore::FindOptions, unsigned maxMatchCount) = 0;
+
+    virtual WebCore::IntPoint convertToRootView(const WebCore::IntPoint& pointInLocalCoordinates) const;
+
+    virtual bool shouldAlwaysAutoStart() const { return false; }
+
+    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const = 0;
+
+    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) = 0;
+
+    virtual String getSelectionString() const = 0;
 
 protected:
     Plugin();

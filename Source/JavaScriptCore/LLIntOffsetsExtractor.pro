@@ -34,7 +34,7 @@ LLINT_DEPENDENCY = \
     $$PWD/llint/LowLevelInterpreter.asm \
     $$PWD/llint/LowLevelInterpreter32_64.asm \
     $$PWD/llint/LowLevelInterpreter64.asm \
-    $$PWD/offlineasm/armv7.rb \
+    $$PWD/offlineasm/arm.rb \
     $$PWD/offlineasm/ast.rb \
     $$PWD/offlineasm/backends.rb \
     $$PWD/offlineasm/generate_offset_extractor.rb \
@@ -56,6 +56,12 @@ llint.depends = $$LLINT_DEPENDENCY
 llint.commands = ruby $$llint.script ${QMAKE_FILE_NAME} ${QMAKE_FILE_OUT}
 llint.CONFIG += no_link
 QMAKE_EXTRA_COMPILERS += llint
+
+macx {
+    DESTDIR = $$targetSubDir()
+    llint.output = $$targetSubDir()/$$llint.output
+    INCLUDEPATH += $$targetSubDir()
+}
 
 # Compilation of this file will automatically depend on LLIntDesiredOffsets.h
 # due to qmake scanning the source file for header dependencies.

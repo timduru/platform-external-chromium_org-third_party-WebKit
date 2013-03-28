@@ -19,9 +19,8 @@
 */
 
 #include "config.h"
-#include "V8TestCallback.h"
-
 #if ENABLE(SQL_DATABASE)
+#include "V8TestCallback.h"
 
 #include "ScriptExecutionContext.h"
 #include "V8Binding.h"
@@ -39,16 +38,15 @@
 
 namespace WebCore {
 
-V8TestCallback::V8TestCallback(v8::Local<v8::Object> callback, ScriptExecutionContext* context)
+V8TestCallback::V8TestCallback(v8::Handle<v8::Object> callback, ScriptExecutionContext* context)
     : ActiveDOMCallback(context)
-    , m_callback(v8::Persistent<v8::Object>::New(callback))
+    , m_callback(callback)
     , m_worldContext(UseCurrentWorld)
 {
 }
 
 V8TestCallback::~V8TestCallback()
 {
-    m_callback.Dispose();
 }
 
 // Functions
@@ -70,7 +68,7 @@ bool V8TestCallback::callbackWithNoParam()
     v8::Handle<v8::Value> *argv = 0;
 
     bool callbackReturnValue = false;
-    return !invokeCallback(m_callback, 0, argv, callbackReturnValue, scriptExecutionContext());
+    return !invokeCallback(m_callback.get(), 0, argv, callbackReturnValue, scriptExecutionContext());
 }
 
 bool V8TestCallback::callbackWithClass1Param(Class1* class1Param)
@@ -86,7 +84,7 @@ bool V8TestCallback::callbackWithClass1Param(Class1* class1Param)
 
     v8::Context::Scope scope(v8Context);
 
-    v8::Handle<v8::Value> class1ParamHandle = toV8(class1Param);
+    v8::Handle<v8::Value> class1ParamHandle = toV8(class1Param, v8::Handle<v8::Object>(), v8Context->GetIsolate());
     if (class1ParamHandle.IsEmpty()) {
         if (!isScriptControllerTerminating())
             CRASH();
@@ -98,7 +96,7 @@ bool V8TestCallback::callbackWithClass1Param(Class1* class1Param)
     };
 
     bool callbackReturnValue = false;
-    return !invokeCallback(m_callback, 1, argv, callbackReturnValue, scriptExecutionContext());
+    return !invokeCallback(m_callback.get(), 1, argv, callbackReturnValue, scriptExecutionContext());
 }
 
 bool V8TestCallback::callbackWithClass2Param(Class2* class2Param, const String& strArg)
@@ -114,13 +112,13 @@ bool V8TestCallback::callbackWithClass2Param(Class2* class2Param, const String& 
 
     v8::Context::Scope scope(v8Context);
 
-    v8::Handle<v8::Value> class2ParamHandle = toV8(class2Param);
+    v8::Handle<v8::Value> class2ParamHandle = toV8(class2Param, v8::Handle<v8::Object>(), v8Context->GetIsolate());
     if (class2ParamHandle.IsEmpty()) {
         if (!isScriptControllerTerminating())
             CRASH();
         return true;
     }
-    v8::Handle<v8::Value> strArgHandle = v8String(strArg);
+    v8::Handle<v8::Value> strArgHandle = v8String(strArg, v8Context->GetIsolate());
     if (strArgHandle.IsEmpty()) {
         if (!isScriptControllerTerminating())
             CRASH();
@@ -133,7 +131,7 @@ bool V8TestCallback::callbackWithClass2Param(Class2* class2Param, const String& 
     };
 
     bool callbackReturnValue = false;
-    return !invokeCallback(m_callback, 2, argv, callbackReturnValue, scriptExecutionContext());
+    return !invokeCallback(m_callback.get(), 2, argv, callbackReturnValue, scriptExecutionContext());
 }
 
 bool V8TestCallback::callbackWithStringList(RefPtr<DOMStringList> listParam)
@@ -149,7 +147,7 @@ bool V8TestCallback::callbackWithStringList(RefPtr<DOMStringList> listParam)
 
     v8::Context::Scope scope(v8Context);
 
-    v8::Handle<v8::Value> listParamHandle = toV8(listParam);
+    v8::Handle<v8::Value> listParamHandle = toV8(listParam, v8::Handle<v8::Object>(), v8Context->GetIsolate());
     if (listParamHandle.IsEmpty()) {
         if (!isScriptControllerTerminating())
             CRASH();
@@ -161,7 +159,7 @@ bool V8TestCallback::callbackWithStringList(RefPtr<DOMStringList> listParam)
     };
 
     bool callbackReturnValue = false;
-    return !invokeCallback(m_callback, 1, argv, callbackReturnValue, scriptExecutionContext());
+    return !invokeCallback(m_callback.get(), 1, argv, callbackReturnValue, scriptExecutionContext());
 }
 
 bool V8TestCallback::callbackWithBoolean(bool boolParam)
@@ -177,7 +175,7 @@ bool V8TestCallback::callbackWithBoolean(bool boolParam)
 
     v8::Context::Scope scope(v8Context);
 
-    v8::Handle<v8::Value> boolParamHandle = v8Boolean(boolParam);
+    v8::Handle<v8::Value> boolParamHandle = v8Boolean(boolParam, v8Context->GetIsolate());
     if (boolParamHandle.IsEmpty()) {
         if (!isScriptControllerTerminating())
             CRASH();
@@ -189,7 +187,7 @@ bool V8TestCallback::callbackWithBoolean(bool boolParam)
     };
 
     bool callbackReturnValue = false;
-    return !invokeCallback(m_callback, 1, argv, callbackReturnValue, scriptExecutionContext());
+    return !invokeCallback(m_callback.get(), 1, argv, callbackReturnValue, scriptExecutionContext());
 }
 
 bool V8TestCallback::callbackRequiresThisToPass(Class8* class8Param, ThisClass* thisClassParam)
@@ -207,13 +205,13 @@ bool V8TestCallback::callbackRequiresThisToPass(Class8* class8Param, ThisClass* 
 
     v8::Context::Scope scope(v8Context);
 
-    v8::Handle<v8::Value> class8ParamHandle = toV8(class8Param);
+    v8::Handle<v8::Value> class8ParamHandle = toV8(class8Param, v8::Handle<v8::Object>(), v8Context->GetIsolate());
     if (class8ParamHandle.IsEmpty()) {
         if (!isScriptControllerTerminating())
             CRASH();
         return true;
     }
-    v8::Handle<v8::Value> thisClassParamHandle = toV8(thisClassParam);
+    v8::Handle<v8::Value> thisClassParamHandle = toV8(thisClassParam, v8::Handle<v8::Object>(), v8Context->GetIsolate());
     if (thisClassParamHandle.IsEmpty()) {
         if (!isScriptControllerTerminating())
             CRASH();
@@ -226,7 +224,7 @@ bool V8TestCallback::callbackRequiresThisToPass(Class8* class8Param, ThisClass* 
     };
 
     bool callbackReturnValue = false;
-    return !invokeCallback(m_callback, v8::Handle<v8::Object>::Cast(thisClassParamHandle), 2, argv, callbackReturnValue, scriptExecutionContext());
+    return !invokeCallback(m_callback.get(), v8::Handle<v8::Object>::Cast(thisClassParamHandle), 2, argv, callbackReturnValue, scriptExecutionContext());
 }
 
 } // namespace WebCore

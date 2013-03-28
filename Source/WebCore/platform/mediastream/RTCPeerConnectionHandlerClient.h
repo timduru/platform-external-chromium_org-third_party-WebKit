@@ -38,41 +38,46 @@
 namespace WebCore {
 
 class MediaStreamDescriptor;
-class RTCDataChannelDescriptor;
+class RTCDataChannelHandler;
 class RTCIceCandidateDescriptor;
 
 class RTCPeerConnectionHandlerClient {
 public:
-    enum ReadyState {
-        ReadyStateNew = 1,
-        ReadyStateOpening = 2,
-        ReadyStateActive = 3,
-        ReadyStateClosing = 4,
-        ReadyStateClosed = 5
+    enum SignalingState {
+        SignalingStateStable = 1,
+        SignalingStateHaveLocalOffer = 2,
+        SignalingStateHaveRemoteOffer = 3,
+        SignalingStateHaveLocalPrAnswer = 4,
+        SignalingStateHaveRemotePrAnswer = 5,
+        SignalingStateClosed = 6,
     };
 
-    enum IceState {
-        IceStateNew = 1,
-        IceStateGathering = 2,
-        IceStateWaiting = 3,
-        IceStateChecking = 4,
-        IceStateConnected = 5,
-        IceStateCompleted = 6,
-        IceStateFailed = 7,
-        IceStateClosed = 8
+    enum IceConnectionState {
+        IceConnectionStateNew = 1,
+        IceConnectionStateChecking = 2,
+        IceConnectionStateConnected = 3,
+        IceConnectionStateCompleted = 4,
+        IceConnectionStateFailed = 5,
+        IceConnectionStateDisconnected = 6,
+        IceConnectionStateClosed = 7
+    };
+
+    enum IceGatheringState {
+        IceGatheringStateNew = 1,
+        IceGatheringStateGathering = 2,
+        IceGatheringStateComplete = 3
     };
 
     virtual ~RTCPeerConnectionHandlerClient() { }
 
     virtual void negotiationNeeded() = 0;
     virtual void didGenerateIceCandidate(PassRefPtr<RTCIceCandidateDescriptor>) = 0;
-    virtual void didChangeReadyState(ReadyState) = 0;
-    virtual void didChangeIceState(IceState) = 0;
+    virtual void didChangeSignalingState(SignalingState) = 0;
+    virtual void didChangeIceGatheringState(IceGatheringState) = 0;
+    virtual void didChangeIceConnectionState(IceConnectionState) = 0;
     virtual void didAddRemoteStream(PassRefPtr<MediaStreamDescriptor>) = 0;
     virtual void didRemoveRemoteStream(MediaStreamDescriptor*) = 0;
-
-    // RTCDataChannel.
-    virtual void didAddRemoteDataChannel(PassRefPtr<RTCDataChannelDescriptor>) = 0;
+    virtual void didAddRemoteDataChannel(PassOwnPtr<RTCDataChannelHandler>) = 0;
 };
 
 } // namespace WebCore

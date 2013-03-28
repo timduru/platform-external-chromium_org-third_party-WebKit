@@ -65,8 +65,7 @@ PassRefPtr<ThreadableWebSocketChannel> ThreadableWebSocketChannel::create(Script
     }
 #endif // ENABLE(WORKERS)
 
-    ASSERT(context->isDocument());
-    return WebSocketChannel::create(static_cast<Document*>(context), client);
+    return WebSocketChannel::create(toDocument(context), client);
 }
 
 } // namespace WebCore

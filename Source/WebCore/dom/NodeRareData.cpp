@@ -38,30 +38,33 @@
 
 namespace WebCore {
 
+struct SameSizeAsNodeRareData {
+    unsigned m_bitfields : 20;
+    void* m_pointer[3];
+#if ENABLE(MICRODATA)
+    void* m_microData;
+#endif
+};
+
+COMPILE_ASSERT(sizeof(NodeRareData) == sizeof(SameSizeAsNodeRareData), NodeRareDataShouldStaySmall);
+
 void NodeListsNodeData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_atomicNameCaches);
-    info.addMember(m_nameCaches);
-    info.addMember(m_tagNodeListCacheNS);
+    info.addMember(m_childNodeList, "childNodeList");
+    info.addMember(m_atomicNameCaches, "atomicNameCaches");
+    info.addMember(m_nameCaches, "nameCaches");
+    info.addMember(m_tagNodeListCacheNS, "tagNodeListCacheNS");
 }
 
 void NodeRareData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_treeScope);
-    info.addMember(m_nodeLists);
-    info.addMember(m_childNodeList);
-
-#if ENABLE(MUTATION_OBSERVERS)
-    info.addMember(m_mutationObserverRegistry);
-    info.addMember(m_transientMutationObserverRegistry);
-#endif
+    info.addMember(m_nodeLists, "nodeLists");
+    info.addMember(m_mutationObserverData, "mutationObserverData");
 
 #if ENABLE(MICRODATA)
-    info.addMember(m_itemProp);
-    info.addMember(m_itemRef);
-    info.addMember(m_itemType);
+    info.addMember(m_microDataTokenLists, "microDataTokenLists");
 #endif
 }
 

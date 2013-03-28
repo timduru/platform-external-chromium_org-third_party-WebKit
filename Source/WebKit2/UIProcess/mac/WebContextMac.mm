@@ -26,20 +26,23 @@
 #import "config.h"
 #import "WebContext.h"
 
-#import "NetworkProcessManager.h"
 #import "PluginProcessManager.h"
 #import "SharedWorkerProcessManager.h"
+#import "WKBrowsingContextControllerInternal.h"
+#import "WKBrowsingContextControllerInternal.h"
 #import "WebKitSystemInterface.h"
 #import "WebProcessCreationParameters.h"
 #import "WebProcessMessages.h"
+#import <QuartzCore/CARemoteLayerServer.h>
 #import <WebCore/Color.h>
 #import <WebCore/FileSystem.h>
-#include <WebCore/NotImplemented.h>
+#import <WebCore/NotImplemented.h>
 #import <WebCore/PlatformPasteboard.h>
 #import <sys/param.h>
 
-#if HAVE(HOSTED_CORE_ANIMATION) && __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
-#import <QuartzCore/CARemoteLayerServer.h>
+#if ENABLE(NETWORK_PROCESS)
+#import "NetworkProcessCreationParameters.h"
+#import "NetworkProcessProxy.h"
 #endif
 
 using namespace WebCore;
@@ -54,9 +57,162 @@ static NSString *WebKitApplicationDidChangeAccessibilityEnhancedUserInterfaceNot
 // FIXME: <rdar://problem/9138817> - After this "backwards compatibility" radar is removed, this code should be removed to only return an empty String.
 NSString *WebIconDatabaseDirectoryDefaultsKey = @"WebIconDatabaseDirectoryDefaultsKey";
 
+static NSString * const WebKit2HTTPProxyDefaultsKey = @"WebKit2HTTPProxy";
+static NSString * const WebKit2HTTPSProxyDefaultsKey = @"WebKit2HTTPSProxy";
+
 namespace WebKit {
 
-bool WebContext::s_applicationIsOccluded = false;
+NSString *SchemeForCustomProtocolRegisteredNotificationName = @"WebKitSchemeForCustomProtocolRegisteredNotification";
+NSString *SchemeForCustomProtocolUnregisteredNotificationName = @"WebKitSchemeForCustomProtocolUnregisteredNotification";
+
+static bool s_applicationIsOccluded = false;
+static bool s_occlusionNotificationHandlersRegistered = false;
+static bool s_processSuppressionEnabledForAllContexts = true;
+
+static void registerUserDefaultsIfNeeded()
+{
+    static bool didRegister;
+    if (didRegister)
+        return;
+
+    didRegister = true;
+    NSMutableDictionary *registrationDictionary = [NSMutableDictionary dictionary];
+    
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    [registrationDictionary setObject:[NSNumber numberWithBool:YES] forKey:WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey];
+#endif
+
+    [[NSUserDefaults standardUserDefaults] registerDefaults:registrationDictionary];
+}
+
+static void updateProcessSuppressionStateOfGlobalChildProcesses()
+{
+    // The plan is to have all child processes become context specific.  This function
+    // can be removed once that is complete.
+#if ENABLE(PLUGIN_PROCESS) || ENABLE(SHARED_WORKER_PROCESS)
+    bool canEnable = WebContext::canEnableProcessSuppressionForGlobalChildProcesses();
+#endif
+#if ENABLE(PLUGIN_PROCESS)
+    PluginProcessManager::shared().setProcessSuppressionEnabled(canEnable);
+#endif
+#if ENABLE(SHARED_WORKER_PROCESS)
+    SharedWorkerProcessManager::shared().setProcessSuppressionEnabled(canEnable);
+#endif
+}
+
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+static void applicationOcclusionStateChanged()
+{
+    const Vector<WebContext*>& contexts = WebContext::allContexts();
+    for (size_t i = 0, count = contexts.size(); i < count; ++i) {
+        if (contexts[i]->processSuppressionEnabled())
+            contexts[i]->updateProcessSuppressionStateOfChildProcesses();
+    }
+
+    if (s_processSuppressionEnabledForAllContexts)
+        updateProcessSuppressionStateOfGlobalChildProcesses();
+}
+
+static void applicationBecameVisible(uint32_t, void*, uint32_t, void*, uint32_t)
+{
+    if (!s_applicationIsOccluded)
+        return;
+    s_applicationIsOccluded = false;
+    applicationOcclusionStateChanged();
+}
+
+static void applicationBecameOccluded(uint32_t, void*, uint32_t, void*, uint32_t)
+{
+    if (s_applicationIsOccluded)
+        return;
+    s_applicationIsOccluded = true;
+    applicationOcclusionStateChanged();
+}
+#endif
+
+static void registerOcclusionNotificationHandlers()
+{
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    if (!WKRegisterOcclusionNotificationHandler(WKOcclusionNotificationTypeApplicationBecameVisible, applicationBecameVisible)) {
+        WTFLogAlways("Registration of \"Application Became Visible\" notification handler failed.\n");
+        return;
+    }
+    
+    if (!WKRegisterOcclusionNotificationHandler(WKOcclusionNotificationTypeApplicationBecameOccluded, applicationBecameOccluded))
+        WTFLogAlways("Registration of \"Application Became Occluded\" notification handler failed.\n");
+#endif
+}
+
+static void unregisterOcclusionNotificationHandlers()
+{
+#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
+    if (!WKUnregisterOcclusionNotificationHandler(WKOcclusionNotificationTypeApplicationBecameOccluded, applicationBecameOccluded)) {
+        WTFLogAlways("Unregistration of \"Application Became Occluded\" notification handler failed.\n");
+        return;
+    }
+    
+    if (!WKUnregisterOcclusionNotificationHandler(WKOcclusionNotificationTypeApplicationBecameOccluded, applicationBecameVisible))
+        WTFLogAlways("Unregistration of \"Application Became Visible\" notification handler failed.\n");
+#endif
+}
+
+static void enableOcclusionNotifications()
+{
+    if (s_occlusionNotificationHandlersRegistered)
+        return;
+
+    s_occlusionNotificationHandlersRegistered = true;
+    registerOcclusionNotificationHandlers();
+}
+
+static void disableOcclusionNotifications()
+{
+    if (!s_occlusionNotificationHandlersRegistered)
+        return;
+
+    s_occlusionNotificationHandlersRegistered = false;
+    unregisterOcclusionNotificationHandlers();
+}
+
+static bool processSuppressionIsEnabledForAnyContext()
+{
+    bool result = false;
+    const Vector<WebContext*>& contexts = WebContext::allContexts();
+    for (size_t i = 0, count = contexts.size(); i < count; ++i) {
+        if (contexts[i]->processSuppressionEnabled()) {
+            result = true;
+            break;
+        }
+    }
+    return result;
+}
+
+static bool processSuppressionIsEnabledForAllContexts()
+{
+    bool result = true;
+    const Vector<WebContext*>& contexts = WebContext::allContexts();
+    for (size_t i = 0, count = contexts.size(); i < count; ++i) {
+        if (!contexts[i]->processSuppressionEnabled()) {
+            result = false;
+            break;
+        }
+    }
+    return result;
+}
+
+static bool omitProcessSuppression()
+{
+    static bool result = [[NSUserDefaults standardUserDefaults] boolForKey:@"WebKit2OmitProcessSuppression"];
+    return result;
+}
+
+void WebContext::platformInitialize()
+{
+    registerUserDefaultsIfNeeded();
+    registerNotificationObservers();
+    ASSERT(m_processSuppressionEnabled);
+    enableOcclusionNotifications();
+}
 
 String WebContext::applicationCacheDirectory()
 {
@@ -80,40 +236,21 @@ String WebContext::applicationCacheDirectory()
     return [cacheDir stringByAppendingPathComponent:appName];
 }
 
-static void registerUserDefaultsIfNeeded()
-{
-    static bool didRegister;
-    if (didRegister)
-        return;
-
-    didRegister = true;
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-    [[NSUserDefaults standardUserDefaults] registerDefaults:[NSDictionary dictionaryWithObject:[NSNumber numberWithBool:YES] forKey:WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey]];
-#endif
-}
-
 void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& parameters)
 {
     parameters.presenterApplicationPid = getpid();
-
-    parameters.parentProcessName = [[NSProcessInfo processInfo] processName];    
 
     NSURLCache *urlCache = [NSURLCache sharedURLCache];
     parameters.nsURLCacheMemoryCapacity = [urlCache memoryCapacity];
     parameters.nsURLCacheDiskCapacity = [urlCache diskCapacity];
 
-    registerUserDefaultsIfNeeded();
 #if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
     parameters.shouldForceScreenFontSubstitution = [[NSUserDefaults standardUserDefaults] boolForKey:@"NSFontDefaultScreenFontSubstitutionEnabled"];
 #endif
     parameters.shouldEnableKerningAndLigaturesByDefault = [[NSUserDefaults standardUserDefaults] boolForKey:WebKitKerningAndLigaturesEnabledByDefaultDefaultsKey];
 
 #if USE(ACCELERATED_COMPOSITING) && HAVE(HOSTED_CORE_ANIMATION)
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1070
     mach_port_t renderServerPort = [[CARemoteLayerServer sharedServer] serverPort];
-#else
-    mach_port_t renderServerPort = WKInitializeRenderServer();
-#endif
     if (renderServerPort != MACH_PORT_NULL)
         parameters.acceleratedCompositingPort = CoreIPC::MachPort(renderServerPort, MACH_MSG_TYPE_COPY_SEND);
 #endif
@@ -123,16 +260,38 @@ void WebContext::platformInitializeWebProcess(WebProcessCreationParameters& para
     SandboxExtension::createHandle(parameters.uiProcessBundleResourcePath, SandboxExtension::ReadOnly, parameters.uiProcessBundleResourcePathExtensionHandle);
 
     parameters.uiProcessBundleIdentifier = String([[NSBundle mainBundle] bundleIdentifier]);
-    
-    // Listen for enhanced accessibility changes and propagate them to the WebProcess.
-    m_enhancedAccessibilityObserver = [[NSNotificationCenter defaultCenter] addObserverForName:WebKitApplicationDidChangeAccessibilityEnhancedUserInterfaceNotification object:nil queue:[NSOperationQueue currentQueue] usingBlock:^(NSNotification *note) {
-        setEnhancedAccessibility([[[note userInfo] objectForKey:@"AXEnhancedUserInterface"] boolValue]);
-    }];
+
+#if ENABLE(NETWORK_PROCESS)
+    if (!m_usesNetworkProcess) {
+#endif
+        for (NSString *scheme in [WKBrowsingContextController customSchemes])
+            parameters.urlSchemesRegisteredForCustomProtocols.append(scheme);
+#if ENABLE(NETWORK_PROCESS)
+    }
+#endif
 }
+
+#if ENABLE(NETWORK_PROCESS)
+void WebContext::platformInitializeNetworkProcess(NetworkProcessCreationParameters& parameters)
+{
+    NSURLCache *urlCache = [NSURLCache sharedURLCache];
+    parameters.nsURLCacheMemoryCapacity = [urlCache memoryCapacity];
+    parameters.nsURLCacheDiskCapacity = [urlCache diskCapacity];
+
+    parameters.parentProcessName = [[NSProcessInfo processInfo] processName];
+    parameters.uiProcessBundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+
+    for (NSString *scheme in [WKBrowsingContextController customSchemes])
+        parameters.urlSchemesRegisteredForCustomProtocols.append(scheme);
+
+    parameters.httpProxy = [[NSUserDefaults standardUserDefaults] stringForKey:WebKit2HTTPProxyDefaultsKey];
+    parameters.httpsProxy = [[NSUserDefaults standardUserDefaults] stringForKey:WebKit2HTTPSProxyDefaultsKey];
+}
+#endif
 
 void WebContext::platformInvalidateContext()
 {
-    [[NSNotificationCenter defaultCenter] removeObserver:(id)m_enhancedAccessibilityObserver.get()];
+    unregisterNotificationObservers();
 }
 
 String WebContext::platformDefaultDiskCacheDirectory() const
@@ -263,72 +422,85 @@ void WebContext::setPasteboardBufferForType(const String& pasteboardName, const 
     PlatformPasteboard(pasteboardName).setBufferForType(buffer, pasteboardType);
 }
 
-void WebContext::applicationBecameVisible(uint32_t, void*, uint32_t, void*, uint32_t)
+void WebContext::setProcessSuppressionEnabled(bool enabled)
 {
-    if (s_applicationIsOccluded) {
-        s_applicationIsOccluded = false;
-
-        const Vector<WebContext*>& contexts = WebContext::allContexts();
-        for (size_t i = 0, count = contexts.size(); i < count; ++i)
-            contexts[i]->sendToAllProcesses(Messages::WebProcess::SetApplicationIsOccluded(false));
-
-#if ENABLE(PLUGIN_PROCESS)
-        PluginProcessManager::shared().setApplicationIsOccluded(false);
-#endif
-#if ENABLE(NETWORK_PROCESS)
-        NetworkProcessManager::shared().setApplicationIsOccluded(false);
-#endif
-#if ENABLE(SHARED_WORKER_PROCESS)
-        SharedWorkerProcessManager::shared().setApplicationIsOccluded(false);
-#endif
-    }
-}
-
-void WebContext::applicationBecameOccluded(uint32_t, void*, uint32_t, void*, uint32_t)
-{
-    if (!s_applicationIsOccluded) {
-        s_applicationIsOccluded = true;
-        const Vector<WebContext*>& contexts = WebContext::allContexts();
-        for (size_t i = 0, count = contexts.size(); i < count; ++i)
-            contexts[i]->sendToAllProcesses(Messages::WebProcess::SetApplicationIsOccluded(true));
-
-#if ENABLE(PLUGIN_PROCESS)
-        PluginProcessManager::shared().setApplicationIsOccluded(true);
-#endif
-#if ENABLE(NETWORK_PROCESS)
-        NetworkProcessManager::shared().setApplicationIsOccluded(true);
-#endif
-#if ENABLE(SHARED_WORKER_PROCESS)
-        SharedWorkerProcessManager::shared().setApplicationIsOccluded(true);
-#endif
-    }
-}
-
-void WebContext::initializeProcessSuppressionSupport()
-{
-    static bool didInitialize = false;
-    if (didInitialize)
+    if (m_processSuppressionEnabled == enabled)
         return;
-
-    didInitialize = true;
-    // A temporary default until process suppression is enabled by default, at which point a context setting can be added with the
-    // interpretation that any context disabling process suppression disables it for plugin/network and shared worker processes.
-    bool processSuppressionSupportEnabled = [[NSUserDefaults standardUserDefaults] boolForKey:@"WebKitProcessSuppressionSupportEnabled"];
-    if (processSuppressionSupportEnabled)
-        registerOcclusionNotificationHandlers();
+    m_processSuppressionEnabled = enabled;
+    processSuppressionEnabledChanged();
 }
 
-void WebContext::registerOcclusionNotificationHandlers()
+void WebContext::updateProcessSuppressionStateOfChildProcesses()
 {
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1090
-    if (!WKRegisterOcclusionNotificationHandler(WKOcclusionNotificationTypeApplicationBecameVisible, applicationBecameVisible)) {
-        WTFLogAlways("Registeration of \"App Became Visible\" notification handler failed.\n");
-        return;
-    }
-
-    if (!WKRegisterOcclusionNotificationHandler(WKOcclusionNotificationTypeApplicationBecameOccluded, applicationBecameOccluded))
-        WTFLogAlways("Registeration of \"App Became Occluded\" notification handler failed.\n");
+#if ENABLE(NETWORK_PROCESS)
+    bool canEnable = canEnableProcessSuppressionForNetworkProcess();
+    if (usesNetworkProcess() && networkProcess())
+        networkProcess()->setProcessSuppressionEnabled(canEnable);
 #endif
+    size_t processCount = m_processes.size();
+    for (size_t i = 0; i < processCount; ++i) {
+        WebProcessProxy* process = m_processes[i].get();
+        process->updateProcessSuppressionState();
+    }
+}
+
+bool WebContext::canEnableProcessSuppressionForNetworkProcess() const
+{
+    return s_applicationIsOccluded && m_processSuppressionEnabled && !omitProcessSuppression();
+}
+
+bool WebContext::canEnableProcessSuppressionForWebProcess(const WebKit::WebProcessProxy *webProcess) const
+{
+    return (s_applicationIsOccluded || webProcess->allPagesAreProcessSuppressible())
+           && m_processSuppressionEnabled && !omitProcessSuppression();
+}
+
+bool WebContext::canEnableProcessSuppressionForGlobalChildProcesses()
+{
+    return s_applicationIsOccluded && s_processSuppressionEnabledForAllContexts && !omitProcessSuppression();
+}
+
+void WebContext::processSuppressionEnabledChanged()
+{
+    updateProcessSuppressionStateOfChildProcesses();
+
+    if (processSuppressionIsEnabledForAnyContext())
+        enableOcclusionNotifications();
+    else
+        disableOcclusionNotifications();
+
+    bool newProcessSuppressionEnabledForAllContexts = processSuppressionIsEnabledForAllContexts();
+    if (s_processSuppressionEnabledForAllContexts != newProcessSuppressionEnabledForAllContexts) {
+        s_processSuppressionEnabledForAllContexts = newProcessSuppressionEnabledForAllContexts;
+        updateProcessSuppressionStateOfGlobalChildProcesses();
+    }
+}
+
+void WebContext::registerNotificationObservers()
+{
+    m_customSchemeRegisteredObserver = [[NSNotificationCenter defaultCenter] addObserverForName:WebKit::SchemeForCustomProtocolRegisteredNotificationName object:nil queue:[NSOperationQueue currentQueue] usingBlock:^(NSNotification *notification) {
+        NSString *scheme = [notification object];
+        ASSERT([scheme isKindOfClass:[NSString class]]);
+        registerSchemeForCustomProtocol(scheme);
+    }];
+    
+    m_customSchemeUnregisteredObserver = [[NSNotificationCenter defaultCenter] addObserverForName:WebKit::SchemeForCustomProtocolUnregisteredNotificationName object:nil queue:[NSOperationQueue currentQueue] usingBlock:^(NSNotification *notification) {
+        NSString *scheme = [notification object];
+        ASSERT([scheme isKindOfClass:[NSString class]]);
+        unregisterSchemeForCustomProtocol(scheme);
+    }];
+    
+    // Listen for enhanced accessibility changes and propagate them to the WebProcess.
+    m_enhancedAccessibilityObserver = [[NSNotificationCenter defaultCenter] addObserverForName:WebKitApplicationDidChangeAccessibilityEnhancedUserInterfaceNotification object:nil queue:[NSOperationQueue currentQueue] usingBlock:^(NSNotification *note) {
+        setEnhancedAccessibility([[[note userInfo] objectForKey:@"AXEnhancedUserInterface"] boolValue]);
+    }];
+}
+
+void WebContext::unregisterNotificationObservers()
+{
+    [[NSNotificationCenter defaultCenter] removeObserver:(id)m_customSchemeRegisteredObserver.get()];
+    [[NSNotificationCenter defaultCenter] removeObserver:(id)m_customSchemeUnregisteredObserver.get()];
+    [[NSNotificationCenter defaultCenter] removeObserver:(id)m_enhancedAccessibilityObserver.get()];
 }
 
 } // namespace WebKit

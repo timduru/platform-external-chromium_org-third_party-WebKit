@@ -32,6 +32,7 @@
 #include "PagePopupController.h"
 
 #if ENABLE(PAGE_POPUP)
+#include "HistogramSupport.h"
 #include "PagePopupClient.h"
 #include "PlatformLocale.h"
 
@@ -54,6 +55,18 @@ void PagePopupController::setValueAndClosePopup(int numValue, const String& stri
         m_popupClient->setValueAndClosePopup(numValue, stringValue);
 }
 
+void PagePopupController::setValue(const String& value)
+{
+    if (m_popupClient)
+        m_popupClient->setValue(value);
+}
+
+void PagePopupController::closePopup()
+{
+    if (m_popupClient)
+        m_popupClient->closePopup();
+}
+
 String PagePopupController::localizeNumberString(const String& numberString)
 {
     if (m_popupClient)
@@ -61,9 +74,34 @@ String PagePopupController::localizeNumberString(const String& numberString)
     return numberString;
 }
 
+#if ENABLE(CALENDAR_PICKER)
+String PagePopupController::formatMonth(int year, int zeroBaseMonth)
+{
+    if (!m_popupClient)
+        return emptyString();
+    DateComponents date;
+    date.setMonthsSinceEpoch((year - 1970) * 12.0 + zeroBaseMonth);
+    return m_popupClient->locale().formatDateTime(date, Locale::FormatTypeMedium);
+}
+
+String PagePopupController::formatShortMonth(int year, int zeroBaseMonth)
+{
+    if (!m_popupClient)
+        return emptyString();
+    DateComponents date;
+    date.setMonthsSinceEpoch((year - 1970) * 12.0 + zeroBaseMonth);
+    return m_popupClient->locale().formatDateTime(date, Locale::FormatTypeShort);
+}
+#endif
+
 void PagePopupController::clearPagePopupClient()
 {
     m_popupClient = 0;
+}
+
+void PagePopupController::histogramEnumeration(const String& name, int sample, int boundaryValue)
+{
+    HistogramSupport::histogramEnumeration(name.utf8().data(), sample, boundaryValue);
 }
 
 }

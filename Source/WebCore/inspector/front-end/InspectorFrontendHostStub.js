@@ -95,11 +95,6 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         return undefined;
     },
 
-    hiddenPanels: function()
-    {
-        return WebInspector.queryParamsObject["hiddenPanels"] || "";
-    },
-
     inspectedURLChanged: function(url)
     {
         document.title = WebInspector.UIString(Preferences.applicationTitle, url);
@@ -195,13 +190,35 @@ WebInspector.InspectorFrontendHostStub.prototype = {
         return loadXHR(url);
     },
 
+    supportsFileSystems: function()
+    {
+        return false;
+    },
+
+    requestFileSystems: function()
+    {
+    },
+
+    addFileSystem: function()
+    {
+    },
+
+    removeFileSystem: function(fileSystemPath)
+    {
+    },
+
+    isolatedFileSystem: function(fileSystemId, registeredName)
+    {
+        return null;
+    },
+
     setZoomFactor: function(zoom)
     {
     },
 
-    canInspectWorkers: function()
+    isUnderTest: function()
     {
-        return true;
+        return false;
     }
 }
 

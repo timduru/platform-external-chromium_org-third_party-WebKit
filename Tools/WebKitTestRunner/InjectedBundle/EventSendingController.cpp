@@ -247,14 +247,8 @@ void EventSendingController::scheduleAsynchronousClick()
     WKBundlePostMessage(InjectedBundle::shared().bundle(), EventSenderMessageName.get(), mouseUpMessageBody.get());
 }
 
-void EventSendingController::keyDown(JSStringRef key, JSValueRef modifierArray, int location)
+static WKRetainPtr<WKMutableDictionaryRef> createKeyDownMessageBody(JSStringRef key, WKEventModifiers modifiers, int location)
 {
-    WKBundlePageRef page = InjectedBundle::shared().page()->page();
-    WKBundleFrameRef frame = WKBundlePageGetMainFrame(page);
-    JSContextRef context = WKBundleFrameGetJavaScriptContext(frame);
-    WKEventModifiers modifiers = parseModifierArray(context, modifierArray);
-
-    WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
     WKRetainPtr<WKMutableDictionaryRef> EventSenderMessageBody(AdoptWK, WKMutableDictionaryCreate());
 
     WKRetainPtr<WKStringRef> subMessageKey(AdoptWK, WKStringCreateWithUTF8CString("SubMessage"));
@@ -272,7 +266,28 @@ void EventSendingController::keyDown(JSStringRef key, JSValueRef modifierArray, 
     WKRetainPtr<WKUInt64Ref> locationRef(AdoptWK, WKUInt64Create(location));
     WKDictionaryAddItem(EventSenderMessageBody.get(), locationKey.get(), locationRef.get());
 
-    WKBundlePostSynchronousMessage(InjectedBundle::shared().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+    return EventSenderMessageBody;
+}
+
+void EventSendingController::keyDown(JSStringRef key, JSValueRef modifierArray, int location)
+{
+    WKBundlePageRef page = InjectedBundle::shared().page()->page();
+    WKBundleFrameRef frame = WKBundlePageGetMainFrame(page);
+    JSContextRef context = WKBundleFrameGetJavaScriptContext(frame);
+    WKEventModifiers modifiers = parseModifierArray(context, modifierArray);
+
+    WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
+    WKRetainPtr<WKMutableDictionaryRef> keyDownMessageBody = createKeyDownMessageBody(key, modifiers, location);
+
+    WKBundlePostSynchronousMessage(InjectedBundle::shared().bundle(), EventSenderMessageName.get(), keyDownMessageBody.get(), 0);
+}
+
+void EventSendingController::scheduleAsynchronousKeyDown(JSStringRef key)
+{
+    WKRetainPtr<WKStringRef> EventSenderMessageName(AdoptWK, WKStringCreateWithUTF8CString("EventSender"));
+    WKRetainPtr<WKMutableDictionaryRef> keyDownMessageBody = createKeyDownMessageBody(key, 0 /* modifiers */, 0 /* location */);
+
+    WKBundlePostMessage(InjectedBundle::shared().bundle(), EventSenderMessageName.get(), keyDownMessageBody.get());
 }
 
 void EventSendingController::mouseScrollBy(int x, int y)
@@ -317,6 +332,37 @@ void EventSendingController::continuousMouseScrollBy(int x, int y, bool paged)
     WKDictionaryAddItem(EventSenderMessageBody.get(), pagedKey.get(), pagedRef.get());
 
     WKBundlePostSynchronousMessage(InjectedBundle::shared().bundle(), EventSenderMessageName.get(), EventSenderMessageBody.get(), 0);
+}
+
+JSValueRef EventSendingController::contextClick()
+{
+    WKBundlePageRef page = InjectedBundle::shared().page()->page();
+    WKBundleFrameRef mainFrame = WKBundlePageGetMainFrame(page);
+    JSContextRef context = WKBundleFrameGetJavaScriptContext(mainFrame);
+#if ENABLE(CONTEXT_MENUS)
+    // Do mouse context click.
+    mouseDown(2, 0);
+    mouseUp(2, 0);
+
+    WKRetainPtr<WKArrayRef> entriesNames = adoptWK(WKBundlePageCopyContextMenuItemTitles(page));
+    JSRetainPtr<JSStringRef> jsPropertyName(Adopt, JSStringCreateWithUTF8CString("title"));
+    size_t entriesSize = WKArrayGetSize(entriesNames.get());
+    OwnArrayPtr<JSValueRef> jsValuesArray = adoptArrayPtr(new JSValueRef[entriesSize]);
+    for (size_t i = 0; i < entriesSize; ++i) {
+        ASSERT(WKGetTypeID(WKArrayGetItemAtIndex(entriesNames.get(), i)) == WKStringGetTypeID());
+
+        WKStringRef wkEntryName = static_cast<WKStringRef>(WKArrayGetItemAtIndex(entriesNames.get(), i));
+        JSObjectRef jsItemObject = JSObjectMake(context, /* JSClassRef */0, /* privData */0);
+        JSRetainPtr<JSStringRef> jsNameCopy(Adopt, WKStringCopyJSString(wkEntryName));
+        JSValueRef jsEntryName = JSValueMakeString(context, jsNameCopy.get());
+        JSObjectSetProperty(context, jsItemObject, jsPropertyName.get(), jsEntryName, kJSPropertyAttributeReadOnly, 0);
+        jsValuesArray[i] = jsItemObject;
+    }
+
+    return JSObjectMakeArray(context, entriesSize, jsValuesArray.get(), 0);
+#else
+    return JSValueMakeUndefined(context);
+#endif
 }
 
 #ifdef USE_WEBPROCESS_EVENT_SIMULATION

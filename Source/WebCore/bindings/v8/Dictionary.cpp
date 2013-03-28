@@ -30,6 +30,7 @@
 #include "DOMStringList.h"
 #include "V8Binding.h"
 #include "V8DOMWindow.h"
+#include "V8EventTarget.h"
 #include "V8Storage.h"
 #include "V8Uint8Array.h"
 #include "V8Utilities.h"
@@ -56,6 +57,17 @@
 #include "V8SpeechRecognitionError.h"
 #include "V8SpeechRecognitionResult.h"
 #include "V8SpeechRecognitionResultList.h"
+#endif
+
+#if ENABLE(MEDIA_STREAM)
+#include "MediaStream.h"
+#include "V8MediaStream.h"
+#endif
+
+#if ENABLE(FONT_LOAD_EVENTS)
+#include "V8CSSFontFaceRule.h"
+#include "V8DOMError.h"
+#include "V8VoidCallback.h"
 #endif
 
 namespace WebCore {
@@ -102,7 +114,9 @@ bool Dictionary::getKey(const String& key, v8::Local<v8::Value>& value) const
     v8::Local<v8::Object> options = m_options->ToObject();
     ASSERT(!options.IsEmpty());
 
-    v8::Handle<v8::String> v8Key = v8String(key);
+    ASSERT(m_isolate);
+    ASSERT(m_isolate == v8::Isolate::GetCurrent());
+    v8::Handle<v8::String> v8Key = v8String(key, m_isolate);
     if (!options->Has(v8Key))
         return false;
     value = options->Get(v8Key);
@@ -213,6 +227,19 @@ bool Dictionary::get(const String& key, unsigned& value) const
     return true;
 }
 
+bool Dictionary::get(const String& key, unsigned long& value) const
+{
+    v8::Local<v8::Value> v8Value;
+    if (!getKey(key, v8Value))
+        return false;
+
+    v8::Local<v8::Integer> v8Integer = v8Value->ToInteger();
+    if (v8Integer.IsEmpty())
+        return false;
+    value = static_cast<unsigned long>(v8Integer->Value());
+    return true;
+}
+
 bool Dictionary::get(const String& key, unsigned long long& value) const
 {
     v8::Local<v8::Value> v8Value;
@@ -233,14 +260,15 @@ bool Dictionary::get(const String& key, RefPtr<DOMWindow>& value) const
     if (!getKey(key, v8Value))
         return false;
 
-    DOMWindow* source = 0;
+    // We need to handle a DOMWindow specially, because a DOMWindow wrapper
+    // exists on a prototype chain of v8Value.
+    value = 0;
     if (v8Value->IsObject()) {
         v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
-        v8::Handle<v8::Object> window = V8DOMWrapper::lookupDOMWrapper(V8DOMWindow::GetTemplate(), wrapper);
+        v8::Handle<v8::Object> window = wrapper->FindInstanceInPrototypeChain(V8DOMWindow::GetTemplate(m_isolate, worldTypeInMainThread(m_isolate)));
         if (!window.IsEmpty())
-            source = V8DOMWindow::toNative(window);
+            value = V8DOMWindow::toNative(window);
     }
-    value = source;
     return true;
 }
 
@@ -250,14 +278,9 @@ bool Dictionary::get(const String& key, RefPtr<Storage>& value) const
     if (!getKey(key, v8Value))
         return false;
 
-    Storage* source = 0;
-    if (v8Value->IsObject()) {
-        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
-        v8::Handle<v8::Object> storage = V8DOMWrapper::lookupDOMWrapper(V8Storage::GetTemplate(), wrapper);
-        if (!storage.IsEmpty())
-            source = V8Storage::toNative(storage);
-    }
-    value = source;
+    value = 0;
+    if (V8Storage::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
+        value = V8Storage::toNative(v8::Handle<v8::Object>::Cast(v8Value));
     return true;
 }
 
@@ -282,9 +305,11 @@ bool Dictionary::get(const String& key, HashSet<AtomicString>& value) const
     if (!v8Value->IsArray())
         return false;
 
+    ASSERT(m_isolate);
+    ASSERT(m_isolate == v8::Isolate::GetCurrent());
     v8::Local<v8::Array> v8Array = v8::Local<v8::Array>::Cast(v8Value);
     for (size_t i = 0; i < v8Array->Length(); ++i) {
-        v8::Local<v8::Value> indexedValue = v8Array->Get(v8Integer(i));
+        v8::Local<v8::Value> indexedValue = v8Array->Get(v8Integer(i, m_isolate));
         value.add(toWebCoreString(indexedValue));
     }
 
@@ -311,15 +336,9 @@ bool Dictionary::get(const String& key, RefPtr<Uint8Array>& value) const
     if (!getKey(key, v8Value))
         return false;
 
-    Uint8Array* source = 0;
-    if (v8Value->IsObject()) {
-        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
-
-        v8::Handle<v8::Object> array = V8DOMWrapper::lookupDOMWrapper(V8Uint8Array::GetTemplate(), wrapper);
-        if (!array.IsEmpty())
-            source = V8Uint8Array::toNative(array);
-    }
-    value = source;
+    value = 0;
+    if (V8Uint8Array::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
+        value = V8Uint8Array::toNative(v8::Handle<v8::Object>::Cast(v8Value));
     return true;
 }
 
@@ -330,15 +349,9 @@ bool Dictionary::get(const String& key, RefPtr<MediaKeyError>& value) const
     if (!getKey(key, v8Value))
         return false;
 
-    MediaKeyError* source = 0;
-    if (v8Value->IsObject()) {
-        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
-
-        v8::Handle<v8::Object> error = V8DOMWrapper::lookupDOMWrapper(V8MediaKeyError::GetTemplate(), wrapper);
-        if (!error.IsEmpty())
-            source = V8MediaKeyError::toNative(error);
-    }
-    value = source;
+    value = 0;
+    if (V8MediaKeyError::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
+        value = V8MediaKeyError::toNative(v8::Handle<v8::Object>::Cast(v8Value));
     return true;
 }
 #endif
@@ -356,7 +369,7 @@ bool Dictionary::get(const String& key, RefPtr<TrackBase>& value) const
 
         // FIXME: this will need to be changed so it can also return an AudioTrack or a VideoTrack once
         // we add them.
-        v8::Handle<v8::Object> track = V8DOMWrapper::lookupDOMWrapper(V8TextTrack::GetTemplate(), wrapper);
+        v8::Handle<v8::Object> track = wrapper->FindInstanceInPrototypeChain(V8TextTrack::GetTemplate(m_isolate, worldType(m_isolate)));
         if (!track.IsEmpty())
             source = V8TextTrack::toNative(track);
     }
@@ -372,14 +385,9 @@ bool Dictionary::get(const String& key, RefPtr<SpeechRecognitionError>& value) c
     if (!getKey(key, v8Value))
         return false;
 
-    SpeechRecognitionError* source = 0;
-    if (v8Value->IsObject()) {
-        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
-        v8::Handle<v8::Object> speechRecognitionError = V8DOMWrapper::lookupDOMWrapper(V8SpeechRecognitionError::GetTemplate(), wrapper);
-        if (!speechRecognitionError.IsEmpty())
-            source = V8SpeechRecognitionError::toNative(speechRecognitionError);
-    }
-    value = source;
+    value = 0;
+    if (V8SpeechRecognitionError::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
+        value = V8SpeechRecognitionError::toNative(v8::Handle<v8::Object>::Cast(v8Value));
     return true;
 }
 
@@ -389,14 +397,9 @@ bool Dictionary::get(const String& key, RefPtr<SpeechRecognitionResult>& value) 
     if (!getKey(key, v8Value))
         return false;
 
-    SpeechRecognitionResult* source = 0;
-    if (v8Value->IsObject()) {
-        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
-        v8::Handle<v8::Object> speechRecognitionResult = V8DOMWrapper::lookupDOMWrapper(V8SpeechRecognitionResult::GetTemplate(), wrapper);
-        if (!speechRecognitionResult.IsEmpty())
-            source = V8SpeechRecognitionResult::toNative(speechRecognitionResult);
-    }
-    value = source;
+    value = 0;
+    if (V8SpeechRecognitionResult::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
+        value = V8SpeechRecognitionResult::toNative(v8::Handle<v8::Object>::Cast(v8Value));
     return true;
 }
 
@@ -406,18 +409,52 @@ bool Dictionary::get(const String& key, RefPtr<SpeechRecognitionResultList>& val
     if (!getKey(key, v8Value))
         return false;
 
-    SpeechRecognitionResultList* source = 0;
-    if (v8Value->IsObject()) {
-        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
-        v8::Handle<v8::Object> speechRecognitionResultList = V8DOMWrapper::lookupDOMWrapper(V8SpeechRecognitionResultList::GetTemplate(), wrapper);
-        if (!speechRecognitionResultList.IsEmpty())
-            source = V8SpeechRecognitionResultList::toNative(speechRecognitionResultList);
-    }
-    value = source;
+    value = 0;
+    if (V8SpeechRecognitionResultList::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
+        value = V8SpeechRecognitionResultList::toNative(v8::Handle<v8::Object>::Cast(v8Value));
     return true;
 }
 
 #endif
+
+#if ENABLE(MEDIA_STREAM)
+bool Dictionary::get(const String& key, RefPtr<MediaStream>& value) const
+{
+    v8::Local<v8::Value> v8Value;
+    if (!getKey(key, v8Value))
+        return false;
+
+    value = 0;
+    if (V8MediaStream::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
+        value = V8MediaStream::toNative(v8::Handle<v8::Object>::Cast(v8Value));
+    return true;
+}
+#endif
+
+bool Dictionary::get(const String& key, RefPtr<EventTarget>& value) const
+{
+    v8::Local<v8::Value> v8Value;
+    if (!getKey(key, v8Value))
+        return false;
+
+    value = 0;
+    // We need to handle a DOMWindow specially, because a DOMWindow wrapper
+    // exists on a prototype chain of v8Value.
+    if (v8Value->IsObject()) {
+        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
+        v8::Handle<v8::Object> window = wrapper->FindInstanceInPrototypeChain(V8DOMWindow::GetTemplate(m_isolate, worldTypeInMainThread(m_isolate)));
+        if (!window.IsEmpty()) {
+            value = toWrapperTypeInfo(window)->toEventTarget(window);
+            return true;
+        }
+    }
+
+    if (V8DOMWrapper::isDOMWrapper(v8Value)) {
+        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
+        value = toWrapperTypeInfo(wrapper)->toEventTarget(wrapper);
+    }
+    return true;
+}
 
 bool Dictionary::get(const String& key, Dictionary& value) const
 {
@@ -466,6 +503,55 @@ bool Dictionary::get(const String& key, ArrayValue& value) const
     value = ArrayValue(v8::Local<v8::Array>::Cast(v8Value), m_isolate);
     return true;
 }
+
+#if ENABLE(FONT_LOAD_EVENTS)
+bool Dictionary::get(const String& key, RefPtr<CSSFontFaceRule>& value) const
+{
+    v8::Local<v8::Value> v8Value;
+    if (!getKey(key, v8Value))
+        return false;
+
+    CSSFontFaceRule* source = 0;
+    if (v8Value->IsObject()) {
+        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
+        v8::Handle<v8::Object> fontface = wrapper->FindInstanceInPrototypeChain(V8CSSFontFaceRule::GetTemplate(m_isolate, worldType(m_isolate)));
+        if (!fontface.IsEmpty())
+            source = V8CSSFontFaceRule::toNative(fontface);
+    }
+    value = source;
+    return true;
+}
+
+bool Dictionary::get(const String& key, RefPtr<DOMError>& value) const
+{
+    v8::Local<v8::Value> v8Value;
+    if (!getKey(key, v8Value))
+        return false;
+
+    DOMError* error = 0;
+    if (v8Value->IsObject()) {
+        v8::Handle<v8::Object> wrapper = v8::Handle<v8::Object>::Cast(v8Value);
+        v8::Handle<v8::Object> domError = wrapper->FindInstanceInPrototypeChain(V8DOMError::GetTemplate(m_isolate, worldType(m_isolate)));
+        if (!domError.IsEmpty())
+            error = V8DOMError::toNative(domError);
+    }
+    value = error;
+    return true;
+}
+
+bool Dictionary::get(const String& key, RefPtr<VoidCallback>& value) const
+{
+    v8::Local<v8::Value> v8Value;
+    if (!getKey(key, v8Value))
+        return false;
+
+    if (!v8Value->IsFunction())
+        return false;
+
+    value = V8VoidCallback::create(v8Value, getScriptExecutionContext());
+    return true;
+}
+#endif
 
 bool Dictionary::getOwnPropertiesAsStringHashMap(HashMap<String, String>& hashMap) const
 {

@@ -12,26 +12,13 @@ INCLUDEPATH += \
     $$SOURCE_DIR/qt/WebCoreSupport \
     $$ROOT_WEBKIT_DIR/Source/WTF/wtf/qt
 
-enable?(DEVICE_ORIENTATION)|enable?(ORIENTATION_EVENTS) {
-    QT += sensors
-}
+have?(qtsensors):if(enable?(DEVICE_ORIENTATION)|enable?(ORIENTATION_EVENTS)): QT += sensors
 
-enable?(GEOLOCATION): QT += location
-
-use?(QT_MULTIMEDIA): QT *= multimediawidgets
+have?(qtlocation):enable?(GEOLOCATION): QT += location
 
 contains(CONFIG, texmap): DEFINES += WTF_USE_TEXTURE_MAPPER=1
 
 use?(PLUGIN_BACKEND_XLIB): PKGCONFIG += x11
 
-QT += network widgets
-have?(QTQUICK): QT += quick
-have?(QTPRINTSUPPORT): QT += printsupport
-
-use?(TEXTURE_MAPPER_GL)|enable?(WEBGL) {
-    QT *= opengl
-    # Make sure OpenGL libs are after the webcore lib so MinGW can resolve symbols
-    win32*:!win32-msvc*: LIBS += $$QMAKE_LIBS_OPENGL
-}
-
+QT += network
 

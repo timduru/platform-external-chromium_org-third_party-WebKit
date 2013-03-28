@@ -38,6 +38,8 @@ QT_BEGIN_NAMESPACE
 class QUrl;
 QT_END_NAMESPACE
 
+QWEBKIT_EXPORT void qt_networkAccessAllowed(bool isAllowed);
+
 class QWEBKIT_EXPORT QWebSettings {
 public:
     enum FontFamily {
@@ -78,11 +80,13 @@ public:
         JavascriptCanCloseWindows,
         WebGLEnabled,
         CSSRegionsEnabled,
+        CSSCompositingEnabled,
         HyperlinkAuditingEnabled,
         CSSGridLayoutEnabled,
         ScrollAnimatorEnabled,
         CaretBrowsingEnabled,
-        NotificationsEnabled
+        NotificationsEnabled,
+        WebAudioEnabled
     };
     enum WebGraphic {
         MissingImageGraphic,
@@ -163,6 +167,7 @@ public:
     inline QWebSettingsPrivate* handle() const { return d; }
 
 private:
+    friend class QWebPageAdapter;
     friend class QWebPagePrivate;
     friend class QWebSettingsPrivate;
 

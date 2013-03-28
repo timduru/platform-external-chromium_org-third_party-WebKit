@@ -54,13 +54,15 @@ TextFieldDecorator::~TextFieldDecorator()
 
 // TextFieldDecorationElement ----------------------------------------------------------------
 
+// FIXME: This class is only used in Chromium, and has no layout tests!!
+
 TextFieldDecorationElement::TextFieldDecorationElement(Document* document, TextFieldDecorator* decorator)
     : HTMLDivElement(HTMLNames::divTag, document)
     , m_textFieldDecorator(decorator)
     , m_isInHoverState(false)
 {
     ASSERT(decorator);
-    setHasCustomCallbacks();
+    setHasCustomStyleCallbacks();
 }
 
 PassRefPtr<TextFieldDecorationElement> TextFieldDecorationElement::create(Document* document, TextFieldDecorator* decorator)
@@ -89,8 +91,13 @@ static inline void getDecorationRootAndDecoratedRoot(HTMLInputElement* input, Sh
     }
     if (newRoot)
         newRoot->removeChild(newRoot->firstChild());
-    else
-        newRoot = ShadowRoot::create(input, ShadowRoot::UserAgentShadowRoot, ASSERT_NO_EXCEPTION).get();
+    else {
+        // FIXME: This interacts really badly with author shadow roots because now
+        // we can interleave user agent and author shadow roots on the element meaning
+        // input.shadowRoot may be inaccessible if the browser has decided to decorate
+        // the input.
+        newRoot = input->ensureShadow()->addShadowRoot(input, ShadowRoot::UserAgentShadowRoot);
+    }
     decorationRoot = newRoot;
     decoratedRoot = existingRoot;
 }
@@ -105,12 +112,13 @@ void TextFieldDecorationElement::decorate(HTMLInputElement* input, bool visible)
     ASSERT(existingRoot);
     RefPtr<HTMLDivElement> box = HTMLDivElement::create(input->document());
     decorationRoot->appendChild(box);
-    box->setInlineStyleProperty(CSSPropertyDisplay, CSSValueWebkitBox);
-    box->setInlineStyleProperty(CSSPropertyWebkitBoxAlign, CSSValueCenter);
+    box->setInlineStyleProperty(CSSPropertyDisplay, CSSValueWebkitFlex);
+    box->setInlineStyleProperty(CSSPropertyWebkitAlignItems, CSSValueCenter);
     ASSERT(existingRoot->childNodeCount() == 1);
-    toHTMLElement(existingRoot->firstChild())->setInlineStyleProperty(CSSPropertyWebkitBoxFlex, 1.0, CSSPrimitiveValue::CSS_NUMBER);
+    toHTMLElement(existingRoot->firstChild())->setInlineStyleProperty(CSSPropertyWebkitFlexGrow, 1.0, CSSPrimitiveValue::CSS_NUMBER);
+#if ENABLE(SHADOW_DOM)
     box->appendChild(HTMLShadowElement::create(HTMLNames::shadowTag, input->document()));
-
+#endif
     setInlineStyleProperty(CSSPropertyDisplay, visible ? CSSValueBlock : CSSValueNone);
     box->appendChild(this);
 }
@@ -119,7 +127,7 @@ inline HTMLInputElement* TextFieldDecorationElement::hostInput()
 {
     // TextFieldDecorationElement is created only by C++ code, and it is always
     // in <input> shadow.
-    ASSERT(!shadowHost() || shadowHost()->hasTagName(inputTag));
+    ASSERT_WITH_SECURITY_IMPLICATION(!shadowHost() || shadowHost()->hasTagName(inputTag));
     return static_cast<HTMLInputElement*>(shadowHost());
 }
 
@@ -185,7 +193,7 @@ bool TextFieldDecorationElement::isMouseFocusable() const
 void TextFieldDecorationElement::defaultEventHandler(Event* event)
 {
     RefPtr<HTMLInputElement> input(hostInput());
-    if (!input || input->disabled() || input->readOnly() || !event->isMouseEvent()) {
+    if (!input || input->isDisabledOrReadOnly() || !event->isMouseEvent()) {
         if (!event->defaultHandled())
             HTMLDivElement::defaultEventHandler(event);
         return;
@@ -214,7 +222,7 @@ void TextFieldDecorationElement::defaultEventHandler(Event* event)
 bool TextFieldDecorationElement::willRespondToMouseMoveEvents()
 {
     const HTMLInputElement* input = hostInput();
-    if (!input->disabled() && !input->readOnly())
+    if (!input->isDisabledOrReadOnly())
         return true;
 
     return HTMLDivElement::willRespondToMouseMoveEvents();
@@ -223,7 +231,7 @@ bool TextFieldDecorationElement::willRespondToMouseMoveEvents()
 bool TextFieldDecorationElement::willRespondToMouseClickEvents()
 {
     const HTMLInputElement* input = hostInput();
-    if (!input->disabled() && !input->readOnly())
+    if (!input->isDisabledOrReadOnly())
         return true;
 
     return HTMLDivElement::willRespondToMouseClickEvents();

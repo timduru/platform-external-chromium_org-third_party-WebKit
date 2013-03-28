@@ -50,6 +50,7 @@
 #include <cstring>
 #include <getopt.h>
 #include <gtk/gtk.h>
+#include <locale.h>
 #include <webkit/webkit.h>
 #include <wtf/Assertions.h>
 #include <wtf/gobject/GOwnPtr.h>
@@ -173,6 +174,7 @@ static void initializeGtkFontSettings(const char* testURL)
                  "gtk-xft-antialias", 1,
                  "gtk-xft-hinting", 0,
                  "gtk-font-name", "Liberation Sans 12",
+                 "gtk-icon-theme-name", "gnome",
                  NULL);
     gdk_screen_set_resolution(gdk_screen_get_default(), 96.0);
 
@@ -243,8 +245,7 @@ static void initializeFonts(const char* testURL = 0)
     if (fontsPath.isNull())
         g_error("Could not locate test fonts at %s. Is WEBKIT_TOP_LEVEL set?", fontsPath.data());
 
-    GOwnPtr<GError> error;
-    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.data(), 0, &error.outPtr()));
+    GOwnPtr<GDir> fontsDirectory(g_dir_open(fontsPath.data(), 0, 0));
     while (const char* directoryEntry = g_dir_read_name(fontsDirectory.get())) {
         if (!g_str_has_suffix(directoryEntry, ".ttf") && !g_str_has_suffix(directoryEntry, ".otf"))
             continue;
@@ -446,7 +447,6 @@ static void resetDefaultsToConsistentValues()
                  "html5-local-storage-database-path", localStoragePath.get(),
                  "enable-xss-auditor", FALSE,
                  "enable-spatial-navigation", FALSE,
-                 "enable-frame-flattening", FALSE,
                  "javascript-can-access-clipboard", TRUE,
                  "javascript-can-open-windows-automatically", TRUE,
                  "enable-offline-web-application-cache", TRUE,
@@ -483,7 +483,6 @@ static void resetDefaultsToConsistentValues()
     g_object_set(G_OBJECT(inspector), "javascript-profiling-enabled", FALSE, NULL);
 
     webkit_web_view_set_zoom_level(webView, 1.0);
-    DumpRenderTreeSupportGtk::setMinimumTimerInterval(webView, DumpRenderTreeSupportGtk::defaultMinimumTimerInterval());
 
     DumpRenderTreeSupportGtk::resetOriginAccessWhiteLists();
 
@@ -502,8 +501,6 @@ static void resetDefaultsToConsistentValues()
 
     DumpRenderTreeSupportGtk::setLinksIncludedInFocusChain(true);
     webkit_icon_database_set_path(webkit_get_icon_database(), 0);
-    DumpRenderTreeSupportGtk::setSelectTrailingWhitespaceEnabled(false);
-    DumpRenderTreeSupportGtk::setSmartInsertDeleteEnabled(webView, true);
     DumpRenderTreeSupportGtk::setDefersLoading(webView, false);
     DumpRenderTreeSupportGtk::setSerializeHTTPLoads(false);
 
@@ -518,8 +515,18 @@ static void resetDefaultsToConsistentValues()
     DumpRenderTreeSupportGtk::setCSSGridLayoutEnabled(webView, false);
     DumpRenderTreeSupportGtk::setCSSRegionsEnabled(webView, true);
     DumpRenderTreeSupportGtk::setCSSCustomFilterEnabled(webView, false);
+    DumpRenderTreeSupportGtk::setExperimentalContentSecurityPolicyFeaturesEnabled(true);
+    DumpRenderTreeSupportGtk::setSeamlessIFramesEnabled(true);
     DumpRenderTreeSupportGtk::setShadowDOMEnabled(true);
     DumpRenderTreeSupportGtk::setStyleScopedEnabled(true);
+
+    if (gTestRunner) {
+        gTestRunner->setAuthenticationPassword("");
+        gTestRunner->setAuthenticationUsername("");
+        gTestRunner->setHandlesAuthenticationChallenges(false);
+    }
+
+    gtk_widget_set_direction(GTK_WIDGET(webView), GTK_TEXT_DIR_NONE);
 }
 
 static bool useLongRunningServerMode(int argc, char *argv[])
@@ -643,6 +650,15 @@ void dump()
     gtk_main_quit();
 }
 
+static CString temporaryDatabaseDirectory()
+{
+    const char* directoryFromEnvironment = g_getenv("DUMPRENDERTREE_TEMP");
+    if (directoryFromEnvironment)
+        return directoryFromEnvironment;
+    GOwnPtr<char> fallback(g_build_filename(g_get_user_data_dir(), "gtkwebkitdrt", "databases", NULL));
+    return fallback.get();
+}
+
 static void setDefaultsToConsistentStateValuesForTesting()
 {
     resetDefaultsToConsistentValues();
@@ -651,9 +667,7 @@ static void setDefaultsToConsistentStateValuesForTesting()
     webkit_web_settings_add_extra_plugin_directory(webView, TEST_PLUGIN_DIR);
 #endif
 
-    gchar* databaseDirectory = g_build_filename(g_get_user_data_dir(), "gtkwebkitdrt", "databases", NULL);
-    webkit_set_web_database_directory_path(databaseDirectory);
-    g_free(databaseDirectory);
+    webkit_set_web_database_directory_path(temporaryDatabaseDirectory().data());
 
 #if defined(GTK_API_VERSION_2)
     gtk_rc_parse_string("style \"nix_scrollbar_spacing\"                    "
@@ -1231,8 +1245,7 @@ static CString descriptionSuitableForTestResult(WebKitNetworkRequest* request)
     CString mainDocumentURIString(descriptionSuitableForTestResult(mainDocumentURI));
     CString path(convertNetworkRequestToURLPath(request));
     GOwnPtr<char> description(g_strdup_printf("<NSURLRequest URL %s, main document URL %s, http method %s>",
-                                              path.data(), mainDocumentURIString.data(),
-                                              soupMessage ? soupMessage->method : "(none)"));
+        path.data(), mainDocumentURIString.data(), soupMessage->method));
     return CString(description.get());
 }
 
@@ -1337,11 +1350,55 @@ static gboolean webViewRunFileChooser(WebKitWebView*, WebKitFileChooserRequest*)
     return TRUE;
 }
 
+static void frameLoadEventCallback(WebKitWebFrame* frame, DumpRenderTreeSupportGtk::FrameLoadEvent event, const char* url)
+{
+    if (done || !gTestRunner->dumpFrameLoadCallbacks())
+        return;
+
+    GOwnPtr<char> frameName(getFrameNameSuitableForTestResult(webkit_web_frame_get_web_view(frame), frame));
+    switch (event) {
+    case DumpRenderTreeSupportGtk::WillPerformClientRedirectToURL:
+        ASSERT(url);
+        printf("%s - willPerformClientRedirectToURL: %s \n", frameName.get(), url);
+        break;
+    case DumpRenderTreeSupportGtk::DidCancelClientRedirect:
+        printf("%s - didCancelClientRedirectForFrame\n", frameName.get());
+        break;
+    case DumpRenderTreeSupportGtk::DidReceiveServerRedirectForProvisionalLoad:
+        printf("%s - didReceiveServerRedirectForProvisionalLoadForFrame\n", frameName.get());
+        break;
+    case DumpRenderTreeSupportGtk::DidDisplayInsecureContent:
+        printf ("didDisplayInsecureContent\n");
+        break;
+    case DumpRenderTreeSupportGtk::DidDetectXSS:
+        printf ("didDetectXSS\n");
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+    }
+}
+
+static bool authenticationCallback(CString& username, CString& password)
+{
+    if (!gTestRunner->handlesAuthenticationChallenges()) {
+        printf("<unknown> - didReceiveAuthenticationChallenge - Simulating cancelled authentication sheet\n");
+        return false;
+    }
+
+    username = gTestRunner->authenticationUsername().c_str();
+    password = gTestRunner->authenticationPassword().c_str();
+    printf("<unknown> - didReceiveAuthenticationChallenge - Responding with %s:%s\n", username.data(), password.data());
+    return true;
+}
+
 static WebKitWebView* createWebView()
 {
     // It is important to declare DRT is running early so when creating
     // web view mock clients are used instead of proper ones.
     DumpRenderTreeSupportGtk::setDumpRenderTreeModeEnabled(true);
+
+    DumpRenderTreeSupportGtk::setFrameLoadEventCallback(frameLoadEventCallback);
+    DumpRenderTreeSupportGtk::setAuthenticationCallback(authenticationCallback);
 
     WebKitWebView* view = WEBKIT_WEB_VIEW(self_scrolling_webkit_web_view_new());
 

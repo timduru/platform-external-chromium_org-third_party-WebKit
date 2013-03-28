@@ -31,13 +31,14 @@
 #include "HTMLTableColElement.h"
 #include "RenderTable.h"
 #include "RenderTableCell.h"
+#include "WebCoreMemoryInstrumentation.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderTableCol::RenderTableCol(Node* node)
-    : RenderBox(node)
+RenderTableCol::RenderTableCol(Element* element)
+    : RenderBox(element)
     , m_span(1)
 {
     // init RenderObject attributes
@@ -114,7 +115,7 @@ void RenderTableCol::imageChanged(WrappedImagePtr, const IntRect*)
     repaint();
 }
 
-void RenderTableCol::computePreferredLogicalWidths()
+void RenderTableCol::clearPreferredLogicalWidthsDirtyBits()
 {
     setPreferredLogicalWidthsDirty(false);
 
@@ -185,6 +186,13 @@ const BorderValue& RenderTableCol::borderAdjoiningCellAfter(const RenderTableCel
 {
     ASSERT_UNUSED(cell, table()->colElement(cell->col() - 1) == this);
     return style()->borderEnd();
+}
+
+void RenderTableCol::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Rendering);
+    RenderBox::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_children, "children");
 }
 
 }

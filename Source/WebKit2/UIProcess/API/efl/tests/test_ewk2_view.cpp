@@ -20,13 +20,7 @@
 #include "config.h"
 
 #include "UnitTestUtils/EWK2UnitTestBase.h"
-#include "UnitTestUtils/EWK2UnitTestEnvironment.h"
 #include "UnitTestUtils/EWK2UnitTestServer.h"
-#include <EWebKit2.h>
-#include <Ecore.h>
-#include <Eina.h>
-#include <Evas.h>
-#include <gtest/gtest.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
 #include <wtf/UnusedParam.h>
@@ -140,14 +134,14 @@ TEST_F(EWK2UnitTestBase, ewk_view_navigation)
     ASSERT_FALSE(ewk_view_forward_possible(webView()));
 }
 
-TEST_F(EWK2UnitTestBase, ewk_view_setting_encoding_custom)
+TEST_F(EWK2UnitTestBase, DISABLED_ewk_view_setting_encoding_custom)
 {
-    ASSERT_FALSE(ewk_view_setting_encoding_custom_get(webView()));
-    ASSERT_TRUE(ewk_view_setting_encoding_custom_set(webView(), "UTF-8"));
-    ASSERT_STREQ("UTF-8", ewk_view_setting_encoding_custom_get(webView()));
+    ASSERT_FALSE(ewk_view_custom_encoding_get(webView()));
+    ASSERT_TRUE(ewk_view_custom_encoding_set(webView(), "UTF-8"));
+    ASSERT_STREQ("UTF-8", ewk_view_custom_encoding_get(webView()));
     // Set the default charset.
-    ASSERT_TRUE(ewk_view_setting_encoding_custom_set(webView(), 0));
-    ASSERT_FALSE(ewk_view_setting_encoding_custom_get(webView()));
+    ASSERT_TRUE(ewk_view_custom_encoding_set(webView(), 0));
+    ASSERT_FALSE(ewk_view_custom_encoding_get(webView()));
 }
 
 static void onFormAboutToBeSubmitted(void* userData, Evas_Object*, void* eventInfo)
@@ -225,9 +219,9 @@ TEST_F(EWK2UnitTestBase, ewk_view_theme_set)
     ewk_view_html_string_load(webView(), buttonHTML, "file:///", 0);
     EXPECT_TRUE(waitUntilTitleChangedTo("30")); // the result should be same as default theme
 
-    ewk_view_theme_set(webView(), environment->pathForResource("big_button_theme.edj").data());
+    ewk_view_theme_set(webView(), environment->pathForTheme("big_button_theme.edj").data());
     ewk_view_html_string_load(webView(), buttonHTML, "file:///", 0);
-    EXPECT_TRUE(waitUntilTitleChangedTo("299")); // button of big button theme has 299px as padding (150 to -150)
+    EXPECT_TRUE(waitUntilTitleChangedTo("299")); // button of big button theme has 299px as padding (15 to -285)
 }
 
 TEST_F(EWK2UnitTestBase, ewk_view_mouse_events_enabled)
@@ -563,6 +557,13 @@ TEST_F(EWK2UnitTestBase, ewk_view_context_get)
     ASSERT_EQ(context, ewk_view_context_get(webView()));
 }
 
+TEST_F(EWK2UnitTestBase, ewk_view_page_group_get)
+{
+    Ewk_Page_Group* pageGroup = ewk_view_page_group_get(webView());
+    ASSERT_TRUE(pageGroup);
+    ASSERT_EQ(pageGroup, ewk_view_page_group_get(webView()));
+}
+
 TEST_F(EWK2UnitTestBase, ewk_view_feed_touch_event)
 {
     Eina_List* points = 0;
@@ -754,7 +755,7 @@ TEST_F(EWK2UnitTestBase, ewk_view_inspector)
 #endif
 }
 
-TEST_F(EWK2UnitTestBase, ewk_view_scale)
+TEST_F(EWK2UnitTestBase, DISABLED_ewk_view_scale)
 {
     ASSERT_TRUE(loadUrlSync(environment->defaultTestPageUrl()));
 
@@ -808,13 +809,13 @@ struct VibrationCbData {
     bool didReceiveVibrate; // Whether the vibration event received.
     bool didReceiveCancelVibration; // Whether the cancel vibration event received.
     unsigned vibrateCalledCount; // Vibrate callbacks count.
-    uint64_t expectedVibrationTime; // Expected vibration time.
+    unsigned expectedVibrationTime; // Expected vibration time.
 };
 
 static void onVibrate(void* userData, Evas_Object*, void* eventInfo)
 {
     VibrationCbData* data = static_cast<VibrationCbData*>(userData);
-    uint64_t* vibrationTime = static_cast<uint64_t*>(eventInfo);
+    unsigned* vibrationTime = static_cast<unsigned*>(eventInfo);
     if (*vibrationTime == data->expectedVibrationTime)
         data->didReceiveVibrate = true;
     data->vibrateCalledCount++;
@@ -887,3 +888,89 @@ TEST_F(EWK2UnitTestBase, ewk_context_vibration_client_callbacks_set)
     ASSERT_FALSE(data.didReceiveCancelVibration);
 }
 
+static void onContentsSizeChanged(void* userData, Evas_Object*, void* eventInfo)
+{
+    bool* result = static_cast<bool*>(userData);
+    Ewk_CSS_Size* size = static_cast<Ewk_CSS_Size*>(eventInfo);
+
+    if (size->w == 2000 && size->h == 3000)
+        *result = true;
+}
+
+TEST_F(EWK2UnitTestBase, ewk_view_contents_size_changed)
+{
+    const char contentsSizeHTML[] =
+        "<!DOCTYPE html>"
+        "<body style=\"margin:0px;width:2000px;height:3000px\"></body>";
+
+    bool sizeChanged = false;
+    evas_object_smart_callback_add(webView(), "contents,size,changed", onContentsSizeChanged, &sizeChanged);
+    ewk_view_html_string_load(webView(), contentsSizeHTML, 0, 0);
+    while (!sizeChanged)
+        ecore_main_loop_iterate();
+
+    ewk_view_device_pixel_ratio_set(webView(), 2);
+    ewk_view_html_string_load(webView(), contentsSizeHTML, 0, 0);
+    sizeChanged = false;
+    while (!sizeChanged)
+        ecore_main_loop_iterate();
+
+    ewk_view_scale_set(webView(), 3, 0, 0);
+    ewk_view_html_string_load(webView(), contentsSizeHTML, 0, 0);
+    sizeChanged = false;
+    while (!sizeChanged)
+        ecore_main_loop_iterate();
+
+    evas_object_smart_callback_del(webView(), "contents,size,changed", onContentsSizeChanged);
+}
+
+static bool obtainedPageContents = false;
+
+static void PageContentsCallback(Ewk_Page_Contents_Type type, const char* data)
+{
+    // Check the type
+    ASSERT_EQ(EWK_PAGE_CONTENTS_TYPE_MHTML, type);
+
+    // The variable data should have below text block.
+    const String expectedMHTML = "\r\n\r\n<=00h=00t=00m=00l=00>=00<=00h=00e=00a=00d=00>=00<=00m=00e=00t=00a=00 =00c=\r\n"
+        "=00h=00a=00r=00s=00e=00t=00=3D=00\"=00U=00T=00F=00-=001=006=00L=00E=00\"=00>=\r\n"
+        "=00<=00/=00h=00e=00a=00d=00>=00<=00b=00o=00d=00y=00>=00<=00p=00>=00S=00i=00=\r\n"
+        "m=00p=00l=00e=00 =00H=00T=00M=00L=00<=00/=00p=00>=00<=00/=00b=00o=00d=00y=\r\n"
+        "=00>=00<=00/=00h=00t=00m=00l=00>=00\r\n";
+
+    ASSERT_TRUE(String(data).contains(expectedMHTML));
+
+    obtainedPageContents = true;
+}
+
+TEST_F(EWK2UnitTestBase, ewk_view_page_contents_get)
+{
+    const char content[] = "<p>Simple HTML</p>";
+    ewk_view_html_string_load(webView(), content, 0, 0);
+    waitUntilLoadFinished();
+
+    ASSERT_TRUE(ewk_view_page_contents_get(webView(), EWK_PAGE_CONTENTS_TYPE_MHTML, PageContentsCallback));
+    while (!obtainedPageContents)
+        ecore_main_loop_iterate();
+}
+
+TEST_F(EWK2UnitTestBase, ewk_view_source_mode)
+{
+    const char indexHTML[] = "<html><body>Test Web View Mode<script>document.title=window.document.body.innerText;</script></body></html>";
+    const char contents[] = "Test Web View Mode";
+
+    // Default source mode is false.
+    EXPECT_FALSE(ewk_view_source_mode_get(webView()));
+
+    // Load web contents of the web page.
+    ewk_view_html_string_load(webView(), indexHTML, 0, 0);
+    EXPECT_TRUE(waitUntilTitleChangedTo(contents));
+
+    EXPECT_TRUE(ewk_view_source_mode_set(webView(), true));
+    EXPECT_TRUE(ewk_view_source_mode_get(webView()));
+
+    // TODO: Add a test case when the source mode is true.
+    //       But it needs a way to retrieve the body contents to compare the loaded contents
+    //       such as excuting the JavaScript, 'window.document.body.innerText'.
+    //       https://bugs.webkit.org/show_bug.cgi?id=101904.
+}

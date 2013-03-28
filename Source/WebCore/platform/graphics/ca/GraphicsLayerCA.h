@@ -89,7 +89,6 @@ public:
     virtual void setAcceleratesDrawing(bool);
 
     virtual void setBackgroundColor(const Color&);
-    virtual void clearBackgroundColor();
 
     virtual void setContentsOpaque(bool);
     virtual void setBackfaceVisibility(bool);
@@ -117,7 +116,7 @@ public:
     virtual void setContentsToImage(Image*);
     virtual void setContentsToMedia(PlatformLayer*);
     virtual void setContentsToCanvas(PlatformLayer*);
-    virtual void setContentsToBackgroundColor(const Color&);
+    virtual void setContentsToSolidColor(const Color&);
 
     virtual bool hasContentsLayer() const { return m_contentsLayer; }
     
@@ -132,7 +131,13 @@ public:
     virtual void setMaintainsPixelAlignment(bool);
     virtual void deviceOrPageScaleFactorChanged();
 
-    void recursiveCommitChanges(const TransformState&, float pageScaleFactor = 1, const FloatPoint& positionRelativeToBase = FloatPoint(), bool affectedByPageScale = false);
+    struct CommitState {
+        bool ancestorHasTransformAnimation;
+        CommitState()
+            : ancestorHasTransformAnimation(false)
+        { }
+    };
+    void recursiveCommitChanges(const CommitState&, const TransformState&, float pageScaleFactor = 1, const FloatPoint& positionRelativeToBase = FloatPoint(), bool affectedByPageScale = false);
 
     virtual void flushCompositingState(const FloatRect&);
     virtual void flushCompositingStateForThisLayerOnly();
@@ -209,6 +214,8 @@ private:
     bool setFilterAnimationKeyframes(const KeyframeValueList&, const Animation*, PlatformCAAnimation*, int functionIndex, int internalFilterPropertyIndex, FilterOperation::OperationType);
 #endif
 
+    bool isRunningTransformAnimation() const;
+
     bool animationIsRunning(const String& animationName) const
     {
         return m_runningAnimations.find(animationName) != m_runningAnimations.end();
@@ -222,7 +229,7 @@ private:
     FloatSize constrainedSize() const;
 
     bool requiresTiledLayer(float pageScaleFactor) const;
-    void swapFromOrToTiledLayer(bool useTiledLayer, float pageScaleFactor, const FloatPoint& positionRelativeToBase);
+    void swapFromOrToTiledLayer(bool useTiledLayer);
 
     CompositingCoordinatesOrientation defaultContentsOrientation() const;
     
@@ -315,35 +322,36 @@ private:
     void updateContentsVisibility();
     void updateContentsOpaque();
     void updateBackfaceVisibility();
-    void updateStructuralLayer(float pixelAlignmentScale, const FloatPoint& positionRelativeToBase);
-    void updateLayerDrawsContent(float pixelAlignmentScale, const FloatPoint& positionRelativeToBase);
-    void updateLayerBackgroundColor();
+    void updateStructuralLayer();
+    void updateLayerDrawsContent(float pixelAlignmentScale);
+    void updateBackgroundColor();
 
     void updateContentsImage();
     void updateContentsMediaLayer();
     void updateContentsCanvasLayer();
+    void updateContentsColorLayer();
     void updateContentsRect();
     void updateMaskLayer();
     void updateReplicatedLayers();
 
-    void updateLayerAnimations();
+    void updateAnimations();
     void updateContentsNeedsDisplay();
     void updateAcceleratesDrawing();
     void updateDebugBorder();
     void updateVisibleRect(const FloatRect& oldVisibleRect);
-    void updateContentsScale(float pixelAlignmentScale, const FloatPoint& positionRelativeToBase);
+    void updateContentsScale(float pageScaleFactor);
     
     enum StructuralLayerPurpose {
         NoStructuralLayer = 0,
         StructuralLayerForPreserves3D,
         StructuralLayerForReplicaFlattening
     };
-    void ensureStructuralLayer(StructuralLayerPurpose, float pixelAlignmentScale, const FloatPoint& positionRelativeToBase);
+    void ensureStructuralLayer(StructuralLayerPurpose);
     StructuralLayerPurpose structuralLayerPurpose() const;
 
-    void setAnimationOnLayer(PlatformCAAnimation*, AnimatedPropertyID, const String& animationName, int index, double timeOffset);
-    bool removeCAAnimationFromLayer(AnimatedPropertyID, const String& animationName, int index);
-    void pauseCAAnimationOnLayer(AnimatedPropertyID, const String& animationName, int index, double timeOffset);
+    void setAnimationOnLayer(PlatformCAAnimation*, AnimatedPropertyID, const String& animationName, int index, int subIndex, double timeOffset);
+    bool removeCAAnimationFromLayer(AnimatedPropertyID, const String& animationName, int index, int subINdex);
+    void pauseCAAnimationOnLayer(AnimatedPropertyID, const String& animationName, int index, int subIndex, double timeOffset);
 
     enum MoveOrCopy { Move, Copy };
     static void moveOrCopyLayerAnimation(MoveOrCopy, const String& animationIdentifier, PlatformCALayer *fromLayer, PlatformCALayer *toLayer);
@@ -373,16 +381,17 @@ private:
         ContentsImageChanged = 1 << 15,
         ContentsMediaLayerChanged = 1 << 16,
         ContentsCanvasLayerChanged = 1 << 17,
-        ContentsRectChanged = 1 << 18,
-        MaskLayerChanged = 1 << 19,
-        ReplicatedLayerChanged = 1 << 20,
-        ContentsNeedsDisplay = 1 << 21,
-        AcceleratesDrawingChanged = 1 << 22,
-        ContentsScaleChanged = 1 << 23,
-        ContentsVisibilityChanged = 1 << 24,
-        VisibleRectChanged = 1 << 25,
-        FiltersChanged = 1 << 26,
-        DebugIndicatorsChanged = 1 << 27
+        ContentsColorLayerChanged = 1 << 18,
+        ContentsRectChanged = 1 << 19,
+        MaskLayerChanged = 1 << 20,
+        ReplicatedLayerChanged = 1 << 21,
+        ContentsNeedsDisplay = 1 << 22,
+        AcceleratesDrawingChanged = 1 << 23,
+        ContentsScaleChanged = 1 << 24,
+        ContentsVisibilityChanged = 1 << 25,
+        VisibleRectChanged = 1 << 26,
+        FiltersChanged = 1 << 27,
+        DebugIndicatorsChanged = 1 << 28
     };
     typedef unsigned LayerChangeFlags;
     void noteLayerPropertyChanged(LayerChangeFlags flags);
@@ -415,9 +424,10 @@ private:
     };
     
     ContentsLayerPurpose m_contentsLayerPurpose;
-    bool m_contentsLayerHasBackgroundColor : 1;
     bool m_allowTiledLayer : 1;
-    bool m_isPageTileCacheLayer : 1;
+    bool m_isPageTiledBackingLayer : 1;
+    
+    Color m_contentsSolidColor;
 
     RetainPtr<CGImageRef> m_uncorrectedContentsImage;
     RetainPtr<CGImageRef> m_pendingContentsImage;
@@ -425,11 +435,12 @@ private:
     // This represents the animation of a single property. There may be multiple transform animations for
     // a single transition or keyframe animation, so index is used to distinguish these.
     struct LayerPropertyAnimation {
-        LayerPropertyAnimation(PassRefPtr<PlatformCAAnimation> caAnimation, const String& animationName, AnimatedPropertyID property, int index, double timeOffset)
+        LayerPropertyAnimation(PassRefPtr<PlatformCAAnimation> caAnimation, const String& animationName, AnimatedPropertyID property, int index, int subIndex, double timeOffset)
         : m_animation(caAnimation)
         , m_name(animationName)
         , m_property(property)
         , m_index(index)
+        , m_subIndex(subIndex)
         , m_timeOffset(timeOffset)
         { }
 
@@ -437,6 +448,7 @@ private:
         String m_name;
         AnimatedPropertyID m_property;
         int m_index;
+        int m_subIndex;
         double m_timeOffset;
     };
     

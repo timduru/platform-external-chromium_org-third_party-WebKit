@@ -24,13 +24,13 @@
 
 messages -> WebInspectorProxy {
     CreateInspectorPage() -> (uint64_t inspectorPageID, WebKit::WebPageCreationParameters inspectorPageParameters)
-    DidLoadInspectorPage()
     DidClose()
     BringToFront()
     InspectedURLChanged(WTF::String urlString)
 
     Attach()
     Detach()
+    AttachAvailabilityChanged(bool available)
     SetAttachedWindowHeight(unsigned height)
 
 #if ENABLE(INSPECTOR_SERVER)

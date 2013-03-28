@@ -57,7 +57,7 @@ String::String(const UChar* str)
         
     size_t len = 0;
     while (str[len] != UChar(0))
-        len++;
+        ++len;
 
     if (len > numeric_limits<unsigned>::max())
         CRASH();
@@ -103,6 +103,16 @@ void String::append(const String& str)
     // call to fastMalloc every single time.
     if (str.m_impl) {
         if (m_impl) {
+            if (m_impl->is8Bit() && str.m_impl->is8Bit()) {
+                LChar* data;
+                if (str.length() > numeric_limits<unsigned>::max() - m_impl->length())
+                    CRASH();
+                RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(m_impl->length() + str.length(), data);
+                memcpy(data, m_impl->characters8(), m_impl->length() * sizeof(LChar));
+                memcpy(data + m_impl->length(), str.characters8(), str.length() * sizeof(LChar));
+                m_impl = newImpl.release();
+                return;
+            }
             UChar* data;
             if (str.length() > numeric_limits<unsigned>::max() - m_impl->length())
                 CRASH();
@@ -651,6 +661,21 @@ String String::isolatedCopy() const
     return m_impl->isolatedCopy();
 }
 
+bool String::isSafeToSendToAnotherThread() const
+{
+    if (!impl())
+        return true;
+    // AtomicStrings are not safe to send between threads as ~StringImpl()
+    // will try to remove them from the wrong AtomicStringTable.
+    if (impl()->isAtomic())
+        return false;
+    if (impl()->hasOneRef())
+        return true;
+    if (isEmpty())
+        return true;
+    return false;
+}
+
 void String::split(const String& separator, bool allowEmptyEntries, Vector<String>& result) const
 {
     result.clear();
@@ -867,16 +892,23 @@ String String::fromUTF8(const LChar* stringStart, size_t length)
     if (!stringStart)
         return String();
 
+    if (!length)
+        return emptyString();
+
     // We'll use a StringImpl as a buffer; if the source string only contains ascii this should be
     // the right length, if there are any multi-byte sequences this buffer will be too large.
     UChar* buffer;
     String stringBuffer(StringImpl::createUninitialized(length, buffer));
     UChar* bufferEnd = buffer + length;
-
+ 
     // Try converting into the buffer.
     const char* stringCurrent = reinterpret_cast<const char*>(stringStart);
-    if (convertUTF8ToUTF16(&stringCurrent, reinterpret_cast<const char *>(stringStart + length), &buffer, bufferEnd) != conversionOK)
+    bool isAllASCII;
+    if (convertUTF8ToUTF16(&stringCurrent, reinterpret_cast<const char *>(stringStart + length), &buffer, bufferEnd, &isAllASCII) != conversionOK)
         return String();
+
+    if (isAllASCII)
+        return String(stringStart, length);
 
     // stringBuffer is full (the input must have been all ascii) so just return it!
     if (buffer == bufferEnd)
@@ -893,6 +925,11 @@ String String::fromUTF8(const LChar* string)
     if (!string)
         return String();
     return fromUTF8(string, strlen(reinterpret_cast<const char*>(string)));
+}
+
+String String::fromUTF8(const CString& s)
+{
+    return fromUTF8(s.data());
 }
 
 String String::fromUTF8WithLatin1Fallback(const LChar* string, size_t size)
@@ -936,24 +973,24 @@ static inline IntegralType toIntegralType(const CharType* data, size_t length, b
 
     // skip leading whitespace
     while (length && isSpaceOrNewline(*data)) {
-        length--;
-        data++;
+        --length;
+        ++data;
     }
 
     if (isSigned && length && *data == '-') {
-        length--;
-        data++;
+        --length;
+        ++data;
         isNegative = true;
     } else if (length && *data == '+') {
-        length--;
-        data++;
+        --length;
+        ++data;
     }
 
     if (!length || !isCharacterAllowedInBase(*data, base))
         goto bye;
 
     while (length && isCharacterAllowedInBase(*data, base)) {
-        length--;
+        --length;
         IntegralType digitValue;
         CharType c = *data;
         if (isASCIIDigit(c))
@@ -967,7 +1004,7 @@ static inline IntegralType toIntegralType(const CharType* data, size_t length, b
             goto bye;
 
         value = base * value + digitValue;
-        data++;
+        ++data;
     }
 
 #if COMPILER(MSVC)
@@ -984,8 +1021,8 @@ static inline IntegralType toIntegralType(const CharType* data, size_t length, b
 
     // skip trailing space
     while (length && isSpaceOrNewline(*data)) {
-        length--;
-        data++;
+        --length;
+        ++data;
     }
 
     if (!length)
@@ -1196,7 +1233,7 @@ Vector<char> asciiDebug(String& string);
 
 void String::show() const
 {
-    dataLog("%s\n", asciiDebug(impl()).data());
+    dataLogF("%s\n", asciiDebug(impl()).data());
 }
 
 String* string(const char* s)

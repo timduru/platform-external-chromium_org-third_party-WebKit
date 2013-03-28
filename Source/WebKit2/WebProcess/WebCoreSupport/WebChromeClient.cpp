@@ -36,6 +36,7 @@
 #include "WebFrame.h"
 #include "WebFrameLoaderClient.h"
 #include "WebFullScreenManager.h"
+#include "WebImage.h"
 #include "WebOpenPanelParameters.h"
 #include "WebOpenPanelResultListener.h"
 #include "WebPage.h"
@@ -48,14 +49,17 @@
 #include "WebSecurityOrigin.h"
 #include <WebCore/AXObjectCache.h>
 #include <WebCore/ColorChooser.h>
-#include <WebCore/DatabaseTracker.h>
+#include <WebCore/DatabaseManager.h>
+#include <WebCore/DocumentLoader.h>
 #include <WebCore/FileChooser.h>
 #include <WebCore/FileIconLoader.h>
 #include <WebCore/Frame.h>
 #include <WebCore/FrameLoadRequest.h>
 #include <WebCore/FrameLoader.h>
 #include <WebCore/FrameView.h>
+#include <WebCore/HTMLInputElement.h>
 #include <WebCore/HTMLNames.h>
+#include <WebCore/HTMLParserIdioms.h>
 #include <WebCore/HTMLPlugInImageElement.h>
 #include <WebCore/Icon.h>
 #include <WebCore/NotImplemented.h>
@@ -103,11 +107,16 @@ void WebChromeClient::chromeDestroyed()
 
 void WebChromeClient::setWindowRect(const FloatRect& windowFrame)
 {
-    m_page->send(Messages::WebPageProxy::SetWindowFrame(windowFrame));
+    m_page->sendSetWindowFrame(windowFrame);
 }
 
 FloatRect WebChromeClient::windowRect()
 {
+#if PLATFORM(MAC)
+    if (m_page->hasCachedWindowFrame())
+        return m_page->windowFrameInScreenCoordinates();
+#endif
+
     FloatRect newWindowFrame;
 
     if (!WebProcess::shared().connection()->sendSync(Messages::WebPageProxy::GetWindowFrame(), Messages::WebPageProxy::GetWindowFrame::Reply(newWindowFrame), m_page->pageID()))
@@ -149,9 +158,19 @@ void WebChromeClient::takeFocus(FocusDirection direction)
     m_page->send(Messages::WebPageProxy::TakeFocus(direction));
 }
 
-void WebChromeClient::focusedNodeChanged(Node*)
+void WebChromeClient::focusedNodeChanged(Node* node)
 {
-    notImplemented();
+    if (!node)
+        return;
+    if (!node->hasTagName(inputTag))
+        return;
+
+    HTMLInputElement* inputElement = static_cast<HTMLInputElement*>(node);
+    if (!inputElement->isText())
+        return;
+
+    WebFrame* webFrame = static_cast<WebFrameLoaderClient*>(node->document()->frame()->loader()->client())->webFrame();
+    m_page->injectedBundleFormClient().didFocusTextField(m_page, inputElement, webFrame);
 }
 
 void WebChromeClient::focusedFrameChanged(Frame* frame)
@@ -263,7 +282,7 @@ void WebChromeClient::setResizable(bool resizable)
     m_page->send(Messages::WebPageProxy::SetIsResizable(resizable));
 }
 
-void WebChromeClient::addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned int lineNumber, const String& /*sourceID*/)
+void WebChromeClient::addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, const String& /*sourceID*/)
 {
     // Notify the bundle client.
     m_page->injectedBundleUIClient().willAddMessageToConsole(m_page, message, lineNumber);
@@ -385,7 +404,7 @@ void WebChromeClient::invalidateContentsAndRootView(const IntRect& rect, bool)
             return;
     }
 
-    m_page->drawingArea()->setNeedsDisplay(rect);
+    m_page->drawingArea()->setNeedsDisplayInRect(rect);
 }
 
 void WebChromeClient::invalidateContentsForSlowScroll(const IntRect& rect, bool)
@@ -396,13 +415,17 @@ void WebChromeClient::invalidateContentsForSlowScroll(const IntRect& rect, bool)
     }
 
     m_page->pageDidScroll();
-    m_page->drawingArea()->setNeedsDisplay(rect);
+#if USE(COORDINATED_GRAPHICS)
+    m_page->drawingArea()->scroll(rect, IntSize());
+#else
+    m_page->drawingArea()->setNeedsDisplayInRect(rect);
+#endif
 }
 
-void WebChromeClient::scroll(const IntSize& scrollOffset, const IntRect& scrollRect, const IntRect& clipRect)
+void WebChromeClient::scroll(const IntSize& scrollDelta, const IntRect& scrollRect, const IntRect& clipRect)
 {
     m_page->pageDidScroll();
-    m_page->drawingArea()->scroll(intersection(scrollRect, clipRect), scrollOffset);
+    m_page->drawingArea()->scroll(intersection(scrollRect, clipRect), scrollDelta);
 }
 
 #if USE(TILED_BACKING_STORE)
@@ -428,7 +451,7 @@ PlatformPageClient WebChromeClient::platformPageClient() const
     return 0;
 }
 
-void WebChromeClient::contentsSizeChanged(Frame* frame, const IntSize& /*size*/) const
+void WebChromeClient::contentsSizeChanged(Frame* frame, const IntSize& size) const
 {
     if (!m_page->corePage()->settings()->frameFlatteningEnabled()) {
         WebFrame* largestFrame = findLargestFrameInFrameSet(m_page);
@@ -441,16 +464,14 @@ void WebChromeClient::contentsSizeChanged(Frame* frame, const IntSize& /*size*/)
     if (frame->page()->mainFrame() != frame)
         return;
 
-#if PLATFORM(QT) || (PLATFORM(EFL) && USE(TILED_BACKING_STORE))
-    if (m_page->useFixedLayout()) {
-        // The below method updates the size().
-        m_page->resizeToContentsIfNeeded();
-        m_page->drawingArea()->layerTreeHost()->sizeDidChange(m_page->size());
-    }
+#if USE(COORDINATED_GRAPHICS)
+    if (m_page->useFixedLayout())
+        m_page->drawingArea()->layerTreeHost()->sizeDidChange(size);
 
-    m_page->send(Messages::WebPageProxy::DidChangeContentsSize(m_page->size()));
-
+    m_page->send(Messages::WebPageProxy::DidChangeContentsSize(size));
 #endif
+
+    m_page->drawingArea()->mainFrameContentSizeChanged(size);
 
     FrameView* frameView = frame->view();
     if (frameView && !frameView->delegatesScrolling())  {
@@ -498,7 +519,13 @@ void WebChromeClient::unavailablePluginButtonClicked(Element* element, RenderEmb
 
     HTMLPlugInImageElement* pluginElement = static_cast<HTMLPlugInImageElement*>(element);
 
-    m_page->send(Messages::WebPageProxy::UnavailablePluginButtonClicked(pluginUnavailabilityReason, pluginElement->serviceType(), pluginElement->url(), pluginElement->getAttribute(pluginspageAttr)));
+    String frameURLString = pluginElement->document()->frame()->loader()->documentLoader()->responseURL().string();
+    String pageURLString = m_page->mainFrame()->loader()->documentLoader()->responseURL().string();
+    String pluginURLString = pluginElement->document()->completeURL(pluginElement->url()).string();
+    KURL pluginspageAttributeURL = element->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(pluginElement->getAttribute(pluginspageAttr)));
+    if (!pluginspageAttributeURL.protocolIsInHTTPFamily())
+        pluginspageAttributeURL = KURL();
+    m_page->send(Messages::WebPageProxy::UnavailablePluginButtonClicked(pluginUnavailabilityReason, pluginElement->serviceType(), pluginURLString, pluginspageAttributeURL.string(), frameURLString, pageURLString));
 }
 
 void WebChromeClient::scrollbarsModeDidChange() const
@@ -536,14 +563,14 @@ void WebChromeClient::print(Frame* frame)
 }
 
 #if ENABLE(SQL_DATABASE)
-void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseName)
+void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& databaseName, DatabaseDetails details)
 {
     WebFrame* webFrame = static_cast<WebFrameLoaderClient*>(frame->loader()->client())->webFrame();
     SecurityOrigin* origin = frame->document()->securityOrigin();
 
-    DatabaseDetails details = DatabaseTracker::tracker().detailsForNameAndOrigin(databaseName, origin);
-    uint64_t currentQuota = DatabaseTracker::tracker().quotaForOrigin(origin);
-    uint64_t currentOriginUsage = DatabaseTracker::tracker().usageForOrigin(origin);
+    DatabaseManager& dbManager = DatabaseManager::manager();
+    uint64_t currentQuota = dbManager.quotaForOrigin(origin);
+    uint64_t currentOriginUsage = dbManager.usageForOrigin(origin);
     uint64_t newQuota = 0;
     RefPtr<WebSecurityOrigin> webSecurityOrigin = WebSecurityOrigin::createFromDatabaseIdentifier(origin->databaseIdentifier());
     newQuota = m_page->injectedBundleUIClient().didExceedDatabaseQuota(m_page, webSecurityOrigin.get(), databaseName, details.displayName(), currentQuota, currentOriginUsage, details.currentUsage(), details.expectedUsage());
@@ -554,7 +581,7 @@ void WebChromeClient::exceededDatabaseQuota(Frame* frame, const String& database
             Messages::WebPageProxy::ExceededDatabaseQuota::Reply(newQuota), m_page->pageID());
     }
 
-    DatabaseTracker::tracker().setQuota(origin, newQuota);
+    dbManager.setQuota(origin, newQuota);
 }
 #endif
 
@@ -667,7 +694,7 @@ void WebChromeClient::formStateDidChange(const Node*)
 
 bool WebChromeClient::selectItemWritingDirectionIsNatural()
 {
-#if PLATFORM(WIN) || PLATFORM(EFL)
+#if PLATFORM(EFL)
     return true;
 #else
     return false;
@@ -676,11 +703,7 @@ bool WebChromeClient::selectItemWritingDirectionIsNatural()
 
 bool WebChromeClient::selectItemAlignmentFollowsMenuWritingDirection()
 {
-#if PLATFORM(WIN)
-    return false;
-#else
     return true;
-#endif
 }
 
 bool WebChromeClient::hasOpenedPopup() const
@@ -726,25 +749,10 @@ void WebChromeClient::scheduleCompositingLayerFlush()
 
 #endif
 
-#if PLATFORM(WIN) && USE(AVFOUNDATION)
-WebCore::GraphicsDeviceAdapter* WebChromeClient::graphicsDeviceAdapter() const
-{
-    if (!m_page->drawingArea())
-        return 0;
-    return m_page->drawingArea()->layerTreeHost()->graphicsDeviceAdapter();
-}
-#endif
-
 #if ENABLE(TOUCH_EVENTS)
 void WebChromeClient::needTouchEvents(bool needTouchEvents)
 {
     m_page->send(Messages::WebPageProxy::NeedTouchEvents(needTouchEvents));
-}
-#endif
-
-#if PLATFORM(WIN)
-void WebChromeClient::setLastSetCursorToCurrentCursor()
-{
 }
 #endif
 
@@ -798,6 +806,11 @@ bool WebChromeClient::shouldRubberBandInDirection(WebCore::ScrollDirection direc
     return true;
 }
 
+Color WebChromeClient::underlayColor() const
+{
+    return m_page->underlayColor();
+}
+
 void WebChromeClient::numWheelEventHandlersChanged(unsigned count)
 {
     m_page->numWheelEventHandlersChanged(count);
@@ -809,6 +822,21 @@ void WebChromeClient::logDiagnosticMessage(const String& message, const String& 
         return;
 
     m_page->injectedBundleDiagnosticLoggingClient().logDiagnosticMessage(m_page, message, description, success);
+}
+
+String WebChromeClient::plugInStartLabelTitle() const
+{
+    return m_page->injectedBundleUIClient().plugInStartLabelTitle();
+}
+
+String WebChromeClient::plugInStartLabelSubtitle() const
+{
+    return m_page->injectedBundleUIClient().plugInStartLabelSubtitle();
+}
+
+String WebChromeClient::plugInExtraStyleSheet() const
+{
+    return m_page->injectedBundleUIClient().plugInExtraStyleSheet();
 }
 
 } // namespace WebKit

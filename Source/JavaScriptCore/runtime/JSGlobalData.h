@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008, 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2008, 2009, 2013 Apple Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
@@ -34,15 +34,20 @@
 #include "ExecutableAllocator.h"
 #include "Heap.h"
 #include "Intrinsic.h"
-#include "JITStubs.h"
+#include "JITThunks.h"
+#include "JITThunks.h"
+#include "JSCJSValue.h"
 #include "JSLock.h"
-#include "JSValue.h"
 #include "LLIntData.h"
+#include "MacroAssemblerCodeRef.h"
 #include "NumericStrings.h"
+#include "ProfilerDatabase.h"
 #include "PrivateName.h"
+#include "PrototypeMap.h"
 #include "SmallStrings.h"
 #include "Strong.h"
 #include "Terminator.h"
+#include "ThunkGenerators.h"
 #include "TimeoutChecker.h"
 #include "TypedArrayDescriptor.h"
 #include "WeakRandom.h"
@@ -57,14 +62,12 @@
 #include <wtf/ListHashSet.h>
 #endif
 
-struct OpaqueJSClass;
-struct OpaqueJSClassContextData;
-
 namespace JSC {
 
     class CodeBlock;
     class CodeCache;
     class CommonIdentifiers;
+    class ExecState;
     class HandleStack;
     class IdentifierTable;
     class Interpreter;
@@ -72,10 +75,12 @@ namespace JSC {
     class JSObject;
     class Keywords;
     class LLIntOffsetsExtractor;
+    class LegacyProfiler;
     class NativeExecutable;
     class ParserArena;
-    class Profiler;
     class RegExpCache;
+    class SourceProvider;
+    class SourceProviderCache;
     class Stringifier;
     class Structure;
 #if ENABLE(REGEXP_TRACING)
@@ -85,6 +90,12 @@ namespace JSC {
     class UnlinkedEvalCodeBlock;
     class UnlinkedFunctionExecutable;
     class UnlinkedProgramCodeBlock;
+
+#if ENABLE(DFG_JIT)
+    namespace DFG {
+    class LongLivedState;
+    }
+#endif // ENABLE(DFG_JIT)
 
     struct HashTable;
     struct Instruction;
@@ -118,8 +129,8 @@ namespace JSC {
 #endif
     struct ScratchBuffer {
         ScratchBuffer()
-            : m_activeLength(0)
         {
+            u.m_activeLength = 0;
         }
 
         static ScratchBuffer* create(size_t size)
@@ -129,14 +140,21 @@ namespace JSC {
             return result;
         }
 
-        static size_t allocationSize(size_t bufferSize) { return sizeof(size_t) + bufferSize; }
-        void setActiveLength(size_t activeLength) { m_activeLength = activeLength; }
-        size_t activeLength() const { return m_activeLength; };
-        size_t* activeLengthPtr() { return &m_activeLength; };
+        static size_t allocationSize(size_t bufferSize) { return sizeof(ScratchBuffer) + bufferSize; }
+        void setActiveLength(size_t activeLength) { u.m_activeLength = activeLength; }
+        size_t activeLength() const { return u.m_activeLength; };
+        size_t* activeLengthPtr() { return &u.m_activeLength; };
         void* dataBuffer() { return m_buffer; }
 
-        size_t m_activeLength;
+        union {
+            size_t m_activeLength;
+            double pad; // Make sure m_buffer is double aligned.
+        } u;
+#if CPU(MIPS) && (defined WTF_MIPS_ARCH_REV && WTF_MIPS_ARCH_REV == 2)
+        void* m_buffer[0] __attribute__((aligned(8)));
+#else
         void* m_buffer[0];
+#endif
     };
 #if COMPILER(MSVC)
 #pragma warning(pop)
@@ -184,10 +202,14 @@ namespace JSC {
         // The heap should be just after executableAllocator and before other members to ensure that it's
         // destructed after all the objects that reference it.
         Heap heap;
+        
+#if ENABLE(DFG_JIT)
+        OwnPtr<DFG::LongLivedState> m_dfgState;
+#endif // ENABLE(DFG_JIT)
 
         GlobalDataType globalDataType;
         ClientData* clientData;
-        CallFrame* topCallFrame;
+        ExecState* topCallFrame;
 
         const HashTable* arrayConstructorTable;
         const HashTable* arrayPrototypeTable;
@@ -201,15 +223,14 @@ namespace JSC {
         const HashTable* numberConstructorTable;
         const HashTable* numberPrototypeTable;
         const HashTable* objectConstructorTable;
-        const HashTable* objectPrototypeTable;
         const HashTable* privateNamePrototypeTable;
         const HashTable* regExpTable;
         const HashTable* regExpConstructorTable;
         const HashTable* regExpPrototypeTable;
-        const HashTable* stringTable;
         const HashTable* stringConstructorTable;
         
         Strong<Structure> structureStructure;
+        Strong<Structure> structureRareDataStructure;
         Strong<Structure> debuggerActivationStructure;
         Strong<Structure> interruptedExecutionErrorStructure;
         Strong<Structure> terminatedExecutionErrorStructure;
@@ -233,6 +254,7 @@ namespace JSC {
         Strong<Structure> unlinkedProgramCodeBlockStructure;
         Strong<Structure> unlinkedEvalCodeBlockStructure;
         Strong<Structure> unlinkedFunctionCodeBlockStructure;
+        Strong<Structure> propertyTableStructure;
 
         IdentifierTable* identifierTable;
         CommonIdentifiers* propertyNames;
@@ -263,7 +285,7 @@ namespace JSC {
             return m_inDefineOwnProperty;
         }
 
-        Profiler* enabledProfiler()
+        LegacyProfiler* enabledProfiler()
         {
             return m_enabledProfiler;
         }
@@ -282,9 +304,14 @@ namespace JSC {
         bool canUseRegExpJIT() { return false; } // interpreter only
 #endif
 
-        PrivateName m_inheritorIDKey;
+        SourceProviderCache* addSourceProviderCache(SourceProvider*);
+        void clearSourceProviderCaches();
+
+        PrototypeMap prototypeMap;
 
         OwnPtr<ParserArena> parserArena;
+        typedef HashMap<RefPtr<SourceProvider>, RefPtr<SourceProviderCache> > SourceProviderCacheMap;
+        SourceProviderCacheMap sourceProviderCacheMap;
         OwnPtr<Keywords> keywords;
         Interpreter* interpreter;
 #if ENABLE(JIT)
@@ -307,7 +334,7 @@ namespace JSC {
 
         ReturnAddressPtr exceptionLocation;
         JSValue hostCallReturnValue;
-        CallFrame* callFrameForThrow;
+        ExecState* callFrameForThrow;
         void* targetMachinePCForThrow;
         Instruction* targetInterpreterPCForThrow;
 #if ENABLE(DFG_JIT)
@@ -339,8 +366,6 @@ namespace JSC {
         void gatherConservativeRoots(ConservativeRoots&);
 #endif
 
-        HashMap<OpaqueJSClass*, OwnPtr<OpaqueJSClassContextData> > opaqueJSClassData;
-
         JSGlobalObject* dynamicGlobalObject;
 
         HashSet<JSObject*> stringRecursionCheckVisitedObjects;
@@ -351,7 +376,8 @@ namespace JSC {
         String cachedDateString;
         double cachedDateStringValue;
 
-        Profiler* m_enabledProfiler;
+        LegacyProfiler* m_enabledProfiler;
+        OwnPtr<Profiler::Database> m_perBytecodeProfiler;
         RegExpCache* m_regExpCache;
         BumpPointerAllocator m_regExpAllocator;
 
@@ -389,12 +415,12 @@ namespace JSC {
         unsigned m_timeoutCount;
 #endif
 
-        unsigned m_newStringsSinceLastHashConst;
+        unsigned m_newStringsSinceLastHashCons;
 
-        static const unsigned s_minNumberOfNewStringsToHashConst = 100;
+        static const unsigned s_minNumberOfNewStringsToHashCons = 100;
 
-        bool haveEnoughNewStringsToHashConst() { return m_newStringsSinceLastHashConst > s_minNumberOfNewStringsToHashConst; }
-        void resetNewStringsSinceLastHashConst() { m_newStringsSinceLastHashConst = 0; }
+        bool haveEnoughNewStringsToHashCons() { return m_newStringsSinceLastHashCons > s_minNumberOfNewStringsToHashCons; }
+        void resetNewStringsSinceLastHashCons() { m_newStringsSinceLastHashCons = 0; }
 
 #define registerTypedArrayFunction(type, capitalizedType) \
         void registerTypedArrayDescriptor(const capitalizedType##Array*, const TypedArrayDescriptor& descriptor) \
@@ -447,6 +473,8 @@ namespace JSC {
 
         JSLock& apiLock() { return m_apiLock; }
         CodeCache* codeCache() { return m_codeCache.get(); }
+
+        JS_EXPORT_PRIVATE void discardAllCode();
 
     private:
         friend class LLIntOffsetsExtractor;

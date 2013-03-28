@@ -37,6 +37,7 @@
 #include "RenderLayerBacking.h"
 #include "RenderObject.h"
 #include "RenderView.h"
+#include "SkMatrix44.h"
 #include "WebFrameImpl.h"
 #include "WebKit.h"
 #include "WebViewImpl.h"
@@ -47,7 +48,7 @@
 #include <public/WebFloatPoint.h>
 #include <public/WebRect.h>
 #include <public/WebSize.h>
-#include <public/WebTransformationMatrix.h>
+#include <wtf/CurrentTime.h>
 
 using namespace WebCore;
 
@@ -66,6 +67,7 @@ LinkHighlight::LinkHighlight(Node* node, WebViewImpl* owningWebViewImpl)
     , m_currentGraphicsLayer(0)
     , m_geometryNeedsUpdate(false)
     , m_isAnimating(false)
+    , m_startTime(monotonicallyIncreasingTime())
 {
     ASSERT(m_node);
     ASSERT(owningWebViewImpl);
@@ -126,9 +128,9 @@ RenderLayer* LinkHighlight::computeEnclosingCompositingLayer()
         return 0;
 
     GraphicsLayerChromium* newGraphicsLayer = static_cast<GraphicsLayerChromium*>(renderLayer->backing()->graphicsLayer());
-    m_clipLayer->setSublayerTransform(WebTransformationMatrix());
+    m_clipLayer->setSublayerTransform(SkMatrix44());
     if (!newGraphicsLayer->drawsContent()) {
-        m_clipLayer->setSublayerTransform(WebTransformationMatrix(newGraphicsLayer->transform()));
+        m_clipLayer->setSublayerTransform(newGraphicsLayer->platformLayer()->transform());
         newGraphicsLayer = static_cast<GraphicsLayerChromium*>(m_owningWebViewImpl->nonCompositedContentHost()->topLevelRootLayer());
     }
 
@@ -159,7 +161,7 @@ static void convertTargetSpaceQuadToCompositedLayer(const FloatQuad& targetSpace
 
         point = targetRenderer->frame()->view()->contentsToWindow(point);
         point = compositedRenderer->frame()->view()->windowToContents(point);
-        FloatPoint floatPoint = compositedRenderer->absoluteToLocal(point, UseTransforms | SnapOffsetForTransforms);
+        FloatPoint floatPoint = compositedRenderer->absoluteToLocal(point, UseTransforms);
 
         switch (i) {
         case 0: compositedSpaceQuad.setP1(floatPoint); break;
@@ -212,7 +214,7 @@ bool LinkHighlight::computeHighlightLayerPathAndPosition(RenderLayer* compositin
     }
 
     FloatRect boundingRect = newPath.boundingRect();
-    newPath.translate(FloatPoint() - boundingRect.location());
+    newPath.translate(-toFloatSize(boundingRect.location()));
 
     bool pathHasChanged = !m_path.platformPath() || !(*newPath.platformPath() == *m_path.platformPath());
     if (pathHasChanged) {
@@ -246,7 +248,8 @@ void LinkHighlight::startHighlightAnimationIfNeeded()
     m_isAnimating = true;
     const float startOpacity = 1;
     // FIXME: Should duration be configurable?
-    const float duration = 0.1f;
+    const float fadeDuration = 0.1f;
+    const float minPreFadeDuration = 0.1f;
 
     m_contentLayer->layer()->setOpacity(startOpacity);
 
@@ -255,9 +258,12 @@ void LinkHighlight::startHighlightAnimationIfNeeded()
     OwnPtr<WebFloatAnimationCurve> curve = adoptPtr(compositorSupport->createFloatAnimationCurve());
 
     curve->add(WebFloatKeyframe(0, startOpacity));
-    curve->add(WebFloatKeyframe(duration / 2, startOpacity));
+    // Make sure we have displayed for at least minPreFadeDuration before starting to fade out.
+    float extraDurationRequired = std::max(0.f, minPreFadeDuration - static_cast<float>(monotonicallyIncreasingTime() - m_startTime));
+    if (extraDurationRequired)
+        curve->add(WebFloatKeyframe(extraDurationRequired, startOpacity));
     // For layout tests we don't fade out.
-    curve->add(WebFloatKeyframe(duration, WebKit::layoutTestMode() ? startOpacity : 0));
+    curve->add(WebFloatKeyframe(fadeDuration + extraDurationRequired, WebKit::layoutTestMode() ? startOpacity : 0));
 
     m_animation = adoptPtr(compositorSupport->createAnimation(*curve, WebAnimation::TargetPropertyOpacity));
 

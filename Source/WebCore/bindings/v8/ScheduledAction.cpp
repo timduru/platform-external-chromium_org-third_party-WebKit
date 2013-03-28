@@ -45,25 +45,32 @@
 #include "V8GCController.h"
 #include "V8RecursionScope.h"
 #include "WorkerContext.h"
-#include "WorkerContextExecutionProxy.h"
 #include "WorkerThread.h"
 
 namespace WebCore {
 
-ScheduledAction::ScheduledAction(v8::Handle<v8::Context> context, v8::Handle<v8::Function> function, int argc, v8::Handle<v8::Value> argv[])
+ScheduledAction::ScheduledAction(v8::Handle<v8::Context> context, v8::Handle<v8::Function> function, int argc, v8::Handle<v8::Value> argv[], v8::Isolate* isolate)
     : m_context(context)
     , m_function(function)
     , m_code(String(), KURL(), TextPosition::belowRangePosition())
+    , m_isolate(isolate)
 {
     m_args.reserveCapacity(argc);
     for (int i = 0; i < argc; ++i)
-        m_args.append(v8::Persistent<v8::Value>::New(argv[i]));
+        m_args.append(v8::Persistent<v8::Value>::New(m_isolate, argv[i]));
+}
+
+ScheduledAction::ScheduledAction(v8::Handle<v8::Context> context, const String& code, const KURL& url, v8::Isolate* isolate)
+    : m_context(context)
+    , m_code(code, url)
+    , m_isolate(isolate)
+{
 }
 
 ScheduledAction::~ScheduledAction()
 {
     for (size_t i = 0; i < m_args.size(); ++i) {
-        m_args[i].Dispose();
+        m_args[i].Dispose(m_isolate);
         m_args[i].Clear();
     }
 }
@@ -71,7 +78,7 @@ ScheduledAction::~ScheduledAction()
 void ScheduledAction::execute(ScriptExecutionContext* context)
 {
     if (context->isDocument()) {
-        Frame* frame = static_cast<Document*>(context)->frame();
+        Frame* frame = toDocument(context)->frame();
         if (!frame)
             return;
         if (!frame->script()->canExecuteScripts(AboutToExecuteScript))

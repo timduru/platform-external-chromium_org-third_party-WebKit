@@ -28,7 +28,7 @@
 
 import json
 import sys
-import unittest
+import unittest2 as unittest
 
 from webkitpy.common.system.outputcapture import OutputCapture
 from webkitpy.layout_tests.models.test_configuration import *
@@ -81,17 +81,6 @@ class TestGardeningHTTPRequestHandler(GardeningHTTPRequestHandler):
         print "== Begin JSON Response =="
         print json.dumps(json_object)
         print "== End JSON Response =="
-
-
-class BuildCoverageExtrapolatorTest(unittest.TestCase):
-    def test_extrapolate(self):
-        # FIXME: Make this test not rely on actual (not mock) port objects.
-        host = MockHost()
-        port = host.port_factory.get('chromium-win-win7', None)
-        converter = TestConfigurationConverter(port.all_test_configurations(), port.configuration_specifier_macros())
-        extrapolator = BuildCoverageExtrapolator(converter)
-        self.assertEquals(extrapolator.extrapolate_test_configurations("WebKit XP"), set([TestConfiguration(version='xp', architecture='x86', build_type='release')]))
-        self.assertRaises(KeyError, extrapolator.extrapolate_test_configurations, "Potato")
 
 
 class GardeningServerTest(unittest.TestCase):

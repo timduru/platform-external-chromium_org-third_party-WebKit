@@ -138,12 +138,14 @@ public:
     virtual IntPoint scrollPosition() const;
     virtual IntPoint minimumScrollPosition() const;
     virtual IntPoint maximumScrollPosition() const;
-    virtual IntRect visibleContentRect(bool /*includeScrollbars*/ = false) const;
+
+    enum VisibleContentRectIncludesScrollbars { ExcludeScrollbars, IncludeScrollbars };
+    virtual IntRect visibleContentRect(VisibleContentRectIncludesScrollbars = ExcludeScrollbars) const;
     virtual int visibleHeight() const = 0;
     virtual int visibleWidth() const = 0;
     virtual IntSize contentsSize() const = 0;
     virtual IntSize overhangAmount() const { return IntSize(); }
-    virtual IntPoint currentMousePosition() const { return IntPoint(); }
+    virtual IntPoint lastKnownMousePosition() const { return IntPoint(); }
 
     virtual bool shouldSuspendScrollAnimations() const { return true; }
     virtual void scrollbarStyleChanged(int /*newStyle*/, bool /*forceUpdate*/) { }
@@ -158,11 +160,15 @@ public:
     virtual IntRect scrollableAreaBoundingBox() const = 0;
 
     virtual bool shouldRubberBandInDirection(ScrollDirection) const { return true; }
+    virtual bool isRubberBandInProgress() const { return false; }
 
     virtual bool scrollAnimatorEnabled() const { return false; }
 
     // NOTE: Only called from Internals for testing.
     void setScrollOffsetFromInternals(const IntPoint&);
+
+    static IntPoint constrainScrollPositionForOverhang(const IntRect& visibleContentRect, const IntSize& contentsSize, const IntPoint& scrollPosition, const IntPoint& scrollOrigin);
+    IntPoint constrainScrollPositionForOverhang(const IntPoint& scrollPosition);
 
     // Let subclasses provide a way of asking for and servicing scroll
     // animations.
@@ -173,6 +179,8 @@ public:
     virtual TiledBacking* tiledBacking() { return 0; }
     virtual bool usesCompositedScrolling() const { return false; }
 #endif
+
+    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
 protected:
     ScrollableArea();
@@ -185,6 +193,8 @@ protected:
     virtual void invalidateScrollCornerRect(const IntRect&) = 0;
 
 #if USE(ACCELERATED_COMPOSITING)
+    friend class ScrollingCoordinator;
+    virtual GraphicsLayer* layerForScrolling() const { return 0; }
     virtual GraphicsLayer* layerForHorizontalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForVerticalScrollbar() const { return 0; }
     virtual GraphicsLayer* layerForScrollCorner() const { return 0; }

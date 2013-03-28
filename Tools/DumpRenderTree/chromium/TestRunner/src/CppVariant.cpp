@@ -31,13 +31,14 @@
 #include "config.h"
 #include "CppVariant.h"
 
+#include "TestCommon.h"
 #include "WebBindings.h"
 #include <limits>
-#include <wtf/Assertions.h>
-#include <wtf/StringExtras.h>
 
 using namespace WebKit;
 using namespace std;
+
+namespace WebTestRunner {
 
 CppVariant::CppVariant()
 {
@@ -218,7 +219,7 @@ void CppVariant::set(NPObject* newValue)
 
 string CppVariant::toString() const
 {
-    ASSERT(isString());
+    WEBKIT_ASSERT(isString());
     return string(value.stringValue.UTF8Characters,
                   value.stringValue.UTF8Length);
 }
@@ -229,7 +230,7 @@ int32_t CppVariant::toInt32() const
         return value.intValue;
     if (isDouble())
         return static_cast<int32_t>(value.doubleValue);
-    ASSERT_NOT_REACHED();
+    WEBKIT_ASSERT_NOT_REACHED();
     return 0;
 }
 
@@ -239,21 +240,21 @@ double CppVariant::toDouble() const
         return static_cast<double>(value.intValue);
     if (isDouble())
         return value.doubleValue;
-    ASSERT_NOT_REACHED();
+    WEBKIT_ASSERT_NOT_REACHED();
     return 0;
 }
 
 bool CppVariant::toBoolean() const
 {
-    ASSERT(isBool());
+    WEBKIT_ASSERT(isBool());
     return value.boolValue;
 }
 
-Vector<string> CppVariant::toStringVector() const
+vector<string> CppVariant::toStringVector() const
 {
 
-    ASSERT(isObject());
-    Vector<string> stringVector;
+    WEBKIT_ASSERT(isObject());
+    vector<string> stringVector;
     NPObject* npValue = value.objectValue;
     NPIdentifier lengthId = WebBindings::getStringIdentifier("length");
 
@@ -288,7 +289,7 @@ Vector<string> CppVariant::toStringVector() const
         if (NPVARIANT_IS_STRING(indexValue)) {
             string item(NPVARIANT_TO_STRING(indexValue).UTF8Characters,
                         NPVARIANT_TO_STRING(indexValue).UTF8Length);
-            stringVector.append(item);
+            stringVector.push_back(item);
         }
         WebBindings::releaseVariantValue(&indexValue);
     }
@@ -298,7 +299,7 @@ Vector<string> CppVariant::toStringVector() const
 bool CppVariant::invoke(const string& method, const CppVariant* arguments,
                         uint32_t argumentCount, CppVariant& result) const
 {
-    ASSERT(isObject());
+    WEBKIT_ASSERT(isObject());
     NPIdentifier methodName = WebBindings::getStringIdentifier(method.c_str());
     NPObject* npObject = value.objectValue;
     if (!WebBindings::hasMethod(0, npObject, methodName))
@@ -312,10 +313,12 @@ bool CppVariant::invoke(const string& method, const CppVariant* arguments,
 bool CppVariant::invokeDefault(const CppVariant* arguments, uint32_t argumentCount,
                                CppVariant& result) const
 {
-    ASSERT(isObject());
+    WEBKIT_ASSERT(isObject());
     NPObject* npObject = value.objectValue;
     NPVariant r;
     bool status = WebBindings::invokeDefault(0, npObject, arguments, argumentCount, &r);
     result.set(r);
     return status;
+}
+
 }

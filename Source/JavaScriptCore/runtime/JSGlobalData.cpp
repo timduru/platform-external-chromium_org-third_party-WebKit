@@ -32,6 +32,7 @@
 #include "ArgList.h"
 #include "CodeCache.h"
 #include "CommonIdentifiers.h"
+#include "DFGLongLivedState.h"
 #include "DebuggerActivation.h"
 #include "FunctionConstructor.h"
 #include "GCActivityCallback.h"
@@ -43,7 +44,6 @@
 #include "JSActivation.h"
 #include "JSAPIValueWrapper.h"
 #include "JSArray.h"
-#include "JSClassRef.h"
 #include "JSFunction.h"
 #include "JSLock.h"
 #include "JSNameScope.h"
@@ -56,6 +56,7 @@
 #include "ParserArena.h"
 #include "RegExpCache.h"
 #include "RegExpObject.h"
+#include "SourceProviderCache.h"
 #include "StrictEvalActivation.h"
 #include "StrongInlines.h"
 #include "UnlinkedCodeBlock.h"
@@ -91,12 +92,10 @@ extern const HashTable mathTable;
 extern const HashTable numberConstructorTable;
 extern const HashTable numberPrototypeTable;
 JS_EXPORTDATA extern const HashTable objectConstructorTable;
-extern const HashTable objectPrototypeTable;
 extern const HashTable privateNamePrototypeTable;
 extern const HashTable regExpTable;
 extern const HashTable regExpConstructorTable;
 extern const HashTable regExpPrototypeTable;
-extern const HashTable stringTable;
 extern const HashTable stringConstructorTable;
 
 // Note: Platform.h will enforce that ENABLE(ASSEMBLER) is true if either
@@ -153,12 +152,10 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, HeapType heapType)
     , numberConstructorTable(fastNew<HashTable>(JSC::numberConstructorTable))
     , numberPrototypeTable(fastNew<HashTable>(JSC::numberPrototypeTable))
     , objectConstructorTable(fastNew<HashTable>(JSC::objectConstructorTable))
-    , objectPrototypeTable(fastNew<HashTable>(JSC::objectPrototypeTable))
     , privateNamePrototypeTable(fastNew<HashTable>(JSC::privateNamePrototypeTable))
     , regExpTable(fastNew<HashTable>(JSC::regExpTable))
     , regExpConstructorTable(fastNew<HashTable>(JSC::regExpConstructorTable))
     , regExpPrototypeTable(fastNew<HashTable>(JSC::regExpPrototypeTable))
-    , stringTable(fastNew<HashTable>(JSC::stringTable))
     , stringConstructorTable(fastNew<HashTable>(JSC::stringConstructorTable))
     , identifierTable(globalDataType == Default ? wtfThreadData().currentIdentifierTable() : createIdentifierTable())
     , propertyNames(new CommonIdentifiers(this))
@@ -184,7 +181,7 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, HeapType heapType)
 #if CPU(X86) && ENABLE(JIT)
     , m_timeoutCount(512)
 #endif
-    , m_newStringsSinceLastHashConst(0)
+    , m_newStringsSinceLastHashCons(0)
 #if ENABLE(ASSEMBLER)
     , m_canUseAssembler(enableAssembler(executableAllocator))
 #endif
@@ -206,6 +203,7 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, HeapType heapType)
     JSLockHolder lock(this);
     IdentifierTable* existingEntryIdentifierTable = wtfThreadData().setCurrentIdentifierTable(identifierTable);
     structureStructure.set(*this, Structure::createStructure(*this));
+    structureRareDataStructure.set(*this, StructureRareData::createStructure(*this, 0, jsNull()));
     debuggerActivationStructure.set(*this, DebuggerActivation::createStructure(*this, 0, jsNull()));
     interruptedExecutionErrorStructure.set(*this, InterruptedExecutionError::createStructure(*this, 0, jsNull()));
     terminatedExecutionErrorStructure.set(*this, TerminatedExecutionError::createStructure(*this, 0, jsNull()));
@@ -229,11 +227,14 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, HeapType heapType)
     unlinkedProgramCodeBlockStructure.set(*this, UnlinkedProgramCodeBlock::createStructure(*this, 0, jsNull()));
     unlinkedEvalCodeBlockStructure.set(*this, UnlinkedEvalCodeBlock::createStructure(*this, 0, jsNull()));
     unlinkedFunctionCodeBlockStructure.set(*this, UnlinkedFunctionCodeBlock::createStructure(*this, 0, jsNull()));
+    propertyTableStructure.set(*this, PropertyTable::createStructure(*this, 0, jsNull()));
+    smallStrings.initializeCommonStrings(*this);
 
     wtfThreadData().setCurrentIdentifierTable(existingEntryIdentifierTable);
 
 #if ENABLE(JIT)
-    jitStubs = adoptPtr(new JITThunks(this));
+    jitStubs = adoptPtr(new JITThunks());
+    performPlatformSpecificJITAssertions(this);
 #endif
     
     interpreter->initialize(this->canUseJIT());
@@ -243,12 +244,23 @@ JSGlobalData::JSGlobalData(GlobalDataType globalDataType, HeapType heapType)
 #endif
 
     heap.notifyIsSafeToCollect();
-    
+
     LLInt::Data::performAssertions(*this);
+    
+    if (Options::enableProfiler())
+        m_perBytecodeProfiler = adoptPtr(new Profiler::Database(*this));
+
+#if ENABLE(DFG_JIT)
+    if (canUseJIT())
+        m_dfgState = adoptPtr(new DFG::LongLivedState());
+#endif
 }
 
 JSGlobalData::~JSGlobalData()
 {
+    // Clear this first to ensure that nobody tries to remove themselves from it.
+    m_perBytecodeProfiler.clear();
+    
     ASSERT(!m_apiLock.currentThreadIsHoldingLock());
     heap.didStartVMShutdown();
 
@@ -269,12 +281,10 @@ JSGlobalData::~JSGlobalData()
     numberConstructorTable->deleteTable();
     numberPrototypeTable->deleteTable();
     objectConstructorTable->deleteTable();
-    objectPrototypeTable->deleteTable();
     privateNamePrototypeTable->deleteTable();
     regExpTable->deleteTable();
     regExpConstructorTable->deleteTable();
     regExpPrototypeTable->deleteTable();
-    stringTable->deleteTable();
     stringConstructorTable->deleteTable();
 
     fastDelete(const_cast<HashTable*>(arrayConstructorTable));
@@ -289,15 +299,11 @@ JSGlobalData::~JSGlobalData()
     fastDelete(const_cast<HashTable*>(numberConstructorTable));
     fastDelete(const_cast<HashTable*>(numberPrototypeTable));
     fastDelete(const_cast<HashTable*>(objectConstructorTable));
-    fastDelete(const_cast<HashTable*>(objectPrototypeTable));
     fastDelete(const_cast<HashTable*>(privateNamePrototypeTable));
     fastDelete(const_cast<HashTable*>(regExpTable));
     fastDelete(const_cast<HashTable*>(regExpConstructorTable));
     fastDelete(const_cast<HashTable*>(regExpPrototypeTable));
-    fastDelete(const_cast<HashTable*>(stringTable));
     fastDelete(const_cast<HashTable*>(stringConstructorTable));
-
-    opaqueJSClassData.clear();
 
     delete emptyList;
 
@@ -425,12 +431,32 @@ void JSGlobalData::stopSampling()
     interpreter->stopSampling();
 }
 
+void JSGlobalData::discardAllCode()
+{
+    m_codeCache->clear();
+    heap.deleteAllCompiledCode();
+    heap.reportAbandonedObjectGraph();
+}
+
 void JSGlobalData::dumpSampleData(ExecState* exec)
 {
     interpreter->dumpSampleData(exec);
 #if ENABLE(ASSEMBLER)
     ExecutableAllocator::dumpProfile();
 #endif
+}
+
+SourceProviderCache* JSGlobalData::addSourceProviderCache(SourceProvider* sourceProvider)
+{
+    SourceProviderCacheMap::AddResult addResult = sourceProviderCacheMap.add(sourceProvider, 0);
+    if (addResult.isNewEntry)
+        addResult.iterator->value = adoptRef(new SourceProviderCache);
+    return addResult.iterator->value.get();
+}
+
+void JSGlobalData::clearSourceProviderCaches()
+{
+    sourceProviderCacheMap.clear();
 }
 
 struct StackPreservingRecompiler : public MarkedBlock::VoidFunctor {
@@ -507,17 +533,17 @@ void JSGlobalData::dumpRegExpTrace()
     RTTraceList::iterator iter = ++m_rtTraceList->begin();
     
     if (iter != m_rtTraceList->end()) {
-        dataLog("\nRegExp Tracing\n");
-        dataLog("                                                            match()    matches\n");
-        dataLog("Regular Expression                          JIT Address      calls      found\n");
-        dataLog("----------------------------------------+----------------+----------+----------\n");
+        dataLogF("\nRegExp Tracing\n");
+        dataLogF("                                                            match()    matches\n");
+        dataLogF("Regular Expression                          JIT Address      calls      found\n");
+        dataLogF("----------------------------------------+----------------+----------+----------\n");
     
         unsigned reCount = 0;
     
         for (; iter != m_rtTraceList->end(); ++iter, ++reCount)
             (*iter)->printTraceData();
 
-        dataLog("%d Regular Expressions\n", reCount);
+        dataLogF("%d Regular Expressions\n", reCount);
     }
     
     m_rtTraceList->clear();

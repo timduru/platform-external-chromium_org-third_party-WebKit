@@ -55,14 +55,22 @@ public:
     virtual bool isEmpty() const;
 
     void append(const char*, unsigned);
+    void append(SharedBuffer*);
+#if USE(NETWORK_CFDATA_ARRAY_CALLBACK)
+    void append(CFDataRef);
+#endif
     void clear();
     
     unsigned getSomeData(const char*& data, unsigned position = 0) const;
     
     SharedBuffer* sharedBuffer() const;
+#if PLATFORM(MAC)
+    void tryReplaceSharedBufferContents(SharedBuffer*);
+#endif
     PassRefPtr<ResourceBuffer> copy() const;
 
     bool hasPurgeableBuffer() const;
+    void createPurgeableBuffer() const;
     
     // Ensure this buffer has no other clients before calling this.
     PassOwnPtr<PurgeableBuffer> releasePurgeableBuffer();
@@ -72,9 +80,6 @@ public:
 #endif
 #if USE(CF)
     CFDataRef createCFData();
-#endif
-#if HAVE(NETWORK_CFDATA_ARRAY_CALLBACK)
-    void append(CFDataRef);
 #endif
 
     void reportMemoryUsage(MemoryObjectInfo*) const;

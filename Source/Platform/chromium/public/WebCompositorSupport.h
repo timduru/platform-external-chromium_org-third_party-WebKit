@@ -34,13 +34,13 @@
 namespace WebKit {
 
 class WebAnimationCurve;
+class WebCompositorOutputSurface;
 class WebContentLayer;
 class WebContentLayerClient;
-class WebDelegatedRendererLayer;
 class WebExternalTextureLayer;
 class WebExternalTextureLayerClient;
 class WebFloatAnimationCurve;
-class WebIOSurfaceLayer;
+class WebGraphicsContext3D;
 class WebImageLayer;
 class WebLayer;
 class WebScrollbar;
@@ -49,6 +49,7 @@ class WebScrollbarThemeGeometry;
 class WebSolidColorLayer;
 class WebThread;
 class WebTransformAnimationCurve;
+class WebTransformOperations;
 class WebVideoFrameProvider;
 class WebVideoLayer;
 
@@ -59,23 +60,16 @@ public:
     // prior to calling initialize.
     virtual void initialize(WebThread*) { }
 
-    // Returns whether the compositor was initialized with threading enabled.
-    virtual bool isThreadingEnabled() { return false; }
-
     // Shuts down the compositor. This must be called when all compositor data
     // types have been deleted. No compositor classes or methods should be used
     // after shutdown.
     virtual void shutdown() { }
 
-    // These may only be called before initialize.
-    virtual void setPerTilePaintingEnabled(bool) { }
-    virtual void setPartialSwapEnabled(bool) { }
-    virtual void setAcceleratedAnimationEnabled(bool) { }
-    virtual void setPageScalePinchZoomEnabled(bool) { }
+    // Creates an output surface for the compositor backed by a 3d context.
+    virtual WebCompositorOutputSurface* createOutputSurfaceFor3D(WebKit::WebGraphicsContext3D*) { return 0; }
 
-    // May return 0 if initialization fails.
-    virtual WebLayerTreeView* createLayerTreeView(WebLayerTreeViewClient*, const WebLayer& root, const WebLayerTreeView::Settings&) { return 0; }
-
+    // Creates an output surface for the compositor backed by a software device.
+    virtual WebCompositorOutputSurface* createOutputSurfaceForSoftware() { return 0; }
 
     // Layers -------------------------------------------------------
 
@@ -83,11 +77,7 @@ public:
 
     virtual WebContentLayer* createContentLayer(WebContentLayerClient*) { return 0; }
 
-    virtual WebDelegatedRendererLayer* createDelegatedRendererLayer() { return 0; }
-
     virtual WebExternalTextureLayer* createExternalTextureLayer(WebExternalTextureLayerClient* = 0) { return 0; }
-
-    virtual WebIOSurfaceLayer* createIOSurfaceLayer() { return 0; }
 
     virtual WebImageLayer* createImageLayer() { return 0; }
 
@@ -105,6 +95,9 @@ public:
     virtual WebFloatAnimationCurve* createFloatAnimationCurve() { return 0; }
 
     virtual WebTransformAnimationCurve* createTransformAnimationCurve() { return 0; }
+
+    virtual WebTransformOperations* createTransformOperations() { return 0; }
+
 
 protected:
     virtual ~WebCompositorSupport() { }

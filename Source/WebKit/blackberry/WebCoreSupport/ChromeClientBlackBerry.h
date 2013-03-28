@@ -61,7 +61,7 @@ public:
     virtual void setMenubarVisible(bool);
     virtual bool menubarVisible();
     virtual void setResizable(bool);
-    virtual void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String& message, unsigned int lineNumber, const String& sourceID);
+    virtual void addMessageToConsole(MessageSource, MessageLevel, const String& message, unsigned lineNumber, const String& sourceID);
     virtual bool canRunBeforeUnloadConfirmPanel();
     virtual bool runBeforeUnloadConfirmPanel(const String&, Frame*);
     virtual void closeWindowSoon();
@@ -91,7 +91,7 @@ public:
     virtual bool shouldRubberBandInDirection(ScrollDirection) const { return true; }
     virtual void numWheelEventHandlersChanged(unsigned) { }
     virtual void print(Frame*);
-    virtual void exceededDatabaseQuota(Frame*, const String&);
+    virtual void exceededDatabaseQuota(Frame*, const String&, DatabaseDetails);
     virtual void runOpenPanel(Frame*, PassRefPtr<FileChooser>);
     virtual void loadIconForFiles(const Vector<String>&, FileIconLoader*);
     virtual void setCursor(const Cursor&);
@@ -151,17 +151,8 @@ public:
     virtual bool allowsAcceleratedCompositing() const;
 #endif
 
-#if ENABLE(NAVIGATOR_CONTENT_UTILS)
-    virtual void registerProtocolHandler(const String& /*scheme*/, const String& /*baseURL*/, const String& /*url*/, const String& /*title*/);
-
-#if ENABLE(CUSTOM_SCHEME_HANDLER)
-    virtual CustomHandlersState isProtocolHandlerRegistered(const String& /*scheme*/, const String& /*baseURL*/, const String& /*url*/);
-    virtual void unregisterProtocolHandler(const String& /*scheme*/, const String& /*baseURL*/, const String& /*url*/);
-#endif
-#endif
-
     virtual void addSearchProvider(const BlackBerry::Platform::String&, const BlackBerry::Platform::String&);
-    virtual int isSearchProviderInstalled(const BlackBerry::Platform::String&, const BlackBerry::Platform::String&);
+    virtual int isSearchProviderInstalled(const BlackBerry::Platform::String&);
 
     BlackBerry::WebKit::WebPagePrivate* webPagePrivate() const { return m_webPagePrivate; }
 

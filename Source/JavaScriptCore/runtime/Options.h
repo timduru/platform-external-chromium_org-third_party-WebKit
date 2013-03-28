@@ -66,13 +66,28 @@ namespace JSC {
     v(bool, useDFGJIT, true) \
     v(bool, useRegExpJIT, true) \
     \
+    v(bool, forceDFGCodeBlockLiveness, false) \
+    \
+    v(bool, dumpGeneratedBytecodes, false) \
+    \
     /* showDisassembly implies showDFGDisassembly. */ \
     v(bool, showDisassembly, false) \
     v(bool, showDFGDisassembly, false) \
+    v(bool, showAllDFGNodes, false) \
+    v(bool, dumpBytecodeAtDFGTime, false) \
+    v(bool, dumpGraphAtEachPhase, false) \
+    v(bool, verboseCompilation, false) \
+    v(bool, logCompilationChanges, false) \
+    v(bool, printEachOSRExit, false) \
+    v(bool, validateGraph, false) \
+    v(bool, validateGraphAtEachPhase, false) \
+    \
+    v(bool, enableProfiler, false) \
     \
     v(unsigned, maximumOptimizationCandidateInstructionCount, 10000) \
     \
     v(unsigned, maximumFunctionForCallInlineCandidateInstructionCount, 180) \
+    v(unsigned, maximumFunctionForClosureCallInlineCandidateInstructionCount, 100) \
     v(unsigned, maximumFunctionForConstructInlineCandidateInstructionCount, 100) \
     \
     /* Depth of inline stack, so 1 = no inlining, 2 = one level, etc. */ \
@@ -82,21 +97,20 @@ namespace JSC {
     v(int32, thresholdForJITSoon, 100) \
     \
     v(int32, thresholdForOptimizeAfterWarmUp, 1000) \
-    v(int32, thresholdForOptimizeAfterLongWarmUp, 5000) \
+    v(int32, thresholdForOptimizeAfterLongWarmUp, 1000) \
     v(int32, thresholdForOptimizeSoon, 1000) \
     \
     v(int32, executionCounterIncrementForLoop, 1) \
     v(int32, executionCounterIncrementForReturn, 15) \
     \
+    v(int32, evalThresholdMultiplier, 10) \
+    \
     v(bool, randomizeExecutionCountsBetweenCheckpoints, false) \
     v(int32, maximumExecutionCountsBetweenCheckpoints, 1000) \
     \
-    v(double, likelyToTakeSlowCaseThreshold, 0.15) \
-    v(double, couldTakeSlowCaseThreshold, 0.05) \
     v(unsigned, likelyToTakeSlowCaseMinimumCount, 100) \
     v(unsigned, couldTakeSlowCaseMinimumCount, 10) \
     \
-    v(double, osrExitProminenceForFrequentExitSite, 0.3) \
     v(unsigned, osrExitCountForReoptimization, 100) \
     v(unsigned, osrExitCountForReoptimizationFromLoop, 5) \
     \
@@ -112,7 +126,6 @@ namespace JSC {
     v(double, structureCheckVoteRatioForHoisting, 1) \
     \
     v(unsigned, minimumNumberOfScansBetweenRebalance, 100) \
-    v(unsigned, gcMarkStackSegmentSize, pageSize()) \
     v(unsigned, numberOfGCMarkers, computeNumberOfGCMarkers(7)) \
     v(unsigned, opaqueRootMergeThreshold, 1000) \
     v(double, minHeapUtilization, 0.8) \

@@ -28,15 +28,13 @@
     #define TEXMAP_OPENGL_ES_2
 #endif
 #endif
-#if PLATFORM(GTK) && USE(OPENGL_ES_2)
+#if (PLATFORM(GTK) || PLATFORM(EFL)) && USE(OPENGL_ES_2)
 #define TEXMAP_OPENGL_ES_2
 #endif
 
-#include "FilterOperations.h"
 #include "GraphicsContext.h"
 #include "IntRect.h"
 #include "IntSize.h"
-#include "TextureMapperPlatformLayer.h"
 #include "TransformationMatrix.h"
 #include <wtf/UnusedParam.h>
 
@@ -48,10 +46,13 @@
 namespace WebCore {
 
 class BitmapTexturePool;
+class CustomFilterProgram;
+class GraphicsLayer;
 class TextureMapper;
+class FilterOperations;
 
 // A 2D texture that can be the target of software or GL rendering.
-class BitmapTexture  : public RefCounted<BitmapTexture> {
+class BitmapTexture : public RefCounted<BitmapTexture> {
 public:
     enum Flag {
         SupportsAlpha = 0x01
@@ -74,6 +75,7 @@ public:
 
     virtual IntSize size() const = 0;
     virtual void updateContents(Image*, const IntRect&, const IntPoint& offset, UpdateContentsFlag) = 0;
+    virtual void updateContents(TextureMapper*, GraphicsLayer*, const IntRect& target, const IntPoint& offset, UpdateContentsFlag);
     virtual void updateContents(const void*, const IntRect& target, const IntPoint& offset, int bytesPerLine, UpdateContentsFlag) = 0;
     virtual bool isValid() const = 0;
     inline Flags flags() const { return m_flags; }
@@ -127,14 +129,16 @@ public:
         AllEdges = LeftEdge | RightEdge | TopEdge | BottomEdge,
     };
 
-    virtual void drawBorder(const Color&, float borderWidth, const FloatRect& targetRect, const TransformationMatrix& modelViewMatrix = TransformationMatrix()) = 0;
-    virtual void drawRepaintCounter(int value, int pointSize, const FloatPoint&, const TransformationMatrix& modelViewMatrix = TransformationMatrix()) = 0;
-    virtual void drawTexture(const BitmapTexture&, const FloatRect& target, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0f, const BitmapTexture* maskTexture = 0, unsigned exposedEdges = AllEdges) = 0;
+    virtual void drawBorder(const Color&, float borderWidth, const FloatRect&, const TransformationMatrix&) = 0;
+    virtual void drawNumber(int number, const Color&, const FloatPoint&, const TransformationMatrix&) = 0;
+
+    virtual void drawTexture(const BitmapTexture&, const FloatRect& target, const TransformationMatrix& modelViewMatrix = TransformationMatrix(), float opacity = 1.0f, unsigned exposedEdges = AllEdges) = 0;
+    virtual void drawSolidColor(const FloatRect&, const TransformationMatrix&, const Color&) = 0;
 
     // makes a surface the target for the following drawTexture calls.
     virtual void bindSurface(BitmapTexture* surface) = 0;
-    virtual void setGraphicsContext(GraphicsContext* context) { m_context = context; }
-    virtual GraphicsContext* graphicsContext() { return m_context; }
+    void setGraphicsContext(GraphicsContext* context) { m_context = context; }
+    GraphicsContext* graphicsContext() { return m_context; }
     virtual void beginClip(const TransformationMatrix&, const FloatRect&) = 0;
     virtual void endClip() = 0;
     virtual PassRefPtr<BitmapTexture> createTexture() = 0;
@@ -149,12 +153,22 @@ public:
     virtual void beginPainting(PaintFlags = 0) { }
     virtual void endPainting() { }
 
-    virtual IntSize maxTextureSize() const { return IntSize(INT_MAX, INT_MAX); }
+    void setMaskMode(bool m) { m_isMaskMode = m; }
+
+    virtual IntSize maxTextureSize() const = 0;
 
     virtual PassRefPtr<BitmapTexture> acquireTextureFromPool(const IntSize&);
 
+#if ENABLE(CSS_SHADERS)
+    virtual void removeCachedCustomFilterProgram(CustomFilterProgram*) { }
+#endif
+
 protected:
-    TextureMapper(AccelerationMode);
+    explicit TextureMapper(AccelerationMode);
+
+    GraphicsContext* m_context;
+
+    bool isInMaskMode() const { return m_isMaskMode; }
 
 private:
 #if USE(TEXTURE_MAPPER_GL)
@@ -168,8 +182,8 @@ private:
     InterpolationQuality m_interpolationQuality;
     TextDrawingModeFlags m_textDrawingMode;
     OwnPtr<BitmapTexturePool> m_texturePool;
-    GraphicsContext* m_context;
     AccelerationMode m_accelerationMode;
+    bool m_isMaskMode;
 };
 
 }

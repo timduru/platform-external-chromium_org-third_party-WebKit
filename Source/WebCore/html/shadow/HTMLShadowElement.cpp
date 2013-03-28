@@ -35,13 +35,14 @@
 #include "ShadowRoot.h"
 #include <wtf/text/AtomicString.h>
 
+#if ENABLE(SHADOW_DOM)
+
 namespace WebCore {
 
 class Document;
 
 inline HTMLShadowElement::HTMLShadowElement(const QualifiedName& tagName, Document* document)
     : InsertionPoint(tagName, document)
-    , m_registeredWithShadowRoot(false)
 {
     ASSERT(hasTagName(HTMLNames::shadowTag));
 }
@@ -55,42 +56,21 @@ HTMLShadowElement::~HTMLShadowElement()
 {
 }
 
-const AtomicString& HTMLShadowElement::select() const
+ShadowRoot* HTMLShadowElement::olderShadowRoot()
 {
-     return nullAtom;
-}
+    ShadowRoot* containingRoot = containingShadowRoot();
+    if (!containingRoot)
+        return 0;
 
-Node::InsertionNotificationRequest HTMLShadowElement::insertedInto(ContainerNode* insertionPoint)
-{
-    InsertionPoint::insertedInto(insertionPoint);
+    ContentDistributor::ensureDistribution(containingRoot);
 
-    if (insertionPoint->inDocument() && isActive()) {
-        if (ShadowRoot* root = shadowRoot()) {
-            root->registerShadowElement();
-            m_registeredWithShadowRoot = true;
-        }
-    }
+    ShadowRoot* older = containingRoot->olderShadowRoot();
+    if (!older || older->type() != ShadowRoot::AuthorShadowRoot || ScopeContentDistribution::assignedTo(older) != this)
+        return 0;
 
-    return InsertionDone;
-}
-
-void HTMLShadowElement::removedFrom(ContainerNode* insertionPoint)
-{
-    if (insertionPoint->inDocument() && m_registeredWithShadowRoot) {
-        ShadowRoot* root = shadowRoot();
-        if (!root)
-            root = insertionPoint->shadowRoot();
-        if (root)
-            root->unregisterShadowElement();
-        m_registeredWithShadowRoot = false;
-    }
-    InsertionPoint::removedFrom(insertionPoint);
-}
-
-const CSSSelectorList& HTMLShadowElement::emptySelectorList()
-{
-    DEFINE_STATIC_LOCAL(CSSSelectorList, selectorList, (CSSSelectorList()));
-    return selectorList;
+    return older;
 }
 
 } // namespace WebCore
+
+#endif // if ENABLE(SHADOW_DOM)

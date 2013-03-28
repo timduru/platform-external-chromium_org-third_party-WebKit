@@ -1,5 +1,5 @@
 # Copyright (C) 2011 Google Inc. All rights reserved.
-# Copyright (C) 2012 Apple Inc. All rights reserved.
+# Copyright (C) 2012, 2013 Apple Inc. All rights reserved.
 #
 # Redistribution and use in source and binary forms, with or without
 # modification, are permitted provided that the following conditions are
@@ -29,9 +29,6 @@
 
 import logging
 import os
-import re
-import subprocess
-import sys
 import time
 
 from webkitpy.common.system.crashlogs import CrashLogs
@@ -68,6 +65,9 @@ class MacPort(ApplePort):
             return 350 * 1000
         return super(MacPort, self).default_timeout_ms()
 
+    def supports_per_test_timeout(self):
+        return True
+
     def _build_driver_flags(self):
         return ['ARCHS=i386'] if self.architecture() == 'x86' else []
 
@@ -76,14 +76,17 @@ class MacPort(ApplePort):
         return True
 
     def default_baseline_search_path(self):
-        if self._name.endswith(self.FUTURE_VERSION):
+        name = self._name.replace('-wk2', '')
+        if name.endswith(self.FUTURE_VERSION):
             fallback_names = [self.port_name]
         else:
-            fallback_names = self.VERSION_FALLBACK_ORDER[self.VERSION_FALLBACK_ORDER.index(self._name):-1] + [self.port_name]
+            fallback_names = self.VERSION_FALLBACK_ORDER[self.VERSION_FALLBACK_ORDER.index(name):-1] + [self.port_name]
         if self.get_option('webkit_test_runner'):
-            fallback_names.insert(0, self._wk2_port_name())
-            # Note we do not add 'wk2' here, even though it's included in _skipped_search_paths().
+            fallback_names = [self._wk2_port_name(), 'wk2'] + fallback_names
         return map(self._webkit_baseline_path, fallback_names)
+
+    def _port_specific_expectations_files(self):
+        return list(reversed([self._filesystem.join(self._webkit_baseline_path(p), 'TestExpectations') for p in self.baseline_search_path()]))
 
     def setup_environ_for_server(self, server_name=None):
         env = super(MacPort, self).setup_environ_for_server(server_name)
@@ -107,10 +110,8 @@ class MacPort(ApplePort):
         return self._version == "lion"
 
     def default_child_processes(self):
-        # FIXME: The Printer isn't initialized when this is called, so using _log would just show an unitialized logger error.
-
         if self._version == "snowleopard":
-            print >> sys.stderr, "Cannot run tests in parallel on Snow Leopard due to rdar://problem/10621525."
+            _log.warning("Cannot run tests in parallel on Snow Leopard due to rdar://problem/10621525.")
             return 1
 
         default_count = super(MacPort, self).default_child_processes()
@@ -127,12 +128,12 @@ class MacPort(ApplePort):
         overhead = 2048 * 1024 * 1024  # Assume we need 2GB free for the O/S
         supportable_instances = max((total_memory - overhead) / bytes_per_drt, 1)  # Always use one process, even if we don't have space for it.
         if supportable_instances < default_count:
-            print >> sys.stderr, "This machine could support %s child processes, but only has enough memory for %s." % (default_count, supportable_instances)
+            _log.warning("This machine could support %s child processes, but only has enough memory for %s." % (default_count, supportable_instances))
         return min(supportable_instances, default_count)
 
     def _build_java_test_support(self):
         java_tests_path = self._filesystem.join(self.layout_tests_dir(), "java")
-        build_java = ["/usr/bin/make", "-C", java_tests_path]
+        build_java = [self.make_command(), "-C", java_tests_path]
         if self._executive.run_command(build_java, return_exit_code=True):  # Paths are absolute, so we don't need to set a cwd.
             _log.error("Failed to build Java support files: %s" % build_java)
             return False
@@ -168,8 +169,8 @@ class MacPort(ApplePort):
         # We don't use self._run_script() because we don't want to wait for the script
         # to exit and we want the output to show up on stdout in case there are errors
         # launching the browser.
-        self._executive.popen([self._config.script_path('run-safari')] + self._arguments_for_configuration() + ['--no-saved-state', '-NSOpen', results_filename],
-            cwd=self._config.webkit_base_dir(), stdout=file(os.devnull), stderr=file(os.devnull))
+        self._executive.popen([self.path_to_script('run-safari')] + self._arguments_for_configuration() + ['--no-saved-state', '-NSOpen', results_filename],
+            cwd=self.webkit_base(), stdout=file(os.devnull), stderr=file(os.devnull))
 
     # FIXME: The next two routines turn off the http locking in order
     # to work around failures on the bots caused when the slave restarts.
@@ -187,6 +188,9 @@ class MacPort(ApplePort):
 
     def release_http_lock(self):
         pass
+
+    def sample_file_path(self, name, pid):
+        return self._filesystem.join(self.results_directory(), "{0}-{1}-sample.txt".format(name, pid))
 
     def _get_crash_log(self, name, pid, stdout, stderr, newer_than, time_fn=None, sleep_fn=None, wait_for_log=True):
         # Note that we do slow-spin here and wait, since it appears the time
@@ -224,16 +228,25 @@ class MacPort(ApplePort):
         crash_logs = {}
         for (test_name, process_name, pid) in crashed_processes:
             # Passing None for output.  This is a second pass after the test finished so
-            # if the output had any loggine we would have already collected it.
+            # if the output had any logging we would have already collected it.
             crash_log = self._get_crash_log(process_name, pid, None, None, start_time, wait_for_log=False)[1]
             if not crash_log:
                 continue
             crash_logs[test_name] = crash_log
         return crash_logs
 
+    def look_for_new_samples(self, unresponsive_processes, start_time):
+        sample_files = {}
+        for (test_name, process_name, pid) in unresponsive_processes:
+            sample_file = self.sample_file_path(process_name, pid)
+            if not self._filesystem.isfile(sample_file):
+                continue
+            sample_files[test_name] = sample_file
+        return sample_files
+
     def sample_process(self, name, pid):
         try:
-            hang_report = self._filesystem.join(self.results_directory(), "%s-%s.sample.txt" % (name, pid))
+            hang_report = self.sample_file_path(name, pid)
             self._executive.run_command([
                 "/usr/bin/sample",
                 pid,
@@ -242,8 +255,8 @@ class MacPort(ApplePort):
                 "-file",
                 hang_report,
             ])
-        except ScriptError, e:
-            _log.warning('Unable to sample process.')
+        except ScriptError as e:
+            _log.warning('Unable to sample process:' + str(e))
 
     def _path_to_helper(self):
         binary_name = 'LayoutTestHelper'
@@ -253,9 +266,8 @@ class MacPort(ApplePort):
         helper_path = self._path_to_helper()
         if helper_path:
             _log.debug("Starting layout helper %s" % helper_path)
-            # Note: Not thread safe: http://bugs.python.org/issue2320
             self._helper = self._executive.popen([helper_path],
-                stdin=subprocess.PIPE, stdout=subprocess.PIPE, stderr=None)
+                stdin=self._executive.PIPE, stdout=self._executive.PIPE, stderr=None)
             is_ready = self._helper.stdout.readline()
             if not is_ready.startswith('ready'):
                 _log.error("LayoutTestHelper failed to be ready")
@@ -269,12 +281,17 @@ class MacPort(ApplePort):
                 self._helper.wait()
             except IOError, e:
                 _log.debug("IOError raised while stopping helper: %s" % str(e))
-                pass
             self._helper = None
 
+    def make_command(self):
+        return self.xcrun_find('make', '/usr/bin/make')
+
     def nm_command(self):
+        return self.xcrun_find('nm', 'nm')
+
+    def xcrun_find(self, command, fallback):
         try:
-            return self._executive.run_command(['xcrun', '-find', 'nm']).rstrip()
-        except ScriptError, e:
-            _log.warn("xcrun failed; falling back to 'nm'.")
-            return 'nm'
+            return self._executive.run_command(['xcrun', '-find', command]).rstrip()
+        except ScriptError:
+            _log.warn("xcrun failed; falling back to '%s'." % fallback)
+            return fallback

@@ -26,6 +26,7 @@
 
 #include "Attribute.h"
 #include "Frame.h"
+#include "FrameLoader.h"
 #include "HTMLDocument.h"
 #include "HTMLNames.h"
 #include "HTMLParamElement.h"
@@ -51,19 +52,19 @@ PassRefPtr<HTMLAppletElement> HTMLAppletElement::create(const QualifiedName& tag
     return adoptRef(new HTMLAppletElement(tagName, document, createdByParser));
 }
 
-void HTMLAppletElement::parseAttribute(const Attribute& attribute)
+void HTMLAppletElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == altAttr
-        || attribute.name() == archiveAttr
-        || attribute.name() == codeAttr
-        || attribute.name() == codebaseAttr
-        || attribute.name() == mayscriptAttr
-        || attribute.name() == objectAttr) {
+    if (name == altAttr
+        || name == archiveAttr
+        || name == codeAttr
+        || name == codebaseAttr
+        || name == mayscriptAttr
+        || name == objectAttr) {
         // Do nothing.
         return;
     }
 
-    HTMLPlugInImageElement::parseAttribute(attribute);
+    HTMLPlugInImageElement::parseAttribute(name, value);
 }
 
 bool HTMLAppletElement::rendererIsNeeded(const NodeRenderingContext& context)

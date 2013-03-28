@@ -30,7 +30,7 @@
 #include "ChromeClientWx.h"
 #include "Console.h"
 #if ENABLE(SQL_DATABASE)
-#include "DatabaseTracker.h"
+#include "DatabaseManager.h"
 #endif
 #include "FileChooser.h"
 #include "FileIconLoader.h"
@@ -227,10 +227,9 @@ void ChromeClientWx::setResizable(bool)
 }
 
 void ChromeClientWx::addMessageToConsole(MessageSource source,
-                                          MessageType type,
                                           MessageLevel level,
                                           const String& message,
-                                          unsigned int lineNumber,
+                                          unsigned lineNumber,
                                           const String& sourceID)
 {
     if (m_webView) {
@@ -421,15 +420,15 @@ void ChromeClientWx::print(Frame* frame)
 }
 
 #if ENABLE(SQL_DATABASE)
-void ChromeClientWx::exceededDatabaseQuota(Frame*, const String&)
+void ChromeClientWx::exceededDatabaseQuota(Frame*, const String&, DatabaseDetails)
 {
     unsigned long long quota = 5 * 1024 * 1024;
 
     if (WebFrame* webFrame = m_webView->GetMainFrame())
         if (Frame* frame = webFrame->GetFrame())
             if (Document* document = frame->document())
-                if (!DatabaseTracker::tracker().hasEntryForOrigin(document->securityOrigin()))
-                    DatabaseTracker::tracker().setQuota(document->securityOrigin(), quota);
+                if (!DatabaseManager::manager().hasEntryForOrigin(document->securityOrigin()))
+                    DatabaseManager::manager().setQuota(document->securityOrigin(), quota);
 }
 #endif
 

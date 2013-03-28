@@ -52,6 +52,7 @@
 
 #if USE(JSC)
 #include <runtime/JSLock.h>
+#include <runtime/Operations.h>
 #endif
 
 #if ENABLE(WEBGL)    
@@ -111,11 +112,11 @@ HTMLCanvasElement::~HTMLCanvasElement()
     m_context.clear(); // Ensure this goes away before the ImageBuffer.
 }
 
-void HTMLCanvasElement::parseAttribute(const Attribute& attribute)
+void HTMLCanvasElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (attribute.name() == widthAttr || attribute.name() == heightAttr)
+    if (name == widthAttr || name == heightAttr)
         reset();
-    HTMLElement::parseAttribute(attribute);
+    HTMLElement::parseAttribute(name, value);
 }
 
 RenderObject* HTMLCanvasElement::createRenderer(RenderArena* arena, RenderStyle* style)
@@ -188,14 +189,20 @@ CanvasRenderingContext* HTMLCanvasElement::getContext(const String& type, Canvas
 #if ENABLE(WEBGL)    
     Settings* settings = document()->settings();
     if (settings && settings->webGLEnabled()
-#if !PLATFORM(CHROMIUM) && !PLATFORM(GTK) && !PLATFORM(EFL)
+#if !PLATFORM(CHROMIUM) && !PLATFORM(GTK) && !PLATFORM(EFL) && !PLATFORM(QT)
         && settings->acceleratedCompositingEnabled()
 #endif
         ) {
+
         // Accept the legacy "webkit-3d" name as well as the provisional "experimental-webgl" name.
-        // Once ratified, we will also accept "webgl" as the context name.
-        if ((type == "webkit-3d") ||
-            (type == "experimental-webgl")) {
+        bool is3dContext = (type == "webkit-3d") || (type == "experimental-webgl");
+
+#if PLATFORM(CHROMIUM) && !OS(ANDROID)
+        // Now that WebGL is ratified, we will also accept "webgl" as the context name in Chrome.
+        is3dContext |= (type == "webgl");
+#endif
+
+        if (is3dContext) {
             if (m_context && !m_context->is3d())
                 return 0;
             if (!m_context) {
@@ -229,6 +236,11 @@ void HTMLCanvasElement::didDraw(const FloatRect& rect)
         ro->repaintRectangle(enclosingIntRect(m_dirtyRect));
     }
 
+    notifyObserversCanvasChanged(rect);
+}
+
+void HTMLCanvasElement::notifyObserversCanvasChanged(const FloatRect& rect)
+{
     HashSet<CanvasObserver*>::iterator end = m_observers.end();
     for (HashSet<CanvasObserver*>::iterator it = m_observers.begin(); it != end; ++it)
         (*it)->canvasChanged(this, rect);
@@ -349,7 +361,7 @@ void HTMLCanvasElement::paint(GraphicsContext* context, const LayoutRect& r, boo
             if (m_presentedImage)
                 context->drawImage(m_presentedImage.get(), ColorSpaceDeviceRGB, pixelSnappedIntRect(r), CompositeSourceOver, DoNotRespectImageOrientation, useLowQualityScale);
             else
-                context->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, pixelSnappedIntRect(r), CompositeSourceOver, useLowQualityScale);
+                context->drawImageBuffer(imageBuffer, ColorSpaceDeviceRGB, pixelSnappedIntRect(r), CompositeSourceOver, BlendModeNormal, useLowQualityScale);
         }
     }
 
@@ -514,22 +526,6 @@ bool HTMLCanvasElement::shouldAccelerate(const IntSize& size) const
 #endif
 }
 
-bool HTMLCanvasElement::shouldDefer() const
-{
-#if USE(SKIA)
-    if (m_context && !m_context->is2d())
-        return false;
-
-    Settings* settings = document()->settings();
-    if (!settings || !settings->deferred2dCanvasEnabled())
-        return false;
-
-    return true;
-#else
-    return false;
-#endif
-}
-
 void HTMLCanvasElement::createImageBuffer() const
 {
     ASSERT(!m_imageBuffer);
@@ -559,12 +555,13 @@ void HTMLCanvasElement::createImageBuffer() const
 #else
         Unaccelerated;
 #endif
-    DeferralMode deferralMode = shouldDefer() ? Deferred : NonDeferred;
-    m_imageBuffer = ImageBuffer::create(size(), m_deviceScaleFactor, ColorSpaceDeviceRGB, renderingMode, deferralMode);
+    m_imageBuffer = ImageBuffer::create(size(), m_deviceScaleFactor, ColorSpaceDeviceRGB, renderingMode);
     if (!m_imageBuffer)
         return;
     m_imageBuffer->context()->setShadowsIgnoreTransforms(true);
     m_imageBuffer->context()->setImageInterpolationQuality(DefaultInterpolationQuality);
+    if (document()->settings() && !document()->settings()->antialiased2dCanvasEnabled())
+        m_imageBuffer->context()->setShouldAntialias(false);
     m_imageBuffer->context()->setStrokeThickness(1);
     m_contextStateSaver = adoptPtr(new GraphicsContextStateSaver(*m_imageBuffer->context()));
 
@@ -648,12 +645,12 @@ void HTMLCanvasElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) co
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
     HTMLElement::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_observers);
-    info.addMember(m_context);
-    info.addMember(m_imageBuffer);
-    info.addMember(m_contextStateSaver);
-    info.addMember(m_presentedImage);
-    info.addMember(m_copiedImage);
+    info.addMember(m_observers, "observers");
+    info.addMember(m_context, "context");
+    info.addMember(m_imageBuffer, "imageBuffer");
+    info.addMember(m_contextStateSaver, "contextStateSaver");
+    info.addMember(m_presentedImage, "presentedImage");
+    info.addMember(m_copiedImage, "copiedImage");
 }
 
 }

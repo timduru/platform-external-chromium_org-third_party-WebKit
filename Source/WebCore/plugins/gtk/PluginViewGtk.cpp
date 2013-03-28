@@ -62,8 +62,8 @@
 #include "JSDOMBinding.h"
 #include "npruntime_impl.h"
 #include "runtime_root.h"
+#include <runtime/JSCJSValue.h>
 #include <runtime/JSLock.h>
-#include <runtime/JSValue.h>
 
 #ifdef GTK_API_VERSION_2
 #include <gdkconfig.h>
@@ -122,7 +122,7 @@ void PluginView::updatePluginWidget()
         return;
 
     ASSERT(parent()->isFrameView());
-    FrameView* frameView = static_cast<FrameView*>(parent());
+    FrameView* frameView = toFrameView(parent());
 
     IntRect oldWindowRect = m_windowRect;
     IntRect oldClipRect = m_clipRect;
@@ -882,6 +882,13 @@ void PluginView::platformDestroy()
     if (m_drawable) {
         XFreePixmap(GDK_DISPLAY_XDISPLAY(gdk_display_get_default()), m_drawable);
         m_drawable = 0;
+    }
+
+    GtkWidget* widget = platformWidget();
+    if (widget) {
+        GtkWidget* parent = gtk_widget_get_parent(widget);
+        ASSERT(parent);
+        gtk_container_remove(GTK_CONTAINER(parent), widget);
     }
 }
 

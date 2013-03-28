@@ -49,6 +49,7 @@
 #include "SkCornerPathEffect.h"
 #include "SkData.h"
 #include "SkLayerDrawLooper.h"
+#include "SkRRect.h"
 #include "SkShader.h"
 #include "SkiaUtils.h"
 #include "skia/ext/platform_canvas.h"
@@ -67,6 +68,7 @@ using namespace std;
 namespace WebCore {
 
 namespace {
+// Local helper functions ------------------------------------------------------
 
 // Return value % max, but account for value possibly being negative.
 inline int fastMod(int value, int max)
@@ -82,10 +84,6 @@ inline int fastMod(int value, int max)
         value = -value;
     return value;
 }
-
-}  // namespace
-
-// Local helper functions ------------------------------------------------------
 
 void addCornerArc(SkPath* path, const SkRect& rect, const IntSize& size, int startAngle)
 {
@@ -199,6 +197,20 @@ void draw1xMarker(SkBitmap* bitmap, int index)
     }
 }
 
+inline void setRadii(SkVector* radii, IntSize topLeft, IntSize topRight, IntSize bottomRight, IntSize bottomLeft)
+{
+    radii[SkRRect::kUpperLeft_Corner].set(SkIntToScalar(topLeft.width()),
+        SkIntToScalar(topLeft.height()));
+    radii[SkRRect::kUpperRight_Corner].set(SkIntToScalar(topRight.width()),
+        SkIntToScalar(topRight.height()));
+    radii[SkRRect::kLowerRight_Corner].set(SkIntToScalar(bottomRight.width()),
+        SkIntToScalar(bottomRight.height()));
+    radii[SkRRect::kLowerLeft_Corner].set(SkIntToScalar(bottomLeft.width()),
+        SkIntToScalar(bottomLeft.height()));
+}
+
+} // namespace
+
 // -----------------------------------------------------------------------------
 
 // This may be called with a NULL pointer to create a graphics context that has
@@ -275,25 +287,6 @@ bool GraphicsContext::supportsTransparencyLayers()
 
 // Graphics primitives ---------------------------------------------------------
 
-void GraphicsContext::addInnerRoundedRectClip(const IntRect& rect, int thickness)
-{
-    if (paintingDisabled())
-        return;
-
-    SkRect r(rect);
-    SkPath path;
-    path.addOval(r, SkPath::kCW_Direction);
-    // only perform the inset if we won't invert r
-    if (2 * thickness < rect.width() && 2 * thickness < rect.height()) {
-        // Adding one to the thickness doesn't make the border too thick as
-        // it's painted over afterwards. But without this adjustment the
-        // border appears a little anemic after anti-aliasing.
-        r.inset(SkIntToScalar(thickness + 1), SkIntToScalar(thickness + 1));
-        path.addOval(r, SkPath::kCCW_Direction);
-    }
-    platformContext()->clipPathAntiAliased(path);
-}
-
 void GraphicsContext::clearPlatformShadow()
 {
     if (paintingDisabled())
@@ -310,8 +303,7 @@ void GraphicsContext::clearRect(const FloatRect& rect)
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
     paint.setXfermodeMode(SkXfermode::kClear_Mode);
-    platformContext()->canvas()->drawRect(r, paint);
-    platformContext()->didDrawRect(r, paint);
+    platformContext()->drawRect(r, paint);
 }
 
 void GraphicsContext::clip(const FloatRect& rect)
@@ -319,23 +311,48 @@ void GraphicsContext::clip(const FloatRect& rect)
     if (paintingDisabled())
         return;
 
-    platformContext()->canvas()->clipRect(rect);
+    platformContext()->clipRect(rect);
 }
 
-void GraphicsContext::clip(const Path& path)
+void GraphicsContext::clip(const Path& path, WindRule clipRule)
 {
     if (paintingDisabled() || path.isEmpty())
         return;
 
-    platformContext()->clipPathAntiAliased(*path.platformPath());
+    clipPath(path, clipRule);
 }
 
-void GraphicsContext::canvasClip(const Path& path)
+void GraphicsContext::clipRoundedRect(const RoundedRect& rect)
 {
     if (paintingDisabled())
         return;
 
-    platformContext()->canvasClipPath(path.isNull() ? SkPath() : *path.platformPath());
+    SkVector radii[4];
+    RoundedRect::Radii wkRadii = rect.radii();
+    setRadii(radii, wkRadii.topLeft(), wkRadii.topRight(), wkRadii.bottomRight(), wkRadii.bottomLeft());
+
+    SkRRect r;
+    r.setRectRadii(rect.rect(), radii);
+
+    platformContext()->clipRRect(r, PlatformContextSkia::AntiAliased);
+}
+
+void GraphicsContext::canvasClip(const Path& pathToClip, WindRule clipRule)
+{
+    if (paintingDisabled())
+        return;
+
+    const SkPath* path = pathToClip.platformPath();
+    SkPath::FillType ftype = (clipRule == RULE_EVENODD) ? SkPath::kEvenOdd_FillType : SkPath::kWinding_FillType;
+    SkPath storage;
+
+    if (path && (path->getFillType() != ftype)) {
+        storage = *path;
+        storage.setFillType(ftype);
+        path = &storage;
+    }
+
+    platformContext()->clipPath(path ? *path : SkPath());
 }
 
 void GraphicsContext::clipOut(const IntRect& rect)
@@ -343,7 +360,7 @@ void GraphicsContext::clipOut(const IntRect& rect)
     if (paintingDisabled())
         return;
 
-    platformContext()->canvas()->clipRect(rect, SkRegion::kDifference_Op);
+    platformContext()->clipRect(rect, PlatformContextSkia::NotAntiAliased, SkRegion::kDifference_Op);
 }
 
 void GraphicsContext::clipOut(const Path& p)
@@ -354,7 +371,7 @@ void GraphicsContext::clipOut(const Path& p)
     // We must make a copy of the path, to mark it as inverse-filled.
     SkPath path(p.isNull() ? SkPath() : *p.platformPath());
     path.toggleInverseFillType();
-    platformContext()->clipPathAntiAliased(path);
+    platformContext()->clipPath(path, PlatformContextSkia::AntiAliased);
 }
 
 void GraphicsContext::clipPath(const Path& pathToClip, WindRule clipRule)
@@ -372,7 +389,7 @@ void GraphicsContext::clipPath(const Path& pathToClip, WindRule clipRule)
         storage.setFillType(ftype);
         path = &storage;
     }
-    platformContext()->clipPathAntiAliased(*path);
+    platformContext()->clipPath(*path, PlatformContextSkia::AntiAliased);
 }
 
 void GraphicsContext::concatCTM(const AffineTransform& affine)
@@ -380,7 +397,7 @@ void GraphicsContext::concatCTM(const AffineTransform& affine)
     if (paintingDisabled())
         return;
 
-    platformContext()->canvas()->concat(affine);
+    platformContext()->concat(affine);
 }
 
 void GraphicsContext::setCTM(const AffineTransform& affine)
@@ -388,7 +405,7 @@ void GraphicsContext::setCTM(const AffineTransform& affine)
     if (paintingDisabled())
         return;
 
-    platformContext()->canvas()->setMatrix(affine);
+    platformContext()->setMatrix(affine);
 }
 
 static void setPathFromConvexPoints(SkPath* path, size_t numPoints, const FloatPoint* points)
@@ -429,14 +446,12 @@ void GraphicsContext::drawConvexPolygon(size_t numPoints,
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
     paint.setAntiAlias(shouldAntialias);
-    platformContext()->canvas()->drawPath(path, paint);
-    platformContext()->didDrawPath(path, paint);
+    platformContext()->drawPath(path, paint);
 
     if (strokeStyle() != NoStroke) {
         paint.reset();
         platformContext()->setupPaintForStroking(&paint, 0, 0);
-        platformContext()->canvas()->drawPath(path, paint);
-        platformContext()->didDrawPath(path, paint);
+        platformContext()->drawPath(path, paint);
     }
 }
 
@@ -450,10 +465,9 @@ void GraphicsContext::clipConvexPolygon(size_t numPoints, const FloatPoint* poin
 
     SkPath path;
     setPathFromConvexPoints(&path, numPoints, points);
-    if (antialiased)
-        platformContext()->clipPathAntiAliased(path);
-    else
-        platformContext()->canvas()->clipPath(path);
+    platformContext()->clipPath(path, antialiased
+        ? PlatformContextSkia::AntiAliased
+        : PlatformContextSkia::NotAntiAliased);
 }
 
 // This method is only used to draw the little circles used in lists.
@@ -465,14 +479,12 @@ void GraphicsContext::drawEllipse(const IntRect& elipseRect)
     SkRect rect = elipseRect;
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
-    platformContext()->canvas()->drawOval(rect, paint);
-    platformContext()->didDrawBounded(rect, paint);
+    platformContext()->drawOval(rect, paint);
 
     if (strokeStyle() != NoStroke) {
         paint.reset();
         platformContext()->setupPaintForStroking(&paint, &rect, 0);
-        platformContext()->canvas()->drawOval(rect, paint);
-        platformContext()->didDrawBounded(rect, paint);
+        platformContext()->drawOval(rect, paint);
     }
 }
 
@@ -491,8 +503,7 @@ static inline void drawOuterPath(PlatformContextSkia* context, const SkPath& pat
     paint.setStrokeWidth(1);
     paint.setPathEffect(new SkCornerPathEffect(1))->unref();
 #endif
-    context->canvas()->drawPath(path, paint);
-    context->didDrawPath(path, paint);
+    context->drawPath(path, paint);
 }
 
 static inline void drawInnerPath(PlatformContextSkia* context, const SkPath& path, SkPaint& paint, int width)
@@ -500,8 +511,7 @@ static inline void drawInnerPath(PlatformContextSkia* context, const SkPath& pat
 #if PLATFORM(CHROMIUM) && OS(DARWIN)
     paint.setAlpha(128);
     paint.setStrokeWidth(width * 0.5f);
-    context->canvas()->drawPath(path, paint);
-    context->didDrawPath(path, paint);
+    context->drawPath(path, paint);
 #endif
 }
 
@@ -582,17 +592,14 @@ void GraphicsContext::drawLine(const IntPoint& point1, const IntPoint& point2)
         }
         SkPaint fillPaint;
         fillPaint.setColor(paint.getColor());
-        platformContext()->canvas()->drawRect(r1, fillPaint);
-        platformContext()->canvas()->drawRect(r2, fillPaint);
-        platformContext()->didDrawRect(r1, fillPaint);
-        platformContext()->didDrawRect(r2, fillPaint);
+        platformContext()->drawRect(r1, fillPaint);
+        platformContext()->drawRect(r2, fillPaint);
     }
 
     adjustLineToPixelBoundaries(p1, p2, width, penStyle);
     SkPoint pts[2] = { (SkPoint)p1, (SkPoint)p2 };
 
-    platformContext()->canvas()->drawPoints(SkCanvas::kLines_PointMode, 2, pts, paint);
-    platformContext()->didDrawPoints(SkCanvas::kLines_PointMode, 2, pts, paint);
+    platformContext()->drawPoints(SkCanvas::kLines_PointMode, 2, pts, paint);
 }
 
 void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float width, DocumentMarkerLineStyle style)
@@ -721,14 +728,12 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float widt
     rect.set(originX, originY, originX + WebCoreFloatToSkScalar(width) * deviceScaleFactor, originY + SkIntToScalar(misspellBitmap[index]->height()));
 
     if (deviceScaleFactor == 2) {
-        platformContext()->canvas()->save();
-        platformContext()->canvas()->scale(SK_ScalarHalf, SK_ScalarHalf);
+        platformContext()->save();
+        platformContext()->scale(SK_ScalarHalf, SK_ScalarHalf);
     }
-    platformContext()->canvas()->drawRect(rect, paint);
+    platformContext()->drawRect(rect, paint);
     if (deviceScaleFactor == 2)
-        platformContext()->canvas()->restore();
-
-    platformContext()->didDrawRect(rect, paint);
+        platformContext()->restore();
 }
 
 void GraphicsContext::drawLineForText(const FloatPoint& pt,
@@ -745,7 +750,8 @@ void GraphicsContext::drawLineForText(const FloatPoint& pt,
     SkRect r;
     r.fLeft = WebCoreFloatToSkScalar(pt.x());
     // Avoid anti-aliasing lines. Currently, these are always horizontal.
-    r.fTop = WebCoreFloatToSkScalar(floorf(pt.y()));
+    // Round to nearest pixel to match text and other content.
+    r.fTop = WebCoreFloatToSkScalar(floorf(pt.y() + 0.5f));
     r.fRight = r.fLeft + WebCoreFloatToSkScalar(width);
     r.fBottom = r.fTop + SkIntToScalar(thickness);
 
@@ -753,8 +759,7 @@ void GraphicsContext::drawLineForText(const FloatPoint& pt,
     platformContext()->setupPaintForFilling(&paint);
     // Text lines are drawn using the stroke color.
     paint.setColor(platformContext()->effectiveStrokeColor());
-    platformContext()->canvas()->drawRect(r, paint);
-    platformContext()->didDrawRect(r, paint);
+    platformContext()->drawRect(r, paint);
 }
 
 // Draws a filled rectangle with a stroked border.
@@ -790,8 +795,7 @@ void GraphicsContext::fillPath(const Path& pathToFill)
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
 
-    platformContext()->canvas()->drawPath(*path, paint);
-    platformContext()->didDrawPath(*path, paint);
+    platformContext()->drawPath(*path, paint);
 }
 
 void GraphicsContext::fillRect(const FloatRect& rect)
@@ -803,8 +807,7 @@ void GraphicsContext::fillRect(const FloatRect& rect)
 
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
-    platformContext()->canvas()->drawRect(r, paint);
-    platformContext()->didDrawRect(r, paint);
+    platformContext()->drawRect(r, paint);
 }
 
 void GraphicsContext::fillRect(const FloatRect& rect, const Color& color, ColorSpace colorSpace)
@@ -816,8 +819,7 @@ void GraphicsContext::fillRect(const FloatRect& rect, const Color& color, ColorS
     SkPaint paint;
     platformContext()->setupPaintCommon(&paint);
     paint.setColor(color.rgb());
-    platformContext()->canvas()->drawRect(r, paint);
-    platformContext()->didDrawRect(r, paint);
+    platformContext()->drawRect(r, paint);
 }
 
 void GraphicsContext::fillRoundedRect(const IntRect& rect,
@@ -842,18 +844,17 @@ void GraphicsContext::fillRoundedRect(const IntRect& rect,
         return;
     }
 
-    SkRect r = rect;
-    SkPath path;
-    addCornerArc(&path, r, topRight, 270);
-    addCornerArc(&path, r, bottomRight, 0);
-    addCornerArc(&path, r, bottomLeft, 90);
-    addCornerArc(&path, r, topLeft, 180);
+    SkVector radii[4];
+    setRadii(radii, topLeft, topRight, bottomRight, bottomLeft);
+
+    SkRRect rr;
+    rr.setRectRadii(rect, radii);
 
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
     paint.setColor(color.rgb());
-    platformContext()->canvas()->drawPath(path, paint);
-    platformContext()->didDrawPath(path, paint);
+
+    platformContext()->drawRRect(rr, paint);
 }
 
 AffineTransform GraphicsContext::getCTM(IncludeDeviceScale) const
@@ -861,7 +862,7 @@ AffineTransform GraphicsContext::getCTM(IncludeDeviceScale) const
     if (paintingDisabled())
         return AffineTransform();
 
-    const SkMatrix& m = platformContext()->canvas()->getTotalMatrix();
+    const SkMatrix& m = platformContext()->getTotalMatrix();
     return AffineTransform(SkScalarToDouble(m.getScaleX()),
                            SkScalarToDouble(m.getSkewY()),
                            SkScalarToDouble(m.getSkewX()),
@@ -880,7 +881,7 @@ void GraphicsContext::scale(const FloatSize& size)
     if (paintingDisabled())
         return;
 
-    platformContext()->canvas()->scale(WebCoreFloatToSkScalar(size.width()),
+    platformContext()->scale(WebCoreFloatToSkScalar(size.width()),
         WebCoreFloatToSkScalar(size.height()));
 }
 
@@ -892,7 +893,7 @@ void GraphicsContext::setAlpha(float alpha)
     platformContext()->setAlpha(alpha);
 }
 
-void GraphicsContext::setPlatformCompositeOperation(CompositeOperator op)
+void GraphicsContext::setPlatformCompositeOperation(CompositeOperator op, BlendMode)
 {
     if (paintingDisabled())
         return;
@@ -1011,7 +1012,6 @@ void GraphicsContext::setPlatformShadow(const FloatSize& size,
     double blur = blurFloat;
 
     uint32_t mfFlags = SkBlurMaskFilter::kHighQuality_BlurFlag;
-    SkXfermode::Mode colorMode = SkXfermode::kSrc_Mode;
 
     if (m_state.shadowsIgnoreTransforms)  {
         // Currently only the GraphicsContext associated with the
@@ -1019,12 +1019,6 @@ void GraphicsContext::setPlatformShadow(const FloatSize& size,
         // Transforms. So with this flag set, we know this state is associated
         // with a CanvasRenderingContext.
         mfFlags |= SkBlurMaskFilter::kIgnoreTransform_BlurFlag;
-
-        // CSS wants us to ignore the original's alpha, but Canvas wants us to
-        // modulate with it. Using shadowsIgnoreTransforms to tell us that we're
-        // in a Canvas, we change the colormode to kDst_Mode, so we don't overwrite
-        // it with our layer's (default opaque-black) color.
-        colorMode = SkXfermode::kDst_Mode;
 
         // CG uses natural orientation for Y axis, but the HTML5 canvas spec
         // does not.
@@ -1051,9 +1045,13 @@ void GraphicsContext::setPlatformShadow(const FloatSize& size,
     // lower layer contains our offset, blur, and colorfilter
     SkLayerDrawLooper::LayerInfo info;
 
+    // Since CSS box-shadow ignores the original alpha, we used to default to kSrc_Mode here and
+    // only switch to kDst_Mode for Canvas. But that precaution is not really necessary because
+    // RenderBoxModelObject performs a dedicated shadow fill with opaque black to ensure
+    // cross-platform consistent results.
+    info.fColorMode = SkXfermode::kDst_Mode;
     info.fPaintBits |= SkLayerDrawLooper::kMaskFilter_Bit; // our blur
     info.fPaintBits |= SkLayerDrawLooper::kColorFilter_Bit;
-    info.fColorMode = colorMode;
     info.fOffset.set(width, height);
     info.fPostTranslate = m_state.shadowsIgnoreTransforms;
 
@@ -1140,8 +1138,7 @@ void GraphicsContext::strokeArc(const IntRect& r, int startAngle, int angleSpan)
 
     SkPath path;
     path.addArc(oval, SkIntToScalar(-startAngle), SkIntToScalar(-angleSpan));
-    platformContext()->canvas()->drawPath(path, paint);
-    platformContext()->didDrawPath(path, paint);
+    platformContext()->drawPath(path, paint);
 }
 
 void GraphicsContext::strokePath(const Path& pathToStroke)
@@ -1152,8 +1149,7 @@ void GraphicsContext::strokePath(const Path& pathToStroke)
     const SkPath& path = *pathToStroke.platformPath();
     SkPaint paint;
     platformContext()->setupPaintForStroking(&paint, 0, 0);
-    platformContext()->canvas()->drawPath(path, paint);
-    platformContext()->didDrawPath(path, paint);
+    platformContext()->drawPath(path, paint);
 }
 
 void GraphicsContext::strokeRect(const FloatRect& rect, float lineWidth)
@@ -1170,10 +1166,8 @@ void GraphicsContext::strokeRect(const FloatRect& rect, float lineWidth)
     SkRect r(rect);
     bool validW = r.width() > 0;
     bool validH = r.height() > 0;
-    SkCanvas* canvas = platformContext()->canvas();
     if (validW && validH) {
-        canvas->drawRect(r, paint);
-        platformContext()->didDrawRect(r, paint);
+        platformContext()->drawRect(r, paint);
     } else if (validW || validH) {
         // we are expected to respect the lineJoin, so we can't just call
         // drawLine -- we have to create a path that doubles back on itself.
@@ -1181,8 +1175,7 @@ void GraphicsContext::strokeRect(const FloatRect& rect, float lineWidth)
         path.moveTo(r.fLeft, r.fTop);
         path.lineTo(r.fRight, r.fBottom);
         path.close();
-        canvas->drawPath(path, paint);
-        platformContext()->didDrawPath(path, paint);
+        platformContext()->drawPath(path, paint);
     }
 }
 
@@ -1191,8 +1184,7 @@ void GraphicsContext::rotate(float angleInRadians)
     if (paintingDisabled())
         return;
 
-    platformContext()->canvas()->rotate(WebCoreFloatToSkScalar(
-        angleInRadians * (180.0f / 3.14159265f)));
+    platformContext()->rotate(WebCoreFloatToSkScalar(angleInRadians * (180.0f / 3.14159265f)));
 }
 
 void GraphicsContext::translate(float w, float h)
@@ -1200,8 +1192,7 @@ void GraphicsContext::translate(float w, float h)
     if (paintingDisabled())
         return;
 
-    platformContext()->canvas()->translate(WebCoreFloatToSkScalar(w),
-                                           WebCoreFloatToSkScalar(h));
+    platformContext()->translate(WebCoreFloatToSkScalar(w), WebCoreFloatToSkScalar(h));
 }
 
 bool GraphicsContext::isAcceleratedContext() const
@@ -1225,8 +1216,7 @@ void GraphicsContext::platformFillEllipse(const FloatRect& ellipse)
     SkRect rect = ellipse;
     SkPaint paint;
     platformContext()->setupPaintForFilling(&paint);
-    platformContext()->canvas()->drawOval(rect, paint);
-    platformContext()->didDrawBounded(rect, paint);
+    platformContext()->drawOval(rect, paint);
 }
 
 void GraphicsContext::platformStrokeEllipse(const FloatRect& ellipse)
@@ -1237,8 +1227,7 @@ void GraphicsContext::platformStrokeEllipse(const FloatRect& ellipse)
     SkRect rect(ellipse);
     SkPaint paint;
     platformContext()->setupPaintForStroking(&paint, 0, 0);
-    platformContext()->canvas()->drawOval(rect, paint);
-    platformContext()->didDrawBounded(rect, paint);
+    platformContext()->drawOval(rect, paint);
 }
 
 }  // namespace WebCore

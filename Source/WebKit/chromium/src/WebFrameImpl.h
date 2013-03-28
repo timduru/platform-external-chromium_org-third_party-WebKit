@@ -31,12 +31,12 @@
 #ifndef WebFrameImpl_h
 #define WebFrameImpl_h
 
-#include "WebAnimationControllerImpl.h"
 #include "WebFrame.h"
 
 #include "Frame.h"
 #include "FrameDestructionObserver.h"
 #include "FrameLoaderClientImpl.h"
+#include <public/WebFileSystemType.h>
 #include <wtf/Compiler.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
@@ -51,15 +51,14 @@ class KURL;
 class Node;
 class Range;
 class SubstituteData;
+struct FrameLoadRequest;
 struct WindowFeatures;
 }
 
 namespace WebKit {
 class ChromePrintContext;
 class WebDataSourceImpl;
-class WebDeliveredIntentClient;
 class WebInputElement;
-class WebIntent;
 class WebFrameClient;
 class WebPerformance;
 class WebPluginContainerImpl;
@@ -80,7 +79,7 @@ public:
     virtual WebString assignedName() const;
     virtual void setName(const WebString&);
     virtual long long identifier() const;
-    virtual WebVector<WebIconURL> iconURLs(int iconTypes) const;
+    virtual WebVector<WebIconURL> iconURLs(int iconTypesMask) const;
     virtual WebSize scrollOffset() const;
     virtual void setScrollOffset(const WebSize&);
     virtual WebSize minimumScrollOffset() const;
@@ -89,6 +88,7 @@ public:
     virtual int contentsPreferredWidth() const;
     virtual int documentElementScrollHeight() const;
     virtual bool hasVisibleContent() const;
+    virtual WebRect visibleContentRect() const;
     virtual bool hasHorizontalScrollbar() const;
     virtual bool hasVerticalScrollbar() const;
     virtual WebView* view() const;
@@ -105,7 +105,6 @@ public:
     virtual WebFrame* findChildByName(const WebString&) const;
     virtual WebFrame* findChildByExpression(const WebString&) const;
     virtual WebDocument document() const;
-    virtual WebAnimationController* animationController();
     virtual WebPerformance performance() const;
     virtual NPObject* windowObject() const;
     virtual void bindToWindowObject(const WebString& name, NPObject*);
@@ -118,7 +117,6 @@ public:
     virtual void addMessageToConsole(const WebConsoleMessage&);
     virtual void collectGarbage();
     virtual bool checkIfRunInsecureContent(const WebURL&) const;
-#if WEBKIT_USING_V8
     virtual v8::Handle<v8::Value> executeScriptAndReturnValue(
         const WebScriptSource&);
     virtual void executeScriptInIsolatedWorld(
@@ -130,18 +128,17 @@ public:
         int argc,
         v8::Handle<v8::Value> argv[]);
     virtual v8::Local<v8::Context> mainWorldScriptContext() const;
-    virtual v8::Handle<v8::Value> createFileSystem(WebFileSystem::Type,
-                                                   const WebString& name,
-                                                   const WebString& path);
-    virtual v8::Handle<v8::Value> createSerializableFileSystem(WebFileSystem::Type,
-                                                               const WebString& name,
-                                                               const WebString& path);
-    virtual v8::Handle<v8::Value> createFileEntry(WebFileSystem::Type,
-                                                  const WebString& fileSystemName,
-                                                  const WebString& fileSystemPath,
-                                                  const WebString& filePath,
-                                                  bool isDirectory);
-#endif
+    virtual v8::Handle<v8::Value> createFileSystem(WebFileSystemType,
+        const WebString& name,
+        const WebString& path);
+    virtual v8::Handle<v8::Value> createSerializableFileSystem(WebFileSystemType,
+        const WebString& name,
+        const WebString& path);
+    virtual v8::Handle<v8::Value> createFileEntry(WebFileSystemType,
+        const WebString& fileSystemName,
+        const WebString& fileSystemPath,
+        const WebString& filePath,
+        bool isDirectory);
     virtual void reload(bool ignoreCache);
     virtual void reloadWithOverrideURL(const WebURL& overrideUrl, bool ignoreCache);
     virtual void loadRequest(const WebURLRequest&);
@@ -165,8 +162,6 @@ public:
     virtual WebURLLoader* createAssociatedURLLoader(const WebURLLoaderOptions&);
     virtual void commitDocumentData(const char* data, size_t length);
     virtual unsigned unloadListenerCount() const;
-    virtual bool isProcessingUserGesture() const;
-    virtual bool consumeUserGesture() const;
     virtual bool willSuppressOpenerInNewFrame() const;
     virtual void replaceSelection(const WebString&);
     virtual void insertText(const WebString&);
@@ -190,6 +185,7 @@ public:
     virtual bool selectWordAroundCaret();
     virtual void selectRange(const WebPoint& base, const WebPoint& extent);
     virtual void selectRange(const WebRange&);
+    virtual void moveCaretSelectionTowardsWindowPoint(const WebPoint&);
     virtual int printBegin(const WebPrintParams&,
                            const WebNode& constrainToNode,
                            bool* useBrowserOverlays);
@@ -224,16 +220,9 @@ public:
 
     virtual void sendOrientationChangeEvent(int orientation);
 
-    virtual void addEventListener(const WebString& eventType,
-                                  WebDOMEventListener*, bool useCapture);
-    virtual void removeEventListener(const WebString& eventType,
-                                     WebDOMEventListener*, bool useCapture);
-    virtual bool dispatchEvent(const WebDOMEvent&);
     virtual void dispatchMessageEventWithOriginCheck(
         const WebSecurityOrigin& intendedTargetOrigin,
         const WebDOMEvent&);
-
-    virtual void deliverIntent(const WebIntent&, WebMessagePortChannelArray*, WebDeliveredIntentClient*);
 
     virtual WebString contentAsText(size_t maxChars) const;
     virtual WebString contentAsMarkup() const;
@@ -493,9 +482,6 @@ private:
     // Valid between calls to BeginPrint() and EndPrint(). Containts the print
     // information. Is used by PrintPage().
     OwnPtr<ChromePrintContext> m_printContext;
-
-    // Keeps a reference to the frame's WebAnimationController.
-    WebAnimationControllerImpl m_animationController;
 
     // The identifier of this frame.
     long long m_identifier;

@@ -20,11 +20,14 @@
 #include "config.h"
 #include "WebKitWebContext.h"
 
+#include "WebCookieManagerProxy.h"
+#include "WebGeolocationManagerProxy.h"
 #include "WebKitCookieManagerPrivate.h"
 #include "WebKitDownloadClient.h"
 #include "WebKitDownloadPrivate.h"
 #include "WebKitFaviconDatabasePrivate.h"
 #include "WebKitGeolocationProvider.h"
+#include "WebKitInjectedBundleClient.h"
 #include "WebKitPluginPrivate.h"
 #include "WebKitPrivate.h"
 #include "WebKitRequestManagerClient.h"
@@ -32,6 +35,7 @@
 #include "WebKitTextChecker.h"
 #include "WebKitURISchemeRequestPrivate.h"
 #include "WebKitWebContextPrivate.h"
+#include "WebKitWebViewBasePrivate.h"
 #include "WebResourceCacheManagerProxy.h"
 #include <WebCore/FileSystem.h>
 #include <WebCore/IconDatabase.h>
@@ -45,6 +49,32 @@
 #include <wtf/text/CString.h>
 
 using namespace WebKit;
+
+/**
+ * SECTION: WebKitWebContext
+ * @Short_description: Manages aspects common to all #WebKitWebView<!-- -->s
+ * @Title: WebKitWebContext
+ *
+ * The #WebKitWebContext manages all aspects common to all
+ * #WebKitWebView<!-- -->s.
+ *
+ * You can define the #WebKitCacheModel with
+ * webkit_web_context_set_cache_model(), depending on the needs of
+ * your application. You can access the #WebKitCookieManager or the
+ * #WebKitSecurityManager to specify the behaviour of your application
+ * regarding cookies and security, using
+ * webkit_web_context_get_cookie_manager() and
+ * webkit_web_context_get_security_manager() for that.
+ *
+ * It is also possible to change your preferred language or enable
+ * spell checking, using webkit_web_context_set_preferred_languages(),
+ * webkit_web_context_set_spell_checking_languages() and
+ * webkit_web_context_set_spell_checking_enabled().
+ *
+ * You can use webkit_web_context_register_uri_scheme() to register
+ * custom URI schemes, and manage several other settings.
+ *
+ */
 
 enum {
     DOWNLOAD_STARTED,
@@ -110,29 +140,18 @@ struct _WebKitWebContextPrivate {
     OwnPtr<WebKitTextChecker> textChecker;
 #endif
     CString faviconDatabaseDirectory;
+    WebKitTLSErrorsPolicy tlsErrorsPolicy;
+
+    HashMap<uint64_t, WebKitWebView*> webViews;
 };
 
 static guint signals[LAST_SIGNAL] = { 0, };
 
-G_DEFINE_TYPE(WebKitWebContext, webkit_web_context, G_TYPE_OBJECT)
-
-static void webkitWebContextFinalize(GObject* object)
-{
-    WEBKIT_WEB_CONTEXT(object)->priv->~WebKitWebContextPrivate();
-    G_OBJECT_CLASS(webkit_web_context_parent_class)->finalize(object);
-}
-
-static void webkit_web_context_init(WebKitWebContext* webContext)
-{
-    WebKitWebContextPrivate* priv = G_TYPE_INSTANCE_GET_PRIVATE(webContext, WEBKIT_TYPE_WEB_CONTEXT, WebKitWebContextPrivate);
-    webContext->priv = priv;
-    new (priv) WebKitWebContextPrivate();
-}
+WEBKIT_DEFINE_TYPE(WebKitWebContext, webkit_web_context, G_TYPE_OBJECT)
 
 static void webkit_web_context_class_init(WebKitWebContextClass* webContextClass)
 {
     GObjectClass* gObjectClass = G_OBJECT_CLASS(webContextClass);
-    gObjectClass->finalize = webkitWebContextFinalize;
 
     /**
      * WebKitWebContext::download-started:
@@ -149,8 +168,22 @@ static void webkit_web_context_class_init(WebKitWebContextClass* webContextClass
                      g_cclosure_marshal_VOID__OBJECT,
                      G_TYPE_NONE, 1,
                      WEBKIT_TYPE_DOWNLOAD);
+}
 
-    g_type_class_add_private(webContextClass, sizeof(WebKitWebContextPrivate));
+static CString injectedBundleDirectory()
+{
+    if (const char* bundleDirectory = g_getenv("WEBKIT_INJECTED_BUNDLE_PATH"))
+        return bundleDirectory;
+
+    static const char* injectedBundlePath = LIBDIR G_DIR_SEPARATOR_S "webkit2gtk-" WEBKITGTK_API_VERSION_STRING
+        G_DIR_SEPARATOR_S "injected-bundle" G_DIR_SEPARATOR_S;
+    return injectedBundlePath;
+}
+
+static CString injectedBundleFilename()
+{
+    GOwnPtr<char> bundleFilename(g_build_filename(injectedBundleDirectory().data(), "libwebkit2gtkinjectedbundle.so", NULL));
+    return bundleFilename.get();
 }
 
 static gpointer createDefaultWebContext(gpointer)
@@ -158,15 +191,17 @@ static gpointer createDefaultWebContext(gpointer)
     static GRefPtr<WebKitWebContext> webContext = adoptGRef(WEBKIT_WEB_CONTEXT(g_object_new(WEBKIT_TYPE_WEB_CONTEXT, NULL)));
     WebKitWebContextPrivate* priv = webContext->priv;
 
-    priv->context = WebContext::create(String());
-    priv->requestManager = webContext->priv->context->soupRequestManagerProxy();
+    priv->context = WebContext::create(WebCore::filenameToString(injectedBundleFilename().data()));
+    priv->requestManager = webContext->priv->context->supplement<WebSoupRequestManagerProxy>();
     priv->context->setCacheModel(CacheModelPrimaryWebBrowser);
+    priv->tlsErrorsPolicy = WEBKIT_TLS_ERRORS_POLICY_IGNORE;
 
+    attachInjectedBundleClientToContext(webContext.get());
     attachDownloadClientToContext(webContext.get());
     attachRequestManagerClientToContext(webContext.get());
 
 #if ENABLE(GEOLOCATION)
-    priv->geolocationProvider = WebKitGeolocationProvider::create(priv->context->geolocationManagerProxy());
+    priv->geolocationProvider = WebKitGeolocationProvider::create(priv->context->supplement<WebGeolocationManagerProxy>());
 #endif
 #if ENABLE(SPELLCHECK)
     priv->textChecker = WebKitTextChecker::create();
@@ -274,7 +309,7 @@ void webkit_web_context_clear_cache(WebKitWebContext* context)
 {
     g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
 
-    context->priv->context->resourceCacheManagerProxy()->clearCacheForAllOrigins(AllResourceCaches);
+    context->priv->context->supplement<WebResourceCacheManagerProxy>()->clearCacheForAllOrigins(AllResourceCaches);
 }
 
 typedef HashMap<DownloadProxy*, GRefPtr<WebKitDownload> > DownloadsMap;
@@ -320,7 +355,7 @@ WebKitCookieManager* webkit_web_context_get_cookie_manager(WebKitWebContext* con
 
     WebKitWebContextPrivate* priv = context->priv;
     if (!priv->cookieManager)
-        priv->cookieManager = adoptGRef(webkitCookieManagerCreate(priv->context->cookieManagerProxy()));
+        priv->cookieManager = adoptGRef(webkitCookieManagerCreate(priv->context->supplement<WebCookieManagerProxy>()));
 
     return priv->cookieManager.get();
 }
@@ -684,6 +719,77 @@ void webkit_web_context_set_preferred_languages(WebKitWebContext* context, const
     WebCore::languageDidChange();
 }
 
+/**
+ * webkit_web_context_set_tls_errors_policy:
+ * @context: a #WebKitWebContext
+ * @policy: a #WebKitTLSErrorsPolicy
+ *
+ * Set the TLS errors policy of @context as @policy
+ */
+void webkit_web_context_set_tls_errors_policy(WebKitWebContext* context, WebKitTLSErrorsPolicy policy)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
+
+    if (context->priv->tlsErrorsPolicy == policy)
+        return;
+
+    context->priv->tlsErrorsPolicy = policy;
+    bool ignoreTLSErrors = policy == WEBKIT_TLS_ERRORS_POLICY_IGNORE;
+    if (context->priv->context->ignoreTLSErrors() != ignoreTLSErrors)
+        context->priv->context->setIgnoreTLSErrors(ignoreTLSErrors);
+}
+
+/**
+ * webkit_web_context_get_tls_errors_policy:
+ * @context: a #WebKitWebContext
+ *
+ * Get the TLS errors policy of @context
+ *
+ * Returns: a #WebKitTLSErrorsPolicy
+ */
+WebKitTLSErrorsPolicy webkit_web_context_get_tls_errors_policy(WebKitWebContext* context)
+{
+    g_return_val_if_fail(WEBKIT_IS_WEB_CONTEXT(context), WEBKIT_TLS_ERRORS_POLICY_IGNORE);
+
+    return context->priv->tlsErrorsPolicy;
+}
+
+/**
+ * webkit_web_context_set_web_extensions_directory:
+ * @context: a #WebKitWebContext
+ * @directory: the directory to add
+ *
+ * Set the directory where WebKit will look for Web Extensions.
+ * This method must be called before loading anything in this context, otherwise
+ * it will not have any effect.
+ */
+void webkit_web_context_set_web_extensions_directory(WebKitWebContext* context, const char* directory)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
+    g_return_if_fail(directory);
+
+    // We pass the additional web extensions directory to the injected bundle as initialization user data.
+    context->priv->context->setInjectedBundleInitializationUserData(WebString::create(WebCore::filenameToString(directory)));
+}
+
+/**
+ * webkit_web_context_prefetch_dns:
+ * @context: a #WebKitWebContext
+ * @hostname: a hostname to be resolved
+ *
+ * Resolve the domain name of the given @hostname in advance, so that if a URI
+ * of @hostname is requested the load will be performed more quickly.
+ */
+void webkit_web_context_prefetch_dns(WebKitWebContext* context, const char* hostname)
+{
+    g_return_if_fail(WEBKIT_IS_WEB_CONTEXT(context));
+    g_return_if_fail(hostname);
+
+    ImmutableDictionary::MapType message;
+    message.set(String::fromUTF8("Hostname"), WebString::create(String::fromUTF8(hostname)));
+    context->priv->context->postMessageToInjectedBundle(String::fromUTF8("PrefetchDNS"), ImmutableDictionary::adopt(message).get());
+}
+
 WebKitDownload* webkitWebContextGetOrCreateDownload(DownloadProxy* downloadProxy)
 {
     GRefPtr<WebKitDownload> download = downloadsMap().get(downloadProxy);
@@ -697,8 +803,9 @@ WebKitDownload* webkitWebContextGetOrCreateDownload(DownloadProxy* downloadProxy
 
 WebKitDownload* webkitWebContextStartDownload(WebKitWebContext* context, const char* uri, WebPageProxy* initiatingPage)
 {
-    DownloadProxy* downloadProxy = context->priv->context->download(initiatingPage, WebCore::ResourceRequest(String::fromUTF8(uri)));
-    WebKitDownload* download = webkitDownloadCreate(downloadProxy);
+    WebCore::ResourceRequest request(String::fromUTF8(uri));
+    DownloadProxy* downloadProxy = context->priv->context->download(initiatingPage, request);
+    WebKitDownload* download = webkitDownloadCreateForRequest(downloadProxy, request);
     downloadsMap().set(downloadProxy, download);
     return download;
 }
@@ -748,4 +855,23 @@ void webkitWebContextDidFailToLoadURIRequest(WebKitWebContext* context, uint64_t
 void webkitWebContextDidFinishURIRequest(WebKitWebContext* context, uint64_t requestID)
 {
     context->priv->uriSchemeRequests.remove(requestID);
+}
+
+void webkitWebContextCreatePageForWebView(WebKitWebContext* context, WebKitWebView* webView)
+{
+    WebKitWebViewBase* webViewBase = WEBKIT_WEB_VIEW_BASE(webView);
+    webkitWebViewBaseCreateWebPage(webViewBase, context->priv->context.get(), 0);
+    WebPageProxy* page = webkitWebViewBaseGetPage(webViewBase);
+    context->priv->webViews.set(page->pageID(), webView);
+}
+
+void webkitWebContextWebViewDestroyed(WebKitWebContext* context, WebKitWebView* webView)
+{
+    WebPageProxy* page = webkitWebViewBaseGetPage(WEBKIT_WEB_VIEW_BASE(webView));
+    context->priv->webViews.remove(page->pageID());
+}
+
+WebKitWebView* webkitWebContextGetWebViewForPage(WebKitWebContext* context, WebPageProxy* page)
+{
+    return page ? context->priv->webViews.get(page->pageID()) : 0;
 }

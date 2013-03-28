@@ -31,9 +31,9 @@
 #include "AudioContext.h"
 #include "AudioNodeOutput.h"
 #include "AudioUtilities.h"
-#include "Document.h"
 #include "FloatConversion.h"
 #include "ScriptCallStack.h"
+#include "ScriptExecutionContext.h"
 #include <algorithm>
 #include <wtf/MainThread.h>
 #include <wtf/MathExtras.h>
@@ -69,9 +69,9 @@ AudioBufferSourceNode::AudioBufferSourceNode(AudioContext* context, float sample
 {
     setNodeType(NodeTypeAudioBufferSource);
 
-    m_gain = AudioGain::create(context, "gain", 1.0, 0.0, 1.0);
+    m_gain = AudioParam::create(context, "gain", 1.0, 0.0, 1.0);
     m_playbackRate = AudioParam::create(context, "playbackRate", 1.0, 0.0, MaxRate);
-    
+
     // Default to mono.  A call to setBuffer() will set the number of output channels to that of the buffer.
     addOutput(adoptPtr(new AudioNodeOutput(this, 1)));
 
@@ -97,6 +97,14 @@ void AudioBufferSourceNode::process(size_t framesToProcess)
     MutexTryLocker tryLocker(m_processLock);
     if (tryLocker.locked()) {
         if (!buffer()) {
+            outputBus->zero();
+            return;
+        }
+
+        // After calling setBuffer() with a buffer having a different number of channels, there can in rare cases be a slight delay
+        // before the output bus is updated to the new number of channels because of use of tryLocks() in the context's updating system.
+        // In this case, if the the buffer has just been changed and we're not quite ready yet, then just output silence.
+        if (numberOfChannels() != buffer()->numberOfChannels()) {
             outputBus->zero();
             return;
         }
@@ -155,7 +163,7 @@ bool AudioBufferSourceNode::renderSilenceAndFinishIfNotLooping(AudioBus*, unsign
 bool AudioBufferSourceNode::renderFromBuffer(AudioBus* bus, unsigned destinationFrameOffset, size_t numberOfFrames)
 {
     ASSERT(context()->isAudioThread());
-    
+
     // Basic sanity checking
     ASSERT(bus);
     ASSERT(buffer());
@@ -437,7 +445,7 @@ double AudioBufferSourceNode::totalPitchRate()
         totalRate = 1; // zero rate is considered illegal
     totalRate = min(MaxRate, totalRate);
     
-    bool isTotalRateValid = !isnan(totalRate) && !isinf(totalRate);
+    bool isTotalRateValid = !std::isnan(totalRate) && !std::isinf(totalRate);
     ASSERT(isTotalRateValid);
     if (!isTotalRateValid)
         totalRate = 1.0;
@@ -448,8 +456,8 @@ double AudioBufferSourceNode::totalPitchRate()
 bool AudioBufferSourceNode::looping()
 {
     static bool firstTime = true;
-    if (firstTime && context() && context()->document()) {
-        context()->document()->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, "AudioBufferSourceNode 'looping' attribute is deprecated.  Use 'loop' instead.");
+    if (firstTime && context() && context()->scriptExecutionContext()) {
+        context()->scriptExecutionContext()->addConsoleMessage(JSMessageSource, WarningMessageLevel, "AudioBufferSourceNode 'looping' attribute is deprecated.  Use 'loop' instead.");
         firstTime = false;
     }
 
@@ -459,8 +467,8 @@ bool AudioBufferSourceNode::looping()
 void AudioBufferSourceNode::setLooping(bool looping)
 {
     static bool firstTime = true;
-    if (firstTime && context() && context()->document()) {
-        context()->document()->addConsoleMessage(JSMessageSource, LogMessageType, WarningMessageLevel, "AudioBufferSourceNode 'looping' attribute is deprecated.  Use 'loop' instead.");
+    if (firstTime && context() && context()->scriptExecutionContext()) {
+        context()->scriptExecutionContext()->addConsoleMessage(JSMessageSource, WarningMessageLevel, "AudioBufferSourceNode 'looping' attribute is deprecated.  Use 'loop' instead.");
         firstTime = false;
     }
 

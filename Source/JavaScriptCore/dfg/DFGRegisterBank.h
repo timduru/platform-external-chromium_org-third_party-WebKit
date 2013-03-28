@@ -28,7 +28,7 @@
 
 #if ENABLE(DFG_JIT)
 
-#include <dfg/DFGCommon.h>
+#include "DFGCommon.h"
 
 namespace JSC { namespace DFG {
 
@@ -216,11 +216,11 @@ public:
         // For each register, print the VirtualRegister 'name'.
         for (uint32_t i =0; i < NUM_REGS; ++i) {
             if (m_data[i].name != InvalidVirtualRegister)
-                dataLog("[%02d]", m_data[i].name);
+                dataLogF("[%02d]", m_data[i].name);
             else
-                dataLog("[--]");
+                dataLogF("[--]");
         }
-        dataLog("\n");
+        dataLogF("\n");
     }
 #endif
 

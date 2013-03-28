@@ -30,7 +30,9 @@
 
 #include "Connection.h"
 #include "Plugin.h"
+#include "PluginProcess.h"
 #include <WebCore/AffineTransform.h>
+#include <WebCore/FindOptions.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/SecurityOrigin.h>
 
@@ -54,19 +56,19 @@ struct PluginCreationParameters;
 
 class PluginProxy : public Plugin {
 public:
-    static PassRefPtr<PluginProxy> create(const String& pluginPath);
+    static PassRefPtr<PluginProxy> create(const String& pluginPath, PluginProcess::Type);
     ~PluginProxy();
 
     uint64_t pluginInstanceID() const { return m_pluginInstanceID; }
     void pluginProcessCrashed();
 
-    void didReceivePluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
-    void didReceiveSyncPluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
+    void didReceivePluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&);
+    void didReceiveSyncPluginProxyMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&, OwnPtr<CoreIPC::MessageEncoder>&);
 
     bool isBeingAsynchronouslyInitialized() const { return m_waitingOnAsynchronousInitialization; }
 
 private:
-    explicit PluginProxy(const String& pluginPath);
+    explicit PluginProxy(const String& pluginPath, PluginProcess::Type);
 
     // Plugin
     virtual bool initialize(const Parameters&);
@@ -104,6 +106,7 @@ private:
     virtual bool handleEditingCommand(const String& commandName, const String& argument) OVERRIDE;
     virtual bool isEditingCommandEnabled(const String& commandName) OVERRIDE;
     virtual bool shouldAllowScripting() OVERRIDE { return true; }
+    virtual bool shouldAllowNavigationFromDrags() OVERRIDE { return false; }
     
     virtual bool handlesPageScaleFactor();
     
@@ -124,6 +127,16 @@ private:
     virtual bool handleScroll(WebCore::ScrollDirection, WebCore::ScrollGranularity);
     virtual WebCore::Scrollbar* horizontalScrollbar();
     virtual WebCore::Scrollbar* verticalScrollbar();
+
+    virtual unsigned countFindMatches(const String&, WebCore::FindOptions, unsigned) OVERRIDE  { return 0; }
+    virtual bool findString(const String&, WebCore::FindOptions, unsigned) OVERRIDE { return false; }
+
+    virtual WebCore::IntPoint convertToRootView(const WebCore::IntPoint&) const OVERRIDE;
+
+    virtual PassRefPtr<WebCore::SharedBuffer> liveResourceData() const OVERRIDE;
+    virtual bool performDictionaryLookupAtLocation(const WebCore::FloatPoint&) OVERRIDE { return false; }
+
+    virtual String getSelectionString() const OVERRIDE { return String(); }
 
     float contentsScaleFactor();
     bool needsBackingStore() const;
@@ -203,6 +216,8 @@ private:
 #if PLATFORM(MAC)
     RetainPtr<CALayer> m_pluginLayer;
 #endif
+
+    PluginProcess::Type m_processType;
 };
 
 } // namespace WebKit

@@ -50,6 +50,8 @@
 
 namespace WebCore {
 
+using namespace HTMLNames;
+
 // Animated property definitions
 DEFINE_ANIMATED_STRING(SVGAElement, SVGNames::targetAttr, SVGTarget, svgTarget)
 DEFINE_ANIMATED_STRING(SVGAElement, XLinkNames::hrefAttr, Href, href)
@@ -99,25 +101,25 @@ bool SVGAElement::isSupportedAttribute(const QualifiedName& attrName)
     return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
 }
 
-void SVGAElement::parseAttribute(const Attribute& attribute)
+void SVGAElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-    if (!isSupportedAttribute(attribute.name())) {
-        SVGStyledTransformableElement::parseAttribute(attribute);
+    if (!isSupportedAttribute(name)) {
+        SVGStyledTransformableElement::parseAttribute(name, value);
         return;
     }
 
-    if (attribute.name() == SVGNames::targetAttr) {
-        setSVGTargetBaseValue(attribute.value());
+    if (name == SVGNames::targetAttr) {
+        setSVGTargetBaseValue(value);
         return;
     }
 
-    if (SVGURIReference::parseAttribute(attribute))
+    if (SVGURIReference::parseAttribute(name, value))
         return;
-    if (SVGTests::parseAttribute(attribute))
+    if (SVGTests::parseAttribute(name, value))
         return;
-    if (SVGLangSpace::parseAttribute(attribute))
+    if (SVGLangSpace::parseAttribute(name, value))
         return;
-    if (SVGExternalResourcesRequired::parseAttribute(attribute))
+    if (SVGExternalResourcesRequired::parseAttribute(name, value))
         return;
 
     ASSERT_NOT_REACHED();
@@ -145,7 +147,7 @@ void SVGAElement::svgAttributeChanged(const QualifiedName& attrName)
 
 RenderObject* SVGAElement::createRenderer(RenderArena* arena, RenderStyle*)
 {
-    if (parentNode() && parentNode()->isSVGElement() && static_cast<SVGElement*>(parentNode())->isTextContent())
+    if (parentNode() && parentNode()->isSVGElement() && toSVGElement(parentNode())->isTextContent())
         return new (arena) RenderSVGInline(this);
 
     return new (arena) RenderSVGTransformableContainer(this);
@@ -204,6 +206,11 @@ bool SVGAElement::isFocusable() const
         return false;
     
     return SVGElement::isFocusable();
+}
+
+bool SVGAElement::isURLAttribute(const Attribute& attribute) const
+{
+    return attribute.name().localName() == hrefAttr || SVGStyledTransformableElement::isURLAttribute(attribute);
 }
 
 bool SVGAElement::isMouseFocusable() const

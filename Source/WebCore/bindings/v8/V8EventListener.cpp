@@ -41,7 +41,7 @@
 namespace WebCore {
 
 V8EventListener::V8EventListener(v8::Local<v8::Object> listener, bool isAttribute, const WorldContextHandle& worldContext)
-    : V8AbstractEventListener(isAttribute, worldContext)
+    : V8AbstractEventListener(isAttribute, worldContext, v8::Isolate::GetCurrent()) // FIXME: Remove GetCurrent().
 {
     setListenerObject(listener);
 }
@@ -72,7 +72,7 @@ v8::Local<v8::Value> V8EventListener::callListenerFunction(ScriptExecutionContex
 {
 
     v8::Local<v8::Function> handlerFunction = getListenerFunction(context);
-    v8::Local<v8::Object> receiver = getReceiverObject(event);
+    v8::Local<v8::Object> receiver = getReceiverObject(context, event);
     if (handlerFunction.IsEmpty() || receiver.IsEmpty())
         return v8::Local<v8::Value>();
 
@@ -85,7 +85,7 @@ v8::Local<v8::Value> V8EventListener::callListenerFunction(ScriptExecutionContex
     if (!context->isDocument())
         return v8::Local<v8::Value>();
 
-    Frame* frame = static_cast<Document*>(context)->frame();
+    Frame* frame = toDocument(context)->frame();
     if (!frame)
         return v8::Local<v8::Value>();
 

@@ -18,12 +18,12 @@
     Boston, MA 02111-1307, USA.
 */
 
-#if ENABLE(SQL_DATABASE)
-
 #ifndef V8TestCallback_h
 #define V8TestCallback_h
 
+#if ENABLE(SQL_DATABASE)
 #include "ActiveDOMCallback.h"
+#include "ScopedPersistent.h"
 #include "TestCallback.h"
 #include "WorldContextHandle.h"
 #include <v8.h>
@@ -35,11 +35,11 @@ class ScriptExecutionContext;
 
 class V8TestCallback : public TestCallback, public ActiveDOMCallback {
 public:
-    static PassRefPtr<V8TestCallback> create(v8::Local<v8::Value> value, ScriptExecutionContext* context)
+    static PassRefPtr<V8TestCallback> create(v8::Handle<v8::Value> value, ScriptExecutionContext* context)
     {
         ASSERT(value->IsObject());
         ASSERT(context);
-        return adoptRef(new V8TestCallback(value->ToObject(), context));
+        return adoptRef(new V8TestCallback(v8::Handle<v8::Object>::Cast(value), context));
     }
 
     virtual ~V8TestCallback();
@@ -54,10 +54,12 @@ public:
     virtual bool callbackWithBoolean(bool boolParam);
     virtual bool callbackRequiresThisToPass(Class8* class8Param, ThisClass* thisClassParam);
 
-private:
-    V8TestCallback(v8::Local<v8::Object>, ScriptExecutionContext*);
+    virtual ScriptExecutionContext* scriptExecutionContext() const { return ContextDestructionObserver::scriptExecutionContext(); }
 
-    v8::Persistent<v8::Object> m_callback;
+private:
+    V8TestCallback(v8::Handle<v8::Object>, ScriptExecutionContext*);
+
+    ScopedPersistent<v8::Object> m_callback;
     WorldContextHandle m_worldContext;
 };
 

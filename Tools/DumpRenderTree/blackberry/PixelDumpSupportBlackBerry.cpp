@@ -20,6 +20,11 @@
 #include "PixelDumpSupportBlackBerry.h"
 
 #include "BackingStore.h"
+#include "BlackBerryPlatformExecutableMessage.h"
+#include "BlackBerryPlatformGraphics.h"
+#include "BlackBerryPlatformGraphicsContext.h"
+#include "BlackBerryPlatformGraphicsImpl.h"
+#include "BlackBerryPlatformMessageClient.h"
 #include "DumpRenderTreeBlackBerry.h"
 #include "PNGImageEncoder.h"
 #include "PixelDumpSupport.h"
@@ -37,6 +42,11 @@ using namespace BlackBerry::WebKit;
 using namespace BlackBerry;
 using namespace WTF;
 
+void readPixelsUserInterfaceThread(BlackBerry::Platform::Graphics::PlatformGraphicsContext* context, const BlackBerry::Platform::IntRect& srcRect, unsigned char* pixels)
+{
+    context->readPixels(srcRect, pixels, false, false);
+}
+
 PassRefPtr<BitmapContext> createBitmapContextFromWebView(bool /*onscreen*/, bool /*incrementalRepaint*/, bool /*sweepHorizontally*/, bool /*drawSelectionRect*/)
 {
     Platform::Graphics::Window* window = DumpRenderTree::currentInstance()->page()->client()->window();
@@ -52,11 +62,11 @@ PassRefPtr<BitmapContext> createBitmapContextFromWebView(bool /*onscreen*/, bool
     const Platform::IntSize& windowSize = window->viewportSize();
     unsigned char* data = new unsigned char[windowSize.width() * windowSize.height() * 4];
 
+#if USE(SKIA)
     // We need to force a synchronous update to the window or we may get an empty bitmap.
     // For example, running DRT with one test case that finishes before the screen is updated.
     window->post(windowRect);
 
-#if USE(SKIA)
     SkBitmap bitmap;
     bitmap.setConfig(SkBitmap::kARGB_8888_Config, windowSize.width(), windowSize.height());
     bitmap.allocPixels();
@@ -71,14 +81,21 @@ PassRefPtr<BitmapContext> createBitmapContextFromWebView(bool /*onscreen*/, bool
 
     const unsigned char* windowPixels = 0;
     if (!contentsBitmap.empty()) {
-        SkAutoLockPixels lock(contentsBitmap);
         windowPixels = static_cast<const unsigned char*>(contentsBitmap.getPixels());
+        if (windowPixels)
+            memcpy(data, windowPixels, windowSize.width() * windowSize.height() * 4);
     }
 #else
-    const unsigned char* windowPixels = lockBufferBackingImage(window->buffer(), Platform::Graphics::ReadAccess);
+    BlackBerry::Platform::Graphics::Buffer* buffer = BlackBerry::Platform::Graphics::createBuffer(windowSize, BlackBerry::Platform::Graphics::AlwaysBacked);
+    BlackBerry::Platform::Graphics::Drawable* drawable = BlackBerry::Platform::Graphics::lockBufferDrawable(buffer);
+    if (drawable) {
+        backingStore->drawContents(drawable, windowRect, windowSize);
+        BlackBerry::Platform::userInterfaceThreadMessageClient()->dispatchSyncMessage(
+            BlackBerry::Platform::createFunctionCallMessage(&readPixelsUserInterfaceThread, drawable, windowRect, data));
+        BlackBerry::Platform::Graphics::releaseBufferDrawable(buffer);
+    }
+    BlackBerry::Platform::Graphics::destroyBuffer(buffer);
 #endif
-    memcpy(data, windowPixels, windowSize.width() * windowSize.height() * 4);
-    Platform::Graphics::releaseBufferBackingImage(window->buffer());
     return BitmapContext::createByAdoptingData(data, windowSize.width(), windowSize.height());
 }
 

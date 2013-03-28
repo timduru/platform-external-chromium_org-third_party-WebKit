@@ -29,40 +29,27 @@
 
 #include "BackingStore.h"
 #include "DrawingAreaInfo.h"
+#include "MessageReceiver.h"
 #include <WebCore/FloatPoint.h>
 #include <WebCore/IntRect.h>
 #include <WebCore/IntSize.h>
 #include <stdint.h>
 #include <wtf/Noncopyable.h>
 
-namespace CoreIPC {
-    class Connection;
-    class MessageDecoder;
-    class MessageID;
-}
-
-namespace WebCore {
-    class TransformationMatrix;
-}
-
 namespace WebKit {
 
 class LayerTreeContext;
-class LayerTreeCoordinatorProxy;
+class CoordinatedLayerTreeHostProxy;
 class UpdateInfo;
-class WebLayerTreeInfo;
-class WebLayerUpdateInfo;
 class WebPageProxy;
 
-class DrawingAreaProxy {
+class DrawingAreaProxy : public CoreIPC::MessageReceiver {
     WTF_MAKE_NONCOPYABLE(DrawingAreaProxy);
 
 public:
     virtual ~DrawingAreaProxy();
 
     DrawingAreaType type() const { return m_type; }
-
-    void didReceiveDrawingAreaProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
 
     virtual void deviceScaleFactorDidChange() = 0;
 
@@ -81,14 +68,14 @@ public:
     virtual void waitForPossibleGeometryUpdate() { }
 
     virtual void colorSpaceDidChange() { }
+    virtual void minimumLayoutWidthDidChange() { }
 
 #if USE(COORDINATED_GRAPHICS)
     virtual void updateViewport();
     virtual WebCore::IntRect viewportVisibleRect() const { return contentsRect(); }
     virtual WebCore::IntRect contentsRect() const;
-    LayerTreeCoordinatorProxy* layerTreeCoordinatorProxy() const { return m_layerTreeCoordinatorProxy.get(); }
-    virtual void setVisibleContentsRect(const WebCore::FloatRect& /* visibleContentsRect */, float /* scale */, const WebCore::FloatPoint& /* trajectoryVector */) { }
-    virtual void didReceiveLayerTreeCoordinatorProxyMessage(CoreIPC::Connection*, CoreIPC::MessageID, CoreIPC::MessageDecoder&);
+    CoordinatedLayerTreeHostProxy* coordinatedLayerTreeHostProxy() const { return m_coordinatedLayerTreeHostProxy.get(); }
+    virtual void setVisibleContentsRect(const WebCore::FloatRect& /* visibleContentsRect */, const WebCore::FloatPoint& /* trajectoryVector */) { }
 
     WebPageProxy* page() { return m_webPageProxy; }
 #endif
@@ -102,11 +89,14 @@ protected:
     WebCore::IntSize m_scrollOffset;
 
 #if USE(COORDINATED_GRAPHICS)
-    OwnPtr<LayerTreeCoordinatorProxy> m_layerTreeCoordinatorProxy;
+    OwnPtr<CoordinatedLayerTreeHostProxy> m_coordinatedLayerTreeHostProxy;
 #endif
 
 private:
     virtual void sizeDidChange() = 0;
+
+    // CoreIPC::MessageReceiver
+    virtual void didReceiveMessage(CoreIPC::Connection*, CoreIPC::MessageDecoder&) OVERRIDE;
 
     // CoreIPC message handlers.
     // FIXME: These should be pure virtual.
@@ -118,7 +108,8 @@ private:
     virtual void updateAcceleratedCompositingMode(uint64_t /* backingStoreStateID */, const LayerTreeContext&) { }
 #endif
 #if PLATFORM(MAC)
-    virtual void didUpdateGeometry() { }
+    virtual void didUpdateGeometry(const WebCore::IntSize& newIntrinsicContentSize) { }
+    virtual void intrinsicContentSizeDidChange(const WebCore::IntSize& newIntrinsicContentSize) { }
 #endif
 };
 

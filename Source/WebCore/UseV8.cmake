@@ -1,21 +1,21 @@
-ADD_DEFINITIONS(-DUSING_V8_SHARED)
-ADD_DEFINITIONS(-DWTF_CHANGES=1)
+add_definitions(-DUSING_V8_SHARED)
+add_definitions(-DWTF_CHANGES=1)
 
-LIST(APPEND WebCore_INCLUDE_DIRECTORIES
+list(APPEND WebCore_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/bindings/v8"
     "${WEBCORE_DIR}/bindings/v8/custom"
     "${JAVASCRIPTCORE_DIR}/runtime"
 )
 
-LIST(APPEND WebCoreTestSupport_INCLUDE_DIRECTORIES
+list(APPEND WebCoreTestSupport_INCLUDE_DIRECTORIES
     "${WEBCORE_DIR}/testing/v8"
 )
 
-LIST(APPEND WebCore_IDL_INCLUDES
+list(APPEND WebCore_IDL_INCLUDES
     bindings/v8
 )
 
-LIST(APPEND WebCore_SOURCES
+list(APPEND WebCore_SOURCES
     bindings/generic/BindingSecurity.cpp
 
     bindings/v8/BindingState.cpp
@@ -55,6 +55,7 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/V8GCController.cpp
     bindings/v8/V8GCForContextDispose.cpp
     bindings/v8/V8HiddenPropertyName.cpp
+    bindings/v8/V8Initializer.cpp
     bindings/v8/V8LazyEventListener.cpp
     bindings/v8/V8NodeFilterCondition.cpp
     bindings/v8/V8ObjectConstructor.cpp
@@ -67,7 +68,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/V8WindowErrorHandler.cpp
     bindings/v8/V8WorkerContextErrorHandler.cpp
     bindings/v8/V8WorkerContextEventListener.cpp
-    bindings/v8/WorkerContextExecutionProxy.cpp
     bindings/v8/WorkerScriptController.cpp
     bindings/v8/WorkerScriptDebugServer.cpp
     bindings/v8/WorldContextHandle.cpp
@@ -76,6 +76,7 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8ArrayBufferCustom.cpp
     bindings/v8/custom/V8ArrayBufferViewCustom.cpp
     bindings/v8/custom/V8AudioContextCustom.cpp
+    bindings/v8/custom/V8BiquadFilterNodeCustom.cpp
     bindings/v8/custom/V8CSSRuleCustom.cpp
     bindings/v8/custom/V8CSSStyleDeclarationCustom.cpp
     bindings/v8/custom/V8CSSValueCustom.cpp
@@ -83,7 +84,6 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8CanvasRenderingContextCustom.cpp
     bindings/v8/custom/V8ClipboardCustom.cpp
     bindings/v8/custom/V8ConsoleCustom.cpp
-    bindings/v8/custom/V8CoordinatesCustom.cpp
     bindings/v8/custom/V8CustomEventCustom.cpp
     bindings/v8/custom/V8CustomSQLStatementErrorCallback.cpp
     bindings/v8/custom/V8CustomXPathNSResolver.cpp
@@ -106,26 +106,24 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8HTMLCollectionCustom.cpp
     bindings/v8/custom/V8HTMLDocumentCustom.cpp
     bindings/v8/custom/V8HTMLElementCustom.cpp
+    bindings/v8/custom/V8HTMLFormControlsCollectionCustom.cpp
     bindings/v8/custom/V8HTMLFormElementCustom.cpp
     bindings/v8/custom/V8HTMLFrameElementCustom.cpp
     bindings/v8/custom/V8HTMLFrameSetElementCustom.cpp
     bindings/v8/custom/V8HTMLImageElementConstructor.cpp
-    bindings/v8/custom/V8HTMLInputElementCustom.cpp
+    bindings/v8/custom/V8HTMLInputElementConstructor.cpp
     bindings/v8/custom/V8HTMLLinkElementCustom.cpp
-    bindings/v8/custom/V8HTMLOptionElementConstructor.cpp
     bindings/v8/custom/V8HTMLOptionsCollectionCustom.cpp
-    bindings/v8/custom/V8HTMLOutputElementCustom.cpp
     bindings/v8/custom/V8HTMLPlugInElementCustom.cpp
     bindings/v8/custom/V8HTMLSelectElementCustom.cpp
     bindings/v8/custom/V8HistoryCustom.cpp
     bindings/v8/custom/V8IDBAnyCustom.cpp
-    bindings/v8/custom/V8IDBKeyCustom.cpp
     bindings/v8/custom/V8ImageDataCustom.cpp
     bindings/v8/custom/V8InjectedScriptHostCustom.cpp
     bindings/v8/custom/V8InjectedScriptManager.cpp
     bindings/v8/custom/V8InspectorFrontendHostCustom.cpp
     bindings/v8/custom/V8LocationCustom.cpp
-    bindings/v8/custom/V8MessageChannelConstructor.cpp
+    bindings/v8/custom/V8MessageChannelCustom.cpp
     bindings/v8/custom/V8MessageEventCustom.cpp
     bindings/v8/custom/V8MessagePortCustom.cpp
     bindings/v8/custom/V8MicroDataItemValueCustom.cpp
@@ -135,10 +133,9 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8NamedNodesCollection.cpp
     bindings/v8/custom/V8NodeCustom.cpp
     bindings/v8/custom/V8NodeListCustom.cpp
-    bindings/v8/custom/V8NotificationCustom.cpp
-    bindings/v8/custom/V8NotificationCenterCustom.cpp
-    bindings/v8/custom/V8PerformanceCustom.cpp
+    bindings/v8/custom/V8OscillatorNodeCustom.cpp
     bindings/v8/custom/V8PerformanceEntryCustom.cpp
+    bindings/v8/custom/V8PannerNodeCustom.cpp
     bindings/v8/custom/V8PopStateEventCustom.cpp
     bindings/v8/custom/V8SQLResultSetRowListCustom.cpp
     bindings/v8/custom/V8SQLTransactionCustom.cpp
@@ -148,29 +145,26 @@ LIST(APPEND WebCore_SOURCES
     bindings/v8/custom/V8StyleSheetCustom.cpp
     bindings/v8/custom/V8StyleSheetListCustom.cpp
     bindings/v8/custom/V8WebGLRenderingContextCustom.cpp
-    bindings/v8/custom/V8WebKitAnimationCustom.cpp
-    bindings/v8/custom/V8WebKitPointConstructor.cpp
-    bindings/v8/custom/V8WebSocketCustom.cpp
+    bindings/v8/custom/V8WebKitPointCustom.cpp
     bindings/v8/custom/V8WorkerContextCustom.cpp
     bindings/v8/custom/V8WorkerCustom.cpp
-    bindings/v8/custom/V8XMLHttpRequestConstructor.cpp
     bindings/v8/custom/V8XMLHttpRequestCustom.cpp
     bindings/v8/custom/V8XSLTProcessorCustom.cpp
 )
 
-LIST(APPEND WebCoreTestSupport_SOURCES
+list(APPEND WebCoreTestSupport_SOURCES
     testing/v8/WebCoreTestSupport.cpp
 )
 
-LIST(APPEND WebCore_SOURCES
+list(APPEND WebCore_SOURCES
     ${JAVASCRIPTCORE_DIR}/yarr/YarrInterpreter.cpp
     ${JAVASCRIPTCORE_DIR}/yarr/YarrJIT.cpp
     ${JAVASCRIPTCORE_DIR}/yarr/YarrPattern.cpp
     ${JAVASCRIPTCORE_DIR}/yarr/YarrSyntaxChecker.cpp
 )
 
-IF (ENABLE_JAVASCRIPT_DEBUGGER)
-    LIST(APPEND WebCore_SOURCES
+if (ENABLE_JAVASCRIPT_DEBUGGER)
+    list(APPEND WebCore_SOURCES
         bindings/v8/JavaScriptCallFrame.cpp
         bindings/v8/ScriptDebugServer.cpp
         bindings/v8/ScriptHeapSnapshot.cpp
@@ -179,61 +173,59 @@ IF (ENABLE_JAVASCRIPT_DEBUGGER)
         bindings/v8/ScriptProfiler.cpp
 
         bindings/v8/custom/V8JavaScriptCallFrameCustom.cpp
-        bindings/v8/custom/V8ScriptProfileCustom.cpp
-        bindings/v8/custom/V8ScriptProfileNodeCustom.cpp
     )
-ENDIF ()
+endif ()
 
-IF (ENABLE_NETSCAPE_PLUGIN_API)
-    LIST(APPEND WebCore_SOURCES
+if (ENABLE_NETSCAPE_PLUGIN_API)
+    list(APPEND WebCore_SOURCES
         bindings/v8/NPV8Object.cpp
         bindings/v8/V8NPObject.cpp
         bindings/v8/V8NPUtils.cpp
     )
-ENDIF()
+endif ()
 
-IF (ENABLE_VIDEO)
-    LIST(APPEND WebCore_SOURCES
+if (ENABLE_VIDEO)
+    list(APPEND WebCore_SOURCES
         bindings/v8/custom/V8HTMLAudioElementConstructor.cpp
     )
-ENDIF ()
+endif ()
 
-IF (ENABLE_SVG)
-    LIST(APPEND WebCore_SOURCES
+if (ENABLE_SVG)
+    list(APPEND WebCore_SOURCES
         bindings/v8/custom/V8SVGDocumentCustom.cpp
         bindings/v8/custom/V8SVGElementCustom.cpp
         bindings/v8/custom/V8SVGLengthCustom.cpp
         bindings/v8/custom/V8SVGPathSegCustom.cpp
     )
-ENDIF ()
+endif ()
 
-LIST(APPEND SCRIPTS_BINDINGS
+list(APPEND SCRIPTS_BINDINGS
     ${WEBCORE_DIR}/bindings/scripts/CodeGenerator.pm
     ${WEBCORE_DIR}/bindings/scripts/CodeGeneratorV8.pm
 )
 
-SET(IDL_INCLUDES "")
-FOREACH (_include ${WebCore_IDL_INCLUDES})
-    LIST(APPEND IDL_INCLUDES --include=${WEBCORE_DIR}/${_include})
-ENDFOREACH ()
+set(IDL_INCLUDES "")
+foreach (_include ${WebCore_IDL_INCLUDES})
+    list(APPEND IDL_INCLUDES --include=${WEBCORE_DIR}/${_include})
+endforeach ()
 
-FOREACH (_include ${WebCoreTestSupport_IDL_INCLUDES})
-    LIST(APPEND IDL_INCLUDES --include=${WEBCORE_DIR}/${_include})
-ENDFOREACH ()
+foreach (_include ${WebCoreTestSupport_IDL_INCLUDES})
+    list(APPEND IDL_INCLUDES --include=${WEBCORE_DIR}/${_include})
+endforeach ()
 
-SET(FEATURE_DEFINES_JAVASCRIPT "LANGUAGE_JAVASCRIPT=1 V8_BINDING=1 ${FEATURE_DEFINES_WITH_SPACE_SEPARATOR}")
+set(FEATURE_DEFINES_JAVASCRIPT "LANGUAGE_JAVASCRIPT=1 V8_BINDING=1 ${FEATURE_DEFINES_WITH_SPACE_SEPARATOR}")
 
 # Generate DebuggerScriptSource.h
-ADD_CUSTOM_COMMAND(
+add_custom_command(
     OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/DebuggerScriptSource.h
     MAIN_DEPENDENCY ${WEBCORE_DIR}/bindings/v8/DebuggerScript.js
     DEPENDS ${WEBCORE_DIR}/inspector/xxd.pl
     COMMAND ${PERL_EXECUTABLE} ${WEBCORE_DIR}/inspector/xxd.pl DebuggerScriptSource_js ${WEBCORE_DIR}/bindings/v8/DebuggerScript.js ${DERIVED_SOURCES_WEBCORE_DIR}/DebuggerScriptSource.h
     VERBATIM)
-LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/DebuggerScriptSource.h)
+list(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/DebuggerScriptSource.h)
 
 #GENERATOR: "RegExpJitTables.h": tables used by Yarr
-ADD_CUSTOM_COMMAND(
+add_custom_command(
     OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/RegExpJitTables.h
     MAIN_DEPENDENCY ${JAVASCRIPTCORE_DIR}/create_regex_tables
     COMMAND ${PYTHON_EXECUTABLE} ${JAVASCRIPTCORE_DIR}/create_regex_tables > ${DERIVED_SOURCES_WEBCORE_DIR}/RegExpJitTables.h
@@ -241,29 +233,33 @@ ADD_CUSTOM_COMMAND(
 ADD_SOURCE_DEPENDENCIES(${JAVASCRIPTCORE_DIR}/yarr/YarrPattern.cpp ${DERIVED_SOURCES_WEBCORE_DIR}/RegExpJitTables.h)
 
 # Generate V8ArrayBufferViewCustomScript.h
-ADD_CUSTOM_COMMAND(
+add_custom_command(
     OUTPUT ${DERIVED_SOURCES_WEBCORE_DIR}/V8ArrayBufferViewCustomScript.h
     MAIN_DEPENDENCY ${WEBCORE_DIR}/bindings/v8/custom/V8ArrayBufferViewCustomScript.js
     DEPENDS ${WEBCORE_DIR}/inspector/xxd.pl
     COMMAND ${PERL_EXECUTABLE} ${WEBCORE_DIR}/inspector/xxd.pl V8ArrayBufferViewCustomScript_js ${WEBCORE_DIR}/bindings/v8/custom/V8ArrayBufferViewCustomScript.js ${DERIVED_SOURCES_WEBCORE_DIR}/V8ArrayBufferViewCustomScript.h
     VERBATIM)
-LIST(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/V8ArrayBufferViewCustomScript.h)
+list(APPEND WebCore_SOURCES ${DERIVED_SOURCES_WEBCORE_DIR}/V8ArrayBufferViewCustomScript.h)
 
 # Create JavaScript C++ code given an IDL input
-FOREACH (_idl ${WebCore_IDL_FILES})
-    SET(IDL_FILES_LIST "${IDL_FILES_LIST}${WEBCORE_DIR}/${_idl}\n")
-ENDFOREACH ()
+foreach (_idl ${WebCore_IDL_FILES})
+    set(IDL_FILES_LIST "${IDL_FILES_LIST}${WEBCORE_DIR}/${_idl}\n")
+endforeach ()
 
-FOREACH (_idl ${WebCoreTestSupport_IDL_FILES})
-    SET(IDL_FILES_LIST "${IDL_FILES_LIST}${WEBCORE_DIR}/${_idl}\n")
-ENDFOREACH ()
+foreach (_idl ${WebCoreTestSupport_IDL_FILES})
+    set(IDL_FILES_LIST "${IDL_FILES_LIST}${WEBCORE_DIR}/${_idl}\n")
+endforeach ()
 
-FILE(WRITE ${IDL_FILES_TMP} ${IDL_FILES_LIST})
+set(IDL_FILES_LIST "${IDL_FILES_LIST}${DERIVED_SOURCES_WEBCORE_DIR}/InternalSettingsGenerated.idl\n")
+list(APPEND WebCoreTestSupport_IDL_FILES ${DERIVED_SOURCES_WEBCORE_DIR}/InternalSettingsGenerated.idl)
+list(APPEND IDL_INCLUDES --include=${DERIVED_SOURCES_WEBCORE_DIR})
 
-ADD_CUSTOM_COMMAND(
+file(WRITE ${IDL_FILES_TMP} ${IDL_FILES_LIST})
+
+add_custom_command(
     OUTPUT ${SUPPLEMENTAL_DEPENDENCY_FILE}
     DEPENDS ${WEBCORE_DIR}/bindings/scripts/preprocess-idls.pl ${SCRIPTS_PREPROCESS_IDLS} ${WebCore_IDL_FILES} ${WebCoreTestSupport_IDL_FILES} ${IDL_ATTRIBUTES_FILE}
-    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/preprocess-idls.pl --defines "${FEATURE_DEFINES_JAVASCRIPT}" --idlFilesList ${IDL_FILES_TMP} --preprocessor "${CODE_GENERATOR_PREPROCESSOR}" --supplementalDependencyFile ${SUPPLEMENTAL_DEPENDENCY_FILE} --idlAttributesFile ${IDL_ATTRIBUTES_FILE}
+    COMMAND ${PERL_EXECUTABLE} -I${WEBCORE_DIR}/bindings/scripts ${WEBCORE_DIR}/bindings/scripts/preprocess-idls.pl --defines "${FEATURE_DEFINES_JAVASCRIPT}" --idlFilesList ${IDL_FILES_TMP} --supplementalDependencyFile ${SUPPLEMENTAL_DEPENDENCY_FILE}
     VERBATIM)
 
 GENERATE_BINDINGS(WebCore_SOURCES
@@ -272,6 +268,7 @@ GENERATE_BINDINGS(WebCore_SOURCES
     "${IDL_INCLUDES}"
     "${FEATURE_DEFINES_JAVASCRIPT}"
     ${DERIVED_SOURCES_WEBCORE_DIR} V8 V8
+    ${IDL_ATTRIBUTES_FILE}
     ${SUPPLEMENTAL_DEPENDENCY_FILE})
 
 GENERATE_BINDINGS(WebCoreTestSupport_SOURCES
@@ -280,4 +277,5 @@ GENERATE_BINDINGS(WebCoreTestSupport_SOURCES
     "${IDL_INCLUDES}"
     "${FEATURE_DEFINES_JAVASCRIPT}"
     ${DERIVED_SOURCES_WEBCORE_DIR} V8 V8
+    ${IDL_ATTRIBUTES_FILE}
     ${SUPPLEMENTAL_DEPENDENCY_FILE})

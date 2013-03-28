@@ -26,40 +26,76 @@
 #ifndef ImageFrameGenerator_h
 #define ImageFrameGenerator_h
 
+#include "DiscardablePixelRef.h"
 #include "SkTypes.h"
+#include "SkBitmap.h"
 #include "SkSize.h"
-#include <wtf/OwnPtr.h>
+#include "ThreadSafeDataTransport.h"
 #include <wtf/PassOwnPtr.h>
+#include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
+#include <wtf/ThreadSafeRefCounted.h>
+#include <wtf/ThreadingPrimitives.h>
+#include <wtf/Vector.h>
 
 namespace WebCore {
 
 class ImageDecoder;
+class ScaledImageFragment;
 class SharedBuffer;
 
-class ImageFrameGenerator : public RefCounted<ImageFrameGenerator> {
+class ImageDecoderFactory {
 public:
-    static PassRefPtr<ImageFrameGenerator> create(PassOwnPtr<ImageDecoder> decoder)
+    virtual ~ImageDecoderFactory() { }
+    virtual PassOwnPtr<ImageDecoder> create() = 0;
+};
+
+class ImageFrameGenerator : public ThreadSafeRefCounted<ImageFrameGenerator> {
+public:
+    static PassRefPtr<ImageFrameGenerator> create(const SkISize& fullSize, PassRefPtr<SharedBuffer> data, bool allDataReceived)
     {
-        return adoptRef(new ImageFrameGenerator(decoder));
+        return adoptRef(new ImageFrameGenerator(fullSize, data, allDataReceived));
     }
 
-    explicit ImageFrameGenerator(PassOwnPtr<ImageDecoder>);
+    ImageFrameGenerator(const SkISize& fullSize, PassRefPtr<SharedBuffer>, bool allDataReceived);
     ~ImageFrameGenerator();
 
-    // Creates the image decoder if needed.
-    ImageDecoder* decoder();
+    const ScaledImageFragment* decodeAndScale(const SkISize& scaledSize);
+
     void setData(PassRefPtr<SharedBuffer>, bool allDataReceived);
 
-    const SkISize& fullSize() const { return m_fullSize; }
-    int imageId() const { return m_imageId; }
+    // Creates a new SharedBuffer containing the data received so far.
+    void copyData(RefPtr<SharedBuffer>*, bool* allDataReceived);
+
+    void setImageDecoderFactoryForTesting(PassOwnPtr<ImageDecoderFactory> factory) { m_imageDecoderFactory = factory; }
+
+    bool hasAlpha();
 
 private:
-    OwnPtr<ImageDecoder> m_decoder;
-    RefPtr<SharedBuffer> m_data;
+    // These methods are called while m_decodeMutex is locked.
+    const ScaledImageFragment* tryToLockCompleteCache(const SkISize& scaledSize);
+    const ScaledImageFragment* tryToScale(const ScaledImageFragment* fullSizeImage, const SkISize& scaledSize);
+    const ScaledImageFragment* tryToResumeDecodeAndScale(const SkISize& scaledSize);
+    const ScaledImageFragment* tryToDecodeAndScale(const SkISize& scaledSize);
+
+    // Use the given decoder to decode. If a decoder is not given then try to create one.
+    PassOwnPtr<ScaledImageFragment> decode(ImageDecoder**);
+
     SkISize m_fullSize;
-    int m_imageId;
+    ThreadSafeDataTransport m_data;
+    bool m_decodeFailedAndEmpty;
+    bool m_hasAlpha;
+    int m_decodeCount;
+    DiscardablePixelRefAllocator m_allocator;
+
+    OwnPtr<ImageDecoderFactory> m_imageDecoderFactory;
+
+    // Prevents multiple decode operations on the same data.
+    Mutex m_decodeMutex;
+
+    // Protect concurrent access to m_hasAlpha.
+    Mutex m_alphaMutex;
 };
 
 } // namespace WebCore

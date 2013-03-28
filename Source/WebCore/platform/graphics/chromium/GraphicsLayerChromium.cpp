@@ -53,23 +53,27 @@
 #include "Image.h"
 #include "NativeImageSkia.h"
 #include "PlatformContextSkia.h"
+#include "PlatformMemoryInstrumentation.h"
 #include "ScrollableArea.h"
 #include "SkImageFilter.h"
 #include "SkMatrix44.h"
 #include "SkiaImageFilterBuilder.h"
 #include "SystemTime.h"
+#include "TransformSkMatrix44Conversions.h"
 #include <public/Platform.h>
 #include <public/WebAnimation.h>
 #include <public/WebCompositorSupport.h>
+#include <public/WebContentLayer.h>
 #include <public/WebFilterOperation.h>
 #include <public/WebFilterOperations.h>
 #include <public/WebFloatPoint.h>
 #include <public/WebFloatRect.h>
 #include <public/WebImageLayer.h>
 #include <public/WebSize.h>
-#include <public/WebTransformationMatrix.h>
+#include <public/WebSolidColorLayer.h>
 #include <wtf/CurrentTime.h>
 #include <wtf/HashSet.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
 #include <wtf/StringExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringHash.h>
@@ -82,15 +86,13 @@ namespace WebCore {
 
 PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerFactory* factory, GraphicsLayerClient* client)
 {
-    if (!factory)
-        return adoptPtr(new GraphicsLayerChromium(client));
-
     return factory->createGraphicsLayer(client);
 }
 
 PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerClient* client)
 {
-    return adoptPtr(new GraphicsLayerChromium(client));
+    ASSERT_NOT_REACHED();
+    return nullptr;
 }
 
 GraphicsLayerChromium::GraphicsLayerChromium(GraphicsLayerClient* client)
@@ -99,7 +101,6 @@ GraphicsLayerChromium::GraphicsLayerChromium(GraphicsLayerClient* client)
     , m_contentsLayerId(0)
     , m_linkHighlight(0)
     , m_contentsLayerPurpose(NoContentsLayer)
-    , m_contentsLayerHasBackgroundColor(false)
     , m_inSetChildren(false)
     , m_scrollableArea(0)
 {
@@ -108,7 +109,6 @@ GraphicsLayerChromium::GraphicsLayerChromium(GraphicsLayerClient* client)
     m_layer->layer()->setDrawsContent(m_drawsContent && m_contentsVisible);
     m_layer->layer()->setScrollClient(this);
     m_layer->setAutomaticallyComputeRasterScale(true);
-    updateDebugIndicators();
 }
 
 GraphicsLayerChromium::~GraphicsLayerChromium()
@@ -284,18 +284,11 @@ void GraphicsLayerChromium::setContentsVisible(bool contentsVisible)
 
 void GraphicsLayerChromium::setBackgroundColor(const Color& color)
 {
-    GraphicsLayer::setBackgroundColor(color.rgb());
+    if (color == m_backgroundColor)
+        return;
 
-    m_contentsLayerHasBackgroundColor = true;
+    GraphicsLayer::setBackgroundColor(color);
     updateLayerBackgroundColor();
-}
-
-void GraphicsLayerChromium::clearBackgroundColor()
-{
-    GraphicsLayer::clearBackgroundColor();
-
-    if (WebLayer* contentsLayer = contentsLayerIfRegistered())
-        contentsLayer->setBackgroundColor(static_cast<RGBA32>(0));
 }
 
 void GraphicsLayerChromium::setContentsOpaque(bool opaque)
@@ -388,6 +381,13 @@ bool GraphicsLayerChromium::setFilters(const FilterOperations& filters)
     // switch all filtering over to this path, and remove setFilters() and
     // WebFilterOperations altogether.
     if (filters.hasReferenceFilter()) {
+        if (filters.hasCustomFilter()) {
+            // Make sure the filters are removed from the platform layer, as they are
+            // going to fallback to software mode.
+            m_layer->layer()->setFilter(0);
+            GraphicsLayer::setFilters(FilterOperations());
+            return false;
+        }
         SkiaImageFilterBuilder builder;
         SkAutoTUnref<SkImageFilter> imageFilter(builder.build(filters));
         m_layer->layer()->setFilter(imageFilter);
@@ -498,7 +498,7 @@ void GraphicsLayerChromium::setContentsToImage(Image* image)
             childrenChanged = true;
         }
         m_imageLayer->setBitmap(nativeImage->bitmap());
-        m_imageLayer->layer()->setOpaque(image->isBitmapImage() && !image->currentFrameHasAlpha());
+        m_imageLayer->layer()->setOpaque(image->currentFrameKnownToBeOpaque());
         updateContentsRect();
     } else {
         if (m_imageLayer) {
@@ -513,6 +513,40 @@ void GraphicsLayerChromium::setContentsToImage(Image* image)
 
     if (childrenChanged)
         updateChildList();
+}
+
+void GraphicsLayerChromium::setContentsToSolidColor(const Color& color)
+{
+    if (color == m_contentsSolidColor)
+        return;
+
+    bool childrenChanged = false;
+
+    m_contentsSolidColor = color;
+
+    if (color.isValid()) {
+        if (!m_contentsSolidColorLayer) {
+            m_contentsSolidColorLayer = adoptPtr(Platform::current()->compositorSupport()->createSolidColorLayer());
+            registerContentsLayer(m_contentsSolidColorLayer->layer());
+
+            setupContentsLayer(m_contentsSolidColorLayer->layer());
+            childrenChanged = true;
+        }
+
+        m_contentsSolidColorLayer->setBackgroundColor(color.rgb());
+        updateContentsRect();
+    } else {
+        if (m_contentsSolidColorLayer) {
+            childrenChanged = true;
+            unregisterContentsLayer(m_contentsSolidColorLayer->layer());
+            m_contentsSolidColorLayer.clear();
+        }
+        m_contentsLayer = 0;
+    }
+
+    if (childrenChanged)
+        updateChildList();
+
 }
 
 static HashSet<int>* s_registeredLayerSet;
@@ -644,25 +678,6 @@ PlatformLayer* GraphicsLayerChromium::platformLayer() const
     return m_transformLayer ? m_transformLayer.get() : m_layer->layer();
 }
 
-void GraphicsLayerChromium::setDebugBackgroundColor(const Color& color)
-{
-    if (color.isValid())
-        m_layer->layer()->setBackgroundColor(color.rgb());
-    else
-        m_layer->layer()->setBackgroundColor(static_cast<RGBA32>(0));
-}
-
-void GraphicsLayerChromium::setDebugBorder(const Color& color, float borderWidth)
-{
-    if (color.isValid()) {
-        m_layer->layer()->setDebugBorderColor(color.rgb());
-        m_layer->layer()->setDebugBorderWidth(borderWidth);
-    } else {
-        m_layer->layer()->setDebugBorderColor(static_cast<RGBA32>(0));
-        m_layer->layer()->setDebugBorderWidth(0);
-    }
-}
-
 void GraphicsLayerChromium::updateChildList()
 {
     WebLayer* childHost = m_transformLayer ? m_transformLayer.get() : m_layer->layer();
@@ -725,18 +740,17 @@ void GraphicsLayerChromium::updateAnchorPoint()
 
 void GraphicsLayerChromium::updateTransform()
 {
-    platformLayer()->setTransform(WebTransformationMatrix(m_transform));
+    platformLayer()->setTransform(TransformSkMatrix44Conversions::convert(m_transform));
 }
 
 void GraphicsLayerChromium::updateChildrenTransform()
 {
-    platformLayer()->setSublayerTransform(WebTransformationMatrix(m_childrenTransform));
+    platformLayer()->setSublayerTransform(TransformSkMatrix44Conversions::convert(m_childrenTransform));
 }
 
 void GraphicsLayerChromium::updateMasksToBounds()
 {
     m_layer->layer()->setMasksToBounds(m_masksToBounds);
-    updateDebugIndicators();
 }
 
 void GraphicsLayerChromium::updateLayerPreserves3D()
@@ -757,7 +771,7 @@ void GraphicsLayerChromium::updateLayerPreserves3D()
         m_layer->layer()->setPosition(FloatPoint::zero());
 
         m_layer->layer()->setAnchorPoint(FloatPoint(0.5f, 0.5f));
-        m_layer->layer()->setTransform(SkMatrix44());
+        m_layer->layer()->setTransform(SkMatrix44::I());
 
         // Set the old layer to opacity of 1. Further down we will set the opacity on the transform layer.
         m_layer->layer()->setOpacity(1);
@@ -811,21 +825,11 @@ void GraphicsLayerChromium::updateLayerIsDrawable()
         if (m_linkHighlight)
             m_linkHighlight->invalidate();
     }
-
-    updateDebugIndicators();
 }
 
 void GraphicsLayerChromium::updateLayerBackgroundColor()
 {
-    WebLayer* contentsLayer = contentsLayerIfRegistered();
-    if (!contentsLayer)
-        return;
-
-    // We never create the contents layer just for background color yet.
-    if (m_backgroundColorSet)
-        contentsLayer->setBackgroundColor(m_backgroundColor.rgb());
-    else
-        contentsLayer->setBackgroundColor(static_cast<RGBA32>(0));
+    m_layer->layer()->setBackgroundColor(m_backgroundColor.rgb());
 }
 
 void GraphicsLayerChromium::updateContentsVideo()
@@ -859,24 +863,17 @@ void GraphicsLayerChromium::setupContentsLayer(WebLayer* contentsLayer)
         // Insert the content layer first. Video elements require this, because they have
         // shadow content that must display in front of the video.
         m_layer->layer()->insertChild(m_contentsLayer, 0);
-
-        if (isShowingDebugBorder()) {
-            m_contentsLayer->setDebugBorderColor(Color(0, 0, 128, 180).rgb());
-            m_contentsLayer->setDebugBorderWidth(1);
-        }
     }
-    updateDebugIndicators();
     updateNames();
 }
 
-void GraphicsLayerChromium::setAppliesPageScale(bool appliesScale)
+void GraphicsLayerChromium::setAppliesPageScale(bool)
 {
-    m_layer->setBoundsContainPageScale(appliesScale);
 }
 
 bool GraphicsLayerChromium::appliesPageScale() const
 {
-    return m_layer->boundsContainPageScale();
+    return false;
 }
 
 void GraphicsLayerChromium::paint(GraphicsContext& context, const IntRect& clip)
@@ -899,6 +896,21 @@ void GraphicsLayerChromium::didScroll()
 {
     if (m_scrollableArea)
         m_scrollableArea->scrollToOffsetWithoutAnimation(IntPoint(m_layer->layer()->scrollPosition()));
+}
+
+void GraphicsLayerChromium::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, PlatformMemoryTypes::Layers);
+    GraphicsLayer::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_nameBase, "nameBase");
+    info.addMember(m_layer, "layer");
+    info.addMember(m_transformLayer, "transformLayer");
+    info.addMember(m_imageLayer, "imageLayer");
+    info.addMember(m_contentsLayer, "contentsLayer");
+    info.addMember(m_linkHighlight, "linkHighlight");
+    info.addMember(m_opaqueRectTrackingContentLayerDelegate, "opaqueRectTrackingContentLayerDelegate");
+    info.addMember(m_animationIdMap, "animationIdMap");
+    info.addMember(m_scrollableArea, "scrollableArea");
 }
 
 } // namespace WebCore

@@ -94,7 +94,7 @@ ImageBufferData::~ImageBufferData()
     delete m_memDC;
 }
 
-ImageBuffer::ImageBuffer(const IntSize& size, float resolutionScale, ColorSpace colorSpace, RenderingMode, DeferralMode, bool& success)
+ImageBuffer::ImageBuffer(const IntSize& size, float resolutionScale, ColorSpace colorSpace, RenderingMode, bool& success)
     : m_data(size)
     , m_size(size)
     , m_logicalSize(size)
@@ -150,6 +150,11 @@ PassRefPtr<Image> ImageBuffer::copyImage(BackingStoreCopy copyBehavior, ScaleBeh
     
     RefPtr<BitmapImage> img = BitmapImage::create(m_data.m_bitmap);
     return img.release();
+}
+
+BackingStoreCopy ImageBuffer::fastCopyImageMode()
+{
+    return CopyBackingStore;
 }
 
 void ImageBuffer::clip(GraphicsContext* context, const FloatRect& rect) const

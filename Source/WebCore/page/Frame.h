@@ -80,7 +80,8 @@ namespace WebCore {
         LayerTreeFlagsIncludeDebugInfo = 1 << 0,
         LayerTreeFlagsIncludeVisibleRects = 1 << 1,
         LayerTreeFlagsIncludeTileCaches = 1 << 2,
-        LayerTreeFlagsIncludeRepaintRects = 1 << 3
+        LayerTreeFlagsIncludeRepaintRects = 1 << 3,
+        LayerTreeFlagsIncludePaintingPhases = 1 << 4
     };
     typedef unsigned LayerTreeFlags;
 
@@ -201,6 +202,8 @@ namespace WebCore {
 
         // Should only be called on the main frame of a page.
         void notifyChromeClientWheelEventHandlerCountChanged() const;
+
+        bool isURLAllowed(const KURL&) const;
 
     // ========
 
