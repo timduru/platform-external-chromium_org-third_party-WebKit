@@ -25,16 +25,14 @@
 
 #include "config.h"
 
-#if USE(LEVELDB)
-
-#include "FileSystem.h"
-#include "LevelDBComparator.h"
-#include "LevelDBDatabase.h"
-#include "LevelDBIterator.h"
-#include "LevelDBSlice.h"
-#include "LevelDBTransaction.h"
 #include <gtest/gtest.h>
 #include <webkit/support/webkit_support.h>
+#include "core/platform/FileSystem.h"
+#include "core/platform/leveldb/LevelDBComparator.h"
+#include "core/platform/leveldb/LevelDBDatabase.h"
+#include "core/platform/leveldb/LevelDBIterator.h"
+#include "core/platform/leveldb/LevelDBSlice.h"
+#include "core/platform/leveldb/LevelDBTransaction.h"
 #include <wtf/Vector.h>
 
 using namespace WebCore;
@@ -203,5 +201,3 @@ TEST(LevelDBDatabaseTest, TransactionIterator)
 }
 
 } // namespace
-
-#endif // USE(LEVELDB)

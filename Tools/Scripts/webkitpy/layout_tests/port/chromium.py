@@ -60,7 +60,10 @@ class ChromiumPort(Port):
         ('lucid', 'x86_64'),
         # FIXME: Technically this should be 'arm', but adding a third architecture type breaks TestConfigurationConverter.
         # If we need this to be 'arm' in the future, then we first have to fix TestConfigurationConverter.
-        ('icecreamsandwich', 'x86'))
+        # FIXME: Until we have an android bot to do rebaselines, we need to not include it in ALL_SYSTEMS
+        # because otherwise rebaselines won't correclty remove lines from TestExpectations.
+        #('icecreamsandwich', 'x86'),
+        )
 
     ALL_BASELINE_VARIANTS = [
         'chromium-mac-mountainlion', 'chromium-mac-lion', 'chromium-mac-snowleopard',
@@ -79,6 +82,10 @@ class ChromiumPort(Port):
 
     # overridden in subclasses.
     FALLBACK_PATHS = {}
+
+    @classmethod
+    def latest_platform_fallback_path(cls):
+        return cls.FALLBACK_PATHS[cls.SUPPORTED_VERSIONS[-1]]
 
     @classmethod
     def _static_build_path(cls, filesystem, build_directory, chromium_base, webkit_base, configuration, comps):
@@ -121,6 +128,15 @@ class ChromiumPort(Port):
 
     def is_chromium(self):
         return True
+
+    def default_child_processes(self):
+        default_count = super(ChromiumPort, self).default_child_processes()
+        # Since content_shell spawns multiple subprocesses, we need to reduce
+        # the number of running processes.
+        if self.driver_name() == self.CONTENT_SHELL_NAME:
+            default_count = int(.75 * default_count)
+
+        return default_count
 
     def default_max_locked_shards(self):
         """Return the number of "locked" shards to run in parallel (like the http tests)."""
@@ -351,12 +367,9 @@ class ChromiumPort(Port):
         return True
 
     def _port_specific_expectations_files(self):
-        paths = [self.path_to_test_expectations_file()]
-        skia_expectations_path = self.path_from_chromium_base('skia', 'skia_test_expectations.txt')
-        # FIXME: we should probably warn if this file is missing in some situations.
-        # See the discussion in webkit.org/b/97699.
-        if self._filesystem.exists(skia_expectations_path):
-            paths.append(skia_expectations_path)
+        paths = []
+        paths.append(self.path_from_chromium_base('skia', 'skia_test_expectations.txt'))
+        paths.append(self._filesystem.join(self.layout_tests_dir(), 'NeverFixTests'))
 
         builder_name = self.get_option('builder_name', 'DUMMY_BUILDER_NAME')
         if builder_name == 'DUMMY_BUILDER_NAME' or '(deps)' in builder_name or builder_name in self.try_builder_names:
@@ -388,31 +401,31 @@ class ChromiumPort(Port):
 
     def virtual_test_suites(self):
         return [
-            VirtualTestSuite('platform/chromium/virtual/gpu/fast/canvas',
+            VirtualTestSuite('virtual/gpu/fast/canvas',
                              'fast/canvas',
                              ['--enable-accelerated-2d-canvas']),
-            VirtualTestSuite('platform/chromium/virtual/gpu/canvas/philip',
+            VirtualTestSuite('virtual/gpu/canvas/philip',
                              'canvas/philip',
                              ['--enable-accelerated-2d-canvas']),
-            VirtualTestSuite('platform/chromium/virtual/threaded/compositing/visibility',
+            VirtualTestSuite('virtual/threaded/compositing/visibility',
                              'compositing/visibility',
                              ['--enable-threaded-compositing']),
-            VirtualTestSuite('platform/chromium/virtual/threaded/compositing/webgl',
+            VirtualTestSuite('virtual/threaded/compositing/webgl',
                              'compositing/webgl',
                              ['--enable-threaded-compositing']),
-            VirtualTestSuite('platform/chromium/virtual/gpu/fast/hidpi',
+            VirtualTestSuite('virtual/gpu/fast/hidpi',
                              'fast/hidpi',
                              ['--force-compositing-mode']),
-            VirtualTestSuite('platform/chromium/virtual/softwarecompositing',
+            VirtualTestSuite('virtual/softwarecompositing',
                              'compositing',
                              ['--enable-software-compositing']),
-            VirtualTestSuite('platform/chromium/virtual/deferred/fast/images',
+            VirtualTestSuite('virtual/deferred/fast/images',
                              'fast/images',
                              ['--enable-deferred-image-decoding', '--enable-per-tile-painting', '--force-compositing-mode']),
-            VirtualTestSuite('platform/chromium/virtual/gpu/compositedscrolling/overflow',
+            VirtualTestSuite('virtual/gpu/compositedscrolling/overflow',
                              'compositing/overflow',
                              ['--enable-accelerated-overflow-scroll']),
-            VirtualTestSuite('platform/chromium/virtual/gpu/compositedscrolling/scrollbars',
+            VirtualTestSuite('virtual/gpu/compositedscrolling/scrollbars',
                              'scrollbars',
                              ['--enable-accelerated-overflow-scroll']),
         ]
@@ -429,8 +442,8 @@ class ChromiumPort(Port):
 
     def _build_path_with_configuration(self, configuration, *comps):
         # Note that we don't implement --root or do the option caching that the
-        # base class does, because chromium doesn't use 'webkit-build-directory' and
-        # hence finding the right directory is relatively fast.
+        # base class does, because finding the right directory is relatively
+        # fast.
         configuration = configuration or self.get_option('configuration')
         return self._static_build_path(self._filesystem, self.get_option('build_directory'),
             self.path_from_chromium_base(), self.path_from_webkit_base(), configuration, comps)

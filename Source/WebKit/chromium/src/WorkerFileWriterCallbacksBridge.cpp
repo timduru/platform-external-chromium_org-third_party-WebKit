@@ -31,15 +31,13 @@
 #include "config.h"
 #include "WorkerFileWriterCallbacksBridge.h"
 
-#if ENABLE(FILE_SYSTEM) && ENABLE(WORKERS)
-
-#include "AsyncFileWriterClient.h"
-#include "CrossThreadTask.h"
 #include "WebFileWriter.h"
 #include "WebWorkerBase.h"
-#include "WorkerContext.h"
-#include "WorkerLoaderProxy.h"
-#include "WorkerThread.h"
+#include "core/dom/CrossThreadTask.h"
+#include "core/workers/WorkerContext.h"
+#include "core/workers/WorkerLoaderProxy.h"
+#include "core/workers/WorkerThread.h"
+#include "modules/filesystem/AsyncFileWriterClient.h"
 #include <public/Platform.h>
 #include <public/WebCString.h>
 #include <public/WebFileSystem.h>
@@ -54,6 +52,10 @@ void WorkerFileWriterCallbacksBridge::notifyStop()
 {
     ASSERT(m_workerContext->isContextThread());
     m_clientOnWorkerThread = 0;
+    {
+        MutexLocker locker(m_loaderProxyMutex);
+        m_proxy = 0;
+    }
 }
 
 void WorkerFileWriterCallbacksBridge::postWriteToMainThread(long long position, const KURL& data)
@@ -205,8 +207,11 @@ void WorkerFileWriterCallbacksBridge::dispatchTaskToMainThread(PassOwnPtr<Script
 void WorkerFileWriterCallbacksBridge::dispatchTaskToWorkerThread(PassOwnPtr<ScriptExecutionContext::Task> task)
 {
     ASSERT(isMainThread());
-    m_proxy->postTaskForModeToWorkerContext(
-        createCallbackTask(&runTaskOnWorkerThread, this, task), m_mode);
+
+    MutexLocker locker(m_loaderProxyMutex);
+    if (m_proxy)
+        m_proxy->postTaskForModeToWorkerContext(
+            createCallbackTask(&runTaskOnWorkerThread, this, task), m_mode);
 }
 
 bool WorkerFileWriterCallbacksBridge::waitForOperationToComplete()
@@ -220,5 +225,3 @@ bool WorkerFileWriterCallbacksBridge::waitForOperationToComplete()
 }
 
 } // namespace WebKit
-
-#endif // ENABLE(FILE_SYSTEM)

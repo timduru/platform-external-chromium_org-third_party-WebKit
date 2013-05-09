@@ -25,23 +25,21 @@
 
 #include "config.h"
 
-#include "IDBDatabase.h"
+#include "modules/indexeddb/IDBDatabase.h"
 
-#include "IDBBackingStore.h"
-#include "IDBCursorBackendInterface.h"
-#include "IDBDatabaseBackendImpl.h"
 #include "IDBDatabaseCallbacksProxy.h"
-#include "IDBFactoryBackendImpl.h"
 #include "IDBFakeBackingStore.h"
-#include "IDBTransactionBackendImpl.h"
-#include "IndexedDB.h"
-#include "SharedBuffer.h"
 #include "WebIDBDatabaseCallbacksImpl.h"
 #include "WebIDBDatabaseImpl.h"
+#include "core/platform/SharedBuffer.h"
+#include "modules/indexeddb/IDBBackingStore.h"
+#include "modules/indexeddb/IDBCursorBackendInterface.h"
+#include "modules/indexeddb/IDBDatabaseBackendImpl.h"
+#include "modules/indexeddb/IDBFactoryBackendImpl.h"
+#include "modules/indexeddb/IDBTransactionBackendImpl.h"
+#include "modules/indexeddb/IndexedDB.h"
 
 #include <gtest/gtest.h>
-
-#if ENABLE(INDEXED_DATABASE)
 
 using namespace WebCore;
 using WebKit::IDBDatabaseCallbacksProxy;
@@ -72,7 +70,7 @@ public:
         EXPECT_TRUE(m_wasSuccessDBCalled);
     }
     virtual void onError(PassRefPtr<IDBDatabaseError>) OVERRIDE { }
-    virtual void onSuccess(PassRefPtr<DOMStringList>) OVERRIDE { }
+    virtual void onSuccess(const Vector<String>&) OVERRIDE { }
     virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SharedBuffer>) OVERRIDE { }
     virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>, const IDBDatabaseMetadata&) OVERRIDE
     {
@@ -176,6 +174,26 @@ private:
     WebIDBDatabaseImpl& m_webDatabase;
 };
 
+class MockIDBDatabaseCallbacks : public IDBDatabaseCallbacks {
+public:
+    static PassRefPtr<MockIDBDatabaseCallbacks> create() { return adoptRef(new MockIDBDatabaseCallbacks()); }
+    virtual ~MockIDBDatabaseCallbacks()
+    {
+        EXPECT_TRUE(m_wasAbortCalled);
+    }
+    virtual void onVersionChange(int64_t oldVersion, int64_t newVersion) OVERRIDE { }
+    virtual void onForcedClose() OVERRIDE { }
+    virtual void onAbort(int64_t transactionId, PassRefPtr<IDBDatabaseError> error) OVERRIDE
+    {
+        m_wasAbortCalled = true;
+    }
+    virtual void onComplete(int64_t transactionId) OVERRIDE { }
+private:
+    MockIDBDatabaseCallbacks()
+        : m_wasAbortCalled(false) { }
+    bool m_wasAbortCalled;
+};
+
 TEST(IDBDatabaseBackendTest, ForcedClose)
 {
     RefPtr<IDBFakeBackingStore> backingStore = adoptRef(new IDBFakeBackingStore());
@@ -185,16 +203,21 @@ TEST(IDBDatabaseBackendTest, ForcedClose)
     RefPtr<IDBDatabaseBackendImpl> backend = IDBDatabaseBackendImpl::create("db", backingStore.get(), factory, "uniqueid");
     EXPECT_GT(backingStore->refCount(), 1);
 
-    RefPtr<FakeIDBDatabaseCallbacks> connection = FakeIDBDatabaseCallbacks::create();
+    RefPtr<MockIDBDatabaseCallbacks> connection = MockIDBDatabaseCallbacks::create();
     RefPtr<IDBDatabaseCallbacksProxy> connectionProxy = IDBDatabaseCallbacksProxy::create(adoptPtr(new WebIDBDatabaseCallbacksImpl(connection)));
     WebIDBDatabaseImpl webDatabase(backend, connectionProxy);
 
     RefPtr<MockIDBDatabaseBackendProxy> proxy = MockIDBDatabaseBackendProxy::create(webDatabase);
     RefPtr<MockIDBCallbacks> request = MockIDBCallbacks::create();
-    backend->openConnection(request, connectionProxy, 3, IDBDatabaseMetadata::DefaultIntVersion);
+    const int64_t upgradeTransactionId = 3;
+    backend->openConnection(request, connectionProxy, upgradeTransactionId, IDBDatabaseMetadata::DefaultIntVersion);
 
     ScriptExecutionContext* context = 0;
     RefPtr<IDBDatabase> idbDatabase = IDBDatabase::create(context, proxy, connection);
+
+    const int64_t transactionId = 123;
+    const Vector<int64_t> scope;
+    webDatabase.createTransaction(transactionId, 0, scope, IndexedDB::TransactionReadOnly);
 
     webDatabase.forceClose();
 
@@ -202,5 +225,3 @@ TEST(IDBDatabaseBackendTest, ForcedClose)
 }
 
 } // namespace
-
-#endif // ENABLE(INDEXED_DATABASE)

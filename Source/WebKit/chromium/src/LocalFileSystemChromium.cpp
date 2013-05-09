@@ -29,30 +29,28 @@
  */
 
 #include "config.h"
-#include "LocalFileSystem.h"
+#include "modules/filesystem/LocalFileSystem.h"
 
-#if ENABLE(FILE_SYSTEM)
-
-#include "CrossThreadTask.h"
-#include "Document.h"
-#include "ErrorCallback.h"
-#include "FileSystemCallback.h"
-#include "FileSystemCallbacks.h"
-#include "FileSystemType.h"
 #include "WebFileSystemCallbacksImpl.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
 #include "WebPermissionClient.h"
 #include "WebViewImpl.h"
 #include "WebWorkerBase.h"
-#include "WorkerContext.h"
 #include "WorkerFileSystemCallbacksBridge.h"
-#include "WorkerThread.h"
+#include "core/dom/CrossThreadTask.h"
+#include "core/dom/Document.h"
+#include "core/workers/WorkerContext.h"
+#include "core/workers/WorkerThread.h"
+#include "modules/filesystem/ErrorCallback.h"
+#include "modules/filesystem/FileSystemCallback.h"
+#include "modules/filesystem/FileSystemCallbacks.h"
+#include "modules/filesystem/FileSystemType.h"
 #include <public/WebFileError.h>
 #include <public/WebFileSystem.h>
 #include <public/WebFileSystemType.h>
-#include <wtf/Threading.h>
 #include <wtf/text/WTFString.h>
+#include <wtf/Threading.h>
 
 using namespace WebKit;
 
@@ -70,8 +68,6 @@ enum CreationFlag {
     OpenExisting,
     CreateIfNotPresent
 };
-
-#if ENABLE(WORKERS)
 
 static const char allowFileSystemMode[] = "allowFileSystemMode";
 static const char openFileSystemMode[] = "openFileSystemMode";
@@ -175,8 +171,6 @@ void openFileSystemForWorker(WebCommonWorkerClient* commonClient, WebFileSystemT
     }
 }
 
-#endif // ENABLE(WORKERS)
-
 } // namespace
 
 static void openFileSystemNotAllowed(ScriptExecutionContext*, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
@@ -202,16 +196,12 @@ static void openFileSystemHelper(ScriptExecutionContext* context, FileSystemType
         else
             webFrame->client()->openFileSystem(webFrame, static_cast<WebFileSystemType>(type), size, create == CreateIfNotPresent, new WebFileSystemCallbacksImpl(callbacks));
     } else {
-#if ENABLE(WORKERS)
         WorkerContext* workerContext = static_cast<WorkerContext*>(context);
         WebWorkerBase* webWorker = static_cast<WebWorkerBase*>(workerContext->thread()->workerLoaderProxy().toWebWorkerBase());
         if (!allowFileSystemForWorker(webWorker->commonClient()))
             allowed = false;
         else
             openFileSystemForWorker(webWorker->commonClient(), static_cast<WebFileSystemType>(type), size, create == CreateIfNotPresent, new WebFileSystemCallbacksImpl(callbacks, context, synchronousType), synchronousType);
-#else
-        ASSERT_NOT_REACHED();
-#endif
     }
 
     if (!allowed) {
@@ -247,5 +237,3 @@ void LocalFileSystem::deleteFileSystem(ScriptExecutionContext* context, FileSyst
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(FILE_SYSTEM)

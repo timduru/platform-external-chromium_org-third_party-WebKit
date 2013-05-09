@@ -114,6 +114,7 @@
             'TestNetscapePlugIn/Tests/GetURLWithJavaScriptURLDestroyingPlugin.cpp',
             'TestNetscapePlugIn/Tests/GetUserAgentWithNullNPPFromNPPNew.cpp',
             'TestNetscapePlugIn/Tests/LogNPPSetWindow.cpp',
+            'TestNetscapePlugIn/Tests/NPDeallocateCalledBeforeNPShutdown.cpp',
             'TestNetscapePlugIn/Tests/NPPNewFails.cpp',
             'TestNetscapePlugIn/Tests/NPRuntimeCallsWithNullNPP.cpp',
             'TestNetscapePlugIn/Tests/NPRuntimeObjectFromDestroyedPlugin.cpp',
@@ -122,7 +123,6 @@
             'TestNetscapePlugIn/Tests/PassDifferentNPPStruct.cpp',
             'TestNetscapePlugIn/Tests/PluginScriptableNPObjectInvokeDefault.cpp',
             'TestNetscapePlugIn/Tests/PluginScriptableObjectOverridesAllProperties.cpp',
-            'TestNetscapePlugIn/Tests/PrivateBrowsing.cpp',
             'TestNetscapePlugIn/main.cpp',
         ],
     }

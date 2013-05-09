@@ -25,10 +25,10 @@
 
 #include "config.h"
 
-#include "ThreadSafeDataTransport.h"
+#include "core/platform/graphics/chromium/ThreadSafeDataTransport.h"
 
-#include "SharedBuffer.h"
 #include <gtest/gtest.h>
+#include "core/platform/SharedBuffer.h"
 
 using namespace WebCore;
 

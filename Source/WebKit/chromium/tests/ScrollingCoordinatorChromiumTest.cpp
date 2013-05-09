@@ -24,13 +24,10 @@
 
 #include "config.h"
 
-#include "ScrollingCoordinator.h"
+#include "core/page/scrolling/ScrollingCoordinator.h"
 
+#include <gtest/gtest.h>
 #include "FrameTestHelpers.h"
-#include "GraphicsLayerChromium.h"
-#include "RenderLayerBacking.h"
-#include "RenderLayerCompositor.h"
-#include "RenderView.h"
 #include "URLTestHelpers.h"
 #include "WebCompositorInitializer.h"
 #include "WebFrameClient.h"
@@ -38,7 +35,10 @@
 #include "WebSettings.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
-#include <gtest/gtest.h>
+#include "core/platform/graphics/chromium/GraphicsLayerChromium.h"
+#include "core/rendering/RenderLayerBacking.h"
+#include "core/rendering/RenderLayerCompositor.h"
+#include "core/rendering/RenderView.h"
 #include <public/Platform.h>
 #include <public/WebLayer.h>
 #include <public/WebLayerTreeView.h>
@@ -147,9 +147,6 @@ TEST_F(ScrollingCoordinatorChromiumTest, fastScrollingForFixedPosition)
     registerMockedHttpURLLoad("fixed-position.html");
     navigateTo(m_baseURL + "fixed-position.html");
 
-    Page* page = m_webViewImpl->mainFrameImpl()->frame()->page();
-    ASSERT_TRUE(page->scrollingCoordinator()->supportsFixedPositionLayers());
-
     // Fixed position should not fall back to main thread scrolling.
     WebLayer* rootScrollLayer = getRootScrollLayer();
     ASSERT_FALSE(rootScrollLayer->shouldScrollOnMainThread());
@@ -229,7 +226,7 @@ TEST_F(ScrollingCoordinatorChromiumTest, overflowScrolling)
     WebLayer* webScrollLayer = static_cast<WebLayer*>(layerBacking->scrollingContentsLayer()->platformLayer());
     ASSERT_TRUE(webScrollLayer->scrollable());
 
-#if !OS(DARWIN) && !OS(WINDOWS)
+#if OS(ANDROID)
     // Now verify we've attached impl-side scrollbars onto the scrollbar layers
     ASSERT_TRUE(layerBacking->layerForHorizontalScrollbar());
     ASSERT_TRUE(layerBacking->layerForHorizontalScrollbar()->hasContentsLayer());
@@ -272,7 +269,7 @@ TEST_F(ScrollingCoordinatorChromiumTest, iframeScrolling)
     WebLayer* webScrollLayer = static_cast<WebLayer*>(scrollLayer->platformLayer());
     ASSERT_TRUE(webScrollLayer->scrollable());
 
-#if !OS(DARWIN) && !OS(WINDOWS)
+#if OS(ANDROID)
     // Now verify we've attached impl-side scrollbars onto the scrollbar layers
     ASSERT_TRUE(innerCompositor->layerForHorizontalScrollbar());
     ASSERT_TRUE(innerCompositor->layerForHorizontalScrollbar()->hasContentsLayer());
@@ -315,8 +312,17 @@ TEST_F(ScrollingCoordinatorChromiumTest, rtlIframe)
     WebLayer* webScrollLayer = static_cast<WebLayer*>(scrollLayer->platformLayer());
     ASSERT_TRUE(webScrollLayer->scrollable());
 
-    ASSERT_EQ(973, webScrollLayer->scrollPosition().x);
-    ASSERT_EQ(973, webScrollLayer->maxScrollPosition().width);
+    int expectedScrollPosition = 958 + (innerFrameView->verticalScrollbar()->isOverlayScrollbar() ? 0 : 15);
+    ASSERT_EQ(expectedScrollPosition, webScrollLayer->scrollPosition().x);
+    ASSERT_EQ(expectedScrollPosition, webScrollLayer->maxScrollPosition().width);
+}
+
+TEST_F(ScrollingCoordinatorChromiumTest, setupScrollbarLayerShouldNotCrash)
+{
+    registerMockedHttpURLLoad("setup_scrollbar_layer_crash.html");
+    navigateTo(m_baseURL + "setup_scrollbar_layer_crash.html");
+    // This test document setup an iframe with scrollbars, then switch to
+    // an empty document by javascript.
 }
 
 } // namespace

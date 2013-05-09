@@ -209,7 +209,7 @@ void WebViewHost::showContextMenu(WebFrame*, const WebContextMenuData& contextMe
 
 void WebViewHost::didUpdateLayout()
 {
-#if OS(MAC_OS_X)
+#if OS(DARWIN)
     static bool queryingPreferredSize = false;
     if (queryingPreferredSize)
         return;
@@ -409,15 +409,6 @@ WebPlugin* WebViewHost::createPlugin(WebFrame* frame, const WebPluginParams& par
     return webkit_support::CreateWebPlugin(frame, params);
 }
 
-WebMediaPlayer* WebViewHost::createMediaPlayer(WebFrame* frame, const WebURL& url, WebMediaPlayerClient* client)
-{
-#if ENABLE(MEDIA_STREAM)
-    return webkit_support::CreateMediaPlayer(frame, url, client, testMediaStreamClient());
-#else
-    return webkit_support::CreateMediaPlayer(frame, url, client);
-#endif
-}
-
 WebApplicationCacheHost* WebViewHost::createApplicationCacheHost(WebFrame* frame, WebApplicationCacheHostClient* client)
 {
     return webkit_support::CreateApplicationCacheHost(frame, client);
@@ -437,9 +428,7 @@ void WebViewHost::loadURLExternally(WebFrame*, const WebURLRequest& request, Web
 }
 
 WebNavigationPolicy WebViewHost::decidePolicyForNavigation(
-    WebFrame*, const WebURLRequest&,
-    WebNavigationType, const WebNode&,
-    WebNavigationPolicy defaultPolicy, bool)
+    WebFrame*, const WebURLRequest&, WebNavigationType, WebNavigationPolicy defaultPolicy, bool)
 {
     return defaultPolicy;
 }
@@ -729,6 +718,13 @@ void WebViewHost::captureHistoryForWindow(WebTestProxyBase* proxy, WebVector<Web
     }
 }
 
+WebMediaPlayer* WebViewHost::createWebMediaPlayer(WebFrame* frame, const WebURL& url, WebMediaPlayerClient* client)
+{
+    return webkit_support::CreateMediaPlayer(frame, url, client,
+        testMediaStreamClient()
+        );
+}
+
 // Public functions -----------------------------------------------------------
 
 WebViewHost::WebViewHost(TestShell* shell)
@@ -992,11 +988,9 @@ void WebViewHost::exitFullScreenNow()
     webView()->didExitFullScreen();
 }
 
-#if ENABLE(MEDIA_STREAM)
 webkit_support::TestMediaStreamClient* WebViewHost::testMediaStreamClient()
 {
     if (!m_testMediaStreamClient.get())
         m_testMediaStreamClient = adoptPtr(new webkit_support::TestMediaStreamClient());
     return m_testMediaStreamClient.get();
 }
-#endif

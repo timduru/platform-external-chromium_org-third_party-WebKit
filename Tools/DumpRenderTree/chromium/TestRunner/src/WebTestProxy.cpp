@@ -63,8 +63,8 @@
 #include "WebUserMediaClientMock.h"
 #include "WebView.h"
 // FIXME: Including platform_canvas.h here is a layering violation.
-#include "skia/ext/platform_canvas.h"
 #include <cctype>
+#include "skia/ext/platform_canvas.h"
 #include <public/WebCString.h>
 #include <public/WebURLError.h>
 #include <public/WebURLRequest.h>
@@ -986,13 +986,14 @@ void WebTestProxyBase::showContextMenu(WebFrame*, const WebContextMenuData& cont
 
 WebUserMediaClient* WebTestProxyBase::userMediaClient()
 {
-#if ENABLE_WEBRTC
     if (!m_userMediaClient.get())
         m_userMediaClient.reset(new WebUserMediaClientMock(m_delegate));
     return m_userMediaClient.get();
-#else
-    return 0;
-#endif // ENABLE_WEBRTC
+}
+
+WebMediaPlayer* WebTestProxyBase::createMediaPlayer(WebFrame* frame, const WebURL& url, WebMediaPlayerClient* client)
+{
+    return m_delegate->createWebMediaPlayer(frame, url, client);
 }
 
 // Simulate a print by going into print mode and then exit straight away.
@@ -1222,14 +1223,6 @@ void WebTestProxyBase::didDetectXSS(WebFrame*, const WebURL&, bool)
         m_delegate->printMessage("didDetectXSS\n");
 }
 
-void WebTestProxyBase::assignIdentifierToRequest(WebFrame*, unsigned identifier, const WebKit::WebURLRequest& request)
-{
-    if (m_testInterfaces->testRunner()->shouldDumpResourceLoadCallbacks() || m_testInterfaces->testRunner()->shouldDumpResourcePriorities()) {
-        WEBKIT_ASSERT(m_resourceIdentifierMap.find(identifier) == m_resourceIdentifierMap.end());
-        m_resourceIdentifierMap[identifier] = descriptionSuitableForTestResult(request.url().spec());
-    }
-}
-
 void WebTestProxyBase::willRequestResource(WebFrame* frame, const WebKit::WebCachedURLRequest& request)
 {
     if (m_testInterfaces->testRunner()->shouldDumpResourceRequestCallbacks()) {
@@ -1279,6 +1272,11 @@ void WebTestProxyBase::willSendRequest(WebFrame*, unsigned identifier, WebKit::W
     string requestURL = url.possibly_invalid_spec();
 
     GURL mainDocumentURL = request.firstPartyForCookies();
+
+    if (redirectResponse.isNull() && (m_testInterfaces->testRunner()->shouldDumpResourceLoadCallbacks() || m_testInterfaces->testRunner()->shouldDumpResourcePriorities())) {
+        WEBKIT_ASSERT(m_resourceIdentifierMap.find(identifier) == m_resourceIdentifierMap.end());
+        m_resourceIdentifierMap[identifier] = descriptionSuitableForTestResult(requestURL);
+    }
 
     if (m_testInterfaces->testRunner()->shouldDumpResourceLoadCallbacks()) {
         if (m_resourceIdentifierMap.find(identifier) == m_resourceIdentifierMap.end())
@@ -1459,18 +1457,13 @@ void WebTestProxyBase::locationChangeDone(WebFrame* frame)
     m_testInterfaces->testRunner()->setTopLoadingFrame(frame, true);
 }
 
-WebNavigationPolicy WebTestProxyBase::decidePolicyForNavigation(WebFrame*, const WebURLRequest& request, WebNavigationType type, const WebNode& originatingNode, WebNavigationPolicy defaultPolicy, bool isRedirect)
+WebNavigationPolicy WebTestProxyBase::decidePolicyForNavigation(WebFrame*, const WebURLRequest& request, WebNavigationType type, WebNavigationPolicy defaultPolicy, bool isRedirect)
 {
     WebNavigationPolicy result;
     if (!m_testInterfaces->testRunner()->policyDelegateEnabled())
         return defaultPolicy;
 
-    m_delegate->printMessage(string("Policy delegate: attempt to load ") + URLDescription(request.url()) + " with navigation type '" + webNavigationTypeToString(type) + "'");
-    if (!originatingNode.isNull()) {
-        m_delegate->printMessage(" originating from ");
-        printNodeDescription(m_delegate, originatingNode, 0);
-    }
-    m_delegate->printMessage("\n");
+    m_delegate->printMessage(string("Policy delegate: attempt to load ") + URLDescription(request.url()) + " with navigation type '" + webNavigationTypeToString(type) + "'\n");
     if (m_testInterfaces->testRunner()->policyDelegateIsPermissive())
         result = WebKit::WebNavigationPolicyCurrentTab;
     else

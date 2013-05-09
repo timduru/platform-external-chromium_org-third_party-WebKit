@@ -24,15 +24,15 @@
 
 #include "config.h"
 
-#include "GraphicsLayerChromium.h"
+#include "core/platform/graphics/chromium/GraphicsLayerChromium.h"
 
-#include "CompositorFakeWebGraphicsContext3D.h"
-#include "GraphicsLayer.h"
-#include "Matrix3DTransformOperation.h"
-#include "RotateTransformOperation.h"
-#include "ScrollableArea.h"
-#include "TranslateTransformOperation.h"
 #include <gtest/gtest.h>
+#include "CompositorFakeWebGraphicsContext3D.h"
+#include "core/platform/ScrollableArea.h"
+#include "core/platform/graphics/GraphicsLayer.h"
+#include "core/platform/graphics/transforms/Matrix3DTransformOperation.h"
+#include "core/platform/graphics/transforms/RotateTransformOperation.h"
+#include "core/platform/graphics/transforms/TranslateTransformOperation.h"
 #include <public/Platform.h>
 #include <public/WebCompositorSupport.h>
 #include <public/WebFloatAnimationCurve.h>
@@ -50,7 +50,6 @@ namespace {
 class MockGraphicsLayerClient : public GraphicsLayerClient {
   public:
     virtual void notifyAnimationStarted(const GraphicsLayer*, double time) OVERRIDE { }
-    virtual void notifyFlushRequired(const GraphicsLayer*) OVERRIDE { }
     virtual void paintContents(const GraphicsLayer*, GraphicsContext&, GraphicsLayerPaintingPhase, const IntRect& inClip) OVERRIDE { }
     virtual float deviceScaleFactor() const OVERRIDE { return 2; }
 };
@@ -145,6 +144,18 @@ TEST_F(GraphicsLayerChromiumTest, applyScrollToScrollableArea)
     m_platformLayer->setScrollPosition(scrollPosition);
 
     EXPECT_EQ(scrollPosition, WebPoint(scrollableArea.scrollPosition()));
+}
+
+TEST_F(GraphicsLayerChromiumTest, DISABLED_setContentsToSolidColor)
+{
+    m_graphicsLayer->setContentsToSolidColor(Color::transparent);
+    EXPECT_FALSE(m_graphicsLayer->contentsLayer());
+
+    m_graphicsLayer->setContentsToSolidColor(Color::white);
+    EXPECT_TRUE(m_graphicsLayer->contentsLayer());
+
+    m_graphicsLayer->setContentsToSolidColor(Color());
+    EXPECT_FALSE(m_graphicsLayer->contentsLayer());
 }
 
 } // namespace

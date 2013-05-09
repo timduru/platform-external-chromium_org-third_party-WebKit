@@ -122,6 +122,7 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual void loadURLForFrame(const WebKit::WebURL&, const std::string& frameName) OVERRIDE;
     virtual bool allowExternalPages() OVERRIDE;
     virtual void captureHistoryForWindow(WebTestRunner::WebTestProxyBase*, WebKit::WebVector<WebKit::WebHistoryItem>*, size_t* currentEntryIndex) OVERRIDE;
+    virtual WebKit::WebMediaPlayer* createWebMediaPlayer(WebKit::WebFrame*, const WebKit::WebURL&, WebKit::WebMediaPlayerClient*) OVERRIDE;
 
     // NavigationHost
     virtual bool navigate(const TestNavigationEntry&, bool reload);
@@ -175,14 +176,12 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
 
     // WebKit::WebFrameClient
     virtual WebKit::WebPlugin* createPlugin(WebKit::WebFrame*, const WebKit::WebPluginParams&);
-    virtual WebKit::WebMediaPlayer* createMediaPlayer(WebKit::WebFrame*, const WebKit::WebURL&, WebKit::WebMediaPlayerClient*);
     virtual WebKit::WebApplicationCacheHost* createApplicationCacheHost(WebKit::WebFrame*, WebKit::WebApplicationCacheHostClient*);
     virtual void loadURLExternally(WebKit::WebFrame*, const WebKit::WebURLRequest&, WebKit::WebNavigationPolicy);
     virtual void loadURLExternally(WebKit::WebFrame*, const WebKit::WebURLRequest&, WebKit::WebNavigationPolicy, const WebKit::WebString& downloadName);
     virtual WebKit::WebNavigationPolicy decidePolicyForNavigation(
         WebKit::WebFrame*, const WebKit::WebURLRequest&,
-        WebKit::WebNavigationType, const WebKit::WebNode&,
-        WebKit::WebNavigationPolicy, bool isRedirect);
+        WebKit::WebNavigationType, WebKit::WebNavigationPolicy, bool isRedirect);
     virtual bool canHandleRequest(WebKit::WebFrame*, const WebKit::WebURLRequest&);
     virtual WebKit::WebURLError cancelledError(WebKit::WebFrame*, const WebKit::WebURLRequest&);
     virtual void unableToImplementPolicyWithError(WebKit::WebFrame*, const WebKit::WebURLError&);
@@ -239,9 +238,7 @@ private:
 
     void updateViewportSize();
 
-#if ENABLE(MEDIA_STREAM)
     webkit_support::TestMediaStreamClient* testMediaStreamClient();
-#endif
 
     // Non-owning pointer. The WebViewHost instance is owned by this TestShell instance.
     TestShell* m_shell;
@@ -271,13 +268,9 @@ private:
     std::string m_editCommandName;
     std::string m_editCommandValue;
 
-
     OwnPtr<WebKit::WebContextMenuData> m_lastContextMenuData;
 
-
-#if ENABLE(MEDIA_STREAM)
     OwnPtr<webkit_support::TestMediaStreamClient> m_testMediaStreamClient;
-#endif
 
     OwnPtr<TestNavigationController> m_navigationController;
 

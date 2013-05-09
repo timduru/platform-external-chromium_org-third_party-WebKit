@@ -60,6 +60,8 @@ class WebFrame;
 class WebGeolocationClient;
 class WebGeolocationClientMock;
 class WebImage;
+class WebMediaPlayer;
+class WebMediaPlayerClient;
 class WebNode;
 class WebNotificationPresenter;
 class WebPlugin;
@@ -152,6 +154,7 @@ protected:
     void didStopLoading();
     void showContextMenu(WebKit::WebFrame*, const WebKit::WebContextMenuData&);
     WebKit::WebUserMediaClient* userMediaClient();
+    WebKit::WebMediaPlayer* createMediaPlayer(WebKit::WebFrame*, const WebKit::WebURL&, WebKit::WebMediaPlayerClient*);
     void printPage(WebKit::WebFrame*);
     WebKit::WebNotificationPresenter* notificationPresenter();
     WebKit::WebGeolocationClient* geolocationClient();
@@ -180,7 +183,6 @@ protected:
     void didDisplayInsecureContent(WebKit::WebFrame*);
     void didRunInsecureContent(WebKit::WebFrame*, const WebKit::WebSecurityOrigin&, const WebKit::WebURL& insecureURL);
     void didDetectXSS(WebKit::WebFrame*, const WebKit::WebURL& insecureURL, bool didBlockEntirePage);
-    void assignIdentifierToRequest(WebKit::WebFrame*, unsigned identifier, const WebKit::WebURLRequest&);
     void willRequestResource(WebKit::WebFrame*, const WebKit::WebCachedURLRequest&);
     bool canHandleRequest(WebKit::WebFrame*, const WebKit::WebURLRequest&);
     WebKit::WebURLError cannotHandleRequestError(WebKit::WebFrame*, const WebKit::WebURLRequest&);
@@ -196,7 +198,7 @@ protected:
     bool runModalConfirmDialog(WebKit::WebFrame*, const WebKit::WebString&);
     bool runModalPromptDialog(WebKit::WebFrame*, const WebKit::WebString& message, const WebKit::WebString& defaultValue, WebKit::WebString* actualValue);
     bool runModalBeforeUnloadDialog(WebKit::WebFrame*, const WebKit::WebString&);
-    WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame*, const WebKit::WebURLRequest&, WebKit::WebNavigationType, const WebKit::WebNode& originatingNode, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect);
+    WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame*, const WebKit::WebURLRequest&, WebKit::WebNavigationType, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect);
     bool willCheckAndDispatchMessageEvent(WebKit::WebFrame* sourceFrame, WebKit::WebFrame* targetFrame, WebKit::WebSecurityOrigin target, WebKit::WebDOMMessageEvent);
 
 private:
@@ -288,7 +290,7 @@ public:
     virtual void startDragging(WebKit::WebFrame* frame, const WebKit::WebDragData& data, WebKit::WebDragOperationsMask mask, const WebKit::WebImage& image, const WebKit::WebPoint& point)
     {
         WebTestProxyBase::startDragging(frame, data, mask, image, point);
-        Base::startDragging(frame, data, mask, image, point);
+        // Don't forward this call to Base because we don't want to do a real drag-and-drop.
     }
     virtual bool shouldBeginEditing(const WebKit::WebRange& range)
     {
@@ -376,6 +378,10 @@ public:
     virtual WebKit::WebUserMediaClient* userMediaClient()
     {
         return WebTestProxyBase::userMediaClient();
+    }
+    virtual WebKit::WebMediaPlayer* createMediaPlayer(WebKit::WebFrame* frame, const WebKit::WebURL& url, WebKit::WebMediaPlayerClient* client)
+    {
+        return WebTestProxyBase::createMediaPlayer(frame, url, client);
     }
     virtual void printPage(WebKit::WebFrame* frame)
     {
@@ -505,11 +511,6 @@ public:
         WebTestProxyBase::didDetectXSS(frame, insecureURL, didBlockEntirePage);
         Base::didDetectXSS(frame, insecureURL, didBlockEntirePage);
     }
-    virtual void assignIdentifierToRequest(WebKit::WebFrame* frame, unsigned identifier, const WebKit::WebURLRequest& request)
-    {
-        WebTestProxyBase::assignIdentifierToRequest(frame, identifier, request);
-        Base::assignIdentifierToRequest(frame, identifier, request);
-    }
     virtual void willRequestResource(WebKit::WebFrame* frame, const WebKit::WebCachedURLRequest& request)
     {
         WebTestProxyBase::willRequestResource(frame, request);
@@ -584,12 +585,12 @@ public:
     {
         return WebTestProxyBase::runModalBeforeUnloadDialog(frame, message);
     }
-    virtual WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame* frame, const WebKit::WebURLRequest& request, WebKit::WebNavigationType type, const WebKit::WebNode& originatingNode, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect)
+    virtual WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame* frame, const WebKit::WebURLRequest& request, WebKit::WebNavigationType type, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect)
     {
-        WebKit::WebNavigationPolicy policy = WebTestProxyBase::decidePolicyForNavigation(frame, request, type, originatingNode, defaultPolicy, isRedirect);
+        WebKit::WebNavigationPolicy policy = WebTestProxyBase::decidePolicyForNavigation(frame, request, type, defaultPolicy, isRedirect);
         if (policy == WebKit::WebNavigationPolicyIgnore)
             return policy;
-        return Base::decidePolicyForNavigation(frame, request, type, originatingNode, defaultPolicy, isRedirect);
+        return Base::decidePolicyForNavigation(frame, request, type, defaultPolicy, isRedirect);
     }
     virtual bool willCheckAndDispatchMessageEvent(WebKit::WebFrame* sourceFrame, WebKit::WebFrame* targetFrame, WebKit::WebSecurityOrigin target, WebKit::WebDOMMessageEvent event)
     {

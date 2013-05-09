@@ -192,7 +192,6 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("removeOriginAccessWhitelistEntry", &TestRunner::removeOriginAccessWhitelistEntry);
     bindMethod("hasCustomPageSizeStyle", &TestRunner::hasCustomPageSizeStyle);
     bindMethod("forceRedSelectionColors", &TestRunner::forceRedSelectionColors);
-    bindMethod("addUserScript", &TestRunner::addUserScript);
     bindMethod("addUserStyleSheet", &TestRunner::addUserStyleSheet);
     bindMethod("startSpeechInput", &TestRunner::startSpeechInput);
     bindMethod("findString", &TestRunner::findString);
@@ -313,7 +312,6 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("setApplicationCacheOriginQuota", &TestRunner::notImplemented);
     bindMethod("setCallCloseOnWebViews", &TestRunner::notImplemented);
     bindMethod("setMainFrameIsFirstResponder", &TestRunner::notImplemented);
-    bindMethod("setPrivateBrowsingEnabled", &TestRunner::notImplemented);
     bindMethod("setUseDashboardCompatibilityMode", &TestRunner::notImplemented);
     bindMethod("deleteAllLocalStorage", &TestRunner::notImplemented);
     bindMethod("localStorageDiskUsageForOrigin", &TestRunner::notImplemented);
@@ -1265,17 +1263,6 @@ void TestRunner::forceRedSelectionColors(const CppArgumentList& arguments, CppVa
     m_webView->setSelectionColors(0xffee0000, 0xff00ee00, 0xff000000, 0xffc0c0c0);
 }
 
-void TestRunner::addUserScript(const CppArgumentList& arguments, CppVariant* result)
-{
-    result->setNull();
-    if (arguments.size() < 3 || !arguments[0].isString() || !arguments[1].isBool() || !arguments[2].isBool())
-        return;
-    WebView::addUserScript(
-        cppVariantToWebString(arguments[0]), WebVector<WebString>(),
-        arguments[1].toBoolean() ? WebView::UserScriptInjectAtDocumentStart : WebView::UserScriptInjectAtDocumentEnd,
-        arguments[2].toBoolean() ? WebView::UserContentInjectInAllFrames : WebView::UserContentInjectInTopFrameOnly);
-}
-
 void TestRunner::addUserStyleSheet(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
@@ -1614,10 +1601,6 @@ void TestRunner::overridePreference(const CppArgumentList& arguments, CppVariant
         prefs->pluginsEnabled = cppVariantToBool(value);
     else if (key == "WebKitJavaEnabled")
         prefs->javaEnabled = cppVariantToBool(value);
-    else if (key == "WebKitUsesPageCachePreferenceKey")
-        prefs->usesPageCache = cppVariantToBool(value);
-    else if (key == "WebKitPageCacheSupportsPluginsPreferenceKey")
-        prefs->pageCacheSupportsPlugins = cppVariantToBool(value);
     else if (key == "WebKitOfflineWebApplicationCacheEnabled")
         prefs->offlineWebApplicationCacheEnabled = cppVariantToBool(value);
     else if (key == "WebKitTabToLinksPreferenceKey")
@@ -1628,6 +1611,8 @@ void TestRunner::overridePreference(const CppArgumentList& arguments, CppVariant
         prefs->experimentalCSSRegionsEnabled = cppVariantToBool(value);
     else if (key == "WebKitCSSGridLayoutEnabled")
         prefs->experimentalCSSGridLayoutEnabled = cppVariantToBool(value);
+    else if (key == "WebKitExperimentalWebSocketEnabled")
+        prefs->experimentalWebSocketEnabled = cppVariantToBool(value);
     else if (key == "WebKitHyperlinkAuditingEnabled")
         prefs->hyperlinkAuditingEnabled = cppVariantToBool(value);
     else if (key == "WebKitEnableCaretBrowsing")

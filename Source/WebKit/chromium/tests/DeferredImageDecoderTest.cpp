@@ -25,16 +25,16 @@
 
 #include "config.h"
 
-#include "DeferredImageDecoder.h"
+#include "core/platform/graphics/chromium/DeferredImageDecoder.h"
 
-#include "ImageDecodingStore.h"
+#include <gtest/gtest.h>
 #include "MockImageDecoder.h"
-#include "NativeImageSkia.h"
-#include "SharedBuffer.h"
 #include "SkCanvas.h"
 #include "SkDevice.h"
 #include "SkPicture.h"
-#include <gtest/gtest.h>
+#include "core/platform/SharedBuffer.h"
+#include "core/platform/graphics/chromium/ImageDecodingStore.h"
+#include "core/platform/graphics/skia/NativeImageSkia.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Threading.h>
@@ -117,7 +117,7 @@ protected:
 
 TEST_F(DeferredImageDecoderTest, drawIntoSkPicture)
 {
-    OwnPtr<NativeImageSkia> image(adoptPtr(m_lazyDecoder->frameBufferAtIndex(0)->asNewNativeImage()));
+    RefPtr<NativeImageSkia> image = m_lazyDecoder->frameBufferAtIndex(0)->asNewNativeImage();
     EXPECT_EQ(1, image->bitmap().width());
     EXPECT_EQ(1, image->bitmap().height());
     EXPECT_FALSE(image->bitmap().isNull());
@@ -140,7 +140,7 @@ TEST_F(DeferredImageDecoderTest, drawIntoSkPicture)
 
 TEST_F(DeferredImageDecoderTest, drawScaledIntoSkPicture)
 {
-    OwnPtr<NativeImageSkia> image(adoptPtr(m_lazyDecoder->frameBufferAtIndex(0)->asNewNativeImage()));
+    RefPtr<NativeImageSkia> image = m_lazyDecoder->frameBufferAtIndex(0)->asNewNativeImage();
     SkBitmap scaledBitmap = image->resizedBitmap(SkISize::Make(50, 51), SkIRect::MakeWH(50, 51));
     EXPECT_FALSE(scaledBitmap.isNull());
     EXPECT_TRUE(scaledBitmap.isImmutable());
@@ -174,7 +174,7 @@ TEST_F(DeferredImageDecoderTest, decodeOnOtherThread)
 {
     WTF::initializeThreading();
 
-    OwnPtr<NativeImageSkia> image(adoptPtr(m_lazyDecoder->frameBufferAtIndex(0)->asNewNativeImage()));
+    RefPtr<NativeImageSkia> image = m_lazyDecoder->frameBufferAtIndex(0)->asNewNativeImage();
     EXPECT_EQ(1, image->bitmap().width());
     EXPECT_EQ(1, image->bitmap().height());
     EXPECT_FALSE(image->bitmap().isNull());

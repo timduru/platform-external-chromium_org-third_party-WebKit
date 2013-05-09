@@ -27,9 +27,11 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import logging
+import re
 
 from webkitpy.common.webkit_finder import WebKitFinder
 from webkitpy.layout_tests.port import chromium
+from webkitpy.layout_tests.port import chromium_win
 from webkitpy.layout_tests.port import config
 
 
@@ -39,21 +41,10 @@ _log = logging.getLogger(__name__)
 class ChromiumLinuxPort(chromium.ChromiumPort):
     port_name = 'chromium-linux'
 
-    SUPPORTED_ARCHITECTURES = ('x86', 'x86_64')
+    SUPPORTED_VERSIONS = ('x86', 'x86_64')
 
-    FALLBACK_PATHS = {
-        'x86_64': [
-            'chromium-linux',
-            'chromium-win',
-            'chromium',
-        ],
-        'x86': [
-            'chromium-linux-x86',
-            'chromium-linux',
-            'chromium-win',
-            'chromium',
-        ],
-    }
+    FALLBACK_PATHS = { 'x86_64': [ 'chromium-linux' ] + chromium_win.ChromiumWinPort.latest_platform_fallback_path() }
+    FALLBACK_PATHS['x86'] = ['chromium-linux-x86'] + FALLBACK_PATHS['x86_64']
 
     DEFAULT_BUILD_DIRECTORIES = ('sconsbuild', 'out')
 
@@ -74,11 +65,11 @@ class ChromiumLinuxPort(chromium.ChromiumPort):
         file_output = ''
         if filesystem.exists(driver_path):
             # The --dereference flag tells file to follow symlinks
-            file_output = executive.run_command(['file', '--dereference', driver_path], return_stderr=True)
+            file_output = executive.run_command(['file', '--brief', '--dereference', driver_path], return_stderr=True)
 
-        if 'ELF 32-bit LSB executable' in file_output:
+        if re.match(r'ELF 32-bit LSB\s+executable', file_output):
             return 'x86'
-        if 'ELF 64-bit LSB executable' in file_output:
+        if re.match(r'ELF 64-bit LSB\s+executable', file_output):
             return 'x86_64'
         if file_output:
             _log.warning('Could not determine architecture from "file" output: %s' % file_output)
@@ -99,7 +90,7 @@ class ChromiumLinuxPort(chromium.ChromiumPort):
         chromium.ChromiumPort.__init__(self, host, port_name, **kwargs)
         (base, arch) = port_name.rsplit('-', 1)
         assert base == 'chromium-linux'
-        assert arch in self.SUPPORTED_ARCHITECTURES
+        assert arch in self.SUPPORTED_VERSIONS
         assert port_name in ('chromium-linux', 'chromium-linux-x86', 'chromium-linux-x86_64')
         self._version = 'lucid'  # We only support lucid right now.
         self._architecture = arch
@@ -148,10 +139,13 @@ class ChromiumLinuxPort(chromium.ChromiumPort):
         return 'wdiff is not installed; please install using "sudo apt-get install wdiff"'
 
     def _path_to_apache(self):
-        if self._is_redhat_based():
-            return '/usr/sbin/httpd'
-        else:
-            return '/usr/sbin/apache2'
+        # The Apache binary path can vary depending on OS and distribution
+        # See http://wiki.apache.org/httpd/DistrosDefaultLayout
+        for path in ["/usr/sbin/httpd", "/usr/sbin/apache2"]:
+            if self._filesystem.exists(path):
+                return path
+        _log.error("Could not find apache. Not installed or unknown path.")
+        return None
 
     def _path_to_lighttpd(self):
         return "/usr/sbin/lighttpd"

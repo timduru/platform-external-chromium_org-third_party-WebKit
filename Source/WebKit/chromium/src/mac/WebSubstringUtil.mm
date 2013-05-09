@@ -34,19 +34,20 @@
 
 #import <Cocoa/Cocoa.h>
 
-#include "ColorMac.h"
-#include "Document.h"
-#include "Element.h"
-#include "Font.h"
-#include "Frame.h"
-#include "FrameView.h"
-#include "HTMLElement.h"
-#include "Node.h"
-#include "Range.h"
-#include "RenderObject.h"
-#include "RenderStyle.h"
-#include "TextIterator.h"
 #include "WebFrameImpl.h"
+#include "core/dom/Document.h"
+#include "core/dom/Element.h"
+#include "core/dom/Node.h"
+#include "core/dom/Range.h"
+#include "core/editing/FrameSelection.h"
+#include "core/editing/TextIterator.h"
+#include "core/html/HTMLElement.h"
+#include "core/page/Frame.h"
+#include "core/page/FrameView.h"
+#include "core/platform/graphics/Font.h"
+#include "core/platform/graphics/mac/ColorMac.h"
+#include "core/rendering/RenderObject.h"
+#include "core/rendering/style/RenderStyle.h"
 #include <public/WebRect.h>
 
 using namespace WebCore;

@@ -24,20 +24,18 @@
  */
 
 #include "config.h"
-#include "DOMStringList.h"
-#include "IDBCallbacks.h"
-#include "IDBCursorBackendInterface.h"
-#include "IDBDatabaseBackendInterface.h"
-#include "IDBDatabaseCallbacks.h"
-#include "IDBFactoryBackendImpl.h"
-#include "IDBFakeBackingStore.h"
-#include "IDBKey.h"
-#include "IndexedDB.h"
-#include "SecurityOrigin.h"
 #include <gtest/gtest.h>
+#include "IDBFakeBackingStore.h"
+#include "core/dom/DOMStringList.h"
+#include "core/page/SecurityOrigin.h"
+#include "modules/indexeddb/IDBCallbacks.h"
+#include "modules/indexeddb/IDBCursorBackendInterface.h"
+#include "modules/indexeddb/IDBDatabaseBackendInterface.h"
+#include "modules/indexeddb/IDBDatabaseCallbacks.h"
+#include "modules/indexeddb/IDBFactoryBackendImpl.h"
+#include "modules/indexeddb/IDBKey.h"
+#include "modules/indexeddb/IndexedDB.h"
 #include <wtf/Vector.h>
-
-#if ENABLE(INDEXED_DATABASE)
 
 using namespace WebCore;
 
@@ -57,7 +55,7 @@ public:
     {
         m_wasErrorCalled = true;
     }
-    virtual void onSuccess(PassRefPtr<DOMStringList>) { }
+    virtual void onSuccess(const Vector<String>&) { }
     virtual void onSuccess(PassRefPtr<IDBCursorBackendInterface>, PassRefPtr<IDBKey>, PassRefPtr<IDBKey>, PassRefPtr<SharedBuffer>) { }
     virtual void onSuccess(PassRefPtr<IDBDatabaseBackendInterface>, const IDBDatabaseMetadata&)
     {
@@ -99,7 +97,7 @@ public:
     virtual void removeIDBDatabaseBackend(const WTF::String &) { }
 
 protected:
-    virtual PassRefPtr<IDBBackingStore> openBackingStore(PassRefPtr<SecurityOrigin> prpOrigin, const String& dataDir)
+    virtual PassRefPtr<IDBBackingStore> openBackingStore(const String&, const String& dataDir)
     {
         return FailingBackingStore::open();
     }
@@ -125,9 +123,7 @@ TEST(IDBAbortTest, TheTest)
     RefPtr<FakeIDBDatabaseCallbacks> databaseCallbacks = FakeIDBDatabaseCallbacks::create();
     RefPtr<SecurityOrigin> origin = SecurityOrigin::create("http", "localhost", 81);
     const int64_t DummyVersion = 2;
-    factory->open(name, DummyVersion, 1, callbacks.get(), databaseCallbacks, origin, 0 /*Frame*/, String() /*path*/);
+    factory->open(name, DummyVersion, 1, callbacks.get(), databaseCallbacks, origin->databaseIdentifier(), 0, String() /*path*/);
 }
 
 } // namespace
-
-#endif // ENABLE(INDEXED_DATABASE)

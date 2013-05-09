@@ -99,11 +99,11 @@ class PortTestCase(unittest.TestCase):
         self.assertEqual(port.default_max_locked_shards(), 1)
 
     def test_default_timeout_ms(self):
-        self.assertEqual(self.make_port(options=MockOptions(configuration='Release')).default_timeout_ms(), 35000)
-        self.assertEqual(self.make_port(options=MockOptions(configuration='Debug')).default_timeout_ms(), 35000)
+        self.assertEqual(self.make_port(options=MockOptions(configuration='Release')).default_timeout_ms(), 6000)
+        self.assertEqual(self.make_port(options=MockOptions(configuration='Debug')).default_timeout_ms(), 12000)
 
     def test_default_pixel_tests(self):
-        self.assertEqual(self.make_port().default_pixel_tests(), False)
+        self.assertEqual(self.make_port().default_pixel_tests(), True)
 
     def test_driver_cmd_line(self):
         port = self.make_port()
@@ -219,7 +219,7 @@ class PortTestCase(unittest.TestCase):
 
     def integration_test_image_diff(self):
         port = self.make_port()
-        # FIXME: This test will never run since we are using a MockFilesystem for these tests!?!?
+        # FIXME: This test will never run since we are using MockFileSystem for these tests!?!?
         if not port.check_image_diff():
             # The port hasn't been built - don't run the tests.
             return
@@ -425,7 +425,6 @@ class PortTestCase(unittest.TestCase):
             port._filesystem.write_text_file(path, '')
         ordered_dict = port.expectations_dict()
         self.assertEqual(port.path_to_generic_test_expectations_file(), ordered_dict.keys()[0])
-        self.assertEqual(port.path_to_test_expectations_file(), ordered_dict.keys()[1])
 
         options = MockOptions(additional_expectations=['/tmp/foo', '/tmp/bar'])
         port = self.make_port(options=options)
@@ -436,20 +435,6 @@ class PortTestCase(unittest.TestCase):
         ordered_dict = port.expectations_dict()
         self.assertEqual(ordered_dict.keys()[-2:], options.additional_expectations)  # pylint: disable=E1101
         self.assertEqual(ordered_dict.values()[-2:], ['foo', 'bar'])
-
-    def test_path_to_test_expectations_file(self):
-        port = TestWebKitPort()
-        port._options = MockOptions(webkit_test_runner=False)
-        self.assertEqual(port.path_to_test_expectations_file(), '/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations')
-
-        port = TestWebKitPort()
-        port._options = MockOptions(webkit_test_runner=True)
-        self.assertEqual(port.path_to_test_expectations_file(), '/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations')
-
-        port = TestWebKitPort()
-        port.host.filesystem.files['/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations'] = 'some content'
-        port._options = MockOptions(webkit_test_runner=False)
-        self.assertEqual(port.path_to_test_expectations_file(), '/mock-checkout/LayoutTests/platform/testwebkitport/TestExpectations')
 
     def test_skipped_directories_for_symbols(self):
         # This first test confirms that the commonly found symbols result in the expected skipped directories.
@@ -475,7 +460,7 @@ class PortTestCase(unittest.TestCase):
 000000000124f670 s __ZZN7WebCore13GraphicsLayer13addChildBelowEPS0_S1_E19__PRETTY_FUNCTION__
 """
         # Note 'compositing' is not in the list of skipped directories (hence the parsing of GraphicsLayer worked):
-        expected_directories = set(['mathml', 'transforms/3d', 'compositing/webgl', 'fast/canvas/webgl', 'animations/3d', 'webgl', 'mhtml', 'http/tests/canvas/webgl', 'fast/css/variables', 'inspector/styles/variables'])
+        expected_directories = set(['mathml', 'compositing/webgl', 'fast/canvas/webgl', 'webgl', 'mhtml', 'http/tests/canvas/webgl', 'fast/css/variables', 'inspector/styles/variables'])
         result_directories = set(TestWebKitPort(symbols_string=symbols_string)._skipped_tests_for_unsupported_features(test_list=['mathml/foo.html']))
         self.assertEqual(result_directories, expected_directories)
 
@@ -513,9 +498,6 @@ class PortTestCase(unittest.TestCase):
         port = TestWebKitPort(port_name="testwebkitport-version")
         self.assertEqual(platform_dirs(port), ['LayoutTests', 'testwebkitport', 'testwebkitport-version'])
 
-        port = TestWebKitPort(port_name="testwebkitport-version-wk2")
-        self.assertEqual(platform_dirs(port), ['LayoutTests', 'testwebkitport', 'testwebkitport-version', 'wk2', 'testwebkitport-wk2'])
-
         port = TestWebKitPort(port_name="testwebkitport-version",
                               options=MockOptions(additional_platform_directory=["internal-testwebkitport"]))
         self.assertEqual(platform_dirs(port), ['LayoutTests', 'testwebkitport', 'testwebkitport-version', 'internal-testwebkitport'])
@@ -532,40 +514,6 @@ class PortTestCase(unittest.TestCase):
             'BUG_TESTEXPECTATIONS SKIP : fast/html/article-element.html = FAIL\n')
         port = TestWebKitPort(host=host)
         self.assertEqual(''.join(port.expectations_dict().values()), 'BUG_TESTEXPECTATIONS SKIP : fast/html/article-element.html = FAIL\n')
-
-    def test_build_driver(self):
-        output = OutputCapture()
-        port = TestWebKitPort()
-        # Delay setting _executive to avoid logging during construction
-        port._executive = MockExecutive(should_log=True)
-        port._options = MockOptions(configuration="Release")  # This should not be necessary, but I think TestWebKitPort is actually reading from disk (and thus detects the current configuration).
-        expected_logs = "MOCK run_command: ['Tools/Scripts/build-dumprendertree', '--release'], cwd=/mock-checkout, env={'LC_ALL': 'C', 'MOCK_ENVIRON_COPY': '1'}\n"
-        self.assertTrue(output.assert_outputs(self, port._build_driver, expected_logs=expected_logs))
-
-        # Make sure when passed --webkit-test-runner we build the right tool.
-        port._options = MockOptions(webkit_test_runner=True, configuration="Release")
-        expected_logs = "MOCK run_command: ['Tools/Scripts/build-dumprendertree', '--release'], cwd=/mock-checkout, env={'LC_ALL': 'C', 'MOCK_ENVIRON_COPY': '1'}\nMOCK run_command: ['Tools/Scripts/build-webkittestrunner', '--release'], cwd=/mock-checkout, env={'LC_ALL': 'C', 'MOCK_ENVIRON_COPY': '1'}\n"
-        self.assertTrue(output.assert_outputs(self, port._build_driver, expected_logs=expected_logs))
-
-        # Make sure we show the build log when --verbose is passed, which we simulate by setting the logging level to DEBUG.
-        output.set_log_level(logging.DEBUG)
-        port._options = MockOptions(configuration="Release")
-        expected_logs = """MOCK run_command: ['Tools/Scripts/build-dumprendertree', '--release'], cwd=/mock-checkout, env={'LC_ALL': 'C', 'MOCK_ENVIRON_COPY': '1'}
-Output of ['Tools/Scripts/build-dumprendertree', '--release']:
-MOCK output of child process
-"""
-        self.assertTrue(output.assert_outputs(self, port._build_driver, expected_logs=expected_logs))
-        output.set_log_level(logging.INFO)
-
-        # Make sure that failure to build returns False.
-        port._executive = MockExecutive(should_log=True, should_throw=True)
-        # Because WK2 currently has to build both webkittestrunner and DRT, if DRT fails, that's the only one it tries.
-        expected_logs = """MOCK run_command: ['Tools/Scripts/build-dumprendertree', '--release'], cwd=/mock-checkout, env={'LC_ALL': 'C', 'MOCK_ENVIRON_COPY': '1'}
-MOCK ScriptError
-
-MOCK output of child process
-"""
-        self.assertFalse(output.assert_outputs(self, port._build_driver, expected_logs=expected_logs))
 
     def _assert_config_file_for_platform(self, port, platform, config_file):
         self.assertEqual(port._apache_config_file_name_for_platform(platform), config_file)
@@ -626,30 +574,6 @@ MOCK output of child process
             self.assertEqual(port._path_to_apache_config_file(), '/existing/httpd.conf')
         finally:
             os.environ = saved_environ.copy()
-
-    def test_check_build(self):
-        port = self.make_port(options=MockOptions(build=True))
-        self.build_called = False
-
-        def build_driver_called():
-            self.build_called = True
-            return True
-
-        port._build_driver = build_driver_called
-        port.check_build(False)
-        self.assertTrue(self.build_called)
-
-        port = self.make_port(options=MockOptions(root='/tmp', build=True))
-        self.build_called = False
-        port._build_driver = build_driver_called
-        port.check_build(False)
-        self.assertFalse(self.build_called, None)
-
-        port = self.make_port(options=MockOptions(build=False))
-        self.build_called = False
-        port._build_driver = build_driver_called
-        port.check_build(False)
-        self.assertFalse(self.build_called, None)
 
     def test_additional_platform_directory(self):
         port = self.make_port(options=MockOptions(additional_platform_directory=['/tmp/foo']))

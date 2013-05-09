@@ -24,15 +24,12 @@
  */
 
 #include "config.h"
-#include "IDBLevelDBCoding.h"
+#include "modules/indexeddb/IDBLevelDBCoding.h"
 
-#if ENABLE(INDEXED_DATABASE)
-#if USE(LEVELDB)
-
-#include "IDBKey.h"
-#include "IDBKeyPath.h"
-#include "LevelDBSlice.h"
 #include <gtest/gtest.h>
+#include "core/platform/leveldb/LevelDBSlice.h"
+#include "modules/indexeddb/IDBKey.h"
+#include "modules/indexeddb/IDBKeyPath.h"
 #include <wtf/Vector.h>
 
 using namespace WebCore;
@@ -744,6 +741,3 @@ TEST(IDBLevelDBCodingTest, EncodeVarIntVSEncodeByteTest)
 }
 
 } // namespace
-
-#endif // USE(LEVELDB)
-#endif // ENABLE(INDEXED_DATABASE)

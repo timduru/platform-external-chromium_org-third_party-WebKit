@@ -293,14 +293,6 @@ class PortTest(unittest.TestCase):
         self.assertEqual(environment['FOO'], 'BAR')
         self.assertEqual(environment['BAR'], 'FOO')
 
-    def test_uses_test_expectations_file(self):
-        port = self.make_port(port_name='foo')
-        port.port_name = 'foo'
-        port.path_to_test_expectations_file = lambda: '/mock-results/TestExpectations'
-        self.assertFalse(port.uses_test_expectations_file())
-        port._filesystem = MockFileSystem({'/mock-results/TestExpectations': ''})
-        self.assertTrue(port.uses_test_expectations_file())
-
     def test_find_no_paths_specified(self):
         port = self.make_port(with_tests=True)
         layout_tests_dir = port.layout_tests_dir()
@@ -329,23 +321,22 @@ class PortTest(unittest.TestCase):
 
     def test_is_test_file(self):
         filesystem = MockFileSystem()
-        self.assertTrue(Port._is_test_file(filesystem, '', 'foo.html'))
-        self.assertTrue(Port._is_test_file(filesystem, '', 'foo.shtml'))
-        self.assertTrue(Port._is_test_file(filesystem, '', 'foo.svg'))
-        self.assertTrue(Port._is_test_file(filesystem, '', 'test-ref-test.html'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo.png'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-expected.html'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-expected.svg'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-expected.xht'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-expected-mismatch.html'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-expected-mismatch.svg'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-expected-mismatch.xhtml'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-ref.html'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-notref.html'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-notref.xht'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'foo-ref.xhtml'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'ref-foo.html'))
-        self.assertFalse(Port._is_test_file(filesystem, '', 'notref-foo.xhr'))
+        self.assertTrue(Port.is_test_file(filesystem, '', 'foo.html'))
+        self.assertTrue(Port.is_test_file(filesystem, '', 'foo.svg'))
+        self.assertTrue(Port.is_test_file(filesystem, '', 'test-ref-test.html'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo.png'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-expected.html'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-expected.svg'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-expected.xht'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-expected-mismatch.html'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-expected-mismatch.svg'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-expected-mismatch.xhtml'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-ref.html'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-notref.html'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-notref.xht'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'foo-ref.xhtml'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'ref-foo.html'))
+        self.assertFalse(Port.is_test_file(filesystem, '', 'notref-foo.xhr'))
 
     def test_parse_reftest_list(self):
         port = self.make_port(with_tests=True)

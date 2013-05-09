@@ -65,8 +65,9 @@ public:
     MOCK_METHOD2(scrollByIfPossible, bool(WebPoint, WebFloatSize));
     MOCK_METHOD2(scrollVerticallyByPageIfPossible, bool(WebPoint, WebScrollbar::ScrollDirection));
     MOCK_METHOD0(scrollEnd, void());
+    MOCK_METHOD0(flingScrollBegin, ScrollStatus());
 
-    MOCK_METHOD0(didReceiveLastInputEventForVSync, void());
+    MOCK_METHOD1(didReceiveLastInputEventForVSync, void(double));
 
 private:
     virtual void startPageScaleAnimation(WebSize targetPosition,
@@ -74,6 +75,8 @@ private:
                                          float pageScale,
                                          double startTimeMs,
                                          double durationMs) OVERRIDE { }
+
+    virtual void notifyCurrentFlingVelocity(WebFloatSize velocity) OVERRIDE { }
 };
 
 class MockWebCompositorInputHandlerClient : public WebCompositorInputHandlerClient {
@@ -148,6 +151,16 @@ protected:
     ExpectedDisposition m_expectedDisposition;
 };
 
+TEST_F(WebCompositorInputHandlerImplTest, mouseWheelByPageMainThread)
+{
+    WebMouseWheelEvent wheel;
+    wheel.type = WebInputEvent::MouseWheel;
+    wheel.scrollByPage = true;
+
+    EXPECT_CALL(m_mockClient, didNotHandleInputEvent(true)).Times(1);
+    m_inputHandler->handleInputEvent(wheel);
+    testing::Mock::VerifyAndClearExpectations(&m_mockClient);
+}
 
 TEST_F(WebCompositorInputHandlerImplTest, gestureScrollStarted)
 {
@@ -370,6 +383,10 @@ TEST_F(WebCompositorInputHandlerImplTest, gestureFlingOnMainThreadTouchpad)
     gesture.type = WebInputEvent::GestureFlingStart;
     gesture.sourceDevice = WebGestureEvent::Touchpad;
     m_inputHandler->handleInputEvent(gesture);
+
+    // Since we returned ScrollStatusOnMainThread from scrollBegin, ensure the input
+    // handler knows it's scrolling off the impl thread
+    ASSERT_FALSE(m_inputHandler->isGestureScrollOnImplThread());
 
     VERIFY_AND_RESET_MOCKS();
 
@@ -640,8 +657,15 @@ TEST_F(WebCompositorInputHandlerImplTest, gestureFlingStartedTouchscreen)
     // We shouldn't send any events to the widget for this gesture.
     m_expectedDisposition = DidHandle;
     VERIFY_AND_RESET_MOCKS();
-
     EXPECT_CALL(m_mockInputHandlerClient, scrollBegin(testing::_, testing::_))
+        .WillOnce(testing::Return(WebInputHandlerClient::ScrollStatusStarted));
+    gesture.type = WebInputEvent::GestureScrollBegin;
+    gesture.sourceDevice = WebGestureEvent::Touchscreen;
+    m_inputHandler->handleInputEvent(gesture);
+
+    VERIFY_AND_RESET_MOCKS();
+
+    EXPECT_CALL(m_mockInputHandlerClient, flingScrollBegin())
         .WillOnce(testing::Return(WebInputHandlerClient::ScrollStatusStarted));
     EXPECT_CALL(m_mockInputHandlerClient, scheduleAnimation());
 
@@ -669,6 +693,13 @@ TEST_F(WebCompositorInputHandlerImplTest, gestureFlingOnMainThreadTouchscreen)
     EXPECT_CALL(m_mockInputHandlerClient, scrollBegin(testing::_, testing::_))
         .WillOnce(testing::Return(WebInputHandlerClient::ScrollStatusOnMainThread));
 
+    gesture.type = WebInputEvent::GestureScrollBegin;
+    m_inputHandler->handleInputEvent(gesture);
+
+    VERIFY_AND_RESET_MOCKS();
+
+    EXPECT_CALL(m_mockInputHandlerClient, flingScrollBegin()).Times(0);
+
     gesture.type = WebInputEvent::GestureFlingStart;
     gesture.sourceDevice = WebGestureEvent::Touchscreen;
     m_inputHandler->handleInputEvent(gesture);
@@ -683,10 +714,20 @@ TEST_F(WebCompositorInputHandlerImplTest, gestureFlingOnMainThreadTouchscreen)
 
 TEST_F(WebCompositorInputHandlerImplTest, gestureFlingIgnoredTouchscreen)
 {
-    m_expectedDisposition = DropEvent;
+    m_expectedDisposition = DidHandle;
     VERIFY_AND_RESET_MOCKS();
 
     EXPECT_CALL(m_mockInputHandlerClient, scrollBegin(testing::_, testing::_))
+        .WillOnce(testing::Return(WebInputHandlerClient::ScrollStatusStarted));
+
+    gesture.type = WebInputEvent::GestureScrollBegin;
+    gesture.sourceDevice = WebGestureEvent::Touchscreen;
+    m_inputHandler->handleInputEvent(gesture);
+
+    m_expectedDisposition = DropEvent;
+    VERIFY_AND_RESET_MOCKS();
+
+    EXPECT_CALL(m_mockInputHandlerClient, flingScrollBegin())
         .WillOnce(testing::Return(WebInputHandlerClient::ScrollStatusIgnored));
 
     gesture.type = WebInputEvent::GestureFlingStart;
@@ -707,6 +748,15 @@ TEST_F(WebCompositorInputHandlerImplTest, gestureFlingAnimatesTouchscreen)
     m_expectedDisposition = DidHandle;
     VERIFY_AND_RESET_MOCKS();
 
+    EXPECT_CALL(m_mockInputHandlerClient, scrollBegin(testing::_, testing::_))
+        .WillOnce(testing::Return(WebInputHandlerClient::ScrollStatusStarted));
+
+    gesture.type = WebInputEvent::GestureScrollBegin;
+    gesture.sourceDevice = WebGestureEvent::Touchscreen;
+    m_inputHandler->handleInputEvent(gesture);
+
+    VERIFY_AND_RESET_MOCKS();
+
     // On the fling start, we should schedule an animation but not actually start
     // scrolling.
     gesture.type = WebInputEvent::GestureFlingStart;
@@ -723,7 +773,7 @@ TEST_F(WebCompositorInputHandlerImplTest, gestureFlingAnimatesTouchscreen)
     gesture.globalY = flingGlobalPoint.y;
     gesture.modifiers = modifiers;
     EXPECT_CALL(m_mockInputHandlerClient, scheduleAnimation());
-    EXPECT_CALL(m_mockInputHandlerClient, scrollBegin(testing::_, testing::_))
+    EXPECT_CALL(m_mockInputHandlerClient, flingScrollBegin())
         .WillOnce(testing::Return(WebInputHandlerClient::ScrollStatusStarted));
     m_inputHandler->handleInputEvent(gesture);
 
@@ -786,7 +836,7 @@ TEST_F(WebCompositorInputHandlerImplTest, gestureScrollOnImplThreadFlagClearedAf
     gesture.globalY = flingGlobalPoint.y;
     gesture.modifiers = modifiers;
     EXPECT_CALL(m_mockInputHandlerClient, scheduleAnimation());
-    EXPECT_CALL(m_mockInputHandlerClient, scrollBegin(testing::_, testing::_))
+    EXPECT_CALL(m_mockInputHandlerClient, flingScrollBegin())
         .WillOnce(testing::Return(WebInputHandlerClient::ScrollStatusStarted));
     m_inputHandler->handleInputEvent(gesture);
 
@@ -828,8 +878,9 @@ TEST_F(WebCompositorInputHandlerImplTest, lastInputEventForVSync)
     VERIFY_AND_RESET_MOCKS();
 
     gesture.type = WebInputEvent::GestureFlingCancel;
+    gesture.timeStampSeconds = 1234;
     gesture.modifiers |= WebInputEvent::IsLastInputEventForCurrentVSync;
-    EXPECT_CALL(m_mockInputHandlerClient, didReceiveLastInputEventForVSync());
+    EXPECT_CALL(m_mockInputHandlerClient, didReceiveLastInputEventForVSync(gesture.timeStampSeconds));
     m_inputHandler->handleInputEvent(gesture);
 }
 

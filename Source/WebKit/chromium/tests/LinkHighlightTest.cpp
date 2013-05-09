@@ -26,10 +26,8 @@
 
 #include "LinkHighlight.h"
 
+#include <gtest/gtest.h>
 #include "FrameTestHelpers.h"
-#include "FrameView.h"
-#include "IntRect.h"
-#include "Node.h"
 #include "URLTestHelpers.h"
 #include "WebCompositorInitializer.h"
 #include "WebFrame.h"
@@ -37,7 +35,9 @@
 #include "WebInputEvent.h"
 #include "WebInputEventConversion.h"
 #include "WebViewImpl.h"
-#include <gtest/gtest.h>
+#include "core/dom/Node.h"
+#include "core/page/FrameView.h"
+#include "core/platform/graphics/IntRect.h"
 #include <public/WebContentLayer.h>
 #include <public/WebFloatPoint.h>
 #include <public/WebSize.h>
@@ -48,7 +48,6 @@ using namespace WebCore;
 
 namespace {
 
-#if ENABLE(GESTURE_EVENTS)
 TEST(LinkHighlightTest, verifyWebViewImplIntegration)
 {
     WebKitTests::WebCompositorInitializer compositorInitializer(0);
@@ -121,6 +120,5 @@ TEST(LinkHighlightTest, verifyWebViewImplIntegration)
 
     webViewImpl->close();
 }
-#endif
 
 } // namespace

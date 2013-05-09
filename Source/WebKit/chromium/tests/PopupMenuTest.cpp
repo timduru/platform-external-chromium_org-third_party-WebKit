@@ -30,16 +30,7 @@
 
 #include "config.h"
 
-#include "Color.h"
-#include "Element.h"
-#include "FrameView.h"
-#include "HTMLSelectElement.h"
-#include "KeyboardCodes.h"
-#include "PopupContainer.h"
-#include "PopupMenu.h"
-#include "PopupMenuChromium.h"
-#include "PopupMenuClient.h"
-#include "RuntimeEnabledFeatures.h"
+#include <gtest/gtest.h>
 #include "URLTestHelpers.h"
 #include "WebDocument.h"
 #include "WebElement.h"
@@ -53,14 +44,25 @@
 #include "WebView.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
+#include "core/dom/Element.h"
+#include "core/html/HTMLSelectElement.h"
+#include "core/page/EventHandler.h"
+#include "core/page/FrameView.h"
+#include "RuntimeEnabledFeatures.h"
+#include "core/platform/PlatformMouseEvent.h"
+#include "core/platform/PopupMenu.h"
+#include "core/platform/PopupMenuClient.h"
+#include "core/platform/chromium/KeyboardCodes.h"
+#include "core/platform/chromium/PopupContainer.h"
+#include "core/platform/chromium/PopupMenuChromium.h"
+#include "core/platform/graphics/Color.h"
 #include "v8.h"
-#include <gtest/gtest.h>
 #include <public/Platform.h>
 #include <public/WebString.h>
+#include <public/WebUnitTestSupport.h>
 #include <public/WebURL.h>
 #include <public/WebURLRequest.h>
 #include <public/WebURLResponse.h>
-#include <public/WebUnitTestSupport.h>
 
 using namespace WebCore;
 using namespace WebKit;
@@ -111,7 +113,6 @@ public:
     virtual bool itemIsSeparator(unsigned listIndex) const { return false; }
     virtual bool itemIsLabel(unsigned listIndex) const { return false; }
     virtual bool itemIsSelected(unsigned listIndex) const { return listIndex == m_selectIndex; }
-    virtual bool shouldPopOver() const { return false; }
     virtual bool valueShouldChangeOnHotTrack() const { return false; }
     virtual void setTextFromItem(unsigned listIndex) { }
 

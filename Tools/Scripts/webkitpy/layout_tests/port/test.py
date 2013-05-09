@@ -366,7 +366,7 @@ class TestPort(Port):
         Port.__init__(self, host, port_name or TestPort.default_port_name, **kwargs)
         self._tests = unit_test_list()
         self._flakes = set()
-        self._expectations_path = LAYOUT_TEST_DIR + '/platform/test/TestExpectations'
+        self._generic_expectations_path = LAYOUT_TEST_DIR + '/TestExpectations'
         self._results_directory = None
 
         self._operating_system = 'mac'
@@ -385,6 +385,9 @@ class TestPort(Port):
         }
         self._version = version_map[self._name]
 
+    def buildbot_archives_baselines(self):
+        return self._name != 'test-win-xp'
+
     def default_pixel_tests(self):
         return True
 
@@ -400,7 +403,7 @@ class TestPort(Port):
             'test-win-win7': ['test-win-win7'],
             'test-win-vista': ['test-win-vista', 'test-win-win7'],
             'test-win-xp': ['test-win-xp', 'test-win-vista', 'test-win-win7'],
-            'test-linux-x86_64': ['test-linux', 'test-win-win7'],
+            'test-linux-x86_64': ['test-linux-x86_64', 'test-win-win7'],
         }
         return [self._webkit_baseline_path(d) for d in search_paths[self.name()]]
 
@@ -496,8 +499,8 @@ class TestPort(Port):
     def _path_to_apache_config_file(self):
         return self._filesystem.join(self.layout_tests_dir(), 'http', 'conf', 'httpd.conf')
 
-    def path_to_test_expectations_file(self):
-        return self._expectations_path
+    def path_to_generic_test_expectations_file(self):
+        return self._generic_expectations_path
 
     def all_test_configurations(self):
         """Returns a sequence of the TestConfigurations the port supports."""

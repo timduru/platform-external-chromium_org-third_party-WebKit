@@ -83,6 +83,7 @@ WebView* createWebView(bool enableJavascript, WebFrameClient* webFrameClient, We
     WebView* webView = WebView::create(webViewClient);
     webView->settings()->setJavaScriptEnabled(enableJavascript);
     webView->settings()->setDeviceSupportsMouse(false);
+    webView->settings()->setForceCompositingMode(true);
     webView->initializeMainFrame(webFrameClient);
 
     return webView;

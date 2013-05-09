@@ -81,10 +81,11 @@ void WebPreferences::reset()
     allowRunningOfInsecureContent = true;
     authorAndUserStylesEnabled = true;
     defaultTextEncodingName = WebString::fromUTF8("ISO-8859-1");
-    developerExtrasEnabled = true;
     experimentalWebGLEnabled = false;
+    experimentalCSSExclusionsEnabled = true;
     experimentalCSSRegionsEnabled = true;
     experimentalCSSGridLayoutEnabled = false;
+    experimentalWebSocketEnabled = false;
     javaEnabled = false;
     javaScriptCanAccessClipboard = true;
     javaScriptCanOpenWindowsAutomatically = true;
@@ -97,8 +98,6 @@ void WebPreferences::reset()
     shrinksStandaloneImagesToFit = false;
     textAreasAreResizable = true;
     userStyleSheetLocation = WebURL();
-    usesPageCache = false;
-    pageCacheSupportsPlugins = false;
     webSecurityEnabled = true;
     caretBrowsingEnabled = false;
 
@@ -153,11 +152,12 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setAllowRunningOfInsecureContent(allowRunningOfInsecureContent);
     settings->setAuthorAndUserStylesEnabled(authorAndUserStylesEnabled);
     settings->setDefaultTextEncodingName(defaultTextEncodingName);
-    settings->setDeveloperExtrasEnabled(developerExtrasEnabled);
     settings->setExperimentalWebGLEnabled(experimentalWebGLEnabled);
     WebRuntimeFeatures::enableCSSRegions(experimentalCSSRegionsEnabled);
+    WebRuntimeFeatures::enableCSSExclusions(experimentalCSSExclusionsEnabled);
     settings->setExperimentalCSSGridLayoutEnabled(experimentalCSSGridLayoutEnabled);
     settings->setExperimentalCSSCustomFilterEnabled(cssCustomFilterEnabled);
+    WebRuntimeFeatures::enableExperimentalWebSocket(experimentalWebSocketEnabled);
     settings->setJavaEnabled(javaEnabled);
     settings->setJavaScriptCanAccessClipboard(javaScriptCanAccessClipboard);
     settings->setJavaScriptCanOpenWindowsAutomatically(javaScriptCanOpenWindowsAutomatically);
@@ -170,8 +170,6 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setShrinksStandaloneImagesToFit(shrinksStandaloneImagesToFit);
     settings->setTextAreasAreResizable(textAreasAreResizable);
     settings->setUserStyleSheetLocation(userStyleSheetLocation);
-    settings->setUsesPageCache(usesPageCache);
-    settings->setPageCacheSupportsPlugins(pageCacheSupportsPlugins);
     settings->setWebSecurityEnabled(webSecurityEnabled);
     settings->setAllowUniversalAccessFromFileURLs(allowUniversalAccessFromFileURLs);
     settings->setEditingBehavior(editingBehavior);
@@ -197,6 +195,7 @@ void WebPreferences::applyTo(WebView* webView)
 
     // Fixed values.
     settings->setTouchDragDropEnabled(false);
+    settings->setTouchEditingEnabled(false);
     settings->setTextDirectionSubmenuInclusionBehaviorNeverIncluded();
     settings->setDownloadableBinaryFontsEnabled(true);
     settings->setAllowScriptsToCloseWindows(false);
@@ -213,7 +212,6 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setValidationMessageTimerMagnification(-1);
     settings->setVisualWordMovementEnabled(false);
     settings->setPasswordEchoEnabled(false);
-    settings->setApplyDeviceScaleFactorInCompositor(true);
     settings->setSmartInsertDeleteEnabled(true);
 #ifdef WIN32
     settings->setSelectTrailingWhitespaceEnabled(true);

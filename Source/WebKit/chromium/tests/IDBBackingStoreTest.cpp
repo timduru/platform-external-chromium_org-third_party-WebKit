@@ -25,16 +25,15 @@
 
 #include "config.h"
 
-#include "IDBBackingStore.h"
+#include "modules/indexeddb/IDBBackingStore.h"
 
-#include "IDBFactoryBackendImpl.h"
-#include "IDBLevelDBCoding.h"
-#include "SharedBuffer.h"
+#include "core/page/SecurityOrigin.h"
+#include "core/platform/SharedBuffer.h"
+#include "modules/indexeddb/IDBFactoryBackendImpl.h"
+#include "modules/indexeddb/IDBLevelDBCoding.h"
 
 #include <gtest/gtest.h>
 #include <webkit/support/webkit_support.h>
-
-#if ENABLE(INDEXED_DATABASE)
 
 using namespace WebCore;
 using IDBLevelDBCoding::KeyPrefix;
@@ -46,11 +45,8 @@ public:
     IDBBackingStoreTest() { }
     void SetUp()
     {
-        SecurityOrigin* securityOrigin = 0;
-        // Empty pathBase means an in-memory database.
-        String pathBase;
         String fileIdentifier;
-        m_backingStore = IDBBackingStore::open(securityOrigin, pathBase, fileIdentifier);
+        m_backingStore = IDBBackingStore::openInMemory(fileIdentifier);
 
         // useful keys and values during tests
         const char rawValue1[] = "value1";
@@ -271,7 +267,7 @@ public:
 
     PassRefPtr<IDBBackingStore> testOpenBackingStore(PassRefPtr<SecurityOrigin> origin, const String& dataDirectory)
     {
-        return openBackingStore(origin, dataDirectory);
+        return openBackingStore(origin->databaseIdentifier(), dataDirectory);
     }
 };
 
@@ -290,14 +286,33 @@ TEST(IDBFactoryBackendTest, BackingStoreLifetime)
     EXPECT_TRUE(diskStore1->hasOneRef());
 
     RefPtr<IDBBackingStore> diskStore2 = factory->testOpenBackingStore(origin1, path);
-    EXPECT_EQ(diskStore2.get(), diskStore1.get());
-    EXPECT_EQ(diskStore2->refCount(), 2);
+    EXPECT_EQ(diskStore1.get(), diskStore2.get());
+    EXPECT_EQ(2, diskStore2->refCount());
 
     RefPtr<IDBBackingStore> diskStore3 = factory->testOpenBackingStore(origin2, path);
     EXPECT_TRUE(diskStore3->hasOneRef());
-    EXPECT_EQ(diskStore1->refCount(), 2);
+    EXPECT_EQ(2, diskStore1->refCount());
+}
+
+TEST(IDBFactoryBackendTest, MemoryBackingStoreLifetime)
+{
+    RefPtr<SecurityOrigin> origin1 = SecurityOrigin::create("http", "localhost", 81);
+    RefPtr<SecurityOrigin> origin2 = SecurityOrigin::create("http", "localhost", 82);
+
+    RefPtr<MockIDBFactoryBackend> factory = MockIDBFactoryBackend::create();
+    RefPtr<IDBBackingStore> memStore1 = factory->testOpenBackingStore(origin1, String());
+    EXPECT_EQ(2, memStore1->refCount());
+    RefPtr<IDBBackingStore> memStore2 = factory->testOpenBackingStore(origin1, String());
+    EXPECT_EQ(memStore1.get(), memStore2.get());
+    EXPECT_EQ(3, memStore2->refCount());
+
+    RefPtr<IDBBackingStore> memStore3 = factory->testOpenBackingStore(origin2, String());
+    EXPECT_EQ(2, memStore3->refCount());
+    EXPECT_EQ(3, memStore1->refCount());
+
+    factory.clear();
+    EXPECT_EQ(2, memStore1->refCount());
+    EXPECT_EQ(1, memStore3->refCount());
 }
 
 } // namespace
-
-#endif // ENABLE(INDEXED_DATABASE)

@@ -24,14 +24,12 @@
 
 #include "config.h"
 
-#include "PlatformContextSkia.h"
-
-#include "BitmapImageSingleFrameSkia.h"
-#include "GraphicsContext.h"
-#include "ImageBuffer.h"
-#include "NativeImageSkia.h"
-#include "SkCanvas.h"
 #include <gtest/gtest.h>
+#include "SkCanvas.h"
+#include "core/platform/graphics/BitmapImage.h"
+#include "core/platform/graphics/GraphicsContext.h"
+#include "core/platform/graphics/ImageBuffer.h"
+#include "core/platform/graphics/skia/NativeImageSkia.h"
 
 using namespace WebCore;
 
@@ -72,56 +70,55 @@ TEST(PlatformContextSkiaTest, trackOpaqueTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 90, 90), alpha, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(99, 13, 10, 90), opaque, ColorSpaceDeviceRGB, CompositePlusLighter);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(99, 13, 10, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceIn);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(99, 13, 10, 90), alpha, ColorSpaceDeviceRGB, CompositeSourceIn);
-    EXPECT_EQ_RECT(IntRect(10, 10, 89, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 89, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(8, 8, 3, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOut);
-    EXPECT_EQ_RECT(IntRect(11, 10, 88, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(11, 10, 88, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(30, 30, 290, 290), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(30, 30, 290, 290), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(30, 30, 290, 290), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(40, 20, 290, 50), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(30, 30, 290, 290), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(30, 30, 290, 290), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 390, 50), opaque, ColorSpaceDeviceRGB, CompositeSourceIn);
-    EXPECT_EQ_RECT(IntRect(30, 30, 290, 290), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(30, 30, 290, 290), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 390, 50), alpha, ColorSpaceDeviceRGB);
-    EXPECT_EQ_RECT(IntRect(30, 30, 290, 290), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(30, 30, 290, 290), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 390, 50), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(30, 10, 290, 310), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(30, 10, 290, 310), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueClipTest)
@@ -131,72 +128,71 @@ TEST(PlatformContextSkiaTest, trackOpaqueClipTest)
     bitmap.allocPixels();
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.clearRect(FloatRect(10, 10, 90, 90));
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     context.save();
     context.clip(FloatRect(0, 0, 10, 10));
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.restore();
 
     context.clearRect(FloatRect(10, 10, 90, 90));
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     context.save();
     context.clip(FloatRect(20, 20, 10, 10));
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.clearRect(FloatRect(10, 10, 90, 90));
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     // The intersection of the two clips becomes empty.
     context.clip(FloatRect(30, 20, 10, 10));
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.restore();
 
     context.clearRect(FloatRect(10, 10, 90, 90));
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     // The transform and the clip need to interact correctly (transform first)
     context.save();
     context.translate(10, 10);
     context.clip(FloatRect(20, 20, 10, 10));
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(30, 30, 10, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(30, 30, 10, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.restore();
 
     context.clearRect(FloatRect(10, 10, 90, 90));
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     // The transform and the clip need to interact correctly (clip first)
     context.save();
     context.clip(FloatRect(20, 20, 10, 10));
     context.translate(10, 10);
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.restore();
 
     context.clearRect(FloatRect(10, 10, 90, 90));
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     Path path;
     path.moveTo(FloatPoint(0, 0));
@@ -206,8 +202,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueClipTest)
     context.save();
     context.clipPath(path, RULE_EVENODD);
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.restore();
 
     // Another non-rectangular clip.
@@ -215,8 +211,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueClipTest)
     context.clip(IntRect(30, 30, 20, 20));
     context.clipOut(IntRect(30, 30, 10, 10));
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.restore();
 
     OwnPtr<ImageBuffer> alphaImage = ImageBuffer::create(IntSize(100, 100));
@@ -227,8 +223,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueClipTest)
     context.clipToImageBuffer(alphaImage.get(), FloatRect(30, 30, 10, 10));
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
     context.restore();
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackImageMask)
@@ -239,9 +235,8 @@ TEST(PlatformContextSkiaTest, trackImageMask)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
@@ -266,8 +261,8 @@ TEST(PlatformContextSkiaTest, trackImageMask)
     context.endTransparencyLayer();
     context.endTransparencyLayer();
 
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH_EXACT(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH_EXACT(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackImageMaskWithOpaqueRect)
@@ -278,9 +273,8 @@ TEST(PlatformContextSkiaTest, trackImageMaskWithOpaqueRect)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
@@ -308,8 +302,8 @@ TEST(PlatformContextSkiaTest, trackImageMaskWithOpaqueRect)
     context.endTransparencyLayer();
     context.endTransparencyLayer();
 
-    EXPECT_EQ_RECT(IntRect(12, 12, 3, 3), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH_EXACT(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(12, 12, 3, 3), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH_EXACT(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueJoinTest)
@@ -319,56 +313,55 @@ TEST(PlatformContextSkiaTest, trackOpaqueJoinTest)
     bitmap.allocPixels();
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
 
     context.fillRect(FloatRect(20, 20, 10, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     // Doesn't join
     context.fillRect(FloatRect(31, 20, 10, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     // Does join
     context.fillRect(FloatRect(30, 20, 10, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 20, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 20, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     // Doesn't join
     context.fillRect(FloatRect(20, 31, 20, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 20, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 20, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     // Does join
     context.fillRect(FloatRect(20, 30, 20, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 20, 20), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 20, 20), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     // Doesn't join
     context.fillRect(FloatRect(9, 20, 10, 20), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 20, 20), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 20, 20), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     // Does join
     context.fillRect(FloatRect(10, 20, 10, 20), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 20, 30, 20), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 20, 30, 20), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     // Doesn't join
     context.fillRect(FloatRect(10, 9, 30, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 20, 30, 20), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 20, 30, 20), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     // Does join
     context.fillRect(FloatRect(10, 10, 30, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 30, 30), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 30, 30), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueLineTest)
@@ -379,9 +372,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueLineTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
@@ -394,8 +386,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueLineTest)
     context.setCompositeOperation(CompositeSourceOver);
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setCompositeOperation(CompositeSourceIn);
 
@@ -403,36 +395,36 @@ TEST(PlatformContextSkiaTest, trackOpaqueLineTest)
     context.setStrokeColor(alpha, ColorSpaceDeviceRGB);
     context.drawLine(IntPoint(0, 0), IntPoint(100, 0));
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.save();
     context.setStrokeColor(opaque, ColorSpaceDeviceRGB);
     context.drawLine(IntPoint(0, 10), IntPoint(100, 10));
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.save();
     context.setStrokeColor(alpha, ColorSpaceDeviceRGB);
     context.drawLine(IntPoint(0, 10), IntPoint(100, 10));
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 13, 90, 87), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 13, 90, 87), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.save();
     context.setStrokeColor(alpha, ColorSpaceDeviceRGB);
     context.drawLine(IntPoint(0, 11), IntPoint(100, 11));
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 14, 90, 86), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 14, 90, 86), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setShouldAntialias(true);
     context.setCompositeOperation(CompositeSourceOver);
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setCompositeOperation(CompositeSourceIn);
 
@@ -440,31 +432,31 @@ TEST(PlatformContextSkiaTest, trackOpaqueLineTest)
     context.setStrokeColor(alpha, ColorSpaceDeviceRGB);
     context.drawLine(IntPoint(0, 0), IntPoint(100, 0));
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setShouldAntialias(false);
     context.save();
     context.setStrokeColor(opaque, ColorSpaceDeviceRGB);
     context.drawLine(IntPoint(0, 10), IntPoint(100, 10));
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setShouldAntialias(true);
     context.save();
     context.setStrokeColor(opaque, ColorSpaceDeviceRGB);
     context.drawLine(IntPoint(0, 10), IntPoint(100, 10));
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 13, 90, 87), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 13, 90, 87), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.save();
     context.setStrokeColor(alpha, ColorSpaceDeviceRGB);
     context.drawLine(IntPoint(0, 11), IntPoint(100, 11));
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 14, 90, 86), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 14, 90, 86), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaquePathTest)
@@ -474,16 +466,15 @@ TEST(PlatformContextSkiaTest, trackOpaquePathTest)
     bitmap.allocPixels();
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setShouldAntialias(false);
     context.setMiterLimit(1);
@@ -498,32 +489,32 @@ TEST(PlatformContextSkiaTest, trackOpaquePathTest)
     path.moveTo(FloatPoint(0, 0));
     path.addLineTo(FloatPoint(100, 0));
     context.fillPath(path);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     path.clear();
 
     context.setFillColor(opaque, ColorSpaceDeviceRGB);
     path.moveTo(FloatPoint(0, 10));
     path.addLineTo(FloatPoint(100, 13));
     context.fillPath(path);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     path.clear();
 
     context.setFillColor(alpha, ColorSpaceDeviceRGB);
     path.moveTo(FloatPoint(0, 10));
     path.addLineTo(FloatPoint(100, 13));
     context.fillPath(path);
-    EXPECT_EQ_RECT(IntRect(10, 13, 90, 87), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 13, 90, 87), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     path.clear();
 
     context.setFillColor(alpha, ColorSpaceDeviceRGB);
     path.moveTo(FloatPoint(0, 14));
     path.addLineTo(FloatPoint(100, 10));
     context.fillPath(path);
-    EXPECT_EQ_RECT(IntRect(10, 14, 90, 86), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 14, 90, 86), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     path.clear();
 }
 
@@ -534,81 +525,84 @@ TEST(PlatformContextSkiaTest, trackOpaqueImageTest)
     bitmap.allocPixels();
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
 
-    SkBitmap drawBitmap;
-    drawBitmap.setConfig(SkBitmap::kARGB_8888_Config, 10, 10);
-    drawBitmap.allocPixels();
+    SkBitmap opaqueBitmap;
+    opaqueBitmap.setConfig(SkBitmap::kARGB_8888_Config, 10, 10);
+    opaqueBitmap.allocPixels();
 
-    drawBitmap.setIsOpaque(true);
-    for (int y = 0; y < drawBitmap.height(); ++y)
-        for (int x = 0; x < drawBitmap.width(); ++x)
-            *drawBitmap.getAddr32(x, y) = 0xFFFFFFFF;
-    RefPtr<BitmapImageSingleFrameSkia> opaqueImage = BitmapImageSingleFrameSkia::create(drawBitmap, true);
+    opaqueBitmap.setIsOpaque(true);
+    for (int y = 0; y < opaqueBitmap.height(); ++y)
+        for (int x = 0; x < opaqueBitmap.width(); ++x)
+            *opaqueBitmap.getAddr32(x, y) = 0xFFFFFFFF;
+    RefPtr<BitmapImage> opaqueImage = BitmapImage::create(NativeImageSkia::create(opaqueBitmap));
     EXPECT_TRUE(opaqueImage->currentFrameKnownToBeOpaque());
 
-    drawBitmap.setIsOpaque(false);
-    for (int y = 0; y < drawBitmap.height(); ++y)
-        for (int x = 0; x < drawBitmap.width(); ++x)
-            *drawBitmap.getAddr32(x, y) = 0x00000000;
-    RefPtr<BitmapImageSingleFrameSkia> alphaImage = BitmapImageSingleFrameSkia::create(drawBitmap, true);
+    SkBitmap alphaBitmap;
+    alphaBitmap.setConfig(SkBitmap::kARGB_8888_Config, 10, 10);
+    alphaBitmap.allocPixels();
+
+    alphaBitmap.setIsOpaque(false);
+    for (int y = 0; y < alphaBitmap.height(); ++y)
+        for (int x = 0; x < alphaBitmap.width(); ++x)
+            *alphaBitmap.getAddr32(x, y) = 0x00000000;
+    RefPtr<BitmapImage> alphaImage = BitmapImage::create(NativeImageSkia::create(alphaBitmap));
     EXPECT_FALSE(alphaImage->currentFrameKnownToBeOpaque());
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.drawImage(opaqueImage.get(), ColorSpaceDeviceRGB, IntPoint(0, 0));
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.drawImage(alphaImage.get(), ColorSpaceDeviceRGB, IntPoint(0, 0));
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.drawImage(opaqueImage.get(), ColorSpaceDeviceRGB, IntPoint(5, 5));
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.drawImage(alphaImage.get(), ColorSpaceDeviceRGB, IntPoint(5, 5));
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.drawImage(opaqueImage.get(), ColorSpaceDeviceRGB, IntPoint(10, 10));
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     context.drawImage(alphaImage.get(), ColorSpaceDeviceRGB, IntPoint(10, 10));
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.drawImage(alphaImage.get(), ColorSpaceDeviceRGB, IntPoint(20, 10), CompositeSourceIn);
-    EXPECT_EQ_RECT(IntRect(10, 20, 90, 80), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 20, 90, 80), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.save();
     context.setAlpha(0.5);
     context.drawImage(opaqueImage.get(), ColorSpaceDeviceRGB, IntPoint(25, 15), CompositeSourceIn);
     context.restore();
-    EXPECT_EQ_RECT(IntRect(10, 25, 90, 75), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 25, 90, 75), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.drawImage(alphaImage.get(), ColorSpaceDeviceRGB, IntPoint(10, 20), CompositeSourceIn);
-    EXPECT_EQ_RECT(IntRect(20, 10, 80, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 10, 80, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.save();
     context.setAlpha(0.5);
     context.drawImage(opaqueImage.get(), ColorSpaceDeviceRGB, IntPoint(15, 25), CompositeSourceIn);
     context.restore();
-    EXPECT_EQ_RECT(IntRect(25, 10, 75, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(25, 10, 75, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueOvalTest)
@@ -619,23 +613,22 @@ TEST(PlatformContextSkiaTest, trackOpaqueOvalTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
 
-    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.drawEllipse(IntRect(10, 10, 90, 90));
-    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setCompositeOperation(CompositeSourceIn);
 
@@ -643,25 +636,25 @@ TEST(PlatformContextSkiaTest, trackOpaqueOvalTest)
 
     context.setFillColor(opaque, ColorSpaceDeviceRGB);
     context.drawEllipse(IntRect(10, 10, 50, 30));
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setFillColor(alpha, ColorSpaceDeviceRGB);
     context.drawEllipse(IntRect(10, 10, 30, 50));
-    EXPECT_EQ_RECT(IntRect(40, 10, 60, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(40, 10, 60, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setShouldAntialias(true);
 
     context.setFillColor(opaque, ColorSpaceDeviceRGB);
     context.drawEllipse(IntRect(10, 10, 50, 30));
-    EXPECT_EQ_RECT(IntRect(40, 41, 60, 59), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(40, 41, 60, 59), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setFillColor(alpha, ColorSpaceDeviceRGB);
     context.drawEllipse(IntRect(20, 10, 30, 50));
-    EXPECT_EQ_RECT(IntRect(51, 41, 49, 59), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(51, 41, 49, 59), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueRoundedRectTest)
@@ -672,85 +665,42 @@ TEST(PlatformContextSkiaTest, trackOpaqueRoundedRectTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
     IntSize radii(10, 10);
 
-    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRoundedRect(IntRect(10, 10, 90, 90), radii, radii, radii, radii, opaque, ColorSpaceDeviceRGB);
-    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.setCompositeOperation(CompositeSourceIn);
     context.setShouldAntialias(false);
 
     context.fillRoundedRect(IntRect(10, 10, 50, 30), radii, radii, radii, radii, opaque, ColorSpaceDeviceRGB);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRoundedRect(IntRect(10, 10, 30, 50), radii, radii, radii, radii, alpha, ColorSpaceDeviceRGB);
-    EXPECT_EQ_RECT(IntRect(40, 10, 60, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(40, 10, 60, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRoundedRect(IntRect(10, 0, 50, 30), radii, radii, radii, radii, alpha, ColorSpaceDeviceRGB);
-    EXPECT_EQ_RECT(IntRect(40, 30, 60, 70), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(40, 30, 60, 70), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRoundedRect(IntRect(30, 0, 70, 50), radii, radii, radii, radii, opaque, ColorSpaceDeviceRGB);
-    EXPECT_EQ_RECT(IntRect(40, 30, 60, 70), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
-}
-
-TEST(PlatformContextSkiaTest, trackOpaqueIRectTest)
-{
-    SkBitmap bitmap;
-    bitmap.setConfig(SkBitmap::kARGB_8888_Config, 200, 200);
-    bitmap.allocPixels();
-    bitmap.eraseColor(0);
-    SkCanvas canvas(bitmap);
-
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
-
-    Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
-    Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
-
-    SkPaint opaquePaint;
-    opaquePaint.setColor(opaque.rgb());
-    opaquePaint.setXfermodeMode(SkXfermode::kSrc_Mode);
-    SkPaint alphaPaint;
-    alphaPaint.setColor(alpha.rgb());
-    alphaPaint.setXfermodeMode(SkXfermode::kSrc_Mode);
-
-    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
-
-    platformContext.drawIRect(SkIRect::MakeXYWH(10, 10, 90, 90), opaquePaint);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
-
-    platformContext.drawIRect(SkIRect::MakeXYWH(0, 0, 100, 10), alphaPaint);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
-
-    platformContext.drawIRect(SkIRect::MakeXYWH(0, 0, 100, 20), alphaPaint);
-    EXPECT_EQ_RECT(IntRect(10, 20, 90, 80), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
-
-    platformContext.drawIRect(SkIRect::MakeXYWH(50, 0, 50, 100), alphaPaint);
-    EXPECT_EQ_RECT(IntRect(10, 20, 40, 80), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(40, 30, 60, 70), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueTextTest)
@@ -761,9 +711,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueTextTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
@@ -782,40 +731,40 @@ TEST(PlatformContextSkiaTest, trackOpaqueTextTest)
     path.lineTo(SkPoint::Make(100, 0));
 
     context.fillRect(FloatRect(50, 50, 50, 50), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawPosText("A", 1, &point, opaquePaint);
-    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawPosText("A", 1, &point, opaquePaint);
+    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawPosText("A", 1, &point, alphaPaint);
-    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
-
-    context.fillRect(FloatRect(50, 50, 50, 50), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
-
-    platformContext.drawPosTextH("A", 1, &pointX, 0, opaquePaint);
-    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
-
-    platformContext.drawPosTextH("A", 1, &pointX, 0, alphaPaint);
-    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawPosText("A", 1, &point, alphaPaint);
+    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(50, 50, 50, 50), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawTextOnPath("A", 1, path, 0, opaquePaint);
-    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawPosTextH("A", 1, &pointX, 0, opaquePaint);
+    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawTextOnPath("A", 1, path, 0, alphaPaint);
-    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawPosTextH("A", 1, &pointX, 0, alphaPaint);
+    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
+
+    context.fillRect(FloatRect(50, 50, 50, 50), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
+    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
+
+    context.drawTextOnPath("A", 1, path, 0, opaquePaint);
+    EXPECT_EQ_RECT(IntRect(50, 50, 50, 50), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
+
+    context.drawTextOnPath("A", 1, path, 0, alphaPaint);
+    EXPECT_EQ_RECT(IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueWritePixelsTest)
@@ -826,9 +775,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueWritePixelsTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
 
@@ -851,29 +799,29 @@ TEST(PlatformContextSkiaTest, trackOpaqueWritePixelsTest)
     SkPaint paint;
     paint.setXfermodeMode(SkXfermode::kSrc_Mode);
 
-    platformContext.writePixels(opaqueBitmap, 50, 50);
-    EXPECT_EQ_RECT(IntRect(50, 50, 10, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.writePixels(opaqueBitmap, 50, 50);
+    EXPECT_EQ_RECT(IntRect(50, 50, 10, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.writePixels(alphaBitmap, 10, 0);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.writePixels(alphaBitmap, 10, 0);
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.writePixels(alphaBitmap, 10, 1);
-    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.writePixels(alphaBitmap, 10, 1);
+    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.writePixels(alphaBitmap, 0, 10);
-    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.writePixels(alphaBitmap, 0, 10);
+    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.writePixels(alphaBitmap, 1, 10);
-    EXPECT_EQ_RECT(IntRect(11, 11, 89, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.writePixels(alphaBitmap, 1, 10);
+    EXPECT_EQ_RECT(IntRect(11, 11, 89, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueDrawBitmapTest)
@@ -884,9 +832,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueDrawBitmapTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
 
@@ -909,29 +856,29 @@ TEST(PlatformContextSkiaTest, trackOpaqueDrawBitmapTest)
     SkPaint paint;
     paint.setXfermodeMode(SkXfermode::kSrc_Mode);
 
-    platformContext.drawBitmap(opaqueBitmap, 10, 10, &paint);
-    EXPECT_EQ_RECT(IntRect(10, 10, 10, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmap(opaqueBitmap, 10, 10, &paint);
+    EXPECT_EQ_RECT(IntRect(10, 10, 10, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
     context.fillRect(FloatRect(10, 10, 90, 90), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawBitmap(alphaBitmap, 10, 0, &paint);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmap(alphaBitmap, 10, 0, &paint);
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawBitmap(alphaBitmap, 10, 1, &paint);
-    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmap(alphaBitmap, 10, 1, &paint);
+    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawBitmap(alphaBitmap, 0, 10, &paint);
-    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmap(alphaBitmap, 0, 10, &paint);
+    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawBitmap(alphaBitmap, 1, 10, &paint);
-    EXPECT_EQ_RECT(IntRect(11, 11, 89, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmap(alphaBitmap, 1, 10, &paint);
+    EXPECT_EQ_RECT(IntRect(11, 11, 89, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, trackOpaqueDrawBitmapRectTest)
@@ -942,9 +889,8 @@ TEST(PlatformContextSkiaTest, trackOpaqueDrawBitmapRectTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
 
@@ -967,25 +913,25 @@ TEST(PlatformContextSkiaTest, trackOpaqueDrawBitmapRectTest)
     SkPaint paint;
     paint.setXfermodeMode(SkXfermode::kSrc_Mode);
 
-    platformContext.drawBitmapRect(opaqueBitmap, 0, SkRect::MakeXYWH(10, 10, 90, 90), &paint);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmapRect(opaqueBitmap, 0, SkRect::MakeXYWH(10, 10, 90, 90), &paint);
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawBitmapRect(alphaBitmap, 0, SkRect::MakeXYWH(10, 0, 10, 10), &paint);
-    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmapRect(alphaBitmap, 0, SkRect::MakeXYWH(10, 0, 10, 10), &paint);
+    EXPECT_EQ_RECT(IntRect(10, 10, 90, 90), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawBitmapRect(alphaBitmap, 0, SkRect::MakeXYWH(10, 0, 10, 11), &paint);
-    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmapRect(alphaBitmap, 0, SkRect::MakeXYWH(10, 0, 10, 11), &paint);
+    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawBitmapRect(alphaBitmap, 0, SkRect::MakeXYWH(0, 10, 10, 10), &paint);
-    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmapRect(alphaBitmap, 0, SkRect::MakeXYWH(0, 10, 10, 10), &paint);
+    EXPECT_EQ_RECT(IntRect(10, 11, 90, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 
-    platformContext.drawBitmapRect(alphaBitmap, 0, SkRect::MakeXYWH(0, 10, 11, 10), &paint);
-    EXPECT_EQ_RECT(IntRect(11, 11, 89, 89), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    context.drawBitmapRect(alphaBitmap, 0, SkRect::MakeXYWH(0, 10, 11, 10), &paint);
+    EXPECT_EQ_RECT(IntRect(11, 11, 89, 89), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, contextTransparencyLayerTest)
@@ -996,33 +942,32 @@ TEST(PlatformContextSkiaTest, contextTransparencyLayerTest)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
     
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     
     context.fillRect(FloatRect(20, 20, 10, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 20, 10, 10), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
     
     context.clearRect(FloatRect(20, 20, 10, 10));
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     context.beginTransparencyLayer(0.5);
     context.save();
     context.fillRect(FloatRect(20, 20, 10, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
     context.restore();
     context.endTransparencyLayer();
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     context.clearRect(FloatRect(20, 20, 10, 10));
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 
     context.beginTransparencyLayer(0.5);
     context.fillRect(FloatRect(20, 20, 10, 10), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
     context.endTransparencyLayer();
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, UnboundedDrawsAreClipped)
@@ -1033,9 +978,8 @@ TEST(PlatformContextSkiaTest, UnboundedDrawsAreClipped)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1055,8 +999,8 @@ TEST(PlatformContextSkiaTest, UnboundedDrawsAreClipped)
 
     // Make the device opaque in 10,10 40x40.
     context.fillRect(FloatRect(10, 10, 40, 40), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 40, 40), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH_EXACT(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 40, 40), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH_EXACT(bitmap, context.opaqueRegion().asRect());
 
     // Clip to the left edge of the opaque area.
     context.clip(IntRect(10, 10, 10, 40));
@@ -1068,8 +1012,8 @@ TEST(PlatformContextSkiaTest, UnboundedDrawsAreClipped)
     path.addLineTo(FloatPoint(40, 40));
     context.strokePath(path);
 
-    EXPECT_EQ_RECT(IntRect(20, 10, 30, 40), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(20, 10, 30, 40), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH(bitmap, context.opaqueRegion().asRect());
 }
 
 TEST(PlatformContextSkiaTest, PreserveOpaqueOnlyMattersForFirstLayer)
@@ -1080,9 +1024,8 @@ TEST(PlatformContextSkiaTest, PreserveOpaqueOnlyMattersForFirstLayer)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    GraphicsContext context(&platformContext);
+    GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
     Color opaque(1.0f, 0.0f, 0.0f, 1.0f);
     Color alpha(0.0f, 0.0f, 0.0f, 0.0f);
@@ -1102,8 +1045,8 @@ TEST(PlatformContextSkiaTest, PreserveOpaqueOnlyMattersForFirstLayer)
 
     // Make the device opaque in 10,10 40x40.
     context.fillRect(FloatRect(10, 10, 40, 40), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
-    EXPECT_EQ_RECT(IntRect(10, 10, 40, 40), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH_EXACT(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 40, 40), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH_EXACT(bitmap, context.opaqueRegion().asRect());
 
     // Begin a layer that preserves opaque.
     context.setCompositeOperation(CompositeSourceOver);
@@ -1124,8 +1067,8 @@ TEST(PlatformContextSkiaTest, PreserveOpaqueOnlyMattersForFirstLayer)
 
     context.endTransparencyLayer();
     context.endTransparencyLayer();
-    EXPECT_EQ_RECT(IntRect(10, 10, 40, 40), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH_EXACT(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(10, 10, 40, 40), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH_EXACT(bitmap, context.opaqueRegion().asRect());
 
     // Now begin a layer that does not preserve opaque and draw through it to the device.
     context.setCompositeOperation(CompositeSourceOut);
@@ -1135,8 +1078,8 @@ TEST(PlatformContextSkiaTest, PreserveOpaqueOnlyMattersForFirstLayer)
     context.fillRect(FloatRect(10, 10, 40, 40), opaque, ColorSpaceDeviceRGB, CompositeSourceOver);
 
     context.endTransparencyLayer();
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH_EXACT(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH_EXACT(bitmap, context.opaqueRegion().asRect());
 
     // Now we draw with a path for which it cannot compute fast bounds. This should destroy the entire opaque region.
 
@@ -1150,8 +1093,8 @@ TEST(PlatformContextSkiaTest, PreserveOpaqueOnlyMattersForFirstLayer)
     context.strokePath(path);
 
     context.endTransparencyLayer();
-    EXPECT_EQ_RECT(IntRect(), platformContext.opaqueRegion().asRect());
-    EXPECT_PIXELS_MATCH_EXACT(bitmap, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(IntRect(), context.opaqueRegion().asRect());
+    EXPECT_PIXELS_MATCH_EXACT(bitmap, context.opaqueRegion().asRect());
 }
 
 } // namespace

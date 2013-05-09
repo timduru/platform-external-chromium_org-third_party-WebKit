@@ -30,23 +30,11 @@
 
 {
     'includes': [
-        'features.gypi',
+        '../../core/features.gypi',
         'WebKit.gypi',
+        '../../wtf/wtf.gypi',
+        '../../core/core.gypi',
     ],
-    'variables': {
-        'conditions': [
-            # Location of the chromium src directory and target type is different
-            # if webkit is built inside chromium or as standalone project.
-            ['inside_chromium_build==0', {
-                # Webkit is being built outside of the full chromium project.
-                # e.g. via build-webkit --chromium
-                'chromium_src_dir': '../../WebKit/chromium',
-            },{
-                # WebKit is checked out in src/chromium/third_party/WebKit
-                'chromium_src_dir': '../../../../..',
-            }],
-        ],
-    },
     'targets': [
         {
             'target_name': 'webkit_unit_tests',
@@ -56,15 +44,15 @@
             'dependencies': [
                 'WebKit.gyp:webkit',
                 '../../../Tools/DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:DumpRenderTree_resources',
-                '<(chromium_src_dir)/base/base.gyp:base',
-                '<(chromium_src_dir)/base/base.gyp:base_i18n',
-                '<(chromium_src_dir)/base/base.gyp:test_support_base',
-                '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
-                '<(chromium_src_dir)/testing/gmock.gyp:gmock',
-                '<(chromium_src_dir)/testing/gtest.gyp:gtest',
-                '<(chromium_src_dir)/third_party/zlib/zlib.gyp:zlib',
-                '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
-                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
+                '<(DEPTH)/base/base.gyp:base',
+                '<(DEPTH)/base/base.gyp:base_i18n',
+                '<(DEPTH)/base/base.gyp:test_support_base',
+                '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
+                '<(DEPTH)/testing/gmock.gyp:gmock',
+                '<(DEPTH)/testing/gtest.gyp:gtest',
+                '<(DEPTH)/third_party/zlib/zlib.gyp:zlib',
+                '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
+                '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_support',
             ],
             'sources': [
                 'tests/RunAllTests.cpp',
@@ -79,18 +67,20 @@
                 '../../Platform/chromium',
             ],
             'conditions': [
-                ['inside_chromium_build==1 and component=="shared_library"', {
+                ['component=="shared_library"', {
                     'defines': [
                         'WEBKIT_DLL_UNITTEST',
                     ],
                 }, {
                     'dependencies': [
-                        '../../WebCore/WebCore.gyp/WebCore.gyp:webcore',
+                        '../../core/core.gyp/core.gyp:webcore',
                     ],
                     'defines': [
                         'WEBKIT_IMPLEMENTATION=1',
                     ],
                     'sources': [
+                        '<@(wtf_unittest_files)',
+                        '<@(core_unittest_files)',
                         '<@(webkit_unittest_files)',
                     ],
                     'conditions': [
@@ -105,7 +95,7 @@
                         }],
                     ],
                 }],
-                ['inside_chromium_build==1 and OS=="win" and component!="shared_library"', {
+                ['OS=="win" and component!="shared_library"', {
                     'configurations': {
                         'Debug_Base': {
                             'msvs_settings': {
@@ -119,8 +109,8 @@
                 ['OS=="android" and gtest_target_type == "shared_library"', {
                     'type': 'shared_library',
                     'dependencies': [
-                        '<(chromium_src_dir)/testing/android/native_test.gyp:native_test_native_code',
-                        '<(chromium_src_dir)/tools/android/forwarder2/forwarder.gyp:forwarder2',
+                        '<(DEPTH)/testing/android/native_test.gyp:native_test_native_code',
+                        '<(DEPTH)/tools/android/forwarder2/forwarder.gyp:forwarder2',
                     ],
                 }],
                 ['OS=="mac"', {
@@ -130,14 +120,14 @@
                 }],
                 [ 'os_posix==1 and OS!="mac" and OS!="android" and OS!="ios" and linux_use_tcmalloc==1', {
                     'dependencies': [
-                        '<(chromium_src_dir)/base/allocator/allocator.gyp:allocator',
+                        '<(DEPTH)/base/allocator/allocator.gyp:allocator',
                     ],
                 }],
             ],
         }                
     ], # targets
     'conditions': [
-        ['os_posix==1 and OS!="mac" and gcc_version>=46', {
+        ['gcc_version>=46', {
             'target_defaults': {
                 # Disable warnings about c++0x compatibility, as some names (such
                 # as nullptr) conflict with upcoming c++0x types.
@@ -150,66 +140,15 @@
                 'target_name': 'webkit_unit_tests_apk',
                 'type': 'none',
                 'dependencies': [
-                    '<(chromium_src_dir)/base/base.gyp:base_java',
-                    '<(chromium_src_dir)/net/net.gyp:net_java',
+                    '<(DEPTH)/base/base.gyp:base_java',
+                    '<(DEPTH)/net/net.gyp:net_java',
                     'webkit_unit_tests',
                 ],
                 'variables': {
+                    'test_suite_name': 'webkit_unit_tests',
                     'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)webkit_unit_tests<(SHARED_LIB_SUFFIX)',
-                    'conditions': [
-                        ['inside_chromium_build==1', {
-                            'ant_build_to_chromium_src': '<(ant_build_out)/../../',
-                        }, {
-                            'ant_build_to_chromium_src': '<(ant_build_out)/../../Source/WebKit/chromium',
-                        }],
-                    ],
                 },
-                # Part of the following was copied from <(chromium_src_dir)/build/apk_test.gpyi.
-                # Not including it because gyp include doesn't support variable in path or under
-                # conditions. And we also have some different requirements.
-                'actions': [{
-                    'action_name': 'apk_webkit_unit_tests',
-                    'message': 'Building webkit_unit_tests test apk.',
-                    'inputs': [
-                        '<(chromium_src_dir)/testing/android/AndroidManifest.xml',
-                        '<(chromium_src_dir)/testing/android/generate_native_test.py',
-                        '<(input_shlib_path)',
-                        '>@(input_jars_paths)',
-                    ],
-                    'outputs': [
-                        '<(PRODUCT_DIR)/webkit_unit_tests_apk/webkit_unit_tests-debug.apk',
-                    ],
-                    'action': [
-                        '<(chromium_src_dir)/testing/android/generate_native_test.py',
-                        '--native_library',
-                        '<(input_shlib_path)',
-                        '--output',
-                        '<(PRODUCT_DIR)/webkit_unit_tests_apk',
-                        '--strip-binary=<(android_strip)',
-                        '--ant-args',
-                        '-quiet',
-                        '--ant-args',
-                        '-DANDROID_SDK=<(android_sdk)',
-                        '--ant-args',
-                        '-DANDROID_SDK_ROOT=<(android_sdk_root)',
-                        '--ant-args',
-                        '-DANDROID_SDK_TOOLS=<(android_sdk_tools)',
-                        '--ant-args',
-                        '-DANDROID_SDK_VERSION=<(android_sdk_version)',
-                        '--ant-args',
-                        '-DANDROID_TOOLCHAIN=<(android_toolchain)',
-                        '--ant-args',
-                        '-DANDROID_GDBSERVER=<(android_gdbserver)',
-                        '--ant-args',
-                        '-DPRODUCT_DIR=<(ant_build_out)',
-                        '--ant-args',
-                        '-DCHROMIUM_SRC=<(ant_build_to_chromium_src)',
-                        '--ant-args',
-                        '-DINPUT_JARS_PATHS=>@(input_jars_paths)',
-                        '--app_abi',
-                        '<(android_app_abi)',
-                    ],
-                }],
+                'includes': [ '../../../../../build/apk_test.gypi' ],
             }],
         }],
         ['clang==1', {

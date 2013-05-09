@@ -82,6 +82,7 @@ class WebWorkerRunLoop;
 struct WebFloatPoint;
 struct WebLocalizedString;
 struct WebSize;
+struct WebURLError;
 
 class Platform {
 public:

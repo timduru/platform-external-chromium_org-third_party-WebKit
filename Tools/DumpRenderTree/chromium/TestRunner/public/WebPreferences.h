@@ -63,10 +63,11 @@ struct WEBTESTRUNNER_EXPORT WebPreferences {
     bool allowRunningOfInsecureContent;
     bool authorAndUserStylesEnabled;
     WebKit::WebString defaultTextEncodingName;
-    bool developerExtrasEnabled;
     bool experimentalWebGLEnabled;
     bool experimentalCSSRegionsEnabled;
+    bool experimentalCSSExclusionsEnabled;
     bool experimentalCSSGridLayoutEnabled;
+    bool experimentalWebSocketEnabled;
     bool javaEnabled;
     bool javaScriptCanAccessClipboard;
     bool javaScriptCanOpenWindowsAutomatically;
@@ -79,8 +80,6 @@ struct WEBTESTRUNNER_EXPORT WebPreferences {
     bool shrinksStandaloneImagesToFit;
     bool textAreasAreResizable;
     WebKit::WebURL userStyleSheetLocation;
-    bool usesPageCache;
-    bool pageCacheSupportsPlugins;
     bool webSecurityEnabled;
     bool allowUniversalAccessFromFileURLs;
     WebKit::WebSettings::EditingBehavior editingBehavior;

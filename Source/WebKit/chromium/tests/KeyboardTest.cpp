@@ -33,11 +33,11 @@
 #include <gtest/gtest.h>
 
 #include "EditorClientImpl.h"
-#include "EventTarget.h"
-#include "KeyboardCodes.h"
-#include "KeyboardEvent.h"
 #include "WebInputEvent.h"
 #include "WebInputEventConversion.h"
+#include "core/dom/EventTarget.h"
+#include "core/dom/KeyboardEvent.h"
+#include "core/platform/chromium/KeyboardCodes.h"
 
 using namespace WebCore;
 using namespace WebKit;

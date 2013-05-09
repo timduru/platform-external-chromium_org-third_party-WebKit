@@ -32,20 +32,20 @@
 
 #include "WebInputEventConversion.h"
 
-#include "Frame.h"
+#include <gtest/gtest.h>
 #include "FrameTestHelpers.h"
-#include "FrameView.h"
-#include "GestureEvent.h"
-#include "KeyboardEvent.h"
-#include "MouseEvent.h"
-#include "Touch.h"
-#include "TouchEvent.h"
-#include "TouchList.h"
 #include "URLTestHelpers.h"
 #include "WebFrame.h"
 #include "WebSettings.h"
 #include "WebViewImpl.h"
-#include <gtest/gtest.h>
+#include "core/dom/GestureEvent.h"
+#include "core/dom/KeyboardEvent.h"
+#include "core/dom/MouseEvent.h"
+#include "core/dom/Touch.h"
+#include "core/dom/TouchEvent.h"
+#include "core/dom/TouchList.h"
+#include "core/page/Frame.h"
+#include "core/page/FrameView.h"
 
 using namespace WebKit;
 using namespace WebCore;
@@ -97,8 +97,6 @@ TEST(WebInputEventConversionTest, InputEventsScaling)
 
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(baseURL.c_str()), WebString::fromUTF8("fixed_layout.html"));
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(baseURL + fileName, true));
-    webViewImpl->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    webViewImpl->settings()->setApplyPageScaleFactorInCompositor(true);
     webViewImpl->enableFixedLayoutMode(true);
     webViewImpl->settings()->setViewportEnabled(true);
     int pageWidth = 640;
@@ -156,6 +154,17 @@ TEST(WebInputEventConversionTest, InputEventsScaling)
     {
         WebGestureEvent webGestureEvent;
         webGestureEvent.type = WebInputEvent::GestureTap;
+        webGestureEvent.data.tap.width = 10;
+        webGestureEvent.data.tap.height = 10;
+
+        PlatformGestureEventBuilder platformGestureBuilder(view, webGestureEvent);
+        EXPECT_EQ(5, platformGestureBuilder.area().width());
+        EXPECT_EQ(5, platformGestureBuilder.area().height());
+    }
+
+    {
+        WebGestureEvent webGestureEvent;
+        webGestureEvent.type = WebInputEvent::GestureTapUnconfirmed;
         webGestureEvent.data.tap.width = 10;
         webGestureEvent.data.tap.height = 10;
 
@@ -231,6 +240,13 @@ TEST(WebInputEventConversionTest, InputEventsScaling)
         EXPECT_EQ(10, webMouseBuilder.globalY);
         EXPECT_EQ(10, webMouseBuilder.windowX);
         EXPECT_EQ(10, webMouseBuilder.windowY);
+    }
+
+    {
+        PlatformMouseEvent platformMouseEvent(IntPoint(10, 10), IntPoint(10, 10), NoButton, PlatformEvent::MouseMoved, 1, false, false, false, false, 0);
+        RefPtr<MouseEvent> mouseEvent = MouseEvent::create(WebCore::eventNames().mousemoveEvent, domWindow, platformMouseEvent, 0, document);
+        WebMouseEventBuilder webMouseBuilder(view, docRenderer, *mouseEvent);
+        EXPECT_EQ(WebMouseEvent::ButtonNone, webMouseBuilder.button);
     }
 
     {

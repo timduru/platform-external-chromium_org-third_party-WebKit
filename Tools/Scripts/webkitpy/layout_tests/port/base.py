@@ -54,6 +54,7 @@ from webkitpy.common.system import path
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.common.system.systemhost import SystemHost
 from webkitpy.common.webkit_finder import WebKitFinder
+from webkitpy.layout_tests.layout_package.bot_test_expectations import BotTestExpectations
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port import config as port_config
 from webkitpy.layout_tests.port import driver
@@ -84,14 +85,13 @@ class Port(object):
 
     ALL_BUILD_TYPES = ('debug', 'release')
 
+    CONTENT_SHELL_NAME = 'content_shell'
+
     @classmethod
     def determine_full_port_name(cls, host, options, port_name):
         """Return a fully-specified port name that can be used to construct objects."""
         # Subclasses will usually override this.
-        options = options or {}
         assert port_name.startswith(cls.port_name)
-        if getattr(options, 'webkit_test_runner', False) and not '-wk2' in port_name:
-            return port_name + '-wk2'
         return port_name
 
     def __init__(self, host, port_name, options=None, **kwargs):
@@ -108,9 +108,6 @@ class Port(object):
         # well-formed options object that had all of the necessary
         # options defined on it.
         self._options = options or optparse.Values()
-
-        if self._name and '-wk2' in self._name:
-            self._options.webkit_test_runner = True
 
         self.host = host
         self._executive = host.executive
@@ -141,7 +138,7 @@ class Port(object):
         self._wdiff_available = None
 
         # FIXME: prettypatch.py knows this path, why is it copied here?
-        self._pretty_patch_path = self.path_from_webkit_base("Websites", "bugs.webkit.org", "PrettyPatch", "prettify.rb")
+        self._pretty_patch_path = self.path_from_webkit_base("Tools", "Scripts", "webkitruby", "PrettyPatch", "prettify.rb")
         self._pretty_patch_available = None
 
         if not hasattr(options, 'configuration') or not options.configuration:
@@ -151,7 +148,12 @@ class Port(object):
         self._results_directory = None
         self._root_was_set = hasattr(options, 'root') and options.root
 
+    def buildbot_archives_baselines(self):
+        return True
+
     def additional_drt_flag(self):
+        if self.driver_name() == self.CONTENT_SHELL_NAME:
+            return ['--dump-render-tree']
         return []
 
     def supports_per_test_timeout(self):
@@ -162,10 +164,6 @@ class Port(object):
         return False
 
     def default_timeout_ms(self):
-        if self.get_option('webkit_test_runner'):
-            # Add some more time to WebKitTestRunner because it needs to syncronise the state
-            # with the web process and we want to detect if there is a problem with that in the driver.
-            return 80 * 1000
         return 35 * 1000
 
     def driver_stop_timeout(self):
@@ -223,8 +221,6 @@ class Port(object):
         """Return a list of absolute paths to directories to search under for
         baselines. The directories are searched in order."""
         search_paths = []
-        if self.get_option('webkit_test_runner'):
-            search_paths.append(self._wk2_port_name())
         search_paths.append(self.name())
         if self.name() != self.port_name:
             search_paths.append(self.port_name)
@@ -242,7 +238,7 @@ class Port(object):
         """This routine is used to ensure that the build is up to date
         and all the needed binaries are present."""
         # If we're using a pre-built copy of WebKit (--root), we assume it also includes a build of DRT.
-        if not self._root_was_set and self.get_option('build') and not self._build_driver():
+        if not self._root_was_set and self.get_option('build'):
             return False
         if not self._check_driver():
             return False
@@ -398,8 +394,8 @@ class Port(object):
     def driver_name(self):
         if self.get_option('driver_name'):
             return self.get_option('driver_name')
-        if self.get_option('webkit_test_runner'):
-            return 'WebKitTestRunner'
+        if self.get_option('content_shell'):
+            return self.CONTENT_SHELL_NAME
         return 'DumpRenderTree'
 
     def expected_baselines_by_extension(self, test_name):
@@ -421,7 +417,7 @@ class Port(object):
 
     def baseline_extensions(self):
         """Returns a tuple of all of the non-reftest baseline extensions we use. The extensions include the leading '.'."""
-        return ('.wav', '.webarchive', '.txt', '.png')
+        return ('.wav', '.txt', '.png')
 
     def expected_baselines(self, test_name, suffix, all_baselines=False):
         """Given a test name, finds where the baseline results are located.
@@ -538,9 +534,7 @@ class Port(object):
         # baselines as a binary string, too.
         baseline_path = self.expected_filename(test_name, '.txt')
         if not self._filesystem.exists(baseline_path):
-            baseline_path = self.expected_filename(test_name, '.webarchive')
-            if not self._filesystem.exists(baseline_path):
-                return None
+            return None
         text = self._filesystem.read_binary_file(baseline_path)
         return text.replace("\r\n", "\n")
 
@@ -605,11 +599,11 @@ class Port(object):
     def _real_tests(self, paths):
         # When collecting test cases, skip these directories
         skipped_directories = set(['.svn', '_svn', 'resources', 'script-tests', 'reference', 'reftest'])
-        files = find_files.find(self._filesystem, self.layout_tests_dir(), paths, skipped_directories, Port._is_test_file, self.test_key)
+        files = find_files.find(self._filesystem, self.layout_tests_dir(), paths, skipped_directories, Port.is_test_file, self.test_key)
         return [self.relative_test_filename(f) for f in files]
 
     # When collecting test cases, we include any file with these extensions.
-    _supported_file_extensions = set(['.html', '.shtml', '.xml', '.xhtml', '.pl',
+    _supported_file_extensions = set(['.html', '.xml', '.xhtml', '.pl',
                                       '.htm', '.php', '.svg', '.mht'])
 
     @staticmethod
@@ -630,7 +624,7 @@ class Port(object):
         return extension in Port._supported_file_extensions
 
     @staticmethod
-    def _is_test_file(filesystem, dirname, filename):
+    def is_test_file(filesystem, dirname, filename):
         return Port._has_supported_extension(filesystem, filename) and not Port.is_reference_html_file(filesystem, dirname, filename)
 
     def test_key(self, test_name):
@@ -808,22 +802,6 @@ class Port(object):
     @memoized
     def path_to_generic_test_expectations_file(self):
         return self._filesystem.join(self.layout_tests_dir(), 'TestExpectations')
-
-    @memoized
-    def path_to_test_expectations_file(self):
-        """Update the test expectations to the passed-in string.
-
-        This is used by the rebaselining tool. Raises NotImplementedError
-        if the port does not use expectations files."""
-
-        # FIXME: We need to remove this when we make rebaselining work with multiple files and just generalize expectations_files().
-
-        # test_expectations are always in mac/ not mac-leopard/ by convention, hence we use port_name instead of name().
-        port_name = self.port_name
-        if port_name.startswith('chromium'):
-            port_name = 'chromium'
-
-        return self._filesystem.join(self._webkit_baseline_path(port_name), 'TestExpectations')
 
     def relative_test_filename(self, filename):
         """Returns a test_name a relative unix-style path for a filename under the LayoutTests
@@ -1043,9 +1021,8 @@ class Port(object):
         raise NotImplementedError
 
     def uses_test_expectations_file(self):
-        # This is different from checking test_expectations() is None, because
-        # some ports have Skipped files which are returned as part of test_expectations().
-        return self._filesystem.exists(self.path_to_test_expectations_file())
+        # FIXME: Remove this method.
+        return True
 
     def warn_if_bug_missing_in_test_expectations(self):
         return False
@@ -1060,6 +1037,12 @@ class Port(object):
         then any built-in expectations (e.g., from compile-time exclusions), then --additional-expectations options."""
         # FIXME: rename this to test_expectations() once all the callers are updated to know about the ordered dict.
         expectations = OrderedDict()
+
+        ignore_flaky_tests = self.get_option('ignore_flaky_tests')
+        if ignore_flaky_tests == 'very-flaky' or ignore_flaky_tests == 'maybe-flaky':
+            ignore_only_very_flaky = self.get_option('ignore_flaky_tests') == 'very-flaky'
+            full_port_name = self.determine_full_port_name(self.host, self._options, self.port_name)
+            expectations['autogenerated'] = BotTestExpectations(ignore_only_very_flaky).expectations_string(full_port_name)
 
         for path in self.expectations_files():
             if self._filesystem.exists(path):
@@ -1082,11 +1065,6 @@ class Port(object):
         non_wk2_name = self.name().replace('-wk2', '')
         if non_wk2_name != self.port_name:
             search_paths.append(non_wk2_name)
-
-        if self.get_option('webkit_test_runner'):
-            # Because nearly all of the skipped tests for WebKit 2 are due to cross-platform
-            # issues, all wk2 ports share a skipped list under platform/wk2.
-            search_paths.extend(["wk2", self._wk2_port_name()])
 
         search_paths.extend(self.get_option("additional_platform_directory", []))
 
@@ -1204,13 +1182,7 @@ class Port(object):
         """Returns the full path to the apache binary.
 
         This is needed only by ports that use the apache_http_server module."""
-        # The Apache binary path can vary depending on OS and distribution
-        # See http://wiki.apache.org/httpd/DistrosDefaultLayout
-        for path in ["/usr/sbin/httpd", "/usr/sbin/apache2"]:
-            if self._filesystem.exists(path):
-                return path
-        _log.error("Could not find apache. Not installed or unknown path.")
-        return None
+        raise NotImplementedError('Port._path_to_apache')
 
     # FIXME: This belongs on some platform abstraction instead of Port.
     def _is_redhat_based(self):
@@ -1325,7 +1297,7 @@ class Port(object):
     def _generate_all_test_configurations(self):
         """Generates a list of TestConfiguration instances, representing configurations
         for a platform across all OSes, architectures, build and graphics types."""
-        raise NotImplementedError('Port._generate_test_configurations')
+        raise NotImplementedError('Port._generate_all_test_configurations')
 
     def _driver_class(self):
         """Returns the port's driver implementation."""
@@ -1431,28 +1403,6 @@ class Port(object):
         _log.debug('Output of %s:\n%s' % (run_script_command, output))
         return output
 
-    def _build_driver(self):
-        environment = self.host.copy_current_environment()
-        environment.disable_gcc_smartquotes()
-        env = environment.to_dictionary()
-
-        # FIXME: We build both DumpRenderTree and WebKitTestRunner for
-        # WebKitTestRunner runs because DumpRenderTree still includes
-        # the DumpRenderTreeSupport module and the TestNetscapePlugin.
-        # These two projects should be factored out into their own
-        # projects.
-        try:
-            self._run_script("build-dumprendertree", args=self._build_driver_flags(), env=env)
-            if self.get_option('webkit_test_runner'):
-                self._run_script("build-webkittestrunner", args=self._build_driver_flags(), env=env)
-        except ScriptError, e:
-            _log.error(e.message_with_output(output_limit=None))
-            return False
-        return True
-
-    def _build_driver_flags(self):
-        return []
-
     def _tests_for_other_platforms(self):
         # By default we will skip any directory under LayoutTests/platform
         # that isn't in our baseline search path (this mirrors what
@@ -1513,7 +1463,6 @@ class Port(object):
         return {
             "MathMLElement": ["mathml"],
             "GraphicsLayer": ["compositing"],
-            "WebCoreHas3DRendering": ["animations/3d", "transforms/3d"],
             "WebGLShader": ["fast/canvas/webgl", "compositing/webgl", "http/tests/canvas/webgl", "webgl"],
             "MHTMLArchive": ["mhtml"],
             "CSSVariableValue": ["fast/css/variables", "inspector/styles/variables"],

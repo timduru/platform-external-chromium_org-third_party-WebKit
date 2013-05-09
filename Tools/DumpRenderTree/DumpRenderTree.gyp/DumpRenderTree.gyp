@@ -34,16 +34,6 @@
         'tools_dir': '../..',
         'source_dir': '../../../Source',
         'conditions': [
-            # Location of the chromium src directory and target type is different
-            # if webkit is built inside chromium or as standalone project.
-            ['inside_chromium_build==0', {
-                # Webkit is being built outside of the full chromium project.
-                # e.g. via build-webkit --chromium
-                'chromium_src_dir': '<(source_dir)/WebKit/chromium',
-            },{
-                # WebKit is checked out in src/chromium/third_party/WebKit
-                'chromium_src_dir': '<(tools_dir)/../../..',
-            }],
             ['OS=="linux"', {
                 'use_custom_freetype%': 1,
             }, {
@@ -53,14 +43,14 @@
     },
     'includes': [
         '../DumpRenderTree.gypi',
-        '../../../Source/WebKit/chromium/features.gypi',
+        '../../../Source/core/features.gypi',
     ],
     'targets': [
         {
             'target_name': 'ImageDiff',
             'type': 'executable',
             'dependencies': [
-                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support_gfx',
+                '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_support_gfx',
             ],
             'include_dirs': [
                 '<(DEPTH)',
@@ -81,7 +71,7 @@
         },
         {
             'target_name': 'TestRunner',
-            'type': 'static_library',
+            'type': '<(component)',
             'defines': [
                 'WEBTESTRUNNER_IMPLEMENTATION=1',
             ],
@@ -91,7 +81,7 @@
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit_test_support',
             ],
             'include_dirs': [
-                '<(chromium_src_dir)',
+                '<(DEPTH)',
                 '<(source_dir)/WebKit/chromium/public',
                 '<(DEPTH)',
                 '../chromium/TestRunner/public',
@@ -108,47 +98,42 @@
                 '<@(test_runner_files)',
             ],
             'conditions': [
-                ['inside_chromium_build == 1', {
-                    'type': '<(component)',
-                    'conditions': [
-                        ['component=="shared_library"', {
-                            'defines': [
-                                'WEBTESTRUNNER_DLL',
-                                'WEBTESTRUNNER_IMPLEMENTATION=1',
-                            ],
-                            'dependencies': [
-                                '<(chromium_src_dir)/base/base.gyp:base',
-                                '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
-                                '<(chromium_src_dir)/skia/skia.gyp:skia',
-                                '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
-                            ],
-                            'direct_dependent_settings': {
-                                'defines': [
-                                    'WEBTESTRUNNER_DLL',
-                                ],
-                            },
-                            'export_dependent_settings': [
-                                '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
-                                '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
-                            ],
-                            'msvs_settings': {
-                                'VCLinkerTool': {
-                                    'conditions': [
-                                        ['incremental_chrome_dll==1', {
-                                            'UseLibraryDependencyInputs': 'true',
-                                        }],
-                                    ],
-                                },
-                            },
-                        }],
+                ['component=="shared_library"', {
+                    'defines': [
+                        'WEBTESTRUNNER_DLL',
+                        'WEBTESTRUNNER_IMPLEMENTATION=1',
                     ],
+                    'dependencies': [
+                        '<(DEPTH)/base/base.gyp:base',
+                        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
+                        '<(DEPTH)/skia/skia.gyp:skia',
+                        '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
+                    ],
+                    'direct_dependent_settings': {
+                        'defines': [
+                            'WEBTESTRUNNER_DLL',
+                        ],
+                    },
+                    'export_dependent_settings': [
+                        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
+                        '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
+                    ],
+                    'msvs_settings': {
+                        'VCLinkerTool': {
+                            'conditions': [
+                                ['incremental_chrome_dll==1', {
+                                    'UseLibraryDependencyInputs': 'true',
+                                }],
+                            ],
+                        },
+                    },
                 }],
                 ['toolkit_uses_gtk == 1', {
                     'defines': [
                         'WTF_USE_GTK=1',
                     ],
                     'dependencies': [
-                        '<(chromium_src_dir)/build/linux/system.gyp:gtk',
+                        '<(DEPTH)/build/linux/system.gyp:gtk',
                     ],
                     'include_dirs': [
                         '<(source_dir)/WebKit/chromium/public/gtk',
@@ -201,9 +186,15 @@
                         ],
                     },
                 }],
+                # The test plugin relies on X11.
+                ['OS=="linux" and use_x11==0', {
+                    'dependencies!': [
+                        'copy_TestNetscapePlugIn',
+                    ],
+                }],
                 ['use_x11 == 1', {
                     'dependencies': [
-                        '<(chromium_src_dir)/tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
+                        '<(DEPTH)/tools/xdisplaycheck/xdisplaycheck.gyp:xdisplaycheck',
                     ],
                     'copies': [{
                         'destination': '<(PRODUCT_DIR)',
@@ -241,19 +232,19 @@
             'dependencies': [
                 'TestRunner',
                 'DumpRenderTree_resources',
-                '<(source_dir)/WebKit/chromium/WebKit.gyp:inspector_resources',
+                '<(source_dir)/devtools/devtools.gyp:devtools_frontend_resources',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit',
                 '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit_wtf_support',
-                '<(source_dir)/WTF/WTF.gyp/WTF.gyp:wtf',
-                '<(chromium_src_dir)/base/base.gyp:test_support_base',
-                '<(chromium_src_dir)/build/temp_gyp/googleurl.gyp:googleurl',
-                '<(chromium_src_dir)/third_party/icu/icu.gyp:icuuc',
-                '<(chromium_src_dir)/third_party/mesa/mesa.gyp:osmesa',
-                '<(chromium_src_dir)/v8/tools/gyp/v8.gyp:v8',
-                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_support',
+                '<(source_dir)/wtf/wtf.gyp:wtf',
+                '<(DEPTH)/base/base.gyp:test_support_base',
+                '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
+                '<(DEPTH)/third_party/icu/icu.gyp:icuuc',
+                '<(DEPTH)/third_party/mesa/mesa.gyp:osmesa',
+                '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
+                '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_support',
             ],
             'include_dirs': [
-                '<(chromium_src_dir)',
+                '<(DEPTH)',
                 '<(source_dir)/WebKit/chromium/public',
                 '<(tools_dir)/DumpRenderTree',
                 '<(DEPTH)',
@@ -276,8 +267,8 @@
                 }],
                 ['OS=="win"', {
                     'dependencies': [
-                        '<(chromium_src_dir)/third_party/angle/src/build_angle.gyp:libEGL',
-                        '<(chromium_src_dir)/third_party/angle/src/build_angle.gyp:libGLESv2',
+                        '<(DEPTH)/third_party/angle/src/build_angle.gyp:libEGL',
+                        '<(DEPTH)/third_party/angle/src/build_angle.gyp:libGLESv2',
                     ],
                     'resource_include_dirs': ['<(SHARED_INTERMEDIATE_DIR)/webkit'],
                     'sources': [
@@ -287,19 +278,15 @@
                         '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources.rc',
                         '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_strings_en-US.rc',
                     ],
-                    'conditions': [
-                        ['inside_chromium_build==1', {
-                            'configurations': {
-                                'Debug_Base': {
-                                    'msvs_settings': {
-                                        'VCLinkerTool': {
-                                            'LinkIncremental': '<(msvs_large_module_debug_link_mode)',
-                                        },
-                                    },
+                    'configurations': {
+                        'Debug_Base': {
+                            'msvs_settings': {
+                                'VCLinkerTool': {
+                                    'LinkIncremental': '<(msvs_large_module_debug_link_mode)',
                                 },
                             },
-                        }],
-                    ],
+                        },
+                    },
                 },{ # OS!="win"
                     'sources/': [
                         ['exclude', 'Win\\.cpp$'],
@@ -322,7 +309,7 @@
                 }],
                 ['use_x11 == 1', {
                     'dependencies': [
-                        '<(chromium_src_dir)/build/linux/system.gyp:fontconfig',
+                        '<(DEPTH)/build/linux/system.gyp:fontconfig',
                     ],
                     'variables': {
                         # FIXME: Enable warnings on other platforms.
@@ -331,7 +318,7 @@
                     'conditions': [
                         ['linux_use_tcmalloc == 1', {
                             'dependencies': [
-                                '<(chromium_src_dir)/base/allocator/allocator.gyp:allocator',
+                                '<(DEPTH)/base/allocator/allocator.gyp:allocator',
                             ],
                         }],
                     ],
@@ -345,7 +332,7 @@
                         'WTF_USE_GTK=1',
                     ],
                     'dependencies': [
-                        '<(chromium_src_dir)/build/linux/system.gyp:gtk',
+                        '<(DEPTH)/build/linux/system.gyp:gtk',
                     ],
                     'include_dirs': [
                         '<(source_dir)/WebKit/chromium/public/gtk',
@@ -354,10 +341,10 @@
                 ['OS=="android"', {
                     'type': 'shared_library',
                     'dependencies': [
-                        '<(chromium_src_dir)/base/base.gyp:test_support_base',
-                        '<(chromium_src_dir)/testing/android/native_test.gyp:native_test_native_code',
-                        '<(chromium_src_dir)/tools/android/forwarder/forwarder.gyp:forwarder',
-                        '<(chromium_src_dir)/tools/android/md5sum/md5sum.gyp:md5sum',
+                        '<(DEPTH)/base/base.gyp:test_support_base',
+                        '<(DEPTH)/testing/android/native_test.gyp:native_test_native_code',
+                        '<(DEPTH)/tools/android/forwarder/forwarder.gyp:forwarder',
+                        '<(DEPTH)/tools/android/md5sum/md5sum.gyp:md5sum',
                     ],
                 }, { # OS!="android"
                     'sources/': [
@@ -366,13 +353,8 @@
                 }],
                 ['use_custom_freetype==1', {
                    'dependencies': [
-                       '<(chromium_src_dir)/third_party/freetype2/freetype2.gyp:freetype2',
+                       '<(DEPTH)/third_party/freetype2/freetype2.gyp:freetype2',
                    ],
-                }],
-                ['inside_chromium_build==0', {
-                    'dependencies': [
-                        '<(chromium_src_dir)/webkit/support/setup_third_party.gyp:third_party_headers',
-                    ]
                 }],
             ],
         },
@@ -380,15 +362,15 @@
             'target_name': 'DumpRenderTree_resources',
             'type': 'none',
             'dependencies': [
-                '<(chromium_src_dir)/net/net.gyp:net_resources',
-                '<(chromium_src_dir)/ui/ui.gyp:ui_resources',
-                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_resources',
-                '<(chromium_src_dir)/webkit/support/webkit_support.gyp:webkit_strings',
+                '<(DEPTH)/net/net.gyp:net_resources',
+                '<(DEPTH)/ui/ui.gyp:ui_resources',
+                '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_resources',
+                '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_strings',
             ],
             'actions': [{
                 'action_name': 'repack_local',
                 'variables': {
-                    'repack_path': '<(chromium_src_dir)/tools/grit/grit/format/repack.py',
+                    'repack_path': '<(DEPTH)/tools/grit/grit/format/repack.py',
                     'pak_inputs': [
                         '<(SHARED_INTERMEDIATE_DIR)/net/net_resources.pak',
                         '<(SHARED_INTERMEDIATE_DIR)/ui/gfx/gfx_resources.pak',
@@ -420,10 +402,10 @@
             'type': 'loadable_module',
             'sources': [ '<@(test_plugin_files)' ],
             'dependencies': [
-                '<(chromium_src_dir)/third_party/npapi/npapi.gyp:npapi',
+                '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
             ],
             'include_dirs': [
-                '<(chromium_src_dir)',
+                '<(DEPTH)',
                 '<(tools_dir)/DumpRenderTree/TestNetscapePlugIn',
                 '<(tools_dir)/DumpRenderTree/chromium/TestNetscapePlugIn/ForwardingHeaders',
             ],
@@ -513,7 +495,7 @@
                 },
             }],
         }],
-        ['os_posix==1 and OS!="mac" and gcc_version>=46', {
+        ['gcc_version>=46', {
             'target_defaults': {
                 # Disable warnings about c++0x compatibility, as some names (such
                 # as nullptr) conflict with upcoming c++0x types.
@@ -526,67 +508,16 @@
                 'target_name': 'DumpRenderTree_apk',
                 'type': 'none',
                 'dependencies': [
-                    '<(chromium_src_dir)/base/base.gyp:base_java',
-                    '<(chromium_src_dir)/media/media.gyp:media_java',
-                    '<(chromium_src_dir)/net/net.gyp:net_java',
+                    '<(DEPTH)/base/base.gyp:base_java',
+                    '<(DEPTH)/media/media.gyp:media_java',
+                    '<(DEPTH)/net/net.gyp:net_java',
                     'DumpRenderTree',
                 ],
                 'variables': {
+                    'test_suite_name': 'DumpRenderTree',
                     'input_shlib_path': '<(SHARED_LIB_DIR)/<(SHARED_LIB_PREFIX)DumpRenderTree<(SHARED_LIB_SUFFIX)',
-                    'conditions': [
-                        ['inside_chromium_build==1', {
-                            'ant_build_to_chromium_src': '<(ant_build_out)/../../',
-                        }, {
-                            'ant_build_to_chromium_src': '<(chromium_src_dir)',
-                        }],
-                    ],
                 },
-                # Part of the following was copied from <(chromium_src_dir)/build/apk_test.gpyi.
-                # Not including it because gyp include doesn't support variable in path or under
-                # conditions. And we also have some different requirements.
-                'actions': [{
-                    'action_name': 'apk_DumpRenderTree',
-                    'message': 'Building DumpRenderTree test apk.',
-                    'inputs': [
-                        '<(chromium_src_dir)/testing/android/AndroidManifest.xml',
-                        '<(chromium_src_dir)/testing/android/generate_native_test.py',
-                        '<(input_shlib_path)',
-                        '>@(input_jars_paths)',
-                    ],
-                    'outputs': [
-                        '<(PRODUCT_DIR)/DumpRenderTree_apk/DumpRenderTree-debug.apk',
-                    ],
-                    'action': [
-                        '<(chromium_src_dir)/testing/android/generate_native_test.py',
-                        '--native_library',
-                        '<(input_shlib_path)',
-                        '--output',
-                        '<(PRODUCT_DIR)/DumpRenderTree_apk',
-                        '--strip-binary=<(android_strip)',
-                        '--ant-args',
-                        '-quiet',
-                        '--ant-args',
-                        '-DANDROID_SDK=<(android_sdk)',
-                        '--ant-args',
-                        '-DANDROID_SDK_ROOT=<(android_sdk_root)',
-                        '--ant-args',
-                        '-DANDROID_SDK_TOOLS=<(android_sdk_tools)',
-                        '--ant-args',
-                        '-DANDROID_SDK_VERSION=<(android_sdk_version)',
-                        '--ant-args',
-                        '-DANDROID_TOOLCHAIN=<(android_toolchain)',
-                        '--ant-args',
-                        '-DANDROID_GDBSERVER=<(android_gdbserver)',
-                        '--ant-args',
-                        '-DPRODUCT_DIR=<(ant_build_out)',
-                        '--ant-args',
-                        '-DCHROMIUM_SRC=<(ant_build_to_chromium_src)',
-                        '--ant-args',
-                        '-DINPUT_JARS_PATHS=>@(input_jars_paths)',
-                        '--app_abi',
-                        '<(android_app_abi)',
-                    ],
-                }],
+                'includes': [ '../../../../../build/apk_test.gypi' ],
             }],
         }],
         ['clang==1', {

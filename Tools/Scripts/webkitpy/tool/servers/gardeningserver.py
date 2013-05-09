@@ -27,6 +27,7 @@ import SocketServer
 import logging
 import json
 import os
+import re
 import sys
 import urllib
 
@@ -52,6 +53,12 @@ class GardeningHTTPServer(SocketServer.ThreadingMixIn, BaseHTTPServer.HTTPServer
 
 
 class GardeningHTTPRequestHandler(ReflectionHandler):
+    REVISION_LIMIT = 100
+    BLINK_SVN_URL = 'http://src.chromium.org/blink/trunk'
+    CHROMIUM_SVN_DEPS_URL = 'http://src.chromium.org/chrome/trunk/src/DEPS'
+    # "webkit_revision": "149598",
+    BLINK_REVISION_REGEXP = re.compile(r'^  "webkit_revision": "(?P<revision>\d+)",$', re.MULTILINE);
+
     STATIC_FILE_NAMES = frozenset()
 
     STATIC_FILE_EXTENSIONS = ('.js', '.css', '.html', '.gif', '.png', '.ico')
@@ -62,10 +69,7 @@ class GardeningHTTPRequestHandler(ReflectionHandler):
         '..',
         '..',
         '..',
-        'BuildSlaveSupport',
-        'build.webkit.org-config',
-        'public_html',
-        'TestFailures')
+        'GardeningServer')
 
     allow_cross_origin_requests = True
     debug_output = ''
@@ -79,6 +83,21 @@ class GardeningHTTPRequestHandler(ReflectionHandler):
         process.stdin.write(input_string)
         output, error = process.communicate()
         return (process.returncode, output, error)
+
+    def svnlog(self):
+        self._serve_xml(self.server.tool.executive.run_command(['svn', 'log', '--xml', '--limit', self.REVISION_LIMIT, self.BLINK_SVN_URL]))
+
+    def lastroll(self):
+        deps_contents = self.server.tool.executive.run_command(['svn', 'cat', self.CHROMIUM_SVN_DEPS_URL])
+        match = re.search(self.BLINK_REVISION_REGEXP, deps_contents)
+        if not match:
+            _log.error("Unable to produce last Blink roll revision")
+            self._serve_text("0")
+            return
+
+        revision_line = match.group()
+        revision = match.group("revision")
+        self._serve_text(revision)
 
     def rebaselineall(self):
         command = ['rebaseline-json']

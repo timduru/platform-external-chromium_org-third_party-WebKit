@@ -43,6 +43,7 @@
 #include "config.h"
 #include "EventSender.h"
 
+#include <deque>
 #include "KeyCodeMapping.h"
 #include "MockSpellCheck.h"
 #include "TestCommon.h"
@@ -51,7 +52,6 @@
 #include "WebTestDelegate.h"
 #include "WebTouchPoint.h"
 #include "WebView.h"
-#include <deque>
 #include <public/WebDragData.h>
 #include <public/WebPoint.h>
 #include <public/WebString.h>
@@ -518,6 +518,8 @@ void EventSender::mouseMoveTo(const CppArgumentList& arguments, CppVariant* resu
     } else {
         WebMouseEvent event;
         initMouseEvent(WebInputEvent::MouseMove, pressedButton, mousePos, &event, getCurrentEventTimeSec(m_delegate));
+        if (arguments.size() >= 3 && (arguments[2].isObject() || arguments[2].isString()))
+            applyKeyModifiers(&(arguments[2]), &event);
         doMouseMove(event);
     }
 }
@@ -1242,6 +1244,14 @@ void EventSender::gestureEvent(WebInputEvent::Type type, const CppArgumentList& 
         event.x = point.x;
         event.y = point.y;
         break;
+    case WebInputEvent::GestureTapUnconfirmed:
+        if (arguments.size() >= 3)
+            event.data.tap.tapCount = static_cast<float>(arguments[2].toDouble());
+        else
+          event.data.tap.tapCount = 1;
+        event.x = point.x;
+        event.y = point.y;
+        break;
     case WebInputEvent::GestureTapDown:
         event.x = point.x;
         event.y = point.y;
@@ -1286,13 +1296,18 @@ void EventSender::gestureEvent(WebInputEvent::Type type, const CppArgumentList& 
     event.globalY = event.y;
     event.timeStampSeconds = getCurrentEventTimeSec(m_delegate);
     webview()->handleInputEvent(event);
+
+    // Long press might start a drag drop session. Complete it if so.
+    if (type == WebInputEvent::GestureLongPress && !currentDragData.isNull()) {
+        WebMouseEvent mouseEvent;
+        initMouseEvent(WebInputEvent::MouseDown, pressedButton, point, &mouseEvent, getCurrentEventTimeSec(m_delegate));
+        finishDragAndDrop(mouseEvent, WebKit::WebDragOperationNone);
+    }
 }
 
-void EventSender::gestureFlingCancel(const CppArgumentList& arguments, CppVariant* result)
+void EventSender::gestureFlingCancel(const CppArgumentList&, CppVariant* result)
 {
     result->setNull();
-    if (!arguments.size())
-        return;
 
     WebGestureEvent event;
     event.type = WebInputEvent::GestureFlingCancel;

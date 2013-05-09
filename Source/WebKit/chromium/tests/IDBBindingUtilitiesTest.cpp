@@ -24,24 +24,22 @@
  */
 
 #include "config.h"
-#include "Document.h"
-#include "Frame.h"
 #include "FrameTestHelpers.h"
-#include "IDBBindingUtilities.h"
-#include "IDBKey.h"
-#include "IDBKeyPath.h"
-#include "V8Binding.h"
-#include "V8PerIsolateData.h"
-#include "V8Utilities.h"
 #include "WebFrame.h"
 #include "WebFrameImpl.h"
 #include "WebView.h"
-#include "WorldContextHandle.h"
+#include "bindings/v8/IDBBindingUtilities.h"
+#include "bindings/v8/ScriptController.h"
+#include "bindings/v8/V8Binding.h"
+#include "bindings/v8/V8PerIsolateData.h"
+#include "bindings/v8/V8Utilities.h"
+#include "core/dom/Document.h"
+#include "core/page/Frame.h"
+#include "modules/indexeddb/IDBKey.h"
+#include "modules/indexeddb/IDBKeyPath.h"
 
 #include <gtest/gtest.h>
 #include <wtf/Vector.h>
-
-#if ENABLE(INDEXED_DATABASE)
 
 using namespace WebCore;
 using namespace WebKit;
@@ -211,5 +209,3 @@ TEST_F(InjectIDBKeyTest, DISABLED_SubProperty)
 }
 
 } // namespace
-
-#endif // ENABLE(INDEXED_DATABASE)

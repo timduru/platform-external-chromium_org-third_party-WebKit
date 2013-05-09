@@ -24,10 +24,10 @@
  */
 
 #include "config.h"
-#include "LocaleMac.h"
+#include "core/platform/text/mac/LocaleMac.h"
 
-#include "DateComponents.h"
 #include <gtest/gtest.h>
+#include "core/platform/DateComponents.h"
 #include <wtf/DateMath.h>
 #include <wtf/MathExtras.h>
 #include <wtf/PassOwnPtr.h>

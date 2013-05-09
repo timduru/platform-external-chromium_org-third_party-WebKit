@@ -31,6 +31,7 @@
 #include "config.h"
 #include "TestInterfaces.h"
 
+#include <string>
 #include "AccessibilityControllerChromium.h"
 #include "EventSender.h"
 #include "GamepadController.h"
@@ -41,7 +42,6 @@
 #include "WebRuntimeFeatures.h"
 #include <public/WebString.h>
 #include <public/WebURL.h>
-#include <string>
 
 using namespace WebKit;
 using namespace std;
@@ -59,33 +59,9 @@ TestInterfaces::TestInterfaces()
 {
     WebKit::setLayoutTestMode(true);
 
-    WebRuntimeFeatures::enableDataTransferItems(true);
-    WebRuntimeFeatures::enableDeviceMotion(false);
-    WebRuntimeFeatures::enableGeolocation(true);
-    WebRuntimeFeatures::enableIndexedDatabase(true);
-    WebRuntimeFeatures::enableInputTypeDateTime(true);
-    WebRuntimeFeatures::enableInputTypeDateTimeLocal(true);
-    WebRuntimeFeatures::enableInputTypeMonth(true);
-    WebRuntimeFeatures::enableInputTypeTime(true);
-    WebRuntimeFeatures::enableInputTypeWeek(true);
-    WebRuntimeFeatures::enableFileSystem(true);
-    WebRuntimeFeatures::enableFontLoadEvents(true);
-    WebRuntimeFeatures::enableJavaScriptI18NAPI(true);
-    WebRuntimeFeatures::enableMediaSource(true);
-    WebRuntimeFeatures::enableEncryptedMedia(true);
-    WebRuntimeFeatures::enableMediaStream(true);
-    WebRuntimeFeatures::enablePeerConnection(true);
-    WebRuntimeFeatures::enableWebAudio(true);
-    WebRuntimeFeatures::enableVideoTrack(true);
-    WebRuntimeFeatures::enableGamepad(true);
-    WebRuntimeFeatures::enableShadowDOM(true);
-    WebRuntimeFeatures::enableCustomDOMElements(true);
-    WebRuntimeFeatures::enableStyleScoped(true);
-    WebRuntimeFeatures::enableScriptedSpeech(true);
-    WebRuntimeFeatures::enableRequestAutocomplete(true);
-    WebRuntimeFeatures::enableExperimentalContentSecurityPolicyFeatures(true);
-    WebRuntimeFeatures::enableSeamlessIFrames(true);
-    WebRuntimeFeatures::enableCanvasPath(true);
+    WebRuntimeFeatures::enableStableFeatures(true);
+    WebRuntimeFeatures::enableExperimentalFeatures(true);
+    WebRuntimeFeatures::enableTestOnlyFeatures(true);
 
     resetAll();
 }

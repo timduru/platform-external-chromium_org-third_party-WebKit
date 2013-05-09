@@ -109,11 +109,6 @@ def parse_args(args):
             help="Run Android layout tests on these devices."),
     ]))
 
-    option_group_definitions.append(("EFL-specific Options", [
-        optparse.make_option("--webprocess-cmd-prefix", type="string",
-            default=False, help="Prefix used when spawning the Web process (Debug mode only)"),
-    ]))
-
     option_group_definitions.append(("WebKit Options", [
         optparse.make_option("--gc-between-tests", action="store_true", default=False,
             help="Force garbage collection between each test"),
@@ -125,8 +120,6 @@ def parse_args(args):
             help="Enable Guard Malloc (Mac OS X only)"),
         optparse.make_option("--threaded", action="store_true", default=False,
             help="Run a concurrent JavaScript thread with each test"),
-        optparse.make_option("--webkit-test-runner", "-2", action="store_true",
-            help="Use WebKitTestRunner rather than DumpRenderTree."),
         # FIXME: We should merge this w/ --build-directory and only have one flag.
         optparse.make_option("--root", action="store",
             help="Path to a directory containing the executables needed to run tests."),
@@ -178,6 +171,8 @@ def parse_args(args):
                  "Specify multiple times to add multiple flags."),
         optparse.make_option("--driver-name", type="string",
             help="Alternative DumpRenderTree binary to use"),
+        optparse.make_option("--content-shell", action="store_true",
+            help="Use Content Shell instead of DumpRenderTree"),
         optparse.make_option("--additional-platform-directory", action="append",
             default=[], help="Additional directory where to look for test "
                  "baselines (will take precendence over platform baselines). "
@@ -222,6 +217,11 @@ def parse_args(args):
                  "running. (Example: --wrapper='valgrind --smc-check=all')"),
         optparse.make_option("-i", "--ignore-tests", action="append", default=[],
             help="directories or test to ignore (may specify multiple times)"),
+        optparse.make_option("--ignore-flaky-tests", action="store", default="default",
+            help=("Control whether tests that are flaky on the bots get ignored."
+                "'default' == Don't use the bot data."
+                "'very-flaky' == Ignore any tests that flaked more than once on the bot."
+                "'maybe-flaky' == Ignore any tests that flaked once on the bot.")),
         optparse.make_option("--test-list", action="append",
             help="read list of tests to run from file", metavar="FILE"),
         optparse.make_option("--skipped", action="store", default="default",

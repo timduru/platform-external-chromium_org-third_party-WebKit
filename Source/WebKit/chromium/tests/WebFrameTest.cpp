@@ -32,16 +32,8 @@
 
 #include "WebFrame.h"
 
-#include "DocumentMarkerController.h"
-#include "FloatRect.h"
-#include "Frame.h"
+#include <gtest/gtest.h>
 #include "FrameTestHelpers.h"
-#include "FrameView.h"
-#include "PlatformContextSkia.h"
-#include "Range.h"
-#include "RenderView.h"
-#include "ResourceError.h"
-#include "Settings.h"
 #include "SkBitmap.h"
 #include "SkCanvas.h"
 #include "URLTestHelpers.h"
@@ -63,13 +55,26 @@
 #include "WebTextCheckingResult.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
+#include "core/dom/DocumentMarkerController.h"
+#include "core/dom/Range.h"
+#include "core/editing/FrameSelection.h"
+#include "core/page/EventHandler.h"
+#include "core/page/Frame.h"
+#include "core/page/FrameView.h"
+#include "core/page/Settings.h"
+#include "core/platform/ScrollbarTheme.h"
+#include "core/platform/graphics/FloatRect.h"
+#include "core/platform/network/ResourceError.h"
+#include "core/rendering/HitTestResult.h"
+#include "core/rendering/RenderLayerCompositor.h"
+#include "core/rendering/RenderView.h"
 #include "v8.h"
-#include <gtest/gtest.h>
 #include <public/Platform.h>
 #include <public/WebFloatRect.h>
 #include <public/WebThread.h>
-#include <public/WebURLResponse.h>
 #include <public/WebUnitTestSupport.h>
+#include <public/WebURLResponse.h>
+#include <wtf/dtoa/utils.h>
 #include <wtf/Forward.h>
 
 using namespace WebKit;
@@ -88,6 +93,33 @@ namespace {
     EXPECT_EQ(a.y(), b.y()); \
     EXPECT_EQ(a.width(), b.width()); \
     EXPECT_EQ(a.height(), b.height());
+
+class FakeWebFrameClient : public WebFrameClient {
+    // To make the destructor public.
+};
+
+class FakeCompositingWebViewClient : public WebViewClient {
+public:
+    virtual ~FakeCompositingWebViewClient()
+    {
+    }
+
+    virtual void initializeLayerTreeView() OVERRIDE
+    {
+        m_layerTreeView = adoptPtr(Platform::current()->unitTestSupport()->createLayerTreeViewForTesting(WebUnitTestSupport::TestViewTypeUnitTest));
+        ASSERT(m_layerTreeView);
+    }
+
+    virtual WebLayerTreeView* layerTreeView() OVERRIDE
+    {
+        return m_layerTreeView.get();
+    }
+
+    FakeWebFrameClient m_fakeWebFrameClient;
+
+private:
+    OwnPtr<WebLayerTreeView> m_layerTreeView;
+};
 
 class WebFrameTest : public testing::Test {
 public:
@@ -119,9 +151,25 @@ public:
         URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_chromeURL.c_str()), WebString::fromUTF8(fileName.c_str()));
     }
 
+    void createCompositingWebView()
+    {
+        m_fakeCompositingWebViewClient = adoptPtr(new FakeCompositingWebViewClient());
+        m_webView = WebView::create(m_fakeCompositingWebViewClient.get());
+        m_webView->settings()->setJavaScriptEnabled(true);
+        m_webView->settings()->setForceCompositingMode(true);
+        m_webView->settings()->setAcceleratedCompositingEnabled(true);
+        m_webView->settings()->setAcceleratedCompositingForFixedPositionEnabled(true);
+        m_webView->settings()->setAcceleratedCompositingForOverflowScrollEnabled(true);
+        m_webView->settings()->setAcceleratedCompositingForScrollableFramesEnabled(true);
+        m_webView->settings()->setCompositedScrollingForFramesEnabled(true);
+        m_webView->settings()->setFixedPositionCreatesStackingContext(true);
+        m_webView->initializeMainFrame(&m_fakeCompositingWebViewClient->m_fakeWebFrameClient);
+    }
+
 protected:
     std::string m_baseURL;
     std::string m_chromeURL;
+    OwnPtr<FakeCompositingWebViewClient> m_fakeCompositingWebViewClient;
 
     WebView* m_webView;
 };
@@ -244,8 +292,6 @@ TEST_F(WebFrameTest, DispatchMessageEventWithOriginCheck)
     EXPECT_EQ(std::string::npos, content.find("Message 2."));
 }
 
-#if ENABLE(VIEWPORT)
-
 class FixedLayoutTestWebViewClient : public WebViewClient {
  public:
     virtual WebScreenInfo screenInfo() OVERRIDE { return m_screenInfo; }
@@ -264,8 +310,6 @@ TEST_F(WebFrameTest, FrameViewNeedsLayoutOnFixedLayoutResize)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -294,8 +338,6 @@ TEST_F(WebFrameTest, DeviceScaleFactorUsesDefaultWithoutViewportTag)
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "no_viewport_tag.html", true, 0, &client);
 
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -325,8 +367,6 @@ TEST_F(WebFrameTest, FixedLayoutInitializeAtMinimumPageScale)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -362,8 +402,6 @@ TEST_F(WebFrameTest, setInitializeAtMinimumPageScaleToFalse)
     int viewportHeight = 480;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-auto-initial-scale.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->settings()->setInitializeAtMinimumPageScale(false);
@@ -373,7 +411,70 @@ TEST_F(WebFrameTest, setInitializeAtMinimumPageScaleToFalse)
     EXPECT_EQ(1.0f, m_webView->pageScaleFactor());
 }
 
-TEST_F(WebFrameTest, PageViewportInitialScaleOverridesInitializeAtMinimumScale)
+TEST_F(WebFrameTest, SetInitializeAtMinimumPageScaleToFalseAndNoWideViewport)
+{
+    registerMockedHttpURLLoad("large-div.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "large-div.html", true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setInitializeAtMinimumPageScale(false);
+    m_webView->settings()->setUseWideViewport(false);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+    // The page must be displayed at 100% zoom, despite that it hosts a wide div element.
+    EXPECT_EQ(1.0f, m_webView->pageScaleFactor());
+}
+
+TEST_F(WebFrameTest, NoWideViewportIgnoresPageViewportWidth)
+{
+    registerMockedHttpURLLoad("viewport-auto-initial-scale.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-auto-initial-scale.html", true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setUseWideViewport(false);
+    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+    // The page sets viewport width to 3000, but with UseWideViewport == false is must be ignored.
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+    EXPECT_EQ(viewportWidth, webViewImpl->mainFrameImpl()->frameView()->contentsSize().width());
+}
+
+TEST_F(WebFrameTest, NoWideViewportIgnoresPageViewportWidthButAccountsScale)
+{
+    registerMockedHttpURLLoad("viewport-wide-2x-initial-scale.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-wide-2x-initial-scale.html", true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setUseWideViewport(false);
+    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+    // The page sets viewport width to 3000, but with UseWideViewport == false is must be ignored.
+    // While the initial scale specified by the page must be accounted.
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+    EXPECT_EQ(viewportWidth / 2, webViewImpl->mainFrameImpl()->frameView()->contentsSize().width());
+}
+
+TEST_F(WebFrameTest, WideViewportSetsTo980WithAutoWidth)
 {
     registerMockedHttpURLLoad("viewport-2x-initial-scale.html");
 
@@ -383,8 +484,27 @@ TEST_F(WebFrameTest, PageViewportInitialScaleOverridesInitializeAtMinimumScale)
     int viewportHeight = 480;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-2x-initial-scale.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    // This behavior is for compatibility with Android WebView, so it is only
+    // activated when support for target-densityDpi is enabled.
+    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+    EXPECT_EQ(980, webViewImpl->mainFrameImpl()->frameView()->contentsSize().width());
+}
+
+TEST_F(WebFrameTest, PageViewportInitialScaleOverridesInitializeAtMinimumScale)
+{
+    registerMockedHttpURLLoad("viewport-wide-2x-initial-scale.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-wide-2x-initial-scale.html", true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->settings()->setInitializeAtMinimumPageScale(false);
@@ -403,8 +523,6 @@ TEST_F(WebFrameTest, setInitialPageScaleFactorPermanently)
     float enforcedPageScalePactor = 2.0f;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->setInitialPageScaleOverride(enforcedPageScalePactor);
 
     EXPECT_EQ(enforcedPageScalePactor, m_webView->pageScaleFactor());
@@ -440,8 +558,6 @@ TEST_F(WebFrameTest, PermanentInitialPageScaleFactorOverridesInitializeAtMinimum
     float enforcedPageScalePactor = 0.5f;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-auto-initial-scale.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->settings()->setInitializeAtMinimumPageScale(false);
@@ -453,7 +569,7 @@ TEST_F(WebFrameTest, PermanentInitialPageScaleFactorOverridesInitializeAtMinimum
 
 TEST_F(WebFrameTest, PermanentInitialPageScaleFactorOverridesPageViewportInitialScale)
 {
-    registerMockedHttpURLLoad("viewport-2x-initial-scale.html");
+    registerMockedHttpURLLoad("viewport-wide-2x-initial-scale.html");
 
     FixedLayoutTestWebViewClient client;
     client.m_screenInfo.deviceScaleFactor = 1;
@@ -461,9 +577,7 @@ TEST_F(WebFrameTest, PermanentInitialPageScaleFactorOverridesPageViewportInitial
     int viewportHeight = 480;
     float enforcedPageScalePactor = 0.5f;
 
-    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-2x-initial-scale.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-wide-2x-initial-scale.html", true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->setInitialPageScaleOverride(enforcedPageScalePactor);
@@ -494,12 +608,11 @@ TEST_F(WebFrameTest, setPageScaleFactorDoesNotLayout)
 
     FixedLayoutTestWebViewClient client;
     client.m_screenInfo.deviceScaleFactor = 1;
-    int viewportWidth = 640;
-    int viewportHeight = 480;
+    // Small viewport to ensure there are always scrollbars.
+    int viewportWidth = 64;
+    int viewportHeight = 48;
 
     m_webView = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client));
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -512,6 +625,49 @@ TEST_F(WebFrameTest, setPageScaleFactorDoesNotLayout)
     EXPECT_EQ(prevLayoutCount, webViewImpl->mainFrameImpl()->frameView()->layoutCount());
 }
 
+TEST_F(WebFrameTest, setPageScaleFactorWithOverlayScrollbarsDoesNotLayout)
+{
+    WebCore::Settings::setMockScrollbarsEnabled(true);
+    WebCore::Settings::setUsesOverlayScrollbars(true);
+    EXPECT_TRUE(WebCore::ScrollbarTheme::theme()->usesOverlayScrollbars());
+
+    registerMockedHttpURLLoad("fixed_layout.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client));
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+    m_webView->layout();
+
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+    int prevLayoutCount = webViewImpl->mainFrameImpl()->frameView()->layoutCount();
+    webViewImpl->setPageScaleFactor(30, WebPoint());
+    EXPECT_FALSE(webViewImpl->mainFrameImpl()->frameView()->needsLayout());
+    EXPECT_EQ(prevLayoutCount, webViewImpl->mainFrameImpl()->frameView()->layoutCount());
+
+    WebCore::Settings::setMockScrollbarsEnabled(false);
+    WebCore::Settings::setUsesOverlayScrollbars(false);
+}
+
+TEST_F(WebFrameTest, setPageScaleFactorBeforeFrameHasView)
+{
+    registerMockedHttpURLLoad("fixed_layout.html");
+
+    float pageScaleFactor = 3;
+    m_webView = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad("about:html", true, 0, 0));
+    m_webView->setPageScaleFactor(pageScaleFactor, WebPoint());
+
+    FrameTestHelpers::loadFrame(m_webView->mainFrame(), m_baseURL + "fixed_layout.html");
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    WebCore::FrameView* view = static_cast<WebViewImpl*>(m_webView)->mainFrameImpl()->frameView();
+    EXPECT_EQ(pageScaleFactor, view->visibleContentScaleFactor());
+}
+
 TEST_F(WebFrameTest, pageScaleFactorWrittenToHistoryItem)
 {
     registerMockedHttpURLLoad("fixed_layout.html");
@@ -522,8 +678,6 @@ TEST_F(WebFrameTest, pageScaleFactorWrittenToHistoryItem)
     int viewportHeight = 480;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -543,20 +697,19 @@ TEST_F(WebFrameTest, pageScaleFactorShrinksViewport)
 
     FixedLayoutTestWebViewClient client;
     client.m_screenInfo.deviceScaleFactor = 1;
-    int viewportWidth = 640;
-    int viewportHeight = 480;
+    // Small viewport to ensure there are always scrollbars.
+    int viewportWidth = 64;
+    int viewportHeight = 48;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
     m_webView->layout();
 
     WebCore::FrameView* view = static_cast<WebViewImpl*>(m_webView)->mainFrameImpl()->frameView();
-    int viewportWidthMinusScrollbar = 640 - (view->verticalScrollbar()->isOverlayScrollbar() ? 0 : 15);
-    int viewportHeightMinusScrollbar = 480 - (view->horizontalScrollbar()->isOverlayScrollbar() ? 0 : 15);
+    int viewportWidthMinusScrollbar = viewportWidth - (view->verticalScrollbar()->isOverlayScrollbar() ? 0 : 15);
+    int viewportHeightMinusScrollbar = viewportHeight - (view->horizontalScrollbar()->isOverlayScrollbar() ? 0 : 15);
 
     m_webView->setPageScaleFactor(2, WebPoint());
 
@@ -583,8 +736,6 @@ TEST_F(WebFrameTest, pageScaleFactorDoesNotApplyCssTransform)
     int viewportHeight = 480;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -593,11 +744,171 @@ TEST_F(WebFrameTest, pageScaleFactorDoesNotApplyCssTransform)
     m_webView->setPageScaleFactor(2, WebPoint());
 
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
-    EXPECT_EQ(1, webViewImpl->page()->mainFrame()->frameScaleFactor());
     EXPECT_EQ(980, webViewImpl->page()->mainFrame()->contentRenderer()->unscaledDocumentRect().width());
     EXPECT_EQ(980, webViewImpl->mainFrameImpl()->frameView()->contentsSize().width());
 }
-#endif
+
+TEST_F(WebFrameTest, targetDensityDpiHigh)
+{
+    registerMockedHttpURLLoad("viewport-target-densitydpi-high.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 4.0f / 3.0f;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-target-densitydpi-high.html", true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+    // high-dpi = 240, device-dpi = 160
+    EXPECT_NEAR(viewportWidth * (240.0f / 160.0f), m_webView->fixedLayoutSize().width, 1.0f);
+    EXPECT_NEAR(viewportHeight * (240.0f / 160.0f), m_webView->fixedLayoutSize().height, 1.0f);
+    EXPECT_NEAR(160.0f / 240.0f, m_webView->pageScaleFactor(), 0.01f);
+}
+
+TEST_F(WebFrameTest, targetDensityDpiDevice)
+{
+    registerMockedHttpURLLoad("viewport-target-densitydpi-device.html");
+
+    float deviceScaleFactors[] = { 1.0f, 4.0f / 3.0f, 2.0f };
+
+    FixedLayoutTestWebViewClient client;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    for (size_t i = 0; i < ARRAY_SIZE(deviceScaleFactors); ++i) {
+        client.m_screenInfo.deviceScaleFactor = deviceScaleFactors[i];
+
+        m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-target-densitydpi-device.html", true, 0, &client);
+        m_webView->enableFixedLayoutMode(true);
+        m_webView->settings()->setViewportEnabled(true);
+        m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
+        m_webView->resize(WebSize(viewportWidth, viewportHeight));
+
+        EXPECT_NEAR(viewportWidth * client.m_screenInfo.deviceScaleFactor, m_webView->fixedLayoutSize().width, 1.0f);
+        EXPECT_NEAR(viewportHeight * client.m_screenInfo.deviceScaleFactor, m_webView->fixedLayoutSize().height, 1.0f);
+        EXPECT_NEAR(1.0f / client.m_screenInfo.deviceScaleFactor, m_webView->pageScaleFactor(), 0.01f);
+
+        m_webView->close();
+        m_webView = 0;
+    }
+}
+
+class WebFrameResizeTest : public WebFrameTest {
+protected:
+
+    static WebCore::FloatSize computeRelativeOffset(const WebCore::IntPoint& absoluteOffset, const WebCore::LayoutRect& rect)
+    {
+        WebCore::FloatSize relativeOffset = WebCore::FloatPoint(absoluteOffset) - rect.location();
+        relativeOffset.scale(1.f / rect.width(), 1.f / rect.height());
+        return relativeOffset;
+    }
+
+    void testResizeYieldsCorrectScrollAndScale(const char* url,
+                                               const float initialPageScaleFactor,
+                                               const WebSize scrollOffset,
+                                               const WebSize viewportSize,
+                                               const bool shouldScaleRelativeToViewportWidth) {
+        registerMockedHttpURLLoad(url);
+
+        const float aspectRatio = static_cast<float>(viewportSize.width) / viewportSize.height;
+
+        m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + url, true);
+        m_webView->settings()->setViewportEnabled(true);
+        m_webView->enableFixedLayoutMode(true);
+        WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+
+        // Origin scrollOffsets preserved under resize.
+        {
+            webViewImpl->resize(WebSize(viewportSize.width, viewportSize.height));
+            m_webView->setPageScaleFactor(initialPageScaleFactor, WebPoint());
+            webViewImpl->resize(WebSize(viewportSize.height, viewportSize.width));
+            float expectedPageScaleFactor = initialPageScaleFactor * (shouldScaleRelativeToViewportWidth ? 1 / aspectRatio : 1);
+            EXPECT_NEAR(expectedPageScaleFactor, webViewImpl->pageScaleFactor(), 0.05f);
+            EXPECT_EQ(WebSize(), webViewImpl->mainFrame()->scrollOffset());
+        }
+
+        // Resizing just the height should not affect pageScaleFactor.
+        {
+            webViewImpl->resize(WebSize(viewportSize.width, viewportSize.height));
+            m_webView->setPageScaleFactor(initialPageScaleFactor, WebPoint());
+            webViewImpl->mainFrame()->setScrollOffset(WebSize(0, 10));
+            webViewImpl->resize(WebSize(viewportSize.width, viewportSize.height * 1.25f));
+            EXPECT_EQ(initialPageScaleFactor, webViewImpl->pageScaleFactor());
+            webViewImpl->resize(WebSize(viewportSize.width, viewportSize.height * .8f));
+            EXPECT_EQ(initialPageScaleFactor, webViewImpl->pageScaleFactor());
+        }
+
+        // Generic resize preserves scrollOffset relative to anchor node located
+        // the top center of the screen.
+        {
+            webViewImpl->resize(WebSize(viewportSize.height, viewportSize.width));
+            float pageScaleFactor = webViewImpl->pageScaleFactor();
+            webViewImpl->resize(WebSize(viewportSize.width, viewportSize.height));
+            float expectedPageScaleFactor = pageScaleFactor * (shouldScaleRelativeToViewportWidth ? aspectRatio : 1);
+            EXPECT_NEAR(expectedPageScaleFactor, webViewImpl->pageScaleFactor(), 0.05f);
+            webViewImpl->mainFrame()->setScrollOffset(scrollOffset);
+
+            WebCore::IntPoint anchorPoint = WebCore::IntPoint(scrollOffset) + WebCore::IntPoint(viewportSize.width / 2, 0);
+            RefPtr<WebCore::Node> anchorNode = webViewImpl->mainFrameImpl()->frame()->eventHandler()->hitTestResultAtPoint(anchorPoint).innerNode();
+            ASSERT(anchorNode);
+
+            pageScaleFactor = webViewImpl->pageScaleFactor();
+            const WebCore::FloatSize preResizeRelativeOffset
+                = computeRelativeOffset(anchorPoint, anchorNode->boundingBox());
+            webViewImpl->resize(WebSize(viewportSize.height, viewportSize.width));
+            WebCore::IntPoint newAnchorPoint = WebCore::IntPoint(webViewImpl->mainFrame()->scrollOffset()) + WebCore::IntPoint(viewportSize.height / 2, 0);
+            const WebCore::FloatSize postResizeRelativeOffset
+                = computeRelativeOffset(newAnchorPoint, anchorNode->boundingBox());
+            EXPECT_NEAR(preResizeRelativeOffset.width(), postResizeRelativeOffset.width(), 0.15f);
+            expectedPageScaleFactor = pageScaleFactor * (shouldScaleRelativeToViewportWidth ? 1 / aspectRatio : 1);
+            EXPECT_NEAR(expectedPageScaleFactor, webViewImpl->pageScaleFactor(), 0.05f);
+        }
+    }
+};
+
+TEST_F(WebFrameResizeTest, ResizeYieldsCorrectScrollAndScaleForWidthEqualsDeviceWidth)
+{
+    // With width=device-width, pageScaleFactor is preserved across resizes as
+    // long as the content adjusts according to the device-width.
+    const char* url = "resize_scroll_mobile.html";
+    const float initialPageScaleFactor = 1;
+    const WebSize scrollOffset(0, 200);
+    const WebSize viewportSize(120, 160);
+    const bool shouldScaleRelativeToViewportWidth = true;
+
+    testResizeYieldsCorrectScrollAndScale(
+        url, initialPageScaleFactor, scrollOffset, viewportSize, shouldScaleRelativeToViewportWidth);
+}
+
+TEST_F(WebFrameResizeTest, ResizeYieldsCorrectScrollAndScaleForFixedWidth)
+{
+    // With a fixed width, pageScaleFactor scales by the relative change in viewport width.
+    const char* url = "resize_scroll_fixed_width.html";
+    const float initialPageScaleFactor = 2;
+    const WebSize scrollOffset(0, 200);
+    const WebSize viewportSize(240, 320);
+    const bool shouldScaleRelativeToViewportWidth = true;
+
+    testResizeYieldsCorrectScrollAndScale(
+        url, initialPageScaleFactor, scrollOffset, viewportSize, shouldScaleRelativeToViewportWidth);
+}
+
+TEST_F(WebFrameResizeTest, ResizeYieldsCorrectScrollAndScaleForFixedLayout)
+{
+    // With a fixed layout, pageScaleFactor scales by the relative change in viewport width.
+    const char* url = "resize_scroll_fixed_layout.html";
+    const float initialPageScaleFactor = 2;
+    const WebSize scrollOffset(200, 400);
+    const WebSize viewportSize(320, 240);
+    const bool shouldScaleRelativeToViewportWidth = true;
+
+    testResizeYieldsCorrectScrollAndScale(
+        url, initialPageScaleFactor, scrollOffset, viewportSize, shouldScaleRelativeToViewportWidth);
+}
 
 TEST_F(WebFrameTest, pageScaleFactorScalesPaintClip)
 {
@@ -609,8 +920,6 @@ TEST_F(WebFrameTest, pageScaleFactorScalesPaintClip)
     int viewportHeight = 50;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -626,11 +935,10 @@ TEST_F(WebFrameTest, pageScaleFactorScalesPaintClip)
     bitmap.eraseColor(0);
     SkCanvas canvas(bitmap);
 
-    WebCore::PlatformContextSkia platformContext(&canvas);
-    platformContext.setTrackOpaqueRegion(true);
-    WebCore::GraphicsContext context(&platformContext);
+    WebCore::GraphicsContext context(&canvas);
+    context.setTrackOpaqueRegion(true);
 
-    EXPECT_EQ_RECT(WebCore::IntRect(0, 0, 0, 0), platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(WebCore::IntRect(0, 0, 0, 0), context.opaqueRegion().asRect());
 
     WebCore::FrameView* view = static_cast<WebViewImpl*>(m_webView)->mainFrameImpl()->frameView();
     WebCore::IntRect paintRect(0, 0, 200, 200);
@@ -639,7 +947,32 @@ TEST_F(WebFrameTest, pageScaleFactorScalesPaintClip)
     int viewportWidthMinusScrollbar = 50 - (view->verticalScrollbar()->isOverlayScrollbar() ? 0 : 15);
     int viewportHeightMinusScrollbar = 50 - (view->horizontalScrollbar()->isOverlayScrollbar() ? 0 : 15);
     WebCore::IntRect clippedRect(0, 0, viewportWidthMinusScrollbar * 2, viewportHeightMinusScrollbar * 2);
-    EXPECT_EQ_RECT(clippedRect, platformContext.opaqueRegion().asRect());
+    EXPECT_EQ_RECT(clippedRect, context.opaqueRegion().asRect());
+}
+
+TEST_F(WebFrameTest, pageScaleFactorUpdatesScrollbars)
+{
+    registerMockedHttpURLLoad("fixed_layout.html");
+
+    FixedLayoutTestWebViewClient client;
+    client.m_screenInfo.deviceScaleFactor = 1;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+    m_webView->layout();
+
+    WebCore::FrameView* view = static_cast<WebViewImpl*>(m_webView)->mainFrameImpl()->frameView();
+    EXPECT_EQ(view->scrollSize(WebCore::HorizontalScrollbar), view->contentsSize().width() - view->visibleContentRect().width());
+    EXPECT_EQ(view->scrollSize(WebCore::VerticalScrollbar), view->contentsSize().height() - view->visibleContentRect().height());
+
+    m_webView->setPageScaleFactor(10, WebPoint());
+
+    EXPECT_EQ(view->scrollSize(WebCore::HorizontalScrollbar), view->contentsSize().width() - view->visibleContentRect().width());
+    EXPECT_EQ(view->scrollSize(WebCore::VerticalScrollbar), view->contentsSize().height() - view->visibleContentRect().height());
 }
 
 TEST_F(WebFrameTest, CanOverrideMaximumScaleFactor)
@@ -652,8 +985,6 @@ TEST_F(WebFrameTest, CanOverrideMaximumScaleFactor)
     int viewportHeight = 480;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "no_scale_for_you.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -666,7 +997,33 @@ TEST_F(WebFrameTest, CanOverrideMaximumScaleFactor)
     EXPECT_EQ(4.0f, m_webView->maximumPageScaleFactor());
 }
 
-#if ENABLE(GESTURE_EVENTS)
+TEST_F(WebFrameTest, updateOverlayScrollbarLayers)
+{
+    WebCore::Settings::setMockScrollbarsEnabled(true);
+    WebCore::Settings::setUsesOverlayScrollbars(true);
+    EXPECT_TRUE(WebCore::ScrollbarTheme::theme()->usesOverlayScrollbars());
+
+    registerMockedHttpURLLoad("large-div.html");
+
+    int viewWidth = 500;
+    int viewHeight = 500;
+
+    createCompositingWebView();
+    m_webView->resize(WebSize(viewWidth, viewHeight));
+    FrameTestHelpers::loadFrame(m_webView->mainFrame(), m_baseURL + "large-div.html");
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    m_webView->layout();
+
+    WebCore::FrameView* view = static_cast<WebViewImpl*>(m_webView)->mainFrameImpl()->frameView();
+    EXPECT_TRUE(view->renderView()->compositor()->layerForHorizontalScrollbar());
+    EXPECT_TRUE(view->renderView()->compositor()->layerForVerticalScrollbar());
+
+    m_webView->resize(WebSize(viewWidth * 10, viewHeight * 10));
+    m_webView->layout();
+    EXPECT_FALSE(view->renderView()->compositor()->layerForHorizontalScrollbar());
+    EXPECT_FALSE(view->renderView()->compositor()->layerForVerticalScrollbar());
+}
+
 void setScaleAndScrollAndLayout(WebKit::WebView* webView, WebPoint scroll, float scale)
 {
     webView->setPageScaleFactor(scale, WebPoint(scroll.x, scroll.y));
@@ -681,8 +1038,6 @@ TEST_F(WebFrameTest, DivAutoZoomParamsTest)
     int viewportWidth = 640 / deviceScaleFactor;
     int viewportHeight = 1280 / deviceScaleFactor;
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_scale_for_auto_zoom_into_div_test.html"); //
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->setDeviceScaleFactor(deviceScaleFactor);
     m_webView->setPageScaleFactorLimits(0.01f, 4);
     m_webView->setPageScaleFactor(0.5f, WebPoint(0, 0));
@@ -750,8 +1105,6 @@ TEST_F(WebFrameTest, DivAutoZoomMultipleDivsTest)
     int viewportHeight = 1280 / deviceScaleFactor;
     float doubleTapZoomAlreadyLegibleRatio = 1.2f;
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_multiple_divs_for_auto_zoom_test.html");
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
     m_webView->setPageScaleFactorLimits(0.5f, 4);
@@ -801,8 +1154,6 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest)
     int viewportHeight = 480;
     float doubleTapZoomAlreadyLegibleRatio = 1.2f;
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_scale_bounds_check_for_auto_zoom_test.html");
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
     m_webView->setDeviceScaleFactor(1.5f);
@@ -857,7 +1208,6 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest)
     EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
 }
 
-#if ENABLE(TEXT_AUTOSIZING)
 TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest)
 {
     registerMockedHttpURLLoad("get_scale_bounds_check_for_auto_zoom_test.html");
@@ -867,8 +1217,6 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest)
     float doubleTapZoomAlreadyLegibleRatio = 1.2f;
     float textAutosizingFontScaleFactor = 1.13f;
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_scale_bounds_check_for_auto_zoom_test.html");
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
     m_webView->layout();
@@ -937,7 +1285,6 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest)
     simulateDoubleTap(webViewImpl, doubleTapPoint, scale);
     EXPECT_FLOAT_EQ(legibleScale, scale);
 }
-#endif
 
 TEST_F(WebFrameTest, DivScrollIntoEditableTest)
 {
@@ -949,8 +1296,6 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
     int caretPadding = 10;
     float minReadableCaretHeight = 18.0f;
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_scale_for_zoom_into_editable_test.html");
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->enableFixedLayoutMode(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
     m_webView->setPageScaleFactorLimits(1, 4);
@@ -1020,13 +1365,10 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
     EXPECT_FALSE(needAnimation);
 }
 
-#endif
-
 class TestReloadDoesntRedirectWebFrameClient : public WebFrameClient {
 public:
     virtual WebNavigationPolicy decidePolicyForNavigation(
         WebFrame*, const WebURLRequest&, WebNavigationType,
-        const WebNode& originatingNode,
         WebNavigationPolicy defaultPolicy, bool isRedirect)
     {
         EXPECT_FALSE(isRedirect);
@@ -1140,7 +1482,7 @@ public:
     public:
         Notification(WebFrame* frame, v8::Handle<v8::Context> context, int worldId)
             : frame(frame)
-            , context(v8::Persistent<v8::Context>::New(context->GetIsolate(), context))
+            , context(context->GetIsolate(), context)
             , worldId(worldId)
         {
         }
@@ -2073,8 +2415,6 @@ TEST_F(WebFrameTest, DisambiguationPopup)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + htmlFile, true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->resize(WebSize(1000, 1000));
     m_webView->layout();
 
@@ -2122,8 +2462,6 @@ TEST_F(WebFrameTest, DisambiguationPopupNoContainer)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "disambiguation_popup_no_container.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->resize(WebSize(1000, 1000));
     m_webView->layout();
 
@@ -2145,8 +2483,6 @@ TEST_F(WebFrameTest, DisambiguationPopupMobileSite)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + htmlFile, true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->resize(WebSize(1000, 1000));
     m_webView->layout();
 
@@ -2187,8 +2523,6 @@ TEST_F(WebFrameTest, DisambiguationPopupBlacklist)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + htmlFile, true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
     m_webView->layout();
 
@@ -2220,8 +2554,6 @@ TEST_F(WebFrameTest, DisambiguationPopupPageScale)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "disambiguation_popup_page_scale.html", true, 0, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->resize(WebSize(1000, 1000));
     m_webView->layout();
 
@@ -2374,31 +2706,27 @@ TEST_F(WebFrameTest, MoveCaretSelectionTowardsWindowPointWithNoSelection)
 
 class SpellCheckClient : public WebSpellCheckClient {
 public:
-    SpellCheckClient() : m_numberOfTimesChecked(0) { }
+    explicit SpellCheckClient(uint32_t hash = 0) : m_numberOfTimesChecked(0), m_hash(hash) { }
     virtual ~SpellCheckClient() { }
-    virtual void requestCheckingOfText(const WebKit::WebString&, WebKit::WebTextCheckingCompletion* completion) OVERRIDE
+    virtual void requestCheckingOfText(const WebKit::WebString&, const WebKit::WebVector<uint32_t>&, const WebKit::WebVector<unsigned>&, WebKit::WebTextCheckingCompletion* completion) OVERRIDE
     {
         ++m_numberOfTimesChecked;
         Vector<WebTextCheckingResult> results;
         const int misspellingStartOffset = 1;
         const int misspellingLength = 8;
-        results.append(WebTextCheckingResult(WebTextCheckingTypeSpelling, misspellingStartOffset, misspellingLength, WebString()));
+        results.append(WebTextCheckingResult(WebTextCheckingTypeSpelling, misspellingStartOffset, misspellingLength, WebString(), m_hash));
         completion->didFinishCheckingText(results);
     }
     int numberOfTimesChecked() const { return m_numberOfTimesChecked; }
 private:
     int m_numberOfTimesChecked;
+    uint32_t m_hash;
 };
 
-#if OS(ANDROID)
-// Crashes on Android. http://webkit.org/b/109548
-#define MAYBE_ReplaceMisspelledRange DISABLED_ReplaceMisspelledRange
-#else
-#define MAYBE_ReplaceMisspelledRange ReplaceMisspelledRange
-#endif
-TEST_F(WebFrameTest, MAYBE_ReplaceMisspelledRange)
+TEST_F(WebFrameTest, ReplaceMisspelledRange)
 {
-    m_webView = FrameTestHelpers::createWebViewAndLoad("data:text/html,<div id=\"data\" contentEditable></div>");
+    registerMockedHttpURLLoad("spell.html");
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "spell.html");
     SpellCheckClient spellcheck;
     m_webView->setSpellCheckClient(&spellcheck);
 
@@ -2406,9 +2734,9 @@ TEST_F(WebFrameTest, MAYBE_ReplaceMisspelledRange)
     Document* document = frame->frame()->document();
     Element* element = document->getElementById("data");
 
-    frame->frame()->settings()->setAsynchronousSpellCheckingEnabled(true);
-    frame->frame()->settings()->setUnifiedTextCheckerEnabled(true);
-    frame->frame()->settings()->setEditingBehaviorType(WebCore::EditingWindowsBehavior);
+    m_webView->settings()->setAsynchronousSpellCheckingEnabled(true);
+    m_webView->settings()->setUnifiedTextCheckerEnabled(true);
+    m_webView->settings()->setEditingBehavior(WebSettings::EditingBehaviorWin);
 
     element->focus();
     document->execCommand("InsertText", false, "_wellcome_.");
@@ -2423,6 +2751,65 @@ TEST_F(WebFrameTest, MAYBE_ReplaceMisspelledRange)
 
     frame->replaceMisspelledRange("welcome");
     EXPECT_EQ("_welcome_.", std::string(frame->contentAsText(std::numeric_limits<size_t>::max()).utf8().data()));
+
+    m_webView->close();
+    m_webView = 0;
+}
+
+TEST_F(WebFrameTest, RemoveSpellingMarkers)
+{
+    registerMockedHttpURLLoad("spell.html");
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "spell.html");
+    SpellCheckClient spellcheck;
+    m_webView->setSpellCheckClient(&spellcheck);
+
+    WebFrameImpl* frame = static_cast<WebFrameImpl*>(m_webView->mainFrame());
+    Document* document = frame->frame()->document();
+    Element* element = document->getElementById("data");
+
+    m_webView->settings()->setAsynchronousSpellCheckingEnabled(true);
+    m_webView->settings()->setUnifiedTextCheckerEnabled(true);
+    m_webView->settings()->setEditingBehavior(WebSettings::EditingBehaviorWin);
+
+    element->focus();
+    document->execCommand("InsertText", false, "_wellcome_.");
+
+    frame->removeSpellingMarkers();
+
+    const int allTextBeginOffset = 0;
+    const int allTextLength = 11;
+    frame->selectRange(WebRange::fromDocumentRange(frame, allTextBeginOffset, allTextLength));
+    RefPtr<Range> selectionRange = frame->frame()->selection()->toNormalizedRange();
+
+    EXPECT_EQ(0U, document->markers()->markersInRange(selectionRange.get(), DocumentMarker::Spelling).size());
+
+    m_webView->close();
+    m_webView = 0;
+}
+
+TEST_F(WebFrameTest, MarkerHashIdentifiers) {
+    registerMockedHttpURLLoad("spell.html");
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "spell.html");
+
+    static const uint32_t kHash = 42;
+    SpellCheckClient spellcheck(kHash);
+    m_webView->setSpellCheckClient(&spellcheck);
+
+    WebFrameImpl* frame = static_cast<WebFrameImpl*>(m_webView->mainFrame());
+    Document* document = frame->frame()->document();
+    Element* element = document->getElementById("data");
+
+    m_webView->settings()->setAsynchronousSpellCheckingEnabled(true);
+    m_webView->settings()->setUnifiedTextCheckerEnabled(true);
+    m_webView->settings()->setEditingBehavior(WebSettings::EditingBehaviorWin);
+
+    element->focus();
+    document->execCommand("InsertText", false, "wellcome.");
+
+    WebVector<uint32_t> documentMarkers;
+    m_webView->spellingMarkers(&documentMarkers);
+    EXPECT_EQ(1U, documentMarkers.size());
+    EXPECT_EQ(kHash, documentMarkers[0]);
 
     m_webView->close();
     m_webView = 0;
@@ -2536,8 +2923,6 @@ TEST_F(WebFrameTest, CompositorScrollIsUserScrollLongPage)
     // Make sure we initialize to minimum scale, even if the window size
     // only becomes available after the load begins.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "long_scroll.html", true, &client);
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->resize(WebSize(1000, 1000));
     m_webView->layout();
 
@@ -2595,8 +2980,6 @@ TEST_F(WebFrameTest, CompositorScrollIsUserScrollShortPage)
     // Short page tests.
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "short_scroll.html", true, &client);
 
-    m_webView->settings()->setApplyDeviceScaleFactorInCompositor(true);
-    m_webView->settings()->setApplyPageScaleFactorInCompositor(true);
     m_webView->resize(WebSize(1000, 1000));
     m_webView->layout();
 

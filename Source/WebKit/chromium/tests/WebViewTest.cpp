@@ -31,11 +31,8 @@
 #include "config.h"
 #include "WebView.h"
 
-#include "Document.h"
-#include "Element.h"
+#include <gtest/gtest.h>
 #include "FrameTestHelpers.h"
-#include "FrameView.h"
-#include "HTMLDocument.h"
 #include "URLTestHelpers.h"
 #include "WebAutofillClient.h"
 #include "WebContentDetectionResult.h"
@@ -48,7 +45,10 @@
 #include "WebSettings.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
-#include <gtest/gtest.h>
+#include "core/dom/Document.h"
+#include "core/dom/Element.h"
+#include "core/html/HTMLDocument.h"
+#include "core/page/FrameView.h"
 #include <public/Platform.h>
 #include <public/WebSize.h>
 #include <public/WebThread.h>
@@ -354,24 +354,14 @@ TEST_F(WebViewTest, DISABLED_TextInputType)
     testTextInputType(WebTextInputTypeNumber, "input_field_number.html");
     testTextInputType(WebTextInputTypeTelephone, "input_field_tel.html");
     testTextInputType(WebTextInputTypeURL, "input_field_url.html");
-#if ENABLE(INPUT_TYPE_DATE)
     testTextInputType(WebTextInputTypeDate, "input_field_date.html");
-#endif
-#if ENABLE(INPUT_TYPE_DATETIME)
+#if ENABLE(INPUT_TYPE_DATETIME_INCOMPLETE)
     testTextInputType(WebTextInputTypeDateTime, "input_field_datetime.html");
 #endif
-#if ENABLE(INPUT_TYPE_DATETIMELOCAL)
     testTextInputType(WebTextInputTypeDateTimeLocal, "input_field_datetimelocal.html");
-#endif
-#if ENABLE(INPUT_TYPE_MONTH)
     testTextInputType(WebTextInputTypeMonth, "input_field_month.html");
-#endif
-#if ENABLE(INPUT_TYPE_TIME)
     testTextInputType(WebTextInputTypeTime, "input_field_time.html");
-#endif
-#if ENABLE(INPUT_TYPE_WEEK)
     testTextInputType(WebTextInputTypeWeek, "input_field_week.html");
-#endif
 
 }
 
@@ -482,8 +472,8 @@ TEST_F(WebViewTest, ResetScrollAndScaleState)
 {
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("hello_world.html"));
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "hello_world.html"));
-    webViewImpl->settings()->setApplyPageScaleFactorInCompositor(true);
     webViewImpl->resize(WebSize(640, 480));
+    webViewImpl->layout();
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().height);
 

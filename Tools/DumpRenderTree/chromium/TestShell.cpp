@@ -41,7 +41,6 @@
 #include "WebElement.h"
 #include "WebFrame.h"
 #include "WebHistoryItem.h"
-#include "WebIDBFactory.h"
 #include "WebTestingSupport.h"
 #include "WebSettings.h"
 #include "WebTestProxy.h"
@@ -134,14 +133,11 @@ void TestShell::initialize(MockPlatform* platformSupport)
     m_testInterfaces = adoptPtr(new WebTestInterfaces());
     platformSupport->setInterfaces(m_testInterfaces.get());
     m_devToolsTestInterfaces = adoptPtr(new WebTestInterfaces());
-#if ENABLE(LINK_PRERENDER)
     m_prerenderingSupport = adoptPtr(new MockWebPrerenderingSupport());
-#endif
-#if !defined(USE_DEFAULT_RENDER_THEME) && (OS(WINDOWS) || OS(MAC_OS_X))
+#if !defined(USE_DEFAULT_RENDER_THEME) && (OS(WINDOWS) || OS(DARWIN))
     // Set theme engine.
     webkit_support::SetThemeEngine(m_testInterfaces->themeEngine());
 #endif
-
 
     WTF::initializeThreading();
 
@@ -404,7 +400,7 @@ void TestShell::dumpImage(SkCanvas* canvas) const
     // drawing may have erased it in a few places. So on Windows we force it to
     // opaque and also don't write the alpha channel for the reference. Linux
     // doesn't have the wrong alpha like Windows, but we match Windows.
-#if OS(MAC_OS_X)
+#if OS(DARWIN)
     bool discardTransparency = false;
 #else
     bool discardTransparency = true;

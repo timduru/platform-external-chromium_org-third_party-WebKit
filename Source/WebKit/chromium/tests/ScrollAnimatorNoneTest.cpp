@@ -27,18 +27,16 @@
 
 #include "config.h"
 
-#if ENABLE(SMOOTH_SCROLLING)
+#include "core/platform/ScrollAnimatorNone.h"
 
-#include "ScrollAnimatorNone.h"
-
-#include "FloatPoint.h"
-#include "IntRect.h"
-#include "Logging.h"
-#include "ScrollAnimator.h"
-#include "ScrollableArea.h"
-#include "TreeTestHelpers.h"
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
+#include "TreeTestHelpers.h"
+#include "core/platform/Logging.h"
+#include "core/platform/ScrollAnimator.h"
+#include "core/platform/ScrollableArea.h"
+#include "core/platform/graphics/FloatPoint.h"
+#include "core/platform/graphics/IntRect.h"
 
 using namespace std;
 using namespace WebCore;
@@ -1045,5 +1043,3 @@ TEST_F(ScrollAnimatorNoneTest, ReverseInMiddle)
         result = result && animateScroll(t);
     EXPECT_GE(before, m_currentPosition);
 }
-
-#endif // ENABLE(SMOOTH_SCROLLING)
