@@ -66,9 +66,6 @@ public:
 
     void clear();
 
-    void captureEvents();
-    void releaseEvents();
-
     void addNamedItem(const AtomicString& name);
     void removeNamedItem(const AtomicString& name);
     bool hasNamedItem(AtomicStringImpl* name);
@@ -80,14 +77,9 @@ public:
     static bool isCaseSensitiveAttribute(const QualifiedName&);
 
 protected:
-    HTMLDocument(Frame*, const KURL&);
+    HTMLDocument(Frame*, const KURL&, DocumentClassFlags extendedDocumentClasses = DefaultDocumentClass);
 
 private:
-    virtual PassRefPtr<Element> createElement(const AtomicString& tagName, ExceptionCode&);
-
-    virtual bool isFrameSet() const;
-    virtual PassRefPtr<DocumentParser> createParser();
-
     void addItemToMap(HashCountedSet<AtomicStringImpl*>&, const AtomicString&);
     void removeItemFromMap(HashCountedSet<AtomicStringImpl*>&, const AtomicString&);
 

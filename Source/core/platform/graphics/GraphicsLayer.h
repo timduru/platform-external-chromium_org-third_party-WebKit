@@ -34,9 +34,15 @@
 #include "core/platform/graphics/GraphicsLayerClient.h"
 #include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/PlatformLayer.h"
+#include "core/platform/graphics/chromium/OpaqueRectTrackingContentLayerDelegate.h"
 #include "core/platform/graphics/filters/FilterOperations.h"
 #include "core/platform/graphics/transforms/TransformOperations.h"
 #include "core/platform/graphics/transforms/TransformationMatrix.h"
+
+#include <public/WebContentLayer.h>
+#include <public/WebImageLayer.h>
+#include <public/WebLayer.h>
+#include <public/WebSolidColorLayer.h>
 
 #include <wtf/OwnPtr.h>
 #include <wtf/PassOwnPtr.h>
@@ -62,6 +68,7 @@ class FloatRect;
 class GraphicsContext;
 class GraphicsLayerFactory;
 class Image;
+class ScrollableArea;
 class TextStream;
 class TimingFunction;
 
@@ -187,7 +194,16 @@ protected:
     AnimatedPropertyID m_property;
 };
 
+// FIXME: find a better home for this declaration.
+class LinkHighlightClient {
+public:
+    virtual void invalidate() = 0;
+    virtual void clearCurrentGraphicsLayer() = 0;
+    virtual WebKit::WebLayer* layer() = 0;
 
+protected:
+    virtual ~LinkHighlightClient() { }
+};
 
 // GraphicsLayer is an abstraction for a rendering surface with backing store,
 // which may have associated transformation and animations.
@@ -195,6 +211,13 @@ protected:
 class GraphicsLayer {
     WTF_MAKE_NONCOPYABLE(GraphicsLayer); WTF_MAKE_FAST_ALLOCATED;
 public:
+    enum ContentsLayerPurpose {
+        NoContentsLayer = 0,
+        ContentsLayerForImage,
+        ContentsLayerForVideo,
+        ContentsLayerForCanvas,
+    };
+
     static PassOwnPtr<GraphicsLayer> create(GraphicsLayerFactory*, GraphicsLayerClient*);
 
     // FIXME: Replace all uses of this create function with the one that takes a GraphicsLayerFactory.
@@ -387,9 +410,6 @@ public:
     virtual void setMaintainsPixelAlignment(bool maintainsAlignment) { m_maintainsPixelAlignment = maintainsAlignment; }
     virtual bool maintainsPixelAlignment() const { return m_maintainsPixelAlignment; }
     
-    virtual void setAppliesPageScale(bool appliesScale = true) { m_appliesPageScale = appliesScale; }
-    virtual bool appliesPageScale() const { return m_appliesPageScale; }
-
     float pageScaleFactor() const { return m_client ? m_client->pageScaleFactor() : 1; }
     float deviceScaleFactor() const { return m_client ? m_client->deviceScaleFactor() : 1; }
 
@@ -418,6 +438,9 @@ public:
     void updateDebugIndicators();
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const;
+
+    static void registerContentsLayer(WebKit::WebLayer*);
+    static void unregisterContentsLayer(WebKit::WebLayer*);
 
 protected:
     // Should be called from derived class destructors. Should call willBeDestroyed() on super.
@@ -453,6 +476,29 @@ protected:
 
     virtual void getDebugBorderInfo(Color&, float& width) const;
 
+    // Helper functions used by settors to keep layer's the state consistent.
+    void updateNames();
+    void updateChildList();
+    void updateLayerPosition();
+    void updateLayerSize();
+    void updateAnchorPoint();
+    void updateTransform();
+    void updateChildrenTransform();
+    void updateMasksToBounds();
+    void updateLayerPreserves3D();
+    void updateLayerIsDrawable();
+    void updateLayerBackgroundColor();
+    void updateContentsRect();
+
+    void setContentsTo(ContentsLayerPurpose, WebKit::WebLayer*);
+    void setupContentsLayer(WebKit::WebLayer*);
+    void clearContentsLayerIfUnregistered();
+    WebKit::WebLayer* contentsLayerIfRegistered();
+
+    // Temporary virtual helper while migrating code. Set the animation
+    // delegate to "this" from the derived class.
+    virtual void setAnimationDelegateForLayer(WebKit::WebLayer*) = 0;
+
     GraphicsLayerClient* m_client;
     String m_name;
     
@@ -481,7 +527,6 @@ protected:
     bool m_drawsContent : 1;
     bool m_contentsVisible : 1;
     bool m_maintainsPixelAlignment : 1;
-    bool m_appliesPageScale : 1; // Set for the layer which has the page scale applied to it.
     bool m_showDebugBorder : 1;
     bool m_showRepaintCounter : 1;
     
@@ -501,6 +546,33 @@ protected:
     IntRect m_contentsRect;
 
     int m_repaintCount;
+
+    String m_nameBase;
+
+    Color m_contentsSolidColor;
+
+    OwnPtr<WebKit::WebContentLayer> m_layer;
+    OwnPtr<WebKit::WebLayer> m_transformLayer;
+    OwnPtr<WebKit::WebImageLayer> m_imageLayer;
+    OwnPtr<WebKit::WebSolidColorLayer> m_contentsSolidColorLayer;
+    WebKit::WebLayer* m_contentsLayer;
+    // We don't have ownership of m_contentsLayer, but we do want to know if a given layer is the
+    // same as our current layer in setContentsTo(). Since m_contentsLayer may be deleted at this point,
+    // we stash an ID away when we know m_contentsLayer is alive and use that for comparisons from that point
+    // on.
+    int m_contentsLayerId;
+
+    LinkHighlightClient* m_linkHighlight;
+
+    OwnPtr<OpaqueRectTrackingContentLayerDelegate> m_opaqueRectTrackingContentLayerDelegate;
+
+    ContentsLayerPurpose m_contentsLayerPurpose;
+    bool m_inSetChildren;
+
+    typedef HashMap<String, int> AnimationIdMap;
+    AnimationIdMap m_animationIdMap;
+
+    ScrollableArea* m_scrollableArea;
 };
 
 

@@ -34,7 +34,7 @@
 #include "core/rendering/svg/RenderSVGInlineText.h"
 #endif
 
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/rendering/style/StyleInheritedData.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
@@ -46,6 +46,11 @@ namespace WebCore {
 PassRefPtr<Text> Text::create(Document* document, const String& data)
 {
     return adoptRef(new Text(document, data, CreateText));
+}
+
+PassRefPtr<Text> Text::create(ScriptExecutionContext* context, const String& data)
+{
+    return adoptRef(new Text(toDocument(context), data, CreateText));
 }
 
 PassRefPtr<Text> Text::createEditingText(Document* document, const String& data)
@@ -94,8 +99,6 @@ static const Text* earliestLogicallyAdjacentTextNode(const Text* t)
             continue;
         }
 
-        // We would need to visit EntityReference child text nodes if they existed
-        ASSERT(type != Node::ENTITY_REFERENCE_NODE || !n->hasChildNodes());
         break;
     }
     return t;
@@ -111,8 +114,6 @@ static const Text* latestLogicallyAdjacentTextNode(const Text* t)
             continue;
         }
 
-        // We would need to visit EntityReference child text nodes if they existed
-        ASSERT(type != Node::ENTITY_REFERENCE_NODE || !n->hasChildNodes());
         break;
     }
     return t;

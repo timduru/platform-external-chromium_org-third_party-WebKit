@@ -22,8 +22,6 @@
 #include "V8TestMediaQueryListListener.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "V8TestMediaQueryListListener.h"
-#include "bindings/v8/BindingState.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMWrapper.h"
@@ -31,7 +29,7 @@
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
-#include <wtf/UnusedParam.h>
+#include "wtf/UnusedParam.h"
 
 #if ENABLE(BINDING_INTEGRITY)
 #if defined(OS_WIN)

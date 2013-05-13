@@ -51,6 +51,7 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS := \
 
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/ArrayBuffer.cpp \
+	third_party/WebKit/Source/wtf/ArrayBufferContents.cpp \
 	third_party/WebKit/Source/wtf/ArrayBufferView.cpp \
 	third_party/WebKit/Source/wtf/Assertions.cpp \
 	third_party/WebKit/Source/wtf/BitVector.cpp \
@@ -73,7 +74,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/RefCountedLeakCounter.cpp \
 	third_party/WebKit/Source/wtf/SHA1.cpp \
 	third_party/WebKit/Source/wtf/SizeLimits.cpp \
-	third_party/WebKit/Source/wtf/StackBounds.cpp \
 	third_party/WebKit/Source/wtf/ThreadIdentifierDataPthreads.cpp \
 	third_party/WebKit/Source/wtf/Threading.cpp \
 	third_party/WebKit/Source/wtf/ThreadingPthreads.cpp \
@@ -87,6 +87,14 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/text/StringBuilder.cpp \
 	third_party/WebKit/Source/wtf/text/StringImpl.cpp \
 	third_party/WebKit/Source/wtf/text/StringStatics.cpp \
+	third_party/WebKit/Source/wtf/text/TextCodec.cpp \
+	third_party/WebKit/Source/wtf/text/TextCodecICU.cpp \
+	third_party/WebKit/Source/wtf/text/TextCodecLatin1.cpp \
+	third_party/WebKit/Source/wtf/text/TextCodecUTF16.cpp \
+	third_party/WebKit/Source/wtf/text/TextCodecUTF8.cpp \
+	third_party/WebKit/Source/wtf/text/TextCodecUserDefined.cpp \
+	third_party/WebKit/Source/wtf/text/TextEncoding.cpp \
+	third_party/WebKit/Source/wtf/text/TextEncodingRegistry.cpp \
 	third_party/WebKit/Source/wtf/text/WTFString.cpp \
 	third_party/WebKit/Source/wtf/unicode/CollatorDefault.cpp \
 	third_party/WebKit/Source/wtf/unicode/UTF8.cpp \
@@ -147,16 +155,12 @@ MY_DEFS := \
 	'-DENABLE_BATTERY_STATUS=0' \
 	'-DENABLE_CANVAS_USES_MAILBOX=0' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_COMPOSITING=0' \
 	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_JAVASCRIPT_I18N_API=1' \
 	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
-	'-DENABLE_RUBY=1' \
-	'-DENABLE_SANDBOX=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \

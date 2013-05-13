@@ -33,7 +33,7 @@
 #include "core/css/CSSParser.h"
 #include "core/css/CSSSelectorList.h"
 #include "core/css/StylePropertySet.h"
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
 #include "core/dom/ClientRect.h"
 #include "core/dom/ClientRectList.h"
@@ -181,13 +181,6 @@ static Attr* findAttrNodeInList(AttrNodeList* attrNodeList, const QualifiedName&
             return attrNodeList->at(i).get();
     }
     return 0;
-}
-
-// Need a template since ElementShadow is not a Node, but has the style recalc methods.
-template<class T>
-static inline bool shouldRecalcStyle(Node::StyleChange change, const T* node)
-{
-    return change >= Node::Inherit || node->childNeedsStyleRecalc() || node->needsStyleRecalc();
 }
 
 PassRefPtr<Element> Element::create(const QualifiedName& tagName, Document* document)
@@ -338,6 +331,36 @@ NamedNodeMap* Element::attributes() const
 
     rareData->setAttributeMap(NamedNodeMap::create(const_cast<Element*>(this)));
     return rareData->attributeMap();
+}
+
+void Element::addActiveAnimation(Animation* animation)
+{
+    ElementRareData* rareData = ensureElementRareData();
+    if (!rareData->activeAnimations())
+        rareData->setActiveAnimations(adoptPtr(new Vector<Animation*>));
+    rareData->activeAnimations()->append(animation);
+}
+
+void Element::removeActiveAnimation(Animation* animation)
+{
+    ElementRareData* rareData = elementRareData();
+    ASSERT(rareData);
+    size_t position = rareData->activeAnimations()->find(animation);
+    ASSERT(position != notFound);
+    rareData->activeAnimations()->remove(position);
+}
+
+bool Element::hasActiveAnimations() const
+{
+    return hasRareData() && elementRareData()->activeAnimations()
+        && elementRareData()->activeAnimations()->size();
+}
+
+Vector<Animation*>* Element::activeAnimations() const
+{
+    if (!elementRareData())
+        return 0;
+    return elementRareData()->activeAnimations();
 }
 
 Node::NodeType Element::nodeType() const
@@ -1555,7 +1578,6 @@ bool Element::childTypeAllowed(NodeType type) const
     case COMMENT_NODE:
     case PROCESSING_INSTRUCTION_NODE:
     case CDATA_SECTION_NODE:
-    case ENTITY_REFERENCE_NODE:
         return true;
     default:
         break;
@@ -2887,6 +2909,11 @@ void Element::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     ContainerNode::reportMemoryUsage(memoryObjectInfo);
     info.addMember(m_tagName, "tagName");
     info.addMember(m_elementData, "elementData");
+}
+
+InputMethodContext* Element::getInputContext()
+{
+    return ensureElementRareData()->ensureInputMethodContext(toHTMLElement(this));
 }
 
 #if ENABLE(SVG)

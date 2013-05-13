@@ -28,9 +28,10 @@
 #include "core/page/FrameView.h"
 
 #include "HTMLNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/css/FontLoader.h"
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/OverflowEvent.h"
 #include "core/editing/FrameSelection.h"
@@ -944,13 +945,7 @@ void FrameView::layout(bool allowSubtree)
             m_inSynchronousPostLayout = false;
         }
 
-        // Viewport-dependent media queries may cause us to need completely different style information.
-        // Check that here.
-        if (document->styleResolver()->affectedByViewportChange()) {
-            document->styleResolverChanged(RecalcStyleImmediately);
-            InspectorInstrumentation::mediaQueryResultChanged(document);
-        } else
-            document->evaluateMediaQueryList();
+        document->evaluateMediaQueryList();
 
         // If there is any pagination to apply, it will affect the RenderView's style, so we should
         // take care of that now.
@@ -2061,6 +2056,8 @@ void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
     for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext()) {
         frame->view()->serviceScrollAnimations();
         frame->animation()->serviceAnimations();
+        if (RuntimeEnabledFeatures::webAnimationEnabled())
+            frame->document()->timeline()->serviceAnimations(monotonicAnimationStartTime);
     }
 
     Vector<RefPtr<Document> > documents;
@@ -2253,6 +2250,9 @@ void FrameView::flushAnyPendingPostLayoutTasks()
 
 void FrameView::performPostLayoutTasks()
 {
+    // updateWidgets() call below can blow us away from underneath.
+    RefPtr<FrameView> protect(this);
+
     m_postLayoutTasksTimer.stop();
 
     m_frame->selection()->setCaretRectNeedsUpdate();
@@ -2310,8 +2310,13 @@ void FrameView::performPostLayoutTasks()
 
     m_actionScheduler->resume();
 
-    // Refetch render view since it can be destroyed by updateWidget()
-    // call above.
+    // Viewport-dependent media queries may cause us to need completely different style information.
+    if (m_frame->document()->styleResolver()->affectedByViewportChange()) {
+        m_frame->document()->styleResolverChanged(DeferRecalcStyle);
+        InspectorInstrumentation::mediaQueryResultChanged(m_frame->document());
+    }
+
+    // Refetch render view since it can be destroyed by updateWidget() call above.
     renderView = this->renderView();
     if (renderView && !renderView->printing()) {
         IntSize currentSize;
@@ -2567,16 +2572,6 @@ void FrameView::setVisibleContentScaleFactor(float visibleContentScaleFactor)
     updateScrollbars(scrollOffset());
 }
 
-void FrameView::setVisibleScrollerThumbRect(const IntRect& scrollerThumb)
-{
-    Page* page = m_frame->page();
-    if (!page)
-        return;
-    if (page->mainFrame() != m_frame)
-        return;
-    page->chrome()->client()->notifyScrollerThumbIsVisibleInRect(scrollerThumb);
-}
-
 bool FrameView::scrollbarsCanBeActive() const
 {
     if (!m_frame)
@@ -2659,7 +2654,6 @@ void FrameView::scrollbarStyleChanged(int newStyle, bool forceUpdate)
         return;
     if (page->mainFrame() != m_frame)
         return;
-    page->chrome()->client()->recommendedScrollbarStyleDidChange(newStyle);
 
     if (forceUpdate)
         ScrollView::scrollbarStyleChanged(newStyle, forceUpdate);
@@ -3401,6 +3395,23 @@ String FrameView::trackedRepaintRectsAsText() const
         ts << ")\n";
     }
     return ts.release();
+}
+
+void FrameView::addResizerArea(RenderLayer* resizerLayer)
+{
+    if (!m_resizerAreas)
+        m_resizerAreas = adoptPtr(new ResizerAreaSet);
+    m_resizerAreas->add(resizerLayer);
+}
+
+void FrameView::removeResizerArea(RenderLayer* resizerLayer)
+{
+    if (!m_resizerAreas)
+        return;
+
+    ResizerAreaSet::iterator it = m_resizerAreas->find(resizerLayer);
+    if (it != m_resizerAreas->end())
+        m_resizerAreas->remove(it);
 }
 
 bool FrameView::addScrollableArea(ScrollableArea* scrollableArea)

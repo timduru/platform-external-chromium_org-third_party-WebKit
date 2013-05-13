@@ -22,7 +22,7 @@
 #include "config.h"
 #include "core/rendering/style/StyleRareNonInheritedData.h"
 
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/rendering/RenderCounter.h"
 #include "core/rendering/style/ContentData.h"
@@ -82,9 +82,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData()
     , m_wrapThrough(RenderStyle::initialWrapThrough())
     , m_runningAcceleratedAnimation(false)
     , m_hasAspectRatio(false)
-#if ENABLE(CSS_COMPOSITING)
     , m_effectiveBlendMode(RenderStyle::initialBlendMode())
-#endif
 {
     m_maskBoxImage.setMaskDefaults();
 }
@@ -159,9 +157,7 @@ StyleRareNonInheritedData::StyleRareNonInheritedData(const StyleRareNonInherited
     , m_wrapThrough(o.m_wrapThrough)
     , m_runningAcceleratedAnimation(o.m_runningAcceleratedAnimation)
     , m_hasAspectRatio(o.m_hasAspectRatio)
-#if ENABLE(CSS_COMPOSITING)
     , m_effectiveBlendMode(o.m_effectiveBlendMode)
-#endif
 {
 }
 
@@ -238,9 +234,7 @@ bool StyleRareNonInheritedData::operator==(const StyleRareNonInheritedData& o) c
         && m_wrapFlow == o.m_wrapFlow
         && m_wrapThrough == o.m_wrapThrough
         && !m_runningAcceleratedAnimation && !o.m_runningAcceleratedAnimation
-#if ENABLE(CSS_COMPOSITING)
         && m_effectiveBlendMode == o.m_effectiveBlendMode
-#endif
         && m_hasAspectRatio == o.m_hasAspectRatio;
 }
 
@@ -261,7 +255,7 @@ bool StyleRareNonInheritedData::counterDataEquivalent(const StyleRareNonInherite
 {
     if (m_counterDirectives.get() == o.m_counterDirectives.get())
         return true;
-        
+
     if (m_counterDirectives && o.m_counterDirectives && *m_counterDirectives == *o.m_counterDirectives)
         return true;
 

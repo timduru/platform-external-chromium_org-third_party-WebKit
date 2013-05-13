@@ -24,6 +24,7 @@
 #include "config.h"
 #include "core/html/HTMLAnchorElement.h"
 
+#include <wtf/text/StringBuilder.h>
 #include "HTMLNames.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/EventNames.h"
@@ -40,15 +41,14 @@
 #include "core/page/ChromeClient.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
-#include "core/page/SecurityOrigin.h"
-#include "core/page/SecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/platform/HistogramSupport.h"
 #include "core/platform/PlatformMouseEvent.h"
 #include "core/platform/network/DNS.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/rendering/RenderImage.h"
-#include <wtf/text/StringBuilder.h>
+#include "origin/SecurityOrigin.h"
+#include "origin/SecurityPolicy.h"
 
 namespace WebCore {
 
@@ -547,7 +547,7 @@ void HTMLAnchorElement::handleClick(Event* event)
 
         frame->loader()->client()->startDownload(request, fastGetAttribute(downloadAttr));
     } else
-        frame->loader()->urlSelected(kurl, target(), event, false, false, hasRel(RelationNoReferrer) ? NeverSendReferrer : MaybeSendReferrer);
+        frame->loader()->urlSelected(kurl, target(), event, false, hasRel(RelationNoReferrer) ? NeverSendReferrer : MaybeSendReferrer);
 
     sendPings(kurl);
 }
@@ -616,7 +616,7 @@ Element* HTMLAnchorElement::rootEditableElementForSelectionOnMouseDown() const
 {
     if (!m_hasRootEditableElementForSelectionOnMouseDown)
         return 0;
-    return rootEditableElementMap().get(this).get();
+    return rootEditableElementMap().get(this);
 }
 
 void HTMLAnchorElement::clearRootEditableElementForSelectionOnMouseDown()

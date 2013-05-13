@@ -5,11 +5,13 @@
 #include "config.h"
 #include "WebMediaPlayerClientImpl.h"
 
+#include "InbandTextTrackPrivateImpl.h"
 #include "WebAudioSourceProvider.h"
 #include "WebDocument.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
 #include "WebHelperPluginImpl.h"
+#include "WebInbandTextTrack.h"
 #include "WebMediaPlayer.h"
 #include "WebMediaSourceImpl.h"
 #include "WebViewImpl.h"
@@ -26,7 +28,6 @@
 #include "core/platform/graphics/IntSize.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/platform/graphics/chromium/GraphicsLayerChromium.h"
-#include "core/platform/graphics/skia/PlatformContextSkia.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include <public/Platform.h>
@@ -79,12 +80,7 @@ void WebMediaPlayerClientImpl::setIsEnabled(bool isEnabled)
 void WebMediaPlayerClientImpl::registerSelf(MediaEngineRegistrar registrar)
 {
     if (m_isEnabled) {
-        registrar(WebMediaPlayerClientImpl::create,
-                  WebMediaPlayerClientImpl::getSupportedTypes,
-                  WebMediaPlayerClientImpl::supportsType,
-                  0,
-                  0,
-                  0);
+        registrar(WebMediaPlayerClientImpl::create, WebMediaPlayerClientImpl::supportsType);
     }
 }
 
@@ -294,6 +290,19 @@ void WebMediaPlayerClientImpl::setWebLayer(WebLayer* layer)
         m_videoLayer->setOpaque(m_opaque);
         GraphicsLayerChromium::registerContentsLayer(m_videoLayer);
     }
+}
+
+void WebMediaPlayerClientImpl::addTextTrack(WebInbandTextTrack* textTrack)
+{
+    m_mediaPlayer->addTextTrack(adoptRef(new InbandTextTrackPrivateImpl(textTrack)));
+}
+
+void WebMediaPlayerClientImpl::removeTextTrack(WebInbandTextTrack* textTrack)
+{
+    // The following static_cast is safe, because we created the object with the textTrack
+    // that was passed to addTextTrack.  (The object from which we are downcasting includes
+    // WebInbandTextTrack as one of the intefaces from which inherits.)
+    m_mediaPlayer->removeTextTrack(static_cast<InbandTextTrackPrivateImpl*>(textTrack->client()));
 }
 
 // MediaPlayerPrivateInterface -------------------------------------------------
@@ -608,16 +617,14 @@ void WebMediaPlayerClientImpl::paintCurrentFrameInContext(GraphicsContext* conte
     // Since we're accessing platformContext() directly we have to manually
     // check.
     if (m_webMediaPlayer && !context->paintingDisabled()) {
-        PlatformGraphicsContext* platformContext = context->platformContext();
-
         // On Android, video frame is emitted as GL_TEXTURE_EXTERNAL_OES texture. We use a different path to
         // paint the video frame into the context.
 #if defined(OS_ANDROID)
         RefPtr<GraphicsContext3D> context3D = SharedGraphicsContext3D::get();
-        paintOnAndroid(context, context3D.get(), rect, platformContext->getNormalizedAlpha());
+        paintOnAndroid(context, context3D.get(), rect, context->getNormalizedAlpha());
 #else
-        WebCanvas* canvas = platformContext->canvas();
-        m_webMediaPlayer->paint(canvas, rect, platformContext->getNormalizedAlpha());
+        WebCanvas* canvas = context->canvas();
+        m_webMediaPlayer->paint(canvas, rect, context->getNormalizedAlpha());
 #endif
     }
 }
@@ -627,10 +634,11 @@ bool WebMediaPlayerClientImpl::copyVideoTextureToPlatformTexture(WebCore::Graphi
     if (!context || !m_webMediaPlayer)
         return false;
     Extensions3D* extensions = context->getExtensions();
-    if (!extensions || !extensions->supports("GL_CHROMIUM_copy_texture") || !extensions->supports("GL_CHROMIUM_flipy") || !context->makeContextCurrent())
+    if (!extensions || !extensions->supports("GL_CHROMIUM_copy_texture") || !extensions->supports("GL_CHROMIUM_flipy")
+        || !extensions->canUseCopyTextureCHROMIUM(internalFormat, type, level) || !context->makeContextCurrent())
         return false;
     WebGraphicsContext3D* webGraphicsContext3D = GraphicsContext3DPrivate::extractWebGraphicsContext3D(context);
-    return m_webMediaPlayer->copyVideoTextureToPlatformTexture(webGraphicsContext3D, texture, level, internalFormat, premultiplyAlpha, flipY);
+    return m_webMediaPlayer->copyVideoTextureToPlatformTexture(webGraphicsContext3D, texture, level, internalFormat, type, premultiplyAlpha, flipY);
 }
 
 void WebMediaPlayerClientImpl::setPreload(MediaPlayer::Preload preload)
@@ -730,12 +738,6 @@ PassOwnPtr<MediaPlayerPrivateInterface> WebMediaPlayerClientImpl::create(MediaPl
     return client.release();
 }
 
-void WebMediaPlayerClientImpl::getSupportedTypes(HashSet<String>& supportedTypes)
-{
-    // FIXME: integrate this list with WebMediaPlayerClientImpl::supportsType.
-    notImplemented();
-}
-
 #if ENABLE(ENCRYPTED_MEDIA)
 MediaPlayer::SupportsType WebMediaPlayerClientImpl::supportsType(const String& type,
                                                                  const String& codecs,
@@ -801,8 +803,7 @@ void WebMediaPlayerClientImpl::paintOnAndroid(WebCore::GraphicsContext* context,
 
     // Copy video texture to bitmap texture.
     WebGraphicsContext3D* webGraphicsContext3D = GraphicsContext3DPrivate::extractWebGraphicsContext3D(context3D);
-    PlatformGraphicsContext* platformContext = context->platformContext();
-    WebCanvas* canvas = platformContext->canvas();
+    WebCanvas* canvas = context->canvas();
     unsigned int textureId = static_cast<unsigned int>(m_texture->getTextureHandle());
     if (!m_webMediaPlayer->copyVideoTextureToPlatformTexture(webGraphicsContext3D, textureId, 0, GraphicsContext3D::RGBA, true, false)) { return; }
 

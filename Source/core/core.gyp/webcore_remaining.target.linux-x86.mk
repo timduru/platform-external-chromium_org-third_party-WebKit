@@ -51,6 +51,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableColumn.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableHeaderContainer.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableRow.cpp \
+	third_party/WebKit/Source/core/animation/Animation.cpp \
+	third_party/WebKit/Source/core/animation/AnimationEffect.cpp \
+	third_party/WebKit/Source/core/animation/DocumentTimeline.cpp \
+	third_party/WebKit/Source/core/animation/TimedItem.cpp \
 	third_party/WebKit/Source/core/css/BasicShapeFunctions.cpp \
 	third_party/WebKit/Source/core/css/CSSAspectRatioValue.cpp \
 	third_party/WebKit/Source/core/css/CSSBasicShapes.cpp \
@@ -128,7 +132,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/SVGCSSComputedStyleDeclaration.cpp \
 	third_party/WebKit/Source/core/css/SVGCSSParser.cpp \
 	third_party/WebKit/Source/core/css/SVGCSSStyleSelector.cpp \
-	third_party/WebKit/Source/core/css/ScopedStyleResolver.cpp \
 	third_party/WebKit/Source/core/css/SelectorChecker.cpp \
 	third_party/WebKit/Source/core/css/SelectorCheckerFastPath.cpp \
 	third_party/WebKit/Source/core/css/SelectorFilter.cpp \
@@ -138,14 +141,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/StylePropertySerializer.cpp \
 	third_party/WebKit/Source/core/css/StylePropertySet.cpp \
 	third_party/WebKit/Source/core/css/StylePropertyShorthand.cpp \
-	third_party/WebKit/Source/core/css/StyleResolver.cpp \
 	third_party/WebKit/Source/core/css/StyleRule.cpp \
 	third_party/WebKit/Source/core/css/StyleRuleImport.cpp \
 	third_party/WebKit/Source/core/css/StyleSheet.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetContents.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetList.cpp \
-	third_party/WebKit/Source/core/css/TransformBuilder.cpp \
-	third_party/WebKit/Source/core/css/ViewportStyleResolver.cpp \
 	third_party/WebKit/Source/core/css/WebKitCSSArrayFunctionValue.cpp \
 	third_party/WebKit/Source/core/css/WebKitCSSFilterRule.cpp \
 	third_party/WebKit/Source/core/css/WebKitCSSFilterValue.cpp \
@@ -158,7 +158,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/WebKitCSSSVGDocumentValue.cpp \
 	third_party/WebKit/Source/core/css/WebKitCSSTransformValue.cpp \
 	third_party/WebKit/Source/core/css/WebKitCSSViewportRule.cpp \
-	third_party/WebKit/Source/core/editing/AlternativeTextController.cpp \
+	third_party/WebKit/Source/core/css/resolver/FilterOperationResolver.cpp \
+	third_party/WebKit/Source/core/css/resolver/ScopedStyleResolver.cpp \
+	third_party/WebKit/Source/core/css/resolver/StyleResolver.cpp \
+	third_party/WebKit/Source/core/css/resolver/StyleResolverState.cpp \
+	third_party/WebKit/Source/core/css/resolver/TransformBuilder.cpp \
+	third_party/WebKit/Source/core/css/resolver/ViewportStyleResolver.cpp \
 	third_party/WebKit/Source/core/editing/AppendNodeCommand.cpp \
 	third_party/WebKit/Source/core/editing/ApplyBlockElementCommand.cpp \
 	third_party/WebKit/Source/core/editing/ApplyStyleCommand.cpp \
@@ -168,7 +173,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/DeleteFromTextNodeCommand.cpp \
 	third_party/WebKit/Source/core/editing/DeleteSelectionCommand.cpp \
 	third_party/WebKit/Source/core/editing/DictationAlternative.cpp \
-	third_party/WebKit/Source/core/editing/DictationCommand.cpp \
 	third_party/WebKit/Source/core/editing/EditCommand.cpp \
 	third_party/WebKit/Source/core/editing/EditingStyle.cpp \
 	third_party/WebKit/Source/core/editing/Editor.cpp \
@@ -382,7 +386,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/MouseEventWithHitTestResults.cpp \
 	third_party/WebKit/Source/core/page/Navigator.cpp \
 	third_party/WebKit/Source/core/page/NavigatorBase.cpp \
-	third_party/WebKit/Source/core/page/OriginAccessEntry.cpp \
 	third_party/WebKit/Source/core/page/Page.cpp \
 	third_party/WebKit/Source/core/page/PageConsole.cpp \
 	third_party/WebKit/Source/core/page/PageGroup.cpp \
@@ -402,8 +405,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/RuntimeCSSEnabled.cpp \
 	third_party/WebKit/Source/core/page/RuntimeEnabledFeaturesCustom.cpp \
 	third_party/WebKit/Source/core/page/Screen.cpp \
-	third_party/WebKit/Source/core/page/SecurityOrigin.cpp \
-	third_party/WebKit/Source/core/page/SecurityPolicy.cpp \
 	third_party/WebKit/Source/core/page/Settings.cpp \
 	third_party/WebKit/Source/core/page/SpatialNavigation.cpp \
 	third_party/WebKit/Source/core/page/SpeechInput.cpp \
@@ -542,16 +543,12 @@ MY_DEFS := \
 	'-DENABLE_BATTERY_STATUS=0' \
 	'-DENABLE_CANVAS_USES_MAILBOX=0' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_COMPOSITING=0' \
 	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_JAVASCRIPT_I18N_API=1' \
 	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
-	'-DENABLE_RUBY=1' \
-	'-DENABLE_SANDBOX=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \

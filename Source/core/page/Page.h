@@ -22,7 +22,6 @@
 #define Page_h
 
 #include "core/dom/ViewportArguments.h"
-#include "core/loader/FrameLoaderTypes.h"
 #include "core/page/LayoutMilestones.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/page/UseCounter.h"
@@ -43,7 +42,6 @@
 
 namespace WebCore {
 
-class AlternativeTextClient;
 class BackForwardClient;
 class BackForwardController;
 class Chrome;
@@ -107,7 +105,6 @@ public:
         PageClients();
         ~PageClients();
 
-        AlternativeTextClient* alternativeTextClient;
         ChromeClient* chromeClient;
         ContextMenuClient* contextMenuClient;
         EditorClient* editorClient;
@@ -147,7 +144,7 @@ public:
     void goBackOrForward(int distance);
     int getHistoryLength();
 
-    void goToItem(HistoryItem*, FrameLoadType);
+    void goToItem(HistoryItem*);
 
     enum PageGroupType { PrivatePageGroup, SharedPageGroup };
     void setGroupType(PageGroupType);
@@ -249,8 +246,6 @@ public:
     bool isPainting() const { return m_isPainting; }
 #endif
 
-    AlternativeTextClient* alternativeTextClient() const { return m_alternativeTextClient; }
-
     PageConsole* console() { return m_console.get(); }
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
@@ -336,7 +331,6 @@ private:
 #ifndef NDEBUG
     bool m_isPainting;
 #endif
-    AlternativeTextClient* m_alternativeTextClient;
 
     OwnPtr<PageConsole> m_console;
 };

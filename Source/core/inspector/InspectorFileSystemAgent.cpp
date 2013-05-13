@@ -29,7 +29,6 @@
  */
 
 #include "config.h"
-
 #include "core/inspector/InspectorFileSystemAgent.h"
 
 #include "core/dom/DOMImplementation.h"
@@ -45,10 +44,8 @@
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/loader/TextResourceDecoder.h"
 #include "core/page/Frame.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/platform/KURL.h"
 #include "core/platform/MIMETypeRegistry.h"
-#include "core/platform/text/TextEncoding.h"
 #include "modules/filesystem/DOMFileSystem.h"
 #include "modules/filesystem/DirectoryEntry.h"
 #include "modules/filesystem/DirectoryReader.h"
@@ -63,7 +60,10 @@
 #include "modules/filesystem/LocalFileSystem.h"
 #include "modules/filesystem/Metadata.h"
 #include "modules/filesystem/MetadataCallback.h"
-#include <wtf/text/Base64.h>
+#include "origin/SecurityOrigin.h"
+#include "wtf/ArrayBuffer.h"
+#include "wtf/text/Base64.h"
+#include "wtf/text/TextEncoding.h"
 
 using WebCore::TypeBuilder::Array;
 

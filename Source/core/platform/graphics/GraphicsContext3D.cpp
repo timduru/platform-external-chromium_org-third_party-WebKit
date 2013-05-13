@@ -385,7 +385,7 @@ rt GraphicsContext3D::name(t1 a1, t2 a2, t3 a3, t4 a4, t5 a5, t6 a6, t7 a7, t8 a
     return m_private->webContext()->name(a1, a2, a3, a4, a5, a6, a7, a8, a9); \
 }
 
-GraphicsContext3D::GraphicsContext3D(GraphicsContext3D::Attributes, HostWindow*, GraphicsContext3D::RenderStyle)
+GraphicsContext3D::GraphicsContext3D()
 {
 }
 
@@ -405,10 +405,8 @@ void GraphicsContext3D::setErrorMessageCallback(PassOwnPtr<GraphicsContext3D::Er
     m_private->setErrorMessageCallback(callback);
 }
 
-PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attributes attrs, HostWindow*, GraphicsContext3D::RenderStyle renderStyle)
+PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attributes attrs)
 {
-    ASSERT(renderStyle != GraphicsContext3D::RenderDirectlyToHostWindow);
-
     WebKit::WebGraphicsContext3D::Attributes webAttributes;
     webAttributes.alpha = attrs.alpha;
     webAttributes.depth = attrs.depth;
@@ -427,33 +425,12 @@ PassRefPtr<GraphicsContext3D> GraphicsContext3D::create(GraphicsContext3D::Attri
     return GraphicsContext3DPrivate::createGraphicsContextFromWebContext(webContext.release(), attrs.preserveDrawingBuffer);
 }
 
-PlatformGraphicsContext3D GraphicsContext3D::platformGraphicsContext3D() const
-{
-    return m_private->webContext();
-}
-
-Platform3DObject GraphicsContext3D::platformTexture() const
-{
-    return m_private->webContext()->getPlatformTextureId();
-}
-
 GrContext* GraphicsContext3D::grContext()
 {
     return m_private->grContext();
 }
 
-PlatformLayer* GraphicsContext3D::platformLayer() const
-{
-    return 0;
-}
-
 DELEGATE_TO_WEBCONTEXT_R(makeContextCurrent, bool)
-DELEGATE_TO_WEBCONTEXT(prepareTexture)
-
-bool GraphicsContext3D::isGLES2Compliant() const
-{
-    return m_private->webContext()->isGLES2Compliant();
-}
 
 bool GraphicsContext3D::isResourceSafe()
 {
@@ -740,11 +717,6 @@ DELEGATE_TO_WEBCONTEXT_1(synthesizeGLError, GC3Denum)
 Extensions3D* GraphicsContext3D::getExtensions()
 {
     return m_private->getExtensions();
-}
-
-IntSize GraphicsContext3D::getInternalFramebufferSize() const
-{
-    return IntSize(m_private->webContext()->width(), m_private->webContext()->height());
 }
 
 bool GraphicsContext3D::texImage2DResourceSafe(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, GC3Dint unpackAlignment)

@@ -36,10 +36,10 @@
 #include "core/css/CSSStyleSheet.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StylePropertyShorthand.h"
-#include "core/css/StyleResolver.h"
 #include "core/css/StyleRule.h"
 #include "core/css/StyleSheet.h"
 #include "core/css/StyleSheetList.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/NamedFlow.h"
 #include "core/dom/NamedFlowCollection.h"
@@ -47,8 +47,10 @@
 #include "core/dom/NodeList.h"
 #include "core/html/HTMLHeadElement.h"
 #include "core/html/HTMLStyleElement.h"
+#include "core/inspector/ContentSearchUtils.h"
 #include "core/inspector/InspectorDOMAgent.h"
 #include "core/inspector/InspectorHistory.h"
+#include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InspectorValues.h"
 #include "core/inspector/InstrumentingAgents.h"
@@ -603,10 +605,11 @@ CSSStyleRule* InspectorCSSAgent::asCSSStyleRule(CSSRule* rule)
     return static_cast<CSSStyleRule*>(rule);
 }
 
-InspectorCSSAgent::InspectorCSSAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorDOMAgent* domAgent)
+InspectorCSSAgent::InspectorCSSAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorDOMAgent* domAgent, InspectorPageAgent* pageAgent)
     : InspectorBaseAgent<InspectorCSSAgent>("CSS", instrumentingAgents, state)
     , m_frontend(0)
     , m_domAgent(domAgent)
+    , m_pageAgent(pageAgent)
     , m_lastStyleSheetId(1)
     , m_creatingViaInspectorStyleSheet(false)
 {
@@ -673,11 +676,13 @@ void InspectorCSSAgent::enable(ErrorString*)
     m_state->setBoolean(CSSAgentState::cssAgentEnabled, true);
     m_instrumentingAgents->setInspectorCSSAgent(this);
 
+    if (!m_frontend)
+        return;
     RefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSStyleSheetHeader> > styleInfos = TypeBuilder::Array<TypeBuilder::CSS::CSSStyleSheetHeader>::create();
     Vector<InspectorStyleSheet*> styleSheets;
     collectAllStyleSheets(styleSheets);
     for (size_t i = 0; i < styleSheets.size(); ++i)
-        m_frontend->styleSheetAdded(styleSheets.at(i)->buildObjectForStyleSheetInfo());
+        m_frontend->styleSheetAdded(buildObjectForStyleSheetInfo(styleSheets.at(i)));
 }
 
 void InspectorCSSAgent::disable(ErrorString*)
@@ -736,11 +741,11 @@ void InspectorCSSAgent::regionLayoutUpdated(NamedFlow* namedFlow, int documentNo
     m_frontend->regionLayoutUpdated(buildObjectForNamedFlow(&errorString, namedFlow, documentNodeId));
 }
 
-void InspectorCSSAgent::activeStyleSheetsUpdated(const Vector<RefPtr<StyleSheet> >& newSheets)
+void InspectorCSSAgent::activeStyleSheetsUpdated(Document* document, const Vector<RefPtr<StyleSheet> >& newSheets)
 {
     HashSet<CSSStyleSheet*> removedSheets;
     for (CSSStyleSheetToInspectorStyleSheet::iterator it = m_cssStyleSheetToInspectorStyleSheet.begin(); it != m_cssStyleSheetToInspectorStyleSheet.end(); ++it) {
-        if (it->value->canBind())
+        if (it->value->canBind() && (!it->key->ownerDocument() || it->key->ownerDocument() == document))
             removedSheets.add(it->key);
     }
 
@@ -777,9 +782,18 @@ void InspectorCSSAgent::activeStyleSheetsUpdated(const Vector<RefPtr<StyleSheet>
         if (!m_cssStyleSheetToInspectorStyleSheet.contains(*it)) {
             InspectorStyleSheet* newStyleSheet = bindStyleSheet(static_cast<CSSStyleSheet*>(*it));
             if (m_frontend)
-                m_frontend->styleSheetAdded(newStyleSheet->buildObjectForStyleSheetInfo());
+                m_frontend->styleSheetAdded(buildObjectForStyleSheetInfo(newStyleSheet));
         }
     }
+}
+
+void InspectorCSSAgent::frameDetachedFromParent(Frame* frame)
+{
+    Document* document = frame->document();
+    if (!document)
+        return;
+    Vector<RefPtr<StyleSheet> > newSheets;
+    activeStyleSheetsUpdated(document, newSheets);
 }
 
 bool InspectorCSSAgent::forcePseudoState(Element* element, CSSSelector::PseudoType pseudoType)
@@ -892,7 +906,7 @@ void InspectorCSSAgent::getAllStyleSheets(ErrorString*, RefPtr<TypeBuilder::Arra
     Vector<InspectorStyleSheet*> styleSheets;
     collectAllStyleSheets(styleSheets);
     for (size_t i = 0; i < styleSheets.size(); ++i)
-        styleInfos->addItem(styleSheets.at(i)->buildObjectForStyleSheetInfo());
+        styleInfos->addItem(buildObjectForStyleSheetInfo(styleSheets.at(i)));
 }
 
 void InspectorCSSAgent::getStyleSheet(ErrorString* errorString, const String& styleSheetId, RefPtr<TypeBuilder::CSS::CSSStyleSheetBody>& styleSheetObject)
@@ -1192,6 +1206,38 @@ void InspectorCSSAgent::collectStyleSheets(CSSStyleSheet* styleSheet, Vector<Ins
     }
 }
 
+String InspectorCSSAgent::sourceMapURLForStyleSheet(const InspectorStyleSheet* styleSheet)
+{
+    DEFINE_STATIC_LOCAL(String, sourceMapHttpHeader, (ASCIILiteral("X-SourceMap")));
+    if (styleSheet->origin() != TypeBuilder::CSS::StyleSheetOrigin::Regular)
+        return String();
+
+    String styleSheetText;
+    bool success = styleSheet->getText(&styleSheetText);
+    if (success) {
+        String sourceMapURL = ContentSearchUtils::findSourceMapURL(styleSheetText, ContentSearchUtils::CSSMagicComment);
+        if (!sourceMapURL.isEmpty())
+            return sourceMapURL;
+    }
+
+    if (styleSheet->finalURL().isEmpty())
+        return String();
+
+    CachedResource* resource = m_pageAgent->cachedResource(m_pageAgent->mainFrame(), KURL(ParsedURLString, styleSheet->finalURL()));
+    if (resource)
+        return resource->response().httpHeaderField(sourceMapHttpHeader);
+    return String();
+}
+
+PassRefPtr<TypeBuilder::CSS::CSSStyleSheetHeader> InspectorCSSAgent::buildObjectForStyleSheetInfo(const InspectorStyleSheet* inspectorStyleSheet)
+{
+    RefPtr<TypeBuilder::CSS::CSSStyleSheetHeader> result = inspectorStyleSheet->buildObjectForStyleSheetInfo();
+    String sourceMapURL = sourceMapURLForStyleSheet(inspectorStyleSheet);
+    if (!sourceMapURL.isEmpty())
+        result->setSourceMapURL(sourceMapURL);
+    return result.release();
+}
+
 InspectorStyleSheet* InspectorCSSAgent::bindStyleSheet(CSSStyleSheet* styleSheet)
 {
     RefPtr<InspectorStyleSheet> inspectorStyleSheet = m_cssStyleSheetToInspectorStyleSheet.get(styleSheet);
@@ -1254,7 +1300,7 @@ InspectorStyleSheet* InspectorCSSAgent::viaInspectorStyleSheet(Document* documen
     if (ec)
         return 0;
 
-    return m_documentToInspectorStyleSheet.get(document).get();
+    return m_documentToInspectorStyleSheet.get(document);
 }
 
 InspectorStyleSheet* InspectorCSSAgent::assertStyleSheetForId(ErrorString* errorString, const String& styleSheetId)

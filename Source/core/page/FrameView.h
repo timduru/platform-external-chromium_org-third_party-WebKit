@@ -308,6 +308,14 @@ public:
     bool containsScrollableArea(ScrollableArea*) const;
     const ScrollableAreaSet* scrollableAreas() const { return m_scrollableAreas.get(); }
 
+    // With CSS style "resize:" enabled, a little resizer handle will appear at the bottom
+    // right of the object. We keep track of these resizer areas for checking if touches
+    // (implemented using Scroll gesture) are targeting the resizer.
+    typedef HashSet<RenderLayer*> ResizerAreaSet;
+    void addResizerArea(RenderLayer*);
+    void removeResizerArea(RenderLayer*);
+    const ResizerAreaSet* resizerAreas() const { return m_resizerAreas.get(); }
+
     virtual void removeChild(Widget*) OVERRIDE;
 
     // This function exists for ports that need to handle wheel events manually.
@@ -391,7 +399,6 @@ private:
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&) OVERRIDE;
     virtual void getTickmarks(Vector<IntRect>&) const OVERRIDE;
     virtual void scrollTo(const IntSize&) OVERRIDE;
-    virtual void setVisibleScrollerThumbRect(const IntRect&) OVERRIDE;
     virtual ScrollableArea* enclosingScrollableArea() const OVERRIDE;
     virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;
     virtual bool scrollAnimatorEnabled() const OVERRIDE;
@@ -526,6 +533,7 @@ private:
     IntSize m_maxAutoSize;
 
     OwnPtr<ScrollableAreaSet> m_scrollableAreas;
+    OwnPtr<ResizerAreaSet> m_resizerAreas;
     OwnPtr<ViewportConstrainedObjectSet> m_viewportConstrainedObjects;
 
     static double s_normalDeferredRepaintDelay;

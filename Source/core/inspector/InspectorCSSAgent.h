@@ -90,9 +90,9 @@ public:
 
     static CSSStyleRule* asCSSStyleRule(CSSRule*);
 
-    static PassOwnPtr<InspectorCSSAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorDOMAgent* domAgent)
+    static PassOwnPtr<InspectorCSSAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorDOMAgent* domAgent, InspectorPageAgent* pageAgent)
     {
-        return adoptPtr(new InspectorCSSAgent(instrumentingAgents, state, domAgent));
+        return adoptPtr(new InspectorCSSAgent(instrumentingAgents, state, domAgent, pageAgent));
     }
     ~InspectorCSSAgent();
 
@@ -109,7 +109,8 @@ public:
     void willRemoveNamedFlow(Document*, NamedFlow*);
     void didUpdateRegionLayout(Document*, NamedFlow*);
     void regionLayoutUpdated(NamedFlow*, int documentNodeId);
-    void activeStyleSheetsUpdated(const Vector<RefPtr<StyleSheet> >& newSheets);
+    void activeStyleSheetsUpdated(Document*, const Vector<RefPtr<StyleSheet> >& newSheets);
+    void frameDetachedFromParent(Frame*);
 
     virtual void getComputedStyleForNode(ErrorString*, int nodeId, RefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSComputedStyleProperty> >&);
     virtual void getInlineStylesForNode(ErrorString*, int nodeId, RefPtr<TypeBuilder::CSS::CSSStyle>& inlineStyle, RefPtr<TypeBuilder::CSS::CSSStyle>& attributes);
@@ -145,7 +146,7 @@ private:
     class SetRuleSelectorAction;
     class AddRuleAction;
 
-    InspectorCSSAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorDOMAgent*);
+    InspectorCSSAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorDOMAgent*, InspectorPageAgent*);
 
     typedef HashMap<String, RefPtr<InspectorStyleSheet> > IdToInspectorStyleSheet;
     typedef HashMap<Node*, RefPtr<InspectorStyleSheetForInlineStyle> > NodeToInspectorStyleSheet; // bogus "stylesheets" with elements' inline styles
@@ -158,6 +159,8 @@ private:
     int documentNodeWithRequestedFlowsId(Document*);
     void collectAllStyleSheets(Vector<InspectorStyleSheet*>&);
     void collectStyleSheets(CSSStyleSheet*, Vector<InspectorStyleSheet*>&);
+    String sourceMapURLForStyleSheet(const InspectorStyleSheet*);
+    PassRefPtr<TypeBuilder::CSS::CSSStyleSheetHeader> buildObjectForStyleSheetInfo(const InspectorStyleSheet*);
 
     InspectorStyleSheet* bindStyleSheet(CSSStyleSheet*);
     String unbindStyleSheet(InspectorStyleSheet*);
@@ -184,6 +187,7 @@ private:
 
     InspectorFrontend::CSS* m_frontend;
     InspectorDOMAgent* m_domAgent;
+    InspectorPageAgent* m_pageAgent;
 
     IdToInspectorStyleSheet m_idToInspectorStyleSheet;
     CSSStyleSheetToInspectorStyleSheet m_cssStyleSheetToInspectorStyleSheet;

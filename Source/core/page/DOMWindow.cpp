@@ -27,7 +27,13 @@
 #include "config.h"
 #include "core/page/DOMWindow.h"
 
+#include <wtf/CurrentTime.h>
+#include <wtf/MainThread.h>
+#include <wtf/MathExtras.h>
+#include <wtf/text/Base64.h>
+#include <wtf/text/WTFString.h>
 #include <algorithm>
+#include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ScheduledAction.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
 #include "bindings/v8/ScriptController.h"
@@ -38,7 +44,7 @@
 #include "core/css/MediaQueryList.h"
 #include "core/css/MediaQueryMatcher.h"
 #include "core/css/StyleMedia.h"
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/BeforeUnloadEvent.h"
 #include "core/dom/DOMStringList.h"
 #include "core/dom/DeviceOrientationController.h"
@@ -85,10 +91,7 @@
 #include "core/page/PageConsole.h"
 #include "core/page/PageGroup.h"
 #include "core/page/Performance.h"
-#include "RuntimeEnabledFeatures.h"
 #include "core/page/Screen.h"
-#include "core/page/SecurityOrigin.h"
-#include "core/page/SecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "core/page/WindowFocusAllowedIndicator.h"
@@ -101,11 +104,8 @@
 #include "core/storage/StorageNamespace.h"
 #include "modules/device_orientation/DeviceMotionController.h"
 #include "modules/notifications/DOMWindowNotifications.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/MainThread.h>
-#include <wtf/MathExtras.h>
-#include <wtf/text/Base64.h>
-#include <wtf/text/WTFString.h>
+#include "origin/SecurityOrigin.h"
+#include "origin/SecurityPolicy.h"
 
 using std::min;
 using std::max;
@@ -1623,16 +1623,6 @@ void DOMWindow::removeAllEventListeners()
     removeAllBeforeUnloadEventListeners(this);
 }
 
-void DOMWindow::captureEvents()
-{
-    // Not implemented.
-}
-
-void DOMWindow::releaseEvents()
-{
-    // Not implemented.
-}
-
 void DOMWindow::finishedLoading()
 {
     if (m_shouldPrintWhenFinishedLoading) {
@@ -1678,7 +1668,6 @@ void DOMWindow::setLocation(const String& urlString, DOMWindow* activeWindow, DO
     m_frame->navigationScheduler()->scheduleLocationChange(activeDocument->securityOrigin(),
         // FIXME: What if activeDocument()->frame() is 0?
         completedURL, activeDocument->frame()->loader()->outgoingReferrer(),
-        locking != LockHistoryBasedOnGestureState || !ScriptController::processingUserGesture(),
         locking != LockHistoryBasedOnGestureState);
 }
 
@@ -1791,11 +1780,9 @@ Frame* DOMWindow::createWindow(const String& urlString, const AtomicString& fram
         function(newFrame->document()->domWindow(), functionContext);
 
     if (created)
-        newFrame->loader()->changeLocation(activeWindow->document()->securityOrigin(), completedURL, referrer, false, false);
-    else if (!urlString.isEmpty()) {
-        bool lockHistory = !ScriptController::processingUserGesture();
-        newFrame->navigationScheduler()->scheduleLocationChange(activeWindow->document()->securityOrigin(), completedURL.string(), referrer, lockHistory, false);
-    }
+        newFrame->loader()->changeLocation(activeWindow->document()->securityOrigin(), completedURL, referrer, false);
+    else if (!urlString.isEmpty())
+        newFrame->navigationScheduler()->scheduleLocationChange(activeWindow->document()->securityOrigin(), completedURL.string(), referrer, false);
 
     return newFrame;
 }
@@ -1844,12 +1831,10 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
 
         // For whatever reason, Firefox uses the first window rather than the active window to
         // determine the outgoing referrer. We replicate that behavior here.
-        bool lockHistory = !ScriptController::processingUserGesture();
         targetFrame->navigationScheduler()->scheduleLocationChange(
             activeDocument->securityOrigin(),
             completedURL,
             firstFrame->loader()->outgoingReferrer(),
-            lockHistory,
             false);
         return targetFrame->document()->domWindow();
     }

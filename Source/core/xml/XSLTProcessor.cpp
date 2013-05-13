@@ -37,7 +37,7 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/SecurityOrigin.h"
+#include "origin/SecurityOrigin.h"
 
 #include <wtf/Assertions.h>
 #include <wtf/Vector.h>
@@ -98,7 +98,7 @@ PassRefPtr<Document> XSLTProcessor::createDocumentFromSource(const String& sourc
     }
 
     RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create(sourceMIMEType);
-    decoder->setEncoding(sourceEncoding.isEmpty() ? UTF8Encoding() : TextEncoding(sourceEncoding), TextResourceDecoder::EncodingFromXMLHeader);
+    decoder->setEncoding(sourceEncoding.isEmpty() ? UTF8Encoding() : WTF::TextEncoding(sourceEncoding), TextResourceDecoder::EncodingFromXMLHeader);
     result->setDecoder(decoder.release());
 
     result->setContent(documentSource);

@@ -59,7 +59,6 @@ class FormState;
 class FormSubmission;
 class FrameLoaderClient;
 class FrameNetworkingContext;
-class MHTMLArchive;
 class NavigationAction;
 class NetworkingContext;
 class Page;
@@ -97,23 +96,20 @@ public:
 
     // FIXME: These are all functions which start loads. We have too many.
     void loadURLIntoChildFrame(const KURL&, const String& referer, Frame*);
-    void loadFrameRequest(const FrameLoadRequest&, bool lockHistory, bool lockBackForwardList,  // Called by submitForm, calls loadPostRequest and loadURL.
+    void loadFrameRequest(const FrameLoadRequest&, bool lockBackForwardList,  // Called by submitForm, calls loadPostRequest and loadURL.
         PassRefPtr<Event>, PassRefPtr<FormState>, ShouldSendReferrer);
 
     void load(const FrameLoadRequest&);
 
-    void loadArchive(PassRefPtr<MHTMLArchive>);
     unsigned long loadResourceSynchronously(const ResourceRequest&, StoredCredentials, ResourceError&, ResourceResponse&, Vector<char>& data);
 
-    void changeLocation(SecurityOrigin*, const KURL&, const String& referrer, bool lockHistory = true, bool lockBackForwardList = true, bool refresh = false);
-    void urlSelected(const KURL&, const String& target, PassRefPtr<Event>, bool lockHistory, bool lockBackForwardList, ShouldSendReferrer);
+    void changeLocation(SecurityOrigin*, const KURL&, const String& referrer, bool lockBackForwardList = true, bool refresh = false);
+    void urlSelected(const KURL&, const String& target, PassRefPtr<Event>, bool lockBackForwardList, ShouldSendReferrer);
     void submitForm(PassRefPtr<FormSubmission>);
 
-    void reload(bool endToEndReload = false);
-    void reloadWithOverrideEncoding(const String& overrideEncoding);
-    void reloadWithOverrideURL(const KURL& overrideUrl, bool endToEndReload = false);
+    void reload(bool endToEndReload = false, const KURL& overrideURL = KURL(), const String& overrideEncoding = String());
 
-    void loadItem(HistoryItem*, FrameLoadType);
+    void loadItem(HistoryItem*);
     HistoryItem* requestedHistoryItem() const { return m_requestedHistoryItem.get(); }
 
     static void reportLocalLoadFailed(Frame*, const String& url);
@@ -243,7 +239,7 @@ public:
 
     void completed();
     bool allAncestorsAreComplete() const; // including this
-    void clientRedirected(const KURL&, double delay, double fireDate, bool lockBackForwardList);
+    void clientRedirected(const KURL&, double delay, double fireDate);
     void clientRedirectCancelledOrFinished();
 
     void setOriginalURLForDownloadRequest(ResourceRequest&);
@@ -251,8 +247,6 @@ public:
     bool suppressOpenerInNewFrame() const { return m_suppressOpenerInNewFrame; }
 
     static ObjectContentType defaultObjectContentType(const KURL&, const String& mimeType, bool shouldPreferPlugInsForImages);
-
-    bool quickRedirectComing() const { return m_quickRedirectComing; }
 
     bool shouldClose();
     
@@ -273,17 +267,12 @@ public:
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
-    enum FormSubmissionCacheLoadPolicy {
-        MayAttemptCacheOnlyLoadForFormSubmissionItem,
-        MayNotAttemptCacheOnlyLoadForFormSubmissionItem
-    };
-
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
     void checkTimerFired(Timer<FrameLoader>*);
     
     void loadSameDocumentItem(HistoryItem*);
-    void loadDifferentDocumentItem(HistoryItem*, FrameLoadType, FormSubmissionCacheLoadPolicy);
+    void loadDifferentDocumentItem(HistoryItem*);
     
     void updateFirstPartyForCookies();
     void setFirstPartyForCookies(const KURL&);
@@ -313,24 +302,20 @@ private:
 
     void closeOldDataSources();
 
-    bool shouldReloadToHandleUnreachableURL(DocumentLoader*);
+    bool shouldReloadToHandleUnreachableURL(const KURL&);
 
     void dispatchDidCommitLoad();
 
-    void urlSelected(const FrameLoadRequest&, PassRefPtr<Event>, bool lockHistory, bool lockBackForwardList, ShouldSendReferrer, ShouldReplaceDocumentIfJavaScriptURL);
+    void urlSelected(const FrameLoadRequest&, PassRefPtr<Event>, bool lockBackForwardList, ShouldSendReferrer);
 
-    void loadWithDocumentLoader(DocumentLoader*, FrameLoadType, PassRefPtr<FormState>); // Calls continueLoadAfterNavigationPolicy
-    void load(DocumentLoader*);                                                         // Calls loadWithDocumentLoader   
-
-    void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,      // Calls loadWithDocumentLoader
-        bool lockHistory, FrameLoadType, PassRefPtr<FormState>);
+    // Calls continueLoadAfterNavigationPolicy
+    void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,
+        FrameLoadType, PassRefPtr<FormState>, const SubstituteData&, const String& overrideEncoding = String());
 
     void loadPostRequest(const ResourceRequest&, const String& referrer,                // Called by loadFrameRequest, calls loadWithNavigationAction
-        const String& frameName, bool lockHistory, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);
+        const String& frameName, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);
     void loadURL(const KURL&, const String& referrer, const String& frameName,          // Called by loadFrameRequest, calls loadWithNavigationAction or dispatches to navigation policy delegate
-        bool lockHistory, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);                                                         
-
-    void reloadWithRequest(const ResourceRequest&, bool endToEndReload);
+        FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);
 
     bool shouldReload(const KURL& currentURL, const KURL& destinationURL);
 
@@ -342,7 +327,6 @@ private:
     void loadInSameDocument(const KURL&, PassRefPtr<SerializedScriptValue> stateObject, bool isNewNavigation);
 
     void prepareForLoadStart();
-    void provisionalLoadStarted();
 
     bool didOpenURL();
 
@@ -381,19 +365,14 @@ private:
 
     bool m_delegateIsHandlingProvisionalLoadError;
 
-    bool m_quickRedirectComing;
     bool m_inStopAllLoaders;
 
     String m_outgoingReferrer;
-
-    bool m_isExecutingJavaScriptFormAction;
 
     bool m_didCallImplicitClose;
     bool m_wasUnloadEventEmitted;
     PageDismissalType m_pageDismissalEventBeingDispatched;
     bool m_isComplete;
-
-    RefPtr<SerializedScriptValue> m_pendingStateObject;
 
     bool m_needsClear;
 

@@ -103,6 +103,7 @@
        ],
        'outputs': [
          '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
+         '<(SHARED_INTERMEDIATE_DIR)/DOMWindowConstructors.idl',
        ],
        'msvs_cygwin_shell': 0,
        'action': [
@@ -117,6 +118,8 @@
          '<(idl_files_list)',
          '--supplementalDependencyFile',
          '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
+         '--windowConstructorsFile',
+         '<(SHARED_INTERMEDIATE_DIR)/DOMWindowConstructors.idl',
        ],
        'message': 'Resolving partial interfaces dependencies in all IDL files',
       }]
@@ -127,7 +130,7 @@
       'hard_dependency': 1,
       'dependencies': [
         'supplemental_dependencies',
-        '../core/core.gyp/core_derived_sources.gyp:generate_settings',
+        '../core/core.gyp/core_derived_sources.gyp:generate_test_support_idls',
       ],
       'sources': [
         '<@(idl_files)',
@@ -156,12 +159,12 @@
         'msvs_external_rule': 1,
         'inputs': [
           'scripts/generate-bindings.pl',
-          'scripts/CodeGenerator.pm',
           'scripts/CodeGeneratorV8.pm',
           'scripts/IDLParser.pm',
           'scripts/IDLAttributes.txt',
           '../core/scripts/preprocessor.pm',
           '<!@pymod_do_main(supplemental_idl_files <@(idl_files))',
+          '<(SHARED_INTERMEDIATE_DIR)/DOMWindowConstructors.idl',
         ],
         'outputs': [
           # FIXME:  The .cpp file should be in webkit/bindings once

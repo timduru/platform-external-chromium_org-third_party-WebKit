@@ -87,6 +87,8 @@ public:
     virtual void closeHelperPlugin();
     virtual bool needsWebLayerForVideo() const;
     virtual void setWebLayer(WebLayer*);
+    virtual void addTextTrack(WebInbandTextTrack*);
+    virtual void removeTextTrack(WebInbandTextTrack*);
 
     // MediaPlayerPrivateInterface methods:
     virtual void load(const WTF::String& url);
@@ -158,7 +160,6 @@ private:
     void loadInternal();
 
     static PassOwnPtr<WebCore::MediaPlayerPrivateInterface> create(WebCore::MediaPlayer*);
-    static void getSupportedTypes(WTF::HashSet<WTF::String>&);
 #if ENABLE(ENCRYPTED_MEDIA)
     static WebCore::MediaPlayer::SupportsType supportsType(
         const WTF::String& type, const WTF::String& codecs, const String& keySystem, const WebCore::KURL&);

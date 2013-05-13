@@ -28,6 +28,7 @@
 #ifndef Document_h
 #define Document_h
 
+#include "core/animation/DocumentTimeline.h"
 #include "core/dom/ContainerNode.h"
 #include "core/dom/DOMTimeStamp.h"
 #include "core/dom/DocumentEventQueue.h"
@@ -44,7 +45,7 @@
 #include "core/page/FocusDirection.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/platform/PlatformScreen.h"
-#include "core/platform/ReferrerPolicy.h"
+#include "origin/ReferrerPolicy.h"
 #include "core/platform/Timer.h"
 #include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/IntRect.h"
@@ -89,7 +90,6 @@ class DocumentSharedObjectPool;
 class DocumentStyleSheetCollection;
 class DocumentType;
 class Element;
-class EntityReference;
 class Event;
 class EventListener;
 class FloatRect;
@@ -191,15 +191,27 @@ const int numNodeListInvalidationTypes = InvalidateOnAnyAttrChange + 1;
 
 typedef HashCountedSet<Node*> TouchEventTargetSet;
 
+enum DocumentClass {
+    DefaultDocumentClass = 0,
+    HTMLDocumentClass = 1,
+    XHTMLDocumentClass = 1 << 1,
+    ImageDocumentClass = 1 << 2,
+    PluginDocumentClass = 1 << 3,
+    MediaDocumentClass = 1 << 4,
+    SVGDocumentClass = 1 << 5,
+};
+
+typedef unsigned char DocumentClassFlags;
+
 class Document : public ContainerNode, public TreeScope, public ScriptExecutionContext {
 public:
     static PassRefPtr<Document> create(Frame* frame, const KURL& url)
     {
-        return adoptRef(new Document(frame, url, false, false));
+        return adoptRef(new Document(frame, url));
     }
     static PassRefPtr<Document> createXHTML(Frame* frame, const KURL& url)
     {
-        return adoptRef(new Document(frame, url, true, false));
+        return adoptRef(new Document(frame, url, XHTMLDocumentClass));
     }
     virtual ~Document();
 
@@ -293,8 +305,8 @@ public:
     }
 
     bool hasManifest() const;
-    
-    virtual PassRefPtr<Element> createElement(const AtomicString& tagName, ExceptionCode&);
+
+    PassRefPtr<Element> createElement(const AtomicString& name, ExceptionCode&);
     PassRefPtr<DocumentFragment> createDocumentFragment();
     PassRefPtr<Text> createTextNode(const String& data);
     PassRefPtr<Comment> createComment(const String& data);
@@ -302,10 +314,9 @@ public:
     PassRefPtr<ProcessingInstruction> createProcessingInstruction(const String& target, const String& data, ExceptionCode&);
     PassRefPtr<Attr> createAttribute(const String& name, ExceptionCode&);
     PassRefPtr<Attr> createAttributeNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&, bool shouldIgnoreNamespaceChecks = false);
-    PassRefPtr<EntityReference> createEntityReference(const String& name, ExceptionCode&);
     PassRefPtr<Node> importNode(Node* importedNode, ExceptionCode& ec) { return importNode(importedNode, true, ec); }
     PassRefPtr<Node> importNode(Node* importedNode, bool deep, ExceptionCode&);
-    virtual PassRefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&);
+    PassRefPtr<Element> createElementNS(const String& namespaceURI, const String& qualifiedName, ExceptionCode&);
     PassRefPtr<Element> createElement(const QualifiedName&, bool createdByParser);
 
     bool cssStickyPositionEnabled() const;
@@ -391,20 +402,20 @@ public:
     PassRefPtr<HTMLCollection> windowNamedItems(const AtomicString& name);
     PassRefPtr<HTMLCollection> documentNamedItems(const AtomicString& name);
 
-    // Other methods (not part of DOM)
-    bool isHTMLDocument() const { return m_isHTML; }
-    bool isXHTMLDocument() const { return m_isXHTML; }
-    virtual bool isImageDocument() const { return false; }
+    bool isHTMLDocument() const { return m_documentClasses & HTMLDocumentClass; }
+    bool isXHTMLDocument() const { return m_documentClasses & XHTMLDocumentClass; }
+    bool isImageDocument() const { return m_documentClasses & ImageDocumentClass; }
+    bool isSVGDocument() const { return m_documentClasses & SVGDocumentClass; }
+    bool isPluginDocument() const { return m_documentClasses & PluginDocumentClass; }
+    bool isMediaDocument() const { return m_documentClasses & MediaDocumentClass; }
+
 #if ENABLE(SVG)
-    virtual bool isSVGDocument() const { return false; }
     bool hasSVGRootNode() const;
 #else
-    static bool isSVGDocument() { return false; }
     static bool hasSVGRootNode() { return false; }
 #endif
-    virtual bool isPluginDocument() const { return false; }
-    virtual bool isMediaDocument() const { return false; }
-    virtual bool isFrameSet() const { return false; }
+
+    bool isFrameSet() const;
 
     bool isSrcdocDocument() const { return m_isSrcdocDocument; }
 
@@ -899,10 +910,10 @@ public:
 
     virtual void postTask(PassOwnPtr<Task>); // Executes the task on context's thread asynchronously.
 
-    virtual void suspendScriptedAnimationControllerCallbacks();
-    virtual void resumeScriptedAnimationControllerCallbacks();
-    
-    virtual void finishedParsing();
+    void suspendScriptedAnimationControllerCallbacks();
+    void resumeScriptedAnimationControllerCallbacks();
+
+    void finishedParsing();
 
     void documentWillBecomeInactive();
 
@@ -1089,6 +1100,8 @@ public:
     // Return a Locale for the default locale if the argument is null or empty.
     Locale& getCachedLocale(const AtomicString& locale = nullAtom);
 
+    DocumentTimeline* timeline() { return m_timeline.get(); }
+
     void addToTopLayer(Element*);
     void removeFromTopLayer(Element*);
     const Vector<RefPtr<Element> >& topLayerElements() const { return m_topLayerElements; }
@@ -1108,7 +1121,7 @@ public:
     PassRefPtr<FontLoader> fontloader();
 
 protected:
-    Document(Frame*, const KURL&, bool isXHTML, bool isHTML);
+    Document(Frame*, const KURL&, DocumentClassFlags = DefaultDocumentClass);
 
     virtual void didUpdateSecurityOrigin() OVERRIDE;
 
@@ -1355,8 +1368,7 @@ private:
 
     bool m_useSecureKeyboardEntryWhenActive;
 
-    bool m_isXHTML;
-    bool m_isHTML;
+    DocumentClassFlags m_documentClasses;
 
     bool m_isViewSource;
     bool m_sawElementsInKnownNamespaces;
@@ -1430,6 +1442,8 @@ private:
 
     typedef HashMap<AtomicString, OwnPtr<Locale> > LocaleIdentifierToLocaleMap;
     LocaleIdentifierToLocaleMap m_localeCache;
+
+    RefPtr<DocumentTimeline> m_timeline;
 
     RefPtr<Document> m_templateDocument;
     Document* m_templateDocumentHost; // Manually managed weakref (backpointer from m_templateDocument).

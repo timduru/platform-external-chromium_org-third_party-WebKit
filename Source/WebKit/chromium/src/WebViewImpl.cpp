@@ -31,6 +31,24 @@
 #include "config.h"
 #include "WebViewImpl.h"
 
+#include <public/Platform.h>
+#include <public/WebCompositorOutputSurface.h>
+#include <public/WebCompositorSupport.h>
+#include <public/WebDragData.h>
+#include <public/WebFloatPoint.h>
+#include <public/WebGraphicsContext3D.h>
+#include <public/WebImage.h>
+#include <public/WebLayer.h>
+#include <public/WebLayerTreeView.h>
+#include <public/WebPoint.h>
+#include <public/WebRect.h>
+#include <public/WebString.h>
+#include <public/WebVector.h>
+#include <wtf/CurrentTime.h>
+#include <wtf/MainThread.h>
+#include <wtf/RefPtr.h>
+#include <wtf/TemporaryChange.h>
+#include <wtf/Uint8ClampedArray.h>
 #include "AutofillPopupMenuClient.h"
 #include "BatteryClientImpl.h"
 #include "CSSValueKeywords.h"
@@ -73,7 +91,7 @@
 #include "WebTextInputInfo.h"
 #include "WebViewClient.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/KeyboardEvent.h"
@@ -105,8 +123,6 @@
 #include "core/page/PageGroupLoadDeferrer.h"
 #include "core/page/PagePopupClient.h"
 #include "core/page/PointerLockController.h"
-#include "core/page/SecurityOrigin.h"
-#include "core/page/SecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/page/TouchDisambiguation.h"
 #include "core/platform/ContextMenu.h"
@@ -120,7 +136,6 @@
 #include "core/platform/PlatformMouseEvent.h"
 #include "core/platform/PlatformWheelEvent.h"
 #include "core/platform/PopupMenuClient.h"
-#include "core/platform/SchemeRegistry.h"
 #include "core/platform/Timer.h"
 #include "core/platform/chromium/KeyboardCodes.h"
 #include "core/platform/chromium/PopupContainer.h"
@@ -137,32 +152,16 @@
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/chromium/LayerPainterChromium.h"
 #include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
-#include "core/platform/graphics/skia/PlatformContextSkia.h"
 #include "core/platform/network/ResourceHandle.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "modules/battery/BatteryController.h"
 #include "modules/geolocation/GeolocationController.h"
+#include "origin/SchemeRegistry.h"
+#include "origin/SecurityOrigin.h"
+#include "origin/SecurityPolicy.h"
 #include "painting/ContinuousPainter.h"
-#include <public/Platform.h>
-#include <public/WebCompositorOutputSurface.h>
-#include <public/WebCompositorSupport.h>
-#include <public/WebDragData.h>
-#include <public/WebFloatPoint.h>
-#include <public/WebGraphicsContext3D.h>
-#include <public/WebImage.h>
-#include <public/WebLayer.h>
-#include <public/WebLayerTreeView.h>
-#include <public/WebPoint.h>
-#include <public/WebRect.h>
-#include <public/WebString.h>
-#include <public/WebVector.h>
-#include <wtf/CurrentTime.h>
-#include <wtf/MainThread.h>
-#include <wtf/RefPtr.h>
-#include <wtf/TemporaryChange.h>
-#include <wtf/Uint8ClampedArray.h>
 
 #if ENABLE(DEFAULT_RENDER_THEME)
 #include "core/platform/chromium/PlatformThemeChromiumDefault.h"
@@ -2588,7 +2587,7 @@ void WebViewImpl::setPageEncoding(const WebString& encodingName)
     String newEncodingName;
     if (!encodingName.isEmpty())
         newEncodingName = encodingName;
-    m_page->mainFrame()->loader()->reloadWithOverrideEncoding(newEncodingName);
+    m_page->mainFrame()->loader()->reload(false, KURL(), newEncodingName);
 }
 
 bool WebViewImpl::dispatchBeforeUnloadEvent()
@@ -3514,7 +3513,8 @@ void WebViewImpl::applyAutofillSuggestions(
         refreshAutofillPopup();
     } else {
         m_autofillPopupShowing = true;
-        m_autofillPopup->showInRect(focusedNode->pixelSnappedBoundingBox(), focusedNode->ownerDocument()->view(), 0);
+        IntRect rect = focusedNode->pixelSnappedBoundingBox();
+        m_autofillPopup->showInRect(FloatQuad(rect), rect.size(), focusedNode->ownerDocument()->view(), 0);
     }
 }
 

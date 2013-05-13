@@ -61,7 +61,6 @@
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PagePopupDriver.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/page/Settings.h"
 #include "core/platform/Cursor.h"
 #include "core/platform/DateTimeChooser.h"
@@ -71,7 +70,6 @@
 #include "core/platform/PlatformScreen.h"
 #include "core/platform/chromium/PopupContainer.h"
 #include "core/platform/chromium/PopupMenuChromium.h"
-#include "core/platform/chromium/SearchPopupMenuChromium.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/Icon.h"
 #include "core/platform/graphics/IntRect.h"
@@ -79,9 +77,17 @@
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderWidget.h"
 #include "modules/geolocation/Geolocation.h"
+#include "origin/SecurityOrigin.h"
 #if ENABLE(INPUT_TYPE_COLOR)
 #include "WebColorChooser.h"
 #endif
+#include <public/Platform.h>
+#include <public/WebRect.h>
+#include <public/WebURLRequest.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/StringBuilder.h>
+#include <wtf/text/StringConcatenate.h>
+#include <wtf/unicode/CharacterNames.h>
 #include "WebConsoleMessage.h"
 #include "WebCursorInfo.h"
 #include "WebFileChooserCompletionImpl.h"
@@ -104,13 +110,6 @@
 #include "WebWindowFeatures.h"
 #include "core/page/WindowFeatures.h"
 #include "core/platform/chromium/support/WrappedResourceRequest.h"
-#include <public/Platform.h>
-#include <public/WebRect.h>
-#include <public/WebURLRequest.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/text/StringConcatenate.h>
-#include <wtf/unicode/CharacterNames.h>
 
 using namespace WebCore;
 
@@ -980,11 +979,6 @@ PassRefPtr<PopupMenu> ChromeClientImpl::createPopupMenu(PopupMenuClient* client)
         return adoptRef(new ExternalPopupMenu(client, m_webView->client()));
 
     return adoptRef(new PopupMenuChromium(client));
-}
-
-PassRefPtr<SearchPopupMenu> ChromeClientImpl::createSearchPopupMenu(PopupMenuClient* client) const
-{
-    return adoptRef(new SearchPopupMenuChromium(client));
 }
 
 #if ENABLE(PAGE_POPUP)

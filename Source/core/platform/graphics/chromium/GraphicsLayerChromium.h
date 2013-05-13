@@ -51,16 +51,6 @@ namespace WebCore {
 class Path;
 class ScrollableArea;
 
-class LinkHighlightClient {
-public:
-    virtual void invalidate() = 0;
-    virtual void clearCurrentGraphicsLayer() = 0;
-    virtual WebKit::WebLayer* layer() = 0;
-
-protected:
-    virtual ~LinkHighlightClient() { }
-};
-
 class GraphicsLayerChromium : public GraphicsLayer, public GraphicsContextPainter, public WebKit::WebAnimationDelegate, public WebKit::WebLayerScrollClient {
 public:
     GraphicsLayerChromium(GraphicsLayerClient*);
@@ -113,9 +103,6 @@ public:
 
     virtual void setContentsRect(const IntRect&);
 
-    static void registerContentsLayer(WebKit::WebLayer*);
-    static void unregisterContentsLayer(WebKit::WebLayer*);
-
     virtual void setContentsToImage(Image*) OVERRIDE;
     virtual void setContentsToMedia(PlatformLayer*) OVERRIDE;
     virtual void setContentsToCanvas(PlatformLayer*) OVERRIDE;
@@ -133,9 +120,6 @@ public:
     LinkHighlightClient* linkHighlight() { return m_linkHighlight; }
 
     virtual WebKit::WebLayer* platformLayer() const;
-
-    virtual void setAppliesPageScale(bool appliesScale) OVERRIDE;
-    virtual bool appliesPageScale() const OVERRIDE;
 
     void setScrollableArea(ScrollableArea* scrollableArea) { m_scrollableArea = scrollableArea; }
     ScrollableArea* scrollableArea() const { return m_scrollableArea; }
@@ -157,61 +141,7 @@ public:
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
-private:
-    void updateNames();
-    void updateChildList();
-    void updateLayerPosition();
-    void updateLayerSize();
-    void updateAnchorPoint();
-    void updateTransform();
-    void updateChildrenTransform();
-    void updateMasksToBounds();
-    void updateLayerPreserves3D();
-    void updateLayerIsDrawable();
-    void updateLayerBackgroundColor();
-
-    void updateContentsImage();
-    void updateContentsVideo();
-    void updateContentsRect();
-
-    enum ContentsLayerPurpose {
-        NoContentsLayer = 0,
-        ContentsLayerForImage,
-        ContentsLayerForVideo,
-        ContentsLayerForCanvas,
-    };
-
-    void setContentsTo(ContentsLayerPurpose, WebKit::WebLayer*);
-    void setupContentsLayer(WebKit::WebLayer*);
-    void clearContentsLayerIfUnregistered();
-    WebKit::WebLayer* contentsLayerIfRegistered();
-
-    String m_nameBase;
-
-    Color m_contentsSolidColor;
-
-    OwnPtr<WebKit::WebContentLayer> m_layer;
-    OwnPtr<WebKit::WebLayer> m_transformLayer;
-    OwnPtr<WebKit::WebImageLayer> m_imageLayer;
-    OwnPtr<WebKit::WebSolidColorLayer> m_contentsSolidColorLayer;
-    WebKit::WebLayer* m_contentsLayer;
-    // We don't have ownership of m_contentsLayer, but we do want to know if a given layer is the
-    // same as our current layer in setContentsTo(). Since m_contentsLayer may be deleted at this point,
-    // we stash an ID away when we know m_contentsLayer is alive and use that for comparisons from that point
-    // on.
-    int m_contentsLayerId;
-
-    LinkHighlightClient* m_linkHighlight;
-
-    OwnPtr<OpaqueRectTrackingContentLayerDelegate> m_opaqueRectTrackingContentLayerDelegate;
-
-    ContentsLayerPurpose m_contentsLayerPurpose;
-    bool m_inSetChildren;
-
-    typedef HashMap<String, int> AnimationIdMap;
-    AnimationIdMap m_animationIdMap;
-
-    ScrollableArea* m_scrollableArea;
+    virtual void setAnimationDelegateForLayer(WebKit::WebLayer*) OVERRIDE;
 };
 
 } // namespace WebCore

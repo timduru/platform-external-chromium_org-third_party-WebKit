@@ -33,12 +33,9 @@
 
     // Extensions
 
-    [Replaceable] attribute HTMLAllCollection all;
+    [Replaceable] readonly attribute HTMLAllCollection all;
 
-    void clear();
-
-    void captureEvents();
-    void releaseEvents();
+    [DeprecateAs=DocumentClear] void clear();
 
     readonly attribute long width;
     readonly attribute long height;

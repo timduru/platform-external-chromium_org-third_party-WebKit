@@ -918,7 +918,7 @@ DragSourceAction EventHandler::updateDragSourceActionsAllowed() const
     if (!view)
         return DragSourceActionNone;
 
-    return page->dragController()->delegateDragSourceAction(view->contentsToRootView(m_mouseDownPos));
+    return page->dragController()->delegateDragSourceAction();
 }
 
 HitTestResult EventHandler::hitTestResultAtPoint(const LayoutPoint& point, HitTestRequest::HitTestRequestType hitType, const LayoutSize& padding)
@@ -1205,7 +1205,7 @@ OptionalCursor EventHandler::selectCursor(const MouseEventWithHitTestResults& ev
         if (renderer) {
             if (RenderLayer* layer = renderer->enclosingLayer()) {
                 if (FrameView* view = m_frame->view())
-                    inResizer = layer->isPointInResizeControl(view->windowToContents(event.event().position()));
+                    inResizer = layer->isPointInResizeControl(view->windowToContents(event.event().position()), RenderLayer::ResizerForPointer);
             }
         }
         if ((editable || (renderer && renderer->isText() && node->canStartSelection())) && !inResizer && !scrollbar)
@@ -1369,7 +1369,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
     if (FrameView* view = m_frame->view()) {
         RenderLayer* layer = m_clickNode->renderer() ? m_clickNode->renderer()->enclosingLayer() : 0;
         IntPoint p = view->windowToContents(mouseEvent.position());
-        if (layer && layer->isPointInResizeControl(p)) {
+        if (layer && layer->isPointInResizeControl(p, RenderLayer::ResizerForPointer)) {
             layer->setInResizeMode(true);
             m_resizeLayer = layer;
             m_offsetFromResizeCorner = layer->offsetFromResizeCorner(p);
@@ -2272,7 +2272,8 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
 
     IntPoint adjustedPoint = gestureEvent.position();
     HitTestRequest::HitTestRequestType hitType = HitTestRequest::TouchEvent;
-    if (gestureEvent.type() == PlatformEvent::GestureTapDown) {
+    if (gestureEvent.type() == PlatformEvent::GestureTapDown ||
+        gestureEvent.type() == PlatformEvent::GestureTapUnconfirmed) {
         adjustGesturePosition(gestureEvent, adjustedPoint);
         hitType |= HitTestRequest::Active;
     } else if (gestureEvent.type() == PlatformEvent::GestureTapDownCancel)
@@ -2312,7 +2313,11 @@ bool EventHandler::handleGestureEvent(const PlatformGestureEvent& gestureEvent)
     }
 
     if (eventTarget) {
-        bool eventSwallowed = eventTarget->dispatchGestureEvent(gestureEvent);
+        bool eventSwallowed = false;
+        if (handleScrollGestureOnResizer(eventTarget, gestureEvent))
+            eventSwallowed = true;
+        else
+            eventSwallowed = eventTarget->dispatchGestureEvent(gestureEvent);
         if (gestureEvent.type() == PlatformEvent::GestureScrollBegin || gestureEvent.type() == PlatformEvent::GestureScrollEnd) {
             if (eventSwallowed)
                 m_scrollGestureHandlingNode = eventTarget;
@@ -2418,14 +2423,16 @@ bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEve
     bool shouldLongPressSelectWord = m_frame->settings() && m_frame->settings()->touchEditingEnabled();
 #endif
     if (shouldLongPressSelectWord) {
-      IntPoint hitTestPoint = m_frame->view()->windowToContents(gestureEvent.position());
-      HitTestResult result = hitTestResultAtPoint(hitTestPoint, HitTestRequest::ReadOnly | HitTestRequest::Active);
-      Node* innerNode = result.targetNode();
-      if (!result.isLiveLink() && innerNode && (innerNode->isContentEditable() || innerNode->isTextNode())) {
-          selectClosestWordFromHitTestResult(result, DontAppendTrailingWhitespace);
-          if (m_frame->selection()->isRange())
-              return true;
-      }
+        IntPoint hitTestPoint = m_frame->view()->windowToContents(gestureEvent.position());
+        HitTestResult result = hitTestResultAtPoint(hitTestPoint, HitTestRequest::ReadOnly | HitTestRequest::Active);
+        Node* innerNode = result.targetNode();
+        if (!result.isLiveLink() && innerNode && (innerNode->isContentEditable() || innerNode->isTextNode())) {
+            selectClosestWordFromHitTestResult(result, DontAppendTrailingWhitespace);
+            if (m_frame->selection()->isRange()) {
+                focusDocumentView();
+                return true;
+            }
+        }
     }
     return sendContextMenuEventForGesture(gestureEvent);
 }
@@ -2443,6 +2450,33 @@ bool EventHandler::handleGestureLongTap(const PlatformGestureEvent& gestureEvent
         return sendContextMenuEventForGesture(gestureEvent);
     }
 #endif
+    return false;
+}
+
+bool EventHandler::handleScrollGestureOnResizer(Node* eventTarget, const PlatformGestureEvent& gestureEvent) {
+    if (gestureEvent.type() == PlatformEvent::GestureScrollBegin) {
+        RenderLayer* layer = eventTarget->renderer() ? eventTarget->renderer()->enclosingLayer() : 0;
+        IntPoint p = m_frame->view()->windowToContents(gestureEvent.position());
+        if (layer && layer->isPointInResizeControl(p, RenderLayer::ResizerForTouch)) {
+            layer->setInResizeMode(true);
+            m_resizeLayer = layer;
+            m_offsetFromResizeCorner = layer->offsetFromResizeCorner(p);
+            return true;
+        }
+    } else if (gestureEvent.type() == PlatformEvent::GestureScrollUpdate ||
+               gestureEvent.type() == PlatformEvent::GestureScrollUpdateWithoutPropagation) {
+        if (m_resizeLayer && m_resizeLayer->inResizeMode()) {
+            m_resizeLayer->resize(gestureEvent, m_offsetFromResizeCorner);
+            return true;
+        }
+    } else if (gestureEvent.type() == PlatformEvent::GestureScrollEnd) {
+        if (m_resizeLayer && m_resizeLayer->inResizeMode()) {
+            m_resizeLayer->setInResizeMode(false);
+            m_resizeLayer = 0;
+            return false;
+        }
+    }
+
     return false;
 }
 
@@ -2497,14 +2531,14 @@ bool EventHandler::handleGestureScrollBegin(const PlatformGestureEvent& gestureE
     HitTestResult result(viewPoint);
     document->renderView()->hitTest(request, result);
 
-    m_lastHitTestResultOverWidget = result.isOverWidget(); 
+    m_lastHitTestResultOverWidget = result.isOverWidget();
     m_scrollGestureHandlingNode = result.innerNode();
     m_previousGestureScrolledNode = 0;
 
     Node* node = m_scrollGestureHandlingNode.get();
     if (node)
         passGestureEventToWidgetIfPossible(gestureEvent, node->renderer());
-    
+
     return node && node->renderer();
 }
 
@@ -2659,6 +2693,7 @@ bool EventHandler::adjustGesturePosition(const PlatformGestureEvent& gestureEven
     Node* targetNode = 0;
     switch (gestureEvent.type()) {
     case PlatformEvent::GestureTap:
+    case PlatformEvent::GestureTapUnconfirmed:
     case PlatformEvent::GestureTapDown:
         bestClickableNodeForTouchPoint(gestureEvent.position(), IntSize(gestureEvent.area().width() / 2, gestureEvent.area().height() / 2), adjustedPoint, targetNode);
         break;
@@ -3009,36 +3044,18 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
         return keydown->defaultHandled() || keydown->defaultPrevented() || changedFocusedFrame;
     }
 
-    // Run input method in advance of DOM event handling.  This may result in the IM
-    // modifying the page prior the keydown event, but this behaviour is necessary
-    // in order to match IE:
-    // 1. preventing default handling of keydown and keypress events has no effect on IM input;
-    // 2. if an input method handles the event, its keyCode is set to 229 in keydown event.
-    m_frame->editor()->handleInputMethodKeydown(keydown.get());
-    
-    bool handledByInputMethod = keydown->defaultHandled();
-    
-    if (handledByInputMethod) {
-        keyDownEvent.setWindowsVirtualKeyCode(CompositionEventKeyCode);
-        keydown = KeyboardEvent::create(keyDownEvent, m_frame->document()->defaultView());
-        keydown->setTarget(node);
-        keydown->setDefaultHandled();
-    }
-
     node->dispatchEvent(keydown, IGNORE_EXCEPTION);
     // If frame changed as a result of keydown dispatch, then return early to avoid sending a subsequent keypress message to the new frame.
     bool changedFocusedFrame = m_frame->page() && m_frame != m_frame->page()->focusController()->focusedOrMainFrame();
     bool keydownResult = keydown->defaultHandled() || keydown->defaultPrevented() || changedFocusedFrame;
-    if (handledByInputMethod || keydownResult)
+    if (keydownResult)
         return keydownResult;
     
     // Focus may have changed during keydown handling, so refetch node.
     // But if we are dispatching a fake backward compatibility keypress, then we pretend that the keypress happened on the original node.
-    if (!keydownResult) {
-        node = eventTargetNodeForDocument(m_frame->document());
-        if (!node)
-            return false;
-    }
+    node = eventTargetNodeForDocument(m_frame->document());
+    if (!node)
+        return false;
 
     PlatformKeyboardEvent keyPressEvent = initialKeyEvent;
     keyPressEvent.disambiguateKeyDownEvent(PlatformEvent::Char);

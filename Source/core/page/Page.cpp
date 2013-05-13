@@ -41,7 +41,6 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/ProgressTracker.h"
 #include "core/loader/TextResourceDecoder.h"
-#include "core/page/AlternativeTextClient.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/ContextMenuClient.h"
@@ -65,7 +64,6 @@
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/FileSystem.h"
 #include "core/platform/Logging.h"
-#include "core/platform/SchemeRegistry.h"
 #include "core/platform/SharedBuffer.h"
 #include "core/platform/Widget.h"
 #include "core/platform/network/NetworkStateNotifier.h"
@@ -76,11 +74,12 @@
 #include "core/rendering/RenderWidget.h"
 #include "core/storage/StorageArea.h"
 #include "core/storage/StorageNamespace.h"
-#include <wtf/HashMap.h>
-#include <wtf/RefCountedLeakCounter.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/Base64.h>
-#include <wtf/text/StringHash.h>
+#include "origin/SchemeRegistry.h"
+#include "wtf/HashMap.h"
+#include "wtf/RefCountedLeakCounter.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/text/Base64.h"
+#include "wtf/text/StringHash.h"
 
 namespace WebCore {
 
@@ -150,7 +149,6 @@ Page::Page(PageClients& pageClients)
 #ifndef NDEBUG
     , m_isPainting(false)
 #endif
-    , m_alternativeTextClient(pageClients.alternativeTextClient)
     , m_console(PageConsole::create(this))
 {
     ASSERT(m_editorClient);
@@ -180,11 +178,8 @@ Page::~Page()
         frame->detachFromPage();
     }
 
-    m_editorClient->pageDestroyed();
     if (m_plugInClient)
         m_plugInClient->pageDestroyed();
-    if (m_alternativeTextClient)
-        m_alternativeTextClient->pageDestroyed();
 
     m_inspectorController->inspectedPageDestroyed();
 
@@ -243,7 +238,7 @@ PassRefPtr<ClientRectList> Page::nonFastScrollableRects(const Frame* frame)
 
     Vector<IntRect> rects;
     if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator())
-        rects = scrollingCoordinator->computeNonFastScrollableRegion(frame, IntPoint()).rects();
+        rects = scrollingCoordinator->computeShouldHandleScrollGestureOnMainThreadRegion(frame, IntPoint()).rects();
 
     Vector<FloatQuad> quads(rects.size());
     for (size_t i = 0; i < rects.size(); ++i)
@@ -272,7 +267,7 @@ bool Page::goBack()
     HistoryItem* item = backForward()->backItem();
 
     if (item) {
-        goToItem(item, FrameLoadTypeBack);
+        goToItem(item);
         return true;
     }
     return false;
@@ -283,7 +278,7 @@ bool Page::goForward()
     HistoryItem* item = backForward()->forwardItem();
 
     if (item) {
-        goToItem(item, FrameLoadTypeForward);
+        goToItem(item);
         return true;
     }
     return false;
@@ -319,10 +314,10 @@ void Page::goBackOrForward(int distance)
     if (!item)
         return;
 
-    goToItem(item, FrameLoadTypeIndexedBackForward);
+    goToItem(item);
 }
 
-void Page::goToItem(HistoryItem* item, FrameLoadType type)
+void Page::goToItem(HistoryItem* item)
 {
     // stopAllLoaders may end up running onload handlers, which could cause further history traversals that may lead to the passed in HistoryItem
     // being deref()-ed. Make sure we can still use it with HistoryController::goToItem later.
@@ -331,7 +326,7 @@ void Page::goToItem(HistoryItem* item, FrameLoadType type)
     if (m_mainFrame->loader()->history()->shouldStopLoadingForHistoryItem(item))
         m_mainFrame->loader()->stopAllLoaders();
 
-    m_mainFrame->loader()->history()->goToItem(item, type);
+    m_mainFrame->loader()->history()->goToItem(item);
 }
 
 int Page::getHistoryLength()
@@ -814,7 +809,6 @@ void Page::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_bottomRelevantPaintedRegion, "relevantPaintedRegion");
     info.addMember(m_relevantUnpaintedRegion, "relevantUnpaintedRegion");
 
-    info.ignoreMember(m_alternativeTextClient);
     info.ignoreMember(m_editorClient);
     info.ignoreMember(m_plugInClient);
     info.ignoreMember(m_validationMessageClient);
@@ -827,8 +821,7 @@ void Page::captionPreferencesChanged()
 }
 
 Page::PageClients::PageClients()
-    : alternativeTextClient(0)
-    , chromeClient(0)
+    : chromeClient(0)
     , contextMenuClient(0)
     , editorClient(0)
     , dragClient(0)

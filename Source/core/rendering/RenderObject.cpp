@@ -31,7 +31,7 @@
 #include <algorithm>
 #include "HTMLNames.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/editing/EditingBoundary.h"
 #include "core/editing/FrameSelection.h"
@@ -1144,7 +1144,16 @@ void RenderObject::addPDFURLRect(GraphicsContext* context, const LayoutRect& rec
     const AtomicString& href = toElement(n)->getAttribute(hrefAttr);
     if (href.isNull())
         return;
-    context->setURLForRect(n->document()->completeURL(href), pixelSnappedIntRect(rect));
+    KURL url = n->document()->completeURL(href);
+    if (!url.isValid())
+        return;
+    if (context->supportsURLFragments() && url.hasFragmentIdentifier() && equalIgnoringFragmentIdentifier(url, n->document()->baseURL())) {
+        String name = url.fragmentIdentifier();
+        if (document()->findAnchor(name))
+            context->setURLFragmentForRect(name, pixelSnappedIntRect(rect));
+        return;
+    }
+    context->setURLForRect(url, pixelSnappedIntRect(rect));
 }
 
 void RenderObject::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRect)
@@ -2367,7 +2376,7 @@ bool RenderObject::isSelectionBorder() const
 
 inline void RenderObject::clearLayoutRootIfNeeded() const
 {
-    if (!documentBeingDestroyed() && frame()) {
+    if (frame()) {
         if (FrameView* view = frame()->view()) {
             if (view->layoutRoot() == this) {
                 ASSERT_NOT_REACHED();
@@ -2782,6 +2791,11 @@ PassRefPtr<RenderStyle> RenderObject::getUncachedPseudoStyle(const PseudoStyleRe
     }
 
     return document()->styleResolver()->pseudoStyleForElement(element, pseudoStyleRequest, parentStyle);
+}
+
+bool RenderObject::hasBlendMode() const
+{
+    return RuntimeEnabledFeatures::cssCompositingEnabled() && style() && style()->hasBlendMode();
 }
 
 static Color decorationColor(RenderStyle* style)

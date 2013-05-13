@@ -44,27 +44,13 @@
 #undef NO_ERROR
 #endif
 
-typedef void* PlatformGraphicsContext3D;
-typedef void* PlatformGraphicsSurface3D;
-
 class GrContext;
-
-// These are currently the same among all implementations.
-const PlatformGraphicsContext3D NullPlatformGraphicsContext3D = 0;
-const Platform3DObject NullPlatform3DObject = 0;
 
 namespace WebCore {
 class DrawingBuffer;
 class Extensions3D;
-#if USE(OPENGL_ES_2)
-class Extensions3DOpenGLES;
-#else
-class Extensions3DOpenGL;
-#endif
-class HostWindow;
 class Image;
 class ImageBuffer;
-class ImageSource;
 class ImageData;
 class IntRect;
 class IntSize;
@@ -420,12 +406,6 @@ public:
         KURL topDocumentURL;
     };
 
-    enum RenderStyle {
-        RenderOffscreen,
-        RenderDirectlyToHostWindow,
-        RenderToCurrentGLContext
-    };
-
     class ContextLostCallback {
     public:
         virtual void onContextLost() = 0;
@@ -441,28 +421,17 @@ public:
     void setContextLostCallback(PassOwnPtr<ContextLostCallback>);
     void setErrorMessageCallback(PassOwnPtr<ErrorMessageCallback>);
 
-    static PassRefPtr<GraphicsContext3D> create(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
+    static PassRefPtr<GraphicsContext3D> create(Attributes);
     static PassRefPtr<GraphicsContext3D> createForCurrentGLContext();
     ~GraphicsContext3D();
 
-    PlatformGraphicsContext3D platformGraphicsContext3D() const;
-    Platform3DObject platformTexture() const;
     GrContext* grContext();
-    PlatformLayer* platformLayer() const;
     bool makeContextCurrent();
-
-    // With multisampling on, blit from multisampleFBO to regular FBO.
-    void prepareTexture();
-
-    // Equivalent to ::glTexImage2D(). Allows pixels==0 with no allocation.
-    void texImage2DDirect(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, const void* pixels);
 
     // Helper to texImage2D with pixel==0 case: pixels are initialized to 0.
     // Return true if no GL error is synthesized.
     // By default, alignment is 4, the OpenGL default setting.
     bool texImage2DResourceSafe(GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width, GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, GC3Dint alignment = 4);
-
-    bool isGLES2Compliant() const;
 
     //----------------------------------------------------------------------
     // Helpers for texture uploading and pixel readback.
@@ -519,42 +488,26 @@ public:
     // by non-member functions.
     enum DataFormat {
         DataFormatRGBA8 = 0,
-        DataFormatRGBA16Little,
-        DataFormatRGBA16Big,
         DataFormatRGBA16F,
         DataFormatRGBA32F,
         DataFormatRGB8,
-        DataFormatRGB16Little,
-        DataFormatRGB16Big,
         DataFormatRGB16F,
         DataFormatRGB32F,
         DataFormatBGR8,
         DataFormatBGRA8,
-        DataFormatBGRA16Little,
-        DataFormatBGRA16Big,
         DataFormatARGB8,
-        DataFormatARGB16Little,
-        DataFormatARGB16Big,
         DataFormatABGR8,
         DataFormatRGBA5551,
         DataFormatRGBA4444,
         DataFormatRGB565,
         DataFormatR8,
-        DataFormatR16Little,
-        DataFormatR16Big,
         DataFormatR16F,
         DataFormatR32F,
         DataFormatRA8,
-        DataFormatRA16Little,
-        DataFormatRA16Big,
         DataFormatRA16F,
         DataFormatRA32F,
         DataFormatAR8,
-        DataFormatAR16Little,
-        DataFormatAR16Big,
         DataFormatA8,
-        DataFormatA16Little,
-        DataFormatA16Big,
         DataFormatA16F,
         DataFormatA32F,
         DataFormatNumFormats
@@ -562,7 +515,7 @@ public:
 
     // Check if the format is one of the formats from the ImageData or DOM elements.
     // The formats from ImageData is always RGBA8.
-    // The formats from DOM elements vary with Graphics ports. It can only be RGBA8 or BGRA8 for non-CG port while a little more for CG port.
+    // The formats from DOM elements vary with Graphics ports. It can only be RGBA8 or BGRA8.
     static ALWAYS_INLINE bool srcFormatComeFromDOMElementOrImageData(DataFormat SrcFormat)
     {
     return SrcFormat == DataFormatBGRA8 || SrcFormat == DataFormatRGBA8;
@@ -758,8 +711,6 @@ public:
     // determine this.
     Extensions3D* getExtensions();
 
-    IntSize getInternalFramebufferSize() const;
-
     static unsigned getClearBitsByAttachmentType(GC3Denum);
     static unsigned getClearBitsByFormat(GC3Denum);
 
@@ -830,7 +781,7 @@ public:
     };
 
 private:
-    GraphicsContext3D(Attributes, HostWindow*, RenderStyle = RenderOffscreen);
+    GraphicsContext3D();
 
     // Helper for packImageData/extractImageData/extractTextureData which implement packing of pixel
     // data into the specified OpenGL destination format and type.
@@ -839,50 +790,7 @@ private:
     // Destination data will have no gaps between rows.
     static bool packPixels(const uint8_t* sourceData, DataFormat sourceDataFormat, unsigned width, unsigned height, unsigned sourceUnpackAlignment, unsigned destinationFormat, unsigned destinationType, AlphaOp, void* destinationData, bool flipY);
 
-    bool reshapeFBOs(const IntSize&);
-    void resolveMultisamplingIfNecessary(const IntRect& = IntRect());
-
-    int m_currentWidth, m_currentHeight;
     bool isResourceSafe();
-
-    friend class Extensions3DOpenGLCommon;
-
-    Attributes m_attrs;
-    RenderStyle m_renderStyle;
-    Vector<Vector<float> > m_vertexArray;
-
-    GC3Duint m_texture;
-    GC3Duint m_compositorTexture;
-    GC3Duint m_fbo;
-
-    GC3Duint m_depthBuffer;
-    GC3Duint m_stencilBuffer;
-    GC3Duint m_depthStencilBuffer;
-
-    bool m_layerComposited;
-    GC3Duint m_internalColorFormat;
-
-    struct GraphicsContext3DState {
-        GraphicsContext3DState()
-            : boundFBO(0)
-            , activeTexture(GraphicsContext3D::TEXTURE0)
-            , boundTexture0(0)
-        { }
-
-        GC3Duint boundFBO;
-        GC3Denum activeTexture;
-        GC3Duint boundTexture0;
-    };
-
-    GraphicsContext3DState m_state;
-
-    // For multisampling
-    GC3Duint m_multisampleFBO;
-    GC3Duint m_multisampleDepthStencilBuffer;
-    GC3Duint m_multisampleColorBuffer;
-
-    // Errors raised by synthesizeGLError().
-    ListHashSet<GC3Denum> m_syntheticErrors;
 
     friend class GraphicsContext3DPrivate;
     OwnPtr<GraphicsContext3DPrivate> m_private;

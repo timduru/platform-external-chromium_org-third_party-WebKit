@@ -47,8 +47,8 @@
 #include "core/css/ShadowValue.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StylePropertyShorthand.h"
-#include "core/css/StyleResolver.h"
 #include "core/css/WebKitCSSTransformValue.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/PseudoElement.h"
@@ -86,9 +86,7 @@ namespace WebCore {
 // to respect runtime enabling of CSS properties.
 static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyBackgroundAttachment,
-#if ENABLE(CSS_COMPOSITING)
     CSSPropertyBackgroundBlendMode,
-#endif
     CSSPropertyBackgroundClip,
     CSSPropertyBackgroundColor,
     CSSPropertyBackgroundImage,
@@ -151,9 +149,7 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyMaxWidth,
     CSSPropertyMinHeight,
     CSSPropertyMinWidth,
-#if ENABLE(CSS_COMPOSITING)
     CSSPropertyMixBlendMode,
-#endif
     CSSPropertyOpacity,
     CSSPropertyOrphans,
     CSSPropertyOutlineColor,
@@ -1026,15 +1022,39 @@ static PassRefPtr<CSSValue> valueForGridTrackSize(const GridTrackSize& trackSize
     return 0;
 }
 
-static PassRefPtr<CSSValue> valueForGridTrackList(const Vector<GridTrackSize>& trackSizes, const RenderStyle* style, RenderView *renderView)
+static void addValuesForNamedGridLinesAtIndex(const NamedGridLinesMap& namedGridLines, size_t i, CSSValueList& list)
+{
+    // Note that this won't return the results in the order specified in the style sheet,
+    // which is probably fine as we stil *do* return all the expected values.
+    NamedGridLinesMap::const_iterator it = namedGridLines.begin();
+    NamedGridLinesMap::const_iterator end = namedGridLines.end();
+    for (; it != end; ++it) {
+        const Vector<size_t>& linesIndexes = it->value;
+        for (size_t j = 0; j < linesIndexes.size(); ++j) {
+            if (linesIndexes[j] != i)
+                continue;
+
+            list.append(cssValuePool().createValue(it->key, CSSPrimitiveValue::CSS_STRING));
+            break;
+        }
+    }
+}
+
+static PassRefPtr<CSSValue> valueForGridTrackList(const Vector<GridTrackSize>& trackSizes, const NamedGridLinesMap& namedGridLines, const RenderStyle* style, RenderView* renderView)
 {
     // Handle the 'none' case here.
-    if (!trackSizes.size())
+    if (!trackSizes.size()) {
+        ASSERT(namedGridLines.isEmpty());
         return cssValuePool().createIdentifierValue(CSSValueNone);
+    }
 
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
-    for (size_t i = 0; i < trackSizes.size(); ++i)
+    for (size_t i = 0; i < trackSizes.size(); ++i) {
+        addValuesForNamedGridLinesAtIndex(namedGridLines, i, *list);
         list->append(valueForGridTrackSize(trackSizes[i], style, renderView));
+    }
+    // Those are the trailing <string>* allowed in the syntax.
+    addValuesForNamedGridLinesAtIndex(namedGridLines, trackSizes.size(), *list);
     return list.release();
 }
 
@@ -1905,9 +1925,9 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWebkitGridAutoRows:
             return valueForGridTrackSize(style->gridAutoRows(), style.get(), m_node->document()->renderView());
         case CSSPropertyWebkitGridColumns:
-            return valueForGridTrackList(style->gridColumns(), style.get(), m_node->document()->renderView());
+            return valueForGridTrackList(style->gridColumns(), style->namedGridColumnLines(), style.get(), m_node->document()->renderView());
         case CSSPropertyWebkitGridRows:
-            return valueForGridTrackList(style->gridRows(), style.get(), m_node->document()->renderView());
+            return valueForGridTrackList(style->gridRows(), style->namedGridRowLines(), style.get(), m_node->document()->renderView());
 
         case CSSPropertyWebkitGridStart:
             return valueForGridPosition(style->gridStart());
@@ -2581,7 +2601,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->wrapThrough());
         case CSSPropertyWebkitFilter:
             return valueForFilter(renderer, style.get());
-#if ENABLE(CSS_COMPOSITING)
         case CSSPropertyMixBlendMode:
             return cssValuePool().createValue(style->blendMode());
             
@@ -2596,7 +2615,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
 
             return list.release();
         }
-#endif
         case CSSPropertyBackground:
             return getBackgroundShorthandValue();
         case CSSPropertyBorder: {

@@ -51,6 +51,7 @@ public:
     static PassRefPtr<Range> create(PassRefPtr<Document>);
     static PassRefPtr<Range> create(PassRefPtr<Document>, PassRefPtr<Node> startContainer, int startOffset, PassRefPtr<Node> endContainer, int endOffset);
     static PassRefPtr<Range> create(PassRefPtr<Document>, const Position&, const Position&);
+    static PassRefPtr<Range> create(ScriptExecutionContext*);
     ~Range();
 
     Document* ownerDocument() const { return m_ownerDocument.get(); }
@@ -157,7 +158,6 @@ private:
     Node* checkNodeWOffset(Node*, int offset, ExceptionCode&) const;
     void checkNodeBA(Node*, ExceptionCode&) const;
     void checkDeleteExtract(ExceptionCode&);
-    bool containedByReadOnly() const;
     int maxStartOffset() const;
     int maxEndOffset() const;
 

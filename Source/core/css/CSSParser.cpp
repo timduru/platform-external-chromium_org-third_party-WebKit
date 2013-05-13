@@ -28,6 +28,7 @@
 #include "core/css/CSSParser.h"
 
 #include "CSSValueKeywords.h"
+#include "RuntimeEnabledFeatures.h"
 #include "core/css/CSSAspectRatioValue.h"
 #include "core/css/CSSBasicShapes.h"
 #include "core/css/CSSBorderImage.h"
@@ -68,8 +69,11 @@
 #include "core/css/StyleRule.h"
 #include "core/css/StyleRuleImport.h"
 #include "core/css/StyleSheetContents.h"
+#include "core/css/WebKitCSSArrayFunctionValue.h"
+#include "core/css/WebKitCSSFilterValue.h"
 #include "core/css/WebKitCSSKeyframeRule.h"
 #include "core/css/WebKitCSSKeyframesRule.h"
+#include "core/css/WebKitCSSMixFunctionValue.h"
 #include "core/css/WebKitCSSRegionRule.h"
 #include "core/css/WebKitCSSShaderValue.h"
 #include "core/css/WebKitCSSTransformValue.h"
@@ -77,29 +81,24 @@
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
-#include "RuntimeEnabledFeatures.h"
 #include "core/page/Settings.h"
 #include "core/platform/FloatConversion.h"
 #include "core/platform/HashTools.h"
 #include "core/platform/HistogramSupport.h"
-#include "core/platform/text/TextEncoding.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/svg/SVGParserUtilities.h"
+#include "wtf/BitArray.h"
+#include "wtf/HexNumber.h"
+#include "wtf/dtoa.h"
+#include "wtf/text/StringBuffer.h"
+#include "wtf/text/StringBuilder.h"
+#include "wtf/text/StringImpl.h"
+#include "wtf/text/TextEncoding.h"
 #include <limits.h>
-#include <wtf/BitArray.h>
-#include <wtf/HexNumber.h>
-#include <wtf/dtoa.h>
-#include <wtf/text/StringBuffer.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/text/StringImpl.h>
 
 #if ENABLE(SVG)
 #include "core/css/WebKitCSSSVGDocumentValue.h"
 #endif
-
-#include "core/css/WebKitCSSArrayFunctionValue.h"
-#include "core/css/WebKitCSSFilterValue.h"
-#include "core/css/WebKitCSSMixFunctionValue.h"
 
 #define YYDEBUG 0
 
@@ -244,7 +243,6 @@ CSSParserContext::CSSParserContext(CSSParserMode mode, const KURL& baseURL)
     , isHTMLDocument(false)
     , isCSSCustomFilterEnabled(false)
     , isCSSStickyPositionEnabled(false)
-    , isCSSCompositingEnabled(false)
     , isCSSGridLayoutEnabled(false)
     , isCSSVariablesEnabled(false)
     , needsSiteSpecificQuirks(false)
@@ -258,7 +256,6 @@ CSSParserContext::CSSParserContext(Document* document, const KURL& baseURL, cons
     , isHTMLDocument(document->isHTMLDocument())
     , isCSSCustomFilterEnabled(document->settings() ? document->settings()->isCSSCustomFilterEnabled() : false)
     , isCSSStickyPositionEnabled(document->cssStickyPositionEnabled())
-    , isCSSCompositingEnabled(document->cssCompositingEnabled())
     , isCSSGridLayoutEnabled(document->cssGridLayoutEnabled())
     , isCSSVariablesEnabled(document->settings() ? document->settings()->cssVariablesEnabled() : false)
     , needsSiteSpecificQuirks(document->settings() ? document->settings()->needsSiteSpecificQuirks() : false)
@@ -273,7 +270,6 @@ bool operator==(const CSSParserContext& a, const CSSParserContext& b)
         && a.isHTMLDocument == b.isHTMLDocument
         && a.isCSSCustomFilterEnabled == b.isCSSCustomFilterEnabled
         && a.isCSSStickyPositionEnabled == b.isCSSStickyPositionEnabled
-        && a.isCSSCompositingEnabled == b.isCSSCompositingEnabled
         && a.isCSSGridLayoutEnabled == b.isCSSGridLayoutEnabled
         && a.isCSSVariablesEnabled == b.isCSSVariablesEnabled
         && a.needsSiteSpecificQuirks == b.needsSiteSpecificQuirks;
@@ -794,16 +790,14 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (valueID == CSSValueVisible || valueID == CSSValueHidden)
             return true;
         break;
-#if ENABLE(CSS_COMPOSITING)
     case CSSPropertyMixBlendMode:
-        if (parserContext.isCSSCompositingEnabled && (valueID == CSSValueNormal || valueID == CSSValueMultiply || valueID == CSSValueScreen
+        if (RuntimeEnabledFeatures::cssCompositingEnabled() && (valueID == CSSValueNormal || valueID == CSSValueMultiply || valueID == CSSValueScreen
             || valueID == CSSValueOverlay || valueID == CSSValueDarken || valueID == CSSValueLighten ||  valueID == CSSValueColorDodge
             || valueID == CSSValueColorBurn || valueID == CSSValueHardLight || valueID == CSSValueSoftLight || valueID == CSSValueDifference
             || valueID == CSSValueExclusion || valueID == CSSValueHue || valueID == CSSValueSaturation || valueID == CSSValueColor
             || valueID == CSSValueLuminosity))
             return true;
         break;
-#endif
     case CSSPropertyWebkitBorderFit:
         if (valueID == CSSValueBorder || valueID == CSSValueLines)
             return true;
@@ -1007,6 +1001,8 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
 static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
 {
     switch (propertyId) {
+    case CSSPropertyMixBlendMode:
+        return RuntimeEnabledFeatures::cssCompositingEnabled();
     case CSSPropertyBorderBottomStyle:
     case CSSPropertyBorderCollapse:
     case CSSPropertyBorderLeftStyle:
@@ -1023,9 +1019,6 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     case CSSPropertyImageRendering:
     case CSSPropertyListStylePosition:
     case CSSPropertyListStyleType:
-#if ENABLE(CSS_COMPOSITING)
-    case CSSPropertyMixBlendMode:
-#endif
     case CSSPropertyOutlineStyle:
     case CSSPropertyOverflowWrap:
     case CSSPropertyOverflowX:
@@ -1985,10 +1978,8 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         break;
     }
 
-    case CSSPropertyBackgroundAttachment:
-#if ENABLE(CSS_COMPOSITING)
     case CSSPropertyBackgroundBlendMode:
-#endif
+    case CSSPropertyBackgroundAttachment:
     case CSSPropertyBackgroundClip:
     case CSSPropertyWebkitBackgroundClip:
     case CSSPropertyWebkitBackgroundComposite:
@@ -2352,12 +2343,12 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             return false;
         }
         break;
-#if ENABLE(CSS_COMPOSITING)
     case CSSPropertyMixBlendMode:
-        if (cssCompositingEnabled())
-            validPrimitive = true;
+        if (!RuntimeEnabledFeatures::cssCompositingEnabled())
+            return false;
+
+        validPrimitive = true;
         break;
-#endif
     case CSSPropertyWebkitFlex: {
         ShorthandScope scope(this, propId);
         if (id == CSSValueNone) {
@@ -4183,9 +4174,8 @@ bool CSSParser::parseFillProperty(CSSPropertyID propId, CSSPropertyID& propId1, 
                         m_valueList->next();
                     }
                     break;
-#if ENABLE(CSS_COMPOSITING)
                 case CSSPropertyBackgroundBlendMode:
-                    if (cssCompositingEnabled() && (val->id == CSSValueNormal || val->id == CSSValueMultiply
+                    if (RuntimeEnabledFeatures::cssCompositingEnabled() && (val->id == CSSValueNormal || val->id == CSSValueMultiply
                         || val->id == CSSValueScreen || val->id == CSSValueOverlay || val->id == CSSValueDarken
                         || val->id == CSSValueLighten ||  val->id == CSSValueColorDodge || val->id == CSSValueColorBurn
                         || val->id == CSSValueHardLight || val->id == CSSValueSoftLight || val->id == CSSValueDifference
@@ -4195,7 +4185,6 @@ bool CSSParser::parseFillProperty(CSSPropertyID propId, CSSPropertyID& propId1, 
                         m_valueList->next();
                     }
                     break;
-#endif
                 case CSSPropertyBackgroundRepeat:
                 case CSSPropertyWebkitMaskRepeat:
                     parseFillRepeat(currValue, currValue2);
@@ -4634,7 +4623,18 @@ bool CSSParser::parseGridTrackList(CSSPropertyID propId, bool important)
     }
 
     RefPtr<CSSValueList> values = CSSValueList::createSpaceSeparated();
+    size_t currentLineNumber = 0;
     while (m_valueList->current()) {
+        while (m_valueList->current() && m_valueList->current()->unit == CSSPrimitiveValue::CSS_STRING) {
+            RefPtr<CSSPrimitiveValue> name = createPrimitiveStringValue(m_valueList->current());
+            values->append(name);
+            m_valueList->next();
+        }
+
+        // This allows trailing <string>* per the specification.
+        if (!m_valueList->current())
+            break;
+
         RefPtr<CSSPrimitiveValue> primitiveValue = parseGridTrackSize();
         if (!primitiveValue)
             return false;
@@ -8659,11 +8659,6 @@ static bool validFlowName(const String& flowName)
             || equalIgnoringCase(flowName, "inherit")
             || equalIgnoringCase(flowName, "initial")
             || equalIgnoringCase(flowName, "none"));
-}
-
-bool CSSParser::cssCompositingEnabled() const
-{
-    return m_context.isCSSCompositingEnabled;
 }
 
 bool CSSParser::cssGridLayoutEnabled() const

@@ -31,6 +31,12 @@
 #include "config.h"
 #include "bindings/v8/V8DOMWindowShell.h"
 
+#include <v8-debug.h>
+#include <v8-i18n/include/extension.h>
+#include <v8.h>
+#include <algorithm>
+#include <utility>
+#include "RuntimeEnabledFeatures.h"
 #include "V8DOMWindow.h"
 #include "V8Document.h"
 #include "V8HTMLCollection.h"
@@ -53,21 +59,12 @@
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
-#include "RuntimeEnabledFeatures.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/platform/HistogramSupport.h"
-#include <algorithm>
-#include <utility>
-#include <v8-debug.h>
-#include <v8.h>
+#include "origin/SecurityOrigin.h"
 #include "wtf/Assertions.h"
 #include "wtf/OwnArrayPtr.h"
 #include "wtf/StringExtras.h"
 #include "wtf/text/CString.h"
-
-#if ENABLE(JAVASCRIPT_I18N_API)
-#include <v8-i18n/include/extension.h>
-#endif
 
 namespace WebCore {
 
@@ -273,11 +270,9 @@ void V8DOMWindowShell::createContext()
     // Used to avoid sleep calls in unload handlers.
     ScriptController::registerExtensionIfNeeded(DateExtension::get());
 
-#if ENABLE(JAVASCRIPT_I18N_API)
     // Enables experimental i18n API in V8.
     if (RuntimeEnabledFeatures::javaScriptI18NAPIEnabled())
         ScriptController::registerExtensionIfNeeded(v8_i18n::Extension::get());
-#endif
 
     // Dynamically tell v8 about our extensions now.
     const V8Extensions& extensions = ScriptController::registeredExtensions();

@@ -181,8 +181,9 @@ public:
     virtual void discardBackbufferCHROMIUM() { }
     virtual void ensureBackbufferCHROMIUM() { }
 
+    // FIXME: this api is not used anymore.
     // Query whether it is built on top of compliant GLES2 implementation.
-    virtual bool isGLES2Compliant() = 0;
+    virtual bool isGLES2Compliant() { return true; }
 
     virtual bool setParentContext(WebGraphicsContext3D* parentContext) { return false; }
 
@@ -199,10 +200,11 @@ public:
     // ordering. Returns true on success.
     virtual bool readBackFramebuffer(unsigned char* pixels, size_t bufferSize, WebGLId framebuffer, int width, int height) = 0;
 
+    // FIXME: this api is not used anymore.
     // Returns the id of the texture which is used for storing the contents of
     // the framebuffer associated with this context. This texture is accessible
     // by the gpu-based page compositor.
-    virtual WebGLId getPlatformTextureId() = 0;
+    virtual WebGLId getPlatformTextureId() { return 0; }
 
     // Copies the contents of the off-screen render target used by the WebGL
     // context to the corresponding texture used by the compositor.
@@ -451,6 +453,11 @@ public:
     // GL_CHROMIUM_copy_texture
     virtual void copyTextureCHROMIUM(WGC3Denum target, WGC3Duint sourceId,
                                      WGC3Duint destId, WGC3Dint level, WGC3Denum internalFormat) { }
+    // This function adds one more parameter(destType) than the above one to define the destination texture if needed.
+    // TODO(jun.a.jiang@intel.com): once all clients switch to call this newer function with six parameters, the older
+    // one with five parameters would be removed.
+    virtual void copyTextureCHROMIUM(WGC3Denum target, WGC3Duint sourceId,
+        WGC3Duint destId, WGC3Dint level, WGC3Denum internalFormat, WGC3Denum destType) { }
 
     // GL_CHROMIUM_shallow_flush
     virtual void shallowFlushCHROMIUM() { }
@@ -491,7 +498,11 @@ public:
     virtual GrGLInterface* createGrGLInterface() { return onCreateGrGLInterface(); }
 
     // GL_CHROMIUM_gpu_memory_buffer
-    virtual void imageBufferDataCHROMIUM(WGC3Denum target, WGC3Dsizei width, WGC3Dsizei height) { }
+    virtual WGC3Duint createImageCHROMIUM(WGC3Dsizei width, WGC3Dsizei height) { return 0; }
+    virtual void destroyImageCHROMIUM(WGC3Duint imageId) { }
+    virtual void getImageParameterivCHROMIUM(WGC3Duint imageId, WGC3Denum pname, WGC3Dint* params) { }
+    virtual void* mapImageCHROMIUM(WGC3Duint imageId, WGC3Denum access) { return 0; }
+    virtual WGC3Dboolean unmapImageCHROMIUM(WGC3Duint imageId) { return false; }
 
 protected:
     virtual GrGLInterface* onCreateGrGLInterface() { return 0; }

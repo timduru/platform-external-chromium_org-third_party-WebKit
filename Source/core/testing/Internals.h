@@ -48,6 +48,7 @@ class DocumentMarker;
 class Element;
 class Frame;
 class InspectorFrontendChannelDummy;
+class InternalRuntimeFlags;
 class InternalSettings;
 class Node;
 class Page;
@@ -82,7 +83,6 @@ public:
     PassRefPtr<CSSComputedStyleDeclaration> computedStyleIncludingVisitedInfo(Node*, ExceptionCode&) const;
 
     ShadowRoot* ensureShadowRoot(Element* host, ExceptionCode&);
-    ShadowRoot* createShadowRoot(Element* host, ExceptionCode&);
     ShadowRoot* shadowRoot(Element* host, ExceptionCode&);
     ShadowRoot* youngestShadowRoot(Element* host, ExceptionCode&);
     ShadowRoot* oldestShadowRoot(Element* host, ExceptionCode&);
@@ -96,16 +96,11 @@ public:
     String shadowPseudoId(Element*, ExceptionCode&);
     void setShadowPseudoId(Element*, const String&, ExceptionCode&);
 
-    // CSS Animation testing.
+    // CSS Animation / Transition testing.
     unsigned numberOfActiveAnimations() const;
     void suspendAnimations(Document*, ExceptionCode&) const;
     void resumeAnimations(Document*, ExceptionCode&) const;
-    bool pauseAnimationAtTimeOnElement(const String& animationName, double pauseTime, Element*, ExceptionCode&);
-    bool pauseAnimationAtTimeOnPseudoElement(const String& animationName, double pauseTime, Element*, const String& pseudoId, ExceptionCode&);
-
-    // CSS Transition testing.
-    bool pauseTransitionAtTimeOnElement(const String& propertyName, double pauseTime, Element*, ExceptionCode&);
-    bool pauseTransitionAtTimeOnPseudoElement(const String& property, double pauseTime, Element*, const String& pseudoId, ExceptionCode&);
+    void pauseAnimations(double pauseTime, ExceptionCode&);
 
     PassRefPtr<Element> createContentElement(ExceptionCode&);
     bool isValidContentSelect(Element* insertionPoint, ExceptionCode&);
@@ -205,6 +200,7 @@ public:
     static const char* internalsId;
 
     InternalSettings* settings() const;
+    InternalRuntimeFlags* runtimeFlags() const;
     unsigned workerThreadCount() const;
 
     void setBatteryStatus(Document*, const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode&);
@@ -304,6 +300,7 @@ private:
     DocumentMarker* markerAt(Node*, const String& markerType, unsigned index, ExceptionCode&);
     RefPtr<DOMWindow> m_frontendWindow;
     OwnPtr<InspectorFrontendChannelDummy> m_frontendChannel;
+    RefPtr<InternalRuntimeFlags> m_runtimeFlags;
 };
 
 } // namespace WebCore

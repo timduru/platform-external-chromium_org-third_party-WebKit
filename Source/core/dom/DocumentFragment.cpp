@@ -43,6 +43,11 @@ PassRefPtr<DocumentFragment> DocumentFragment::create(Document* document)
     return adoptRef(new DocumentFragment(document, Node::CreateDocumentFragment));
 }
 
+PassRefPtr<DocumentFragment> DocumentFragment::create(ScriptExecutionContext* context)
+{
+    return adoptRef(new DocumentFragment(toDocument(context), Node::CreateDocumentFragment));
+}
+
 String DocumentFragment::nodeName() const
 {
     return "#document-fragment";
@@ -61,7 +66,6 @@ bool DocumentFragment::childTypeAllowed(NodeType type) const
         case COMMENT_NODE:
         case TEXT_NODE:
         case CDATA_SECTION_NODE:
-        case ENTITY_REFERENCE_NODE:
             return true;
         default:
             return false;

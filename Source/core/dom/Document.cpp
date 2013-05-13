@@ -28,6 +28,16 @@
 #include "config.h"
 #include "core/dom/Document.h"
 
+#include <wtf/CurrentTime.h>
+#include <wtf/HashFunctions.h>
+#include <wtf/MainThread.h>
+#include <wtf/MemoryInstrumentationHashCountedSet.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
+#include <wtf/MemoryInstrumentationHashSet.h>
+#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/PassRefPtr.h>
+#include <wtf/StdLibExtras.h>
+#include <wtf/text/StringBuffer.h>
 #include "CSSValueKeywords.h"
 #include "HTMLElementFactory.h"
 #include "HTMLNames.h"
@@ -45,9 +55,9 @@
 #include "core/css/MediaQueryList.h"
 #include "core/css/MediaQueryMatcher.h"
 #include "core/css/StylePropertySet.h"
-#include "core/css/StyleResolver.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/css/StyleSheetList.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/CDATASection.h"
@@ -65,7 +75,6 @@
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
 #include "core/dom/ElementShadow.h"
-#include "core/dom/EntityReference.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventFactory.h"
 #include "core/dom/EventListener.h"
@@ -117,6 +126,7 @@
 #include "core/html/HTMLStyleElement.h"
 #include "core/html/HTMLTitleElement.h"
 #include "core/html/PluginDocument.h"
+#include "core/html/parser/HTMLDocumentParser.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/parser/NestingLevelIncrementer.h"
 #include "core/inspector/InspectorCounters.h"
@@ -149,8 +159,6 @@
 #include "core/page/PageConsole.h"
 #include "core/page/PageGroup.h"
 #include "core/page/PointerLockController.h"
-#include "core/page/SecurityOrigin.h"
-#include "core/page/SecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/page/UserContentURLPattern.h"
 #include "core/page/animation/AnimationController.h"
@@ -160,7 +168,6 @@
 #include "core/platform/Language.h"
 #include "core/platform/Logging.h"
 #include "core/platform/PlatformKeyboardEvent.h"
-#include "core/platform/SchemeRegistry.h"
 #include "core/platform/Timer.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "core/platform/network/HTTPParsers.h"
@@ -186,16 +193,9 @@
 #include "core/xml/XSLTProcessor.h"
 #include "core/xml/parser/XMLDocumentParser.h"
 #include "modules/geolocation/GeolocationController.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/HashFunctions.h>
-#include <wtf/MainThread.h>
-#include <wtf/MemoryInstrumentationHashCountedSet.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuffer.h>
+#include "origin/SchemeRegistry.h"
+#include "origin/SecurityOrigin.h"
+#include "origin/SecurityPolicy.h"
 
 #if ENABLE(SVG)
 #include "SVGElementFactory.h"
@@ -373,7 +373,7 @@ static void printNavigationErrorMessage(Frame* frame, const KURL& activeURL, con
 
 uint64_t Document::s_globalTreeVersion = 0;
 
-Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
+Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentClasses)
     : ContainerNode(0, CreateDocument)
     , TreeScope(this)
     , m_styleResolverThrowawayTimer(this, &Document::styleResolverThrowawayTimerFired)
@@ -408,8 +408,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
     , m_createRenderers(true)
     , m_accessKeyMapValid(false)
     , m_useSecureKeyboardEntryWhenActive(false)
-    , m_isXHTML(isXHTML)
-    , m_isHTML(isHTML)
+    , m_documentClasses(documentClasses)
     , m_isViewSource(false)
     , m_sawElementsInKnownNamespaces(false)
     , m_isSrcdocDocument(false)
@@ -436,6 +435,7 @@ Document::Document(Frame* frame, const KURL& url, bool isXHTML, bool isHTML)
 #ifndef NDEBUG
     , m_didDispatchViewportPropertiesChanged(false)
 #endif
+    , m_timeline(DocumentTimeline::create(this))
     , m_templateDocumentHost(0)
     , m_fontloader(0)
     , m_didAssociateFormControlsTimer(this, &Document::didAssociateFormControlsTimerFired)
@@ -760,8 +760,8 @@ PassRefPtr<Element> Document::createElement(const AtomicString& name, ExceptionC
         return 0;
     }
 
-    if (m_isXHTML)
-        return HTMLElementFactory::createHTMLElement(QualifiedName(nullAtom, name, xhtmlNamespaceURI), this, 0, false);
+    if (isXHTMLDocument() || isHTMLDocument())
+        return HTMLElementFactory::createHTMLElement(QualifiedName(nullAtom, isHTMLDocument() ? name.lower() : name, xhtmlNamespaceURI), this, 0, false);
 
     return createElement(QualifiedName(nullAtom, name, nullAtom), false);
 }
@@ -875,19 +875,6 @@ PassRefPtr<ProcessingInstruction> Document::createProcessingInstruction(const St
     return ProcessingInstruction::create(this, target, data);
 }
 
-PassRefPtr<EntityReference> Document::createEntityReference(const String& name, ExceptionCode& ec)
-{
-    if (!isValidName(name)) {
-        ec = INVALID_CHARACTER_ERR;
-        return 0;
-    }
-    if (isHTMLDocument()) {
-        ec = NOT_SUPPORTED_ERR;
-        return 0;
-    }
-    return EntityReference::create(this, name);
-}
-
 PassRefPtr<Text> Document::createEditingTextNode(const String& text)
 {
     return Text::createEditingText(this, text);
@@ -912,8 +899,6 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCo
         return createTextNode(importedNode->nodeValue());
     case CDATA_SECTION_NODE:
         return createCDATASection(importedNode->nodeValue(), ec);
-    case ENTITY_REFERENCE_NODE:
-        return createEntityReference(importedNode->nodeName(), ec);
     case PROCESSING_INSTRUCTION_NODE:
         return createProcessingInstruction(importedNode->nodeName(), importedNode->nodeValue(), ec);
     case COMMENT_NODE:
@@ -984,11 +969,6 @@ PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionCode& ec)
 {
     if (!source) {
         ec = NOT_SUPPORTED_ERR;
-        return 0;
-    }
-
-    if (source->isReadOnlyNode()) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
         return 0;
     }
 
@@ -1664,7 +1644,7 @@ void Document::recalcStyle(StyleChange change)
             if (!n->isElementNode())
                 continue;
             Element* element = toElement(n);
-            if (change >= Inherit || element->childNeedsStyleRecalc() || element->needsStyleRecalc())
+            if (shouldRecalcStyle(change, element))
                 element->recalcStyle(change);
         }
 
@@ -2018,8 +1998,20 @@ void Document::setVisuallyOrdered()
 
 PassRefPtr<DocumentParser> Document::createParser()
 {
+    if (isHTMLDocument()) {
+        bool reportErrors = InspectorInstrumentation::collectingHTMLParseErrors(this->page());
+        return HTMLDocumentParser::create(toHTMLDocument(this), reportErrors);
+    }
     // FIXME: this should probably pass the frame instead
     return XMLDocumentParser::create(this, view());
+}
+
+bool Document::isFrameSet() const
+{
+    if (!isHTMLDocument())
+        return false;
+    HTMLElement* bodyElement = body();
+    return bodyElement && bodyElement->hasTagName(framesetTag);
 }
 
 ScriptableDocumentParser* Document::scriptableDocumentParser() const
@@ -2828,7 +2820,6 @@ bool Document::childTypeAllowed(NodeType type) const
     case DOCUMENT_FRAGMENT_NODE:
     case DOCUMENT_NODE:
     case ENTITY_NODE:
-    case ENTITY_REFERENCE_NODE:
     case NOTATION_NODE:
     case TEXT_NODE:
     case XPATH_NAMESPACE_NODE:
@@ -2887,7 +2878,6 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
             case DOCUMENT_FRAGMENT_NODE:
             case DOCUMENT_NODE:
             case ENTITY_NODE:
-            case ENTITY_REFERENCE_NODE:
             case NOTATION_NODE:
             case TEXT_NODE:
             case XPATH_NAMESPACE_NODE:
@@ -2910,7 +2900,6 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
         case DOCUMENT_FRAGMENT_NODE:
         case DOCUMENT_NODE:
         case ENTITY_NODE:
-        case ENTITY_REFERENCE_NODE:
         case NOTATION_NODE:
         case TEXT_NODE:
         case XPATH_NAMESPACE_NODE:

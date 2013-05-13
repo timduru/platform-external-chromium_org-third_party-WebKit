@@ -29,7 +29,7 @@
 
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/html/HTMLCanvasElement.h"
 #include "core/html/HTMLIFrameElement.h"
@@ -193,17 +193,15 @@ void RenderLayerBacking::createPrimaryGraphicsLayer()
     
     m_graphicsLayer = createGraphicsLayer(layerName);
 
-    if (m_isMainFrameRenderViewLayer) {
+    if (m_isMainFrameRenderViewLayer)
         m_graphicsLayer->setContentsOpaque(true);
-        m_graphicsLayer->setAppliesPageScale();
-    }
 
     updateOpacity(renderer()->style());
     updateTransform(renderer()->style());
     updateFilters(renderer()->style());
-#if ENABLE(CSS_COMPOSITING)
-    updateLayerBlendMode(renderer()->style());
-#endif
+
+    if (RuntimeEnabledFeatures::cssCompositingEnabled())
+        updateLayerBlendMode(renderer()->style());
 }
 
 void RenderLayerBacking::destroyGraphicsLayers()
@@ -264,11 +262,9 @@ void RenderLayerBacking::updateFilters(const RenderStyle* style)
     }
 }
 
-#if ENABLE(CSS_COMPOSITING)
 void RenderLayerBacking::updateLayerBlendMode(const RenderStyle*)
 {
 }
-#endif
 
 static bool hasNonZeroTransformOrigin(const RenderObject* renderer)
 {
@@ -476,9 +472,8 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
     if (!renderer()->animation()->isRunningAcceleratedAnimationOnRenderer(renderer(), CSSPropertyOpacity))
         updateOpacity(renderer()->style());
 
-#if ENABLE(CSS_COMPOSITING)
-    updateLayerBlendMode(renderer()->style());
-#endif
+    if (RuntimeEnabledFeatures::cssCompositingEnabled())
+        updateLayerBlendMode(renderer()->style());
 
     bool isSimpleContainer = isSimpleContainerCompositingLayer();
     
@@ -682,7 +677,7 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
         ASSERT(m_scrollingContentsLayer);
         RenderBox* renderBox = toRenderBox(renderer());
         IntRect paddingBox(renderBox->borderLeft(), renderBox->borderTop(), renderBox->width() - renderBox->borderLeft() - renderBox->borderRight(), renderBox->height() - renderBox->borderTop() - renderBox->borderBottom());
-        IntSize scrollOffset = m_owningLayer->scrollOffset();
+        IntSize scrollOffset = m_owningLayer->adjustedScrollOffset();
 
         m_scrollingLayer->setPosition(FloatPoint(paddingBox.location() - localCompositingBounds.location()));
 
@@ -1014,8 +1009,6 @@ bool RenderLayerBacking::updateBackgroundLayer(bool needsBackgroundLayer)
             layerName = m_owningLayer->debugName() + " (contents containment)";
 #endif
             m_contentsContainmentLayer = createGraphicsLayer(layerName);
-            m_contentsContainmentLayer->setAppliesPageScale(true);
-            m_graphicsLayer->setAppliesPageScale(false);
             layerChanged = true;
         }
     } else {
@@ -1028,7 +1021,6 @@ bool RenderLayerBacking::updateBackgroundLayer(bool needsBackgroundLayer)
             m_contentsContainmentLayer->removeFromParent();
             m_contentsContainmentLayer = nullptr;
             layerChanged = true;
-            m_graphicsLayer->setAppliesPageScale(true);
         }
     }
     
@@ -1532,11 +1524,9 @@ void RenderLayerBacking::setRequiresOwnBackingStore(bool requiresOwnBacking)
     compositor()->repaintInCompositedAncestor(m_owningLayer, compositedBounds());
 }
 
-#if ENABLE(CSS_COMPOSITING)
 void RenderLayerBacking::setBlendMode(BlendMode)
 {
 }
-#endif
 
 void RenderLayerBacking::setContentsNeedDisplay()
 {

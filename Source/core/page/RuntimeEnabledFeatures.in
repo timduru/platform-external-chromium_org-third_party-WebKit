@@ -1,54 +1,65 @@
 // This list is used to generate RuntimeEnabledFeatures.h/cpp which contains
-// a class that stores static enablers for all experimental features. Note that
-// the method names must line up with the JavaScript method they enable for code
-// generation to work properly.
+// a class that stores static enablers for all experimental features.
+//
+// Each feature can be assigned a "status":
+// status=stable -> Enable this in all Blink configurations.  We are committed to these APIs indefinitely.
+// status=experimental -> In-progress features, Web Developers might play with, but are not on by default in stable.
+// status=test -> Enabled in ContentShell for testing, otherwise off.
+// Features without a status are not enabled anywhere by default.
+//
+// "stable" features listed here should be rare, as anything which we've shipped stable
+// can have its runtime flag removed soon after.
+//
+// condition=ENABLE_NAME is used for wrapping features in compile-time
+// #if ENABLE(FEATURE) guards.  These are deprecated and should all be removed.
 
-ApplicationCache default=true
-AudioContext condition=WEB_AUDIO
+ApplicationCache status=stable
 AuthorShadowDOMForAnyElement
-CanvasPath
-CSSCompositing condition=CSS_COMPOSITING
-CSSExclusions
-CSSRegions
-CustomDOMElements
-Database default=true
-DeviceMotion default=true
-DeviceOrientation default=true
-DialogElement
-DirectoryUpload default=true
-EncryptedMedia condition=ENCRYPTED_MEDIA
-ExperimentalCanvasFeatures
-ExperimentalContentSecurityPolicyFeatures
-ExperimentalShadowDOM
+CanvasPath status=test
+CSSCompositing status=experimental
+CSSExclusions status=experimental
+CSSRegions status=experimental
+CustomDOMElements status=experimental
+Database status=stable
+DeviceMotion
+DeviceOrientation status=stable
+DialogElement status=experimental
+DirectoryUpload status=stable
+EncryptedMedia condition=ENCRYPTED_MEDIA, status=stable
+ExperimentalCanvasFeatures status=test
+ExperimentalContentSecurityPolicyFeatures status=experimental
+ExperimentalShadowDOM status=experimental
 ExperimentalWebSocket
-FileSystem
-FontLoadEvents
-Fullscreen default=true
-Geolocation default=true
-IMEAPI
-IndexedDB
-InputTypeDateTime condition=INPUT_TYPE_DATETIME_INCOMPLETE
-InputTypeWeek default=true
-JavaScriptI18NAPI condition=JAVASCRIPT_I18N_API
+FileSystem status=stable
+FontLoadEvents status=experimental
+Fullscreen status=stable
+Gamepad status=stable
+Geolocation status=stable
+IMEAPI status=test
+IndexedDB status=stable
+InputTypeDateTime condition=INPUT_TYPE_DATETIME_INCOMPLETE, status=test
+InputTypeWeek status=stable
+JavaScriptI18NAPI status=stable
 LangAttributeAwareFormControlUI
 LazyLayout
-LocalStorage default=true
+LocalStorage status=stable
 Media custom
-MediaSource
-MediaStream default=true
-PeerConnection default=true, depends_on=MediaStream
-Quota
-RequestAutocomplete
-ScriptedSpeech
-SeamlessIFrames
-SessionStorage default=true
+MediaSource status=stable
+MediaStream status=stable
+Notifications status=stable
+PeerConnection depends_on=MediaStream, status=stable
+Quota status=stable
+RequestAutocomplete status=test
+ScriptedSpeech status=stable
+SeamlessIFrames status=experimental
+SessionStorage status=stable
 SharedWorker custom
-SpeechInput default=true
+SpeechInput status=stable
 SpeechSynthesis
-StyleScoped
-Touch default=true
-WebkitGetGamepads
-WebkitNotifications
-WebkitVideoTrack default=true
-WebMIDI
+StyleScoped status=experimental
+Touch status=stable
+VideoTrack status=stable
+WebAnimation
+WebAudio condition=WEB_AUDIO, status=stable
+WebMIDI status=test
 WebPInAcceptHeader

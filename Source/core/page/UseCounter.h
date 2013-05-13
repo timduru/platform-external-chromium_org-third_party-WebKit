@@ -78,7 +78,7 @@ public:
         UnprefixedTransitionEndEvent,
         PrefixedAndUnprefixedTransitionEndEvent,
         AutoFocusAttribute,
-        AutoSaveAttribute,
+        UnusedSlot01, // Prior to 4/2013, we used this slot for AutoSaveAttribute.
         DataListElement,
         FormAttribute,
         IncrementalAttribute,
@@ -130,6 +130,7 @@ public:
         PrefixedMediaAddKey,
         PrefixedMediaGenerateKeyRequest,
         WebAudioLooping,
+        DocumentClear,
         // Add new features above this line. Don't change assigned numbers of each items.
         NumberOfFeatures, // This enum value must be last.
     };

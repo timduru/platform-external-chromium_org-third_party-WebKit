@@ -76,7 +76,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/ElementShadow.cpp \
 	third_party/WebKit/Source/core/dom/Element.cpp \
 	third_party/WebKit/Source/core/dom/ElementRareData.cpp \
-	third_party/WebKit/Source/core/dom/EntityReference.cpp \
 	third_party/WebKit/Source/core/dom/ErrorEvent.cpp \
 	third_party/WebKit/Source/core/dom/Event.cpp \
 	third_party/WebKit/Source/core/dom/EventContext.cpp \
@@ -231,16 +230,12 @@ MY_DEFS := \
 	'-DENABLE_BATTERY_STATUS=0' \
 	'-DENABLE_CANVAS_USES_MAILBOX=0' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_COMPOSITING=0' \
 	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_JAVASCRIPT_I18N_API=1' \
 	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
-	'-DENABLE_RUBY=1' \
-	'-DENABLE_SANDBOX=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \

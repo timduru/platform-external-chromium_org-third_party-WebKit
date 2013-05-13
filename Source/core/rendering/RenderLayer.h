@@ -47,6 +47,7 @@
 #include "core/platform/ScrollableArea.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBox.h"
+
 #include <wtf/OwnPtr.h>
 
 #include "core/rendering/RenderLayerFilterInfo.h"
@@ -58,6 +59,7 @@ class FilterOperations;
 class HitTestRequest;
 class HitTestResult;
 class HitTestingTransformState;
+class PlatformEvent;
 class RenderFlowThread;
 class RenderGeometryMap;
 class RenderLayerBacking;
@@ -375,6 +377,14 @@ public:
 
     LayoutRect rect() const { return LayoutRect(location(), size()); }
 
+    enum ResizerHitTestType {
+        ResizerForPointer,
+        ResizerForTouch
+    };
+
+    // See comments on isPointInResizeControl.
+    virtual IntRect resizerCornerRect(const IntRect& bounds, ResizerHitTestType resizerHitTestType) const;
+
     int scrollWidth() const;
     int scrollHeight() const;
 
@@ -393,7 +403,7 @@ public:
 
     int scrollXOffset() const { return m_scrollOffset.width() + scrollOrigin().x(); }
     int scrollYOffset() const { return m_scrollOffset.height() + scrollOrigin().y(); }
-    IntSize scrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
+    IntSize adjustedScrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
 
     void scrollRectToVisible(const LayoutRect&, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
 
@@ -419,7 +429,9 @@ public:
     int horizontalScrollbarHeight(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
     bool hasOverflowControls() const;
-    bool isPointInResizeControl(const IntPoint& absolutePoint) const;
+    // isPointInResizeControl() is used for testing if a pointer/touch position is in the resize control
+    // area.
+    bool isPointInResizeControl(const IntPoint& absolutePoint, ResizerHitTestType resizerHitTestType) const;
     bool hitTestOverflowControls(HitTestResult&, const IntPoint& localPoint);
     IntSize offsetFromResizeCorner(const IntPoint& absolutePoint) const;
 
@@ -433,7 +445,7 @@ public:
     void autoscroll(const IntPoint&);
 
     bool canResize() const;
-    void resize(const PlatformMouseEvent&, const LayoutSize&);
+    void resize(const PlatformEvent&, const LayoutSize&);
     bool inResizeMode() const { return m_inResizeMode; }
     void setInResizeMode(bool b) { m_inResizeMode = b; }
 
@@ -468,10 +480,8 @@ public:
     RenderLayer* enclosingPaginationLayer() const { return m_enclosingPaginationLayer; }
 
     void updateTransform();
-    
-#if ENABLE(CSS_COMPOSITING)
+
     void updateBlendMode();
-#endif
 
     const LayoutSize& paintOffset() const { return m_paintOffset; }
 
@@ -721,11 +731,7 @@ public:
     virtual void filterNeedsRepaint();
     bool hasFilter() const { return renderer()->hasFilter(); }
 
-#if ENABLE(CSS_COMPOSITING)
-    bool hasBlendMode() const { return renderer()->hasBlendMode(); }
-#else
-    bool hasBlendMode() const { return false; }
-#endif
+    bool hasBlendMode() const;
 
     // Overloaded new operator. Derived classes must override operator new
     // in order to allocate out of the RenderArena.
@@ -1021,6 +1027,7 @@ private:
 
     IntSize scrollbarOffset(const Scrollbar*) const;
     
+    void updateResizerAreaSet();
     void updateScrollableAreaSet(bool hasOverflow);
 
     void dirtyAncestorChainVisibleDescendantStatus();
@@ -1172,9 +1179,7 @@ protected:
 
     bool m_hasFilterInfo : 1;
 
-#if ENABLE(CSS_COMPOSITING)
     BlendMode m_blendMode;
-#endif
 
     RenderLayerModelObject* m_renderer;
 

@@ -39,15 +39,13 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/FileChooser.cpp \
 	third_party/WebKit/Source/core/platform/FileIconLoader.cpp \
 	third_party/WebKit/Source/core/platform/FileStream.cpp \
-	third_party/WebKit/Source/core/platform/FileSystem.cpp \
-	third_party/WebKit/Source/core/platform/KURL.cpp \
-	third_party/WebKit/Source/core/platform/KURLGoogle.cpp \
 	third_party/WebKit/Source/core/platform/KillRingNone.cpp \
 	third_party/WebKit/Source/core/platform/Language.cpp \
 	third_party/WebKit/Source/core/platform/LayoutTestSupport.cpp \
 	third_party/WebKit/Source/core/platform/Length.cpp \
 	third_party/WebKit/Source/core/platform/LengthBox.cpp \
 	third_party/WebKit/Source/core/platform/Logging.cpp \
+	third_party/WebKit/Source/core/platform/MIMETypeFromURL.cpp \
 	third_party/WebKit/Source/core/platform/NotImplemented.cpp \
 	third_party/WebKit/Source/core/platform/PlatformEvent.cpp \
 	third_party/WebKit/Source/core/platform/PlatformInstrumentation.cpp \
@@ -55,7 +53,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesizer.cpp \
-	third_party/WebKit/Source/core/platform/SchemeRegistry.cpp \
 	third_party/WebKit/Source/core/platform/ScrollAnimator.cpp \
 	third_party/WebKit/Source/core/platform/ScrollAnimatorNone.cpp \
 	third_party/WebKit/Source/core/platform/ScrollView.cpp \
@@ -147,7 +144,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/SSLKeyGeneratorChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ScrollbarThemeChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ScrollbarThemeChromiumAndroid.cpp \
-	third_party/WebKit/Source/core/platform/chromium/SearchPopupMenuChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SharedTimerChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SoundChromiumPosix.cpp \
 	third_party/WebKit/Source/core/platform/chromium/StatsCounterChromium.cpp \
@@ -272,7 +268,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/skia/MemoryInstrumentationSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/NativeImageSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/OpaqueRegionSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/PlatformContextSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SimpleFontDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SkiaUtils.cpp \
 	third_party/WebKit/Source/core/platform/graphics/transforms/Matrix3DTransformOperation.cpp \
@@ -301,6 +296,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/leveldb/LevelDBTransaction.cpp \
 	third_party/WebKit/Source/core/platform/leveldb/LevelDBWriteBatch.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamCenter.cpp \
+	third_party/WebKit/Source/core/platform/mediastream/MediaStreamComponent.cpp \
+	third_party/WebKit/Source/core/platform/mediastream/MediaStreamDescriptor.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamSource.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/RTCIceCandidateDescriptor.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/RTCSessionDescriptionDescriptor.cpp \
@@ -353,15 +350,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/text/TextBoundaries.cpp \
 	third_party/WebKit/Source/core/platform/text/TextBreakIterator.cpp \
 	third_party/WebKit/Source/core/platform/text/TextBreakIteratorICU.cpp \
-	third_party/WebKit/Source/core/platform/text/TextCodec.cpp \
-	third_party/WebKit/Source/core/platform/text/TextCodecICU.cpp \
-	third_party/WebKit/Source/core/platform/text/TextCodecLatin1.cpp \
-	third_party/WebKit/Source/core/platform/text/TextCodecUTF16.cpp \
-	third_party/WebKit/Source/core/platform/text/TextCodecUTF8.cpp \
-	third_party/WebKit/Source/core/platform/text/TextCodecUserDefined.cpp \
-	third_party/WebKit/Source/core/platform/text/TextEncoding.cpp \
 	third_party/WebKit/Source/core/platform/text/TextEncodingDetectorICU.cpp \
-	third_party/WebKit/Source/core/platform/text/TextEncodingRegistry.cpp \
 	third_party/WebKit/Source/core/platform/text/TextStream.cpp \
 	third_party/WebKit/Source/core/platform/text/UnicodeRange.cpp \
 	third_party/WebKit/Source/core/platform/text/chromium/Hyphenation.cpp \
@@ -425,16 +414,12 @@ MY_DEFS := \
 	'-DENABLE_BATTERY_STATUS=0' \
 	'-DENABLE_CANVAS_USES_MAILBOX=0' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_COMPOSITING=0' \
 	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_JAVASCRIPT_I18N_API=1' \
 	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
-	'-DENABLE_RUBY=1' \
-	'-DENABLE_SANDBOX=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \

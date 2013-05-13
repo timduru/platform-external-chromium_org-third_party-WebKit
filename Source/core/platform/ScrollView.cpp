@@ -33,7 +33,7 @@
 #include "core/platform/ScrollAnimator.h"
 #include "core/platform/Scrollbar.h"
 #include "core/platform/ScrollbarTheme.h"
-#include "core/platform/graphics/GraphicsContext.h"
+#include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/GraphicsLayer.h"
 #include <wtf/StdLibExtras.h>
 
@@ -217,9 +217,9 @@ IntRect ScrollView::visibleContentRect(VisibleContentRectIncludesScrollbars scol
     return IntRect(IntPoint(m_scrollOffset), expandedIntSize(visibleContentSize));
 }
 
-IntSize ScrollView::layoutSize() const
+IntSize ScrollView::layoutSize(VisibleContentRectIncludesScrollbars scrollbarInclusion) const
 {
-    return m_fixedLayoutSize.isEmpty() || !m_useFixedLayout ? unscaledVisibleContentSize(ExcludeScrollbars) : m_fixedLayoutSize;
+    return m_fixedLayoutSize.isEmpty() || !m_useFixedLayout ? unscaledVisibleContentSize(scrollbarInclusion) : m_fixedLayoutSize;
 }
 
 IntSize ScrollView::fixedLayoutSize() const

@@ -31,6 +31,8 @@
 #include "config.h"
 #include "core/loader/DocumentThreadableLoader.h"
 
+#include <wtf/Assertions.h>
+#include <wtf/UnusedParam.h>
 #include "core/dom/Document.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/CrossOriginAccessControl.h"
@@ -44,12 +46,10 @@
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
 #include "core/page/Frame.h"
-#include "core/page/SecurityOrigin.h"
-#include "core/platform/SchemeRegistry.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceRequest.h"
-#include <wtf/Assertions.h>
-#include <wtf/UnusedParam.h>
+#include "origin/SchemeRegistry.h"
+#include "origin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -386,14 +386,20 @@ void DocumentThreadableLoader::loadRequest(const ResourceRequest& request, Secur
         }
         return;
     }
-    
+
     // FIXME: ThreadableLoaderOptions.sniffContent is not supported for synchronous requests.
     Vector<char> data;
     ResourceError error;
     ResourceResponse response;
     unsigned long identifier = std::numeric_limits<unsigned long>::max();
-    if (m_document->frame())
-        identifier = m_document->frame()->loader()->loadResourceSynchronously(request, m_options.allowCredentials, error, response, data);
+    if (Frame* frame = m_document->frame()) {
+        Frame* top = frame->tree()->top();
+        if (!top->loader()->mixedContentChecker()->canDisplayInsecureContent(top->document()->securityOrigin(), requestURL)) {
+            m_client->didFail(error);
+            return;
+        }
+        identifier = frame->loader()->loadResourceSynchronously(request, m_options.allowCredentials, error, response, data);
+    }
 
     InspectorInstrumentation::documentThreadableLoaderStartedLoadingForClient(m_document, identifier, m_client);
 

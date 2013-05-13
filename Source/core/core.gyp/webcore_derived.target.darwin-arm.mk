@@ -81,9 +81,9 @@ $(gyp_intermediate_dir)/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/webki
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/ColorSuggestionPicker.cpp: $(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/EventFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/EventFactory.cpp
+$(gyp_intermediate_dir)/Event.cpp: $(gyp_shared_intermediate_dir)/webkit/Event.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/ExceptionCodeDescription.cpp: $(gyp_shared_intermediate_dir)/webkit/ExceptionCodeDescription.cpp
+$(gyp_intermediate_dir)/DOMException.cpp: $(gyp_shared_intermediate_dir)/webkit/DOMException.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/PickerCommon.cpp: $(gyp_shared_intermediate_dir)/webkit/PickerCommon.cpp
 	mkdir -p $(@D); cp $< $@
@@ -150,8 +150,8 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/HTMLNames.cpp \
 	$(gyp_intermediate_dir)/CalendarPicker.cpp \
 	$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp \
-	$(gyp_intermediate_dir)/EventFactory.cpp \
-	$(gyp_intermediate_dir)/ExceptionCodeDescription.cpp \
+	$(gyp_intermediate_dir)/Event.cpp \
+	$(gyp_intermediate_dir)/DOMException.cpp \
 	$(gyp_intermediate_dir)/PickerCommon.cpp \
 	$(gyp_intermediate_dir)/UserAgentStyleSheetsData.cpp \
 	$(gyp_intermediate_dir)/V8HTMLElementWrapperFactory.cpp \
@@ -181,7 +181,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ActiveDOMCallback.cpp \
 	third_party/WebKit/Source/bindings/v8/ArrayValue.cpp \
 	third_party/WebKit/Source/bindings/v8/BindingSecurity.cpp \
-	third_party/WebKit/Source/bindings/v8/BindingState.cpp \
 	third_party/WebKit/Source/bindings/v8/CustomElementHelpers.cpp \
 	third_party/WebKit/Source/bindings/v8/DOMDataStore.cpp \
 	third_party/WebKit/Source/bindings/v8/DOMWrapperWorld.cpp \
@@ -304,7 +303,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8MessageEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8MessagePortCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8MutationObserverCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8NamedNodeMapCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8NamedNodesCollection.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8NodeCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8NodeListCustom.cpp \
@@ -388,16 +386,12 @@ MY_DEFS := \
 	'-DENABLE_BATTERY_STATUS=0' \
 	'-DENABLE_CANVAS_USES_MAILBOX=0' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_COMPOSITING=0' \
 	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_JAVASCRIPT_I18N_API=1' \
 	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
-	'-DENABLE_RUBY=1' \
-	'-DENABLE_SANDBOX=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \

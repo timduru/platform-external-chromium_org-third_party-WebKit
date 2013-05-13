@@ -29,7 +29,7 @@
 #include "config.h"
 
 #if ENABLE(SVG)
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 
 #include <stdlib.h>
 #include "CSSPropertyNames.h"
@@ -109,7 +109,7 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
     if (value->isPrimitiveValue())
         primitiveValue = static_cast<CSSPrimitiveValue*>(value);
 
-    const State& state = m_state;
+    const StyleResolverState& state = m_state;
     SVGRenderStyle* svgstyle = state.style()->accessSVGStyle();
 
     bool isInherit = state.parentNode() && value->isInheritedValue();

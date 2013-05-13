@@ -26,15 +26,13 @@
 #include "RuntimeEnabledFeatures.h"
 #include "SerializedScriptValue.h"
 #include "V8MessagePort.h"
-#include "V8TestSerializedScriptValueInterface.h"
-#include "bindings/v8/BindingState.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/SerializedScriptValue.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/page/Frame.h"
-#include <wtf/UnusedParam.h>
+#include "wtf/UnusedParam.h"
 
 #if ENABLE(BINDING_INTEGRITY)
 #if defined(OS_WIN)
@@ -200,13 +198,13 @@ static v8::Handle<v8::Value> cachedReadonlyValueAttrGetterCallback(v8::Local<v8:
 static const V8DOMConfiguration::BatchedAttribute V8TestSerializedScriptValueInterfaceAttrs[] = {
     // Attribute 'value' (Type: 'attribute' ExtAttr: '')
     {"value", TestSerializedScriptValueInterfaceV8Internal::valueAttrGetterCallback, TestSerializedScriptValueInterfaceV8Internal::valueAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'readonlyValue' (Type: 'readonly attribute' ExtAttr: '')
+    // Attribute 'readonlyValue' (Type: 'attribute' ExtAttr: '')
     {"readonlyValue", TestSerializedScriptValueInterfaceV8Internal::readonlyValueAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'cachedValue' (Type: 'attribute' ExtAttr: 'CachedAttribute')
     {"cachedValue", TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrGetterCallback, TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'ports' (Type: 'readonly attribute' ExtAttr: '')
+    // Attribute 'ports' (Type: 'attribute' ExtAttr: '')
     {"ports", TestSerializedScriptValueInterfaceV8Internal::portsAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'cachedReadonlyValue' (Type: 'readonly attribute' ExtAttr: 'CachedAttribute')
+    // Attribute 'cachedReadonlyValue' (Type: 'attribute' ExtAttr: 'CachedAttribute')
     {"cachedReadonlyValue", TestSerializedScriptValueInterfaceV8Internal::cachedReadonlyValueAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
 

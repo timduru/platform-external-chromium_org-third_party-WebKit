@@ -25,9 +25,9 @@
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/WrapperTypeInfo.h"
+#include "wtf/HashMap.h"
+#include "wtf/text/StringHash.h"
 #include <v8.h>
-#include <wtf/HashMap.h>
-#include <wtf/text/StringHash.h>
 
 namespace WebCore {
 
@@ -62,6 +62,12 @@ inline v8::Handle<v8::Object> wrap(TestException* impl, v8::Handle<v8::Object> c
 {
     ASSERT(impl);
     ASSERT(DOMDataStore::getWrapper(impl, isolate).IsEmpty());
+    if (ScriptWrappable::wrapperCanBeStoredInObject(impl)) {
+        const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl);
+        // Might be a XXXConstructor::info instead of an XXX::info. These will both have
+        // the same object de-ref functions, though, so use that as the basis of the check.
+        RELEASE_ASSERT(actualInfo->derefObjectFunction == V8TestException::info.derefObjectFunction);
+    }
     return V8TestException::createWrapper(impl, creationContext, isolate);
 }
 

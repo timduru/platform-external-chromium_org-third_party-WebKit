@@ -21,6 +21,9 @@
 #include "config.h"
 #include "core/css/StyleSheetContents.h"
 
+#include <wtf/Deque.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
+#include <wtf/MemoryInstrumentationVector.h>
 #include "core/css/CSSImportRule.h"
 #include "core/css/CSSParser.h"
 #include "core/css/CSSStyleSheet.h"
@@ -32,10 +35,7 @@
 #include "core/dom/Node.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/loader/cache/CachedCSSStyleSheet.h"
-#include "core/page/SecurityOrigin.h"
-#include <wtf/Deque.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationVector.h>
+#include "origin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -373,6 +373,14 @@ StyleSheetContents* StyleSheetContents::rootStyleSheet() const
     while (root->parentStyleSheet())
         root = root->parentStyleSheet();
     return const_cast<StyleSheetContents*>(root);
+}
+
+bool StyleSheetContents::hasSingleOwnerNode() const
+{
+    StyleSheetContents* root = rootStyleSheet();
+    if (root->m_clients.isEmpty())
+        return false;
+    return root->m_clients.size() == 1;
 }
 
 Node* StyleSheetContents::singleOwnerNode() const

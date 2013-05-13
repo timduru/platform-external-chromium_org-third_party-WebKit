@@ -36,7 +36,6 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/platform/graphics/Color.h"
-#include "core/platform/graphics/skia/PlatformContextSkia.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerModelObject.h"
@@ -335,6 +334,9 @@ void LinkHighlight::updateGeometry()
 
         if (m_currentGraphicsLayer)
             m_currentGraphicsLayer->addRepaintRect(FloatRect(layer()->position().x, layer()->position().y, layer()->bounds().width, layer()->bounds().height));
+    } else {
+        clearGraphicsLayerLinkHighlightPointer();
+        releaseResources();
     }
 }
 

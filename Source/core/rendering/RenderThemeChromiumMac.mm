@@ -25,7 +25,7 @@
 #import "HTMLNames.h"
 #import "UserAgentStyleSheets.h"
 #import "core/css/CSSValueList.h"
-#import "core/css/StyleResolver.h"
+#import "core/css/resolver/StyleResolver.h"
 #import "core/dom/Document.h"
 #import "core/dom/Element.h"
 #import "core/fileapi/FileList.h"
@@ -40,6 +40,7 @@
 #import "core/platform/LocalizedStrings.h"
 #import "core/platform/SharedBuffer.h"
 #import "core/platform/graphics/BitmapImage.h"
+#import "core/platform/graphics/GraphicsContextStateSaver.h"
 #import "core/platform/graphics/Image.h"
 #import "core/platform/graphics/ImageBuffer.h"
 #import "core/platform/graphics/StringTruncator.h"
@@ -1715,54 +1716,6 @@ bool RenderThemeChromiumMac::paintSearchFieldResultsDecoration(RenderObject* o, 
 
     [[search searchButtonCell] drawWithFrame:localBounds inView:documentViewFor(o)];
     [[search searchButtonCell] setControlView:nil];
-    return false;
-}
-
-const int resultsArrowWidth = 5;
-void RenderThemeChromiumMac::adjustSearchFieldResultsButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
-{
-    IntSize size = sizeForSystemFont(style, resultsButtonSizes());
-    style->setWidth(Length(size.width() + resultsArrowWidth, Fixed));
-    style->setHeight(Length(size.height(), Fixed));
-    style->setBoxShadow(nullptr);
-}
-
-bool RenderThemeChromiumMac::paintSearchFieldResultsButton(RenderObject* o, const PaintInfo& paintInfo, const IntRect& r)
-{
-    Node* input = o->node()->shadowHost();
-    if (!input)
-        input = o->node();
-    if (!input->renderer()->isBox())
-        return false;
-
-    LocalCurrentGraphicsContext localContext(paintInfo.context);
-    setSearchCellState(input->renderer(), r);
-
-    NSSearchFieldCell* search = this->search();
-
-    updateActiveState([search searchButtonCell], o);
-
-    if (![search searchMenuTemplate])
-        [search setSearchMenuTemplate:searchMenuTemplate()];
-
-    GraphicsContextStateSaver stateSaver(*paintInfo.context);
-    float zoomLevel = o->style()->effectiveZoom();
-
-    FloatRect localBounds = [search searchButtonRectForBounds:NSRect(input->renderBox()->pixelSnappedBorderBoxRect())];
-    localBounds = convertToPaintingRect(input->renderer(), o, localBounds, r);
-
-    IntRect unzoomedRect(localBounds);
-    if (zoomLevel != 1.0f) {
-        unzoomedRect.setWidth(unzoomedRect.width() / zoomLevel);
-        unzoomedRect.setHeight(unzoomedRect.height() / zoomLevel);
-        paintInfo.context->translate(unzoomedRect.x(), unzoomedRect.y());
-        paintInfo.context->scale(FloatSize(zoomLevel, zoomLevel));
-        paintInfo.context->translate(-unzoomedRect.x(), -unzoomedRect.y());
-    }
-
-    [[search searchButtonCell] drawWithFrame:unzoomedRect inView:documentViewFor(o)];
-    [[search searchButtonCell] setControlView:nil];
-
     return false;
 }
 

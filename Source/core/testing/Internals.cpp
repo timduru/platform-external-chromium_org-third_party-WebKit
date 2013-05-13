@@ -29,9 +29,11 @@
 
 #include "HTMLNames.h"
 #include "InspectorFrontendClientLocal.h"
+#include "InternalRuntimeFlags.h"
 #include "InternalSettings.h"
 #include "MallocStatistics.h"
 #include "MockPagePopupDriver.h"
+#include "RuntimeEnabledFeatures.h"
 #include "TypeConversions.h"
 #include "bindings/v8/SerializedScriptValue.h"
 #include "core/css/StyleSheetContents.h"
@@ -85,21 +87,20 @@
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PrintContext.h"
-#include "RuntimeEnabledFeatures.h"
 #include "core/page/Settings.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/Cursor.h"
 #include "core/platform/Language.h"
-#include "core/platform/SchemeRegistry.h"
 #include "core/platform/graphics/IntRect.h"
 #include "core/rendering/RenderMenuList.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderTreeAsText.h"
 #include "core/rendering/RenderView.h"
 #include "core/workers/WorkerThread.h"
-#include <wtf/dtoa.h>
-#include <wtf/text/StringBuffer.h>
+#include "origin/SchemeRegistry.h"
+#include "wtf/dtoa.h"
+#include "wtf/text/StringBuffer.h"
 
 #if ENABLE(INPUT_TYPE_COLOR)
 #include "core/platform/ColorChooser.h"
@@ -234,6 +235,7 @@ void Internals::resetToConsistentState(Page* page)
 
 Internals::Internals(Document* document)
     : ContextDestructionObserver(document)
+    , m_runtimeFlags(InternalRuntimeFlags::create())
 {
     if (document && document->page())
         document->page()->group().captionPreferences()->setTestingMode(true);
@@ -260,6 +262,11 @@ InternalSettings* Internals::settings() const
     if (!page)
         return 0;
     return InternalSettings::from(page);
+}
+
+InternalRuntimeFlags* Internals::runtimeFlags() const
+{
+    return m_runtimeFlags.get();
 }
 
 unsigned Internals::workerThreadCount() const
@@ -428,66 +435,14 @@ void Internals::resumeAnimations(Document* document, ExceptionCode& ec) const
     controller->resumeAnimations();
 }
 
-bool Internals::pauseAnimationAtTimeOnElement(const String& animationName, double pauseTime, Element* element, ExceptionCode& ec)
+void Internals::pauseAnimations(double pauseTime, ExceptionCode& ec)
 {
-    if (!element || pauseTime < 0) {
+    if (pauseTime < 0) {
         ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-    AnimationController* controller = frame()->animation();
-    return controller->pauseAnimationAtTime(element->renderer(), AtomicString(animationName), pauseTime);
-}
-
-bool Internals::pauseAnimationAtTimeOnPseudoElement(const String& animationName, double pauseTime, Element* element, const String& pseudoId, ExceptionCode& ec)
-{
-    if (!element || pauseTime < 0) {
-        ec = INVALID_ACCESS_ERR;
-        return false;
+        return;
     }
 
-    if (pseudoId != "before" && pseudoId != "after") {
-        ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-
-    PseudoElement* pseudoElement = element->pseudoElement(pseudoId == "before" ? BEFORE : AFTER);
-    if (!pseudoElement) {
-        ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-
-    return frame()->animation()->pauseAnimationAtTime(pseudoElement->renderer(), AtomicString(animationName), pauseTime);
-}
-
-bool Internals::pauseTransitionAtTimeOnElement(const String& propertyName, double pauseTime, Element* element, ExceptionCode& ec)
-{
-    if (!element || pauseTime < 0) {
-        ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-    AnimationController* controller = frame()->animation();
-    return controller->pauseTransitionAtTime(element->renderer(), propertyName, pauseTime);
-}
-
-bool Internals::pauseTransitionAtTimeOnPseudoElement(const String& property, double pauseTime, Element* element, const String& pseudoId, ExceptionCode& ec)
-{
-    if (!element || pauseTime < 0) {
-        ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-
-    if (pseudoId != "before" && pseudoId != "after") {
-        ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-
-    PseudoElement* pseudoElement = element->pseudoElement(pseudoId == "before" ? BEFORE : AFTER);
-    if (!pseudoElement) {
-        ec = INVALID_ACCESS_ERR;
-        return false;
-    }
-
-    return frame()->animation()->pauseTransitionAtTime(pseudoElement->renderer(), property, pauseTime);
+    frame()->animation()->pauseAnimationsForTesting(pauseTime);
 }
 
 bool Internals::hasShadowInsertionPoint(const Node* root, ExceptionCode& ec) const
@@ -629,15 +584,6 @@ ShadowRoot* Internals::ensureShadowRoot(Element* host, ExceptionCode& ec)
     if (ElementShadow* shadow = host->shadow())
         return shadow->youngestShadowRoot();
 
-    return host->createShadowRoot(ec).get();
-}
-
-ShadowRoot* Internals::createShadowRoot(Element* host, ExceptionCode& ec)
-{
-    if (!host) {
-        ec = INVALID_ACCESS_ERR;
-        return 0;
-    }
     return host->createShadowRoot(ec).get();
 }
 

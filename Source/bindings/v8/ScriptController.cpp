@@ -35,7 +35,6 @@
 #include "V8DOMWindow.h"
 #include "V8Event.h"
 #include "V8HTMLElement.h"
-#include "bindings/v8/BindingState.h"
 #include "bindings/v8/NPObjectWrapper.h"
 #include "bindings/v8/NPV8Object.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
@@ -67,13 +66,13 @@
 #include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/page/Settings.h"
 #include "core/platform/HistogramSupport.h"
 #include "core/platform/NotImplemented.h"
 #include "core/platform/Widget.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "core/plugins/PluginView.h"
+#include "origin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/StringExtras.h"
@@ -95,7 +94,7 @@ void ScriptController::initializeThreading()
 
 bool ScriptController::canAccessFromCurrentOrigin(Frame *frame)
 {
-    return !v8::Context::InContext() || BindingSecurity::shouldAllowAccessToFrame(BindingState::instance(), frame);
+    return !v8::Context::InContext() || BindingSecurity::shouldAllowAccessToFrame(frame);
 }
 
 ScriptController::ScriptController(Frame* frame)
@@ -711,7 +710,7 @@ ScriptValue ScriptController::executeScript(const ScriptSourceCode& sourceCode)
     return evaluate(sourceCode);
 }
 
-bool ScriptController::executeIfJavaScriptURL(const KURL& url, ShouldReplaceDocumentIfJavaScriptURL shouldReplaceDocumentIfJavaScriptURL)
+bool ScriptController::executeIfJavaScriptURL(const KURL& url)
 {
     if (!protocolIsJavaScript(url))
         return false;
@@ -739,18 +738,13 @@ bool ScriptController::executeIfJavaScriptURL(const KURL& url, ShouldReplaceDocu
     if (!result.getString(scriptResult))
         return true;
 
-    // FIXME: We should always replace the document, but doing so
-    //        synchronously can cause crashes:
-    //        http://bugs.webkit.org/show_bug.cgi?id=16782
-    if (shouldReplaceDocumentIfJavaScriptURL == ReplaceDocumentIfJavaScriptURL) {
-        // We're still in a frame, so there should be a DocumentLoader.
-        ASSERT(m_frame->document()->loader());
+    // We're still in a frame, so there should be a DocumentLoader.
+    ASSERT(m_frame->document()->loader());
         
-        // DocumentWriter::replaceDocument can cause the DocumentLoader to get deref'ed and possible destroyed,
-        // so protect it with a RefPtr.
-        if (RefPtr<DocumentLoader> loader = m_frame->document()->loader())
-            loader->writer()->replaceDocument(scriptResult, ownerDocument.get());
-    }
+    // DocumentWriter::replaceDocument can cause the DocumentLoader to get deref'ed and possible destroyed,
+    // so protect it with a RefPtr.
+    if (RefPtr<DocumentLoader> loader = m_frame->document()->loader())
+        loader->writer()->replaceDocument(scriptResult, ownerDocument.get());
     return true;
 }
 

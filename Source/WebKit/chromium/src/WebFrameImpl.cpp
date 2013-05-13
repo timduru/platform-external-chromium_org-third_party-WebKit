@@ -71,6 +71,18 @@
 #include "config.h"
 #include "WebFrameImpl.h"
 
+#include <public/Platform.h>
+#include <public/WebFileSystem.h>
+#include <public/WebFileSystemType.h>
+#include <public/WebFloatPoint.h>
+#include <public/WebFloatRect.h>
+#include <public/WebPoint.h>
+#include <public/WebRect.h>
+#include <public/WebSize.h>
+#include <public/WebURLError.h>
+#include <public/WebVector.h>
+#include <wtf/CurrentTime.h>
+#include <wtf/HashMap.h>
 #include <algorithm>
 #include "AssociatedURLLoader.h"
 #include "AsyncFileSystemChromium.h"
@@ -152,11 +164,9 @@
 #include "core/page/Page.h"
 #include "core/page/Performance.h"
 #include "core/page/PrintContext.h"
-#include "core/page/SecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/platform/AsyncFileSystem.h"
 #include "core/platform/KURL.h"
-#include "core/platform/SchemeRegistry.h"
 #include "core/platform/ScrollTypes.h"
 #include "core/platform/ScrollbarTheme.h"
 #include "core/platform/chromium/ClipboardUtilitiesChromium.h"
@@ -179,18 +189,8 @@
 #include "modules/filesystem/DirectoryEntry.h"
 #include "modules/filesystem/FileEntry.h"
 #include "modules/filesystem/FileSystemType.h"
-#include <public/Platform.h>
-#include <public/WebFileSystem.h>
-#include <public/WebFileSystemType.h>
-#include <public/WebFloatPoint.h>
-#include <public/WebFloatRect.h>
-#include <public/WebPoint.h>
-#include <public/WebRect.h>
-#include <public/WebSize.h>
-#include <public/WebURLError.h>
-#include <public/WebVector.h>
-#include <wtf/CurrentTime.h>
-#include <wtf/HashMap.h>
+#include "origin/SchemeRegistry.h"
+#include "origin/SecurityPolicy.h"
 
 using namespace WebCore;
 
@@ -357,6 +357,8 @@ public:
         context.translate(static_cast<float>(-pageRect.x()), static_cast<float>(-pageRect.y()));
         context.clip(pageRect);
         frame()->view()->paintContents(&context, pageRect);
+        if (context.supportsURLFragments())
+            outputLinkedDestinations(context, frame()->document(), pageRect);
         context.restore();
         return scale;
     }
@@ -931,15 +933,13 @@ v8::Handle<v8::Value> WebFrameImpl::createFileEntry(WebFileSystemType type, cons
 void WebFrameImpl::reload(bool ignoreCache)
 {
     ASSERT(frame());
-    frame()->loader()->history()->saveDocumentAndScrollState();
     frame()->loader()->reload(ignoreCache);
 }
 
 void WebFrameImpl::reloadWithOverrideURL(const WebURL& overrideUrl, bool ignoreCache)
 {
     ASSERT(frame());
-    frame()->loader()->history()->saveDocumentAndScrollState();
-    frame()->loader()->reloadWithOverrideURL(overrideUrl, ignoreCache);
+    frame()->loader()->reload(ignoreCache, overrideUrl);
 }
 
 void WebFrameImpl::loadRequest(const WebURLRequest& request)
@@ -965,7 +965,7 @@ void WebFrameImpl::loadHistoryItem(const WebHistoryItem& item)
     frame()->loader()->prepareForHistoryNavigation();
     RefPtr<HistoryItem> currentItem = frame()->loader()->history()->currentItem();
     m_inSameDocumentHistoryLoad = currentItem && currentItem->shouldDoSameDocumentNavigationTo(historyItem.get());
-    frame()->page()->goToItem(historyItem.get(), FrameLoadTypeIndexedBackForward);
+    frame()->page()->goToItem(historyItem.get());
     m_inSameDocumentHistoryLoad = false;
 }
 

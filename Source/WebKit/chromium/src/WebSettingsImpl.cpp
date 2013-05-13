@@ -546,17 +546,12 @@ void WebSettingsImpl::setCaretBrowsingEnabled(bool enabled)
 
 void WebSettingsImpl::setInteractiveFormValidationEnabled(bool enabled)
 {
-    m_settings->setInteractiveFormValidationEnabled(enabled);
+    // FIXME: Remove this function when all of callsites are removed.
 }
 
 void WebSettingsImpl::setValidationMessageTimerMagnification(int newValue)
 {
     m_settings->setValidationMessageTimerMagnification(newValue);
-}
-
-void WebSettingsImpl::setMinimumTimerInterval(double interval)
-{
-    // FIXME: remove this once the embedder is no longer calling it.
 }
 
 void WebSettingsImpl::setFullScreenEnabled(bool enabled)

@@ -35,10 +35,11 @@
 #include "GrContext.h"
 #include "GrGLInterface.h"
 #include "core/platform/graphics/Extensions3D.h"
+#include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/gpu/DrawingBuffer.h"
-#include "core/platform/graphics/skia/PlatformContextSkia.h"
 #include <public/WebGraphicsContext3D.h>
+#include <public/WebGraphicsContext3DProvider.h>
 #include <public/WebGraphicsMemoryAllocation.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/StringHash.h>
@@ -68,13 +69,14 @@ GraphicsContext3DPrivate::GraphicsContext3DPrivate(PassOwnPtr<WebKit::WebGraphic
 {
 }
 
-GraphicsContext3DPrivate::GraphicsContext3DPrivate(WebKit::WebGraphicsContext3D* webContext, GrContext* grContext, bool preserveDrawingBuffer)
-    : m_impl(webContext)
+GraphicsContext3DPrivate::GraphicsContext3DPrivate(PassOwnPtr<WebKit::WebGraphicsContext3DProvider> provider, bool preserveDrawingBuffer)
+    : m_provider(provider)
+    , m_impl(m_provider->context3d())
     , m_initializedAvailableExtensions(false)
     , m_layerComposited(false)
     , m_preserveDrawingBuffer(preserveDrawingBuffer)
     , m_resourceSafety(ResourceSafetyUnknown)
-    , m_grContext(grContext)
+    , m_grContext(m_provider->grContext())
 {
 }
 
@@ -89,18 +91,18 @@ GraphicsContext3DPrivate::~GraphicsContext3DPrivate()
 
 PassRefPtr<GraphicsContext3D> GraphicsContext3DPrivate::createGraphicsContextFromWebContext(PassOwnPtr<WebKit::WebGraphicsContext3D> webContext, bool preserveDrawingBuffer)
 {
-    RefPtr<GraphicsContext3D> context = adoptRef(new GraphicsContext3D(GraphicsContext3D::Attributes(), 0));
+    RefPtr<GraphicsContext3D> context = adoptRef(new GraphicsContext3D());
 
     OwnPtr<GraphicsContext3DPrivate> priv = adoptPtr(new GraphicsContext3DPrivate(webContext, preserveDrawingBuffer));
     context->m_private = priv.release();
     return context.release();
 }
 
-PassRefPtr<GraphicsContext3D> GraphicsContext3DPrivate::createGraphicsContextFromExternalWebContextAndGrContext(WebKit::WebGraphicsContext3D* webContext, GrContext* grContext, bool preserveDrawingBuffer)
+PassRefPtr<GraphicsContext3D> GraphicsContext3DPrivate::createGraphicsContextFromProvider(PassOwnPtr<WebKit::WebGraphicsContext3DProvider> provider, bool preserveDrawingBuffer)
 {
-    RefPtr<GraphicsContext3D> context = adoptRef(new GraphicsContext3D(GraphicsContext3D::Attributes(), 0));
+    RefPtr<GraphicsContext3D> context = adoptRef(new GraphicsContext3D());
 
-    OwnPtr<GraphicsContext3DPrivate> priv = adoptPtr(new GraphicsContext3DPrivate(webContext, grContext, preserveDrawingBuffer));
+    OwnPtr<GraphicsContext3DPrivate> priv = adoptPtr(new GraphicsContext3DPrivate(provider, preserveDrawingBuffer));
     context->m_private = priv.release();
     return context.release();
 }
@@ -188,7 +190,7 @@ void GraphicsContext3DPrivate::paintFramebufferToCanvas(int framebuffer, int wid
     unsigned char* pixels = 0;
     size_t bufferSize = 4 * width * height;
 
-    const SkBitmap* canvasBitmap = imageBuffer->context()->platformContext()->bitmap();
+    const SkBitmap* canvasBitmap = imageBuffer->context()->bitmap();
     const SkBitmap* readbackBitmap = 0;
     ASSERT(canvasBitmap->config() == SkBitmap::kARGB_8888_Config);
     if (canvasBitmap->width() == width && canvasBitmap->height() == height) {

@@ -23,6 +23,12 @@
 #include "config.h"
 #include "core/xml/XMLHttpRequest.h"
 
+#include <wtf/ArrayBuffer.h>
+#include <wtf/ArrayBufferView.h>
+#include <wtf/RefCountedLeakCounter.h>
+#include <wtf/StdLibExtras.h>
+#include <wtf/text/CString.h>
+#include <wtf/UnusedParam.h>
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/DOMImplementation.h"
@@ -46,7 +52,6 @@
 #include "core/loader/cache/CachedResourceRequestInitiators.h"
 #include "core/loader/cache/MemoryCache.h"
 #include "core/page/ContentSecurityPolicy.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/page/Settings.h"
 #include "core/platform/HistogramSupport.h"
 #include "core/platform/SharedBuffer.h"
@@ -57,12 +62,7 @@
 #include "core/platform/network/ResourceRequest.h"
 #include "core/xml/XMLHttpRequestProgressEvent.h"
 #include "core/xml/XMLHttpRequestUpload.h"
-#include <wtf/ArrayBuffer.h>
-#include <wtf/ArrayBufferView.h>
-#include <wtf/RefCountedLeakCounter.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/CString.h>
-#include <wtf/UnusedParam.h>
+#include "origin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -588,8 +588,8 @@ void XMLHttpRequest::send(Document* document, ExceptionCode& ec)
         String body = createMarkup(document);
 
         // FIXME: this should use value of document.inputEncoding to determine the encoding to use.
-        TextEncoding encoding = UTF8Encoding();
-        m_requestEntityBody = FormData::create(encoding.encode(body.characters(), body.length(), EntitiesForUnencodables));
+        WTF::TextEncoding encoding = UTF8Encoding();
+        m_requestEntityBody = FormData::create(encoding.encode(body.characters(), body.length(), WTF::EntitiesForUnencodables));
         if (m_upload)
             m_requestEntityBody->setAlwaysStream(true);
     }
@@ -611,7 +611,7 @@ void XMLHttpRequest::send(const String& body, ExceptionCode& ec)
             m_requestHeaders.set("Content-Type", contentType);
         }
 
-        m_requestEntityBody = FormData::create(UTF8Encoding().encode(body.characters(), body.length(), EntitiesForUnencodables));
+        m_requestEntityBody = FormData::create(UTF8Encoding().encode(body.characters(), body.length(), WTF::EntitiesForUnencodables));
         if (m_upload)
             m_requestEntityBody->setAlwaysStream(true);
     }
@@ -654,10 +654,6 @@ void XMLHttpRequest::send(DOMFormData* body, ExceptionCode& ec)
 
     if (m_method != "GET" && m_method != "HEAD" && m_url.protocolIsInHTTPFamily()) {
         m_requestEntityBody = FormData::createMultiPart(*(static_cast<FormDataList*>(body)), body->encoding(), document());
-
-        // We need to ask the client to provide the generated file names if needed. When FormData fills the element
-        // for the file, it could set a flag to use the generated file name, i.e. a package file on Mac.
-        m_requestEntityBody->generateFiles(document());
 
         String contentType = getRequestHeader("Content-Type");
         if (contentType.isEmpty()) {

@@ -47,13 +47,13 @@
 #include "core/page/DiagnosticLoggingKeys.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
-#include "core/page/SecurityOrigin.h"
-#include "core/page/SecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/platform/MIMETypeRegistry.h"
 #include "core/plugins/PluginData.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "core/rendering/RenderView.h"
+#include "origin/SecurityOrigin.h"
+#include "origin/SecurityPolicy.h"
 
 namespace WebCore {
     
@@ -70,7 +70,7 @@ void SubframeLoader::clear()
     m_containsPlugins = false;
 }
 
-bool SubframeLoader::requestFrame(HTMLFrameOwnerElement* ownerElement, const String& urlString, const AtomicString& frameName, bool lockHistory, bool lockBackForwardList)
+bool SubframeLoader::requestFrame(HTMLFrameOwnerElement* ownerElement, const String& urlString, const AtomicString& frameName, bool lockBackForwardList)
 {
     // Support for <frame src="javascript:string">
     KURL scriptURL;
@@ -81,16 +81,18 @@ bool SubframeLoader::requestFrame(HTMLFrameOwnerElement* ownerElement, const Str
     } else
         url = completeURL(urlString);
 
-    Frame* frame = loadOrRedirectSubframe(ownerElement, url, frameName, lockHistory, lockBackForwardList);
-    if (!frame)
+    if (!loadOrRedirectSubframe(ownerElement, url, frameName, lockBackForwardList))
+        return false;
+
+    if (!ownerElement->contentFrame())
         return false;
 
     if (!scriptURL.isEmpty())
-        frame->script()->executeIfJavaScriptURL(scriptURL);
+        ownerElement->contentFrame()->script()->executeIfJavaScriptURL(scriptURL);
 
     return true;
 }
-    
+
 bool SubframeLoader::resourceWillUsePlugin(const String& url, const String& mimeType, bool shouldPreferPlugInsForImages)
 {
     KURL completedURL;
@@ -178,7 +180,7 @@ bool SubframeLoader::requestObject(HTMLPlugInImageElement* ownerElement, const S
     // If the plug-in element already contains a subframe, loadOrRedirectSubframe will re-use it. Otherwise,
     // it will create a new frame and set it as the RenderPart's widget, causing what was previously 
     // in the widget to be torn down.
-    return loadOrRedirectSubframe(ownerElement, completedURL, frameName, true, true);
+    return loadOrRedirectSubframe(ownerElement, completedURL, frameName, true);
 }
 
 PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, HTMLAppletElement* element, const Vector<String>& paramNames, const Vector<String>& paramValues)
@@ -226,19 +228,17 @@ PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, H
     return widget;
 }
 
-Frame* SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement* ownerElement, const KURL& url, const AtomicString& frameName, bool lockHistory, bool lockBackForwardList)
+bool SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement* ownerElement, const KURL& url, const AtomicString& frameName, bool lockBackForwardList)
 {
-    Frame* frame = ownerElement->contentFrame();
-    if (frame)
-        frame->navigationScheduler()->scheduleLocationChange(m_frame->document()->securityOrigin(), url.string(), m_frame->loader()->outgoingReferrer(), lockHistory, lockBackForwardList);
-    else
-        frame = loadSubframe(ownerElement, url, frameName, m_frame->loader()->outgoingReferrer());
+    if (Frame* frame = ownerElement->contentFrame()) {
+        frame->navigationScheduler()->scheduleLocationChange(m_frame->document()->securityOrigin(), url.string(), m_frame->loader()->outgoingReferrer(), lockBackForwardList);
+        return true;
+    }
 
-    ASSERT(ownerElement->contentFrame() == frame || !ownerElement->contentFrame());
-    return ownerElement->contentFrame();
+    return loadSubframe(ownerElement, url, frameName, m_frame->loader()->outgoingReferrer());
 }
 
-Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement* ownerElement, const KURL& url, const String& name, const String& referrer)
+bool SubframeLoader::loadSubframe(HTMLFrameOwnerElement* ownerElement, const KURL& url, const String& name, const String& referrer)
 {
     RefPtr<Frame> protect(m_frame);
 
@@ -254,7 +254,7 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement* ownerElement, const K
 
     if (!ownerElement->document()->securityOrigin()->canDisplay(url)) {
         FrameLoader::reportLocalLoadFailed(m_frame, url.string());
-        return 0;
+        return false;
     }
 
     String referrerToUse = SecurityPolicy::generateReferrerHeader(ownerElement->document()->referrerPolicy(), url, referrer);
@@ -262,7 +262,7 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement* ownerElement, const K
 
     if (!frame)  {
         m_frame->loader()->checkCallImplicitClose();
-        return 0;
+        return false;
     }
     
     // All new frames will have m_isComplete set to true at this point due to synchronously loading
@@ -291,8 +291,7 @@ Frame* SubframeLoader::loadSubframe(HTMLFrameOwnerElement* ownerElement, const K
     // create the child first, then invoke the loader separately.
     if (frame->loader()->state() == FrameStateComplete && !frame->loader()->policyDocumentLoader())
         frame->loader()->checkCompleted();
-
-    return frame.get();
+    return true;
 }
 
 bool SubframeLoader::allowPlugins(ReasonForCallingAllowPlugins reason)

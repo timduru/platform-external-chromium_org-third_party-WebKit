@@ -35,6 +35,8 @@
 
 namespace WebCore {
 
+class Animation;
+
 class Attr;
 class ClientRect;
 class ClientRectList;
@@ -43,14 +45,15 @@ class DOMTokenList;
 class Element;
 class ElementRareData;
 class ElementShadow;
-class ShareableElementData;
+class InputMethodContext;
 class IntSize;
 class Locale;
-class UniqueElementData;
 class PseudoElement;
 class RenderRegion;
 class ShadowRoot;
+class ShareableElementData;
 class StylePropertySet;
+class UniqueElementData;
 
 class ElementData : public RefCounted<ElementData> {
     WTF_MAKE_FAST_ALLOCATED;
@@ -595,6 +598,13 @@ public:
     void setSavedLayerScrollOffset(const IntSize&);
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
+    void addActiveAnimation(Animation*);
+    void removeActiveAnimation(Animation*);
+    bool hasActiveAnimations() const;
+    Vector<Animation*>* activeAnimations() const;
+
+    InputMethodContext* getInputContext();
 
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)

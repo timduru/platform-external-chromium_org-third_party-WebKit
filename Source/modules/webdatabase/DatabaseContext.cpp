@@ -33,14 +33,14 @@
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/Page.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/page/Settings.h"
-#include "core/platform/SchemeRegistry.h"
 #include "modules/webdatabase/Database.h"
 #include "modules/webdatabase/DatabaseBackendContext.h"
 #include "modules/webdatabase/DatabaseManager.h"
 #include "modules/webdatabase/DatabaseTask.h"
 #include "modules/webdatabase/DatabaseThread.h"
+#include "origin/SchemeRegistry.h"
+#include "origin/SecurityOrigin.h"
 
 namespace WebCore {
 

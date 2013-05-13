@@ -35,10 +35,11 @@
 
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "core/css/CSSFontSelector.h"
 #include "core/css/CSSParser.h"
 #include "core/css/StylePropertySet.h"
-#include "core/css/StyleResolver.h"
+#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/html/HTMLCanvasElement.h"
@@ -55,18 +56,18 @@
 #include "core/loader/cache/CachedImage.h"
 #include "core/page/Console.h"
 #include "core/page/Page.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/page/Settings.h"
 #include "core/platform/FloatConversion.h"
 #include "core/platform/KURL.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/FontCache.h"
-#include "core/platform/graphics/GraphicsContext.h"
+#include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/StrokeStyleApplier.h"
 #include "core/platform/graphics/TextRun.h"
 #include "core/platform/graphics/transforms/AffineTransform.h"
 #include "core/rendering/RenderHTMLCanvas.h"
 #include "core/rendering/RenderLayer.h"
+#include "origin/SecurityOrigin.h"
 
 #include <wtf/CheckedArithmetic.h>
 #include <wtf/MathExtras.h>
@@ -611,6 +612,8 @@ void CanvasRenderingContext2D::setGlobalCompositeOperation(const String& operati
     BlendMode blendMode = BlendModeNormal;
     if (!parseCompositeAndBlendOperator(operation, op, blendMode))
         return;
+    if (!RuntimeEnabledFeatures::cssCompositingEnabled() && blendMode != BlendModeNormal)
+        blendMode = BlendModeNormal;
     if ((state().m_globalComposite == op) && (state().m_globalBlend == blendMode))
         return;
     realizeSaves();

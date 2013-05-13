@@ -33,6 +33,7 @@
 #include "core/loader/DocumentLoader.h"
 #include "core/page/FrameView.h"
 #include "core/page/Settings.h"
+#include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/ImageObserver.h"
 #include "core/platform/graphics/IntRect.h"
@@ -346,6 +347,7 @@ bool SVGImage::dataChanged(bool allDataReceived)
         FrameLoader* loader = frame->loader();
         loader->forceSandboxFlags(SandboxAll);
 
+        frame->view()->setScrollbarsSuppressed(true);
         frame->view()->setCanHaveScrollbars(false); // SVG Images will always synthesize a viewBox, if it's not available, and thus never see scrollbars.
         frame->view()->setTransparent(true); // SVG Images are transparent.
 

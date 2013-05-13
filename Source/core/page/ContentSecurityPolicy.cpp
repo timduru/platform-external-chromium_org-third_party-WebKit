@@ -26,6 +26,7 @@
 #include "config.h"
 #include "core/page/ContentSecurityPolicy.h"
 
+#include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
 #include "bindings/v8/ScriptState.h"
 #include "core/dom/DOMStringList.h"
@@ -39,16 +40,15 @@
 #include "core/page/Console.h"
 #include "core/page/Frame.h"
 #include "core/page/PageConsole.h"
-#include "RuntimeEnabledFeatures.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/page/UseCounter.h"
 #include "core/platform/KURL.h"
-#include "core/platform/SchemeRegistry.h"
 #include "core/platform/network/FormData.h"
-#include "core/platform/text/TextEncoding.h"
-#include <wtf/HashSet.h>
-#include <wtf/text/TextPosition.h>
-#include <wtf/text/WTFString.h>
+#include "origin/SchemeRegistry.h"
+#include "origin/SecurityOrigin.h"
+#include "wtf/HashSet.h"
+#include "wtf/text/TextEncoding.h"
+#include "wtf/text/TextPosition.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -162,15 +162,6 @@ UseCounter::Feature getUseCounterType(ContentSecurityPolicy::HeaderType type)
     }
     ASSERT_NOT_REACHED();
     return UseCounter::NumberOfFeatures;
-}
-
-const ScriptCallFrame& getFirstNonNativeFrame(PassRefPtr<ScriptCallStack> stack)
-{
-    int frameNumber = 0;
-    if (!stack->at(0).lineNumber() && stack->size() > 1 && stack->at(1).lineNumber())
-        frameNumber = 1;
-
-    return stack->at(frameNumber);
 }
 
 } // namespace
@@ -1718,11 +1709,11 @@ static void gatherSecurityPolicyViolationEventData(SecurityPolicyViolationEventI
     init.lineNumber = 0;
     init.columnNumber = 0;
 
-    RefPtr<ScriptCallStack> stack = createScriptCallStack(2, false);
+    RefPtr<ScriptCallStack> stack = createScriptCallStack(1, false);
     if (!stack)
         return;
 
-    const ScriptCallFrame& callFrame = getFirstNonNativeFrame(stack);
+    const ScriptCallFrame& callFrame = stack->at(0);
 
     if (callFrame.lineNumber()) {
         KURL source = KURL(ParsedURLString, callFrame.sourceURL());

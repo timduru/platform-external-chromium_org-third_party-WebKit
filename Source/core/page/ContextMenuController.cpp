@@ -174,7 +174,7 @@ static void openNewWindow(const KURL& urlToLoad, Frame* frame)
                 return;
             newPage->chrome()->show();
         }
-        newPage->mainFrame()->loader()->loadFrameRequest(request, false, false, 0, 0, MaybeSendReferrer);
+        newPage->mainFrame()->loader()->loadFrameRequest(request, false, 0, 0, MaybeSendReferrer);
     }
 }
 
@@ -290,12 +290,12 @@ void ContextMenuController::contextMenuItemSelected(const ContextMenuItem* item)
         break;
     case ContextMenuItemTagOpenLink:
         if (Frame* targetFrame = m_hitTestResult.targetFrame())
-            targetFrame->loader()->loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_hitTestResult.absoluteLinkURL(), frame->loader()->outgoingReferrer())), false, false, 0, 0, MaybeSendReferrer);
+            targetFrame->loader()->loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_hitTestResult.absoluteLinkURL(), frame->loader()->outgoingReferrer())), false, 0, 0, MaybeSendReferrer);
         else
             openNewWindow(m_hitTestResult.absoluteLinkURL(), frame);
         break;
     case ContextMenuItemTagOpenLinkInThisWindow:
-        frame->loader()->loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_hitTestResult.absoluteLinkURL(), frame->loader()->outgoingReferrer())), false, false, 0, 0, MaybeSendReferrer);
+        frame->loader()->loadFrameRequest(FrameLoadRequest(frame->document()->securityOrigin(), ResourceRequest(m_hitTestResult.absoluteLinkURL(), frame->loader()->outgoingReferrer())), false, 0, 0, MaybeSendReferrer);
         break;
     case ContextMenuItemTagBold:
         frame->editor()->command("ToggleBold").execute();
@@ -342,37 +342,12 @@ void ContextMenuController::contextMenuItemSelected(const ContextMenuItem* item)
         frame->editor()->toggleContinuousSpellChecking();
         break;
     case ContextMenuItemTagCheckGrammarWithSpelling:
-        frame->editor()->toggleGrammarChecking();
         break;
-#if USE(AUTOMATIC_TEXT_REPLACEMENT)
-    case ContextMenuItemTagShowSubstitutions:
-        frame->editor()->showSubstitutionsPanel();
-        break;
-    case ContextMenuItemTagSmartCopyPaste:
-        frame->editor()->toggleSmartInsertDelete();
-        break;
-    case ContextMenuItemTagSmartQuotes:
-        frame->editor()->toggleAutomaticQuoteSubstitution();
-        break;
-    case ContextMenuItemTagSmartDashes:
-        frame->editor()->toggleAutomaticDashSubstitution();
-        break;
-    case ContextMenuItemTagSmartLinks:
-        frame->editor()->toggleAutomaticLinkDetection();
-        break;
-    case ContextMenuItemTagTextReplacement:
-        frame->editor()->toggleAutomaticTextReplacement();
-        break;
-    case ContextMenuItemTagCorrectSpellingAutomatically:
-        frame->editor()->toggleAutomaticSpellingCorrection();
-        break;
-#endif
     case ContextMenuItemTagInspectElement:
         if (Page* page = frame->page())
             page->inspectorController()->inspect(m_hitTestResult.innerNonSharedNode());
         break;
     case ContextMenuItemTagDictationAlternative:
-        frame->editor()->applyDictationAlternativelternative(item->title());
         break;
     default:
         break;
@@ -626,18 +601,6 @@ void ContextMenuController::populate()
                         appendItem(IgnoreGrammarItem, m_contextMenu.get());
                     appendItem(*separatorItem(), m_contextMenu.get());
                     haveContextMenuItemsForMisspellingOrGrammer = true;
-                }
-            }
-
-            if (!haveContextMenuItemsForMisspellingOrGrammer) {
-                // Spelling and grammar checking is mutually exclusive with dictation alternatives.
-                Vector<String> dictationAlternatives = m_hitTestResult.dictationAlternatives();
-                if (!dictationAlternatives.isEmpty()) {
-                    for (size_t i = 0; i < dictationAlternatives.size(); ++i) {
-                        ContextMenuItem item(ActionType, ContextMenuItemTagDictationAlternative, dictationAlternatives[i]);
-                        appendItem(item, m_contextMenu.get());
-                    }
-                    appendItem(*separatorItem(), m_contextMenu.get());
                 }
             }
         }

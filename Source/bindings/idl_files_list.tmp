@@ -59,7 +59,6 @@
 ../core/dom/DocumentType.idl
 ../core/dom/Element.idl
 ../core/dom/Entity.idl
-../core/dom/EntityReference.idl
 ../core/dom/ErrorEvent.idl
 ../core/dom/Event.idl
 ../core/dom/EventException.idl
@@ -241,6 +240,8 @@
 ../core/html/canvas/WebGLTexture.idl
 ../core/html/canvas/WebGLUniformLocation.idl
 ../core/html/canvas/WebGLVertexArrayObjectOES.idl
+../core/html/ime/Composition.idl
+../core/html/ime/InputMethodContext.idl
 ../core/html/shadow/HTMLContentElement.idl
 ../core/html/shadow/HTMLShadowElement.idl
 ../core/html/track/TextTrack.idl
@@ -362,12 +363,9 @@
 ../modules/indexeddb/IDBTransaction.idl
 ../modules/indexeddb/IDBVersionChangeEvent.idl
 ../modules/indexeddb/WorkerContextIndexedDatabase.idl
-../modules/inputmethod/Composition.idl
-../modules/inputmethod/InputMethodContext.idl
 ../modules/mediasource/MediaSource.idl
 ../modules/mediasource/SourceBuffer.idl
 ../modules/mediasource/SourceBufferList.idl
-../modules/mediastream/DOMWindowMediaStream.idl
 ../modules/mediastream/MediaStream.idl
 ../modules/mediastream/MediaStreamEvent.idl
 ../modules/mediastream/MediaStreamTrack.idl
@@ -403,7 +401,6 @@
 ../modules/quota/StorageQuotaCallback.idl
 ../modules/quota/StorageUsageCallback.idl
 ../modules/quota/WorkerNavigatorStorageQuota.idl
-../modules/speech/DOMWindowSpeech.idl
 ../modules/speech/DOMWindowSpeechSynthesis.idl
 ../modules/speech/SpeechGrammar.idl
 ../modules/speech/SpeechGrammarList.idl
@@ -434,7 +431,6 @@
 ../modules/webaudio/BiquadFilterNode.idl
 ../modules/webaudio/ConvolverNode.idl
 ../modules/webaudio/DelayNode.idl
-../modules/webaudio/DOMWindowWebAudio.idl
 ../modules/webaudio/DynamicsCompressorNode.idl
 ../modules/webaudio/ScriptProcessorNode.idl
 ../modules/webaudio/MediaElementAudioSourceNode.idl
@@ -462,14 +458,12 @@
 ../modules/webdatabase/SQLTransactionSync.idl
 ../modules/webdatabase/SQLTransactionSyncCallback.idl
 ../modules/webdatabase/WorkerContextWebDatabase.idl
-../modules/webmidi/DOMWindowWebMIDI.idl
 ../modules/webmidi/MIDIConnectionEvent.idl
 ../modules/webmidi/MIDIErrorCallback.idl
 ../modules/webmidi/MIDIInput.idl
 ../modules/webmidi/MIDIMessageEvent.idl
 ../modules/webmidi/MIDIPort.idl
 ../modules/websockets/CloseEvent.idl
-../modules/websockets/DOMWindowWebSocket.idl
 ../modules/websockets/WebSocket.idl
 ../modules/websockets/WorkerContextWebSocket.idl
 ../core/svg/SVGAElement.idl

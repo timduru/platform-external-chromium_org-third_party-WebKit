@@ -43,14 +43,15 @@
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/fileapi/Blob.h"
 #include "core/inspector/ScriptCallStack.h"
+#include "core/page/ConsoleTypes.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
-#include "core/page/SecurityOrigin.h"
 #include "core/platform/Logging.h"
 #include "core/platform/network/BlobData.h"
 #include "modules/websockets/CloseEvent.h"
 #include "modules/websockets/WebSocketChannel.h"
+#include "origin/SecurityOrigin.h"
 #include "wtf/ArrayBuffer.h"
 #include "wtf/ArrayBufferView.h"
 #include "wtf/HashSet.h"
@@ -392,7 +393,7 @@ void WebSocket::closeInternal(int code, const String& reason, ExceptionCode& ec)
         return;
     if (m_state == CONNECTING) {
         m_state = CLOSING;
-        m_channel->fail("WebSocket is closed before the connection is established.");
+        m_channel->fail("WebSocket is closed before the connection is established.", WarningMessageLevel);
         return;
     }
     m_state = CLOSING;

@@ -646,12 +646,7 @@ void DeleteSelectionCommand::mergeParagraphs()
         m_endingPosition = m_upstreamStart;
         return;
     }
-    
-    RefPtr<Range> range = Range::create(document(), startOfParagraphToMove.deepEquivalent().parentAnchoredEquivalent(), endOfParagraphToMove.deepEquivalent().parentAnchoredEquivalent());
-    RefPtr<Range> rangeToBeReplaced = Range::create(document(), mergeDestination.deepEquivalent().parentAnchoredEquivalent(), mergeDestination.deepEquivalent().parentAnchoredEquivalent());
-    if (!document()->frame()->editor()->client()->shouldMoveRangeAfterDelete(range.get(), rangeToBeReplaced.get()))
-        return;
-    
+
     // moveParagraphs will insert placeholders if it removes blocks that would require their use, don't let block
     // removals that it does cause the insertion of *another* placeholder.
     bool needPlaceholder = m_needPlaceholder;
@@ -791,13 +786,6 @@ void DeleteSelectionCommand::doApply()
 
     String originalString = originalStringForAutocorrectionAtBeginningOfSelection();
 
-    // If the deletion is occurring in a text field, and we're not deleting to replace the selection, then let the frame call across the bridge to notify the form delegate. 
-    if (!m_replace) {
-        Element* textControl = enclosingTextFormControl(m_selectionToDelete.start());
-        if (textControl && textControl->focused())
-            document()->frame()->editor()->textWillBeDeletedInTextField(textControl);
-    }
-
     // save this to later make the selection with
     EAffinity affinity = m_selectionToDelete.affinity();
     
@@ -852,11 +840,6 @@ void DeleteSelectionCommand::doApply()
     rebalanceWhitespaceAt(m_endingPosition);
 
     calculateTypingStyleAfterDelete();
-
-    if (!originalString.isEmpty()) {
-        if (Frame* frame = document()->frame())
-            frame->editor()->deletedAutocorrectionAtPosition(m_endingPosition, originalString);
-    }
 
     setEndingSelection(VisibleSelection(m_endingPosition, affinity, endingSelection().isDirectional()));
     clearTransientState();

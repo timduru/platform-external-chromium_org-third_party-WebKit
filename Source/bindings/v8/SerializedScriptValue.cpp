@@ -63,6 +63,7 @@
 #include "core/platform/SharedBuffer.h"
 
 #include "wtf/ArrayBuffer.h"
+#include "wtf/ArrayBufferContents.h"
 #include "wtf/ArrayBufferView.h"
 #include "wtf/Assertions.h"
 #include "wtf/ByteOrder.h"
@@ -2376,6 +2377,8 @@ inline void neuterBinding(T* object)
 
 PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValue::transferArrayBuffers(ArrayBufferArray& arrayBuffers, bool& didThrow, v8::Isolate* isolate)
 {
+    ASSERT(arrayBuffers.size());
+
     for (size_t i = 0; i < arrayBuffers.size(); i++) {
         if (arrayBuffers[i]->isNeutered()) {
             setDOMException(INVALID_STATE_ERR, isolate);
@@ -2445,7 +2448,7 @@ SerializedScriptValue::SerializedScriptValue(v8::Handle<v8::Value> value, Messag
         return;
     case Serializer::Success:
         m_data = String(StringImpl::adopt(writer.data())).isolatedCopy();
-        if (arrayBuffers)
+        if (arrayBuffers && arrayBuffers->size())
             m_arrayBufferContentsArray = transferArrayBuffers(*arrayBuffers, didThrow, isolate);
         return;
     case Serializer::JSException:

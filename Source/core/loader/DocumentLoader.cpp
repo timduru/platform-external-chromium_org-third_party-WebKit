@@ -30,6 +30,13 @@
 #include "config.h"
 #include "core/loader/DocumentLoader.h"
 
+#include <wtf/Assertions.h>
+#include <wtf/MemoryInstrumentationHashMap.h>
+#include <wtf/MemoryInstrumentationHashSet.h>
+#include <wtf/MemoryInstrumentationVector.h>
+#include <wtf/text/CString.h>
+#include <wtf/text/WTFString.h>
+#include <wtf/unicode/Unicode.h>
 #include "core/dom/Document.h"
 #include "core/dom/DocumentParser.h"
 #include "core/dom/Event.h"
@@ -54,17 +61,10 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
-#include "core/page/SecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/platform/Logging.h"
-#include "core/platform/SchemeRegistry.h"
-#include <wtf/Assertions.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/WTFString.h>
-#include <wtf/unicode/Unicode.h>
+#include "origin/SchemeRegistry.h"
+#include "origin/SecurityPolicy.h"
 
 namespace WebCore {
 
@@ -292,6 +292,7 @@ void DocumentLoader::commitIfReady()
     if (!m_committed) {
         m_committed = true;
         frameLoader()->commitProvisionalLoad();
+        m_writer.setMIMEType(m_response.mimeType());
     }
 }
 
@@ -646,6 +647,8 @@ void DocumentLoader::commitData(const char* bytes, size_t length)
 
         if (frameLoader()->stateMachine()->creatingInitialEmptyDocument())
             return;
+        if (frameLoader()->stateMachine()->isDisplayingInitialEmptyDocument())
+            frameLoader()->stateMachine()->advanceTo(FrameLoaderStateMachine::CommittedFirstRealLoad);
         
         // The origin is the MHTML file, we need to set the base URL to the document encoded in the MHTML so
         // relative URLs are resolved properly.
@@ -803,27 +806,31 @@ bool DocumentLoader::maybeCreateArchive()
     return true;
 }
 
-void DocumentLoader::setArchive(PassRefPtr<MHTMLArchive> archive)
-{
-    m_archive = archive;
-    addAllArchiveResources(m_archive.get());
-}
-
 void DocumentLoader::addAllArchiveResources(MHTMLArchive* archive)
 {
+    ASSERT(archive);
     if (!m_archiveResourceCollection)
         m_archiveResourceCollection = adoptPtr(new ArchiveResourceCollection);
-        
-    ASSERT(archive);
-    if (!archive)
-        return;
-        
     m_archiveResourceCollection->addAllResources(archive);
 }
 
-PassRefPtr<MHTMLArchive> DocumentLoader::popArchiveForSubframe(const String& frameName, const KURL& url)
+void DocumentLoader::prepareSubframeArchiveLoadIfNeeded()
 {
-    return m_archiveResourceCollection ? m_archiveResourceCollection->popSubframeArchive(frameName, url) : PassRefPtr<MHTMLArchive>(0);
+    if (!m_frame->tree()->parent())
+        return;
+
+    ArchiveResourceCollection* parentCollection = m_frame->tree()->parent()->loader()->documentLoader()->m_archiveResourceCollection.get();
+    if (!parentCollection)
+        return;
+
+    m_archive = parentCollection->popSubframeArchive(m_frame->tree()->uniqueName(), m_request.url());
+
+    if (!m_archive)
+        return;
+    addAllArchiveResources(m_archive.get());
+
+    ArchiveResource* mainResource = m_archive->mainResource();
+    m_substituteData = SubstituteData(mainResource->data(), mainResource->mimeType(), mainResource->textEncoding(), KURL());
 }
 
 void DocumentLoader::clearArchiveResources()
@@ -1059,6 +1066,7 @@ void DocumentLoader::startLoadingMainResource()
         return;
 
     m_applicationCacheHost->willStartLoadingMainResource(m_request);
+    prepareSubframeArchiveLoadIfNeeded();
 
     if (m_substituteData.isValid()) {
         m_identifierForLoadWithoutResourceLoader = createUniqueIdentifier();
