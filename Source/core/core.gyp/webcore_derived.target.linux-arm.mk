@@ -258,7 +258,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomSQLStatementErrorCallback.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomXPathNSResolver.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8DOMFormDataCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8DOMPointCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8DOMStringMapCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8DOMWindowCustom.cpp \
@@ -274,6 +273,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8EventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8EventTargetCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8FileReaderCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8FormDataCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8GeolocationCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLAllCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLCanvasElementCustom.cpp \
@@ -391,14 +391,11 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
-	'-DWTF_USE_BUILTIN_UTF8_CODEC=1' \
-	'-DWTF_USE_WEBKIT_IMAGE_DECODERS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_DATALIST_ELEMENT=0' \
@@ -424,7 +421,7 @@ MY_DEFS := \
 	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_USE_POSIX_THREADS' \
-	'-DSK_BUILD_FOR_ANDROID_NDK' \
+	'-DSK_BUILD_FOR_ANDROID' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \

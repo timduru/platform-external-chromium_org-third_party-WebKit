@@ -32,6 +32,7 @@
 #include "V8AudioBuffer.h"
 #include "V8OfflineAudioContext.h"
 #include "bindings/v8/V8Binding.h"
+#include "core/dom/Document.h"
 #include "core/page/Frame.h"
 #include "modules/webaudio/AudioBuffer.h"
 #include "modules/webaudio/AudioContext.h"
@@ -48,10 +49,7 @@ v8::Handle<v8::Value> V8AudioContext::constructorCustom(const v8::Arguments& arg
     
     if (!args.Length()) {
         // Constructor for default AudioContext which talks to audio hardware.
-        ExceptionCode ec = 0;
-        audioContext = AudioContext::create(document, ec);
-        if (ec)
-            return setDOMException(ec, args.GetIsolate());
+        audioContext = AudioContext::create(document);
         if (!audioContext.get())
             return throwError(v8SyntaxError, "audio resources unavailable for AudioContext construction", args.GetIsolate());
     } else {

@@ -24,6 +24,7 @@
 
 #include "HTMLNames.h"
 #include "core/dom/DocumentMarkerController.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/html/HTMLAnchorElement.h"
@@ -112,16 +113,34 @@ HitTestResult& HitTestResult::operator=(const HitTestResult& other)
     return *this;
 }
 
-void HitTestResult::setToNonShadowAncestor()
+void HitTestResult::setToNodesInDocumentTreeScope()
 {
-    Node* node = innerNode();
-    if (node)
+    if (Node* node = innerNode()) {
         node = node->document()->ancestorInThisScope(node);
-    setInnerNode(node);
-    node = innerNonSharedNode();
-    if (node)
+        setInnerNode(node);
+    }
+
+    if (Node* node = innerNonSharedNode()) {
         node = node->document()->ancestorInThisScope(node);
-    setInnerNonSharedNode(node);
+        setInnerNonSharedNode(node);
+    }
+}
+
+void HitTestResult::setToShadowHostIfInUserAgentShadowRoot()
+{
+    if (Node* node = innerNode()) {
+        if (ShadowRoot* containingShadowRoot = node->containingShadowRoot()) {
+            if (containingShadowRoot->type() == ShadowRoot::UserAgentShadowRoot)
+                setInnerNode(node->shadowHost());
+        }
+    }
+
+    if (Node* node = innerNonSharedNode()) {
+        if (ShadowRoot* containingShadowRoot = node->containingShadowRoot()) {
+            if (containingShadowRoot->type() == ShadowRoot::UserAgentShadowRoot)
+                setInnerNonSharedNode(node->shadowHost());
+        }
+    }
 }
 
 void HitTestResult::setInnerNode(Node* n)
@@ -198,20 +217,6 @@ String HitTestResult::spellingToolTip(TextDirection& dir) const
     return marker->description();
 }
 
-String HitTestResult::replacedString() const
-{
-    // Return the replaced string associated with this point, if any. This marker is created when a string is autocorrected, 
-    // and is used for generating a contextual menu item that allows it to easily be changed back if desired.
-    if (!m_innerNonSharedNode)
-        return String();
-    
-    DocumentMarker* marker = m_innerNonSharedNode->document()->markers()->markerContainingPoint(m_hitTestLocation.point(), DocumentMarker::Replacement);
-    if (!marker)
-        return String();
-    
-    return marker->description();
-}    
-    
 String HitTestResult::title(TextDirection& dir) const
 {
     dir = LTR;

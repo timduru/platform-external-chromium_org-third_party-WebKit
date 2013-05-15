@@ -51,7 +51,7 @@
 #include "core/platform/graphics/Image.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/plugins/PluginData.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 #if ENABLE(SVG)
 #include "SVGNames.h"
@@ -302,7 +302,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& namespaceUR
     return doc.release();
 }
 
-PassRefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, const String& media, ExceptionCode&)
+PassRefPtr<CSSStyleSheet> DOMImplementation::createCSSStyleSheet(const String&, const String& media)
 {
     // FIXME: Title should be set.
     // FIXME: Media could have wrong syntax, in which case we should generate an exception.

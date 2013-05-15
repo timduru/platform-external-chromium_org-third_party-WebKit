@@ -55,6 +55,7 @@
 
 namespace WebCore {
 
+class CSSParserLocation;
 class CSSRule;
 class CachedResource;
 class CharacterData;
@@ -148,6 +149,7 @@ InstrumentingAgents* instrumentingAgentsForNonDocumentContext(ScriptExecutionCon
 namespace InstrumentationEvents {
 extern const char PaintLayer[];
 extern const char RasterTask[];
+extern const char ImageDecodeTask[];
 extern const char Paint[];
 extern const char Layer[];
 extern const char BeginFrame[];
@@ -191,6 +193,8 @@ inline InstrumentingAgents* instrumentingAgentsForElement(Element* element)
 {
     return instrumentingAgentsForDocument(element->document());
 }
+
+bool cssErrorFilter(const CSSParserLocation&, int errorType);
 
 } // namespace InspectorInstrumentation
 

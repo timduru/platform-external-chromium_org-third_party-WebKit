@@ -34,7 +34,8 @@
 
 #include "modules/webdatabase/DatabaseBackend.h"
 #include "modules/webdatabase/SQLTransactionBackend.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/DatabaseIdentifier.h"
+#include "weborigin/SecurityOrigin.h"
 #include "wtf/Deque.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
@@ -46,7 +47,7 @@ static String getDatabaseIdentifier(SQLTransactionBackend* transaction)
 {
     DatabaseBackend* database = transaction->database();
     ASSERT(database);
-    return database->securityOrigin()->databaseIdentifier();
+    return createDatabaseIdentifierFromSecurityOrigin(database->securityOrigin());
 }
 
 SQLTransactionCoordinator::SQLTransactionCoordinator()

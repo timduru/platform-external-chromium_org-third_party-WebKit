@@ -40,8 +40,9 @@
 #endif
 #include "WebAudioSourceProviderClient.h"
 #include "WebMediaPlayerClient.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include "wtf/OwnPtr.h"
+#include "wtf/PassOwnPtr.h"
+#include "wtf/Threading.h"
 
 namespace WebCore { class AudioSourceProviderClient; }
 
@@ -92,11 +93,10 @@ public:
 
     // MediaPlayerPrivateInterface methods:
     virtual void load(const WTF::String& url);
-    virtual void load(const WTF::String& url, PassRefPtr<WebCore::MediaSource>);
+    virtual void load(const WTF::String& url, PassRefPtr<WebCore::WebKitMediaSource>);
 
     virtual void cancelLoad();
     virtual WebKit::WebLayer* platformLayer() const;
-    virtual WebCore::PlatformMedia platformMedia() const;
     virtual void play();
     virtual void pause();
     virtual void prepareToPlay();
@@ -231,12 +231,13 @@ private:
     private:
         WebAudioSourceProvider* m_webAudioSourceProvider;
         OwnPtr<AudioClientImpl> m_client;
+        Mutex provideInputLock;
     };
 
     AudioSourceProviderImpl m_audioSourceProvider;
 #endif
 
-    RefPtr<WebCore::MediaSource> m_mediaSource;
+    RefPtr<WebCore::WebKitMediaSource> m_mediaSource;
 };
 
 } // namespace WebKit

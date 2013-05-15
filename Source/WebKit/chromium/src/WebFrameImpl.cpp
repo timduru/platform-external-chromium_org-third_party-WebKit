@@ -128,9 +128,9 @@
 #include "core/dom/MessagePort.h"
 #include "core/dom/Node.h"
 #include "core/dom/NodeTraversal.h"
-#include "core/dom/ShadowRoot.h"
 #include "core/dom/UserGestureIndicator.h"
 #include "core/dom/default/chromium/PlatformMessagePortChannelChromium.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/SpellChecker.h"
@@ -189,8 +189,8 @@
 #include "modules/filesystem/DirectoryEntry.h"
 #include "modules/filesystem/FileEntry.h"
 #include "modules/filesystem/FileSystemType.h"
-#include "origin/SchemeRegistry.h"
-#include "origin/SecurityPolicy.h"
+#include "weborigin/SchemeRegistry.h"
+#include "weborigin/SecurityPolicy.h"
 
 using namespace WebCore;
 
@@ -2192,7 +2192,7 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request
     if (!childFrame->tree()->parent())
         return 0;
 
-    frame()->loader()->loadURLIntoChildFrame(request.resourceRequest().url(), request.resourceRequest().httpReferrer(), childFrame.get());
+    frame()->loader()->loadURLIntoChildFrame(request.resourceRequest(), childFrame.get());
 
     // A synchronous navigation (about:blank) would have already processed
     // onload, so it is possible for the frame to have already been destroyed by

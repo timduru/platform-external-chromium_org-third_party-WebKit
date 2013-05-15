@@ -51,7 +51,6 @@
 #include "core/dom/DocumentFragment.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
-#include "core/dom/ElementShadow.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventContext.h"
 #include "core/dom/EventListener.h"
@@ -61,8 +60,9 @@
 #include "core/dom/Node.h"
 #include "core/dom/NodeList.h"
 #include "core/dom/NodeTraversal.h"
-#include "core/dom/ShadowRoot.h"
 #include "core/dom/Text.h"
+#include "core/dom/shadow/ElementShadow.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/fileapi/File.h"
 #include "core/fileapi/FileList.h"
 #include "core/html/HTMLElement.h"
@@ -179,7 +179,7 @@ static Node* hoveredNodeForPoint(Frame* frame, const IntPoint& point, bool ignor
     HitTestRequest request(hitType);
     HitTestResult result(frame->view()->windowToContents(point));
     frame->contentRenderer()->hitTest(request, result);
-    result.setToNonShadowAncestor();
+    result.setToShadowHostIfInUserAgentShadowRoot();
     Node* node = result.innerNode();
     while (node && node->nodeType() == Node::TEXT_NODE)
         node = node->parentNode();
@@ -316,12 +316,8 @@ Vector<Document*> InspectorDOMAgent::documents()
 
 void InspectorDOMAgent::reset()
 {
-    if (m_history)
-        m_history->reset();
-    m_searchResults.clear();
-    discardBindings();
-    if (m_revalidateStyleAttrTask)
-        m_revalidateStyleAttrTask->reset();
+    discardFrontendBindings();
+    discardBackendBindings();
     m_document = 0;
 }
 
@@ -476,10 +472,7 @@ void InspectorDOMAgent::getDocument(ErrorString* errorString, RefPtr<TypeBuilder
         return;
     }
 
-    // Reset backend state.
-    RefPtr<Document> doc = m_document;
-    reset();
-    m_document = doc;
+    discardFrontendBindings();
 
     root = buildObjectForNode(m_document.get(), 2, &m_documentNodeToIdMap);
 }
@@ -511,12 +504,21 @@ void InspectorDOMAgent::pushChildNodesToFrontend(int nodeId, int depth)
     m_frontend->setChildNodes(nodeId, children.release());
 }
 
-void InspectorDOMAgent::discardBindings()
+void InspectorDOMAgent::discardFrontendBindings()
 {
+    if (m_history)
+        m_history->reset();
+    m_searchResults.clear();
     m_documentNodeToIdMap.clear();
     m_idToNode.clear();
     releaseDanglingNodes();
     m_childrenRequested.clear();
+    if (m_revalidateStyleAttrTask)
+        m_revalidateStyleAttrTask->reset();
+}
+
+void InspectorDOMAgent::discardBackendBindings()
+{
     m_backendIdToNode.clear();
     m_nodeGroupToBackendIdMap.clear();
 }
@@ -698,38 +700,39 @@ void InspectorDOMAgent::setAttributesAsText(ErrorString* errorString, int elemen
     if (!element)
         return;
 
-    RefPtr<HTMLElement> parsedElement = createHTMLElement(element->document(), spanTag);
-    ExceptionCode ec = 0;
-    parsedElement.get()->setInnerHTML("<span " + text + "></span>", ec);
-    if (ec) {
-        *errorString = InspectorDOMAgent::toErrorString(ec);
-        return;
-    }
+    String markup = "<span " + text + "></span>";
+    RefPtr<DocumentFragment> fragment = element->document()->createDocumentFragment();
+    fragment->parseXML(markup, 0, DisallowScriptingContent);
 
-    Node* child = parsedElement->firstChild();
-    if (!child) {
+    Element* parsedElement = fragment->firstChild() && fragment->firstChild()->isElementNode() ? toElement(fragment->firstChild()) : 0;
+    if (!parsedElement) {
         *errorString = "Could not parse value as attributes";
         return;
     }
 
-    Element* childElement = toElement(child);
-    if (!childElement->hasAttributes() && name) {
-        m_domEditor->removeAttribute(element, *name, errorString);
+    bool shouldIgnoreCase = element->document()->isHTMLDocument() && element->isHTMLElement();
+    String caseAdjustedName = name ? (shouldIgnoreCase ? name->lower() : *name) : String();
+
+    if (!parsedElement->hasAttributes() && name) {
+        m_domEditor->removeAttribute(element, caseAdjustedName, errorString);
         return;
     }
 
     bool foundOriginalAttribute = false;
-    unsigned numAttrs = childElement->attributeCount();
+    unsigned numAttrs = parsedElement->attributeCount();
     for (unsigned i = 0; i < numAttrs; ++i) {
         // Add attribute pair
-        const Attribute* attribute = childElement->attributeItem(i);
-        foundOriginalAttribute = foundOriginalAttribute || (name && attribute->name().toString() == *name);
-        if (!m_domEditor->setAttribute(element, attribute->name().toString(), attribute->value(), errorString))
+        const Attribute* attribute = parsedElement->attributeItem(i);
+        String attributeName = attribute->name().toString();
+        if (shouldIgnoreCase)
+            attributeName = attributeName.lower();
+        foundOriginalAttribute |= name && attributeName == caseAdjustedName;
+        if (!m_domEditor->setAttribute(element, attributeName, attribute->value(), errorString))
             return;
     }
 
     if (!foundOriginalAttribute && name && !name->stripWhiteSpace().isEmpty())
-        m_domEditor->removeAttribute(element, *name, errorString);
+        m_domEditor->removeAttribute(element, caseAdjustedName, errorString);
 }
 
 void InspectorDOMAgent::removeAttribute(ErrorString* errorString, int elementId, const String& name)
@@ -1581,7 +1584,7 @@ bool InspectorDOMAgent::isWhitespace(Node* node)
 void InspectorDOMAgent::mainFrameDOMContentLoaded()
 {
     // Re-push document once it is loaded.
-    discardBindings();
+    discardFrontendBindings();
     if (m_state->getBoolean(DOMAgentState::documentRequested))
         m_frontend->documentUpdated();
 }

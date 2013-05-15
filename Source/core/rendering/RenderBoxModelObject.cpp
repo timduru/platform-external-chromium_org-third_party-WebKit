@@ -514,10 +514,7 @@ static void applyBoxShadowForBackground(GraphicsContext* context, RenderStyle* s
         boxShadow = boxShadow->next();
 
     FloatSize shadowOffset(boxShadow->x(), boxShadow->y());
-    if (!boxShadow->isWebkitBoxShadow())
-        context->setShadow(shadowOffset, boxShadow->blur(), boxShadow->color(), style->colorSpace());
-    else
-        context->setLegacyShadow(shadowOffset, boxShadow->blur(), boxShadow->color(), style->colorSpace());
+    context->setShadow(shadowOffset, boxShadow->blur(), boxShadow->color(), style->colorSpace());
 }
 
 void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, const Color& color, const FillLayer* bgLayer, const LayoutRect& rect,
@@ -2379,11 +2376,7 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
             IntSize extraOffset(paintRect.pixelSnappedWidth() + max(0, shadowOffset.width()) + shadowBlur + 2 * shadowSpread + 1, 0);
             shadowOffset -= extraOffset;
             fillRect.move(extraOffset);
-
-            if (shadow->isWebkitBoxShadow())
-                context->setLegacyShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
-            else
-                context->setShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
+            context->setShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
 
             if (hasBorderRadius) {
                 RoundedRect rectToClipOut = border;
@@ -2473,12 +2466,7 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
             IntSize extraOffset(2 * paintRect.pixelSnappedWidth() + max(0, shadowOffset.width()) + shadowBlur - 2 * shadowSpread + 1, 0);
             context->translate(extraOffset.width(), extraOffset.height());
             shadowOffset -= extraOffset;
-
-            if (shadow->isWebkitBoxShadow())
-                context->setLegacyShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
-            else
-                context->setShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
-
+            context->setShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
             context->fillRectWithRoundedHole(outerRect, roundedHole, fillColor, s->colorSpace());
         }
     }
@@ -2600,6 +2588,9 @@ bool RenderBoxModelObject::shouldAntialiasLines(GraphicsContext* context)
 
 void RenderBoxModelObject::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
 {
+    // We don't expect to be called during layout.
+    ASSERT(!view() || !view()->layoutStateEnabled());
+
     RenderObject* o = container();
     if (!o)
         return;

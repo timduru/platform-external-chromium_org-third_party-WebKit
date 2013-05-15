@@ -90,7 +90,8 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     this._navigator = new WebInspector.ScriptsNavigator();
     this._navigator.view.show(this.editorView.sidebarElement);
 
-    this._editorContainer = new WebInspector.TabbedEditorContainer(this, "previouslyViewedFiles");
+    var tabbedEditorPlaceholderText = WebInspector.isMac() ? WebInspector.UIString("Hit Cmd+O to open a file") : WebInspector.UIString("Hit Ctrl+O to open a file");
+    this._editorContainer = new WebInspector.TabbedEditorContainer(this, "previouslyViewedFiles", tabbedEditorPlaceholderText);
     this._editorContainer.show(this.editorView.mainElement);
 
     this._navigatorController = new WebInspector.NavigatorOverlayController(this.editorView, this._navigator.view, this._editorContainer.view);
@@ -1221,7 +1222,7 @@ WebInspector.ScriptsPanel.prototype = {
         var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (target);
         contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Local modifications\u2026" : "Local Modifications\u2026"), this._showLocalHistory.bind(this, uiSourceCode));
 
-        if (WebInspector.isolatedFileSystemManager.supportsFileSystems() && WebInspector.experimentsSettings.fileSystemProject.isEnabled())
+        if (WebInspector.isolatedFileSystemManager.supportsFileSystems())
             this._appendUISourceCodeMappingItems(contextMenu, uiSourceCode);
 
         var resource = WebInspector.resourceForURL(uiSourceCode.url);

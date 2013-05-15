@@ -38,7 +38,7 @@
 #include "core/page/PageGroup.h"
 #include "core/storage/Storage.h"
 #include "core/storage/StorageEvent.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 #include <public/WebStorageArea.h>
 #include <public/WebString.h>
@@ -49,9 +49,8 @@
 
 namespace WebCore {
 
-// FIXME: storageArea argument should be a PassOwnPtr.
-StorageAreaProxy::StorageAreaProxy(WebKit::WebStorageArea* storageArea, StorageType storageType)
-    : m_storageArea(adoptPtr(storageArea))
+StorageAreaProxy::StorageAreaProxy(PassOwnPtr<WebKit::WebStorageArea> storageArea, StorageType storageType)
+    : m_storageArea(storageArea)
     , m_storageType(storageType)
     , m_canAccessStorageCachedResult(false)
     , m_canAccessStorageCachedFrame(0)

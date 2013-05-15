@@ -34,7 +34,9 @@
 #include "HTMLNames.h"
 #include "V8Document.h"
 #include "V8HTMLImageElement.h"
+#include "bindings/v8/BindingSecurity.h"
 #include "bindings/v8/V8Binding.h"
+#include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/Document.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/page/Frame.h"
@@ -94,7 +96,7 @@ v8::Persistent<v8::FunctionTemplate> V8HTMLImageElementConstructor::GetTemplate(
     result->SetClassName(v8::String::NewSymbol("HTMLImageElement"));
     result->Inherit(V8HTMLImageElement::GetTemplate(isolate, worldType));
 
-    cachedTemplate = v8::Persistent<v8::FunctionTemplate>::New(isolate, result);
+    cachedTemplate.Reset(isolate, result);
     return cachedTemplate;
 }
 

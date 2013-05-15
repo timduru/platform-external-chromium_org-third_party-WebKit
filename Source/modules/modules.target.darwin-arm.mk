@@ -97,10 +97,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/indexeddb/PageGroupIndexedDatabase.cpp \
 	third_party/WebKit/Source/modules/indexeddb/WorkerContextIndexedDatabase.cpp \
 	third_party/WebKit/Source/modules/indexeddb/chromium/IDBFactoryBackendInterfaceChromium.cpp \
-	third_party/WebKit/Source/modules/mediasource/MediaSource.cpp \
 	third_party/WebKit/Source/modules/mediasource/MediaSourceRegistry.cpp \
-	third_party/WebKit/Source/modules/mediasource/SourceBuffer.cpp \
-	third_party/WebKit/Source/modules/mediasource/SourceBufferList.cpp \
+	third_party/WebKit/Source/modules/mediasource/WebKitMediaSource.cpp \
+	third_party/WebKit/Source/modules/mediasource/WebKitSourceBuffer.cpp \
+	third_party/WebKit/Source/modules/mediasource/WebKitSourceBufferList.cpp \
 	third_party/WebKit/Source/modules/mediastream/MediaConstraintsImpl.cpp \
 	third_party/WebKit/Source/modules/mediastream/MediaStream.cpp \
 	third_party/WebKit/Source/modules/mediastream/MediaStreamEvent.cpp \
@@ -225,6 +225,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/webdatabase/chromium/SQLTransactionClientChromium.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIErrorCallback.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIInput.cpp \
+	third_party/WebKit/Source/modules/webmidi/MIDIOutput.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIPort.cpp \
 	third_party/WebKit/Source/modules/websockets/MainThreadWebSocketChannel.cpp \
 	third_party/WebKit/Source/modules/websockets/ThreadableWebSocketChannelClientWrapper.cpp \
@@ -302,14 +303,11 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
-	'-DWTF_USE_BUILTIN_UTF8_CODEC=1' \
-	'-DWTF_USE_WEBKIT_IMAGE_DECODERS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_DATALIST_ELEMENT=0' \
@@ -335,7 +333,7 @@ MY_DEFS := \
 	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_USE_POSIX_THREADS' \
-	'-DSK_BUILD_FOR_ANDROID_NDK' \
+	'-DSK_BUILD_FOR_ANDROID' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
 	'-DUSE_STLPORT=1' \

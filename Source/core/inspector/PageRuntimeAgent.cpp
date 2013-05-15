@@ -38,9 +38,10 @@
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InstrumentingAgents.h"
+#include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 using WebCore::TypeBuilder::Runtime::ExecutionContextDescription;
 

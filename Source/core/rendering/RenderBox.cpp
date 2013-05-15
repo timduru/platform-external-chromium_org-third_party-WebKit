@@ -186,7 +186,7 @@ void RenderBox::removeFloatingOrPositionedChildFromBlockLists()
         for (RenderObject* curr = parent(); curr && !curr->isRenderView(); curr = curr->parent()) {
             if (curr->isRenderBlock()) {
                 RenderBlock* currBlock = toRenderBlock(curr);
-                if (!parentBlock || parentBlock->isAnonymousBlock() || currBlock->containsFloat(this))
+                if (!parentBlock || currBlock->containsFloat(this))
                     parentBlock = currBlock;
             }
         }
@@ -1750,6 +1750,9 @@ const RenderObject* RenderBox::pushMappingToContainer(const RenderLayerModelObje
 
 void RenderBox::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
 {
+    // We don't expect to be called during layout.
+    ASSERT(!view() || !view()->layoutStateEnabled());
+
     bool isFixedPos = style()->position() == FixedPosition;
     bool hasTransform = hasLayer() && layer()->transform();
     if (hasTransform && !isFixedPos) {
@@ -4066,7 +4069,7 @@ bool RenderBox::shrinkToAvoidFloats() const
 
 bool RenderBox::avoidsFloats() const
 {
-    return isReplaced() || hasOverflowClip() || isHR() || isLegend() || isWritingModeRoot() || isDeprecatedFlexItem();
+    return isReplaced() || hasOverflowClip() || isHR() || isLegend() || isWritingModeRoot() || isFlexItemIncludingDeprecated();
 }
 
 void RenderBox::addVisualEffectOverflow()

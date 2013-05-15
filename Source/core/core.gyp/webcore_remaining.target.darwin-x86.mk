@@ -172,7 +172,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/CreateLinkCommand.cpp \
 	third_party/WebKit/Source/core/editing/DeleteFromTextNodeCommand.cpp \
 	third_party/WebKit/Source/core/editing/DeleteSelectionCommand.cpp \
-	third_party/WebKit/Source/core/editing/DictationAlternative.cpp \
 	third_party/WebKit/Source/core/editing/EditCommand.cpp \
 	third_party/WebKit/Source/core/editing/EditingStyle.cpp \
 	third_party/WebKit/Source/core/editing/Editor.cpp \
@@ -230,7 +229,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/fileapi/FileReader.cpp \
 	third_party/WebKit/Source/core/fileapi/FileReaderLoader.cpp \
 	third_party/WebKit/Source/core/fileapi/FileReaderSync.cpp \
-	third_party/WebKit/Source/core/fileapi/FileThread.cpp \
 	third_party/WebKit/Source/core/fileapi/ThreadableBlobRegistry.cpp \
 	third_party/WebKit/Source/core/history/BackForwardController.cpp \
 	third_party/WebKit/Source/core/history/HistoryItem.cpp \
@@ -355,7 +353,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/cache/CachedXSLStyleSheet.cpp \
 	third_party/WebKit/Source/core/loader/cache/MemoryCache.cpp \
 	third_party/WebKit/Source/core/page/AutoscrollController.cpp \
-	third_party/WebKit/Source/core/page/BarInfo.cpp \
+	third_party/WebKit/Source/core/page/BarProp.cpp \
 	third_party/WebKit/Source/core/page/CaptionUserPreferences.cpp \
 	third_party/WebKit/Source/core/page/Chrome.cpp \
 	third_party/WebKit/Source/core/page/Console.cpp \
@@ -548,14 +546,11 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
-	'-DWTF_USE_BUILTIN_UTF8_CODEC=1' \
-	'-DWTF_USE_WEBKIT_IMAGE_DECODERS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_DATALIST_ELEMENT=0' \
@@ -581,7 +576,7 @@ MY_DEFS := \
 	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_USE_POSIX_THREADS' \
-	'-DSK_BUILD_FOR_ANDROID_NDK' \
+	'-DSK_BUILD_FOR_ANDROID' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \

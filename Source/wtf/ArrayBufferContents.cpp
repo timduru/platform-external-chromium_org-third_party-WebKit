@@ -31,39 +31,24 @@
 
 namespace WTF {
 
-void ArrayBufferContents::tryAllocate(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy policy, ArrayBufferContents& result)
-{
-    // Do not allow 32-bit overflow of the total size.
-    // FIXME: Why not? The tryFastCalloc function already checks its arguments,
-    // and will fail if there is any overflow, so why should we include a
-    // redudant unnecessarily restrictive check here?
-    if (numElements) {
-        unsigned totalSize = numElements * elementByteSize;
-        if (totalSize / numElements != elementByteSize) {
-            result.m_data = 0;
-            return;
-        }
-    }
-    bool allocationSucceeded = false;
-    if (policy == ZeroInitialize)
-        allocationSucceeded = WTF::tryFastCalloc(numElements, elementByteSize).getValue(result.m_data);
-    else {
-        ASSERT(policy == DontInitialize);
-        allocationSucceeded = WTF::tryFastMalloc(numElements * elementByteSize).getValue(result.m_data);
-    }
+ArrayBufferContents::ArrayBufferContents()
+    : m_deallocationObserver(0) { }
 
-    if (allocationSucceeded) {
-        result.m_sizeInBytes = numElements * elementByteSize;
-        return;
-    }
-    result.m_data = 0;
-}
+ArrayBufferContents::ArrayBufferContents(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy policy)
+    : RawBuffer(numElements, elementByteSize, policy)
+    , m_deallocationObserver(0) { }
 
 ArrayBufferContents::~ArrayBufferContents()
 {
-    if (m_deallocationObserver)
-        m_deallocationObserver->ArrayBufferDeallocated(m_sizeInBytes);
-    WTF::fastFree(m_data);
+    clear();
+}
+
+void ArrayBufferContents::clear()
+{
+    if (data() && m_deallocationObserver)
+        m_deallocationObserver->ArrayBufferDeallocated(sizeInBytes());
+    RawBuffer::clear();
+    m_deallocationObserver = 0;
 }
 
 } // namespace WTF

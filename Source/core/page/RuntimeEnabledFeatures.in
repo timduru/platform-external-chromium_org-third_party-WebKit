@@ -29,7 +29,6 @@ EncryptedMedia condition=ENCRYPTED_MEDIA, status=stable
 ExperimentalCanvasFeatures status=test
 ExperimentalContentSecurityPolicyFeatures status=experimental
 ExperimentalShadowDOM status=experimental
-ExperimentalWebSocket
 FileSystem status=stable
 FontLoadEvents status=experimental
 Fullscreen status=stable
@@ -37,14 +36,12 @@ Gamepad status=stable
 Geolocation status=stable
 IMEAPI status=test
 IndexedDB status=stable
-InputTypeDateTime condition=INPUT_TYPE_DATETIME_INCOMPLETE, status=test
 InputTypeWeek status=stable
 JavaScriptI18NAPI status=stable
 LangAttributeAwareFormControlUI
 LazyLayout
 LocalStorage status=stable
 Media custom
-MediaSource status=stable
 MediaStream status=stable
 Notifications status=stable
 PeerConnection depends_on=MediaStream, status=stable
@@ -55,7 +52,7 @@ SeamlessIFrames status=experimental
 SessionStorage status=stable
 SharedWorker custom
 SpeechInput status=stable
-SpeechSynthesis
+SpeechSynthesis status=experimental
 StyleScoped status=experimental
 Touch status=stable
 VideoTrack status=stable
@@ -63,3 +60,4 @@ WebAnimation
 WebAudio condition=WEB_AUDIO, status=stable
 WebMIDI status=test
 WebPInAcceptHeader
+WebKitMediaSource status=stable

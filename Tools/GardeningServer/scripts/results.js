@@ -197,9 +197,9 @@ function resultsDirectoryListingURL(platform, builderName)
     return layoutTestResultsURL(platform) + '/' + results.directoryForBuilder(builderName) + '/';
 }
 
-function resultsDirectoryURLForBuildNumber(platform, builderName, buildNumber, revision)
+function resultsDirectoryURLForBuildNumber(platform, builderName, buildNumber)
 {
-    return resultsDirectoryListingURL(platform, builderName) + config.kPlatforms[platform].resultsDirectoryForBuildNumber(buildNumber, revision) + '/';
+    return resultsDirectoryListingURL(platform, builderName) + buildNumber + '/';
 }
 
 function resultsSummaryURL(platform, builderName)
@@ -207,9 +207,9 @@ function resultsSummaryURL(platform, builderName)
     return resultsDirectoryURL(platform, builderName) + kResultsName;
 }
 
-function resultsSummaryURLForBuildNumber(platform, builderName, buildNumber, revision)
+function resultsSummaryURLForBuildNumber(platform, builderName, buildNumber)
 {
-    return resultsDirectoryURLForBuildNumber(platform, builderName, buildNumber, revision) + kResultsName;
+    return resultsDirectoryURLForBuildNumber(platform, builderName, buildNumber) + kResultsName;
 }
 
 var g_resultsCache = new base.AsynchronousCache(function (key, callback) {
@@ -219,6 +219,7 @@ var g_resultsCache = new base.AsynchronousCache(function (key, callback) {
 results.ResultAnalyzer = base.extends(Object, {
     init: function(resultNode)
     {
+        this._isUnexpected = resultNode.is_unexpected;
         this._actual = resultNode ? results.failureTypeList(resultNode.actual) : [];
         this._expected = resultNode ? this._addImpliedExpectations(results.failureTypeList(resultNode.expected)) : [];
         this._wontfix = resultNode ? resultNode.wontfix : false;
@@ -243,10 +244,6 @@ results.ResultAnalyzer = base.extends(Object, {
     {
         return this._hasPass(this._actual);
     },
-    expectedToSucceed: function()
-    {
-        return this._hasPass(this._expected);
-    },
     flaky: function()
     {
         return this._actual.length > 1;
@@ -257,17 +254,7 @@ results.ResultAnalyzer = base.extends(Object, {
     },
     hasUnexpectedFailures: function()
     {
-        var difference = {};
-        this._actual.forEach(function(actual) {
-            difference[actual] = actual !== PASS;
-        });
-        this._expected.forEach(function(expected) {
-            if (expected !== PASS)
-                delete difference[expected];
-        });
-        return Object.keys(difference).some(function(key) {
-            return difference[key];
-        });
+        return this._isUnexpected;
     }
 })
 
@@ -298,14 +285,6 @@ results.unexpectedFailures = function(resultsTree)
     return base.filterTree(resultsTree.tests, isResultNode, isUnexpectedFailure);
 };
 
-results.unexpectedSuccesses = function(resultsTree)
-{
-    return base.filterTree(resultsTree.tests, isResultNode, function(resultNode) {
-        var analyzer = new results.ResultAnalyzer(resultNode);
-        return !analyzer.expectedToSucceed() && analyzer.succeeded() && !analyzer.flaky();
-    });
-};
-
 function resultsByTest(resultsByBuilder, filter)
 {
     var resultsByTest = {};
@@ -330,11 +309,6 @@ results.unexpectedFailuresByTest = function(resultsByBuilder)
     return resultsByTest(resultsByBuilder, results.unexpectedFailures);
 };
 
-results.unexpectedSuccessesByTest = function(resultsByBuilder)
-{
-    return resultsByTest(resultsByBuilder, results.unexpectedSuccesses);
-};
-
 results.failureInfoForTestAndBuilder = function(resultsByTest, testName, builderName)
 {
     var failureInfoForTest = {
@@ -356,18 +330,16 @@ results.collectUnexpectedResults = function(dictionaryOfResultNodes)
     return base.uniquifyArray(collectedResults);
 };
 
-// Callback data is [{ buildNumber:, revision:, url: }]
+// Callback data is [{ buildNumber:, url: }]
 function historicalResultsLocations(platform, builderName, callback)
 {
     var listingURL = resultsDirectoryListingURL(platform, builderName);
     net.get(listingURL, function(directoryListing) {
         var historicalResultsData = directoryListing.match(kBuildLinkRegexp).map(function(buildLink) {
             var buildNumber = parseInt(buildLink.match(kBuildNumberRegexp)[0]);
-            var revision = 0; // unused for Chromium.
             var resultsData = {
                 'buildNumber': buildNumber,
-                'revision': revision,
-                'url': resultsSummaryURLForBuildNumber(platform, builderName, buildNumber, revision)
+                'url': resultsSummaryURLForBuildNumber(platform, builderName, buildNumber)
             };
             return resultsData;
         }).reverse();
@@ -396,8 +368,11 @@ function walkHistory(platform, builderName, testName, callback)
                 return;
             }
             var resultNode = results.resultNodeForTest(resultsTree, testName);
-            var revision = parseInt(resultsTree['revision'])
-            if (isNaN(revision))
+            var revision = parseInt(resultsTree['blink_revision'])
+            // FIXME: full_results.json files before 150044 are busted.
+            // Remove this check once all the bots have cycled enough that they
+            // wouldn't try to load older revisions than 150044.
+            if (isNaN(revision) || revision < 150044)
                 revision = 0;
             processResultNode(revision, resultNode);
         });
@@ -490,26 +465,6 @@ results.unifyRegressionRanges = function(builderNameList, testName, callback)
     });
 };
 
-results.countFailureOccurences = function(builderNameList, testName, callback)
-{
-    var failureCount = 0;
-
-    var tracker = new base.RequestTracker(builderNameList.length, function() {
-        callback(failureCount);
-    });
-
-    $.each(builderNameList, function(index, builderName) {
-        walkHistory(config.currentPlatform, builderName, testName, function(revision, resultNode) {
-            if (isUnexpectedFailure(resultNode)) {
-                ++failureCount;
-                return true;
-            }
-            tracker.requestComplete();
-            return false;
-        });
-    });
-};
-
 results.resultNodeForTest = function(resultsTree, testName)
 {
     var testNamePath = testName.split('/');
@@ -581,40 +536,6 @@ results.fetchResultsURLs = function(failureInfo, callback)
     });
 };
 
-results.fetchResultsForBuilder = function(builderName, callback)
-{
-    var resultsURL = resultsSummaryURL(config.currentPlatform, builderName);
-    net.jsonp(resultsURL, callback);
-};
-
-results.fetchResultsForBuildOnBuilder = function(builderName, buildNumber, revision, callback)
-{
-    var resultsURL = resultsSummaryURLForBuildNumber(config.currentPlatform, builderName, buildNumber, revision);
-    net.jsonp(resultsURL, callback);
-};
-
-// Look for the most recent completed build that has full results.
-results.fetchResultsForMostRecentCompletedBuildOnBuilder = function(builderName, callback)
-{
-    historicalResultsLocations(config.currentPlatform, builderName, function(buildLocations) {
-        var currentIndex = 0;
-        var resultsCallback = function(buildResults) {
-            if ($.isEmptyObject(buildResults)) {
-                ++currentIndex;
-                if (currentIndex >= buildLocations.length) {
-                    callback(null);
-                    return;
-                }
-
-                net.jsonp(buildLocations[currentIndex].url, resultsCallback);
-                return;
-            }
-            callback(buildResults);
-        };
-        net.jsonp(buildLocations[currentIndex].url, resultsCallback);
-    });
-};
-
 results.fetchResultsByBuilder = function(builderNameList, callback)
 {
     var resultsByBuilder = {};
@@ -622,7 +543,8 @@ results.fetchResultsByBuilder = function(builderNameList, callback)
         callback(resultsByBuilder);
     });
     $.each(builderNameList, function(index, builderName) {
-        results.fetchResultsForBuilder(builderName, function(resultsTree) {
+        var resultsURL = resultsSummaryURL(config.currentPlatform, builderName);
+        net.jsonp(resultsURL, function(resultsTree) {
             resultsByBuilder[builderName] = resultsTree;
             tracker.requestComplete();
         });

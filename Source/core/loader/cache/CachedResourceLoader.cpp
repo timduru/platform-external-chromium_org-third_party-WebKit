@@ -58,8 +58,8 @@
 #include "core/page/Performance.h"
 #include "core/page/Settings.h"
 #include "core/platform/Logging.h"
-#include "origin/SecurityOrigin.h"
-#include "origin/SecurityPolicy.h"
+#include "weborigin/SecurityOrigin.h"
+#include "weborigin/SecurityPolicy.h"
 
 #include "core/loader/cache/CachedTextTrack.h"
 
@@ -186,7 +186,7 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
         memoryCache()->remove(existing);
     }
 
-    request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck));
+    request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck));
     return static_cast<CachedCSSStyleSheet*>(requestResource(CachedResource::CSSStyleSheet, request).get());
 }
 
@@ -233,6 +233,7 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
     case CachedResource::SVGDocumentResource:
 #endif
     case CachedResource::CSSStyleSheet:
+    case CachedResource::RawResource:
         // These resource can inject script into the current document (Script,
         // XSL) or exfiltrate the content of the current document (CSS).
         if (Frame* f = frame())
@@ -241,7 +242,6 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
         break;
     case CachedResource::TextTrackResource:
     case CachedResource::ShaderResource:
-    case CachedResource::RawResource:
     case CachedResource::ImageResource:
     case CachedResource::FontResource: {
         // These resources can corrupt only the frame's pixels.
@@ -498,34 +498,6 @@ void CachedResourceLoader::determineTargetType(ResourceRequest& request, CachedR
     request.setTargetType(targetType);
 }
 
-ResourceRequestCachePolicy CachedResourceLoader::resourceRequestCachePolicy(const ResourceRequest& request, CachedResource::Type type)
-{
-    if (type == CachedResource::MainResource) {
-        FrameLoadType frameLoadType = frame()->loader()->loadType();
-        bool isReload = frameLoadType == FrameLoadTypeReload || frameLoadType == FrameLoadTypeReloadFromOrigin;
-        if (request.httpMethod() == "POST" && (isReload || frameLoadType == FrameLoadTypeBackForward))
-            return ReturnCacheDataDontLoad;
-        if (!m_documentLoader->overrideEncoding().isEmpty() || frameLoadType == FrameLoadTypeBackForward)
-            return ReturnCacheDataElseLoad;
-        if (isReload || frameLoadType == FrameLoadTypeSame || request.isConditional())
-            return ReloadIgnoringCacheData;
-        return UseProtocolCachePolicy;
-    }
-
-    if (request.isConditional())
-        return ReloadIgnoringCacheData;
-
-    if (m_documentLoader->isLoadingInAPISense()) {
-        // For POST requests, we mutate the main resource's cache policy to avoid form resubmission.
-        // This policy should not be inherited by subresources.
-        ResourceRequestCachePolicy mainResourceCachePolicy = m_documentLoader->request().cachePolicy();
-        if (mainResourceCachePolicy == ReturnCacheDataDontLoad)
-            return ReturnCacheDataElseLoad;
-        return mainResourceCachePolicy;
-    }
-    return UseProtocolCachePolicy;
-}
-
 void CachedResourceLoader::addAdditionalRequestHeaders(ResourceRequest& request, CachedResource::Type type)
 {
     if (!frame())
@@ -555,7 +527,6 @@ void CachedResourceLoader::addAdditionalRequestHeaders(ResourceRequest& request,
         FrameLoader::addHTTPOriginIfNeeded(request, outgoingOrigin);
     }
 
-    request.setCachePolicy(resourceRequestCachePolicy(request, type));
     if (request.targetType() == ResourceRequest::TargetIsUnspecified)
         determineTargetType(request, type);
     frameLoader->addExtraFieldsToRequest(request);
@@ -1042,7 +1013,7 @@ void CachedResourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
 
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck);
+    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck);
     return options;
 }
 

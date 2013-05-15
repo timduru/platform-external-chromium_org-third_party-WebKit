@@ -74,7 +74,6 @@
 #include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
-#include "core/dom/ElementShadow.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventFactory.h"
 #include "core/dom/EventListener.h"
@@ -100,13 +99,14 @@
 #include "core/dom/ScriptRunner.h"
 #include "core/dom/ScriptedAnimationController.h"
 #include "core/dom/SelectorQuery.h"
-#include "core/dom/ShadowRoot.h"
 #include "core/dom/TouchList.h"
 #include "core/dom/TransformSource.h"
 #include "core/dom/TreeWalker.h"
 #include "core/dom/UserActionElementSet.h"
 #include "core/dom/VisitedLinkState.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
+#include "core/dom/shadow/ElementShadow.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/htmlediting.h"
@@ -193,9 +193,9 @@
 #include "core/xml/XSLTProcessor.h"
 #include "core/xml/parser/XMLDocumentParser.h"
 #include "modules/geolocation/GeolocationController.h"
-#include "origin/SchemeRegistry.h"
-#include "origin/SecurityOrigin.h"
-#include "origin/SecurityPolicy.h"
+#include "weborigin/SchemeRegistry.h"
+#include "weborigin/SecurityOrigin.h"
+#include "weborigin/SecurityPolicy.h"
 
 #if ENABLE(SVG)
 #include "SVGElementFactory.h"
@@ -2047,9 +2047,6 @@ void Document::open(Document* ownerDocument)
     implicitOpen();
     if (ScriptableDocumentParser* parser = scriptableDocumentParser())
         parser->setWasCreatedByScript(true);
-
-    if (DOMWindow* domWindow = this->domWindow())
-        domWindow->removeAllEventListeners();
 
     if (m_frame)
         m_frame->loader()->didExplicitOpen();
@@ -4204,18 +4201,6 @@ const Vector<IconURL>& Document::iconURLs(int iconTypesMask)
     }
 
     return m_iconURLs;
-}
-
-void Document::addIconURL(const String& url, const String&, const String&, IconType iconType)
-{
-    if (url.isEmpty())
-        return;
-
-    Frame* f = frame();
-    if (!f)
-        return;
-
-    f->loader()->didChangeIcons(iconType);
 }
 
 void Document::setUseSecureKeyboardEntryWhenActive(bool usesSecureKeyboard)

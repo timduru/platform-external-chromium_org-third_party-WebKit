@@ -38,7 +38,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/DragImage.cpp \
 	third_party/WebKit/Source/core/platform/FileChooser.cpp \
 	third_party/WebKit/Source/core/platform/FileIconLoader.cpp \
-	third_party/WebKit/Source/core/platform/FileStream.cpp \
 	third_party/WebKit/Source/core/platform/KillRingNone.cpp \
 	third_party/WebKit/Source/core/platform/Language.cpp \
 	third_party/WebKit/Source/core/platform/LayoutTestSupport.cpp \
@@ -107,7 +106,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/audio/chromium/AudioDestinationChromium.cpp \
 	third_party/WebKit/Source/core/platform/audio/chromium/FFTFrameOpenMAXDLAndroid.cpp \
 	third_party/WebKit/Source/core/platform/audio/ffmpeg/FFTFrameFFMPEG.cpp \
-	third_party/WebKit/Source/core/platform/audio/mkl/FFTFrameMKL.cpp \
 	third_party/WebKit/Source/core/platform/audio/ipp/FFTFrameIPP.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ChromiumDataObject.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ChromiumDataObjectItem.cpp \
@@ -340,6 +338,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/sql/chromium/SQLiteFileSystemChromiumPosix.cpp \
 	third_party/WebKit/Source/core/platform/text/BidiContext.cpp \
 	third_party/WebKit/Source/core/platform/text/DateTimeFormat.cpp \
+	third_party/WebKit/Source/core/platform/text/Hyphenation.cpp \
 	third_party/WebKit/Source/core/platform/text/LineEnding.cpp \
 	third_party/WebKit/Source/core/platform/text/LocaleICU.cpp \
 	third_party/WebKit/Source/core/platform/text/LocaleToScriptMappingDefault.cpp \
@@ -350,11 +349,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/text/TextBoundaries.cpp \
 	third_party/WebKit/Source/core/platform/text/TextBreakIterator.cpp \
 	third_party/WebKit/Source/core/platform/text/TextBreakIteratorICU.cpp \
+	third_party/WebKit/Source/core/platform/text/TextBreakIteratorInternalICU.cpp \
 	third_party/WebKit/Source/core/platform/text/TextEncodingDetectorICU.cpp \
 	third_party/WebKit/Source/core/platform/text/TextStream.cpp \
 	third_party/WebKit/Source/core/platform/text/UnicodeRange.cpp \
-	third_party/WebKit/Source/core/platform/text/chromium/Hyphenation.cpp \
-	third_party/WebKit/Source/core/platform/text/chromium/TextBreakIteratorInternalICUChromium.cpp \
 	third_party/WebKit/Source/core/platform/text/transcoder/FontTranscoder.cpp
 
 
@@ -421,14 +419,11 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
-	'-DWTF_USE_BUILTIN_UTF8_CODEC=1' \
-	'-DWTF_USE_WEBKIT_IMAGE_DECODERS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_DATALIST_ELEMENT=0' \
@@ -454,7 +449,7 @@ MY_DEFS := \
 	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_USE_POSIX_THREADS' \
-	'-DSK_BUILD_FOR_ANDROID_NDK' \
+	'-DSK_BUILD_FOR_ANDROID' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \

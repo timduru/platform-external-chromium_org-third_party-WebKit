@@ -271,10 +271,24 @@ WebInspector.NavigatorView.prototype = {
      */
     rename: function(uiSourceCode, callback)
     {
-        var node = this._uiSourceCodeNodes[uiSourceCode.uri()];
+        var uri = uiSourceCode.uri();
+        var node = this._uiSourceCodeNodes[uri];
         if (!node)
             return null;
-        node.rename(callback);
+        /**
+         * @param {boolean} renameCommitted
+         */
+        function callbackWrapper(renameCommitted)
+        {
+            if (renameCommitted) {
+                delete this._uiSourceCodeNodes[uri];
+                this._uiSourceCodeNodes[uiSourceCode.uri()] = node;
+            }
+
+            if (callback)
+                callback(renameCommitted);
+        }
+        node.rename(callbackWrapper.bind(this));
     },
 
     reset: function()
@@ -630,7 +644,7 @@ WebInspector.NavigatorSourceTreeElement.prototype = {
 WebInspector.NavigatorTreeNode = function(id)
 {
     this.id = id;
-    this._children = {};
+    this._children = new StringMap();
 }
 
 WebInspector.NavigatorTreeNode.prototype = {
@@ -669,8 +683,9 @@ WebInspector.NavigatorTreeNode.prototype = {
 
     wasPopulated: function()
     {
-        for (var id in this._children)
-            this.treeElement().appendChild(this._children[id].treeElement());
+        var children = this.children();
+        for (var i = 0; i < children.length; ++i)
+            this.treeElement().appendChild(children[i].treeElement());
     },
 
     didAddChild: function(node)
@@ -697,17 +712,17 @@ WebInspector.NavigatorTreeNode.prototype = {
 
     child: function(id)
     {
-        return this._children[id];
+        return this._children.get(id);
     },
 
     children: function()
     {
-        return Object.values(this._children);
+        return this._children.values();
     },
 
     appendChild: function(node)
     {
-        this._children[node.id] = node;
+        this._children.put(node.id, node);
         node.parent = this;
         this.didAddChild(node);
     },
@@ -715,14 +730,14 @@ WebInspector.NavigatorTreeNode.prototype = {
     removeChild: function(node)
     {
         this.willRemoveChild(node);
-        delete this._children[node.id];
+        this._children.remove(node.id);
         delete node.parent;
         node.dispose();
     },
 
     reset: function()
     {
-        this._children = {};
+        this._children.clear();
     }
 }
 
@@ -752,24 +767,6 @@ WebInspector.NavigatorRootTreeNode.prototype = {
     treeElement: function()
     {
         return this._navigatorView._scriptsTree;
-    },
-
-    wasPopulated: function()
-    {
-        for (var id in this._children)
-            this.treeElement().appendChild(this._children[id].treeElement());
-    },
-
-    didAddChild: function(node)
-    {
-        if (this.isPopulated())
-            this.treeElement().appendChild(node.treeElement());
-    },
-
-    willRemoveChild: function(node)
-    {
-        if (this.isPopulated())
-            this.treeElement().removeChild(node.treeElement());
     },
 
     __proto__: WebInspector.NavigatorTreeNode.prototype
@@ -973,8 +970,9 @@ WebInspector.NavigatorFolderTreeNode.prototype = {
 
     _addChildrenRecursive: function()
     {
-        for (var id in this._children) {
-            var child = this._children[id];
+        var children = this.children();
+        for (var i = 0; i < children.length; ++i) {
+            var child = children[i];
             this.didAddChild(child);
             if (child instanceof WebInspector.NavigatorFolderTreeNode)
                 child._addChildrenRecursive();

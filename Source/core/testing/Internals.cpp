@@ -39,21 +39,23 @@
 #include "core/css/StyleSheetContents.h"
 #include "core/dom/ClientRect.h"
 #include "core/dom/ClientRectList.h"
-#include "core/dom/ComposedShadowTreeWalker.h"
 #include "core/dom/DOMStringList.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentMarker.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/Element.h"
-#include "core/dom/ElementShadow.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/PseudoElement.h"
 #include "core/dom/Range.h"
-#include "core/dom/ShadowRoot.h"
 #include "core/dom/StaticNodeList.h"
 #include "core/dom/TreeScope.h"
 #include "core/dom/ViewportArguments.h"
+#include "core/dom/shadow/ComposedShadowTreeWalker.h"
+#include "core/dom/shadow/ContentDistributor.h"
+#include "core/dom/shadow/ElementShadow.h"
+#include "core/dom/shadow/SelectRuleFeatureSet.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/SpellChecker.h"
 #include "core/editing/TextIterator.h"
@@ -64,9 +66,7 @@
 #include "core/html/HTMLMediaElement.h"
 #include "core/html/HTMLSelectElement.h"
 #include "core/html/HTMLTextAreaElement.h"
-#include "core/html/shadow/ContentDistributor.h"
 #include "core/html/shadow/HTMLContentElement.h"
-#include "core/html/shadow/SelectRuleFeatureSet.h"
 #include "core/inspector/InspectorClient.h"
 #include "core/inspector/InspectorConsoleAgent.h"
 #include "core/inspector/InspectorController.h"
@@ -98,7 +98,7 @@
 #include "core/rendering/RenderTreeAsText.h"
 #include "core/rendering/RenderView.h"
 #include "core/workers/WorkerThread.h"
-#include "origin/SchemeRegistry.h"
+#include "weborigin/SchemeRegistry.h"
 #include "wtf/dtoa.h"
 #include "wtf/text/StringBuffer.h"
 
@@ -170,20 +170,6 @@ static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerType
         result =  DocumentMarker::Grammar;
     else if (equalIgnoringCase(markerType, "TextMatch"))
         result =  DocumentMarker::TextMatch;
-    else if (equalIgnoringCase(markerType, "Replacement"))
-        result =  DocumentMarker::Replacement;
-    else if (equalIgnoringCase(markerType, "CorrectionIndicator"))
-        result =  DocumentMarker::CorrectionIndicator;
-    else if (equalIgnoringCase(markerType, "RejectedCorrection"))
-        result =  DocumentMarker::RejectedCorrection;
-    else if (equalIgnoringCase(markerType, "Autocorrected"))
-        result =  DocumentMarker::Autocorrected;
-    else if (equalIgnoringCase(markerType, "SpellCheckingExemption"))
-        result =  DocumentMarker::SpellCheckingExemption;
-    else if (equalIgnoringCase(markerType, "DeletedAutocorrection"))
-        result =  DocumentMarker::DeletedAutocorrection;
-    else if (equalIgnoringCase(markerType, "DictationAlternatives"))
-        result =  DocumentMarker::DictationAlternatives;
     else
         return false;
 
@@ -213,6 +199,7 @@ void Internals::resetToConsistentState(Page* page)
 {
     ASSERT(page);
 
+    page->setDeviceScaleFactor(1);
     page->setPageScaleFactor(1, IntPoint(0, 0));
     page->setPagination(Pagination());
     TextRun::setAllowsRoundingHacks(false);
@@ -1356,14 +1343,6 @@ bool Internals::hasSpellingMarker(Document* document, int from, int length, Exce
     return document->frame()->editor()->selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
 }
 
-bool Internals::hasAutocorrectedMarker(Document* document, int from, int length, ExceptionCode&)
-{
-    if (!document || !document->frame())
-        return 0;
-
-    return document->frame()->editor()->selectionStartHasMarkerFor(DocumentMarker::Autocorrected, from, length);
-}
-
 void Internals::setContinuousSpellCheckingEnabled(bool enabled, ExceptionCode&)
 {
     if (!contextDocument() || !contextDocument()->frame() || !contextDocument()->frame()->editor())
@@ -1709,6 +1688,17 @@ String Internals::pageSizeAndMarginsInPixels(int pageNumber, int width, int heig
     }
 
     return PrintContext::pageSizeAndMarginsInPixels(frame(), pageNumber, width, height, marginTop, marginRight, marginBottom, marginLeft);
+}
+
+void Internals::setDeviceScaleFactor(float scaleFactor, ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->page()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+    Page* page = document->page();
+    page->setDeviceScaleFactor(scaleFactor);
 }
 
 void Internals::setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode& ec)

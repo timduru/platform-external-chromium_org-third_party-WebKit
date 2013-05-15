@@ -22,7 +22,7 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_Platform_Platform_gyp_webkit_platform_gyp)/webkit_platform.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_wtf_wtf_gyp)/third_party_WebKit_Source_wtf_wtf_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp \
-	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_origin_origin_gyp)/third_party_WebKit_Source_origin_origin_gyp.a \
+	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_weborigin_weborigin_gyp)/third_party_WebKit_Source_weborigin_weborigin_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,build_temp_gyp_googleurl_gyp)/build_temp_gyp_googleurl_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,gpu_gles2_c_lib_gyp)/gpu_gles2_c_lib_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_gyp)/skia_skia_gyp.a \

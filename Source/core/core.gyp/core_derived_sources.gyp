@@ -67,6 +67,8 @@
             '<@(scripts_for_in_files)',
             '../scripts/make_internal_runtime_flags.py',
             '../page/RuntimeEnabledFeatures.in',
+            '../scripts/templates/InternalRuntimeFlags.h.tmpl',
+            '../scripts/templates/InternalRuntimeFlags.idl.tmpl',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/InternalRuntimeFlags.idl',
@@ -172,6 +174,8 @@
             '<@(scripts_for_in_files)',
             '../scripts/make_runtime_features.py',
             '../page/RuntimeEnabledFeatures.in',
+            '../scripts/templates/RuntimeEnabledFeatures.cpp.tmpl',
+            '../scripts/templates/RuntimeEnabledFeatures.h.tmpl',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/RuntimeEnabledFeatures.cpp',
@@ -420,15 +424,14 @@
               '../css/make-css-file-arrays.pl',
               '../scripts/preprocessor.pm',
             ],
-            # The .css files are in the same order as ../DerivedSources.make.
             'stylesheets': [
               '../css/html.css',
               '../css/quirks.css',
               '../css/view-source.css',
-              '../css/themeChromium.css', # Chromium only.
-              '../css/themeChromiumAndroid.css', # Chromium only.
-              '../css/themeChromiumLinux.css', # Chromium only.
-              '../css/themeChromiumSkia.css',  # Chromium only.
+              '../css/themeChromium.css',
+              '../css/themeChromiumAndroid.css',
+              '../css/themeChromiumLinux.css',
+              '../css/themeChromiumSkia.css',
               '../css/themeWin.css',
               '../css/themeWinQuirks.css',
               '../css/svg.css',
@@ -437,7 +440,6 @@
               '../css/mediaControlsChromium.css',
               '../css/mediaControlsChromiumAndroid.css',
               '../css/fullscreen.css',
-              # Skip fullscreenQuickTime.
             ],
           },
           'inputs': [

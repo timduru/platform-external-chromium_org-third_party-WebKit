@@ -36,19 +36,19 @@
     // DOM Level 0
     [Replaceable] readonly attribute Screen screen;
     [Replaceable] readonly attribute History history;
-    [Replaceable] readonly attribute BarInfo locationbar;
-    [Replaceable] readonly attribute BarInfo menubar;
-    [Replaceable] readonly attribute BarInfo personalbar;
-    [Replaceable] readonly attribute BarInfo scrollbars;
-    [Replaceable] readonly attribute BarInfo statusbar;
-    [Replaceable] readonly attribute BarInfo toolbar;
+    [Replaceable] readonly attribute BarProp locationbar;
+    [Replaceable] readonly attribute BarProp menubar;
+    [Replaceable] readonly attribute BarProp personalbar;
+    [Replaceable] readonly attribute BarProp scrollbars;
+    [Replaceable] readonly attribute BarProp statusbar;
+    [Replaceable] readonly attribute BarProp toolbar;
     [Replaceable, PerWorldBindings, ActivityLog=GetterForIsolatedWorlds] readonly attribute Navigator navigator;
     [Replaceable] readonly attribute Navigator clientInformation;
     readonly attribute Crypto crypto;
     [DoNotCheckSecurity, CustomSetter, Unforgeable, Replaceable] readonly attribute Location location;
     [MeasureAs=WindowEvent, NotEnumerable, Replaceable, CustomGetter, CustomSetter] readonly attribute Event event;
 
-    DOMSelection getSelection();
+    Selection getSelection();
 
     [CheckSecurityForNode] readonly attribute Element frameElement;
 
@@ -182,7 +182,7 @@
     [RaisesException] DOMString atob([TreatNullAs=NullString,Default=Undefined] optional DOMString string);
     [RaisesException] DOMString btoa([TreatNullAs=NullString,Default=Undefined] optional DOMString string);
 
-    [Replaceable] readonly attribute DOMWindowCSS CSS;
+    [Replaceable] readonly attribute CSS CSS;
 
     // Events
     attribute EventListener onabort;
@@ -289,7 +289,7 @@
     // Mozilla has a separate XMLDocument object for XML documents.
     // We just use Document for this.
     attribute DocumentConstructor XMLDocument;
-    attribute DOMURLConstructor webkitURL; // FIXME: deprecate this.
+    attribute URLConstructor webkitURL; // FIXME: deprecate this.
     attribute MutationObserverConstructor WebKitMutationObserver; // FIXME: Add metrics to determine when we can remove this.
     attribute IDBCursorConstructor webkitIDBCursor;
     attribute IDBDatabaseConstructor webkitIDBDatabase;
@@ -299,6 +299,10 @@
     attribute IDBObjectStoreConstructor webkitIDBObjectStore;
     attribute IDBRequestConstructor webkitIDBRequest;
     attribute IDBTransactionConstructor webkitIDBTransaction;
+
+    [EnabledAtRuntime=webKitMediaSource] attribute WebKitMediaSourceConstructor WebKitMediaSource;
+    [EnabledAtRuntime=webKitMediaSource] attribute WebKitSourceBufferConstructor WebKitSourceBuffer;
+    [EnabledAtRuntime=webKitMediaSource] attribute WebKitSourceBufferListConstructor WebKitSourceBufferList;
 
     // Constructors enabled at runtime but whose interface does not have EnabledAtRuntime
     // extended attribute.
@@ -330,9 +334,6 @@
     // Constructors whose name does not match the interface name.
     // FIXME: Remove these once [ImplementedAs] is used and once constructor names match interface names.
     attribute ShadowRootConstructor WebKitShadowRoot;
-    [EnabledAtRuntime=mediaSource] attribute MediaSourceConstructor WebKitMediaSource;
-    [EnabledAtRuntime=mediaSource] attribute SourceBufferConstructor WebKitSourceBuffer;
-    [EnabledAtRuntime=mediaSource] attribute SourceBufferListConstructor WebKitSourceBufferList;
     [Conditional=WEB_AUDIO] attribute PannerNodeConstructor webkitAudioPannerNode;
 
     // window.toString() requires special handling in V8

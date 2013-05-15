@@ -71,6 +71,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/ParallelJobsGeneric.cpp \
 	third_party/WebKit/Source/wtf/PrintStream.cpp \
 	third_party/WebKit/Source/wtf/RandomNumber.cpp \
+	third_party/WebKit/Source/wtf/RawBuffer.cpp \
 	third_party/WebKit/Source/wtf/RefCountedLeakCounter.cpp \
 	third_party/WebKit/Source/wtf/SHA1.cpp \
 	third_party/WebKit/Source/wtf/SizeLimits.cpp \
@@ -162,14 +163,11 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
-	'-DWTF_USE_BUILTIN_UTF8_CODEC=1' \
-	'-DWTF_USE_WEBKIT_IMAGE_DECODERS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_DATALIST_ELEMENT=0' \

@@ -94,6 +94,7 @@ public:
     virtual void setCSSStickyPositionEnabled(bool);
     virtual void setExperimentalCSSVariablesEnabled(bool);
     virtual void setExperimentalWebGLEnabled(bool);
+    virtual void setExperimentalWebSocketEnabled(bool);
     virtual void setFantasyFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON);
     virtual void setFixedFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON);
     virtual void setFixedPositionCreatesStackingContext(bool);
@@ -105,7 +106,6 @@ public:
     virtual void setHyperlinkAuditingEnabled(bool);
     virtual void setImagesEnabled(bool);
     virtual void setInitializeAtMinimumPageScale(bool);
-    virtual void setInteractiveFormValidationEnabled(bool);
     virtual void setJavaEnabled(bool);
     virtual void setJavaScriptCanAccessClipboard(bool);
     virtual void setJavaScriptCanOpenWindowsAutomatically(bool);

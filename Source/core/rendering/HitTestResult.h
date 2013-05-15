@@ -80,7 +80,8 @@ public:
     const LayoutPoint& localPoint() const { return m_localPoint; }
     void setLocalPoint(const LayoutPoint& p) { m_localPoint = p; }
 
-    void setToNonShadowAncestor();
+    void setToNodesInDocumentTreeScope();
+    void setToShadowHostIfInUserAgentShadowRoot();
 
     const HitTestLocation& hitTestLocation() const { return m_hitTestLocation; }
 
@@ -93,7 +94,6 @@ public:
     Frame* targetFrame() const;
     bool isSelected() const;
     String spellingToolTip(TextDirection&) const;
-    String replacedString() const;
     String title(TextDirection&) const;
     String innerTextIfTruncated(TextDirection&) const;
     String altDisplayString() const;

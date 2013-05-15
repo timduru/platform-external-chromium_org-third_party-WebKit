@@ -90,11 +90,11 @@ const int nodeStyleChangeShift = 15;
 // SyntheticStyleChange means that we need to go through the entire style change logic even though
 // no style property has actually changed. It is used to restructure the tree when, for instance,
 // RenderLayers are created or destroyed due to animation changes.
-enum StyleChangeType { 
-    NoStyleChange = 0, 
-    InlineStyleChange = 1 << nodeStyleChangeShift, 
-    FullStyleChange = 2 << nodeStyleChangeShift, 
-    SyntheticStyleChange = 3 << nodeStyleChangeShift
+enum StyleChangeType {
+    NoStyleChange = 0,
+    InlineStyleChange = 1 << nodeStyleChangeShift,
+    SyntheticStyleChange = 2 << nodeStyleChangeShift,
+    FullStyleChange = 3 << nodeStyleChangeShift,
 };
 
 class NodeRareDataBase {
@@ -186,6 +186,11 @@ public:
     bool hasAttributes() const;
     NamedNodeMap* attributes() const;
 
+    // ChildNode interface API
+    Element* previousElementSibling() const;
+    Element* nextElementSibling() const;
+    void remove(ExceptionCode&);
+
     Node* pseudoAwareNextSibling() const;
     Node* pseudoAwarePreviousSibling() const;
     Node* pseudoAwareFirstChild() const;
@@ -203,7 +208,6 @@ public:
     bool removeChild(Node* child, ExceptionCode&);
     bool appendChild(PassRefPtr<Node> newChild, ExceptionCode&, AttachBehavior = AttachNow);
 
-    void remove(ExceptionCode&);
     bool hasChildNodes() const { return firstChild(); }
     virtual PassRefPtr<Node> cloneNode(bool deep) = 0;
     const AtomicString& localName() const { return virtualLocalName(); }

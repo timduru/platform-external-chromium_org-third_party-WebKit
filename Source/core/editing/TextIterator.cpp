@@ -32,7 +32,7 @@
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Range.h"
-#include "core/dom/ShadowRoot.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/VisiblePosition.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
@@ -543,7 +543,7 @@ void TextIterator::handleTextBox()
     }
     String str = renderer->text();
     unsigned start = m_offset;
-    unsigned end = (m_node == m_endContainer) ? static_cast<unsigned>(m_endOffset) : UINT_MAX;
+    unsigned end = (m_node == m_endContainer) ? static_cast<unsigned>(m_endOffset) : INT_MAX;
     while (m_textBox) {
         unsigned textBoxStart = m_textBox->start();
         unsigned runStart = max(textBoxStart, start);
@@ -1253,7 +1253,7 @@ bool SimplifiedBackwardsTextIterator::handleTextNode()
     m_textLength = m_positionEndOffset - m_positionStartOffset;
     m_textCharacters = text.characters() + (m_positionStartOffset - offsetInNode);
     ASSERT(m_textCharacters >= text.characters());
-    ASSERT(m_textCharacters + m_textLength <= text.characters() + static_cast<int>(text.length()));
+    RELEASE_ASSERT(m_textCharacters + m_textLength <= text.characters() + static_cast<int>(text.length()));
 
     m_lastCharacter = text[m_positionEndOffset - 1];
 

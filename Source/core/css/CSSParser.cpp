@@ -79,6 +79,7 @@
 #include "core/css/WebKitCSSTransformValue.h"
 #include "core/dom/Document.h"
 #include "core/html/parser/HTMLParserIdioms.h"
+#include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
 #include "core/page/Settings.h"
@@ -1309,7 +1310,7 @@ bool CSSParser::parseColor(RGBA32& color, const String& string, bool strict)
     if (!value->isPrimitiveValue())
         return false;
 
-    CSSPrimitiveValue* primitiveValue = static_cast<CSSPrimitiveValue*>(value);
+    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
     if (!primitiveValue->isRGBColor())
         return false;
 
@@ -1605,13 +1606,11 @@ bool CSSParser::validUnit(CSSParserValue* value, Units unitflags, CSSParserMode 
     case CSSPrimitiveValue::CSS_TURN:
         b = (unitflags & FAngle);
         break;
-#if ENABLE(RESOLUTION_MEDIA_QUERY)
     case CSSPrimitiveValue::CSS_DPPX:
     case CSSPrimitiveValue::CSS_DPI:
     case CSSPrimitiveValue::CSS_DPCM:
         b = (unitflags & FResolution);
         break;
-#endif
     case CSSPrimitiveValue::CSS_HZ:
     case CSSPrimitiveValue::CSS_KHZ:
     case CSSPrimitiveValue::CSS_DIMENSION:
@@ -1633,16 +1632,10 @@ inline PassRefPtr<CSSPrimitiveValue> CSSParser::createPrimitiveNumericValue(CSSP
         return CSSPrimitiveValue::create(m_parsedCalculation.release());
     }
 
-#if ENABLE(RESOLUTION_MEDIA_QUERY)
     ASSERT((value->unit >= CSSPrimitiveValue::CSS_NUMBER && value->unit <= CSSPrimitiveValue::CSS_KHZ)
         || (value->unit >= CSSPrimitiveValue::CSS_TURN && value->unit <= CSSPrimitiveValue::CSS_CHS)
         || (value->unit >= CSSPrimitiveValue::CSS_VW && value->unit <= CSSPrimitiveValue::CSS_VMAX)
         || (value->unit >= CSSPrimitiveValue::CSS_DPPX && value->unit <= CSSPrimitiveValue::CSS_DPCM));
-#else
-    ASSERT((value->unit >= CSSPrimitiveValue::CSS_NUMBER && value->unit <= CSSPrimitiveValue::CSS_KHZ)
-        || (value->unit >= CSSPrimitiveValue::CSS_TURN && value->unit <= CSSPrimitiveValue::CSS_CHS)
-        || (value->unit >= CSSPrimitiveValue::CSS_VW && value->unit <= CSSPrimitiveValue::CSS_VMAX));
-#endif
     return cssValuePool().createValue(value->fValue, static_cast<CSSPrimitiveValue::UnitTypes>(value->unit));
 }
 
@@ -1690,10 +1683,8 @@ inline PassRefPtr<CSSPrimitiveValue> CSSParser::parseValidPrimitive(int identifi
         return createPrimitiveNumericValue(value);
     if (value->unit >= CSSPrimitiveValue::CSS_VW && value->unit <= CSSPrimitiveValue::CSS_VMAX)
         return createPrimitiveNumericValue(value);
-#if ENABLE(RESOLUTION_MEDIA_QUERY)
     if (value->unit >= CSSPrimitiveValue::CSS_DPPX && value->unit <= CSSPrimitiveValue::CSS_DPCM)
         return createPrimitiveNumericValue(value);
-#endif
     if (value->unit == CSSPrimitiveValue::CSS_VARIABLE_NAME)
         return createPrimitiveVariableNameValue(value);
     if (value->unit >= CSSParserValue::Q_EMS)
@@ -2945,7 +2936,7 @@ void CSSParser::addFillValue(RefPtr<CSSValue>& lval, PassRefPtr<CSSValue> rval)
 {
     if (lval) {
         if (lval->isBaseValueList())
-            static_cast<CSSValueList*>(lval.get())->append(rval);
+            toCSSValueList(lval.get())->append(rval);
         else {
             PassRefPtr<CSSValue> oldlVal(lval.release());
             PassRefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
@@ -3144,7 +3135,7 @@ void CSSParser::addAnimationValue(RefPtr<CSSValue>& lval, PassRefPtr<CSSValue> r
 {
     if (lval) {
         if (lval->isValueList())
-            static_cast<CSSValueList*>(lval.get())->append(rval);
+            toCSSValueList(lval.get())->append(rval);
         else {
             PassRefPtr<CSSValue> oldVal(lval.release());
             PassRefPtr<CSSValueList> list = CSSValueList::createCommaSeparated();
@@ -3863,8 +3854,8 @@ void CSSParser::parse3ValuesFillPosition(CSSParserValueList* valueList, RefPtr<C
         value1.swap(value2);
 
 #ifndef NDEBUG
-    CSSPrimitiveValue* first = static_cast<CSSPrimitiveValue*>(value1.get());
-    CSSPrimitiveValue* second = static_cast<CSSPrimitiveValue*>(value2.get());
+    CSSPrimitiveValue* first = toCSSPrimitiveValue(value1.get());
+    CSSPrimitiveValue* second = toCSSPrimitiveValue(value2.get());
     ident1 = first->getPairValue()->first()->getIdent();
     ident2 = second->getPairValue()->first()->getIdent();
     ASSERT(ident1 == CSSValueLeft || ident1 == CSSValueRight);
@@ -3924,8 +3915,8 @@ void CSSParser::parseFillPosition(CSSParserValueList* valueList, RefPtr<CSSValue
         return;
     }
 
-    RefPtr<CSSPrimitiveValue> parsedValue1 = static_cast<CSSPrimitiveValue*>(value1.get());
-    RefPtr<CSSPrimitiveValue> parsedValue2 = static_cast<CSSPrimitiveValue*>(value2.get());
+    RefPtr<CSSPrimitiveValue> parsedValue1 = toCSSPrimitiveValue(value1.get());
+    RefPtr<CSSPrimitiveValue> parsedValue2 = toCSSPrimitiveValue(value2.get());
 
     value1.clear();
     value2.clear();
@@ -4022,7 +4013,7 @@ void CSSParser::parseFillRepeat(RefPtr<CSSValue>& value1, RefPtr<CSSValue>& valu
 
     // If only one value was specified, value2 is the same as value1.
     m_implicitShorthand = true;
-    value2 = cssValuePool().createIdentifierValue(static_cast<CSSPrimitiveValue*>(value1.get())->getIdent());
+    value2 = cssValuePool().createIdentifierValue(toCSSPrimitiveValue(value1.get())->getIdent());
 }
 
 PassRefPtr<CSSValue> CSSParser::parseFillSize(CSSPropertyID propId, bool& allowComma)
@@ -7200,14 +7191,11 @@ bool CSSParser::parseDeprecatedRadialGradient(CSSParserValueList* valueList, Ref
             return false;
     }
 
-    ASSERT(!centerX || centerX->isPrimitiveValue());
-    ASSERT(!centerY || centerY->isPrimitiveValue());
-
-    result->setFirstX(static_cast<CSSPrimitiveValue*>(centerX.get()));
-    result->setSecondX(static_cast<CSSPrimitiveValue*>(centerX.get()));
+    result->setFirstX(toCSSPrimitiveValue(centerX.get()));
+    result->setSecondX(toCSSPrimitiveValue(centerX.get()));
     // CSS3 radial gradients always share the same start and end point.
-    result->setFirstY(static_cast<CSSPrimitiveValue*>(centerY.get()));
-    result->setSecondY(static_cast<CSSPrimitiveValue*>(centerY.get()));
+    result->setFirstY(toCSSPrimitiveValue(centerY.get()));
+    result->setSecondY(toCSSPrimitiveValue(centerY.get()));
 
     RefPtr<CSSPrimitiveValue> shapeValue;
     RefPtr<CSSPrimitiveValue> sizeValue;
@@ -7457,19 +7445,17 @@ bool CSSParser::parseRadialGradient(CSSParserValueList* valueList, RefPtr<CSSVal
             return false;
 
         parseFillPosition(args, centerX, centerY);
-        ASSERT(centerX->isPrimitiveValue());
-        ASSERT(centerY->isPrimitiveValue());
         if (!(centerX && centerY))
             return false;
 
         a = args->current();
         if (!a)
             return false;
-        result->setFirstX(static_cast<CSSPrimitiveValue*>(centerX.get()));
-        result->setFirstY(static_cast<CSSPrimitiveValue*>(centerY.get()));
+        result->setFirstX(toCSSPrimitiveValue(centerX.get()));
+        result->setFirstY(toCSSPrimitiveValue(centerY.get()));
         // Right now, CSS radial gradients have the same start and end centers.
-        result->setSecondX(static_cast<CSSPrimitiveValue*>(centerX.get()));
-        result->setSecondY(static_cast<CSSPrimitiveValue*>(centerY.get()));
+        result->setSecondX(toCSSPrimitiveValue(centerX.get()));
+        result->setSecondY(toCSSPrimitiveValue(centerY.get()));
     }
 
     if (shapeValue || sizeValue || horizontalSize || centerX || centerY)
@@ -9446,9 +9432,9 @@ inline UChar* CSSParser::tokenStart<UChar>()
     return m_tokenStart.ptr16;
 }
 
-CSSParser::Location CSSParser::currentLocation()
+CSSParserLocation CSSParser::currentLocation()
 {
-    Location location;
+    CSSParserLocation location;
     location.lineNumber = m_tokenStartLineNumber;
     if (is8BitSource())
         location.token.init(tokenStart<LChar>(), currentCharacter<LChar>() - tokenStart<LChar>());
@@ -9909,7 +9895,6 @@ inline void CSSParser::detectNumberToken(CharacterType* type, int length)
     case 'd':
         if (length == 3 && isASCIIAlphaCaselessEqual(type[1], 'e') && isASCIIAlphaCaselessEqual(type[2], 'g'))
             m_token = DEGS;
-#if ENABLE(RESOLUTION_MEDIA_QUERY)
         else if (length > 2 && isASCIIAlphaCaselessEqual(type[1], 'p')) {
             if (length == 4) {
                 // There is a discussion about the name of this unit on www-style.
@@ -9922,7 +9907,6 @@ inline void CSSParser::detectNumberToken(CharacterType* type, int length)
             } else if (length == 3 && isASCIIAlphaCaselessEqual(type[2], 'i'))
                     m_token = DPI;
         }
-#endif
         return;
 
     case 'e':
@@ -10930,10 +10914,13 @@ CSSParser::RuleList* CSSParser::createRuleList()
     return listPtr;
 }
 
-void CSSParser::syntaxError(const Location& location, SyntaxErrorType error)
+void CSSParser::syntaxError(const CSSParserLocation& location, SyntaxErrorType error)
 {
     if (!isLoggingErrors())
         return;
+    if (!InspectorInstrumentation::cssErrorFilter(location, error))
+        return;
+
     StringBuilder builder;
     switch (error) {
     case PropertyDeclarationError:
@@ -11005,7 +10992,7 @@ StyleRuleBase* CSSParser::createFontFaceRule()
         CSSProperty& property = m_parsedProperties[i];
         if (property.id() == CSSPropertyFontVariant && property.value()->isPrimitiveValue())
             property.wrapValueInCommaSeparatedList();
-        else if (property.id() == CSSPropertyFontFamily && (!property.value()->isValueList() || static_cast<CSSValueList*>(property.value())->length() != 1)) {
+        else if (property.id() == CSSPropertyFontFamily && (!property.value()->isValueList() || toCSSValueList(property.value())->length() != 1)) {
             // Unlike font-family property, font-family descriptor in @font-face rule
             // has to be a value list with exactly one family name. It cannot have a
             // have 'initial' value and cannot 'inherit' from parent.

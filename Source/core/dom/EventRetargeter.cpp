@@ -20,16 +20,17 @@
 #include "config.h"
 #include "core/dom/EventRetargeter.h"
 
+#include "RuntimeEnabledFeatures.h"
 #include "core/dom/ContainerNode.h"
 #include "core/dom/EventContext.h"
 #include "core/dom/EventPathWalker.h"
 #include "core/dom/FocusEvent.h"
 #include "core/dom/MouseEvent.h"
-#include "core/dom/ShadowRoot.h"
 #include "core/dom/Touch.h"
 #include "core/dom/TouchEvent.h"
 #include "core/dom/TouchList.h"
 #include "core/dom/TreeScope.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/Vector.h>
@@ -102,6 +103,28 @@ void EventRetargeter::calculateEventPath(Node* node, Event* event)
             ASSERT(!targetStack.isEmpty());
             targetStack.removeLast();
         }
+    }
+
+    // Calculates eventPath for each node for Event.path() API.
+    if (!RuntimeEnabledFeatures::experimentalShadowDOMEnabled())
+        return;
+    TreeScope* lastScope = 0;
+    size_t eventPathSize = eventPath.size();
+    for (size_t i = 0; i < eventPathSize; ++i) {
+        TreeScope* currentScope = eventPath[i]->node()->treeScope();
+        if (currentScope == lastScope) {
+            // Fast path.
+            eventPath[i]->setEventPath(eventPath[i - 1]->eventPath());
+            continue;
+        }
+        lastScope = currentScope;
+        Vector<RefPtr<Node> > nodes;
+        for (size_t j = 0; j < eventPathSize; ++j) {
+            Node* node = eventPath[j]->node();
+            if (node->treeScope()->isInclusiveAncestorOf(currentScope))
+                nodes.append(node);
+        }
+        eventPath[i]->adoptEventPath(nodes);
     }
 }
 

@@ -38,7 +38,7 @@
 #include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/MediaPlayerPrivate.h"
-#include "modules/mediasource/MediaSource.h"
+#include "modules/mediasource/WebKitMediaSource.h"
 #include <wtf/text/CString.h>
 
 #include "core/platform/graphics/InbandTextTrackPrivate.h"
@@ -47,8 +47,6 @@
 
 namespace WebCore {
 
-const PlatformMedia NoPlatformMedia = { PlatformMedia::None, {0} };
-
 // a null player to make MediaPlayer logic simpler
 
 class NullMediaPlayerPrivate : public MediaPlayerPrivateInterface {
@@ -56,14 +54,13 @@ public:
     NullMediaPlayerPrivate(MediaPlayer*) { }
 
     virtual void load(const String&) { }
-    virtual void load(const String&, PassRefPtr<MediaSource>) { }
+    virtual void load(const String&, PassRefPtr<WebKitMediaSource>) { }
     virtual void cancelLoad() { }
 
     virtual void prepareToPlay() { }
     virtual void play() { }
     virtual void pause() { }    
 
-    virtual PlatformMedia platformMedia() const { return NoPlatformMedia; }
     virtual PlatformLayer* platformLayer() const { return 0; }
 
     virtual IntSize naturalSize() const { return IntSize(0, 0); }
@@ -263,7 +260,7 @@ bool MediaPlayer::load(const KURL& url, const ContentType& contentType, const St
     return m_currentMediaEngine;
 }
 
-bool MediaPlayer::load(const KURL& url, PassRefPtr<MediaSource> mediaSource)
+bool MediaPlayer::load(const KURL& url, PassRefPtr<WebKitMediaSource> mediaSource)
 {
     m_mediaSource = mediaSource;
     m_contentMIMEType = "";
@@ -445,11 +442,6 @@ bool MediaPlayer::inMediaDocument()
     Document* document = frame ? frame->document() : 0;
 
     return document && document->isMediaDocument();
-}
-
-PlatformMedia MediaPlayer::platformMedia() const
-{
-    return m_private->platformMedia();
 }
 
 PlatformLayer* MediaPlayer::platformLayer() const
@@ -861,17 +853,5 @@ void MediaPlayer::setTextTrackRepresentation(TextTrackRepresentation* representa
 {
     m_private->setTextTrackRepresentation(representation);
 }
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-bool MediaPlayer::implementsTextTrackControls() const
-{
-    return m_private->implementsTextTrackControls();
-}
-
-PassRefPtr<PlatformTextTrackMenuInterface> MediaPlayer::textTrackMenu()
-{
-    return m_private->textTrackMenu();
-}
-#endif // USE(PLATFORM_TEXT_TRACK_MENU)
 
 }

@@ -45,7 +45,7 @@
 #include "core/page/FocusDirection.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/platform/PlatformScreen.h"
-#include "origin/ReferrerPolicy.h"
+#include "weborigin/ReferrerPolicy.h"
 #include "core/platform/Timer.h"
 #include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/IntRect.h"
@@ -893,7 +893,6 @@ public:
 
     const Vector<IconURL>& shortcutIconURLs();
     const Vector<IconURL>& iconURLs(int iconTypesMask);
-    void addIconURL(const String& url, const String& mimeType, const String& size, IconType);
 
     void setUseSecureKeyboardEntryWhenActive(bool);
     bool useSecureKeyboardEntryWhenActive() const;

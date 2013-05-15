@@ -27,6 +27,7 @@
 #ifndef DOMWindow_h
 #define DOMWindow_h
 
+#include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/ContextDestructionObserver.h"
 #include "core/dom/EventTarget.h"
 #include "core/page/FrameDestructionObserver.h"
@@ -34,8 +35,7 @@
 #include "core/platform/Supplementable.h"
 
 namespace WebCore {
-
-    class BarInfo;
+    class BarProp;
     class CSSRuleList;
     class CSSStyleDeclaration;
     class Console;
@@ -82,11 +82,7 @@ namespace WebCore {
     enum SetLocationLocking { LockHistoryBasedOnGestureState, LockHistoryAndBackForwardList };
 
     // FIXME: DOMWindow shouldn't subclass FrameDestructionObserver and instead should get to Frame via its Document.
-    class DOMWindow : public RefCounted<DOMWindow>
-                    , public EventTarget
-                    , public ContextDestructionObserver
-                    , public FrameDestructionObserver
-                    , public Supplementable<DOMWindow> {
+    class DOMWindow : public RefCounted<DOMWindow>, public ScriptWrappable, public EventTarget, public ContextDestructionObserver, public FrameDestructionObserver, public Supplementable<DOMWindow> {
     public:
         static PassRefPtr<DOMWindow> create(Document* document) { return adoptRef(new DOMWindow(document)); }
         virtual ~DOMWindow();
@@ -129,12 +125,12 @@ namespace WebCore {
         Screen* screen() const;
         History* history() const;
         Crypto* crypto() const;
-        BarInfo* locationbar() const;
-        BarInfo* menubar() const;
-        BarInfo* personalbar() const;
-        BarInfo* scrollbars() const;
-        BarInfo* statusbar() const;
-        BarInfo* toolbar() const;
+        BarProp* locationbar() const;
+        BarProp* menubar() const;
+        BarProp* personalbar() const;
+        BarProp* scrollbars() const;
+        BarProp* statusbar() const;
+        BarProp* toolbar() const;
         Navigator* navigator() const;
         Navigator* clientInformation() const { return navigator(); }
 
@@ -411,12 +407,12 @@ namespace WebCore {
         mutable RefPtr<Screen> m_screen;
         mutable RefPtr<History> m_history;
         mutable RefPtr<Crypto>  m_crypto;
-        mutable RefPtr<BarInfo> m_locationbar;
-        mutable RefPtr<BarInfo> m_menubar;
-        mutable RefPtr<BarInfo> m_personalbar;
-        mutable RefPtr<BarInfo> m_scrollbars;
-        mutable RefPtr<BarInfo> m_statusbar;
-        mutable RefPtr<BarInfo> m_toolbar;
+        mutable RefPtr<BarProp> m_locationbar;
+        mutable RefPtr<BarProp> m_menubar;
+        mutable RefPtr<BarProp> m_personalbar;
+        mutable RefPtr<BarProp> m_scrollbars;
+        mutable RefPtr<BarProp> m_statusbar;
+        mutable RefPtr<BarProp> m_toolbar;
         mutable RefPtr<Console> m_console;
         mutable RefPtr<Navigator> m_navigator;
         mutable RefPtr<Location> m_location;

@@ -76,7 +76,6 @@ compositedScrollingForFramesEnabled initial=false
 
 webGLEnabled initial=false
 webGLErrorsToConsoleEnabled initial=true
-openGLMultisamplingEnabled initial=true
 privilegedWebGLExtensionsEnabled initial=false
 accelerated2dCanvasEnabled initial=false
 antialiased2dCanvasEnabled initial=true
@@ -136,3 +135,5 @@ selectionIncludesAltImageText initial=false
 
 # This setting enables touch based text selection and editing.
 touchEditingEnabled initial=false
+
+experimentalWebSocketEnabled initial=false

@@ -915,7 +915,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
             DropShadowFilterOperation* dropShadowOperation = static_cast<DropShadowFilterOperation*>(filterOperation);
             filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::DropShadowFilterOperation);
             // We want our computed style to look like that of a text shadow (has neither spread nor inset style).
-            ShadowData shadowData = ShadowData(dropShadowOperation->location(), dropShadowOperation->stdDeviation(), 0, Normal, false, dropShadowOperation->color());
+            ShadowData shadowData = ShadowData(dropShadowOperation->location(), dropShadowOperation->stdDeviation(), 0, Normal, dropShadowOperation->color());
             filterValue->append(valueForShadow(&shadowData, CSSPropertyTextShadow, style));
             break;
         }
@@ -2841,7 +2841,7 @@ bool CSSComputedStyleDeclaration::cssPropertyMatches(CSSPropertyID propertyID, c
         RenderStyle* style = m_node->computedStyle(m_pseudoElementSpecifier);
         if (style && style->fontDescription().keywordSize()) {
             int sizeValue = cssIdentifierForFontSizeKeyword(style->fontDescription().keywordSize());
-            const CSSPrimitiveValue* primitiveValue = static_cast<const CSSPrimitiveValue*>(propertyValue);
+            const CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(propertyValue);
             if (primitiveValue->isIdent() && primitiveValue->getIdent() == sizeValue)
                 return true;
         }

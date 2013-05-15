@@ -38,69 +38,24 @@
 #include <wtf/PassOwnPtr.h>
 #include <wtf/text/StringHash.h>
 
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-#include "core/platform/graphics/PlatformTextTrackMenu.h"
-#endif
-
-OBJC_CLASS AVPlayer;
-OBJC_CLASS QTMovie;
-
-class AVCFPlayer;
-class QTMovieGWorld;
-class QTMovieVisualContext;
-
 namespace WebCore {
 
 class AudioSourceProvider;
-class Document;
-class GStreamerGWorld;
-class MediaPlayerPrivateInterface;
-class MediaSource;
-class TextTrackRepresentation;
-
-// Structure that will hold every native
-// types supported by the current media player.
-// We have to do that has multiple media players
-// backend can live at runtime.
-struct PlatformMedia {
-    enum {
-        None,
-        QTMovieType,
-        QTMovieGWorldType,
-        QTMovieVisualContextType,
-        GStreamerGWorldType,
-        ChromiumMediaPlayerType,
-        QtMediaPlayerType,
-        AVFoundationMediaPlayerType,
-        AVFoundationCFMediaPlayerType
-    } type;
-
-    union {
-        QTMovie* qtMovie;
-        QTMovieGWorld* qtMovieGWorld;
-        QTMovieVisualContext* qtMovieVisualContext;
-        GStreamerGWorld* gstreamerGWorld;
-        MediaPlayerPrivateInterface* chromiumMediaPlayer;
-        MediaPlayerPrivateInterface* qtMediaPlayer;
-        AVPlayer* avfMediaPlayer;
-        AVCFPlayer* avcfMediaPlayer;
-    } media;
-};
-
-extern const PlatformMedia NoPlatformMedia;
-
 class CachedResourceLoader;
 class ContentType;
+class Document;
 class FrameView;
 class GraphicsContext;
 class GraphicsContext3D;
+class HostWindow;
 class IntRect;
 class IntSize;
 class MediaPlayer;
-struct MediaPlayerFactory;
+class MediaPlayerPrivateInterface;
+class TextTrackRepresentation;
 class TimeRanges;
-class HostWindow;
+class WebKitMediaSource;
+struct MediaPlayerFactory;
 
 class MediaPlayerClient {
 public:
@@ -221,7 +176,6 @@ public:
     bool supportsFullscreen() const;
     bool supportsSave() const;
     bool supportsScanning() const;
-    PlatformMedia platformMedia() const;
     PlatformLayer* platformLayer() const;
 
     IntSize naturalSize();
@@ -236,7 +190,7 @@ public:
     void setSize(const IntSize& size);
 
     bool load(const KURL&, const ContentType&, const String& keySystem);
-    bool load(const KURL&, PassRefPtr<MediaSource>);
+    bool load(const KURL&, PassRefPtr<WebKitMediaSource>);
     void cancelLoad();
 
     bool visible() const;
@@ -244,7 +198,7 @@ public:
 
     void prepareToPlay();
     void play();
-    void pause();    
+    void pause();
 
 #if ENABLE(ENCRYPTED_MEDIA)
     // Represents synchronous exceptions that can be thrown from the Encrypted Media methods.
@@ -271,7 +225,7 @@ public:
     double rate() const;
     void setRate(double);
 
-    bool preservesPitch() const;    
+    bool preservesPitch() const;
     void setPreservesPitch(bool);
 
     PassRefPtr<TimeRanges> buffered();
@@ -289,7 +243,7 @@ public:
     bool hasClosedCaptions() const;
     void setClosedCaptionsVisible(bool closedCaptionsVisible);
 
-    bool autoplay() const;    
+    bool autoplay() const;
     void setAutoplay(bool);
 
     void paint(GraphicsContext*, const IntRect&);
@@ -398,11 +352,6 @@ public:
     bool requiresTextTrackRepresentation() const;
     void setTextTrackRepresentation(TextTrackRepresentation*);
 
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    bool implementsTextTrackControls() const;
-    PassRefPtr<PlatformTextTrackMenuInterface> textTrackMenu();
-#endif
-
 private:
     MediaPlayer(MediaPlayerClient*);
     void loadWithMediaEngine();
@@ -425,7 +374,7 @@ private:
     bool m_shouldPrepareToRender;
     bool m_contentMIMETypeWasInferredFromExtension;
 
-    RefPtr<MediaSource> m_mediaSource;
+    RefPtr<WebKitMediaSource> m_mediaSource;
 };
 
 typedef PassOwnPtr<MediaPlayerPrivateInterface> (*CreateMediaEnginePlayer)(MediaPlayer*);

@@ -124,7 +124,7 @@
 #include "modules/notifications/NotificationClient.h"
 #include "modules/quota/StorageQuota.h"
 #include "modules/speech/SpeechRecognitionError.h"
-#include "origin/ReferrerPolicy.h"
+#include "weborigin/ReferrerPolicy.h"
 
 #define COMPILE_ASSERT_MATCHING_ENUM(webkit_name, webcore_name) \
     COMPILE_ASSERT(int(WebKit::webkit_name) == int(WebCore::webcore_name), mismatching_enums)
@@ -530,12 +530,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebGeolocationError::ErrorPositionUnavailable, Geol
 
 COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeSpelling, TextCheckingTypeSpelling);
 COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeGrammar, TextCheckingTypeGrammar);
-COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeLink, TextCheckingTypeLink);
-COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeQuote, TextCheckingTypeQuote);
-COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeDash, TextCheckingTypeDash);
-COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeReplacement, TextCheckingTypeReplacement);
-COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeCorrection, TextCheckingTypeCorrection);
-COMPILE_ASSERT_MATCHING_ENUM(WebTextCheckingTypeShowCorrectionPanel, TextCheckingTypeShowCorrectionPanel);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebStorageQuotaErrorNotSupported, NOT_SUPPORTED_ERR);
 COMPILE_ASSERT_MATCHING_ENUM(WebStorageQuotaErrorInvalidModification, INVALID_MODIFICATION_ERR);

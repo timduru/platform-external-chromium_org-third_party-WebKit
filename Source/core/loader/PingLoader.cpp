@@ -46,8 +46,8 @@
 #include "core/platform/network/ResourceHandle.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/network/ResourceResponse.h"
-#include "origin/SecurityOrigin.h"
-#include "origin/SecurityPolicy.h"
+#include "weborigin/SecurityOrigin.h"
+#include "weborigin/SecurityPolicy.h"
 
 namespace WebCore {
 
@@ -114,18 +114,18 @@ void PingLoader::sendViolationReport(Frame* frame, const KURL& reportURL, PassRe
     String referrer = SecurityPolicy::generateReferrerHeader(frame->document()->referrerPolicy(), reportURL, frame->loader()->outgoingReferrer());
     if (!referrer.isEmpty())
         request.setHTTPReferrer(referrer);
-    OwnPtr<PingLoader> pingLoader = adoptPtr(new PingLoader(frame, request));
+    OwnPtr<PingLoader> pingLoader = adoptPtr(new PingLoader(frame, request, SecurityOrigin::create(reportURL)->isSameSchemeHostPort(frame->document()->securityOrigin()) ? AllowStoredCredentials : DoNotAllowStoredCredentials));
 
     // Leak the ping loader, since it will kill itself as soon as it receives a response.
     PingLoader* leakedPingLoader = pingLoader.leakPtr();
     UNUSED_PARAM(leakedPingLoader);
 }
 
-PingLoader::PingLoader(Frame* frame, ResourceRequest& request)
+PingLoader::PingLoader(Frame* frame, ResourceRequest& request, StoredCredentials credentialsAllowed)
     : m_timeout(this, &PingLoader::timeout)
 {
     unsigned long identifier = createUniqueIdentifier();
-    m_handle = ResourceHandle::create(frame->loader()->networkingContext(), request, this, false, false, AllowStoredCredentials);
+    m_handle = ResourceHandle::create(frame->loader()->networkingContext(), request, this, false, false, credentialsAllowed);
 
     InspectorInstrumentation::continueAfterPingLoader(frame, identifier, frame->loader()->activeDocumentLoader(), request, ResourceResponse());
 

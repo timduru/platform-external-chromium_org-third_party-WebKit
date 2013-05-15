@@ -43,15 +43,15 @@
 #include "core/dom/Attribute.h"
 #include "core/dom/ClientRect.h"
 #include "core/dom/ClientRectList.h"
-#include "core/dom/ElementShadow.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/MouseEvent.h"
 #include "core/dom/NodeRenderingContext.h"
-#include "core/dom/ShadowRoot.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
+#include "core/dom/shadow/ElementShadow.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLDocument.h"
 #include "core/html/HTMLSourceElement.h"
 #include "core/html/HTMLVideoElement.h"
@@ -85,11 +85,11 @@
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderVideo.h"
 #include "core/rendering/RenderView.h"
-#include "modules/mediasource/MediaSource.h"
 #include "modules/mediasource/MediaSourceRegistry.h"
+#include "modules/mediasource/WebKitMediaSource.h"
 #include "modules/mediastream/MediaStreamRegistry.h"
-#include "origin/SecurityOrigin.h"
-#include "origin/SecurityPolicy.h"
+#include "weborigin/SecurityOrigin.h"
+#include "weborigin/SecurityPolicy.h"
 
 #include "RuntimeEnabledFeatures.h"
 #include "core/html/HTMLTrackElement.h"
@@ -107,10 +107,6 @@
 #if ENABLE(ENCRYPTED_MEDIA_V2)
 #include "MediaKeyNeededEvent.h"
 #include "MediaKeys.h"
-#endif
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-#include "core/platform/graphics/PlatformTextTrack.h"
 #endif
 
 using namespace std;
@@ -296,7 +292,7 @@ HTMLMediaElement::~HTMLMediaElement()
     if (m_mediaController)
         m_mediaController->removeMediaElement(this);
 
-    setSourceState(MediaSource::closedKeyword());
+    closeMediaSource();
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
     setMediaKeys(0);
@@ -642,7 +638,7 @@ void HTMLMediaElement::prepareForLoad()
     if (m_networkState == NETWORK_LOADING || m_networkState == NETWORK_IDLE)
         scheduleEvent(eventNames().abortEvent);
 
-    setSourceState(MediaSource::closedKeyword());
+    closeMediaSource();
 
     createMediaPlayer();
 
@@ -1353,7 +1349,7 @@ void HTMLMediaElement::noneSupported()
     // 7 - Queue a task to fire a simple event named error at the media element.
     scheduleEvent(eventNames().errorEvent);
 
-    setSourceState(MediaSource::closedKeyword());
+    closeMediaSource();
 
     // 8 - Set the element's delaying-the-load-event flag to false. This stops delaying the load event.
     setShouldDelayLoadEvent(false);
@@ -1382,7 +1378,7 @@ void HTMLMediaElement::mediaEngineError(PassRefPtr<MediaError> err)
     // 3 - Queue a task to fire a simple event named error at the media element.
     scheduleEvent(eventNames().errorEvent);
 
-    setSourceState(MediaSource::closedKeyword());
+    closeMediaSource();
 
     // 4 - Set the element's networkState attribute to the NETWORK_EMPTY value and queue a
     // task to fire a simple event called emptied at the element.
@@ -1882,7 +1878,7 @@ void HTMLMediaElement::seek(double time, ExceptionCode& ec)
 
     // Always notify the media engine of a seek if the source is not closed. This ensures that the source is
     // always in a flushed state when the 'seeking' event fires.
-    if (m_mediaSource && m_mediaSource->readyState() != MediaSource::closedKeyword())
+    if (m_mediaSource && m_mediaSource->readyState() != WebKitMediaSource::closedKeyword())
         noSeekRequired = false;
 
     if (noSeekRequired) {
@@ -2245,14 +2241,13 @@ void HTMLMediaElement::pauseInternal()
     updatePlayState();
 }
 
-void HTMLMediaElement::setSourceState(const String& state)
+void HTMLMediaElement::closeMediaSource()
 {
     if (!m_mediaSource)
-         return;
+        return;
 
-    m_mediaSource->setReadyState(state);
-    if (state == MediaSource::closedKeyword())
-        m_mediaSource = 0;
+    m_mediaSource->setReadyState(WebKitMediaSource::closedKeyword());
+    m_mediaSource = 0;
 }
 
 #if ENABLE(ENCRYPTED_MEDIA)
@@ -2588,80 +2583,10 @@ void HTMLMediaElement::mediaPlayerDidRemoveTrack(PassRefPtr<InbandTextTrackPriva
     removeTrack(textTrack.get());
 }
 
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-void HTMLMediaElement::setSelectedTextTrack(PassRefPtr<PlatformTextTrack> platformTrack)
-{
-    if (!m_textTracks)
-        return;
-
-    TrackDisplayUpdateScope scope(this);
-
-    if (!platformTrack) {
-        setSelectedTextTrack(0);
-        return;
-    }
-
-    TextTrack* textTrack;
-    size_t i;
-    for (i = 0; i < m_textTracks->length(); ++i) {
-        textTrack = m_textTracks->item(i);
-
-        if (textTrack->platformTextTrack() == platformTrack)
-            break;
-    }
-
-    if (i == m_textTracks->length())
-        return;
-    setSelectedTextTrack(textTrack);
-}
-
-Vector<RefPtr<PlatformTextTrack> > HTMLMediaElement::platformTextTracks()
-{
-    if (!m_textTracks || !m_textTracks->length())
-        return Vector<RefPtr<PlatformTextTrack> >();
-
-    Vector<RefPtr<PlatformTextTrack> > platformTracks;
-    for (size_t i = 0; i < m_textTracks->length(); ++i)
-        platformTracks.append(m_textTracks->item(i)->platformTextTrack());
-
-    return platformTracks;
-}
-
-void HTMLMediaElement::notifyMediaPlayerOfTextTrackChanges()
-{
-    if (!m_textTracks || !m_textTracks->length() || !platformTextTrackMenu())
-        return;
-
-    m_platformMenu->tracksDidChange();
-}
-
-PlatformTextTrackMenuInterface* HTMLMediaElement::platformTextTrackMenu()
-{
-    if (m_platformMenu)
-        return m_platformMenu.get();
-
-    if (!m_player->implementsTextTrackControls())
-        return 0;
-
-    m_platformMenu = m_player->textTrackMenu();
-    if (!m_platformMenu)
-        return 0;
-
-    m_platformMenu->setClient(this);
-
-    return m_platformMenu.get();
-}
-#endif // #if USE(PLATFORM_TEXT_TRACK_MENU)
-
 void HTMLMediaElement::closeCaptionTracksChanged()
 {
     if (hasMediaControls())
         mediaControls()->closedCaptionTracksChanged();
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    if (m_player->implementsTextTrackControls())
-        scheduleDelayedAction(TextTrackChangesNotification);
-#endif
 }
 
 void HTMLMediaElement::addTrack(TextTrack* track)
@@ -3609,7 +3534,7 @@ void HTMLMediaElement::userCancelledLoad()
     // 3 - Queue a task to fire a simple event named error at the media element.
     scheduleEvent(eventNames().abortEvent);
 
-    setSourceState(MediaSource::closedKeyword());
+    closeMediaSource();
 
     // 4 - If the media element's readyState attribute has a value equal to HAVE_NOTHING, set the
     // element's networkState attribute to the NETWORK_EMPTY value and queue a task to fire a
@@ -3646,7 +3571,7 @@ void HTMLMediaElement::clearMediaPlayer(int flags)
 
     removeAllInbandTracks();
 
-    setSourceState(MediaSource::closedKeyword());
+    closeMediaSource();
 
     m_player.clear();
     stopPeriodicTimers();
@@ -3765,11 +3690,6 @@ void HTMLMediaElement::willStopBeingFullscreenElement()
 {
     if (hasMediaControls())
         mediaControls()->exitedFullscreen();
-}
-
-PlatformMedia HTMLMediaElement::platformMedia() const
-{
-    return m_player ? m_player->platformMedia() : NoPlatformMedia;
 }
 
 PlatformLayer* HTMLMediaElement::platformLayer() const
@@ -4010,7 +3930,7 @@ void HTMLMediaElement::createMediaPlayer()
 #endif
 
     if (m_mediaSource)
-        m_mediaSource->setReadyState(MediaSource::closedKeyword());
+        closeMediaSource();
 
     m_player = MediaPlayer::create(this);
 

@@ -1,3 +1,4 @@
+../core/css/CSS.idl
 ../core/css/CSSCharsetRule.idl
 ../core/css/CSSFontFaceLoadEvent.idl
 ../core/css/CSSFontFaceRule.idl
@@ -15,7 +16,6 @@
 ../core/css/CSSValue.idl
 ../core/css/CSSValueList.idl
 ../core/css/Counter.idl
-../core/css/DOMWindowCSS.idl
 ../core/css/FontLoader.idl
 ../core/css/MediaList.idl
 ../core/css/MediaQueryList.idl
@@ -89,7 +89,6 @@
 ../core/dom/Range.idl
 ../core/dom/RequestAnimationFrameCallback.idl
 ../core/dom/SecurityPolicyViolationEvent.idl
-../core/dom/ShadowRoot.idl
 ../core/dom/StringCallback.idl
 ../core/dom/Text.idl
 ../core/dom/TextEvent.idl
@@ -100,6 +99,7 @@
 ../core/dom/TreeWalker.idl
 ../core/dom/UIEvent.idl
 ../core/dom/WheelEvent.idl
+../core/dom/shadow/ShadowRoot.idl
 ../core/fileapi/Blob.idl
 ../core/fileapi/File.idl
 ../core/fileapi/FileError.idl
@@ -107,10 +107,9 @@
 ../core/fileapi/FileList.idl
 ../core/fileapi/FileReader.idl
 ../core/fileapi/FileReaderSync.idl
-../core/html/DOMFormData.idl
 ../core/html/DOMSettableTokenList.idl
 ../core/html/DOMTokenList.idl
-../core/html/DOMURL.idl
+../core/html/FormData.idl
 ../core/html/HTMLAllCollection.idl
 ../core/html/HTMLAnchorElement.idl
 ../core/html/HTMLAppletElement.idl
@@ -193,6 +192,7 @@
 ../core/html/RadioNodeList.idl
 ../core/html/TextMetrics.idl
 ../core/html/TimeRanges.idl
+../core/html/URL.idl
 ../core/html/ValidityState.idl
 ../core/html/VoidCallback.idl
 ../core/html/canvas/ArrayBuffer.idl
@@ -203,7 +203,6 @@
 ../core/html/canvas/CanvasRenderingContext2D.idl
 ../core/html/canvas/Canvas2DContextAttributes.idl
 ../core/html/canvas/DataView.idl
-../core/html/canvas/DOMPath.idl
 ../core/html/canvas/EXTDrawBuffers.idl
 ../core/html/canvas/EXTTextureFilterAnisotropic.idl
 ../core/html/canvas/Float32Array.idl
@@ -216,6 +215,7 @@
 ../core/html/canvas/OESTextureHalfFloat.idl
 ../core/html/canvas/OESVertexArrayObject.idl
 ../core/html/canvas/OESElementIndexUint.idl
+../core/html/canvas/Path.idl
 ../core/html/canvas/Uint16Array.idl
 ../core/html/canvas/Uint32Array.idl
 ../core/html/canvas/Uint8Array.idl
@@ -257,12 +257,10 @@
 ../core/inspector/ScriptProfile.idl
 ../core/inspector/ScriptProfileNode.idl
 ../core/loader/appcache/DOMApplicationCache.idl
-../core/page/BarInfo.idl
+../core/page/BarProp.idl
 ../core/page/Console.idl
 ../core/page/Crypto.idl
 ../core/page/DOMPoint.idl
-../core/page/DOMSecurityPolicy.idl
-../core/page/DOMSelection.idl
 ../core/page/DOMWindow.idl
 ../core/page/DOMWindowPagePopup.idl
 ../core/page/EventSource.idl
@@ -279,6 +277,8 @@
 ../core/page/PerformanceResourceTiming.idl
 ../core/page/PerformanceTiming.idl
 ../core/page/Screen.idl
+../core/page/SecurityPolicy.idl
+../core/page/Selection.idl
 ../core/page/SpeechInputEvent.idl
 ../core/page/SpeechInputResult.idl
 ../core/page/SpeechInputResultList.idl
@@ -363,9 +363,9 @@
 ../modules/indexeddb/IDBTransaction.idl
 ../modules/indexeddb/IDBVersionChangeEvent.idl
 ../modules/indexeddb/WorkerContextIndexedDatabase.idl
-../modules/mediasource/MediaSource.idl
-../modules/mediasource/SourceBuffer.idl
-../modules/mediasource/SourceBufferList.idl
+../modules/mediasource/WebKitMediaSource.idl
+../modules/mediasource/WebKitSourceBuffer.idl
+../modules/mediasource/WebKitSourceBufferList.idl
 ../modules/mediastream/MediaStream.idl
 ../modules/mediastream/MediaStreamEvent.idl
 ../modules/mediastream/MediaStreamTrack.idl
@@ -462,6 +462,7 @@
 ../modules/webmidi/MIDIErrorCallback.idl
 ../modules/webmidi/MIDIInput.idl
 ../modules/webmidi/MIDIMessageEvent.idl
+../modules/webmidi/MIDIOutput.idl
 ../modules/webmidi/MIDIPort.idl
 ../modules/websockets/CloseEvent.idl
 ../modules/websockets/WebSocket.idl

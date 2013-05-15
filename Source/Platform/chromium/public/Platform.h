@@ -55,6 +55,7 @@ class WebClipboard;
 class WebCompositorSupport;
 class WebCookieJar;
 class WebDiscardableMemory;
+class WebFallbackThemeEngine;
 class WebFileSystem;
 class WebFileUtilities;
 class WebFlingAnimator;
@@ -67,6 +68,7 @@ class WebMediaStreamCenterClient;
 class WebMessagePortChannel;
 class WebMimeRegistry;
 class WebPluginListBuilder;
+class WebPrescientNetworking;
 class WebRTCPeerConnectionHandler;
 class WebRTCPeerConnectionHandlerClient;
 class WebSandboxSupport;
@@ -116,6 +118,8 @@ public:
 
     // May return null on some platforms.
     virtual WebThemeEngine* themeEngine() { return 0; }
+
+    virtual WebFallbackThemeEngine* fallbackThemeEngine() { return 0; }
 
     // Must return non-null.
     virtual WebHyphenator* hyphenator() { return 0; }
@@ -264,6 +268,9 @@ public:
 
     // A suggestion to prefetch IP information for the given hostname.
     virtual void prefetchHostName(const WebString&) { }
+
+    // May return null.
+    virtual WebPrescientNetworking* prescientNetworking() { return 0; }
 
     // Returns a new WebSocketStreamHandle instance.
     virtual WebSocketStreamHandle* createSocketStreamHandle() { return 0; }

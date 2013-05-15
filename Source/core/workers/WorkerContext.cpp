@@ -54,7 +54,7 @@
 #include "core/workers/WorkerObjectProxy.h"
 #include "core/workers/WorkerScriptLoader.h"
 #include "core/workers/WorkerThread.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 #include "modules/notifications/NotificationCenter.h"
@@ -93,6 +93,7 @@ WorkerContext::WorkerContext(const KURL& url, const String& userAgent, PassOwnPt
     , m_eventQueue(WorkerEventQueue::create(this))
     , m_topOrigin(topOrigin)
 {
+    ScriptWrappable::init(this);
     setSecurityOrigin(SecurityOrigin::create(url));
 }
 

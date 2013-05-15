@@ -34,6 +34,7 @@
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8GCController.h"
 #include "bindings/v8/V8NPUtils.h"
+#include "bindings/v8/V8ObjectConstructor.h"
 #include "bindings/v8/WrapperTypeInfo.h"
 #include "bindings/v8/npruntime_impl.h"
 #include "bindings/v8/npruntime_priv.h"
@@ -167,7 +168,10 @@ NPObject* npCreateV8ScriptObject(NPP npp, v8::Handle<v8::Object> object, DOMWind
         objectVector = &iter->value;
     }
     V8NPObject* v8npObject = reinterpret_cast<V8NPObject*>(_NPN_CreateObject(npp, &V8NPObjectClass));
-    v8npObject->v8Object = v8::Persistent<v8::Object>::New(v8::Isolate::GetCurrent(), object);
+    // This is uninitialized memory, we need to clear it so that
+    // Persistent::Reset won't try to Dispose anything bogus.
+    v8npObject->v8Object.Clear();
+    v8npObject->v8Object.Reset(v8::Isolate::GetCurrent(), object);
     v8npObject->rootObject = root;
 
     if (objectVector)

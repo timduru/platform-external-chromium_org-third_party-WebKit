@@ -158,9 +158,9 @@
 #include "core/rendering/RenderWidget.h"
 #include "modules/battery/BatteryController.h"
 #include "modules/geolocation/GeolocationController.h"
-#include "origin/SchemeRegistry.h"
-#include "origin/SecurityOrigin.h"
-#include "origin/SecurityPolicy.h"
+#include "weborigin/SchemeRegistry.h"
+#include "weborigin/SecurityOrigin.h"
+#include "weborigin/SecurityPolicy.h"
 #include "painting/ContinuousPainter.h"
 
 #if ENABLE(DEFAULT_RENDER_THEME)
@@ -2272,8 +2272,6 @@ WebTextInputType WebViewImpl::textInputType()
             return WebTextInputTypeURL;
         if (input->isDateField())
             return WebTextInputTypeDate;
-        if (input->isDateTimeField())
-            return WebTextInputTypeDateTime;
         if (input->isDateTimeLocalField())
             return WebTextInputTypeDateTimeLocal;
         if (input->isMonthField())

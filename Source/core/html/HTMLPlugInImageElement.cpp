@@ -28,8 +28,8 @@
 #include "core/dom/NodeList.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeRenderingContext.h"
-#include "core/dom/ShadowRoot.h"
 #include "core/dom/Text.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLDivElement.h"
 #include "core/html/HTMLImageLoader.h"
 #include "core/loader/FrameLoader.h"
@@ -39,7 +39,6 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/PlugInClient.h"
 #include "core/page/Settings.h"
 #include "core/platform/LocalizedStrings.h"
 #include "core/platform/Logging.h"
@@ -47,8 +46,8 @@
 #include "core/platform/graphics/Image.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "core/rendering/RenderImage.h"
-#include "origin/SchemeRegistry.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SchemeRegistry.h"
+#include "weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 

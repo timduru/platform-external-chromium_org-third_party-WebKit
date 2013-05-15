@@ -25,7 +25,7 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/NodeRenderingContext.h"
-#include "core/dom/ShadowRoot.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/rendering/RenderCombineText.h"
 #include "core/rendering/RenderText.h"
 
@@ -148,7 +148,7 @@ String Text::wholeText() const
     return result.toString();
 }
 
-PassRefPtr<Text> Text::replaceWholeText(const String& newText, ExceptionCode&)
+PassRefPtr<Text> Text::replaceWholeText(const String& newText)
 {
     // Remove all adjacent text nodes, and replace the contents of this one.
 

@@ -67,9 +67,6 @@ typedef Vector<CueInterval> CueList;
 
 class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, public ActiveDOMObject, public MediaControllerInterface
     , private TextTrackClient
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    , public PlatformTextTrackMenuClient
-#endif
 {
 public:
     MediaPlayer* player() const { return m_player.get(); }
@@ -87,7 +84,6 @@ public:
     virtual bool supportsSave() const;
     virtual bool supportsScanning() const;
     
-    PlatformMedia platformMedia() const;
     PlatformLayer* platformLayer() const;
 
     enum DelayedActionType {
@@ -157,7 +153,7 @@ public:
     unsigned webkitVideoDecodedByteCount() const;
 
 //  Media Source.
-    void setSourceState(const String&);
+    void closeMediaSource();
 
 #if ENABLE(ENCRYPTED_MEDIA)
     void webkitGenerateKeyRequest(const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionCode&);
@@ -213,12 +209,6 @@ public:
 
     virtual void mediaPlayerDidAddTrack(PassRefPtr<InbandTextTrackPrivate>) OVERRIDE;
     virtual void mediaPlayerDidRemoveTrack(PassRefPtr<InbandTextTrackPrivate>) OVERRIDE;
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    virtual void setSelectedTextTrack(PassRefPtr<PlatformTextTrack>) OVERRIDE;
-    virtual Vector<RefPtr<PlatformTextTrack> > platformTextTracks() OVERRIDE;
-    PlatformTextTrackMenuInterface* platformTextTrackMenu();
-#endif
 
     struct TrackGroup {
         enum GroupKind { CaptionsAndSubtitles, Description, Chapter, Metadata, Other };
@@ -565,7 +555,7 @@ private:
     // calling the media engine recursively.
     int m_processingMediaPlayerCallback;
 
-    RefPtr<MediaSource> m_mediaSource;
+    RefPtr<WebKitMediaSource> m_mediaSource;
 
     mutable double m_cachedTime;
     mutable double m_cachedTimeWallClockUpdateTime;
@@ -634,10 +624,6 @@ private:
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
     RefPtr<MediaKeys> m_mediaKeys;
-#endif
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    RefPtr<PlatformTextTrackMenuInterface> m_platformMenu;
 #endif
 };
 

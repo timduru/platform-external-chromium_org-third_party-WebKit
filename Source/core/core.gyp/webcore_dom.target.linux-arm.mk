@@ -40,7 +40,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/Clipboard.cpp \
 	third_party/WebKit/Source/core/dom/ClipboardEvent.cpp \
 	third_party/WebKit/Source/core/dom/Comment.cpp \
-	third_party/WebKit/Source/core/dom/ComposedShadowTreeWalker.cpp \
 	third_party/WebKit/Source/core/dom/CompositionEvent.cpp \
 	third_party/WebKit/Source/core/dom/ContainerNode.cpp \
 	third_party/WebKit/Source/core/dom/ContainerNodeAlgorithms.cpp \
@@ -73,7 +72,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/DocumentSharedObjectPool.cpp \
 	third_party/WebKit/Source/core/dom/DocumentStyleSheetCollection.cpp \
 	third_party/WebKit/Source/core/dom/DocumentType.cpp \
-	third_party/WebKit/Source/core/dom/ElementShadow.cpp \
 	third_party/WebKit/Source/core/dom/Element.cpp \
 	third_party/WebKit/Source/core/dom/ElementRareData.cpp \
 	third_party/WebKit/Source/core/dom/ErrorEvent.cpp \
@@ -141,7 +139,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/ScriptedAnimationController.cpp \
 	third_party/WebKit/Source/core/dom/SecurityContext.cpp \
 	third_party/WebKit/Source/core/dom/SelectorQuery.cpp \
-	third_party/WebKit/Source/core/dom/ShadowRoot.cpp \
 	third_party/WebKit/Source/core/dom/SpaceSplitString.cpp \
 	third_party/WebKit/Source/core/dom/StaticNodeList.cpp \
 	third_party/WebKit/Source/core/dom/StringCallback.cpp \
@@ -169,7 +166,14 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/WebCoreMemoryInstrumentation.cpp \
 	third_party/WebKit/Source/core/dom/WheelEvent.cpp \
 	third_party/WebKit/Source/core/dom/WindowEventContext.cpp \
-	third_party/WebKit/Source/core/dom/default/chromium/PlatformMessagePortChannelChromium.cpp
+	third_party/WebKit/Source/core/dom/default/chromium/PlatformMessagePortChannelChromium.cpp \
+	third_party/WebKit/Source/core/dom/shadow/ComposedShadowTreeWalker.cpp \
+	third_party/WebKit/Source/core/dom/shadow/ContentDistributor.cpp \
+	third_party/WebKit/Source/core/dom/shadow/ContentSelectorQuery.cpp \
+	third_party/WebKit/Source/core/dom/shadow/ElementShadow.cpp \
+	third_party/WebKit/Source/core/dom/shadow/InsertionPoint.cpp \
+	third_party/WebKit/Source/core/dom/shadow/SelectRuleFeatureSet.cpp \
+	third_party/WebKit/Source/core/dom/shadow/ShadowRoot.cpp
 
 
 # Flags passed to both C and C++ files.
@@ -233,14 +237,11 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
-	'-DWTF_USE_BUILTIN_UTF8_CODEC=1' \
-	'-DWTF_USE_WEBKIT_IMAGE_DECODERS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_DATALIST_ELEMENT=0' \
@@ -266,7 +267,7 @@ MY_DEFS := \
 	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_USE_POSIX_THREADS' \
-	'-DSK_BUILD_FOR_ANDROID_NDK' \
+	'-DSK_BUILD_FOR_ANDROID' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \

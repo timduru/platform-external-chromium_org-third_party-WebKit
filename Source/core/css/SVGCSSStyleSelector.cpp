@@ -107,7 +107,7 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
     ASSERT(value);
     CSSPrimitiveValue* primitiveValue = 0;
     if (value->isPrimitiveValue())
-        primitiveValue = static_cast<CSSPrimitiveValue*>(value);
+        primitiveValue = toCSSPrimitiveValue(value);
 
     const StyleResolverState& state = m_state;
     SVGRenderStyle* svgstyle = state.style()->accessSVGStyle();
@@ -276,7 +276,7 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
                 break;
             }
 
-            CSSValueList* dashes = static_cast<CSSValueList*>(value);
+            CSSValueList* dashes = toCSSValueList(value);
 
             Vector<SVGLength> array;
             size_t length = dashes->length();
@@ -285,7 +285,7 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
                 if (!currValue->isPrimitiveValue())
                     continue;
 
-                CSSPrimitiveValue* dash = static_cast<CSSPrimitiveValue*>(dashes->itemWithoutBoundsCheck(i));
+                CSSPrimitiveValue* dash = toCSSPrimitiveValue(dashes->itemWithoutBoundsCheck(i));
                 array.append(SVGLength::fromCSSPrimitiveValue(dash));
             }
 
@@ -557,7 +557,7 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             if (!value->isValueList())
                 return;
 
-            CSSValueList *list = static_cast<CSSValueList*>(value);
+            CSSValueList* list = toCSSValueList(value);
             if (!list->length())
                 return;
 
@@ -576,7 +576,7 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             ASSERT(!item->spread);
             ASSERT(!item->style);
 
-            OwnPtr<ShadowData> shadowData = adoptPtr(new ShadowData(location, blur, 0, Normal, false, color.isValid() ? color : Color::transparent));
+            OwnPtr<ShadowData> shadowData = adoptPtr(new ShadowData(location, blur, 0, Normal, color.isValid() ? color : Color::transparent));
             svgstyle->setShadow(shadowData.release());
             return;
         }

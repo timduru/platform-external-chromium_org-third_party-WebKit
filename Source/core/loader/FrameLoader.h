@@ -95,7 +95,7 @@ public:
     void setupForReplace();
 
     // FIXME: These are all functions which start loads. We have too many.
-    void loadURLIntoChildFrame(const KURL&, const String& referer, Frame*);
+    void loadURLIntoChildFrame(const ResourceRequest&, Frame*);
     void loadFrameRequest(const FrameLoadRequest&, bool lockBackForwardList,  // Called by submitForm, calls loadPostRequest and loadURL.
         PassRefPtr<Event>, PassRefPtr<FormState>, ShouldSendReferrer);
 
@@ -144,7 +144,6 @@ public:
     FrameState state() const { return m_state; }
 
     const ResourceRequest& originalRequest() const;
-    const ResourceRequest& initialRequest() const;
     void receivedMainResourceError(const ResourceError&);
 
     bool willLoadMediaElementURL(KURL&);
@@ -246,8 +245,6 @@ public:
 
     bool suppressOpenerInNewFrame() const { return m_suppressOpenerInNewFrame; }
 
-    static ObjectContentType defaultObjectContentType(const KURL&, const String& mimeType, bool shouldPreferPlugInsForImages);
-
     bool shouldClose();
     
     void started();
@@ -261,8 +258,6 @@ public:
     PageDismissalType pageDismissalEventBeingDispatched() const { return m_pageDismissalEventBeingDispatched; }
 
     NetworkingContext* networkingContext() const;
-
-    const KURL& previousURL() const { return m_previousURL; }
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
@@ -302,8 +297,6 @@ private:
 
     void closeOldDataSources();
 
-    bool shouldReloadToHandleUnreachableURL(const KURL&);
-
     void dispatchDidCommitLoad();
 
     void urlSelected(const FrameLoadRequest&, PassRefPtr<Event>, bool lockBackForwardList, ShouldSendReferrer);
@@ -312,10 +305,8 @@ private:
     void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,
         FrameLoadType, PassRefPtr<FormState>, const SubstituteData&, const String& overrideEncoding = String());
 
-    void loadPostRequest(const ResourceRequest&, const String& referrer,                // Called by loadFrameRequest, calls loadWithNavigationAction
-        const String& frameName, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);
-    void loadURL(const KURL&, const String& referrer, const String& frameName,          // Called by loadFrameRequest, calls loadWithNavigationAction or dispatches to navigation policy delegate
-        FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);
+    // Called by loadFrameRequest, calls loadWithNavigationAction or checkNewWindowPolicyAndContinue
+    void loadURL(const ResourceRequest&, const String& frameName, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);
 
     bool shouldReload(const KURL& currentURL, const KURL& destinationURL);
 
@@ -393,7 +384,6 @@ private:
 
     RefPtr<FrameNetworkingContext> m_networkingContext;
 
-    KURL m_previousURL;
     RefPtr<HistoryItem> m_requestedHistoryItem;
 };
 

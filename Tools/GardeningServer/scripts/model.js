@@ -132,7 +132,7 @@ model.buildersInFlightForRevision = function(revision)
     var builders = {};
     Object.keys(model.state.resultsByBuilder).forEach(function(builderName) {
         var results = model.state.resultsByBuilder[builderName];
-        if (parseInt(results.revision) < revision)
+        if (parseInt(results.blink_revision) < revision)
             builders[builderName] = { actual: 'BUILDING' };
     });
     return builders;
@@ -148,9 +148,9 @@ model.latestRevisionWithNoBuildersInFlight = function()
     var revision = 0;
     Object.keys(model.state.resultsByBuilder).forEach(function(builderName) {
         var results = model.state.resultsByBuilder[builderName];
-        if (!results.revision)
+        if (!results.blink_revision)
             return;
-        var testedRevision = parseInt(results.revision);
+        var testedRevision = parseInt(results.blink_revision);
         revision = revision ? Math.min(revision, testedRevision) : testedRevision;
     });
     return revision;
@@ -209,22 +209,6 @@ model.unexpectedFailureInfoForTestName = function(testName)
 
     return Object.keys(resultsByTest[testName]).map(function(builderName) {
         return results.failureInfoForTestAndBuilder(resultsByTest, testName, builderName);
-    });
-};
-
-model.analyzeUnexpectedSuccesses = function(callback)
-{
-    var unexpectedSuccesses = results.unexpectedSuccessesByTest(model.state.resultsByBuilder);
-    $.each(unexpectedSuccesses, function(testName, resultNodesByBuilder) {
-        var successAnalysis = {
-            'testName': testName,
-            'resultNodesByBuilder': resultNodesByBuilder,
-        };
-
-        // FIXME: Consider looking at the history to see how long this test
-        // has been unexpectedly passing.
-
-        callback(successAnalysis);
     });
 };
 

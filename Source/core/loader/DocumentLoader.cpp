@@ -63,8 +63,8 @@
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/Logging.h"
-#include "origin/SchemeRegistry.h"
-#include "origin/SecurityPolicy.h"
+#include "weborigin/SchemeRegistry.h"
+#include "weborigin/SecurityPolicy.h"
 
 namespace WebCore {
 
@@ -477,9 +477,9 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
     if (newRequest.cachePolicy() == UseProtocolCachePolicy && isPostOrRedirectAfterPost(newRequest, redirectResponse))
         newRequest.setCachePolicy(ReloadIgnoringCacheData);
 
-    Frame* top = m_frame->tree()->top();
-    if (top != m_frame) {
-        if (!frameLoader()->mixedContentChecker()->canDisplayInsecureContent(top->document()->securityOrigin(), newRequest.url())) {
+    Frame* parent = m_frame->tree()->parent();
+    if (parent) {
+        if (!parent->loader()->mixedContentChecker()->canRunInsecureContent(parent->document()->securityOrigin(), newRequest.url())) {
             cancelMainResourceLoad(frameLoader()->cancelledError(newRequest));
             return;
         }
@@ -647,8 +647,6 @@ void DocumentLoader::commitData(const char* bytes, size_t length)
 
         if (frameLoader()->stateMachine()->creatingInitialEmptyDocument())
             return;
-        if (frameLoader()->stateMachine()->isDisplayingInitialEmptyDocument())
-            frameLoader()->stateMachine()->advanceTo(FrameLoaderStateMachine::CommittedFirstRealLoad);
         
         // The origin is the MHTML file, we need to set the base URL to the document encoded in the MHTML so
         // relative URLs are resolved properly.
@@ -1077,7 +1075,7 @@ void DocumentLoader::startLoadingMainResource()
 
     ResourceRequest request(m_request);
     DEFINE_STATIC_LOCAL(ResourceLoaderOptions, mainResourceLoadOptions,
-        (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck));
+        (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck));
     CachedResourceRequest cachedResourceRequest(request, mainResourceLoadOptions);
     m_mainResource = m_cachedResourceLoader->requestMainResource(cachedResourceRequest);
     if (!m_mainResource) {

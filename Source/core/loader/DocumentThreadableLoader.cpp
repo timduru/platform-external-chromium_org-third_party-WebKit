@@ -31,8 +31,7 @@
 #include "config.h"
 #include "core/loader/DocumentThreadableLoader.h"
 
-#include <wtf/Assertions.h>
-#include <wtf/UnusedParam.h>
+#include "bindings/v8/ScriptController.h"
 #include "core/dom/Document.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/CrossOriginAccessControl.h"
@@ -45,11 +44,15 @@
 #include "core/loader/cache/CachedRawResource.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
+#include "core/loader/cache/CachedResourceRequestInitiators.h"
+#include "core/page/ContentSecurityPolicy.h"
 #include "core/page/Frame.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceRequest.h"
-#include "origin/SchemeRegistry.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SchemeRegistry.h"
+#include "weborigin/SecurityOrigin.h"
+#include "wtf/Assertions.h"
+#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -179,6 +182,12 @@ void DocumentThreadableLoader::redirectReceived(CachedResource* resource, Resour
     ASSERT_UNUSED(resource, resource == m_resource);
 
     RefPtr<DocumentThreadableLoader> protect(this);
+    if (!isAllowedByPolicy(request.url())) {
+        m_client->didFailRedirectCheck();
+        request = ResourceRequest();
+        return;
+    }
+
     // Allow same origin requests to continue after allowing clients to audit the redirect.
     if (isAllowedRedirect(request.url())) {
         if (m_client->isDocumentThreadableLoaderClient())
@@ -187,7 +196,8 @@ void DocumentThreadableLoader::redirectReceived(CachedResource* resource, Resour
     }
 
     // When using access control, only simple cross origin requests are allowed to redirect. The new request URL must have a supported
-    // scheme and not contain the userinfo production. In addition, the redirect response must pass the access control check.
+    // scheme and not contain the userinfo production. In addition, the redirect response must pass the access control check if the
+    // original request was not same-origin.
     if (m_options.crossOriginRequestPolicy == UseAccessControl) {
         bool allowRedirect = false;
         if (m_simpleRequest) {
@@ -195,7 +205,7 @@ void DocumentThreadableLoader::redirectReceived(CachedResource* resource, Resour
             allowRedirect = SchemeRegistry::shouldTreatURLSchemeAsCORSEnabled(request.url().protocol())
                             && request.url().user().isEmpty()
                             && request.url().pass().isEmpty()
-                            && passesAccessControlCheck(redirectResponse, m_options.allowCredentials, securityOrigin(), accessControlErrorDescription);
+                            && (m_sameOriginRequest || passesAccessControlCheck(redirectResponse, m_options.allowCredentials, securityOrigin(), accessControlErrorDescription));
         }
 
         if (allowRedirect) {
@@ -204,11 +214,18 @@ void DocumentThreadableLoader::redirectReceived(CachedResource* resource, Resour
 
             RefPtr<SecurityOrigin> originalOrigin = SecurityOrigin::createFromString(redirectResponse.url());
             RefPtr<SecurityOrigin> requestOrigin = SecurityOrigin::createFromString(request.url());
-            // If the request URL origin is not same origin with the original URL origin, set source origin to a globally unique identifier.
-            if (!originalOrigin->isSameSchemeHostPort(requestOrigin.get()))
+            // If the original request wasn't same-origin, then if the request URL origin is not same origin with the original URL origin,
+            // set the source origin to a globally unique identifier. (If the original request was same-origin, the origin of the new request
+            // should be the original URL origin.)
+            if (!m_sameOriginRequest && !originalOrigin->isSameSchemeHostPort(requestOrigin.get()))
                 m_options.securityOrigin = SecurityOrigin::createUnique();
             // Force any subsequent requests to use these checks.
             m_sameOriginRequest = false;
+
+            // Since the request is no longer same-origin, if the user didn't request credentials in
+            // the first place, update our state so we neither request them nor expect they must be allowed.
+            if (m_options.credentialsRequested == ClientDidNotRequestCredentials)
+                m_options.allowCredentials = DoNotAllowStoredCredentials;
 
             // Remove any headers that may have been added by the network layer that cause access control to fail.
             request.clearHTTPContentType();
@@ -394,7 +411,7 @@ void DocumentThreadableLoader::loadRequest(const ResourceRequest& request, Secur
     unsigned long identifier = std::numeric_limits<unsigned long>::max();
     if (Frame* frame = m_document->frame()) {
         Frame* top = frame->tree()->top();
-        if (!top->loader()->mixedContentChecker()->canDisplayInsecureContent(top->document()->securityOrigin(), requestURL)) {
+        if (!top->loader()->mixedContentChecker()->canRunInsecureContent(top->document()->securityOrigin(), requestURL)) {
             m_client->didFail(error);
             return;
         }
@@ -413,7 +430,7 @@ void DocumentThreadableLoader::loadRequest(const ResourceRequest& request, Secur
     // FIXME: FrameLoader::loadSynchronously() does not tell us whether a redirect happened or not, so we guess by comparing the
     // request and response URLs. This isn't a perfect test though, since a server can serve a redirect to the same URL that was
     // requested. Also comparing the request and response URLs as strings will fail if the requestURL still has its credentials.
-    if (requestURL != response.url() && !isAllowedRedirect(response.url())) {
+    if (requestURL != response.url() && (!isAllowedByPolicy(response.url()) || !isAllowedRedirect(response.url()))) {
         m_client->didFailRedirectCheck();
         return;
     }
@@ -427,12 +444,19 @@ void DocumentThreadableLoader::loadRequest(const ResourceRequest& request, Secur
     didFinishLoading(identifier, 0.0);
 }
 
-bool DocumentThreadableLoader::isAllowedRedirect(const KURL& url)
+bool DocumentThreadableLoader::isAllowedRedirect(const KURL& url) const
 {
     if (m_options.crossOriginRequestPolicy == AllowCrossOriginRequests)
         return true;
 
     return m_sameOriginRequest && securityOrigin()->canRequest(url);
+}
+
+bool DocumentThreadableLoader::isAllowedByPolicy(const KURL& url) const
+{
+    if (m_options.contentSecurityPolicyEnforcement != EnforceConnectSrcDirective)
+        return true;
+    return m_document->contentSecurityPolicy()->allowConnectToSource(url);
 }
 
 SecurityOrigin* DocumentThreadableLoader::securityOrigin() const

@@ -62,7 +62,7 @@
 #include "core/platform/network/ResourceRequest.h"
 #include "core/xml/XMLHttpRequestProgressEvent.h"
 #include "core/xml/XMLHttpRequestUpload.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -204,7 +204,7 @@ XMLHttpRequest::~XMLHttpRequest()
 Document* XMLHttpRequest::document() const
 {
     ASSERT(scriptExecutionContext()->isDocument());
-    return static_cast<Document*>(scriptExecutionContext());
+    return toDocument(scriptExecutionContext());
 }
 
 SecurityOrigin* XMLHttpRequest::securityOrigin() const
@@ -477,14 +477,7 @@ void XMLHttpRequest::open(const String& method, const KURL& url, bool async, Exc
         return;
     }
 
-    // FIXME: Convert this to check the isolated world's Content Security Policy once webkit.org/b/104520 is solved.
-    bool shouldBypassMainWorldContentSecurityPolicy = false;
-    if (scriptExecutionContext()->isDocument()) {
-        Document* document = static_cast<Document*>(scriptExecutionContext());
-        if (document->frame())
-            shouldBypassMainWorldContentSecurityPolicy = document->frame()->script()->shouldBypassMainWorldContentSecurityPolicy();
-    }
-    if (!shouldBypassMainWorldContentSecurityPolicy && !scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
+    if (!ContentSecurityPolicy::shouldBypassMainWorld(scriptExecutionContext()) && !scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
         // FIXME: Should this be throwing an exception?
         ec = SECURITY_ERR;
         return;
@@ -749,9 +742,11 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.sniffContent = DoNotSniffContent;
     options.preflightPolicy = uploadEvents ? ForcePreflight : ConsiderPreflight;
     options.allowCredentials = (m_sameOriginRequest || m_includeCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+    options.credentialsRequested = m_includeCredentials ? ClientRequestedCredentials : ClientDidNotRequestCredentials;
     options.crossOriginRequestPolicy = UseAccessControl;
     options.securityOrigin = securityOrigin();
     options.initiator = cachedResourceRequestInitiators().xmlhttprequest;
+    options.contentSecurityPolicyEnforcement = ContentSecurityPolicy::shouldBypassMainWorld(scriptExecutionContext()) ? DoNotEnforceContentSecurityPolicy : EnforceConnectSrcDirective;
 
 #if ENABLE(XHR_TIMEOUT)
     if (m_timeoutMilliseconds)

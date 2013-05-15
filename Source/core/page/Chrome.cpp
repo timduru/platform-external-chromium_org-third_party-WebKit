@@ -52,7 +52,7 @@
 #include "core/rendering/RenderObject.h"
 #include "core/storage/StorageNamespace.h"
 #include "modules/geolocation/Geolocation.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 #if ENABLE(INPUT_TYPE_COLOR)
 #include "core/platform/ColorChooser.h"
@@ -119,11 +119,6 @@ void Chrome::contentsSizeChanged(Frame* frame, const IntSize& size) const
 void Chrome::layoutUpdated(Frame* frame) const
 {
     m_client->layoutUpdated(frame);
-}
-
-void Chrome::scrollbarsModeDidChange() const
-{
-    m_client->scrollbarsModeDidChange();
 }
 
 void Chrome::setWindowRect(const FloatRect& rect) const

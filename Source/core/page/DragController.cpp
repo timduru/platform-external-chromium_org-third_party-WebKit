@@ -38,9 +38,9 @@
 #include "core/dom/Element.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/Node.h"
-#include "core/dom/ShadowRoot.h"
 #include "core/dom/Text.h"
 #include "core/dom/TextEvent.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/MoveSelectionCommand.h"
@@ -75,7 +75,7 @@
 #include "core/rendering/RenderFileUploadControl.h"
 #include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderView.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 #if OS(WINDOWS)
 #include <windows.h>

@@ -31,8 +31,8 @@
 #include "config.h"
 #include "WebRuntimeFeatures.h"
 
-#include "WebMediaPlayerClientImpl.h"
 #include "RuntimeEnabledFeatures.h"
+#include "WebMediaPlayerClientImpl.h"
 #include "modules/websockets/WebSocket.h"
 
 using namespace WebCore;
@@ -209,12 +209,13 @@ bool WebRuntimeFeatures::isExperimentalShadowDOMEnabled()
 
 void WebRuntimeFeatures::enableExperimentalWebSocket(bool enable)
 {
-    RuntimeEnabledFeatures::setExperimentalWebSocketEnabled(enable);
+    // Do nothing. This flag will be deleted.
 }
 
 bool WebRuntimeFeatures::isExperimentalWebSocketEnabled()
 {
-    return RuntimeEnabledFeatures::experimentalWebSocketEnabled();
+    // This flag will be deleted.
+    return false;
 }
 
 void WebRuntimeFeatures::enableFileSystem(bool enable)
@@ -287,16 +288,6 @@ bool WebRuntimeFeatures::isIndexedDBEnabled()
     return RuntimeEnabledFeatures::indexedDBEnabled();
 }
 
-void WebRuntimeFeatures::enableInputTypeDateTime(bool enable)
-{
-    RuntimeEnabledFeatures::setInputTypeDateTimeEnabled(enable);
-}
-
-bool WebRuntimeFeatures::isInputTypeDateTimeEnabled()
-{
-    return RuntimeEnabledFeatures::inputTypeDateTimeEnabled();
-}
-
 void WebRuntimeFeatures::enableInputTypeWeek(bool enable)
 {
     RuntimeEnabledFeatures::setInputTypeWeekEnabled(enable);
@@ -349,12 +340,26 @@ bool WebRuntimeFeatures::isMediaPlayerEnabled()
 
 void WebRuntimeFeatures::enableMediaSource(bool enable)
 {
-    RuntimeEnabledFeatures::setMediaSourceEnabled(enable);
+    // FIXME: Change to setMediaSourceEnabled() once Chromium
+    // starts calling enableWebKitMediaSource().
+    RuntimeEnabledFeatures::setWebKitMediaSourceEnabled(enable);
 }
 
 bool WebRuntimeFeatures::isMediaSourceEnabled()
 {
-    return RuntimeEnabledFeatures::mediaSourceEnabled();
+    // FIXME: Change to mediaSourceEnabled() once Chromium
+    // starts calling isWebKitMediaSourceEnabled()
+    return RuntimeEnabledFeatures::webKitMediaSourceEnabled();
+}
+
+void WebRuntimeFeatures::enableWebKitMediaSource(bool enable)
+{
+    RuntimeEnabledFeatures::setWebKitMediaSourceEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isWebKitMediaSourceEnabled()
+{
+    return RuntimeEnabledFeatures::webKitMediaSourceEnabled();
 }
 
 void WebRuntimeFeatures::enableMediaStream(bool enable)

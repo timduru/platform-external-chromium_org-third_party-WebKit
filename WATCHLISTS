@@ -45,6 +45,9 @@
                   '|Source/core/css/*Event.*' \
                   '|Source/core/platform/*Event*.*'
     },
+    'html': {
+      'filepath': 'Source/core/html/'
+    },
     'loader': {
       'filepath': 'Source/core/loader',
     },
@@ -143,6 +146,12 @@
                   '|LayoutTests/fast/regions/' \
                   '|LayoutTests/platform/chromium.*/fast/regions/'
     },
+    'webcomponents': {
+      'filepath': 'Source/core/dom/shadow/.*' \
+                  '|Source/core/dom/CustomElement.*' \
+                  '|Source/bindings/v8/custom/V8CustomElementConstructorCustom.*' \
+                  '|Source/bindings/v8/CustomElementHelpers.*'
+    },
   },
 
   'WATCHLISTS': {
@@ -163,11 +172,12 @@
                   'eustas+blink@chromium.org',
                   'caseq+blink@chromium.org'],
     'bindings': [ 'abarth@chromium.org',
+                  'adamk+blink@chromium.org',
                   'japhet@chromium.org',
                   'jsbell+bindings@chromium.org',
                   'haraken@chromium.org' ],
     'canvas': [ 'cabanier@adobe.com' ],
-    'custom_elements': [ 'dominicc+watchlist@chromium.org' ],
+    'custom_elements': [ 'dominicc+watchlist@chromium.org', 'dglazkov+blink@chromium.org' ],
     'layers': [ 'blink-layers@chromium.org' ],
     'loader': [ 'japhet@chromium.org', 'gavinp+loader@chromium.org' ],
     'owners': [ 'abarth@chromium.org'],
@@ -179,12 +189,16 @@
                            'cabanier@adobe.com' ],
     'platform': [ 'forgerbr@gmail.com' ],
     'svg': [ 'schenney@chromium.org', 'pdr@google.com', 'fmalita@chromium.org' ],
-    'css': [ 'alexis.menard@intel.com', 'apavlov+blink@chromium.org' ],
-    'dom': [ 'eae+blinkwatch@chromium.org' ],
+    'css': [ 'alexis.menard@intel.com', 'apavlov+blink@chromium.org', 'dglazkov+blink@chromium.org' ],
+    'dom': [ 'adamk+blink@chromium.org', 'eae+blinkwatch@chromium.org', 'dglazkov+blink@chromium.org' ],
     'events': [ 'eae+blinkwatch@chromium.org' ],
+    'html': [ 'adamk+blink@chromium.org' ],
     'public_api': [ 'abarth@chromum.org', 'jamesr@chromium.org' ],
-    'wtf': [ 'abarth@chromium.org', 'forgerbr@gmail.com',
-             'loislo+blink@chromium.org', 'yurys+blink@chromium.org' ],
+    'wtf': [ 'abarth@chromium.org',
+             'adamk+blink@chromium.org',
+             'forgerbr@gmail.com',
+             'loislo+blink@chromium.org',
+             'yurys+blink@chromium.org' ],
     'indexed_db': ['alecflett@chromium.org','dgrogan@chromium.org',
                    'jsbell@chromium.org'],
     'rendering': [ 'eae+blinkwatch@chromium.org', 'jchaffraix+rendering@chromium.org', 'leviw+renderwatch@chromium.org' ],
@@ -197,5 +211,6 @@
     'quota': [ 'kinuko@chromium.org' ],
     'viewport_interaction': [ 'kenneth.christiansen@gmail.com' ],
     'css_regions': [ 'ChromiumBugTracker@adobe.com' ],
+    'webcomponents': [ 'webcomponents-bugzilla@chromium.org', 'dglazkov+blink@chromium.org' ],
   },
 }

@@ -38,7 +38,7 @@
 #include "core/page/Frame.h"
 #include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderVideo.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 #if ENABLE(SVG)
 #include "core/rendering/svg/RenderSVGImage.h"
@@ -211,8 +211,8 @@ void ImageLoader::updateFromElement()
             clearFailedLoadURL();
     } else if (!attr.isNull()) {
         // Fire an error event if the url is empty.
-        // FIXME: Should we fire this event asynchronoulsy via errorEventSender()?
-        m_element->dispatchEvent(Event::create(eventNames().errorEvent, false, false));
+        m_hasPendingErrorEvent = true;
+        errorEventSender().dispatchEventSoon(this);
     }
     
     CachedImage* oldImage = m_image.get();

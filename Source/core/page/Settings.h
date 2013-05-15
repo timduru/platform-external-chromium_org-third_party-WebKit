@@ -104,10 +104,6 @@ public:
     const IntSize& textAutosizingWindowSizeOverride() const { return m_textAutosizingWindowSizeOverride; }
 
     // Only set by Layout Tests.
-    void setResolutionOverride(const IntSize&);
-    const IntSize& resolutionOverride() const { return m_resolutionDensityPerInchOverride; }
-
-    // Only set by Layout Tests.
     void setMediaTypeOverride(const String&);
     const String& mediaTypeOverride() const { return m_mediaTypeOverride; }
 
@@ -160,6 +156,9 @@ public:
     void setTouchEventEmulationEnabled(bool enabled) { m_touchEventEmulationEnabled = enabled; }
     bool isTouchEventEmulationEnabled() const { return m_touchEventEmulationEnabled; }
 
+    void setOpenGLMultisamplingEnabled(bool flag);
+    bool openGLMultisamplingEnabled();
+
 private:
     explicit Settings(Page*);
 
@@ -179,7 +178,6 @@ private:
     float m_textAutosizingFontScaleFactor;
     IntSize m_textAutosizingWindowSizeOverride;
     bool m_textAutosizingEnabled : 1;
-    IntSize m_resolutionDensityPerInchOverride;
 
     SETTINGS_MEMBER_VARIABLES
 
@@ -195,6 +193,7 @@ private:
     bool m_dnsPrefetchingEnabled : 1;
 
     bool m_touchEventEmulationEnabled : 1;
+    bool m_openGLMultisamplingEnabled : 1;
 
     Timer<Settings> m_setImageLoadingSettingsTimer;
     void imageLoadingSettingsTimerFired(Timer<Settings>*);

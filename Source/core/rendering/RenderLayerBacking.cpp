@@ -135,7 +135,6 @@ PassOwnPtr<GraphicsLayer> RenderLayerBacking::createGraphicsLayer(const String& 
 #else
     UNUSED_PARAM(name);
 #endif
-    graphicsLayer->setMaintainsPixelAlignment(compositor()->keepLayersPixelAligned());
     
     return graphicsLayer.release();
 }
@@ -676,24 +675,26 @@ void RenderLayerBacking::updateGraphicsLayerGeometry()
     if (m_scrollingLayer) {
         ASSERT(m_scrollingContentsLayer);
         RenderBox* renderBox = toRenderBox(renderer());
-        IntRect paddingBox(renderBox->borderLeft(), renderBox->borderTop(), renderBox->width() - renderBox->borderLeft() - renderBox->borderRight(), renderBox->height() - renderBox->borderTop() - renderBox->borderBottom());
-        IntSize scrollOffset = m_owningLayer->adjustedScrollOffset();
+        IntRect clientBox = enclosingIntRect(renderBox->clientBoxRect());
+        // FIXME: We should make RenderBox::clientBoxRect consider scrollbar placement.
+        if (style->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
+            clientBox.move(renderBox->verticalScrollbarWidth(), 0);
 
-        m_scrollingLayer->setPosition(FloatPoint(paddingBox.location() - localCompositingBounds.location()));
-
-        m_scrollingLayer->setSize(paddingBox.size());
-        m_scrollingContentsLayer->setPosition(FloatPoint(-scrollOffset.width(), -scrollOffset.height()));
+        IntSize adjustedScrollOffset = m_owningLayer->adjustedScrollOffset();
+        m_scrollingLayer->setPosition(FloatPoint(clientBox.location() - localCompositingBounds.location()));
+        m_scrollingLayer->setSize(clientBox.size());
+        m_scrollingContentsLayer->setPosition(FloatPoint(-adjustedScrollOffset.width(), -adjustedScrollOffset.height()));
 
         IntSize oldScrollingLayerOffset = m_scrollingLayer->offsetFromRenderer();
-        m_scrollingLayer->setOffsetFromRenderer(-toIntSize(paddingBox.location()));
+        m_scrollingLayer->setOffsetFromRenderer(-toIntSize(clientBox.location()));
 
-        bool paddingBoxOffsetChanged = oldScrollingLayerOffset != m_scrollingLayer->offsetFromRenderer();
+        bool clientBoxOffsetChanged = oldScrollingLayerOffset != m_scrollingLayer->offsetFromRenderer();
 
         IntSize scrollSize(m_owningLayer->scrollWidth(), m_owningLayer->scrollHeight());
-        if (scrollSize != m_scrollingContentsLayer->size() || paddingBoxOffsetChanged)
+        if (scrollSize != m_scrollingContentsLayer->size() || clientBoxOffsetChanged)
             m_scrollingContentsLayer->setNeedsDisplay();
 
-        IntSize scrollingContentsOffset = toIntSize(paddingBox.location() - scrollOffset);
+        IntSize scrollingContentsOffset = toIntSize(clientBox.location() - adjustedScrollOffset);
         if (scrollingContentsOffset != m_scrollingContentsLayer->offsetFromRenderer() || scrollSize != m_scrollingContentsLayer->size())
             compositor()->scrollingLayerDidChange(m_owningLayer);
 
@@ -1681,16 +1682,6 @@ void RenderLayerBacking::paintContents(const GraphicsLayer* graphicsLayer, Graph
 #endif
 }
 
-float RenderLayerBacking::pageScaleFactor() const
-{
-    return compositor()->pageScaleFactor();
-}
-
-float RenderLayerBacking::deviceScaleFactor() const
-{
-    return compositor()->deviceScaleFactor();
-}
-
 void RenderLayerBacking::didCommitChangesForLayer(const GraphicsLayer* layer) const
 {
 }
@@ -1748,29 +1739,27 @@ bool RenderLayerBacking::startAnimation(double timeOffset, const CSSAnimationDat
         
         bool isFirstOrLastKeyframe = key == 0 || key == 1;
         if ((hasTransform && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyWebkitTransform))
-            transformVector.insert(new TransformAnimationValue(key, &(keyframeStyle->transform()), tf));
+            transformVector.insert(adoptPtr(new TransformAnimationValue(key, &(keyframeStyle->transform()), tf)));
         
         if ((hasOpacity && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyOpacity))
-            opacityVector.insert(new FloatAnimationValue(key, keyframeStyle->opacity(), tf));
+            opacityVector.insert(adoptPtr(new FloatAnimationValue(key, keyframeStyle->opacity(), tf)));
 
         if ((hasFilter && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyWebkitFilter))
-            filterVector.insert(new FilterAnimationValue(key, &(keyframeStyle->filter()), tf));
+            filterVector.insert(adoptPtr(new FilterAnimationValue(key, &(keyframeStyle->filter()), tf)));
     }
 
-    bool didAnimateTransform = false;
-    bool didAnimateOpacity = false;
-    bool didAnimateFilter = false;
-    
+    bool didAnimate = false;
+
     if (hasTransform && m_graphicsLayer->addAnimation(transformVector, toRenderBox(renderer())->pixelSnappedBorderBoxRect().size(), anim, keyframes.animationName(), timeOffset))
-        didAnimateTransform = true;
+        didAnimate = true;
 
     if (hasOpacity && m_graphicsLayer->addAnimation(opacityVector, IntSize(), anim, keyframes.animationName(), timeOffset))
-        didAnimateOpacity = true;
+        didAnimate = true;
 
     if (hasFilter && m_graphicsLayer->addAnimation(filterVector, IntSize(), anim, keyframes.animationName(), timeOffset))
-        didAnimateFilter = true;
+        didAnimate = true;
 
-    return didAnimateTransform || didAnimateOpacity || didAnimateFilter;
+    return didAnimate;
 }
 
 void RenderLayerBacking::animationPaused(double timeOffset, const String& animationName)
@@ -1785,9 +1774,7 @@ void RenderLayerBacking::animationFinished(const String& animationName)
 
 bool RenderLayerBacking::startTransition(double timeOffset, CSSPropertyID property, const RenderStyle* fromStyle, const RenderStyle* toStyle)
 {
-    bool didAnimateOpacity = false;
-    bool didAnimateTransform = false;
-    bool didAnimateFilter = false;
+    bool didAnimate = false;
 
     ASSERT(property != CSSPropertyInvalid);
 
@@ -1795,13 +1782,13 @@ bool RenderLayerBacking::startTransition(double timeOffset, CSSPropertyID proper
         const CSSAnimationData* opacityAnim = toStyle->transitionForProperty(CSSPropertyOpacity);
         if (opacityAnim && !opacityAnim->isEmptyOrZeroDuration()) {
             KeyframeValueList opacityVector(AnimatedPropertyOpacity);
-            opacityVector.insert(new FloatAnimationValue(0, compositingOpacity(fromStyle->opacity())));
-            opacityVector.insert(new FloatAnimationValue(1, compositingOpacity(toStyle->opacity())));
+            opacityVector.insert(adoptPtr(new FloatAnimationValue(0, compositingOpacity(fromStyle->opacity()))));
+            opacityVector.insert(adoptPtr(new FloatAnimationValue(1, compositingOpacity(toStyle->opacity()))));
             // The boxSize param is only used for transform animations (which can only run on RenderBoxes), so we pass an empty size here.
             if (m_graphicsLayer->addAnimation(opacityVector, IntSize(), opacityAnim, GraphicsLayer::animationNameForTransition(AnimatedPropertyOpacity), timeOffset)) {
                 // To ensure that the correct opacity is visible when the animation ends, also set the final opacity.
                 updateOpacity(toStyle);
-                didAnimateOpacity = true;
+                didAnimate = true;
             }
         }
     }
@@ -1810,12 +1797,12 @@ bool RenderLayerBacking::startTransition(double timeOffset, CSSPropertyID proper
         const CSSAnimationData* transformAnim = toStyle->transitionForProperty(CSSPropertyWebkitTransform);
         if (transformAnim && !transformAnim->isEmptyOrZeroDuration()) {
             KeyframeValueList transformVector(AnimatedPropertyWebkitTransform);
-            transformVector.insert(new TransformAnimationValue(0, &fromStyle->transform()));
-            transformVector.insert(new TransformAnimationValue(1, &toStyle->transform()));
+            transformVector.insert(adoptPtr(new TransformAnimationValue(0, &fromStyle->transform())));
+            transformVector.insert(adoptPtr(new TransformAnimationValue(1, &toStyle->transform())));
             if (m_graphicsLayer->addAnimation(transformVector, toRenderBox(renderer())->pixelSnappedBorderBoxRect().size(), transformAnim, GraphicsLayer::animationNameForTransition(AnimatedPropertyWebkitTransform), timeOffset)) {
                 // To ensure that the correct transform is visible when the animation ends, also set the final transform.
                 updateTransform(toStyle);
-                didAnimateTransform = true;
+                didAnimate = true;
             }
         }
     }
@@ -1824,17 +1811,17 @@ bool RenderLayerBacking::startTransition(double timeOffset, CSSPropertyID proper
         const CSSAnimationData* filterAnim = toStyle->transitionForProperty(CSSPropertyWebkitFilter);
         if (filterAnim && !filterAnim->isEmptyOrZeroDuration()) {
             KeyframeValueList filterVector(AnimatedPropertyWebkitFilter);
-            filterVector.insert(new FilterAnimationValue(0, &fromStyle->filter()));
-            filterVector.insert(new FilterAnimationValue(1, &toStyle->filter()));
+            filterVector.insert(adoptPtr(new FilterAnimationValue(0, &fromStyle->filter())));
+            filterVector.insert(adoptPtr(new FilterAnimationValue(1, &toStyle->filter())));
             if (m_graphicsLayer->addAnimation(filterVector, IntSize(), filterAnim, GraphicsLayer::animationNameForTransition(AnimatedPropertyWebkitFilter), timeOffset)) {
                 // To ensure that the correct filter is visible when the animation ends, also set the final filter.
                 updateFilters(toStyle);
-                didAnimateFilter = true;
+                didAnimate = true;
             }
         }
     }
 
-    return didAnimateOpacity || didAnimateTransform || didAnimateFilter;
+    return didAnimate;
 }
 
 void RenderLayerBacking::transitionPaused(double timeOffset, CSSPropertyID property)

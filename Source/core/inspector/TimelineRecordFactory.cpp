@@ -234,16 +234,20 @@ static PassRefPtr<InspectorArray> createQuad(const FloatQuad& quad)
     return array.release();
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createPaintData(const FloatQuad& quad)
+PassRefPtr<InspectorObject> TimelineRecordFactory::createPaintData(const FloatQuad& quad, int layerRootNodeId)
 {
     RefPtr<InspectorObject> data = InspectorObject::create();
     data->setArray("clip", createQuad(quad));
+    if (layerRootNodeId)
+        data->setNumber("layerRootNode", layerRootNodeId);
     return data.release();
 }
 
-void TimelineRecordFactory::appendLayoutRoot(InspectorObject* data, const FloatQuad& quad)
+void TimelineRecordFactory::appendLayoutRoot(InspectorObject* data, const FloatQuad& quad, int rootNodeId)
 {
     data->setArray("root", createQuad(quad));
+    if (rootNodeId)
+        data->setNumber("rootNode", rootNodeId);
 }
 
 void TimelineRecordFactory::appendStyleRecalcDetails(InspectorObject* data, unsigned elementCount)

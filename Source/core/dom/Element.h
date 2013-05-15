@@ -80,6 +80,7 @@ public:
     const Attribute* getAttributeItem(const QualifiedName&) const;
     size_t getAttributeItemIndex(const QualifiedName&) const;
     size_t getAttributeItemIndex(const AtomicString& name, bool shouldIgnoreAttributeCase) const;
+    size_t getAttrIndex(Attr*) const;
 
     bool hasID() const { return !m_idForStyleResolution.isNull(); }
     bool hasClass() const { return !m_classNames.isNull(); }
@@ -503,13 +504,6 @@ public:
     bool childNeedsShadowWalker() const;
     void didShadowTreeAwareChildrenChange();
 
-    // ElementTraversal API
-    Element* firstElementChild() const;
-    Element* lastElementChild() const;
-    Element* previousElementSibling() const;
-    Element* nextElementSibling() const;
-    unsigned childElementCount() const;
-
     virtual bool matchesReadOnlyPseudoClass() const;
     virtual bool matchesReadWritePseudoClass() const;
     bool webkitMatchesSelector(const String& selectors, ExceptionCode&);
@@ -555,6 +549,7 @@ public:
     virtual bool isDisabledFormControl() const;
 
     bool isInert() const;
+    virtual bool shouldBeReparentedUnderRenderView(const RenderStyle*) const { return isInTopLayer(); }
 
 #if ENABLE(SVG)
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
@@ -723,6 +718,7 @@ private:
 
     void detachAllAttrNodesFromElement();
     void detachAttrNodeFromElementWithValue(Attr*, const AtomicString& value);
+    void detachAttrNodeAtIndex(Attr*, size_t index);
 
     void createRendererIfNeeded();
 
@@ -777,7 +773,7 @@ inline Element* Node::parentElement() const
     return parent && parent->isElementNode() ? toElement(parent) : 0;
 }
 
-inline Element* Element::previousElementSibling() const
+inline Element* Node::previousElementSibling() const
 {
     Node* n = previousSibling();
     while (n && !n->isElementNode())
@@ -785,7 +781,7 @@ inline Element* Element::previousElementSibling() const
     return static_cast<Element*>(n);
 }
 
-inline Element* Element::nextElementSibling() const
+inline Element* Node::nextElementSibling() const
 {
     Node* n = nextSibling();
     while (n && !n->isElementNode())

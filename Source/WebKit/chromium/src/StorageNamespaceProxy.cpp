@@ -27,6 +27,7 @@
 #include "StorageNamespaceProxy.h"
 
 #include <public/Platform.h>
+#include <public/WebStorageArea.h>
 #include <public/WebStorageNamespace.h>
 #include <public/WebString.h>
 #include "ChromeClientImpl.h"
@@ -36,7 +37,7 @@
 #include "WebViewImpl.h"
 #include "core/page/Chrome.h"
 #include "core/page/Page.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -77,7 +78,7 @@ PassRefPtr<StorageNamespace> StorageNamespaceProxy::copy()
 
 PassRefPtr<StorageArea> StorageNamespaceProxy::storageArea(PassRefPtr<SecurityOrigin> origin)
 {
-    return adoptRef(new StorageAreaProxy(m_storageNamespace->createStorageArea(origin->toString()), m_storageType));
+    return adoptRef(new StorageAreaProxy(adoptPtr(m_storageNamespace->createStorageArea(origin->toString())), m_storageType));
 }
 
 void StorageNamespaceProxy::close()

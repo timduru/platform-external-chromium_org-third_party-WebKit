@@ -27,6 +27,7 @@
 #include "config.h"
 #include "InternalSettings.h"
 
+#include "RuntimeEnabledFeatures.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/CaptionUserPreferences.h"
@@ -34,7 +35,6 @@
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PageGroup.h"
-#include "RuntimeEnabledFeatures.h"
 #include "core/page/Settings.h"
 #include "core/platform/Language.h"
 #include "core/platform/Supplementable.h"
@@ -70,12 +70,12 @@ InternalSettings::Backup::Backup(Settings* settings)
     , m_originalCSSVariablesEnabled(settings->cssVariablesEnabled())
     , m_originalAuthorShadowDOMForAnyElementEnabled(RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
     , m_originalExperimentalShadowDOMEnabled(RuntimeEnabledFeatures::experimentalShadowDOMEnabled())
+    , m_originalExperimentalWebSocketEnabled(settings->experimentalWebSocketEnabled())
     , m_originalStyleScoped(RuntimeEnabledFeatures::styleScopedEnabled())
     , m_originalEditingBehavior(settings->editingBehaviorType())
     , m_originalTextAutosizingEnabled(settings->textAutosizingEnabled())
     , m_originalTextAutosizingWindowSizeOverride(settings->textAutosizingWindowSizeOverride())
     , m_originalTextAutosizingFontScaleFactor(settings->textAutosizingFontScaleFactor())
-    , m_originalResolutionOverride(settings->resolutionOverride())
     , m_originalMediaTypeOverride(settings->mediaTypeOverride())
     , m_originalDialogElementEnabled(RuntimeEnabledFeatures::dialogElementEnabled())
     , m_originalLazyLayoutEnabled(RuntimeEnabledFeatures::lazyLayoutEnabled())
@@ -95,12 +95,12 @@ void InternalSettings::Backup::restoreTo(Settings* settings)
     settings->setCSSVariablesEnabled(m_originalCSSVariablesEnabled);
     RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(m_originalAuthorShadowDOMForAnyElementEnabled);
     RuntimeEnabledFeatures::setExperimentalShadowDOMEnabled(m_originalExperimentalShadowDOMEnabled);
+    settings->setExperimentalWebSocketEnabled(m_originalExperimentalWebSocketEnabled);
     RuntimeEnabledFeatures::setStyleScopedEnabled(m_originalStyleScoped);
     settings->setEditingBehaviorType(m_originalEditingBehavior);
     settings->setTextAutosizingEnabled(m_originalTextAutosizingEnabled);
     settings->setTextAutosizingWindowSizeOverride(m_originalTextAutosizingWindowSizeOverride);
     settings->setTextAutosizingFontScaleFactor(m_originalTextAutosizingFontScaleFactor);
-    settings->setResolutionOverride(m_originalResolutionOverride);
     settings->setMediaTypeOverride(m_originalMediaTypeOverride);
     RuntimeEnabledFeatures::setDialogElementEnabled(m_originalDialogElementEnabled);
     RuntimeEnabledFeatures::setLazyLayoutEnabled(m_originalLazyLayoutEnabled);
@@ -186,6 +186,11 @@ void InternalSettings::setExperimentalShadowDOMEnabled(bool isEnabled)
     RuntimeEnabledFeatures::setExperimentalShadowDOMEnabled(isEnabled);
 }
 
+void InternalSettings::setExperimentalWebSocketEnabled(bool isEnabled)
+{
+    settings()->setExperimentalWebSocketEnabled(isEnabled);
+}
+
 void InternalSettings::setStyleScopedEnabled(bool enabled)
 {
     RuntimeEnabledFeatures::setStyleScopedEnabled(enabled);
@@ -257,13 +262,6 @@ void InternalSettings::setTextAutosizingWindowSizeOverride(int width, int height
 {
     InternalSettingsGuardForSettings();
     settings()->setTextAutosizingWindowSizeOverride(IntSize(width, height));
-}
-
-void InternalSettings::setResolutionOverride(int dotsPerCSSInchHorizontally, int dotsPerCSSInchVertically, ExceptionCode& ec)
-{
-    InternalSettingsGuardForSettings();
-    // An empty size resets the override.
-    settings()->setResolutionOverride(IntSize(dotsPerCSSInchHorizontally, dotsPerCSSInchVertically));
 }
 
 void InternalSettings::setMediaTypeOverride(const String& mediaType, ExceptionCode& ec)

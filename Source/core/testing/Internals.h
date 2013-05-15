@@ -187,7 +187,6 @@ public:
 
     bool hasSpellingMarker(Document*, int from, int length, ExceptionCode&);
     bool hasGrammarMarker(Document*, int from, int length, ExceptionCode&);
-    bool hasAutocorrectedMarker(Document*, int from, int length, ExceptionCode&);
     void setContinuousSpellCheckingEnabled(bool enabled, ExceptionCode&);
 
     bool isOverwriteModeEnabled(Document*, ExceptionCode&);
@@ -250,6 +249,7 @@ public:
     String pageProperty(String, int, ExceptionCode& = ASSERT_NO_EXCEPTION) const;
     String pageSizeAndMarginsInPixels(int, int, int, int, int, int, int, ExceptionCode& = ASSERT_NO_EXCEPTION) const;
 
+    void setDeviceScaleFactor(float scaleFactor, ExceptionCode&);
     void setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCode&);
 
     void setIsCursorVisible(Document*, bool, ExceptionCode&);

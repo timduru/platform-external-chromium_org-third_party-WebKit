@@ -29,55 +29,24 @@
 
 #include "wtf/ArrayBufferDeallocationObserver.h"
 #include "wtf/Noncopyable.h"
+#include "wtf/RawBuffer.h"
 
 namespace WTF {
 
-class ArrayBufferContents {
+class ArrayBufferContents : public RawBuffer {
     WTF_MAKE_NONCOPYABLE(ArrayBufferContents);
 public:
-    ArrayBufferContents()
-        : m_data(0)
-        , m_sizeInBytes(0)
-        , m_deallocationObserver(0)
-    { }
+    ArrayBufferContents();
+    ArrayBufferContents(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy);
 
     ~ArrayBufferContents();
 
-    void* data() { return m_data; }
-    unsigned sizeInBytes() { return m_sizeInBytes; }
+    void clear();
+
+    bool hasDeallocationObserver() const { return !!m_deallocationObserver; }
+    void setDeallocationObserver(ArrayBufferDeallocationObserver* observer) { m_deallocationObserver = observer; }
 
 private:
-    ArrayBufferContents(void* data, unsigned sizeInBytes)
-        : m_data(data)
-        , m_sizeInBytes(sizeInBytes)
-        , m_deallocationObserver(0)
-    { }
-
-    friend class ArrayBuffer;
-
-    enum InitializationPolicy {
-        ZeroInitialize,
-        DontInitialize
-    };
-
-    static void tryAllocate(unsigned numElements, unsigned elementByteSize, InitializationPolicy, ArrayBufferContents&);
-    void transfer(ArrayBufferContents& other)
-    {
-        ASSERT(!other.m_data);
-        other.m_data = m_data;
-        other.m_sizeInBytes = m_sizeInBytes;
-        m_data = 0;
-        m_sizeInBytes = 0;
-        // Notify the current V8 isolate that the buffer is gone.
-        if (m_deallocationObserver)
-            m_deallocationObserver->ArrayBufferDeallocated(other.m_sizeInBytes);
-        ASSERT(!other.m_deallocationObserver);
-        m_deallocationObserver = 0;
-    }
-
-    void* m_data;
-    unsigned m_sizeInBytes;
-
     ArrayBufferDeallocationObserver* m_deallocationObserver;
 };
 

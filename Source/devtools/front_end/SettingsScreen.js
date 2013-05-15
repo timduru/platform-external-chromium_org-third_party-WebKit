@@ -51,8 +51,7 @@ WebInspector.SettingsScreen = function(onHide)
     this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.General, WebInspector.UIString("General"), new WebInspector.GenericSettingsTab());
     if (!WebInspector.experimentsSettings.showOverridesInDrawer.isEnabled())
         this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.Overrides, WebInspector.UIString("Overrides"), new WebInspector.OverridesSettingsTab());
-    if (WebInspector.experimentsSettings.fileSystemProject.isEnabled())
-        this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.Workspace, WebInspector.UIString("Workspace"), new WebInspector.WorkspaceSettingsTab());
+    this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.Workspace, WebInspector.UIString("Workspace"), new WebInspector.WorkspaceSettingsTab());
     if (WebInspector.experimentsSettings.tethering.isEnabled())
         this._tabbedPane.appendTab(WebInspector.SettingsScreen.Tabs.Tethering, WebInspector.UIString("Port forwarding"), new WebInspector.TetheringSettingsTab());
     if (WebInspector.experimentsSettings.experimentsEnabled)
@@ -521,13 +520,13 @@ WebInspector.WorkspaceSettingsTab.prototype = {
 
     _createFileSystemsEditor: function()
     {
-        var p = this._appendSection(WebInspector.UIString("File systems"));
+        var p = this._appendSection(WebInspector.UIString("Folders"));
         this._fileSystemsEditor = p.createChild("p", "file-systems-editor");
 
         this._addFileSystemRowElement = this._fileSystemsEditor.createChild("div", "workspace-settings-row");
         var addFileSystemButton = this._addFileSystemRowElement.createChild("input", "file-system-add-button");
         addFileSystemButton.type = "button";
-        addFileSystemButton.value = WebInspector.UIString("Add file system");
+        addFileSystemButton.value = WebInspector.UIString("Add folder");
         addFileSystemButton.addEventListener("click", this._addFileSystemClicked.bind(this));
 
         var fileSystemPaths = WebInspector.isolatedFileSystemManager.mapping().fileSystemPaths();
@@ -639,9 +638,9 @@ WebInspector.WorkspaceSettingsTab.prototype = {
 
         this._addMappingRowElement = this._fileMappingEditor.createChild("div", "workspace-settings-row");
 
-        this._urlInputElement = this._createEditTextInput("file-mapping-url", WebInspector.UIString("File mapping url"));
+        this._urlInputElement = this._createEditTextInput("file-mapping-url", WebInspector.UIString("URL prefix"));
         this._addMappingRowElement.appendChild(this._urlInputElement);
-        this._pathInputElement = this._createEditTextInput("file-mapping-path", WebInspector.UIString("File mapping path"));
+        this._pathInputElement = this._createEditTextInput("file-mapping-path", WebInspector.UIString("Folder path"));
         this._addMappingRowElement.appendChild(this._pathInputElement);
 
         this._addMappingRowElement.appendChild(this._createAddButton(this._addFileMappingClicked.bind(this)));
@@ -714,8 +713,18 @@ WebInspector.TetheringSettingsTab.prototype = {
         if (this._paragraphElement)
             return;
 
-        this._paragraphElement = this._appendSection(WebInspector.UIString("Mappings"));
         WebInspector.SettingsTab.prototype.wasShown.call(this);
+
+        var sectionElement = this._appendSection();
+        var labelElement = sectionElement.createChild("div");
+        labelElement.addStyleClass("tethering-help-info");
+        labelElement.textContent =
+            WebInspector.UIString("Creates a listen TCP port on your device that maps to a particular TCP port accessible from the host machine.");
+        labelElement.createChild("br");
+        labelElement.createChild("div", "tethering-help-title-left").textContent = WebInspector.UIString("Device port");
+        labelElement.createChild("div", "tethering-help-title-right").textContent = WebInspector.UIString("Target");
+
+        this._paragraphElement = sectionElement.createChild("div");
         var mappingEntries = WebInspector.settings.portForwardings.get();
         for (var i = 0; i < mappingEntries.length; ++i)
             this._addMappingRow(mappingEntries[i].port, mappingEntries[i].location, false);
@@ -733,7 +742,7 @@ WebInspector.TetheringSettingsTab.prototype = {
     _addMappingRow: function(port, location, focus)
     {
         var mappingRow = this._paragraphElement.createChild("div", "workspace-settings-row");
-        var portElement = mappingRow.createChild("input");
+        var portElement = mappingRow.createChild("input", "tethering-port-input");
         portElement.type = "text";
         portElement.value = port || "";
         if (!port)

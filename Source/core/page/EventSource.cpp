@@ -53,7 +53,7 @@
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/network/ResourceResponse.h"
-#include "origin/SecurityOrigin.h"
+#include "weborigin/SecurityOrigin.h"
 
 namespace WebCore {
 
@@ -131,10 +131,12 @@ void EventSource::connect()
     options.sendLoadCallbacks = SendCallbacks;
     options.sniffContent = DoNotSniffContent;
     options.allowCredentials = (origin->canRequest(m_url) || m_withCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
+    options.credentialsRequested = m_withCredentials ? ClientRequestedCredentials : ClientDidNotRequestCredentials;
     options.preflightPolicy = PreventPreflight;
     options.crossOriginRequestPolicy = UseAccessControl;
     options.dataBufferingPolicy = DoNotBufferData;
     options.securityOrigin = origin;
+    options.contentSecurityPolicyEnforcement = ContentSecurityPolicy::shouldBypassMainWorld(scriptExecutionContext()) ? DoNotEnforceContentSecurityPolicy : EnforceConnectSrcDirective;
 
     m_loader = ThreadableLoader::create(scriptExecutionContext(), this, request, options);
 

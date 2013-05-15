@@ -34,6 +34,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebActiveGestureAnimation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebAudioBus.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCString.cpp \
+	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFilterOperation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFilterOperations.cpp \
@@ -55,6 +56,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCStatsResponse.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebRTCVoidRequest.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarImpl.cpp \
+	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeClientImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeGeometryNative.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSocketStreamError.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisUtterance.cpp \
@@ -145,7 +147,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCommon.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCompositorInputHandlerImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCrossOriginPreflightResultCache.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebCursorInfo.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMActivityLogger.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMCustomEvent.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMEvent.cpp \
@@ -227,7 +228,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/WebScopedMicrotaskSuppression.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebScopedUserGesture.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebScriptController.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebScrollbarThemeClientImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebScrollbarThemePainter.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebSearchableFormData.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebSecurityOrigin.cpp \
@@ -328,14 +328,11 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA=1' \
-	'-DENABLE_RESOLUTION_MEDIA_QUERY=0' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
-	'-DWTF_USE_BUILTIN_UTF8_CODEC=1' \
-	'-DWTF_USE_WEBKIT_IMAGE_DECODERS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_DATALIST_ELEMENT=0' \
@@ -361,7 +358,7 @@ MY_DEFS := \
 	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_USE_POSIX_THREADS' \
-	'-DSK_BUILD_FOR_ANDROID_NDK' \
+	'-DSK_BUILD_FOR_ANDROID' \
 	'-D__STDC_CONSTANT_MACROS' \
 	'-D__STDC_FORMAT_MACROS' \
 	'-DANDROID' \

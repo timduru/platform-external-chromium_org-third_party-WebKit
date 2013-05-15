@@ -261,15 +261,6 @@ void Settings::setTextAutosizingFontScaleFactor(float fontScaleFactor)
     m_page->setNeedsRecalcStyleInAllFrames();
 }
 
-void Settings::setResolutionOverride(const IntSize& densityPerInchOverride)
-{
-    if (m_resolutionDensityPerInchOverride == densityPerInchOverride)
-        return;
-
-    m_resolutionDensityPerInchOverride = densityPerInchOverride;
-    m_page->setNeedsRecalcStyleInAllFrames();
-}
-
 void Settings::setMediaTypeOverride(const String& mediaTypeOverride)
 {
     if (m_mediaTypeOverride == mediaTypeOverride)
@@ -379,6 +370,20 @@ void Settings::setUsesOverlayScrollbars(bool flag)
 bool Settings::usesOverlayScrollbars()
 {
     return gUsesOverlayScrollbars;
+}
+
+void Settings::setOpenGLMultisamplingEnabled(bool flag)
+{
+    if (m_openGLMultisamplingEnabled == flag)
+        return;
+
+    m_openGLMultisamplingEnabled = flag;
+    m_page->multisamplingChanged();
+}
+
+bool Settings::openGLMultisamplingEnabled()
+{
+    return m_openGLMultisamplingEnabled;
 }
 
 } // namespace WebCore

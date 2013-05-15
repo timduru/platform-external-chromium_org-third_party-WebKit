@@ -34,7 +34,6 @@ namespace WebCore {
 
 class IntRect;
 class IntSize;
-class PlatformTextTrack;
 
 class MediaPlayerPrivateInterface {
     WTF_MAKE_NONCOPYABLE(MediaPlayerPrivateInterface); WTF_MAKE_FAST_ALLOCATED;
@@ -43,11 +42,10 @@ public:
     virtual ~MediaPlayerPrivateInterface() { }
 
     virtual void load(const String& url) = 0;
-    virtual void load(const String& url, PassRefPtr<MediaSource>) = 0;
+    virtual void load(const String& url, PassRefPtr<WebKitMediaSource>) = 0;
     virtual void cancelLoad() = 0;
 
     virtual void prepareToPlay() { }
-    virtual PlatformMedia platformMedia() const { return NoPlatformMedia; }
     virtual PlatformLayer* platformLayer() const { return 0; }
 
     virtual void play() = 0;
@@ -160,12 +158,6 @@ public:
 
     virtual bool requiresTextTrackRepresentation() const { return false; }
     virtual void setTextTrackRepresentation(TextTrackRepresentation*) { }
-
-#if USE(PLATFORM_TEXT_TRACK_MENU)
-    virtual bool implementsTextTrackControls() const { return false; }
-    virtual PassRefPtr<PlatformTextTrackMenuInterface> textTrackMenu() { return 0; }
-#endif
-
 };
 
 }
