@@ -123,6 +123,8 @@ $(gyp_intermediate_dir)/SVGElementFactory.cpp: $(gyp_shared_intermediate_dir)/we
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/V8SVGElementWrapperFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/V8SVGElementWrapperFactory.cpp
 	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/StyleBuilder.cpp: $(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp
+	mkdir -p $(@D); cp $< $@
 LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/V8DerivedSources01.cpp \
 	$(gyp_intermediate_dir)/V8DerivedSources02.cpp \
@@ -170,7 +172,8 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/InspectorBackendDispatcher.cpp \
 	$(gyp_intermediate_dir)/InspectorTypeBuilder.cpp \
 	$(gyp_intermediate_dir)/SVGElementFactory.cpp \
-	$(gyp_intermediate_dir)/V8SVGElementWrapperFactory.cpp
+	$(gyp_intermediate_dir)/V8SVGElementWrapperFactory.cpp \
+	$(gyp_intermediate_dir)/StyleBuilder.cpp
 
 GYP_COPIED_SOURCE_ORIGIN_DIRS := \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
@@ -203,7 +206,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ScriptObject.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptProfiler.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptScope.cpp \
-	third_party/WebKit/Source/bindings/v8/ScriptSourceCode.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptState.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptValue.cpp \
 	third_party/WebKit/Source/bindings/v8/SerializedScriptValue.cpp \
@@ -252,7 +254,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8CanvasRenderingContext2DCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CanvasRenderingContextCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8ClipboardCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8ConsoleCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CryptoCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomElementConstructorCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomEventCustom.cpp \
@@ -281,11 +282,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLDocumentCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFormControlsCollectionCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFormElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFrameElementCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8HTMLFrameSetElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLImageElementConstructor.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8HTMLInputElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLLinkElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLMediaElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLOptionsCollectionCustom.cpp \
@@ -303,7 +301,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8MessageEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8MessagePortCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8MutationObserverCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8NamedNodesCollection.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8NodeCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8NodeListCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8OscillatorNodeCustom.cpp \
@@ -376,6 +373,7 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
+	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
@@ -392,7 +390,7 @@ MY_DEFS := \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
-	'-DENABLE_ENCRYPTED_MEDIA=1' \
+	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
@@ -400,7 +398,6 @@ MY_DEFS := \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_DATALIST_ELEMENT=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_INPUT_TYPE_COLOR=0' \
@@ -408,12 +405,10 @@ MY_DEFS := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PAGE_POPUP=0' \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_8BIT_TEXTRUN=1' \
-	'-DENABLE_BINDING_INTEGRITY=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -468,8 +463,8 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/leveldatabase \
 	$(LOCAL_PATH)/third_party/ots/include \
 	$(LOCAL_PATH)/third_party/zlib \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/common \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/i18n \
+	$(PWD)/external/icu4c/common \
+	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/src/core \
 	$(LOCAL_PATH)/third_party/skia/include/config \
@@ -495,10 +490,10 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party \
 	$(LOCAL_PATH)/v8/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/jpeg \
-	$(GYP_ABS_ANDROID_TOP_DIR)/frameworks/wilhelm/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/bionic \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/stlport/stlport
+	$(PWD)/external/jpeg \
+	$(PWD)/frameworks/wilhelm/include \
+	$(PWD)/bionic \
+	$(PWD)/external/stlport/stlport
 
 LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES)
 

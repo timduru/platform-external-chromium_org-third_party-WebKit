@@ -35,46 +35,12 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
-#include "wtf/Float32Array.h"
 #include "wtf/GetPtr.h"
-#include "wtf/Int32Array.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
 #include "wtf/UnusedParam.h"
 
-#if ENABLE(BINDING_INTEGRITY)
-#if defined(OS_WIN)
-#pragma warning(disable: 4483)
-extern "C" { extern void (*const __identifier("??_7Float64Array@WebCore@@6B@")[])(); }
-#else
-extern "C" { extern void* _ZTVN7WebCore12Float64ArrayE[]; }
-#endif
-#endif // ENABLE(BINDING_INTEGRITY)
-
 namespace WebCore {
-
-#if ENABLE(BINDING_INTEGRITY)
-// This checks if a DOM object that is about to be wrapped is valid.
-// Specifically, it checks that a vtable of the DOM object is equal to
-// a vtable of an expected class.
-// Due to a dangling pointer, the DOM object you are wrapping might be
-// already freed or realloced. If freed, the check will fail because
-// a free list pointer should be stored at the head of the DOM object.
-// If realloced, the check will fail because the vtable of the DOM object
-// differs from the expected vtable (unless the same class of DOM object
-// is realloced on the slot).
-inline void checkTypeOrDieTrying(Float64Array* object)
-{
-    void* actualVTablePointer = *(reinterpret_cast<void**>(object));
-#if defined(OS_WIN)
-    void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7Float64Array@WebCore@@6B@"));
-#else
-    void* expectedVTablePointer = &_ZTVN7WebCore12Float64ArrayE[2];
-#endif
-    if (actualVTablePointer != expectedVTablePointer)
-        CRASH();
-}
-#endif // ENABLE(BINDING_INTEGRITY)
 
 #if defined(OS_WIN)
 // In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
@@ -82,12 +48,13 @@ inline void checkTypeOrDieTrying(Float64Array* object)
 } // namespace WebCore
 using WebCore::ScriptWrappable;
 using WebCore::V8Float64Array;
-using WebCore::Float64Array;
 #endif
 void initializeScriptWrappableForInterface(Float64Array* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8Float64Array::info);
+    else
+        ASSERT_NOT_REACHED();
 }
 #if defined(OS_WIN)
 namespace WebCore {
@@ -122,7 +89,7 @@ static v8::Handle<v8::Value> setMethodCallback(const v8::Arguments& args)
     return Float64ArrayV8Internal::setMethod(args);
 }
 
-static v8::Handle<v8::Value> constructor(const v8::Arguments& args)
+static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     return constructWebGLArray<Float64Array, V8Float64Array, double>(args, &V8Float64Array::info, v8::kExternalDoubleArray);
 }
@@ -142,15 +109,19 @@ static const V8DOMConfiguration::BatchedMethod V8Float64ArrayMethods[] = {
     {"set", Float64ArrayV8Internal::setMethodCallback, 0, 0},
 };
 
-v8::Handle<v8::Value> V8Float64Array::constructorCallback(const v8::Arguments& args)
+void V8Float64Array::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+    if (!args.IsConstructCall()) {
+        throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+        return;
+    }
 
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
+    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject) {
+        args.GetReturnValue().Set(args.Holder());
+        return;
+    }
 
-    return Float64ArrayV8Internal::constructor(args);
+    Float64ArrayV8Internal::constructor(args);
 }
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
@@ -168,6 +139,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
     UNUSED_PARAM(instance); // In some cases, it will not be used.
     UNUSED_PARAM(proto); // In some cases, it will not be used.
+    desc->InstanceTemplate()->SetIndexedPropertyHandler(V8Float64Array::indexedPropertyGetter, V8Float64Array::indexedPropertySetter, 0, 0, nodeCollectionIndexedPropertyEnumerator<Float64Array>);
 
     // Custom Signature 'foo'
     const int fooArgc = 1;
@@ -211,10 +183,6 @@ v8::Handle<v8::Object> V8Float64Array::createWrapper(PassRefPtr<Float64Array> im
 {
     ASSERT(impl.get());
     ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
-
-#if ENABLE(BINDING_INTEGRITY)
-    checkTypeOrDieTrying(impl.get());
-#endif
     ASSERT(static_cast<void*>(static_cast<ArrayBufferView*>(impl.get())) == static_cast<void*>(impl.get()));
 
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
@@ -222,7 +190,7 @@ v8::Handle<v8::Object> V8Float64Array::createWrapper(PassRefPtr<Float64Array> im
         return wrapper;
 
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, hasDependentLifetime ? WrapperConfiguration::Dependent : WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8Float64Array::derefObject(void* object)

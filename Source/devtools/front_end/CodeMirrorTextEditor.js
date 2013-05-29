@@ -36,6 +36,7 @@ importScript("cm/htmlmixed.js");
 importScript("cm/matchbrackets.js");
 importScript("cm/closebrackets.js");
 importScript("cm/markselection.js");
+importScript("cm/showhint.js");
 
 /**
  * @constructor
@@ -51,7 +52,16 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
     this._url = url;
 
     this.registerRequiredCSS("cm/codemirror.css");
+    this.registerRequiredCSS("cm/showhint.css");
     this.registerRequiredCSS("cm/cmdevtools.css");
+
+    function autocompleteCommand()
+    {
+        if (!this._dictionary || this._codeMirror.somethingSelected())
+            return;
+        CodeMirror.showHint(this._codeMirror, this._autocomplete.bind(this));
+    }
+    CodeMirror.commands.autocomplete = autocompleteCommand.bind(this);
 
     this._codeMirror = window.CodeMirror(this.element, {
         lineNumbers: true,
@@ -63,7 +73,7 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
         autoCloseBrackets: true
     });
 
-    var extraKeys = {};
+    var extraKeys = {"Ctrl-Space": "autocomplete"};
     var indent = WebInspector.settings.textEditorIndent.get();
     if (indent === WebInspector.TextUtils.Indent.TabCharacter) {
         this._codeMirror.setOption("indentWithTabs", true);
@@ -85,12 +95,11 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
     this._fixWordMovement = new WebInspector.CodeMirrorTextEditor.FixWordMovement(this._codeMirror);
 
     this._codeMirror.on("change", this._change.bind(this));
+    this._codeMirror.on("beforeChange", this._beforeChange.bind(this));
     this._codeMirror.on("gutterClick", this._gutterClick.bind(this));
     this._codeMirror.on("cursorActivity", this._cursorActivity.bind(this));
     this._codeMirror.on("scroll", this._scroll.bind(this));
     this.element.addEventListener("contextmenu", this._contextMenu.bind(this));
-
-    this._lastRange = this.range();
 
     this.element.firstChild.addStyleClass("source-code");
     this.element.firstChild.addStyleClass("fill");
@@ -98,6 +107,7 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
     this._nestedUpdatesCounter = 0;
 
     this.element.addEventListener("focus", this._handleElementFocus.bind(this), false);
+    this.element.addEventListener("keydown", this._handleKeyDown.bind(this), false);
     this.element.tabIndex = 0;
     this._setupSelectionColor();
 }
@@ -129,6 +139,70 @@ WebInspector.CodeMirrorTextEditor.prototype = {
         var style = document.createElement("style");
         style.textContent = backgroundColorRule + foregroundColorRule;
         document.head.appendChild(style);
+    },
+
+    _autocomplete: function(codeMirror)
+    {
+        var cursor = codeMirror.getCursor();
+        var prefixRange = this._wordRangeForCursorPosition(cursor.line, cursor.ch, true);
+        if (!prefixRange)
+            return null;
+        var prefix = this.copyRange(prefixRange);
+        this._dictionary.removeWord(prefix);
+        var wordsWithPrefix = this._dictionary.wordsWithPrefix(this.copyRange(prefixRange));
+        this._dictionary.addWord(prefix);
+
+        var data = {
+            list: wordsWithPrefix,
+            from: new CodeMirror.Pos(prefixRange.startLine, prefixRange.startColumn),
+            to: new CodeMirror.Pos(prefixRange.endLine, prefixRange.endColumn)
+        };
+        CodeMirror.on(data, "close", this._handleAutocompletionClose.bind(this));
+
+        return data;
+    },
+
+    _handleKeyDown: function(e)
+    {
+        if (!!this._consumeEsc && e.keyCode === WebInspector.KeyboardShortcut.Keys.Esc.code)
+            e.consume(true);
+        delete this._consumeEsc;
+    },
+
+    _handleAutocompletionClose: function()
+    {
+        this._consumeEsc = true;
+    },
+
+    /**
+     * @param {string} text
+     */
+    _addTextToCompletionDictionary: function(text)
+    {
+        var words = WebInspector.TextUtils.textToWords(text);
+        for(var i = 0; i < words.length; ++i) {
+            this._dictionary.addWord(words[i]);
+        }
+    },
+
+    /**
+     * @param {string} text
+     */
+    _removeTextFromCompletionDictionary: function(text)
+    {
+        var words = WebInspector.TextUtils.textToWords(text);
+        for(var i = 0; i < words.length; ++i) {
+            this._dictionary.removeWord(words[i]);
+        }
+    },
+
+    /**
+     * @param {WebInspector.CompletionDictionary} dictionary
+     */
+    setCompletionDictionary: function(dictionary)
+    {
+        this._dictionary = dictionary;
+        this._addTextToCompletionDictionary(this.text());
     },
 
     /**
@@ -175,7 +249,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
             return "javascript-ident";
         if (tokenType === "string-2")
             return "javascript-regexp";
-        if (tokenType === "number" || tokenType === "comment" || tokenType === "string")
+        if (tokenType === "number" || tokenType === "comment" || tokenType === "string" || tokenType === "keyword")
             return "javascript-" + tokenType;
         return null;
     },
@@ -423,19 +497,28 @@ WebInspector.CodeMirrorTextEditor.prototype = {
 
     /**
      * @param {number} lineNumber
+     * @param {number=} columnNumber
      */
-    highlightLine: function(lineNumber)
+    highlightPosition: function(lineNumber, columnNumber)
     {
-        this.clearLineHighlight();
+        if (lineNumber < 0)
+            return;
+        lineNumber = Math.min(lineNumber, this._codeMirror.lineCount());
+        if (typeof columnNumber !== "number" || columnNumber < 0 || columnNumber > this._codeMirror.getLine(lineNumber).length)
+            columnNumber = 0;
+
+        this.clearPositionHighlight();
         this._highlightedLine = this._codeMirror.getLineHandle(lineNumber);
         if (!this._highlightedLine)
           return;
         this.revealLine(lineNumber);
         this._codeMirror.addLineClass(this._highlightedLine, null, "cm-highlight");
-        this._clearHighlightTimeout = setTimeout(this.clearLineHighlight.bind(this), 2000);
+        this._clearHighlightTimeout = setTimeout(this.clearPositionHighlight.bind(this), 2000);
+        if (!this.readOnly())
+            this._codeMirror.setSelection(new CodeMirror.Pos(lineNumber, columnNumber));
     },
 
-    clearLineHighlight: function()
+    clearPositionHighlight: function()
     {
         if (this._clearHighlightTimeout)
             clearTimeout(this._clearHighlightTimeout);
@@ -480,17 +563,81 @@ WebInspector.CodeMirrorTextEditor.prototype = {
         return newRange;
     },
 
-    _change: function()
+    /**
+     * @param {number} lineNumber
+     * @param {number} column
+     * @param {boolean=} prefixOnly
+     * @return {?WebInspector.TextRange}
+     */
+    _wordRangeForCursorPosition: function(lineNumber, column, prefixOnly)
+    {
+        var line = this.line(lineNumber);
+        if (!WebInspector.TextUtils.isWordChar(line.charAt(column - 1)))
+            return null;
+        var wordStart = column - 1;
+        while(wordStart > 0 && WebInspector.TextUtils.isWordChar(line.charAt(wordStart - 1)))
+            --wordStart;
+        if (prefixOnly)
+            return new WebInspector.TextRange(lineNumber, wordStart, lineNumber, column);
+        var wordEnd = column;
+        while(wordEnd < line.length && WebInspector.TextUtils.isWordChar(line.charAt(wordEnd)))
+            ++wordEnd;
+        return new WebInspector.TextRange(lineNumber, wordStart, lineNumber, wordEnd);
+    },
+
+    _beforeChange: function(codeMirror, changeObject)
+    {
+        if (!this._dictionary)
+            return;
+        this._updatedLines = this._updatedLines || {};
+        for(var i = changeObject.from.line; i <= changeObject.to.line; ++i)
+            this._updatedLines[i] = this.line(i);
+    },
+
+    _change: function(codeMirror, changeObject)
     {
         var widgets = this._elementToWidget.values();
         for (var i = 0; i < widgets.length; ++i)
             this._codeMirror.removeLineWidget(widgets[i]);
         this._elementToWidget.clear();
 
-        var newRange = this.range();
-        if (!this._muteTextChangedEvent)
-            this._delegate.onTextChanged(this._lastRange, newRange);
-        this._lastRange = newRange;
+        if (this._updatedLines) {
+            for(var lineNumber in this._updatedLines)
+                this._removeTextFromCompletionDictionary(this._updatedLines[lineNumber]);
+            delete this._updatedLines;
+        }
+
+        var linesToUpdate = {};
+        do {
+            var oldRange = this._toRange(changeObject.from, changeObject.to);
+            var newRange = oldRange.clone();
+            var linesAdded = changeObject.text.length;
+            if (linesAdded === 0) {
+                newRange.endLine = newRange.startLine;
+                newRange.endColumn = newRange.startColumn;
+            } else if (linesAdded === 1) {
+                newRange.endLine = newRange.startLine;
+                newRange.endColumn = newRange.startColumn + changeObject.text[0].length;
+            } else {
+                newRange.endLine = newRange.startLine + linesAdded - 1;
+                newRange.endColumn = changeObject.text[linesAdded - 1].length;
+            }
+
+            if (!this._muteTextChangedEvent)
+                this._delegate.onTextChanged(oldRange, newRange);
+
+            for(var i = newRange.startLine; i <= newRange.endLine; ++i) {
+                linesToUpdate[i] = true;
+            }
+            if (this._dictionary) {
+                for(var i = newRange.startLine; i <= newRange.endLine; ++i)
+                    linesToUpdate[i] = this.line(i);
+            }
+        } while (changeObject = changeObject.next);
+        if (this._dictionary) {
+            for(var lineNumber in linesToUpdate)
+                this._addTextToCompletionDictionary(linesToUpdate[lineNumber]);
+        }
     },
 
     _cursorActivity: function()

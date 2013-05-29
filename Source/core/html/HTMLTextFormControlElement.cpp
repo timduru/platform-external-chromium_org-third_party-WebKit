@@ -26,9 +26,7 @@
 #include "core/html/HTMLTextFormControlElement.h"
 
 #include "HTMLNames.h"
-#include "bindings/v8/ScriptEventListener.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
@@ -38,9 +36,6 @@
 #include "core/editing/FrameSelection.h"
 #include "core/editing/TextIterator.h"
 #include "core/html/HTMLBRElement.h"
-#include "core/html/HTMLFormElement.h"
-#include "core/html/HTMLInputElement.h"
-#include "core/page/ChromeClient.h"
 #include "core/page/Frame.h"
 #include "core/page/UseCounter.h"
 #include "core/rendering/RenderBox.h"
@@ -77,7 +72,7 @@ bool HTMLTextFormControlElement::childShouldCreateRenderer(const NodeRenderingCo
 
 Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(ContainerNode* insertionPoint)
 {
-    HTMLFormControlElement::insertedInto(insertionPoint);
+    HTMLFormControlElementWithState::insertedInto(insertionPoint);
     if (!insertionPoint->inDocument())
         return InsertionDone;
     String initialValue = value();

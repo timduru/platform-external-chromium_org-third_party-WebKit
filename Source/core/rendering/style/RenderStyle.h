@@ -52,10 +52,12 @@
 #include "core/rendering/style/NinePieceImage.h"
 #include "core/rendering/style/OutlineValue.h"
 #include "core/rendering/style/RenderStyleConstants.h"
+#include "core/rendering/style/SVGRenderStyle.h"
 #include "core/rendering/style/ShadowData.h"
 #include "core/rendering/style/StyleBackgroundData.h"
 #include "core/rendering/style/StyleBoxData.h"
 #include "core/rendering/style/StyleDeprecatedFlexibleBoxData.h"
+#include "core/rendering/style/StyleFilterData.h"
 #include "core/rendering/style/StyleFlexibleBoxData.h"
 #include "core/rendering/style/StyleGridData.h"
 #include "core/rendering/style/StyleGridItemData.h"
@@ -67,18 +69,12 @@
 #include "core/rendering/style/StyleSurroundData.h"
 #include "core/rendering/style/StyleTransformData.h"
 #include "core/rendering/style/StyleVisualData.h"
+#include "core/svg/SVGPaint.h"
 #include <wtf/Forward.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/Vector.h>
-
-#include "core/rendering/style/StyleFilterData.h"
-
-#if ENABLE(SVG)
-#include "core/rendering/style/SVGRenderStyle.h"
-#include "core/svg/SVGPaint.h"
-#endif
 
 template<typename T, typename U> inline bool compareEqual(const T& t, const U& u) { return t == static_cast<T>(u); }
 
@@ -140,9 +136,7 @@ protected:
     // list of associated pseudo styles
     OwnPtr<PseudoStyleCache> m_cachedPseudoStyles;
 
-#if ENABLE(SVG)
     DataRef<SVGRenderStyle> m_svgStyle;
-#endif
 
 // !START SYNC!: Keep this in sync with the copy constructor in RenderStyle.cpp and implicitlyInherited() in StyleResolver.cpp
 
@@ -179,7 +173,7 @@ protected:
         unsigned _visibility : 2; // EVisibility
         unsigned _text_align : 4; // ETextAlign
         unsigned _text_transform : 2; // ETextTransform
-        unsigned _text_decorations : ETextDecorationBits;
+        unsigned _text_decorations : TextDecorationBits;
         unsigned _cursor_style : 6; // ECursor
         unsigned _direction : 1; // TextDirection
         unsigned _white_space : 3; // EWhiteSpace
@@ -549,8 +543,8 @@ public:
 #endif
     ETextAlign textAlign() const { return static_cast<ETextAlign>(inherited_flags._text_align); }
     ETextTransform textTransform() const { return static_cast<ETextTransform>(inherited_flags._text_transform); }
-    ETextDecoration textDecorationsInEffect() const { return static_cast<ETextDecoration>(inherited_flags._text_decorations); }
-    ETextDecoration textDecoration() const { return static_cast<ETextDecoration>(visual->textDecoration); }
+    TextDecoration textDecorationsInEffect() const { return static_cast<TextDecoration>(inherited_flags._text_decorations); }
+    TextDecoration textDecoration() const { return static_cast<TextDecoration>(visual->textDecoration); }
 #if ENABLE(CSS3_TEXT)
     TextDecorationStyle textDecorationStyle() const { return static_cast<TextDecorationStyle>(rareNonInheritedData->m_textDecorationStyle); }
     TextAlignLast textAlignLast() const { return static_cast<TextAlignLast>(rareInheritedData->m_textAlignLast); }
@@ -918,6 +912,8 @@ public:
 
     bool shouldPlaceBlockDirectionScrollbarOnLogicalLeft() const { return !isLeftToRightDirection() && isHorizontalWritingMode(); }
 
+    TouchAction touchAction() const { return static_cast<TouchAction>(rareNonInheritedData->m_touchAction); }
+
 // attribute setter methods
 
     void setDisplay(EDisplay v) { noninherited_flags._effectiveDisplay = v; }
@@ -1061,9 +1057,9 @@ public:
 #endif
     void setTextAlign(ETextAlign v) { inherited_flags._text_align = v; }
     void setTextTransform(ETextTransform v) { inherited_flags._text_transform = v; }
-    void addToTextDecorationsInEffect(ETextDecoration v) { inherited_flags._text_decorations |= v; }
-    void setTextDecorationsInEffect(ETextDecoration v) { inherited_flags._text_decorations = v; }
-    void setTextDecoration(ETextDecoration v) { SET_VAR(visual, textDecoration, v); }
+    void addToTextDecorationsInEffect(TextDecoration v) { inherited_flags._text_decorations |= v; }
+    void setTextDecorationsInEffect(TextDecoration v) { inherited_flags._text_decorations = v; }
+    void setTextDecoration(TextDecoration v) { SET_VAR(visual, textDecoration, v); }
 #if ENABLE(CSS3_TEXT)
     void setTextDecorationStyle(TextDecorationStyle v) { SET_VAR(rareNonInheritedData, m_textDecorationStyle, v); }
     void setTextAlignLast(TextAlignLast v) { SET_VAR(rareInheritedData, m_textAlignLast, v); }
@@ -1328,8 +1324,8 @@ public:
     void setUseTouchOverflowScrolling(bool v) { SET_VAR(rareInheritedData, useTouchOverflowScrolling, v); }
 #endif
     void setTextSecurity(ETextSecurity aTextSecurity) { SET_VAR(rareInheritedData, textSecurity, aTextSecurity); }
+    void setTouchAction(TouchAction t) { SET_VAR(rareNonInheritedData, m_touchAction, t); }
 
-#if ENABLE(SVG)
     const SVGRenderStyle* svgStyle() const { return m_svgStyle.get(); }
     SVGRenderStyle* accessSVGStyle() { return m_svgStyle.access(); }
 
@@ -1365,7 +1361,6 @@ public:
     void setBaselineShiftValue(SVGLength s) { accessSVGStyle()->setBaselineShiftValue(s); }
     SVGLength kerning() const { return svgStyle()->kerning(); }
     void setKerning(SVGLength k) { accessSVGStyle()->setKerning(k); }
-#endif
 
     void setShapeInside(PassRefPtr<ExclusionShapeValue> value)
     {
@@ -1523,7 +1518,7 @@ public:
     static short initialOrphans() { return 2; }
     static Length initialLineHeight() { return Length(-100.0, Percent); }
     static ETextAlign initialTextAlign() { return TASTART; }
-    static ETextDecoration initialTextDecoration() { return TDNONE; }
+    static TextDecoration initialTextDecoration() { return TextDecorationNone; }
 #if ENABLE(CSS3_TEXT)
     static TextDecorationStyle initialTextDecorationStyle() { return TextDecorationStyleSolid; }
     static TextAlignLast initialTextAlignLast() { return TextAlignLastAuto; }
@@ -1611,6 +1606,7 @@ public:
     static StyleImage* initialBorderImageSource() { return 0; }
     static StyleImage* initialMaskBoxImageSource() { return 0; }
     static PrintColorAdjust initialPrintColorAdjust() { return PrintColorAdjustEconomy; }
+    static TouchAction initialTouchAction() { return TouchActionAuto; }
 
     // The initial value is 'none' for grid tracks.
     static Vector<GridTrackSize> initialGridColumns() { return Vector<GridTrackSize>(); }
@@ -1620,6 +1616,9 @@ public:
 
     static GridTrackSize initialGridAutoColumns() { return GridTrackSize(Auto); }
     static GridTrackSize initialGridAutoRows() { return GridTrackSize(Auto); }
+
+    static NamedGridLinesMap initialNamedGridColumnLines() { return NamedGridLinesMap(); }
+    static NamedGridLinesMap initialNamedGridRowLines() { return NamedGridLinesMap(); }
 
     // 'auto' is the default.
     static GridPosition initialGridStart() { return GridPosition(); }
@@ -1721,11 +1720,9 @@ private:
 
     Color colorIncludingFallback(int colorProperty, bool visitedLink) const;
 
-#if ENABLE(SVG)
     Color stopColor() const { return svgStyle()->stopColor(); }
     Color floodColor() const { return svgStyle()->floodColor(); }
     Color lightingColor() const { return svgStyle()->lightingColor(); }
-#endif
 
     void appendContent(PassOwnPtr<ContentData>);
 };

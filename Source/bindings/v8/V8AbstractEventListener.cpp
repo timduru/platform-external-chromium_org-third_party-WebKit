@@ -46,12 +46,6 @@
 
 namespace WebCore {
 
-template<>
-void WeakHandleListener<V8AbstractEventListener>::callback(v8::Isolate*, v8::Persistent<v8::Value>, V8AbstractEventListener* listener)
-{
-    listener->m_listener.clear();
-}
-
 V8AbstractEventListener::V8AbstractEventListener(bool isAttribute, PassRefPtr<DOMWrapperWorld> world, v8::Isolate* isolate)
     : EventListener(JSEventListenerType)
     , m_isAttribute(isAttribute)
@@ -101,8 +95,8 @@ void V8AbstractEventListener::handleEvent(ScriptExecutionContext* context, Event
 
 void V8AbstractEventListener::setListenerObject(v8::Handle<v8::Object> listener)
 {
-    m_listener.set(listener);
-    WeakHandleListener<V8AbstractEventListener>::makeWeak(m_isolate, m_listener.get(), this);
+    m_listener.set(m_isolate, listener);
+    m_listener.get().MakeWeak(m_isolate, this, &makeWeakCallback);
 }
 
 void V8AbstractEventListener::invokeEventHandler(ScriptExecutionContext* context, Event* event, v8::Local<v8::Value> jsEvent)
@@ -179,14 +173,21 @@ bool V8AbstractEventListener::shouldPreventDefault(v8::Local<v8::Value> returnVa
 
 v8::Local<v8::Object> V8AbstractEventListener::getReceiverObject(ScriptExecutionContext* context, Event* event)
 {
-    if (!m_listener.isEmpty() && !m_listener->IsFunction())
-        return v8::Local<v8::Object>::New(m_listener.get());
+    v8::Isolate* isolate = toV8Context(context, world())->GetIsolate();
+    v8::Local<v8::Object> listener = m_listener.newLocal(isolate);
+    if (!m_listener.isEmpty() && !listener->IsFunction())
+        return listener;
 
     EventTarget* target = event->currentTarget();
-    v8::Handle<v8::Value> value = toV8(target, v8::Handle<v8::Object>(), toV8Context(context, world())->GetIsolate());
+    v8::Handle<v8::Value> value = toV8(target, v8::Handle<v8::Object>(), isolate);
     if (value.IsEmpty())
         return v8::Local<v8::Object>();
     return v8::Local<v8::Object>::New(v8::Handle<v8::Object>::Cast(value));
+}
+
+void V8AbstractEventListener::makeWeakCallback(v8::Isolate*, v8::Persistent<v8::Object>*, V8AbstractEventListener* listener)
+{
+    listener->m_listener.clear();
 }
 
 } // namespace WebCore

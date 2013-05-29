@@ -24,15 +24,12 @@
 #include "config.h"
 #include "core/rendering/svg/SVGRootInlineBox.h"
 
-#if ENABLE(SVG)
 #include "SVGNames.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/svg/RenderSVGInlineText.h"
 #include "core/rendering/svg/RenderSVGText.h"
 #include "core/rendering/svg/SVGInlineFlowBox.h"
 #include "core/rendering/svg/SVGInlineTextBox.h"
 #include "core/rendering/svg/SVGRenderingContext.h"
-#include "core/svg/SVGTextPositioningElement.h"
 
 namespace WebCore {
 
@@ -66,6 +63,14 @@ void SVGRootInlineBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
             child->paint(paintInfo, LayoutPoint(), 0, 0);
         }
     }
+}
+
+void SVGRootInlineBox::markDirty(bool dirty)
+{
+    if (dirty)
+        for (InlineBox* child = firstChild(); child; child = child->nextOnLine())
+            child->markDirty(true);
+    RootInlineBox::markDirty(dirty);
 }
 
 void SVGRootInlineBox::computePerCharacterLayoutInformation()
@@ -307,5 +312,3 @@ void SVGRootInlineBox::reorderValueLists(Vector<SVGTextLayoutAttributes*>& attri
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

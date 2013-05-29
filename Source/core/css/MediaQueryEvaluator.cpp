@@ -34,24 +34,18 @@
 #include "core/css/CSSAspectRatioValue.h"
 #include "core/css/CSSHelper.h"
 #include "core/css/CSSPrimitiveValue.h"
-#include "core/css/CSSValueList.h"
 #include "core/css/MediaFeatureNames.h"
 #include "core/css/MediaList.h"
 #include "core/css/MediaQuery.h"
 #include "core/css/MediaQueryExp.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
-#include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/Screen.h"
 #include "core/page/Settings.h"
 #include "core/platform/PlatformScreen.h"
 #include "core/platform/graphics/FloatRect.h"
-#include "core/platform/graphics/IntRect.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/RenderStyle.h"
@@ -66,14 +60,6 @@ enum MediaFeaturePrefix { MinPrefix, MaxPrefix, NoPrefix };
 typedef bool (*EvalFunc)(CSSValue*, RenderStyle*, Frame*, MediaFeaturePrefix);
 typedef HashMap<AtomicStringImpl*, EvalFunc> FunctionMap;
 static FunctionMap* gFunctionMap;
-
-/*
- * FIXME: following media features are not implemented:  scan
- *
- * scan: The "scan" media feature describes the scanning process of
- * tv output devices. It's unknown how to retrieve this information from
- * the platform
- */
 
 MediaQueryEvaluator::MediaQueryEvaluator(bool mediaFeatureResult)
     : m_frame(0)
@@ -554,8 +540,10 @@ static bool animationMediaFeatureEval(CSSValue* value, RenderStyle*, Frame*, Med
     return true;
 }
 
-static bool transitionMediaFeatureEval(CSSValue* value, RenderStyle*, Frame*, MediaFeaturePrefix op)
+static bool deprecatedTransitionMediaFeatureEval(CSSValue* value, RenderStyle*, Frame* frame, MediaFeaturePrefix op)
 {
+    UseCounter::countDeprecation(frame->document(), UseCounter::PrefixedTransitionMediaFeature);
+
     if (value) {
         float number;
         return numberValue(value, number) && compareValue(1, static_cast<int>(number), op);
@@ -658,6 +646,25 @@ static bool pointerMediaFeatureEval(CSSValue* value, RenderStyle*, Frame* frame,
     return (pointer == NoPointer && id == CSSValueNone)
         || (pointer == TouchPointer && id == CSSValueCoarse)
         || (pointer == MousePointer && id == CSSValueFine);
+}
+
+static bool scanMediaFeatureEval(CSSValue* value, RenderStyle*, Frame* frame, MediaFeaturePrefix)
+{
+    // Scan only applies to tv media.
+    if (!equalIgnoringCase(frame->view()->mediaType(), "tv"))
+        return false;
+
+    if (!value)
+        return true;
+
+    if (!value->isPrimitiveValue())
+        return false;
+
+    // If a platform interface supplies progressive/interlace info for TVs in the
+    // future, it needs to be handled here. For now, assume a modern TV with
+    // progressive display.
+    const int id = toCSSPrimitiveValue(value)->getIdent();
+    return id == CSSValueProgressive;
 }
 
 static void createFunctionMap()

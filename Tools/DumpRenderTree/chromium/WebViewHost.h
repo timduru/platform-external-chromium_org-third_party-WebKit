@@ -101,6 +101,8 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual void applyPreferences() OVERRIDE;
     virtual std::string makeURLErrorDescription(const WebKit::WebURLError&) OVERRIDE;
     virtual void setClientWindowRect(const WebKit::WebRect&) OVERRIDE;
+    virtual void enableAutoResizeMode(const WebKit::WebSize&, const WebKit::WebSize&) OVERRIDE;
+    virtual void disableAutoResizeMode(const WebKit::WebSize&) OVERRIDE;
     virtual void showDevTools() OVERRIDE;
     virtual void closeDevTools() OVERRIDE;
     virtual void evaluateInWebInspector(long, const std::string&) OVERRIDE;
@@ -135,6 +137,7 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual WebKit::WebWidget* createPopupMenu(WebKit::WebPopupType);
     virtual WebKit::WebWidget* createPopupMenu(const WebKit::WebPopupMenuInfo&);
     virtual WebKit::WebStorageNamespace* createSessionStorageNamespace(unsigned quota);
+
     virtual void didAddMessageToConsole(const WebKit::WebConsoleMessage&, const WebKit::WebString& sourceName, unsigned sourceLine);
     virtual void didStartLoading();
     virtual void didStopLoading();
@@ -182,7 +185,6 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual WebKit::WebNavigationPolicy decidePolicyForNavigation(
         WebKit::WebFrame*, const WebKit::WebURLRequest&,
         WebKit::WebNavigationType, WebKit::WebNavigationPolicy, bool isRedirect);
-    virtual bool canHandleRequest(WebKit::WebFrame*, const WebKit::WebURLRequest&);
     virtual WebKit::WebURLError cancelledError(WebKit::WebFrame*, const WebKit::WebURLRequest&);
     virtual void unableToImplementPolicyWithError(WebKit::WebFrame*, const WebKit::WebURLError&);
     virtual void didCreateDataSource(WebKit::WebFrame*, WebKit::WebDataSource*);

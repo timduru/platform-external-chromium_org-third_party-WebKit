@@ -777,6 +777,11 @@ NPObject* WebFrameImpl::windowObject() const
 
 void WebFrameImpl::bindToWindowObject(const WebString& name, NPObject* object)
 {
+    bindToWindowObject(name, object, 0);
+}
+
+void WebFrameImpl::bindToWindowObject(const WebString& name, NPObject* object, void*)
+{
     if (!frame() || !frame()->script()->canExecuteScripts(NotAboutToExecuteScript))
         return;
     frame()->script()->bindToWindowObject(frame(), String(name), object);
@@ -800,7 +805,7 @@ void WebFrameImpl::executeScriptInIsolatedWorld(int worldID, const WebScriptSour
         sources.append(ScriptSourceCode(sourcesIn[i].code, sourcesIn[i].url, position));
     }
 
-    frame()->script()->evaluateInIsolatedWorld(worldID, sources, extensionGroup, 0);
+    frame()->script()->executeScriptInIsolatedWorld(worldID, sources, extensionGroup, 0);
 }
 
 void WebFrameImpl::setIsolatedWorldSecurityOrigin(int worldID, const WebSecurityOrigin& securityOrigin)
@@ -847,7 +852,7 @@ void WebFrameImpl::collectGarbage()
         return;
     if (!frame()->settings()->isScriptEnabled())
         return;
-    V8GCController::collectGarbage();
+    V8GCController::collectGarbage(v8::Isolate::GetCurrent());
 }
 
 bool WebFrameImpl::checkIfRunInsecureContent(const WebURL& url) const
@@ -884,13 +889,13 @@ void WebFrameImpl::executeScriptInIsolatedWorld(int worldID, const WebScriptSour
 
     if (results) {
         Vector<ScriptValue> scriptResults;
-        frame()->script()->evaluateInIsolatedWorld(worldID, sources, extensionGroup, &scriptResults);
+        frame()->script()->executeScriptInIsolatedWorld(worldID, sources, extensionGroup, &scriptResults);
         WebVector<v8::Local<v8::Value> > v8Results(scriptResults.size());
         for (unsigned i = 0; i < scriptResults.size(); i++)
             v8Results[i] = v8::Local<v8::Value>::New(scriptResults[i].v8Value());
         results->swap(v8Results);
     } else
-        frame()->script()->evaluateInIsolatedWorld(worldID, sources, extensionGroup, 0);
+        frame()->script()->executeScriptInIsolatedWorld(worldID, sources, extensionGroup, 0);
 }
 
 v8::Handle<v8::Value> WebFrameImpl::callFunctionEvenIfScriptDisabled(v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> argv[])
@@ -1363,15 +1368,7 @@ bool WebFrameImpl::selectWordAroundCaret()
 
 void WebFrameImpl::selectRange(const WebPoint& base, const WebPoint& extent)
 {
-    IntPoint unscaledBase = base;
-    IntPoint unscaledExtent = extent;
-    unscaledExtent.scale(1 / view()->pageScaleFactor(), 1 / view()->pageScaleFactor());
-    unscaledBase.scale(1 / view()->pageScaleFactor(), 1 / view()->pageScaleFactor());
-    VisiblePosition basePosition = visiblePositionForWindowPoint(unscaledBase);
-    VisiblePosition extentPosition = visiblePositionForWindowPoint(unscaledExtent);
-    VisibleSelection newSelection = VisibleSelection(basePosition, extentPosition);
-    if (frame()->selection()->shouldChangeSelection(newSelection))
-        frame()->selection()->setSelection(newSelection, CharacterGranularity);
+    moveRangeSelection(base, extent);
 }
 
 void WebFrameImpl::selectRange(const WebRange& webRange)
@@ -1382,31 +1379,46 @@ void WebFrameImpl::selectRange(const WebRange& webRange)
 
 void WebFrameImpl::moveCaretSelectionTowardsWindowPoint(const WebPoint& point)
 {
-    IntPoint unscaledPoint(point);
-    unscaledPoint.scale(1 / view()->pageScaleFactor(), 1 / view()->pageScaleFactor());
+    moveCaretSelection(point);
+}
 
+void WebFrameImpl::moveRangeSelection(const WebPoint& base, const WebPoint& extent)
+{
+    FrameSelection* selection = frame()->selection();
+    if (!selection)
+        return;
+
+    VisiblePosition basePosition = visiblePositionForWindowPoint(base);
+    VisiblePosition extentPosition = visiblePositionForWindowPoint(extent);
+    VisibleSelection newSelection = VisibleSelection(basePosition, extentPosition);
+    if (frame()->selection()->shouldChangeSelection(newSelection))
+        frame()->selection()->setSelection(newSelection, CharacterGranularity);
+}
+
+void WebFrameImpl::moveCaretSelection(const WebPoint& point)
+{
     Element* editable = frame()->selection()->rootEditableElement();
     if (!editable)
         return;
 
-    IntPoint contentsPoint = frame()->view()->windowToContents(unscaledPoint);
-    LayoutPoint localPoint(editable->convertFromPage(contentsPoint));
-    VisiblePosition position = editable->renderer()->positionForPoint(localPoint);
+    VisiblePosition position = visiblePositionForWindowPoint(point);
     if (frame()->selection()->shouldChangeSelection(position))
         frame()->selection()->moveTo(position, UserTriggered);
 }
 
 VisiblePosition WebFrameImpl::visiblePositionForWindowPoint(const WebPoint& point)
 {
-    HitTestRequest request = HitTestRequest::Move | HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent;
-    HitTestResult result(frame()->view()->windowToContents(IntPoint(point)));
+    FloatPoint unscaledPoint(point);
+    unscaledPoint.scale(1 / view()->pageScaleFactor(), 1 / view()->pageScaleFactor());
 
+    HitTestRequest request = HitTestRequest::Move | HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::IgnoreClipping | HitTestRequest::DisallowShadowContent;
+    HitTestResult result(frame()->view()->windowToContents(roundedIntPoint(unscaledPoint)));
     frame()->document()->renderView()->layer()->hitTest(request, result);
 
     Node* node = result.targetNode();
     if (!node)
         return VisiblePosition();
-    return node->renderer()->positionForPoint(result.localPoint());
+    return frame()->selection()->selection().visiblePositionRespectingEditingBoundary(result.localPoint(), node);
 }
 
 int WebFrameImpl::printBegin(const WebPrintParams& printParams, const WebNode& constrainToNode, bool* useBrowserOverlays)
@@ -2458,7 +2470,7 @@ void WebFrameImpl::invalidateIfNecessary()
 
 void WebFrameImpl::loadJavaScriptURL(const KURL& url)
 {
-    // This is copied from ScriptController::executeIfJavaScriptURL.
+    // This is copied from ScriptController::executeScriptIfJavaScriptURL.
     // Unfortunately, we cannot just use that method since it is private, and
     // it also doesn't quite behave as we require it to for bookmarklets.  The
     // key difference is that we need to suppress loading the string result

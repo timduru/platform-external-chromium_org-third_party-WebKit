@@ -29,7 +29,6 @@
 #include "core/html/shadow/MediaControls.h"
 
 #include "core/dom/ExceptionCodePlaceholder.h"
-#include "core/page/Settings.h"
 
 namespace WebCore {
 
@@ -254,10 +253,6 @@ void MediaControls::enteredFullscreen()
 {
     m_isFullscreen = true;
     m_fullScreenButton->setIsFullscreen(true);
-
-    if (Page* page = document()->page())
-        page->chrome()->setCursorHiddenUntilMouseMoves(true);
-
     startHideFullscreenControlsTimer();
 }
 
@@ -314,9 +309,6 @@ void MediaControls::hideFullscreenControlsTimerFired(Timer<MediaControls>*)
 
     if (!shouldHideControls())
         return;
-
-    if (Page* page = document()->page())
-        page->chrome()->setCursorHiddenUntilMouseMoves(true);
 
     makeTransparent();
 }

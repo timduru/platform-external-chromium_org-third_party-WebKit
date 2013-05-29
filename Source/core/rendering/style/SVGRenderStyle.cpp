@@ -27,14 +27,9 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/rendering/style/SVGRenderStyle.h"
 
-#include "core/css/CSSPrimitiveValue.h"
 #include "core/css/CSSValueList.h"
-#include "core/dom/NodeRenderStyle.h"
-#include "core/platform/graphics/IntRect.h"
-#include "core/svg/SVGStyledElement.h"
 
 using namespace std;
 
@@ -233,5 +228,3 @@ StyleDifference SVGRenderStyle::diff(const SVGRenderStyle* other) const
 }
 
 }
-
-#endif // ENABLE(SVG)

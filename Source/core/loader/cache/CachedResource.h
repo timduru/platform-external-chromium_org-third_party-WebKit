@@ -67,15 +67,13 @@ public:
         CSSStyleSheet,
         Script,
         FontResource,
-        RawResource
-#if ENABLE(SVG)
-        , SVGDocumentResource
-#endif
-        , XSLStyleSheet
-        , LinkPrefetch
-        , LinkSubresource
-        , TextTrackResource
-        , ShaderResource
+        RawResource,
+        SVGDocumentResource,
+        XSLStyleSheet,
+        LinkPrefetch,
+        LinkSubresource,
+        TextTrackResource,
+        ShaderResource
     };
 
     enum Status {
@@ -153,12 +151,12 @@ public:
             || type() == RawResource;
     }
 
+    void updateForAccess();
     unsigned accessCount() const { return m_accessCount; }
-    void increaseAccessCount() { m_accessCount++; }
 
     // Computes the status of an object after loading.  
     // Updates the expire date on the cache entry file
-    void finish();
+    void finish(double finishTime = 0.0);
 
     // FIXME: Remove the stringless variant once all the callsites' error messages are updated.
     bool passesAccessControlCheck(SecurityOrigin*);
@@ -173,7 +171,7 @@ public:
     
     bool inLiveDecodedResourcesList() { return m_inLiveDecodedResourcesList; }
     
-    void stopLoading();
+    void clearLoader();
 
     SharedBuffer* resourceBuffer() const { ASSERT(!m_purgeableData); return m_data.get(); }
 
@@ -211,8 +209,6 @@ public:
     DataBufferingPolicy dataBufferingPolicy() const { return m_options.dataBufferingPolicy; }
     
     virtual void destroyDecodedData() { }
-
-    void setOwningCachedResourceLoader(CachedResourceLoader* cachedResourceLoader) { m_owningCachedResourceLoader = cachedResourceLoader; }
     
     bool isPreloaded() const { return m_preloadCount; }
     void increasePreloadCount() { ++m_preloadCount; }
@@ -225,6 +221,7 @@ public:
     bool mustRevalidateDueToCacheHeaders(CachePolicy) const;
     bool isCacheValidator() const { return m_resourceToRevalidate; }
     CachedResource* resourceToRevalidate() const { return m_resourceToRevalidate; }
+    void setResourceToRevalidate(CachedResource*);
     
     bool isPurgeable() const;
     bool wasPurged() const;
@@ -234,16 +231,9 @@ public:
     // better way to handle the archive case.
     bool makePurgeable(bool purgeable);
     
-    // HTTP revalidation support methods for CachedResourceLoader.
-    void setResourceToRevalidate(CachedResource*);
-    virtual void switchClientsToRevalidatedResource();
-    void clearResourceToRevalidate();
-    void updateResponseAfterRevalidation(const ResourceResponse& validatingResponse);
-    
     virtual void didSendData(unsigned long long /* bytesSent */, unsigned long long /* totalBytesToBeSent */) { }
     virtual void didDownloadData(int) { }
 
-    void setLoadFinishTime(double finishTime) { m_loadFinishTime = finishTime; }
     double loadFinishTime() const { return m_loadFinishTime; }
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const;
@@ -259,6 +249,10 @@ protected:
     void didAccessDecodedData(double timeStamp);
 
     bool isSafeToMakePurgeable() const;
+
+    virtual void switchClientsToRevalidatedResource();
+    void clearResourceToRevalidate();
+    void updateResponseAfterRevalidation(const ResourceResponse& validatingResponse);
     
     HashCountedSet<CachedResourceClient*> m_clients;
 
@@ -294,6 +288,9 @@ protected:
 private:
     bool addClientToSet(CachedResourceClient*);
     void decodedDataDeletionTimerFired(Timer<CachedResource>*);
+
+    void revalidationSucceeded(const ResourceResponse&);
+    void revalidationFailed();
 
     virtual PurgePriority purgePriority() const { return PurgeDefault; }
 
@@ -340,8 +337,6 @@ private:
     
     CachedResource* m_nextInLiveResourcesList;
     CachedResource* m_prevInLiveResourcesList;
-
-    CachedResourceLoader* m_owningCachedResourceLoader; // only non-0 for resources that are not in the cache
     
     // If this field is non-null we are using the resource as a proxy for checking whether an existing resource is still up to date
     // using HTTP If-Modified-Since/If-None-Match headers. If the response is 304 all clients of this resource are moved

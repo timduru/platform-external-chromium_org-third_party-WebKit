@@ -91,7 +91,7 @@ MainThreadWebSocketChannel::MainThreadWebSocketChannel(Document* document, WebSo
     , m_sourceURLAtConnection(sourceURL)
     , m_lineNumberAtConnection(lineNumber)
 {
-    if (Page* page = m_document->page())
+    if (m_document->page())
         m_identifier = createUniqueIdentifier();
 }
 
@@ -111,7 +111,7 @@ void MainThreadWebSocketChannel::connect(const KURL& url, const String& protocol
         m_handshake->addExtensionProcessor(m_perMessageDeflate.createExtensionProcessor());
     m_handshake->addExtensionProcessor(m_deflateFramer.createExtensionProcessor());
     if (m_identifier)
-        InspectorInstrumentation::didCreateWebSocket(m_document, m_identifier, url, m_document->url(), protocol);
+        InspectorInstrumentation::didCreateWebSocket(m_document, m_identifier, url, protocol);
     ref();
     m_handle = SocketStreamHandle::create(m_handshake->url(), this);
     RefPtr<ScriptCallStack> callStack = createScriptCallStack(1, true);

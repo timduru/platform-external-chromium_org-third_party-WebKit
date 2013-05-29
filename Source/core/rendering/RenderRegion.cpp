@@ -31,12 +31,7 @@
 #include "core/rendering/RenderRegion.h"
 
 #include "core/css/resolver/StyleResolver.h"
-#include "core/dom/Range.h"
-#include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/IntRect.h"
 #include "core/rendering/FlowThreadController.h"
-#include "core/rendering/HitTestResult.h"
-#include "core/rendering/LayoutRepainter.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBoxRegionInfo.h"
 #include "core/rendering/RenderNamedFlowThread.h"
@@ -170,24 +165,16 @@ void RenderRegion::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOff
 }
 
 // Hit Testing
-bool RenderRegion::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
+bool RenderRegion::hitTestFlowThreadContents(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction action)
 {
-    if (!isValid())
+    if (!isValid() || action != HitTestForeground)
         return false;
 
-    LayoutPoint adjustedLocation = accumulatedOffset + location();
-
-    // Check our bounds next. For this purpose always assume that we can only be hit in the
-    // foreground phase (which is true for replaced elements like images).
-    // FIXME: Once we support overflow, we need to intersect with that and not with the bounds rect.
     LayoutRect boundsRect = borderBoxRectInRegion(locationInContainer.region());
-    boundsRect.moveBy(adjustedLocation);
-    if (visibleToHitTestRequest(request) && action == HitTestForeground && locationInContainer.intersects(boundsRect)) {
-        // Check the contents of the RenderFlowThread.
-        if (m_flowThread->hitTestFlowThreadPortionInRegion(this, flowThreadPortionRect(), flowThreadPortionOverflowRect(), request, result, locationInContainer, LayoutPoint(adjustedLocation.x() + borderLeft() + paddingLeft(), adjustedLocation.y() + borderTop() + paddingTop())))
-            return true;
-        updateHitTestResult(result, locationInContainer.point() - toLayoutSize(adjustedLocation));
-        if (!result.addNodeToRectBasedTestResult(generatingNode(), request, locationInContainer, boundsRect))
+    boundsRect.moveBy(accumulatedOffset);
+    if (visibleToHitTesting() && locationInContainer.intersects(boundsRect)) {
+        if (m_flowThread->hitTestFlowThreadPortionInRegion(this, flowThreadPortionRect(), flowThreadPortionOverflowRect(), request, result,
+            locationInContainer, LayoutPoint(accumulatedOffset.x() + borderLeft() + paddingLeft(), accumulatedOffset.y() + borderTop() + paddingTop())))
             return true;
     }
 

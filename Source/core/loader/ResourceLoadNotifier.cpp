@@ -85,19 +85,19 @@ void ResourceLoadNotifier::didFailToLoad(ResourceLoader* loader, const ResourceE
     if (!error.isNull())
         m_frame->loader()->client()->dispatchDidFailLoading(loader->documentLoader(), loader->identifier(), error);
 
-    InspectorInstrumentation::didFailLoading(m_frame, loader->documentLoader(), loader->identifier(), error);
+    InspectorInstrumentation::didFailLoading(m_frame, loader->identifier(), loader->documentLoader(), error);
 }
 
 void ResourceLoadNotifier::dispatchWillSendRequest(DocumentLoader* loader, unsigned long identifier, ResourceRequest& request, const ResourceResponse& redirectResponse)
 {
     String oldRequestURL = request.url().string();
-    m_frame->loader()->documentLoader()->didTellClientAboutLoad(request.url());
+    m_frame->loader()->documentLoader()->didTellClientAboutLoad(request.url().string());
 
     m_frame->loader()->client()->dispatchWillSendRequest(loader, identifier, request, redirectResponse);
 
     // If the URL changed, then we want to put that new URL in the "did tell client" set too.
     if (!request.isNull() && oldRequestURL != request.url().string())
-        m_frame->loader()->documentLoader()->didTellClientAboutLoad(request.url());
+        m_frame->loader()->documentLoader()->didTellClientAboutLoad(request.url().string());
 
     InspectorInstrumentation::willSendRequest(m_frame, identifier, loader, request, redirectResponse);
 
@@ -124,7 +124,7 @@ void ResourceLoadNotifier::dispatchDidFinishLoading(DocumentLoader* loader, unsi
 {
     m_frame->loader()->client()->dispatchDidFinishLoading(loader, identifier);
 
-    InspectorInstrumentation::didFinishLoading(m_frame, loader, identifier, finishTime);
+    InspectorInstrumentation::didFinishLoading(m_frame, identifier, loader, finishTime);
 }
 
 void ResourceLoadNotifier::sendRemainingDelegateMessages(DocumentLoader* loader, unsigned long identifier, const ResourceResponse& response, const char* data, int dataLength, int encodedDataLength, const ResourceError& error)

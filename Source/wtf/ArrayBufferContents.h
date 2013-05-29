@@ -29,13 +29,18 @@
 
 #include "wtf/ArrayBufferDeallocationObserver.h"
 #include "wtf/Noncopyable.h"
-#include "wtf/RawBuffer.h"
+#include "wtf/WTFExport.h"
 
 namespace WTF {
 
-class ArrayBufferContents : public RawBuffer {
+class WTF_EXPORT ArrayBufferContents {
     WTF_MAKE_NONCOPYABLE(ArrayBufferContents);
 public:
+    enum InitializationPolicy {
+        ZeroInitialize,
+        DontInitialize
+    };
+
     ArrayBufferContents();
     ArrayBufferContents(unsigned numElements, unsigned elementByteSize, ArrayBufferContents::InitializationPolicy);
 
@@ -43,10 +48,17 @@ public:
 
     void clear();
 
+    void* data() const { return m_data; }
+    unsigned sizeInBytes() const { return m_sizeInBytes; }
+
     bool hasDeallocationObserver() const { return !!m_deallocationObserver; }
     void setDeallocationObserver(ArrayBufferDeallocationObserver* observer) { m_deallocationObserver = observer; }
 
+    void transfer(ArrayBufferContents& other);
+
 private:
+    void* m_data;
+    unsigned m_sizeInBytes;
     ArrayBufferDeallocationObserver* m_deallocationObserver;
 };
 

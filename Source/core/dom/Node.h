@@ -210,9 +210,9 @@ public:
 
     bool hasChildNodes() const { return firstChild(); }
     virtual PassRefPtr<Node> cloneNode(bool deep) = 0;
-    const AtomicString& localName() const { return virtualLocalName(); }
-    const AtomicString& namespaceURI() const { return virtualNamespaceURI(); }
-    const AtomicString& prefix() const { return virtualPrefix(); }
+    virtual const AtomicString& localName() const;
+    virtual const AtomicString& namespaceURI() const;
+    virtual const AtomicString& prefix() const;
     virtual void setPrefix(const AtomicString&, ExceptionCode&);
     void normalize();
 
@@ -375,7 +375,6 @@ public:
 
     void setNeedsStyleRecalc(StyleChangeType changeType = FullStyleChange);
     void clearNeedsStyleRecalc() { m_nodeFlags &= ~StyleChangeMask; }
-    virtual void scheduleSetNeedsStyleRecalc(StyleChangeType changeType = FullStyleChange) { setNeedsStyleRecalc(changeType); }
 
     void setIsLink(bool f) { setFlag(f, IsLinkFlag); }
     void setIsLink() { setFlag(IsLinkFlag); }
@@ -393,12 +392,8 @@ public:
     bool isV8CollectableDuringMinorGC() const { return getFlag(V8CollectableDuringMinorGCFlag); }
     void setV8CollectableDuringMinorGC(bool flag) { setFlag(flag, V8CollectableDuringMinorGCFlag); }
 
-    enum ShouldSetAttached {
-        SetAttached,
-        DoNotSetAttached
-    };
-    void lazyAttach(ShouldSetAttached = SetAttached);
-    void lazyReattach(ShouldSetAttached = SetAttached);
+    void lazyAttach();
+    void lazyReattach();
 
     virtual void setFocus(bool flag);
     virtual void setActive(bool flag = true, bool pause = false);
@@ -541,7 +536,7 @@ public:
 #endif
 
     void reattach();
-    void reattachIfAttached();
+    void lazyReattachIfAttached();
     ContainerNode* parentNodeForRenderingAndStyle();
     
     // Wrapper for nodes that don't have a renderer, but still cache the style (like HTMLOptionElement).
@@ -708,9 +703,7 @@ private:
         // These bits are used by derived classes, pulled up here so they can
         // be stored in the same memory word as the Node bits above.
         IsParsingChildrenFinishedFlag = 1 << 13, // Element
-#if ENABLE(SVG)
         HasSVGRareDataFlag = 1 << 14, // SVGElement
-#endif
 
         StyleChangeMask = 1 << nodeStyleChangeShift | 1 << (nodeStyleChangeShift + 1),
 
@@ -804,9 +797,6 @@ private:
 
     virtual RenderStyle* nonRendererStyle() const { return 0; }
 
-    virtual const AtomicString& virtualPrefix() const;
-    virtual const AtomicString& virtualLocalName() const;
-    virtual const AtomicString& virtualNamespaceURI() const;
     virtual RenderStyle* virtualComputedStyle(PseudoId = NOPSEUDO);
 
     Element* ancestorElement() const;
@@ -833,11 +823,9 @@ protected:
     void setIsParsingChildrenFinished() { setFlag(IsParsingChildrenFinishedFlag); }
     void clearIsParsingChildrenFinished() { clearFlag(IsParsingChildrenFinishedFlag); }
 
-#if ENABLE(SVG)
     bool hasSVGRareData() const { return getFlag(HasSVGRareDataFlag); }
     void setHasSVGRareData() { setFlag(HasSVGRareDataFlag); }
     void clearHasSVGRareData() { clearFlag(HasSVGRareDataFlag); }
-#endif
 };
 
 // Used in Node::addSubresourceAttributeURLs() and in addSubresourceStyleURLs()
@@ -877,17 +865,17 @@ inline void Node::reattach()
     attach();
 }
 
-inline void Node::reattachIfAttached()
+inline void Node::lazyReattachIfAttached()
 {
     if (attached())
-        reattach();
+        lazyReattach();
 }
 
-inline void Node::lazyReattach(ShouldSetAttached shouldSetAttached)
+inline void Node::lazyReattach()
 {
     if (attached())
         detach();
-    lazyAttach(shouldSetAttached);
+    lazyAttach();
 }
 
 // Need a template since ElementShadow is not a Node, but has the style recalc methods.

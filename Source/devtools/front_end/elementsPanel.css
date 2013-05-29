@@ -57,7 +57,7 @@
 
 #elements-content .CodeMirror {
     /* Consistent with the .editing class in inspector.css */
-    -webkit-box-shadow: rgba(0, 0, 0, .5) 3px 3px 4px;
+    box-shadow: rgba(0, 0, 0, .5) 3px 3px 4px;
     outline: 1px solid rgb(66%, 66%, 66%) !important;
     background-color: white;
 }
@@ -175,8 +175,8 @@
     padding: 2px 2px 4px 4px;
     min-height: 18px;
     white-space: nowrap;
-    -webkit-background-origin: padding;
-    -webkit-background-clip: padding;
+    background-origin: padding;
+    background-clip: padding;
     -webkit-user-select: text;
 }
 
@@ -189,7 +189,7 @@
 }
 
 .styles-section .properties li.not-parsed-ok {
-    margin-left: 0px;
+    margin-left: 0;
 }
 
 .styles-section.computed-style .properties li.not-parsed-ok {
@@ -209,8 +209,8 @@
 
 .styles-section .header {
     white-space: nowrap;
-    -webkit-background-origin: padding;
-    -webkit-background-clip: padding;
+    background-origin: padding;
+    background-clip: padding;
 }
 
 .styles-section .header .title {
@@ -218,7 +218,8 @@
     white-space: normal;
 }
 
-.styles-section .header .title .media, .styles-section .header .title .media .subtitle {
+.styles-section .header .title .media,
+.styles-section .header .title .media .subtitle {
     color: rgb(128, 128, 128);
     overflow: hidden;
 }
@@ -405,7 +406,8 @@
     opacity: 0.5;
 }
 
-.styles-section .properties .implicit, .styles-section .properties .inherited {
+.styles-section .properties .implicit,
+.styles-section .properties .inherited {
     opacity: 0.5;
 }
 
@@ -472,8 +474,8 @@
     min-height: 16px;
     opacity: 1.0;
     white-space: nowrap;
-    -webkit-background-origin: padding;
-    -webkit-background-clip: padding;
+    background-origin: padding;
+    background-clip: padding;
 }
 
 .event-bars .event-bar .header .title {
@@ -570,16 +572,16 @@
     background-repeat: no-repeat;
     margin: 1px 0 0 0;
     padding: 0;
-    -webkit-border-radius: 0;
+    border-radius: 0;
     -webkit-appearance: none;
 }
 
 .panel.elements .sidebar-pane-toolbar > select:hover {
-    background-position: -23px 0px;
+    background-position: -23px 0;
 }
 
 .panel.elements .sidebar-pane-toolbar > select:active {
-    background-position: -46px 0px;
+    background-position: -46px 0;
 }
 
 .panel.elements .sidebar-pane-toolbar > select.select-settings {
@@ -589,6 +591,14 @@
 .panel.elements .sidebar-pane-toolbar > select.select-filter {
     background-image: url(Images/paneFilterButtons.png);
 }
-.panel.elements .sidebar-pane-toolbar > select > option, .panel.elements .sidebar-pane-toolbar > select > hr {
+.panel.elements .sidebar-pane-toolbar > select > option,
+.panel.elements .sidebar-pane-toolbar > select > hr {
     color: black;
+}
+
+.styles-section:not(.read-only) .properties .webkit-css-property.styles-panel-hovered,
+.styles-section:not(.read-only) .properties .value .styles-panel-hovered,
+.styles-section:not(.read-only) .properties .value.styles-panel-hovered {
+    text-decoration: underline;
+    cursor: default;
 }

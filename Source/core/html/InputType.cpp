@@ -31,12 +31,11 @@
 #include <limits>
 #include "HTMLNames.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/dom/BeforeTextInsertedEvent.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/KeyboardEvent.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/dom/shadow/ElementShadow.h"
+#include "core/dom/ScopedEventQueue.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/fileapi/FileList.h"
 #include "core/html/ButtonInputType.h"
@@ -508,7 +507,7 @@ void InputType::dispatchSimulatedClickIfActive(KeyboardEvent* event) const
 Chrome* InputType::chrome() const
 {
     if (Page* page = element()->document()->page())
-        return page->chrome();
+        return &page->chrome();
     return 0;
 }
 
@@ -898,7 +897,6 @@ String InputType::defaultToolTip() const
     return String();
 }
 
-#if ENABLE(DATALIST_ELEMENT)
 void InputType::listAttributeTargetChanged()
 {
 }
@@ -908,7 +906,6 @@ Decimal InputType::findClosestTickMarkValue(const Decimal&)
     ASSERT_NOT_REACHED();
     return Decimal::nan();
 }
-#endif
 
 void InputType::updateClearButtonVisibility()
 {
@@ -1051,6 +1048,7 @@ void InputType::stepUpFromRenderer(int n)
     if (!stepRange.hasStep())
       return;
 
+    EventQueueScope scope;
     const Decimal step = stepRange.step();
 
     int sign;
@@ -1070,7 +1068,7 @@ void InputType::stepUpFromRenderer(int n)
             current = stepRange.minimum() - nextDiff;
         if (current > stepRange.maximum() - nextDiff)
             current = stepRange.maximum() - nextDiff;
-        setValueAsDecimal(current, DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
+        setValueAsDecimal(current, DispatchNoEvent, IGNORE_EXCEPTION);
     }
     if ((sign > 0 && current < stepRange.minimum()) || (sign < 0 && current > stepRange.maximum()))
         setValueAsDecimal(sign > 0 ? stepRange.minimum() : stepRange.maximum(), DispatchInputAndChangeEvent, IGNORE_EXCEPTION);

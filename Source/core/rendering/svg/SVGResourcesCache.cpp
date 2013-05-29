@@ -20,13 +20,11 @@
 #include "config.h"
 #include "core/rendering/svg/SVGResourcesCache.h"
 
-#if ENABLE(SVG)
 #include "HTMLNames.h"
 #include "core/rendering/svg/RenderSVGResourceContainer.h"
 #include "core/rendering/svg/SVGResources.h"
 #include "core/rendering/svg/SVGResourcesCycleSolver.h"
 #include "core/svg/SVGDocumentExtensions.h"
-#include "core/svg/SVGStyledElement.h"
 
 namespace WebCore {
 
@@ -112,7 +110,7 @@ void SVGResourcesCache::clientLayoutChanged(RenderObject* object)
 
     // Invalidate the resources if either the RenderObject itself changed,
     // or we have filter resources, which could depend on the layout of children.
-    if (object->selfNeedsLayout())
+    if (object->selfNeedsLayout() || resources->filter())
         resources->removeClientFromCache(object);
 }
 
@@ -205,5 +203,3 @@ void SVGResourcesCache::resourceDestroyed(RenderSVGResourceContainer* resource)
 }
 
 }
-
-#endif

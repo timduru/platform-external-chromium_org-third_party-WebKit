@@ -27,8 +27,7 @@
  */
 
 [
-    NoInterfaceObject,
-    ImplementationLacksVTable
+    NoInterfaceObject
 ] interface SQLTransaction {
     [Custom] void executeSql(DOMString sqlStatement,
                              ObjectArray arguments,

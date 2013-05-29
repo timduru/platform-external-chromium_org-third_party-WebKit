@@ -24,16 +24,15 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/css/WebKitCSSSVGDocumentValue.h"
 
 #include "core/css/CSSParser.h"
 #include "core/dom/Document.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
+#include "core/loader/cache/CachedDocument.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
 #include "core/loader/cache/CachedResourceRequestInitiators.h"
-#include "core/loader/cache/CachedSVGDocument.h"
 
 namespace WebCore {
 
@@ -48,15 +47,14 @@ WebKitCSSSVGDocumentValue::~WebKitCSSSVGDocumentValue()
 {
 }
 
-CachedSVGDocument* WebKitCSSSVGDocumentValue::load(CachedResourceLoader* loader)
+CachedDocument* WebKitCSSSVGDocumentValue::load(CachedResourceLoader* loader)
 {
     ASSERT(loader);
 
     if (!m_loadRequested) {
         m_loadRequested = true;
 
-        CachedResourceRequest request(ResourceRequest(loader->document()->completeURL(m_url)));
-        request.setInitiator(cachedResourceRequestInitiators().css);
+        CachedResourceRequest request(ResourceRequest(loader->document()->completeURL(m_url)), cachedResourceRequestInitiators().css);
         m_document = loader->requestSVGDocument(request);
     }
 
@@ -81,5 +79,3 @@ void WebKitCSSSVGDocumentValue::reportDescendantMemoryUsage(MemoryObjectInfo* me
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

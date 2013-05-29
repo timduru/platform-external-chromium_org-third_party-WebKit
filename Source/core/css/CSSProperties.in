@@ -1,0 +1,124 @@
+// FIXME: When we have all the properties using the new StyleBuilder, we
+//   should use this for make_css_property_names.py
+// Note: Mandatory blank line to skip parameter parsing phase
+
+border-bottom-style type_name=EBorderStyle, initial=initialBorderStyle
+border-collapse
+border-left-style type_name=EBorderStyle, initial=initialBorderStyle
+border-right-style type_name=EBorderStyle, initial=initialBorderStyle
+border-top-style type_name=EBorderStyle, initial=initialBorderStyle
+bottom apply_type=length, initial=initialOffset, use_auto
+box-sizing
+caption-side
+clear
+empty-cells type_name=EEmptyCell
+float type_name=EFloat, name_for_methods=Floating
+height apply_type=length, initial=initialSize, use_auto, use_intrinsic
+image-rendering
+left apply_type=length, initial=initialOffset, use_auto
+list-style-position
+list-style-type
+margin-bottom apply_type=length, initial=initialMargin, use_auto
+margin-left apply_type=length, initial=initialMargin, use_auto
+margin-right apply_type=length, initial=initialMargin, use_auto
+margin-top apply_type=length, initial=initialMargin, use_auto
+max-height apply_type=length, initial=initialMaxSize, use_auto, use_intrinsic, use_none
+max-width apply_type=length, initial=initialMaxSize, use_auto, use_intrinsic, use_none
+min-height apply_type=length, initial=initialMinSize, use_auto, use_intrinsic, use_none
+min-width apply_type=length, initial=initialMinSize, use_auto, use_intrinsic
+mix-blend-mode type_name=BlendMode, name_for_methods=BlendMode
+opacity type_name=float
+overflow-wrap
+overflow-x type_name=EOverflow
+overflow-y type_name=EOverflow
+padding-bottom apply_type=length, initial=initialPadding
+padding-left apply_type=length, initial=initialPadding
+padding-right apply_type=length, initial=initialPadding
+padding-top apply_type=length, initial=initialPadding
+page-break-after type_name=EPageBreak, initial=initialPageBreak
+page-break-before type_name=EPageBreak, initial=initialPageBreak
+page-break-inside type_name=EPageBreak, initial=initialPageBreak
+pointer-events
+position
+right apply_type=length, initial=initialOffset, use_auto
+speak
+table-layout
+tab-size type_name=unsigned
+text-overflow type_name=TextOverflow
+text-transform
+top apply_type=length, initial=initialOffset, use_auto
+touch-action type_name=TouchAction, initial=initialTouchAction
+unicode-bidi
+visibility
+white-space
+width apply_type=length, initial=initialSize, use_auto, use_intrinsic
+word-break
+// UAs must treat 'word-wrap' as an alternate name for the 'overflow-wrap' property. So using the same handlers.
+word-wrap name_for_methods=OverflowWrap
+
+-webkit-align-content
+-webkit-align-items
+-webkit-align-self type_name=EAlignItems
+-webkit-appearance type_name=ControlPart
+-webkit-backface-visibility
+-webkit-border-fit
+-webkit-box-align type_name=EBoxAlignment
+-webkit-box-decoration-break
+-webkit-box-direction
+-webkit-box-flex-group type_name=unsigned int
+-webkit-box-flex type_name=float
+-webkit-box-lines
+-webkit-box-ordinal-group type_name=unsigned int
+-webkit-box-orient
+-webkit-box-pack
+-webkit-color-correction type_name=ColorSpace, name_for_methods=ColorSpace
+-webkit-column-axis type_name=ColumnAxis
+-webkit-column-break-after type_name=EPageBreak, initial=initialPageBreak
+-webkit-column-break-before type_name=EPageBreak, initial=initialPageBreak
+-webkit-column-break-inside type_name=EPageBreak, initial=initialPageBreak
+-webkit-column-progression type_name=ColumnProgression
+-webkit-column-rule-style type_name=EBorderStyle, initial=initialBorderStyle
+-webkit-column-span type_name=ColumnSpan
+-webkit-flex-basis apply_type=length, use_auto
+-webkit-flex-direction
+-webkit-flex-grow type_name=float
+-webkit-flex-shrink type_name=float
+-webkit-flex-wrap
+-webkit-grid-auto-flow type_name=GridAutoFlow
+-webkit-hyphens type_name=Hyphens
+-webkit-justify-content
+-webkit-line-align type_name=LineAlign
+-webkit-line-break type_name=LineBreak
+-webkit-line-clamp type_name=LineClampValue
+-webkit-line-snap type_name=LineSnap
+-webkit-margin-after-collapse type_name=EMarginCollapse
+-webkit-margin-before-collapse type_name=EMarginCollapse
+-webkit-margin-bottom-collapse type_name=EMarginCollapse, name_for_methods=MarginAfterCollapse
+-webkit-margin-top-collapse type_name=EMarginCollapse, name_for_methods=MarginBeforeCollapse
+-webkit-marquee-direction
+-webkit-marquee-style name_for_methods=MarqueeBehavior
+-webkit-order type_name=int
+-webkit-perspective-origin-x apply_type=length
+-webkit-perspective-origin-y apply_type=length
+-webkit-print-color-adjust type_name=PrintColorAdjust
+-webkit-region-break-after type_name=EPageBreak, initial=initialPageBreak
+-webkit-region-break-before type_name=EPageBreak, initial=initialPageBreak
+-webkit-region-break-inside type_name=EPageBreak, initial=initialPageBreak
+-webkit-region-overflow type_name=RegionOverflow
+-webkit-rtl-ordering type_name=Order, getter=rtlOrdering, setter=setRTLOrdering, initial=initialRTLOrdering
+-webkit-ruby-position type_name=RubyPosition
+-webkit-shape-margin apply_type=length
+-webkit-shape-padding apply_type=length
+-webkit-text-align-last type_name=TextAlignLast, condition=CSS3_TEXT
+-webkit-text-combine type_name=TextCombine
+-webkit-text-decoration-style type_name=TextDecorationStyle, condition=CSS3_TEXT
+-webkit-text-emphasis-position type_name=TextEmphasisPosition
+-webkit-text-security
+-webkit-transform-origin-x apply_type=length
+-webkit-transform-origin-y apply_type=length
+-webkit-transform-style name_for_methods=TransformStyle3D
+-webkit-user-drag
+-webkit-user-modify
+-webkit-user-select
+-webkit-wrap-flow type_name=WrapFlow
+-webkit-wrap-through type_name=WrapThrough

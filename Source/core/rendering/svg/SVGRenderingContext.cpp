@@ -24,13 +24,11 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/rendering/svg/SVGRenderingContext.h"
 
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/rendering/RenderLayer.h"
-#include "core/rendering/style/BasicShapes.h"
 #include "core/rendering/svg/RenderSVGImage.h"
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/RenderSVGResourceClipper.h"
@@ -116,7 +114,7 @@ void SVGRenderingContext::prepareToRenderSVGContent(RenderObject* object, PaintI
 
         if (shadow) {
             m_paintInfo->context->clip(repaintRect);
-            m_paintInfo->context->setShadow(IntSize(roundToInt(shadow->x()), roundToInt(shadow->y())), shadow->blur(), shadow->color(), style->colorSpace());
+            m_paintInfo->context->setShadow(IntSize(roundToInt(shadow->x()), roundToInt(shadow->y())), shadow->blur(), shadow->color());
             m_paintInfo->context->beginTransparencyLayer(1);
             m_renderingFlags |= EndShadowLayer;
         }
@@ -350,5 +348,3 @@ bool SVGRenderingContext::bufferForeground(OwnPtr<ImageBuffer>& imageBuffer)
 }
 
 }
-
-#endif

@@ -38,10 +38,7 @@
 #include "core/dom/DocumentFragment.h"
 #include "core/dom/Event.h"
 #include "core/dom/NodeTraversal.h"
-#include "core/dom/Text.h"
 #include "core/html/HTMLDivElement.h"
-#include "core/html/HTMLMediaElement.h"
-#include "core/html/HTMLSpanElement.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackCueList.h"
 #include "core/html/track/WebVTTElement.h"
@@ -204,6 +201,7 @@ TextTrackCue::TextTrackCue(ScriptExecutionContext* context, double start, double
     , m_displayDirection(CSSValueLtr)
 {
     ASSERT(m_scriptExecutionContext->isDocument());
+    ScriptWrappable::init(this);
 
     // 4. If the text track cue writing direction is horizontal, then let
     // writing-mode be 'horizontal-tb'. Otherwise, if the text track cue writing

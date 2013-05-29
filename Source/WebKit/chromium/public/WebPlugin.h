@@ -31,13 +31,14 @@
 #ifndef WebPlugin_h
 #define WebPlugin_h
 
-#include "../../../Platform/chromium/public/WebCanvas.h"
-#include "../../../Platform/chromium/public/WebString.h"
-#include "../../../Platform/chromium/public/WebURL.h"
+#include "../../../../public/platform/WebCanvas.h"
+#include "../../../../public/platform/WebString.h"
+#include "../../../../public/platform/WebURL.h"
 #include "WebDragOperation.h"
 #include "WebDragStatus.h"
 
 struct NPObject;
+struct _NPP;
 
 namespace WebKit {
 
@@ -63,6 +64,7 @@ public:
     virtual WebPluginContainer* container() const { return 0; }
 
     virtual NPObject* scriptableObject() = 0;
+    virtual struct _NPP* pluginNPP() { return 0; }
 
     // Returns true if the form submission value is successfully obtained
     // from the plugin. The value would be associated with the name attribute

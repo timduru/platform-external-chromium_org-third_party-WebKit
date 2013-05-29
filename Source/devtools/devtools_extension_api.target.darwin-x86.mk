@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "devtools_html":
 $(gyp_shared_intermediate_dir)/resources/inspector/devtools_extension_api.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/devtools_extension_api.js: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/resources/inspector/devtools_extension_api.js: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/resources/inspector/devtools_extension_api.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/devtools_extension_api.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/resources/inspector/devtools_extension_api.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/resources/inspector/devtools_extension_api.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/generate_devtools_extension_api.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/ExtensionAPI.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/DevToolsExtensionAPI.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_devtools_extension_api_target_devtools_html ($@)"

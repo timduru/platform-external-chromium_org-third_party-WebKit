@@ -108,6 +108,23 @@ static PassRefPtr<InspectorObject> buildObjectForHeaders(const HTTPHeaderMap& he
 
 static PassRefPtr<TypeBuilder::Network::ResourceTiming> buildObjectForTiming(const ResourceLoadTiming& timing, DocumentLoader* loader)
 {
+#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
+    double requestTime = timing.requestTime;
+    return TypeBuilder::Network::ResourceTiming::create()
+        .setRequestTime(loader->timing()->monotonicTimeToPseudoWallTime(requestTime))
+        .setProxyStart(timing.calculateMillisecondDelta(timing.proxyStart))
+        .setProxyEnd(timing.calculateMillisecondDelta(timing.proxyEnd))
+        .setDnsStart(timing.calculateMillisecondDelta(timing.dnsStart))
+        .setDnsEnd(timing.calculateMillisecondDelta(timing.dnsEnd))
+        .setConnectStart(timing.calculateMillisecondDelta(timing.connectStart))
+        .setConnectEnd(timing.calculateMillisecondDelta(timing.connectEnd))
+        .setSslStart(timing.calculateMillisecondDelta(timing.sslStart))
+        .setSslEnd(timing.calculateMillisecondDelta(timing.sslEnd))
+        .setSendStart(timing.calculateMillisecondDelta(timing.sendStart))
+        .setSendEnd(timing.calculateMillisecondDelta(timing.sendEnd))
+        .setReceiveHeadersEnd(timing.calculateMillisecondDelta(timing.receiveHeadersEnd))
+        .release();
+#else
     return TypeBuilder::Network::ResourceTiming::create()
         .setRequestTime(loader->timing()->monotonicTimeToPseudoWallTime(timing.convertResourceLoadTimeToMonotonicTime(0)))
         .setProxyStart(timing.proxyStart)
@@ -122,6 +139,7 @@ static PassRefPtr<TypeBuilder::Network::ResourceTiming> buildObjectForTiming(con
         .setSendEnd(timing.sendEnd)
         .setReceiveHeadersEnd(timing.receiveHeadersEnd)
         .release();
+#endif
 }
 
 static PassRefPtr<TypeBuilder::Network::Request> buildObjectForResourceRequest(const ResourceRequest& request)
@@ -184,7 +202,7 @@ static PassRefPtr<TypeBuilder::Network::Response> buildObjectForResourceResponse
 static PassRefPtr<TypeBuilder::Network::CachedResource> buildObjectForCachedResource(const CachedResource& cachedResource, DocumentLoader* loader)
 {
     RefPtr<TypeBuilder::Network::CachedResource> resourceObject = TypeBuilder::Network::CachedResource::create()
-        .setUrl(cachedResource.url())
+        .setUrl(cachedResource.url().string())
         .setType(InspectorPageAgent::cachedResourceTypeJson(cachedResource))
         .setBodySize(cachedResource.encodedSize());
     RefPtr<TypeBuilder::Network::Response> resourceResponse = buildObjectForResourceResponse(cachedResource.response(), loader);
@@ -202,7 +220,7 @@ InspectorResourceAgent::~InspectorResourceAgent()
     ASSERT(!m_instrumentingAgents->inspectorResourceAgent());
 }
 
-void InspectorResourceAgent::willSendResourceRequest(unsigned long identifier, DocumentLoader* loader, ResourceRequest& request, const ResourceResponse& redirectResponse)
+void InspectorResourceAgent::willSendRequest(unsigned long identifier, DocumentLoader* loader, ResourceRequest& request, const ResourceResponse& redirectResponse)
 {
     String requestId = IdentifiersFactory::requestId(identifier);
     m_resourcesData->resourceCreated(requestId, m_pageAgent->loaderId(loader));
@@ -294,8 +312,13 @@ void InspectorResourceAgent::didReceiveData(unsigned long identifier, const char
     m_frontend->dataReceived(requestId, currentTime(), dataLength, encodedDataLength);
 }
 
-void InspectorResourceAgent::didFinishLoading(unsigned long identifier, DocumentLoader* loader, double finishTime)
+void InspectorResourceAgent::didFinishLoading(unsigned long identifier, DocumentLoader* loader, double monotonicFinishTime)
 {
+    double finishTime = 0.0;
+    // FIXME: Expose all of the timing details to inspector and have it calculate finishTime.
+    if (monotonicFinishTime)
+        finishTime = loader->timing()->monotonicTimeToPseudoWallTime(monotonicFinishTime);
+
     String requestId = IdentifiersFactory::requestId(identifier);
     if (m_resourcesData->resourceType(requestId) == InspectorPageAgent::DocumentResource) {
         RefPtr<SharedBuffer> buffer = loader->frameLoader()->documentLoader()->mainResourceData();
@@ -638,8 +661,11 @@ void InspectorResourceAgent::setCacheDisabled(ErrorString*, bool cacheDisabled)
         memoryCache()->evictResources();
 }
 
-void InspectorResourceAgent::mainFrameNavigated(DocumentLoader* loader)
+void InspectorResourceAgent::didCommitLoad(Frame* frame, DocumentLoader* loader)
 {
+    if (loader->frame() != frame->page()->mainFrame())
+        return;
+
     if (m_state->getBoolean(ResourceAgentState::cacheDisabled))
         memoryCache()->evictResources();
 

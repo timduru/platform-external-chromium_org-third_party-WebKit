@@ -24,10 +24,12 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "V8Node.h"
+#include "V8NodeList.h"
 #include "V8TestObject.h"
 #include "bindings/bindings/tests/idls/TestPartialInterface.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/V8Binding.h"
+#include "bindings/v8/V8Collection.h"
 #include "bindings/v8/V8DOMConfiguration.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8ObjectConstructor.h"
@@ -40,39 +42,7 @@
 #include "wtf/RefPtr.h"
 #include "wtf/UnusedParam.h"
 
-#if ENABLE(BINDING_INTEGRITY)
-#if defined(OS_WIN)
-#pragma warning(disable: 4483)
-extern "C" { extern void (*const __identifier("??_7TestInterface@WebCore@@6B@")[])(); }
-#else
-extern "C" { extern void* _ZTVN7WebCore13TestInterfaceE[]; }
-#endif
-#endif // ENABLE(BINDING_INTEGRITY)
-
 namespace WebCore {
-
-#if ENABLE(BINDING_INTEGRITY)
-// This checks if a DOM object that is about to be wrapped is valid.
-// Specifically, it checks that a vtable of the DOM object is equal to
-// a vtable of an expected class.
-// Due to a dangling pointer, the DOM object you are wrapping might be
-// already freed or realloced. If freed, the check will fail because
-// a free list pointer should be stored at the head of the DOM object.
-// If realloced, the check will fail because the vtable of the DOM object
-// differs from the expected vtable (unless the same class of DOM object
-// is realloced on the slot).
-inline void checkTypeOrDieTrying(TestInterface* object)
-{
-    void* actualVTablePointer = *(reinterpret_cast<void**>(object));
-#if defined(OS_WIN)
-    void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestInterface@WebCore@@6B@"));
-#else
-    void* expectedVTablePointer = &_ZTVN7WebCore13TestInterfaceE[2];
-#endif
-    if (actualVTablePointer != expectedVTablePointer)
-        CRASH();
-}
-#endif // ENABLE(BINDING_INTEGRITY)
 
 #if defined(OS_WIN)
 // In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
@@ -86,6 +56,8 @@ void initializeScriptWrappableForInterface(TestInterface* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestInterface::info);
+    else
+        ASSERT_NOT_REACHED();
 }
 #if defined(OS_WIN)
 namespace WebCore {
@@ -417,17 +389,13 @@ static v8::Handle<v8::Value> supplementalMethod2Method(const v8::Arguments& args
         return throwNotEnoughArgumentsError(args.GetIsolate());
     TestInterface* imp = V8TestInterface::toNative(args.Holder());
     ExceptionCode ec = 0;
-    {
     V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, strArg, args[0]);
     V8TRYCATCH(TestObj*, objArg, V8TestObject::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(args[1])) : 0);
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
     RefPtr<TestObj> result = TestPartialInterface::supplementalMethod2(scriptContext, imp, strArg, objArg, ec);
     if (UNLIKELY(ec))
-        goto fail;
+        return setDOMException(ec, args.GetIsolate());
     return toV8(result.release(), args.Holder(), args.GetIsolate());
-    }
-    fail:
-    return setDOMException(ec, args.GetIsolate());
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -469,26 +437,27 @@ static v8::Handle<v8::Value> supplementalMethod4MethodCallback(const v8::Argumen
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
 
-static v8::Handle<v8::Value> constructor(const v8::Arguments& args)
+static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1)
-        return throwNotEnoughArgumentsError(args.GetIsolate());
-
+    if (args.Length() < 1) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
     ExceptionCode ec = 0;
-    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, str1, args[0]);
-    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, str2, args[1]);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, str1, args[0]);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, str2, args[1]);
 
     ScriptExecutionContext* context = getScriptExecutionContext();
 
     RefPtr<TestInterface> impl = TestInterface::create(context, str1, str2, ec);
     v8::Handle<v8::Object> wrapper = args.Holder();
-    if (ec)
-        goto fail;
+    if (ec) {
+        setDOMException(ec, args.GetIsolate());
+        return;
+    }
 
     V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestInterface::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
-    return wrapper;
-    fail:
-    return setDOMException(ec, args.GetIsolate());
+    args.GetReturnValue().Set(wrapper);
 }
 
 } // namespace TestInterfaceV8Internal
@@ -546,15 +515,41 @@ COMPILE_ASSERT(1 == TestPartialInterface::SUPPLEMENTALCONSTANT1, TestInterfaceEn
 COMPILE_ASSERT(2 == TestPartialInterface::CONST_IMPL, TestInterfaceEnumCONST_IMPLIsWrongUseDoNotCheckConstants);
 #endif
 
-v8::Handle<v8::Value> V8TestInterface::constructorCallback(const v8::Arguments& args)
+void V8TestInterface::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+    if (!args.IsConstructCall()) {
+        throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+        return;
+    }
 
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
+    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject) {
+        args.GetReturnValue().Set(args.Holder());
+        return;
+    }
 
-    return TestInterfaceV8Internal::constructor(args);
+    TestInterfaceV8Internal::constructor(args);
+}
+
+v8::Handle<v8::Value> V8TestInterface::namedPropertyGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+    if (!info.Holder()->GetRealNamedPropertyInPrototypeChain(name).IsEmpty())
+        return v8Undefined();
+    if (info.Holder()->HasRealNamedCallbackProperty(name))
+        return v8Undefined();
+
+    ASSERT(V8DOMWrapper::maybeDOMWrapper(info.Holder()));
+    TestInterface* collection = toNative(info.Holder());
+    AtomicString propertyName = toWebCoreAtomicString(name);
+    bool element0Enabled = false;
+    RefPtr<Node> element0;
+    bool element1Enabled = false;
+    RefPtr<NodeList> element1;
+    collection->getItem(propertyName, element0Enabled, element0, element1Enabled, element1);
+    if (element0Enabled)
+        return toV8Fast(element0.release(), info, collection);
+    if (element1Enabled)
+        return toV8Fast(element1.release(), info, collection);
+    return v8Undefined();
 }
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestInterfaceTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
@@ -582,6 +577,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestInterfaceTemplate(v8:
     }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
+    desc->InstanceTemplate()->SetNamedPropertyHandler(V8TestInterface::namedPropertyGetter, V8TestInterface::namedPropertySetter, 0, 0, 0);
 
     // Custom Signature 'supplementalMethod2'
     const int supplementalMethod2Argc = 2;
@@ -660,16 +656,12 @@ v8::Handle<v8::Object> V8TestInterface::createWrapper(PassRefPtr<TestInterface> 
     ASSERT(impl.get());
     ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
 
-#if ENABLE(BINDING_INTEGRITY)
-    checkTypeOrDieTrying(impl.get());
-#endif
-
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, hasDependentLifetime ? WrapperConfiguration::Dependent : WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Dependent);
     return wrapper;
 }
 void V8TestInterface::derefObject(void* object)

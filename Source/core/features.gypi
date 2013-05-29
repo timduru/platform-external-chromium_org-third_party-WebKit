@@ -40,9 +40,9 @@
       'ENABLE_CSS_EXCLUSIONS=1',
       'ENABLE_CSS_REGIONS=1',
       'ENABLE_CUSTOM_SCHEME_HANDLER=0',
-      'ENABLE_ENCRYPTED_MEDIA=1',
-      'ENABLE_SVG=<(enable_svg)',
-      'ENABLE_SVG_FONTS=<(enable_svg)',
+      'ENABLE_ENCRYPTED_MEDIA_V2=1',
+      'ENABLE_SVG=1',
+      'ENABLE_SVG_FONTS=1',
       'ENABLE_TOUCH_ICON_LOADING=<(enable_touch_icon_loading)',
       'ENABLE_WEBGL=1',
       'ENABLE_XHR_TIMEOUT=0',
@@ -53,10 +53,8 @@
     # We have to nest variables inside variables so that they can be overridden
     # through GYP_DEFINES.
     'variables': {
-      'enable_svg%': 1,
       'enable_touch_icon_loading%' : 0,
     },
-    'enable_svg%': '<(enable_svg)',
     'conditions': [
       ['use_concatenated_impulse_responses==1', {
         # Use concatenated HRTF impulse responses
@@ -65,7 +63,6 @@
       ['OS=="android"', {
         'feature_defines': [
           'ENABLE_CALENDAR_PICKER=0',
-          'ENABLE_DATALIST_ELEMENT=0',
           'ENABLE_FAST_MOBILE_SCROLLING=1',
           'ENABLE_INPUT_SPEECH=0',
           'ENABLE_INPUT_TYPE_COLOR=0',
@@ -73,7 +70,6 @@
           'ENABLE_MEDIA_CAPTURE=1',
           'ENABLE_NOTIFICATIONS=0',
           'ENABLE_ORIENTATION_EVENTS=1',
-          'ENABLE_PAGE_POPUP=0',
           'ENABLE_PRINTING=0',
           'ENABLE_NAVIGATOR_CONTENT_UTILS=0',
           'WTF_USE_NATIVE_FULLSCREEN_VIDEO=1',
@@ -82,7 +78,6 @@
       }, { # OS!="android"
         'feature_defines': [
           'ENABLE_CALENDAR_PICKER=1',
-          'ENABLE_DATALIST_ELEMENT=1',
           'ENABLE_INPUT_SPEECH=1',
           'ENABLE_INPUT_TYPE_COLOR=1',
           'ENABLE_INPUT_MULTIPLE_FIELDS_UI=1',
@@ -91,7 +86,6 @@
           'ENABLE_NAVIGATOR_CONTENT_UTILS=1',
           'ENABLE_NOTIFICATIONS=1',
           'ENABLE_ORIENTATION_EVENTS=0',
-          'ENABLE_PAGE_POPUP=1',
           'ENABLE_PRINTING=1',
           'ENABLE_WEB_AUDIO=1',
         ],
@@ -100,11 +94,6 @@
         'feature_defines': [
           # 8Bit text runs should be enabled for all platforms webkit.org/b/111348
           'ENABLE_8BIT_TEXTRUN=1',
-          'ENABLE_BINDING_INTEGRITY=1',
-        ],
-      }, { # OS!="linux"
-        'feature_defines': [
-          'ENABLE_BINDING_INTEGRITY=0',
         ],
       }],
       # Mac OS X uses Accelerate.framework FFT by default instead of FFmpeg.

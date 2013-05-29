@@ -22,11 +22,8 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
-#include "core/css/CSSInheritedValue.h"
-#include "core/css/CSSInitialValue.h"
 #include "core/css/CSSParser.h"
 #include "core/css/CSSValueList.h"
 #include "core/rendering/RenderTheme.h"
@@ -290,7 +287,7 @@ bool CSSParser::parseSVGValue(CSSPropertyID propId, bool important)
     case CSSPropertyMarker:
     {
         ShorthandScope scope(this, propId);
-        m_implicitShorthand = true;
+        CSSParser::ImplicitScope implicitScope(this, PropertyImplicit);
         if (!parseValue(CSSPropertyMarkerStart, important))
             return false;
         if (m_valueList->current()) {
@@ -300,7 +297,6 @@ bool CSSParser::parseSVGValue(CSSPropertyID propId, bool important)
         CSSValue* value = m_parsedProperties.last().value();
         addProperty(CSSPropertyMarkerMid, value, important);
         addProperty(CSSPropertyMarkerEnd, value, important);
-        m_implicitShorthand = false;
         return true;
     }
     default:
@@ -373,5 +369,3 @@ PassRefPtr<CSSValue> CSSParser::parseSVGColor()
 }
 
 }
-
-#endif // ENABLE(SVG)

@@ -18,6 +18,7 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_platform_geometry_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_platform_geometry_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_remaining_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_remaining_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_rendering_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_rendering_gyp.a \
+	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_svg_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_svg_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_derived_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_derived_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_Platform_Platform_gyp_webkit_platform_gyp)/webkit_platform.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_wtf_wtf_gyp)/third_party_WebKit_Source_wtf_wtf_gyp.a \
@@ -26,8 +27,7 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_npapi_npapi_gyp)/npapi.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_qcms_qcms_gyp)/third_party_qcms_qcms_gyp.a \
 	$(call intermediates-dir-for,GYP,v8_tools_gyp_v8_gyp)/v8.stamp \
-	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_arm_neon_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_arm_neon_gyp.a \
-	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_svg_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_svg_gyp.a
+	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_arm_neon_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_arm_neon_gyp.a
 
 GYP_GENERATED_OUTPUTS :=
 

@@ -29,8 +29,6 @@
 #include "core/css/CSSParser.h"
 #include "core/css/CSSRuleList.h"
 #include "core/css/CSSStyleSheet.h"
-#include "core/css/StylePropertySet.h"
-#include "core/css/StyleSheet.h"
 #include "core/css/WebKitCSSKeyframeRule.h"
 #include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/text/StringBuilder.h>
@@ -122,8 +120,8 @@ void WebKitCSSKeyframesRule::insertRule(const String& ruleText)
 {
     ASSERT(m_childRuleCSSOMWrappers.size() == m_keyframesRule->keyframes().size());
 
-    CSSParser parser(parserContext());
     CSSStyleSheet* styleSheet = parentStyleSheet();
+    CSSParser parser(parserContext(), UseCounter::getFrom(styleSheet));
     RefPtr<StyleKeyframe> keyframe = parser.parseKeyframeRule(styleSheet ? styleSheet->contents() : 0, ruleText);
     if (!keyframe)
         return;

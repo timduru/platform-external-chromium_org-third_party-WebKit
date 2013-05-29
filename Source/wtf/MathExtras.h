@@ -26,13 +26,14 @@
 #ifndef WTF_MathExtras_h
 #define WTF_MathExtras_h
 
+#include "wtf/CPU.h"
+#include "wtf/StdLibExtras.h"
 #include <algorithm>
 #include <cmath>
 #include <float.h>
 #include <limits>
 #include <stdint.h>
 #include <stdlib.h>
-#include <wtf/StdLibExtras.h>
 
 #if OS(SOLARIS)
 #include <ieeefp.h>
@@ -150,10 +151,6 @@ inline float log2f(float num)
 #endif
 
 #if COMPILER(MSVC)
-// The 64bit version of abs() is already defined in stdlib.h which comes with VC10
-#if COMPILER(MSVC9_OR_LOWER)
-inline long long abs(long long num) { return _abs64(num); }
-#endif
 
 namespace std {
 

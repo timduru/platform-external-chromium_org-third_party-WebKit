@@ -100,9 +100,7 @@ protected:
     unsigned m_arraySize : 28;
     mutable unsigned m_presentationAttributeStyleIsDirty : 1;
     mutable unsigned m_styleAttributeIsDirty : 1;
-#if ENABLE(SVG)
     mutable unsigned m_animatedSVGAttributesAreDirty : 1;
-#endif
 
     mutable RefPtr<StylePropertySet> m_inlineStyle;
     mutable SpaceSplitString m_classNames;
@@ -113,9 +111,7 @@ private:
     friend class StyledElement;
     friend class ShareableElementData;
     friend class UniqueElementData;
-#if ENABLE(SVG)
     friend class SVGElement;
-#endif
 
     const Attribute* attributeBase() const;
     const Attribute* getAttributeItem(const AtomicString& name, bool shouldIgnoreAttributeCase) const;
@@ -359,9 +355,9 @@ public:
     bool hasLocalName(const AtomicString& other) const { return m_tagName.localName() == other; }
     bool hasLocalName(const QualifiedName& other) const { return m_tagName.localName() == other.localName(); }
 
-    const AtomicString& localName() const { return m_tagName.localName(); }
-    const AtomicString& prefix() const { return m_tagName.prefix(); }
-    const AtomicString& namespaceURI() const { return m_tagName.namespaceURI(); }
+    virtual const AtomicString& localName() const OVERRIDE { return m_tagName.localName(); }
+    virtual const AtomicString& prefix() const OVERRIDE { return m_tagName.prefix(); }
+    virtual const AtomicString& namespaceURI() const OVERRIDE { return m_tagName.namespaceURI(); }
 
     virtual KURL baseURI() const OVERRIDE FINAL;
 
@@ -369,6 +365,8 @@ public:
 
     PassRefPtr<Element> cloneElementWithChildren();
     PassRefPtr<Element> cloneElementWithoutChildren();
+
+    void scheduleSyntheticStyleChange();
 
     void normalizeAttributes();
     String nodeNamePreservingCase() const;
@@ -546,18 +544,16 @@ public:
 
     // Used for disabled form elements; if true, prevents mouse events from being dispatched
     // to event listeners, and prevents DOMActivate events from being sent at all.
-    virtual bool isDisabledFormControl() const;
+    virtual bool isDisabledFormControl() const { return false; }
 
     bool isInert() const;
     virtual bool shouldBeReparentedUnderRenderView(const RenderStyle*) const { return isInTopLayer(); }
 
-#if ENABLE(SVG)
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
     bool hasPendingResources() const;
     void setHasPendingResources();
     void clearHasPendingResources();
     virtual void buildPendingResource() { };
-#endif
 
     enum {
         ALLOW_KEYBOARD_INPUT = 1 << 0,
@@ -680,9 +676,6 @@ private:
 
     void cancelFocusAppearanceUpdate();
 
-    virtual const AtomicString& virtualPrefix() const OVERRIDE FINAL { return prefix(); }
-    virtual const AtomicString& virtualLocalName() const OVERRIDE FINAL { return localName(); }
-    virtual const AtomicString& virtualNamespaceURI() const OVERRIDE FINAL { return namespaceURI(); }
     virtual RenderStyle* virtualComputedStyle(PseudoId pseudoElementSpecifier = NOPSEUDO) { return computedStyle(pseudoElementSpecifier); }
     
     // cloneNode is private so that non-virtual cloneElementWithChildren and cloneElementWithoutChildren
@@ -839,10 +832,8 @@ inline const AtomicString& Element::getClassAttribute() const
 {
     if (!hasClass())
         return nullAtom;
-#if ENABLE(SVG)
     if (isSVGElement())
         return getAttribute(HTMLNames::classAttr);
-#endif
     return fastGetAttribute(HTMLNames::classAttr);
 }
 

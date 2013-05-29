@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "concatenate_devtools_audits_js":
 $(gyp_shared_intermediate_dir)/resources/inspector/AuditsPanel.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/AuditsPanel.js: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/resources/inspector/AuditsPanel.js: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/resources/inspector/AuditsPanel.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/AuditsPanel.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/resources/inspector/AuditsPanel.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/resources/inspector/AuditsPanel.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/inline_js_imports.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/AuditCategories.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/AuditController.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/AuditFormatters.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/AuditLauncherView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/AuditResultView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/AuditRules.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/AuditsPanel.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_concatenated_devtools_audits_js_target_concatenate_devtools_audits_js ($@)"

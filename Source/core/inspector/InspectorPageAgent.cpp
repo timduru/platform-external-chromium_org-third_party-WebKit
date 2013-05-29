@@ -97,6 +97,8 @@ static const char pageAgentShowPaintRects[] = "pageAgentShowPaintRects";
 static const char pageAgentShowDebugBorders[] = "pageAgentShowDebugBorders";
 static const char touchEventEmulationEnabled[] = "touchEventEmulationEnabled";
 static const char pageAgentEmulatedMedia[] = "pageAgentEmulatedMedia";
+static const char showSizeOnResize[] = "showSizeOnResize";
+static const char showGridOnResize[] = "showGridOnResize";
 }
 
 static bool decodeBuffer(const char* buffer, unsigned size, const String& textEncodingName, String* result)
@@ -402,6 +404,7 @@ void InspectorPageAgent::disable(ErrorString*)
     setShowFPSCounter(0, false);
     setEmulatedMedia(0, "");
     setContinuousPaintingEnabled(0, false);
+    setShowViewportSizeOnResize(0, false, 0);
 
     if (!deviceMetricsChanged(0, 0, 1, false))
         return;
@@ -536,7 +539,7 @@ void InspectorPageAgent::getCookies(ErrorString*, RefPtr<TypeBuilder::Array<Type
         Vector<KURL> allURLs = allResourcesURLsForFrame(frame);
         for (Vector<KURL>::const_iterator it = allURLs.begin(); it != allURLs.end(); ++it) {
             Vector<Cookie> docCookiesList;
-            getRawCookies(document, KURL(ParsedURLString, *it), docCookiesList);
+            getRawCookies(document, *it, docCookiesList);
             int cookiesSize = docCookiesList.size();
             for (int i = 0; i < cookiesSize; i++) {
                 if (!rawCookiesList.contains(docCookiesList[i]))
@@ -641,13 +644,13 @@ void InspectorPageAgent::searchInResources(ErrorString*, const String& text, con
             if (textContentForCachedResource(cachedResource, &content)) {
                 int matchesCount = ContentSearchUtils::countRegularExpressionMatches(regex.get(), content);
                 if (matchesCount)
-                    searchResults->addItem(buildObjectForSearchResult(frameId(frame), cachedResource->url(), matchesCount));
+                    searchResults->addItem(buildObjectForSearchResult(frameId(frame), cachedResource->url().string(), matchesCount));
             }
         }
         if (mainResourceContent(frame, false, &content)) {
             int matchesCount = ContentSearchUtils::countRegularExpressionMatches(regex.get(), content);
             if (matchesCount)
-                searchResults->addItem(buildObjectForSearchResult(frameId(frame), frame->document()->url(), matchesCount));
+                searchResults->addItem(buildObjectForSearchResult(frameId(frame), frame->document()->url().string(), matchesCount));
         }
     }
 
@@ -673,7 +676,7 @@ void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int 
     const static long maxDimension = 10000000;
 
     if (width < 0 || height < 0 || width > maxDimension || height > maxDimension) {
-        *errorString = makeString("Width and height values must be positive, not greater than ", String::number(maxDimension));
+        *errorString = "Width and height values must be positive, not greater than " + String::number(maxDimension);
         return;
     }
 
@@ -814,18 +817,21 @@ void InspectorPageAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWor
         frame->script()->executeScript(m_scriptToEvaluateOnLoadOnce);
 }
 
-void InspectorPageAgent::domContentEventFired()
+void InspectorPageAgent::domContentLoadedEventFired(Frame* frame)
 {
+    if (frame->page()->mainFrame() != frame)
+        return;
+
     m_isFirstLayoutAfterOnLoad = true;
     m_frontend->domContentEventFired(currentTime());
 }
 
-void InspectorPageAgent::loadEventFired()
+void InspectorPageAgent::loadEventFired(Frame*)
 {
     m_frontend->loadEventFired(currentTime());
 }
 
-void InspectorPageAgent::frameNavigated(DocumentLoader* loader)
+void InspectorPageAgent::didCommitLoad(Frame*, DocumentLoader* loader)
 {
     if (loader->frame() == m_page->mainFrame()) {
         m_scriptToEvaluateOnLoadOnce = m_pendingScriptToEvaluateOnLoadOnce;
@@ -1009,8 +1015,8 @@ void InspectorPageAgent::didScroll()
 
 void InspectorPageAgent::didResizeMainFrame()
 {
-    if (m_enabled)
-        m_overlay->showAndHideViewSize();
+    if (m_enabled && m_state->getBoolean(PageAgentState::showSizeOnResize))
+        m_overlay->showAndHideViewSize(m_state->getBoolean(PageAgentState::showGridOnResize));
 }
 
 void InspectorPageAgent::didRecalculateStyle()
@@ -1060,7 +1066,7 @@ PassRefPtr<TypeBuilder::Page::FrameResourceTree> InspectorPageAgent::buildObject
         CachedResource* cachedResource = *it;
 
         RefPtr<TypeBuilder::Page::FrameResourceTree::Resources> resourceObject = TypeBuilder::Page::FrameResourceTree::Resources::create()
-            .setUrl(cachedResource->url())
+            .setUrl(cachedResource->url().string())
             .setType(cachedResourceTypeJson(*cachedResource))
             .setMimeType(cachedResource->response().mimeType());
         if (cachedResource->wasCanceled())
@@ -1228,6 +1234,12 @@ void InspectorPageAgent::captureScreenshot(ErrorString*, String*)
 void InspectorPageAgent::handleJavaScriptDialog(ErrorString* errorString, bool accept, const String* promptText)
 {
     // Handled on the browser level.
+}
+
+void InspectorPageAgent::setShowViewportSizeOnResize(ErrorString*, bool show, const bool* showGrid)
+{
+    m_state->setBoolean(PageAgentState::showSizeOnResize, show);
+    m_state->setBoolean(PageAgentState::showGridOnResize, showGrid && *showGrid);
 }
 
 } // namespace WebCore

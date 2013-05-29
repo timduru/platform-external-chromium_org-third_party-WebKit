@@ -75,8 +75,8 @@ public:
 
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
 
-    void didCommitLoad();
-    void domContentLoadedEventFired();
+    void didCommitLoad(Frame*, DocumentLoader*);
+    void domContentLoadedEventFired(Frame*);
 
     bool hasFrontend() const { return m_frontend; }
 

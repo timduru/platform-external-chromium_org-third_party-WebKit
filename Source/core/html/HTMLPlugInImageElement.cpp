@@ -155,7 +155,9 @@ RenderObject* HTMLPlugInImageElement::createRenderer(RenderArena* arena, RenderS
 
 void HTMLPlugInImageElement::willRecalcStyle(StyleChange)
 {
-    // FIXME: Why is this necessary?  Manual re-attach is almost always wrong.
+    // FIXME: setNeedsWidgetUpdate is used by subclasses to signal that they need
+    // their renderer replaced on the next style recalc. It's not clear why they
+    // don't just do lazyReattach instead. This code looks like a terrible hack.
     if (!useFallbackContent() && needsWidgetUpdate() && renderer() && !isImageType())
         reattach();
 }
@@ -220,9 +222,9 @@ void HTMLPlugInImageElement::didMoveToNewDocument(Document* oldDocument)
     HTMLPlugInElement::didMoveToNewDocument(oldDocument);
 }
 
-void HTMLPlugInImageElement::updateWidgetCallback(Node* n, unsigned)
+void HTMLPlugInImageElement::updateWidgetCallback(Node* n)
 {
-    static_cast<HTMLPlugInImageElement*>(n)->updateWidgetIfNecessary();
+    toHTMLPlugInImageElement(n)->updateWidgetIfNecessary();
 }
 
 void HTMLPlugInImageElement::subframeLoaderWillCreatePlugIn(const KURL& url)

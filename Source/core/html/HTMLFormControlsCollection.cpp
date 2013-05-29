@@ -25,7 +25,6 @@
 
 #include "HTMLNames.h"
 #include "core/html/HTMLFieldSetElement.h"
-#include "core/html/HTMLFormControlElement.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLImageElement.h"
 
@@ -159,6 +158,24 @@ void HTMLFormControlsCollection::updateNameCache() const
     }
 
     setHasNameCache();
+}
+
+void HTMLFormControlsCollection::namedGetter(const AtomicString& name, bool& returnValue0Enabled, RefPtr<RadioNodeList>& returnValue0, bool& returnValue1Enabled, RefPtr<Node>& returnValue1)
+{
+    Vector<RefPtr<Node> > namedItems;
+    this->namedItems(name, namedItems);
+
+    if (!namedItems.size())
+        return;
+
+    if (namedItems.size() == 1) {
+        returnValue1Enabled = true;
+        returnValue1 = namedItems.at(0);
+        return;
+    }
+
+    returnValue0Enabled = true;
+    returnValue0 = this->ownerNode()->radioNodeList(name);
 }
 
 }

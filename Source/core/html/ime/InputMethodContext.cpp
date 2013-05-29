@@ -31,7 +31,6 @@
 #include "config.h"
 #include "core/html/ime/InputMethodContext.h"
 
-#include "core/html/HTMLElement.h"
 #include "core/html/ime/Composition.h"
 
 namespace WebCore {
@@ -46,6 +45,7 @@ InputMethodContext::InputMethodContext(HTMLElement* element)
     , m_composition(0)
     , m_element(element)
 {
+    ScriptWrappable::init(this);
 }
 
 InputMethodContext::~InputMethodContext()

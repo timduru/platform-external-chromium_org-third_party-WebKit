@@ -55,6 +55,7 @@ public:
     virtual void setAcceleratedCompositingForCanvasEnabled(bool);
     virtual void setAcceleratedCompositingForFixedPositionEnabled(bool);
     virtual void setAcceleratedCompositingForOverflowScrollEnabled(bool);
+    virtual void setAcceleratedCompositingForTransitionEnabled(bool);
     virtual void setAcceleratedCompositingForPluginsEnabled(bool);
     virtual void setAcceleratedCompositingForScrollableFramesEnabled(bool);
     virtual void setAcceleratedCompositingForVideoEnabled(bool);
@@ -92,7 +93,6 @@ public:
     virtual void setExperimentalCSSCustomFilterEnabled(bool);
     virtual void setExperimentalCSSGridLayoutEnabled(bool);
     virtual void setCSSStickyPositionEnabled(bool);
-    virtual void setExperimentalCSSVariablesEnabled(bool);
     virtual void setExperimentalWebGLEnabled(bool);
     virtual void setExperimentalWebSocketEnabled(bool);
     virtual void setFantasyFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON);
@@ -100,18 +100,17 @@ public:
     virtual void setFixedPositionCreatesStackingContext(bool);
     virtual void setFontRenderingModeNormal();
     virtual void setForceCompositingMode(bool);
-    virtual void setFrameFlatteningEnabled(bool);
     virtual void setFullScreenEnabled(bool);
     virtual void setGestureTapHighlightEnabled(bool);
     virtual void setHyperlinkAuditingEnabled(bool);
     virtual void setImagesEnabled(bool);
-    virtual void setInitializeAtMinimumPageScale(bool);
     virtual void setJavaEnabled(bool);
     virtual void setJavaScriptCanAccessClipboard(bool);
     virtual void setJavaScriptCanOpenWindowsAutomatically(bool);
     virtual void setJavaScriptEnabled(bool);
     virtual void setLayoutFallbackWidth(int);
     virtual void setLoadsImagesAutomatically(bool);
+    virtual void setLoadWithOverviewMode(bool);
     virtual void setLocalStorageEnabled(bool);
     virtual void setMediaPlaybackRequiresUserGesture(bool);
     virtual void setMemoryInfoEnabled(bool);
@@ -126,6 +125,7 @@ public:
     virtual void setPasswordEchoEnabled(bool);
     virtual void setPerTilePaintingEnabled(bool);
     virtual void setPictographFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON);
+    virtual void setPinchVirtualViewportEnabled(bool);
     virtual void setPluginsEnabled(bool);
     virtual void setPrivilegedWebGLExtensionsEnabled(bool);
     virtual void setRenderVSyncNotificationEnabled(bool);
@@ -151,7 +151,6 @@ public:
     virtual void setTextAreasAreResizable(bool);
     virtual void setTextAutosizingEnabled(bool);
     virtual void setTextAutosizingFontScaleFactor(float);
-    virtual void setTextDirectionSubmenuInclusionBehaviorNeverIncluded();
     virtual void setTouchDragDropEnabled(bool);
     virtual void setTouchEditingEnabled(bool);
     virtual void setThreadedHTMLParser(bool);
@@ -171,13 +170,11 @@ public:
     bool showFPSCounter() const { return m_showFPSCounter; }
     bool showPaintRects() const { return m_showPaintRects; }
     bool renderVSyncNotificationEnabled() const { return m_renderVSyncNotificationEnabled; }
-    bool initializeAtMinimumPageScale() const { return m_initializeAtMinimumPageScale; }
     bool autoZoomFocusedNodeToLegibleScale() const { return m_autoZoomFocusedNodeToLegibleScale; }
     bool gestureTapHighlightEnabled() const { return m_gestureTapHighlightEnabled; }
     bool doubleTapToZoomEnabled() const { return m_doubleTapToZoomEnabled; }
     bool perTilePaintingEnabled() const { return m_perTilePaintingEnabled; }
     bool supportDeprecatedTargetDensityDPI() const { return m_supportDeprecatedTargetDensityDPI; }
-    bool useWideViewport() const { return m_useWideViewport; }
 
 private:
     WebCore::Settings* m_settings;
@@ -185,8 +182,6 @@ private:
     bool m_showPaintRects;
     bool m_renderVSyncNotificationEnabled;
     bool m_viewportEnabled;
-    bool m_initializeAtMinimumPageScale;
-    bool m_useWideViewport;
     bool m_gestureTapHighlightEnabled;
     bool m_autoZoomFocusedNodeToLegibleScale;
     bool m_deferredImageDecodingEnabled;

@@ -59,9 +59,10 @@
 #ifndef Atomics_h
 #define Atomics_h
 
-#include <wtf/Platform.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/UnusedParam.h>
+#include "wtf/CPU.h"
+#include "wtf/Platform.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/UnusedParam.h"
 
 #if OS(WINDOWS)
 #include <windows.h>
@@ -74,7 +75,7 @@ namespace WTF {
 #if OS(WINDOWS)
 #define WTF_USE_LOCKFREE_THREADSAFEREFCOUNTED 1
 
-#if COMPILER(MINGW) || COMPILER(MSVC7_OR_LOWER)
+#if COMPILER(MINGW)
 inline int atomicIncrement(int* addend) { return InterlockedIncrement(reinterpret_cast<long*>(addend)); }
 inline int atomicDecrement(int* addend) { return InterlockedDecrement(reinterpret_cast<long*>(addend)); }
 

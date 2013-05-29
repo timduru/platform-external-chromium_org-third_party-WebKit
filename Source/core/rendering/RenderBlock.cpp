@@ -33,7 +33,6 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
-#include "core/html/HTMLFormElement.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
@@ -51,17 +50,14 @@
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/LayoutRepainter.h"
 #include "core/rendering/PaintInfo.h"
-#include "core/rendering/RenderBoxRegionInfo.h"
 #include "core/rendering/RenderCombineText.h"
 #include "core/rendering/RenderDeprecatedFlexibleBox.h"
 #include "core/rendering/RenderFlexibleBox.h"
-#include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderMarquee.h"
 #include "core/rendering/RenderNamedFlowThread.h"
 #include "core/rendering/RenderRegion.h"
-#include "core/rendering/RenderReplica.h"
 #include "core/rendering/RenderTableCell.h"
 #include "core/rendering/RenderTextFragment.h"
 #include "core/rendering/RenderTheme.h"
@@ -1440,8 +1436,10 @@ void RenderBlock::updateExclusionShapeInsideInfoAfterStyleChange(const Exclusion
     if (shapeInside) {
         ExclusionShapeInsideInfo* exclusionShapeInsideInfo = ensureExclusionShapeInsideInfo();
         exclusionShapeInsideInfo->dirtyShapeSize();
-    } else
+    } else {
         setExclusionShapeInsideInfo(nullptr);
+        markShapeInsideDescendantsForLayout();
+    }
 }
 
 static inline bool exclusionInfoRequiresRelayout(const RenderBlock* block)
@@ -2558,6 +2556,12 @@ void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, Lay
     bool markDescendantsWithFloats = false;
     if (logicalTopEstimate != oldLogicalTop && !child->avoidsFloats() && childRenderBlock && childRenderBlock->containsFloats())
         markDescendantsWithFloats = true;
+    else if (UNLIKELY(logicalTopEstimate.mightBeSaturated()))
+        // logicalTopEstimate, returned by estimateLogicalTopPosition, might be saturated for
+        // very large elements. If it does the comparison with oldLogicalTop might yield a
+        // false negative as adding and removing margins, borders etc from a saturated number
+        // might yield incorrect results. If this is the case always mark for layout.
+        markDescendantsWithFloats = true;
     else if (!child->avoidsFloats() || child->shrinkToAvoidFloats()) {
         // If an element might be affected by the presence of floats, then always mark it for
         // layout.
@@ -3077,59 +3081,21 @@ void RenderBlock::paintContents(PaintInfo& paintInfo, const LayoutPoint& paintOf
         PaintInfo paintInfoForChild(paintInfo);
         paintInfoForChild.phase = newPhase;
         paintInfoForChild.updatePaintingRootForChildren(this);
-
-        // FIXME: Paint-time pagination is obsolete and is now only used by embedded WebViews inside AppKit
-        // NSViews. Do not add any more code for this.
-        bool usePrintRect = !view()->printRect().isEmpty();
-        paintChildren(paintInfo, paintOffset, paintInfoForChild, usePrintRect);
+        paintChildren(paintInfoForChild, paintOffset);
     }
 }
 
-void RenderBlock::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOffset, PaintInfo& paintInfoForChild, bool usePrintRect)
+void RenderBlock::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
-        if (!paintChild(child, paintInfo, paintOffset, paintInfoForChild, usePrintRect))
-            return;
-    }
+    for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox())
+        paintChild(child, paintInfo, paintOffset);
 }
 
-bool RenderBlock::paintChild(RenderBox* child, PaintInfo& paintInfo, const LayoutPoint& paintOffset, PaintInfo& paintInfoForChild, bool usePrintRect)
+void RenderBlock::paintChild(RenderBox* child, PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    // Check for page-break-before: always, and if it's set, break and bail.
-    bool checkBeforeAlways = !childrenInline() && (usePrintRect && child->style()->pageBreakBefore() == PBALWAYS);
-    LayoutUnit absoluteChildY = paintOffset.y() + child->y();
-    if (checkBeforeAlways
-        && absoluteChildY > paintInfo.rect.y()
-        && absoluteChildY < paintInfo.rect.maxY()) {
-        view()->setBestTruncatedAt(absoluteChildY, this, true);
-        return false;
-    }
-
-    RenderView* renderView = view();
-    if (!child->isFloating() && child->isReplaced() && usePrintRect && child->height() <= renderView->printRect().height()) {
-        // Paginate block-level replaced elements.
-        if (absoluteChildY + child->height() > renderView->printRect().maxY()) {
-            if (absoluteChildY < renderView->truncatedAt())
-                renderView->setBestTruncatedAt(absoluteChildY, child);
-            // If we were able to truncate, don't paint.
-            if (absoluteChildY >= renderView->truncatedAt())
-                return false;
-        }
-    }
-
     LayoutPoint childPoint = flipForWritingModeForChild(child, paintOffset);
     if (!child->hasSelfPaintingLayer() && !child->isFloating())
-        child->paint(paintInfoForChild, childPoint);
-
-    // Check for page-break-after: always, and if it's set, break and bail.
-    bool checkAfterAlways = !childrenInline() && (usePrintRect && child->style()->pageBreakAfter() == PBALWAYS);
-    if (checkAfterAlways
-        && (absoluteChildY + child->height()) > paintInfo.rect.y()
-        && (absoluteChildY + child->height()) < paintInfo.rect.maxY()) {
-        view()->setBestTruncatedAt(absoluteChildY + child->height() + max<LayoutUnit>(0, child->collapsedMarginAfter()), this, true);
-        return false;
-    }
-    return true;
+        child->paint(paintInfo, childPoint);
 }
 
 
@@ -4768,6 +4734,22 @@ bool RenderBlock::containsFloat(RenderBox* renderer) const
     return m_floatingObjects && m_floatingObjects->set().contains<RenderBox*, FloatingObjectHashTranslator>(renderer);
 }
 
+void RenderBlock::markShapeInsideDescendantsForLayout()
+{
+    if (!everHadLayout())
+        return;
+    if (childrenInline()) {
+        setNeedsLayout(true);
+        return;
+    }
+    for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
+        if (!child->isRenderBlock())
+            continue;
+        RenderBlock* childBlock = toRenderBlock(child);
+        childBlock->markShapeInsideDescendantsForLayout();
+    }
+}
+
 void RenderBlock::markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove, bool inLayout)
 {
     if (!everHadLayout())
@@ -5096,6 +5078,9 @@ void RenderBlock::adjustForColumnRect(LayoutSize& offset, const LayoutPoint& loc
 
 bool RenderBlock::hitTestContents(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
 {
+    if (isRenderRegion())
+        return toRenderRegion(this)->hitTestFlowThreadContents(request, result, locationInContainer, accumulatedOffset, hitTestAction);
+
     if (childrenInline() && !isTable()) {
         // We have to hit-test our line boxes.
         if (m_lineBoxes.hitTest(this, request, result, locationInContainer, accumulatedOffset, hitTestAction))
@@ -5932,7 +5917,7 @@ static inline void stripTrailingSpace(float& inlineMax, float& inlineMin,
 
 static inline void updatePreferredWidth(LayoutUnit& preferredWidth, float& result)
 {
-    LayoutUnit snappedResult = ceiledLayoutUnit(result);
+    LayoutUnit snappedResult = LayoutUnit::fromFloatCeil(result);
     preferredWidth = max(snappedResult, preferredWidth);
 }
 
@@ -5942,7 +5927,7 @@ static inline void updatePreferredWidth(LayoutUnit& preferredWidth, float& resul
 // pure float accumulation.
 static inline LayoutUnit adjustFloatForSubPixelLayout(float value)
 {
-    return ceiledLayoutUnit(value);
+    return LayoutUnit::fromFloatCeil(value);
 }
 
 
@@ -6485,17 +6470,6 @@ int RenderBlock::lastLineBoxBaseline(LineDirectionMode lineDirection) const
     }
 
     return -1;
-}
-
-bool RenderBlock::containsNonZeroBidiLevel() const
-{
-    for (RootInlineBox* root = firstRootBox(); root; root = root->nextRootBox()) {
-        for (InlineBox* box = root->firstLeafChild(); box; box = box->nextLeafChild()) {
-            if (box->bidiLevel())
-                return true;
-        }
-    }
-    return false;
 }
 
 RenderBlock* RenderBlock::firstLineBlock() const

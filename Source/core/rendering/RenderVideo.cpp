@@ -33,11 +33,9 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderFullScreen.h"
-#include "core/rendering/RenderView.h"
 
 namespace WebCore {
 
@@ -51,10 +49,8 @@ RenderVideo::RenderVideo(HTMLVideoElement* video)
 
 RenderVideo::~RenderVideo()
 {
-    if (MediaPlayer* p = mediaElement()->player()) {
+    if (MediaPlayer* p = mediaElement()->player())
         p->setVisible(false);
-        p->setFrameView(0);
-    }
 }
 
 IntSize RenderVideo::defaultSize()
@@ -251,7 +247,6 @@ void RenderVideo::updatePlayer()
     contentChanged(VideoChanged);
     
     IntRect videoBounds = videoBox(); 
-    mediaPlayer->setFrameView(document()->view());
     mediaPlayer->setSize(IntSize(videoBounds.width(), videoBounds.height()));
     mediaPlayer->setVisible(true);
 }
@@ -278,13 +273,6 @@ bool RenderVideo::supportsAcceleratedRendering() const
         return p->supportsAcceleratedRendering();
 
     return false;
-}
-
-void RenderVideo::acceleratedRenderingStateChanged()
-{
-    MediaPlayer* p = mediaElement()->player();
-    if (p)
-        p->acceleratedRenderingStateChanged();
 }
 
 static const RenderBlock* rendererPlaceholder(const RenderObject* renderer)

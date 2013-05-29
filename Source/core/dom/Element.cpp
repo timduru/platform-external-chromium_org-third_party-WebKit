@@ -27,11 +27,9 @@
 #include "core/dom/Element.h"
 
 #include "HTMLNames.h"
-#include "XMLNSNames.h"
+#include "SVGNames.h"
 #include "XMLNames.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/css/CSSParser.h"
-#include "core/css/CSSSelectorList.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
@@ -40,17 +38,14 @@
 #include "core/dom/CustomElementRegistry.h"
 #include "core/dom/DatasetDOMStringMap.h"
 #include "core/dom/Document.h"
-#include "core/dom/DocumentFragment.h"
 #include "core/dom/DocumentSharedObjectPool.h"
 #include "core/dom/ElementRareData.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/MutationObserverInterestGroup.h"
 #include "core/dom/MutationRecord.h"
 #include "core/dom/NamedNodeMap.h"
-#include "core/dom/NodeList.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeRenderingContext.h"
-#include "core/dom/NodeTraversal.h"
 #include "core/dom/PseudoElement.h"
 #include "core/dom/SelectorQuery.h"
 #include "core/dom/Text.h"
@@ -61,7 +56,6 @@
 #include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
 #include "core/html/ClassList.h"
-#include "core/html/DOMTokenList.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLDocument.h"
 #include "core/html/HTMLElement.h"
@@ -70,28 +64,21 @@
 #include "core/html/HTMLLabelElement.h"
 #include "core/html/HTMLOptionsCollection.h"
 #include "core/html/HTMLTableRowsCollection.h"
-#include "core/html/VoidCallback.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/FocusController.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PointerLockController.h"
-#include "core/page/Settings.h"
 #include "core/rendering/FlowThreadController.h"
 #include "core/rendering/RenderRegion.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
-#include <wtf/BitVector.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/text/CString.h>
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
 #include "core/svg/SVGDocumentExtensions.h"
 #include "core/svg/SVGElement.h"
-#endif
+#include "wtf/BitVector.h"
+#include "wtf/MemoryInstrumentationVector.h"
+#include "wtf/text/CString.h"
 
 namespace WebCore {
 
@@ -213,12 +200,10 @@ Element::~Element()
     if (hasSyntheticAttrChildNodes())
         detachAllAttrNodesFromElement();
 
-#if ENABLE(SVG)
     if (hasPendingResources()) {
         document()->accessSVGExtensions()->removeElementFromPendingResources(this);
         ASSERT(!hasPendingResources());
     }
-#endif
 }
 
 inline ElementRareData* Element::elementRareData() const
@@ -390,12 +375,10 @@ void Element::synchronizeAllAttributes() const
         ASSERT(isStyledElement());
         static_cast<const StyledElement*>(this)->synchronizeStyleAttributeInternal();
     }
-#if ENABLE(SVG)
     if (elementData()->m_animatedSVGAttributesAreDirty) {
         ASSERT(isSVGElement());
         toSVGElement(this)->synchronizeAnimatedSVGAttribute(anyQName());
     }
-#endif
 }
 
 inline void Element::synchronizeAttribute(const QualifiedName& name) const
@@ -407,12 +390,10 @@ inline void Element::synchronizeAttribute(const QualifiedName& name) const
         static_cast<const StyledElement*>(this)->synchronizeStyleAttributeInternal();
         return;
     }
-#if ENABLE(SVG)
     if (UNLIKELY(elementData()->m_animatedSVGAttributesAreDirty)) {
         ASSERT(isSVGElement());
         toSVGElement(this)->synchronizeAnimatedSVGAttribute(name);
     }
-#endif
 }
 
 inline void Element::synchronizeAttribute(const AtomicString& localName) const
@@ -426,13 +407,11 @@ inline void Element::synchronizeAttribute(const AtomicString& localName) const
         static_cast<const StyledElement*>(this)->synchronizeStyleAttributeInternal();
         return;
     }
-#if ENABLE(SVG)
     if (elementData()->m_animatedSVGAttributesAreDirty) {
         // We're not passing a namespace argument on purpose. SVGNames::*Attr are defined w/o namespaces as well.
         ASSERT(isSVGElement());
         static_cast<const SVGElement*>(this)->synchronizeAnimatedSVGAttribute(QualifiedName(nullAtom, localName, nullAtom));
     }
-#endif
 }
 
 const AtomicString& Element::getAttribute(const QualifiedName& name) const
@@ -696,16 +675,13 @@ IntRect Element::boundsInRootViewSpace()
         return IntRect();
 
     Vector<FloatQuad> quads;
-#if ENABLE(SVG)
     if (isSVGElement() && renderer()) {
         // Get the bounding rectangle from the SVG model.
         SVGElement* svgElement = toSVGElement(this);
         FloatRect localRect;
         if (svgElement->getBoundingBox(localRect))
             quads.append(renderer()->localToAbsoluteQuad(localRect));
-    } else
-#endif
-    {
+    } else {
         // Get the bounding rectangle from the box model.
         if (renderBoxModelObject())
             renderBoxModelObject()->absoluteQuads(quads);
@@ -744,16 +720,13 @@ PassRefPtr<ClientRect> Element::getBoundingClientRect()
     document()->updateLayoutIgnorePendingStylesheets();
 
     Vector<FloatQuad> quads;
-#if ENABLE(SVG)
     if (isSVGElement() && renderer() && !renderer()->isSVGRoot()) {
         // Get the bounding rectangle from the SVG model.
         SVGElement* svgElement = toSVGElement(this);
         FloatRect localRect;
         if (svgElement->getBoundingBox(localRect))
             quads.append(renderer()->localToAbsoluteQuad(localRect));
-    } else
-#endif
-    {
+    } else {
         // Get the bounding rectangle from the box model.
         if (renderBoxModelObject())
             renderBoxModelObject()->absoluteQuads(quads);
@@ -1183,18 +1156,9 @@ void Element::setChangedSinceLastFormControlChangeEvent(bool)
 {
 }
 
-bool Element::isDisabledFormControl() const
-{
-    // FIXME: disabled and inert are separate concepts in the spec, but now we treat them as the same.
-    // For example, an inert, non-disabled form control should not be grayed out.
-    if (isInert())
-        return true;
-    return false;
-}
-
 bool Element::isInert() const
 {
-    Element* dialog = document()->activeModalDialog();
+    const Element* dialog = document()->activeModalDialog();
     return dialog && !containsIncludingShadowDOM(dialog) && !dialog->containsIncludingShadowDOM(this);
 }
 
@@ -1241,9 +1205,7 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
 
 void Element::removedFrom(ContainerNode* insertionPoint)
 {
-#if ENABLE(SVG)
     bool wasInDocument = insertionPoint->document();
-#endif
 
     if (Element* before = pseudoElement(BEFORE))
         before->removedFrom(insertionPoint);
@@ -1277,10 +1239,8 @@ void Element::removedFrom(ContainerNode* insertionPoint)
     }
 
     ContainerNode::removedFrom(insertionPoint);
-#if ENABLE(SVG)
     if (wasInDocument && hasPendingResources())
         document()->accessSVGExtensions()->removeElementFromPendingResources(this);
-#endif
 }
 
 void Element::createRendererIfNeeded()
@@ -1399,6 +1359,8 @@ PassRefPtr<RenderStyle> Element::styleForRenderer()
 
 void Element::recalcStyle(StyleChange change)
 {
+    ASSERT(document()->inStyleRecalc());
+
     if (hasCustomStyleCallbacks())
         willRecalcStyle(change);
 
@@ -1497,9 +1459,10 @@ void Element::recalcStyle(StyleChange change)
     if (shouldRecalcStyle(change, this))
         updatePseudoElement(AFTER, change);
 
+    setAttached();
     clearNeedsStyleRecalc();
     clearChildNeedsStyleRecalc();
-    
+
     if (hasCustomStyleCallbacks())
         didRecalcStyle(change);
     InspectorInstrumentation::didRecalculateStyleForElement(this);
@@ -2436,7 +2399,6 @@ void Element::setUnsignedIntegralAttribute(const QualifiedName& attributeName, u
     setAttribute(attributeName, String::number(value));
 }
 
-#if ENABLE(SVG)
 bool Element::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
 {
     // Only create renderers for SVG elements whose parents are SVG elements, or for proper <svg xmlns="svgNS"> subdocuments.
@@ -2445,7 +2407,6 @@ bool Element::childShouldCreateRenderer(const NodeRenderingContext& childContext
 
     return ContainerNode::childShouldCreateRenderer(childContext);
 }
-#endif
 
 void Element::webkitRequestFullscreen()
 {
@@ -2494,7 +2455,7 @@ void Element::setIsInTopLayer(bool inTopLayer)
 
     // We must ensure a reattach occurs so the renderer is inserted in the correct sibling order under RenderView according to its
     // top layer position, or in its usual place if not in the top layer.
-    reattachIfAttached();
+    lazyReattachIfAttached();
 }
 
 void Element::webkitRequestPointerLock()
@@ -2589,10 +2550,8 @@ bool Element::fastAttributeLookupAllowed(const QualifiedName& name) const
     if (name == HTMLNames::styleAttr)
         return false;
 
-#if ENABLE(SVG)
     if (isSVGElement())
         return !static_cast<const SVGElement*>(this)->isAnimatableAttribute(name);
-#endif
 
     return true;
 }
@@ -2744,6 +2703,19 @@ PassRefPtr<HTMLCollection> Element::ensureCachedHTMLCollection(CollectionType ty
         return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLFormControlsCollection>(this, type);
     }
     return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLCollection>(this, type);
+}
+
+static void needsSyntheticStyleChangeCallback(Node* node)
+{
+    node->setNeedsStyleRecalc(SyntheticStyleChange);
+}
+
+void Element::scheduleSyntheticStyleChange()
+{
+    if (postAttachCallbacksAreSuspended())
+        queuePostAttachCallback(needsSyntheticStyleChangeCallback, this);
+    else
+        setNeedsStyleRecalc(SyntheticStyleChange);
 }
 
 HTMLCollection* Element::cachedHTMLCollection(CollectionType type)
@@ -2900,7 +2872,6 @@ InputMethodContext* Element::getInputContext()
     return ensureElementRareData()->ensureInputMethodContext(toHTMLElement(this));
 }
 
-#if ENABLE(SVG)
 bool Element::hasPendingResources() const
 {
     return hasRareData() && elementRareData()->hasPendingResources();
@@ -2915,7 +2886,6 @@ void Element::clearHasPendingResources()
 {
     ensureElementRareData()->setHasPendingResources(false);
 }
-#endif
 
 void ElementData::deref()
 {
@@ -2933,9 +2903,7 @@ ElementData::ElementData()
     , m_arraySize(0)
     , m_presentationAttributeStyleIsDirty(false)
     , m_styleAttributeIsDirty(false)
-#if ENABLE(SVG)
     , m_animatedSVGAttributesAreDirty(false)
-#endif
 {
 }
 
@@ -2944,9 +2912,7 @@ ElementData::ElementData(unsigned arraySize)
     , m_arraySize(arraySize)
     , m_presentationAttributeStyleIsDirty(false)
     , m_styleAttributeIsDirty(false)
-#if ENABLE(SVG)
     , m_animatedSVGAttributesAreDirty(false)
-#endif
 {
 }
 
@@ -3005,9 +2971,7 @@ ElementData::ElementData(const ElementData& other, bool isUnique)
     , m_arraySize(isUnique ? 0 : other.length())
     , m_presentationAttributeStyleIsDirty(other.m_presentationAttributeStyleIsDirty)
     , m_styleAttributeIsDirty(other.m_styleAttributeIsDirty)
-#if ENABLE(SVG)
     , m_animatedSVGAttributesAreDirty(other.m_animatedSVGAttributesAreDirty)
-#endif
     , m_classNames(other.m_classNames)
     , m_idForStyleResolution(other.m_idForStyleResolution)
 {
@@ -3023,7 +2987,7 @@ UniqueElementData::UniqueElementData(const UniqueElementData& other)
     , m_presentationAttributeStyle(other.m_presentationAttributeStyle)
     , m_attributeVector(other.m_attributeVector)
 {
-    m_inlineStyle = other.m_inlineStyle ? other.m_inlineStyle->copy() : 0;
+    m_inlineStyle = other.m_inlineStyle ? other.m_inlineStyle->mutableCopy() : 0;
 }
 
 UniqueElementData::UniqueElementData(const ShareableElementData& other)

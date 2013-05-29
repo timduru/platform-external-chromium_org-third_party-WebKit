@@ -61,12 +61,12 @@ public:
 
     v8::Local<v8::Context> context() const
     {
-        return v8::Local<v8::Context>::New(m_context.get());
+        return m_context.newLocal(m_isolate);
     }
 
     v8::Isolate* isolate()
     {
-        return m_context->GetIsolate();
+        return m_isolate;
     }
 
     DOMWindow* domWindow() const;
@@ -76,18 +76,22 @@ public:
     static ScriptState* current();
 
 protected:
-    ScriptState() { }
+    ScriptState()
+        : m_isolate(v8::Isolate::GetCurrent())
+    {
+    }
+
     ~ScriptState();
 
 private:
     friend ScriptState* mainWorldScriptState(Frame*);
-    friend class WeakHandleListener<ScriptState>;
     explicit ScriptState(v8::Handle<v8::Context>);
 
-    static void weakReferenceCallback(v8::Isolate*, v8::Persistent<v8::Value>, void* parameter);
+    static void makeWeakCallback(v8::Isolate*, v8::Persistent<v8::Context>*, ScriptState*);
 
     v8::Local<v8::Value> m_exception;
     ScopedPersistent<v8::Context> m_context;
+    v8::Isolate* m_isolate;
 };
 
 class EmptyScriptState : public ScriptState {
@@ -109,7 +113,7 @@ public:
     {
         v8::HandleScope handleScope;
         // Keep the context from being GC'ed. ScriptState is guaranteed to be live while the context is live.
-        m_context.set(scriptState->context());
+        m_context.set(scriptState->isolate(), scriptState->context());
     }
 
     ScriptState* get() const { return m_scriptState; }

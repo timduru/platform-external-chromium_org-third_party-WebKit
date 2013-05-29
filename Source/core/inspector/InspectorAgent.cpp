@@ -111,8 +111,11 @@ void InspectorAgent::clearFrontend()
     disable(&error);
 }
 
-void InspectorAgent::didCommitLoad()
+void InspectorAgent::didCommitLoad(Frame* frame, DocumentLoader* loader)
 {
+    if (loader->frame() != frame->page()->mainFrame())
+        return;
+
     m_injectedScriptManager->discardInjectedScripts();
 }
 
@@ -133,8 +136,11 @@ void InspectorAgent::disable(ErrorString*)
     m_state->setBoolean(InspectorAgentState::inspectorAgentEnabled, false);
 }
 
-void InspectorAgent::domContentLoadedEventFired()
+void InspectorAgent::domContentLoadedEventFired(Frame* frame)
 {
+    if (frame->page()->mainFrame() != frame)
+        return;
+
     m_injectedScriptManager->injectedScriptHost()->clearInspectedObjects();
 }
 

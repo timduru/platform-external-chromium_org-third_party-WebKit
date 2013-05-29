@@ -32,13 +32,14 @@
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/ImageData.h"
-#include "core/html/canvas/CheckedInt.h"
 #include "core/html/canvas/EXTDrawBuffers.h"
 #include "core/html/canvas/EXTTextureFilterAnisotropic.h"
 #include "core/html/canvas/OESElementIndexUint.h"
 #include "core/html/canvas/OESStandardDerivatives.h"
 #include "core/html/canvas/OESTextureFloat.h"
+#include "core/html/canvas/OESTextureFloatLinear.h"
 #include "core/html/canvas/OESTextureHalfFloat.h"
+#include "core/html/canvas/OESTextureHalfFloatLinear.h"
 #include "core/html/canvas/OESVertexArrayObject.h"
 #include "core/html/canvas/WebGLActiveInfo.h"
 #include "core/html/canvas/WebGLBuffer.h"
@@ -62,9 +63,7 @@
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/cache/CachedImage.h"
-#include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
-#include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/NotImplemented.h"
@@ -634,8 +633,7 @@ void WebGLRenderingContext::initializeNewContext()
     
     m_vertexAttribValue.resize(m_maxVertexAttribs);
 
-    if (!isGLES2NPOTStrict())
-        createFallbackBlackTextures1x1();
+    createFallbackBlackTextures1x1();
 
     IntSize canvasSize = clampedCanvasSize();
     m_drawingBuffer->reset(canvasSize);
@@ -839,8 +837,6 @@ void WebGLRenderingContext::paintRenderingResultsToCanvas()
     // Until the canvas is written to by the application, the clear that
     // happened after it was composited should be ignored by the compositor.
     if (m_context->layerComposited() && !m_attributes.preserveDrawingBuffer) {
-        m_context->paintCompositedResultsToCanvas(canvas()->buffer());
-
         m_drawingBuffer->paintCompositedResultsToCanvas(canvas()->buffer());
 
         canvas()->makePresentationCopy();
@@ -1750,12 +1746,9 @@ void WebGLRenderingContext::drawArrays(GC3Denum mode, GC3Dint first, GC3Dsizei c
 
     clearIfComposited();
 
-    bool vertexAttrib0Simulated = false;
-    if (!isGLES2NPOTStrict())
-        handleNPOTTextures("drawArrays", true);
+    handleTextureCompleteness("drawArrays", true);
     m_context->drawArrays(mode, first, count);
-    if (!isGLES2NPOTStrict())
-        handleNPOTTextures("drawArrays", false);
+    handleTextureCompleteness("drawArrays", false);
     markContextChanged();
 }
 
@@ -1811,11 +1804,9 @@ void WebGLRenderingContext::drawElements(GC3Denum mode, GC3Dsizei count, GC3Denu
     }
     clearIfComposited();
 
-    if (!isGLES2NPOTStrict())
-        handleNPOTTextures("drawElements", true);
+    handleTextureCompleteness("drawElements", true);
     m_context->drawElements(mode, count, type, static_cast<GC3Dintptr>(offset));
-    if (!isGLES2NPOTStrict())
-        handleNPOTTextures("drawElements", false);
+    handleTextureCompleteness("drawElements", false);
     markContextChanged();
 }
 
@@ -1855,7 +1846,7 @@ void WebGLRenderingContext::finish()
 {
     if (isContextLost())
         return;
-    m_context->finish();
+    m_context->flush(); // Intentionally a flush, not a finish.
 }
 
 void WebGLRenderingContext::flush()
@@ -2111,19 +2102,23 @@ WebGLExtension* WebGLRenderingContext::getExtension(const String& name)
     static const char* bothPrefixes[] = { "", "WEBKIT_", NULL, };
 
     WebGLExtension* extension = 0;
-    if (getExtensionIfMatch<OESStandardDerivatives>(name, m_oesStandardDerivatives, unprefixed, extension))
+    if (getExtensionIfMatch<EXTDrawBuffers>(name, m_extDrawBuffers, unprefixed, extension))
         return extension;
     if (getExtensionIfMatch<EXTTextureFilterAnisotropic>(name, m_extTextureFilterAnisotropic, webkitPrefix, extension))
         return extension;
+    if (getExtensionIfMatch<OESElementIndexUint>(name, m_oesElementIndexUint, unprefixed, extension))
+        return extension;
+    if (getExtensionIfMatch<OESStandardDerivatives>(name, m_oesStandardDerivatives, unprefixed, extension))
+        return extension;
     if (getExtensionIfMatch<OESTextureFloat>(name, m_oesTextureFloat, unprefixed, extension))
+        return extension;
+    if (getExtensionIfMatch<OESTextureFloatLinear>(name, m_oesTextureFloatLinear, unprefixed, extension))
         return extension;
     if (getExtensionIfMatch<OESTextureHalfFloat>(name, m_oesTextureHalfFloat, unprefixed, extension))
         return extension;
+    if (getExtensionIfMatch<OESTextureHalfFloatLinear>(name, m_oesTextureHalfFloatLinear, unprefixed, extension))
+        return extension;
     if (getExtensionIfMatch<OESVertexArrayObject>(name, m_oesVertexArrayObject, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<OESElementIndexUint>(name, m_oesElementIndexUint, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<WebGLLoseContext>(name, m_webglLoseContext, bothPrefixes, extension))
         return extension;
     if (getExtensionIfMatch<WebGLCompressedTextureATC>(name, m_webglCompressedTextureATC, webkitPrefix, extension))
         return extension;
@@ -2133,7 +2128,7 @@ WebGLExtension* WebGLRenderingContext::getExtension(const String& name)
         return extension;
     if (getExtensionIfMatch<WebGLDepthTexture>(name, m_webglDepthTexture, bothPrefixes, extension))
         return extension;
-    if (getExtensionIfMatch<EXTDrawBuffers>(name, m_extDrawBuffers, unprefixed, extension))
+    if (getExtensionIfMatch<WebGLLoseContext>(name, m_webglLoseContext, bothPrefixes, extension))
         return extension;
     if (allowPrivilegedExtensions()) {
         if (getExtensionIfMatch<WebGLDebugRendererInfo>(name, m_webglDebugRendererInfo, unprefixed, extension))
@@ -2621,6 +2616,9 @@ Vector<String> WebGLRenderingContext::getSupportedExtensions()
     appendIfSupported<OESElementIndexUint>(result, false);
     appendIfSupported<OESStandardDerivatives>(result, false);
     appendIfSupported<OESTextureFloat>(result, false);
+    appendIfSupported<OESTextureFloatLinear>(result, false);
+    appendIfSupported<OESTextureHalfFloat>(result, false);
+    appendIfSupported<OESTextureHalfFloatLinear>(result, false);
     appendIfSupported<OESVertexArrayObject>(result, false);
     appendIfSupported<WebGLCompressedTextureATC>(result, true);
     appendIfSupported<WebGLCompressedTexturePVRTC>(result, true);
@@ -3485,12 +3483,6 @@ void WebGLRenderingContext::texImage2D(GC3Denum target, GC3Dint level, GC3Denum 
     // Otherwise, it will fall back to the normal SW path.
     WebGLTexture* texture = validateTextureBinding("texImage2D", target, true);
     if (GraphicsContext3D::TEXTURE_2D == target && texture) {
-        // FIXME: Currently we must make sure the target texture has the correct size before copying
-        // because of crbug.com/225781. Remove this once that bug is fixed.
-        if (texture->getWidth(target, level) != video->videoWidth() || texture->getHeight(target, level) != video->videoHeight()) {
-            m_context->texImage2D(target, level, internalformat, video->videoWidth(), video->videoHeight(), 0, format, type, 0);
-            texture->setLevelInfo(target, level, internalformat, video->videoWidth(), video->videoHeight(), type);
-        }
         if (video->copyVideoTextureToPlatformTexture(m_context.get(), texture->object(), level, type, internalformat, m_unpackPremultiplyAlpha, m_unpackFlipY)) {
             texture->setLevelInfo(target, level, internalformat, video->videoWidth(), video->videoHeight(), type);
             return;
@@ -4349,13 +4341,15 @@ WebGLGetInfo WebGLRenderingContext::getWebGLIntArrayParameter(GC3Denum pname)
     return WebGLGetInfo(Int32Array::create(value, length));
 }
 
-void WebGLRenderingContext::handleNPOTTextures(const char* functionName, bool prepareToDraw)
+void WebGLRenderingContext::handleTextureCompleteness(const char* functionName, bool prepareToDraw)
 {
     // All calling functions check isContextLost, so a duplicate check is not needed here.
     bool resetActiveUnit = false;
+    WebGLTexture::TextureExtensionFlag flag = static_cast<WebGLTexture::TextureExtensionFlag>((m_oesTextureFloatLinear ? WebGLTexture::TextureFloatLinearExtensionEnabled : 0)
+        | (m_oesTextureHalfFloatLinear ? WebGLTexture::TextureHalfFloatLinearExtensionEnabled : 0));
     for (unsigned ii = 0; ii < m_textureUnits.size(); ++ii) {
-        if ((m_textureUnits[ii].m_texture2DBinding && m_textureUnits[ii].m_texture2DBinding->needToUseBlackTexture())
-            || (m_textureUnits[ii].m_textureCubeMapBinding && m_textureUnits[ii].m_textureCubeMapBinding->needToUseBlackTexture())) {
+        if ((m_textureUnits[ii].m_texture2DBinding.get() && m_textureUnits[ii].m_texture2DBinding->needToUseBlackTexture(flag))
+            || (m_textureUnits[ii].m_textureCubeMapBinding.get() && m_textureUnits[ii].m_textureCubeMapBinding->needToUseBlackTexture(flag))) {
             if (ii != m_activeTextureUnit) {
                 m_context->activeTexture(ii);
                 resetActiveUnit = true;
@@ -4367,7 +4361,8 @@ void WebGLRenderingContext::handleNPOTTextures(const char* functionName, bool pr
             WebGLTexture* texCubeMap;
             if (prepareToDraw) {
                 String msg(String("texture bound to texture unit ") + String::number(ii)
-                    + " is not renderable. It maybe non-power-of-2 and have incompatible texture filtering or is not 'texture complete'");
+                    + " is not renderable. It maybe non-power-of-2 and have incompatible texture filtering or is not 'texture complete'."
+                    + " Or the texture is Float or Half Float type with linear filtering while OES_float_linear or OES_half_float_linear extension is not enabled.");
                 printGLWarningToConsole(functionName, msg.utf8().data());
                 tex2D = m_blackTexture2D.get();
                 texCubeMap = m_blackTextureCubeMap.get();
@@ -4375,9 +4370,9 @@ void WebGLRenderingContext::handleNPOTTextures(const char* functionName, bool pr
                 tex2D = m_textureUnits[ii].m_texture2DBinding.get();
                 texCubeMap = m_textureUnits[ii].m_textureCubeMapBinding.get();
             }
-            if (m_textureUnits[ii].m_texture2DBinding && m_textureUnits[ii].m_texture2DBinding->needToUseBlackTexture())
+            if (m_textureUnits[ii].m_texture2DBinding && m_textureUnits[ii].m_texture2DBinding->needToUseBlackTexture(flag))
                 m_context->bindTexture(GraphicsContext3D::TEXTURE_2D, objectOrZero(tex2D));
-            if (m_textureUnits[ii].m_textureCubeMapBinding && m_textureUnits[ii].m_textureCubeMapBinding->needToUseBlackTexture())
+            if (m_textureUnits[ii].m_textureCubeMapBinding && m_textureUnits[ii].m_textureCubeMapBinding->needToUseBlackTexture(flag))
                 m_context->bindTexture(GraphicsContext3D::TEXTURE_CUBE_MAP, objectOrZero(texCubeMap));
         }
     }

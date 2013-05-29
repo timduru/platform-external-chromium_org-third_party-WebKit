@@ -82,7 +82,6 @@ public:
     virtual bool supportsFullscreen() const { return false; };
 
     virtual bool supportsSave() const;
-    virtual bool supportsScanning() const;
     
     PlatformLayer* platformLayer() const;
 
@@ -155,7 +154,6 @@ public:
 //  Media Source.
     void closeMediaSource();
 
-#if ENABLE(ENCRYPTED_MEDIA)
     void webkitGenerateKeyRequest(const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionCode&);
     void webkitGenerateKeyRequest(const String& keySystem, ExceptionCode&);
     void webkitAddKey(const String& keySystem, PassRefPtr<Uint8Array> key, PassRefPtr<Uint8Array> initData, const String& sessionId, ExceptionCode&);
@@ -165,10 +163,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeyadded);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeyerror);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitkeymessage);
-#endif
-#if ENABLE(ENCRYPTED_MEDIA) || ENABLE(ENCRYPTED_MEDIA_V2)
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitneedkey);
-#endif
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
     MediaKeys* mediaKeys() const { return m_mediaKeys.get(); }
@@ -249,9 +244,6 @@ public:
     virtual void textTrackRemoveCues(TextTrack*, const TextTrackCueList*);
     virtual void textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue>);
     virtual void textTrackRemoveCue(TextTrack*, PassRefPtr<TextTrackCue>);
-
-    bool requiresTextTrackRepresentation() const;
-    void setTextTrackRepresentation(TextTrackRepresentation*);
 
     // EventTarget function.
     // Both Node (via HTMLElement) and ActiveDOMObject define this method, which
@@ -368,55 +360,32 @@ private:
     void setReadyState(MediaPlayer::ReadyState);
     void setNetworkState(MediaPlayer::NetworkState);
 
-    virtual Document* mediaPlayerOwningDocument();
-    virtual void mediaPlayerNetworkStateChanged(MediaPlayer*);
-    virtual void mediaPlayerReadyStateChanged(MediaPlayer*);
-    virtual void mediaPlayerTimeChanged(MediaPlayer*);
-    virtual void mediaPlayerVolumeChanged(MediaPlayer*);
-    virtual void mediaPlayerMuteChanged(MediaPlayer*);
-    virtual void mediaPlayerDurationChanged(MediaPlayer*);
-    virtual void mediaPlayerRateChanged(MediaPlayer*);
-    virtual void mediaPlayerPlaybackStateChanged(MediaPlayer*);
-    virtual void mediaPlayerSawUnsupportedTracks(MediaPlayer*);
-    virtual void mediaPlayerResourceNotSupported(MediaPlayer*);
-    virtual void mediaPlayerRepaint(MediaPlayer*);
-    virtual void mediaPlayerSizeChanged(MediaPlayer*);
-    virtual bool mediaPlayerRenderingCanBeAccelerated(MediaPlayer*);
-    virtual void mediaPlayerRenderingModeChanged(MediaPlayer*);
-    virtual void mediaPlayerEngineUpdated(MediaPlayer*);
-    
-    virtual void mediaPlayerFirstVideoFrameAvailable(MediaPlayer*);
-    virtual void mediaPlayerCharacteristicChanged(MediaPlayer*);
+    virtual void mediaPlayerNetworkStateChanged() OVERRIDE;
+    virtual void mediaPlayerReadyStateChanged() OVERRIDE;
+    virtual void mediaPlayerTimeChanged() OVERRIDE;
+    virtual void mediaPlayerVolumeChanged() OVERRIDE;
+    virtual void mediaPlayerMuteChanged() OVERRIDE;
+    virtual void mediaPlayerDurationChanged() OVERRIDE;
+    virtual void mediaPlayerRateChanged() OVERRIDE;
+    virtual void mediaPlayerPlaybackStateChanged() OVERRIDE;
+    virtual void mediaPlayerSawUnsupportedTracks() OVERRIDE;
+    virtual void mediaPlayerResourceNotSupported() OVERRIDE;
+    virtual void mediaPlayerRepaint() OVERRIDE;
+    virtual void mediaPlayerSizeChanged() OVERRIDE;
+    virtual void mediaPlayerEngineUpdated() OVERRIDE;
 
-#if ENABLE(ENCRYPTED_MEDIA)
-    virtual void mediaPlayerKeyAdded(MediaPlayer*, const String& keySystem, const String& sessionId) OVERRIDE;
-    virtual void mediaPlayerKeyError(MediaPlayer*, const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode, unsigned short systemCode) OVERRIDE;
-    virtual void mediaPlayerKeyMessage(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength, const KURL& defaultURL) OVERRIDE;
-    virtual bool mediaPlayerKeyNeeded(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength) OVERRIDE;
-#endif
+    virtual void mediaPlayerKeyAdded(const String& keySystem, const String& sessionId) OVERRIDE;
+    virtual void mediaPlayerKeyError(const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode, unsigned short systemCode) OVERRIDE;
+    virtual void mediaPlayerKeyMessage(const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength, const KURL& defaultURL) OVERRIDE;
+    virtual bool mediaPlayerKeyNeeded(const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength) OVERRIDE;
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
-    virtual bool mediaPlayerKeyNeeded(MediaPlayer*, Uint8Array*);
+    virtual bool mediaPlayerKeyNeeded(Uint8Array*) OVERRIDE;
 #endif
 
-    virtual String mediaPlayerReferrer() const OVERRIDE;
-    virtual String mediaPlayerUserAgent() const OVERRIDE;
     virtual CORSMode mediaPlayerCORSMode() const OVERRIDE;
 
-    virtual void mediaPlayerEnterFullscreen() OVERRIDE;
-    virtual void mediaPlayerExitFullscreen() OVERRIDE;
-    virtual bool mediaPlayerIsFullscreen() const OVERRIDE;
-    virtual bool mediaPlayerIsFullscreenPermitted() const OVERRIDE;
-    virtual bool mediaPlayerIsVideo() const OVERRIDE;
-    virtual LayoutRect mediaPlayerContentBoxRect() const OVERRIDE;
-    virtual void mediaPlayerSetSize(const IntSize&) OVERRIDE;
-    virtual void mediaPlayerPause() OVERRIDE;
-    virtual void mediaPlayerPlay() OVERRIDE;
-    virtual bool mediaPlayerIsPaused() const OVERRIDE;
-    virtual bool mediaPlayerIsLooping() const OVERRIDE;
-    virtual HostWindow* mediaPlayerHostWindow() OVERRIDE;
-    virtual IntRect mediaPlayerWindowClipRect() OVERRIDE;
-    virtual CachedResourceLoader* mediaPlayerCachedResourceLoader() OVERRIDE;
+    virtual void mediaPlayerNeedsStyleRecalc() OVERRIDE;
 
     void loadTimerFired(Timer<HTMLMediaElement>*);
     void progressEventTimerFired(Timer<HTMLMediaElement>*);

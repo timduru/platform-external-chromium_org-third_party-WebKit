@@ -27,11 +27,8 @@
 
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
-#include "core/dom/Attribute.h"
 #include "core/dom/NodeRenderingContext.h"
-#include "core/dom/ScriptableDocumentParser.h"
 #include "core/html/HTMLDocument.h"
-#include "core/page/Frame.h"
 #include "core/rendering/RenderIFrame.h"
 #include <wtf/text/TextPosition.h>
 
@@ -41,6 +38,7 @@ using namespace HTMLNames;
 
 inline HTMLIFrameElement::HTMLIFrameElement(const QualifiedName& tagName, Document* document)
     : HTMLFrameElementBase(tagName, document)
+    , m_didLoadNonEmptyDocument(false)
 {
     ASSERT(hasTagName(iframeTag));
     ScriptWrappable::init(this);
@@ -135,7 +133,7 @@ void HTMLIFrameElement::didRecalcStyle(StyleChange styleChange)
     if (!shouldDisplaySeamlessly())
         return;
     Document* childDocument = contentDocument();
-    if (styleChange >= Inherit || childDocument->childNeedsStyleRecalc() || childDocument->needsStyleRecalc())
+    if (shouldRecalcStyle(styleChange, childDocument))
         contentDocument()->recalcStyle(styleChange);
 }
 

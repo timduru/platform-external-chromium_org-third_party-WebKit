@@ -41,10 +41,10 @@ class CharacterData;
 class Frame;
 class GraphicsContext;
 class HTMLFormElement;
+class MutableStylePropertySet;
 class RenderObject;
 class RenderView;
 class Settings;
-class StylePropertySet;
 class VisiblePosition;
 
 enum EUserTriggered { NotUserTriggered = 0, UserTriggered = 1 };
@@ -243,7 +243,7 @@ public:
     void paintDragCaret(GraphicsContext*, const LayoutPoint&, const LayoutRect& clipRect) const;
 
     EditingStyle* typingStyle() const;
-    PassRefPtr<StylePropertySet> copyTypingStyle() const;
+    PassRefPtr<MutableStylePropertySet> copyTypingStyle() const;
     void setTypingStyle(PassRefPtr<EditingStyle>);
     void clearTypingStyle();
 
@@ -266,6 +266,7 @@ private:
     VisiblePosition positionForPlatform(bool isGetStart) const;
     VisiblePosition startForPlatform() const;
     VisiblePosition endForPlatform() const;
+    VisiblePosition nextWordPositionForPlatform(const VisiblePosition&);
 
     VisiblePosition modifyExtendingRight(TextGranularity);
     VisiblePosition modifyExtendingForward(TextGranularity);

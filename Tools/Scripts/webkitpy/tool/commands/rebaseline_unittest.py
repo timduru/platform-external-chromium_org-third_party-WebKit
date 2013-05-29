@@ -498,12 +498,16 @@ class TestRebaselineExpectations(_BaseTestCase):
         self.assertDictEqual(self.command._tests_to_rebaseline(self.lion_port), {'userscripts/another-test.html': set(['png', 'txt', 'wav'])})
         self.assertEqual(self._read(self.lion_expectations_path), '')
 
+    def test_rebaseline_without_other_expectations(self):
+        self._write("userscripts/another-test.html", "Dummy test contents")
+        self._write(self.lion_expectations_path, "Bug(x) userscripts/another-test.html [ Rebaseline ]\n")
+        self.assertDictEqual(self.command._tests_to_rebaseline(self.lion_port), {'userscripts/another-test.html': ('png', 'wav', 'txt')})
+
 
 class _FakeOptimizer(BaselineOptimizer):
     def read_results_by_directory(self, baseline_name):
         if baseline_name.endswith('txt'):
-            return {'LayoutTests/passes/text.html': '123456',
-                    'LayoutTests/platform/test-mac-leopard/passes/text.html': 'abcdef'}
+            return {'LayoutTests/passes/text.html': '123456'}
         return {}
 
 
@@ -522,13 +526,11 @@ class TestAnalyzeBaselines(_BaseTestCase):
         self.command.execute(MockOptions(suffixes='txt', missing=False, platform=None), ['passes/text.html'], self.tool)
         self.assertEqual(self.lines,
             ['passes/text-expected.txt:',
-             '  (generic): 123456',
-             '  test-mac-leopard: abcdef'])
+             '  (generic): 123456'])
 
     def test_missing_baselines(self):
         self.command.execute(MockOptions(suffixes='png,txt', missing=True, platform=None), ['passes/text.html'], self.tool)
         self.assertEqual(self.lines,
             ['passes/text-expected.png: (no baselines found)',
              'passes/text-expected.txt:',
-             '  (generic): 123456',
-             '  test-mac-leopard: abcdef'])
+             '  (generic): 123456'])

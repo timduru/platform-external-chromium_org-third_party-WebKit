@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "concatenate_devtools_elements_js":
 $(gyp_shared_intermediate_dir)/resources/inspector/ElementsPanel.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/ElementsPanel.js: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/resources/inspector/ElementsPanel.js: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/resources/inspector/ElementsPanel.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/ElementsPanel.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/resources/inspector/ElementsPanel.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/resources/inspector/ElementsPanel.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/inline_js_imports.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/CSSNamedFlowCollectionsView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/CSSNamedFlowView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/ElementsPanel.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/EventListenersSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/MetricsSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/PropertiesSidebarPane.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/StylesSidebarPane.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_concatenated_devtools_elements_js_target_concatenate_devtools_elements_js ($@)"

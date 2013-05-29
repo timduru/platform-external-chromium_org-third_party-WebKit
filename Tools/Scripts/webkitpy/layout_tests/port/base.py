@@ -54,7 +54,7 @@ from webkitpy.common.system import path
 from webkitpy.common.system.executive import ScriptError
 from webkitpy.common.system.systemhost import SystemHost
 from webkitpy.common.webkit_finder import WebKitFinder
-from webkitpy.layout_tests.layout_package.bot_test_expectations import BotTestExpectations
+from webkitpy.layout_tests.layout_package.bot_test_expectations import BotTestExpecationsFactory
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port import config as port_config
 from webkitpy.layout_tests.port import driver
@@ -379,24 +379,12 @@ class Port(object):
                                     actual_filename)
         return ''.join(diff)
 
-    def check_for_leaks(self, process_name, process_pid):
-        # Subclasses should check for leaks in the running process
-        # and print any necessary warnings if leaks are found.
-        # FIXME: We should consider moving much of this logic into
-        # Executive and make it platform-specific instead of port-specific.
-        pass
-
-    def print_leaks_summary(self):
-        # Subclasses can override this to print a summary of leaks found
-        # while running the layout tests.
-        pass
-
     def driver_name(self):
         if self.get_option('driver_name'):
             return self.get_option('driver_name')
-        if self.get_option('content_shell'):
-            return self.CONTENT_SHELL_NAME
-        return 'DumpRenderTree'
+        if self.get_option('dump_render_tree'):
+            return 'DumpRenderTree'
+        return self.CONTENT_SHELL_NAME
 
     def expected_baselines_by_extension(self, test_name):
         """Returns a dict mapping baseline suffix to relative path for each baseline in
@@ -577,33 +565,19 @@ class Port(object):
         return reftest_list.get(self._filesystem.join(self.layout_tests_dir(), test_name), [])  # pylint: disable=E1103
 
     def tests(self, paths):
-        """Return the list of tests found. Both generic and platform-specific tests matching paths should be returned."""
-        expanded_paths = self._expanded_paths(paths)
-        tests = self._real_tests(expanded_paths)
-        tests.extend(self._virtual_tests(expanded_paths, self.populated_virtual_test_suites()))
+        """Return the list of tests found matching paths."""
+        tests = self._real_tests(paths)
+        tests.extend(self._virtual_tests(paths, self.populated_virtual_test_suites()))
         return tests
-
-    def _expanded_paths(self, paths):
-        expanded_paths = []
-        fs = self._filesystem
-        all_platform_dirs = [path for path in fs.glob(fs.join(self.layout_tests_dir(), 'platform', '*')) if fs.isdir(path)]
-        for path in paths:
-            expanded_paths.append(path)
-            if self.test_isdir(path) and not path.startswith('platform'):
-                for platform_dir in all_platform_dirs:
-                    if fs.isdir(fs.join(platform_dir, path)) and platform_dir in self.baseline_search_path():
-                        expanded_paths.append(self.relative_test_filename(fs.join(platform_dir, path)))
-
-        return expanded_paths
 
     def _real_tests(self, paths):
         # When collecting test cases, skip these directories
-        skipped_directories = set(['.svn', '_svn', 'resources', 'script-tests', 'reference', 'reftest'])
+        skipped_directories = set(['.svn', '_svn', 'platform', 'resources', 'script-tests', 'reference', 'reftest'])
         files = find_files.find(self._filesystem, self.layout_tests_dir(), paths, skipped_directories, Port.is_test_file, self.test_key)
         return [self.relative_test_filename(f) for f in files]
 
     # When collecting test cases, we include any file with these extensions.
-    _supported_file_extensions = set(['.html', '.xml', '.xhtml', '.pl',
+    _supported_file_extensions = set(['.html', '.xml', '.xhtml', '.xht', '.pl',
                                       '.htm', '.php', '.svg', '.mht'])
 
     @staticmethod
@@ -732,7 +706,7 @@ class Port(object):
 
     def skipped_layout_tests(self, test_list):
         """Returns tests skipped outside of the TestExpectations files."""
-        return set(self._tests_for_other_platforms()).union(self._skipped_tests_for_unsupported_features(test_list))
+        return set(self._skipped_tests_for_unsupported_features(test_list))
 
     def _tests_from_skipped_file_contents(self, skipped_file_contents):
         tests_to_skip = []
@@ -906,7 +880,7 @@ class Port(object):
 
     def create_driver(self, worker_number, no_timeout=False):
         """Return a newly created Driver subclass for starting/stopping the test driver."""
-        return driver.DriverProxy(self, worker_number, self._driver_class(), pixel_tests=self.get_option('pixel_tests'), no_timeout=no_timeout)
+        return self._driver_class()(self, worker_number, pixel_tests=self.get_option('pixel_tests'), no_timeout=no_timeout)
 
     def start_helper(self):
         """If a port needs to reconfigure graphics settings or do other
@@ -1038,12 +1012,6 @@ class Port(object):
         # FIXME: rename this to test_expectations() once all the callers are updated to know about the ordered dict.
         expectations = OrderedDict()
 
-        ignore_flaky_tests = self.get_option('ignore_flaky_tests')
-        if ignore_flaky_tests == 'very-flaky' or ignore_flaky_tests == 'maybe-flaky':
-            ignore_only_very_flaky = self.get_option('ignore_flaky_tests') == 'very-flaky'
-            full_port_name = self.determine_full_port_name(self.host, self._options, self.port_name)
-            expectations['autogenerated'] = BotTestExpectations(ignore_only_very_flaky).expectations_string(full_port_name)
-
         for path in self.expectations_files():
             if self._filesystem.exists(path):
                 expectations[path] = self._filesystem.read_text_file(path)
@@ -1056,6 +1024,18 @@ class Port(object):
             else:
                 _log.warning("additional_expectations path '%s' does not exist" % path)
         return expectations
+
+    def bot_expectations(self):
+        if not self.get_option('ignore_flaky_tests'):
+            return {}
+
+        full_port_name = self.determine_full_port_name(self.host, self._options, self.port_name)
+        ignore_only_very_flaky = self.get_option('ignore_flaky_tests') == 'very-flaky'
+        factory = BotTestExpecationsFactory()
+        expectations = factory.expectations_for_port(full_port_name)
+        if not expectations:
+            return {}
+        return expectations.flakes_by_path(ignore_only_very_flaky)
 
     def _port_specific_expectations_files(self):
         # Unlike baseline_search_path, we only want to search [WK2-PORT, PORT-VERSION, PORT] and any directories
@@ -1368,60 +1348,7 @@ class Port(object):
             return False
         if self._options.pixel_test_directories:
             return any(test_input.test_name.startswith(directory) for directory in self._options.pixel_test_directories)
-        return self._should_run_as_pixel_test(test_input)
-
-    def _should_run_as_pixel_test(self, test_input):
-        # Default behavior is to allow all test to run as pixel tests if --pixel-tests is on and
-        # --pixel-test-directory is not specified.
         return True
-
-    # FIXME: Eventually we should standarize port naming, and make this method smart enough
-    # to use for all port configurations (including architectures, graphics types, etc).
-    def _port_flag_for_scripts(self):
-        # This is overrriden by ports which need a flag passed to scripts to distinguish the use of that port.
-        # For example --qt on linux, since a user might have both Gtk and Qt libraries installed.
-        # FIXME: Chromium should override this once ChromiumPort is a WebKitPort.
-        return None
-
-    # This is modeled after webkitdirs.pm argumentsForConfiguration() from old-run-webkit-tests
-    def _arguments_for_configuration(self):
-        config_args = []
-        config_args.append(self._config.flag_for_configuration(self.get_option('configuration')))
-        # FIXME: We may need to add support for passing --32-bit like old-run-webkit-tests had.
-        port_flag = self._port_flag_for_scripts()
-        if port_flag:
-            config_args.append(port_flag)
-        return config_args
-
-    def _run_script(self, script_name, args=None, include_configuration_arguments=True, decode_output=True, env=None):
-        run_script_command = [self.path_to_script(script_name)]
-        if include_configuration_arguments:
-            run_script_command.extend(self._arguments_for_configuration())
-        if args:
-            run_script_command.extend(args)
-        output = self._executive.run_command(run_script_command, cwd=self.webkit_base(), decode_output=decode_output, env=env)
-        _log.debug('Output of %s:\n%s' % (run_script_command, output))
-        return output
-
-    def _tests_for_other_platforms(self):
-        # By default we will skip any directory under LayoutTests/platform
-        # that isn't in our baseline search path (this mirrors what
-        # old-run-webkit-tests does in findTestsToRun()).
-        # Note this returns LayoutTests/platform/*, not platform/*/*.
-        entries = self._filesystem.glob(self._webkit_baseline_path('*'))
-        dirs_to_skip = []
-        for entry in entries:
-            if self._filesystem.isdir(entry) and entry not in self.baseline_search_path():
-                basename = self._filesystem.basename(entry)
-                dirs_to_skip.append('platform/%s' % basename)
-        return dirs_to_skip
-
-    def _runtime_feature_list(self):
-        """If a port makes certain features available only through runtime flags, it can override this routine to indicate which ones are available."""
-        return None
-
-    def nm_command(self):
-        return 'nm'
 
     def _modules_to_search_for_symbols(self):
         path = self._path_to_webcore_library()
@@ -1433,24 +1360,10 @@ class Port(object):
         symbols = ''
         for path_to_module in self._modules_to_search_for_symbols():
             try:
-                symbols += self._executive.run_command([self.nm_command(), path_to_module], error_handler=self._executive.ignore_error)
+                symbols += self._executive.run_command(['nm', path_to_module], error_handler=self._executive.ignore_error)
             except OSError, e:
                 _log.warn("Failed to run nm: %s.  Can't determine supported features correctly." % e)
         return symbols
-
-    # Ports which use run-time feature detection should define this method and return
-    # a dictionary mapping from Feature Names to skipped directoires.  NRWT will
-    # run DumpRenderTree --print-supported-features and parse the output.
-    # If the Feature Names are not found in the output, the corresponding directories
-    # will be skipped.
-    def _missing_feature_to_skipped_tests(self):
-        """Return the supported feature dictionary. Keys are feature names and values
-        are the lists of directories to skip if the feature name is not matched."""
-        # FIXME: This list matches WebKitWin and should be moved onto the Win port.
-        return {
-            "Accelerated Compositing": ["compositing"],
-            "3D Rendering": ["animations/3d", "transforms/3d"],
-        }
 
     # Ports which use compile-time feature detection should define this method and return
     # a dictionary mapping from symbol substrings to possibly disabled test directories.
@@ -1458,14 +1371,9 @@ class Port(object):
     # If ports don't ever enable certain features, then those directories can just be
     # in the Skipped list instead of compile-time-checked here.
     def _missing_symbol_to_skipped_tests(self):
-        """Return the supported feature dictionary. The keys are symbol-substrings
-        and the values are the lists of directories to skip if that symbol is missing."""
         return {
-            "MathMLElement": ["mathml"],
-            "GraphicsLayer": ["compositing"],
-            "WebGLShader": ["fast/canvas/webgl", "compositing/webgl", "http/tests/canvas/webgl", "webgl"],
-            "MHTMLArchive": ["mhtml"],
-            "CSSVariableValue": ["fast/css/variables", "inspector/styles/variables"],
+            "ff_mp3_decoder": ["webaudio/codec-tests/mp3"],
+            "ff_aac_decoder": ["webaudio/codec-tests/aac"],
         }
 
     def _has_test_in_directories(self, directory_lists, test_list):
@@ -1479,32 +1387,15 @@ class Port(object):
         return False
 
     def _skipped_tests_for_unsupported_features(self, test_list):
-        # Only check the runtime feature list of there are tests in the test_list that might get skipped.
-        # This is a performance optimization to avoid the subprocess call to DRT.
-        # If the port supports runtime feature detection, disable any tests
-        # for features missing from the runtime feature list.
-        # If _runtime_feature_list returns a non-None value, then prefer
-        # runtime feature detection over static feature detection.
-        if self._has_test_in_directories(self._missing_feature_to_skipped_tests().values(), test_list):
-            supported_feature_list = self._runtime_feature_list()
-            if supported_feature_list is not None:
-                return reduce(operator.add, [directories for feature, directories in self._missing_feature_to_skipped_tests().items() if feature not in supported_feature_list])
-
         # Only check the symbols of there are tests in the test_list that might get skipped.
         # This is a performance optimization to avoid the calling nm.
-        # Runtime feature detection not supported, fallback to static dectection:
+        # Runtime feature detection not supported, fallback to static detection:
         # Disable any tests for symbols missing from the executable or libraries.
         if self._has_test_in_directories(self._missing_symbol_to_skipped_tests().values(), test_list):
             symbols_string = self._symbols_string()
             if symbols_string is not None:
                 return reduce(operator.add, [directories for symbol_substring, directories in self._missing_symbol_to_skipped_tests().items() if symbol_substring not in symbols_string], [])
-
         return []
-
-    def _wk2_port_name(self):
-        # By current convention, the WebKit2 name is always mac-wk2, win-wk2, not mac-leopard-wk2, etc,
-        # except for Qt because WebKit2 is only supported by Qt 5.0 (therefore: qt-5.0-wk2).
-        return "%s-wk2" % self.port_name
 
 
 class VirtualTestSuite(object):

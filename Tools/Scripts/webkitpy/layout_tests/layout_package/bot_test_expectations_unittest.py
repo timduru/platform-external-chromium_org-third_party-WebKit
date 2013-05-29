@@ -29,58 +29,90 @@
 import unittest2 as unittest
 
 from webkitpy.layout_tests.layout_package import bot_test_expectations
+from webkitpy.layout_tests.models import test_expectations
+
 
 class BotTestExpectationsTest(unittest.TestCase):
+    # FIXME: Find a way to import this map from Tools/TestResultServer/model/jsonresults.py.
+    FAILURE_MAP = {"A": "AUDIO", "C": "CRASH", "F": "TEXT", "I": "IMAGE", "O": "MISSING",
+        "N": "NO DATA", "P": "PASS", "T": "TIMEOUT", "Y": "NOTRUN", "X": "SKIP", "Z": "IMAGE+TEXT"}
+
+    # All result_string's in this file expect newest result
+    # on left: "PFF", means it just passed after 2 failures.
+
+    def _assert_is_flaky(self, results_string, should_be_flaky):
+        results_json = self._results_json_from_test_data({})
+        expectations = bot_test_expectations.BotTestExpectations(results_json)
+        length_encoded = self._results_from_string(results_string)['results']
+        num_actual_results = len(expectations._flaky_types_in_results(length_encoded, only_ignore_very_flaky=True))
+        if should_be_flaky:
+            self.assertGreater(num_actual_results, 1)
+        else:
+            self.assertEqual(num_actual_results, 1)
+
+    def test_basic_flaky(self):
+        self._assert_is_flaky('PFF', False)  # Used to fail, but now passes.
+        self._assert_is_flaky('FFP', False)  # Just started failing.
+        self._assert_is_flaky('PFPF', True)  # Seen both failures and passes.
+        # self._assert_is_flaky('PPPF', True)  # Should be counted as flaky but isn't yet.
+        self._assert_is_flaky('FPPP', False)  # Just started failing, not flaky.
+        self._assert_is_flaky('PFFP', True)  # Failed twice in a row, still flaky.
+        # Failing 3+ times in a row is unlikely to be flaky, but rather a transient failure on trunk.
+        # self._assert_is_flaky('PFFFP', False)
+        # self._assert_is_flaky('PFFFFP', False)
+
+    def _results_json_from_test_data(self, test_data):
+        test_data[bot_test_expectations.ResultsJSON.FAILURE_MAP_KEY] = self.FAILURE_MAP
+        json_dict = {
+            'builder': test_data,
+        }
+        return bot_test_expectations.ResultsJSON('builder', json_dict)
+
+    def _results_from_string(self, results_string):
+        results_list = []
+        last_char = None
+        for char in results_string:
+            if char != last_char:
+                results_list.insert(0, [1, char])
+            else:
+                results_list[0][0] += 1
+        return {'results': results_list}
+
+    def _assert_expectations(self, test_data, expectations_string, only_ignore_very_flaky):
+        results_json = self._results_json_from_test_data(test_data)
+        expectations = bot_test_expectations.BotTestExpectations(results_json)
+        self.assertEqual(expectations.flakes_by_path(only_ignore_very_flaky), expectations_string)
 
     def test_basic(self):
-        expectations = bot_test_expectations.BotTestExpectations(only_ignore_very_flaky=True)
         test_data = {
             'tests': {
                 'foo': {
-                    'veryflaky.html': {
-                        'results': [[1, 'F'], [1, 'P'], [1, 'F'], [1, 'P']]
-                    },
-                    'maybeflaky.html': {
-                        'results': [[3, 'P'], [1, 'F'], [3, 'P']]
-                    },
-                    'notflakypass.html': {
-                        'results': [[4, 'P']]
-                    },
-                    'notflakyfail.html': {
-                        'results': [[4, 'F']]
-                    },
+                    'veryflaky.html': self._results_from_string('FPFP'),
+                    'maybeflaky.html': self._results_from_string('PPFP'),
+                    'notflakypass.html': self._results_from_string('PPPP'),
+                    'notflakyfail.html': self._results_from_string('FFFF'),
                 }
             }
         }
-        output = expectations._generate_expectations_string(test_data)
-        expected_output = """Bug(auto) foo/veryflaky.html [ Failure Pass ]"""
-        self.assertMultiLineEqual(output, expected_output)
+        self._assert_expectations(test_data, {
+            'foo/veryflaky.html': sorted(["TEXT", "PASS"]),
+        }, only_ignore_very_flaky=True)
 
-        expectations = bot_test_expectations.BotTestExpectations(only_ignore_very_flaky=False)
-        output = expectations._generate_expectations_string(test_data)
-        expected_output = """Bug(auto) foo/veryflaky.html [ Failure Pass ]
-Bug(auto) foo/maybeflaky.html [ Failure Pass ]"""
-        self.assertMultiLineEqual(output, expected_output)
+        self._assert_expectations(test_data, {
+            'foo/veryflaky.html': sorted(["TEXT", "PASS"]),
+            'foo/maybeflaky.html': sorted(["TEXT", "PASS"]),
+        }, only_ignore_very_flaky=False)
 
     def test_all_failure_types(self):
-        expectations = bot_test_expectations.BotTestExpectations(only_ignore_very_flaky=True)
         test_data = {
             'tests': {
                 'foo': {
-                    'allfailures.html': {
-                        'results': [[1, 'F'], [1, 'P'], [1, 'F'], [1, 'P'],
-                            [1, 'C'], [1, 'N'], [1, 'C'], [1, 'N'],
-                            [1, 'T'], [1, 'X'], [1, 'T'], [1, 'X'],
-                            [1, 'I'], [1, 'Z'], [1, 'I'], [1, 'Z'],
-                            [1, 'O'], [1, 'C'], [1, 'O'], [1, 'C']]
-                    },
-                    'imageplustextflake.html': {
-                        'results': [[1, 'Z'], [1, 'P'], [1, 'Z'], [1, 'P']]
-                    },
+                    'allfailures.html': self._results_from_string('FPFPCNCNTXTXIZIZOCYOCY'),
+                    'imageplustextflake.html': self._results_from_string('ZPZPPPPPPPPPPPPPPPPP'),
                 }
             }
         }
-        output = expectations._generate_expectations_string(test_data)
-        expected_output = """Bug(auto) foo/imageplustextflake.html [ Failure Pass ]
-Bug(auto) foo/allfailures.html [ Crash Missing ImageOnlyFailure Failure Timeout Pass ]"""
-        self.assertMultiLineEqual(output, expected_output)
+        self._assert_expectations(test_data, {
+            'foo/imageplustextflake.html': sorted(["IMAGE+TEXT", "PASS"]),
+            'foo/allfailures.html': sorted(["TEXT", "PASS", "IMAGE+TEXT", "TIMEOUT", "CRASH", "IMAGE", "MISSING"]),
+        }, only_ignore_very_flaky=True)

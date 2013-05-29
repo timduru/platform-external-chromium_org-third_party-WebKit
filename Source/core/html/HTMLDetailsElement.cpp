@@ -22,7 +22,6 @@
 #include "core/html/HTMLDetailsElement.h"
 
 #include "HTMLNames.h"
-#include "core/dom/MouseEvent.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/Text.h"
 #include "core/dom/shadow/ShadowRoot.h"
@@ -92,7 +91,7 @@ void HTMLDetailsElement::parseAttribute(const QualifiedName& name, const AtomicS
         bool oldValue = m_isOpen;
         m_isOpen = !value.isNull();
         if (oldValue != m_isOpen)
-            reattachIfAttached();
+            lazyReattachIfAttached();
     } else
         HTMLElement::parseAttribute(name, value);
 }

@@ -113,6 +113,18 @@ WebInspector.ProjectDelegate.prototype = {
     setFileContent: function(path, newContent, callback) { },
 
     /**
+     * @return {boolean}
+     */
+    canRename: function() { },
+
+    /**
+     * @param {Array.<string>} path
+     * @param {string} newName
+     * @param {function(boolean, string=)} callback
+     */
+    rename: function(path, newName, callback) { },
+
+    /**
      * @param {Array.<string>} path
      * @param {string} query
      * @param {boolean} caseSensitive
@@ -264,6 +276,44 @@ WebInspector.Project.prototype = {
     {
         this._projectDelegate.setFileContent(uiSourceCode.path(), newContent, callback);
         this._workspace.dispatchEventToListeners(WebInspector.Workspace.Events.UISourceCodeContentCommitted, { uiSourceCode: uiSourceCode, content: newContent });
+    },
+
+    /**
+     * @return {boolean}
+     */
+    canRename: function()
+    {
+        return this._projectDelegate.canRename();
+    },
+
+    /**
+     * @param {WebInspector.UISourceCode} uiSourceCode
+     * @param {string} newName
+     * @param {function(boolean, string=)} callback
+     */
+    rename: function(uiSourceCode, newName, callback)
+    {
+        this._projectDelegate.rename(uiSourceCode.path(), newName, innerCallback.bind(this));
+
+        /**
+         * @param {boolean} success
+         * @param {string=} newName
+         */
+        function innerCallback(success, newName)
+        {
+            if (!success || !newName) {
+                callback(false);
+                return;
+            }
+
+            var copyOfPath = uiSourceCode.path().slice();
+            var oldPath = copyOfPath.join("/");
+            copyOfPath[copyOfPath.length - 1] = newName;
+            var newPath = copyOfPath.join("/");
+            this._uiSourceCodes[newPath] = this._uiSourceCodes[oldPath];
+            delete this._uiSourceCodes[oldPath];
+            callback(true, newName);
+        }
     },
 
     /**
@@ -427,6 +477,8 @@ WebInspector.Workspace.prototype = {
      */
     hasMappingForURL: function(url)
     {
+        if (!InspectorFrontendHost.supportsFileSystems())
+            return false;
         var entry = this._fileMapping.mappingEntryForURL(url);
         if (!entry)
             return false;
@@ -441,21 +493,33 @@ WebInspector.Workspace.prototype = {
     {
         return this._fileSystemMapping.fileSystemPathForPrefix(entry.pathPrefix);
     },
+
+    /**
+     * @param {string} url
+     * @return {WebInspector.UISourceCode}
+     */
+    _networkUISourceCodeForURL: function(url)
+    {
+        var splitURL = WebInspector.ParsedURL.splitURL(url);
+        var projectId = WebInspector.SimpleProjectDelegate.projectId(splitURL[0], WebInspector.projectTypes.Network);
+        var path = WebInspector.SimpleWorkspaceProvider.pathForSplitURL(splitURL);
+        var project = this.project(projectId);
+        return project ? project.uiSourceCode(path) : null;
+    },
+
     /**
      * @param {string} url
      * @return {WebInspector.UISourceCode}
      */
     uiSourceCodeForURL: function(url)
     {
+        if (!InspectorFrontendHost.supportsFileSystems())
+            return this._networkUISourceCodeForURL(url);
+
         var entry = this._fileMapping.mappingEntryForURL(url);
         var fileSystemPath = entry ? this._fileSystemPathForEntry(entry) : null;
-        if (!fileSystemPath) {
-            var splittedURL = WebInspector.ParsedURL.splitURL(url);
-            var projectId = WebInspector.SimpleProjectDelegate.projectId(splittedURL[0], WebInspector.projectTypes.Network);
-            var path = WebInspector.SimpleWorkspaceProvider.pathForSplittedURL(splittedURL);
-            var project = this.project(projectId);
-            return project ? project.uiSourceCode(path) : null;
-        }
+        if (!fileSystemPath)
+            return this._networkUISourceCodeForURL(url);
 
         var projectId = WebInspector.FileSystemProjectDelegate.projectId(fileSystemPath);
         var pathPrefix = entry.pathPrefix.substr(fileSystemPath.length + 1);

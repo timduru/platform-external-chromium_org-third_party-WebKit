@@ -28,9 +28,7 @@
     CheckSecurity,
     EventTarget,
     CustomToV8,
-    CustomNamedGetter,
     DoNotGenerateWrap,
-    CustomIndexedGetter,
     InterfaceName=Window
 ] interface DOMWindow {
     // DOM Level 0
@@ -45,7 +43,7 @@
     [Replaceable, PerWorldBindings, ActivityLog=GetterForIsolatedWorlds] readonly attribute Navigator navigator;
     [Replaceable] readonly attribute Navigator clientInformation;
     readonly attribute Crypto crypto;
-    [DoNotCheckSecurity, CustomSetter, Unforgeable, Replaceable] readonly attribute Location location;
+    [DoNotCheckSecurity, CustomSetter, Unforgeable, Replaceable, PerWorldBindings, ActivityLog=AccessForIsolatedWorlds] readonly attribute Location location;
     [MeasureAs=WindowEvent, NotEnumerable, Replaceable, CustomGetter, CustomSetter] readonly attribute Event event;
 
     Selection getSelection();
@@ -300,10 +298,6 @@
     attribute IDBRequestConstructor webkitIDBRequest;
     attribute IDBTransactionConstructor webkitIDBTransaction;
 
-    [EnabledAtRuntime=webKitMediaSource] attribute WebKitMediaSourceConstructor WebKitMediaSource;
-    [EnabledAtRuntime=webKitMediaSource] attribute WebKitSourceBufferConstructor WebKitSourceBuffer;
-    [EnabledAtRuntime=webKitMediaSource] attribute WebKitSourceBufferListConstructor WebKitSourceBufferList;
-
     // Constructors enabled at runtime but whose interface does not have EnabledAtRuntime
     // extended attribute.
     // FIXME: Remove these.
@@ -338,5 +332,8 @@
 
     // window.toString() requires special handling in V8
     [DoNotCheckSignature, DoNotCheckSecurity, Custom, NotEnumerable] DOMString toString();
+
+    [ImplementedAs=anonymousIndexedGetter] getter DOMWindow(unsigned long index);
+    [Custom] getter DOMWindow (DOMString name);
 };
 

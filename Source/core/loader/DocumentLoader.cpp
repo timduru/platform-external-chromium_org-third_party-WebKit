@@ -56,6 +56,7 @@
 #include "core/loader/archive/ArchiveResourceCollection.h"
 #include "core/loader/archive/MHTMLArchive.h"
 #include "core/loader/cache/CachedResourceLoader.h"
+#include "core/loader/cache/CachedResourceRequestInitiators.h"
 #include "core/loader/cache/MemoryCache.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
@@ -102,7 +103,6 @@ DocumentLoader::DocumentLoader(const ResourceRequest& req, const SubstituteData&
     , m_isClientRedirect(false)
     , m_isLoadingMultipartContent(false)
     , m_wasOnloadHandled(false)
-    , m_substituteResourceDeliveryTimer(this, &DocumentLoader::substituteResourceDeliveryTimerFired)
     , m_loadingMainResource(false)
     , m_timeOfLastDataReceived(0.0)
     , m_identifierForLoadWithoutResourceLoader(0)
@@ -490,6 +490,7 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
     if (redirectResponse.isNull())
         return;
 
+    frameLoader()->client()->dispatchDidReceiveServerRedirectForProvisionalLoad();
     if (!shouldContinueForNavigationPolicy(newRequest))
         stopLoadingForPolicyChange();
 }
@@ -549,7 +550,10 @@ void DocumentLoader::responseReceived(CachedResource* resource, const ResourceRe
             frame()->document()->enforceSandboxFlags(SandboxOrigin);
             if (HTMLFrameOwnerElement* ownerElement = frame()->ownerElement())
                 ownerElement->dispatchEvent(Event::create(eventNames().loadEvent, false, false));
-            cancelMainResourceLoad(frameLoader()->cancelledError(m_request));
+
+            // The load event might have detached this frame. In that case, the load will already have been cancelled during detach.
+            if (frameLoader())
+                cancelMainResourceLoad(frameLoader()->cancelledError(m_request));
             return;
         }
     }
@@ -685,8 +689,6 @@ void DocumentLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_originalRequestCopy, "originalRequestCopy");
     info.addMember(m_request, "request");
     info.addMember(m_response, "response");
-    info.addMember(m_pendingSubstituteResources, "pendingSubstituteResources");
-    info.addMember(m_substituteResourceDeliveryTimer, "substituteResourceDeliveryTimer");
     info.addMember(m_archiveResourceCollection, "archiveResourceCollection");
     info.addMember(m_archive, "archive");
     info.addMember(m_resourcesClientKnowsAbout, "resourcesClientKnowsAbout");
@@ -834,96 +836,23 @@ void DocumentLoader::prepareSubframeArchiveLoadIfNeeded()
 void DocumentLoader::clearArchiveResources()
 {
     m_archiveResourceCollection.clear();
-    m_substituteResourceDeliveryTimer.stop();
 }
 
-ArchiveResource* DocumentLoader::archiveResourceForURL(const KURL& url) const
+bool DocumentLoader::scheduleArchiveLoad(CachedResource* cachedResource, const ResourceRequest& request)
 {
-    if (!m_archiveResourceCollection)
-        return 0;
-        
-    ArchiveResource* resource = m_archiveResourceCollection->archiveResourceForURL(url);
+    if (!m_archive)
+        return false;
 
-    return resource && !resource->shouldIgnoreWhenUnarchiving() ? resource : 0;
-}
+    ASSERT(m_archiveResourceCollection);
+    ArchiveResource* archiveResource = m_archiveResourceCollection->archiveResourceForURL(request.url());
+    ASSERT(archiveResource);
 
-void DocumentLoader::deliverSubstituteResourcesAfterDelay()
-{
-    if (m_pendingSubstituteResources.isEmpty())
-        return;
-    ASSERT(m_frame && m_frame->page());
-    if (m_frame->page()->defersLoading())
-        return;
-    if (!m_substituteResourceDeliveryTimer.isActive())
-        m_substituteResourceDeliveryTimer.startOneShot(0);
-}
-
-void DocumentLoader::substituteResourceDeliveryTimerFired(Timer<DocumentLoader>*)
-{
-    if (m_pendingSubstituteResources.isEmpty())
-        return;
-    ASSERT(m_frame && m_frame->page());
-    if (m_frame->page()->defersLoading())
-        return;
-
-    SubstituteResourceMap copy;
-    copy.swap(m_pendingSubstituteResources);
-
-    SubstituteResourceMap::const_iterator end = copy.end();
-    for (SubstituteResourceMap::const_iterator it = copy.begin(); it != end; ++it) {
-        RefPtr<ResourceLoader> loader = it->key;
-        SubstituteResource* resource = it->value.get();
-        
-        if (resource) {
-            SharedBuffer* data = resource->data();
-        
-            loader->didReceiveResponse(0, resource->response());
-
-            // Calling ResourceLoader::didReceiveResponse can end up cancelling the load,
-            // so we need to check if the loader has reached its terminal state.
-            if (loader->reachedTerminalState())
-                return;
-
-            loader->didReceiveData(0, data->data(), data->size(), data->size());
-
-            // Calling ResourceLoader::didReceiveData can end up cancelling the load,
-            // so we need to check if the loader has reached its terminal state.
-            if (loader->reachedTerminalState())
-                return;
-
-            loader->didFinishLoading(0, 0);
-        } else {
-            // A null resource means that we should fail the load.
-            // FIXME: Maybe we should use another error here - something like "not in cache".
-            loader->didFail(0, loader->cannotShowURLError());
-        }
-    }
-}
-
-#ifndef NDEBUG
-bool DocumentLoader::isSubstituteLoadPending(ResourceLoader* loader) const
-{
-    return m_pendingSubstituteResources.contains(loader);
-}
-#endif
-
-void DocumentLoader::cancelPendingSubstituteLoad(ResourceLoader* loader)
-{
-    if (m_pendingSubstituteResources.isEmpty())
-        return;
-    m_pendingSubstituteResources.remove(loader);
-    if (m_pendingSubstituteResources.isEmpty())
-        m_substituteResourceDeliveryTimer.stop();
-}
-
-bool DocumentLoader::scheduleArchiveLoad(ResourceLoader* loader, const ResourceRequest& request)
-{
-    if (ArchiveResource* resource = archiveResourceForURL(request.url())) {
-        m_pendingSubstituteResources.set(loader, resource);
-        deliverSubstituteResourcesAfterDelay();
-        return true;
-    }
-    return m_archive;
+    cachedResource->setLoading(true);
+    SharedBuffer* data = archiveResource->data();
+    cachedResource->responseReceived(archiveResource->response());
+    cachedResource->appendData(data->data(), data->size());
+    cachedResource->finish();
+    return true;
 }
 
 void DocumentLoader::setTitle(const StringWithDirection& title)
@@ -985,8 +914,6 @@ void DocumentLoader::setDefersLoading(bool defers)
         mainResourceLoader()->setDefersLoading(defers);
 
     setAllDefersLoading(m_resourceLoaders, defers);
-    if (!defers)
-        deliverSubstituteResourcesAfterDelay();
 }
 
 void DocumentLoader::setMainResourceDataBufferingPolicy(DataBufferingPolicy dataBufferingPolicy)
@@ -1075,8 +1002,8 @@ void DocumentLoader::startLoadingMainResource()
 
     ResourceRequest request(m_request);
     DEFINE_STATIC_LOCAL(ResourceLoaderOptions, mainResourceLoadOptions,
-        (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck));
-    CachedResourceRequest cachedResourceRequest(request, mainResourceLoadOptions);
+        (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy));
+    CachedResourceRequest cachedResourceRequest(request, cachedResourceRequestInitiators().document, mainResourceLoadOptions);
     m_mainResource = m_cachedResourceLoader->requestMainResource(cachedResourceRequest);
     if (!m_mainResource) {
         setRequest(ResourceRequest());

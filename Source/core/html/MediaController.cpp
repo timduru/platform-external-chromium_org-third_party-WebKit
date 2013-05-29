@@ -59,6 +59,7 @@ MediaController::MediaController(ScriptExecutionContext* context)
     , m_timeupdateTimer(this, &MediaController::timeupdateTimerFired)
     , m_previousTimeupdateTime(0)
 {
+    ScriptWrappable::init(this);
 }
 
 MediaController::~MediaController()
@@ -586,15 +587,6 @@ void MediaController::setClosedCaptionsVisible(bool visible)
     m_closedCaptionsVisible = visible;
     for (size_t index = 0; index < m_mediaElements.size(); ++index)
         m_mediaElements[index]->setClosedCaptionsVisible(visible);
-}
-
-bool MediaController::supportsScanning() const
-{
-    for (size_t index = 0; index < m_mediaElements.size(); ++index) {
-        if (!m_mediaElements[index]->supportsScanning())
-            return false;
-    }
-    return true;
 }
 
 void MediaController::beginScrubbing()

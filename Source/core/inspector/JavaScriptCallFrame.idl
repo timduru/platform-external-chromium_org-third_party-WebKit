@@ -25,8 +25,7 @@
 
 [
     NoInterfaceObject,
-    DoNotCheckConstants,
-    ImplementationLacksVTable
+    DoNotCheckConstants
 ] interface JavaScriptCallFrame {
 
     // Scope type

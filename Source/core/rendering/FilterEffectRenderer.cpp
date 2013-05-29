@@ -28,35 +28,27 @@
 
 #include "core/rendering/FilterEffectRenderer.h"
 
+#include "SVGNames.h"
 #include "core/dom/Document.h"
+#include "core/loader/cache/CachedDocument.h"
+#include "core/loader/cache/CachedSVGDocumentReference.h"
 #include "core/platform/FloatConversion.h"
 #include "core/platform/graphics/ColorSpace.h"
 #include "core/platform/graphics/filters/FEColorMatrix.h"
 #include "core/platform/graphics/filters/FEComponentTransfer.h"
 #include "core/platform/graphics/filters/FEDropShadow.h"
 #include "core/platform/graphics/filters/FEGaussianBlur.h"
-#include "core/platform/graphics/filters/FEMerge.h"
-#include "core/rendering/RenderLayer.h"
-
-#include <algorithm>
-#include <wtf/MathExtras.h>
-
+#include "core/platform/graphics/filters/SourceAlpha.h"
 #include "core/platform/graphics/filters/custom/CustomFilterGlobalContext.h"
-#include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
-#include "core/platform/graphics/filters/custom/CustomFilterProgram.h"
 #include "core/platform/graphics/filters/custom/CustomFilterValidatedProgram.h"
 #include "core/platform/graphics/filters/custom/FECustomFilter.h"
 #include "core/platform/graphics/filters/custom/ValidatedCustomFilterOperation.h"
+#include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderView.h"
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#include "core/loader/cache/CachedSVGDocument.h"
-#include "core/loader/cache/CachedSVGDocumentReference.h"
-#include "core/platform/graphics/filters/SourceAlpha.h"
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
-#endif
+#include "wtf/MathExtras.h"
+#include <algorithm>
 
 namespace WebCore {
 
@@ -118,7 +110,6 @@ GraphicsContext* FilterEffectRenderer::inputContext()
 
 PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject* renderer, PassRefPtr<FilterEffect> previousEffect, ReferenceFilterOperation* filterOperation)
 {
-#if ENABLE(SVG)
     if (!renderer)
         return 0;
 
@@ -126,7 +117,7 @@ PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject
     ASSERT(document);
 
     CachedSVGDocumentReference* cachedSVGDocumentReference = filterOperation->cachedSVGDocumentReference();
-    CachedSVGDocument* cachedSVGDocument = cachedSVGDocumentReference ? cachedSVGDocumentReference->document() : 0;
+    CachedDocument* cachedSVGDocument = cachedSVGDocumentReference ? cachedSVGDocumentReference->document() : 0;
 
     // If we have an SVG document, this is an external reference. Otherwise
     // we look up the referenced node in the current document.
@@ -178,12 +169,6 @@ PassRefPtr<FilterEffect> FilterEffectRenderer::buildReferenceFilter(RenderObject
         m_effects.append(effect);
     }
     return effect;
-#else
-    UNUSED_PARAM(renderer);
-    UNUSED_PARAM(previousEffect);
-    UNUSED_PARAM(filterOperation);
-    return 0;
-#endif
 }
 
 bool FilterEffectRenderer::build(RenderObject* renderer, const FilterOperations& operations)
@@ -204,7 +189,7 @@ bool FilterEffectRenderer::build(RenderObject* renderer, const FilterOperations&
         case FilterOperation::REFERENCE: {
             ReferenceFilterOperation* referenceOperation = static_cast<ReferenceFilterOperation*>(filterOperation);
             effect = buildReferenceFilter(renderer, previousEffect, referenceOperation);
-            referenceOperation->setFilterEffect(effect);
+            referenceOperation->setFilterEffect(effect, this);
             break;
         }
         case FilterOperation::GRAYSCALE: {

@@ -31,9 +31,9 @@
 #ifndef WebTestDelegate_h
 #define WebTestDelegate_h
 
-#include "Platform/chromium/public/WebString.h"
-#include "Platform/chromium/public/WebURL.h"
-#include "Platform/chromium/public/WebVector.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebURL.h"
+#include "public/platform/WebVector.h"
 #include <string>
 
 #define WEBTESTRUNNER_NEW_HISTORY_CAPTURE
@@ -45,6 +45,7 @@ class WebHistoryItem;
 class WebMediaPlayer;
 class WebMediaPlayerClient;
 struct WebRect;
+struct WebSize;
 struct WebURLError;
 }
 
@@ -98,6 +99,10 @@ public:
 
     // Resizes the WebView to the given size.
     virtual void setClientWindowRect(const WebKit::WebRect&) = 0;
+
+    // Controls auto resize mode.
+    virtual void enableAutoResizeMode(const WebKit::WebSize& minSize, const WebKit::WebSize& maxSize) { }
+    virtual void disableAutoResizeMode(const WebKit::WebSize&) { }
 
     // Opens and closes the inspector.
     virtual void showDevTools() = 0;

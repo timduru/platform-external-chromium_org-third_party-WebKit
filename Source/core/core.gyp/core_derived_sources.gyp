@@ -78,6 +78,7 @@
             'python',
             '../scripts/make_internal_runtime_flags.py',
             '../page/RuntimeEnabledFeatures.in',
+            '--output_dir',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/',
           ],
         },
@@ -185,6 +186,7 @@
             'python',
             '../scripts/make_runtime_features.py',
             '../page/RuntimeEnabledFeatures.in',
+            '--output_dir',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/',
           ],
         },
@@ -193,6 +195,7 @@
           'variables': {
             'in_files': [
               '../css/CSSPropertyNames.in',
+              '../css/SVGCSSPropertyNames.in',
             ],
           },
           'inputs': [
@@ -212,44 +215,50 @@
             '<(SHARED_INTERMEDIATE_DIR)/webkit/',
             '--defines', '<(feature_defines)',
           ],
-          'conditions': [
-            # TODO(maruel): Move it in its own project or generate it anyway?
-            ['enable_svg!=0', {
-              'variables': {
-                'in_files': [
-                  '../css/SVGCSSPropertyNames.in',
-                ],
-              }
-            }],
-          ],
           'msvs_cygwin_shell': 1,
         },
         {
-          'action_name': 'CSSValueKeywords',
+          'action_name': 'StyleBuilder',
           'inputs': [
-            '../css/makevalues.pl',
-            '../css/CSSValueKeywords.in',
+            '<@(scripts_for_in_files)',
+            '../scripts/make_style_builder.py',
+            '../css/CSSProperties.in',
+            '../scripts/templates/StyleBuilder.cpp.tmpl',
+          ],
+          'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/StyleBuilder.cpp',
+          ],
+          'action': [
+            'python',
+            '../scripts/make_style_builder.py',
+            '../css/CSSProperties.in',
+            '--output_dir',
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/',
+          ],
+        },
+        {
+          'action_name': 'CSSValueKeywords',
+          'variables': {
+            'in_files': [
+              '../css/CSSValueKeywords.in',
+              '../css/SVGCSSValueKeywords.in',
+            ],
+          },
+          'inputs': [
+            '<@(scripts_for_in_files)',
+            '../scripts/make_css_value_keywords.py',
+            '<@(in_files)'
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/CSSValueKeywords.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/CSSValueKeywords.h',
           ],
           'action': [
-            'python',
-            'scripts/action_cssvaluekeywords.py',
-            '<@(_outputs)',
-            '--',
+             '../scripts/make_css_value_keywords.py',
+             '<@(in_files)',
+             '--output_dir',
+             '<(SHARED_INTERMEDIATE_DIR)/webkit/',
             '--defines', '<(feature_defines)',
-            '--',
-            '<@(_inputs)',
-          ],
-          'conditions': [
-            # TODO(maruel): Move it in its own project or generate it anyway?
-            ['enable_svg!=0', {
-              'inputs': [
-                '../css/SVGCSSValueKeywords.in',
-              ],
-            }],
           ],
           'msvs_cygwin_shell': 1,
         },
@@ -349,6 +358,7 @@
             'python',
             '../scripts/make_event_factory.py',
             '../dom/EventNames.in',
+            '--output_dir',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/',
           ],
         },
@@ -367,6 +377,7 @@
             'python',
             '../scripts/make_event_factory.py',
             '../dom/EventTargetFactory.in',
+            '--output_dir',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/',
           ],
         },
@@ -387,6 +398,7 @@
             'python',
             '../scripts/make_dom_exceptions.py',
             '../dom/DOMExceptions.in',
+            '--output_dir',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/',
           ],
         },

@@ -31,9 +31,6 @@
 #ifndef WebTestProxy_h
 #define WebTestProxy_h
 
-#include "Platform/chromium/public/WebRect.h"
-#include "Platform/chromium/public/WebURLError.h"
-#include "Platform/chromium/public/WebURLRequest.h"
 #include "WebKit/chromium/public/WebAccessibilityNotification.h"
 #include "WebKit/chromium/public/WebDOMMessageEvent.h"
 #include "WebKit/chromium/public/WebDragOperation.h"
@@ -45,6 +42,9 @@
 #include "WebKit/chromium/public/WebTextAffinity.h"
 #include "WebKit/chromium/public/WebTextDirection.h"
 #include "WebTestCommon.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebURLError.h"
+#include "public/platform/WebURLRequest.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -52,6 +52,8 @@
 namespace WebKit {
 class WebAccessibilityObject;
 class WebCachedURLRequest;
+class WebColorChooser;
+class WebColorChooserClient;
 class WebDataSource;
 class WebDeviceOrientationClient;
 class WebDeviceOrientationClientMock;
@@ -82,6 +84,7 @@ struct WebPluginParams;
 struct WebPoint;
 struct WebSize;
 struct WebWindowFeatures;
+typedef unsigned WebColor;
 }
 
 class SkCanvas;
@@ -105,6 +108,7 @@ public:
     void reset();
 
     WebKit::WebSpellCheckClient *spellCheckClient() const;
+    WebKit::WebColorChooser* createColorChooser(WebKit::WebColorChooserClient*, const WebKit::WebColor&);
 
     std::string captureTree(bool debugRenderTree);
     SkCanvas* capturePixels();
@@ -113,6 +117,10 @@ public:
 
     // FIXME: Make this private again.
     void scheduleComposite();
+
+    void didOpenChooser();
+    void didCloseChooser();
+    bool isChooserShown();
 
 #if WEBTESTRUNNER_IMPLEMENTATION
     void display();
@@ -185,7 +193,6 @@ protected:
     void didRunInsecureContent(WebKit::WebFrame*, const WebKit::WebSecurityOrigin&, const WebKit::WebURL& insecureURL);
     void didDetectXSS(WebKit::WebFrame*, const WebKit::WebURL& insecureURL, bool didBlockEntirePage);
     void willRequestResource(WebKit::WebFrame*, const WebKit::WebCachedURLRequest&);
-    bool canHandleRequest(WebKit::WebFrame*, const WebKit::WebURLRequest&);
     WebKit::WebURLError cannotHandleRequestError(WebKit::WebFrame*, const WebKit::WebURLRequest&);
     void didCreateDataSource(WebKit::WebFrame*, WebKit::WebDataSource*);
     void willSendRequest(WebKit::WebFrame*, unsigned identifier, WebKit::WebURLRequest&, const WebKit::WebURLResponse& redirectResponse);
@@ -224,6 +231,7 @@ private:
     std::map<unsigned, WebKit::WebURLRequest> m_requestMap;
 
     bool m_logConsoleOutput;
+    int m_chooserCount;
 
     std::auto_ptr<WebKit::WebGeolocationClientMock> m_geolocationClient;
     std::auto_ptr<WebKit::WebDeviceOrientationClientMock> m_deviceOrientationClient;
@@ -522,12 +530,6 @@ public:
         WebTestProxyBase::willRequestResource(frame, request);
         Base::willRequestResource(frame, request);
     }
-    virtual bool canHandleRequest(WebKit::WebFrame* frame, const WebKit::WebURLRequest& request)
-    {
-        if (!WebTestProxyBase::canHandleRequest(frame, request))
-            return false;
-        return Base::canHandleRequest(frame, request);
-    }
     virtual WebKit::WebURLError cannotHandleRequestError(WebKit::WebFrame* frame, const WebKit::WebURLRequest& request)
     {
         return WebTestProxyBase::cannotHandleRequestError(frame, request);
@@ -603,6 +605,10 @@ public:
         if (WebTestProxyBase::willCheckAndDispatchMessageEvent(sourceFrame, targetFrame, target, event))
             return true;
         return Base::willCheckAndDispatchMessageEvent(sourceFrame, targetFrame, target, event);
+    }
+    virtual WebKit::WebColorChooser* createColorChooser(WebKit::WebColorChooserClient* client, const WebKit::WebColor& color)
+    {
+        return WebTestProxyBase::createColorChooser(client, color);
     }
 };
 

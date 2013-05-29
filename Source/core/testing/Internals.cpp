@@ -110,10 +110,7 @@
 #include "modules/battery/BatteryController.h"
 #endif
 
-#if ENABLE(PAGE_POPUP)
 #include "core/page/PagePopupController.h"
-#endif
-
 #include "core/platform/graphics/GraphicsLayer.h"
 #include "core/platform/graphics/chromium/GraphicsLayerChromium.h"
 #include "core/platform/graphics/filters/FilterOperation.h"
@@ -121,8 +118,8 @@
 #include "core/rendering/RenderLayerBacking.h"
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
-#include "CDM.h"
-#include "MockCDM.h"
+#include "core/testing/MockCDM.h"
+#include "modules/encryptedmedia/CDM.h"
 #endif
 
 #include "core/page/CaptionUserPreferences.h"
@@ -134,9 +131,7 @@
 
 namespace WebCore {
 
-#if ENABLE(PAGE_POPUP)
 static MockPagePopupDriver* s_pagePopupDriver = 0;
-#endif
 
 using namespace HTMLNames;
 
@@ -205,14 +200,9 @@ void Internals::resetToConsistentState(Page* page)
     TextRun::setAllowsRoundingHacks(false);
     WebCore::overrideUserPreferredLanguages(Vector<String>());
     WebCore::Settings::setUsesOverlayScrollbars(false);
-#if ENABLE(PAGE_POPUP)
     delete s_pagePopupDriver;
     s_pagePopupDriver = 0;
-    if (page->chrome())
-        page->chrome()->client()->resetPagePopupDriver();
-#endif
-    if (page->inspectorController())
-        page->inspectorController()->setProfilerEnabled(false);
+    page->chrome().client()->resetPagePopupDriver();
     page->group().captionPreferences()->setTestingMode(false);
     if (!page->mainFrame()->editor()->isContinuousSpellCheckingEnabled())
         page->mainFrame()->editor()->toggleContinuousSpellChecking();
@@ -740,30 +730,23 @@ void Internals::enableMockSpeechSynthesizer()
 
 void Internals::setEnableMockPagePopup(bool enabled, ExceptionCode& ec)
 {
-#if ENABLE(PAGE_POPUP)
     Document* document = contextDocument();
-    if (!document || !document->page() || !document->page()->chrome())
+    if (!document || !document->page())
         return;
     Page* page = document->page();
     if (!enabled) {
-        page->chrome()->client()->resetPagePopupDriver();
+        page->chrome().client()->resetPagePopupDriver();
         return;
     }
     if (!s_pagePopupDriver)
         s_pagePopupDriver = MockPagePopupDriver::create(page->mainFrame()).leakPtr();
-    page->chrome()->client()->setPagePopupDriver(s_pagePopupDriver);
-#else
-    UNUSED_PARAM(enabled);
-    UNUSED_PARAM(ec);
-#endif
+    page->chrome().client()->setPagePopupDriver(s_pagePopupDriver);
 }
 
-#if ENABLE(PAGE_POPUP)
 PassRefPtr<PagePopupController> Internals::pagePopupController()
 {
     return s_pagePopupDriver ? s_pagePopupDriver->pagePopupController() : 0;
 }
-#endif
 
 PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionCode& ec)
 {
@@ -916,12 +899,14 @@ String Internals::configurationForViewport(Document* document, float devicePixel
 
     const int defaultLayoutWidthForNonMobilePages = 980;
 
-    ViewportArguments arguments = page->viewportArguments();
-    ViewportAttributes attributes = computeViewportAttributes(arguments, defaultLayoutWidthForNonMobilePages, deviceWidth, deviceHeight, devicePixelRatio, IntSize(availableWidth, availableHeight));
-    restrictMinimumScaleFactorToViewportSize(attributes, IntSize(availableWidth, availableHeight), devicePixelRatio);
-    restrictScaleFactorToInitialScaleIfNotUserScalable(attributes);
+    // FIXME(aelias): Remove this argument from all the fast/viewport tests.
+    ASSERT(devicePixelRatio == 1);
 
-    return "viewport size " + String::number(attributes.layoutSize.width()) + "x" + String::number(attributes.layoutSize.height()) + " scale " + String::number(attributes.initialScale) + " with limits [" + String::number(attributes.minimumScale) + ", " + String::number(attributes.maximumScale) + "] and userScalable " + (attributes.userScalable ? "true" : "false");
+    ViewportArguments arguments = page->viewportArguments();
+    PageScaleConstraints constraints = arguments.resolve(IntSize(availableWidth, availableHeight), FloatSize(deviceWidth, deviceHeight), defaultLayoutWidthForNonMobilePages);
+    constraints.fitToContentsWidth(constraints.layoutSize.width(), availableWidth);
+
+    return "viewport size " + String::number(constraints.layoutSize.width()) + "x" + String::number(constraints.layoutSize.height()) + " scale " + String::number(constraints.initialScale) + " with limits [" + String::number(constraints.minimumScale) + ", " + String::number(constraints.maximumScale) + "] and userScalable " + (arguments.userZoom ? "true" : "false");
 }
 
 bool Internals::wasLastChangeUserEdit(Element* textField, ExceptionCode& ec)
@@ -1088,6 +1073,8 @@ PassRefPtr<DOMPoint> Internals::touchPositionAdjustedToBestClickableNode(long x,
         return 0;
     }
 
+    document->updateLayout();
+
     IntSize radius(width / 2, height / 2);
     IntPoint point(x + radius.width(), y + radius.height());
 
@@ -1108,6 +1095,8 @@ Node* Internals::touchNodeAdjustedToBestClickableNode(long x, long y, long width
         return 0;
     }
 
+    document->updateLayout();
+
     IntSize radius(width / 2, height / 2);
     IntPoint point(x + radius.width(), y + radius.height());
 
@@ -1123,6 +1112,8 @@ PassRefPtr<DOMPoint> Internals::touchPositionAdjustedToBestContextMenuNode(long 
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
+
+    document->updateLayout();
 
     IntSize radius(width / 2, height / 2);
     IntPoint point(x + radius.width(), y + radius.height());
@@ -1144,6 +1135,8 @@ Node* Internals::touchNodeAdjustedToBestContextMenuNode(long x, long y, long wid
         return 0;
     }
 
+    document->updateLayout();
+
     IntSize radius(width / 2, height / 2);
     IntPoint point(x + radius.width(), y + radius.height());
 
@@ -1159,6 +1152,8 @@ PassRefPtr<ClientRect> Internals::bestZoomableAreaForTouchPoint(long x, long y, 
         ec = INVALID_ACCESS_ERR;
         return 0;
     }
+
+    document->updateLayout();
 
     IntSize radius(width / 2, height / 2);
     IntPoint point(x + radius.width(), y + radius.height());
@@ -1440,17 +1435,6 @@ void Internals::setInspectorResourcesDataSizeLimits(int maximumResourcesContentS
         return;
     }
     page->inspectorController()->setResourcesDataSizeLimitsFromInternals(maximumResourcesContentSize, maximumSingleResourceContentSize);
-}
-
-void Internals::setJavaScriptProfilingEnabled(bool enabled, ExceptionCode& ec)
-{
-    Page* page = contextDocument()->frame()->page();
-    if (!page || !page->inspectorController()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-    page->inspectorController()->setProfilerEnabled(enabled);
 }
 
 bool Internals::hasGrammarMarker(Document* document, int from, int length, ExceptionCode&)

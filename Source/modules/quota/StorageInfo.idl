@@ -24,8 +24,7 @@
  */
 
 [
-    NoInterfaceObject,
-    ImplementationLacksVTable
+    NoInterfaceObject
 ] interface StorageInfo {
     const unsigned short TEMPORARY = 0;
     const unsigned short PERSISTENT = 1;

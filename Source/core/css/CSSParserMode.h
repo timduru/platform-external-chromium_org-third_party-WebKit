@@ -68,7 +68,7 @@ public:
     bool isCSSStickyPositionEnabled;
     bool isCSSCompositingEnabled;
     bool isCSSGridLayoutEnabled;
-    bool isCSSVariablesEnabled;
+    bool isCSSTouchActionEnabled;
     bool needsSiteSpecificQuirks;
 };
 

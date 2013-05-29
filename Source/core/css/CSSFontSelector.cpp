@@ -49,13 +49,8 @@
 #include "core/page/Settings.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/SimpleFontData.h"
-#include "core/rendering/RenderObject.h"
-#include <wtf/text/AtomicString.h>
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
 #include "core/svg/SVGFontFaceElement.h"
-#endif
+#include "wtf/text/AtomicString.h"
 
 using namespace std;
 

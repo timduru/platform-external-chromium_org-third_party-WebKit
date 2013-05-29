@@ -36,8 +36,6 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
-#include "core/platform/KURL.h"
 #include "core/rendering/RenderPart.h"
 
 namespace WebCore {
@@ -159,7 +157,7 @@ void HTMLFrameElementBase::didNotifySubtreeInsertions(ContainerNode*)
     // as part of a DocumentFragment, insertedInto from an earlier element
     // could have forced a style resolve and already attached us).
     if (!renderer())
-        lazyAttach(DoNotSetAttached);
+        lazyAttach();
     setNameAndOpenURL();
 }
 

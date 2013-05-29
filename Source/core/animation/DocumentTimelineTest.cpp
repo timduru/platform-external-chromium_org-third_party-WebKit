@@ -32,27 +32,49 @@
 #include "core/animation/DocumentTimeline.h"
 
 #include "core/animation/Animation.h"
+#include "core/animation/TimedItem.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/dom/QualifiedName.h"
 #include "core/platform/KURL.h"
-
 #include <gtest/gtest.h>
 
 using namespace WebCore;
 
 namespace {
 
+class EmptyAnimationEffect : public AnimationEffect {
+public:
+    static PassRefPtr<EmptyAnimationEffect> create()
+    {
+        return adoptRef(new EmptyAnimationEffect);
+    }
+    virtual PassOwnPtr<CompositableValueMap> sample(int iteration, double fraction) const
+    {
+        return adoptPtr(new CompositableValueMap);
+    }
+private:
+    EmptyAnimationEffect() { }
+};
+
 TEST(DocumentTimeline, AddAnAnimation)
 {
     RefPtr<Document> d = Document::create(0, KURL());
     RefPtr<Element> e = Element::create(nullQName() , d.get());
     RefPtr<DocumentTimeline> timeline = DocumentTimeline::create(d.get());
-    RefPtr<Animation> anim = Animation::create(e.get(), AnimationEffect::create());
-    timeline->play(anim);
+    Timing timing;
+    RefPtr<Animation> anim = Animation::create(e.get(), EmptyAnimationEffect::create(), timing);
+    ASSERT_TRUE(isNull(timeline->currentTime()));
+
+    timeline->play(anim.get());
+    ASSERT_TRUE(isNull(timeline->currentTime()));
+
     timeline->serviceAnimations(0);
-    StylePropertySet* styleSet = anim->cachedStyle();
-    ASSERT_EQ(0u, styleSet->propertyCount());
+    ASSERT_EQ(0, timeline->currentTime());
+    ASSERT_TRUE(anim->compositableValues()->isEmpty());
+
+    timeline->serviceAnimations(100);
+    ASSERT_EQ(100, timeline->currentTime());
 }
 
 }

@@ -23,30 +23,22 @@
 #include "core/rendering/HitTestResult.h"
 
 #include "HTMLNames.h"
+#include "SVGNames.h"
+#include "XLinkNames.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/shadow/ShadowRoot.h"
-#include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMediaElement.h"
-#include "core/html/HTMLPlugInImageElement.h"
-#include "core/html/HTMLVideoElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/loader/cache/CachedImage.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/platform/Scrollbar.h"
 #include "core/rendering/HitTestLocation.h"
-#include "core/rendering/RenderBlock.h"
 #include "core/rendering/RenderImage.h"
-#include "core/rendering/RenderInline.h"
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#include "XLinkNames.h"
-#endif
 
 namespace WebCore {
 
@@ -235,32 +227,6 @@ String HitTestResult::title(TextDirection& dir) const
     return String();
 }
 
-String HitTestResult::innerTextIfTruncated(TextDirection& dir) const
-{
-    for (Node* truncatedNode = m_innerNode.get(); truncatedNode; truncatedNode = truncatedNode->parentNode()) {
-        if (!truncatedNode->isElementNode())
-            continue;
-
-        if (RenderObject* renderer = truncatedNode->renderer()) {
-            if (renderer->isRenderBlock()) {
-                RenderBlock* block = toRenderBlock(renderer);
-                if (block->style()->textOverflow()) {
-                    for (RootInlineBox* line = block->firstRootBox(); line; line = line->nextRootBox()) {
-                        if (line->hasEllipsisBox()) {
-                            dir = block->style()->direction();
-                            return toElement(truncatedNode)->innerText();
-                        }
-                    }
-                }
-                break;
-            }
-        }
-    }
-
-    dir = LTR;
-    return String();
-}
-
 String displayString(const String& string, const Node* node)
 {
     if (!node)
@@ -321,9 +287,7 @@ KURL HitTestResult::absoluteImageURL() const
         || m_innerNonSharedNode->hasTagName(imgTag)
         || m_innerNonSharedNode->hasTagName(inputTag)
         || m_innerNonSharedNode->hasTagName(objectTag)    
-#if ENABLE(SVG)
         || m_innerNonSharedNode->hasTagName(SVGNames::imageTag)
-#endif
        ) {
         Element* element = toElement(m_innerNonSharedNode.get());
         urlString = element->imageSourceURL();
@@ -333,35 +297,11 @@ KURL HitTestResult::absoluteImageURL() const
     return m_innerNonSharedNode->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(urlString));
 }
 
-KURL HitTestResult::absolutePDFURL() const
-{
-    if (!(m_innerNonSharedNode && m_innerNonSharedNode->document()))
-        return KURL();
-
-    if (!m_innerNonSharedNode->hasTagName(embedTag) && !m_innerNonSharedNode->hasTagName(objectTag))
-        return KURL();
-
-    HTMLPlugInImageElement* element = toHTMLPlugInImageElement(m_innerNonSharedNode.get());
-    KURL url = m_innerNonSharedNode->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(element->url()));
-    if (!url.isValid())
-        return KURL();
-
-    if (element->serviceType() == "application/pdf" || (element->serviceType().isEmpty() && url.path().lower().endsWith(".pdf")))
-        return url;
-    return KURL();
-}
-
 KURL HitTestResult::absoluteMediaURL() const
 {
     if (HTMLMediaElement* mediaElt = mediaElement())
         return mediaElt->currentSrc();
     return KURL();
-}
-
-bool HitTestResult::mediaSupportsFullscreen() const
-{
-    HTMLMediaElement* mediaElt(mediaElement());
-    return (mediaElt && mediaElt->hasTagName(HTMLNames::videoTag) && mediaElt->supportsFullscreen());
 }
 
 HTMLMediaElement* HitTestResult::mediaElement() const
@@ -377,82 +317,6 @@ HTMLMediaElement* HitTestResult::mediaElement() const
     return 0;
 }
 
-void HitTestResult::toggleMediaControlsDisplay() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        mediaElt->setControls(!mediaElt->controls());
-}
-
-void HitTestResult::toggleMediaLoopPlayback() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        mediaElt->setLoop(!mediaElt->loop());
-}
-
-void HitTestResult::enterFullscreenForVideo() const
-{
-    HTMLMediaElement* mediaElt(mediaElement());
-    if (mediaElt && mediaElt->hasTagName(HTMLNames::videoTag)) {
-        HTMLVideoElement* videoElt = static_cast<HTMLVideoElement*>(mediaElt);
-        if (!videoElt->isFullscreen() && mediaElt->supportsFullscreen())
-            videoElt->enterFullscreen();
-    }
-}
-
-bool HitTestResult::mediaControlsEnabled() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        return mediaElt->controls();
-    return false;
-}
-
-bool HitTestResult::mediaLoopEnabled() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        return mediaElt->loop();
-    return false;
-}
-
-bool HitTestResult::mediaPlaying() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        return !mediaElt->paused();
-    return false;
-}
-
-void HitTestResult::toggleMediaPlayState() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        mediaElt->togglePlayState();
-}
-
-bool HitTestResult::mediaHasAudio() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        return mediaElt->hasAudio();
-    return false;
-}
-
-bool HitTestResult::mediaIsVideo() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        return mediaElt->hasTagName(HTMLNames::videoTag);
-    return false;
-}
-
-bool HitTestResult::mediaMuted() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        return mediaElt->muted();
-    return false;
-}
-
-void HitTestResult::toggleMediaMuteState() const
-{
-    if (HTMLMediaElement* mediaElt = mediaElement())
-        mediaElt->setMuted(!mediaElt->muted());
-}
-
 KURL HitTestResult::absoluteLinkURL() const
 {
     if (!(m_innerURLElement && m_innerURLElement->document()))
@@ -461,10 +325,8 @@ KURL HitTestResult::absoluteLinkURL() const
     AtomicString urlString;
     if (m_innerURLElement->hasTagName(aTag) || m_innerURLElement->hasTagName(areaTag) || m_innerURLElement->hasTagName(linkTag))
         urlString = m_innerURLElement->getAttribute(hrefAttr);
-#if ENABLE(SVG)
     else if (m_innerURLElement->hasTagName(SVGNames::aTag))
         urlString = m_innerURLElement->getAttribute(XLinkNames::hrefAttr);
-#endif
     else
         return KURL();
 
@@ -478,10 +340,9 @@ bool HitTestResult::isLiveLink() const
 
     if (m_innerURLElement->hasTagName(aTag))
         return static_cast<HTMLAnchorElement*>(m_innerURLElement.get())->isLiveLink();
-#if ENABLE(SVG)
+
     if (m_innerURLElement->hasTagName(SVGNames::aTag))
         return m_innerURLElement->isLink();
-#endif
 
     return false;
 }

@@ -34,6 +34,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
+#include "core/dom/NamedNodesCollection.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/fileapi/FileList.h"
@@ -705,6 +706,34 @@ void HTMLFormElement::copyNonAttributePropertiesFromElement(const Element& sourc
 {
     m_wasDemoted = static_cast<const HTMLFormElement&>(source).m_wasDemoted;
     HTMLElement::copyNonAttributePropertiesFromElement(source);
+}
+
+void HTMLFormElement::anonymousNamedGetter(const AtomicString& name, bool& returnValue0Enabled, RefPtr<NodeList>& returnValue0, bool& returnValue1Enabled, RefPtr<Node>& returnValue1)
+{
+    // Call getNamedElements twice, first time check if it has a value
+    // and let HTMLFormElement update its cache.
+    // See issue: 867404
+    {
+        Vector<RefPtr<Node> > elements;
+        getNamedElements(name, elements);
+        if (elements.isEmpty())
+            return;
+    }
+
+    // Second call may return different results from the first call,
+    // but if the first the size cannot be zero.
+    Vector<RefPtr<Node> > elements;
+    getNamedElements(name, elements);
+    ASSERT(!elements.isEmpty());
+
+    if (elements.size() == 1) {
+        returnValue1Enabled = true;
+        returnValue1 = elements.at(0);
+        return;
+    }
+
+    returnValue0Enabled = true;
+    returnValue0 = NamedNodesCollection::create(elements);
 }
 
 } // namespace

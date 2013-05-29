@@ -482,34 +482,6 @@ void Editor::respondToChangedContents(const VisibleSelection& endingSelection)
         client()->respondToChangedContents();
 }
 
-bool Editor::hasBidiSelection() const
-{
-    if (m_frame->selection()->isNone())
-        return false;
-
-    Node* startNode;
-    if (m_frame->selection()->isRange()) {
-        startNode = m_frame->selection()->selection().start().downstream().deprecatedNode();
-        Node* endNode = m_frame->selection()->selection().end().upstream().deprecatedNode();
-        if (enclosingBlock(startNode) != enclosingBlock(endNode))
-            return false;
-    } else
-        startNode = m_frame->selection()->selection().visibleStart().deepEquivalent().deprecatedNode();
-
-    RenderObject* renderer = startNode->renderer();
-    while (renderer && !renderer->isRenderBlock())
-        renderer = renderer->parent();
-
-    if (!renderer)
-        return false;
-
-    RenderStyle* style = renderer->style();
-    if (!style->isLeftToRightDirection())
-        return true;
-
-    return toRenderBlock(renderer)->containsNonZeroBidiLevel();
-}
-
 TriState Editor::selectionUnorderedListState() const
 {
     if (m_frame->selection()->isCaret()) {
@@ -746,7 +718,7 @@ void Editor::outdent()
     applyCommand(IndentOutdentCommand::create(m_frame->document(), IndentOutdentCommand::Outdent));
 }
 
-static void dispatchEditableContentChangedEvents(Element* startRoot, Element* endRoot)
+static void dispatchEditableContentChangedEvents(PassRefPtr<Element> startRoot, PassRefPtr<Element> endRoot)
 {
     if (startRoot)
         startRoot->dispatchEvent(Event::create(eventNames().webkitEditableContentChangedEvent, false, false), IGNORE_EXCEPTION);
@@ -1104,16 +1076,6 @@ void Editor::didEndEditing()
         client()->didEndEditing();
 }
 
-void Editor::toggleBold()
-{
-    command("ToggleBold").execute();
-}
-
-void Editor::toggleUnderline()
-{
-    command("ToggleUnderline").execute();
-}
-
 void Editor::setBaseWritingDirection(WritingDirection direction)
 {
     Node* focusedNode = frame()->document()->focusedNode();
@@ -1126,7 +1088,7 @@ void Editor::setBaseWritingDirection(WritingDirection direction)
         return;
     }
 
-    RefPtr<StylePropertySet> style = StylePropertySet::create();
+    RefPtr<MutableStylePropertySet> style = MutableStylePropertySet::create();
     style->setProperty(CSSPropertyDirection, direction == LeftToRightWritingDirection ? "ltr" : direction == RightToLeftWritingDirection ? "rtl" : "inherit", false);
     applyParagraphStyleToSelection(style.get(), EditActionSetWritingDirection);
 }
@@ -1181,33 +1143,41 @@ void Editor::confirmComposition()
 {
     if (!m_compositionNode)
         return;
-    setComposition(m_compositionNode->data().substring(m_compositionStart, m_compositionEnd - m_compositionStart), ConfirmComposition);
+    finishComposition(m_compositionNode->data().substring(m_compositionStart, m_compositionEnd - m_compositionStart), ConfirmComposition);
+}
+
+void Editor::confirmComposition(const String& text)
+{
+    finishComposition(text, ConfirmComposition);
 }
 
 void Editor::cancelComposition()
 {
     if (!m_compositionNode)
         return;
-    setComposition(emptyString(), CancelComposition);
+    finishComposition(emptyString(), CancelComposition);
 }
 
-bool Editor::cancelCompositionIfSelectionIsInvalid()
+void Editor::cancelCompositionIfSelectionIsInvalid()
 {
-    unsigned start;
-    unsigned end;
-    if (!hasComposition() || ignoreCompositionSelectionChange() || getCompositionSelection(start, end))
-        return false;
+    if (!hasComposition() || ignoreCompositionSelectionChange())
+        return;
+
+    // Check if selection start and selection end are valid.
+    Position start = m_frame->selection()->start();
+    Position end = m_frame->selection()->end();
+    if (start.containerNode() == m_compositionNode
+        && end.containerNode() == m_compositionNode
+        && static_cast<unsigned>(start.computeOffsetInContainerNode()) > m_compositionStart
+        && static_cast<unsigned>(end.computeOffsetInContainerNode()) < m_compositionEnd)
+        return;
 
     cancelComposition();
-    return true;
+    if (client())
+        client()->didCancelCompositionOnSelectionChange();
 }
 
-void Editor::confirmComposition(const String& text)
-{
-    setComposition(text, ConfirmComposition);
-}
-
-void Editor::setComposition(const String& text, SetCompositionMode mode)
+void Editor::finishComposition(const String& text, FinishCompositionMode mode)
 {
     ASSERT(mode == ConfirmComposition || mode == CancelComposition);
     UserTypingGestureIndicator typingGestureIndicator(m_frame);
@@ -1351,16 +1321,6 @@ void Editor::ignoreSpelling()
     if (!client())
         return;
         
-    RefPtr<Range> selectedRange = frame()->selection()->toNormalizedRange();
-    if (selectedRange)
-        frame()->document()->markers()->removeMarkers(selectedRange.get(), DocumentMarker::Spelling);
-}
-
-void Editor::learnSpelling()
-{
-    if (!client())
-        return;
-
     RefPtr<Range> selectedRange = frame()->selection()->toNormalizedRange();
     if (selectedRange)
         frame()->document()->markers()->removeMarkers(selectedRange.get(), DocumentMarker::Spelling);
@@ -1556,74 +1516,6 @@ String Editor::misspelledWordAtCaretOrRange(Node* clickedNode) const
     return misspellingLength == wordLength ? word : String();
 }
 
-String Editor::misspelledSelectionString() const
-{
-    String selectedString = selectedText();
-    int length = selectedString.length();
-    if (!length || !client())
-        return String();
-
-    int misspellingLocation = -1;
-    int misspellingLength = 0;
-    textChecker()->checkSpellingOfString(selectedString.characters(), length, &misspellingLocation, &misspellingLength);
-    
-    // The selection only counts as misspelled if the selected text is exactly one misspelled word
-    if (misspellingLength != length)
-        return String();
-    
-    // Update the spelling panel to be displaying this error (whether or not the spelling panel is on screen).
-    // This is necessary to make a subsequent call to [NSSpellChecker ignoreWord:inSpellDocumentWithTag:] work
-    // correctly; that call behaves differently based on whether the spelling panel is displaying a misspelling
-    // or a grammar error.
-    client()->updateSpellingUIWithMisspelledWord(selectedString);
-    
-    return selectedString;
-}
-
-bool Editor::isSelectionUngrammatical()
-{
-    Vector<String> ignoredGuesses;
-    RefPtr<Range> range = frame()->selection()->toNormalizedRange();
-    if (!range)
-        return false;
-    return TextCheckingHelper(client(), range).isUngrammatical(ignoredGuesses);
-}
-
-Vector<String> Editor::guessesForUngrammaticalSelection()
-{
-    Vector<String> guesses;
-    RefPtr<Range> range = frame()->selection()->toNormalizedRange();
-    if (!range)
-        return guesses;
-    // Ignore the result of isUngrammatical; we just want the guesses, whether or not there are any
-    TextCheckingHelper(client(), range).isUngrammatical(guesses);
-    return guesses;
-}
-
-Vector<String> Editor::guessesForMisspelledOrUngrammatical(bool& misspelled, bool& ungrammatical)
-{
-    if (unifiedTextCheckerEnabled()) {
-        FrameSelection* frameSelection = frame()->selection();
-        if (RefPtr<Range> range = frameSelection->toNormalizedRange())
-            return TextCheckingHelper(client(), range).guessesForMisspelledOrUngrammaticalRange(isGrammarCheckingEnabled(), misspelled, ungrammatical);
-        return Vector<String>();
-    }
-
-    String misspelledWord = misspelledSelectionString();
-    misspelled = !misspelledWord.isEmpty();
-
-    if (misspelled) {
-        ungrammatical = false;
-        return Vector<String>();
-    }
-    if (isGrammarCheckingEnabled() && isSelectionUngrammatical()) {
-        ungrammatical = true;
-        return guessesForUngrammaticalSelection();
-    }
-    ungrammatical = false;
-    return Vector<String>();
-}
-
 void Editor::showSpellingGuessPanel()
 {
     if (!client()) {
@@ -1638,13 +1530,6 @@ void Editor::showSpellingGuessPanel()
     
     advanceToNextMisspelling(true);
     client()->showSpellingUI(true);
-}
-
-bool Editor::spellingPanelIsShowing()
-{
-    if (!client())
-        return false;
-    return client()->spellingUIIsShowing();
 }
 
 void Editor::clearMisspellingsAndBadGrammar(const VisibleSelection &movingSelection)
@@ -2036,27 +1921,6 @@ PassRefPtr<Range> Editor::compositionRange() const
     return Range::create(m_compositionNode->document(), m_compositionNode.get(), start, m_compositionNode.get(), end);
 }
 
-bool Editor::getCompositionSelection(unsigned& selectionStart, unsigned& selectionEnd) const
-{
-    if (!m_compositionNode)
-        return false;
-    Position start = m_frame->selection()->start();
-    if (start.deprecatedNode() != m_compositionNode)
-        return false;
-    Position end = m_frame->selection()->end();
-    if (end.deprecatedNode() != m_compositionNode)
-        return false;
-
-    if (static_cast<unsigned>(start.deprecatedEditingOffset()) < m_compositionStart)
-        return false;
-    if (static_cast<unsigned>(end.deprecatedEditingOffset()) > m_compositionEnd)
-        return false;
-
-    selectionStart = start.deprecatedEditingOffset() - m_compositionStart;
-    selectionEnd = start.deprecatedEditingOffset() - m_compositionEnd;
-    return true;
-}
-
 bool Editor::setSelectionOffsets(int selectionStart, int selectionEnd)
 {
     Element* rootEditableElement = m_frame->selection()->rootEditableElement();
@@ -2432,6 +2296,8 @@ void Editor::respondToChangedSelection(const VisibleSelection& oldSelection, Fra
         m_frame->document()->markers()->removeMarkers(DocumentMarker::Spelling);
     if (!isContinuousGrammarCheckingEnabled)
         m_frame->document()->markers()->removeMarkers(DocumentMarker::Grammar);
+
+    cancelCompositionIfSelectionIsInvalid();
 
     notifyComponentsOnChangedSelection(oldSelection, options);
 }

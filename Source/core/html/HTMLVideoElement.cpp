@@ -34,10 +34,7 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/html/HTMLImageLoader.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
 #include "core/page/Frame.h"
-#include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderVideo.h"
@@ -182,27 +179,11 @@ void HTMLVideoElement::setDisplayMode(DisplayMode mode)
     if (!poster.isEmpty()) {
         // We have a poster path, but only show it until the user triggers display by playing or seeking and the
         // media engine has something to display.
-        if (mode == Video) {
-            if (oldMode != Video && player())
-                player()->prepareForRendering();
-            if (!hasAvailableVideoFrame())
-                mode = PosterWaitingForVideo;
-        }
-    } else if (oldMode != Video && player())
-        player()->prepareForRendering();
+        if (mode == Video && !hasAvailableVideoFrame())
+            mode = PosterWaitingForVideo;
+    }
 
     HTMLMediaElement::setDisplayMode(mode);
-
-    if (player() && player()->canLoadPoster()) {
-        bool canLoad = true;
-        if (!poster.isEmpty()) {
-            Frame* frame = document()->frame();
-            FrameLoader* loader = frame ? frame->loader() : 0;
-            canLoad = loader && loader->willLoadMediaElementURL(poster);
-        }
-        if (canLoad)
-            player()->setPoster(poster);
-    }
 
     if (renderer() && displayMode() != oldMode)
         renderer()->updateFromElement();
@@ -238,7 +219,7 @@ bool HTMLVideoElement::hasAvailableVideoFrame() const
     if (!player())
         return false;
     
-    return player()->hasVideo() && player()->hasAvailableVideoFrame();
+    return player()->hasVideo() && player()->readyState() >= MediaPlayer::HaveCurrentData;
 }
 
 void HTMLVideoElement::webkitEnterFullscreen(ExceptionCode& ec)

@@ -33,28 +33,20 @@
 #include <wtf/text/CString.h>
 #include <wtf/Uint8Array.h>
 #include <limits>
-#include "CSSPropertyNames.h"
-#include "CSSValueKeywords.h"
 #include "HTMLNames.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/css/MediaList.h"
 #include "core/css/MediaQueryEvaluator.h"
 #include "core/dom/Attribute.h"
-#include "core/dom/ClientRect.h"
-#include "core/dom/ClientRectList.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
-#include "core/dom/MouseEvent.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
-#include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
-#include "core/html/HTMLDocument.h"
 #include "core/html/HTMLSourceElement.h"
-#include "core/html/HTMLVideoElement.h"
 #include "core/html/MediaController.h"
 #include "core/html/MediaDocument.h"
 #include "core/html/MediaError.h"
@@ -63,24 +55,17 @@
 #include "core/html/MediaKeyEvent.h"
 #include "core/html/TimeRanges.h"
 #include "core/html/shadow/MediaControls.h"
-#include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/FrameLoaderClient.h"
-#include "core/loader/appcache/ApplicationCacheHost.h"
-#include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
 #include "core/page/ContentSecurityPolicy.h"
-#include "core/page/DiagnosticLoggingKeys.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PageGroup.h"
 #include "core/page/Settings.h"
 #include "core/platform/ContentType.h"
-#include "core/platform/Language.h"
 #include "core/platform/Logging.h"
 #include "core/platform/MIMETypeFromURL.h"
-#include "core/platform/MIMETypeRegistry.h"
+#include "core/platform/NotImplemented.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderVideo.h"
@@ -105,8 +90,9 @@
 #endif
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
-#include "MediaKeyNeededEvent.h"
-#include "MediaKeys.h"
+// FIXME: Remove dependency on modules/encryptedmedia (http://crbug.com/242754).
+#include "modules/encryptedmedia/MediaKeyNeededEvent.h"
+#include "modules/encryptedmedia/MediaKeys.h"
 #endif
 
 using namespace std;
@@ -171,7 +157,6 @@ static void removeElementFromDocumentMap(HTMLMediaElement* element, Document* do
         map.add(document, set);
 }
 
-#if ENABLE(ENCRYPTED_MEDIA)
 static ExceptionCode exceptionCodeForMediaKeyException(MediaPlayer::MediaKeyException exception)
 {
     switch (exception) {
@@ -186,7 +171,6 @@ static ExceptionCode exceptionCodeForMediaKeyException(MediaPlayer::MediaKeyExce
     ASSERT_NOT_REACHED();
     return INVALID_STATE_ERR;
 }
-#endif
 
 class TrackDisplayUpdateScope {
 public:
@@ -300,6 +284,11 @@ HTMLMediaElement::~HTMLMediaElement()
 
     removeElementFromDocumentMap(this, document());
 
+    // Destroying the player may cause a resource load to be canceled,
+    // which could result in userCancelledLoad() being called back.
+    // Setting m_completelyLoaded ensures that such a call will not cause
+    // us to dispatch an abort event, which would result in a crash.
+    // See http://crbug.com/233654 for more details.
     m_completelyLoaded = true;
     m_player.clear();
 }
@@ -457,19 +446,25 @@ bool HTMLMediaElement::childShouldCreateRenderer(const NodeRenderingContext& chi
 Node::InsertionNotificationRequest HTMLMediaElement::insertedInto(ContainerNode* insertionPoint)
 {
     LOG(Media, "HTMLMediaElement::insertedInto");
+
     HTMLElement::insertedInto(insertionPoint);
-    if (insertionPoint->inDocument() && !getAttribute(srcAttr).isEmpty() && m_networkState == NETWORK_EMPTY)
-        scheduleDelayedAction(LoadMediaResource);
+    if (insertionPoint->inDocument()) {
+        m_inActiveDocument = true;
+
+        if (!getAttribute(srcAttr).isEmpty() && m_networkState == NETWORK_EMPTY)
+            scheduleDelayedAction(LoadMediaResource);
+    }
+
     configureMediaControls();
     return InsertionDone;
 }
 
 void HTMLMediaElement::removedFrom(ContainerNode* insertionPoint)
 {
-    m_inActiveDocument = false;
+    LOG(Media, "HTMLMediaElement::removedFrom");
 
+    m_inActiveDocument = false;
     if (insertionPoint->inDocument()) {
-        LOG(Media, "HTMLMediaElement::removedFromDocument");
         configureMediaControls();
         if (m_networkState > NETWORK_EMPTY)
             pause();
@@ -841,7 +836,6 @@ void HTMLMediaElement::loadResource(const KURL& initialURL, ContentType& content
 
     if (!autoplay())
         m_player->setPreload(m_preload);
-    m_player->setPreservesPitch(m_webkitPreservesPitch);
 
     if (fastHasAttribute(mutedAttr))
         m_muted = true;
@@ -1403,17 +1397,7 @@ void HTMLMediaElement::cancelPendingEventsAndCallbacks()
     }
 }
 
-Document* HTMLMediaElement::mediaPlayerOwningDocument()
-{
-    Document* d = document();
-
-    if (!d)
-        d = ownerDocument();
-
-    return d;
-}
-
-void HTMLMediaElement::mediaPlayerNetworkStateChanged(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerNetworkStateChanged()
 {
     beginProcessingMediaPlayerCallback();
     setNetworkState(m_player->networkState());
@@ -1511,7 +1495,7 @@ void HTMLMediaElement::changeNetworkStateFromLoadingToIdle()
     m_networkState = NETWORK_IDLE;
 }
 
-void HTMLMediaElement::mediaPlayerReadyStateChanged(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerReadyStateChanged()
 {
     beginProcessingMediaPlayerCallback();
 
@@ -1631,8 +1615,7 @@ void HTMLMediaElement::setReadyState(MediaPlayer::ReadyState state)
         updateActiveTextTrackCues(currentTime());
 }
 
-#if ENABLE(ENCRYPTED_MEDIA)
-void HTMLMediaElement::mediaPlayerKeyAdded(MediaPlayer*, const String& keySystem, const String& sessionId)
+void HTMLMediaElement::mediaPlayerKeyAdded(const String& keySystem, const String& sessionId)
 {
     MediaKeyEventInit initializer;
     initializer.keySystem = keySystem;
@@ -1645,7 +1628,7 @@ void HTMLMediaElement::mediaPlayerKeyAdded(MediaPlayer*, const String& keySystem
     m_asyncEventQueue->enqueueEvent(event.release());
 }
 
-void HTMLMediaElement::mediaPlayerKeyError(MediaPlayer*, const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode errorCode, unsigned short systemCode)
+void HTMLMediaElement::mediaPlayerKeyError(const String& keySystem, const String& sessionId, MediaPlayerClient::MediaKeyErrorCode errorCode, unsigned short systemCode)
 {
     MediaKeyError::Code mediaKeyErrorCode = MediaKeyError::MEDIA_KEYERR_UNKNOWN;
     switch (errorCode) {
@@ -1682,7 +1665,7 @@ void HTMLMediaElement::mediaPlayerKeyError(MediaPlayer*, const String& keySystem
     m_asyncEventQueue->enqueueEvent(event.release());
 }
 
-void HTMLMediaElement::mediaPlayerKeyMessage(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength, const KURL& defaultURL)
+void HTMLMediaElement::mediaPlayerKeyMessage(const String& keySystem, const String& sessionId, const unsigned char* message, unsigned messageLength, const KURL& defaultURL)
 {
     MediaKeyEventInit initializer;
     initializer.keySystem = keySystem;
@@ -1697,7 +1680,7 @@ void HTMLMediaElement::mediaPlayerKeyMessage(MediaPlayer*, const String& keySyst
     m_asyncEventQueue->enqueueEvent(event.release());
 }
 
-bool HTMLMediaElement::mediaPlayerKeyNeeded(MediaPlayer*, const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength)
+bool HTMLMediaElement::mediaPlayerKeyNeeded(const String& keySystem, const String& sessionId, const unsigned char* initData, unsigned initDataLength)
 {
     if (!hasEventListeners(eventNames().webkitneedkeyEvent)) {
         m_error = MediaError::create(MediaError::MEDIA_ERR_ENCRYPTED);
@@ -1717,10 +1700,9 @@ bool HTMLMediaElement::mediaPlayerKeyNeeded(MediaPlayer*, const String& keySyste
     m_asyncEventQueue->enqueueEvent(event.release());
     return true;
 }
-#endif
 
 #if ENABLE(ENCRYPTED_MEDIA_V2)
-bool HTMLMediaElement::mediaPlayerKeyNeeded(MediaPlayer*, Uint8Array* initData)
+bool HTMLMediaElement::mediaPlayerKeyNeeded(Uint8Array* initData)
 {
     if (!hasEventListeners("webkitneedkey")) {
         m_error = MediaError::create(MediaError::MEDIA_ERR_ENCRYPTED);
@@ -1802,11 +1784,6 @@ bool HTMLMediaElement::supportsSave() const
     return m_player ? m_player->supportsSave() : false;
 }
 
-bool HTMLMediaElement::supportsScanning() const
-{
-    return m_player ? m_player->supportsScanning() : false;
-}
-
 void HTMLMediaElement::prepareToPlay()
 {
     LOG(Media, "HTMLMediaElement::prepareToPlay(%p)", this);
@@ -1850,8 +1827,7 @@ void HTMLMediaElement::seek(double time, ExceptionCode& ec)
     time = min(time, duration());
 
     // 6 - If the new playback position is less than the earliest possible position, let it be that position instead.
-    double earliestTime = m_player->startTime();
-    time = max(time, earliestTime);
+    time = max(time, 0.0);
 
     // Ask the media engine for the time value in the movie's time scale before comparing with current time. This
     // is necessary because if the seek time is not equal to currentTime but the delta is less than the movie's
@@ -1987,34 +1963,6 @@ double HTMLMediaElement::currentTime() const
         return m_cachedTime;
     }
 
-    // Is it too soon use a cached time?
-    double now = WTF::currentTime();
-    double maximumDurationToCacheMediaTime = m_player->maximumDurationToCacheMediaTime();
-
-    if (maximumDurationToCacheMediaTime && m_cachedTime != MediaPlayer::invalidTime() && !m_paused && now > m_minimumWallClockTimeToCacheMediaTime) {
-        double wallClockDelta = now - m_cachedTimeWallClockUpdateTime;
-
-        // Not too soon, use the cached time only if it hasn't expired.
-        if (wallClockDelta < maximumDurationToCacheMediaTime) {
-            double adjustedCacheTime = m_cachedTime + (m_playbackRate * wallClockDelta);
-
-#if LOG_CACHED_TIME_WARNINGS
-            double delta = adjustedCacheTime - m_player->currentTime();
-            if (delta > minCachedDeltaForWarning)
-                LOG(Media, "HTMLMediaElement::currentTime - WARNING, cached time is %f seconds off of media time when playing", delta);
-#endif
-            return adjustedCacheTime;
-        }
-    }
-
-#if LOG_CACHED_TIME_WARNINGS
-    if (maximumDurationToCacheMediaTime && now > m_minimumWallClockTimeToCacheMediaTime && m_cachedTime != MediaPlayer::invalidTime()) {
-        double wallClockDelta = now - m_cachedTimeWallClockUpdateTime;
-        double delta = m_cachedTime + (m_playbackRate * wallClockDelta) - m_player->currentTime();
-        LOG(Media, "HTMLMediaElement::currentTime - cached time was %f seconds off of media time when it expired", delta);
-    }
-#endif
-
     refreshCachedTime();
 
     return m_cachedTime;
@@ -2031,9 +1979,7 @@ void HTMLMediaElement::setCurrentTime(double time, ExceptionCode& ec)
 
 double HTMLMediaElement::startTime() const
 {
-    if (!m_player)
-        return 0;
-    return m_player->startTime();
+    return 0;
 }
 
 double HTMLMediaElement::initialTime() const
@@ -2041,10 +1987,7 @@ double HTMLMediaElement::initialTime() const
     if (m_fragmentStartTime != MediaPlayer::invalidTime())
         return m_fragmentStartTime;
 
-    if (!m_player)
-        return 0;
-
-    return m_player->initialTime();
+    return 0;
 }
 
 double HTMLMediaElement::duration() const
@@ -2109,11 +2052,7 @@ void HTMLMediaElement::setWebkitPreservesPitch(bool preservesPitch)
     LOG(Media, "HTMLMediaElement::setWebkitPreservesPitch(%s)", boolString(preservesPitch));
 
     m_webkitPreservesPitch = preservesPitch;
-
-    if (!m_player)
-        return;
-
-    m_player->setPreservesPitch(preservesPitch);
+    notImplemented();
 }
 
 bool HTMLMediaElement::ended() const
@@ -2250,7 +2189,6 @@ void HTMLMediaElement::closeMediaSource()
     m_mediaSource = 0;
 }
 
-#if ENABLE(ENCRYPTED_MEDIA)
 void HTMLMediaElement::webkitGenerateKeyRequest(const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionCode& ec)
 {
     if (keySystem.isEmpty()) {
@@ -2332,8 +2270,6 @@ void HTMLMediaElement::webkitCancelKeyRequest(const String& keySystem, const Str
     MediaPlayer::MediaKeyException result = m_player->cancelKeyRequest(keySystem, sessionId);
     ec = exceptionCodeForMediaKeyException(result);
 }
-
-#endif
 
 bool HTMLMediaElement::loop() const
 {
@@ -3103,7 +3039,7 @@ void HTMLMediaElement::sourceWasRemoved(HTMLSourceElement* source)
     }
 }
 
-void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerTimeChanged()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerTimeChanged");
 
@@ -3160,7 +3096,7 @@ void HTMLMediaElement::mediaPlayerTimeChanged(MediaPlayer*)
     endProcessingMediaPlayerCallback();
 }
 
-void HTMLMediaElement::mediaPlayerVolumeChanged(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerVolumeChanged()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerVolumeChanged");
 
@@ -3176,7 +3112,7 @@ void HTMLMediaElement::mediaPlayerVolumeChanged(MediaPlayer*)
     endProcessingMediaPlayerCallback();
 }
 
-void HTMLMediaElement::mediaPlayerMuteChanged(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerMuteChanged()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerMuteChanged");
 
@@ -3186,14 +3122,18 @@ void HTMLMediaElement::mediaPlayerMuteChanged(MediaPlayer*)
     endProcessingMediaPlayerCallback();
 }
 
-void HTMLMediaElement::mediaPlayerDurationChanged(MediaPlayer* player)
+void HTMLMediaElement::mediaPlayerDurationChanged()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerDurationChanged");
 
     beginProcessingMediaPlayerCallback();
 
     scheduleEvent(eventNames().durationchangeEvent);
-    mediaPlayerCharacteristicChanged(player);
+
+    if (hasMediaControls())
+        mediaControls()->reset();
+    if (renderer())
+        renderer()->updateFromElement();
 
     double now = currentTime();
     double dur = duration();
@@ -3203,7 +3143,7 @@ void HTMLMediaElement::mediaPlayerDurationChanged(MediaPlayer* player)
     endProcessingMediaPlayerCallback();
 }
 
-void HTMLMediaElement::mediaPlayerRateChanged(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerRateChanged()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerRateChanged");
 
@@ -3218,7 +3158,7 @@ void HTMLMediaElement::mediaPlayerRateChanged(MediaPlayer*)
     endProcessingMediaPlayerCallback();
 }
 
-void HTMLMediaElement::mediaPlayerPlaybackStateChanged(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerPlaybackStateChanged()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerPlaybackStateChanged");
 
@@ -3233,7 +3173,7 @@ void HTMLMediaElement::mediaPlayerPlaybackStateChanged(MediaPlayer*)
     endProcessingMediaPlayerCallback();
 }
 
-void HTMLMediaElement::mediaPlayerSawUnsupportedTracks(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerSawUnsupportedTracks()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerSawUnsupportedTracks");
 
@@ -3246,7 +3186,7 @@ void HTMLMediaElement::mediaPlayerSawUnsupportedTracks(MediaPlayer*)
     }
 }
 
-void HTMLMediaElement::mediaPlayerResourceNotSupported(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerResourceNotSupported()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerResourceNotSupported");
 
@@ -3255,7 +3195,7 @@ void HTMLMediaElement::mediaPlayerResourceNotSupported(MediaPlayer*)
 }
 
 // MediaPlayerPresentation methods
-void HTMLMediaElement::mediaPlayerRepaint(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerRepaint()
 {
     beginProcessingMediaPlayerCallback();
     updateDisplayState();
@@ -3264,7 +3204,7 @@ void HTMLMediaElement::mediaPlayerRepaint(MediaPlayer*)
     endProcessingMediaPlayerCallback();
 }
 
-void HTMLMediaElement::mediaPlayerSizeChanged(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerSizeChanged()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerSizeChanged");
 
@@ -3274,50 +3214,10 @@ void HTMLMediaElement::mediaPlayerSizeChanged(MediaPlayer*)
     endProcessingMediaPlayerCallback();
 }
 
-bool HTMLMediaElement::mediaPlayerRenderingCanBeAccelerated(MediaPlayer*)
-{
-    if (renderer() && renderer()->isVideo()) {
-        ASSERT(renderer()->view());
-        return renderer()->view()->compositor()->canAccelerateVideoRendering(toRenderVideo(renderer()));
-    }
-    return false;
-}
-
-void HTMLMediaElement::mediaPlayerRenderingModeChanged(MediaPlayer*)
-{
-    LOG(Media, "HTMLMediaElement::mediaPlayerRenderingModeChanged");
-
-    // Kick off a fake recalcStyle that will update the compositing tree.
-    setNeedsStyleRecalc(SyntheticStyleChange);
-}
-
-void HTMLMediaElement::mediaPlayerEngineUpdated(MediaPlayer*)
+void HTMLMediaElement::mediaPlayerEngineUpdated()
 {
     LOG(Media, "HTMLMediaElement::mediaPlayerEngineUpdated");
     beginProcessingMediaPlayerCallback();
-    if (renderer())
-        renderer()->updateFromElement();
-    endProcessingMediaPlayerCallback();
-}
-
-void HTMLMediaElement::mediaPlayerFirstVideoFrameAvailable(MediaPlayer*)
-{
-    LOG(Media, "HTMLMediaElement::mediaPlayerFirstVideoFrameAvailable");
-    beginProcessingMediaPlayerCallback();
-    if (displayMode() == PosterWaitingForVideo) {
-        setDisplayMode(Video);
-        mediaPlayerRenderingModeChanged(m_player.get());
-    }
-    endProcessingMediaPlayerCallback();
-}
-
-void HTMLMediaElement::mediaPlayerCharacteristicChanged(MediaPlayer*)
-{
-    LOG(Media, "HTMLMediaElement::mediaPlayerCharacteristicChanged");
-
-    beginProcessingMediaPlayerCallback();
-    if (hasMediaControls())
-        mediaControls()->reset();
     if (renderer())
         renderer()->updateFromElement();
     endProcessingMediaPlayerCallback();
@@ -3346,7 +3246,8 @@ PassRefPtr<TimeRanges> HTMLMediaElement::played()
 
 PassRefPtr<TimeRanges> HTMLMediaElement::seekable() const
 {
-    return m_player ? m_player->seekable() : TimeRanges::create();
+    double maxSeekable = maxTimeSeekable();
+    return maxSeekable ? TimeRanges::create(0, maxSeekable) : TimeRanges::create();
 }
 
 bool HTMLMediaElement::potentiallyPlaying() const
@@ -3648,17 +3549,6 @@ bool HTMLMediaElement::hasPendingActivity() const
     return (hasAudio() && isPlaying()) || m_asyncEventQueue->hasPendingEvents();
 }
 
-bool HTMLMediaElement::requiresTextTrackRepresentation() const
-{
-    return m_player ? m_player->requiresTextTrackRepresentation() : 0;
-}
-
-void HTMLMediaElement::setTextTrackRepresentation(TextTrackRepresentation* representation)
-{
-    if (m_player)
-        m_player->setTextTrackRepresentation(representation);
-}
-
 bool HTMLMediaElement::isFullscreen() const
 {
     return document()->webkitIsFullScreen() && document()->webkitCurrentFullScreenElement() == this;
@@ -3699,17 +3589,15 @@ PlatformLayer* HTMLMediaElement::platformLayer() const
 
 bool HTMLMediaElement::hasClosedCaptions() const
 {
-    if (m_player && m_player->hasClosedCaptions())
-        return true;
+    if (RuntimeEnabledFeatures::videoTrackEnabled() && m_textTracks) {
+        for (unsigned i = 0; i < m_textTracks->length(); ++i) {
+            if (m_textTracks->item(i)->readinessState() == TextTrack::FailedToLoad)
+                continue;
 
-    if (RuntimeEnabledFeatures::videoTrackEnabled() && m_textTracks)
-    for (unsigned i = 0; i < m_textTracks->length(); ++i) {
-        if (m_textTracks->item(i)->readinessState() == TextTrack::FailedToLoad)
-            continue;
-
-        if (m_textTracks->item(i)->kind() == TextTrack::captionsKeyword()
-            || m_textTracks->item(i)->kind() == TextTrack::subtitlesKeyword())
-            return true;
+            if (m_textTracks->item(i)->kind() == TextTrack::captionsKeyword()
+                || m_textTracks->item(i)->kind() == TextTrack::subtitlesKeyword())
+                return true;
+        }
     }
     return false;
 }
@@ -3737,7 +3625,6 @@ void HTMLMediaElement::setClosedCaptionsVisible(bool closedCaptionVisible)
         return;
 
     m_closedCaptionsVisible = closedCaptionVisible;
-    m_player->setClosedCaptionsVisible(closedCaptionVisible);
 
     if (RuntimeEnabledFeatures::videoTrackEnabled()) {
         m_processingPreferenceChange = true;
@@ -4111,25 +3998,6 @@ void HTMLMediaElement::applyMediaFragmentURI()
     }
 }
 
-String HTMLMediaElement::mediaPlayerReferrer() const
-{
-    Frame* frame = document()->frame();
-    if (!frame)
-        return String();
-
-    return SecurityPolicy::generateReferrerHeader(document()->referrerPolicy(), m_currentSrc, frame->loader()->outgoingReferrer());
-}
-
-String HTMLMediaElement::mediaPlayerUserAgent() const
-{
-    Frame* frame = document()->frame();
-    if (!frame)
-        return String();
-
-    return frame->loader()->userAgent(m_currentSrc);
-
-}
-
 MediaPlayerClient::CORSMode HTMLMediaElement::mediaPlayerCORSMode() const
 {
     if (!fastHasAttribute(HTMLNames::crossoriginAttr))
@@ -4139,82 +4007,14 @@ MediaPlayerClient::CORSMode HTMLMediaElement::mediaPlayerCORSMode() const
     return Anonymous;
 }
 
-void HTMLMediaElement::mediaPlayerEnterFullscreen()
-{
-    enterFullscreen();
-}
-
-void HTMLMediaElement::mediaPlayerExitFullscreen()
-{
-    exitFullscreen();
-}
-
-bool HTMLMediaElement::mediaPlayerIsFullscreen() const
-{
-    return isFullscreen();
-}
-
-bool HTMLMediaElement::mediaPlayerIsFullscreenPermitted() const
-{
-    return !userGestureRequiredForFullscreen() || ScriptController::processingUserGesture();
-}
-
-bool HTMLMediaElement::mediaPlayerIsVideo() const
-{
-    return isVideo();
-}
-
-LayoutRect HTMLMediaElement::mediaPlayerContentBoxRect() const
-{
-    if (renderer())
-        return renderer()->enclosingBox()->contentBoxRect();
-    return LayoutRect();
-}
-
-void HTMLMediaElement::mediaPlayerSetSize(const IntSize& size)
-{
-    setAttribute(widthAttr, String::number(size.width()));
-    setAttribute(heightAttr, String::number(size.height()));
-}
-
-void HTMLMediaElement::mediaPlayerPause()
-{
-    pause();
-}
-
-void HTMLMediaElement::mediaPlayerPlay()
-{
-    play();
-}
-
-bool HTMLMediaElement::mediaPlayerIsPaused() const
-{
-    return paused();
-}
-
-bool HTMLMediaElement::mediaPlayerIsLooping() const
-{
-    return loop();
-}
-
-HostWindow* HTMLMediaElement::mediaPlayerHostWindow()
-{
-    return mediaPlayerOwningDocument()->view()->hostWindow();
-}
-
-IntRect HTMLMediaElement::mediaPlayerWindowClipRect()
-{
-    return mediaPlayerOwningDocument()->view()->windowClipRect();
-}
-
-CachedResourceLoader* HTMLMediaElement::mediaPlayerCachedResourceLoader()
-{
-    return mediaPlayerOwningDocument()->cachedResourceLoader();
-}
-
 void HTMLMediaElement::removeBehaviorsRestrictionsAfterFirstUserGesture()
 {
     m_restrictions = NoRestrictions;
+}
+
+void HTMLMediaElement::mediaPlayerNeedsStyleRecalc()
+{
+    setNeedsStyleRecalc(WebCore::SyntheticStyleChange);
 }
 
 void HTMLMediaElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
@@ -4232,7 +4032,7 @@ void HTMLMediaElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) con
     info.addMember(m_currentSourceNode, "currentSourceNode");
     info.addMember(m_nextChildNodeToConsider, "nextChildNodeToConsider");
     info.addMember(m_player, "player");
-    info.addMember(m_mediaSource, "mediaSource");
+    info.addMember(static_cast<ActiveDOMObject*>(m_mediaSource.get()), "mediaSource");
     info.addMember(m_textTracks, "textTracks");
     info.addMember(m_textTracksWhenResourceSelectionBegan, "textTracksWhenResourceSelectionBegan");
     info.addMember(m_cueTree, "cueTree");

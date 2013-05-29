@@ -268,6 +268,7 @@ private:
     
     void loadSameDocumentItem(HistoryItem*);
     void loadDifferentDocumentItem(HistoryItem*);
+    void insertDummyHistoryItem();
     
     void updateFirstPartyForCookies();
     void setFirstPartyForCookies(const KURL&);
@@ -278,7 +279,7 @@ private:
 
     SubstituteData defaultSubstituteDataForURL(const KURL&);
     
-    bool fireBeforeUnloadEvent(Chrome*);
+    bool fireBeforeUnloadEvent(Chrome&);
 
     void checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState>);
     void checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction&);

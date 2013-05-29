@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "generateInspectorProtocolVersion":
 $(gyp_shared_intermediate_dir)/webkit/InspectorProtocolVersion.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/InspectorProtocolVersion.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/InspectorProtocolVersion.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/InspectorProtocolVersion.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/InspectorProtocolVersion.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/InspectorProtocolVersion.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/InspectorProtocolVersion.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/generate-inspector-protocol-version $(LOCAL_PATH)/third_party/WebKit/Source/devtools/protocol.json $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Validate inspector protocol for backwards compatibility and generate version file ($@)"

@@ -31,9 +31,9 @@
 #ifndef WebBindings_h
 #define WebBindings_h
 
-#include "../../../Platform/chromium/public/WebCommon.h"
-#include "../../../Platform/chromium/public/WebString.h"
-#include "../../../Platform/chromium/public/WebVector.h"
+#include "../../../../public/platform/WebCommon.h"
+#include "../../../../public/platform/WebString.h"
+#include "../../../../public/platform/WebVector.h"
 #include <bindings/npruntime.h>
 
 namespace v8 {
@@ -122,6 +122,12 @@ public:
 
     // NPN_SetProperty
     WEBKIT_EXPORT static bool setProperty(NPP, NPObject*, NPIdentifier, const NPVariant*);
+
+    // _NPN_RegisterObjectOwner
+    WEBKIT_EXPORT static void registerObjectOwner(NPP);
+
+    // _NPN_UnregisterObjectOwner
+    WEBKIT_EXPORT static void unregisterObjectOwner(NPP);
 
     // _NPN_UnregisterObject
     WEBKIT_EXPORT static void unregisterObject(NPObject*);

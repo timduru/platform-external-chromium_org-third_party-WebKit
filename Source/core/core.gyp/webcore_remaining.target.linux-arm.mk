@@ -51,9 +51,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableColumn.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableHeaderContainer.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableRow.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableValue.cpp \
 	third_party/WebKit/Source/core/animation/Animation.cpp \
-	third_party/WebKit/Source/core/animation/AnimationEffect.cpp \
 	third_party/WebKit/Source/core/animation/DocumentTimeline.cpp \
+	third_party/WebKit/Source/core/animation/Player.cpp \
 	third_party/WebKit/Source/core/animation/TimedItem.cpp \
 	third_party/WebKit/Source/core/css/BasicShapeFunctions.cpp \
 	third_party/WebKit/Source/core/css/CSSAspectRatioValue.cpp \
@@ -98,6 +99,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSSegmentedFontFace.cpp \
 	third_party/WebKit/Source/core/css/CSSSelector.cpp \
 	third_party/WebKit/Source/core/css/CSSSelectorList.cpp \
+	third_party/WebKit/Source/core/css/CSSStyleDeclaration.cpp \
 	third_party/WebKit/Source/core/css/CSSStyleRule.cpp \
 	third_party/WebKit/Source/core/css/CSSStyleSheet.cpp \
 	third_party/WebKit/Source/core/css/CSSSupportsRule.cpp \
@@ -290,7 +292,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/inspector/ScriptCallFrame.cpp \
 	third_party/WebKit/Source/core/inspector/ScriptCallStack.cpp \
 	third_party/WebKit/Source/core/inspector/ScriptProfile.cpp \
-	third_party/WebKit/Source/core/inspector/ScriptProfileNode.cpp \
 	third_party/WebKit/Source/core/inspector/TimelineRecordFactory.cpp \
 	third_party/WebKit/Source/core/inspector/TimelineTraceEventProcessor.cpp \
 	third_party/WebKit/Source/core/inspector/WorkerConsoleAgent.cpp \
@@ -338,6 +339,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/archive/MHTMLArchive.cpp \
 	third_party/WebKit/Source/core/loader/archive/MHTMLParser.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedCSSStyleSheet.cpp \
+	third_party/WebKit/Source/core/loader/cache/CachedDocument.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedFont.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedImage.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedRawResource.cpp \
@@ -348,7 +350,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/cache/CachedResourceRequestInitiators.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedScript.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedShader.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedSVGDocument.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedTextTrack.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedXSLStyleSheet.cpp \
 	third_party/WebKit/Source/core/loader/cache/MemoryCache.cpp \
@@ -390,6 +391,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/PageGroupLoadDeferrer.cpp \
 	third_party/WebKit/Source/core/page/PagePopupController.cpp \
 	third_party/WebKit/Source/core/page/PagePopupClient.cpp \
+	third_party/WebKit/Source/core/page/PageScaleConstraints.cpp \
+	third_party/WebKit/Source/core/page/PageScaleConstraintsSet.cpp \
 	third_party/WebKit/Source/core/page/PageSerializer.cpp \
 	third_party/WebKit/Source/core/page/PageVisibilityState.cpp \
 	third_party/WebKit/Source/core/page/Performance.cpp \
@@ -527,6 +530,7 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
+	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
@@ -543,7 +547,7 @@ MY_DEFS := \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
-	'-DENABLE_ENCRYPTED_MEDIA=1' \
+	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
@@ -551,7 +555,6 @@ MY_DEFS := \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_DATALIST_ELEMENT=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_INPUT_TYPE_COLOR=0' \
@@ -559,12 +562,10 @@ MY_DEFS := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PAGE_POPUP=0' \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_8BIT_TEXTRUN=1' \
-	'-DENABLE_BINDING_INTEGRITY=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -605,8 +606,8 @@ LOCAL_C_INCLUDES := \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
 	$(LOCAL_PATH)/third_party/angle/include/GLSLANG \
 	$(LOCAL_PATH)/third_party/WebKit/Source/Platform/chromium \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/common \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/i18n \
+	$(PWD)/external/icu4c/common \
+	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/src/core \
 	$(LOCAL_PATH)/third_party/skia/include/config \
@@ -636,10 +637,10 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/jpeg \
-	$(GYP_ABS_ANDROID_TOP_DIR)/frameworks/wilhelm/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/bionic \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/stlport/stlport
+	$(PWD)/external/jpeg \
+	$(PWD)/frameworks/wilhelm/include \
+	$(PWD)/bionic \
+	$(PWD)/external/stlport/stlport
 
 LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES)
 

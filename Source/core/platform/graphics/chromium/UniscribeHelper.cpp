@@ -324,8 +324,10 @@ int UniscribeHelper::xToCharacter(int x) const
     return 0;
 }
 
-void UniscribeHelper::draw(GraphicsContext* graphicsContext,
-                           HDC dc, int x, int y, int from, int to)
+void UniscribeHelper::draw(GraphicsContext* graphicsContext, HDC dc,
+                           int x, int y,
+                           const FloatRect& textRect,
+                           int from, int to)
 {
     HGDIOBJ oldFont = 0;
     int curX = x;
@@ -426,7 +428,8 @@ void UniscribeHelper::draw(GraphicsContext* graphicsContext,
                               &shaping.m_glyphs[fromGlyph],
                               advances,
                               &shaping.m_offsets[fromGlyph],
-                              &origin);
+                              origin,
+                              textRect);
                 textOutOk = true;
 
                 if (!textOutOk && 0 == executions) {
@@ -543,23 +546,25 @@ void UniscribeHelper::fillRuns()
                                             &m_runs[0], &m_scriptTags[0],
                                             &numberOfItems);
 
-            if (SUCCEEDED(hr)) { 
-                // Pack consecutive runs, the script tag of which are 
-                // SCRIPT_TAG_UNKNOWN, to reduce the number of runs. 
-                for (int i = 0; i < numberOfItems; ++i) { 
-                    if (m_scriptTags[i] == SCRIPT_TAG_UNKNOWN) { 
-                        int j = 1; 
-                        while (i + j < numberOfItems && m_scriptTags[i + j] == SCRIPT_TAG_UNKNOWN) 
-                            ++j; 
-                        if (--j) { 
-                            m_runs.remove(i + 1, j); 
-                            m_scriptTags.remove(i + 1, j); 
-                            numberOfItems -= j; 
-                        } 
-                    } 
-                } 
-                m_scriptTags.resize(numberOfItems); 
-            } 
+            if (SUCCEEDED(hr)) {
+                // Pack consecutive runs, the script tag of which are
+                // SCRIPT_TAG_UNKNOWN, to reduce the number of runs.
+                for (int i = 0; i < numberOfItems; ++i) {
+                    // Do not pack with whitespace characters at the head.
+                    // Otherwise whole the run is rendered as a whitespace.
+                    if (m_scriptTags[i] == SCRIPT_TAG_UNKNOWN && !Font::treatAsSpace(m_input[m_runs[i].iCharPos])) {
+                        int j = 1;
+                        while (i + j < numberOfItems && m_scriptTags[i + j] == SCRIPT_TAG_UNKNOWN)
+                            ++j;
+                        if (--j) {
+                            m_runs.remove(i + 1, j);
+                            m_scriptTags.remove(i + 1, j);
+                            numberOfItems -= j;
+                        }
+                    }
+                }
+                m_scriptTags.resize(numberOfItems);
+            }
         } else {
             hr = ScriptItemize(m_input, m_inputLength,
                                static_cast<int>(m_runs.size()) - 1,
@@ -673,7 +678,7 @@ bool UniscribeHelper::shape(const UChar* input,
 
         // The current font can't render this run, try next font.
         if (!m_disableFontFallback &&
-            nextWinFontData(&hfont, &scriptCache, &fontProperties, &ascent)) {
+            nextWinFontData(hfont, scriptCache, fontProperties, ascent, spaceGlyph)) {
             // The primary font does not support this run. Try next font.
             // In case of web page rendering, they come from fonts specified in
             // CSS stylesheets.

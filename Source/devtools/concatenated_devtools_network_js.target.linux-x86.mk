@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "concatenate_devtools_network_js":
 $(gyp_shared_intermediate_dir)/resources/inspector/NetworkPanel.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/NetworkPanel.js: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/resources/inspector/NetworkPanel.js: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/resources/inspector/NetworkPanel.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/NetworkPanel.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/resources/inspector/NetworkPanel.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/resources/inspector/NetworkPanel.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/inline_js_imports.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/NetworkItemView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/RequestCookiesView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/RequestHeadersView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/RequestHTMLView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/RequestJSONView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/RequestPreviewView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/RequestResponseView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/RequestTimingView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/RequestView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/ResourceWebSocketFrameView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/NetworkPanel.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_concatenated_devtools_network_js_target_concatenate_devtools_network_js ($@)"

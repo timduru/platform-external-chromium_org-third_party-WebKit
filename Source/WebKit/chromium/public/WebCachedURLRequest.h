@@ -31,16 +31,14 @@
 #ifndef WebCachedURLRequest_h
 #define WebCachedURLRequest_h
 
-#include "../../../Platform/chromium/public/WebCommon.h"
-#include "../../../Platform/chromium/public/WebPrivateOwnPtr.h"
-#include "../../../Platform/chromium/public/WebString.h"
-#include "WebElement.h"
+#include "../../../../public/platform/WebCommon.h"
+#include "../../../../public/platform/WebPrivateOwnPtr.h"
+#include "../../../../public/platform/WebString.h"
 
 namespace WebCore { class CachedResourceRequest; }
 
 namespace WebKit {
 
-class WebElement;
 class WebString;
 class WebURLRequest;
 class WrappedResourceRequest;
@@ -54,7 +52,6 @@ public:
     WEBKIT_EXPORT WebString charset() const;
     WEBKIT_EXPORT bool forPreload() const;
     WEBKIT_EXPORT WebString initiatorName() const;
-    WEBKIT_EXPORT WebElement initiatorElement() const;
 
 #if WEBKIT_IMPLEMENTATION
     explicit WebCachedURLRequest(WebCore::CachedResourceRequest*);

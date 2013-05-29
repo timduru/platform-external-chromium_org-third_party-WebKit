@@ -22,7 +22,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGAnimateElement.h"
 
 #include "CSSPropertyNames.h"
@@ -240,7 +239,7 @@ static inline void applyCSSPropertyToTarget(SVGElement* targetElement, CSSProper
 {
     ASSERT(!targetElement->m_deletionHasBegun);
 
-    StylePropertySet* propertySet = targetElement->ensureAnimatedSMILStyleProperties();
+    MutableStylePropertySet* propertySet = targetElement->ensureAnimatedSMILStyleProperties();
     if (!propertySet->setProperty(id, value, false, 0))
         return;
 
@@ -429,5 +428,3 @@ SVGAnimatedTypeAnimator* SVGAnimateElement::ensureAnimator()
 }
 
 }
-
-#endif // ENABLE(SVG)

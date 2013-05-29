@@ -23,7 +23,6 @@
 #ifndef SVGRootInlineBox_h
 #define SVGRootInlineBox_h
 
-#if ENABLE(SVG)
 #include "core/rendering/RootInlineBox.h"
 #include "core/rendering/svg/SVGRenderSupport.h"
 #include "core/rendering/svg/SVGTextLayoutEngine.h"
@@ -40,17 +39,16 @@ public:
     {
     }
 
-    virtual bool isSVGRootInlineBox() const { return true; }
+    virtual bool isSVGRootInlineBox() const OVERRIDE FINAL { return true; }
 
-    virtual float virtualLogicalHeight() const { return m_logicalHeight; }
+    virtual float virtualLogicalHeight() const OVERRIDE FINAL { return m_logicalHeight; }
     void setLogicalHeight(float height) { m_logicalHeight = height; }
 
-    virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom);
+    virtual void paint(PaintInfo&, const LayoutPoint&, LayoutUnit lineTop, LayoutUnit lineBottom) OVERRIDE FINAL;
+
+    virtual void markDirty(bool dirty = true) OVERRIDE FINAL;
 
     void computePerCharacterLayoutInformation();
-
-    virtual FloatRect objectBoundingBox() const { return FloatRect(); }
-    virtual FloatRect repaintRectInLocalCoordinates() const { return FloatRect(); }
 
     InlineBox* closestLeafChildForPosition(const LayoutPoint&);
 
@@ -65,7 +63,5 @@ private:
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)
 
 #endif // SVGRootInlineBox_h

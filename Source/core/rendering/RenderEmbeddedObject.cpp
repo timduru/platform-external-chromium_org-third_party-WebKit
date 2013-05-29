@@ -26,35 +26,20 @@
 
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
-#include "core/dom/MouseEvent.h"
-#include "core/dom/Text.h"
-#include "core/html/HTMLEmbedElement.h"
 #include "core/html/HTMLIFrameElement.h"
-#include "core/html/HTMLObjectElement.h"
-#include "core/html/HTMLParamElement.h"
-#include "core/html/HTMLPlugInElement.h"
-#include "core/loader/FrameLoaderClient.h"
-#include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
-#include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/Cursor.h"
 #include "core/platform/LocalizedStrings.h"
-#include "core/platform/MIMETypeRegistry.h"
-#include "core/platform/PlatformMouseEvent.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/FontSelector.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/Path.h"
 #include "core/platform/graphics/TextRun.h"
 #include "core/plugins/PluginView.h"
-#include "core/rendering/HitTestResult.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
-#include "core/rendering/RenderWidgetProtector.h"
 
 namespace WebCore {
 
@@ -104,14 +89,8 @@ static String unavailablePluginReplacementText(RenderEmbeddedObject::PluginUnava
     switch (pluginUnavailabilityReason) {
     case RenderEmbeddedObject::PluginMissing:
         return missingPluginText();
-    case RenderEmbeddedObject::PluginCrashed:
-        return crashedPluginText();
     case RenderEmbeddedObject::PluginBlockedByContentSecurityPolicy:
         return blockedPluginByContentSecurityPolicyText();
-    case RenderEmbeddedObject::InsecurePluginVersion:
-        return insecurePluginVersionText();
-    case RenderEmbeddedObject::PluginInactive:
-        return inactivePluginText();
     }
 
     ASSERT_NOT_REACHED();
@@ -190,9 +169,11 @@ void RenderEmbeddedObject::paintReplaced(PaintInfo& paintInfo, const LayoutPoint
     const FontMetrics& fontMetrics = font.fontMetrics();
     float labelX = roundf(replacementTextRect.location().x() + (replacementTextRect.size().width() - textWidth) / 2);
     float labelY = roundf(replacementTextRect.location().y() + (replacementTextRect.size().height() - fontMetrics.height()) / 2 + fontMetrics.ascent());
+    TextRunPaintInfo runInfo(run);
+    runInfo.bounds = replacementTextRect;
     context->setAlpha(replacementTextTextOpacity);
     context->setFillColor(Color::black, style()->colorSpace());
-    context->drawBidiText(font, run, FloatPoint(labelX, labelY));
+    context->drawBidiText(font, runInfo, FloatPoint(labelX, labelY));
 }
 
 bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumulatedOffset, FloatRect& contentRect, Path& path, FloatRect& replacementTextRect, Font& font, TextRun& run, float& textWidth) const

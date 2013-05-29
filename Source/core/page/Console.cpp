@@ -89,7 +89,7 @@ static void internalAddMessage(Page* page, MessageType type, MessageLevel level,
     InspectorInstrumentation::addMessageToConsole(page, ConsoleAPIMessageSource, type, level, message, state, arguments);
 
     if (gotMessage)
-        page->chrome()->client()->addMessageToConsole(ConsoleAPIMessageSource, type, level, message, lastCaller.lineNumber(), lastCaller.sourceURL());
+        page->chrome().client()->addMessageToConsole(ConsoleAPIMessageSource, type, level, message, lastCaller.lineNumber(), lastCaller.sourceURL());
 }
 
 void Console::debug(ScriptState* state, PassRefPtr<ScriptArguments> arguments)
@@ -161,7 +161,7 @@ void Console::markTimeline(PassRefPtr<ScriptArguments> arguments)
 }
 
 
-void Console::profile(const String& title, ScriptState* state)
+void Console::profile(ScriptState* state, const String& title)
 {
     Page* page = this->page();
     if (!page)
@@ -175,14 +175,14 @@ void Console::profile(const String& title, ScriptState* state)
     if (title.isNull()) // no title so give it the next user initiated profile title.
         resolvedTitle = InspectorInstrumentation::getCurrentUserInitiatedProfileName(page, true);
 
-    ScriptProfiler::start(state, resolvedTitle);
+    ScriptProfiler::start(resolvedTitle);
 
     RefPtr<ScriptCallStack> callStack(createScriptCallStack(state, 1));
     const ScriptCallFrame& lastCaller = callStack->at(0);
     InspectorInstrumentation::addStartProfilingMessageToConsole(page, resolvedTitle, lastCaller.lineNumber(), lastCaller.sourceURL());
 }
 
-void Console::profileEnd(const String& title, ScriptState* state)
+void Console::profileEnd(ScriptState* state, const String& title)
 {
     Page* page = this->page();
     if (!page)
@@ -191,11 +191,10 @@ void Console::profileEnd(const String& title, ScriptState* state)
     if (!InspectorInstrumentation::profilerEnabled(page))
         return;
 
-    RefPtr<ScriptProfile> profile = ScriptProfiler::stop(state, title);
+    RefPtr<ScriptProfile> profile = ScriptProfiler::stop(title);
     if (!profile)
         return;
 
-    m_profiles.append(profile);
     RefPtr<ScriptCallStack> callStack(createScriptCallStack(state, 1));
     InspectorInstrumentation::addProfile(page, profile, callStack);
 }

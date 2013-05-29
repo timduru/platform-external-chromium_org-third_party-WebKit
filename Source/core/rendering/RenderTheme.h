@@ -62,6 +62,8 @@ public:
         return themeForPage(0);
     };
 
+    static void setSizeIfAuto(RenderStyle*, const IntSize&);
+
     // This method is called whenever style has been computed for an element and the appearance
     // property has been set to a value other than "none".  The theme should map in all of the appropriate
     // metrics and defaults given the contents of the style.  This includes sophisticated operations like
@@ -82,7 +84,7 @@ public:
 
     // These methods return the theme's extra style sheets rules, to let each platform
     // adjust the default CSS rules in html.css, quirks.css or mediaControls.css.
-    virtual String extraDefaultStyleSheet() { return String(); }
+    virtual String extraDefaultStyleSheet();
     virtual String extraQuirksStyleSheet() { return String(); }
     virtual String extraMediaControlsStyleSheet() { return String(); }
     virtual String extraFullScreenStyleSheet() { return String(); }
@@ -124,11 +126,11 @@ public:
     virtual bool supportsHover(const RenderStyle*) const { return false; }
 
     // A method asking if the platform is able to show datalist suggestions for a given input type.
-    virtual bool supportsDataListUI(const AtomicString&) const { return false; }
+    virtual bool supportsDataListUI(const AtomicString&) const;
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
     // A method asking if the platform is able to show a calendar picker for a given input type.
-    virtual bool supportsCalendarPicker(const AtomicString&) const { return false; }
+    virtual bool supportsCalendarPicker(const AtomicString&) const;
 #endif
 
     // Text selection colors.
@@ -196,7 +198,6 @@ public:
     virtual IntSize meterSizeForBounds(const RenderMeter*, const IntRect&) const;
     virtual bool supportsMeter(ControlPart) const;
 
-#if ENABLE(DATALIST_ELEMENT)
     // Returns the threshold distance for snapping to a slider tick mark.
     virtual LayoutUnit sliderTickSnappingThreshold() const;
     // Returns size of one slider tick mark for a horizontal track.
@@ -205,7 +206,6 @@ public:
     // Returns the distance of slider tick origin from the slider track center.
     virtual int sliderTickOffsetFromTrackCenter() const = 0;
     void paintSliderTicks(RenderObject*, const PaintInfo&, const IntRect&);
-#endif
 
     virtual bool shouldShowPlaceholderWhenFocused() const { return false; }
     virtual bool shouldHaveSpinButton(HTMLInputElement*) const;
@@ -314,6 +314,14 @@ protected:
     virtual bool paintMediaTimeRemaining(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaFullScreenVolumeSliderTrack(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
     virtual bool paintMediaFullScreenVolumeSliderThumb(RenderObject*, const PaintInfo&, const IntRect&) { return true; }
+
+    virtual bool shouldUseFallbackTheme(RenderStyle*) const;
+    void adjustStyleUsingFallbackTheme(StyleResolver*, RenderStyle*, Element*);
+    bool paintUsingFallbackTheme(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustCheckboxStyleUsingFallbackTheme(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintCheckboxUsingFallbackTheme(RenderObject*, const PaintInfo&, const IntRect&);
+    void adjustRadioStyleUsingFallbackTheme(StyleResolver*, RenderStyle*, Element*) const;
+    bool paintRadioUsingFallbackTheme(RenderObject*, const PaintInfo&, const IntRect&);
 
 public:
     // Methods for state querying

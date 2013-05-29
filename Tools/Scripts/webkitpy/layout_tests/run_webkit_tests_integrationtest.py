@@ -206,15 +206,18 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         self.assertTrue(one_line_summary in logging_stream.buflist)
 
         # Ensure the results were summarized properly.
-        self.assertEqual(details.summarized_results['num_regressions'], details.exit_code)
+        self.assertEqual(details.summarized_failing_results['num_regressions'], details.exit_code)
 
         # Ensure the image diff percentage is in the results.
-        self.assertEqual(details.summarized_results['tests']['failures']['expected']['image.html']['image_diff_percent'], 1)
+        self.assertEqual(details.summarized_failing_results['tests']['failures']['expected']['image.html']['image_diff_percent'], 1)
 
         # Ensure the results were written out and displayed.
+        failing_results_text = host.filesystem.read_text_file('/tmp/layout-test-results/failing_results.json')
+        json_to_eval = failing_results_text.replace("ADD_RESULTS(", "").replace(");", "")
+        self.assertEqual(json.loads(json_to_eval), details.summarized_failing_results)
+
         full_results_text = host.filesystem.read_text_file('/tmp/layout-test-results/full_results.json')
-        json_to_eval = full_results_text.replace("ADD_RESULTS(", "").replace(");", "")
-        self.assertEqual(json.loads(json_to_eval), details.summarized_results)
+        self.assertEqual(json.loads(full_results_text), details.summarized_full_results)
 
         self.assertEqual(host.user.opened_urls, [path.abspath_to_uri(MockHost().platform, '/tmp/layout-test-results/results.html')])
 
@@ -814,9 +817,14 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         self.assertTrue(RunTest.has_test_of_type(batch_tests_run_http, 'http'))
         self.assertTrue(RunTest.has_test_of_type(batch_tests_run_http, 'websocket'))
 
-    def test_platform_tests_are_found(self):
+    def test_platform_directories_ignored_when_searching_for_tests(self):
+        tests_run = get_tests_run(['--platform', 'test-mac-leopard'])
+        self.assertFalse('platform/test-mac-leopard/http/test.html' in tests_run)
+        self.assertFalse('platform/test-win-win7/http/test.html' in tests_run)
+
+    def test_platform_directories_not_searched_for_additional_tests(self):
         tests_run = get_tests_run(['--platform', 'test-mac-leopard', 'http'])
-        self.assertTrue('platform/test-mac-leopard/http/test.html' in tests_run)
+        self.assertFalse('platform/test-mac-leopard/http/test.html' in tests_run)
         self.assertFalse('platform/test-win-win7/http/test.html' in tests_run)
 
     def test_output_diffs(self):
@@ -880,7 +888,7 @@ class EndToEndTest(unittest.TestCase):
         _, _, _ = logging_run(['--no-show-results', 'reftests/foo/'], tests_included=True, host=host)
         file_list = host.filesystem.written_files.keys()
 
-        json_string = host.filesystem.read_text_file('/tmp/layout-test-results/full_results.json')
+        json_string = host.filesystem.read_text_file('/tmp/layout-test-results/failing_results.json')
         json = parse_full_results(json_string)
         self.assertTrue("multiple-match-success.html" not in json["tests"]["reftests"]["foo"])
         self.assertTrue("multiple-mismatch-success.html" not in json["tests"]["reftests"]["foo"])

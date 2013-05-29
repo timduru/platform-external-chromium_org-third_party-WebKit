@@ -107,6 +107,16 @@ bool WebRuntimeFeatures::isCSSRegionsEnabled()
     return RuntimeEnabledFeatures::cssRegionsEnabled();
 }
 
+void WebRuntimeFeatures::enableCSSTouchAction(bool enable)
+{
+    RuntimeEnabledFeatures::setCSSTouchActionEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isCSSTouchActionEnabled()
+{
+    return RuntimeEnabledFeatures::cssTouchActionEnabled();
+}
+
 void WebRuntimeFeatures::enableCustomDOMElements(bool enable)
 {
     RuntimeEnabledFeatures::setCustomDOMElementsEnabled(enable);
@@ -169,12 +179,34 @@ bool WebRuntimeFeatures::isDirectoryUploadEnabled()
 
 void WebRuntimeFeatures::enableEncryptedMedia(bool enable)
 {
-    RuntimeEnabledFeatures::setEncryptedMediaEnabled(enable);
+    // FIXME: Change to setEncryptedMediaEnabled() once Chromium
+    // starts calling enableLegacyEncryptedMedia().
+    RuntimeEnabledFeatures::setLegacyEncryptedMediaEnabled(enable);
+    // FIXME: Hack to allow MediaKeyError to be enabled for either version.
+    RuntimeEnabledFeatures::setEncryptedMediaAnyVersionEnabled(
+        RuntimeEnabledFeatures::encryptedMediaEnabled()
+        || RuntimeEnabledFeatures::legacyEncryptedMediaEnabled());
 }
 
 bool WebRuntimeFeatures::isEncryptedMediaEnabled()
 {
-    return RuntimeEnabledFeatures::encryptedMediaEnabled();
+    // FIXME: Change to encryptedMediaEnabled() once Chromium
+    // starts calling isLegacyEncryptedMediaEnabled()
+    return RuntimeEnabledFeatures::legacyEncryptedMediaEnabled();
+}
+
+void WebRuntimeFeatures::enableLegacyEncryptedMedia(bool enable)
+{
+    RuntimeEnabledFeatures::setLegacyEncryptedMediaEnabled(enable);
+    // FIXME: Hack to allow MediaKeyError to be enabled for either version.
+    RuntimeEnabledFeatures::setEncryptedMediaAnyVersionEnabled(
+        RuntimeEnabledFeatures::encryptedMediaEnabled()
+        || RuntimeEnabledFeatures::legacyEncryptedMediaEnabled());
+}
+
+bool WebRuntimeFeatures::isLegacyEncryptedMediaEnabled()
+{
+    return RuntimeEnabledFeatures::legacyEncryptedMediaEnabled();
 }
 
 void WebRuntimeFeatures::enableExperimentalCanvasFeatures(bool enable)
@@ -388,6 +420,16 @@ bool WebRuntimeFeatures::isNotificationsEnabled()
 #endif
 }
 
+void WebRuntimeFeatures::enablePagePopup(bool enable)
+{
+    RuntimeEnabledFeatures::setPagePopupEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isPagePopupEnabled()
+{
+    return RuntimeEnabledFeatures::pagePopupEnabled();
+}
+
 void WebRuntimeFeatures::enablePeerConnection(bool enable)
 {
     RuntimeEnabledFeatures::setPeerConnectionEnabled(enable);
@@ -526,6 +568,16 @@ void WebRuntimeFeatures::enableWebPInAcceptHeader(bool enable)
 bool WebRuntimeFeatures::isWebPInAcceptHeaderEnabled()
 {
     return RuntimeEnabledFeatures::webPInAcceptHeaderEnabled();
+}
+
+void WebRuntimeFeatures::enableDataListElement(bool enable)
+{
+    RuntimeEnabledFeatures::setDataListElementEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isDataListElementEnabled()
+{
+    return RuntimeEnabledFeatures::dataListElementEnabled();
 }
 
 } // namespace WebKit

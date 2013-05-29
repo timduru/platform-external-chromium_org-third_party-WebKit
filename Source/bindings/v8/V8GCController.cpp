@@ -34,18 +34,31 @@
 #include "V8MessagePort.h"
 #include "V8MutationObserver.h"
 #include "V8Node.h"
+#include "V8ScriptRunner.h"
 #include "bindings/v8/RetainedDOMInfo.h"
 #include "bindings/v8/V8AbstractEventListener.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8RecursionScope.h"
 #include "bindings/v8/WrapperTypeInfo.h"
 #include "core/dom/Attr.h"
+#include "core/dom/NodeTraversal.h"
+#include "core/dom/shadow/ElementShadow.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/platform/MemoryUsageSupport.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include <algorithm>
 
 namespace WebCore {
+
+inline static ShadowRoot* oldestShadowRootFor(const Node* node)
+{
+    if (!node->isElementNode())
+        return 0;
+    if (ElementShadow* shadow = toElement(node)->shadow())
+        return shadow->oldestShadowRoot();
+    return 0;
+}
 
 // FIXME: This should use opaque GC roots.
 static void addReferencesForNodeWithEventListeners(v8::Isolate* isolate, Node* node, const v8::Persistent<v8::Object>& wrapper)
@@ -144,18 +157,12 @@ public:
     }
 
 private:
-    void gcTree(v8::Isolate* isolate, Node* startNode)
+    bool traverseTree(Node* rootNode, Vector<Node*, initialNodeVectorSize>* newSpaceNodes)
     {
-        Vector<Node*, initialNodeVectorSize> newSpaceNodes;
-
-        // We traverse a DOM tree in the DFS order starting from startNode.
-        // The traversal order does not matter for correctness but does matter for performance.
-        Node* node = startNode;
         // To make each minor GC time bounded, we might need to give up
         // traversing at some point for a large DOM tree. That being said,
         // I could not observe the need even in pathological test cases.
-        do {
-            ASSERT(node);
+        for (Node* node = rootNode; node; node = NodeTraversal::nextPostOrder(node)) {
             if (node->containsWrapper()) {
                 // FIXME: Remove the special handling for image elements.
                 // The same special handling is in V8GCController::opaqueRootForGC().
@@ -165,23 +172,34 @@ private:
                     // This node is not in the new space of V8. This indicates that
                     // the minor GC cannot anyway judge reachability of this DOM tree.
                     // Thus we give up traversing the DOM tree.
-                    return;
+                    return false;
                 }
                 node->setV8CollectableDuringMinorGC(false);
-                newSpaceNodes.append(node);
+                newSpaceNodes->append(node);
             }
-            if (node->firstChild()) {
-                node = node->firstChild();
-                continue;
+            if (node->isShadowRoot()) {
+                if (ShadowRoot* youngerShadowRoot = toShadowRoot(node)->youngerShadowRoot()) {
+                    if (!traverseTree(youngerShadowRoot, newSpaceNodes))
+                        return false;
+                }
+            } else if (ShadowRoot* oldestShadowRoot = oldestShadowRootFor(node)) {
+                if (!traverseTree(oldestShadowRoot, newSpaceNodes))
+                    return false;
             }
-            while (!node->nextSibling()) {
-                if (!node->parentOrShadowHostNode())
-                    break;
-                node = node->parentOrShadowHostNode();
-            }
-            if (node->parentOrShadowHostNode())
-                node = node->nextSibling();
-        } while (node != startNode);
+        }
+        return true;
+    }
+
+    void gcTree(v8::Isolate* isolate, Node* startNode)
+    {
+        Vector<Node*, initialNodeVectorSize> newSpaceNodes;
+
+        Node* node = startNode;
+        while (node->parentOrShadowHostNode())
+            node = node->parentOrShadowHostNode();
+
+        if (!traverseTree(node, &newSpaceNodes))
+            return;
 
         // We completed the DOM tree traversal. All wrappers in the DOM tree are
         // stored in newSpaceNodes and are expected to exist in the new space of V8.
@@ -193,11 +211,13 @@ private:
         v8::UniqueId id(reinterpret_cast<intptr_t>((*nodeIterator)->unsafePersistent().value()));
         for (; nodeIterator != nodeIteratorEnd; ++nodeIterator) {
             // This is safe because we know that GC won't happen before we
-            // dispose the UnsafePersistent (we're just preparing a GC).
-            v8::Persistent<v8::Object> wrapper;
-            (*nodeIterator)->unsafePersistent().copyTo(&wrapper);
-            wrapper.MarkPartiallyDependent(isolate);
-            isolate->SetObjectGroupId(wrapper, id);
+            // dispose the UnsafePersistent (we're just preparing a GC). Though,
+            // we need to keep the UnsafePersistent alive until we're done with
+            // v8::Persistent.
+            UnsafePersistent<v8::Object> unsafeWrapper = (*nodeIterator)->unsafePersistent();
+            v8::Persistent<v8::Object>* wrapper = unsafeWrapper.persistent();
+            wrapper->MarkPartiallyDependent(isolate);
+            isolate->SetObjectGroupId(*wrapper, id);
         }
     }
 
@@ -415,28 +435,10 @@ void V8GCController::hintForCollectGarbage()
     v8::V8::IdleNotification(longIdlePauseInMS);
 }
 
-void V8GCController::collectGarbage()
+void V8GCController::collectGarbage(v8::Isolate* isolate)
 {
-    v8::Isolate* isolate = v8::Isolate::GetCurrent();
     v8::HandleScope handleScope(isolate);
-
-    ScopedPersistent<v8::Context> context;
-    context.set(v8::Context::New(isolate));
-    if (context.isEmpty())
-        return;
-
-    {
-        v8::Context::Scope scope(context.get());
-        v8::Local<v8::String> source = v8::String::New("if (gc) gc();");
-        v8::Local<v8::String> name = v8::String::New("gc");
-        v8::Handle<v8::Script> script = v8::Script::Compile(source, name);
-        if (!script.IsEmpty()) {
-            V8RecursionScope::MicrotaskSuppression scope;
-            script->Run();
-        }
-    }
-
-    context.clear();
+    V8ScriptRunner::compileAndRunInternalScript(v8String("if (gc) gc();", isolate), isolate);
 }
 
 }  // namespace WebCore

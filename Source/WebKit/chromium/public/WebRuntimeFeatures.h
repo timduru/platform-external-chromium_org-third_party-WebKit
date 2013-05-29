@@ -31,7 +31,7 @@
 #ifndef WebRuntimeFeatures_h
 #define WebRuntimeFeatures_h
 
-#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../../public/platform/WebCommon.h"
 
 namespace WebKit {
 
@@ -64,6 +64,9 @@ public:
     WEBKIT_EXPORT static void enableCSSRegions(bool);
     WEBKIT_EXPORT static bool isCSSRegionsEnabled();
 
+    WEBKIT_EXPORT static void enableCSSTouchAction(bool);
+    WEBKIT_EXPORT static bool isCSSTouchActionEnabled();
+
     WEBKIT_EXPORT static void enableCustomDOMElements(bool);
     WEBKIT_EXPORT static bool isCustomDOMElementsEnabled();
 
@@ -84,6 +87,9 @@ public:
 
     WEBKIT_EXPORT static void enableEncryptedMedia(bool);
     WEBKIT_EXPORT static bool isEncryptedMediaEnabled();
+
+    WEBKIT_EXPORT static void enableLegacyEncryptedMedia(bool);
+    WEBKIT_EXPORT static bool isLegacyEncryptedMediaEnabled();
 
     WEBKIT_EXPORT static void enableExperimentalCanvasFeatures(bool);
     WEBKIT_EXPORT static bool isExperimentalCanvasFeaturesEnabled();
@@ -145,6 +151,9 @@ public:
     WEBKIT_EXPORT static void enableNotifications(bool);
     WEBKIT_EXPORT static bool isNotificationsEnabled();
 
+    WEBKIT_EXPORT static void enablePagePopup(bool);
+    WEBKIT_EXPORT static bool isPagePopupEnabled();
+
     WEBKIT_EXPORT static void enablePeerConnection(bool);
     WEBKIT_EXPORT static bool isPeerConnectionEnabled();
 
@@ -186,6 +195,9 @@ public:
 
     WEBKIT_EXPORT static void enableWebPInAcceptHeader(bool);
     WEBKIT_EXPORT static bool isWebPInAcceptHeaderEnabled();
+
+    WEBKIT_EXPORT static void enableDataListElement(bool);
+    WEBKIT_EXPORT static bool isDataListElementEnabled();
 
 private:
     WebRuntimeFeatures();

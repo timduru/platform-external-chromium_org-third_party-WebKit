@@ -30,8 +30,7 @@
 
 [
     NoInterfaceObject,
-    DoNotCheckConstants,
-    ImplementationLacksVTable
+    DoNotCheckConstants
 ] exception FileException {
 
     readonly attribute unsigned short   code;

@@ -28,7 +28,6 @@
 #include "WebKitFontFamilyNames.h"
 #include "core/css/BasicShapeFunctions.h"
 #include "core/css/CSSAspectRatioValue.h"
-#include "core/css/CSSBasicShapes.h"
 #include "core/css/CSSBorderImage.h"
 #include "core/css/CSSFunctionValue.h"
 #include "core/css/CSSLineBoxContainValue.h"
@@ -53,19 +52,16 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/PseudoElement.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
-#include "core/html/HTMLFrameOwnerElement.h"
 #include "core/page/RuntimeCSSEnabled.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/platform/graphics/FontFeatureSettings.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderView.h"
-#include "core/rendering/style/BasicShapes.h"
 #include "core/rendering/style/ContentData.h"
 #include "core/rendering/style/CounterContent.h"
 #include "core/rendering/style/CursorList.h"
 #include "core/rendering/style/ExclusionShapeValue.h"
 #include "core/rendering/style/RenderStyle.h"
-#include "core/rendering/style/StyleInheritedData.h"
 #include <wtf/text/StringBuilder.h>
 
 #include "core/css/WebKitCSSArrayFunctionValue.h"
@@ -188,6 +184,7 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyTextOverflow,
     CSSPropertyTextTransform,
     CSSPropertyTop,
+    CSSPropertyTouchAction,
     CSSPropertyTransitionDelay,
     CSSPropertyTransitionDuration,
     CSSPropertyTransitionProperty,
@@ -344,7 +341,6 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitShapeMargin,
     CSSPropertyWebkitShapePadding,
     CSSPropertyWebkitWrapThrough,
-#if ENABLE(SVG)
     CSSPropertyBufferedRendering,
     CSSPropertyClipPath,
     CSSPropertyClipRule,
@@ -384,7 +380,6 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyGlyphOrientationVertical,
     CSSPropertyWebkitSvgShadow,
     CSSPropertyVectorEffect
-#endif
 };
 
 static const Vector<CSSPropertyID>& computableProperties()
@@ -549,7 +544,7 @@ static PassRefPtr<CSSValue> valueForNinePieceImage(const NinePieceImage& image)
     // Create the repeat rules.
     RefPtr<CSSValue> repeat = valueForNinePieceImageRepeat(image);
 
-    return createBorderImageValue(imageValue, imageSlices, borderSlices, outset, repeat);
+    return createBorderImageValue(imageValue.release(), imageSlices.release(), borderSlices.release(), outset.release(), repeat.release());
 }
 
 inline static PassRefPtr<CSSPrimitiveValue> zoomAdjustedPixelValue(double value, const RenderStyle* style)
@@ -713,7 +708,7 @@ static PassRefPtr<CSSValueList> getBorderRadiusShorthandValue(const RenderStyle*
     if (showHorizontalBottomLeft)
         horizontalRadii->append(bottomLeftRadius->item(0));
 
-    list->append(horizontalRadii);
+    list->append(horizontalRadii.release());
 
     if (showVerticalTopLeft) {
         RefPtr<CSSValueList> verticalRadii = CSSValueList::createSpaceSeparated();
@@ -724,7 +719,7 @@ static PassRefPtr<CSSValueList> getBorderRadiusShorthandValue(const RenderStyle*
             verticalRadii->append(bottomRightRadius->item(1));
         if (showVerticalBottomLeft)
             verticalRadii->append(bottomLeftRadius->item(1));
-        list->append(verticalRadii);
+        list->append(verticalRadii.release());
     }
     return list.release();
 }
@@ -814,7 +809,10 @@ static PassRefPtr<CSSValue> valueForCustomFilterNumberParameter(const CustomFilt
 
 static PassRefPtr<CSSValue> valueForCustomFilterTransformParameter(const RenderObject* renderer, const RenderStyle* style, const CustomFilterTransformParameter* transformParameter)
 {
-    IntSize size = renderer ? pixelSnappedIntRect(toRenderBox(renderer)->borderBoxRect()).size() : IntSize();
+    IntSize size;
+    if (renderer && renderer->isBox())
+        size = pixelSnappedIntRect(toRenderBox(renderer)->borderBoxRect()).size();
+
     TransformationMatrix transform;
     transformParameter->applyTransform(transform, size);
     // FIXME: Need to print out individual functions (https://bugs.webkit.org/show_bug.cgi?id=23924)
@@ -985,7 +983,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
             filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::UnknownFilterOperation);
             break;
         }
-        list->append(filterValue);
+        list->append(filterValue.release());
     }
 
     return list.release();
@@ -1063,12 +1061,15 @@ static PassRefPtr<CSSValue> valueForGridPosition(const GridPosition& position)
     if (position.isAuto())
         return cssValuePool().createIdentifierValue(CSSValueAuto);
 
-    if (position.isInteger())
-        return cssValuePool().createValue(position.integerPosition(), CSSPrimitiveValue::CSS_NUMBER);
-
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
-    list->append(cssValuePool().createIdentifierValue(CSSValueSpan));
-    list->append(cssValuePool().createValue(position.spanPosition(), CSSPrimitiveValue::CSS_NUMBER));
+    if (position.isSpan()) {
+        list->append(cssValuePool().createIdentifierValue(CSSValueSpan));
+        list->append(cssValuePool().createValue(position.spanPosition(), CSSPrimitiveValue::CSS_NUMBER));
+    } else
+        list->append(cssValuePool().createValue(position.integerPosition(), CSSPrimitiveValue::CSS_NUMBER));
+
+    if (!position.namedGridLine().isNull())
+        list->append(cssValuePool().createValue(position.namedGridLine(), CSSPrimitiveValue::CSS_STRING));
     return list;
 }
 static PassRefPtr<CSSValue> createTransitionPropertyValue(const CSSAnimationData* animation)
@@ -1310,11 +1311,11 @@ static PassRefPtr<CSSValue> renderTextDecorationFlagsToCSSValue(int textDecorati
 {
     // Blink value is ignored.
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
-    if (textDecoration & UNDERLINE)
+    if (textDecoration & TextDecorationUnderline)
         list->append(cssValuePool().createIdentifierValue(CSSValueUnderline));
-    if (textDecoration & OVERLINE)
+    if (textDecoration & TextDecorationOverline)
         list->append(cssValuePool().createIdentifierValue(CSSValueOverline));
-    if (textDecoration & LINE_THROUGH)
+    if (textDecoration & TextDecorationLineThrough)
         list->append(cssValuePool().createIdentifierValue(CSSValueLineThrough));
 
     if (!list->length())
@@ -1835,7 +1836,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             }
             RefPtr<CSSValue> value = cssValuePool().createValue(style->cursor());
             if (list) {
-                list->append(value);
+                list->append(value.release());
                 return list.release();
             }
             return value.release();
@@ -2202,6 +2203,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->textTransform());
         case CSSPropertyTop:
             return getPositionOffsetValue(style.get(), CSSPropertyTop, renderer, m_node->document()->renderView());
+        case CSSPropertyTouchAction:
+            return cssValuePool().createValue(style->touchAction());
         case CSSPropertyUnicodeBidi:
             return cssValuePool().createValue(style->unicodeBidi());
         case CSSPropertyVerticalAlign:
@@ -2561,12 +2564,10 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             if (ClipPathOperation* operation = style->clipPath()) {
                 if (operation->getOperationType() == ClipPathOperation::SHAPE)
                     return valueForBasicShape(static_cast<ShapeClipPathOperation*>(operation)->basicShape());
-#if ENABLE(SVG)
-                else if (operation->getOperationType() == ClipPathOperation::REFERENCE) {
+                if (operation->getOperationType() == ClipPathOperation::REFERENCE) {
                     ReferenceClipPathOperation* referenceOperation = static_cast<ReferenceClipPathOperation*>(operation);
                     return CSSPrimitiveValue::create(referenceOperation->url(), CSSPrimitiveValue::CSS_URI);
                 }
-#endif
             }
             return cssValuePool().createIdentifierValue(CSSValueNone);
         case CSSPropertyWebkitFlowInto:
@@ -2664,17 +2665,14 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
 
         /* Unimplemented CSS 3 properties (including CSS3 shorthand properties) */
         case CSSPropertyWebkitTextEmphasis:
-        case CSSPropertyTextLineThrough:
         case CSSPropertyTextLineThroughColor:
         case CSSPropertyTextLineThroughMode:
         case CSSPropertyTextLineThroughStyle:
         case CSSPropertyTextLineThroughWidth:
-        case CSSPropertyTextOverline:
         case CSSPropertyTextOverlineColor:
         case CSSPropertyTextOverlineMode:
         case CSSPropertyTextOverlineStyle:
         case CSSPropertyTextOverlineWidth:
-        case CSSPropertyTextUnderline:
         case CSSPropertyTextUnderlineColor:
         case CSSPropertyTextUnderlineMode:
         case CSSPropertyTextUnderlineStyle:
@@ -2742,7 +2740,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWebkitTransformOriginX:
         case CSSPropertyWebkitTransformOriginY:
         case CSSPropertyWebkitTransformOriginZ:
-        case CSSPropertyWebkitWrap:
             break;
 
 #if ENABLE(CSS_DEVICE_ADAPTATION)
@@ -2753,7 +2750,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             break;
 #endif
 
-#if ENABLE(SVG)
         case CSSPropertyBufferedRendering:
         case CSSPropertyClipPath:
         case CSSPropertyClipRule:
@@ -2797,7 +2793,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWritingMode:
         case CSSPropertyWebkitSvgShadow:
             return getSVGPropertyCSSValue(propertyID, DoNotUpdateLayout);
-#endif
     }
 
     logUnimplementedPropertyID(propertyID);
@@ -2850,7 +2845,7 @@ bool CSSComputedStyleDeclaration::cssPropertyMatches(CSSPropertyID propertyID, c
     return value && propertyValue && value->equals(*propertyValue);
 }
 
-PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copy() const
+PassRefPtr<MutableStylePropertySet> CSSComputedStyleDeclaration::copyProperties() const
 {
     return copyPropertiesInSet(computableProperties());
 }
@@ -2882,13 +2877,13 @@ PassRefPtr<CSSValueList> CSSComputedStyleDeclaration::getCSSPropertyValuesForSid
     bool showBottom = !compareCSSValuePtr(topValue, bottomValue) || showLeft;
     bool showRight = !compareCSSValuePtr(topValue, rightValue) || showBottom;
 
-    list->append(topValue);
+    list->append(topValue.release());
     if (showRight)
-        list->append(rightValue);
+        list->append(rightValue.release());
     if (showBottom)
-        list->append(bottomValue);
+        list->append(bottomValue.release());
     if (showLeft)
-        list->append(leftValue);
+        list->append(leftValue.release());
 
     return list.release();
 }
@@ -2898,12 +2893,12 @@ PassRefPtr<CSSValueList> CSSComputedStyleDeclaration::getCSSPropertyValuesForGri
     RefPtr<CSSValueList> list = CSSValueList::createSlashSeparated();
     for (size_t i = 0; i < shorthand.length(); ++i) {
         RefPtr<CSSValue> value = getPropertyCSSValue(shorthand.properties()[i], DoNotUpdateLayout);
-        list->append(value);
+        list->append(value.release());
     }
     return list.release();
 }
 
-PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copyPropertiesInSet(const Vector<CSSPropertyID>& properties) const
+PassRefPtr<MutableStylePropertySet> CSSComputedStyleDeclaration::copyPropertiesInSet(const Vector<CSSPropertyID>& properties) const
 {
     Vector<CSSProperty, 256> list;
     list.reserveInitialCapacity(properties.size());
@@ -2912,7 +2907,7 @@ PassRefPtr<StylePropertySet> CSSComputedStyleDeclaration::copyPropertiesInSet(co
         if (value)
             list.append(CSSProperty(properties[i], value.release(), false));
     }
-    return StylePropertySet::create(list.data(), list.size());
+    return MutableStylePropertySet::create(list.data(), list.size());
 }
 
 void CSSComputedStyleDeclaration::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const

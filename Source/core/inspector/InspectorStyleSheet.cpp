@@ -143,7 +143,8 @@ namespace WebCore {
 
 static PassOwnPtr<CSSParser> createCSSParser(Document* document)
 {
-    return adoptPtr(new CSSParser(document ? CSSParserContext(document) : strictCSSParserContext()));
+    UseCounter* counter = 0;
+    return adoptPtr(new CSSParser(document ? CSSParserContext(document) : strictCSSParserContext(), counter));
 }
 
 namespace {
@@ -171,7 +172,7 @@ private:
     virtual void endRuleBody(unsigned, bool) OVERRIDE;
     virtual void startEndUnknownRule() OVERRIDE { addNewRuleToSourceTree(CSSRuleSourceData::createUnknown()); }
     virtual void startProperty(unsigned) OVERRIDE;
-    virtual void endProperty(bool, bool, unsigned, CSSParser::SyntaxErrorType) OVERRIDE;
+    virtual void endProperty(bool, bool, unsigned, CSSParser::ErrorType) OVERRIDE;
     virtual void startComment(unsigned) OVERRIDE;
     virtual void endComment(unsigned) OVERRIDE;
 
@@ -343,9 +344,9 @@ void StyleSheetHandler::startProperty(unsigned offset)
     m_propertyRangeStart = offset;
 }
 
-void StyleSheetHandler::endProperty(bool isImportant, bool isParsed, unsigned offset, CSSParser::SyntaxErrorType errorType)
+void StyleSheetHandler::endProperty(bool isImportant, bool isParsed, unsigned offset, CSSParser::ErrorType errorType)
 {
-    if (errorType != CSSParser::NoSyntaxError)
+    if (errorType != CSSParser::NoError)
         m_propertyRangeStart = UINT_MAX;
 
     if (m_propertyRangeStart == UINT_MAX || m_currentRuleDataStack.isEmpty() || !m_currentRuleDataStack.last()->styleSourceData)
@@ -417,7 +418,7 @@ void StyleSheetHandler::endComment(unsigned offset)
     // FIXME: Use another subclass of CSSParser::SourceDataHandler and assert that
     // no comments are encountered (will not need m_document and m_styleSheetContents).
     StyleSheetHandler handler(commentText, m_document, m_styleSheetContents, &sourceData);
-    RefPtr<StylePropertySet> tempMutableStyle = StylePropertySet::create();
+    RefPtr<MutableStylePropertySet> tempMutableStyle = MutableStylePropertySet::create();
     m_commentParser->parseDeclaration(tempMutableStyle.get(), commentText, &handler, m_styleSheetContents);
     Vector<CSSPropertySourceData>& commentPropertyData = sourceData.first()->styleSourceData->propertyData;
     if (commentPropertyData.size() != 1)
@@ -647,7 +648,7 @@ bool InspectorStyle::setPropertyText(unsigned index, const String& propertyText,
     populateAllProperties(allProperties);
 
     if (!propertyText.stripWhiteSpace().isEmpty()) {
-        RefPtr<StylePropertySet> tempMutableStyle = StylePropertySet::create();
+        RefPtr<MutableStylePropertySet> tempMutableStyle = MutableStylePropertySet::create();
         String declarationText = propertyText + " " + bogusPropertyName + ": none";
         RuleSourceDataList sourceData;
         StyleSheetHandler handler(declarationText, ownerDocument(), m_style->parentStyleSheet()->contents(), &sourceData);
@@ -1263,14 +1264,24 @@ PassRefPtr<TypeBuilder::CSS::CSSStyleSheetHeader> InspectorStyleSheet::buildObje
 
     Document* document = styleSheet->ownerDocument();
     Frame* frame = document ? document->frame() : 0;
+
     RefPtr<TypeBuilder::CSS::CSSStyleSheetHeader> result = TypeBuilder::CSS::CSSStyleSheetHeader::create()
         .setStyleSheetId(id())
         .setOrigin(m_origin)
         .setDisabled(styleSheet->disabled())
-        .setSourceURL(finalURL())
+        .setSourceURL(url())
         .setTitle(styleSheet->title())
-        .setFrameId(m_pageAgent->frameId(frame));
+        .setFrameId(m_pageAgent->frameId(frame))
+        .setIsInline(styleSheet->isInline() && !startsAtZero())
+        .setStartLine(styleSheet->startPositionInSource().m_line.zeroBasedInt())
+        .setStartColumn(styleSheet->startPositionInSource().m_column.zeroBasedInt());
 
+    if (hasSourceURL())
+        result->setHasSourceURL(true);
+
+    String sourceMapURLValue = sourceMapURL();
+    if (!sourceMapURLValue.isEmpty())
+        result->setSourceMapURL(sourceMapURLValue);
     return result.release();
 }
 
@@ -1329,13 +1340,12 @@ PassRefPtr<TypeBuilder::CSS::CSSRule> InspectorStyleSheet::buildObjectForRule(CS
 
     RefPtr<TypeBuilder::CSS::CSSRule> result = TypeBuilder::CSS::CSSRule::create()
         .setSelectorList(buildObjectForSelectorList(rule))
-        .setSourceLine(rule->styleRule()->sourceLine())
         .setOrigin(m_origin)
         .setStyle(buildObjectForStyle(rule->style()));
 
-    // "sourceURL" is present only for regular rules, otherwise "origin" should be used in the frontend.
-    if (m_origin == TypeBuilder::CSS::StyleSheetOrigin::Regular)
-        result->setSourceURL(finalURL());
+    String url = this->url();
+    if (!url.isEmpty())
+        result->setSourceURL(url);
 
     if (canBind()) {
         InspectorCSSId id(ruleId(rule));
@@ -1461,6 +1471,85 @@ PassRefPtr<InspectorStyle> InspectorStyleSheet::inspectorStyleForId(const Inspec
         return 0;
 
     return InspectorStyle::create(id, style, this);
+}
+
+String InspectorStyleSheet::sourceURL() const
+{
+    if (!m_sourceURL.isNull())
+        return m_sourceURL;
+    if (m_origin != TypeBuilder::CSS::StyleSheetOrigin::Regular) {
+        m_sourceURL = "";
+        return m_sourceURL;
+    }
+
+    String styleSheetText;
+    bool success = getText(&styleSheetText);
+    if (success) {
+        String commentValue = ContentSearchUtils::findSourceURL(styleSheetText, ContentSearchUtils::CSSMagicComment);
+        if (!commentValue.isEmpty()) {
+            m_sourceURL = commentValue;
+            return m_sourceURL;
+        }
+    }
+    m_sourceURL = "";
+    return m_sourceURL;
+}
+
+String InspectorStyleSheet::url() const
+{
+    // "sourceURL" is present only for regular rules, otherwise "origin" should be used in the frontend.
+    if (m_origin != TypeBuilder::CSS::StyleSheetOrigin::Regular)
+        return String();
+
+    CSSStyleSheet* styleSheet = pageStyleSheet();
+    if (!styleSheet)
+        return String();
+
+    if (hasSourceURL())
+        return sourceURL();
+
+    if (styleSheet->isInline() && startsAtZero())
+        return String();
+
+    return finalURL();
+}
+
+bool InspectorStyleSheet::hasSourceURL() const
+{
+    return !sourceURL().isEmpty();
+}
+
+bool InspectorStyleSheet::startsAtZero() const
+{
+    CSSStyleSheet* styleSheet = pageStyleSheet();
+    if (!styleSheet)
+        return true;
+
+    return styleSheet->startPositionInSource() == TextPosition::minimumPosition();
+}
+
+String InspectorStyleSheet::sourceMapURL() const
+{
+    DEFINE_STATIC_LOCAL(String, sourceMapHttpHeader, (ASCIILiteral("X-SourceMap")));
+
+    if (m_origin != TypeBuilder::CSS::StyleSheetOrigin::Regular)
+        return String();
+
+    String styleSheetText;
+    bool success = getText(&styleSheetText);
+    if (success) {
+        String commentValue = ContentSearchUtils::findSourceMapURL(styleSheetText, ContentSearchUtils::CSSMagicComment);
+        if (!commentValue.isEmpty())
+            return commentValue;
+    }
+
+    if (finalURL().isEmpty())
+        return String();
+
+    CachedResource* resource = m_pageAgent->cachedResource(m_pageAgent->mainFrame(), KURL(ParsedURLString, finalURL()));
+    if (resource)
+        return resource->response().httpHeaderField(sourceMapHttpHeader);
+    return String();
 }
 
 InspectorCSSId InspectorStyleSheet::ruleOrStyleId(CSSStyleDeclaration* style) const
@@ -1654,11 +1743,7 @@ bool InspectorStyleSheet::inlineStyleSheetText(String* result) const
         return false;
     Element* ownerElement = toElement(ownerNode);
 
-    if (!ownerElement->hasTagName(HTMLNames::styleTag)
-#if ENABLE(SVG)
-        && !ownerElement->hasTagName(SVGNames::styleTag)
-#endif
-    )
+    if (!ownerElement->hasTagName(HTMLNames::styleTag) && !ownerElement->hasTagName(SVGNames::styleTag))
         return false;
     *result = ownerElement->textContent();
     return true;
@@ -1810,7 +1895,7 @@ PassRefPtr<CSSRuleSourceData> InspectorStyleSheetForInlineStyle::getStyleAttribu
         return result.release();
     }
 
-    RefPtr<StylePropertySet> tempDeclaration = StylePropertySet::create();
+    RefPtr<MutableStylePropertySet> tempDeclaration = MutableStylePropertySet::create();
     RuleSourceDataList ruleSourceDataResult;
     StyleSheetHandler handler(m_styleText, m_element->document(), m_element->document()->elementSheet()->contents(), &ruleSourceDataResult);
     createCSSParser(m_element->document())->parseDeclaration(tempDeclaration.get(), m_styleText, &handler, m_element->document()->elementSheet()->contents());

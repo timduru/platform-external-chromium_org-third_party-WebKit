@@ -115,13 +115,11 @@ public:
     virtual bool runJavaScriptPrompt(Frame*, const String&, const String&, String&) OVERRIDE { return false; }
 
     virtual bool hasOpenedPopup() const OVERRIDE { return false; }
-    virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const OVERRIDE;
-#if ENABLE(PAGE_POPUP)
+    virtual PassRefPtr<PopupMenu> createPopupMenu(Frame&, PopupMenuClient*) const OVERRIDE;
     virtual PagePopup* openPagePopup(PagePopupClient*, const IntRect&) OVERRIDE { return 0; }
     virtual void closePagePopup(PagePopup*) OVERRIDE { }
     virtual void setPagePopupDriver(PagePopupDriver*) OVERRIDE { }
     virtual void resetPagePopupDriver() OVERRIDE { }
-#endif
 
     virtual void setStatusbarText(const String&) OVERRIDE { }
 
@@ -159,7 +157,6 @@ public:
     virtual void formStateDidChange(const Node*) OVERRIDE { }
 
     virtual void setCursor(const Cursor&) OVERRIDE { }
-    virtual void setCursorHiddenUntilMouseMoves(bool) OVERRIDE { }
 
     virtual void attachRootGraphicsLayer(Frame*, GraphicsLayer*) OVERRIDE { }
     virtual void scheduleCompositingLayerFlush() OVERRIDE { }
@@ -247,7 +244,6 @@ public:
 
     virtual bool shouldFallBack(const ResourceError&) OVERRIDE { return false; }
 
-    virtual bool canHandleRequest(const ResourceRequest&) const OVERRIDE { return false; }
     virtual bool canShowMIMEType(const String&) const OVERRIDE { return false; }
     virtual String generatedMIMETypeForURLScheme(const String&) const OVERRIDE { return ""; }
 
@@ -319,6 +315,7 @@ public:
     virtual void respondToChangedContents() OVERRIDE { }
     virtual void respondToChangedSelection(Frame*) OVERRIDE { }
     virtual void didEndEditing() OVERRIDE { }
+    virtual void didCancelCompositionOnSelectionChange() OVERRIDE { }
 
     virtual void registerUndoStep(PassRefPtr<UndoStep>) OVERRIDE;
     virtual void registerRedoStep(PassRefPtr<UndoStep>) OVERRIDE;
@@ -355,7 +352,7 @@ class EmptyContextMenuClient : public ContextMenuClient {
 public:
     EmptyContextMenuClient() { }
     virtual ~EmptyContextMenuClient() {  }
-    virtual PassOwnPtr<ContextMenu> customizeMenu(PassOwnPtr<ContextMenu>) OVERRIDE;
+    virtual void showContextMenu(const ContextMenu*) OVERRIDE { }
 };
 
 class EmptyDragClient : public DragClient {

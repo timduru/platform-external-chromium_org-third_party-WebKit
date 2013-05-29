@@ -52,6 +52,7 @@ WebKitMediaSource::WebKitMediaSource(ScriptExecutionContext* context)
     , m_readyState(closedKeyword())
     , m_asyncEventQueue(GenericEventQueue::create(this))
 {
+    ScriptWrappable::init(this);
     m_sourceBuffers = WebKitSourceBufferList::create(scriptExecutionContext(), m_asyncEventQueue.get());
     m_activeSourceBuffers = WebKitSourceBufferList::create(scriptExecutionContext(), m_asyncEventQueue.get());
 }
@@ -329,5 +330,19 @@ void WebKitMediaSource::scheduleEvent(const AtomicString& eventName)
 
     m_asyncEventQueue->enqueueEvent(event.release());
 }
+
+void WebKitMediaSource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+{
+    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
+    ScriptWrappable::reportMemoryUsage(memoryObjectInfo);
+    ActiveDOMObject::reportMemoryUsage(memoryObjectInfo);
+    info.addMember(m_eventTargetData, "eventTargetData");
+    info.addMember(m_readyState, "readyState");
+    info.addMember(m_private, "private");
+    info.addMember(m_sourceBuffers, "sourceBuffers");
+    info.addMember(m_activeSourceBuffers, "activeSourceBuffers");
+    info.addMember(m_asyncEventQueue, "asyncEventQueue");
+}
+
 
 } // namespace WebCore

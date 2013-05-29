@@ -32,12 +32,11 @@
 #include "WebInbandTextTrack.h"
 #include "core/platform/graphics/InbandTextTrackPrivateClient.h"
 #include "public/WebString.h"
-#include <wtf/PassOwnPtr.h>
 
 namespace WebKit {
 
 InbandTextTrackPrivateImpl::InbandTextTrackPrivateImpl(WebInbandTextTrack* track)
-    : m_track(adoptPtr(track))
+    : m_track(track)
 {
     ASSERT(track);
     track->setClient(this);
@@ -45,12 +44,12 @@ InbandTextTrackPrivateImpl::InbandTextTrackPrivateImpl(WebInbandTextTrack* track
 
 InbandTextTrackPrivateImpl::~InbandTextTrackPrivateImpl()
 {
+    m_track->setClient(0);
 }
 
 void InbandTextTrackPrivateImpl::setClient(WebCore::InbandTextTrackPrivateClient* client)
 {
     InbandTextTrackPrivate::setClient(client);
-    m_track->setClient(this);
 }
 
 void InbandTextTrackPrivateImpl::setMode(Mode mode)

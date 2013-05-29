@@ -24,7 +24,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGUseElement.h"
 
 #include "HTMLNames.h"
@@ -40,9 +39,9 @@
 #include "core/dom/RegisteredEventListener.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
+#include "core/loader/cache/CachedDocument.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
-#include "core/loader/cache/CachedSVGDocument.h"
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/RenderSVGTransformableContainer.h"
 #include "core/svg/SVGElementInstance.h"
@@ -251,8 +250,7 @@ void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
         if (isExternalReference) {
             KURL url = document()->completeURL(href());
             if (url.hasFragmentIdentifier()) {
-                CachedResourceRequest request(ResourceRequest(url.string()));
-                request.setInitiator(this);
+                CachedResourceRequest request(ResourceRequest(url.string()), localName());
                 setCachedDocument(document()->cachedResourceLoader()->requestSVGDocument(request));
             }
         } else
@@ -995,7 +993,7 @@ void SVGUseElement::finishParsingChildren()
     }
 }
 
-void SVGUseElement::setCachedDocument(CachedResourceHandle<CachedSVGDocument> cachedDocument)
+void SVGUseElement::setCachedDocument(CachedResourceHandle<CachedDocument> cachedDocument)
 {
     if (m_cachedDocument == cachedDocument)
         return;
@@ -1009,5 +1007,3 @@ void SVGUseElement::setCachedDocument(CachedResourceHandle<CachedSVGDocument> ca
 }
 
 }
-
-#endif // ENABLE(SVG)

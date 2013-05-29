@@ -80,6 +80,7 @@
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/loader/CookieJar.h"
+#include "core/loader/DocumentLoader.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
@@ -816,11 +817,7 @@ void InspectorDOMAgent::setOuterHTML(ErrorString* errorString, int nodeId, const
         return;
 
     Document* document = node->isDocumentNode() ? toDocument(node) : node->ownerDocument();
-    if (!document || (!document->isHTMLDocument() && !document->isXHTMLDocument()
-#if ENABLE(SVG)
-        && !document->isSVGDocument()
-#endif
-    )) {
+    if (!document || (!document->isHTMLDocument() && !document->isXHTMLDocument() && !document->isSVGDocument())) {
         *errorString = "Not an HTML/XML document";
         return;
     }
@@ -1581,17 +1578,20 @@ bool InspectorDOMAgent::isWhitespace(Node* node)
     return node && node->nodeType() == Node::TEXT_NODE && node->nodeValue().stripWhiteSpace().length() == 0;
 }
 
-void InspectorDOMAgent::mainFrameDOMContentLoaded()
+void InspectorDOMAgent::domContentLoadedEventFired(Frame* frame)
 {
+    if (frame->page()->mainFrame() != frame)
+        return;
+
     // Re-push document once it is loaded.
     discardFrontendBindings();
     if (m_state->getBoolean(DOMAgentState::documentRequested))
         m_frontend->documentUpdated();
 }
 
-void InspectorDOMAgent::loadEventFired(Document* document)
+void InspectorDOMAgent::loadEventFired(Frame* frame)
 {
-    Element* frameOwner = document->ownerElement();
+    Element* frameOwner = frame->document()->ownerElement();
     if (!frameOwner)
         return;
 
@@ -1608,6 +1608,15 @@ void InspectorDOMAgent::loadEventFired(Document* document)
     Node* previousSibling = innerPreviousSibling(frameOwner);
     int prevId = previousSibling ? m_documentNodeToIdMap.get(previousSibling) : 0;
     m_frontend->childNodeInserted(parentId, prevId, value.release());
+}
+
+void InspectorDOMAgent::didCommitLoad(Frame* frame, DocumentLoader* loader)
+{
+    Frame* mainFrame = frame->page()->mainFrame();
+    if (loader->frame() != mainFrame)
+        return;
+
+    setDocument(mainFrame->document());
 }
 
 void InspectorDOMAgent::didInsertDOMNode(Node* node)
@@ -1639,7 +1648,7 @@ void InspectorDOMAgent::didInsertDOMNode(Node* node)
     }
 }
 
-void InspectorDOMAgent::didRemoveDOMNode(Node* node)
+void InspectorDOMAgent::willRemoveDOMNode(Node* node)
 {
     if (isWhitespace(node))
         return;
@@ -1739,6 +1748,9 @@ void InspectorDOMAgent::didInvalidateStyleAttr(Node* node)
 
 void InspectorDOMAgent::didPushShadowRoot(Element* host, ShadowRoot* root)
 {
+    if (!host->ownerDocument())
+        return;
+
     int hostId = m_documentNodeToIdMap.get(host);
     if (hostId)
         m_frontend->shadowRootPushed(hostId, buildObjectForNode(root, 0, &m_documentNodeToIdMap));
@@ -1746,6 +1758,9 @@ void InspectorDOMAgent::didPushShadowRoot(Element* host, ShadowRoot* root)
 
 void InspectorDOMAgent::willPopShadowRoot(Element* host, ShadowRoot* root)
 {
+    if (!host->ownerDocument())
+        return;
+
     int hostId = m_documentNodeToIdMap.get(host);
     int rootId = m_documentNodeToIdMap.get(root);
     if (hostId && rootId)

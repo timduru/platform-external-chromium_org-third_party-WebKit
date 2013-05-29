@@ -22,10 +22,8 @@
 #if ENABLE(Condition1) || ENABLE(Condition2)
 #include "V8TestSerializedScriptValueInterface.h"
 
-#include "MessagePort.h"
 #include "RuntimeEnabledFeatures.h"
 #include "SerializedScriptValue.h"
-#include "V8MessagePort.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/SerializedScriptValue.h"
 #include "bindings/v8/V8Binding.h"
@@ -36,39 +34,7 @@
 #include "core/page/Frame.h"
 #include "wtf/UnusedParam.h"
 
-#if ENABLE(BINDING_INTEGRITY)
-#if defined(OS_WIN)
-#pragma warning(disable: 4483)
-extern "C" { extern void (*const __identifier("??_7TestSerializedScriptValueInterface@WebCore@@6B@")[])(); }
-#else
-extern "C" { extern void* _ZTVN7WebCore34TestSerializedScriptValueInterfaceE[]; }
-#endif
-#endif // ENABLE(BINDING_INTEGRITY)
-
 namespace WebCore {
-
-#if ENABLE(BINDING_INTEGRITY)
-// This checks if a DOM object that is about to be wrapped is valid.
-// Specifically, it checks that a vtable of the DOM object is equal to
-// a vtable of an expected class.
-// Due to a dangling pointer, the DOM object you are wrapping might be
-// already freed or realloced. If freed, the check will fail because
-// a free list pointer should be stored at the head of the DOM object.
-// If realloced, the check will fail because the vtable of the DOM object
-// differs from the expected vtable (unless the same class of DOM object
-// is realloced on the slot).
-inline void checkTypeOrDieTrying(TestSerializedScriptValueInterface* object)
-{
-    void* actualVTablePointer = *(reinterpret_cast<void**>(object));
-#if defined(OS_WIN)
-    void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestSerializedScriptValueInterface@WebCore@@6B@"));
-#else
-    void* expectedVTablePointer = &_ZTVN7WebCore34TestSerializedScriptValueInterfaceE[2];
-#endif
-    if (actualVTablePointer != expectedVTablePointer)
-        CRASH();
-}
-#endif // ENABLE(BINDING_INTEGRITY)
 
 #if defined(OS_WIN)
 // In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
@@ -82,6 +48,8 @@ void initializeScriptWrappableForInterface(TestSerializedScriptValueInterface* o
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestSerializedScriptValueInterface::info);
+    else
+        ASSERT_NOT_REACHED();
 }
 #if defined(OS_WIN)
 namespace WebCore {
@@ -159,24 +127,6 @@ static void cachedValueAttrSetterCallback(v8::Local<v8::String> name, v8::Local<
     TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetter(name, value, info);
 }
 
-static v8::Handle<v8::Value> portsAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
-{
-    TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
-    MessagePortArray* ports = imp->ports();
-    if (!ports)
-        return v8::Array::New(0);
-    MessagePortArray portsCopy(*ports);
-    v8::Local<v8::Array> portArray = v8::Array::New(portsCopy.size());
-    for (size_t i = 0; i < portsCopy.size(); ++i)
-        portArray->Set(v8Integer(i, info.GetIsolate()), toV8Fast(portsCopy[i].get(), info, imp));
-    return portArray;
-}
-
-static v8::Handle<v8::Value> portsAttrGetterCallback(v8::Local<v8::String> name, const v8::AccessorInfo& info)
-{
-    return TestSerializedScriptValueInterfaceV8Internal::portsAttrGetter(name, info);
-}
-
 static v8::Handle<v8::Value> cachedReadonlyValueAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
     v8::Handle<v8::String> propertyName = v8::String::NewSymbol("cachedReadonlyValue");
@@ -204,8 +154,6 @@ static const V8DOMConfiguration::BatchedAttribute V8TestSerializedScriptValueInt
     {"readonlyValue", TestSerializedScriptValueInterfaceV8Internal::readonlyValueAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'cachedValue' (Type: 'attribute' ExtAttr: 'CachedAttribute')
     {"cachedValue", TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrGetterCallback, TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'ports' (Type: 'attribute' ExtAttr: '')
-    {"ports", TestSerializedScriptValueInterfaceV8Internal::portsAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'cachedReadonlyValue' (Type: 'attribute' ExtAttr: 'CachedAttribute')
     {"cachedReadonlyValue", TestSerializedScriptValueInterfaceV8Internal::cachedReadonlyValueAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
@@ -257,16 +205,12 @@ v8::Handle<v8::Object> V8TestSerializedScriptValueInterface::createWrapper(PassR
     ASSERT(impl.get());
     ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
 
-#if ENABLE(BINDING_INTEGRITY)
-    checkTypeOrDieTrying(impl.get());
-#endif
-
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, hasDependentLifetime ? WrapperConfiguration::Dependent : WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestSerializedScriptValueInterface::derefObject(void* object)

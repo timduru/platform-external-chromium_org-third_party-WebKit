@@ -34,6 +34,7 @@
 #include "config.h"
 
 #include <public/WebClipboard.h>
+#include <public/WebCompositingReasons.h>
 #include <public/WebFileError.h>
 #include <public/WebFileInfo.h>
 #include <public/WebFileSystem.h>
@@ -111,6 +112,7 @@
 #include "core/platform/network/ResourceLoadPriority.h"
 #include "core/platform/network/ResourceResponse.h"
 #include "core/platform/text/TextChecking.h"
+#include "core/rendering/RenderLayer.h"
 #include "modules/filesystem/FileSystemType.h"
 #include "modules/geolocation/GeolocationError.h"
 #include "modules/geolocation/GeolocationPosition.h"
@@ -422,7 +424,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebMediaSourceClient::EndOfStreamStatusNoError, Med
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaSourceClient::EndOfStreamStatusNetworkError, MediaSourcePrivate::EosNetworkError);
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaSourceClient::EndOfStreamStatusDecodeError, MediaSourcePrivate::EosDecodeError);
 
-#if ENABLE(ENCRYPTED_MEDIA)
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::MediaKeyExceptionNoError, MediaPlayer::NoError);
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::MediaKeyExceptionInvalidPlayerState, MediaPlayer::InvalidPlayerState);
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::MediaKeyExceptionKeySystemNotSupported, MediaPlayer::KeySystemNotSupported);
@@ -433,7 +434,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayerClient::MediaKeyErrorCodeService, Med
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayerClient::MediaKeyErrorCodeOutput, MediaPlayerClient::OutputError);
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayerClient::MediaKeyErrorCodeHardwareChange, MediaPlayerClient::HardwareChangeError);
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayerClient::MediaKeyErrorCodeDomain, MediaPlayerClient::DomainError);
-#endif
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
 COMPILE_ASSERT_MATCHING_ENUM(WebNotificationPresenter::PermissionAllowed, NotificationClient::PermissionAllowed);
@@ -480,7 +480,9 @@ COMPILE_ASSERT_MATCHING_ENUM(WebView::UserStyleInjectInExistingDocuments, Inject
 COMPILE_ASSERT_MATCHING_ENUM(WebView::UserStyleInjectInSubsequentDocuments, InjectInSubsequentDocuments);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionUnknownError, IDBDatabaseException::UnknownError);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionConstraintError, IDBDatabaseException::ConstraintError);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionDataError, IDBDatabaseException::DataError);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionVersionError, IDBDatabaseException::VersionError);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionAbortError, IDBDatabaseException::AbortError);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionQuotaError, IDBDatabaseException::QuotaExceededError);
 
@@ -489,6 +491,8 @@ COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::ArrayType, IDBKey::ArrayType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::StringType, IDBKey::StringType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::DateType, IDBKey::DateType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::NumberType, IDBKey::NumberType);
+// MinType is specific to the backing store, and is not plumbed through the Platform API, so this match is not required, and thus is purposefully absent.
+// COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::MinType, IDBKey::MinType);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKeyPath::NullType, IDBKeyPath::NullType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKeyPath::StringType, IDBKeyPath::StringType);
@@ -620,3 +624,37 @@ COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelDebug, DebugMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelLog, LogMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelWarning, WarningMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelError, ErrorMessageLevel);
+
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonUnknown, CompositingReasonNone);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReason3DTransform, CompositingReason3DTransform);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonVideo, CompositingReasonVideo);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonCanvas, CompositingReasonCanvas);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPlugin, CompositingReasonPlugin);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonIFrame, CompositingReasonIFrame);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonBackfaceVisibilityHidden, CompositingReasonBackfaceVisibilityHidden);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonAnimation, CompositingReasonAnimation);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonFilters, CompositingReasonFilters);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPositionFixed, CompositingReasonPositionFixed);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPositionSticky, CompositingReasonPositionSticky);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonOverflowScrollingTouch, CompositingReasonOverflowScrollingTouch);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonBlending, CompositingReasonBlending);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonAssumedOverlap, CompositingReasonAssumedOverlap);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonOverlap, CompositingReasonOverlap);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonNegativeZIndexChildren, CompositingReasonNegativeZIndexChildren);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonTransformWithCompositedDescendants, CompositingReasonTransformWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonOpacityWithCompositedDescendants, CompositingReasonOpacityWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonMaskWithCompositedDescendants, CompositingReasonMaskWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonReflectionWithCompositedDescendants, CompositingReasonReflectionWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonFilterWithCompositedDescendants, CompositingReasonFilterWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonBlendingWithCompositedDescendants, CompositingReasonBlendingWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonClipsCompositingDescendants, CompositingReasonClipsCompositingDescendants);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPerspective, CompositingReasonPerspective);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPreserve3D, CompositingReasonPreserve3D);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonReflectionOfCompositedParent, CompositingReasonReflectionOfCompositedParent);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonRoot, CompositingReasonRoot);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForClip, CompositingReasonLayerForClip);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForScrollbar, CompositingReasonLayerForScrollbar);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForScrollingContainer, CompositingReasonLayerForScrollingContainer);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForForeground, CompositingReasonLayerForForeground);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForBackground, CompositingReasonLayerForBackground);
+COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForMask, CompositingReasonLayerForMask);

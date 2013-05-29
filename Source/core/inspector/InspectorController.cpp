@@ -143,7 +143,7 @@ InspectorController::InspectorController(Page* page, InspectorClient* inspectorC
     m_domDebuggerAgent = domDebuggerAgentPtr.get();
     m_agents.append(domDebuggerAgentPtr.release());
 
-    OwnPtr<InspectorProfilerAgent> profilerAgentPtr(InspectorProfilerAgent::create(m_instrumentingAgents.get(), consoleAgent, page, m_state.get(), m_injectedScriptManager.get()));
+    OwnPtr<InspectorProfilerAgent> profilerAgentPtr(InspectorProfilerAgent::create(m_instrumentingAgents.get(), consoleAgent, m_state.get(), m_injectedScriptManager.get()));
     m_profilerAgent = profilerAgentPtr.get();
     m_agents.append(profilerAgentPtr.release());
 
@@ -193,11 +193,6 @@ void InspectorController::inspectedPageDestroyed()
 void InspectorController::setInspectorFrontendClient(PassOwnPtr<InspectorFrontendClient> inspectorFrontendClient)
 {
     m_inspectorFrontendClient = inspectorFrontendClient;
-}
-
-bool InspectorController::hasInspectorFrontendClient() const
-{
-    return m_inspectorFrontendClient;
 }
 
 void InspectorController::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWorld* world)
@@ -354,15 +349,6 @@ bool InspectorController::handleTouchEvent(Frame* frame, const PlatformTouchEven
 bool InspectorController::profilerEnabled()
 {
     return m_profilerAgent->enabled();
-}
-
-void InspectorController::setProfilerEnabled(bool enable)
-{
-    ErrorString error;
-    if (enable)
-        m_profilerAgent->enable(&error);
-    else
-        m_profilerAgent->disable(&error);
 }
 
 void InspectorController::resume()

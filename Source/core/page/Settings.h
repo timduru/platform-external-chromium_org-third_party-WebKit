@@ -50,12 +50,6 @@ enum EditableLinkBehavior {
     EditableLinkNeverLive
 };
 
-enum TextDirectionSubmenuInclusionBehavior {
-    TextDirectionSubmenuNeverIncluded,
-    TextDirectionSubmenuAutomaticallyIncluded,
-    TextDirectionSubmenuAlwaysIncluded
-};
-
 // UScriptCode uses -1 and 0 for UScriptInvalidCode and UScriptCommon.
 // We need to use -2 and -3 for empty value and deleted value.
 struct UScriptCodeHashTraits : WTF::GenericHashTraits<int> {
@@ -103,6 +97,12 @@ public:
     void setTextAutosizingWindowSizeOverride(const IntSize&);
     const IntSize& textAutosizingWindowSizeOverride() const { return m_textAutosizingWindowSizeOverride; }
 
+    void setUseWideViewport(bool);
+    bool useWideViewport() const { return m_useWideViewport; }
+
+    void setLoadWithOverviewMode(bool);
+    bool loadWithOverviewMode() const { return m_loadWithOverviewMode; }
+
     // Only set by Layout Tests.
     void setMediaTypeOverride(const String&);
     const String& mediaTypeOverride() const { return m_mediaTypeOverride; }
@@ -144,9 +144,6 @@ public:
     void setCSSStickyPositionEnabled(bool enabled) { m_cssStickyPositionEnabled = enabled; }
     bool cssStickyPositionEnabled() const { return m_cssStickyPositionEnabled; }
 
-    void setCSSVariablesEnabled(bool enabled) { m_cssVariablesEnabled = enabled; }
-    bool cssVariablesEnabled() const { return m_cssVariablesEnabled; }
-
     static void setMockScrollbarsEnabled(bool flag);
     static bool mockScrollbarsEnabled();
 
@@ -178,6 +175,8 @@ private:
     float m_textAutosizingFontScaleFactor;
     IntSize m_textAutosizingWindowSizeOverride;
     bool m_textAutosizingEnabled : 1;
+    bool m_useWideViewport : 1;
+    bool m_loadWithOverviewMode : 1;
 
     SETTINGS_MEMBER_VARIABLES
 
@@ -189,7 +188,6 @@ private:
     unsigned m_fontRenderingMode : 1;
     bool m_isCSSCustomFilterEnabled : 1;
     bool m_cssStickyPositionEnabled : 1;
-    bool m_cssVariablesEnabled : 1;
     bool m_dnsPrefetchingEnabled : 1;
 
     bool m_touchEventEmulationEnabled : 1;

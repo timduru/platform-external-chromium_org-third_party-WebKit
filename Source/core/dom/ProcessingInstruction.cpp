@@ -26,13 +26,11 @@
 #include "core/css/StyleSheetContents.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentStyleSheetCollection.h"
-#include "core/dom/ExceptionCode.h"
-#include "core/loader/FrameLoader.h"
 #include "core/loader/cache/CachedCSSStyleSheet.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
+#include "core/loader/cache/CachedResourceRequestInitiators.h"
 #include "core/loader/cache/CachedXSLStyleSheet.h"
-#include "core/page/Frame.h"
 #include "core/xml/XSLStyleSheet.h"
 #include "core/xml/parser/XMLDocumentParser.h" // for parseAttributes()
 
@@ -156,7 +154,7 @@ void ProcessingInstruction::checkStyleSheet()
             m_loading = true;
             document()->styleSheetCollection()->addPendingSheet();
             
-            CachedResourceRequest request(ResourceRequest(document()->completeURL(href)));
+            CachedResourceRequest request(ResourceRequest(document()->completeURL(href)), cachedResourceRequestInitiators().processinginstruction);
             if (m_isXSL)
                 m_cachedSheet = document()->cachedResourceLoader()->requestXSLStyleSheet(request);
             else

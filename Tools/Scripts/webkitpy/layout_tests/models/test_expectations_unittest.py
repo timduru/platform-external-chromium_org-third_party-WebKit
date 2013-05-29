@@ -243,6 +243,24 @@ class MiscTests(Base):
                                                      'failures/expected/text.html') in
                          self._exp.get_tests_with_result_type(SKIP))
 
+    def test_bot_test_expectations(self):
+        test_name = 'failures/expected/text.html'
+
+        expectations_dict = OrderedDict()
+        expectations_dict['expectations'] = "Bug(x) %s [ ImageOnlyFailure ]\n" % test_name
+        self._port.expectations_dict = lambda: expectations_dict
+
+        expectations = TestExpectations(self._port, self.get_basic_tests())
+        self.assertEqual(expectations.get_expectations(self.get_test(test_name)), set([IMAGE]))
+
+        def bot_expectations():
+            return {test_name: ['PASS', 'IMAGE']}
+        self._port.bot_expectations = bot_expectations
+        self._port._options.ignore_flaky = 'very-flaky'
+
+        expectations = TestExpectations(self._port, self.get_basic_tests())
+        self.assertEqual(expectations.get_expectations(self.get_test(test_name)), set([PASS, IMAGE]))
+
 
 class SkippedTests(Base):
     def check(self, expectations, overrides, skips, lint=False):
@@ -257,9 +275,9 @@ class SkippedTests(Base):
         expectations_to_lint = expectations_dict if lint else None
         exp = TestExpectations(port, ['failures/expected/text.html'], expectations_to_lint=expectations_to_lint)
 
-        # Check that the expectation is for BUG_DUMMY SKIP : ... [ Pass ]
+        # Check that the expectation is for SKIP : ... [ Pass ]
         self.assertEqual(exp.get_modifiers('failures/expected/text.html'),
-                          [TestExpectationParser.DUMMY_BUG_MODIFIER, TestExpectationParser.SKIP_MODIFIER, TestExpectationParser.WONTFIX_MODIFIER])
+                          [TestExpectationParser.SKIP_MODIFIER, TestExpectationParser.WONTFIX_MODIFIER])
         self.assertEqual(exp.get_expectations('failures/expected/text.html'), set([PASS]))
 
     def test_skipped_tests_work(self):
@@ -296,6 +314,12 @@ class SkippedTests(Base):
         _, _, logs = capture.restore_output()
         self.assertEqual('The following test foo/bar/baz.html from the Skipped list doesn\'t exist\n', logs)
 
+    def test_expectations_string(self):
+        self.parse_exp(self.get_basic_expectations())
+        notrun = 'failures/expected/text.html'
+        self._exp.add_extra_skipped_tests([notrun])
+        self.assertEqual('NOTRUN', self._exp.get_expectations_string(notrun))
+
 
 class ExpectationSyntaxTests(Base):
     def test_unrecognized_expectation(self):
@@ -326,10 +350,10 @@ class ExpectationSyntaxTests(Base):
         self.assert_tokenize_exp('foo.html', modifiers=['SKIP'], expectations=['PASS'])
 
     def test_bare_name_and_bugs(self):
-        self.assert_tokenize_exp('webkit.org/b/12345 foo.html', modifiers=['BUGWK12345', 'SKIP'], expectations=['PASS'])
-        self.assert_tokenize_exp('crbug.com/12345 foo.html', modifiers=['BUGCR12345', 'SKIP'], expectations=['PASS'])
-        self.assert_tokenize_exp('Bug(dpranke) foo.html', modifiers=['BUGDPRANKE', 'SKIP'], expectations=['PASS'])
-        self.assert_tokenize_exp('crbug.com/12345 crbug.com/34567 foo.html', modifiers=['BUGCR12345', 'BUGCR34567', 'SKIP'], expectations=['PASS'])
+        self.assert_tokenize_exp('webkit.org/b/12345 foo.html', modifiers=['webkit.org/b/12345', 'SKIP'], expectations=['PASS'])
+        self.assert_tokenize_exp('crbug.com/12345 foo.html', modifiers=['crbug.com/12345', 'SKIP'], expectations=['PASS'])
+        self.assert_tokenize_exp('Bug(dpranke) foo.html', modifiers=['Bug(dpranke)', 'SKIP'], expectations=['PASS'])
+        self.assert_tokenize_exp('crbug.com/12345 crbug.com/34567 foo.html', modifiers=['crbug.com/12345', 'crbug.com/34567', 'SKIP'], expectations=['PASS'])
 
     def test_comments(self):
         self.assert_tokenize_exp("# comment", name=None, comment="# comment")
@@ -374,10 +398,10 @@ class SemanticTests(Base):
 
     def test_bad_bugid(self):
         try:
-            self.parse_exp('BUG1234 failures/expected/text.html [ Failure ]', is_lint_mode=True)
+            self.parse_exp('crbug/1234 failures/expected/text.html [ Failure ]', is_lint_mode=True)
             self.fail('should have raised an error about a bad bug identifier')
         except ParseError, exp:
-            self.assertEqual(len(exp.warnings), 1)
+            self.assertEqual(len(exp.warnings), 2)
 
     def test_missing_bugid(self):
         self.parse_exp('failures/expected/text.html [ Failure ]')
@@ -563,6 +587,30 @@ class RebaseliningTest(Base):
         self.assertEqual(len(self._exp.get_rebaselining_failures()), 0)
 
 
+class TestExpectationsParserTests(unittest.TestCase):
+    def __init__(self, testFunc):
+        host = MockHost()
+        test_port = host.port_factory.get('test-win-xp', None)
+        self._converter = TestConfigurationConverter(test_port.all_test_configurations(), test_port.configuration_specifier_macros())
+        unittest.TestCase.__init__(self, testFunc)
+        self._parser = TestExpectationParser(host.port_factory.get('test-win-xp', None), [], allow_rebaseline_modifier=False)
+
+    def test_expectation_line_for_test(self):
+        # This is kind of a silly test, but it at least ensures that we don't throw an error.
+        test_name = 'foo/test.html'
+        expectations = set(["PASS", "IMAGE"])
+
+        expectation_line = TestExpectationLine()
+        expectation_line.original_string = test_name
+        expectation_line.name = test_name
+        expectation_line.filename = '<Bot TestExpectations>'
+        expectation_line.line_number = 0
+        expectation_line.expectations = expectations
+        self._parser._parse_line(expectation_line)
+
+        self.assertEqual(self._parser.expectation_line_for_test(test_name, expectations), expectation_line)
+
+
 class TestExpectationSerializationTests(unittest.TestCase):
     def __init__(self, testFunc):
         host = MockHost()
@@ -620,7 +668,7 @@ class TestExpectationSerializationTests(unittest.TestCase):
 
     def test_parsed_to_string(self):
         expectation_line = TestExpectationLine()
-        expectation_line.parsed_bug_modifiers = ['BUGX']
+        expectation_line.parsed_bug_modifiers = ['Bug(x)']
         expectation_line.name = 'test/name/for/realz.html'
         expectation_line.parsed_expectations = set([IMAGE])
         self.assertEqual(expectation_line.to_string(self._converter), None)
@@ -663,7 +711,6 @@ class TestExpectationSerializationTests(unittest.TestCase):
 
     def test_string_roundtrip(self):
         self.assert_round_trip('')
-        self.assert_round_trip('FOO')
         self.assert_round_trip('[')
         self.assert_round_trip('FOO [')
         self.assert_round_trip('FOO ] bar')
@@ -700,7 +747,7 @@ class TestExpectationSerializationTests(unittest.TestCase):
         def add_line(matching_configurations, reconstitute):
             expectation_line = TestExpectationLine()
             expectation_line.original_string = "Nay"
-            expectation_line.parsed_bug_modifiers = ['BUGX']
+            expectation_line.parsed_bug_modifiers = ['Bug(x)']
             expectation_line.name = 'Yay'
             expectation_line.parsed_expectations = set([IMAGE])
             expectation_line.matching_configurations = matching_configurations

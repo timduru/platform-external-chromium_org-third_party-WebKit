@@ -34,7 +34,6 @@
 #include "core/platform/SharedBuffer.h"
 #include "core/platform/graphics/BitmapImage.h"
 #include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/ImageObserver.h"
 #include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/transforms/AffineTransform.h"
 #include <wtf/MainThread.h>
@@ -86,6 +85,20 @@ void Image::fillWithSolidColor(GraphicsContext* ctxt, const FloatRect& dstRect, 
     ctxt->setCompositeOperation(!color.hasAlpha() && op == CompositeSourceOver ? CompositeCopy : op);
     ctxt->fillRect(dstRect, color, styleColorSpace);
     ctxt->setCompositeOperation(previousOperator);
+}
+
+FloatRect Image::adjustForNegativeSize(const FloatRect& rect)
+{
+    FloatRect norm = rect;
+    if (norm.width() < 0) {
+        norm.setX(norm.x() + norm.width());
+        norm.setWidth(-norm.width());
+    }
+    if (norm.height() < 0) {
+        norm.setY(norm.y() + norm.height());
+        norm.setHeight(-norm.height());
+    }
+    return norm;
 }
 
 void Image::draw(GraphicsContext* ctx, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator op, BlendMode blendMode, RespectImageOrientationEnum)
@@ -168,23 +181,6 @@ void Image::drawTiled(GraphicsContext* ctxt, const FloatRect& dstRect, const Flo
 
     startAnimation();
 }
-
-#if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
-FloatRect Image::adjustSourceRectForDownSampling(const FloatRect& srcRect, const IntSize& scaledSize) const
-{
-    const IntSize unscaledSize = size();
-    if (unscaledSize == scaledSize)
-        return srcRect;
-
-    // Image has been down-sampled.
-    float xscale = static_cast<float>(scaledSize.width()) / unscaledSize.width();
-    float yscale = static_cast<float>(scaledSize.height()) / unscaledSize.height();
-    FloatRect scaledSrcRect = srcRect;
-    scaledSrcRect.scale(xscale, yscale);
-
-    return scaledSrcRect;
-}
-#endif
 
 void Image::computeIntrinsicDimensions(Length& intrinsicWidth, Length& intrinsicHeight, FloatSize& intrinsicRatio)
 {

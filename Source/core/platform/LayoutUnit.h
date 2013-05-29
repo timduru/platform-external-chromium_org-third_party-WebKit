@@ -170,6 +170,12 @@ public:
         return fraction;
     }
 
+    bool mightBeSaturated() const
+    {
+        return rawValue() == std::numeric_limits<int>::max()
+            || rawValue() == std::numeric_limits<int>::min();
+    }
+
     static float epsilon() { return 1.0f / kFixedPointDenominator; }
 
     static const LayoutUnit max()
@@ -771,16 +777,6 @@ inline int roundToInt(LayoutUnit value)
 inline int floorToInt(LayoutUnit value)
 {
     return value.floor();
-}
-
-inline LayoutUnit roundedLayoutUnit(float value)
-{
-    return LayoutUnit::fromFloatRound(value);
-}
-
-inline LayoutUnit ceiledLayoutUnit(float value)
-{
-    return LayoutUnit::fromFloatCeil(value);
 }
 
 inline LayoutUnit absoluteValue(const LayoutUnit& value)

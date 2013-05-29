@@ -49,7 +49,7 @@ namespace WebCore {
 
     class TimelineRecordFactory {
     public:
-        static PassRefPtr<InspectorObject> createGenericRecord(double startTime, int maxCallStackDepth);
+        static PassRefPtr<InspectorObject> createGenericRecord(double startTime, int maxCallStackDepth, const String& type);
         static PassRefPtr<InspectorObject> createBackgroundRecord(double startTime, const String& thread);
 
         static PassRefPtr<InspectorObject> createGCEventData(const size_t usedHeapSizeDelta);
@@ -92,9 +92,11 @@ namespace WebCore {
 
         static PassRefPtr<InspectorObject> createAnimationFrameData(int callbackId);
 
-        static PassRefPtr<InspectorObject> createPaintData(const FloatQuad&, int layerRootNodeId);
+        static PassRefPtr<InspectorObject> createLayerData(long long layerRootNodeId);
 
-        static void appendLayoutRoot(InspectorObject* data, const FloatQuad&, int rootNodeId);
+        static PassRefPtr<InspectorObject> createPaintData(const FloatQuad&, long long layerRootNodeId);
+
+        static void appendLayoutRoot(InspectorObject* data, const FloatQuad&, long long rootNodeId);
 
         static void appendStyleRecalcDetails(InspectorObject* data, unsigned elementCount);
 

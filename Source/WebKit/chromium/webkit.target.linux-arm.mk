@@ -29,7 +29,6 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/platform/chromium/support/GraphicsContext3DPrivate.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/Platform.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebActiveGestureAnimation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebAudioBus.cpp \
@@ -121,6 +120,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/PageOverlay.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/PageOverlayList.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/PageWidgetDelegate.cpp \
+	third_party/WebKit/Source/WebKit/chromium/src/PopupContainer.cpp \
+	third_party/WebKit/Source/WebKit/chromium/src/PopupMenuChromium.cpp \
+	third_party/WebKit/Source/WebKit/chromium/src/PopupListBox.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/ScrollbarGroup.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/SharedWorkerRepository.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/SourceBufferPrivateImpl.cpp \
@@ -145,7 +147,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCachedURLRequest.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebColorName.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCommon.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebCompositorInputHandlerImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCrossOriginPreflightResultCache.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMActivityLogger.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMCustomEvent.cpp \
@@ -258,6 +259,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/WebWorkerClientImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebWorkerInfo.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebWorkerRunLoop.cpp \
+	third_party/WebKit/Source/WebKit/chromium/src/WorkerAllowMainThreadBridgeBase.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WorkerAsyncFileSystemChromium.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WorkerAsyncFileWriterChromium.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WorkerFileSystemCallbacksBridge.cpp \
@@ -310,6 +312,7 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
+	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
@@ -325,7 +328,7 @@ MY_DEFS := \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
-	'-DENABLE_ENCRYPTED_MEDIA=1' \
+	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
@@ -333,7 +336,6 @@ MY_DEFS := \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_DATALIST_ELEMENT=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_INPUT_TYPE_COLOR=0' \
@@ -341,12 +343,10 @@ MY_DEFS := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PAGE_POPUP=0' \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_8BIT_TEXTRUN=1' \
-	'-DENABLE_BINDING_INTEGRITY=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -388,8 +388,8 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/webkit \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/common \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/i18n \
+	$(PWD)/external/icu4c/common \
+	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/qcms/src \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/src/core \
@@ -406,9 +406,9 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/npapi \
 	$(LOCAL_PATH)/third_party/npapi/bindings \
 	$(LOCAL_PATH)/v8/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/frameworks/wilhelm/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/bionic \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/stlport/stlport
+	$(PWD)/frameworks/wilhelm/include \
+	$(PWD)/bionic \
+	$(PWD)/external/stlport/stlport
 
 LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES)
 

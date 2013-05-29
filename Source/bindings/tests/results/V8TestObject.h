@@ -25,15 +25,11 @@
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/WrapperTypeInfo.h"
-#include "wtf/HashMap.h"
-#include "wtf/text/StringHash.h"
-#include <v8.h>
 
 namespace WebCore {
 
 class V8TestObject {
 public:
-    static const bool hasDependentLifetime = false;
     static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
     static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
     static v8::Persistent<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
@@ -46,7 +42,7 @@ public:
     static v8::Handle<v8::Value> customMethodMethodCustom(const v8::Arguments&);
     static v8::Handle<v8::Value> customMethodWithArgsMethodCustom(const v8::Arguments&);
     static v8::Handle<v8::Value> classMethod2MethodCustom(const v8::Arguments&);
-    static v8::Handle<v8::Value> constructorCallback(const v8::Arguments&);
+    static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
     static v8::Handle<v8::Value> customAttrAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo&);
     static void customAttrAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::AccessorInfo&);
     static v8::Handle<v8::Value> indexedPropertyGetter(uint32_t, const v8::AccessorInfo&);
@@ -74,7 +70,7 @@ inline v8::Handle<v8::Object> wrap(TestObj* impl, v8::Handle<v8::Object> creatio
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl);
         // Might be a XXXConstructor::info instead of an XXX::info. These will both have
         // the same object de-ref functions, though, so use that as the basis of the check.
-        RELEASE_ASSERT(actualInfo->derefObjectFunction == V8TestObject::info.derefObjectFunction);
+        RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == V8TestObject::info.derefObjectFunction);
     }
     return V8TestObject::createWrapper(impl, creationContext, isolate);
 }

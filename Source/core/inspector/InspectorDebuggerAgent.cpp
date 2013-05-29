@@ -415,6 +415,16 @@ void InspectorDebuggerAgent::cancelPauseOnNextStatement()
     scriptDebugServer().setPauseOnNextStatement(false);
 }
 
+void InspectorDebuggerAgent::didFireTimer()
+{
+    cancelPauseOnNextStatement();
+}
+
+void InspectorDebuggerAgent::didHandleEvent()
+{
+    cancelPauseOnNextStatement();
+}
+
 void InspectorDebuggerAgent::pause(ErrorString*)
 {
     if (m_javaScriptPauseScheduled)
@@ -641,7 +651,7 @@ void InspectorDebuggerAgent::didParseSource(const String& scriptId, const Script
     String* sourceMapURLParam = sourceMapURL.isNull() ? 0 : &sourceMapURL;
     String sourceURL;
     if (!script.startLine && !script.startColumn)
-        sourceURL = ContentSearchUtils::findSourceURL(script.source);
+        sourceURL = ContentSearchUtils::findSourceURL(script.source, ContentSearchUtils::JavaScriptMagicComment);
     bool hasSourceURL = !sourceURL.isEmpty();
     String scriptURL = hasSourceURL ? sourceURL : script.url;
     bool* hasSourceURLParam = hasSourceURL ? &hasSourceURL : 0;

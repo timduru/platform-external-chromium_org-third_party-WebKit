@@ -84,16 +84,6 @@
 
 namespace WebCore {
 
-void ScriptController::initializeThreading()
-{
-    static bool initializedThreading = false;
-    if (!initializedThreading) {
-        WTF::initializeThreading();
-        WTF::initializeMainThread();
-        initializedThreading = true;
-    }
-}
-
 bool ScriptController::canAccessFromCurrentOrigin(Frame *frame)
 {
     return !v8::Context::InContext() || BindingSecurity::shouldAllowAccessToFrame(frame);
@@ -178,7 +168,13 @@ v8::Local<v8::Value> ScriptController::callFunction(v8::Handle<v8::Function> fun
     return ScriptController::callFunctionWithInstrumentation(m_frame ? m_frame->document() : 0, function, receiver, argc, args);
 }
 
-static inline void resourceInfo(const v8::Handle<v8::Function> function, String& resourceName, int& lineNumber)
+ScriptValue ScriptController::callFunctionEvenIfScriptDisabled(v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> argv[])
+{
+    // FIXME: This should probably perform the same isPaused check that happens in ScriptController::executeScript.
+    return ScriptValue(callFunction(function, receiver, argc, argv));
+}
+
+static void resourceInfo(const v8::Handle<v8::Function> function, String& resourceName, int& lineNumber)
 {
     v8::ScriptOrigin origin = function->GetScriptOrigin();
     if (origin.ResourceName().IsEmpty()) {
@@ -190,7 +186,7 @@ static inline void resourceInfo(const v8::Handle<v8::Function> function, String&
     }
 }
 
-static inline String resourceString(const v8::Handle<v8::Function> function)
+static String resourceString(const v8::Handle<v8::Function> function)
 {
     String resourceName;
     int lineNumber;
@@ -205,11 +201,6 @@ static inline String resourceString(const v8::Handle<v8::Function> function)
 
 v8::Local<v8::Value> ScriptController::callFunctionWithInstrumentation(ScriptExecutionContext* context, v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[])
 {
-    V8GCController::checkMemoryUsage();
-
-    if (V8RecursionScope::recursionLevel() >= kMaxRecursionDepth)
-        return handleMaxRecursionDepthExceeded();
-
     InspectorInstrumentationCookie cookie;
     if (InspectorInstrumentation::timelineAgentEnabled(context)) {
         String resourceName;
@@ -218,29 +209,15 @@ v8::Local<v8::Value> ScriptController::callFunctionWithInstrumentation(ScriptExe
         cookie = InspectorInstrumentation::willCallFunction(context, resourceName, lineNumber);
     }
 
-    v8::Local<v8::Value> result;
-    {
-        TRACE_EVENT1("v8", "v8.callFunction", "callsite", resourceString(function).utf8());
-        V8RecursionScope recursionScope(context);
-        result = function->Call(receiver, argc, args);
-    }
+    v8::Local<v8::Value> result = V8ScriptRunner::callFunction(function, context, receiver, argc, args);
 
     InspectorInstrumentation::didCallFunction(cookie);
-    crashIfV8IsDead();
     return result;
-}
-
-ScriptValue ScriptController::callFunctionEvenIfScriptDisabled(v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> argv[])
-{
-    // FIXME: This should probably perform the same isPaused check that happens in ScriptController::executeScript.
-    return ScriptValue(callFunction(function, receiver, argc, argv));
 }
 
 v8::Local<v8::Value> ScriptController::compileAndRunScript(const ScriptSourceCode& source)
 {
     ASSERT(v8::Context::InContext());
-
-    V8GCController::checkMemoryUsage();
 
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willEvaluateScript(m_frame, source.url().isNull() ? String() : source.url().string(), source.startLine());
 
@@ -253,16 +230,12 @@ v8::Local<v8::Value> ScriptController::compileAndRunScript(const ScriptSourceCod
         v8::TryCatch tryCatch;
         tryCatch.SetVerbose(true);
 
-        // Compile the script.
         v8::Handle<v8::String> code = v8String(source.source(), m_isolate);
-        TRACE_EVENT_BEGIN0("v8", "v8.compile");
-        OwnPtr<v8::ScriptData> scriptData = ScriptSourceCode::precompileScript(code, source.cachedScript());
+        OwnPtr<v8::ScriptData> scriptData = V8ScriptRunner::precompileScript(code, source.cachedScript());
 
         // NOTE: For compatibility with WebCore, ScriptSourceCode's line starts at
         // 1, whereas v8 starts at 0.
-        v8::Handle<v8::Script> script = ScriptSourceCode::compileScript(code, source.url(), source.startPosition(), scriptData.get(), m_isolate);
-        TRACE_EVENT_END0("v8", "v8.compile");
-        TRACE_EVENT0("v8", "v8.run");
+        v8::Handle<v8::Script> script = V8ScriptRunner::compileScript(code, source.url(), source.startPosition(), scriptData.get(), m_isolate);
 
         // Keep Frame (and therefore ScriptController) alive.
         RefPtr<Frame> protect(m_frame);
@@ -273,31 +246,6 @@ v8::Local<v8::Value> ScriptController::compileAndRunScript(const ScriptSourceCod
     InspectorInstrumentation::didEvaluateScript(cookie);
 
     return result;
-}
-
-ScriptValue ScriptController::evaluate(const ScriptSourceCode& sourceCode)
-{
-    String sourceURL = sourceCode.url();
-    const String* savedSourceURL = m_sourceURL;
-    m_sourceURL = &sourceURL;
-
-    v8::HandleScope handleScope;
-    v8::Handle<v8::Context> v8Context = ScriptController::mainWorldContext(m_frame);
-    if (v8Context.IsEmpty())
-        return ScriptValue();
-
-    v8::Context::Scope scope(v8Context);
-
-    RefPtr<Frame> protect(m_frame);
-
-    v8::Local<v8::Value> object = compileAndRunScript(sourceCode);
-
-    m_sourceURL = savedSourceURL;
-
-    if (object.IsEmpty())
-        return ScriptValue();
-
-    return ScriptValue(object);
 }
 
 bool ScriptController::initializeMainWorld()
@@ -349,40 +297,6 @@ V8DOMWindowShell* ScriptController::windowShell(DOMWrapperWorld* world)
             m_frame->loader()->dispatchDidClearWindowObjectInWorld(world);
     }
     return shell;
-}
-
-void ScriptController::evaluateInIsolatedWorld(int worldID, const Vector<ScriptSourceCode>& sources, int extensionGroup, Vector<ScriptValue>* results)
-{
-    ASSERT(worldID > 0);
-
-    v8::HandleScope handleScope;
-    v8::Local<v8::Array> v8Results;
-    {
-        v8::HandleScope evaluateHandleScope;
-        RefPtr<DOMWrapperWorld> world = DOMWrapperWorld::ensureIsolatedWorld(worldID, extensionGroup);
-        V8DOMWindowShell* isolatedWorldShell = windowShell(world.get());
-
-        if (!isolatedWorldShell->isContextInitialized())
-            return;
-
-        v8::Local<v8::Context> context = isolatedWorldShell->context();
-        v8::Context::Scope contextScope(context);
-        v8::Local<v8::Array> resultArray = v8::Array::New(sources.size());
-
-        for (size_t i = 0; i < sources.size(); ++i) {
-            v8::Local<v8::Value> evaluationResult = compileAndRunScript(sources[i]);
-            if (evaluationResult.IsEmpty())
-                evaluationResult = v8::Local<v8::Value>::New(v8::Undefined());
-            resultArray->Set(i, evaluationResult);
-        }
-
-        v8Results = evaluateHandleScope.Close(resultArray);
-    }
-
-    if (results && !v8Results.IsEmpty()) {
-        for (size_t i = 0; i < v8Results->Length(); ++i)
-            results->append(ScriptValue(v8Results->Get(i)));
-    }
 }
 
 bool ScriptController::shouldBypassMainWorldContentSecurityPolicy()
@@ -606,7 +520,6 @@ NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement
     return npCreateV8ScriptObject(0, v8::Handle<v8::Object>::Cast(v8plugin), window);
 }
 
-
 void ScriptController::clearWindowShell()
 {
     double start = currentTime();
@@ -709,10 +622,10 @@ ScriptValue ScriptController::executeScript(const ScriptSourceCode& sourceCode)
 
     RefPtr<Frame> protect(m_frame); // Script execution can destroy the frame, and thus the ScriptController.
 
-    return evaluate(sourceCode);
+    return executeScriptInMainWorld(sourceCode);
 }
 
-bool ScriptController::executeIfJavaScriptURL(const KURL& url)
+bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
 {
     if (!protocolIsJavaScript(url))
         return false;
@@ -748,6 +661,63 @@ bool ScriptController::executeIfJavaScriptURL(const KURL& url)
     if (RefPtr<DocumentLoader> loader = m_frame->document()->loader())
         loader->writer()->replaceDocument(scriptResult, ownerDocument.get());
     return true;
+}
+
+ScriptValue ScriptController::executeScriptInMainWorld(const ScriptSourceCode& sourceCode)
+{
+    String sourceURL = sourceCode.url();
+    const String* savedSourceURL = m_sourceURL;
+    m_sourceURL = &sourceURL;
+
+    v8::HandleScope handleScope;
+    v8::Handle<v8::Context> v8Context = ScriptController::mainWorldContext(m_frame);
+    if (v8Context.IsEmpty())
+        return ScriptValue();
+
+    v8::Context::Scope scope(v8Context);
+    RefPtr<Frame> protect(m_frame);
+    v8::Local<v8::Value> object = compileAndRunScript(sourceCode);
+
+    m_sourceURL = savedSourceURL;
+
+    if (object.IsEmpty())
+        return ScriptValue();
+
+    return ScriptValue(object);
+}
+
+void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<ScriptSourceCode>& sources, int extensionGroup, Vector<ScriptValue>* results)
+{
+    ASSERT(worldID > 0);
+
+    v8::HandleScope handleScope;
+    v8::Local<v8::Array> v8Results;
+    {
+        v8::HandleScope evaluateHandleScope;
+        RefPtr<DOMWrapperWorld> world = DOMWrapperWorld::ensureIsolatedWorld(worldID, extensionGroup);
+        V8DOMWindowShell* isolatedWorldShell = windowShell(world.get());
+
+        if (!isolatedWorldShell->isContextInitialized())
+            return;
+
+        v8::Local<v8::Context> context = isolatedWorldShell->context();
+        v8::Context::Scope contextScope(context);
+        v8::Local<v8::Array> resultArray = v8::Array::New(sources.size());
+
+        for (size_t i = 0; i < sources.size(); ++i) {
+            v8::Local<v8::Value> evaluationResult = compileAndRunScript(sources[i]);
+            if (evaluationResult.IsEmpty())
+                evaluationResult = v8::Local<v8::Value>::New(v8::Undefined());
+            resultArray->Set(i, evaluationResult);
+        }
+
+        v8Results = evaluateHandleScope.Close(resultArray);
+    }
+
+    if (results && !v8Results.IsEmpty()) {
+        for (size_t i = 0; i < v8Results->Length(); ++i)
+            results->append(ScriptValue(v8Results->Get(i)));
+    }
 }
 
 } // namespace WebCore

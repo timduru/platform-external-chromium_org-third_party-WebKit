@@ -202,12 +202,7 @@ public:
     void toggleContinuousSpellChecking();
     bool isGrammarCheckingEnabled();
     void ignoreSpelling();
-    void learnSpelling();
-    bool isSelectionUngrammatical();
-    String misspelledSelectionString() const;
     String misspelledWordAtCaretOrRange(Node* clickedNode) const;
-    Vector<String> guessesForUngrammaticalSelection();
-    Vector<String> guessesForMisspelledOrUngrammatical(bool& misspelled, bool& ungrammatical);
     bool isSpellCheckingEnabledInFocusedNode() const;
     bool isSpellCheckingEnabledFor(Node*) const;
     void markMisspellingsAfterTypingToWord(const VisiblePosition &wordStart, const VisibleSelection& selectionAfterTyping);
@@ -223,7 +218,6 @@ public:
 
     void advanceToNextMisspelling(bool startBeforeSelection = false);
     void showSpellingGuessPanel();
-    bool spellingPanelIsShowing();
 
     bool shouldBeginEditing(Range*);
     bool shouldEndEditing(Range*);
@@ -237,29 +231,25 @@ public:
     void didBeginEditing();
     void didEndEditing();
 
-    void showFontPanel();
-    void showStylesPanel();
-    void showColorPanel();
-    void toggleBold();
-    void toggleUnderline();
     void setBaseWritingDirection(WritingDirection);
 
     // smartInsertDeleteEnabled and selectTrailingWhitespaceEnabled are 
     // mutually exclusive, meaning that enabling one will disable the other.
     bool smartInsertDeleteEnabled();
     bool isSelectTrailingWhitespaceEnabled();
-    
-    bool hasBidiSelection() const;
 
     // international text input composition
     bool hasComposition() const { return m_compositionNode; }
     void setComposition(const String&, const Vector<CompositionUnderline>&, unsigned selectionStart, unsigned selectionEnd);
+    // Inserts the text that is being composed as a regular text.
+    // This method does nothing if composition node is not present.
     void confirmComposition();
-    void confirmComposition(const String&); // if no existing composition, replaces selection
+    // Inserts the given text string in the place of the existing composition, or replaces the selection if composition is not present.
+    void confirmComposition(const String& text);
+    // Deletes the existing composition text.
     void cancelComposition();
-    bool cancelCompositionIfSelectionIsInvalid();
+    void cancelCompositionIfSelectionIsInvalid();
     PassRefPtr<Range> compositionRange() const;
-    bool getCompositionSelection(unsigned& selectionStart, unsigned& selectionEnd) const;
     bool setSelectionOffsets(int selectionStart, int selectionEnd);
 
     // getting international text input composition state (for use by InlineTextBox)
@@ -371,8 +361,8 @@ private:
     String selectedText(TextIteratorBehavior) const;
 
     void selectComposition();
-    enum SetCompositionMode { ConfirmComposition, CancelComposition };
-    void setComposition(const String&, SetCompositionMode);
+    enum FinishCompositionMode { ConfirmComposition, CancelComposition };
+    void finishComposition(const String&, FinishCompositionMode);
 
     void changeSelectionAfterCommand(const VisibleSelection& newSelection, FrameSelection::SetSelectionOptions);
     void notifyComponentsOnChangedSelection(const VisibleSelection& oldSelection, FrameSelection::SetSelectionOptions);

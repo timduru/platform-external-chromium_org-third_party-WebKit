@@ -29,7 +29,6 @@
 #include "core/html/HTMLSelectElement.h"
 
 #include "HTMLNames.h"
-#include "bindings/v8/ScriptEventListener.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/EventNames.h"
@@ -41,11 +40,8 @@
 #include "core/html/FormController.h"
 #include "core/html/FormDataList.h"
 #include "core/html/HTMLFormElement.h"
-#include "core/html/HTMLOptGroupElement.h"
 #include "core/html/HTMLOptionElement.h"
 #include "core/html/HTMLOptionsCollection.h"
-#include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
@@ -307,7 +303,7 @@ void HTMLSelectElement::parseAttribute(const QualifiedName& name, const AtomicSt
         m_size = size;
         setNeedsValidityCheck();
         if (m_size != oldSize && attached()) {
-            reattach();
+            lazyReattach();
             setRecalcListItems();
         }
     } else if (name == multipleAttr)
@@ -1012,7 +1008,7 @@ void HTMLSelectElement::parseMultipleAttribute(const AtomicString& value)
     m_multiple = !value.isNull();
     setNeedsValidityCheck();
     if (oldUsesMenuList != usesMenuList())
-        reattachIfAttached();
+        lazyReattachIfAttached();
 }
 
 bool HTMLSelectElement::appendFormData(FormDataList& list, bool)

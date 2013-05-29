@@ -38,11 +38,8 @@
 #include "core/platform/graphics/SimpleFontData.h"
 #include "core/platform/graphics/harfbuzz/HarfBuzzShaper.h"
 
-#include "SkCanvas.h"
 #include "SkPaint.h"
 #include "SkTemplates.h"
-#include "SkTypeface.h"
-#include "SkUtils.h"
 
 #include <wtf/unicode/Unicode.h>
 
@@ -60,7 +57,7 @@ bool Font::canExpandAroundIdeographsInComplexText()
 
 void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
                       const GlyphBuffer& glyphBuffer,  int from, int numGlyphs,
-                      const FloatPoint& point) const {
+                      const FloatPoint& point, const FloatRect& textRect) const {
     SkASSERT(sizeof(GlyphBufferGlyph) == sizeof(uint16_t)); // compile-time assert
 
     const GlyphBufferGlyph* glyphs = glyphBuffer.glyphs(from);
@@ -107,10 +104,10 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
                 path.reset();
                 path.moveTo(vPosBegin[i]);
                 path.lineTo(vPosEnd[i]);
-                gc->drawTextOnPath(glyphs + i, 2, path, 0, paint);
+                gc->drawTextOnPath(glyphs + i, 2, path, textRect, 0, paint);
             }
         } else
-            gc->drawPosText(glyphs, numGlyphs << 1, pos, paint);
+            gc->drawPosText(glyphs, numGlyphs << 1, pos, textRect, paint);
     }
 
     if ((textMode & TextModeStroke)
@@ -136,10 +133,10 @@ void Font::drawGlyphs(GraphicsContext* gc, const SimpleFontData* font,
                 path.reset();
                 path.moveTo(vPosBegin[i]);
                 path.lineTo(vPosEnd[i]);
-                gc->drawTextOnPath(glyphs + i, 2, path, 0, paint);
+                gc->drawTextOnPath(glyphs + i, 2, path, textRect, 0, paint);
             }
         } else
-            gc->drawPosText(glyphs, numGlyphs << 1, pos, paint);
+            gc->drawPosText(glyphs, numGlyphs << 1, pos, textRect, paint);
     }
 }
 
@@ -149,10 +146,9 @@ static void setupForTextPainting(SkPaint* paint, SkColor color)
     paint->setColor(color);
 }
 
-void Font::drawComplexText(GraphicsContext* gc, const TextRun& run,
-                           const FloatPoint& point, int from, int to) const
+void Font::drawComplexText(GraphicsContext* gc, const TextRunPaintInfo& runInfo, const FloatPoint& point) const
 {
-    if (!run.length())
+    if (!runInfo.run.length())
         return;
 
     TextDrawingModeFlags textMode = gc->textDrawingMode();
@@ -175,15 +171,15 @@ void Font::drawComplexText(GraphicsContext* gc, const TextRun& run,
     }
 
     GlyphBuffer glyphBuffer;
-    HarfBuzzShaper shaper(this, run);
-    shaper.setDrawRange(from, to);
+    HarfBuzzShaper shaper(this, runInfo.run);
+    shaper.setDrawRange(runInfo.from, runInfo.to);
     if (!shaper.shape(&glyphBuffer))
         return;
     FloatPoint adjustedPoint = shaper.adjustStartPoint(point);
-    drawGlyphBuffer(gc, run, glyphBuffer, adjustedPoint);
+    drawGlyphBuffer(gc, runInfo, glyphBuffer, adjustedPoint);
 }
 
-void Font::drawEmphasisMarksForComplexText(GraphicsContext* /* context */, const TextRun& /* run */, const AtomicString& /* mark */, const FloatPoint& /* point */, int /* from */, int /* to */) const
+void Font::drawEmphasisMarksForComplexText(GraphicsContext* /* context */, const TextRunPaintInfo& /* runInfo */, const AtomicString& /* mark */, const FloatPoint& /* point */) const
 {
     notImplemented();
 }

@@ -1422,9 +1422,7 @@ bool RenderThemeChromiumMac::paintSliderTrack(RenderObject* o, const PaintInfo& 
     CGContextRef context = localContext.cgContext();
     CGColorSpaceRef cspace = deviceRGBColorSpaceRef();
 
-#if ENABLE(DATALIST_ELEMENT)
     paintSliderTicks(o, paintInfo, r);
-#endif
 
     GraphicsContextStateSaver stateSaver(*paintInfo.context);
     CGContextClipToRect(context, bounds);
@@ -1719,7 +1717,6 @@ bool RenderThemeChromiumMac::paintSearchFieldResultsDecoration(RenderObject* o, 
     return false;
 }
 
-#if ENABLE(DATALIST_ELEMENT)
 IntSize RenderThemeChromiumMac::sliderTickSize() const
 {
     return IntSize(1, 3);
@@ -1729,7 +1726,6 @@ int RenderThemeChromiumMac::sliderTickOffsetFromTrackCenter() const
 {
     return -9;
 }
-#endif
 
 const int sliderThumbWidth = 15;
 const int sliderThumbHeight = 15;
@@ -1855,11 +1851,6 @@ PassRefPtr<RenderTheme> RenderThemeChromiumMac::create()
     return adoptRef(new RenderThemeChromiumMac);
 }
 
-bool RenderThemeChromiumMac::supportsDataListUI(const AtomicString& type) const
-{
-    return RenderThemeChromiumCommon::supportsDataListUI(type);
-}
-
 bool RenderThemeChromiumMac::usesTestModeFocusRingColor() const
 {
     return isRunningLayoutTest();
@@ -1931,20 +1922,6 @@ String RenderThemeChromiumMac::extraDefaultStyleSheet()
            String(themeChromiumUserAgentStyleSheet, sizeof(themeChromiumUserAgentStyleSheet));
 }
 
-#if ENABLE(DATALIST_ELEMENT)
-LayoutUnit RenderThemeChromiumMac::sliderTickSnappingThreshold() const
-{
-    return RenderThemeChromiumCommon::sliderTickSnappingThreshold();
-}
-#endif
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI) && ENABLE(CALENDAR_PICKER)
-bool RenderThemeChromiumMac::supportsCalendarPicker(const AtomicString& type) const
-{
-    return RenderThemeChromiumCommon::supportsCalendarPicker(type);
-}
-#endif
-
 bool RenderThemeChromiumMac::paintMediaVolumeSliderContainer(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
     return true;
@@ -1983,6 +1960,14 @@ bool RenderThemeChromiumMac::paintMediaFullscreenButton(RenderObject* object, co
 bool RenderThemeChromiumMac::paintMediaToggleClosedCaptionsButton(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
 {
     return RenderMediaControlsChromium::paintMediaControlsPart(MediaShowClosedCaptionsButton, object, paintInfo, rect);
+}
+
+bool RenderThemeChromiumMac::shouldUseFallbackTheme(RenderStyle* style) const
+{
+    ControlPart part = style->appearance();
+    if (part == CheckboxPart || part == RadioPart)
+        return style->effectiveZoom() != 1;
+    return false;
 }
 
 } // namespace WebCore

@@ -115,13 +115,7 @@ static void buildNodeHighlight(Node* node, const HighlightConfig& highlightConfi
     IntRect titleAnchorBox = boundingBox;
 
     // RenderSVGRoot should be highlighted through the isBox() code path, all other SVG elements should just dump their absoluteQuads().
-#if ENABLE(SVG)
-    bool isSVGRenderer = renderer->node() && renderer->node()->isSVGElement() && !renderer->isSVGRoot();
-#else
-    bool isSVGRenderer = false;
-#endif
-
-    if (isSVGRenderer) {
+    if (renderer->node() && renderer->node()->isSVGElement() && !renderer->isSVGRoot()) {
         highlight->type = HighlightTypeRects;
         renderer->absoluteQuads(highlight->quads);
         for (size_t i = 0; i < highlight->quads.size(); ++i)
@@ -195,6 +189,7 @@ InspectorOverlay::InspectorOverlay(Page* page, InspectorClient* client)
     : m_page(page)
     , m_client(client)
     , m_drawViewSize(false)
+    , m_drawViewSizeWithGrid(false)
     , m_timer(this, &InspectorOverlay::onTimer)
 {
 }
@@ -266,9 +261,10 @@ void InspectorOverlay::highlightQuad(PassOwnPtr<FloatQuad> quad, const Highlight
     update();
 }
 
-void InspectorOverlay::showAndHideViewSize()
+void InspectorOverlay::showAndHideViewSize(bool showGrid)
 {
     m_drawViewSize = true;
+    m_drawViewSizeWithGrid = showGrid;
     update();
     m_timer.startOneShot(1);
 }
@@ -324,6 +320,7 @@ void InspectorOverlay::hide()
     m_pausedInDebuggerMessage = String();
     m_size = IntSize();
     m_drawViewSize = false;
+    m_drawViewSizeWithGrid = false;
     update();
 }
 
@@ -443,7 +440,7 @@ void InspectorOverlay::drawPausedInDebuggerMessage()
 void InspectorOverlay::drawViewSize()
 {
     if (m_drawViewSize)
-        evaluateInOverlay("drawViewSize", m_pausedInDebuggerMessage);
+        evaluateInOverlay("drawViewSize", m_drawViewSizeWithGrid ? "true" : "false");
 }
 
 Page* InspectorOverlay::overlayPage()
@@ -512,7 +509,7 @@ void InspectorOverlay::evaluateInOverlay(const String& method, const String& arg
     RefPtr<InspectorArray> command = InspectorArray::create();
     command->pushString(method);
     command->pushString(argument);
-    overlayPage()->mainFrame()->script()->evaluate(ScriptSourceCode(makeString("dispatch(", command->toJSONString(), ")")));
+    overlayPage()->mainFrame()->script()->executeScriptInMainWorld(ScriptSourceCode("dispatch(" + command->toJSONString() + ")"));
 }
 
 void InspectorOverlay::evaluateInOverlay(const String& method, PassRefPtr<InspectorValue> argument)
@@ -520,7 +517,7 @@ void InspectorOverlay::evaluateInOverlay(const String& method, PassRefPtr<Inspec
     RefPtr<InspectorArray> command = InspectorArray::create();
     command->pushString(method);
     command->pushValue(argument);
-    overlayPage()->mainFrame()->script()->evaluate(ScriptSourceCode(makeString("dispatch(", command->toJSONString(), ")")));
+    overlayPage()->mainFrame()->script()->executeScriptInMainWorld(ScriptSourceCode("dispatch(" + command->toJSONString() + ")"));
 }
 
 void InspectorOverlay::onTimer(Timer<InspectorOverlay>*)

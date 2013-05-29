@@ -36,6 +36,7 @@
 #include <wtf/UnusedParam.h>
 #include <wtf/Vector.h>
 #include "HTMLNames.h"
+#include "SVGNames.h"
 #include "XMLNSNames.h"
 #include "bindings/v8/ScriptSourceCode.h"
 #include "bindings/v8/ScriptValue.h"
@@ -60,19 +61,16 @@
 #include "core/loader/cache/CachedScript.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
+#include "core/page/UseCounter.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceHandle.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/network/ResourceResponse.h"
+#include "core/svg/SVGStyleElement.h"
 #include "core/xml/XMLErrors.h"
 #include "core/xml/XMLTreeViewer.h"
 #include "core/xml/parser/XMLDocumentParserScope.h"
 #include "weborigin/SecurityOrigin.h"
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#include "core/svg/SVGStyleElement.h"
-#endif
 
 using namespace std;
 
@@ -456,7 +454,7 @@ void XMLDocumentParser::notifyFinished(CachedResource* unusedResource)
 
     // JavaScript can detach this parser, make sure it's kept alive even if detached.
     RefPtr<XMLDocumentParser> protect(this);
-    
+
     if (errorOccurred)
         scriptElement->dispatchErrorEvent();
     else if (!wasCanceled) {
@@ -734,6 +732,8 @@ XMLDocumentParser::XMLDocumentParser(Document* document, FrameView* frameView)
     , m_scriptStartPosition(TextPosition::belowRangePosition())
     , m_parsingFragment(false)
 {
+    // This is XML being used as a document resource.
+    UseCounter::count(document, UseCounter::XMLDocument);
 }
 
 XMLDocumentParser::XMLDocumentParser(DocumentFragment* fragment, Element* parentElement, ParserContentPolicy parserContentPolicy)

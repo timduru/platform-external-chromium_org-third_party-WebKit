@@ -121,14 +121,12 @@ void SpinButtonElement::defaultEventHandler(Event* event)
                 if (Frame* frame = document()->frame()) {
                     frame->eventHandler()->setCapturingMouseEventsNode(this);
                     m_capturing = true;
-                    if (Page* page = document()->page()) {
-                        if (page->chrome())
-                            page->chrome()->registerPopupOpeningObserver(this);
-                    }
+                    if (Page* page = document()->page())
+                        page->chrome().registerPopupOpeningObserver(this);
                 }
             }
             UpDownState oldUpDownState = m_upDownState;
-            m_upDownState = local.y() < box->height() / 2 ? Up : Down;
+            m_upDownState = (local.y() < box->height() / 2) ? Up : Down;
             if (m_upDownState != oldUpDownState)
                 renderer()->repaint();
         } else {
@@ -199,10 +197,8 @@ void SpinButtonElement::releaseCapture()
         if (Frame* frame = document()->frame()) {
             frame->eventHandler()->setCapturingMouseEventsNode(0);
             m_capturing = false;
-            if (Page* page = document()->page()) {
-                if (page->chrome())
-                    page->chrome()->unregisterPopupOpeningObserver(this);
-            }
+            if (Page* page = document()->page())
+                page->chrome().unregisterPopupOpeningObserver(this);
         }
     }
 }

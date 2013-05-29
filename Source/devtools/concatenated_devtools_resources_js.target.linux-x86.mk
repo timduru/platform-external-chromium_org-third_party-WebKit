@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "concatenate_devtools_resources_js":
 $(gyp_shared_intermediate_dir)/resources/inspector/ResourcesPanel.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/resources/inspector/ResourcesPanel.js: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/resources/inspector/ResourcesPanel.js: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/resources/inspector/ResourcesPanel.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/resources/inspector/ResourcesPanel.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/resources/inspector/ResourcesPanel.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/resources/inspector/ResourcesPanel.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/inline_js_imports.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/ApplicationCacheItemsView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/DOMStorageItemsView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/DatabaseQueryView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/DatabaseTableView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/DirectoryContentView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/FileContentView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/FileSystemView.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/IndexedDBViews.js $(LOCAL_PATH)/third_party/WebKit/Source/devtools/front_end/ResourcesPanel.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_devtools_devtools_gyp_concatenated_devtools_resources_js_target_concatenate_devtools_resources_js ($@)"

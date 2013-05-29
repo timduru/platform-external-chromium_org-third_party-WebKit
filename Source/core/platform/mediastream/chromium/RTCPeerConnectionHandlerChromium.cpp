@@ -36,10 +36,7 @@
 #include "core/platform/mediastream/MediaStreamComponent.h"
 #include "core/platform/mediastream/RTCConfiguration.h"
 #include "core/platform/mediastream/RTCDTMFSenderHandler.h"
-#include "core/platform/mediastream/RTCDataChannelHandlerClient.h"
-#include "core/platform/mediastream/RTCIceCandidateDescriptor.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandlerClient.h"
-#include "core/platform/mediastream/RTCSessionDescriptionDescriptor.h"
 #include "core/platform/mediastream/RTCSessionDescriptionRequest.h"
 #include "core/platform/mediastream/RTCStatsRequest.h"
 #include "core/platform/mediastream/RTCVoidRequest.h"
@@ -107,12 +104,12 @@ void RTCPeerConnectionHandlerChromium::createAnswer(PassRefPtr<RTCSessionDescrip
     m_webHandler->createAnswer(request, constraints);
 }
 
-void RTCPeerConnectionHandlerChromium::setLocalDescription(PassRefPtr<RTCVoidRequest> request, PassRefPtr<RTCSessionDescriptionDescriptor> sessionDescription)
+void RTCPeerConnectionHandlerChromium::setLocalDescription(PassRefPtr<RTCVoidRequest> request, WebKit::WebRTCSessionDescription sessionDescription)
 {
     m_webHandler->setLocalDescription(request, sessionDescription);
 }
 
-void RTCPeerConnectionHandlerChromium::setRemoteDescription(PassRefPtr<RTCVoidRequest> request, PassRefPtr<RTCSessionDescriptionDescriptor> sessionDescription)
+void RTCPeerConnectionHandlerChromium::setRemoteDescription(PassRefPtr<RTCVoidRequest> request, WebKit::WebRTCSessionDescription sessionDescription)
 {
     m_webHandler->setRemoteDescription(request, sessionDescription);
 }
@@ -122,17 +119,17 @@ bool RTCPeerConnectionHandlerChromium::updateIce(PassRefPtr<RTCConfiguration> co
     return m_webHandler->updateICE(configuration, constraints);
 }
 
-bool RTCPeerConnectionHandlerChromium::addIceCandidate(PassRefPtr<RTCIceCandidateDescriptor> iceCandidate)
+bool RTCPeerConnectionHandlerChromium::addIceCandidate(WebKit::WebRTCICECandidate iceCandidate)
 {
     return m_webHandler->addICECandidate(iceCandidate);
 }
 
-PassRefPtr<RTCSessionDescriptionDescriptor> RTCPeerConnectionHandlerChromium::localDescription()
+WebKit::WebRTCSessionDescription RTCPeerConnectionHandlerChromium::localDescription()
 {
     return m_webHandler->localDescription();
 }
 
-PassRefPtr<RTCSessionDescriptionDescriptor> RTCPeerConnectionHandlerChromium::remoteDescription()
+WebKit::WebRTCSessionDescription RTCPeerConnectionHandlerChromium::remoteDescription()
 {
     return m_webHandler->remoteDescription();
 }

@@ -22,12 +22,10 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/rendering/svg/RenderSVGViewportContainer.h"
 
 #include "SVGNames.h"
 #include "core/platform/graphics/GraphicsContext.h"
-#include "core/rendering/RenderView.h"
 #include "core/svg/SVGElementInstance.h"
 #include "core/svg/SVGSVGElement.h"
 #include "core/svg/SVGUseElement.h"
@@ -161,5 +159,3 @@ void RenderSVGViewportContainer::paint(PaintInfo& paintInfo, const LayoutPoint& 
 }
 
 }
-
-#endif // ENABLE(SVG)

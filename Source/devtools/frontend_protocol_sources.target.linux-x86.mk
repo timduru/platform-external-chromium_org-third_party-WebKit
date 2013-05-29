@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "generateInspectorProtocolFrontendSources":
 $(gyp_shared_intermediate_dir)/webcore/InspectorBackendCommands.js: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webcore/InspectorBackendCommands.js: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webcore/InspectorBackendCommands.js: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webcore/InspectorBackendCommands.js: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webcore/InspectorBackendCommands.js: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webcore/InspectorBackendCommands.js: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webcore/InspectorBackendCommands.js: $(LOCAL_PATH)/third_party/WebKit/Source/devtools/scripts/CodeGeneratorFrontend.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/protocol.json $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Generating Inspector protocol frontend sources from protocol.json ($@)"

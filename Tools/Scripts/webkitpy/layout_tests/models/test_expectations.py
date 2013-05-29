@@ -48,6 +48,10 @@ _log = logging.getLogger(__name__)
 # FIXME: Perhas these two routines should be part of the Port instead?
 BASELINE_SUFFIX_LIST = ('png', 'wav', 'txt')
 
+WEBKIT_BUG_PREFIX = 'webkit.org/b/'
+CHROMIUM_BUG_PREFIX = 'crbug.com/'
+V8_BUG_PREFIX = 'code.google.com/p/v8/issues/detail?id='
+NAMED_BUG_PREFIX = 'Bug('
 
 class ParseError(Exception):
     def __init__(self, warnings):
@@ -64,9 +68,6 @@ class ParseError(Exception):
 class TestExpectationParser(object):
     """Provides parsing facilities for lines in the test_expectation.txt file."""
 
-    DUMMY_BUG_MODIFIER = "bug_dummy"
-    BUG_MODIFIER_PREFIX = 'bug'
-    BUG_MODIFIER_REGEX = 'bug\d+'
     REBASELINE_MODIFIER = 'rebaseline'
     PASS_EXPECTATION = 'pass'
     SKIP_MODIFIER = 'skip'
@@ -93,21 +94,30 @@ class TestExpectationParser(object):
             expectation_lines.append(test_expectation)
         return expectation_lines
 
+    def _create_expectation_line(self, test_name, expectations, file_name):
+        expectation_line = TestExpectationLine()
+        expectation_line.original_string = test_name
+        expectation_line.name = test_name
+        expectation_line.filename = file_name
+        expectation_line.line_number = 0
+        expectation_line.expectations = expectations
+        return expectation_line
+
+    def expectation_line_for_test(self, test_name, expectations):
+        expectation_line = self._create_expectation_line(test_name, expectations, '<Bot TestExpectations>')
+        self._parse_line(expectation_line)
+        return expectation_line
+
+
     def expectation_for_skipped_test(self, test_name):
         if not self._port.test_exists(test_name):
             _log.warning('The following test %s from the Skipped list doesn\'t exist' % test_name)
-        expectation_line = TestExpectationLine()
-        expectation_line.original_string = test_name
-        expectation_line.modifiers = [TestExpectationParser.DUMMY_BUG_MODIFIER, TestExpectationParser.SKIP_MODIFIER]
+        expectation_line = self._create_expectation_line(test_name, [TestExpectationParser.PASS_EXPECTATION], '<Skipped file>')
         # FIXME: It's not clear what the expectations for a skipped test should be; the expectations
         # might be different for different entries in a Skipped file, or from the command line, or from
         # only running parts of the tests. It's also not clear if it matters much.
-        expectation_line.modifiers.append(TestExpectationParser.WONTFIX_MODIFIER)
-        expectation_line.name = test_name
-        # FIXME: we should pass in a more descriptive string here.
-        expectation_line.filename = '<Skipped file>'
-        expectation_line.line_number = 0
-        expectation_line.expectations = [TestExpectationParser.PASS_EXPECTATION]
+        expectation_line.modifiers = [TestExpectationParser.SKIP_MODIFIER, TestExpectationParser.WONTFIX_MODIFIER]
+        expectation_line.is_skipped_outside_expectations_file = True
         self._parse_line(expectation_line)
         return expectation_line
 
@@ -140,19 +150,19 @@ class TestExpectationParser(object):
         if self.SLOW_MODIFIER in modifiers and self.TIMEOUT_EXPECTATION in expectations:
             expectation_line.warnings.append('A test can not be both SLOW and TIMEOUT. If it times out indefinitely, then it should be just TIMEOUT.')
 
-        for modifier in modifiers:
-            if modifier in TestExpectations.MODIFIERS:
-                expectation_line.parsed_modifiers.append(modifier)
-                if modifier == self.WONTFIX_MODIFIER:
-                    has_wontfix = True
-            elif modifier.startswith(self.BUG_MODIFIER_PREFIX):
+        for modifier in expectation_line.modifiers:
+            if modifier.startswith(WEBKIT_BUG_PREFIX) or modifier.startswith(CHROMIUM_BUG_PREFIX) or modifier.startswith(V8_BUG_PREFIX) or modifier.startswith(NAMED_BUG_PREFIX):
                 has_bugid = True
-                if re.match(self.BUG_MODIFIER_REGEX, modifier):
-                    expectation_line.warnings.append('BUG\d+ is not allowed, must be one of BUGCR\d+, BUGWK\d+, BUGV8_\d+, or a non-numeric bug identifier.')
-                else:
-                    expectation_line.parsed_bug_modifiers.append(modifier)
+                expectation_line.parsed_bug_modifiers.append(modifier)
             else:
-                parsed_specifiers.add(modifier)
+                # FIXME: Store the unmodified modifier.
+                modifier = modifier.lower()
+                if modifier in TestExpectations.MODIFIERS:
+                    expectation_line.parsed_modifiers.append(modifier)
+                    if modifier == self.WONTFIX_MODIFIER:
+                        has_wontfix = True
+                else:
+                    parsed_specifiers.add(modifier)
 
         if not expectation_line.parsed_bug_modifiers and not has_wontfix and not has_bugid and self._port.warn_if_bug_missing_in_test_expectations():
             expectation_line.warnings.append(self.MISSING_BUG_WARNING)
@@ -275,36 +285,29 @@ class TestExpectationParser(object):
         expectations = []
         warnings = []
 
-        WEBKIT_BUG_PREFIX = 'webkit.org/b/'
-        CHROMIUM_BUG_PREFIX = 'crbug.com/'
-        V8_BUG_PREFIX = 'code.google.com/p/v8/issues/detail?id='
-
         tokens = remaining_string.split()
         state = 'start'
         for token in tokens:
             if (token.startswith(WEBKIT_BUG_PREFIX) or
                 token.startswith(CHROMIUM_BUG_PREFIX) or
                 token.startswith(V8_BUG_PREFIX) or
-                token.startswith('Bug(')):
+                token.startswith(NAMED_BUG_PREFIX)):
                 if state != 'start':
                     warnings.append('"%s" is not at the start of the line.' % token)
                     break
                 if token.startswith(WEBKIT_BUG_PREFIX):
-                    bugs.append(token.replace(WEBKIT_BUG_PREFIX, 'BUGWK'))
+                    bugs.append(token)
                 elif token.startswith(CHROMIUM_BUG_PREFIX):
-                    bugs.append(token.replace(CHROMIUM_BUG_PREFIX, 'BUGCR'))
+                    bugs.append(token)
                 elif token.startswith(V8_BUG_PREFIX):
-                    bugs.append(token.replace(V8_BUG_PREFIX, 'BUGV8_'))
+                    bugs.append(token)
                 else:
                     match = re.match('Bug\((\w+)\)$', token)
                     if not match:
                         warnings.append('unrecognized bug identifier "%s"' % token)
                         break
                     else:
-                        bugs.append('BUG' + match.group(1).upper())
-            elif token.startswith('BUG'):
-                warnings.append('unrecognized old-style bug identifier "%s"' % token)
-                break
+                        bugs.append(token)
             elif token == '[':
                 if state == 'start':
                     state = 'configuration'
@@ -389,6 +392,24 @@ class TestExpectationLine(object):
         self.comment = None
         self.matching_tests = []
         self.warnings = []
+        self.is_skipped_outside_expectations_file = False
+
+    def __eq__(self, other):
+        return (self.original_string == other.original_string
+            and self.filename == other.filename
+            and self.line_number == other.line_number
+            and self.name == other.name
+            and self.path == other.path
+            and self.modifiers == other.modifiers
+            and self.parsed_modifiers == other.parsed_modifiers
+            and self.parsed_bug_modifiers == other.parsed_bug_modifiers
+            and self.matching_configurations == other.matching_configurations
+            and self.expectations == other.expectations
+            and self.parsed_expectations == other.parsed_expectations
+            and self.comment == other.comment
+            and self.matching_tests == other.matching_tests
+            and self.warnings == other.warnings
+            and self.is_skipped_outside_expectations_file == other.is_skipped_outside_expectations_file)
 
     def is_invalid(self):
         return self.warnings and self.warnings != [TestExpectationParser.MISSING_BUG_WARNING]
@@ -448,23 +469,28 @@ class TestExpectationLine(object):
         return ' '.join(result)
 
     @staticmethod
+    def _filter_redundant_expectations(expectations):
+        if set(expectations) == set(['Pass', 'Skip']):
+            return ['Skip']
+        if set(expectations) == set(['Pass', 'Slow']):
+            return ['Slow']
+        return expectations
+
+    @staticmethod
     def _format_line(modifiers, name, expectations, comment, include_modifiers=True, include_expectations=True, include_comment=True):
         bugs = []
         new_modifiers = []
         new_expectations = []
         for modifier in modifiers:
-            modifier = modifier.upper()
-            if modifier.startswith('BUGWK'):
-                bugs.append('webkit.org/b/' + modifier.replace('BUGWK', ''))
-            elif modifier.startswith('BUGCR'):
-                bugs.append('crbug.com/' + modifier.replace('BUGCR', ''))
-            elif modifier.startswith('BUG'):
-                # FIXME: we should preserve case once we can drop the old syntax.
-                bugs.append('Bug(' + modifier[3:].lower() + ')')
-            elif modifier in ('SLOW', 'SKIP', 'REBASELINE', 'WONTFIX'):
-                new_expectations.append(TestExpectationParser._inverted_expectation_tokens.get(modifier))
+            if modifier.startswith(WEBKIT_BUG_PREFIX) or modifier.startswith(CHROMIUM_BUG_PREFIX) or modifier.startswith(V8_BUG_PREFIX) or modifier.startswith(NAMED_BUG_PREFIX):
+                bugs.append(modifier)
             else:
-                new_modifiers.append(TestExpectationParser._inverted_configuration_tokens.get(modifier, modifier))
+                # FIXME: Make this all work with the mixed-cased modifiers (e.g. WontFix, Slow, etc).
+                modifier = modifier.upper()
+                if modifier in ('SLOW', 'SKIP', 'REBASELINE', 'WONTFIX'):
+                    new_expectations.append(TestExpectationParser._inverted_expectation_tokens.get(modifier))
+                else:
+                    new_modifiers.append(TestExpectationParser._inverted_configuration_tokens.get(modifier, modifier))
 
         for expectation in expectations:
             expectation = expectation.upper()
@@ -477,7 +503,8 @@ class TestExpectationLine(object):
             if new_modifiers:
                 result += '[ %s ] ' % ' '.join(new_modifiers)
         result += name
-        if include_expectations and new_expectations and set(new_expectations) != set(['Skip', 'Pass']):
+        if include_expectations and new_expectations:
+            new_expectations = TestExpectationLine._filter_redundant_expectations(new_expectations)
             result += ' [ %s ]' % ' '.join(sorted(set(new_expectations)))
         if include_comment and comment is not None:
             result += " #%s" % comment
@@ -572,6 +599,15 @@ class TestExpectationsModel(object):
     def get_expectations_string(self, test):
         """Returns the expectatons for the given test as an uppercase string.
         If there are no expectations for the test, then "PASS" is returned."""
+        if self.get_expectation_line(test).is_skipped_outside_expectations_file:
+            return 'NOTRUN'
+
+        if self.has_modifier(test, WONTFIX):
+            return TestExpectationParser.WONTFIX_MODIFIER.upper()
+
+        if self.has_modifier(test, SKIP):
+            return TestExpectationParser.SKIP_MODIFIER.upper()
+
         expectations = self.get_expectations(test)
         retval = []
 
@@ -585,6 +621,9 @@ class TestExpectationsModel(object):
         for item in TestExpectations.EXPECTATIONS.items():
             if item[1] == expectation:
                 return item[0].upper()
+        for item in TestExpectations.MODIFIERS.items():
+            if item[1] == expectation:
+                return item[0].upper()
         raise ValueError(expectation)
 
     def remove_expectation_line(self, test):
@@ -593,14 +632,14 @@ class TestExpectationsModel(object):
         self._clear_expectations_for_test(test)
         del self._test_to_expectation_line[test]
 
-    def add_expectation_line(self, expectation_line, in_skipped=False):
+    def add_expectation_line(self, expectation_line, override_existing_matches=False):
         """Returns a list of warnings encountered while matching modifiers."""
 
         if expectation_line.is_invalid():
             return
 
         for test in expectation_line.matching_tests:
-            if not in_skipped and self._already_seen_better_match(test, expectation_line):
+            if not override_existing_matches and self._already_seen_better_match(test, expectation_line):
                 continue
 
             self._clear_expectations_for_test(test)
@@ -875,7 +914,8 @@ class TestExpectations(object):
             expectations_dict_index += 1
 
         # FIXME: move ignore_tests into port.skipped_layout_tests()
-        self.add_skipped_tests(port.skipped_layout_tests(tests).union(set(port.get_option('ignore_tests', []))))
+        self.add_extra_skipped_tests(port.skipped_layout_tests(tests).union(set(port.get_option('ignore_tests', []))))
+        self.add_flaky_expectations_from_bot()
 
         self._has_warnings = False
         self._report_warnings()
@@ -997,7 +1037,7 @@ class TestExpectations(object):
             if self._model_all_expectations or self._test_config in expectation_line.matching_configurations:
                 self._model.add_expectation_line(expectation_line)
 
-    def add_skipped_tests(self, tests_to_skip):
+    def add_extra_skipped_tests(self, tests_to_skip):
         if not tests_to_skip:
             return
         for test in self._expectations:
@@ -1006,7 +1046,15 @@ class TestExpectations(object):
 
         for test_name in tests_to_skip:
             expectation_line = self._parser.expectation_for_skipped_test(test_name)
-            self._model.add_expectation_line(expectation_line, in_skipped=True)
+            self._model.add_expectation_line(expectation_line, override_existing_matches=True)
+
+    def add_flaky_expectations_from_bot(self):
+        # FIXME: Right now, this will show the expectations entry in the flakiness dashboard rows for each test
+        # to be whatever the bot thinks they should be. Is this a good thing?
+        bot_expectations = self._port.bot_expectations()
+        for test_name in bot_expectations:
+            expectation_line = self._parser.expectation_line_for_test(test_name, bot_expectations[test_name])
+            self._model.add_expectation_line(expectation_line, override_existing_matches=True)
 
     def add_expectation_line(self, expectation_line):
         self._model.add_expectation_line(expectation_line)

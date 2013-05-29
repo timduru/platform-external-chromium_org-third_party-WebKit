@@ -40,11 +40,10 @@ WebInspector.SASSSourceMapping = function(cssModel, workspace, networkWorkspaceP
     this._cssModel = cssModel;
     this._workspace = workspace;
     this._networkWorkspaceProvider = networkWorkspaceProvider;
-    this._sourceMapByURL = {};
-    this._sourceMapByStyleSheetURL = {};
+    this._completeSourceMapURLForCSSURL = {};
     this._cssURLsForSASSURL = {};
     this._timeoutForURL = {};
-    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.ResourceAdded, this._resourceAdded, this);
+    this._reset();
     WebInspector.fileManager.addEventListener(WebInspector.FileManager.EventTypes.SavedURL, this._fileSaveFinished, this);
     this._cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSheetChanged, this._styleSheetChanged, this);
     this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
@@ -53,34 +52,23 @@ WebInspector.SASSSourceMapping = function(cssModel, workspace, networkWorkspaceP
 }
 
 WebInspector.SASSSourceMapping.prototype = {
-    _populate: function()
-    {
-        function populateFrame(frame)
-        {
-            for (var i = 0; i < frame.childFrames.length; ++i)
-                populateFrame.call(this, frame.childFrames[i]);
-
-            var resources = frame.resources();
-            for (var i = 0; i < resources.length; ++i)
-                this._resourceAdded({data:resources[i]});
-        }
-
-        populateFrame.call(this, WebInspector.resourceTreeModel.mainFrame);
-    },
-
     /**
      * @param {WebInspector.Event} event
      */
     _styleSheetChanged: function(event)
     {
+        var id = /** @type {!CSSAgent.StyleSheetId} */ (event.data.styleSheetId);
         var isAddingRevision = this._isAddingRevision;
         delete this._isAddingRevision;
-
         if (isAddingRevision)
             return;
-        var url = this._cssModel.resourceBinding().resourceURLForStyleSheetId(event.data.styleSheetId);
+        var header = this._cssModel.styleSheetHeaderForId(id);
+        if (!header)
+            return;
+        var url = header.resourceURL();
         if (!url)
             return;
+
         this._cssModel.setSourceMapping(url, null);
     },
 
@@ -129,55 +117,59 @@ WebInspector.SASSSourceMapping.prototype = {
         this._isAddingRevision = true;
         uiSourceCode.addRevision(newContent);
         // this._isAddingRevision will be deleted in this._styleSheetChanged().
-        this._loadAndProcessSourceMap(newContent, url, true);
+
+        var completeSourceMapURL = this._completeSourceMapURLForCSSURL[url];
+        if (!completeSourceMapURL)
+            return;
+        this._loadSourceMapAndBindUISourceCode(url, true, completeSourceMapURL);
     },
 
     /**
-     * @param {WebInspector.Event} event
+     * @param {WebInspector.CSSStyleSheetHeader} header
      */
-    _resourceAdded: function(event)
+    addHeader: function(header)
     {
-        var resource = /** @type {WebInspector.Resource} */ (event.data);
-        if (resource.type !== WebInspector.resourceTypes.Stylesheet)
+        if (!header.sourceMapURL || !header.sourceURL || header.isInline || !WebInspector.experimentsSettings.sass.isEnabled())
             return;
+        var completeSourceMapURL = WebInspector.ParsedURL.completeURL(header.sourceURL, header.sourceMapURL);
+        if (!completeSourceMapURL)
+            return;
+        this._completeSourceMapURLForCSSURL[header.sourceURL] = completeSourceMapURL;
+        this._loadSourceMapAndBindUISourceCode(header.sourceURL, false, completeSourceMapURL);
+    },
 
-        /**
-         * @param {?string} content
-         * @param {boolean} contentEncoded
-         * @param {string} mimeType
-         */
-        function didRequestContent(content, contentEncoded, mimeType)
-        {
-            this._loadAndProcessSourceMap(content, resource.url);
+    /**
+     * @param {WebInspector.CSSStyleSheetHeader} header
+     */
+    removeHeader: function(header)
+    {
+        if (!header.sourceMapURL || !header.sourceURL || header.isInline)
+            return;
+        var sourceURL = header.sourceURL;
+        delete this._sourceMapByStyleSheetURL[sourceURL];
+        delete this._completeSourceMapURLForCSSURL[sourceURL];
+        for (var sassURL in this._cssURLsForSASSURL) {
+            var urls = this._cssURLsForSASSURL[sassURL];
+            urls.remove(sourceURL);
+            if (!urls.length)
+                delete this._cssURLsForSASSURL[sassURL];
         }
-        resource.requestContent(didRequestContent.bind(this));
+        var completeSourceMapURL = WebInspector.ParsedURL.completeURL(sourceURL, header.sourceMapURL);
+        if (completeSourceMapURL)
+            delete this._sourceMapByURL[completeSourceMapURL];
     },
 
     /**
-     * @param {?string} content
      * @param {string} cssURL
-     * @param {boolean=} forceRebind
+     * @param {boolean} forceRebind
+     * @param {string} completeSourceMapURL
      */
-    _loadAndProcessSourceMap: function(content, cssURL, forceRebind)
+    _loadSourceMapAndBindUISourceCode: function(cssURL, forceRebind, completeSourceMapURL)
     {
-        if (!content)
-            return;
-        var lines = content.split(/\r?\n/);
-        if (!lines.length)
-            return;
-
-        const sourceMapRegex = /^\/\*@ sourceMappingURL=([^\s]+)\s*\*\/$/;
-        var lastLine = lines[lines.length - 1];
-        var match = lastLine.match(sourceMapRegex);
-        if (!match)
-            return;
-
-        if (!forceRebind && this._sourceMapByStyleSheetURL[cssURL])
-            return;
-        var sourceMap = this.loadSourceMapForStyleSheet(match[1], cssURL, forceRebind);
-
+        var sourceMap = this._loadSourceMapForStyleSheet(completeSourceMapURL, cssURL, forceRebind);
         if (!sourceMap)
             return;
+
         this._sourceMapByStyleSheetURL[cssURL] = sourceMap;
         this._bindUISourceCode(cssURL, sourceMap);
     },
@@ -200,19 +192,13 @@ WebInspector.SASSSourceMapping.prototype = {
     },
 
     /**
-     * @param {string} sourceMapURL
-     * @param {string} styleSheetURL
+     * @param {string} completeSourceMapURL
+     * @param {string} completeStyleSheetURL
      * @param {boolean=} forceReload
      * @return {WebInspector.SourceMap}
      */
-    loadSourceMapForStyleSheet: function(sourceMapURL, styleSheetURL, forceReload)
+    _loadSourceMapForStyleSheet: function(completeSourceMapURL, completeStyleSheetURL, forceReload)
     {
-        var completeStyleSheetURL = WebInspector.ParsedURL.completeURL(WebInspector.inspectedPageURL, styleSheetURL);
-        if (!completeStyleSheetURL)
-            return null;
-        var completeSourceMapURL = WebInspector.ParsedURL.completeURL(completeStyleSheetURL, sourceMapURL);
-        if (!completeSourceMapURL)
-            return null;
         var sourceMap = this._sourceMapByURL[completeSourceMapURL];
         if (sourceMap && !forceReload)
             return sourceMap;
@@ -294,9 +280,11 @@ WebInspector.SASSSourceMapping.prototype = {
     _uiSourceCodeAdded: function(event)
     {
         var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (event.data);
+        if (uiSourceCode.contentType() !== WebInspector.resourceTypes.Stylesheet)
+            return;
         var cssURLs = this._cssURLsForSASSURL[uiSourceCode.url];
         // FIXME: we get back all the mappings that StylesSourceMapping stole from us.
-        // It should not have happened at the first place.
+        // It should not have happened in the first place.
         for (var i = 0; cssURLs && i < cssURLs.length; ++i)
             this._cssModel.setSourceMapping(cssURLs[i], this);
         uiSourceCode.setSourceMapping(this);
@@ -315,6 +303,5 @@ WebInspector.SASSSourceMapping.prototype = {
     {
         this._sourceMapByURL = {};
         this._sourceMapByStyleSheetURL = {};
-        this._populate();
     }
 }

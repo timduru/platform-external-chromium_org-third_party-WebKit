@@ -34,43 +34,9 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
-#include "wtf/ArrayBuffer.h"
-#include "wtf/ArrayBufferView.h"
 #include "wtf/UnusedParam.h"
 
-#if ENABLE(BINDING_INTEGRITY)
-#if defined(OS_WIN)
-#pragma warning(disable: 4483)
-extern "C" { extern void (*const __identifier("??_7TestOverloadedConstructors@WebCore@@6B@")[])(); }
-#else
-extern "C" { extern void* _ZTVN7WebCore26TestOverloadedConstructorsE[]; }
-#endif
-#endif // ENABLE(BINDING_INTEGRITY)
-
 namespace WebCore {
-
-#if ENABLE(BINDING_INTEGRITY)
-// This checks if a DOM object that is about to be wrapped is valid.
-// Specifically, it checks that a vtable of the DOM object is equal to
-// a vtable of an expected class.
-// Due to a dangling pointer, the DOM object you are wrapping might be
-// already freed or realloced. If freed, the check will fail because
-// a free list pointer should be stored at the head of the DOM object.
-// If realloced, the check will fail because the vtable of the DOM object
-// differs from the expected vtable (unless the same class of DOM object
-// is realloced on the slot).
-inline void checkTypeOrDieTrying(TestOverloadedConstructors* object)
-{
-    void* actualVTablePointer = *(reinterpret_cast<void**>(object));
-#if defined(OS_WIN)
-    void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestOverloadedConstructors@WebCore@@6B@"));
-#else
-    void* expectedVTablePointer = &_ZTVN7WebCore26TestOverloadedConstructorsE[2];
-#endif
-    if (actualVTablePointer != expectedVTablePointer)
-        CRASH();
-}
-#endif // ENABLE(BINDING_INTEGRITY)
 
 #if defined(OS_WIN)
 // In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
@@ -84,6 +50,8 @@ void initializeScriptWrappableForInterface(TestOverloadedConstructors* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestOverloadedConstructors::info);
+    else
+        ASSERT_NOT_REACHED();
 }
 #if defined(OS_WIN)
 namespace WebCore {
@@ -94,76 +62,91 @@ namespace TestOverloadedConstructorsV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
-static v8::Handle<v8::Value> constructor1(const v8::Arguments& args)
+static void constructor1(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    V8TRYCATCH(ArrayBuffer*, arrayBuffer, V8ArrayBuffer::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8ArrayBuffer::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
+    V8TRYCATCH_VOID(ArrayBuffer*, arrayBuffer, V8ArrayBuffer::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8ArrayBuffer::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
 
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(arrayBuffer);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
-    return wrapper;
+    args.GetReturnValue().Set(wrapper);
 }
 
-static v8::Handle<v8::Value> constructor2(const v8::Arguments& args)
+static void constructor2(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    V8TRYCATCH(ArrayBufferView*, arrayBufferView, V8ArrayBufferView::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8ArrayBufferView::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
+    V8TRYCATCH_VOID(ArrayBufferView*, arrayBufferView, V8ArrayBufferView::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8ArrayBufferView::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
 
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(arrayBufferView);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
-    return wrapper;
+    args.GetReturnValue().Set(wrapper);
 }
 
-static v8::Handle<v8::Value> constructor3(const v8::Arguments& args)
+static void constructor3(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    V8TRYCATCH(Blob*, blob, V8Blob::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Blob::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
+    V8TRYCATCH_VOID(Blob*, blob, V8Blob::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Blob::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
 
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(blob);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
-    return wrapper;
+    args.GetReturnValue().Set(wrapper);
 }
 
-static v8::Handle<v8::Value> constructor4(const v8::Arguments& args)
+static void constructor4(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, string, args[0]);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, string, args[0]);
 
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(string);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
-    return wrapper;
+    args.GetReturnValue().Set(wrapper);
 }
 
-static v8::Handle<v8::Value> constructor(const v8::Arguments& args)
+static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if ((args.Length() == 1 && (V8ArrayBuffer::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))))
-        return TestOverloadedConstructorsV8Internal::constructor1(args);
-    if ((args.Length() == 1 && (V8ArrayBufferView::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))))
-        return TestOverloadedConstructorsV8Internal::constructor2(args);
-    if ((args.Length() == 1 && (V8Blob::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())))))
-        return TestOverloadedConstructorsV8Internal::constructor3(args);
-    if (args.Length() == 1)
-        return TestOverloadedConstructorsV8Internal::constructor4(args);
-    if (args.Length() < 1)
-        return throwNotEnoughArgumentsError(args.GetIsolate());
-    return throwTypeError(0, args.GetIsolate());
+    if ((args.Length() == 1 && (V8ArrayBuffer::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate()))))) {
+        TestOverloadedConstructorsV8Internal::constructor1(args);
+        return;
+    }
+    if ((args.Length() == 1 && (V8ArrayBufferView::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate()))))) {
+        TestOverloadedConstructorsV8Internal::constructor2(args);
+        return;
+    }
+    if ((args.Length() == 1 && (V8Blob::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate()))))) {
+        TestOverloadedConstructorsV8Internal::constructor3(args);
+        return;
+    }
+    if (args.Length() == 1) {
+        TestOverloadedConstructorsV8Internal::constructor4(args);
+        return;
+    }
+    if (args.Length() < 1) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
+    throwTypeError(0, args.GetIsolate());
+    return;
 }
 
 } // namespace TestOverloadedConstructorsV8Internal
 
-v8::Handle<v8::Value> V8TestOverloadedConstructors::constructorCallback(const v8::Arguments& args)
+void V8TestOverloadedConstructors::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+    if (!args.IsConstructCall()) {
+        throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+        return;
+    }
 
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
+    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject) {
+        args.GetReturnValue().Set(args.Holder());
+        return;
+    }
 
-    return TestOverloadedConstructorsV8Internal::constructor(args);
+    TestOverloadedConstructorsV8Internal::constructor(args);
 }
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestOverloadedConstructorsTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
@@ -215,16 +198,12 @@ v8::Handle<v8::Object> V8TestOverloadedConstructors::createWrapper(PassRefPtr<Te
     ASSERT(impl.get());
     ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
 
-#if ENABLE(BINDING_INTEGRITY)
-    checkTypeOrDieTrying(impl.get());
-#endif
-
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, hasDependentLifetime ? WrapperConfiguration::Dependent : WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestOverloadedConstructors::derefObject(void* object)

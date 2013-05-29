@@ -33,6 +33,7 @@
 #include "core/platform/graphics/ImageOrientation.h"
 #include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/NativeImagePtr.h"
+#include "third_party/skia/include/core/SkXfermode.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
 #include <wtf/RefPtr.h>
@@ -115,10 +116,6 @@ public:
     virtual void drawPattern(GraphicsContext*, const FloatRect& srcRect, const AffineTransform& patternTransform,
         const FloatPoint& phase, ColorSpace styleColorSpace, CompositeOperator, const FloatRect& destRect, BlendMode = BlendModeNormal);
 
-#if ENABLE(IMAGE_DECODER_DOWN_SAMPLING)
-    FloatRect adjustSourceRectForDownSampling(const FloatRect& srcRect, const IntSize& scaledSize) const;
-#endif
-
 #if !ASSERT_DISABLED
     virtual bool notSolidColor() { return true; }
 #endif
@@ -129,6 +126,10 @@ protected:
     Image(ImageObserver* = 0);
 
     static void fillWithSolidColor(GraphicsContext*, const FloatRect& dstRect, const Color&, ColorSpace styleColorSpace, CompositeOperator);
+    static FloatRect adjustForNegativeSize(const FloatRect&); // A helper method for translating negative width and height values.
+
+    // FIXME (crbug.com/242060): This does not belong on Image.
+    static void paintSkBitmap(GraphicsContext*, const NativeImageSkia&, const SkRect& /*srcRect*/, const SkRect& /*destRect*/, const SkXfermode::Mode&);
 
     // The ColorSpace parameter will only be used for untagged images.
     virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, ColorSpace styleColorSpace, CompositeOperator, BlendMode) = 0;

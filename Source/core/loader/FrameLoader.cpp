@@ -41,6 +41,7 @@
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
 #include "HTMLNames.h"
+#include "SVGNames.h"
 #include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptSourceCode.h"
@@ -102,30 +103,23 @@
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/text/SegmentedString.h"
 #include "core/plugins/PluginData.h"
-#include "core/xml/parser/XMLDocumentParser.h"
-#include "modules/webdatabase/DatabaseManager.h"
-#include "weborigin/SchemeRegistry.h"
-#include "weborigin/SecurityOrigin.h"
-#include "weborigin/SecurityPolicy.h"
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
 #include "core/svg/SVGDocument.h"
 #include "core/svg/SVGLocatable.h"
 #include "core/svg/SVGPreserveAspectRatio.h"
 #include "core/svg/SVGSVGElement.h"
 #include "core/svg/SVGViewElement.h"
 #include "core/svg/SVGViewSpec.h"
-#endif
+#include "core/xml/parser/XMLDocumentParser.h"
+#include "modules/webdatabase/DatabaseManager.h"
+#include "weborigin/SchemeRegistry.h"
+#include "weborigin/SecurityOrigin.h"
+#include "weborigin/SecurityPolicy.h"
 
 
 namespace WebCore {
 
 using namespace HTMLNames;
-
-#if ENABLE(SVG)
 using namespace SVGNames;
-#endif
 
 static const char defaultAcceptHeader[] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 
@@ -272,7 +266,7 @@ void FrameLoader::urlSelected(const FrameLoadRequest& passedRequest, PassRefPtr<
     RefPtr<Frame> protect(m_frame);
     FrameLoadRequest frameRequest(passedRequest);
 
-    if (m_frame->script()->executeIfJavaScriptURL(frameRequest.resourceRequest().url()))
+    if (m_frame->script()->executeScriptIfJavaScriptURL(frameRequest.resourceRequest().url()))
         return;
 
     if (frameRequest.frameName().isEmpty())
@@ -311,7 +305,7 @@ void FrameLoader::submitForm(PassRefPtr<FormSubmission> submission)
     if (protocolIsJavaScript(submission->action())) {
         if (!m_frame->document()->contentSecurityPolicy()->allowFormAction(KURL(submission->action())))
             return;
-        m_frame->script()->executeIfJavaScriptURL(submission->action());
+        m_frame->script()->executeScriptIfJavaScriptURL(submission->action());
         return;
     }
 
@@ -968,9 +962,7 @@ void FrameLoader::prepareForHistoryNavigation()
     // loaded it.
     RefPtr<HistoryItem> currentItem = history()->currentItem();
     if (!currentItem) {
-        currentItem = HistoryItem::create();
-        history()->setCurrentItem(currentItem.get());
-        frame()->page()->backForward()->setCurrentItem(currentItem.get());
+        insertDummyHistoryItem();
 
         ASSERT(stateMachine()->isDisplayingInitialEmptyDocument());
         stateMachine()->advanceTo(FrameLoaderStateMachine::DisplayingInitialEmptyDocumentPostCommit);
@@ -1049,7 +1041,7 @@ void FrameLoader::loadFrameRequest(const FrameLoadRequest& request, bool lockBac
     Frame* targetFrame = sourceFrame->loader()->findFrameForNavigation(request.frameName());
     if (targetFrame && targetFrame != sourceFrame) {
         if (Page* page = targetFrame->page())
-            page->chrome()->focus();
+            page->chrome().focus();
     }
 }
 
@@ -1186,15 +1178,19 @@ bool FrameLoader::willLoadMediaElementURL(KURL& url)
 
 void FrameLoader::reload(bool endToEndReload, const KURL& overrideURL, const String& overrideEncoding)
 {
-    if (!m_documentLoader)
+    DocumentLoader* documentLoader = activeDocumentLoader();
+    if (!documentLoader)
         return;
 
+    if (m_state == FrameStateProvisional)
+        insertDummyHistoryItem();
     frame()->loader()->history()->saveDocumentAndScrollState();
-    ResourceRequest request = m_documentLoader->request();
+
+    ResourceRequest request = documentLoader->request();
     if (!overrideURL.isEmpty())
         request.setURL(overrideURL);
-    else if (!m_documentLoader->unreachableURL().isEmpty())
-        request.setURL(m_documentLoader->unreachableURL());
+    else if (!documentLoader->unreachableURL().isEmpty())
+        request.setURL(documentLoader->unreachableURL());
 
     bool isFormSubmission = request.httpMethod() == "POST";
     if (overrideEncoding.isEmpty())
@@ -1428,7 +1424,7 @@ void FrameLoader::transitionToCommitted()
     setState(FrameStateCommittedPage);
 
     if (isLoadingMainFrame())
-        m_frame->page()->chrome()->client()->needTouchEvents(false);
+        m_frame->page()->chrome().client()->needTouchEvents(false);
 
     history()->updateForCommit();
     m_client->transitionToCommittedForNewPage();
@@ -1691,9 +1687,9 @@ void FrameLoader::setOriginalURLForDownloadRequest(ResourceRequest& request)
         // FIXME: Using host-only URL is a very heavy-handed approach. We should attempt to provide the actual page where the download was initiated from, as a reminder to the user.
         String hostOnlyURLString;
         if (port)
-            hostOnlyURLString = makeString(originalURL.protocol(), "://", originalURL.host(), ":", String::number(port));
+            hostOnlyURLString = originalURL.protocol() + "://" + originalURL.host() + ":" + String::number(port);
         else
-            hostOnlyURLString = makeString(originalURL.protocol(), "://", originalURL.host());
+            hostOnlyURLString = originalURL.protocol() + "://" + originalURL.host();
 
         // FIXME: Rename firstPartyForCookies back to mainDocumentURL. It was a mistake to think that it was only used for cookies.
         request.setFirstPartyForCookies(KURL(KURL(), hostOnlyURLString));
@@ -2035,8 +2031,7 @@ void FrameLoader::scrollToFragmentWithParentBoundary(const KURL& url)
 bool FrameLoader::shouldClose()
 {
     Page* page = m_frame->page();
-    Chrome* chrome = page ? page->chrome() : 0;
-    if (!chrome || !chrome->canRunBeforeUnloadConfirmPanel())
+    if (!page || !page->chrome().canRunBeforeUnloadConfirmPanel())
         return true;
 
     // Store all references to each subframe in advance since beforeunload's event handler may modify frame
@@ -2053,7 +2048,7 @@ bool FrameLoader::shouldClose()
         for (i = 0; i < targetFrames.size(); i++) {
             if (!targetFrames[i]->tree()->isDescendantOf(m_frame))
                 continue;
-            if (!targetFrames[i]->loader()->fireBeforeUnloadEvent(chrome))
+            if (!targetFrames[i]->loader()->fireBeforeUnloadEvent(page->chrome()))
                 break;
         }
 
@@ -2067,7 +2062,7 @@ bool FrameLoader::shouldClose()
     return shouldClose;
 }
 
-bool FrameLoader::fireBeforeUnloadEvent(Chrome* chrome)
+bool FrameLoader::fireBeforeUnloadEvent(Chrome& chrome)
 {
     DOMWindow* domWindow = m_frame->document()->domWindow();
     if (!domWindow)
@@ -2088,7 +2083,7 @@ bool FrameLoader::fireBeforeUnloadEvent(Chrome* chrome)
         return true;
 
     String text = document->displayStringModifiedByEncoding(beforeUnloadEvent->result());
-    return chrome->runBeforeUnloadConfirmPanel(text, m_frame);
+    return chrome.runBeforeUnloadConfirmPanel(text, m_frame);
 }
 
 void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> formState)
@@ -2236,7 +2231,7 @@ void FrameLoader::loadedResourceFromMemoryCache(CachedResource* resource)
     if (!page)
         return;
 
-    if (!resource->shouldSendResourceLoadCallbacks() || m_documentLoader->haveToldClientAboutLoad(resource->url()))
+    if (!resource->shouldSendResourceLoadCallbacks() || m_documentLoader->haveToldClientAboutLoad(resource->url().string()))
         return;
 
     // Main resource delegate messages are synthesized in MainResourceLoader, so we must not send them here.
@@ -2420,6 +2415,13 @@ void FrameLoader::loadItem(HistoryItem* item)
         loadDifferentDocumentItem(item);
 }
 
+void FrameLoader::insertDummyHistoryItem()
+{
+    RefPtr<HistoryItem> currentItem = HistoryItem::create();
+    history()->setCurrentItem(currentItem.get());
+    frame()->page()->backForward()->setCurrentItem(currentItem.get());
+}
+
 ResourceError FrameLoader::cancelledError(const ResourceRequest& request) const
 {
     ResourceError error = m_client->cancelledError(request);
@@ -2562,7 +2564,7 @@ Frame* createWindow(Frame* openerFrame, Frame* lookupFrame, const FrameLoadReque
         if (Frame* frame = lookupFrame->loader()->findFrameForNavigation(request.frameName(), openerFrame->document())) {
             if (request.frameName() != "_self") {
                 if (Page* page = frame->page())
-                    page->chrome()->focus();
+                    page->chrome().focus();
             }
             created = false;
             return frame;
@@ -2593,7 +2595,7 @@ Frame* createWindow(Frame* openerFrame, Frame* lookupFrame, const FrameLoadReque
         return 0;
 
     NavigationAction action(requestWithReferrer.resourceRequest());
-    Page* page = oldPage->chrome()->createWindow(openerFrame, requestWithReferrer, features, action);
+    Page* page = oldPage->chrome().createWindow(openerFrame, requestWithReferrer, features, action);
     if (!page)
         return 0;
 
@@ -2604,18 +2606,18 @@ Frame* createWindow(Frame* openerFrame, Frame* lookupFrame, const FrameLoadReque
     if (request.frameName() != "_blank")
         frame->tree()->setName(request.frameName());
 
-    page->chrome()->setToolbarsVisible(features.toolBarVisible || features.locationBarVisible);
-    page->chrome()->setStatusbarVisible(features.statusBarVisible);
-    page->chrome()->setScrollbarsVisible(features.scrollbarsVisible);
-    page->chrome()->setMenubarVisible(features.menuBarVisible);
-    page->chrome()->setResizable(features.resizable);
+    page->chrome().setToolbarsVisible(features.toolBarVisible || features.locationBarVisible);
+    page->chrome().setStatusbarVisible(features.statusBarVisible);
+    page->chrome().setScrollbarsVisible(features.scrollbarsVisible);
+    page->chrome().setMenubarVisible(features.menuBarVisible);
+    page->chrome().setResizable(features.resizable);
 
     // 'x' and 'y' specify the location of the window, while 'width' and 'height'
     // specify the size of the viewport. We can only resize the window, so adjust
     // for the difference between the window size and the viewport size.
 
-    FloatRect windowRect = page->chrome()->windowRect();
-    FloatSize viewportSize = page->chrome()->pageRect().size();
+    FloatRect windowRect = page->chrome().windowRect();
+    FloatSize viewportSize = page->chrome().pageRect().size();
 
     if (features.xSet)
         windowRect.setX(features.x);
@@ -2629,8 +2631,8 @@ Frame* createWindow(Frame* openerFrame, Frame* lookupFrame, const FrameLoadReque
     // Ensure non-NaN values, minimum size as well as being within valid screen area.
     FloatRect newWindowRect = DOMWindow::adjustWindowRect(page, windowRect);
 
-    page->chrome()->setWindowRect(newWindowRect);
-    page->chrome()->show();
+    page->chrome().setWindowRect(newWindowRect);
+    page->chrome().show();
 
     created = true;
     return frame;

@@ -23,7 +23,6 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "SerializedScriptValue.h"
-#include "V8DOMStringList.h"
 #include "V8SVGPoint.h"
 #include "V8SerializedScriptValue.h"
 #include "V8TestCallback.h"
@@ -35,46 +34,13 @@
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
-#include "core/dom/DOMStringList.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
 #include "core/svg/properties/SVGPropertyTearOff.h"
 #include "wtf/UnusedParam.h"
 
-#if ENABLE(BINDING_INTEGRITY)
-#if defined(OS_WIN)
-#pragma warning(disable: 4483)
-extern "C" { extern void (*const __identifier("??_7TestTypedefs@WebCore@@6B@")[])(); }
-#else
-extern "C" { extern void* _ZTVN7WebCore12TestTypedefsE[]; }
-#endif
-#endif // ENABLE(BINDING_INTEGRITY)
-
 namespace WebCore {
-
-#if ENABLE(BINDING_INTEGRITY)
-// This checks if a DOM object that is about to be wrapped is valid.
-// Specifically, it checks that a vtable of the DOM object is equal to
-// a vtable of an expected class.
-// Due to a dangling pointer, the DOM object you are wrapping might be
-// already freed or realloced. If freed, the check will fail because
-// a free list pointer should be stored at the head of the DOM object.
-// If realloced, the check will fail because the vtable of the DOM object
-// differs from the expected vtable (unless the same class of DOM object
-// is realloced on the slot).
-inline void checkTypeOrDieTrying(TestTypedefs* object)
-{
-    void* actualVTablePointer = *(reinterpret_cast<void**>(object));
-#if defined(OS_WIN)
-    void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestTypedefs@WebCore@@6B@"));
-#else
-    void* expectedVTablePointer = &_ZTVN7WebCore12TestTypedefsE[2];
-#endif
-    if (actualVTablePointer != expectedVTablePointer)
-        CRASH();
-}
-#endif // ENABLE(BINDING_INTEGRITY)
 
 #if defined(OS_WIN)
 // In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
@@ -88,6 +54,8 @@ void initializeScriptWrappableForInterface(TestTypedefs* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestTypedefs::info);
+    else
+        ASSERT_NOT_REACHED();
 }
 #if defined(OS_WIN)
 namespace WebCore {
@@ -391,15 +359,11 @@ static v8::Handle<v8::Value> stringArrayFunctionMethod(const v8::Arguments& args
         return throwNotEnoughArgumentsError(args.GetIsolate());
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
     ExceptionCode ec = 0;
-    {
     V8TRYCATCH(Vector<String>, values, toNativeArray<String>(args[0]));
     Vector<String> result = imp->stringArrayFunction(values, ec);
     if (UNLIKELY(ec))
-        goto fail;
+        return setDOMException(ec, args.GetIsolate());
     return v8Array(result, args.GetIsolate());
-    }
-    fail:
-    return setDOMException(ec, args.GetIsolate());
 }
 
 static v8::Handle<v8::Value> stringArrayFunctionMethodCallback(const v8::Arguments& args)
@@ -413,15 +377,11 @@ static v8::Handle<v8::Value> stringArrayFunction2Method(const v8::Arguments& arg
         return throwNotEnoughArgumentsError(args.GetIsolate());
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
     ExceptionCode ec = 0;
-    {
     V8TRYCATCH(Vector<String>, values, toNativeArray<String>(args[0]));
     Vector<String> result = imp->stringArrayFunction2(values, ec);
     if (UNLIKELY(ec))
-        goto fail;
+        return setDOMException(ec, args.GetIsolate());
     return v8Array(result, args.GetIsolate());
-    }
-    fail:
-    return setDOMException(ec, args.GetIsolate());
 }
 
 static v8::Handle<v8::Value> stringArrayFunction2MethodCallback(const v8::Arguments& args)
@@ -433,14 +393,10 @@ static v8::Handle<v8::Value> methodWithExceptionMethod(const v8::Arguments& args
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
     ExceptionCode ec = 0;
-    {
     imp->methodWithException(ec);
     if (UNLIKELY(ec))
-        goto fail;
+        return setDOMException(ec, args.GetIsolate());
     return v8Undefined();
-    }
-    fail:
-    return setDOMException(ec, args.GetIsolate());
 }
 
 static v8::Handle<v8::Value> methodWithExceptionMethodCallback(const v8::Arguments& args)
@@ -448,20 +404,24 @@ static v8::Handle<v8::Value> methodWithExceptionMethodCallback(const v8::Argumen
     return TestTypedefsV8Internal::methodWithExceptionMethod(args);
 }
 
-static v8::Handle<v8::Value> constructor(const v8::Arguments& args)
+static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2)
-        return throwNotEnoughArgumentsError(args.GetIsolate());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, hello, args[0]);
-    if (args.Length() <= 1 || !args[1]->IsFunction())
-        return throwTypeError(0, args.GetIsolate());
+    if (args.Length() < 2) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, hello, args[0]);
+    if (args.Length() <= 1 || !args[1]->IsFunction()) {
+        throwTypeError(0, args.GetIsolate());
+        return;
+    }
     RefPtr<TestCallback> testCallback = V8TestCallback::create(args[1], getScriptExecutionContext());
 
     RefPtr<TestTypedefs> impl = TestTypedefs::create(hello, testCallback);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
     V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestTypedefs::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
-    return wrapper;
+    args.GetReturnValue().Set(wrapper);
 }
 
 } // namespace TestTypedefsV8Internal
@@ -495,15 +455,19 @@ static const V8DOMConfiguration::BatchedMethod V8TestTypedefsMethods[] = {
     {"methodWithException", TestTypedefsV8Internal::methodWithExceptionMethodCallback, 0, 0},
 };
 
-v8::Handle<v8::Value> V8TestTypedefs::constructorCallback(const v8::Arguments& args)
+void V8TestTypedefs::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (!args.IsConstructCall())
-        return throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+    if (!args.IsConstructCall()) {
+        throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
+        return;
+    }
 
-    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject)
-        return args.Holder();
+    if (ConstructorMode::current() == ConstructorMode::WrapExistingObject) {
+        args.GetReturnValue().Set(args.Holder());
+        return;
+    }
 
-    return TestTypedefsV8Internal::constructor(args);
+    TestTypedefsV8Internal::constructor(args);
 }
 
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestTypedefsTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
@@ -559,16 +523,12 @@ v8::Handle<v8::Object> V8TestTypedefs::createWrapper(PassRefPtr<TestTypedefs> im
     ASSERT(impl.get());
     ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
 
-#if ENABLE(BINDING_INTEGRITY)
-    checkTypeOrDieTrying(impl.get());
-#endif
-
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, hasDependentLifetime ? WrapperConfiguration::Dependent : WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestTypedefs::derefObject(void* object)

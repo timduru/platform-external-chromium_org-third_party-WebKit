@@ -182,7 +182,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/canvas/EXTTextureFilterAnisotropic.cpp \
 	third_party/WebKit/Source/core/html/canvas/OESStandardDerivatives.cpp \
 	third_party/WebKit/Source/core/html/canvas/OESTextureFloat.cpp \
+	third_party/WebKit/Source/core/html/canvas/OESTextureFloatLinear.cpp \
 	third_party/WebKit/Source/core/html/canvas/OESTextureHalfFloat.cpp \
+	third_party/WebKit/Source/core/html/canvas/OESTextureHalfFloatLinear.cpp \
 	third_party/WebKit/Source/core/html/canvas/OESVertexArrayObject.cpp \
 	third_party/WebKit/Source/core/html/canvas/OESElementIndexUint.cpp \
 	third_party/WebKit/Source/core/html/canvas/WebGLBuffer.cpp \
@@ -235,7 +237,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/parser/HTMLTreeBuilderSimulator.cpp \
 	third_party/WebKit/Source/core/html/parser/HTMLViewSourceParser.cpp \
 	third_party/WebKit/Source/core/html/parser/TextDocumentParser.cpp \
-	third_party/WebKit/Source/core/html/parser/TextViewSourceParser.cpp \
 	third_party/WebKit/Source/core/html/parser/XSSAuditor.cpp \
 	third_party/WebKit/Source/core/html/parser/XSSAuditorDelegate.cpp \
 	third_party/WebKit/Source/core/html/shadow/PickerIndicatorElement.cpp \
@@ -323,6 +324,7 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
+	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
@@ -339,7 +341,7 @@ MY_DEFS := \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
-	'-DENABLE_ENCRYPTED_MEDIA=1' \
+	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
@@ -347,7 +349,6 @@ MY_DEFS := \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_DATALIST_ELEMENT=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_INPUT_TYPE_COLOR=0' \
@@ -355,12 +356,10 @@ MY_DEFS := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PAGE_POPUP=0' \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_8BIT_TEXTRUN=1' \
-	'-DENABLE_BINDING_INTEGRITY=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -400,8 +399,8 @@ LOCAL_C_INCLUDES := \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
 	$(LOCAL_PATH)/third_party/angle/include/GLSLANG \
 	$(LOCAL_PATH)/third_party/WebKit/Source/Platform/chromium \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/common \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/i18n \
+	$(PWD)/external/icu4c/common \
+	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/src/core \
 	$(LOCAL_PATH)/third_party/skia/include/config \
@@ -431,10 +430,10 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/jpeg \
-	$(GYP_ABS_ANDROID_TOP_DIR)/frameworks/wilhelm/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/bionic \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/stlport/stlport
+	$(PWD)/external/jpeg \
+	$(PWD)/frameworks/wilhelm/include \
+	$(PWD)/bionic \
+	$(PWD)/external/stlport/stlport
 
 LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES)
 

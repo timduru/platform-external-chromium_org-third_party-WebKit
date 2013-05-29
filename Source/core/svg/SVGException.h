@@ -21,13 +21,12 @@
 #ifndef SVGException_h
 #define SVGException_h
 
+#include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/ExceptionBase.h"
-
-#if ENABLE(SVG)
 
 namespace WebCore {
 
-class SVGException : public ExceptionBase {
+class SVGException : public ExceptionBase, public ScriptWrappable {
 public:
     static PassRefPtr<SVGException> create(const ExceptionCodeDescription& description)
     {
@@ -49,11 +48,10 @@ private:
     SVGException(const ExceptionCodeDescription& description)
         : ExceptionBase(description)
     {
+        ScriptWrappable::init(this);
     }
 };
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)
 
 #endif // SVGException_h

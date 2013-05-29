@@ -3,7 +3,6 @@
 
 defaultTextEncodingName type=String
 editableLinkBehavior type=EditableLinkBehavior, initial=EditableLinkDefaultBehavior
-textDirectionSubmenuInclusionBehavior type=TextDirectionSubmenuInclusionBehavior, initial=TextDirectionSubmenuAutomaticallyIncluded
 passwordEchoDurationInSeconds type=double, initial=1
 
 # Sets the magnification value for validation message timer.  If the
@@ -69,6 +68,7 @@ acceleratedCompositingForCanvasEnabled initial=true
 acceleratedCompositingForAnimationEnabled initial=true
 acceleratedCompositingForFixedPositionEnabled initial=false
 acceleratedCompositingForOverflowScrollEnabled initial=false
+acceleratedCompositingForTransitionEnabled initial=false
 
 # Works only in conjunction with forceCompositingMode.
 acceleratedCompositingForScrollableFramesEnabled initial=false
@@ -113,7 +113,6 @@ threadedHTMLParser initial=false
 useThreadedHTMLParserForDataURLs initial=false
 
 applyPageScaleFactorInCompositor initial=false
-frameFlatteningEnabled initial=false
 
 allowCustomScrollbarInMainFrame initial=true
 webSecurityEnabled initial=true
@@ -137,3 +136,4 @@ selectionIncludesAltImageText initial=false
 touchEditingEnabled initial=false
 
 experimentalWebSocketEnabled initial=false
+pinchVirtualViewportEnabled initial=false

@@ -24,16 +24,11 @@
 #include "config.h"
 #include "core/dom/ScriptElement.h"
 
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/text/StringHash.h>
-#include <wtf/text/TextPosition.h>
 #include "HTMLNames.h"
+#include "SVGNames.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptSourceCode.h"
-#include "bindings/v8/ScriptValue.h"
 #include "core/dom/Document.h"
-#include "core/dom/DocumentParser.h"
 #include "core/dom/Event.h"
 #include "core/dom/IgnoreDestructiveWriteCountIncrementer.h"
 #include "core/dom/ScriptRunner.h"
@@ -41,23 +36,19 @@
 #include "core/dom/Text.h"
 #include "core/html/HTMLScriptElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/inspector/ScriptCallStack.h"
 #include "core/loader/CrossOriginAccessControl.h"
-#include "core/loader/FrameLoader.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
 #include "core/loader/cache/CachedScript.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/Frame.h"
-#include "core/page/Page.h"
-#include "core/page/Settings.h"
 #include "core/platform/MIMETypeRegistry.h"
-#include "weborigin/SecurityOrigin.h"
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
 #include "core/svg/SVGScriptElement.h"
-#endif
+#include "weborigin/SecurityOrigin.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/text/StringBuilder.h"
+#include "wtf/text/StringHash.h"
+#include "wtf/text/TextPosition.h"
 
 namespace WebCore {
 
@@ -241,7 +232,8 @@ bool ScriptElement::prepareScript(const TextPosition& scriptStartPosition, Legac
     } else {
         // Reset line numbering for nested writes.
         TextPosition position = document->isInDocumentWrite() ? TextPosition() : scriptStartPosition;
-        executeScript(ScriptSourceCode(scriptContent(), document->url(), position));
+        KURL scriptURL = (!document->isInDocumentWrite() && m_parserInserted) ? document->url() : KURL();
+        executeScript(ScriptSourceCode(scriptContent(), scriptURL, position));
     }
 
     return true;
@@ -254,12 +246,10 @@ bool ScriptElement::requestScript(const String& sourceUrl)
         return false;
     if (!m_element->inDocument() || m_element->document() != originalDocument)
         return false;
-    if (!m_element->document()->contentSecurityPolicy()->allowScriptNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr), m_element->document()->url(), m_startLineNumber, m_element->document()->completeURL(sourceUrl)))
-        return false;
 
     ASSERT(!m_cachedScript);
     if (!stripLeadingAndTrailingHTMLSpaces(sourceUrl).isEmpty()) {
-        CachedResourceRequest request(ResourceRequest(m_element->document()->completeURL(sourceUrl)));
+        CachedResourceRequest request(ResourceRequest(m_element->document()->completeURL(sourceUrl)), element()->localName());
 
         String crossOriginMode = m_element->fastGetAttribute(HTMLNames::crossoriginAttr);
         if (!crossOriginMode.isNull()) {
@@ -268,7 +258,10 @@ bool ScriptElement::requestScript(const String& sourceUrl)
             updateRequestForAccessControl(request.mutableResourceRequest(), m_element->document()->securityOrigin(), allowCredentials);
         }
         request.setCharset(scriptCharset());
-        request.setInitiator(element());
+
+        bool isValidScriptNonce = m_element->document()->contentSecurityPolicy()->allowScriptNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr));
+        if (isValidScriptNonce)
+            request.setContentSecurityCheck(DoNotCheckContentSecurityPolicy);
 
         m_cachedScript = m_element->document()->cachedResourceLoader()->requestScript(request);
         m_isExternalScript = true;
@@ -292,9 +285,7 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
     RefPtr<Document> document = m_element->document();
     Frame* frame = document->frame();
 
-    bool shouldBypassMainWorldContentSecurityPolicy = (frame && frame->script()->shouldBypassMainWorldContentSecurityPolicy());
-    if (!shouldBypassMainWorldContentSecurityPolicy && !document->contentSecurityPolicy()->allowScriptNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr), document->url(), m_startLineNumber))
-        return;
+    bool shouldBypassMainWorldContentSecurityPolicy = (frame && frame->script()->shouldBypassMainWorldContentSecurityPolicy()) || document->contentSecurityPolicy()->allowScriptNonce(m_element->fastGetAttribute(HTMLNames::nonceAttr));
 
     if (!m_isExternalScript && (!shouldBypassMainWorldContentSecurityPolicy && !document->contentSecurityPolicy()->allowInlineScript(document->url(), m_startLineNumber)))
         return;
@@ -310,7 +301,7 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
             // Create a script from the script element node, using the script
             // block's source and the script block's type.
             // Note: This is where the script is compiled and actually executed.
-            frame->script()->evaluate(sourceCode);
+            frame->script()->executeScriptInMainWorld(sourceCode);
         }
     }
 }
@@ -420,10 +411,8 @@ ScriptElement* toScriptElementIfPossible(Element* element)
     if (element->isHTMLElement() && element->hasTagName(HTMLNames::scriptTag))
         return static_cast<HTMLScriptElement*>(element);
 
-#if ENABLE(SVG)
     if (element->isSVGElement() && element->hasTagName(SVGNames::scriptTag))
         return static_cast<SVGScriptElement*>(element);
-#endif
 
     return 0;
 }

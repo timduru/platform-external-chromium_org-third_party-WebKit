@@ -85,7 +85,6 @@ void WebPreferences::reset()
     experimentalCSSExclusionsEnabled = true;
     experimentalCSSRegionsEnabled = true;
     experimentalCSSGridLayoutEnabled = false;
-    experimentalWebSocketEnabled = false;
     javaEnabled = false;
     javaScriptCanAccessClipboard = true;
     javaScriptCanOpenWindowsAutomatically = true;
@@ -116,6 +115,7 @@ void WebPreferences::reset()
     acceleratedCompositingForVideoEnabled = false;
     acceleratedCompositingForFixedPositionEnabled = false;
     acceleratedCompositingForOverflowScrollEnabled = false;
+    acceleratedCompositingForTransitionEnabled = false;
     acceleratedCompositingEnabled = false;
     accelerated2dCanvasEnabled = false;
     forceCompositingMode = false;
@@ -157,7 +157,6 @@ void WebPreferences::applyTo(WebView* webView)
     WebRuntimeFeatures::enableCSSExclusions(experimentalCSSExclusionsEnabled);
     settings->setExperimentalCSSGridLayoutEnabled(experimentalCSSGridLayoutEnabled);
     settings->setExperimentalCSSCustomFilterEnabled(cssCustomFilterEnabled);
-    settings->setExperimentalWebSocketEnabled(experimentalWebSocketEnabled);
     settings->setJavaEnabled(javaEnabled);
     settings->setJavaScriptCanAccessClipboard(javaScriptCanAccessClipboard);
     settings->setJavaScriptCanOpenWindowsAutomatically(javaScriptCanOpenWindowsAutomatically);
@@ -182,6 +181,7 @@ void WebPreferences::applyTo(WebView* webView)
     settings->setAcceleratedCompositingForVideoEnabled(acceleratedCompositingForVideoEnabled);
     settings->setAcceleratedCompositingForFixedPositionEnabled(acceleratedCompositingForFixedPositionEnabled);
     settings->setAcceleratedCompositingForOverflowScrollEnabled(acceleratedCompositingForOverflowScrollEnabled);
+    settings->setAcceleratedCompositingForTransitionEnabled(acceleratedCompositingForTransitionEnabled);
     settings->setFixedPositionCreatesStackingContext(acceleratedCompositingForFixedPositionEnabled);
     settings->setForceCompositingMode(forceCompositingMode);
     settings->setThreadedHTMLParser(threadedHTMLParser);

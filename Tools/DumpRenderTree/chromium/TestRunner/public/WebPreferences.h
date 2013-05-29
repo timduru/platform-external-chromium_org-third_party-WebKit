@@ -31,10 +31,10 @@
 #ifndef WebPreferences_h
 #define WebPreferences_h
 
-#include "Platform/chromium/public/WebString.h"
-#include "Platform/chromium/public/WebURL.h"
 #include "WebKit/chromium/public/WebSettings.h"
 #include "WebTestCommon.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebURL.h"
 
 namespace WebKit {
 class WebView;
@@ -67,7 +67,6 @@ struct WEBTESTRUNNER_EXPORT WebPreferences {
     bool experimentalCSSRegionsEnabled;
     bool experimentalCSSExclusionsEnabled;
     bool experimentalCSSGridLayoutEnabled;
-    bool experimentalWebSocketEnabled;
     bool javaEnabled;
     bool javaScriptCanAccessClipboard;
     bool javaScriptCanOpenWindowsAutomatically;
@@ -89,6 +88,7 @@ struct WEBTESTRUNNER_EXPORT WebPreferences {
     bool acceleratedCompositingForVideoEnabled;
     bool acceleratedCompositingForFixedPositionEnabled;
     bool acceleratedCompositingForOverflowScrollEnabled;
+    bool acceleratedCompositingForTransitionEnabled;
     bool acceleratedCompositingEnabled;
     bool forceCompositingMode;
     bool threadedHTMLParser;

@@ -167,7 +167,7 @@ class DumpRenderTreeDriverDetails(SharedDriverDetails):
     def command_line_file(self):
         return '/data/local/tmp/chrome-native-tests-command-line'
     def additional_command_line_flags(self):
-        return ['--create-stdin-fifo', '--separate-stderr-fifo']
+        return ['--create-stdin-fifo', '--separate-stderr-fifo', '--disable-impl-side-painting']
     def device_directory(self):
         return DEVICE_SOURCE_ROOT_DIR + 'drt/'
 
@@ -368,6 +368,13 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
         # The driver doesn't respond to closing stdin, so we might as well stop the driver immediately.
         return 0.0
 
+    def driver_name(self):
+        if self.get_option('driver_name'):
+            return self.get_option('driver_name')
+        if self.get_option('content_shell'):
+            return self.CONTENT_SHELL_NAME
+        return 'DumpRenderTree'
+
     def default_child_processes(self):
         if self._devices:
             return len(self._devices)
@@ -417,8 +424,6 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
         super(ChromiumAndroidPort, self).start_http_server(additional_dirs, number_of_servers)
 
     def create_driver(self, worker_number, no_timeout=False):
-        # We don't want the default DriverProxy which is not compatible with our driver.
-        # See comments in ChromiumAndroidDriver.start().
         return ChromiumAndroidDriver(self, worker_number, pixel_tests=self.get_option('pixel_tests'), driver_details=self._driver_details,
                                      # Force no timeout to avoid test driver timeouts before NRWT.
                                      no_timeout=True)
@@ -606,7 +611,6 @@ http://crbug.com/165250 discusses making these pre-built binaries externally ava
 class ChromiumAndroidDriver(driver.Driver):
     def __init__(self, port, worker_number, pixel_tests, driver_details, no_timeout=False):
         super(ChromiumAndroidDriver, self).__init__(port, worker_number, pixel_tests, no_timeout)
-        self._cmd_line = None
         self._in_fifo_path = driver_details.device_fifo_directory() + 'stdin.fifo'
         self._out_fifo_path = driver_details.device_fifo_directory() + 'test.fifo'
         self._err_fifo_path = driver_details.device_fifo_directory() + 'stderr.fifo'
@@ -865,12 +869,11 @@ class ChromiumAndroidDriver(driver.Driver):
         return super(ChromiumAndroidDriver, self).run_test(driver_input, stop_when_done)
 
     def start(self, pixel_tests, per_test_args):
-        # Only one driver instance is allowed because of the nature of Android activity.
-        # The single driver needs to restart content_shell when the command line changes.
-        cmd_line = self._android_driver_cmd_line(pixel_tests, per_test_args)
-        if cmd_line != self._cmd_line:
+        # We override the default start() so that we can call _android_driver_cmd_line()
+        # instead of cmd_line().
+        new_cmd_line = self._android_driver_cmd_line(pixel_tests, per_test_args)
+        if new_cmd_line != self._current_cmd_line:
             self.stop()
-            self._cmd_line = cmd_line
         super(ChromiumAndroidDriver, self).start(pixel_tests, per_test_args)
 
     def _start(self, pixel_tests, per_test_args):
@@ -893,7 +896,7 @@ class ChromiumAndroidDriver(driver.Driver):
         self._forwarder_process.start()
 
         self._android_commands.run(['logcat', '-c'])
-        self._android_commands.run(['shell', 'echo'] + self._cmd_line + ['>', self._driver_details.command_line_file()])
+        self._android_commands.run(['shell', 'echo'] + self._android_driver_cmd_line(pixel_tests, per_test_args) + ['>', self._driver_details.command_line_file()])
         start_result = self._android_commands.run(['shell', 'am', 'start', '-e', 'RunInSubThread', '-n', self._driver_details.activity_name()])
         if start_result.find('Exception') != -1:
             self._log_error('Failed to start the content_shell application. Exception:\n' + start_result)

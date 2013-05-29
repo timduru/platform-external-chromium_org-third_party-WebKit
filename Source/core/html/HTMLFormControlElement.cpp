@@ -25,19 +25,14 @@
 #include "config.h"
 #include "core/html/HTMLFormControlElement.h"
 
-#include "bindings/v8/ScriptEventListener.h"
-#include "core/dom/Attribute.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
-#include "core/dom/shadow/ElementShadow.h"
 #include "core/html/HTMLFieldSetElement.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLLegendElement.h"
 #include "core/html/ValidationMessage.h"
 #include "core/html/ValidityState.h"
-#include "core/page/EventHandler.h"
-#include "core/page/Frame.h"
 #include "core/page/UseCounter.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderTheme.h"
@@ -202,7 +197,7 @@ static bool shouldAutofocus(HTMLFormControlElement* element)
     return false;
 }
 
-static void focusPostAttach(Node* element, unsigned)
+static void focusPostAttach(Node* element)
 { 
     toElement(element)->focus(); 
     element->deref(); 
@@ -281,9 +276,7 @@ bool HTMLFormControlElement::isDisabledFormControl() const
 
     if (m_ancestorDisabledState == AncestorDisabledStateUnknown)
         updateAncestorDisabledState();
-    if (m_ancestorDisabledState == AncestorDisabledStateDisabled)
-        return true;
-    return HTMLElement::isDisabledFormControl();
+    return m_ancestorDisabledState == AncestorDisabledStateDisabled;
 }
 
 bool HTMLFormControlElement::isRequired() const
@@ -291,7 +284,7 @@ bool HTMLFormControlElement::isRequired() const
     return m_isRequired;
 }
 
-static void updateFromElementCallback(Node* node, unsigned)
+static void updateFromElementCallback(Node* node)
 {
     ASSERT_ARG(node, node->isElementNode());
     ASSERT_ARG(node, toElement(node)->isFormControlElement());

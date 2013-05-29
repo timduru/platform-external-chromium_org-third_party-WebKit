@@ -22,9 +22,9 @@
 #include "config.h"
 #include "core/css/CSSCursorImageValue.h"
 
+#include "SVGNames.h"
 #include "core/css/CSSImageSetValue.h"
 #include "core/css/CSSImageValue.h"
-#include "core/dom/TreeScope.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/loader/cache/CachedImage.h"
 #include "core/loader/cache/CachedResourceLoader.h"
@@ -32,21 +32,16 @@
 #include "core/rendering/style/StyleCachedImageSet.h"
 #include "core/rendering/style/StyleImage.h"
 #include "core/rendering/style/StylePendingImage.h"
+#include "core/svg/SVGCursorElement.h"
+#include "core/svg/SVGLengthContext.h"
+#include "core/svg/SVGURIReference.h"
 #include <wtf/MathExtras.h>
 #include <wtf/MemoryInstrumentationHashSet.h>
 #include <wtf/UnusedParam.h>
 #include <wtf/text/WTFString.h>
 
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#include "core/svg/SVGCursorElement.h"
-#include "core/svg/SVGLengthContext.h"
-#include "core/svg/SVGURIReference.h"
-#endif
-
 namespace WebCore {
 
-#if ENABLE(SVG)
 static inline SVGCursorElement* resourceReferencedByCursorElement(const String& url, Document* document)
 {
     Element* element = SVGURIReference::targetElementFromIRIString(url, document);
@@ -55,7 +50,6 @@ static inline SVGCursorElement* resourceReferencedByCursorElement(const String& 
 
     return 0;
 }
-#endif
 
 CSSCursorImageValue::CSSCursorImageValue(PassRefPtr<CSSValue> imageValue, bool hasHotSpot, const IntPoint& hotSpot)
     : CSSValue(CursorImageClass)
@@ -68,7 +62,6 @@ CSSCursorImageValue::CSSCursorImageValue(PassRefPtr<CSSValue> imageValue, bool h
 
 CSSCursorImageValue::~CSSCursorImageValue()
 {
-#if ENABLE(SVG)
     if (!isSVGCursor())
         return;
 
@@ -82,7 +75,6 @@ CSSCursorImageValue::~CSSCursorImageValue()
         if (SVGCursorElement* cursorElement = resourceReferencedByCursorElement(url, referencedElement->document()))
             cursorElement->removeClient(referencedElement);
     }
-#endif
 }
 
 String CSSCursorImageValue::customCssText() const
@@ -100,9 +92,6 @@ String CSSCursorImageValue::customCssText() const
 
 bool CSSCursorImageValue::updateIfSVGCursorIsUsed(Element* element)
 {
-#if !ENABLE(SVG)
-    UNUSED_PARAM(element);
-#else
     if (!element || !element->isSVGElement())
         return false;
 
@@ -129,7 +118,6 @@ bool CSSCursorImageValue::updateIfSVGCursorIsUsed(Element* element)
         cursorElement->addClient(svgElement);
         return true;
     }
-#endif
 
     return false;
 }
@@ -142,7 +130,6 @@ StyleImage* CSSCursorImageValue::cachedImage(CachedResourceLoader* loader)
     if (!m_accessedImage) {
         m_accessedImage = true;
 
-#if ENABLE(SVG)
         // For SVG images we need to lazily substitute in the correct URL. Rather than attempt
         // to change the URL of the CSSImageValue (which would then change behavior like cssText),
         // we create an alternate CSSImageValue to use.
@@ -156,7 +143,6 @@ StyleImage* CSSCursorImageValue::cachedImage(CachedResourceLoader* loader)
                 return cachedImage;
             }
         }
-#endif
 
         if (m_imageValue->isImageValue())
             m_image = toCSSImageValue(m_imageValue.get())->cachedImage(loader);
@@ -180,7 +166,6 @@ StyleImage* CSSCursorImageValue::cachedOrPendingImage(Document* document)
     return m_image.get();
 }
 
-#if ENABLE(SVG)
 bool CSSCursorImageValue::isSVGCursor() const
 {
     if (m_imageValue->isImageValue()) {
@@ -195,7 +180,7 @@ String CSSCursorImageValue::cachedImageURL()
 {
     if (!m_image || !m_image->isCachedImage())
         return String();
-    return static_cast<StyleCachedImage*>(m_image.get())->cachedImage()->url();
+    return static_cast<StyleCachedImage*>(m_image.get())->cachedImage()->url().string();
 }
 
 void CSSCursorImageValue::clearCachedImage()
@@ -208,7 +193,6 @@ void CSSCursorImageValue::removeReferencedElement(SVGElement* element)
 {
     m_referencedElements.remove(element);
 }
-#endif
 
 bool CSSCursorImageValue::equals(const CSSCursorImageValue& other) const
 {
@@ -221,9 +205,7 @@ void CSSCursorImageValue::reportDescendantMemoryUsage(MemoryObjectInfo* memoryOb
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     m_imageValue->reportMemoryUsage(memoryObjectInfo);
     // No need to report m_image as it is counted as part of RenderArena.
-#if ENABLE(SVG)
     info.addMember(m_referencedElements, "referencedElements");
-#endif
 }
 
 } // namespace WebCore

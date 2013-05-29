@@ -1170,14 +1170,13 @@ void RenderListMarker::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffse
     EListStyleType type = style()->listStyleType();
     switch (type) {
         case Disc:
-            context->drawEllipse(marker);
+            context->fillEllipse(marker);
             return;
         case Circle:
-            context->setFillColor(Color::transparent, ColorSpaceDeviceRGB);
-            context->drawEllipse(marker);
+            context->strokeEllipse(marker);
             return;
         case Square:
-            context->drawRect(marker);
+            context->fillRect(marker);
             return;
         case NoneListStyle:
             return;
@@ -1277,10 +1276,13 @@ void RenderListMarker::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffse
         context->translate(-marker.x(), -marker.maxY());
     }
 
+    TextRunPaintInfo textRunPaintInfo(textRun);
+    textRunPaintInfo.bounds = marker;
     IntPoint textOrigin = IntPoint(marker.x(), marker.y() + style()->fontMetrics().ascent());
 
-    if (type == Asterisks || type == Footnotes)
-        context->drawText(font, textRun, textOrigin);
+    if (type == Asterisks || type == Footnotes) {
+        context->drawText(font, textRunPaintInfo, textOrigin);
+    }
     else {
         // Text is not arbitrary. We can judge whether it's RTL from the first character,
         // and we only need to handle the direction RightToLeft for now.
@@ -1296,16 +1298,21 @@ void RenderListMarker::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffse
 
         const UChar suffix = listMarkerSuffix(type, m_listItem->value());
         if (style()->isLeftToRightDirection()) {
-            int width = font.width(textRun);
-            context->drawText(font, textRun, textOrigin);
+            context->drawText(font, textRunPaintInfo, textOrigin);
+
             UChar suffixSpace[2] = { suffix, ' ' };
-            context->drawText(font, RenderBlock::constructTextRun(this, font, suffixSpace, 2, style()), textOrigin + IntSize(width, 0));
+            TextRun suffixRun = RenderBlock::constructTextRun(this, font, suffixSpace, 2, style());
+            TextRunPaintInfo suffixRunInfo(suffixRun);
+            suffixRunInfo.bounds = marker;
+            context->drawText(font, suffixRunInfo, textOrigin + IntSize(font.width(textRun), 0));
         } else {
             UChar spaceSuffix[2] = { ' ', suffix };
-            TextRun spaceSuffixRun = RenderBlock::constructTextRun(this, font, spaceSuffix, 2, style());
-            int width = font.width(spaceSuffixRun);
-            context->drawText(font, spaceSuffixRun, textOrigin);
-            context->drawText(font, textRun, textOrigin + IntSize(width, 0));
+            TextRun suffixRun = RenderBlock::constructTextRun(this, font, spaceSuffix, 2, style());
+            TextRunPaintInfo suffixRunInfo(suffixRun);
+            suffixRunInfo.bounds = marker;
+            context->drawText(font, suffixRunInfo, textOrigin);
+
+            context->drawText(font, textRunPaintInfo, textOrigin + IntSize(font.width(suffixRun), 0));
         }
     }
 }
@@ -1593,7 +1600,7 @@ void RenderListMarker::updateMargins()
     LayoutUnit marginStart = 0;
     LayoutUnit marginEnd = 0;
 
-    if (isInside()) {
+    if (isInside() && !m_listItem->isFloating()) {
         if (isImage())
             marginEnd = cMarkerPadding;
         else switch (style()->listStyleType()) {

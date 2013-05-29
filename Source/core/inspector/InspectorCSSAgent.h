@@ -42,6 +42,7 @@
 
 namespace WebCore {
 
+struct CSSParserString;
 class CSSRule;
 class CSSRuleList;
 class CSSStyleDeclaration;
@@ -89,6 +90,7 @@ public:
     };
 
     static CSSStyleRule* asCSSStyleRule(CSSRule*);
+    static bool cssErrorFilter(const CSSParserString& content, int propertyId, int errorType);
 
     static PassOwnPtr<InspectorCSSAgent> create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* state, InspectorDOMAgent* domAgent, InspectorPageAgent* pageAgent)
     {
@@ -104,6 +106,7 @@ public:
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
     void reset();
+    void didCommitLoad(Frame*, DocumentLoader*);
     void mediaQueryResultChanged();
     void didCreateNamedFlow(Document*, NamedFlow*);
     void willRemoveNamedFlow(Document*, NamedFlow*);
@@ -159,8 +162,6 @@ private:
     int documentNodeWithRequestedFlowsId(Document*);
     void collectAllStyleSheets(Vector<InspectorStyleSheet*>&);
     void collectStyleSheets(CSSStyleSheet*, Vector<InspectorStyleSheet*>&);
-    String sourceMapURLForStyleSheet(const InspectorStyleSheet*);
-    PassRefPtr<TypeBuilder::CSS::CSSStyleSheetHeader> buildObjectForStyleSheetInfo(const InspectorStyleSheet*);
 
     InspectorStyleSheet* bindStyleSheet(CSSStyleSheet*);
     String unbindStyleSheet(InspectorStyleSheet*);

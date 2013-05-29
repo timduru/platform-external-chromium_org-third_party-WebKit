@@ -32,7 +32,7 @@ class FilterEffect;
 
 class Filter : public RefCounted<Filter> {
 public:
-    Filter(const AffineTransform& absoluteTransform) : m_absoluteTransform(absoluteTransform), m_renderingMode(Unaccelerated) { }
+    Filter(const AffineTransform& absoluteTransform) : m_renderingMode(Unaccelerated), m_absoluteTransform(absoluteTransform) { }
     virtual ~Filter() { }
 
     void setSourceImage(PassOwnPtr<ImageBuffer> sourceImage) { m_sourceImage = sourceImage; }

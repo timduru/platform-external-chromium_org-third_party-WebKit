@@ -44,7 +44,7 @@
 
 namespace WebCore {
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createGenericRecord(double startTime, int maxCallStackDepth)
+PassRefPtr<InspectorObject> TimelineRecordFactory::createGenericRecord(double startTime, int maxCallStackDepth, const String& type)
 {
     RefPtr<InspectorObject> record = InspectorObject::create();
     record->setNumber("startTime", startTime);
@@ -54,6 +54,7 @@ PassRefPtr<InspectorObject> TimelineRecordFactory::createGenericRecord(double st
         if (stackTrace && stackTrace->size())
             record->setValue("stackTrace", stackTrace->buildInspectorArray());
     }
+    record->setString("type", type);
     return record.release();
 }
 
@@ -234,16 +235,22 @@ static PassRefPtr<InspectorArray> createQuad(const FloatQuad& quad)
     return array.release();
 }
 
-PassRefPtr<InspectorObject> TimelineRecordFactory::createPaintData(const FloatQuad& quad, int layerRootNodeId)
+PassRefPtr<InspectorObject> TimelineRecordFactory::createLayerData(long long layerRootNodeId)
 {
     RefPtr<InspectorObject> data = InspectorObject::create();
-    data->setArray("clip", createQuad(quad));
     if (layerRootNodeId)
         data->setNumber("layerRootNode", layerRootNodeId);
     return data.release();
 }
 
-void TimelineRecordFactory::appendLayoutRoot(InspectorObject* data, const FloatQuad& quad, int rootNodeId)
+PassRefPtr<InspectorObject> TimelineRecordFactory::createPaintData(const FloatQuad& quad, long long layerRootNodeId)
+{
+    RefPtr<InspectorObject> data = TimelineRecordFactory::createLayerData(layerRootNodeId);
+    data->setArray("clip", createQuad(quad));
+    return data.release();
+}
+
+void TimelineRecordFactory::appendLayoutRoot(InspectorObject* data, const FloatQuad& quad, long long rootNodeId)
 {
     data->setArray("root", createQuad(quad));
     if (rootNodeId)

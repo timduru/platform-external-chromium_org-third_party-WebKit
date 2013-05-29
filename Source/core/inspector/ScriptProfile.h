@@ -32,7 +32,6 @@
 #define ScriptProfile_h
 
 #include "InspectorTypeBuilder.h"
-#include "core/inspector/ScriptProfileNode.h"
 #include "wtf/RefCounted.h"
 #include "wtf/text/WTFString.h"
 
@@ -54,7 +53,6 @@ public:
 
     String title() const;
     unsigned int uid() const;
-    PassRefPtr<ScriptProfileNode> head() const;
     double idleTime() const;
 
     PassRefPtr<TypeBuilder::Profiler::CPUProfileNode> buildInspectorObjectForHead() const;
@@ -64,7 +62,8 @@ private:
     ScriptProfile(const v8::CpuProfile* profile, double idleTime)
         : m_profile(profile)
         , m_idleTime(idleTime)
-    {}
+    {
+    }
 
     const v8::CpuProfile* m_profile;
     double m_idleTime;

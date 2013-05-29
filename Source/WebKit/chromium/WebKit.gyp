@@ -50,7 +50,6 @@
                 '<(DEPTH)/third_party/icu/icu.gyp:icuuc',
                 '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
                 '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
-                'webkit_wtf_support',
             ],
             'export_dependent_settings': [
                 '../../Platform/Platform.gyp/Platform.gyp:webkit_platform',
@@ -90,8 +89,6 @@
                 'public/WebColorName.h',
                 'public/WebCommonWorkerClient.h',
                 'public/WebCompositionUnderline.h',
-                'public/WebCompositorInputHandler.h',
-                'public/WebCompositorInputHandlerClient.h',
                 'public/WebConsoleMessage.h',
                 'public/WebContentDetectionResult.h',
                 'public/WebContextMenuData.h',
@@ -370,6 +367,12 @@
                 'src/PageOverlayList.h',
                 'src/PageWidgetDelegate.cpp',
                 'src/PageWidgetDelegate.h',
+                'src/PopupContainer.cpp',
+                'src/PopupContainer.h',
+                'src/PopupMenuChromium.cpp',
+                'src/PopupMenuChromium.h',
+                'src/PopupListBox.cpp',
+                'src/PopupListBox.h',
                 'src/ScrollbarGroup.cpp',
                 'src/ScrollbarGroup.h',
                 'src/SharedWorkerRepository.cpp',
@@ -405,8 +408,6 @@
                 'src/WebCachedURLRequest.cpp',
                 'src/WebColorName.cpp',
                 'src/WebCommon.cpp',
-                'src/WebCompositorInputHandlerImpl.cpp',
-                'src/WebCompositorInputHandlerImpl.h',
                 'src/WebCrossOriginPreflightResultCache.cpp',
                 'src/WebDOMActivityLogger.cpp',
                 'src/WebDOMCustomEvent.cpp',
@@ -553,6 +554,8 @@
                 'src/WebWorkerClientImpl.h',
                 'src/WebWorkerInfo.cpp',
                 'src/WebWorkerRunLoop.cpp',
+                'src/WorkerAllowMainThreadBridgeBase.cpp',
+                'src/WorkerAllowMainThreadBridgeBase.h',
                 'src/WorkerAsyncFileSystemChromium.cpp',
                 'src/WorkerAsyncFileSystemChromium.h',
                 'src/WorkerAsyncFileWriterChromium.cpp',
@@ -746,31 +749,6 @@
                     'sources/': [
                         ['include', '^src/linux/WebFontRendering\\.cpp$'],
                         ['include', '^src/linux/WebFontRenderStyle\\.cpp$'],
-                    ],
-                }],
-            ],
-        },
-        {
-            'target_name': 'webkit_wtf_support',
-            'type': 'static_library',
-            'dependencies': [
-                '../../wtf/wtf.gyp:wtf',
-            ],
-            'defines': [
-                'WEBKIT_IMPLEMENTATION=1',
-            ],
-            'include_dirs': [
-                '../../Platform/chromium',
-            ],
-            'sources': [
-                'src/ChromiumCurrentTime.cpp',
-                'src/ChromiumOSRandomSource.cpp',
-                'src/ChromiumThreading.cpp',
-            ],
-            'conditions': [
-                ['component=="shared_library"', {
-                    'defines': [
-                        'WEBKIT_DLL',
                     ],
                 }],
             ],

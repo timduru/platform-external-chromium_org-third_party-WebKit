@@ -27,7 +27,6 @@
 
 #include "core/html/canvas/WebGLRenderbuffer.h"
 
-#include "core/html/canvas/WebGLContextGroup.h"
 #include "core/html/canvas/WebGLRenderingContext.h"
 
 namespace WebCore {
@@ -51,6 +50,7 @@ WebGLRenderbuffer::WebGLRenderbuffer(WebGLRenderingContext* ctx)
     , m_isValid(true)
     , m_hasEverBeenBound(false)
 {
+    ScriptWrappable::init(this);
     setObject(ctx->graphicsContext3D()->createRenderbuffer());
 }
 

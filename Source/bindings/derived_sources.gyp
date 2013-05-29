@@ -41,14 +41,10 @@
     'idl_files': [
       '<@(core_idl_files)',
       '<@(modules_idl_files)',
+      '<@(svg_idl_files)',
     ],
 
     'conditions': [
-      ['enable_svg!=0', {
-        'idl_files': [
-          '<@(svg_idl_files)',
-        ],
-      }],
       ['OS=="win" and buildtype=="Official"', {
         # On windows official release builds, we try to preserve symbol space.
         'derived_sources_aggregate_files': [
@@ -77,6 +73,17 @@
           '<(SHARED_INTERMEDIATE_DIR)/webkit/bindings/V8DerivedSources19.cpp',
         ],
       }],
+      # The bindings generator can not write generated files if they are identical
+      # to the already existing file – that way they don't need to be recompiled.
+      # However, a reverse dependency having a newer timestamp than a
+      # generated binding can confuse some build systems, so only use this on
+      # ninja which explicitly supports this use case (gyp turns all actions into
+      # ninja restat rules).
+      ['"<(GENERATOR)"=="ninja"', {
+        'write_file_only_if_changed': '--write-file-only-if-changed 1',
+      },{
+        'write_file_only_if_changed': '--write-file-only-if-changed 0',
+      }],
     ],
   },
 
@@ -97,7 +104,7 @@
         'idl_files_list': '<|(idl_files_list.tmp <@(idl_files))',
       },
       'inputs': [
-        'scripts/preprocess-idls.pl',
+        'scripts/preprocess_idls.py',
         '<(idl_files_list)',
         '<!@(cat <(idl_files_list))',
        ],
@@ -107,19 +114,15 @@
        ],
        'msvs_cygwin_shell': 0,
        'action': [
-         '<(perl_exe)',
-         '-w',
-         '-Iscripts',
-         '-I../core/scripts',
-         'scripts/preprocess-idls.pl',
-         '--defines',
-         '<(feature_defines)',
-         '--idlFilesList',
+         'python',
+         'scripts/preprocess_idls.py',
+         '--idl-files-list',
          '<(idl_files_list)',
-         '--supplementalDependencyFile',
+         '--supplemental-dependency-file',
          '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
-         '--windowConstructorsFile',
+         '--window-constructors-file',
          '<(SHARED_INTERMEDIATE_DIR)/DOMWindowConstructors.idl',
+         '<@(write_file_only_if_changed)',
        ],
        'message': 'Resolving partial interfaces dependencies in all IDL files',
       }]
@@ -208,6 +211,7 @@
           '<(webcore_test_support_idl_files)',
           '<(RULE_INPUT_PATH)',
           '<@(preprocessor)',
+          '<@(write_file_only_if_changed)',
         ],
         'message': 'Generating binding from <(RULE_INPUT_PATH)',
       }],

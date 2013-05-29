@@ -198,7 +198,7 @@ void V8DOMWindow::locationAttrSetterCustom(v8::Local<v8::String> name, v8::Local
       return;
 
     if (Location* location = imp->location())
-        location->setHref(toWebCoreString(value), active, first);
+        location->setHref(active, first, toWebCoreString(value));
 }
 
 void V8DOMWindow::openerAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
@@ -425,24 +425,6 @@ v8::Handle<v8::Value> V8DOMWindow::openMethodCustom(const v8::Arguments& args)
     return toV8Fast(openedWindow.release(), args, impl);
 }
 
-v8::Handle<v8::Value> V8DOMWindow::indexedPropertyGetter(uint32_t index, const v8::AccessorInfo& info)
-{
-
-    DOMWindow* window = V8DOMWindow::toNative(info.Holder());
-    if (!window)
-        return v8Undefined();
-
-    Frame* frame = window->frame();
-    if (!frame)
-        return v8Undefined();
-
-    Frame* child = frame->tree()->scopedChild(index);
-    if (child)
-        return toV8Fast(child->document()->domWindow(), info, window);
-
-    return v8Undefined();
-}
-
 v8::Handle<v8::Value> V8DOMWindow::namedPropertyGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
 
@@ -525,7 +507,12 @@ bool V8DOMWindow::namedSecurityCheckCustom(v8::Local<v8::Object> host, v8::Local
         // We need to explicitly compare against nameOfProtoProperty because
         // V8's JSObject::LocalLookup finds __proto__ before
         // interceptors and even when __proto__ isn't a "real named property".
-        if (type == v8::ACCESS_GET && childFrame && !host->HasRealNamedProperty(key->ToString()) && name != nameOfProtoProperty)
+        v8::Handle<v8::String> keyString = key->ToString();
+        if (type == v8::ACCESS_GET
+            && childFrame
+            && !host->HasRealNamedProperty(keyString)
+            && !window->HasRealNamedProperty(keyString)
+            && name != nameOfProtoProperty)
             return true;
     }
 
@@ -574,7 +561,7 @@ v8::Handle<v8::Value> toV8(DOMWindow* window, v8::Handle<v8::Object> creationCon
     if (!frame)
         return v8Undefined();
 
-    // Special case: Because of evaluateInIsolatedWorld() one DOMWindow can have
+    // Special case: Because of executeScriptInIsolatedWorld() one DOMWindow can have
     // multiple contexts and multiple global objects associated with it. When
     // code running in one of those contexts accesses the window object, we
     // want to return the global object associated with that context, not

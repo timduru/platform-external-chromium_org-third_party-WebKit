@@ -20,8 +20,7 @@
 
 // Introduced in DOM Level 2:
 [
-    NoInterfaceObject,
-    ImplementationLacksVTable
+    NoInterfaceObject
 ] interface TreeWalker {
     readonly attribute Node root;
     readonly attribute unsigned long whatToShow;

@@ -42,12 +42,15 @@
 #include "HTMLElementFactory.h"
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
+#include "SVGElementFactory.h"
+#include "SVGNames.h"
 #include "XMLNSNames.h"
 #include "XMLNames.h"
 #include "bindings/v8/Dictionary.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/accessibility/AXObjectCache.h"
+#include "core/animation/DocumentTimeline.h"
 #include "core/css/CSSParser.h"
 #include "core/css/CSSStyleDeclaration.h"
 #include "core/css/CSSStyleSheet.h"
@@ -142,6 +145,7 @@
 #include "core/loader/TextResourceDecoder.h"
 #include "core/loader/cache/CachedCSSStyleSheet.h"
 #include "core/loader/cache/CachedResourceLoader.h"
+#include "core/page/CaptionUserPreferences.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/ContentSecurityPolicy.h"
@@ -184,6 +188,9 @@
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
+#include "core/svg/SVGDocumentExtensions.h"
+#include "core/svg/SVGSVGElement.h"
+#include "core/svg/SVGStyleElement.h"
 #include "core/workers/SharedWorkerRepository.h"
 #include "core/xml/XMLHttpRequest.h"
 #include "core/xml/XPathEvaluator.h"
@@ -196,16 +203,6 @@
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
-
-#if ENABLE(SVG)
-#include "SVGElementFactory.h"
-#include "SVGNames.h"
-#include "core/svg/SVGDocumentExtensions.h"
-#include "core/svg/SVGSVGElement.h"
-#include "core/svg/SVGStyleElement.h"
-#endif
-
-#include "core/page/CaptionUserPreferences.h"
 
 using namespace std;
 using namespace WTF;
@@ -373,6 +370,31 @@ static void printNavigationErrorMessage(Frame* frame, const KURL& activeURL, con
 
 uint64_t Document::s_globalTreeVersion = 0;
 
+// This class should be passed only to Document::postTask.
+class CheckFocusedNodeTask FINAL : public ScriptExecutionContext::Task {
+public:
+    static PassOwnPtr<CheckFocusedNodeTask> create()
+    {
+        return adoptPtr(new CheckFocusedNodeTask());
+    }
+    virtual ~CheckFocusedNodeTask() { }
+
+private:
+    CheckFocusedNodeTask() { }
+    virtual void performTask(ScriptExecutionContext* context) OVERRIDE
+    {
+        ASSERT(context->isDocument());
+        Document* document = toDocument(context);
+        document->didRunCheckFocusedNodeTask();
+        if (!document->focusedNode())
+            return;
+        if (document->focusedNode()->renderer() && document->focusedNode()->renderer()->needsLayout())
+            return;
+        if (!document->focusedNode()->isFocusable())
+            document->setFocusedNode(0);
+    }
+};
+
 Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentClasses)
     : ContainerNode(0, CreateDocument)
     , TreeScope(this)
@@ -382,6 +404,7 @@ Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentCla
     , m_contextFeatures(ContextFeatures::defaultSwitch())
     , m_compatibilityMode(NoQuirksMode)
     , m_compatibilityModeLocked(false)
+    , m_didPostCheckFocusedNodeTask(false)
     , m_domTreeVersion(++s_globalTreeVersion)
     , m_mutationObserverTypes(0)
     , m_styleSheetCollection(DocumentStyleSheetCollection::create(this))
@@ -620,6 +643,8 @@ void Document::dispose()
     // so tear down scope information upfront to avoid having stale references in the map.
     destroyTreeScopeData();
     removeDetachedChildren();
+    // removeDetachedChildren() can access FormController.
+    m_formController.clear();
 
     m_markers->detach();
 
@@ -882,7 +907,7 @@ PassRefPtr<Text> Document::createEditingTextNode(const String& text)
 
 PassRefPtr<CSSStyleDeclaration> Document::createCSSStyleDeclaration()
 {
-    return StylePropertySet::create()->ensureCSSStyleDeclaration();
+    return MutableStylePropertySet::create()->ensureCSSStyleDeclaration();
 }
 
 PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCode& ec)
@@ -1052,10 +1077,8 @@ PassRefPtr<Element> Document::createElement(const QualifiedName& qName, bool cre
     // FIXME: Use registered namespaces and look up in a hash to find the right factory.
     if (qName.namespaceURI() == xhtmlNamespaceURI)
         e = HTMLElementFactory::createHTMLElement(qName, this, 0, createdByParser);
-#if ENABLE(SVG)
     else if (qName.namespaceURI() == SVGNames::svgNamespaceURI)
         e = SVGElementFactory::createSVGElement(qName, this, createdByParser);
-#endif
 
     if (e)
         m_sawElementsInKnownNamespaces = true;
@@ -1710,6 +1733,12 @@ void Document::updateLayout()
     // Only do a layout if changes have occurred that make it necessary.
     if (frameView && renderer() && (frameView->layoutPending() || renderer()->needsLayout()))
         frameView->layout();
+
+    // FIXME: Using a Task doesn't look a good idea.
+    if (m_focusedNode && !m_didPostCheckFocusedNodeTask) {
+        postTask(CheckFocusedNodeTask::create());
+        m_didPostCheckFocusedNodeTask = true;
+    }
 }
 
 // FIXME: This is a bad idea and needs to be removed eventually.
@@ -1846,12 +1875,7 @@ void Document::attach()
 
     recalcStyle(Force);
 
-    RenderObject* render = renderer();
-    setRenderer(0);
-
     ContainerNode::attach();
-
-    setRenderer(render);
 }
 
 void Document::detach()
@@ -1992,8 +2016,10 @@ AXObjectCache* Document::axObjectCache() const
 void Document::setVisuallyOrdered()
 {
     m_visuallyOrdered = true;
+    // FIXME: How is possible to not have a renderer here?
     if (renderer())
         renderer()->style()->setRTLOrdering(VisualOrder);
+    scheduleForcedStyleRecalc();
 }
 
 PassRefPtr<DocumentParser> Document::createParser()
@@ -2212,13 +2238,11 @@ void Document::implicitClose()
     HTMLLinkElement::dispatchPendingLoadEvents();
     HTMLStyleElement::dispatchPendingLoadEvents();
 
-#if ENABLE(SVG)
     // To align the HTML load event and the SVGLoad event for the outermost <svg> element, fire it from
     // here, instead of doing it from SVGElement::finishedParsingChildren (if externalResourcesRequired="false",
     // which is the default, for ='true' its fired at a later time, once all external resources finished loading).
     if (svgExtensions())
         accessSVGExtensions()->dispatchSVGLoadEventToOutermostSVGElements();
-#endif
 
     dispatchWindowLoadEvent();
     enqueuePageshowEvent(PageshowEventNotPersisted);
@@ -2283,10 +2307,8 @@ void Document::implicitClose()
         }
     }
 
-#if ENABLE(SVG)
     if (svgExtensions())
         accessSVGExtensions()->startAnimations();
-#endif
 }
 
 void Document::setParsing(bool b)
@@ -2774,7 +2796,7 @@ void Document::updateViewportArguments()
 #ifndef NDEBUG
         m_didDispatchViewportPropertiesChanged = true;
 #endif
-        page()->chrome()->dispatchViewportPropertiesDidChange(m_viewportArguments);
+        page()->chrome().dispatchViewportPropertiesDidChange(m_viewportArguments);
     }
 }
 
@@ -2796,7 +2818,13 @@ MouseEventWithHitTestResults Document::prepareMouseEvent(const HitTestRequest& r
 {
     ASSERT(!renderer() || renderer()->isRenderView());
 
-    if (!renderer())
+    // RenderView::hitTest causes a layout, and we don't want to hit that until the first
+    // layout because until then, there is nothing shown on the screen - the user can't
+    // have intentionally clicked on something belonging to this page. Furthermore,
+    // mousemove events before the first layout should not lead to a premature layout()
+    // happening, which could show a flash of white.
+    // See also the similar code in EventHandler::hitTestResultAtPoint.
+    if (!renderer() || !view() || !view()->didFirstLayout())
         return MouseEventWithHitTestResults(event, HitTestResult(LayoutPoint()));
 
     HitTestResult result(documentPoint);
@@ -3229,7 +3257,7 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode, FocusDirection
     }
 
     if (!focusChangeBlocked)
-        page()->chrome()->focusedNodeChanged(m_focusedNode.get());
+        page()->chrome().focusedNodeChanged(m_focusedNode.get());
 
 SetFocusedNodeDone:
     updateStyleIfNeeded();
@@ -3921,6 +3949,7 @@ KURL Document::openSearchDescriptionURL()
 
 void Document::applyXSLTransform(ProcessingInstruction* pi)
 {
+    UseCounter::count(this, UseCounter::XSLProcessingInstruction);
     RefPtr<XSLTProcessor> processor = XSLTProcessor::create();
     processor->setXSLStyleSheet(static_cast<XSLStyleSheet*>(pi->sheet()));
     String resultMIMEType;
@@ -4001,7 +4030,6 @@ PassRefPtr<Attr> Document::createAttributeNS(const String& namespaceURI, const S
     return Attr::create(this, qName, emptyString());
 }
 
-#if ENABLE(SVG)
 const SVGDocumentExtensions* Document::svgExtensions()
 {
     return m_svgExtensions.get();
@@ -4018,7 +4046,6 @@ bool Document::hasSVGRootNode() const
 {
     return documentElement() && documentElement()->hasTagName(SVGNames::svgTag);
 }
-#endif
 
 PassRefPtr<HTMLCollection> Document::ensureCachedCollection(CollectionType type)
 {
@@ -4710,7 +4737,7 @@ void Document::requestFullScreenForElement(Element* element, unsigned short flag
         // 5. Return, and run the remaining steps asynchronously.
         // 6. Optionally, perform some animation.
         m_areKeysEnabledInFullScreen = flags & Element::ALLOW_KEYBOARD_INPUT;
-        page()->chrome()->client()->enterFullScreenForElement(element);
+        page()->chrome().client()->enterFullScreenForElement(element);
 
         // 7. Optionally, display a message indicating how the user can exit displaying the context object fullscreen.
         return;
@@ -4801,12 +4828,12 @@ void Document::webkitExitFullscreen()
     // Only exit out of full screen window mode if there are no remaining elements in the
     // full screen stack.
     if (!newTop) {
-        page()->chrome()->client()->exitFullScreenForElement(m_fullScreenElement.get());
+        page()->chrome().client()->exitFullScreenForElement(m_fullScreenElement.get());
         return;
     }
 
     // Otherwise, notify the chrome of the new full screen element.
-    page()->chrome()->client()->enterFullScreenForElement(newTop);
+    page()->chrome().client()->enterFullScreenForElement(newTop);
 }
 
 bool Document::webkitFullscreenEnabled() const
@@ -4935,33 +4962,6 @@ void Document::fullScreenRendererDestroyed()
     m_fullScreenRenderer = 0;
 }
 
-void Document::setFullScreenRendererSize(const IntSize& size)
-{
-    ASSERT(m_fullScreenRenderer);
-    if (!m_fullScreenRenderer)
-        return;
-
-    if (m_fullScreenRenderer) {
-        RefPtr<RenderStyle> newStyle = RenderStyle::clone(m_fullScreenRenderer->style());
-        newStyle->setWidth(Length(size.width(), WebCore::Fixed));
-        newStyle->setHeight(Length(size.height(), WebCore::Fixed));
-        newStyle->setTop(Length(0, WebCore::Fixed));
-        newStyle->setLeft(Length(0, WebCore::Fixed));
-        m_fullScreenRenderer->setStyle(newStyle);
-        updateLayout();
-    }
-}
-
-void Document::setFullScreenRendererBackgroundColor(Color backgroundColor)
-{
-    if (!m_fullScreenRenderer)
-        return;
-
-    RefPtr<RenderStyle> newStyle = RenderStyle::clone(m_fullScreenRenderer->style());
-    newStyle->setBackgroundColor(backgroundColor);
-    m_fullScreenRenderer->setStyle(newStyle);
-}
-
 void Document::fullScreenChangeDelayTimerFired(Timer<Document>*)
 {
     // Since we dispatch events in this function, it's possible that the
@@ -5025,11 +5025,6 @@ void Document::removeFullScreenElementOfSubtree(Node* node, bool amongChildrenOn
 
     if (elementInSubtree)
         fullScreenElementRemoved();
-}
-
-bool Document::isAnimatingFullScreen() const
-{
-    return m_isAnimatingFullScreen;
 }
 
 void Document::setAnimatingFullScreen(bool flag)
@@ -5155,7 +5150,7 @@ void Document::serviceScriptedAnimations(double monotonicAnimationStartTime)
     m_scriptedAnimationController->serviceScriptedAnimations(monotonicAnimationStartTime);
 }
 
-PassRefPtr<Touch> Document::createTouch(DOMWindow* window, EventTarget* target, int identifier, int pageX, int pageY, int screenX, int screenY, int radiusX, int radiusY, float rotationAngle, float force, ExceptionCode&) const
+PassRefPtr<Touch> Document::createTouch(DOMWindow* window, EventTarget* target, int identifier, int pageX, int pageY, int screenX, int screenY, int radiusX, int radiusY, float rotationAngle, float force) const
 {
     // FIXME: It's not clear from the documentation at
     // http://developer.apple.com/library/safari/#documentation/UserExperience/Reference/DocumentAdditionsReference/DocumentAdditions/DocumentAdditions.html
@@ -5216,7 +5211,7 @@ void Document::didAddTouchEventHandler(Node* handler)
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
             scrollingCoordinator->touchEventTargetRectsDidChange(this);
         if (m_touchEventTargets->size() == 1)
-            page->chrome()->client()->needTouchEvents(true);
+            page->chrome().client()->needTouchEvents(true);
     }
 }
 
@@ -5242,7 +5237,7 @@ void Document::didRemoveTouchEventHandler(Node* handler)
         if (frame->document() && frame->document()->hasTouchEventHandlers())
             return;
     }
-    page->chrome()->client()->needTouchEvents(false);
+    page->chrome().client()->needTouchEvents(false);
 }
 
 void Document::didRemoveEventTargetNode(Node* handler)
@@ -5541,9 +5536,7 @@ void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_transformSourceDocument, "transformSourceDocument");
     info.addMember(m_decoder, "decoder");
     info.addMember(m_xpathEvaluator, "xpathEvaluator");
-#if ENABLE(SVG)
     info.addMember(m_svgExtensions, "svgExtensions");
-#endif
     info.addMember(m_selectorQueryCache, "selectorQueryCache");
     info.addMember(m_renderer, "renderer");
     info.addMember(m_weakFactory, "weakFactory");
@@ -5630,7 +5623,7 @@ void Document::didAssociateFormControlsTimerFired(Timer<Document>* timer)
     Vector<RefPtr<Element> > associatedFormControls;
     copyToVector(m_associatedFormControls, associatedFormControls);
 
-    frame()->page()->chrome()->client()->didAssociateFormControls(associatedFormControls);
+    frame()->page()->chrome().client()->didAssociateFormControls(associatedFormControls);
     m_associatedFormControls.clear();
 }
 

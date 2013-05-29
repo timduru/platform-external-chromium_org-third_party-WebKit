@@ -70,6 +70,7 @@ inline EventSource::EventSource(ScriptExecutionContext* context, const KURL& url
     , m_requestInFlight(false)
     , m_reconnectDelay(defaultReconnectDelay)
 {
+    ScriptWrappable::init(this);
     eventSourceInit.get("withCredentials", m_withCredentials);
 }
 
@@ -293,7 +294,7 @@ void EventSource::didFail(const ResourceError& error)
 
 void EventSource::didFailAccessControlCheck(const ResourceError& error)
 {
-    String message = makeString("EventSource cannot load ", error.failingURL(), ". ", error.localizedDescription());
+    String message = "EventSource cannot load " + error.failingURL() + ". " + error.localizedDescription();
     scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, message);
 
     abortConnectionAttempt();

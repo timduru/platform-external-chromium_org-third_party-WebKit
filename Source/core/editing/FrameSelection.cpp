@@ -301,6 +301,7 @@ void FrameSelection::setSelection(const VisibleSelection& newSelection, SetSelec
 
     if (m_selection == s) {
         // Even if selection was not changed, selection offsets may have been changed.
+        m_frame->editor()->cancelCompositionIfSelectionIsInvalid();
         notifyRendererOfSelectionChange(userTriggered);
         return;
     }
@@ -495,10 +496,14 @@ TextDirection FrameSelection::directionOfSelection()
     InlineBox* startBox = 0;
     InlineBox* endBox = 0;
     int unusedOffset;
-    if (m_selection.start().isNotNull())
-        m_selection.visibleStart().getInlineBoxAndOffset(startBox, unusedOffset);
-    if (m_selection.end().isNotNull())
-        m_selection.visibleEnd().getInlineBoxAndOffset(endBox, unusedOffset);
+    // Cache the VisiblePositions because visibleStart() and visibleEnd()
+    // can cause layout, which has the potential to invalidate lineboxes.
+    VisiblePosition startPosition = m_selection.visibleStart();
+    VisiblePosition endPosition = m_selection.visibleEnd();
+    if (startPosition.isNotNull())
+        startPosition.getInlineBoxAndOffset(startBox, unusedOffset);
+    if (endPosition.isNotNull())
+        endPosition.getInlineBoxAndOffset(endBox, unusedOffset);
     if (startBox && endBox && startBox->direction() == endBox->direction())
         return startBox->direction();
 
@@ -577,6 +582,26 @@ VisiblePosition FrameSelection::endForPlatform() const
     return positionForPlatform(false);
 }
 
+VisiblePosition FrameSelection::nextWordPositionForPlatform(const VisiblePosition &originalPosition)
+{
+    VisiblePosition positionAfterCurrentWord = nextWordPosition(originalPosition);
+
+    if (m_frame && m_frame->editor()->behavior().shouldSkipSpaceWhenMovingRight()) {
+        // In order to skip spaces when moving right, we advance one
+        // word further and then move one word back. Given the
+        // semantics of previousWordPosition() this will put us at the
+        // beginning of the word following.
+        VisiblePosition positionAfterSpacingAndFollowingWord = nextWordPosition(positionAfterCurrentWord);
+        if (positionAfterSpacingAndFollowingWord.isNotNull() && positionAfterSpacingAndFollowingWord != positionAfterCurrentWord)
+            positionAfterCurrentWord = previousWordPosition(positionAfterSpacingAndFollowingWord);
+
+        bool movingBackwardsMovedPositionToStartOfCurrentWord = positionAfterCurrentWord == previousWordPosition(nextWordPosition(originalPosition));
+        if (movingBackwardsMovedPositionToStartOfCurrentWord)
+            positionAfterCurrentWord = positionAfterSpacingAndFollowingWord;
+    }
+    return positionAfterCurrentWord;
+}
+
 #if ENABLE(USERSELECT_ALL)
 static void adjustPositionForUserSelectAll(VisiblePosition& pos, bool isForward)
 {
@@ -603,7 +628,7 @@ VisiblePosition FrameSelection::modifyExtendingRight(TextGranularity granularity
         break;
     case WordGranularity:
         if (directionOfEnclosingBlock() == LTR)
-            pos = nextWordPosition(pos);
+            pos = nextWordPositionForPlatform(pos);
         else
             pos = previousWordPosition(pos);
         break;
@@ -637,7 +662,7 @@ VisiblePosition FrameSelection::modifyExtendingForward(TextGranularity granulari
         pos = pos.next(CannotCrossEditingBoundary);
         break;
     case WordGranularity:
-        pos = nextWordPosition(pos);
+        pos = nextWordPositionForPlatform(pos);
         break;
     case SentenceGranularity:
         pos = nextSentencePosition(pos);
@@ -717,7 +742,7 @@ VisiblePosition FrameSelection::modifyMovingForward(TextGranularity granularity)
             pos = VisiblePosition(m_selection.extent(), m_selection.affinity()).next(CannotCrossEditingBoundary);
         break;
     case WordGranularity:
-        pos = nextWordPosition(VisiblePosition(m_selection.extent(), m_selection.affinity()));
+        pos = nextWordPositionForPlatform(VisiblePosition(m_selection.extent(), m_selection.affinity()));
         break;
     case SentenceGranularity:
         pos = nextSentencePosition(VisiblePosition(m_selection.extent(), m_selection.affinity()));
@@ -773,7 +798,7 @@ VisiblePosition FrameSelection::modifyExtendingLeft(TextGranularity granularity)
         if (directionOfEnclosingBlock() == LTR)
             pos = previousWordPosition(pos);
         else
-            pos = nextWordPosition(pos);
+            pos = nextWordPositionForPlatform(pos);
         break;
     case LineBoundary:
         if (directionOfEnclosingBlock() == LTR)
@@ -1878,11 +1903,11 @@ void DragCaretController::paintDragCaret(Frame* frame, GraphicsContext* p, const
         paintCaret(m_position.deepEquivalent().deprecatedNode(), p, paintOffset, clipRect);
 }
 
-PassRefPtr<StylePropertySet> FrameSelection::copyTypingStyle() const
+PassRefPtr<MutableStylePropertySet> FrameSelection::copyTypingStyle() const
 {
     if (!m_typingStyle || !m_typingStyle->style())
         return 0;
-    return m_typingStyle->style()->copy();
+    return m_typingStyle->style()->mutableCopy();
 }
 
 bool FrameSelection::shouldDeleteSelection(const VisibleSelection& selection) const

@@ -31,6 +31,7 @@
 #define InjectedScriptHost_h
 
 #include "bindings/v8/ScriptState.h"
+#include "bindings/v8/ScriptWrappable.h"
 #include "core/inspector/InspectorAgent.h"
 #include "core/page/ConsoleTypes.h"
 #include <wtf/RefCounted.h>
@@ -57,7 +58,12 @@ class Storage;
 
 struct EventListenerInfo;
 
-class InjectedScriptHost : public RefCounted<InjectedScriptHost> {
+// SECURITY NOTE: Although the InjectedScriptHost is intended for use solely by the inspector,
+// a reference to the InjectedScriptHost may be leaked to the page being inspected. Thus, the
+// InjectedScriptHost must never implemment methods that have more power over the page than the
+// page already has itself (e.g. origin restriction bypasses).
+
+class InjectedScriptHost : public RefCounted<InjectedScriptHost>, public ScriptWrappable {
 public:
     static PassRefPtr<InjectedScriptHost> create();
     ~InjectedScriptHost();

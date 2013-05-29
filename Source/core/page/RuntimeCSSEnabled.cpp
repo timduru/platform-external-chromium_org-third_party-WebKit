@@ -55,7 +55,6 @@ static void setPropertySwitchesFromRuntimeFeatures(BoolVector& properties)
     };
     setCSSPropertiesEnabled(regionProperites, WTF_ARRAY_LENGTH(regionProperites), RuntimeEnabledFeatures::cssRegionsEnabled());
     CSSPropertyID exclusionProperties[] = {
-        CSSPropertyWebkitWrap,
         CSSPropertyWebkitWrapFlow,
         CSSPropertyWebkitShapeMargin,
         CSSPropertyWebkitShapePadding,
@@ -67,6 +66,7 @@ static void setPropertySwitchesFromRuntimeFeatures(BoolVector& properties)
 
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyBackgroundBlendMode, RuntimeEnabledFeatures::cssCompositingEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyMixBlendMode, RuntimeEnabledFeatures::cssCompositingEnabled());
+    RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyTouchAction, RuntimeEnabledFeatures::cssTouchActionEnabled());
 }
 
 static BoolVector& propertySwitches()

@@ -65,13 +65,13 @@ void fillWithEmptyClients(Page::PageClients& pageClients)
 
 class EmptyPopupMenu : public PopupMenu {
 public:
-    virtual void show(const FloatQuad&, const IntSize&, FrameView*, int) { }
-    virtual void hide() { }
-    virtual void updateFromElement() { }
-    virtual void disconnectClient() { }
+    virtual void show(const FloatQuad&, const IntSize&, int) OVERRIDE { }
+    virtual void hide() OVERRIDE { }
+    virtual void updateFromElement() OVERRIDE { }
+    virtual void disconnectClient() OVERRIDE { }
 };
 
-PassRefPtr<PopupMenu> EmptyChromeClient::createPopupMenu(PopupMenuClient*) const
+PassRefPtr<PopupMenu> EmptyChromeClient::createPopupMenu(Frame&, PopupMenuClient*) const
 {
     return adoptRef(new EmptyPopupMenu());
 }
@@ -145,11 +145,6 @@ void EmptyEditorClient::registerUndoStep(PassRefPtr<UndoStep>)
 
 void EmptyEditorClient::registerRedoStep(PassRefPtr<UndoStep>)
 {
-}
-
-PassOwnPtr<ContextMenu> EmptyContextMenuClient::customizeMenu(PassOwnPtr<ContextMenu>)
-{
-    return nullptr;
 }
 
 void EmptyFrameLoaderClient::didRequestAutocomplete(PassRefPtr<FormState>)

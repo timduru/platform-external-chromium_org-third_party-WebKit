@@ -27,6 +27,7 @@ namespace WebCore {
 namespace MediaFeatureNames {
 
 #define CSS_MEDIAQUERY_NAMES_FOR_EACH_MEDIAFEATURE(macro) \
+    macro(deprecatedTransition, "-webkit-transition") \
     macro(color, "color") \
     macro(colorIndex, "color-index") \
     macro(grid, "grid") \
@@ -66,7 +67,7 @@ namespace MediaFeatureNames {
     macro(resolution, "resolution") \
     macro(transform2d, "-webkit-transform-2d") \
     macro(transform3d, "-webkit-transform-3d") \
-    macro(transition, "-webkit-transition") \
+    macro(scan, "scan") \
     macro(animation, "-webkit-animation") \
     macro(viewMode, "-webkit-view-mode")
 

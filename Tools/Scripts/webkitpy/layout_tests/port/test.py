@@ -27,6 +27,7 @@
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 import base64
+import copy
 import sys
 import time
 
@@ -100,8 +101,8 @@ class TestList(object):
 #
 # These numbers may need to be updated whenever we add or delete tests.
 #
-TOTAL_TESTS = 104
-TOTAL_SKIPS = 28
+TOTAL_TESTS = 102
+TOTAL_SKIPS = 25
 TOTAL_RETRIES = 14
 
 UNEXPECTED_PASSES = 6
@@ -231,13 +232,9 @@ layer at (0,0) size 800x34
 
     tests.add('websocket/tests/passes/text.html')
 
-    # For testing test are properly included from platform directories.
+    # For testing that we don't run tests under platform/. Note that these don't contribute to TOTAL_TESTS.
     tests.add('platform/test-mac-leopard/http/test.html')
     tests.add('platform/test-win-win7/http/test.html')
-
-    # For --no-http tests, test that platform specific HTTP tests are properly skipped.
-    tests.add('platform/test-snow-leopard/http/test.html')
-    tests.add('platform/test-snow-leopard/websocket/test.html')
 
     # For testing if perf tests are running in a locked shard.
     tests.add('perf/foo/test.html')
@@ -555,22 +552,29 @@ class TestDriver(Driver):
         pixel_tests_flag = '-p' if pixel_tests else ''
         return [self._port._path_to_driver()] + [pixel_tests_flag] + self._port.get_option('additional_drt_flag', []) + per_test_args
 
-    def run_test(self, test_input, stop_when_done):
+    def run_test(self, driver_input, stop_when_done):
+        base = self._port.lookup_virtual_test_base(driver_input.test_name)
+        if base:
+            virtual_driver_input = copy.copy(driver_input)
+            virtual_driver_input.test_name = base
+            virtual_driver_input.args = self._port.lookup_virtual_test_args(driver_input.test_name)
+            return self.run_test(virtual_driver_input, stop_when_done)
+
         if not self.started:
             self.started = True
             self.pid = TestDriver.next_pid
             TestDriver.next_pid += 1
 
         start_time = time.time()
-        test_name = test_input.test_name
-        test_args = test_input.args or []
+        test_name = driver_input.test_name
+        test_args = driver_input.args or []
         test = self._port._tests[test_name]
         if test.keyboard:
             raise KeyboardInterrupt
         if test.exception:
             raise ValueError('exception from ' + test_name)
         if test.hang:
-            time.sleep((float(test_input.timeout) * 4) / 1000.0 + 1.0)  # The 1.0 comes from thread_padding_sec in layout_test_runnery.
+            time.sleep((float(driver_input.timeout) * 4) / 1000.0 + 1.0)  # The 1.0 comes from thread_padding_sec in layout_test_runnery.
 
         audio = None
         actual_text = test.actual_text
@@ -601,7 +605,7 @@ class TestDriver(Driver):
         if stop_when_done:
             self.stop()
 
-        if test.actual_checksum == test_input.image_hash:
+        if test.actual_checksum == driver_input.image_hash:
             image = None
         else:
             image = test.actual_image

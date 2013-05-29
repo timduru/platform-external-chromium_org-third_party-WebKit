@@ -19,13 +19,17 @@ CanvasPath status=test
 CSSCompositing status=experimental
 CSSExclusions status=experimental
 CSSRegions status=experimental
+CSSTouchAction status=test
+CSSVariables status=experimental
 CustomDOMElements status=experimental
 Database status=stable
+DataListElement status=stable
 DeviceMotion
 DeviceOrientation status=stable
 DialogElement status=experimental
 DirectoryUpload status=stable
-EncryptedMedia condition=ENCRYPTED_MEDIA, status=stable
+EncryptedMedia status=experimental
+EncryptedMediaAnyVersion status=stable
 ExperimentalCanvasFeatures status=test
 ExperimentalContentSecurityPolicyFeatures status=experimental
 ExperimentalShadowDOM status=experimental
@@ -34,16 +38,19 @@ FontLoadEvents status=experimental
 Fullscreen status=stable
 Gamepad status=stable
 Geolocation status=stable
+HTMLImports status=test
 IMEAPI status=test
 IndexedDB status=stable
 InputTypeWeek status=stable
 JavaScriptI18NAPI status=stable
 LangAttributeAwareFormControlUI
 LazyLayout
+LegacyEncryptedMedia status=stable
 LocalStorage status=stable
 Media custom
 MediaStream status=stable
 Notifications status=stable
+PagePopup status=stable
 PeerConnection depends_on=MediaStream, status=stable
 Quota status=stable
 RequestAutocomplete status=test
@@ -56,8 +63,8 @@ SpeechSynthesis status=experimental
 StyleScoped status=experimental
 Touch status=stable
 VideoTrack status=stable
-WebAnimation
+WebAnimations
 WebAudio condition=WEB_AUDIO, status=stable
 WebMIDI status=test
-WebPInAcceptHeader
 WebKitMediaSource status=stable
+WebPInAcceptHeader

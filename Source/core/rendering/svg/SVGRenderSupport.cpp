@@ -24,17 +24,13 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/rendering/svg/SVGRenderSupport.h"
 
-#include "core/dom/NodeRenderStyle.h"
 #include "core/platform/graphics/transforms/TransformState.h"
 #include "core/rendering/RenderGeometryMap.h"
 #include "core/rendering/RenderLayer.h"
-#include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/RenderSVGResourceClipper.h"
 #include "core/rendering/svg/RenderSVGResourceFilter.h"
-#include "core/rendering/svg/RenderSVGResourceMarker.h"
 #include "core/rendering/svg/RenderSVGResourceMasker.h"
 #include "core/rendering/svg/RenderSVGRoot.h"
 #include "core/rendering/svg/RenderSVGText.h"
@@ -464,5 +460,3 @@ void SVGRenderSupport::styleChanged(RenderObject* object)
 }
 
 }
-
-#endif

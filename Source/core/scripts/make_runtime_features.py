@@ -48,8 +48,8 @@ class RuntimeFeatureWriter(in_generator.Writer):
         'status': None,
     }
 
-    def __init__(self, in_file_path):
-        super(RuntimeFeatureWriter, self).__init__(in_file_path)
+    def __init__(self, in_file_path, enabled_conditions):
+        super(RuntimeFeatureWriter, self).__init__(in_file_path, enabled_conditions)
         self._features = self.in_file.name_dictionaries
         # Make sure the resulting dictionaries have all the keys we expect.
         for feature in self._features:
@@ -66,6 +66,7 @@ class RuntimeFeatureWriter(in_generator.Writer):
         lowered = string[0].lower() + string[1:]
         lowered = lowered.replace("cSS", "css")
         lowered = lowered.replace("iME", "ime")
+        lowered = lowered.replace("hTML", "html")
         return lowered
 
     def _feature_sets(self):

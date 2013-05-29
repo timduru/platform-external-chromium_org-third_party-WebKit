@@ -28,11 +28,8 @@
 #include "core/html/shadow/HTMLContentElement.h"
 
 #include "HTMLNames.h"
-#include "RuntimeEnabledFeatures.h"
 #include "core/css/CSSParser.h"
 #include "core/dom/QualifiedName.h"
-#include "core/dom/shadow/ContentDistributor.h"
-#include "core/dom/shadow/ContentSelectorQuery.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include <wtf/StdLibExtras.h>
 
@@ -96,8 +93,10 @@ void HTMLContentElement::ensureSelectParsed()
     parser.parseSelector(select(), m_selectorList);
     m_shouldParseSelectorList = false;
     m_isValidSelector = validateSelect();
-    if (!m_isValidSelector)
-        m_selectorList = CSSSelectorList();
+    if (!m_isValidSelector) {
+        CSSSelectorList emptyList;
+        m_selectorList.adopt(emptyList);
+    }
 }
 
 void HTMLContentElement::parseAttribute(const QualifiedName& name, const AtomicString& value)

@@ -21,7 +21,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/rendering/svg/RenderSVGResourceMarker.h"
 
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
@@ -31,7 +30,6 @@
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGMarkerElement.h"
 #include "core/svg/SVGStyledElement.h"
-#include "core/svg/SVGStyledTransformableElement.h"
 
 namespace WebCore {
 
@@ -180,5 +178,3 @@ void RenderSVGResourceMarker::calcViewport()
 }
 
 }
-
-#endif // ENABLE(SVG)

@@ -22,7 +22,6 @@
 #include "config.h"
 #include "core/rendering/svg/SVGInlineTextBox.h"
 
-#if ENABLE(SVG)
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/platform/FloatConversion.h"
@@ -31,13 +30,10 @@
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/InlineFlowBox.h"
 #include "core/rendering/PointerEventsHitRules.h"
-#include "core/rendering/RenderBlock.h"
 #include "core/rendering/svg/RenderSVGInlineText.h"
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/RenderSVGResourceSolidColor.h"
-#include "core/rendering/svg/SVGRenderingContext.h"
 #include "core/rendering/svg/SVGResourcesCache.h"
-#include "core/rendering/svg/SVGRootInlineBox.h"
 #include "core/rendering/svg/SVGTextRunRenderingContext.h"
 
 using namespace std;
@@ -68,6 +64,12 @@ void SVGInlineTextBox::dirtyLineBoxes()
 
     // Clear the now stale text fragments
     clearTextFragments();
+
+    // And clear any following text fragments as the text on which they
+    // depend may now no longer exist, or glyph positions may be wrong
+    InlineTextBox* nextBox = nextTextBox();
+    if (nextBox)
+        nextBox->dirtyLineBoxes();
 }
 
 int SVGInlineTextBox::offsetForPosition(float, bool) const
@@ -318,10 +320,10 @@ void SVGInlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
 
         // Spec: All text decorations except line-through should be drawn before the text is filled and stroked; thus, the text is rendered on top of these decorations.
         int decorations = style->textDecorationsInEffect();
-        if (decorations & UNDERLINE)
-            paintDecoration(paintInfo.context, UNDERLINE, fragment);
-        if (decorations & OVERLINE)
-            paintDecoration(paintInfo.context, OVERLINE, fragment);
+        if (decorations & TextDecorationUnderline)
+            paintDecoration(paintInfo.context, TextDecorationUnderline, fragment);
+        if (decorations & TextDecorationOverline)
+            paintDecoration(paintInfo.context, TextDecorationOverline, fragment);
 
         // Fill text
         if (hasFill) {
@@ -336,8 +338,8 @@ void SVGInlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
         }
 
         // Spec: Line-through should be drawn after the text is filled and stroked; thus, the line-through is rendered on top of the text.
-        if (decorations & LINE_THROUGH)
-            paintDecoration(paintInfo.context, LINE_THROUGH, fragment);
+        if (decorations & TextDecorationLineThrough)
+            paintDecoration(paintInfo.context, TextDecorationLineThrough, fragment);
 
         m_paintingResourceMode = ApplyToDefaultMode;
     }
@@ -478,22 +480,22 @@ bool SVGInlineTextBox::mapStartEndPositionsIntoFragmentCoordinates(const SVGText
     return true;
 }
 
-static inline float positionOffsetForDecoration(ETextDecoration decoration, const FontMetrics& fontMetrics, float thickness)
+static inline float positionOffsetForDecoration(TextDecoration decoration, const FontMetrics& fontMetrics, float thickness)
 {
     // FIXME: For SVG Fonts we need to use the attributes defined in the <font-face> if specified.
     // Compatible with Batik/Opera.
-    if (decoration == UNDERLINE)
+    if (decoration == TextDecorationUnderline)
         return fontMetrics.floatAscent() + thickness * 1.5f;
-    if (decoration == OVERLINE)
+    if (decoration == TextDecorationOverline)
         return thickness;
-    if (decoration == LINE_THROUGH)
+    if (decoration == TextDecorationLineThrough)
         return fontMetrics.floatAscent() * 5 / 8.0f;
 
     ASSERT_NOT_REACHED();
     return 0.0f;
 }
 
-static inline float thicknessForDecoration(ETextDecoration, const Font& font)
+static inline float thicknessForDecoration(TextDecoration, const Font& font)
 {
     // FIXME: For SVG Fonts we need to use the attributes defined in the <font-face> if specified.
     // Compatible with Batik/Opera
@@ -507,7 +509,7 @@ static inline RenderObject* findRenderObjectDefininingTextDecoration(InlineFlowB
     while (parentBox) {
         renderer = parentBox->renderer();
 
-        if (renderer->style() && renderer->style()->textDecoration() != TDNONE)
+        if (renderer->style() && renderer->style()->textDecoration() != TextDecorationNone)
             break;
 
         parentBox = parentBox->parent();
@@ -517,9 +519,9 @@ static inline RenderObject* findRenderObjectDefininingTextDecoration(InlineFlowB
     return renderer;
 }
 
-void SVGInlineTextBox::paintDecoration(GraphicsContext* context, ETextDecoration decoration, const SVGTextFragment& fragment)
+void SVGInlineTextBox::paintDecoration(GraphicsContext* context, TextDecoration decoration, const SVGTextFragment& fragment)
 {
-    if (textRenderer()->style()->textDecorationsInEffect() == TDNONE)
+    if (textRenderer()->style()->textDecorationsInEffect() == TextDecorationNone)
         return;
 
     // Find out which render style defined the text-decoration, as its fill/stroke properties have to be used for drawing instead of ours.
@@ -547,7 +549,7 @@ void SVGInlineTextBox::paintDecoration(GraphicsContext* context, ETextDecoration
     }
 }
 
-void SVGInlineTextBox::paintDecorationWithStyle(GraphicsContext* context, ETextDecoration decoration, const SVGTextFragment& fragment, RenderObject* decorationRenderer)
+void SVGInlineTextBox::paintDecorationWithStyle(GraphicsContext* context, TextDecoration decoration, const SVGTextFragment& fragment, RenderObject* decorationRenderer)
 {
     ASSERT(!m_paintingResource);
     ASSERT(m_paintingResourceMode != ApplyToDefaultMode);
@@ -606,6 +608,10 @@ void SVGInlineTextBox::paintTextWithShadows(GraphicsContext* context, RenderStyl
     }
 
     FloatRect shadowRect(FloatPoint(textOrigin.x(), textOrigin.y() - scaledFont.fontMetrics().floatAscent()), textSize);
+    TextRunPaintInfo textRunPaintInfo(textRun);
+    textRunPaintInfo.from = startPosition;
+    textRunPaintInfo.to = endPosition;
+    textRunPaintInfo.bounds = FloatRect(textOrigin, textSize);
 
     do {
         if (!prepareGraphicsContextForTextPainting(context, scalingFactor, textRun, style))
@@ -618,7 +624,7 @@ void SVGInlineTextBox::paintTextWithShadows(GraphicsContext* context, RenderStyl
         context->save();
         context->scale(FloatSize(1 / scalingFactor, 1 / scalingFactor));
 
-        scaledFont.drawText(context, textRun, textOrigin + extraOffset, startPosition, endPosition);
+        scaledFont.drawText(context, textRunPaintInfo, textOrigin + extraOffset);
 
         context->restore();
 
@@ -725,5 +731,3 @@ bool SVGInlineTextBox::nodeAtPoint(const HitTestRequest& request, HitTestResult&
 }
 
 } // namespace WebCore
-
-#endif

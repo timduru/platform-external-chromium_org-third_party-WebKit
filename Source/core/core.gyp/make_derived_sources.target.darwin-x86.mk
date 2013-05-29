@@ -16,8 +16,8 @@ GYP_TARGET_DEPENDENCIES := \
 
 ### Rules for action "generateV8ArrayBufferViewCustomScript":
 $(gyp_shared_intermediate_dir)/webkit/V8ArrayBufferViewCustomScript.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/V8ArrayBufferViewCustomScript.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/V8ArrayBufferViewCustomScript.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/V8ArrayBufferViewCustomScript.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/V8ArrayBufferViewCustomScript.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/V8ArrayBufferViewCustomScript.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/V8ArrayBufferViewCustomScript.h: $(LOCAL_PATH)/third_party/WebKit/Source/bindings/v8/custom/V8ArrayBufferViewCustomScript.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Generating V8ArrayBufferViewCustomScript.h from V8ArrayBufferViewCustomScript.js ($@)"
@@ -26,8 +26,8 @@ $(gyp_shared_intermediate_dir)/webkit/V8ArrayBufferViewCustomScript.h: $(LOCAL_P
 
 ### Rules for action "generateXMLViewerCSS":
 $(gyp_shared_intermediate_dir)/webkit/XMLViewerCSS.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/XMLViewerCSS.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/XMLViewerCSS.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/XMLViewerCSS.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/XMLViewerCSS.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/XMLViewerCSS.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/XMLViewerCSS.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/xml/XMLViewer.css $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_generateXMLViewerCSS ($@)"
@@ -36,8 +36,8 @@ $(gyp_shared_intermediate_dir)/webkit/XMLViewerCSS.h: $(LOCAL_PATH)/third_party/
 
 ### Rules for action "generateXMLViewerJS":
 $(gyp_shared_intermediate_dir)/webkit/XMLViewerJS.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/XMLViewerJS.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/XMLViewerJS.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/XMLViewerJS.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/XMLViewerJS.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/XMLViewerJS.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/XMLViewerJS.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/xml/XMLViewer.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_generateXMLViewerJS ($@)"
@@ -46,8 +46,8 @@ $(gyp_shared_intermediate_dir)/webkit/XMLViewerJS.h: $(LOCAL_PATH)/third_party/W
 
 ### Rules for action "HTMLEntityTable":
 $(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/html/parser/create-html-entity-table $(LOCAL_PATH)/third_party/WebKit/Source/core/html/parser/HTMLEntityNames.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_HTMLEntityTable ($@)"
@@ -56,45 +56,55 @@ $(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp: $(LOCAL_PATH)/third_p
 
 ### Rules for action "RuntimeEnabledFeatures":
 $(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_runtime_features.py $(LOCAL_PATH)/third_party/WebKit/Source/core/page/RuntimeEnabledFeatures.in $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/RuntimeEnabledFeatures.cpp.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/RuntimeEnabledFeatures.h.tmpl $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_RuntimeEnabledFeatures ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_runtime_features.py ../page/RuntimeEnabledFeatures.in "$(gyp_shared_intermediate_dir)/webkit/"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_runtime_features.py ../page/RuntimeEnabledFeatures.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/"
 
 $(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.h: $(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp ;
 
 ### Rules for action "CSSPropertyNames":
 $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_css_property_names.py $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSPropertyNames.in $(LOCAL_PATH)/third_party/WebKit/Source/core/css/SVGCSSPropertyNames.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_CSSPropertyNames ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_css_property_names.py ../css/CSSPropertyNames.in ../css/SVGCSSPropertyNames.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/" --defines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_css_property_names.py ../css/CSSPropertyNames.in ../css/SVGCSSPropertyNames.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/" --defines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.h: $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp ;
 
+### Rules for action "StyleBuilder":
+$(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_style_builder.py $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSProperties.in $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/StyleBuilder.cpp.tmpl $(GYP_TARGET_DEPENDENCIES)
+	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_StyleBuilder ($@)"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_style_builder.py ../css/CSSProperties.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/"
+
+
 ### Rules for action "CSSValueKeywords":
 $(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/css/makevalues.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSValueKeywords.in $(LOCAL_PATH)/third_party/WebKit/Source/core/css/SVGCSSValueKeywords.in $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_css_value_keywords.py $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSValueKeywords.in $(LOCAL_PATH)/third_party/WebKit/Source/core/css/SVGCSSValueKeywords.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_CSSValueKeywords ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_cssvaluekeywords.py "$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp" "$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.h" -- --defines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\"" -- ../css/makevalues.pl ../css/CSSValueKeywords.in ../css/SVGCSSValueKeywords.in
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; ../scripts/make_css_value_keywords.py ../css/CSSValueKeywords.in ../css/SVGCSSValueKeywords.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/" --defines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.h: $(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp ;
 
 ### Rules for action "HTMLNames":
 $(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/html/HTMLTagNames.in $(LOCAL_PATH)/third_party/WebKit/Source/core/html/HTMLAttributeNames.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_HTMLNames ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/HTMLNames.h" "$(gyp_shared_intermediate_dir)/webkit/HTMLElementFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/V8HTMLElementWrapperFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/V8HTMLElementWrapperFactory.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../html/HTMLTagNames.in ../html/HTMLAttributeNames.in -- --factory --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/HTMLNames.h" "$(gyp_shared_intermediate_dir)/webkit/HTMLElementFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/V8HTMLElementWrapperFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/V8HTMLElementWrapperFactory.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../html/HTMLTagNames.in ../html/HTMLAttributeNames.in -- --factory --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/HTMLNames.h: $(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp ;
 $(gyp_shared_intermediate_dir)/webkit/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp ;
@@ -103,8 +113,8 @@ $(gyp_shared_intermediate_dir)/webkit/V8HTMLElementWrapperFactory.h: $(gyp_share
 
 ### Rules for action "WebKitFontFamilyNames":
 $(gyp_shared_intermediate_dir)/webkit/WebKitFontFamilyNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/WebKitFontFamilyNames.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/WebKitFontFamilyNames.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/WebKitFontFamilyNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/WebKitFontFamilyNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/WebKitFontFamilyNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/WebKitFontFamilyNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/css/WebKitFontFamilyNames.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_WebKitFontFamilyNames ($@)"
@@ -114,12 +124,12 @@ $(gyp_shared_intermediate_dir)/webkit/WebKitFontFamilyNames.h: $(gyp_shared_inte
 
 ### Rules for action "SVGNames":
 $(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/svg/svgtags.in $(LOCAL_PATH)/third_party/WebKit/Source/core/svg/svgattrs.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_SVGNames ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/SVGNames.h" "$(gyp_shared_intermediate_dir)/webkit/SVGElementFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/SVGElementFactory.h" "$(gyp_shared_intermediate_dir)/webkit/V8SVGElementWrapperFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/V8SVGElementWrapperFactory.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../svg/svgtags.in ../svg/svgattrs.in -- --factory --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/SVGNames.h" "$(gyp_shared_intermediate_dir)/webkit/SVGElementFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/SVGElementFactory.h" "$(gyp_shared_intermediate_dir)/webkit/V8SVGElementWrapperFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/V8SVGElementWrapperFactory.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../svg/svgtags.in ../svg/svgattrs.in -- --factory --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/SVGNames.h: $(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp ;
 $(gyp_shared_intermediate_dir)/webkit/SVGElementFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp ;
@@ -129,35 +139,35 @@ $(gyp_shared_intermediate_dir)/webkit/V8SVGElementWrapperFactory.h: $(gyp_shared
 
 ### Rules for action "EventFactory":
 $(gyp_shared_intermediate_dir)/webkit/Event.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/Event.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/Event.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/Event.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/Event.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/Event.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/Event.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_event_factory.py $(LOCAL_PATH)/third_party/WebKit/Source/core/dom/EventNames.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_EventFactory ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_event_factory.py ../dom/EventNames.in "$(gyp_shared_intermediate_dir)/webkit/"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_event_factory.py ../dom/EventNames.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/"
 
 $(gyp_shared_intermediate_dir)/webkit/EventHeaders.h: $(gyp_shared_intermediate_dir)/webkit/Event.cpp ;
 $(gyp_shared_intermediate_dir)/webkit/EventInterfaces.h: $(gyp_shared_intermediate_dir)/webkit/Event.cpp ;
 
 ### Rules for action "EventTargetFactory":
 $(gyp_shared_intermediate_dir)/webkit/EventTargetHeaders.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/EventTargetHeaders.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/EventTargetHeaders.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/EventTargetHeaders.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/EventTargetHeaders.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/EventTargetHeaders.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/EventTargetHeaders.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_event_factory.py $(LOCAL_PATH)/third_party/WebKit/Source/core/dom/EventTargetFactory.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_EventTargetFactory ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_event_factory.py ../dom/EventTargetFactory.in "$(gyp_shared_intermediate_dir)/webkit/"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_event_factory.py ../dom/EventTargetFactory.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/"
 
 $(gyp_shared_intermediate_dir)/webkit/EventTargetInterfaces.h: $(gyp_shared_intermediate_dir)/webkit/EventTargetHeaders.h ;
 
 ### Rules for action "ExceptionCodeDescription":
 $(gyp_shared_intermediate_dir)/webkit/DOMException.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/DOMException.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/DOMException.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/DOMException.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/DOMException.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/DOMException.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/DOMException.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_dom_exceptions.py $(LOCAL_PATH)/third_party/WebKit/Source/core/dom/DOMExceptions.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_ExceptionCodeDescription ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_dom_exceptions.py ../dom/DOMExceptions.in "$(gyp_shared_intermediate_dir)/webkit/"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_dom_exceptions.py ../dom/DOMExceptions.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/"
 
 $(gyp_shared_intermediate_dir)/webkit/DOMException.h: $(gyp_shared_intermediate_dir)/webkit/DOMException.cpp ;
 $(gyp_shared_intermediate_dir)/webkit/DOMExceptionHeaders.h: $(gyp_shared_intermediate_dir)/webkit/DOMException.cpp ;
@@ -165,12 +175,12 @@ $(gyp_shared_intermediate_dir)/webkit/DOMExceptionInterfaces.h: $(gyp_shared_int
 
 ### Rules for action "MathMLNames":
 $(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/mathml/mathtags.in $(LOCAL_PATH)/third_party/WebKit/Source/core/mathml/mathattrs.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_MathMLNames ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/MathMLNames.h" "$(gyp_shared_intermediate_dir)/webkit/MathMLElementFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/MathMLElementFactory.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../mathml/mathtags.in ../mathml/mathattrs.in -- --factory --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/MathMLNames.h" "$(gyp_shared_intermediate_dir)/webkit/MathMLElementFactory.cpp" "$(gyp_shared_intermediate_dir)/webkit/MathMLElementFactory.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../mathml/mathtags.in ../mathml/mathattrs.in -- --factory --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/MathMLNames.h: $(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp ;
 $(gyp_shared_intermediate_dir)/webkit/MathMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp ;
@@ -178,19 +188,19 @@ $(gyp_shared_intermediate_dir)/webkit/MathMLElementFactory.h: $(gyp_shared_inter
 
 ### Rules for action "UserAgentStyleSheets":
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/css/make-css-file-arrays.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/preprocessor.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/css/html.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/quirks.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/view-source.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromium.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumAndroid.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumLinux.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumSkia.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeWin.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeWinQuirks.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/svg.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mathml.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mediaControls.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mediaControlsChromium.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mediaControlsChromiumAndroid.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/fullscreen.css $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_UserAgentStyleSheets ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_useragentstylesheets.py "$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h" "$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp" ../css/html.css ../css/quirks.css ../css/view-source.css ../css/themeChromium.css ../css/themeChromiumAndroid.css ../css/themeChromiumLinux.css ../css/themeChromiumSkia.css ../css/themeWin.css ../css/themeWinQuirks.css ../css/svg.css ../css/mathml.css ../css/mediaControls.css ../css/mediaControlsChromium.css ../css/mediaControlsChromiumAndroid.css ../css/fullscreen.css -- ../css/make-css-file-arrays.pl ../scripts/preprocessor.pm -- --defines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_useragentstylesheets.py "$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h" "$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp" ../css/html.css ../css/quirks.css ../css/view-source.css ../css/themeChromium.css ../css/themeChromiumAndroid.css ../css/themeChromiumLinux.css ../css/themeChromiumSkia.css ../css/themeWin.css ../css/themeWinQuirks.css ../css/svg.css ../css/mathml.css ../css/mediaControls.css ../css/mediaControlsChromium.css ../css/mediaControlsChromiumAndroid.css ../css/fullscreen.css -- ../css/make-css-file-arrays.pl ../scripts/preprocessor.pm -- --defines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp: $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h ;
 
 ### Rules for action "PickerCommon":
 $(gyp_shared_intermediate_dir)/webkit/PickerCommon.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/PickerCommon.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/PickerCommon.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/PickerCommon.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/PickerCommon.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/PickerCommon.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/PickerCommon.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/pickerCommon.css $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/pickerCommon.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_PickerCommon ($@)"
@@ -200,8 +210,8 @@ $(gyp_shared_intermediate_dir)/webkit/PickerCommon.cpp: $(gyp_shared_intermediat
 
 ### Rules for action "CalendarPicker":
 $(gyp_shared_intermediate_dir)/webkit/CalendarPicker.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/CalendarPicker.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/CalendarPicker.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/CalendarPicker.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/CalendarPicker.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/CalendarPicker.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/CalendarPicker.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/calendarPicker.css $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/calendarPicker.js $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/chromium/calendarPickerChromium.css $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/chromium/pickerCommonChromium.css $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/suggestionPicker.css $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/suggestionPicker.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_CalendarPicker ($@)"
@@ -211,8 +221,8 @@ $(gyp_shared_intermediate_dir)/webkit/CalendarPicker.cpp: $(gyp_shared_intermedi
 
 ### Rules for action "ColorSuggestionPicker":
 $(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/colorSuggestionPicker.css $(LOCAL_PATH)/third_party/WebKit/Source/core/Resources/pagepopups/colorSuggestionPicker.js $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_ColorSuggestionPicker ($@)"
@@ -222,45 +232,45 @@ $(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.cpp: $(gyp_shared_in
 
 ### Rules for action "XLinkNames":
 $(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/svg/xlinkattrs.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_XLinkNames ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/XLinkNames.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../svg/xlinkattrs.in -- --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/XLinkNames.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../svg/xlinkattrs.in -- --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/XLinkNames.h: $(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp ;
 
 ### Rules for action "XMLNSNames":
 $(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/xml/xmlnsattrs.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_XMLNSNames ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/XMLNSNames.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../xml/xmlnsattrs.in -- --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/XMLNSNames.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../xml/xmlnsattrs.in -- --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/XMLNSNames.h: $(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp ;
 
 ### Rules for action "XMLNames":
 $(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/xml/xmlattrs.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_XMLNames ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/XMLNames.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../xml/xmlattrs.in -- --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/XMLNames.h" -- ../scripts/Hasher.pm ../scripts/StaticString.pm ../scripts/make_names.pl ../xml/xmlattrs.in -- --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/XMLNames.h: $(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp ;
 
 ### Rules for action "preprocess_grammar":
 $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSGrammar.y.in $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSGrammar.y.includes $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_preprocess_grammar ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; perl -I../scripts ../css/makegrammar.pl --outputDir "$(gyp_shared_intermediate_dir)/webkit/" --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_DATALIST_ELEMENT=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PAGE_POPUP=0\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_BINDING_INTEGRITY=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\"" --preprocessOnly --preprocessor "/usr/bin/gcc -E -P -x c++" ../css/CSSGrammar.y.in ../css/CSSGrammar.y.includes
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; perl -I../scripts ../css/makegrammar.pl --outputDir "$(gyp_shared_intermediate_dir)/webkit/" --extraDefines "\"ENABLE_3D_PLUGIN=1\" \"ENABLE_BATTERY_STATUS=0\" \"ENABLE_CANVAS_USES_MAILBOX=0\" \"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_DEVICE_ADAPTATION=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_WEBGL=1\" \"ENABLE_XHR_TIMEOUT=0\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_INPUT_TYPE_COLOR=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_8BIT_TEXTRUN=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\"" --preprocessOnly --preprocessor "/usr/bin/gcc -E -P -x c++" ../css/CSSGrammar.y.in ../css/CSSGrammar.y.includes
 
 
 
@@ -268,24 +278,24 @@ $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: $(LOCAL_PATH)/third_party/We
 ### Generated for rule "third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_bison":
 # "{'msvs_cygwin_shell': '1', 'extension': 'y', 'rule_sources': ['$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y', '../xml/XPathGrammar.y'], 'rule_name': 'bison', 'outputs': ['$(gyp_shared_intermediate_dir)/webkit/%(INPUT_ROOT)s.cpp', '$(gyp_shared_intermediate_dir)/webkit/%(INPUT_ROOT)s.h'], 'action': ['python', 'scripts/rule_bison.py', '$(RULE_SOURCES)', '$(gyp_shared_intermediate_dir)/webkit', 'bison']}":
 $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp: $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y $(GYP_TARGET_DEPENDENCIES)
 	mkdir -p $(gyp_shared_intermediate_dir)/webkit; cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; python scripts/rule_bison.py "$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y" "$(gyp_shared_intermediate_dir)/webkit" bison
 
-$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.h: $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp
+$(gyp_shared_intermediate_dir)/webkit/CSSGrammar.h: $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp ;
 .PHONY: third_party_WebKit_Source_core_core_gyp_make_derived_sources_gyp_rule_trigger
 third_party_WebKit_Source_core_core_gyp_make_derived_sources_gyp_rule_trigger: $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp
 
 $(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/xml/XPathGrammar.y $(GYP_TARGET_DEPENDENCIES)
 	mkdir -p $(gyp_shared_intermediate_dir)/webkit; cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; python scripts/rule_bison.py ../xml/XPathGrammar.y "$(gyp_shared_intermediate_dir)/webkit" bison
 
-$(gyp_shared_intermediate_dir)/webkit/XPathGrammar.h: $(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp
+$(gyp_shared_intermediate_dir)/webkit/XPathGrammar.h: $(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp ;
 .PHONY: third_party_WebKit_Source_core_core_gyp_make_derived_sources_gyp_rule_trigger
 third_party_WebKit_Source_core_core_gyp_make_derived_sources_gyp_rule_trigger: $(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp
 
@@ -293,8 +303,8 @@ third_party_WebKit_Source_core_core_gyp_make_derived_sources_gyp_rule_trigger: $
 ### Generated for rule "third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_make_derived_sources_target_gperf":
 # "{'inputs': ['../scripts/make-hash-tools.pl'], 'msvs_cygwin_shell': '0', 'extension': 'gperf', 'outputs': ['$(gyp_shared_intermediate_dir)/webkit/%(INPUT_ROOT)s.cpp'], 'rule_name': 'gperf', 'rule_sources': ['../platform/ColorData.gperf'], 'action': ['perl', '../scripts/make-hash-tools.pl', '$(gyp_shared_intermediate_dir)/webkit', '$(RULE_SOURCES)', 'gperf']}":
 $(gyp_shared_intermediate_dir)/webkit/ColorData.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/ColorData.cpp: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/ColorData.cpp: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/ColorData.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/ColorData.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/ColorData.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/ColorData.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/platform/ColorData.gperf $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make-hash-tools.pl $(GYP_TARGET_DEPENDENCIES)
 	mkdir -p $(gyp_shared_intermediate_dir)/webkit; cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; perl ../scripts/make-hash-tools.pl "$(gyp_shared_intermediate_dir)/webkit" ../platform/ColorData.gperf gperf
@@ -313,6 +323,7 @@ GYP_GENERATED_OUTPUTS := \
 	$(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.h \
 	$(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.h \
+	$(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.h \
 	$(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp \
@@ -419,6 +430,7 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
+	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
@@ -438,9 +450,9 @@ LOCAL_CFLAGS := $(MY_CFLAGS_C) $(MY_CFLAGS) $(MY_DEFS)
 
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES := \
-	$(GYP_ABS_ANDROID_TOP_DIR)/frameworks/wilhelm/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/bionic \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/stlport/stlport
+	$(PWD)/frameworks/wilhelm/include \
+	$(PWD)/bionic \
+	$(PWD)/external/stlport/stlport
 
 LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES)
 

@@ -30,6 +30,7 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
+#include "core/animation/DocumentTimeline.h"
 #include "core/css/FontLoader.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/DocumentMarkerController.h"
@@ -77,16 +78,13 @@
 #include "core/rendering/RenderView.h"
 #include "core/rendering/TextAutosizer.h"
 #include "core/rendering/style/RenderStyle.h"
+#include "core/rendering/svg/RenderSVGRoot.h"
+#include "core/svg/SVGDocument.h"
+#include "core/svg/SVGSVGElement.h"
 
 #include <wtf/CurrentTime.h>
 #include <wtf/TemporaryChange.h>
 #include <wtf/UnusedParam.h>
-
-#if ENABLE(SVG)
-#include "core/rendering/svg/RenderSVGRoot.h"
-#include "core/svg/SVGDocument.h"
-#include "core/svg/SVGSVGElement.h"
-#endif
 
 #include "core/platform/chromium/TraceEvent.h"
 
@@ -480,23 +478,6 @@ void FrameView::setMarginHeight(LayoutUnit h)
     m_margins.setHeight(h);
 }
 
-bool FrameView::avoidScrollbarCreation() const
-{
-    ASSERT(m_frame);
-
-    // with frame flattening no subframe can have scrollbars
-    // but we also cannot turn scrollbars off as we determine
-    // our flattening policy using that.
-
-    if (!m_frame->ownerElement())
-        return false;
-
-    if (!m_frame->settings() || m_frame->settings()->frameFlatteningEnabled())
-        return true;
-
-    return false;
-}
-
 void FrameView::setCanHaveScrollbars(bool canHaveScrollbars)
 {
     m_canHaveScrollbars = canHaveScrollbars;
@@ -559,7 +540,7 @@ void FrameView::setContentsSize(const IntSize& size)
 
     updateScrollableAreaSet();
 
-    page->chrome()->contentsSizeChanged(frame(), size); //notify only
+    page->chrome().contentsSizeChanged(frame(), size); // Notify only.
 
     m_deferSetNeedsLayouts--;
     
@@ -592,7 +573,6 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
     EOverflow overflowX = o->style()->overflowX();
     EOverflow overflowY = o->style()->overflowY();
 
-#if ENABLE(SVG)
     if (o->isSVGRoot()) {
         // overflow is ignored in stand-alone SVG documents.
         if (!toRenderSVGRoot(o)->isEmbeddedThroughFrameContainingSVGDocument())
@@ -600,7 +580,6 @@ void FrameView::applyOverflowToViewport(RenderObject* o, ScrollbarMode& hMode, S
         overflowX = OHIDDEN;
         overflowY = OHIDDEN;
     }
-#endif
 
     switch (overflowX) {
         case OHIDDEN:
@@ -692,7 +671,7 @@ void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, Scrollbar
         RenderObject* rootRenderer = documentElement ? documentElement->renderer() : 0;
         Node* body = document->body();
         if (body && body->renderer()) {
-            if (body->hasTagName(framesetTag) && m_frame->settings() && !m_frame->settings()->frameFlatteningEnabled()) {
+            if (body->hasTagName(framesetTag)) {
                 vMode = ScrollbarAlwaysOff;
                 hMode = ScrollbarAlwaysOff;
             } else if (body->hasTagName(bodyTag)) {
@@ -854,7 +833,6 @@ static inline void collectFrameViewChildren(FrameView* frameView, Vector<RefPtr<
 
 inline void FrameView::forceLayoutParentViewIfNeeded()
 {
-#if ENABLE(SVG)
     RenderPart* ownerRenderer = m_frame->ownerRenderer();
     if (!ownerRenderer || !ownerRenderer->frame())
         return;
@@ -882,7 +860,6 @@ inline void FrameView::forceLayoutParentViewIfNeeded()
     // Synchronously enter layout, to layout the view containing the host object/embed/iframe.
     ASSERT(frameView);
     frameView->layout();
-#endif
 }
 
 void FrameView::layout(bool allowSubtree)
@@ -897,13 +874,6 @@ void FrameView::layout(bool allowSubtree)
 
     // Every scroll that happens during layout is programmatic.
     TemporaryChange<bool> changeInProgrammaticScroll(m_inProgrammaticScroll, true);
-
-    bool inChildFrameLayoutWithFrameFlattening = isInChildFrameWithFrameFlattening();
-
-    if (inChildFrameLayoutWithFrameFlattening) {
-        if (doLayoutWithFrameFlattening(allowSubtree))
-            return;
-    }
 
     m_layoutTimer.stop();
     m_delayedLayout = false;
@@ -937,7 +907,7 @@ void FrameView::layout(bool allowSubtree)
     {
         TemporaryChange<bool> changeSchedulingEnabled(m_layoutSchedulingEnabled, false);
 
-        if (!m_nestedLayoutCount && !m_inSynchronousPostLayout && m_postLayoutTasksTimer.isActive() && !inChildFrameLayoutWithFrameFlattening) {
+        if (!m_nestedLayoutCount && !m_inSynchronousPostLayout && m_postLayoutTasksTimer.isActive() && !frame()->document()->shouldDisplaySeamlesslyWithParent()) {
             // This is a new top-level layout. If there are any remaining tasks from the previous
             // layout, finish them now.
             m_inSynchronousPostLayout = true;
@@ -983,7 +953,7 @@ void FrameView::layout(bool allowSubtree)
             Document* document = m_frame->document();
             Node* body = document->body();
             if (body && body->renderer()) {
-                if (body->hasTagName(framesetTag) && m_frame->settings() && !m_frame->settings()->frameFlatteningEnabled()) {
+                if (body->hasTagName(framesetTag)) {
                     body->renderer()->setChildNeedsLayout(true);
                 } else if (body->hasTagName(bodyTag)) {
                     if (!m_firstLayout && m_size.height() != layoutHeight() && body->renderer()->enclosingBox()->stretchesToViewport())
@@ -1117,7 +1087,7 @@ void FrameView::layout(bool allowSubtree)
 
     if (!m_postLayoutTasksTimer.isActive()) {
         if (!m_inSynchronousPostLayout) {
-            if (inChildFrameLayoutWithFrameFlattening) {
+            if (frame()->document()->shouldDisplaySeamlesslyWithParent()) {
                 if (RenderView* renderView = this->renderView())
                     renderView->updateWidgetPositions();
             } else {
@@ -1127,9 +1097,9 @@ void FrameView::layout(bool allowSubtree)
                 m_inSynchronousPostLayout = false;
             }
         }
-        
-        if (!m_postLayoutTasksTimer.isActive() && (needsLayout() || m_inSynchronousPostLayout || inChildFrameLayoutWithFrameFlattening)) {
-            // If we need layout or are already in a synchronous call to postLayoutTasks(), 
+
+        if (!m_postLayoutTasksTimer.isActive() && (needsLayout() || m_inSynchronousPostLayout || frame()->document()->shouldDisplaySeamlesslyWithParent())) {
+            // If we need layout or are already in a synchronous call to postLayoutTasks(),
             // defer widget updates and event dispatch until after we return. postLayoutTasks()
             // can make us need to update again, and we can get stuck in a nasty cycle unless
             // we call it through the timer here.
@@ -1153,7 +1123,7 @@ void FrameView::layout(bool allowSubtree)
     if (!page)
         return;
 
-    page->chrome()->client()->layoutUpdated(frame());
+    page->chrome().client()->layoutUpdated(frame());
 }
 
 void FrameView::layoutLazyBlocks()
@@ -1187,7 +1157,6 @@ void FrameView::layoutLazyBlocks()
 
 RenderBox* FrameView::embeddedContentBox() const
 {
-#if ENABLE(SVG)
     RenderView* renderView = this->renderView();
     if (!renderView)
         return 0;
@@ -1199,7 +1168,6 @@ RenderBox* FrameView::embeddedContentBox() const
     // Curently only embedded SVG documents participate in the size-negotiation logic.
     if (firstChild->isSVGRoot())
         return toRenderBox(firstChild);
-#endif
 
     return 0;
 }
@@ -1545,7 +1513,6 @@ bool FrameView::scrollToAnchor(const String& name)
     // Setting to null will clear the current target.
     m_frame->document()->setCSSTarget(anchorNode);
 
-#if ENABLE(SVG)
     if (m_frame->document()->isSVGDocument()) {
         if (SVGSVGElement* svg = toSVGDocument(m_frame->document())->rootElement()) {
             svg->setupInitialView(name, anchorNode);
@@ -1553,7 +1520,6 @@ bool FrameView::scrollToAnchor(const String& name)
                 return true;
         }
     }
-#endif
   
     // Implement the rule that "" and "top" both mean top of page as in other browsers.
     if (!anchorNode && !(name.isEmpty() || equalIgnoringCase(name, "top")))
@@ -1606,7 +1572,7 @@ void FrameView::setScrollPosition(const IntPoint& scrollPoint)
         return;
 
     if (Page* page = m_frame->page())
-        page->chrome()->client()->didProgrammaticallyScroll(m_frame.get(), newScrollPosition);
+        page->chrome().client()->didProgrammaticallyScroll(m_frame.get(), newScrollPosition);
 
     if (requestScrollPositionUpdate(newScrollPosition))
         return;
@@ -1665,7 +1631,7 @@ bool FrameView::shouldRubberBandInDirection(ScrollDirection direction) const
     Page* page = frame() ? frame()->page() : 0;
     if (!page)
         return ScrollView::shouldRubberBandInDirection(direction);
-    return page->chrome()->client()->shouldRubberBandInDirection(direction);
+    return page->chrome().client()->shouldRubberBandInDirection(direction);
 }
 
 bool FrameView::isRubberBandInProgress() const
@@ -1691,7 +1657,7 @@ HostWindow* FrameView::hostWindow() const
     Page* page = frame() ? frame()->page() : 0;
     if (!page)
         return 0;
-    return page->chrome();
+    return &page->chrome();
 }
 
 const unsigned cRepaintRectUnionThreshold = 25;
@@ -1934,9 +1900,10 @@ void FrameView::scheduleRelayout()
     if (!m_frame->document()->shouldScheduleLayout())
         return;
     InspectorInstrumentation::didInvalidateLayout(m_frame.get());
-    // When frame flattening is enabled, the contents of the frame could affect the layout of the parent frames.
+
+    // When frame seamless is enabled, the contents of the frame could affect the layout of the parent frames.
     // Also invalidate parent frame starting from the owner element of this frame.
-    if (m_frame->ownerRenderer() && isInChildFrameWithFrameFlattening())
+    if (m_frame->ownerRenderer() && frame()->document()->shouldDisplaySeamlesslyWithParent())
         m_frame->ownerRenderer()->setNeedsLayout(true, MarkContainingBlockChain);
 
     int delay = m_frame->document()->minimumLayoutDelay();
@@ -2056,7 +2023,7 @@ void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
     for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext()) {
         frame->view()->serviceScrollAnimations();
         frame->animation()->serviceAnimations();
-        if (RuntimeEnabledFeatures::webAnimationEnabled())
+        if (RuntimeEnabledFeatures::webAnimationsEnabled())
             frame->document()->timeline()->serviceAnimations(monotonicAnimationStartTime);
     }
 
@@ -2560,7 +2527,7 @@ IntRect FrameView::windowResizerRect() const
     Page* page = frame() ? frame()->page() : 0;
     if (!page)
         return IntRect();
-    return page->chrome()->windowResizerRect();
+    return page->chrome().windowResizerRect();
 }
 
 void FrameView::setVisibleContentScaleFactor(float visibleContentScaleFactor)
@@ -2720,7 +2687,7 @@ void FrameView::updateAnnotatedRegions()
     Page* page = m_frame->page();
     if (!page)
         return;
-    page->chrome()->client()->annotatedRegionsChanged();
+    page->chrome().client()->annotatedRegionsChanged();
 }
 
 void FrameView::updateScrollCorner()
@@ -2865,55 +2832,6 @@ FrameView* FrameView::parentFrameView() const
         return parentFrame->view();
 
     return 0;
-}
-
-bool FrameView::isInChildFrameWithFrameFlattening() const
-{
-    if (!parent() || !m_frame->ownerElement())
-        return false;
-
-    // Frame flattening applies when the owner element is either in a frameset or
-    // an iframe with flattening parameters.
-    if (m_frame->ownerElement()->hasTagName(iframeTag)) {
-        RenderIFrame* iframeRenderer = toRenderIFrame(m_frame->ownerElement()->renderPart());
-        if (iframeRenderer->flattenFrame() || iframeRenderer->isSeamless())
-            return true;
-    }
-
-    if (!m_frame->settings() || !m_frame->settings()->frameFlatteningEnabled())
-        return false;
-
-    if (m_frame->ownerElement()->hasTagName(frameTag))
-        return true;
-
-    return false;
-}
-
-bool FrameView::doLayoutWithFrameFlattening(bool allowSubtree)
-{
-    // Try initiating layout from the topmost parent.
-    FrameView* parentView = parentFrameView();
-
-    if (!parentView)
-        return false;
-
-    // In the middle of parent layout, no need to restart from topmost.
-    if (parentView->m_nestedLayoutCount)
-        return false;
-
-    // Parent tree is clean. Starting layout from it would have no effect.
-    if (!parentView->needsLayout())
-        return false;
-
-    while (parentView->parentFrameView())
-        parentView = parentView->parentFrameView();
-
-    parentView->layout(allowSubtree);
-
-    RenderObject* root = m_layoutRoot ? m_layoutRoot : m_frame->document()->renderer();
-    ASSERT_UNUSED(root, !root->needsLayout());
-
-    return true;
 }
 
 void FrameView::updateControlTints()
@@ -3073,7 +2991,7 @@ void FrameView::paintOverhangAreas(GraphicsContext* context, const IntRect& hori
 
     Page* page = m_frame->page();
     if (page->mainFrame() == m_frame) {
-        if (page->chrome()->client()->paintCustomOverhangArea(context, horizontalOverhangArea, verticalOverhangArea, dirtyRect))
+        if (page->chrome().client()->paintCustomOverhangArea(context, horizontalOverhangArea, verticalOverhangArea, dirtyRect))
             return;
     }
 
@@ -3110,7 +3028,7 @@ void FrameView::updateLayoutAndStyleIfNeededRecursive()
     // painting, so we need to flush out any deferred repaints too.
     flushDeferredRepaints();
 
-    // When frame flattening is on, child frame can mark parent frame dirty. In such case, child frame
+    // When seamless is on, child frame can mark parent frame dirty. In such case, child frame
     // needs to call layout on parent frame recursively.
     // This assert ensures that parent frames are clean, when child frames finished updating layout and style.
     ASSERT(!needsLayout());

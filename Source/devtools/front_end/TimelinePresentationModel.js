@@ -75,6 +75,7 @@ WebInspector.TimelinePresentationModel._initRecordStyles = function()
     recordStyles[recordTypes.RecalculateStyles] = { title: WebInspector.UIString("Recalculate Style"), category: categories["rendering"] };
     recordStyles[recordTypes.InvalidateLayout] = { title: WebInspector.UIString("Invalidate Layout"), category: categories["rendering"] };
     recordStyles[recordTypes.Layout] = { title: WebInspector.UIString("Layout"), category: categories["rendering"] };
+    recordStyles[recordTypes.PaintSetup] = { title: WebInspector.UIString("Paint Setup"), category: categories["painting"] };
     recordStyles[recordTypes.Paint] = { title: WebInspector.UIString("Paint"), category: categories["painting"] };
     recordStyles[recordTypes.Rasterize] = { title: WebInspector.UIString("Rasterize"), category: categories["painting"] };
     recordStyles[recordTypes.ScrollLayer] = { title: WebInspector.UIString("Scroll"), category: categories["rendering"] };
@@ -404,11 +405,15 @@ WebInspector.TimelinePresentationModel.prototype = {
             lastRecord = lastRecord.children.peekLast();
         var startTime = WebInspector.TimelineModel.startTimeInSeconds(record);
         var endTime = WebInspector.TimelineModel.endTimeInSeconds(record);
-        if (!lastRecord || lastRecord.type !== record.type)
+        if (!lastRecord)
+            return null;
+        if (lastRecord.type !== record.type)
             return null;
         if (lastRecord.endTime + coalescingThresholdSeconds < startTime)
             return null;
         if (endTime + coalescingThresholdSeconds < lastRecord.startTime)
+            return null;
+        if (record.type === WebInspector.TimelineModel.RecordType.TimeStamp && lastRecord.data.message !== record.data.message)
             return null;
         if (lastRecord.parent.coalesced)
             return lastRecord.parent;
@@ -429,6 +434,8 @@ WebInspector.TimelinePresentationModel.prototype = {
         };
         if (record._record.thread)
             rawRecord.thread = "aggregated";
+        if (record.type === WebInspector.TimelineModel.RecordType.TimeStamp)
+            rawRecord.data.message = record.data.message;
         var coalescedRecord = new WebInspector.TimelinePresentationModel.Record(this, rawRecord, null, null, null, false);
         var parent = record.parent;
 
@@ -619,8 +626,12 @@ WebInspector.TimelinePresentationModel.Record = function(presentationModel, reco
     this._lastChildEndTime = this.endTime;
     this._startTimeOffset = this.startTime - presentationModel._minimumRecordTime;
 
-    if (record.data && record.data["url"])
-        this.url = record.data["url"];
+    if (record.data) {
+        if (record.data["url"])
+            this.url = record.data["url"];
+        if (record.data["layerRootNode"])
+            this._relatedBackendNodeId = record.data["layerRootNode"];
+    }
     if (scriptDetails) {
         this.scriptName = scriptDetails.scriptName;
         this.scriptLine = scriptDetails.scriptLine;
@@ -755,7 +766,6 @@ WebInspector.TimelinePresentationModel.Record = function(presentationModel, reco
 
     case recordTypes.Paint:
         this.highlightQuad = record.data.clip || WebInspector.TimelinePresentationModel.quadFromRectData(record.data);
-        this._relatedBackendNodeId = record.data["layerRootNode"];
         break;
 
     case recordTypes.WebSocketCreate:
@@ -1077,6 +1087,10 @@ WebInspector.TimelinePresentationModel.Record.prototype = {
                     if (typeof this.data["width"] !== "undefined" && typeof this.data["height"] !== "undefined")
                         contentHelper.appendTextRow(WebInspector.UIString("Dimensions"), WebInspector.UIString("%d\u2009\u00d7\u2009%d", this.data["width"], this.data["height"]));
                 }
+                // Fall-through intended.
+
+            case recordTypes.PaintSetup:
+            case recordTypes.Rasterize:
                 if (this._relatedNode)
                     contentHelper.appendElementRow(WebInspector.UIString("Layer root"), this._createNodeAnchor(this._relatedNode));
                 break;
@@ -1253,7 +1267,6 @@ WebInspector.TimelinePresentationModel.Record.prototype = {
             break;
         case WebInspector.TimelineModel.RecordType.Time:
         case WebInspector.TimelineModel.RecordType.TimeEnd:
-        case WebInspector.TimelineModel.RecordType.TimeStamp:
             details = this.data["message"];
             break;
         default:

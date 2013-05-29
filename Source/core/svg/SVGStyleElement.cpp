@@ -22,7 +22,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGStyleElement.h"
 
 #include "SVGNames.h"
@@ -74,7 +73,7 @@ const AtomicString& SVGStyleElement::type() const
     return n.isNull() ? defaultValue : n;
 }
 
-void SVGStyleElement::setType(const AtomicString& type, ExceptionCode&)
+void SVGStyleElement::setType(const AtomicString& type)
 {
     setAttribute(SVGNames::typeAttr, type);
 }
@@ -86,7 +85,7 @@ const AtomicString& SVGStyleElement::media() const
     return n.isNull() ? defaultValue : n;
 }
 
-void SVGStyleElement::setMedia(const AtomicString& media, ExceptionCode&)
+void SVGStyleElement::setMedia(const AtomicString& media)
 {
     setAttribute(SVGNames::mediaAttr, media);
 }
@@ -96,7 +95,7 @@ String SVGStyleElement::title() const
     return fastGetAttribute(SVGNames::titleAttr);
 }
 
-void SVGStyleElement::setTitle(const AtomicString& title, ExceptionCode&)
+void SVGStyleElement::setTitle(const AtomicString& title)
 {
     setAttribute(SVGNames::titleAttr, title);
 }
@@ -158,5 +157,3 @@ void SVGStyleElement::childrenChanged(bool changedByParser, Node* beforeChange, 
 }
 
 }
-
-#endif // ENABLE(SVG)

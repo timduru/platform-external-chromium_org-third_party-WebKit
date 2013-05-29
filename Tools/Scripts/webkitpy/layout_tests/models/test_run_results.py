@@ -89,9 +89,10 @@ class TestRunResults(object):
 
 
 class RunDetails(object):
-    def __init__(self, exit_code, summarized_results=None, initial_results=None, retry_results=None, enabled_pixel_tests_in_retry=False):
+    def __init__(self, exit_code, summarized_full_results=None, summarized_failing_results=None, initial_results=None, retry_results=None, enabled_pixel_tests_in_retry=False):
         self.exit_code = exit_code
-        self.summarized_results = summarized_results
+        self.summarized_full_results = summarized_full_results
+        self.summarized_failing_results = summarized_failing_results
         self.initial_results = initial_results
         self.retry_results = retry_results
         self.enabled_pixel_tests_in_retry = enabled_pixel_tests_in_retry
@@ -119,7 +120,7 @@ def _interpret_test_failures(failures):
     return test_dict
 
 
-def summarize_results(port_obj, expectations, initial_results, retry_results, enabled_pixel_tests_in_retry):
+def summarize_results(port_obj, expectations, initial_results, retry_results, enabled_pixel_tests_in_retry, only_include_failing=False):
     """Returns a dictionary containing a summary of the test runs, with the following fields:
         'version': a version indicator
         'fixable': The number of fixable tests (NOW - PASS)
@@ -166,24 +167,12 @@ def summarize_results(port_obj, expectations, initial_results, retry_results, en
         result_type = result.type
         actual = [keywords[result_type]]
 
-        test_dict = {}
-
-        rounded_run_time = round(result.test_run_time, 1)
-        if rounded_run_time:
-            test_dict['time'] = rounded_run_time
-
-        if result.has_stderr:
-            test_dict['has_stderr'] = True
-
-        if result.reftest_type:
-            test_dict.update(reftest_type=list(result.reftest_type))
-
-        if expectations.has_modifier(test_name, test_expectations.WONTFIX):
-            test_dict['wontfix'] = True
+        if only_include_failing and result.type == test_expectations.SKIP:
+            continue
 
         if result_type == test_expectations.PASS:
             num_passes += 1
-            if expected == 'PASS' and result.test_run_time < 1 and not result.has_stderr:
+            if not result.has_stderr and only_include_failing:
                 continue
         elif result_type == test_expectations.CRASH:
             if test_name in initial_results.unexpected_results_by_name:
@@ -207,6 +196,22 @@ def summarize_results(port_obj, expectations, initial_results, retry_results, en
                     num_regressions += 1
             else:
                 num_regressions += 1
+
+        test_dict = {}
+
+        rounded_run_time = round(result.test_run_time, 1)
+        if rounded_run_time:
+            test_dict['time'] = rounded_run_time
+
+        if result.has_stderr:
+            test_dict['has_stderr'] = True
+
+        bugs = expectations.model().get_expectation_line(test_name).parsed_bug_modifiers
+        if bugs:
+            test_dict['bugs'] = bugs
+
+        if result.reftest_type:
+            test_dict.update(reftest_type=list(result.reftest_type))
 
         test_dict['expected'] = expected
         test_dict['actual'] = " ".join(actual)

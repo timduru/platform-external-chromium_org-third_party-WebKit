@@ -21,19 +21,16 @@
 #ifndef V8TestNode_h
 #define V8TestNode_h
 
+#include "V8Node.h"
 #include "bindings/bindings/tests/idls/TestNode.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/WrapperTypeInfo.h"
-#include "wtf/HashMap.h"
-#include "wtf/text/StringHash.h"
-#include <v8.h>
 
 namespace WebCore {
 
 class V8TestNode {
 public:
-    static const bool hasDependentLifetime = true;
     static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
     static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
     static v8::Persistent<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
@@ -44,7 +41,7 @@ public:
     static void derefObject(void*);
     static WrapperTypeInfo info;
     static EventTarget* toEventTarget(v8::Handle<v8::Object>);
-    static v8::Handle<v8::Value> constructorCallback(const v8::Arguments&);
+    static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
     static void installPerContextProperties(v8::Handle<v8::Object>, TestNode*, v8::Isolate*) { }
     static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
@@ -68,7 +65,7 @@ inline v8::Handle<v8::Object> wrap(TestNode* impl, v8::Handle<v8::Object> creati
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl);
         // Might be a XXXConstructor::info instead of an XXX::info. These will both have
         // the same object de-ref functions, though, so use that as the basis of the check.
-        RELEASE_ASSERT(actualInfo->derefObjectFunction == V8TestNode::info.derefObjectFunction);
+        RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == V8TestNode::info.derefObjectFunction);
     }
     return V8TestNode::createWrapper(impl, creationContext, isolate);
 }

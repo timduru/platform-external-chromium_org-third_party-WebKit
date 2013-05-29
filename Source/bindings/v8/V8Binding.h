@@ -70,7 +70,7 @@ namespace WebCore {
     // A helper for throwing JavaScript TypeError for not enough arguments.
     v8::Handle<v8::Value> throwNotEnoughArgumentsError(v8::Isolate*);
 
-    inline v8::Handle<v8::Value> argumentOrNull(const v8::Arguments& args, int index)
+    inline v8::Handle<v8::Value> argumentOrNull(const v8::FunctionCallbackInfo<v8::Value>& args, int index)
     {
         return index >= args.Length() ? v8::Local<v8::Value>() : args[index];
     }
@@ -226,14 +226,14 @@ namespace WebCore {
         }
     };
 
-    template<typename T>
-    v8::Handle<v8::Value> v8Array(const Vector<T>& iterator, v8::Isolate* isolate)
+    template<typename T, size_t inlineCapacity>
+    v8::Handle<v8::Value> v8Array(const Vector<T, inlineCapacity>& iterator, v8::Isolate* isolate)
     {
         v8::Local<v8::Array> result = v8::Array::New(iterator.size());
         int index = 0;
-        typename Vector<T>::const_iterator end = iterator.end();
+        typename Vector<T, inlineCapacity>::const_iterator end = iterator.end();
         typedef V8ValueTraits<T> TraitsType;
-        for (typename Vector<T>::const_iterator iter = iterator.begin(); iter != end; ++iter)
+        for (typename Vector<T, inlineCapacity>::const_iterator iter = iterator.begin(); iter != end; ++iter)
             result->Set(v8Integer(index++, isolate), TraitsType::arrayV8Value(*iter, isolate));
         return result;
     }

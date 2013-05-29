@@ -20,7 +20,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGStyledElement.h"
 
 #include "HTMLNames.h"
@@ -407,7 +406,7 @@ PassRefPtr<CSSValue> SVGStyledElement::getPresentationAttribute(const String& na
     if (!attr)
         return 0;
 
-    RefPtr<StylePropertySet> style = StylePropertySet::create(SVGAttributeMode);
+    RefPtr<MutableStylePropertySet> style = MutableStylePropertySet::create(SVGAttributeMode);
     CSSPropertyID propertyID = SVGStyledElement::cssPropertyIdForSVGAttributeName(attr->name());
     style->setProperty(propertyID, attr->value());
     RefPtr<CSSValue> cssValue = style->getPropertyCSSValue(propertyID);
@@ -484,5 +483,3 @@ bool SVGStyledElement::isKeyboardFocusable(KeyboardEvent*) const
 }
 
 }
-
-#endif // ENABLE(SVG)

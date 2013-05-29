@@ -32,7 +32,6 @@
 #include "core/css/CSSSelector.h"
 #include "core/css/CSSSelectorList.h"
 #include "core/css/SiblingTraversalStrategies.h"
-#include "core/dom/CustomElementRegistry.h"
 #include "core/dom/Document.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/StyledElement.h"
@@ -44,8 +43,7 @@
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLOptionElement.h"
-#include "core/html/HTMLProgressElement.h"
-#include "core/html/HTMLStyleElement.h"
+#include "core/html/parser/HTMLParserIdioms.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/FocusController.h"
 #include "core/page/Frame.h"
@@ -141,6 +139,13 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
 
     switch (relation) {
     case CSSSelector::Descendant:
+        if (context.selector->relationIsForShadowDistributed()) {
+            for (Element* element = context.element; element; element = element->parentElement()) {
+                if (matchForShadowDistributed(element, siblingTraversalStrategy, ignoreDynamicPseudo, nextContext) == SelectorMatches)
+                    return SelectorMatches;
+            }
+            return SelectorFailsCompletely;
+        }
         nextContext.element = context.element->parentElement();
         nextContext.isSubSelector = false;
         nextContext.elementStyle = 0;
@@ -152,15 +157,15 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
                 return SelectorFailsCompletely;
         }
         return SelectorFailsCompletely;
-
     case CSSSelector::Child:
+        if (context.selector->relationIsForShadowDistributed())
+            return matchForShadowDistributed(context.element, siblingTraversalStrategy, ignoreDynamicPseudo, nextContext);
         nextContext.element = context.element->parentElement();
         if (!nextContext.element)
             return SelectorFailsCompletely;
         nextContext.isSubSelector = false;
         nextContext.elementStyle = 0;
         return match(nextContext, ignoreDynamicPseudo, siblingTraversalStrategy);
-
     case CSSSelector::DirectAdjacent:
         if (m_mode == ResolvingStyle) {
             if (Element* parentElement = context.element->parentElement())
@@ -201,7 +206,7 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
         nextContext.isSubSelector = true;
         return match(nextContext, dynamicPseudo, siblingTraversalStrategy);
 
-    case CSSSelector::ShadowDescendant:
+    case CSSSelector::ShadowPseudo:
         {
             // If we're in the same tree-scope as the scoping element, then following a shadow descendant combinator would escape that and thus the scope.
             if (context.scope && context.scope->treeScope() == context.element->treeScope() && (context.behaviorAtBoundary & BoundaryBehaviorMask) != StaysWithinTreeScope)
@@ -214,26 +219,33 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
             nextContext.elementStyle = 0;
             return match(nextContext, ignoreDynamicPseudo, siblingTraversalStrategy);
         }
-    case CSSSelector::ShadowDistributed:
-        {
-            Vector<InsertionPoint*, 8> insertionPoints;
-            for (Element* element = context.element; element; element = element->parentElement()) {
-                insertionPoints.clear();
-                collectInsertionPointsWhereNodeIsDistributed(element, insertionPoints);
-                for (size_t i = 0; i < insertionPoints.size(); ++i) {
-                    nextContext.element = insertionPoints[i];
-                    nextContext.isSubSelector = false;
-                    nextContext.elementStyle = 0;
-                    if (match(nextContext, ignoreDynamicPseudo, siblingTraversalStrategy) == SelectorMatches)
-                        return SelectorMatches;
-                }
-            }
-            return SelectorFailsCompletely;
-        }
     }
 
     ASSERT_NOT_REACHED();
     return SelectorFailsCompletely;
+}
+
+template<typename SiblingTraversalStrategy>
+SelectorChecker::Match SelectorChecker::matchForShadowDistributed(const Element* element, const SiblingTraversalStrategy& siblingTraversalStrategy, PseudoId& dynamicPseudo, SelectorCheckingContext& nextContext) const
+{
+    Vector<InsertionPoint*, 8> insertionPoints;
+    collectInsertionPointsWhereNodeIsDistributed(element, insertionPoints);
+    for (size_t i = 0; i < insertionPoints.size(); ++i) {
+        nextContext.element = insertionPoints[i];
+        nextContext.isSubSelector = false;
+        nextContext.elementStyle = 0;
+        if (match(nextContext, dynamicPseudo, siblingTraversalStrategy) == SelectorMatches)
+            return SelectorMatches;
+    }
+    return SelectorFailsCompletely;
+}
+
+static inline bool containsHTMLSpace(const AtomicString& string)
+{
+    for (unsigned i = 0; i < string.length(); i++)
+        if (isHTMLSpace(string[i]))
+            return true;
+    return false;
 }
 
 static bool attributeValueMatches(const Attribute* attributeItem, CSSSelector::Match match, const AtomicString& selectorValue, bool caseSensitive)
@@ -249,8 +261,8 @@ static bool attributeValueMatches(const Attribute* attributeItem, CSSSelector::M
         break;
     case CSSSelector::List:
         {
-            // Ignore empty selectors or selectors containing spaces
-            if (selectorValue.contains(' ') || selectorValue.isEmpty())
+            // Ignore empty selectors or selectors containing HTML spaces
+            if (containsHTMLSpace(selectorValue) || selectorValue.isEmpty())
                 return false;
 
             unsigned startSearchAt = 0;
@@ -258,9 +270,9 @@ static bool attributeValueMatches(const Attribute* attributeItem, CSSSelector::M
                 size_t foundPos = value.find(selectorValue, startSearchAt, caseSensitive);
                 if (foundPos == notFound)
                     return false;
-                if (!foundPos || value[foundPos - 1] == ' ') {
+                if (!foundPos || isHTMLSpace(value[foundPos - 1])) {
                     unsigned endStr = foundPos + selectorValue.length();
-                    if (endStr == value.length() || value[endStr] == ' ')
+                    if (endStr == value.length() || isHTMLSpace(value[endStr]))
                         break; // We found a match.
                 }
 

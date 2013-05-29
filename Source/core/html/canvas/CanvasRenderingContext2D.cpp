@@ -1184,7 +1184,7 @@ void CanvasRenderingContext2D::applyShadow()
         return;
 
     if (shouldDrawShadows())
-        c->setShadow(state().m_shadowOffset, state().m_shadowBlur, state().m_shadowColor, ColorSpaceDeviceRGB);
+        c->setShadow(state().m_shadowOffset, state().m_shadowBlur, state().m_shadowColor);
     else
         c->clearShadow();
 }
@@ -1961,7 +1961,7 @@ String CanvasRenderingContext2D::font() const
         if (family.startsWith("-webkit-"))
             family = family.substring(8);
         if (family.contains(' '))
-            family = makeString('"', family, '"');
+            family = "\"" + family + "\"";
 
         serializedFont.append(' ');
         serializedFont.append(family);
@@ -1975,7 +1975,7 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
     if (newFont == state().m_unparsedFont && state().m_realizedFont)
         return;
 
-    RefPtr<StylePropertySet> parsedStyle = StylePropertySet::create();
+    RefPtr<MutableStylePropertySet> parsedStyle = MutableStylePropertySet::create();
     CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, newFont, true, strictToCSSParserMode(!m_usesCSSCompatibilityParseMode), 0);
     if (parsedStyle->isEmpty())
         return;
@@ -2182,10 +2182,13 @@ void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, flo
     }
 
     // The slop built in to this mask rect matches the heuristic used in FontCGWin.cpp for GDI text.
-    FloatRect textRect = FloatRect(location.x() - fontMetrics.height() / 2, location.y() - fontMetrics.ascent() - fontMetrics.lineGap(),
-                                   width + fontMetrics.height(), fontMetrics.lineSpacing());
+    TextRunPaintInfo textRunPaintInfo(textRun);
+    textRunPaintInfo.bounds = FloatRect(location.x() - fontMetrics.height() / 2,
+                                        location.y() - fontMetrics.ascent() - fontMetrics.lineGap(),
+                                        width + fontMetrics.height(),
+                                        fontMetrics.lineSpacing());
     if (!fill)
-        inflateStrokeRect(textRect);
+        inflateStrokeRect(textRunPaintInfo.bounds);
 
     c->setTextDrawingMode(fill ? TextModeFill : TextModeStroke);
     if (useMaxWidth) {
@@ -2193,11 +2196,11 @@ void CanvasRenderingContext2D::drawTextInternal(const String& text, float x, flo
         c->translate(location.x(), location.y());
         // We draw when fontWidth is 0 so compositing operations (eg, a "copy" op) still work.
         c->scale(FloatSize((fontWidth > 0 ? (width / fontWidth) : 0), 1));
-        c->drawBidiText(font, textRun, FloatPoint(0, 0), Font::UseFallbackIfFontNotReady);
+        c->drawBidiText(font, textRunPaintInfo, FloatPoint(0, 0), Font::UseFallbackIfFontNotReady);
     } else
-        c->drawBidiText(font, textRun, location, Font::UseFallbackIfFontNotReady);
+        c->drawBidiText(font, textRunPaintInfo, location, Font::UseFallbackIfFontNotReady);
 
-    didDraw(textRect);
+    didDraw(textRunPaintInfo.bounds);
 }
 
 void CanvasRenderingContext2D::inflateStrokeRect(FloatRect& rect) const

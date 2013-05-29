@@ -37,15 +37,8 @@ unittest.kExampleResultsJSON = {
                 "actual": "IMAGE"
             },
             "expected-wontfix": {
-                "expected": "IMAGE",
-                "actual": "IMAGE",
-                "wontfix": true
-            },
-            "unexpected-wontfix": {
-                "expected": "IMAGE",
-                "actual": "TEXT",
-                "is_unexpected": true,
-                "wontfix": true
+                "expected": "WONTFIX",
+                "actual": "SKIP",
             },
             "flaky-scrollbar.html": {
                 "expected": "PASS",
@@ -521,7 +514,7 @@ test("fetchResultsByBuilder", 3, function() {
     {
         simulator.scheduleCallback(function() {
             probedURLs.push(url);
-            callback(base.endsWith(url, 'results/layout-test-results/full_results.json'));
+            callback(base.endsWith(url, 'results/layout-test-results/failing_results.json'));
         });
     };
 
@@ -535,8 +528,8 @@ test("fetchResultsByBuilder", 3, function() {
     });
 
     deepEqual(probedURLs, [
-        "http://build.chromium.org/f/chromium/layout_test_results/MockBuilder1/results/layout-test-results/full_results.json",
-        "http://build.chromium.org/f/chromium/layout_test_results/MockBuilder2/results/layout-test-results/full_results.json"
+        "http://build.chromium.org/f/chromium/layout_test_results/MockBuilder1/results/layout-test-results/failing_results.json",
+        "http://build.chromium.org/f/chromium/layout_test_results/MockBuilder2/results/layout-test-results/failing_results.json"
     ]);
 
 });

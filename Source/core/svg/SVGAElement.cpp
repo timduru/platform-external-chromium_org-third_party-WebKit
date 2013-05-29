@@ -22,7 +22,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGAElement.h"
 
 #include "SVGNames.h"
@@ -230,7 +229,7 @@ bool SVGAElement::isKeyboardFocusable(KeyboardEvent*) const
     if (!page)
         return false;
     
-    return page->chrome()->client()->tabsToLinks();
+    return page->chrome().client()->tabsToLinks();
 }
 
 bool SVGAElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
@@ -246,5 +245,3 @@ bool SVGAElement::childShouldCreateRenderer(const NodeRenderingContext& childCon
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(SVG)

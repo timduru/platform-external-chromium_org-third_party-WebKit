@@ -21,7 +21,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGElementInstance.h"
 
 #include "core/dom/ContainerNodeAlgorithms.h"
@@ -52,6 +51,7 @@ SVGElementInstance::SVGElementInstance(SVGUseElement* correspondingUseElement, S
 {
     ASSERT(m_correspondingUseElement);
     ASSERT(m_element);
+    ScriptWrappable::init(this);
 
     // Register as instance for passed element.
     m_element->mapInstanceToElement(this);
@@ -212,5 +212,3 @@ SVGElementInstance::InstanceUpdateBlocker::~InstanceUpdateBlocker()
 }
    
 }
-
-#endif

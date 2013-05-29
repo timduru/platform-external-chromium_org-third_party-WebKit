@@ -27,14 +27,12 @@
 
 #include "CSSValueKeywords.h"
 #include "UserAgentStyleSheets.h"
-#include "core/platform/ScrollbarTheme.h"
 #include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderProgress.h"
-#include "core/rendering/RenderSlider.h"
 #include <public/default/WebThemeEngine.h>
 #include <public/Platform.h>
 #include <public/WebRect.h>
@@ -104,10 +102,12 @@ Color RenderThemeChromiumDefault::systemColor(int cssValueId) const
 String RenderThemeChromiumDefault::extraDefaultStyleSheet()
 {
 #if !OS(WINDOWS)
-    return RenderThemeChromiumSkia::extraDefaultStyleSheet() +
-           String(themeChromiumLinuxUserAgentStyleSheet, sizeof(themeChromiumLinuxUserAgentStyleSheet));
+    return RenderTheme::extraDefaultStyleSheet() +
+        RenderThemeChromiumSkia::extraDefaultStyleSheet() +
+        String(themeChromiumLinuxUserAgentStyleSheet, sizeof(themeChromiumLinuxUserAgentStyleSheet));
 #else
-    return RenderThemeChromiumSkia::extraDefaultStyleSheet();
+    return RenderTheme::extraDefaultStyleSheet() +
+        RenderThemeChromiumSkia::extraDefaultStyleSheet();
 #endif
 }
 
@@ -156,7 +156,6 @@ Color RenderThemeChromiumDefault::platformInactiveSelectionForegroundColor() con
     return m_inactiveSelectionForegroundColor;
 }
 
-#if ENABLE(DATALIST_ELEMENT)
 IntSize RenderThemeChromiumDefault::sliderTickSize() const
 {
     return IntSize(1, 6);
@@ -166,7 +165,6 @@ int RenderThemeChromiumDefault::sliderTickOffsetFromTrackCenter() const
 {
     return -16;
 }
-#endif
 
 void RenderThemeChromiumDefault::adjustSliderThumbSize(RenderStyle* style, Element* element) const
 {
@@ -337,9 +335,7 @@ bool RenderThemeChromiumDefault::paintSliderTrack(RenderObject* o, const PaintIn
     WebKit::WebCanvas* canvas = i.context->canvas();
     extraParams.slider.vertical = o->style()->appearance() == SliderVerticalPart;
 
-#if ENABLE(DATALIST_ELEMENT)
     paintSliderTicks(o, i, rect);
-#endif
 
     float zoomLevel = o->style()->effectiveZoom();
     GraphicsContextStateSaver stateSaver(*i.context);

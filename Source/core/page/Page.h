@@ -137,7 +137,6 @@ public:
     // DEPRECATED. Use backForward() instead of the following 5 functions.
     bool goBack();
     bool goForward();
-    bool canGoBackOrForward(int distance) const;
     void goBackOrForward(int distance);
     int getHistoryLength();
 
@@ -157,7 +156,7 @@ public:
     void decrementSubframeCount() { ASSERT(m_subframeCount); --m_subframeCount; }
     int subframeCount() const { checkSubframeCountConsistency(); return m_subframeCount; }
 
-    Chrome* chrome() const { return m_chrome.get(); }
+    Chrome& chrome() const { return *m_chrome; }
     DragCaretController* dragCaretController() const { return m_dragCaretController.get(); }
     DragController* dragController() const { return m_dragController.get(); }
     FocusController* focusController() const { return m_focusController.get(); }
@@ -337,7 +336,7 @@ private:
     bool m_isPainting;
 #endif
 
-    OwnPtr<PageConsole> m_console;
+    const OwnPtr<PageConsole> m_console;
 
     HashSet<MultisamplingChangedObserver*> m_multisamplingChangedObservers;
 };

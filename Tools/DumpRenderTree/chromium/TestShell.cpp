@@ -109,6 +109,7 @@ TestShell::TestShell()
     , m_acceleratedCompositingForVideoEnabled(false)
     , m_acceleratedCompositingForFixedPositionEnabled(false)
     , m_acceleratedCompositingForOverflowScrollEnabled(false)
+    , m_acceleratedCompositingForTransitionEnabled(false)
     , m_softwareCompositingEnabled(false)
     , m_threadedCompositingEnabled(false)
     , m_forceCompositingMode(false)
@@ -138,8 +139,6 @@ void TestShell::initialize(MockPlatform* platformSupport)
     // Set theme engine.
     webkit_support::SetThemeEngine(m_testInterfaces->themeEngine());
 #endif
-
-    WTF::initializeThreading();
 
     if (m_threadedCompositingEnabled)
         m_webCompositorThread = adoptPtr(WebKit::Platform::current()->createThread("Compositor"));
@@ -213,6 +212,7 @@ void TestShell::resetWebSettings(WebView& webView)
     m_prefs.acceleratedCompositingForVideoEnabled = m_acceleratedCompositingForVideoEnabled;
     m_prefs.acceleratedCompositingForFixedPositionEnabled = m_acceleratedCompositingForFixedPositionEnabled;
     m_prefs.acceleratedCompositingForOverflowScrollEnabled = m_acceleratedCompositingForOverflowScrollEnabled;
+    m_prefs.acceleratedCompositingForTransitionEnabled = m_acceleratedCompositingForTransitionEnabled;
     m_prefs.forceCompositingMode = m_forceCompositingMode;
     m_prefs.accelerated2dCanvasEnabled = m_accelerated2dCanvasEnabled;
     m_prefs.perTilePaintingEnabled = m_perTilePaintingEnabled;

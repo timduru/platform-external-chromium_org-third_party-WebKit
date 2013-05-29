@@ -31,10 +31,17 @@ class CSSProperty;
 class CSSRule;
 class CSSStyleSheet;
 class CSSValue;
+class MutableStylePropertySet;
 class StylePropertySet;
 class StyledElement;
 
 typedef int ExceptionCode;
+
+class CSSPropertyInfo {
+public:
+    CSSPropertyID propID;
+    bool hadPixelOrPosPrefix;
+};
 
 class CSSStyleDeclaration : public ScriptWrappable {
     WTF_MAKE_NONCOPYABLE(CSSStyleDeclaration); WTF_MAKE_FAST_ALLOCATED;
@@ -64,12 +71,16 @@ public:
     virtual String getPropertyValueInternal(CSSPropertyID) = 0;
     virtual void setPropertyInternal(CSSPropertyID, const String& value, bool important, ExceptionCode&) = 0;
 
-    virtual PassRefPtr<StylePropertySet> copy() const = 0;
+    virtual PassRefPtr<MutableStylePropertySet> copyProperties() const = 0;
 
     virtual bool cssPropertyMatches(CSSPropertyID, const CSSValue*) const = 0;
     virtual CSSStyleSheet* parentStyleSheet() const { return 0; }
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const = 0;
+    void anonymousNamedGetter(const AtomicString& name, bool&, String&, bool&, float&);
+    bool anonymousNamedSetter(const AtomicString& name, const String& value, ExceptionCode&);
+
+    static CSSPropertyInfo* cssPropertyInfo(const String& propertyName);
 
 protected:
     CSSStyleDeclaration()

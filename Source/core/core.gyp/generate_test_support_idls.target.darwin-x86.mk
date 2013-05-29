@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "Settings":
 $(gyp_shared_intermediate_dir)/webkit/SettingsMacros.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/SettingsMacros.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/SettingsMacros.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/SettingsMacros.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/SettingsMacros.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/SettingsMacros.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/SettingsMacros.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/page/make_settings.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/page/Settings.in $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_generate_test_support_idls_target_Settings ($@)"
@@ -28,12 +28,12 @@ $(gyp_shared_intermediate_dir)/webkit/InternalSettingsGenerated.h: $(gyp_shared_
 
 ### Rules for action "InternalRuntimeFlags":
 $(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.idl: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.idl: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.idl: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.idl: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.idl: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.idl: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.idl: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_internal_runtime_flags.py $(LOCAL_PATH)/third_party/WebKit/Source/core/page/RuntimeEnabledFeatures.in $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/InternalRuntimeFlags.h.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/InternalRuntimeFlags.idl.tmpl $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_gyp_core_derived_sources_gyp_generate_test_support_idls_target_InternalRuntimeFlags ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_internal_runtime_flags.py ../page/RuntimeEnabledFeatures.in "$(gyp_shared_intermediate_dir)/webkit/"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core/core.gyp; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python ../scripts/make_internal_runtime_flags.py ../page/RuntimeEnabledFeatures.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/"
 
 $(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.h: $(gyp_shared_intermediate_dir)/webkit/InternalRuntimeFlags.idl ;
 

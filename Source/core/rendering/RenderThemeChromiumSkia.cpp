@@ -24,30 +24,19 @@
 #include "config.h"
 #include "core/rendering/RenderThemeChromiumSkia.h"
 
-#include "CSSValueKeywords.h"
-#include "HTMLNames.h"
 #include "UserAgentStyleSheets.h"
-#include "core/html/HTMLMediaElement.h"
-#include "core/html/TimeRanges.h"
-#include "core/html/shadow/MediaControlElements.h"
 #include "core/platform/LayoutTestSupport.h"
 #include "core/platform/ScrollbarTheme.h"
-#include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/Image.h"
-#include "core/platform/graphics/transforms/TransformationMatrix.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderMediaControlsChromium.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderProgress.h"
-#include "core/rendering/RenderSlider.h"
 #include "core/rendering/RenderThemeChromiumFontProvider.h"
 
 #include <wtf/CurrentTime.h>
-
-#include "SkGradientShader.h"
-#include "SkShader.h"
 
 namespace WebCore {
 
@@ -80,9 +69,10 @@ RenderThemeChromiumSkia::~RenderThemeChromiumSkia()
 // Use the Windows style sheets to match their metrics.
 String RenderThemeChromiumSkia::extraDefaultStyleSheet()
 {
-    return String(themeWinUserAgentStyleSheet, sizeof(themeWinUserAgentStyleSheet)) +
-           String(themeChromiumSkiaUserAgentStyleSheet, sizeof(themeChromiumSkiaUserAgentStyleSheet)) +
-           String(themeChromiumUserAgentStyleSheet, sizeof(themeChromiumUserAgentStyleSheet));
+    return RenderTheme::extraDefaultStyleSheet() +
+        String(themeWinUserAgentStyleSheet, sizeof(themeWinUserAgentStyleSheet)) +
+        String(themeChromiumSkiaUserAgentStyleSheet, sizeof(themeChromiumSkiaUserAgentStyleSheet)) +
+        String(themeChromiumUserAgentStyleSheet, sizeof(themeChromiumUserAgentStyleSheet));
 }
 
 String RenderThemeChromiumSkia::extraQuirksStyleSheet()
@@ -105,18 +95,6 @@ bool RenderThemeChromiumSkia::supportsFocusRing(const RenderStyle* style) const
     // This causes WebKit to draw the focus rings for us.
     return false;
 }
-
-bool RenderThemeChromiumSkia::supportsDataListUI(const AtomicString& type) const
-{
-    return RenderThemeChromiumCommon::supportsDataListUI(type);
-}
-
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI) && ENABLE(CALENDAR_PICKER)
-bool RenderThemeChromiumSkia::supportsCalendarPicker(const AtomicString& type) const
-{
-    return RenderThemeChromiumCommon::supportsCalendarPicker(type);
-}
-#endif
 
 bool RenderThemeChromiumSkia::supportsClosedCaptioning() const
 {
@@ -428,15 +406,6 @@ int RenderThemeChromiumSkia::menuListArrowPadding() const
     return ScrollbarTheme::theme()->scrollbarThickness();
 }
 
-// static
-void RenderThemeChromiumSkia::setSizeIfAuto(RenderStyle* style, const IntSize& size)
-{
-    if (style->width().isIntrinsicOrAuto())
-        style->setWidth(Length(size.width(), Fixed));
-    if (style->height().isAuto())
-        style->setHeight(Length(size.height(), Fixed));
-}
-
 int RenderThemeChromiumSkia::menuListInternalPadding(RenderStyle* style, int paddingType) const
 {
     // This internal padding is in addition to the user-supplied padding.
@@ -459,13 +428,6 @@ bool RenderThemeChromiumSkia::shouldShowPlaceholderWhenFocused() const
 {
     return true;
 }
-
-#if ENABLE(DATALIST_ELEMENT)
-LayoutUnit RenderThemeChromiumSkia::sliderTickSnappingThreshold() const
-{
-    return RenderThemeChromiumCommon::sliderTickSnappingThreshold();
-}
-#endif
 
 //
 // Following values are come from default of GTK+

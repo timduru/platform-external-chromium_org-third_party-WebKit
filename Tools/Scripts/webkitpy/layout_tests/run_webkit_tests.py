@@ -173,6 +173,8 @@ def parse_args(args):
             help="Alternative DumpRenderTree binary to use"),
         optparse.make_option("--content-shell", action="store_true",
             help="Use Content Shell instead of DumpRenderTree"),
+        optparse.make_option("--dump-render-tree", action="store_true",
+            help="Use DumpRenderTree instead of Content Shell"),
         optparse.make_option("--additional-platform-directory", action="append",
             default=[], help="Additional directory where to look for test "
                  "baselines (will take precendence over platform baselines). "
@@ -217,9 +219,8 @@ def parse_args(args):
                  "running. (Example: --wrapper='valgrind --smc-check=all')"),
         optparse.make_option("-i", "--ignore-tests", action="append", default=[],
             help="directories or test to ignore (may specify multiple times)"),
-        optparse.make_option("--ignore-flaky-tests", action="store", default="default",
+        optparse.make_option("--ignore-flaky-tests", action="store",
             help=("Control whether tests that are flaky on the bots get ignored."
-                "'default' == Don't use the bot data."
                 "'very-flaky' == Ignore any tests that flaked more than once on the bot."
                 "'maybe-flaky' == Ignore any tests that flaked once on the bot.")),
         optparse.make_option("--test-list", action="append",

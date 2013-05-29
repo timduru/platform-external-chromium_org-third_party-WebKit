@@ -47,7 +47,6 @@
 #include "wtf/HashSet.h"
 #include "wtf/MemoryInstrumentationHashMap.h"
 #include "wtf/MemoryInstrumentationVector.h"
-#include "wtf/StringExtras.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/StringBuilder.h"
 #include "wtf/text/StringHash.h"
@@ -1067,6 +1066,11 @@ int GraphicsLayer::debugID() const
 {
     // FIXME: change this to assert m_layer always exists, and remove enum.
     return m_layer ? m_layer->layer()->id() : DebugIDNoCompositedLayer;
+}
+
+void GraphicsLayer::setCompositingReasons(WebKit::WebCompositingReasons reasons)
+{
+    m_layer->layer()->setCompositingReasons(reasons);
 }
 
 void GraphicsLayer::setPosition(const FloatPoint& point)

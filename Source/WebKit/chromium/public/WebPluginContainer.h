@@ -31,7 +31,7 @@
 #ifndef WebPluginContainer_h
 #define WebPluginContainer_h
 
-#include "../../../Platform/chromium/public/WebCommon.h"
+#include "../../../../public/platform/WebCommon.h"
 
 struct NPObject;
 
@@ -64,6 +64,11 @@ public:
     // Causes the container to report its current geometry via
     // WebPlugin::updateGeometry.
     virtual void reportGeometry() = 0;
+
+    // Allow the plugin to pass script objects to the browser. The container
+    // tracks ownership of script objects in order to allow browser references
+    // to them to be dropped when clearScriptObjects is called.
+    virtual void allowScriptObjects() = 0;
 
     // Drop any references to script objects allocated by the plugin.
     // These are objects derived from WebPlugin::scriptableObject.  This is

@@ -60,12 +60,10 @@ static v8::Local<v8::String> makeExternalString(const String& string)
     return newString;
 }
 
-template<>
-void WeakHandleListener<StringCache, StringImpl>::callback(v8::Isolate* isolate, v8::Persistent<v8::Value> wrapper, StringImpl* stringImpl)
+static void makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::String>* wrapper, StringImpl* stringImpl)
 {
     V8PerIsolateData::current()->stringCache()->remove(stringImpl);
-    wrapper.Dispose(isolate);
-    wrapper.Clear();
+    wrapper->Dispose(isolate);
     stringImpl->deref();
 }
 
@@ -102,7 +100,7 @@ v8::Handle<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl,
 
     stringImpl->ref();
     wrapper.MarkIndependent(isolate);
-    WeakHandleListener<StringCache, StringImpl>::makeWeak(isolate, wrapper, stringImpl);
+    wrapper.MakeWeak(isolate, stringImpl, &makeWeakCallback);
     m_stringCache.set(stringImpl, wrapper);
 
     m_lastStringImpl = stringImpl;
@@ -121,9 +119,10 @@ void StringCache::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 
 IntegerCache::IntegerCache()
 {
-    v8::HandleScope handleScope;
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    v8::HandleScope handleScope(isolate);
     for (int value = 0; value < numberOfCachedSmallIntegers; value++)
-        m_smallIntegers[value].set(v8::Integer::New(value));
+        m_smallIntegers[value].set(isolate, v8::Integer::New(value));
 }
 
 } // namespace WebCore

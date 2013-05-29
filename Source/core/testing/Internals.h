@@ -127,9 +127,7 @@ public:
     Vector<String> formControlStateOfPreviousHistoryItem(ExceptionCode&);
     void setFormControlStateOfPreviousHistoryItem(const Vector<String>&, ExceptionCode&);
     void setEnableMockPagePopup(bool, ExceptionCode&);
-#if ENABLE(PAGE_POPUP)
     PassRefPtr<PagePopupController> pagePopupController();
-#endif
 
     PassRefPtr<ClientRect> absoluteCaretBounds(ExceptionCode&);
 
@@ -237,7 +235,6 @@ public:
     PassRefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
     void closeDummyInspectorFrontend();
     void setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&);
-    void setJavaScriptProfilingEnabled(bool enabled, ExceptionCode&);
 
     String counterValue(Element*);
 

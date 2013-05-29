@@ -155,7 +155,6 @@ public:
     virtual IntRect rootViewToScreen(const IntRect&) const = 0;
     virtual WebKit::WebScreenInfo screenInfo() const = 0;
     virtual void setCursor(const Cursor&) = 0;
-    virtual void setCursorHiddenUntilMouseMoves(bool) = 0;
 #if !USE(REQUEST_ANIMATION_FRAME_TIMER)
     virtual void scheduleAnimation() = 0;
 #endif
@@ -238,8 +237,7 @@ public:
 
     // Checks if there is an opened popup, called by RenderMenuList::showPopup().
     virtual bool hasOpenedPopup() const = 0;
-    virtual PassRefPtr<PopupMenu> createPopupMenu(PopupMenuClient*) const = 0;
-#if ENABLE(PAGE_POPUP)
+    virtual PassRefPtr<PopupMenu> createPopupMenu(Frame&, PopupMenuClient*) const = 0;
     // Creates a PagePopup object, and shows it beside originBoundsInRootView.
     // The return value can be 0.
     virtual PagePopup* openPagePopup(PagePopupClient*, const IntRect& originBoundsInRootView) = 0;
@@ -247,7 +245,6 @@ public:
     // For testing.
     virtual void setPagePopupDriver(PagePopupDriver*) = 0;
     virtual void resetPagePopupDriver() = 0;
-#endif
     // This function is called whenever a text field <input> is created. The
     // implementation should return true if it wants to do something in
     // addTextFieldDecorationsTo().

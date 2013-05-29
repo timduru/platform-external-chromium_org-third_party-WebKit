@@ -20,7 +20,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGFETurbulenceElement.h"
 
 #include "SVGNames.h"
@@ -139,8 +138,11 @@ bool SVGFETurbulenceElement::setFilterEffectAttribute(FilterEffect* effect, cons
         return turbulence->setType(type());
     if (attrName == SVGNames::stitchTilesAttr)
         return turbulence->setStitchTiles(stitchTiles());
-    if (attrName == SVGNames::baseFrequencyAttr)
-        return (turbulence->setBaseFrequencyX(baseFrequencyX()) || turbulence->setBaseFrequencyY(baseFrequencyY()));
+    if (attrName == SVGNames::baseFrequencyAttr) {
+        bool baseFrequencyXChanged = turbulence->setBaseFrequencyX(baseFrequencyX());
+        bool baseFrequencyYChanged = turbulence->setBaseFrequencyY(baseFrequencyY());
+        return (baseFrequencyXChanged || baseFrequencyYChanged);
+    }
     if (attrName == SVGNames::seedAttr)
         return turbulence->setSeed(seed());
     if (attrName == SVGNames::numOctavesAttr)
@@ -179,5 +181,3 @@ PassRefPtr<FilterEffect> SVGFETurbulenceElement::build(SVGFilterBuilder*, Filter
 }
 
 }
-
-#endif // ENABLE(SVG)

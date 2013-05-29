@@ -31,12 +31,12 @@
 #include "config.h"
 #include "V8HTMLAllCollection.h"
 
+#include "core/dom/NamedNodesCollection.h"
 #include "core/html/HTMLAllCollection.h"
 
 #include "V8Node.h"
 #include "V8NodeList.h"
 #include "bindings/v8/V8Binding.h"
-#include "bindings/v8/custom/V8NamedNodesCollection.h"
 
 namespace WebCore {
 
@@ -54,7 +54,7 @@ static v8::Handle<v8::Value> getNamedItems(HTMLAllCollection* collection, Atomic
 
     // FIXME: HTML5 specification says this should be a HTMLCollection.
     // http://www.whatwg.org/specs/web-apps/current-work/multipage/common-dom-interfaces.html#htmlallcollection
-    return toV8Fast(V8NamedNodesCollection::create(namedItems), holder, collection);
+    return toV8Fast(NamedNodesCollection::create(namedItems), holder, collection);
 }
 
 template<class HolderContainer>
@@ -74,17 +74,6 @@ static v8::Handle<v8::Value> getItem(HTMLAllCollection* collection, v8::Handle<v
     return toV8Fast(result.release(), holder, collection);
 }
 
-v8::Handle<v8::Value> V8HTMLAllCollection::namedPropertyGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
-{
-    if (!info.Holder()->GetRealNamedPropertyInPrototypeChain(name).IsEmpty())
-        return v8Undefined();
-    if (info.Holder()->HasRealNamedCallbackProperty(name))
-        return v8Undefined();
-
-    HTMLAllCollection* imp = V8HTMLAllCollection::toNative(info.Holder());
-    return getNamedItems(imp, toWebCoreAtomicString(name), info);
-}
-
 v8::Handle<v8::Value> V8HTMLAllCollection::itemMethodCustom(const v8::Arguments& args)
 {
     HTMLAllCollection* imp = V8HTMLAllCollection::toNative(args.Holder());
@@ -102,7 +91,7 @@ v8::Handle<v8::Value> V8HTMLAllCollection::namedItemMethodCustom(const v8::Argum
     return result;
 }
 
-v8::Handle<v8::Value> V8HTMLAllCollection::callAsFunctionCallback(const v8::Arguments& args)
+v8::Handle<v8::Value> V8HTMLAllCollection::legacyCallCustom(const v8::Arguments& args)
 {
     if (args.Length() < 1)
         return v8::Undefined();

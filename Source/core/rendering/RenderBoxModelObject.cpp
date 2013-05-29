@@ -28,11 +28,10 @@
 
 #include "HTMLNames.h"
 #include "core/html/HTMLFrameOwnerElement.h"
-#include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/scrolling/ScrollingConstraints.h"
+#include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
-#include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/Path.h"
 #include "core/platform/graphics/transforms/TransformState.h"
 #include "core/rendering/ImageQualityController.h"
@@ -41,6 +40,8 @@
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
+#include "core/rendering/RenderNamedFlowThread.h"
+#include "core/rendering/RenderRegion.h"
 #include "core/rendering/RenderView.h"
 #include <wtf/CurrentTime.h>
 
@@ -294,19 +295,30 @@ LayoutPoint RenderBoxModelObject::adjustedPositionRelativeToOffsetParent(const L
     if (const RenderBoxModelObject* offsetParent = element->renderBoxModelObject()) {
         if (offsetParent->isBox() && !offsetParent->isBody())
             referencePoint.move(-toRenderBox(offsetParent)->borderLeft(), -toRenderBox(offsetParent)->borderTop());
-        if (!isOutOfFlowPositioned()) {
+        if (!isOutOfFlowPositioned() || flowThreadContainingBlock()) {
             if (isRelPositioned())
                 referencePoint.move(relativePositionOffset());
             else if (isStickyPositioned())
                 referencePoint.move(stickyPositionOffset());
 
-            for (const RenderObject* current = parent(); current != offsetParent && current->parent(); current = current->parent()) {
+            // CSS regions specification says that region flows should return the body element as their offsetParent.
+            // Since we will bypass the body’s renderer anyway, just end the loop if we encounter a region flow (named flow thread).
+            // See http://dev.w3.org/csswg/css-regions/#cssomview-offset-attributes
+            RenderObject* current;
+            for (current = parent(); current != offsetParent && !current->isRenderNamedFlowThread() && current->parent(); current = current->parent()) {
                 // FIXME: What are we supposed to do inside SVG content?
-                if (current->isBox() && !current->isTableRow())
-                    referencePoint.moveBy(toRenderBox(current)->topLeftLocation());
-                referencePoint.move(current->parent()->offsetForColumns(referencePoint));
+                if (!isOutOfFlowPositioned()) {
+                    if (current->isBox() && !current->isTableRow())
+                        referencePoint.moveBy(toRenderBox(current)->topLeftLocation());
+                    referencePoint.move(current->parent()->offsetForColumns(referencePoint));
+                }
             }
-            if (offsetParent->isBox() && offsetParent->isBody() && !offsetParent->isPositioned())
+
+            // Compute the offset position for elements inside named flow threads for which the offsetParent was the body.
+            // See https://code.google.com/p/chromium/issues/detail?id=242168
+            if (current->isRenderNamedFlowThread())
+                referencePoint = toRenderNamedFlowThread(current)->adjustedPositionRelativeToOffsetParent(*this, referencePoint);
+            else if (offsetParent->isBox() && offsetParent->isBody() && !offsetParent->isPositioned())
                 referencePoint.moveBy(toRenderBox(offsetParent)->topLeftLocation());
         }
     }
@@ -514,7 +526,7 @@ static void applyBoxShadowForBackground(GraphicsContext* context, RenderStyle* s
         boxShadow = boxShadow->next();
 
     FloatSize shadowOffset(boxShadow->x(), boxShadow->y());
-    context->setShadow(shadowOffset, boxShadow->blur(), boxShadow->color(), style->colorSpace());
+    context->setShadow(shadowOffset, boxShadow->blur(), boxShadow->color(), DrawLooper::ShadowIgnoresAlpha);
 }
 
 void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, const Color& color, const FillLayer* bgLayer, const LayoutRect& rect,
@@ -624,50 +636,44 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
     }
     
     GraphicsContextStateSaver backgroundClipStateSaver(*context, false);
-    OwnPtr<ImageBuffer> maskImage;
     IntRect maskRect;
 
-    if (bgLayer->clip() == PaddingFillBox || bgLayer->clip() == ContentFillBox) {
+    switch (bgLayer->clip()) {
+    case PaddingFillBox:
+    case ContentFillBox: {
+        if (clipToBorderRadius)
+            break;
+
         // Clip to the padding or content boxes as necessary.
-        if (!clipToBorderRadius) {
-            bool includePadding = bgLayer->clip() == ContentFillBox;
-            LayoutRect clipRect = LayoutRect(scrolledPaintRect.x() + bLeft + (includePadding ? pLeft : LayoutUnit()),
-                scrolledPaintRect.y() + borderTop() + (includePadding ? paddingTop() : LayoutUnit()),
-                scrolledPaintRect.width() - bLeft - bRight - (includePadding ? pLeft + pRight : LayoutUnit()),
-                scrolledPaintRect.height() - borderTop() - borderBottom() - (includePadding ? paddingTop() + paddingBottom() : LayoutUnit()));
-            backgroundClipStateSaver.save();
-            context->clip(clipRect);
-        }
-    } else if (bgLayer->clip() == TextFillBox) {
-        // We have to draw our text into a mask that can then be used to clip background drawing.
+        bool includePadding = bgLayer->clip() == ContentFillBox;
+        LayoutRect clipRect = LayoutRect(scrolledPaintRect.x() + bLeft + (includePadding ? pLeft : LayoutUnit()),
+            scrolledPaintRect.y() + borderTop() + (includePadding ? paddingTop() : LayoutUnit()),
+            scrolledPaintRect.width() - bLeft - bRight - (includePadding ? pLeft + pRight : LayoutUnit()),
+            scrolledPaintRect.height() - borderTop() - borderBottom() - (includePadding ? paddingTop() + paddingBottom() : LayoutUnit()));
+        backgroundClipStateSaver.save();
+        context->clip(clipRect);
+
+        break;
+    }
+    case TextFillBox: {
         // First figure out how big the mask has to be.  It should be no bigger than what we need
         // to actually render, so we should intersect the dirty rect with the border box of the background.
         maskRect = pixelSnappedIntRect(rect);
         maskRect.intersect(paintInfo.rect);
 
-        // Now create the mask.
-        maskImage = context->createCompatibleBuffer(maskRect.size());
-        if (!maskImage)
-            return;
-
-        GraphicsContext* maskImageContext = maskImage->context();
-        maskImageContext->translate(-maskRect.x(), -maskRect.y());
-
-        // Now add the text to the clip.  We do this by painting using a special paint phase that signals to
-        // InlineTextBoxes that they should just add their contents to the clip.
-        PaintInfo info(maskImageContext, maskRect, PaintPhaseTextClip, PaintBehaviorForceBlackText, 0, paintInfo.renderRegion);
-        if (box) {
-            RootInlineBox* root = box->root();
-            box->paint(info, LayoutPoint(scrolledPaintRect.x() - box->x(), scrolledPaintRect.y() - box->y()), root->lineTop(), root->lineBottom());
-        } else {
-            LayoutSize localOffset = isBox() ? toRenderBox(this)->locationOffset() : LayoutSize();
-            paint(info, scrolledPaintRect.location() - localOffset);
-        }
-
-        // The mask has been created.  Now we just need to clip to it.
+        // We draw the background into a separate layer, to be later masked with yet another layer
+        // holding the text content.
         backgroundClipStateSaver.save();
         context->clip(maskRect);
         context->beginTransparencyLayer(1);
+
+        break;
+    }
+    case BorderFillBox:
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+        break;
     }
 
     // Only fill with a base color (e.g., white) if we're the root document, since iframes/frames with
@@ -687,13 +693,10 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
                     if (body) {
                         // Can't scroll a frameset document anyway.
                         isOpaqueRoot = body->hasLocalName(framesetTag);
-                    }
-#if ENABLE(SVG)
-                    else {
+                    } else {
                         // SVG documents and XML documents with SVG root nodes are transparent.
                         isOpaqueRoot = !document()->hasSVGRootNode();
                     }
-#endif
                 }
             } else
                 isOpaqueRoot = !view()->frameView()->isTransparent();
@@ -753,7 +756,26 @@ void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, co
     }
 
     if (bgLayer->clip() == TextFillBox) {
-        context->drawImageBuffer(maskImage.get(), ColorSpaceDeviceRGB, maskRect, CompositeDestinationIn);
+        // Create the text mask layer.
+        context->setCompositeOperation(CompositeDestinationIn);
+        context->beginTransparencyLayer(1);
+
+        // FIXME: Workaround for https://code.google.com/p/skia/issues/detail?id=1291.
+        context->clearRect(maskRect);
+
+        // Now draw the text into the mask. We do this by painting using a special paint phase that signals to
+        // InlineTextBoxes that they should just add their contents to the clip.
+        PaintInfo info(context, maskRect, PaintPhaseTextClip, PaintBehaviorForceBlackText, 0, paintInfo.renderRegion);
+        context->setCompositeOperation(CompositeSourceOver);
+        if (box) {
+            RootInlineBox* root = box->root();
+            box->paint(info, LayoutPoint(scrolledPaintRect.x() - box->x(), scrolledPaintRect.y() - box->y()), root->lineTop(), root->lineBottom());
+        } else {
+            LayoutSize localOffset = isBox() ? toRenderBox(this)->locationOffset() : LayoutSize();
+            paint(info, scrolledPaintRect.location() - localOffset);
+        }
+
+        context->endTransparencyLayer();
         context->endTransparencyLayer();
     }
 }
@@ -2369,14 +2391,12 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
             shadowRect.move(shadowOffset);
 
             GraphicsContextStateSaver stateSaver(*context);
-            context->clip(shadowRect);
 
-            // Move the fill just outside the clip, adding 1 pixel separation so that the fill does not
-            // bleed in (due to antialiasing) if the context is transformed.
-            IntSize extraOffset(paintRect.pixelSnappedWidth() + max(0, shadowOffset.width()) + shadowBlur + 2 * shadowSpread + 1, 0);
-            shadowOffset -= extraOffset;
-            fillRect.move(extraOffset);
-            context->setShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
+            // Draw only the shadow.
+            DrawLooper drawLooper;
+            drawLooper.addShadow(shadowOffset, shadowBlur, shadowColor,
+                DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
+            context->setDrawLooper(drawLooper);
 
             if (hasBorderRadius) {
                 RoundedRect rectToClipOut = border;
@@ -2458,15 +2478,15 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
             if (hasBorderRadius) {
                 Path path;
                 path.addRoundedRect(border);
-                context->clip(path);
+                context->clipPath(path);
                 roundedHole.shrinkRadii(shadowSpread);
             } else
                 context->clip(border.rect());
 
-            IntSize extraOffset(2 * paintRect.pixelSnappedWidth() + max(0, shadowOffset.width()) + shadowBlur - 2 * shadowSpread + 1, 0);
-            context->translate(extraOffset.width(), extraOffset.height());
-            shadowOffset -= extraOffset;
-            context->setShadow(shadowOffset, shadowBlur, shadowColor, s->colorSpace());
+            DrawLooper drawLooper;
+            drawLooper.addShadow(shadowOffset, shadowBlur, shadowColor,
+                DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
+            context->setDrawLooper(drawLooper);
             context->fillRectWithRoundedHole(outerRect, roundedHole, fillColor, s->colorSpace());
         }
     }

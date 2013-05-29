@@ -32,7 +32,6 @@ var loader = loader || {};
 (function() {
 
 var TEST_RESULTS_SERVER = 'http://test-results.appspot.com/';
-var CHROMIUM_EXPECTATIONS_URL = 'http://svn.webkit.org/repository/webkit/trunk/LayoutTests/platform/chromium/TestExpectations';
 
 function pathToBuilderResultsFile(builderName) {
     return TEST_RESULTS_SERVER + 'testfile?builder=' + builderName +
@@ -62,7 +61,6 @@ loader.Loader = function()
     this._loadingSteps = [
         this._loadBuildersList,
         this._loadResultsFiles,
-        this._loadExpectationsFiles,
     ];
 
     this._buildersThatFailedToLoad = [];
@@ -165,26 +163,19 @@ loader.Loader.prototype = {
     {
         var builds = JSON.parse(fileData);
 
-        var json_version = builds['version'];
-        for (var builderName in builds) {
-            if (builderName == 'version')
-                continue;
+        // If a test suite stops being run on a given builder, we don't want to show it.
+        // Assume any builder without a run in two weeks for a given test suite isn't
+        // running that suite anymore.
+        // FIXME: Grab which bots run which tests directly from the buildbot JSON instead.
+        var lastRunSeconds = builds[builderName].secondsSinceEpoch[0];
+        if ((Date.now() / 1000) - lastRunSeconds > ONE_WEEK_SECONDS)
+            return;
 
-            // If a test suite stops being run on a given builder, we don't want to show it.
-            // Assume any builder without a run in two weeks for a given test suite isn't
-            // running that suite anymore.
-            // FIXME: Grab which bots run which tests directly from the buildbot JSON instead.
-            var lastRunSeconds = builds[builderName].secondsSinceEpoch[0];
-            if ((Date.now() / 1000) - lastRunSeconds > ONE_WEEK_SECONDS)
-                continue;
+        if ((Date.now() / 1000) - lastRunSeconds > ONE_DAY_SECONDS)
+            this._staleBuilders.push(builderName);
 
-            if ((Date.now() / 1000) - lastRunSeconds > ONE_DAY_SECONDS)
-                this._staleBuilders.push(builderName);
-
-            if (json_version >= 4)
-                builds[builderName][TESTS_KEY] = loader.Loader._flattenTrie(builds[builderName][TESTS_KEY]);
-            g_resultsByBuilder[builderName] = builds[builderName];
-        }
+        builds[builderName][TESTS_KEY] = loader.Loader._flattenTrie(builds[builderName][TESTS_KEY]);
+        g_resultsByBuilder[builderName] = builds[builderName];
     },
     _handleResultsFileLoadError: function(builderName)
     {
@@ -212,39 +203,6 @@ loader.Loader.prototype = {
                 return false;
         }
         return true;
-    },
-    _loadExpectationsFiles: function()
-    {
-        if (!isFlakinessDashboard() && !this._history.crossDashboardState.useTestData) {
-            this._loadNext();
-            return;
-        }
-
-        var expectationsFilesToRequest = {};
-        traversePlatformsTree(function(platform, platformName) {
-            if (platform.fallbackPlatforms)
-                platform.fallbackPlatforms.forEach(function(fallbackPlatform) {
-                    var fallbackPlatformObject = platformObjectForName(fallbackPlatform);
-                    if (fallbackPlatformObject.expectationsDirectory && !(fallbackPlatform in expectationsFilesToRequest))
-                        expectationsFilesToRequest[fallbackPlatform] = EXPECTATIONS_URL_BASE_PATH + fallbackPlatformObject.expectationsDirectory + '/TestExpectations';
-                });
-
-            if (platform.expectationsDirectory)
-                expectationsFilesToRequest[platformName] = EXPECTATIONS_URL_BASE_PATH + platform.expectationsDirectory + '/TestExpectations';
-        });
-
-        for (platformWithExpectations in expectationsFilesToRequest)
-            loader.request(expectationsFilesToRequest[platformWithExpectations],
-                    partial(function(loader, platformName, xhr) {
-                        g_expectationsByPlatform[platformName] = getParsedExpectations(xhr.responseText);
-
-                        delete expectationsFilesToRequest[platformName];
-                        if (!Object.keys(expectationsFilesToRequest).length)
-                            loader._loadNext();
-                    }, this, platformWithExpectations),
-                    partial(function(platformName, xhr) {
-                        console.error('Could not load expectations file for ' + platformName);
-                    }, platformWithExpectations));
     },
     _addErrors: function()
     {

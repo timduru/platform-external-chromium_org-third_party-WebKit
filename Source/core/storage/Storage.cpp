@@ -56,4 +56,44 @@ Storage::~Storage()
         m_storageArea->decrementAccessCount();
 }
 
+String Storage::anonymousIndexedGetter(unsigned index, ExceptionCode& ec)
+{
+    return anonymousNamedGetter(String::number(index), ec);
+}
+
+String Storage::anonymousNamedGetter(const AtomicString& name, ExceptionCode& ec)
+{
+    ec = 0;
+    bool found = contains(name, ec);
+    if (ec || !found)
+        return String();
+    String result = getItem(name, ec);
+    if (ec)
+        return String();
+    return result;
+}
+
+bool Storage::anonymousNamedSetter(const AtomicString& name, const AtomicString& value, ExceptionCode& ec)
+{
+    setItem(name, value, ec);
+    return true;
+}
+
+bool Storage::anonymousNamedDeleter(const AtomicString& name, ExceptionCode& ec)
+{
+    bool found = contains(name, ec);
+    if (!found || ec)
+        return false;
+    removeItem(name, ec);
+    if (ec)
+        return false;
+    return true;
+}
+
+bool Storage::anonymousIndexedDeleter(unsigned index, ExceptionCode& ec)
+{
+    return anonymousNamedDeleter(String::number(index), ec);
+}
+
+
 }

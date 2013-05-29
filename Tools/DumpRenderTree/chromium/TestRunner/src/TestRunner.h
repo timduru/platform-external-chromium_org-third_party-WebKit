@@ -126,7 +126,7 @@ public:
     bool requestPointerLock();
     void requestPointerUnlock();
     bool isPointerLocked();
-    void setToolTipText(WebKit::WebString);
+    void setToolTipText(const WebKit::WebString&);
 
     // A single item in the work queue.
     class WorkItem {
@@ -426,6 +426,9 @@ private:
     // Shows DevTools window.
     void showWebInspector(const CppArgumentList&, CppVariant*);
     void closeWebInspector(const CppArgumentList&, CppVariant*);
+
+    // Inspect chooser state
+    void isChooserShown(const CppArgumentList&, CppVariant*);
 
     // Allows layout tests to exec scripts at WebInspector side.
     void evaluateInWebInspector(const CppArgumentList&, CppVariant*);

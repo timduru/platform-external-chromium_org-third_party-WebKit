@@ -31,6 +31,7 @@
 #ifndef PerformanceTiming_h
 #define PerformanceTiming_h
 
+#include "bindings/v8/ScriptWrappable.h"
 #include "core/page/DOMWindowProperty.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefCounted.h>
@@ -43,7 +44,7 @@ struct DocumentTiming;
 class Frame;
 class ResourceLoadTiming;
 
-class PerformanceTiming : public RefCounted<PerformanceTiming>, public DOMWindowProperty {
+class PerformanceTiming : public RefCounted<PerformanceTiming>, public ScriptWrappable, public DOMWindowProperty {
 public:
     static PassRefPtr<PerformanceTiming> create(Frame* frame) { return adoptRef(new PerformanceTiming(frame)); }
 
@@ -76,7 +77,11 @@ private:
     DocumentLoader* documentLoader() const;
     DocumentLoadTiming* documentLoadTiming() const;
     ResourceLoadTiming* resourceLoadTiming() const;
+
+#ifndef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     unsigned long long resourceLoadTimeRelativeToAbsolute(int) const;
+#endif
+
     unsigned long long monotonicTimeToIntegerMilliseconds(double) const;
 };
 

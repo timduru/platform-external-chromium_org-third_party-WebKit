@@ -2285,23 +2285,23 @@ template<> inline CSSPrimitiveValue::operator TextAlignLast() const
 }
 #endif // CSS3_TEXT
 
-template<> inline CSSPrimitiveValue::operator ETextDecoration() const
+template<> inline CSSPrimitiveValue::operator TextDecoration() const
 {
     switch (m_value.ident) {
     case CSSValueNone:
-        return TDNONE;
+        return TextDecorationNone;
     case CSSValueUnderline:
-        return UNDERLINE;
+        return TextDecorationUnderline;
     case CSSValueOverline:
-        return OVERLINE;
+        return TextDecorationOverline;
     case CSSValueLineThrough:
-        return LINE_THROUGH;
+        return TextDecorationLineThrough;
     case CSSValueBlink:
-        return BLINK;
+        return TextDecorationBlink;
     }
 
     ASSERT_NOT_REACHED();
-    return TDNONE;
+    return TextDecorationNone;
 }
 
 #if ENABLE(CSS3_TEXT)
@@ -3670,8 +3670,6 @@ template<> inline CSSPrimitiveValue::operator BlendMode() const
     return BlendModeNormal;
 }
 
-#if ENABLE(SVG)
-
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(LineCap e)
     : CSSValue(PrimitiveClass)
 {
@@ -3840,8 +3838,6 @@ template<> inline CSSPrimitiveValue::operator EAlignmentBaseline() const
     ASSERT_NOT_REACHED();
     return AB_AUTO;
 }
-
-#endif
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBorderCollapse e)
     : CSSValue(PrimitiveClass)
@@ -4159,8 +4155,6 @@ template<int supported> Length CSSPrimitiveValue::convertToLength(RenderStyle* s
         return viewportPercentageLength();
     return Length(Undefined);
 }
-
-#if ENABLE(SVG)
 
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(EBufferedRendering e)
     : CSSValue(PrimitiveClass)
@@ -4505,7 +4499,32 @@ template<> inline CSSPrimitiveValue::operator EMaskType() const
     return MT_LUMINANCE;
 }
 
-#endif // ENABLE(SVG)
+template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TouchAction t)
+    : CSSValue(PrimitiveClass)
+{
+    m_primitiveUnitType = CSS_IDENT;
+    switch (t) {
+    case TouchActionNone:
+        m_value.ident = CSSValueNone;
+        break;
+    case TouchActionAuto:
+        m_value.ident = CSSValueAuto;
+        break;
+    }
+}
+
+template<> inline CSSPrimitiveValue::operator TouchAction() const
+{
+    switch (m_value.ident) {
+    case CSSValueNone:
+        return TouchActionNone;
+    case CSSValueAuto:
+        return TouchActionAuto;
+    }
+
+    ASSERT_NOT_REACHED();
+    return TouchActionNone;
+}
 
 }
 

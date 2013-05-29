@@ -27,11 +27,9 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/rendering/svg/RenderSVGRect.h"
 
 #include "SVGNames.h"
-#include "core/svg/SVGRectElement.h"
 
 namespace WebCore {
 
@@ -128,5 +126,3 @@ bool RenderSVGRect::shapeDependentFillContains(const FloatPoint& point, const Wi
 }
 
 }
-
-#endif // ENABLE(SVG)

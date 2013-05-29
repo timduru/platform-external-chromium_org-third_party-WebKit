@@ -28,21 +28,17 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/css/resolver/StyleResolver.h"
 
 #include <stdlib.h>
 #include "CSSPropertyNames.h"
-#include "SVGNames.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/CSSValueList.h"
 #include "core/css/ShadowValue.h"
-#include "core/dom/Document.h"
 #include "core/rendering/style/SVGRenderStyle.h"
 #include "core/rendering/style/SVGRenderStyleDefs.h"
 #include "core/svg/SVGColor.h"
 #include "core/svg/SVGPaint.h"
-#include "core/svg/SVGStyledElement.h"
 #include "core/svg/SVGURIReference.h"
 #include <wtf/MathExtras.h>
 
@@ -613,5 +609,3 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
 }
 
 }
-
-#endif

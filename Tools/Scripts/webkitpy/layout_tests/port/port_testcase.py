@@ -64,9 +64,6 @@ class TestWebKitPort(Port):
     def _symbols_string(self):
         return self.symbols_string
 
-    def _tests_for_other_platforms(self):
-        return ["media", ]
-
     def _tests_for_disabled_features(self):
         return ["accessibility", ]
 
@@ -438,54 +435,27 @@ class PortTestCase(unittest.TestCase):
 
     def test_skipped_directories_for_symbols(self):
         # This first test confirms that the commonly found symbols result in the expected skipped directories.
-        symbols_string = " ".join(["GraphicsLayer", "WebCoreHas3DRendering", "isXHTMLMPDocument", "fooSymbol"])
+        symbols_string = " ".join(["fooSymbol"])
         expected_directories = set([
-            "mathml",  # Requires MathMLElement
-            "fast/canvas/webgl",  # Requires WebGLShader
-            "compositing/webgl",  # Requires WebGLShader
-            "http/tests/canvas/webgl",  # Requires WebGLShader
-            "webgl",  # Requires WebGLShader
-            "mhtml",  # Requires MHTMLArchive
-            "fast/css/variables",  # Requires CSS Variables
-            "inspector/styles/variables",  # Requires CSS Variables
+            "webaudio/codec-tests/mp3",
+            "webaudio/codec-tests/aac",
         ])
 
-        result_directories = set(TestWebKitPort(symbols_string=symbols_string)._skipped_tests_for_unsupported_features(test_list=['mathml/foo.html']))
+        result_directories = set(TestWebKitPort(symbols_string=symbols_string)._skipped_tests_for_unsupported_features(test_list=['webaudio/codec-tests/mp3/foo.html']))
         self.assertEqual(result_directories, expected_directories)
 
         # Test that the nm string parsing actually works:
         symbols_string = """
-000000000124f498 s __ZZN7WebCore13GraphicsLayer12replaceChildEPS0_S1_E19__PRETTY_FUNCTION__
-000000000124f500 s __ZZN7WebCore13GraphicsLayer13addChildAboveEPS0_S1_E19__PRETTY_FUNCTION__
-000000000124f670 s __ZZN7WebCore13GraphicsLayer13addChildBelowEPS0_S1_E19__PRETTY_FUNCTION__
+000000000124f498 s __ZZN7WebCore13ff_mp3_decoder12replaceChildEPS0_S1_E19__PRETTY_FUNCTION__
+000000000124f500 s __ZZN7WebCore13ff_mp3_decoder13addChildAboveEPS0_S1_E19__PRETTY_FUNCTION__
+000000000124f670 s __ZZN7WebCore13ff_mp3_decoder13addChildBelowEPS0_S1_E19__PRETTY_FUNCTION__
 """
         # Note 'compositing' is not in the list of skipped directories (hence the parsing of GraphicsLayer worked):
-        expected_directories = set(['mathml', 'compositing/webgl', 'fast/canvas/webgl', 'webgl', 'mhtml', 'http/tests/canvas/webgl', 'fast/css/variables', 'inspector/styles/variables'])
-        result_directories = set(TestWebKitPort(symbols_string=symbols_string)._skipped_tests_for_unsupported_features(test_list=['mathml/foo.html']))
+        expected_directories = set([
+            "webaudio/codec-tests/aac",
+        ])
+        result_directories = set(TestWebKitPort(symbols_string=symbols_string)._skipped_tests_for_unsupported_features(test_list=['webaudio/codec-tests/mp3/foo.html']))
         self.assertEqual(result_directories, expected_directories)
-
-    def test_skipped_directories_for_features(self):
-        supported_features = ["Accelerated Compositing", "Foo Feature"]
-        expected_directories = set(["animations/3d", "transforms/3d"])
-        port = TestWebKitPort(supported_features=supported_features)
-        port._runtime_feature_list = lambda: supported_features
-        result_directories = set(port._skipped_tests_for_unsupported_features(test_list=["animations/3d/foo.html"]))
-        self.assertEqual(result_directories, expected_directories)
-
-    def test_skipped_directories_for_features_no_matching_tests_in_test_list(self):
-        supported_features = ["Accelerated Compositing", "Foo Feature"]
-        expected_directories = set([])
-        result_directories = set(TestWebKitPort(supported_features=supported_features)._skipped_tests_for_unsupported_features(test_list=['foo.html']))
-        self.assertEqual(result_directories, expected_directories)
-
-    def test_skipped_tests_for_unsupported_features_empty_test_list(self):
-        supported_features = ["Accelerated Compositing", "Foo Feature"]
-        expected_directories = set([])
-        result_directories = set(TestWebKitPort(supported_features=supported_features)._skipped_tests_for_unsupported_features(test_list=None))
-        self.assertEqual(result_directories, expected_directories)
-
-    def test_skipped_layout_tests(self):
-        self.assertEqual(TestWebKitPort().skipped_layout_tests(test_list=[]), set(['media']))
 
     def test_expectations_files(self):
         port = TestWebKitPort()
@@ -505,7 +475,7 @@ class PortTestCase(unittest.TestCase):
     def test_root_option(self):
         port = TestWebKitPort()
         port._options = MockOptions(root='/foo')
-        self.assertEqual(port._path_to_driver(), "/foo/DumpRenderTree")
+        self.assertEqual(port._path_to_driver(), "/foo/content_shell")
 
     def test_test_expectations(self):
         # Check that we read the expectations file

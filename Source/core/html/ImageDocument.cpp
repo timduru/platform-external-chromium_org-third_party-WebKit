@@ -42,7 +42,6 @@
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/LocalizedStrings.h"
-#include "core/platform/NotImplemented.h"
 
 using std::min;
 
@@ -128,6 +127,9 @@ static float pageZoomFactor(const Document* document)
 
 void ImageDocumentParser::appendBytes(DocumentWriter*, const char* data, size_t length)
 {
+    if (!length)
+        return;
+
     Frame* frame = document()->frame();
     Settings* settings = frame->settings();
     if (!frame->loader()->client()->allowImage(!settings || settings->areImagesEnabled(), document()->url()))

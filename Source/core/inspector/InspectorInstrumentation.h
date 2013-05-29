@@ -55,7 +55,7 @@
 
 namespace WebCore {
 
-class CSSParserLocation;
+struct CSSParserString;
 class CSSRule;
 class CachedResource;
 class CharacterData;
@@ -136,9 +136,9 @@ void unregisterInstrumentingAgents(InstrumentingAgents*);
 
 InstrumentingAgents* instrumentingAgentsForPage(Page*);
 InstrumentingAgents* instrumentingAgentsForFrame(Frame*);
-InstrumentingAgents* instrumentingAgentsForContext(ScriptExecutionContext*);
+InstrumentingAgents* instrumentingAgentsForScriptExecutionContext(ScriptExecutionContext*);
 InstrumentingAgents* instrumentingAgentsForDocument(Document*);
-InstrumentingAgents* instrumentingAgentsForRenderer(RenderObject*);
+InstrumentingAgents* instrumentingAgentsForRenderObject(RenderObject*);
 InstrumentingAgents* instrumentingAgentsForElement(Element*);
 
 InstrumentingAgents* instrumentingAgentsForWorkerContext(WorkerContext*);
@@ -147,6 +147,7 @@ InstrumentingAgents* instrumentingAgentsForNonDocumentContext(ScriptExecutionCon
 }  // namespace InspectorInstrumentation
 
 namespace InstrumentationEvents {
+extern const char PaintSetup[];
 extern const char PaintLayer[];
 extern const char RasterTask[];
 extern const char ImageDecodeTask[];
@@ -158,11 +159,12 @@ extern const char BeginFrame[];
 namespace InstrumentationEventArguments {
 extern const char LayerId[];
 extern const char PageId[];
+extern const char NodeId[];
 };
 
 namespace InspectorInstrumentation {
 
-inline InstrumentingAgents* instrumentingAgentsForContext(ScriptExecutionContext* context)
+inline InstrumentingAgents* instrumentingAgentsForScriptExecutionContext(ScriptExecutionContext* context)
 {
     if (!context)
         return 0;
@@ -194,7 +196,7 @@ inline InstrumentingAgents* instrumentingAgentsForElement(Element* element)
     return instrumentingAgentsForDocument(element->document());
 }
 
-bool cssErrorFilter(const CSSParserLocation&, int errorType);
+bool cssErrorFilter(const CSSParserString& content, int propertyId, int errorType);
 
 } // namespace InspectorInstrumentation
 

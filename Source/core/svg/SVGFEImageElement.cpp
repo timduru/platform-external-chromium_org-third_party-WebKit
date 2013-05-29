@@ -21,7 +21,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGFEImageElement.h"
 
 #include "SVGNames.h"
@@ -82,8 +81,7 @@ void SVGFEImageElement::clearResourceReferences()
 
 void SVGFEImageElement::requestImageResource()
 {
-    CachedResourceRequest request(ResourceRequest(ownerDocument()->completeURL(href())));
-    request.setInitiator(this);
+    CachedResourceRequest request(ResourceRequest(ownerDocument()->completeURL(href())), localName());
     m_cachedImage = document()->cachedResourceLoader()->requestImage(request);
 
     if (m_cachedImage)
@@ -200,7 +198,7 @@ void SVGFEImageElement::notifyFinished(CachedResource*)
     if (!parent->hasTagName(SVGNames::filterTag) || !parent->renderer())
         return;
 
-    RenderSVGResource::markForLayoutAndParentResourceInvalidation(parent->renderer());
+    RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer());
 }
 
 PassRefPtr<FilterEffect> SVGFEImageElement::build(SVGFilterBuilder*, Filter* filter)
@@ -218,5 +216,3 @@ void SVGFEImageElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) con
 }
 
 }
-
-#endif // ENABLE(SVG)

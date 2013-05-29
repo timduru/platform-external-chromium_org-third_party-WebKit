@@ -29,8 +29,7 @@
 
 [
     NoInterfaceObject,
-    ImplementedAs=DOMWindowCSS,
-    ImplementationLacksVTable
+    ImplementedAs=DOMWindowCSS
 ] interface CSS {
     boolean supports(DOMString property, DOMString value);
     boolean supports(DOMString conditionText);

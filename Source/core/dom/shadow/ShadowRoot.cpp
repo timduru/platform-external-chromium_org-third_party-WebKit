@@ -142,6 +142,12 @@ void ShadowRoot::recalcStyle(StyleChange change)
     StyleResolver* styleResolver = document()->styleResolver();
     styleResolver->pushParentShadowRoot(this);
 
+    // When we're set to lazyAttach we'll have a FullStyleChange and we'll need
+    // to promote the change to a Force for all our descendants so they get a
+    // recalc and will attach.
+    if (styleChangeType() == FullStyleChange)
+        change = Force;
+
     for (Node* child = firstChild(); child; child = child->nextSibling()) {
         if (child->isElementNode())
             toElement(child)->recalcStyle(change);
@@ -159,10 +165,13 @@ void ShadowRoot::setApplyAuthorStyles(bool value)
     if (isOrphan())
         return;
 
-    if (m_applyAuthorStyles != value) {
-        m_applyAuthorStyles = value;
+    if (m_applyAuthorStyles == value)
+        return;
+
+    m_applyAuthorStyles = value;
+    // FIXME: Why do we need to recalc style on all other shadow roots too?
+    if (attached())
         host()->setNeedsStyleRecalc();
-    }
 }
 
 void ShadowRoot::setResetStyleInheritance(bool value)
@@ -170,11 +179,13 @@ void ShadowRoot::setResetStyleInheritance(bool value)
     if (isOrphan())
         return;
 
-    if (value != m_resetStyleInheritance) {
-        m_resetStyleInheritance = value;
-        if (attached() && owner())
-            owner()->recalcStyle(Force);
-    }
+    if (value == m_resetStyleInheritance)
+        return;
+
+    m_resetStyleInheritance = value;
+    // FIXME: Why do we need to recalc style on all other shadow roots too?
+    if (attached())
+        host()->setNeedsStyleRecalc();
 }
 
 void ShadowRoot::attach()

@@ -31,8 +31,8 @@
 #ifndef WebMediaPlayer_h
 #define WebMediaPlayer_h
 
-#include "../../../Platform/chromium/public/WebCanvas.h"
-#include "../../../Platform/chromium/public/WebString.h"
+#include "../../../../public/platform/WebCanvas.h"
+#include "../../../../public/platform/WebString.h"
 #include "WebTimeRange.h"
 
 namespace WebKit {
@@ -98,7 +98,7 @@ public:
 
     virtual void load(const WebURL&, CORSMode) = 0;
     virtual void load(const WebURL&, WebMediaSource*, CORSMode) = 0;
-    virtual void cancelLoad() = 0;
+    virtual void cancelLoad() { } // FIXME: Remove once Chromium no longer overrides
 
     // Playback controls.
     virtual void play() = 0;
@@ -116,7 +116,7 @@ public:
 
     virtual void setSize(const WebSize&) = 0;
 
-    virtual void paint(WebCanvas*, const WebRect&, uint8_t alpha) = 0;
+    virtual void paint(WebCanvas*, const WebRect&, unsigned char alpha) = 0;
 
     // True if the loaded media has a playable video/audio track.
     virtual bool hasVideo() const = 0;
@@ -153,9 +153,6 @@ public:
     virtual unsigned videoDecodedByteCount() const = 0;
 
     // Do a GPU-GPU textures copy if possible.
-    virtual bool copyVideoTextureToPlatformTexture(WebGraphicsContext3D*, unsigned texture, unsigned level, unsigned internalFormat, bool premultiplyAlpha, bool flipY) { return false; }
-    // TODO(jun.a.jiang@intel.com): once all clients switch to call this newer copyVideoTextureToPlatformTexture(...) with
-    // seven parameters, the old one would be removed.
     virtual bool copyVideoTextureToPlatformTexture(WebGraphicsContext3D*, unsigned texture, unsigned level, unsigned internalFormat, unsigned type, bool premultiplyAlpha, bool flipY) { return false; }
 
     virtual WebAudioSourceProvider* audioSourceProvider() { return 0; }

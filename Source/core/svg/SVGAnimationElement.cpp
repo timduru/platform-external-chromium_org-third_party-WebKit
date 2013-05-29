@@ -24,7 +24,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGAnimationElement.h"
 
 #include "CSSPropertyNames.h"
@@ -248,7 +247,7 @@ float SVGAnimationElement::getCurrentTime() const
     return narrowPrecisionToFloat(elapsed().value());
 }
 
-float SVGAnimationElement::getSimpleDuration(ExceptionCode&) const
+float SVGAnimationElement::getSimpleDuration() const
 {
     return narrowPrecisionToFloat(simpleDuration().value());
 }    
@@ -700,5 +699,3 @@ void SVGAnimationElement::checkInvalidCSSAttributeType(SVGElement* target)
 }
 
 }
-
-#endif // ENABLE(SVG)

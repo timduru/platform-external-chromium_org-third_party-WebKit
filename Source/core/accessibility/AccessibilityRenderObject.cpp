@@ -60,6 +60,7 @@
 #include "core/rendering/RenderTextControlSingleLine.h"
 #include "core/rendering/RenderTextFragment.h"
 #include "core/rendering/RenderWidget.h"
+#include "core/svg/SVGDocument.h"
 #include "core/svg/SVGSVGElement.h"
 #include "core/svg/graphics/SVGImage.h"
 #include "core/svg/graphics/SVGImageChromeClient.h"
@@ -414,12 +415,10 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     if (headingLevel())
         return HeadingRole;
 
-#if ENABLE(SVG)
     if (m_renderer->isSVGImage())
         return ImageRole;
     if (m_renderer->isSVGRoot())
         return SVGRootRole;
-#endif
 
     // It's not clear which role a platform should choose for a math element.
     // Declaring a math element role should give flexibility to platforms to choose.
@@ -710,7 +709,7 @@ bool AccessibilityRenderObject::hasPlainText() const
 
     return style->fontDescription().weight() == FontWeightNormal
         && style->fontDescription().italic() == FontItalicOff
-        && style->textDecorationsInEffect() == TDNONE;
+        && style->textDecorationsInEffect() == TextDecorationNone;
 }
 
 bool AccessibilityRenderObject::hasSameFont(RenderObject* renderer) const
@@ -742,7 +741,7 @@ bool AccessibilityRenderObject::hasUnderline() const
     if (!m_renderer)
         return false;
 
-    return m_renderer->style()->textDecorationsInEffect() & UNDERLINE;
+    return m_renderer->style()->textDecorationsInEffect() & TextDecorationUnderline;
 }
 
 //
@@ -2856,7 +2855,6 @@ void AccessibilityRenderObject::detachRemoteSVGRoot()
 
 AccessibilitySVGRoot* AccessibilityRenderObject::remoteSVGRootElement() const
 {
-#if ENABLE(SVG)
     if (!m_renderer || !m_renderer->isRenderImage())
         return 0;
 
@@ -2896,9 +2894,6 @@ AccessibilitySVGRoot* AccessibilityRenderObject::remoteSVGRootElement() const
         return 0;
 
     return toAccessibilitySVGRoot(rootSVGObject);
-#else
-    return 0;
-#endif
 }
 
 AccessibilityObject* AccessibilityRenderObject::remoteSVGElementHitTest(const IntPoint& point) const
@@ -3161,25 +3156,19 @@ LayoutRect AccessibilityRenderObject::computeElementRect() const
     // For a web area, which will have the most elements of any element, absoluteQuads should be used.
     // We should also use absoluteQuads for SVG elements, otherwise transforms won't be applied.
     Vector<FloatQuad> quads;
-    bool isSVGRoot = false;
-#if ENABLE(SVG)
-    if (obj->isSVGRoot())
-        isSVGRoot = true;
-#endif
+
     if (obj->isText())
         toRenderText(obj)->absoluteQuads(quads, 0, RenderText::ClipToEllipsis);
-    else if (isWebArea() || isSeamlessWebArea() || isSVGRoot)
+    else if (isWebArea() || isSeamlessWebArea() || obj->isSVGRoot())
         obj->absoluteQuads(quads);
     else
         obj->absoluteFocusRingQuads(quads);
 
     LayoutRect result = boundingBoxForQuads(obj, quads);
 
-#if ENABLE(SVG)
     Document* document = this->document();
     if (document && document->isSVGDocument())
         offsetBoundingBoxForRemoteSVGElement(result);
-#endif
 
     // The size of the web area should be the content size, not the clipped size.
     if ((isWebArea() || isSeamlessWebArea()) && obj->frame()->view())
@@ -3188,7 +3177,7 @@ LayoutRect AccessibilityRenderObject::computeElementRect() const
     // Checkboxes and radio buttons include their label as part of their rect.
     if (isCheckboxOrRadio()) {
         HTMLLabelElement* label = labelForElement(toElement(m_renderer->node()));
-        if (label && !label->renderer()) {
+        if (label && label->renderer()) {
             LayoutRect labelRect = axObjectCache()->getOrCreate(label)->elementRect();
             result.unite(labelRect);
         }

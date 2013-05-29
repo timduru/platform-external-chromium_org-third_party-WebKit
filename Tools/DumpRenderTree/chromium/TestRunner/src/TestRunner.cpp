@@ -289,6 +289,7 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("wasMockSpeechRecognitionAborted", &TestRunner::wasMockSpeechRecognitionAborted);
     bindMethod("display", &TestRunner::display);
     bindMethod("displayInvalidatedRegion", &TestRunner::displayInvalidatedRegion);
+    bindMethod("isChooserShown", &TestRunner::isChooserShown);
 
     // Properties.
     bindProperty("globalFlag", &m_globalFlag);
@@ -359,7 +360,6 @@ void TestRunner::reset()
         m_webView->setSelectionColors(0xff1e90ff, 0xff000000, 0xffc8c8c8, 0xff323232);
 #endif
         m_webView->removeAllUserContent();
-        m_webView->disableAutoResizeMode();
     }
     m_topLoadingFrame = 0;
     m_waitUntilDone = false;
@@ -378,6 +378,7 @@ void TestRunner::reset()
         m_delegate->setDeviceScaleFactor(1);
         m_delegate->setAcceptAllCookies(false);
         m_delegate->setLocale("");
+        m_delegate->disableAutoResizeMode(WebSize());
     }
 
     m_dumpEditingCallbacks = false;
@@ -713,7 +714,7 @@ bool TestRunner::isPointerLocked()
     return m_pointerLocked;
 }
 
-void TestRunner::setToolTipText(WebKit::WebString text)
+void TestRunner::setToolTipText(const WebKit::WebString& text)
 {
     m_tooltipText.set(text.utf8());
 }
@@ -1469,7 +1470,7 @@ void TestRunner::enableAutoResizeMode(const CppArgumentList& arguments, CppVaria
     int maxHeight = cppVariantToInt32(arguments[3]);
     WebKit::WebSize maxSize(maxWidth, maxHeight);
 
-    m_webView->enableAutoResizeMode(minSize, maxSize);
+    m_delegate->enableAutoResizeMode(minSize, maxSize);
     result->set(true);
 }
 
@@ -1483,9 +1484,7 @@ void TestRunner::disableAutoResizeMode(const CppArgumentList& arguments, CppVari
     int newHeight = cppVariantToInt32(arguments[1]);
     WebKit::WebSize newSize(newWidth, newHeight);
 
-    m_delegate->setClientWindowRect(WebRect(0, 0, newSize.width, newSize.height));
-    m_webView->disableAutoResizeMode();
-    m_webView->resize(newSize);
+    m_delegate->disableAutoResizeMode(newSize);
     result->set(true);
 }
 
@@ -1619,8 +1618,6 @@ void TestRunner::overridePreference(const CppArgumentList& arguments, CppVariant
         prefs->experimentalCSSRegionsEnabled = cppVariantToBool(value);
     else if (key == "WebKitCSSGridLayoutEnabled")
         prefs->experimentalCSSGridLayoutEnabled = cppVariantToBool(value);
-    else if (key == "WebKitExperimentalWebSocketEnabled")
-        prefs->experimentalWebSocketEnabled = cppVariantToBool(value);
     else if (key == "WebKitHyperlinkAuditingEnabled")
         prefs->hyperlinkAuditingEnabled = cppVariantToBool(value);
     else if (key == "WebKitEnableCaretBrowsing")
@@ -1662,6 +1659,11 @@ void TestRunner::closeWebInspector(const CppArgumentList& args, CppVariant* resu
 {
     m_delegate->closeDevTools();
     result->setNull();
+}
+
+void TestRunner::isChooserShown(const CppArgumentList&, CppVariant* result)
+{
+    result->set(m_proxy->isChooserShown());
 }
 
 void TestRunner::evaluateInWebInspector(const CppArgumentList& arguments, CppVariant* result)

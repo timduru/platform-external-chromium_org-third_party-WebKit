@@ -53,8 +53,6 @@ WebSettingsImpl::WebSettingsImpl(Settings* settings)
     , m_showPaintRects(false)
     , m_renderVSyncNotificationEnabled(false)
     , m_viewportEnabled(false)
-    , m_initializeAtMinimumPageScale(true)
-    , m_useWideViewport(true)
     , m_gestureTapHighlightEnabled(true)
     , m_autoZoomFocusedNodeToLegibleScale(false)
     , m_deferredImageDecodingEnabled(false)
@@ -199,9 +197,9 @@ void WebSettingsImpl::setImagesEnabled(bool enabled)
     m_settings->setImagesEnabled(enabled);
 }
 
-void WebSettingsImpl::setInitializeAtMinimumPageScale(bool enabled)
+void WebSettingsImpl::setLoadWithOverviewMode(bool enabled)
 {
-    m_initializeAtMinimumPageScale = enabled;
+    m_settings->setLoadWithOverviewMode(enabled);
 }
 
 void WebSettingsImpl::setPluginsEnabled(bool enabled)
@@ -261,7 +259,7 @@ void WebSettingsImpl::setAuthorAndUserStylesEnabled(bool enabled)
 
 void WebSettingsImpl::setUseWideViewport(bool useWideViewport)
 {
-    m_useWideViewport = useWideViewport;
+    m_settings->setUseWideViewport(useWideViewport);
 }
 
 void WebSettingsImpl::setDoubleTapToZoomEnabled(bool doubleTapToZoomEnabled)
@@ -307,11 +305,6 @@ void WebSettingsImpl::setEditableLinkBehaviorNeverLive()
     m_settings->setEditableLinkBehavior(WebCore::EditableLinkNeverLive);
 }
 
-void WebSettingsImpl::setFrameFlatteningEnabled(bool enabled)
-{
-    m_settings->setFrameFlatteningEnabled(enabled);
-}
-
 void WebSettingsImpl::setFontRenderingModeNormal()
 {
     // FIXME: If you ever need more behaviors than this, then we should probably
@@ -328,14 +321,6 @@ void WebSettingsImpl::setAllowUniversalAccessFromFileURLs(bool allow)
 void WebSettingsImpl::setAllowFileAccessFromFileURLs(bool allow)
 {
     m_settings->setAllowFileAccessFromFileURLs(allow);
-}
-
-void WebSettingsImpl::setTextDirectionSubmenuInclusionBehaviorNeverIncluded()
-{
-    // FIXME: If you ever need more behaviors than this, then we should probably
-    //        define an enum in WebSettings.h and have a switch statement that
-    //        translates.  Until then, this is probably fine, though.
-    m_settings->setTextDirectionSubmenuInclusionBehavior(WebCore::TextDirectionSubmenuNeverIncluded);
 }
 
 void WebSettingsImpl::setTouchDragDropEnabled(bool enabled)
@@ -386,11 +371,6 @@ void WebSettingsImpl::setExperimentalCSSGridLayoutEnabled(bool enabled)
 void WebSettingsImpl::setExperimentalCSSCustomFilterEnabled(bool enabled)
 {
     m_settings->setCSSCustomFilterEnabled(enabled);
-}
-
-void WebSettingsImpl::setExperimentalCSSVariablesEnabled(bool enabled)
-{
-    m_settings->setCSSVariablesEnabled(enabled);
 }
 
 void WebSettingsImpl::setOpenGLMultisamplingEnabled(bool enabled)
@@ -513,6 +493,11 @@ void WebSettingsImpl::setDeferredImageDecodingEnabled(bool enabled)
 void WebSettingsImpl::setAcceleratedCompositingForFixedPositionEnabled(bool enabled)
 {
     m_settings->setAcceleratedCompositingForFixedPositionEnabled(enabled);
+}
+
+void WebSettingsImpl::setAcceleratedCompositingForTransitionEnabled(bool enabled)
+{
+    m_settings->setAcceleratedCompositingForTransitionEnabled(enabled);
 }
 
 void WebSettingsImpl::setMinimumAccelerated2dCanvasSize(int numPixels)
@@ -688,6 +673,11 @@ void WebSettingsImpl::setSelectionIncludesAltImageText(bool enabled)
 void WebSettingsImpl::setSmartInsertDeleteEnabled(bool enabled)
 {
     m_settings->setSmartInsertDeleteEnabled(enabled);
+}
+
+void WebSettingsImpl::setPinchVirtualViewportEnabled(bool enabled)
+{
+    m_settings->setPinchVirtualViewportEnabled(enabled);
 }
 
 } // namespace WebKit

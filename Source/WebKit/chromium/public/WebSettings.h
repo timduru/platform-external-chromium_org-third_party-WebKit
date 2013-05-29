@@ -31,8 +31,8 @@
 #ifndef WebSettings_h
 #define WebSettings_h
 
-#include "../../../Platform/chromium/public/WebCommon.h"
-#include "../../../Platform/chromium/public/WebSize.h"
+#include "../../../../public/platform/WebCommon.h"
+#include "../../../../public/platform/WebSize.h"
 #include <unicode/uscript.h>
 
 namespace WebKit {
@@ -62,6 +62,7 @@ public:
     virtual void setAcceleratedCompositingForCanvasEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForFixedPositionEnabled(bool)  = 0;
     virtual void setAcceleratedCompositingForOverflowScrollEnabled(bool) = 0;
+    virtual void setAcceleratedCompositingForTransitionEnabled(bool)  = 0;
     virtual void setAcceleratedCompositingForPluginsEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForScrollableFramesEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForVideoEnabled(bool) = 0;
@@ -99,26 +100,25 @@ public:
     virtual void setExperimentalCSSCustomFilterEnabled(bool) = 0;
     virtual void setExperimentalCSSGridLayoutEnabled(bool) = 0;
     virtual void setCSSStickyPositionEnabled(bool) = 0;
-    virtual void setExperimentalCSSVariablesEnabled(bool) = 0;
     virtual void setExperimentalWebGLEnabled(bool) = 0;
     virtual void setExperimentalWebSocketEnabled(bool) = 0;
+    virtual void setPinchVirtualViewportEnabled(bool) = 0;
     virtual void setFantasyFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setFixedFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setFixedPositionCreatesStackingContext(bool) = 0;
     virtual void setFontRenderingModeNormal() = 0;
     virtual void setForceCompositingMode(bool) = 0;
-    virtual void setFrameFlatteningEnabled(bool) = 0;
     virtual void setFullScreenEnabled(bool) = 0;
     virtual void setGestureTapHighlightEnabled(bool) = 0;
     virtual void setHyperlinkAuditingEnabled(bool) = 0;
     virtual void setImagesEnabled(bool) = 0;
-    virtual void setInitializeAtMinimumPageScale(bool) = 0;
     virtual void setJavaEnabled(bool) = 0;
     virtual void setJavaScriptCanAccessClipboard(bool) = 0;
     virtual void setJavaScriptCanOpenWindowsAutomatically(bool) = 0;
     virtual void setJavaScriptEnabled(bool) = 0;
     virtual void setLayoutFallbackWidth(int) = 0;
     virtual void setLoadsImagesAutomatically(bool) = 0;
+    virtual void setLoadWithOverviewMode(bool) = 0;
     virtual void setLocalStorageEnabled(bool) = 0;
     virtual void setMediaPlaybackRequiresUserGesture(bool) = 0;
     virtual void setMemoryInfoEnabled(bool) = 0;
@@ -155,7 +155,7 @@ public:
     virtual void setTextAreasAreResizable(bool) = 0;
     virtual void setTextAutosizingEnabled(bool) = 0;
     virtual void setTextAutosizingFontScaleFactor(float) = 0;
-    virtual void setTextDirectionSubmenuInclusionBehaviorNeverIncluded() = 0;
+    virtual void setTextDirectionSubmenuInclusionBehaviorNeverIncluded() { } // FIXME: Remove once its caller is gone from Chromium
     virtual void setThreadedHTMLParser(bool) = 0;
     virtual void setTouchDragDropEnabled(bool) = 0;
     virtual void setTouchEditingEnabled(bool) = 0;
@@ -176,6 +176,7 @@ public:
     void setApplyPageScaleFactorInCompositor(bool enabled) { }
     void setApplyDefaultDeviceScaleFactorInCompositor(bool enabled) { }
     void setFixedElementsLayoutRelativeToFrame(bool) { }
+    void setInitializeAtMinimumPageScale(bool enabled) { setLoadWithOverviewMode(enabled); }
 
 protected:
     ~WebSettings() { }

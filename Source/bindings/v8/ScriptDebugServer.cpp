@@ -38,6 +38,7 @@
 #include "bindings/v8/ScriptObject.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8RecursionScope.h"
+#include "bindings/v8/V8ScriptRunner.h"
 #include "core/inspector/JavaScriptCallFrame.h"
 #include "core/inspector/ScriptDebugListener.h"
 #include "wtf/StdLibExtras.h"
@@ -56,66 +57,41 @@ private:
     OwnPtr<ScriptDebugServer::Task> m_task;
 };
 
-class RecursionScopeSuppression {
-public:
-    RecursionScopeSuppression()
-    {
-#ifndef NDEBUG
-        V8PerIsolateData::current()->incrementInternalScriptRecursionLevel();
-#endif
-    }
-
-    ~RecursionScopeSuppression()
-    {
-#ifndef NDEBUG
-        V8PerIsolateData::current()->decrementInternalScriptRecursionLevel();
-#endif
-    }
-};
-
 }
 
 v8::Local<v8::Value> ScriptDebugServer::callDebuggerMethod(const char* functionName, int argc, v8::Handle<v8::Value> argv[])
 {
     v8::Handle<v8::Function> function = v8::Local<v8::Function>::Cast(m_debuggerScript.get()->Get(v8::String::NewSymbol(functionName)));
-    V8RecursionScope::MicrotaskSuppression scope;
-    return function->Call(m_debuggerScript.get(), argc, argv);
+    ASSERT(v8::Context::InContext());
+    return V8ScriptRunner::callInternalFunction(function, v8::Context::GetCurrent(), m_debuggerScript.get(), argc, argv, m_isolate);
 }
 
 class ScriptDebugServer::ScriptPreprocessor {
     WTF_MAKE_NONCOPYABLE(ScriptPreprocessor);
 public:
-    explicit ScriptPreprocessor(const String& preprocessorScript, v8::Isolate* isolate)
+    ScriptPreprocessor(const String& preprocessorScript, v8::Isolate* isolate)
+        : m_isolate(isolate)
     {
-        v8::HandleScope scope(isolate);
+        v8::HandleScope scope(m_isolate);
 
-        m_utilityContext.set(v8::Context::New(isolate));
-        if (m_utilityContext.isEmpty())
+        v8::Local<v8::Context> context = v8::Context::New(m_isolate);
+        if (context.IsEmpty())
             return;
 
-        v8::Context::Scope contextScope(m_utilityContext.get());
-
-        v8::TryCatch tryCatch;
-
-        String wrappedScript = makeString("(", preprocessorScript, ")");
+        String wrappedScript = "(" + preprocessorScript + ")";
         v8::Handle<v8::String> preprocessor = v8::String::New(wrappedScript.utf8().data(), wrappedScript.utf8().length());
 
-        v8::Handle<v8::Script> script = v8::Script::Compile(preprocessor);
-
-        if (tryCatch.HasCaught())
-            return;
-        RecursionScopeSuppression suppressionScope;
-        v8::Handle<v8::Value> preprocessorFunction = script->Run();
-
-        if (tryCatch.HasCaught() || !preprocessorFunction->IsFunction())
+        v8::Local<v8::Value> preprocessorFunction = V8ScriptRunner::compileAndRunInternalScript(preprocessor, m_isolate, context);
+        if (preprocessorFunction.IsEmpty() || !preprocessorFunction->IsFunction())
             return;
 
-        m_preprocessorFunction.set(v8::Handle<v8::Function>::Cast(preprocessorFunction));
+        m_utilityContext.set(isolate, context);
+        m_preprocessorFunction.set(isolate, v8::Handle<v8::Function>::Cast(preprocessorFunction));
     }
 
     String preprocessSourceCode(const String& sourceCode, const String& sourceName)
     {
-        v8::HandleScope scope;
+        v8::HandleScope handleScope(m_isolate);
 
         if (m_preprocessorFunction.isEmpty())
             return sourceCode;
@@ -129,8 +105,8 @@ public:
         v8::Handle<v8::Value> argv[] = { sourceCodeString, sourceNameString };
 
         v8::TryCatch tryCatch;
-        RecursionScopeSuppression suppressionScope;
-        v8::Handle<v8::Value> resultValue = m_preprocessorFunction->Call(context->Global(), 2, argv);
+        V8RecursionScope::MicrotaskSuppression recursionScope;
+        v8::Handle<v8::Value> resultValue = m_preprocessorFunction.newLocal(m_isolate)->Call(context->Global(), 2, argv);
 
         if (tryCatch.HasCaught())
             return sourceCode;
@@ -151,6 +127,7 @@ private:
     ScopedPersistent<v8::Context> m_utilityContext;
     String m_preprocessorBody;
     ScopedPersistent<v8::Function> m_preprocessorFunction;
+    v8::Isolate* m_isolate;
 };
 
 ScriptDebugServer::ScriptDebugServer(v8::Isolate* isolate)
@@ -250,11 +227,10 @@ void ScriptDebugServer::setPauseOnNextStatement(bool pause)
 {
     if (isPaused())
         return;
-    v8::Isolate* isolate = v8::Isolate::GetCurrent();
     if (pause)
-        v8::Debug::DebugBreak(isolate);
+        v8::Debug::DebugBreak(m_isolate);
     else
-        v8::Debug::CancelDebugBreak(isolate);
+        v8::Debug::CancelDebugBreak(m_isolate);
 }
 
 void ScriptDebugServer::breakProgram()
@@ -266,7 +242,7 @@ void ScriptDebugServer::breakProgram()
         return;
 
     if (m_breakProgramCallbackTemplate.get().IsEmpty()) {
-        m_breakProgramCallbackTemplate.set(v8::FunctionTemplate::New());
+        m_breakProgramCallbackTemplate.set(m_isolate, v8::FunctionTemplate::New());
         m_breakProgramCallbackTemplate.get()->SetCallHandler(&ScriptDebugServer::breakProgramCallback, v8::External::New(this));
     }
 
@@ -420,7 +396,7 @@ void ScriptDebugServer::breakProgram(v8::Handle<v8::Object> executionState, v8::
     if (!listener)
         return;
 
-    m_executionState.set(executionState);
+    m_executionState.set(m_isolate, executionState);
     ScriptState* currentCallFrameState = ScriptState::forContext(m_pausedContext);
     listener->didPause(currentCallFrameState, currentCallFrame(), ScriptValue(exception));
 
@@ -525,14 +501,15 @@ void ScriptDebugServer::dispatchDidParseSource(ScriptDebugListener* listener, v8
 
 void ScriptDebugServer::ensureDebuggerScriptCompiled()
 {
-    if (m_debuggerScript.get().IsEmpty()) {
-        v8::HandleScope scope;
-        v8::Local<v8::Context> debuggerContext = v8::Debug::GetDebugContext();
-        v8::Context::Scope contextScope(debuggerContext);
-        String debuggerScriptSource(reinterpret_cast<const char*>(DebuggerScriptSource_js), sizeof(DebuggerScriptSource_js));
-        V8RecursionScope::MicrotaskSuppression recursionScope;
-        m_debuggerScript.set(v8::Handle<v8::Object>::Cast(v8::Script::Compile(v8String(debuggerScriptSource, debuggerContext->GetIsolate()))->Run()));
-    }
+    if (!m_debuggerScript.get().IsEmpty())
+        return;
+
+    v8::HandleScope scope(m_isolate);
+    v8::Handle<v8::String> source = v8String(String(reinterpret_cast<const char*>(DebuggerScriptSource_js), sizeof(DebuggerScriptSource_js)), m_isolate);
+    v8::Local<v8::Value> value = V8ScriptRunner::compileAndRunInternalScript(source, m_isolate, v8::Debug::GetDebugContext());
+    ASSERT(!value.IsEmpty());
+    ASSERT(value->IsObject());
+    m_debuggerScript.set(m_isolate, v8::Handle<v8::Object>::Cast(value));
 }
 
 v8::Local<v8::Value> ScriptDebugServer::functionScopes(v8::Handle<v8::Function> function)
@@ -579,14 +556,12 @@ void ScriptDebugServer::compileScript(ScriptState* state, const String& expressi
     v8::Handle<v8::Context> context = state->context();
     if (context.IsEmpty())
         return;
+    v8::Isolate* isolate = context->GetIsolate();
     v8::Context::Scope contextScope(context);
 
-    v8::Handle<v8::String> code = v8String(expression, context->GetIsolate());
+    v8::Handle<v8::String> source = v8String(expression, isolate);
     v8::TryCatch tryCatch;
-
-    v8::ScriptOrigin origin(v8String(sourceURL, context->GetIsolate()), v8Integer(0, context->GetIsolate()), v8Integer(0, context->GetIsolate()));
-    v8::Handle<v8::Script> script = v8::Script::New(code, &origin);
-
+    v8::Local<v8::Script> script = V8ScriptRunner::compileScript(source, sourceURL, TextPosition(), 0, isolate);
     if (tryCatch.HasCaught()) {
         v8::Local<v8::Message> message = tryCatch.Message();
         if (!message.IsEmpty())
@@ -620,14 +595,8 @@ void ScriptDebugServer::runScript(ScriptState* state, const String& scriptId, Sc
     if (context.IsEmpty())
         return;
     v8::Context::Scope contextScope(context);
-
-    v8::Local<v8::Value> value;
     v8::TryCatch tryCatch;
-    {
-        V8RecursionScope recursionScope(state->scriptExecutionContext());
-        value = script->Run();
-    }
-
+    v8::Local<v8::Value> value = V8ScriptRunner::runCompiledScript(script, state->scriptExecutionContext());
     *wasThrown = false;
     if (tryCatch.HasCaught()) {
         *wasThrown = true;

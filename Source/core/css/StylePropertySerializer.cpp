@@ -201,11 +201,6 @@ String StylePropertySerializer::asText() const
         case CSSPropertyWebkitTransitionDelay:
             shorthandPropertyID = CSSPropertyWebkitTransition;
             break;
-        case CSSPropertyWebkitWrapFlow:
-        case CSSPropertyWebkitShapeMargin:
-        case CSSPropertyWebkitShapePadding:
-            shorthandPropertyID = CSSPropertyWebkitWrap;
-            break;
         default:
             break;
         }
@@ -381,16 +376,12 @@ String StylePropertySerializer::getPropertyValue(CSSPropertyID propertyID) const
         return getLayeredShorthandValue(webkitTransitionShorthand());
     case CSSPropertyWebkitAnimation:
         return getLayeredShorthandValue(webkitAnimationShorthand());
-    case CSSPropertyWebkitWrap:
-        return getShorthandValue(webkitWrapShorthand());
-#if ENABLE(SVG)
     case CSSPropertyMarker: {
         RefPtr<CSSValue> value = m_propertySet.getPropertyCSSValue(CSSPropertyMarkerStart);
         if (value)
             return value->cssText();
         return String();
     }
-#endif
     case CSSPropertyBorderRadius:
         return get4Values(borderRadiusShorthand());
     default:
@@ -597,6 +588,11 @@ String StylePropertySerializer::getLayeredShorthandValue(const StylePropertyShor
                         yValue = toCSSValueList(nextValue.get())->itemWithoutBoundsCheck(i);
                     else
                         yValue = nextValue;
+
+                    // background-repeat-x(y) or mask-repeat-x(y) may be like this : "initial, repeat". We can omit the implicit initial values
+                    // before starting to compare their values.
+                    if (value->isImplicitInitialValue() || yValue->isImplicitInitialValue())
+                        continue;
 
                     int xId = toCSSPrimitiveValue(value.get())->getIdent();
                     int yId = toCSSPrimitiveValue(yValue.get())->getIdent();

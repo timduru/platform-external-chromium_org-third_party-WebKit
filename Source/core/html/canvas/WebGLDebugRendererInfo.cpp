@@ -27,13 +27,12 @@
 
 #include "core/html/canvas/WebGLDebugRendererInfo.h"
 
-#include "core/html/canvas/WebGLRenderingContext.h"
-
 namespace WebCore {
 
 WebGLDebugRendererInfo::WebGLDebugRendererInfo(WebGLRenderingContext* context)
     : WebGLExtension(context)
 {
+    ScriptWrappable::init(this);
 }
 
 WebGLDebugRendererInfo::~WebGLDebugRendererInfo()

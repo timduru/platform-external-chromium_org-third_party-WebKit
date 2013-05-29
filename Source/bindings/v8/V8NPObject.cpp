@@ -82,9 +82,11 @@ static v8::Handle<v8::Value> npObjectInvokeImpl(const v8::Arguments& args, Invok
         else
             element = V8HTMLObjectElement::toNative(args.Holder());
         ScriptInstance scriptInstance = element->getInstance();
-        if (scriptInstance)
-            npObject = v8ObjectToNPObject(scriptInstance->instance());
-        else
+        if (scriptInstance) {
+            v8::Isolate* isolate = v8::Isolate::GetCurrent();
+            v8::HandleScope handleScope(isolate);
+            npObject = v8ObjectToNPObject(scriptInstance->newLocal(isolate));
+        } else
             npObject = 0;
     } else {
         // The holder object is not a subtype of HTMLPlugInElement, it must be an NPObject which has three
@@ -161,7 +163,6 @@ v8::Handle<v8::Value> npObjectInvokeDefaultHandler(const v8::Arguments& args)
 }
 
 class V8NPTemplateMap {
-    friend class WeakHandleListener<V8NPTemplateMap, PrivateIdentifier>;
 public:
     // NPIdentifier is PrivateIdentifier*.
     typedef HashMap<PrivateIdentifier*, v8::Persistent<v8::FunctionTemplate> > MapType;
@@ -175,7 +176,7 @@ public:
     {
         ASSERT(!m_map.contains(key));
         m_map.set(key, wrapper);
-        WeakHandleListener<V8NPTemplateMap, PrivateIdentifier>::makeWeak(m_isolate, wrapper, key);
+        wrapper.MakeWeak(m_isolate, key, &makeWeakCallback);
     }
 
     static V8NPTemplateMap& sharedInstance(v8::Isolate* isolate)
@@ -200,15 +201,14 @@ private:
         m_map.remove(it);
     }
 
+    static void makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::FunctionTemplate>*, PrivateIdentifier* key)
+    {
+        V8NPTemplateMap::sharedInstance(isolate).dispose(key);
+    }
+
     MapType m_map;
     v8::Isolate* m_isolate;
 };
-
-template<>
-void WeakHandleListener<V8NPTemplateMap, PrivateIdentifier>::callback(v8::Isolate* isolate, v8::Persistent<v8::Value>, PrivateIdentifier* key)
-{
-    V8NPTemplateMap::sharedInstance(isolate).dispose(key);
-}
 
 static v8::Handle<v8::Value> npObjectGetProperty(v8::Local<v8::Object> self, NPIdentifier identifier, v8::Local<v8::Value> key, v8::Isolate* isolate)
 {
@@ -391,18 +391,16 @@ static DOMWrapperMap<NPObject>& staticNPObjectMap()
 }
 
 template<>
-inline void WeakHandleListener<DOMWrapperMap<NPObject> >::callback(v8::Isolate* isolate, v8::Persistent<v8::Value> value, DOMWrapperMap<NPObject>*)
+inline void DOMWrapperMap<NPObject>::makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::Object>* wrapper, DOMWrapperMap<NPObject>*)
 {
-    ASSERT(value->IsObject());
-    v8::Persistent<v8::Object> wrapper = v8::Persistent<v8::Object>::Cast(value);
-    NPObject* npObject = static_cast<NPObject*>(toNative(wrapper));
+    NPObject* npObject = static_cast<NPObject*>(toNative(*wrapper));
 
     ASSERT(npObject);
-    ASSERT(staticNPObjectMap().get(npObject) == wrapper);
+    ASSERT(staticNPObjectMap().get(npObject) == *wrapper);
 
     // Must remove from our map before calling _NPN_ReleaseObject(). _NPN_ReleaseObject can
     // call forgetV8ObjectForNPObject, which uses the table as well.
-    staticNPObjectMap().removeAndDispose(npObject, wrapper, isolate);
+    staticNPObjectMap().removeAndDispose(npObject);
 
     if (_NPN_IsAlive(npObject))
         _NPN_ReleaseObject(npObject);
@@ -460,11 +458,12 @@ v8::Local<v8::Object> createV8ObjectForNPObject(NPObject* object, NPObject* root
 
 void forgetV8ObjectForNPObject(NPObject* object)
 {
-    v8::Handle<v8::Object> wrapper = staticNPObjectMap().get(object);
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    v8::HandleScope scope(isolate);
+    v8::Handle<v8::Object> wrapper = staticNPObjectMap().getNewLocal(isolate, object);
     if (!wrapper.IsEmpty()) {
-        v8::HandleScope scope;
         V8DOMWrapper::clearNativeInfo(wrapper, npObjectTypeInfo());
-        staticNPObjectMap().removeAndDispose(object, wrapper, v8::Isolate::GetCurrent());
+        staticNPObjectMap().removeAndDispose(object);
         _NPN_ReleaseObject(object);
     }
 }

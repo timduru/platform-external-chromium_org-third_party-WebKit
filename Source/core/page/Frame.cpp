@@ -95,6 +95,8 @@
 #include "core/rendering/RenderTextControl.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
+#include "core/svg/SVGDocument.h"
+#include "core/svg/SVGDocumentExtensions.h"
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
@@ -103,11 +105,6 @@
 #include "MathMLNames.h"
 #include "SVGNames.h"
 #include "XLinkNames.h"
-
-#if ENABLE(SVG)
-#include "core/svg/SVGDocument.h"
-#include "core/svg/SVGDocumentExtensions.h"
-#endif
 
 using namespace std;
 
@@ -299,7 +296,7 @@ void Frame::setDocument(PassRefPtr<Document> newDoc)
     if (m_page && m_page->mainFrame() == this) {
         notifyChromeClientWheelEventHandlerCountChanged();
         if (m_doc && m_doc->hasTouchEventHandlers())
-            m_page->chrome()->client()->needTouchEvents(true);
+            m_page->chrome().client()->needTouchEvents(true);
     }
 }
 
@@ -619,14 +616,12 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
     if (!document)
         return;
 
-#if ENABLE(SVG)
     // Respect SVGs zoomAndPan="disabled" property in standalone SVG documents.
     // FIXME: How to handle compound documents + zoomAndPan="disabled"? Needs SVG WG clarification.
     if (document->isSVGDocument()) {
         if (!toSVGDocument(document)->zoomAndPanEnabled())
             return;
     }
-#endif
 
     if (m_pageZoomFactor != pageZoomFactor) {
         if (FrameView* view = this->view()) {
@@ -656,7 +651,7 @@ void Frame::deviceOrPageScaleFactorChanged()
     for (RefPtr<Frame> child = tree()->firstChild(); child; child = child->tree()->nextSibling())
         child->deviceOrPageScaleFactorChanged();
 
-    m_page->chrome()->client()->deviceOrPageScaleFactorChanged();
+    m_page->chrome().client()->deviceOrPageScaleFactorChanged();
 }
 
 void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
@@ -670,7 +665,7 @@ void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
             count += frame->document()->wheelEventHandlerCount();
     }
 
-    m_page->chrome()->client()->numWheelEventHandlersChanged(count);
+    m_page->chrome().client()->numWheelEventHandlersChanged(count);
 }
 
 bool Frame::isURLAllowed(const KURL& url) const

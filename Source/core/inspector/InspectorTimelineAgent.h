@@ -79,6 +79,7 @@ typedef String ErrorString;
 namespace TimelineRecordType {
 extern const char DecodeImage[];
 extern const char Rasterize[];
+extern const char PaintSetup[];
 };
 
 class TimelineTimeConverter {
@@ -142,7 +143,7 @@ public:
     void didRecalculateStyle();
     void didRecalculateStyleForElement();
 
-    void willPaint(Frame*);
+    void willPaint(RenderObject*);
     void didPaint(RenderObject*, GraphicsContext*, const LayoutRect&);
 
     void willScrollLayer(Frame*);
@@ -168,17 +169,17 @@ public:
     void didEvaluateScript();
 
     void didTimeStamp(Frame*, const String&);
-    void didMarkDOMContentEvent(Frame*);
-    void didMarkLoadEvent(Frame*);
+    void domContentLoadedEventFired(Frame*);
+    void loadEventFired(Frame*);
 
     void time(Frame*, const String&);
     void timeEnd(Frame*, const String&);
 
     void didScheduleResourceRequest(Document*, const String& url);
-    void willSendResourceRequest(unsigned long, DocumentLoader*, const ResourceRequest&, const ResourceResponse&);
+    void willSendRequest(unsigned long, DocumentLoader*, const ResourceRequest&, const ResourceResponse&);
     bool willReceiveResourceResponse(Frame*, unsigned long, const ResourceResponse&);
     void didReceiveResourceResponse(unsigned long, DocumentLoader*, const ResourceResponse&, ResourceLoader*);
-    void didFinishLoadingResource(unsigned long, bool didFail, double finishTime, Frame*);
+    void didFinishLoading(unsigned long, DocumentLoader*, double monotonicFinishTime);
     void didFailLoading(unsigned long identifier, DocumentLoader* loader, const ResourceError& error);
     bool willReceiveResourceData(Frame*, unsigned long identifier, int length);
     void didReceiveResourceData();
@@ -223,6 +224,8 @@ private:
         
     InspectorTimelineAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorMemoryAgent*, InspectorDOMAgent*, InspectorCompositeState*, InspectorType, InspectorClient*);
 
+    void didFinishLoadingResource(unsigned long, bool didFail, double finishTime, Frame*);
+
     void sendEvent(PassRefPtr<InspectorObject>);
     void appendRecord(PassRefPtr<InspectorObject> data, const String& type, bool captureCallStack, Frame*);
     void pushCurrentRecord(PassRefPtr<InspectorObject>, const String& type, bool captureCallStack, Frame*, bool hasLowLevelDetails = false);
@@ -237,13 +240,13 @@ private:
     void setHeapSizeStatistics(InspectorObject* record);
     void commitFrameRecord();
 
-    void addRecordToTimeline(PassRefPtr<InspectorObject>, const String& type);
-    void innerAddRecordToTimeline(PassRefPtr<InspectorObject>, const String& type);
+    void addRecordToTimeline(PassRefPtr<InspectorObject>);
+    void innerAddRecordToTimeline(PassRefPtr<InspectorObject>);
     void clearRecordStack();
 
     void localToPageQuad(const RenderObject& renderer, const LayoutRect&, FloatQuad*);
     const TimelineTimeConverter& timeConverter() const { return m_timeConverter; }
-    int idForNode(Node*);
+    long long idForNode(Node*);
     void releaseNodeIds();
 
     double timestamp();

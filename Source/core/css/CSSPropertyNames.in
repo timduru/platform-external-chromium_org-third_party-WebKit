@@ -157,13 +157,11 @@ tab-size
 text-align
 text-decoration
 text-indent
-text-line-through
 text-line-through-color
 text-line-through-mode
 text-line-through-style
 text-line-through-width
 text-overflow
-text-overline
 text-overline-color
 text-overline-mode
 text-overline-style
@@ -171,12 +169,12 @@ text-overline-width
 text-shadow
 text-transform
 -epub-text-transform alias_for=text-transform
-text-underline
 text-underline-color
 text-underline-mode
 text-underline-style
 text-underline-width
 top
+touch-action
 transition
 transition-delay
 transition-duration
@@ -398,7 +396,6 @@ z-index
 -webkit-shape-padding
 -webkit-wrap-flow
 -webkit-wrap-through
--webkit-wrap
 max-zoom condition=CSS_DEVICE_ADAPTATION
 min-zoom condition=CSS_DEVICE_ADAPTATION
 orientation condition=CSS_DEVICE_ADAPTATION

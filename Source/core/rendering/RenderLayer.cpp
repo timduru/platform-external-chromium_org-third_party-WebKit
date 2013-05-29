@@ -46,30 +46,24 @@
 
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
-#include "core/css/StylePropertySet.h"
+#include "SVGNames.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentEventQueue.h"
-#include "core/dom/OverflowEvent.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
 #include "core/html/HTMLFrameElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
-#include "core/loader/FrameLoader.h"
-#include "core/loader/FrameLoaderClient.h"
-#include "core/page/Chrome.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FocusController.h"
 #include "core/page/Frame.h"
-#include "core/page/FrameTree.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/UseCounter.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/FloatConversion.h"
 #include "core/platform/HistogramSupport.h"
 #include "core/platform/PlatformGestureEvent.h"
 #include "core/platform/PlatformMouseEvent.h"
@@ -78,19 +72,14 @@
 #include "core/platform/ScrollbarTheme.h"
 #include "core/platform/graphics/FloatPoint3D.h"
 #include "core/platform/graphics/FloatRect.h"
-#include "core/platform/graphics/Gradient.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/filters/custom/CustomFilterGlobalContext.h"
 #include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "core/platform/graphics/filters/custom/CustomFilterValidatedProgram.h"
 #include "core/platform/graphics/filters/custom/ValidatedCustomFilterOperation.h"
-#include "core/platform/graphics/filters/FEColorMatrix.h"
-#include "core/platform/graphics/filters/FEMerge.h"
-#include "core/platform/graphics/filters/SourceGraphic.h"
 #include "core/platform/graphics/transforms/ScaleTransformOperation.h"
 #include "core/platform/graphics/transforms/TransformationMatrix.h"
 #include "core/platform/graphics/transforms/TranslateTransformOperation.h"
-#include "core/platform/text/TextStream.h"
 #include "core/rendering/ColumnInfo.h"
 #include "core/rendering/FilterEffectRenderer.h"
 #include "core/rendering/HitTestRequest.h"
@@ -103,12 +92,10 @@
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
-#include "core/rendering/RenderLazyBlock.h"
 #include "core/rendering/RenderMarquee.h"
 #include "core/rendering/RenderReplica.h"
 #include "core/rendering/RenderScrollbar.h"
 #include "core/rendering/RenderScrollbarPart.h"
-#include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderTreeAsText.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/svg/RenderSVGResourceClipper.h"
@@ -116,10 +103,6 @@
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/UnusedParam.h>
-
-#if ENABLE(SVG)
-#include "SVGNames.h"
-#endif
 
 #define MIN_INTERSECT_FOR_REVEAL 32
 
@@ -1597,10 +1580,10 @@ bool RenderLayer::cannotBlitToWindow() const
 
 bool RenderLayer::isTransparent() const
 {
-#if ENABLE(SVG)
+    // FIXME: This seems incorrect; why would SVG layers be opaque?
     if (renderer()->node() && renderer()->node()->namespaceURI() == SVGNames::svgNamespaceURI)
         return false;
-#endif
+
     return renderer()->isTransparent() || renderer()->hasMask();
 }
 
@@ -2597,7 +2580,7 @@ IntPoint RenderLayer::minimumScrollPosition() const
 IntPoint RenderLayer::maximumScrollPosition() const
 {
     RenderBox* box = renderBox();
-    if (!box)
+    if (!box || !box->hasOverflowClip())
         return -scrollOrigin();
 
     LayoutRect overflowRect(box->layoutOverflowRect());
@@ -3514,7 +3497,6 @@ void RenderLayer::paintOverlayScrollbars(GraphicsContext* context, const LayoutR
     m_containsDirtyOverlayScrollbars = false;
 }
 
-#ifndef DISABLE_ROUNDED_CORNER_CLIPPING
 static bool inContainingBlockChain(RenderLayer* startLayer, RenderLayer* endLayer)
 {
     if (startLayer == endLayer)
@@ -3528,7 +3510,6 @@ static bool inContainingBlockChain(RenderLayer* startLayer, RenderLayer* endLaye
     
     return false;
 }
-#endif
 
 void RenderLayer::clipToRect(RenderLayer* rootLayer, GraphicsContext* context, const LayoutRect& paintDirtyRect, const ClipRect& clipRect,
                              BorderRadiusClippingRule rule)
@@ -3541,7 +3522,6 @@ void RenderLayer::clipToRect(RenderLayer* rootLayer, GraphicsContext* context, c
     if (!clipRect.hasRadius())
         return;
 
-#ifndef DISABLE_ROUNDED_CORNER_CLIPPING
     // If the clip rect has been tainted by a border radius, then we have to walk up our layer chain applying the clips from
     // any layers with overflow. The condition for being able to apply these clips is that the overflow object be in our
     // containing block chain so we check that also.
@@ -3555,7 +3535,6 @@ void RenderLayer::clipToRect(RenderLayer* rootLayer, GraphicsContext* context, c
         if (layer == rootLayer)
             break;
     }
-#endif
 }
 
 void RenderLayer::restoreClip(GraphicsContext* context, const LayoutRect& paintDirtyRect, const ClipRect& clipRect)
@@ -3730,18 +3709,6 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
     IntRect rootRelativeBounds;
     bool rootRelativeBoundsComputed = false;
 
-    bool didQuantizeFonts = true;
-    bool scrollingOnMainThread = true;
-    Frame* frame = renderer()->frame();
-
-    // FIXME: We shouldn't have to disable subpixel quantization for overflow clips or subframes once we scroll those
-    // things on the scrolling thread.
-    bool needToAdjustSubpixelQuantization = scrollingOnMainThread || (renderer()->hasOverflowClip() && !usesCompositedScrolling()) || (frame && frame->ownerElement());
-    if (needToAdjustSubpixelQuantization) {
-        didQuantizeFonts = context->shouldSubpixelQuantizeFonts();
-        context->setShouldSubpixelQuantizeFonts(false);
-    }
-
     // Apply clip-path to context.
     bool hasClipPath = false;
     RenderStyle* style = renderer()->style();
@@ -3758,9 +3725,7 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
             }
 
             context->clipPath(clipPath->path(rootRelativeBounds), clipPath->windRule());
-        }
-#if ENABLE(SVG)
-        else if (style->clipPath()->getOperationType() == ClipPathOperation::REFERENCE) {
+        } else if (style->clipPath()->getOperationType() == ClipPathOperation::REFERENCE) {
             ReferenceClipPathOperation* referenceClipPathOperation = static_cast<ReferenceClipPathOperation*>(style->clipPath());
             Document* document = renderer()->document();
             // FIXME: It doesn't work with forward or external SVG references (https://bugs.webkit.org/show_bug.cgi?id=90405)
@@ -3775,7 +3740,6 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
                 static_cast<RenderSVGResourceClipper*>(element->renderer())->applyClippingToContext(renderer(), rootRelativeBounds, paintingInfo.paintDirtyRect, context);
             }
         }
-#endif
     }
 
     LayerPaintingInfo localPaintingInfo(paintingInfo);
@@ -3901,10 +3865,6 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
         context->restore();
         m_usedTransparency = false;
     }
-
-    // Re-set this to whatever it was before we painted the layer.
-    if (needToAdjustSubpixelQuantization)
-        context->setShouldSubpixelQuantizeFonts(didQuantizeFonts);
 
     if (hasClipPath)
         context->restore();
@@ -4344,8 +4304,10 @@ bool RenderLayer::hitTest(const HitTestRequest& request, const HitTestLocation& 
 {
     ASSERT(isSelfPaintingLayer() || hasSelfPaintingLayerDescendant());
 
-    renderer()->document()->updateLayout();
-    
+    // RenderView should make sure to update layout before entering hit testing
+    ASSERT(!renderer()->frame()->view()->layoutPending());
+    ASSERT(!renderer()->document()->renderer()->needsLayout());
+
     LayoutRect hitTestArea = isOutOfFlowRenderFlowThread() ? toRenderFlowThread(renderer())->borderBoxRect() : renderer()->view()->documentRect();
     if (!request.ignoreClipping())
         hitTestArea.intersect(frameVisibleRect(renderer()));
@@ -6390,12 +6352,10 @@ void RenderLayer::updateOrRemoveFilterClients()
     else if (hasFilterInfo())
         filterInfo()->removeCustomFilterClients();
 
-#if ENABLE(SVG)
     if (renderer()->style()->filter().hasReferenceFilter())
         ensureFilterInfo()->updateReferenceFilterClients(renderer()->style()->filter());
     else if (hasFilterInfo())
         filterInfo()->removeReferenceFilterClients();
-#endif
 }
 
 void RenderLayer::updateOrRemoveFilterEffectRenderer()

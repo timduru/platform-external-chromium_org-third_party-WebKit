@@ -15,8 +15,8 @@ GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "ConvertFileToHeaderWithCharacterArray":
 $(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: gyp_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_intermediate_dir)
-$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: gyp_shared_intermediate_dir := $(GYP_ABS_ANDROID_TOP_DIR)/$(gyp_shared_intermediate_dir)
+$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/xxd.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/InspectorOverlayPage.html $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Generating $(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h from ../inspector/InspectorOverlayPage.html ($@)"

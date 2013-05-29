@@ -666,7 +666,7 @@ void Node::normalize()
     }
 }
 
-const AtomicString& Node::virtualPrefix() const
+const AtomicString& Node::prefix() const
 {
     // For nodes other than elements and attributes, the prefix is always null
     return nullAtom;
@@ -680,12 +680,12 @@ void Node::setPrefix(const AtomicString& /*prefix*/, ExceptionCode& ec)
     ec = NAMESPACE_ERR;
 }
 
-const AtomicString& Node::virtualLocalName() const
+const AtomicString& Node::localName() const
 {
     return nullAtom;
 }
 
-const AtomicString& Node::virtualNamespaceURI() const
+const AtomicString& Node::namespaceURI() const
 {
     return nullAtom;
 }
@@ -865,15 +865,19 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
         markAncestorsWithChildNeedsStyleRecalc();
 }
 
-void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
+void Node::lazyAttach()
 {
-    for (Node* n = this; n; n = NodeTraversal::next(n, this)) {
-        if (n->hasChildNodes())
-            n->setChildNeedsStyleRecalc();
-        n->setStyleChange(FullStyleChange);
-        if (shouldSetAttached == SetAttached)
-            n->setAttached();
+    // It's safe to synchronously attach here because we're in the middle of style recalc
+    // while it's not safe to mark nodes as needing style recalc except in the loop in
+    // Element::recalcStyle because we may mark an ancestor as not needing recalc and
+    // then the node would never get updated. One place this currently happens is
+    // HTMLObjectElement::renderFallbackContent which may call lazyAttach from inside
+    // attach which was triggered by a recalcStyle.
+    if (document()->inStyleRecalc()) {
+        attach();
+        return;
     }
+    setStyleChange(FullStyleChange);
     markAncestorsWithChildNeedsStyleRecalc();
 }
 
@@ -1032,7 +1036,7 @@ bool Node::isDescendantOf(const Node *other) const
     if (!other || !other->hasChildNodes() || inDocument() != other->inDocument())
         return false;
     if (other->isDocumentNode())
-        return document() == other && !isDocumentNode() && inDocument();
+        return document() == other && !isDocumentNode() && inDocument() && !isInShadowTree();
     for (const ContainerNode* n = parentNode(); n; n = n->parentNode()) {
         if (n == other)
             return true;
@@ -1072,7 +1076,7 @@ bool Node::containsIncludingHostElements(const Node* node) const
 void Node::attach()
 {
     ASSERT(!attached());
-    ASSERT(!renderer() || (renderer()->style() && renderer()->parent()));
+    ASSERT(!renderer() || (renderer()->style() && (renderer()->parent() || renderer()->isRenderView())));
 
     // If this node got a renderer it may be the previousRenderer() of sibling text nodes and thus affect the
     // result of Text::textRendererIsNeeded() for those nodes.
@@ -2170,10 +2174,8 @@ void Node::didMoveToNewDocument(Document* oldDocument)
         document()->didAddWheelEventHandler();
     }
 
-    Vector<AtomicString> touchEventNames = eventNames().touchEventNames();
-    for (size_t i = 0; i < touchEventNames.size(); ++i) {
-        const EventListenerVector& listeners = getEventListeners(touchEventNames[i]);
-        for (size_t j = 0; j < listeners.size(); ++j) {
+    if (const TouchEventTargetSet* touchHandlers = oldDocument ? oldDocument->touchEventTargets() : 0) {
+        while (touchHandlers->contains(this)) {
             oldDocument->didRemoveTouchEventHandler(this);
             document()->didAddTouchEventHandler(this);
         }

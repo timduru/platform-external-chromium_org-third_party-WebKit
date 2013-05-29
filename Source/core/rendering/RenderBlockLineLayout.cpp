@@ -22,14 +22,11 @@
 
 #include "config.h"
 
-#include "core/page/Settings.h"
-#include "core/platform/Logging.h"
 #include "core/platform/text/BidiResolver.h"
 #include "core/platform/text/Hyphenation.h"
 #include "core/rendering/exclusions/ExclusionShapeInsideInfo.h"
 #include "core/rendering/InlineIterator.h"
 #include "core/rendering/InlineTextBox.h"
-#include "core/rendering/RenderArena.h"
 #include "core/rendering/RenderCombineText.h"
 #include "core/rendering/RenderCounter.h"
 #include "core/rendering/RenderFlowThread.h"
@@ -42,15 +39,12 @@
 #include "core/rendering/TrailingFloatsRootInlineBox.h"
 #include "core/rendering/VerticalPositionCache.h"
 #include "core/rendering/break_lines.h"
+#include "core/rendering/svg/RenderSVGInlineText.h"
+#include "core/rendering/svg/SVGRootInlineBox.h"
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
 #include <wtf/unicode/CharacterNames.h>
 #include <wtf/Vector.h>
-
-#if ENABLE(SVG)
-#include "core/rendering/svg/RenderSVGInlineText.h"
-#include "core/rendering/svg/SVGRootInlineBox.h"
-#endif
 
 using namespace std;
 using namespace WTF;
@@ -1219,6 +1213,15 @@ static inline BidiStatus statusWithDirection(TextDirection textDirection, bool i
     return BidiStatus(direction, direction, direction, context.release());
 }
 
+static inline void setupResolverToResumeInIsolate(InlineBidiResolver& resolver, RenderObject* root, RenderObject* startObject)
+{
+    if (root != startObject) {
+        RenderObject* parent = startObject->parent();
+        setupResolverToResumeInIsolate(resolver, root, parent);
+        notifyObserverEnteredObject(&resolver, startObject);
+    }
+}
+
 // FIXME: BidiResolver should have this logic.
 static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, BidiRunList<BidiRun>& bidiRuns, const InlineIterator& endOfRuns, VisualDirectionOverride override, bool previousLineBrokeCleanly)
 {
@@ -1241,6 +1244,7 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
         // to take a RenderObject and do this logic there, but that would be a layering
         // violation for BidiResolver (which knows nothing about RenderObject).
         RenderInline* isolatedInline = toRenderInline(containingIsolate(startObj, currentRoot));
+
         InlineBidiResolver isolatedResolver;
         EUnicodeBidi unicodeBidi = isolatedInline->style()->unicodeBidi();
         TextDirection direction;
@@ -1252,10 +1256,7 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
         }
         isolatedResolver.setStatus(statusWithDirection(direction, isOverride(unicodeBidi)));
 
-        // FIXME: The fact that we have to construct an Iterator here
-        // currently prevents this code from moving into BidiResolver.
-        if (!bidiFirstSkippingEmptyInlines(isolatedInline, &isolatedResolver))
-            continue;
+        setupResolverToResumeInIsolate(isolatedResolver, isolatedInline, startObj);
 
         // The starting position is the beginning of the first run within the isolate that was identified
         // during the earlier call to createBidiRunsForLine. This can be but is not necessarily the
@@ -1326,23 +1327,18 @@ RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(BidiRunList<BidiRun>& bi
         return 0;
 
     lineBox->setEndsWithBreak(lineInfo.previousLineBrokeCleanly());
-    
-#if ENABLE(SVG)
+
     bool isSVGRootInlineBox = lineBox->isSVGRootInlineBox();
-#else
-    bool isSVGRootInlineBox = false;
-#endif
-    
+
     GlyphOverflowAndFallbackFontsMap textBoxDataMap;
-    
+
     // Now we position all of our text runs horizontally.
     if (!isSVGRootInlineBox)
         computeInlineDirectionPositionsForLine(lineBox, lineInfo, bidiRuns.firstRun(), trailingSpaceRun, end.atEnd(), textBoxDataMap, verticalPositionCache, wordMeasurements);
-    
+
     // Now position our text runs vertically.
     computeBlockDirectionPositionsForLine(lineBox, bidiRuns.firstRun(), textBoxDataMap, verticalPositionCache);
-    
-#if ENABLE(SVG)
+
     // SVG text layout code computes vertical & horizontal positions on its own.
     // Note that we still need to execute computeVerticalPositionsForLine() as
     // it calls InlineTextBox::positionLineBox(), which tracks whether the box
@@ -1352,8 +1348,7 @@ RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(BidiRunList<BidiRun>& bi
         ASSERT(isSVGText());
         static_cast<SVGRootInlineBox*>(lineBox)->computePerCharacterLayoutInformation();
     }
-#endif
-    
+
     // Compute our overflow now.
     lineBox->computeOverflow(lineBox->lineTop(), lineBox->lineBottom(), textBoxDataMap);
 
@@ -2647,11 +2642,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
         bool autoWrap = RenderStyle::autoWrap(currWS);
         autoWrapWasEverTrueOnLine = autoWrapWasEverTrueOnLine || autoWrap;
 
-#if ENABLE(SVG)
         bool preserveNewline = current.m_obj->isSVGInlineText() ? false : RenderStyle::preserveNewline(currWS);
-#else
-        bool preserveNewline = RenderStyle::preserveNewline(currWS);
-#endif
 
         bool collapseWhiteSpace = RenderStyle::collapseWhiteSpace(currWS);
 
@@ -2796,9 +2787,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
 
             RenderText* t = toRenderText(current.m_obj);
 
-#if ENABLE(SVG)
             bool isSVGText = t->isSVGInlineText();
-#endif
 
             if (t->style()->hasTextCombine() && current.m_obj->isCombineText() && !toRenderCombineText(current.m_obj)->isCombined()) {
                 RenderCombineText* combineRenderer = toRenderCombineText(current.m_obj);
@@ -2829,12 +2818,11 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
             bool midWordBreak = false;
             bool breakAll = currentStyle->wordBreak() == BreakAllWordBreak && autoWrap;
             float hyphenWidth = 0;
-#if ENABLE(SVG)
+
             if (isSVGText) {
                 breakWords = false;
                 breakAll = false;
             }
-#endif
 
             if (t->isWordBreak()) {
                 width.commit();
@@ -3037,13 +3025,11 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
                     stopIgnoringSpaces(lineMidpointState, InlineIterator(0, current.m_obj, current.m_pos));
                 }
 
-#if ENABLE(SVG)
                 if (isSVGText && current.m_pos > 0) {
                     // Force creation of new InlineBoxes for each absolute positioned character (those that start new text chunks).
                     if (toRenderSVGInlineText(t)->characterStartsNewTextChunk(current.m_pos))
                         ensureCharacterGetsLineBox(lineMidpointState, current);
                 }
-#endif
 
                 if (currentCharacterIsSpace && !previousCharacterIsSpace) {
                     ignoreStart.m_obj = current.m_obj;

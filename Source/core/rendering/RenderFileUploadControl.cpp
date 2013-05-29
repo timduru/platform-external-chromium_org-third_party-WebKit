@@ -28,14 +28,12 @@
 #include "core/editing/VisiblePosition.h"
 #include "core/fileapi/FileList.h"
 #include "core/html/HTMLInputElement.h"
-#include "core/platform/LocalizedStrings.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/Icon.h"
 #include "core/platform/graphics/TextRun.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderButton.h"
-#include "core/rendering/RenderText.h"
 #include "core/rendering/RenderTheme.h"
 
 using namespace std;
@@ -131,11 +129,12 @@ void RenderFileUploadControl::paintObject(PaintInfo& paintInfo, const LayoutPoin
         LayoutUnit buttonWidth = nodeWidth(button);
         LayoutUnit buttonAndIconWidth = buttonWidth + afterButtonSpacing
             + (input->icon() ? iconWidth + iconFilenameSpacing : 0);
+        float textWidth = font.width(textRun);
         LayoutUnit textX;
         if (style()->isLeftToRightDirection())
             textX = contentLeft + buttonAndIconWidth;
         else
-            textX = contentLeft + contentWidth() - buttonAndIconWidth - font.width(textRun);
+            textX = contentLeft + contentWidth() - buttonAndIconWidth - textWidth;
 
         LayoutUnit textY = 0;
         // We want to match the button's baseline
@@ -144,11 +143,16 @@ void RenderFileUploadControl::paintObject(PaintInfo& paintInfo, const LayoutPoin
             textY = paintOffset.y() + borderTop() + paddingTop() + buttonRenderer->baselinePosition(AlphabeticBaseline, true, HorizontalLine, PositionOnContainingLine);
         else
             textY = baselinePosition(AlphabeticBaseline, true, HorizontalLine, PositionOnContainingLine);
+        TextRunPaintInfo textRunPaintInfo(textRun);
+        textRunPaintInfo.bounds = FloatRect(textX,
+                                            textY - style()->fontMetrics().ascent(),
+                                            textWidth,
+                                            style()->fontMetrics().height());
 
         paintInfo.context->setFillColor(style()->visitedDependentColor(CSSPropertyColor), style()->colorSpace());
         
         // Draw the filename
-        paintInfo.context->drawBidiText(font, textRun, IntPoint(roundToInt(textX), roundToInt(textY)));
+        paintInfo.context->drawBidiText(font, textRunPaintInfo, IntPoint(roundToInt(textX), roundToInt(textY)));
         
         if (input->icon()) {
             // Determine where the icon should be placed

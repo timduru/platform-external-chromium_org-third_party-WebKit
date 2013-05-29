@@ -31,8 +31,8 @@
 #ifndef WebWidgetClient_h
 #define WebWidgetClient_h
 
-#include "../../../Platform/chromium/public/WebCommon.h"
-#include "../../../Platform/chromium/public/WebRect.h"
+#include "../../../../public/platform/WebCommon.h"
+#include "../../../../public/platform/WebRect.h"
 #include "WebNavigationPolicy.h"
 #include "WebScreenInfo.h"
 #include <public/WebLayerTreeView.h>
@@ -57,13 +57,10 @@ public:
     // Called when the Widget has changed size as a result of an auto-resize.
     virtual void didAutoResize(const WebSize& newSize) { }
 
-    // Called when the compositor is enabled or disabled.
-    // The inputHandlerIdentifier can be used on the compositor thread to get access
-    // to the WebCompositorInputHandler instance associated with this WebWidget.
-    // If there is no WebCompositorInputHandler associated with this WebWidget (for example if
-    // threaded compositing is not enabled) then calling WebCompositorInputHandler::fromIdentifier()
-    // for the specified identifier will return 0.
-    virtual void didActivateCompositor(int inputHandlerIdentifier) { }
+    // Called when the compositor is enabled or disabled. The parameter to
+    // didActivateCompositor() is meaningless.
+    // FIXME: Remove parameter from didActivateCompositor().
+    virtual void didActivateCompositor(int deprecated) { }
     virtual void didDeactivateCompositor() { }
 
     // Attempt to initialize compositing for this widget. If this is successful,

@@ -215,6 +215,8 @@ protected:
     virtual unsigned ruleIndexByStyle(CSSStyleDeclaration*) const;
     virtual bool ensureParsedDataReady();
     virtual PassRefPtr<InspectorStyle> inspectorStyleForId(const InspectorCSSId&);
+    virtual String sourceMapURL() const;
+    virtual String sourceURL() const;
 
     // Also accessed by friend class InspectorStyle.
     virtual bool setStyleText(CSSStyleDeclaration*, const String&);
@@ -236,6 +238,9 @@ private:
     bool inlineStyleSheetText(String* result) const;
     PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::CSSRule> > buildArrayForRuleList(CSSRuleList*);
     PassRefPtr<TypeBuilder::CSS::SelectorList> buildObjectForSelectorList(CSSStyleRule*);
+    String url() const;
+    bool hasSourceURL() const;
+    bool startsAtZero() const;
 
     InspectorPageAgent* m_pageAgent;
     String m_id;
@@ -247,6 +252,7 @@ private:
     ParsedStyleSheet* m_parsedStyleSheet;
     mutable CSSStyleRuleVector m_flatRules;
     Listener* m_listener;
+    mutable String m_sourceURL;
 };
 
 class InspectorStyleSheetForInlineStyle : public InspectorStyleSheet {
@@ -266,6 +272,8 @@ protected:
     virtual unsigned ruleIndexByStyle(CSSStyleDeclaration*) const { return 0; }
     virtual bool ensureParsedDataReady();
     virtual PassRefPtr<InspectorStyle> inspectorStyleForId(const InspectorCSSId&);
+    virtual String sourceMapURL() const OVERRIDE { return String(); }
+    virtual String sourceURL() const OVERRIDE { return String(); }
 
     // Also accessed by friend class InspectorStyle.
     virtual bool setStyleText(CSSStyleDeclaration*, const String&);

@@ -36,6 +36,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/Decimal.cpp \
 	third_party/WebKit/Source/core/platform/DragData.cpp \
 	third_party/WebKit/Source/core/platform/DragImage.cpp \
+	third_party/WebKit/Source/core/platform/EventTracer.cpp \
 	third_party/WebKit/Source/core/platform/FileChooser.cpp \
 	third_party/WebKit/Source/core/platform/FileIconLoader.cpp \
 	third_party/WebKit/Source/core/platform/KillRingNone.cpp \
@@ -43,6 +44,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/LayoutTestSupport.cpp \
 	third_party/WebKit/Source/core/platform/Length.cpp \
 	third_party/WebKit/Source/core/platform/LengthBox.cpp \
+	third_party/WebKit/Source/core/platform/LinkHash.cpp \
 	third_party/WebKit/Source/core/platform/Logging.cpp \
 	third_party/WebKit/Source/core/platform/MIMETypeFromURL.cpp \
 	third_party/WebKit/Source/core/platform/NotImplemented.cpp \
@@ -113,12 +115,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/ClipboardChromiumPosix.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ClipboardMimeTypes.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ClipboardUtilitiesChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/ContextMenuChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/ContextMenuItemChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/CursorChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/DragDataChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/DragImageChromiumSkia.cpp \
-	third_party/WebKit/Source/core/platform/chromium/EventTracerChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FileSystemChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FileSystemChromiumLinux.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FramelessScrollView.cpp \
@@ -126,7 +124,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/HistogramSupportChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/KeyCodeConversionAndroid.cpp \
 	third_party/WebKit/Source/core/platform/chromium/LanguageChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/LinkHashChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/LocalizedStringsChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MemoryUsageSupportChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MIMETypeRegistryChromium.cpp \
@@ -134,9 +131,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/PlatformKeyboardEventChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/PlatformScreenChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/PlatformSpeechSynthesizerChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/PopupContainer.cpp \
-	third_party/WebKit/Source/core/platform/chromium/PopupMenuChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/PopupListBox.cpp \
 	third_party/WebKit/Source/core/platform/chromium/Prerender.cpp \
 	third_party/WebKit/Source/core/platform/chromium/PrerenderHandle.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SSLKeyGeneratorChromium.cpp \
@@ -146,11 +140,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/SoundChromiumPosix.cpp \
 	third_party/WebKit/Source/core/platform/chromium/StatsCounterChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SuddenTerminationChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/VisitedLinksChromium.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ANGLEWebKitBridge.cpp \
 	third_party/WebKit/Source/core/platform/graphics/BitmapImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Color.cpp \
 	third_party/WebKit/Source/core/platform/graphics/CrossfadeGeneratedImage.cpp \
+	third_party/WebKit/Source/core/platform/graphics/DrawLooper.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Extensions3D.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Font.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontCache.cpp \
@@ -167,8 +161,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/Gradient.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsContext.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsContext3D.cpp \
+	third_party/WebKit/Source/core/platform/graphics/GraphicsContext3DImagePacking.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsLayer.cpp \
-	third_party/WebKit/Source/core/platform/graphics/GraphicsLayerAnimation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsLayerTransform.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GraphicsTypes.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Image.cpp \
@@ -187,7 +181,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/StringTruncator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/SurrogatePairAwareTextIterator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/TextRun.cpp \
-	third_party/WebKit/Source/core/platform/graphics/TextTrackRepresentation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/WidthIterator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/AnimationTranslationUtil.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/Canvas2DLayerBridge.cpp \
@@ -297,8 +290,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamComponent.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamDescriptor.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamSource.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/RTCIceCandidateDescriptor.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/RTCSessionDescriptionDescriptor.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/chromium/MediaStreamCenterChromium.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/chromium/RTCDTMFSenderHandlerChromium.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/chromium/RTCDataChannelHandlerChromium.cpp \
@@ -400,6 +391,7 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
+	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
@@ -416,7 +408,7 @@ MY_DEFS := \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
-	'-DENABLE_ENCRYPTED_MEDIA=1' \
+	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
@@ -424,7 +416,6 @@ MY_DEFS := \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_DATALIST_ELEMENT=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_INPUT_TYPE_COLOR=0' \
@@ -432,12 +423,10 @@ MY_DEFS := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PAGE_POPUP=0' \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_8BIT_TEXTRUN=1' \
-	'-DENABLE_BINDING_INTEGRITY=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -477,8 +466,8 @@ LOCAL_C_INCLUDES := \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
 	$(LOCAL_PATH)/third_party/angle/include/GLSLANG \
 	$(LOCAL_PATH)/third_party/WebKit/Source/Platform/chromium \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/common \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/i18n \
+	$(PWD)/external/icu4c/common \
+	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/src/core \
 	$(LOCAL_PATH)/third_party/skia/include/config \
@@ -508,11 +497,11 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/jpeg \
+	$(PWD)/external/jpeg \
 	$(LOCAL_PATH)/third_party/harfbuzz-ng/src \
-	$(GYP_ABS_ANDROID_TOP_DIR)/frameworks/wilhelm/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/bionic \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/stlport/stlport
+	$(PWD)/frameworks/wilhelm/include \
+	$(PWD)/bionic \
+	$(PWD)/external/stlport/stlport
 
 LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES)
 

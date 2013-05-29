@@ -25,8 +25,7 @@
 
 [
     EnabledAtRuntime=videoTrack,
-    EventTarget,
-    SkipVTableValidation
+    EventTarget
 ] interface TextTrack {
     readonly attribute DOMString kind;
     readonly attribute DOMString label;

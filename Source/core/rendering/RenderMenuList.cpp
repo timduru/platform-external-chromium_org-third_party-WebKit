@@ -39,11 +39,9 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
 #include "core/platform/PopupMenu.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/IntSize.h"
-#include "core/platform/graphics/TextRun.h"
 #include "core/rendering/RenderBR.h"
 #include "core/rendering/RenderScrollbar.h"
 #include "core/rendering/RenderTheme.h"
@@ -322,7 +320,7 @@ void RenderMenuList::showPopup()
     if (m_popupIsVisible)
         return;
 
-    if (document()->page()->chrome()->hasOpenedPopup())
+    if (document()->page()->chrome().hasOpenedPopup())
         return;
 
     // Create m_innerBlock here so it ends up as the first child.
@@ -330,13 +328,13 @@ void RenderMenuList::showPopup()
     // inside the showPopup call and it would fail.
     createInnerBlock();
     if (!m_popup)
-        m_popup = document()->page()->chrome()->createPopupMenu(this);
+        m_popup = document()->page()->chrome().createPopupMenu(*document()->frame(), this);
     m_popupIsVisible = true;
 
     FloatQuad quad(localToAbsoluteQuad(FloatQuad(borderBoundingBox())));
     IntSize size = pixelSnappedIntRect(frameRect()).size();
     HTMLSelectElement* select = selectElement();
-    m_popup->show(quad, size, document()->view(), select->optionToListIndex(select->selectedIndex()));
+    m_popup->show(quad, size, select->optionToListIndex(select->selectedIndex()));
 }
 
 void RenderMenuList::hidePopup()

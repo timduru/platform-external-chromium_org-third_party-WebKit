@@ -188,7 +188,7 @@ static bool canRunModalIfDuringPageDismissal(Page* page, ChromeClient::DialogTyp
     for (Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
         FrameLoader::PageDismissalType dismissal = frame->loader()->pageDismissalEventBeingDispatched();
         if (dismissal != FrameLoader::NoDismissal)
-            return page->chrome()->client()->shouldRunModalDialogDuringPageDismissal(dialog, message, dismissal);
+            return page->chrome().client()->shouldRunModalDialogDuringPageDismissal(dialog, message, dismissal);
     }
     return true;
 }
@@ -432,11 +432,6 @@ void Chrome::setCursor(const Cursor& cursor)
     m_client->setCursor(cursor);
 }
 
-void Chrome::setCursorHiddenUntilMouseMoves(bool hiddenUntilMouseMoves)
-{
-    m_client->setCursorHiddenUntilMouseMoves(hiddenUntilMouseMoves);
-}
-
 void Chrome::scheduleAnimation()
 {
     m_client->scheduleAnimation();
@@ -449,10 +444,10 @@ bool Chrome::hasOpenedPopup() const
     return m_client->hasOpenedPopup();
 }
 
-PassRefPtr<PopupMenu> Chrome::createPopupMenu(PopupMenuClient* client) const
+PassRefPtr<PopupMenu> Chrome::createPopupMenu(Frame& frame, PopupMenuClient* client) const
 {
     notifyPopupOpeningObservers();
-    return m_client->createPopupMenu(client);
+    return m_client->createPopupMenu(frame, client);
 }
 
 void Chrome::registerPopupOpeningObserver(PopupOpeningObserver* observer)

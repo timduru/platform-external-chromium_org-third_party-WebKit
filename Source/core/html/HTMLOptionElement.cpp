@@ -29,18 +29,14 @@
 
 #include "HTMLNames.h"
 #include "core/css/resolver/StyleResolver.h"
-#include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
-#include "core/dom/ExceptionCode.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/dom/NodeRenderingContext.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/ScriptElement.h"
 #include "core/dom/Text.h"
 #include "core/html/HTMLDataListElement.h"
 #include "core/html/HTMLSelectElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/rendering/RenderMenuList.h"
 #include "core/rendering/RenderTheme.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/StringBuilder.h>
@@ -194,13 +190,10 @@ int HTMLOptionElement::index() const
 
 void HTMLOptionElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
-#if ENABLE(DATALIST_ELEMENT)
     if (name == valueAttr) {
         if (HTMLDataListElement* dataList = ownerDataListElement())
             dataList->optionElementChildrenChanged();
-    } else
-#endif
-    if (name == disabledAttr) {
+    } else if (name == disabledAttr) {
         bool oldDisabled = m_disabled;
         m_disabled = !value.isNull();
         if (oldDisabled != m_disabled) {
@@ -275,17 +268,13 @@ void HTMLOptionElement::setSelectedState(bool selected)
 
 void HTMLOptionElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
-#if ENABLE(DATALIST_ELEMENT)
     if (HTMLDataListElement* dataList = ownerDataListElement())
         dataList->optionElementChildrenChanged();
-    else
-#endif
-    if (HTMLSelectElement* select = ownerSelectElement())
+    else if (HTMLSelectElement* select = ownerSelectElement())
         select->optionElementChildrenChanged();
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
 
-#if ENABLE(DATALIST_ELEMENT)
 HTMLDataListElement* HTMLOptionElement::ownerDataListElement() const
 {
     for (ContainerNode* parent = parentNode(); parent ; parent = parent->parentNode()) {
@@ -294,7 +283,6 @@ HTMLDataListElement* HTMLOptionElement::ownerDataListElement() const
     }
     return 0;
 }
-#endif
 
 HTMLSelectElement* HTMLOptionElement::ownerSelectElement() const
 {

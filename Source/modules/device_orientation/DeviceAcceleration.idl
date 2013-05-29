@@ -24,8 +24,7 @@
  */
 
 [
-    NoInterfaceObject,
-    ImplementationLacksVTable
+    NoInterfaceObject
 ] interface DeviceAcceleration {
     readonly attribute double? x;
     readonly attribute double? y;

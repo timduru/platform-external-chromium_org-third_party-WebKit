@@ -56,6 +56,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/Assertions.cpp \
 	third_party/WebKit/Source/wtf/BitVector.cpp \
 	third_party/WebKit/Source/wtf/CryptographicallyRandomNumber.cpp \
+	third_party/WebKit/Source/wtf/CurrentTime.cpp \
 	third_party/WebKit/Source/wtf/DataLog.cpp \
 	third_party/WebKit/Source/wtf/DateMath.cpp \
 	third_party/WebKit/Source/wtf/DecimalNumber.cpp \
@@ -65,13 +66,13 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/GregorianDateTime.cpp \
 	third_party/WebKit/Source/wtf/HashTable.cpp \
 	third_party/WebKit/Source/wtf/MD5.cpp \
+	third_party/WebKit/Source/wtf/MainThread.cpp \
 	third_party/WebKit/Source/wtf/MemoryInstrumentation.cpp \
 	third_party/WebKit/Source/wtf/NullPtr.cpp \
 	third_party/WebKit/Source/wtf/NumberOfCores.cpp \
 	third_party/WebKit/Source/wtf/ParallelJobsGeneric.cpp \
 	third_party/WebKit/Source/wtf/PrintStream.cpp \
 	third_party/WebKit/Source/wtf/RandomNumber.cpp \
-	third_party/WebKit/Source/wtf/RawBuffer.cpp \
 	third_party/WebKit/Source/wtf/RefCountedLeakCounter.cpp \
 	third_party/WebKit/Source/wtf/SHA1.cpp \
 	third_party/WebKit/Source/wtf/SizeLimits.cpp \
@@ -80,7 +81,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/ThreadingPthreads.cpp \
 	third_party/WebKit/Source/wtf/TypeTraits.cpp \
 	third_party/WebKit/Source/wtf/WTFThreadData.cpp \
-	third_party/WebKit/Source/wtf/chromium/MainThreadChromium.cpp \
 	third_party/WebKit/Source/wtf/dtoa.cpp \
 	third_party/WebKit/Source/wtf/text/AtomicString.cpp \
 	third_party/WebKit/Source/wtf/text/Base64.cpp \
@@ -146,12 +146,14 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
+	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
+	'-DWTF_IMPLEMENTATION=1' \
 	'-DENABLE_3D_PLUGIN=1' \
 	'-DENABLE_BATTERY_STATUS=0' \
 	'-DENABLE_CANVAS_USES_MAILBOX=0' \
@@ -160,7 +162,7 @@ MY_DEFS := \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
-	'-DENABLE_ENCRYPTED_MEDIA=1' \
+	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
@@ -168,7 +170,6 @@ MY_DEFS := \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
-	'-DENABLE_DATALIST_ELEMENT=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_INPUT_TYPE_COLOR=0' \
@@ -176,12 +177,10 @@ MY_DEFS := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PAGE_POPUP=0' \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_8BIT_TEXTRUN=1' \
-	'-DENABLE_BINDING_INTEGRITY=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -201,11 +200,11 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/common \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/icu4c/i18n \
-	$(GYP_ABS_ANDROID_TOP_DIR)/frameworks/wilhelm/include \
-	$(GYP_ABS_ANDROID_TOP_DIR)/bionic \
-	$(GYP_ABS_ANDROID_TOP_DIR)/external/stlport/stlport
+	$(PWD)/external/icu4c/common \
+	$(PWD)/external/icu4c/i18n \
+	$(PWD)/frameworks/wilhelm/include \
+	$(PWD)/bionic \
+	$(PWD)/external/stlport/stlport
 
 LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES)
 

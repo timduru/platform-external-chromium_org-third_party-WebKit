@@ -26,10 +26,8 @@
 
 #include "core/accessibility/AXObjectCache.h"
 #include "core/page/Frame.h"
-#include "core/page/animation/AnimationController.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/HitTestResult.h"
-#include "core/rendering/RenderCounter.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderView.h"
@@ -55,8 +53,8 @@ WidgetHierarchyUpdatesSuspensionScope::WidgetToParentMap& WidgetHierarchyUpdates
 
 void WidgetHierarchyUpdatesSuspensionScope::moveWidgets()
 {
-    WidgetToParentMap map = widgetNewParentMap();
-    widgetNewParentMap().clear();
+    WidgetToParentMap map;
+    widgetNewParentMap().swap(map);
     WidgetToParentMap::iterator end = map.end();
     for (WidgetToParentMap::iterator it = map.begin(); it != end; ++it) {
         Widget* child = it->key.get();

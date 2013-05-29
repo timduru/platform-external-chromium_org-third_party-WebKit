@@ -40,6 +40,7 @@
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8HiddenPropertyName.h"
 #include "bindings/v8/V8RecursionScope.h"
+#include "bindings/v8/V8ScriptRunner.h"
 #include "core/dom/Document.h"
 #include "core/dom/Node.h"
 #include "core/html/HTMLElement.h"
@@ -137,6 +138,8 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
 
     v8::Context::Scope scope(v8Context);
 
+    // FIXME: Remove the following 'with' hack.
+    //
     // Nodes other than the document object, when executing inline event
     // handlers push document, form, and the target node on the scope chain.
     // We do this by using 'with' statement.
@@ -163,22 +166,13 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
 
     v8::Handle<v8::String> codeExternalString = v8String(code, isolate);
 
-    v8::Handle<v8::Script> script = ScriptSourceCode::compileScript(codeExternalString, m_sourceURL, m_position, 0, isolate);
-    if (script.IsEmpty())
-        return;
-
-    // FIXME: Remove this code when we stop doing the 'with' hack above.
-    v8::Local<v8::Value> value;
-    {
-        V8RecursionScope::MicrotaskSuppression scope;
-        value = script->Run();
-    }
-    if (value.IsEmpty())
+    v8::Local<v8::Value> result = V8ScriptRunner::compileAndRunInternalScript(codeExternalString, isolate, v8Context, m_sourceURL, m_position, 0);
+    if (result.IsEmpty())
         return;
 
     // Call the outer function to get the inner function.
-    ASSERT(value->IsFunction());
-    v8::Local<v8::Function> intermediateFunction = value.As<v8::Function>();
+    ASSERT(result->IsFunction());
+    v8::Local<v8::Function> intermediateFunction = result.As<v8::Function>();
 
     HTMLFormElement* formElement = 0;
     if (m_node && m_node->isHTMLElement())

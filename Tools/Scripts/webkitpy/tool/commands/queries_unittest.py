@@ -217,8 +217,8 @@ class PrintExpectationsTest(unittest.TestCase):
 
     def test_csv(self):
         self.run_test(['failures/expected/text.html', 'failures/expected/image.html'],
-                      ('test-win-xp,failures/expected/image.html,BUGTEST,IMAGE\n'
-                       'test-win-xp,failures/expected/text.html,BUGTEST,FAIL\n'),
+                      ('test-win-xp,failures/expected/image.html,Bug(test),IMAGE\n'
+                       'test-win-xp,failures/expected/text.html,Bug(test),FAIL\n'),
                       csv=True)
 
     def test_paths(self):
@@ -227,15 +227,6 @@ class PrintExpectationsTest(unittest.TestCase):
                        'LayoutTests/platform/test/TestExpectations\n'
                        'LayoutTests/platform/test-win-xp/TestExpectations\n'),
                       paths=True)
-
-    def test_platform(self):
-        self.run_test(['platform/test-mac-leopard/http/test.html'],
-                      ('// For test-mac-snowleopard\n'
-                       'platform/test-mac-leopard [ Pass Skip WontFix ]\n'  # Note that this is the expectation (from being skipped internally), not the test name
-                       '\n'
-                       '// For test-mac-leopard\n'
-                       'platform/test-mac-leopard/http/test.html [ Pass ]\n'),
-                      platform='test-mac-*')
 
 class PrintBaselinesTest(unittest.TestCase):
     def setUp(self):

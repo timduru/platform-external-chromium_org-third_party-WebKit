@@ -26,9 +26,7 @@
 #include "core/rendering/RenderText.h"
 
 #include "core/accessibility/AXObjectCache.h"
-#include "core/dom/Range.h"
 #include "core/dom/Text.h"
-#include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/editing/VisiblePosition.h"
 #include "core/loader/TextResourceDecoder.h"
 #include "core/page/FrameView.h"
@@ -39,7 +37,6 @@
 #include "core/platform/text/transcoder/FontTranscoder.h"
 #include "core/rendering/EllipsisBox.h"
 #include "core/rendering/InlineTextBox.h"
-#include "core/rendering/RenderArena.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/RenderCombineText.h"
 #include "core/rendering/RenderLayer.h"
@@ -989,7 +986,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
     bool breakAll = (styleToUse->wordBreak() == BreakAllWordBreak || styleToUse->wordBreak() == BreakWordBreak) && styleToUse->autoWrap();
 
     for (int i = 0; i < len; i++) {
-        UChar c = characterAt(i);
+        UChar c = uncheckedCharacterAt(i);
 
         bool previousCharacterIsSpace = isSpace;
 
@@ -1041,7 +1038,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
             j++;
             if (j == len)
                 break;
-            c = characterAt(j);
+            c = uncheckedCharacterAt(j);
             if (isBreakable(breakIterator, j, nextBreakable) && characterAt(j - 1) != softHyphen)
                 break;
             if (breakAll) {
@@ -1285,12 +1282,10 @@ void RenderText::setTextWithOffset(PassRefPtr<StringImpl> text, unsigned offset,
             RootInlineBox* root = curr->root();
             if (!firstRootBox) {
                 firstRootBox = root;
-                if (!dirtiedLines) {
-                    // The affected area was in between two runs. Go ahead and mark the root box of
-                    // the run after the affected area as dirty.
-                    firstRootBox->markDirty();
-                    dirtiedLines = true;
-                }
+                // The affected area was in between two runs. Go ahead and mark the root box of
+                // the run after the affected area as dirty.
+                firstRootBox->markDirty();
+                dirtiedLines = true;
             }
             lastRootBox = root;
         } else if (curr->end() >= offset && curr->end() <= end) {

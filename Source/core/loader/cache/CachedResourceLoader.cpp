@@ -42,11 +42,11 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/PingLoader.h"
 #include "core/loader/cache/CachedCSSStyleSheet.h"
+#include "core/loader/cache/CachedDocument.h"
 #include "core/loader/cache/CachedFont.h"
 #include "core/loader/cache/CachedImage.h"
 #include "core/loader/cache/CachedRawResource.h"
 #include "core/loader/cache/CachedResourceRequest.h"
-#include "core/loader/cache/CachedSVGDocument.h"
 #include "core/loader/cache/CachedScript.h"
 #include "core/loader/cache/CachedShader.h"
 #include "core/loader/cache/CachedXSLStyleSheet.h"
@@ -76,10 +76,8 @@ static CachedResource* createResource(CachedResource::Type type, ResourceRequest
         return new CachedCSSStyleSheet(request, charset);
     case CachedResource::Script:
         return new CachedScript(request, charset);
-#if ENABLE(SVG)
     case CachedResource::SVGDocumentResource:
-        return new CachedSVGDocument(request);
-#endif
+        return new CachedDocument(request, CachedResource::SVGDocumentResource);
     case CachedResource::FontResource:
         return new CachedFont(request);
     case CachedResource::RawResource:
@@ -117,9 +115,6 @@ CachedResourceLoader::~CachedResourceLoader()
     m_document = 0;
 
     clearPreloads();
-    DocumentResourceMap::iterator end = m_documentResources.end();
-    for (DocumentResourceMap::iterator it = m_documentResources.begin(); it != end; ++it)
-        it->value->setOwningCachedResourceLoader(0);
 
     // Make sure no requests still point to this CachedResourceLoader
     ASSERT(m_requestCount == 0);
@@ -147,7 +142,7 @@ CachedResourceHandle<CachedImage> CachedResourceLoader::requestImage(CachedResou
     if (Frame* f = frame()) {
         if (f->loader()->pageDismissalEventBeingDispatched() != FrameLoader::NoDismissal) {
             KURL requestURL = request.resourceRequest().url();
-            if (requestURL.isValid() && canRequest(CachedResource::ImageResource, requestURL))
+            if (requestURL.isValid() && canRequest(CachedResource::ImageResource, requestURL, CheckContentSecurityPolicy))
                 PingLoader::loadImage(f, requestURL);
             return 0;
         }
@@ -186,7 +181,7 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
         memoryCache()->remove(existing);
     }
 
-    request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck));
+    request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy));
     return static_cast<CachedCSSStyleSheet*>(requestResource(CachedResource::CSSStyleSheet, request).get());
 }
 
@@ -200,12 +195,10 @@ CachedResourceHandle<CachedXSLStyleSheet> CachedResourceLoader::requestXSLStyleS
     return static_cast<CachedXSLStyleSheet*>(requestResource(CachedResource::XSLStyleSheet, request).get());
 }
 
-#if ENABLE(SVG)
-CachedResourceHandle<CachedSVGDocument> CachedResourceLoader::requestSVGDocument(CachedResourceRequest& request)
+CachedResourceHandle<CachedDocument> CachedResourceLoader::requestSVGDocument(CachedResourceRequest& request)
 {
-    return static_cast<CachedSVGDocument*>(requestResource(CachedResource::SVGDocumentResource, request).get());
+    return static_cast<CachedDocument*>(requestResource(CachedResource::SVGDocumentResource, request).get());
 }
-#endif
 
 CachedResourceHandle<CachedResource> CachedResourceLoader::requestLinkResource(CachedResource::Type type, CachedResourceRequest& request)
 {
@@ -229,11 +222,8 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
     switch (type) {
     case CachedResource::Script:
     case CachedResource::XSLStyleSheet:
-#if ENABLE(SVG)
     case CachedResource::SVGDocumentResource:
-#endif
     case CachedResource::CSSStyleSheet:
-    case CachedResource::RawResource:
         // These resource can inject script into the current document (Script,
         // XSL) or exfiltrate the content of the current document (CSS).
         if (Frame* f = frame())
@@ -242,6 +232,7 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
         break;
     case CachedResource::TextTrackResource:
     case CachedResource::ShaderResource:
+    case CachedResource::RawResource:
     case CachedResource::ImageResource:
     case CachedResource::FontResource: {
         // These resources can corrupt only the frame's pixels.
@@ -261,7 +252,7 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
     return true;
 }
 
-bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url, bool forPreload)
+bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url, ContentSecurityPolicyCheck contentSecurityPolicyCheck, bool forPreload)
 {
     if (document() && !document()->securityOrigin()->canDisplay(url)) {
         if (!forPreload)
@@ -271,7 +262,7 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
     }
 
     // FIXME: Convert this to check the isolated world's Content Security Policy once webkit.org/b/104520 is solved.
-    bool shouldBypassMainWorldContentSecurityPolicy = (frame() && frame()->script()->shouldBypassMainWorldContentSecurityPolicy());
+    bool shouldBypassMainWorldContentSecurityPolicy = (frame() && frame()->script()->shouldBypassMainWorldContentSecurityPolicy()) || (contentSecurityPolicyCheck == DoNotCheckContentSecurityPolicy);
 
     // Some types of resources can be loaded only from the same origin.  Other
     // types of resources, like Images, Scripts, and CSS, can be loaded from
@@ -290,9 +281,7 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
         // These types of resources can be loaded from any origin.
         // FIXME: Are we sure about CachedResource::FontResource?
         break;
-#if ENABLE(SVG)
     case CachedResource::SVGDocumentResource:
-#endif
     case CachedResource::XSLStyleSheet:
         if (!m_document->securityOrigin()->canRequest(url)) {
             printAccessDeniedMessage(url);
@@ -324,9 +313,7 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
         if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowStyleFromSource(url))
             return false;
         break;
-#if ENABLE(SVG)
     case CachedResource::SVGDocumentResource:
-#endif
     case CachedResource::ImageResource:
         if (!shouldBypassMainWorldContentSecurityPolicy && !m_document->contentSecurityPolicy()->allowImageFromSource(url))
             return false;
@@ -372,19 +359,11 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
     if (!url.isValid())
         return 0;
 
-    if (!canRequest(type, url, request.forPreload()))
+    if (!canRequest(type, url, request.options().contentSecurityPolicyOption, request.forPreload()))
         return 0;
 
     if (Frame* f = frame())
         f->loader()->client()->dispatchWillRequestResource(&request);
-
-    if (memoryCache()->disabled()) {
-        DocumentResourceMap::iterator it = m_documentResources.find(url.string());
-        if (it != m_documentResources.end()) {
-            it->value->setOwningCachedResourceLoader(0);
-            m_documentResources.remove(it);
-        }
-    }
 
     // See if we can use an existing resource from the cache.
     CachedResourceHandle<CachedResource> resource = memoryCache()->resourceForURL(url);
@@ -401,7 +380,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
         resource = revalidateResource(request, resource.get());
         break;
     case Use:
-        memoryCache()->resourceAccessed(resource.get());
+        resource->updateForAccess();
         notifyLoadedFromMemoryCache(resource.get());
         break;
     }
@@ -420,7 +399,8 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
         if (request.options().securityCheck == DoSecurityCheck && (frameLoader->state() == FrameStateProvisional || !frameLoader->activeDocumentLoader() || frameLoader->activeDocumentLoader()->isStopping()))
             return 0;
 
-        resource->load(this, request.options());
+        if (!m_documentLoader->scheduleArchiveLoad(resource.get(), request.resourceRequest()))
+            resource->load(this, request.options());
 
         // We don't support immediate loads, but we do support immediate failure.
         if (resource->errorOccurred()) {
@@ -485,11 +465,9 @@ void CachedResourceLoader::determineTargetType(ResourceRequest& request, CachedR
     case CachedResource::TextTrackResource:
         targetType = ResourceRequest::TargetIsTextTrack;
         break;
-#if ENABLE(SVG)
     case CachedResource::SVGDocumentResource:
         targetType = ResourceRequest::TargetIsImage;
         break;
-#endif
     default:
         ASSERT_NOT_REACHED();
         targetType = ResourceRequest::TargetIsSubresource;
@@ -536,7 +514,6 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
 {
     ASSERT(resource);
     ASSERT(resource->inCache());
-    ASSERT(!memoryCache()->disabled());
     ASSERT(resource->canUseCacheValidator());
     ASSERT(!resource->resourceToRevalidate());
 
@@ -561,22 +538,24 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::loadResource(CachedRe
     addAdditionalRequestHeaders(request.mutableResourceRequest(), type);
     CachedResourceHandle<CachedResource> resource = createResource(type, request.mutableResourceRequest(), charset);
 
-    if (!memoryCache()->add(resource.get()))
-        resource->setOwningCachedResourceLoader(this);
+    memoryCache()->add(resource.get());
     storeResourceTimingInitiatorInformation(resource, request);
     return resource;
 }
 
 void CachedResourceLoader::storeResourceTimingInitiatorInformation(const CachedResourceHandle<CachedResource>& resource, const CachedResourceRequest& request)
 {
+    CachedResourceInitiatorInfo info = request.initiatorInfo();
+    info.startTime = monotonicallyIncreasingTime();
+
     if (resource->type() == CachedResource::MainResource) {
         // <iframe>s should report the initial navigation requested by the parent document, but not subsequent navigations.
-        if (frame()->ownerElement() && m_documentLoader->frameLoader()->stateMachine()->committingFirstRealLoad()) {
-            InitiatorInfo info = { frame()->ownerElement()->localName(), monotonicallyIncreasingTime() };
+        if (frame()->ownerElement() && !frame()->ownerElement()->loadedNonEmptyDocument()) {
+            info.name = frame()->ownerElement()->localName();
             m_initiatorMap.add(resource.get(), info);
+            frame()->ownerElement()->didLoadNonEmptyDocument();
         }
     } else {
-        InitiatorInfo info = { request.initiatorName(), monotonicallyIncreasingTime() };
         m_initiatorMap.add(resource.get(), info);
     }
 }
@@ -749,30 +728,20 @@ CachePolicy CachedResourceLoader::cachePolicy(CachedResource::Type type) const
     return CachePolicyVerify;
 }
 
-void CachedResourceLoader::removeCachedResource(CachedResource* resource) const
-{
-#ifndef NDEBUG
-    DocumentResourceMap::iterator it = m_documentResources.find(resource->url());
-    if (it != m_documentResources.end())
-        ASSERT(it->value.get() == resource);
-#endif
-    m_documentResources.remove(resource->url());
-}
-
 void CachedResourceLoader::loadDone(CachedResource* resource)
 {
     RefPtr<DocumentLoader> protectDocumentLoader(m_documentLoader);
     RefPtr<Document> protectDocument(m_document);
 
     if (resource && resource->response().isHTTP() && ((!resource->errorOccurred() && !resource->wasCanceled()) || resource->response().httpStatusCode() == 304)) {
-        HashMap<CachedResource*, InitiatorInfo>::iterator initiatorIt = m_initiatorMap.find(resource);
+        HashMap<CachedResource*, CachedResourceInitiatorInfo>::iterator initiatorIt = m_initiatorMap.find(resource);
         if (initiatorIt != m_initiatorMap.end()) {
             ASSERT(document());
             Document* initiatorDocument = document();
             if (resource->type() == CachedResource::MainResource)
                 initiatorDocument = document()->parentDocument();
             ASSERT(initiatorDocument);
-            const InitiatorInfo& info = initiatorIt->value;
+            const CachedResourceInitiatorInfo& info = initiatorIt->value;
             initiatorDocument->domWindow()->performance()->addResourceTiming(info.name, initiatorDocument, resource->resourceRequest(), resource->response(), info.startTime, resource->loadFinishTime());
             m_initiatorMap.remove(initiatorIt);
         }
@@ -804,10 +773,8 @@ void CachedResourceLoader::garbageCollectDocumentResources()
     StringVector resourcesToDelete;
 
     for (DocumentResourceMap::iterator it = m_documentResources.begin(); it != m_documentResources.end(); ++it) {
-        if (it->value->hasOneHandle()) {
+        if (it->value->hasOneHandle())
             resourcesToDelete.append(it->key);
-            it->value->setOwningCachedResourceLoader(0);
-        }
     }
 
     for (StringVector::const_iterator it = resourcesToDelete.begin(); it != resourcesToDelete.end(); ++it)
@@ -1007,13 +974,11 @@ void CachedResourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
     info.addMember(m_preloads, "preloads");
     info.addMember(m_pendingPreloads, "pendingPreloads");
     info.addMember(m_garbageCollectDocumentResourcesTimer, "garbageCollectDocumentResourcesTimer");
-    // FIXME: m_initiatorMap has pointers to already deleted CachedResources
-    info.ignoreMember(m_initiatorMap);
 }
 
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck);
+    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck, CheckContentSecurityPolicy);
     return options;
 }
 

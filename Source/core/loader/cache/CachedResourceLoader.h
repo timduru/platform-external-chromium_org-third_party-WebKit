@@ -29,6 +29,7 @@
 #include "core/loader/cache/CachePolicy.h"
 #include "core/loader/cache/CachedResource.h"
 #include "core/loader/cache/CachedResourceHandle.h"
+#include "core/loader/cache/CachedResourceInitiatorInfo.h"
 #include "core/loader/cache/CachedResourceRequest.h"
 #include "core/platform/Timer.h"
 #include "core/platform/network/ResourceLoadPriority.h"
@@ -41,7 +42,7 @@
 namespace WebCore {
 
 class CachedCSSStyleSheet;
-class CachedSVGDocument;
+class CachedDocument;
 class CachedFont;
 class CachedImage;
 class CachedRawResource;
@@ -79,10 +80,7 @@ public:
     CachedResourceHandle<CachedFont> requestFont(CachedResourceRequest&);
     CachedResourceHandle<CachedRawResource> requestRawResource(CachedResourceRequest&);
     CachedResourceHandle<CachedRawResource> requestMainResource(CachedResourceRequest&);
-
-#if ENABLE(SVG)
-    CachedResourceHandle<CachedSVGDocument> requestSVGDocument(CachedResourceRequest&);
-#endif
+    CachedResourceHandle<CachedDocument> requestSVGDocument(CachedResourceRequest&);
     CachedResourceHandle<CachedXSLStyleSheet> requestXSLStyleSheet(CachedResourceRequest&);
     CachedResourceHandle<CachedResource> requestLinkResource(CachedResource::Type, CachedResourceRequest&);
     CachedResourceHandle<CachedTextTrack> requestTextTrack(CachedResourceRequest&);
@@ -109,9 +107,10 @@ public:
     Frame* frame() const; // Can be null
     Document* document() const { return m_document; } // Can be null
     void setDocument(Document* document) { m_document = document; }
+
+    DocumentLoader* documentLoader() const { return m_documentLoader; }
     void clearDocumentLoader() { m_documentLoader = 0; }
 
-    void removeCachedResource(CachedResource*) const;
     void loadDone(CachedResource*);
     void garbageCollectDocumentResources();
     
@@ -125,7 +124,7 @@ public:
     void preload(CachedResource::Type, CachedResourceRequest&, const String& charset);
     void checkForPendingPreloads();
     void printPreloadStats();
-    bool canRequest(CachedResource::Type, const KURL&, bool forPreload = false);
+    bool canRequest(CachedResource::Type, const KURL&, ContentSecurityPolicyCheck, bool forPreload = false);
     
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
@@ -172,11 +171,7 @@ private:
 
     Timer<CachedResourceLoader> m_garbageCollectDocumentResourcesTimer;
 
-    struct InitiatorInfo {
-        AtomicString name;
-        double startTime;
-    };
-    HashMap<CachedResource*, InitiatorInfo> m_initiatorMap;
+    HashMap<CachedResource*, CachedResourceInitiatorInfo> m_initiatorMap;
 
     // 29 bits left
     bool m_autoLoadImages : 1;

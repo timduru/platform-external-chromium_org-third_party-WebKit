@@ -26,7 +26,6 @@
 #include "core/dom/Range.h"
 
 #include <stdio.h>
-#include "HTMLNames.h"
 #include "core/dom/ClientRect.h"
 #include "core/dom/ClientRectList.h"
 #include "core/dom/DocumentFragment.h"
@@ -35,16 +34,13 @@
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/NodeWithIndex.h"
 #include "core/dom/ProcessingInstruction.h"
+#include "core/dom/ScopedEventQueue.h"
 #include "core/dom/Text.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/VisiblePosition.h"
 #include "core/editing/VisibleUnits.h"
-#include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
 #include "core/html/HTMLElement.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
-#include "core/page/Page.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/rendering/RenderBoxModelObject.h"
 #include "core/rendering/RenderText.h"
@@ -69,6 +65,7 @@ inline Range::Range(PassRefPtr<Document> ownerDocument)
     rangeCounter.increment();
 #endif
 
+    ScriptWrappable::init(this);
     m_ownerDocument->attachRange(this);
 }
 
@@ -86,6 +83,7 @@ inline Range::Range(PassRefPtr<Document> ownerDocument, PassRefPtr<Node> startCo
     rangeCounter.increment();
 #endif
 
+    ScriptWrappable::init(this);
     m_ownerDocument->attachRange(this);
 
     // Simply setting the containers and offsets directly would not do any of the checking
@@ -1016,6 +1014,7 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionCode& ec)
         break;
     }
 
+    EventQueueScope scope;
     bool collapsed = m_start == m_end;
     RefPtr<Node> container;
     if (startIsText) {
@@ -1029,8 +1028,6 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionCode& ec)
         if (ec)
             return;
 
-        // This special case doesn't seem to match the DOM specification, but it's currently required
-        // to pass Acid3. We might later decide to remove this.
         if (collapsed)
             m_end.setToBeforeChild(newText.get());
     } else {
@@ -1044,8 +1041,6 @@ void Range::insertNode(PassRefPtr<Node> prpNewNode, ExceptionCode& ec)
         if (ec)
             return;
 
-        // This special case doesn't seem to match the DOM specification, but it's currently required
-        // to pass Acid3. We might later decide to remove this.
         if (collapsed && numNewChildren)
             m_end.set(m_start.container(), startOffset + numNewChildren, lastChild.get());
     }
@@ -1807,11 +1802,7 @@ static inline void boundaryTextNodesSplit(RangeBoundaryPoint& boundary, Text* ol
     unsigned boundaryOffset = boundary.offset();
     if (boundaryOffset <= oldNode->length())
         return;
-    Node* next = oldNode->nextSibling();
-    if (!next || !next->isTextNode())
-        boundary.set(oldNode, oldNode->length(), 0);
-    else
-        boundary.set(next, std::min(boundaryOffset - oldNode->length(), toText(next)->length()), 0);
+    boundary.set(oldNode->nextSibling(), boundaryOffset - oldNode->length(), 0);
 }
 
 void Range::textNodeSplit(Text* oldNode)
@@ -1820,6 +1811,8 @@ void Range::textNodeSplit(Text* oldNode)
     ASSERT(oldNode->document() == m_ownerDocument);
     ASSERT(oldNode->parentNode());
     ASSERT(oldNode->isTextNode());
+    ASSERT(oldNode->nextSibling());
+    ASSERT(oldNode->nextSibling()->isTextNode());
     boundaryTextNodesSplit(m_start, oldNode);
     boundaryTextNodesSplit(m_end, oldNode);
 }

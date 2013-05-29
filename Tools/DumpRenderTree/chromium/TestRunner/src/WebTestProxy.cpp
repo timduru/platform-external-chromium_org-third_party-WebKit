@@ -33,6 +33,7 @@
 
 #include "AccessibilityControllerChromium.h"
 #include "EventSender.h"
+#include "MockColorChooser.h"
 #include "MockWebSpeechInputController.h"
 #include "MockWebSpeechRecognizer.h"
 #include "SpellCheckClient.h"
@@ -439,6 +440,7 @@ WebTestProxyBase::WebTestProxyBase()
     : m_testInterfaces(0)
     , m_delegate(0)
     , m_spellcheck(new SpellCheckClient)
+    , m_chooserCount(0)
 {
     reset();
 }
@@ -484,6 +486,12 @@ void WebTestProxyBase::reset()
 WebSpellCheckClient* WebTestProxyBase::spellCheckClient() const
 {
     return m_spellcheck.get();
+}
+
+WebColorChooser* WebTestProxyBase::createColorChooser(WebColorChooserClient* client, const WebKit::WebColor& color)
+{
+    // This instance is deleted by WebCore::ColorInputType
+    return new MockColorChooser(client, m_delegate, this);
 }
 
 string WebTestProxyBase::captureTree(bool debugRenderTree)
@@ -1073,6 +1081,21 @@ void WebTestProxyBase::setToolTipText(const WebString& text, WebTextDirection)
     m_testInterfaces->testRunner()->setToolTipText(text);
 }
 
+void WebTestProxyBase::didOpenChooser()
+{
+    m_chooserCount++;
+}
+
+void WebTestProxyBase::didCloseChooser()
+{
+    m_chooserCount--;
+}
+
+bool WebTestProxyBase::isChooserShown()
+{
+    return 0 < m_chooserCount;
+}
+
 void WebTestProxyBase::willPerformClientRedirect(WebFrame* frame, const WebURL&, const WebURL& to, double, double)
 {
     if (m_testInterfaces->testRunner()->shouldDumpFrameLoadCallbacks()) {
@@ -1232,25 +1255,9 @@ void WebTestProxyBase::willRequestResource(WebFrame* frame, const WebKit::WebCac
 {
     if (m_testInterfaces->testRunner()->shouldDumpResourceRequestCallbacks()) {
         printFrameDescription(m_delegate, frame);
-        WebElement element = request.initiatorElement();
-        if (!element.isNull()) {
-            m_delegate->printMessage(" - element with ");
-            if (element.hasAttribute("id"))
-                m_delegate->printMessage(string("id '") + element.getAttribute("id").utf8().data() + "'");
-            else
-                m_delegate->printMessage("no id");
-        } else
-            m_delegate->printMessage(string(" - ") + request.initiatorName().utf8().data());
+        m_delegate->printMessage(string(" - ") + request.initiatorName().utf8().data());
         m_delegate->printMessage(string(" requested '") + URLDescription(request.urlRequest().url()).c_str() + "'\n");
     }
-}
-
-bool WebTestProxyBase::canHandleRequest(WebFrame*, const WebURLRequest& request)
-{
-    GURL url = request.url();
-    // Just reject the scheme used in
-    // LayoutTests/http/tests/misc/redirect-to-external-url.html
-    return !url.SchemeIs("spaceballs");
 }
 
 WebURLError WebTestProxyBase::cannotHandleRequestError(WebFrame*, const WebURLRequest& request)

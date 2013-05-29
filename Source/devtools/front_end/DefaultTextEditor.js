@@ -122,6 +122,11 @@ WebInspector.DefaultTextEditor.prototype = {
     },
 
     /**
+     * @param {WebInspector.CompletionDictionary} dictionary
+     */
+    setCompletionDictionary: function(dictionary) { },
+
+    /**
      * @return {boolean}
      */
     isClean: function()
@@ -336,19 +341,22 @@ WebInspector.DefaultTextEditor.prototype = {
 
     /**
      * @param {number} lineNumber
+     * @param {number=} columnNumber
      */
-    highlightLine: function(lineNumber)
+    highlightPosition: function(lineNumber, columnNumber)
     {
-        if (typeof lineNumber !== "number" || lineNumber < 0)
+        if (lineNumber < 0)
             return;
 
         lineNumber = Math.min(lineNumber, this._textModel.linesCount - 1);
-        this._mainPanel.highlightLine(lineNumber);
+        if (typeof columnNumber !== "number" || columnNumber < 0 || columnNumber > this._textModel.lineLength(lineNumber))
+            columnNumber = 0;
+        this._mainPanel.highlightPosition(lineNumber, columnNumber);
     },
 
-    clearLineHighlight: function()
+    clearPositionHighlight: function()
     {
-        this._mainPanel.clearLineHighlight();
+        this._mainPanel.clearPositionHighlight();
     },
 
     /**
@@ -1866,20 +1874,21 @@ WebInspector.TextEditorMainPanel.prototype = {
 
     /**
      * @param {number} lineNumber
+     * @param {number} columnNumber
      */
-    highlightLine: function(lineNumber)
+    highlightPosition: function(lineNumber, columnNumber)
     {
-        this.clearLineHighlight();
+        this.clearPositionHighlight();
         this._highlightedLine = lineNumber;
         this.revealLine(lineNumber);
 
         if (!this._readOnly)
-            this._restoreSelection(WebInspector.TextRange.createFromLocation(lineNumber, 0), false);
+            this._restoreSelection(WebInspector.TextRange.createFromLocation(lineNumber, columnNumber), false);
 
         this.addDecoration(lineNumber, "webkit-highlighted-line");
     },
 
-    clearLineHighlight: function()
+    clearPositionHighlight: function()
     {
         if (typeof this._highlightedLine === "number") {
             this.removeDecoration(this._highlightedLine, "webkit-highlighted-line");

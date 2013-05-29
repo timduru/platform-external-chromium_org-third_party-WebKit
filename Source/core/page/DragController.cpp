@@ -30,7 +30,6 @@
 #include <wtf/CurrentTime.h>
 #include <wtf/RefPtr.h>
 #include "HTMLNames.h"
-#include "core/css/StylePropertySet.h"
 #include "core/dom/Clipboard.h"
 #include "core/dom/ClipboardAccessPolicy.h"
 #include "core/dom/Document.h"
@@ -347,11 +346,6 @@ bool DragController::tryDocumentDrag(DragData* dragData, DragDestinationAction a
     }
 
     if ((actionMask & DragDestinationActionEdit) && canProcessDrag(dragData)) {
-        if (dragData->containsColor()) {
-            dragSession.operation = DragOperationGeneric;
-            return true;
-        }
-
         IntPoint point = frameView->windowToContents(dragData->clientPosition());
         Element* element = elementUnderMouse(m_documentUnderMouse.get(), point);
         if (!element)
@@ -461,19 +455,6 @@ bool DragController::concludeEditDrag(DragData* dragData)
 
     if (m_page->dragCaretController()->hasCaret() && !dispatchTextInputEventFor(innerFrame.get(), dragData))
         return true;
-
-    if (dragData->containsColor()) {
-        Color color = dragData->asColor();
-        if (!color.isValid())
-            return false;
-        RefPtr<Range> innerRange = innerFrame->selection()->toNormalizedRange();
-        RefPtr<StylePropertySet> style = StylePropertySet::create();
-        style->setProperty(CSSPropertyColor, color.serialized(), false);
-        if (!innerFrame->editor()->shouldApplyStyle(style.get(), innerRange.get()))
-            return false;
-        innerFrame->editor()->applyStyle(style.get(), EditActionSetColor);
-        return true;
-    }
 
     if (dragData->containsFiles() && fileInput) {
         // fileInput should be the element we hit tested for, unless it was made
@@ -779,7 +760,7 @@ bool DragController::startDrag(Frame* src, const DragState& state, DragOperation
             }
         }
         if (!dragImage) {
-            dragImage = createDragImageForSelection(src);
+            dragImage = createDragImageForSelection(src->dragImageForSelection(), DragImageAlpha);
             dragLoc = dragLocForSelectionDrag(src);
             m_dragOffset = IntPoint(dragOrigin.x() - dragLoc.x(), dragOrigin.y() - dragLoc.y());
         }
@@ -820,7 +801,9 @@ bool DragController::startDrag(Frame* src, const DragState& state, DragOperation
         }
 
         if (!dragImage) {
-            dragImage = createDragImageForLink(linkURL, hitTestResult.textContent(), src);
+            FontRenderingMode renderingMode = src->settings() ? src->settings()->fontRenderingMode() : NormalRenderingMode;
+            float deviceScaleFactor = src->page() ? src->page()->deviceScaleFactor() : 1;
+            dragImage = createDragImageForLink(linkURL, hitTestResult.textContent(), renderingMode, deviceScaleFactor);
             IntSize size = dragImageSize(dragImage);
             m_dragOffset = IntPoint(-size.width() / 2, -LinkDragBorderInset);
             dragLoc = IntPoint(mouseDraggedPoint.x() + m_dragOffset.x(), mouseDraggedPoint.y() + m_dragOffset.y());

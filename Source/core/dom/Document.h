@@ -28,7 +28,6 @@
 #ifndef Document_h
 #define Document_h
 
-#include "core/animation/DocumentTimeline.h"
 #include "core/dom/ContainerNode.h"
 #include "core/dom/DOMTimeStamp.h"
 #include "core/dom/DocumentEventQueue.h"
@@ -88,6 +87,7 @@ class DocumentMarkerController;
 class DocumentParser;
 class DocumentSharedObjectPool;
 class DocumentStyleSheetCollection;
+class DocumentTimeline;
 class DocumentType;
 class Element;
 class Event;
@@ -132,6 +132,7 @@ class RenderArena;
 class RenderFullScreen;
 class RenderView;
 class RequestAnimationFrameCallback;
+class SVGDocumentExtensions;
 class ScriptElementData;
 class ScriptRunner;
 class ScriptableDocumentParser;
@@ -158,10 +159,6 @@ class XPathEvaluator;
 class XPathExpression;
 class XPathNSResolver;
 class XPathResult;
-
-#if ENABLE(SVG)
-class SVGDocumentExtensions;
-#endif
 
 struct AnnotatedRegionValue;
 
@@ -409,11 +406,7 @@ public:
     bool isPluginDocument() const { return m_documentClasses & PluginDocumentClass; }
     bool isMediaDocument() const { return m_documentClasses & MediaDocumentClass; }
 
-#if ENABLE(SVG)
     bool hasSVGRootNode() const;
-#else
-    static bool hasSVGRootNode() { return false; }
-#endif
 
     bool isFrameSet() const;
 
@@ -643,7 +636,7 @@ public:
     Node* focusedNode() const { return m_focusedNode.get(); }
     UserActionElementSet& userActionElements()  { return m_userActionElements; }
     const UserActionElementSet& userActionElements() const { return m_userActionElements; }
-
+    void didRunCheckFocusedNodeTask() { m_didPostCheckFocusedNodeTask = false; }
     void getFocusableNodes(Vector<RefPtr<Node> >&);
     
     // The m_ignoreAutofocus flag specifies whether or not the document has been changed by the user enough 
@@ -950,10 +943,8 @@ public:
 
     virtual void removeAllEventListeners();
 
-#if ENABLE(SVG)
     const SVGDocumentExtensions* svgExtensions();
     SVGDocumentExtensions* accessSVGExtensions();
-#endif
 
     void initSecurityContext();
     void initContentSecurityPolicy();
@@ -999,15 +990,12 @@ public:
     void setFullScreenRenderer(RenderFullScreen*);
     RenderFullScreen* fullScreenRenderer() const { return m_fullScreenRenderer; }
     void fullScreenRendererDestroyed();
-    
-    void setFullScreenRendererSize(const IntSize&);
-    void setFullScreenRendererBackgroundColor(Color);
-    
+
     void fullScreenChangeDelayTimerFired(Timer<Document>*);
     bool fullScreenIsAllowedForElement(Element*) const;
     void fullScreenElementRemoved();
     void removeFullScreenElementOfSubtree(Node*, bool amongChildrenOnly = false);
-    bool isAnimatingFullScreen() const;
+    bool isAnimatingFullScreen() const { return m_isAnimatingFullScreen; }
     void setAnimatingFullScreen(bool);
 
     // W3C API
@@ -1023,7 +1011,7 @@ public:
     void decrementLoadEventDelayCount();
     bool isDelayingLoadEvent() const { return m_loadEventDelayCount; }
 
-    PassRefPtr<Touch> createTouch(DOMWindow*, EventTarget*, int identifier, int pageX, int pageY, int screenX, int screenY, int radiusX, int radiusY, float rotationAngle, float force, ExceptionCode&) const;
+    PassRefPtr<Touch> createTouch(DOMWindow*, EventTarget*, int identifier, int pageX, int pageY, int screenX, int screenY, int radiusX, int radiusY, float rotationAngle, float force) const;
 
     const DocumentTiming* timing() const { return &m_documentTiming; }
 
@@ -1251,6 +1239,7 @@ private:
 
     Color m_textColor;
 
+    bool m_didPostCheckFocusedNodeTask;
     RefPtr<Node> m_focusedNode;
     RefPtr<Node> m_hoverNode;
     RefPtr<Element> m_activeElement;
@@ -1345,9 +1334,7 @@ private:
 
     RefPtr<XPathEvaluator> m_xpathEvaluator;
 
-#if ENABLE(SVG)
     OwnPtr<SVGDocumentExtensions> m_svgExtensions;
-#endif
 
     Vector<AnnotatedRegionValue> m_annotatedRegions;
     bool m_hasAnnotatedRegions;

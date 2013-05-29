@@ -36,39 +36,7 @@
 #include "core/page/Frame.h"
 #include "wtf/UnusedParam.h"
 
-#if ENABLE(BINDING_INTEGRITY)
-#if defined(OS_WIN)
-#pragma warning(disable: 4483)
-extern "C" { extern void (*const __identifier("??_7TestEventTarget@WebCore@@6B@")[])(); }
-#else
-extern "C" { extern void* _ZTVN7WebCore15TestEventTargetE[]; }
-#endif
-#endif // ENABLE(BINDING_INTEGRITY)
-
 namespace WebCore {
-
-#if ENABLE(BINDING_INTEGRITY)
-// This checks if a DOM object that is about to be wrapped is valid.
-// Specifically, it checks that a vtable of the DOM object is equal to
-// a vtable of an expected class.
-// Due to a dangling pointer, the DOM object you are wrapping might be
-// already freed or realloced. If freed, the check will fail because
-// a free list pointer should be stored at the head of the DOM object.
-// If realloced, the check will fail because the vtable of the DOM object
-// differs from the expected vtable (unless the same class of DOM object
-// is realloced on the slot).
-inline void checkTypeOrDieTrying(TestEventTarget* object)
-{
-    void* actualVTablePointer = *(reinterpret_cast<void**>(object));
-#if defined(OS_WIN)
-    void* expectedVTablePointer = reinterpret_cast<void*>(__identifier("??_7TestEventTarget@WebCore@@6B@"));
-#else
-    void* expectedVTablePointer = &_ZTVN7WebCore15TestEventTargetE[2];
-#endif
-    if (actualVTablePointer != expectedVTablePointer)
-        CRASH();
-}
-#endif // ENABLE(BINDING_INTEGRITY)
 
 #if defined(OS_WIN)
 // In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
@@ -82,6 +50,8 @@ void initializeScriptWrappableForInterface(TestEventTarget* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestEventTarget::info);
+    else
+        ASSERT_NOT_REACHED();
 }
 #if defined(OS_WIN)
 namespace WebCore {
@@ -98,16 +68,10 @@ static v8::Handle<v8::Value> itemMethod(const v8::Arguments& args)
         return throwNotEnoughArgumentsError(args.GetIsolate());
     TestEventTarget* imp = V8TestEventTarget::toNative(args.Holder());
     ExceptionCode ec = 0;
-    {
     V8TRYCATCH(int, index, toUInt32(args[0]));
-    if (UNLIKELY(index < 0)) {
-        ec = INDEX_SIZE_ERR;
-        goto fail;
-    }
+    if (UNLIKELY(index < 0))
+        return setDOMException(INDEX_SIZE_ERR, args.GetIsolate());
     return toV8(imp->item(index), args.Holder(), args.GetIsolate());
-    }
-    fail:
-    return setDOMException(ec, args.GetIsolate());
 }
 
 static v8::Handle<v8::Value> itemMethodCallback(const v8::Arguments& args)
@@ -167,15 +131,11 @@ static v8::Handle<v8::Value> dispatchEventMethod(const v8::Arguments& args)
         return throwNotEnoughArgumentsError(args.GetIsolate());
     TestEventTarget* imp = V8TestEventTarget::toNative(args.Holder());
     ExceptionCode ec = 0;
-    {
     V8TRYCATCH(Event*, evt, V8Event::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Event::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
     bool result = imp->dispatchEvent(evt, ec);
     if (UNLIKELY(ec))
-        goto fail;
+        return setDOMException(ec, args.GetIsolate());
     return v8Boolean(result, args.GetIsolate());
-    }
-    fail:
-    return setDOMException(ec, args.GetIsolate());
 }
 
 static v8::Handle<v8::Value> dispatchEventMethodCallback(const v8::Arguments& args)
@@ -202,6 +162,19 @@ v8::Handle<v8::Value> V8TestEventTarget::indexedPropertyGetter(uint32_t index, c
     return toV8Fast(element.release(), info, collection);
 }
 
+v8::Handle<v8::Boolean> V8TestEventTarget::indexedPropertyDeleter(unsigned index, const v8::AccessorInfo& info)
+{
+
+    TestEventTarget* collection = toNative(info.Holder());
+    ExceptionCode ec = 0;
+    bool result = collection->anonymousIndexedDeleter(index, ec);
+    if (ec) {
+        setDOMException(ec, info.GetIsolate());
+        return v8::Handle<v8::Boolean>();
+    }
+    return v8Boolean(result);
+}
+
 v8::Handle<v8::Value> V8TestEventTarget::namedPropertyGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
 {
     if (!info.Holder()->GetRealNamedPropertyInPrototypeChain(name).IsEmpty())
@@ -218,6 +191,30 @@ v8::Handle<v8::Value> V8TestEventTarget::namedPropertyGetter(v8::Local<v8::Strin
     return toV8Fast(element.release(), info, collection);
 }
 
+v8::Handle<v8::Value> V8TestEventTarget::namedPropertySetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+{
+    if (!info.Holder()->GetRealNamedPropertyInPrototypeChain(name).IsEmpty())
+        return v8Undefined();
+    if (info.Holder()->HasRealNamedCallbackProperty(name))
+        return v8Undefined();
+    TestEventTarget* collection = toNative(info.Holder());
+    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, propertyName, name);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, propertyValue, value);
+    bool result = collection->anonymousNamedSetter(propertyName, propertyValue);
+    if (!result)
+        return v8Undefined();
+    return value;
+}
+
+v8::Handle<v8::Boolean> V8TestEventTarget::namedPropertyDeleter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+{
+
+    TestEventTarget* collection = toNative(info.Holder());
+    AtomicString propertyName = toWebCoreAtomicString(name);
+    bool result = collection->anonymousNamedDeleter(propertyName);
+    return v8Boolean(result);
+}
+
 static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestEventTargetTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     desc->ReadOnlyPrototype();
@@ -231,8 +228,8 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestEventTargetTemplate(v
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
     UNUSED_PARAM(instance); // In some cases, it will not be used.
     UNUSED_PARAM(proto); // In some cases, it will not be used.
-    desc->InstanceTemplate()->SetIndexedPropertyHandler(V8TestEventTarget::indexedPropertyGetter, 0, 0, 0, nodeCollectionIndexedPropertyEnumerator<TestEventTarget>);
-    desc->InstanceTemplate()->SetNamedPropertyHandler(V8TestEventTarget::namedPropertyGetter, 0, 0, 0, 0);
+    desc->InstanceTemplate()->SetIndexedPropertyHandler(V8TestEventTarget::indexedPropertyGetter, 0, 0, V8TestEventTarget::indexedPropertyDeleter, nodeCollectionIndexedPropertyEnumerator<TestEventTarget>);
+    desc->InstanceTemplate()->SetNamedPropertyHandler(V8TestEventTarget::namedPropertyGetter, V8TestEventTarget::namedPropertySetter, 0, V8TestEventTarget::namedPropertyDeleter, 0);
     desc->InstanceTemplate()->MarkAsUndetectable();
 
     // Custom Signature 'dispatchEvent'
@@ -283,16 +280,12 @@ v8::Handle<v8::Object> V8TestEventTarget::createWrapper(PassRefPtr<TestEventTarg
     ASSERT(impl.get());
     ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
 
-#if ENABLE(BINDING_INTEGRITY)
-    checkTypeOrDieTrying(impl.get());
-#endif
-
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
 
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, hasDependentLifetime ? WrapperConfiguration::Dependent : WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestEventTarget::derefObject(void* object)

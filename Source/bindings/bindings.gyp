@@ -60,6 +60,9 @@
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
         '<(libjpeg_gyp_path):libjpeg',
       ],
+      'defines': [
+        'WEBKIT_IMPLEMENTATION=1',
+      ],
       'include_dirs': [
         # FIXME:  Remove <(SHARED_INTERMEDIATE_DIR)/webcore when we
         # can entice gyp into letting us put both the .cpp and .h
@@ -70,7 +73,7 @@
         # Some Mac-specific parts of WebKit won't compile without having this
         # prefix header injected.
         # FIXME: make this a first-class setting.
-        'GCC_PREFIX_HEADER': '../core/WebCorePrefix.h',
+        'GCC_PREFIX_HEADER': '../core/WebCorePrefixMac.h',
       },
       'sources': [
         '<@(derived_sources_aggregate_files)',

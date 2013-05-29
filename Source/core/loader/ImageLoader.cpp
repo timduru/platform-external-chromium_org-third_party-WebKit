@@ -38,11 +38,8 @@
 #include "core/page/Frame.h"
 #include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderVideo.h"
-#include "weborigin/SecurityOrigin.h"
-
-#if ENABLE(SVG)
 #include "core/rendering/svg/RenderSVGImage.h"
-#endif
+#include "weborigin/SecurityOrigin.h"
 
 #if !ASSERT_DISABLED
 // ImageLoader objects are allocated as members of other objects, so generic pointer check would always fail.
@@ -179,8 +176,7 @@ void ImageLoader::updateFromElement()
     // an empty string.
     CachedResourceHandle<CachedImage> newImage = 0;
     if (!attr.isNull() && !stripLeadingAndTrailingHTMLSpaces(attr).isEmpty()) {
-        CachedResourceRequest request(ResourceRequest(document->completeURL(sourceURI(attr))));
-        request.setInitiator(element());
+        CachedResourceRequest request(ResourceRequest(document->completeURL(sourceURI(attr))), element()->localName());
 
         String crossOriginMode = m_element->fastGetAttribute(HTMLNames::crossoriginAttr);
         if (!crossOriginMode.isNull()) {
@@ -193,7 +189,6 @@ void ImageLoader::updateFromElement()
             document->cachedResourceLoader()->setAutoLoadImages(false);
             newImage = new CachedImage(request.resourceRequest());
             newImage->setLoading(true);
-            newImage->setOwningCachedResourceLoader(document->cachedResourceLoader());
             document->cachedResourceLoader()->m_documentResources.set(newImage->url(), newImage.get());
             document->cachedResourceLoader()->setAutoLoadImages(autoLoadOtherImages);
         } else
@@ -327,10 +322,8 @@ RenderImageResource* ImageLoader::renderImageResource()
     if (renderer->isImage() && !static_cast<RenderImage*>(renderer)->isGeneratedContent())
         return toRenderImage(renderer)->imageResource();
 
-#if ENABLE(SVG)
     if (renderer->isSVGImage())
         return toRenderSVGImage(renderer)->imageResource();
-#endif
 
     if (renderer->isVideo())
         return toRenderVideo(renderer)->imageResource();
@@ -401,7 +394,7 @@ void ImageLoader::dispatchPendingBeforeLoadEvent()
     if (!m_element->document()->attached())
         return;
     m_hasPendingBeforeLoadEvent = false;
-    if (m_element->dispatchBeforeLoadEvent(m_image->url())) {
+    if (m_element->dispatchBeforeLoadEvent(m_image->url().string())) {
         updateRenderer();
         return;
     }

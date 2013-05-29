@@ -23,7 +23,6 @@
 
 #include "config.h"
 
-#if ENABLE(SVG)
 #include "core/svg/SVGElement.h"
 
 #include "HTMLNames.h"
@@ -172,7 +171,7 @@ String SVGElement::xmlbase() const
     return fastGetAttribute(XMLNames::baseAttr);
 }
 
-void SVGElement::setXmlbase(const String& value, ExceptionCode&)
+void SVGElement::setXmlbase(const String& value)
 {
     setAttribute(XMLNames::baseAttr, value);
 }
@@ -598,14 +597,14 @@ PassRefPtr<RenderStyle> SVGElement::customStyleForRenderer()
     return document()->styleResolver()->styleForElement(correspondingElement(), style, DisallowStyleSharing);
 }
 
-StylePropertySet* SVGElement::animatedSMILStyleProperties() const
+MutableStylePropertySet* SVGElement::animatedSMILStyleProperties() const
 {
     if (hasSVGRareData())
         return svgRareData()->animatedSMILStyleProperties();
     return 0;
 }
 
-StylePropertySet* SVGElement::ensureAnimatedSMILStyleProperties()
+MutableStylePropertySet* SVGElement::ensureAnimatedSMILStyleProperties()
 {
     return ensureSVGRareData()->ensureAnimatedSMILStyleProperties();
 }
@@ -739,5 +738,3 @@ bool SVGElement::isAnimatableAttribute(const QualifiedName& name) const
 #endif
 
 }
-
-#endif // ENABLE(SVG)

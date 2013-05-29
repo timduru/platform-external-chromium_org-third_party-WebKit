@@ -150,6 +150,7 @@ public:
 
     bool generatesLineBoxesForInlineChild(RenderObject*);
 
+    void markShapeInsideDescendantsForLayout();
     void markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove = 0, bool inLayout = true);
     void markSiblingsWithFloatsForLayout(RenderBox* floatToRemove = 0);
     void markPositionedObjectsForLayout();
@@ -232,8 +233,6 @@ public:
 
     RootInlineBox* firstRootBox() const { return static_cast<RootInlineBox*>(firstLineBox()); }
     RootInlineBox* lastRootBox() const { return static_cast<RootInlineBox*>(lastLineBox()); }
-
-    bool containsNonZeroBidiLevel() const;
 
     GapRects selectionGapRectsForRepaint(const RenderLayerModelObject* repaintContainer);
     LayoutRect logicalLeftSelectionGap(RenderBlock* rootBlock, const LayoutPoint& rootBlockPhysicalPosition, const LayoutSize& offsetFromRootBlock,
@@ -504,9 +503,9 @@ protected:
 
     virtual void paint(PaintInfo&, const LayoutPoint&);
     virtual void paintObject(PaintInfo&, const LayoutPoint&);
-    virtual void paintChildren(PaintInfo& forSelf, const LayoutPoint&, PaintInfo& forChild, bool usePrintRect);
-    bool paintChild(RenderBox*, PaintInfo& forSelf, const LayoutPoint&, PaintInfo& forChild, bool usePrintRect);
-   
+    virtual void paintChildren(PaintInfo&, const LayoutPoint&);
+    void paintChild(RenderBox*, PaintInfo&, const LayoutPoint&);
+
     LayoutUnit logicalRightOffsetForLine(LayoutUnit position, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* logicalHeightRemaining = 0, LayoutUnit logicalHeight = 0) const;
     LayoutUnit logicalLeftOffsetForLine(LayoutUnit position, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* logicalHeightRemaining = 0, LayoutUnit logicalHeight = 0) const;
 
@@ -556,8 +555,7 @@ protected:
 
     virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) OVERRIDE;
 
-#if ENABLE(SVG)
-    // Only used by RenderSVGText, which explicitely overrides RenderBlock::layoutBlock(), do NOT use for anything else.
+    // Only used by RenderSVGText, which explicitly overrides RenderBlock::layoutBlock(), do NOT use for anything else.
     void forceLayoutInlineChildren()
     {
         LayoutUnit repaintLogicalTop = 0;
@@ -565,7 +563,6 @@ protected:
         clearFloats();
         layoutInlineChildren(true, repaintLogicalTop, repaintLogicalBottom);
     }
-#endif
 
     bool updateRegionsAndExclusionsLogicalSize(RenderFlowThread*);
     void computeRegionRangeForBlock(RenderFlowThread*);

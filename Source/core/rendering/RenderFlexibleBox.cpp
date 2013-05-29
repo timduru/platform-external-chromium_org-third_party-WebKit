@@ -164,6 +164,9 @@ static LayoutUnit marginLogicalWidthForChild(RenderBox* child, RenderStyle* pare
 
 void RenderFlexibleBox::computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const
 {
+    // FIXME: We're ignoring flex-basis here and we shouldn't. We can't start honoring it though until
+    // the flex shorthand stops setting it to 0.
+    // See https://bugs.webkit.org/show_bug.cgi?id=116117 and http://crbug.com/240765.
     for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
         if (child->isOutOfFlowPositioned())
             continue;
@@ -409,12 +412,10 @@ void RenderFlexibleBox::repaintChildrenDuringLayoutIfMoved(const ChildFrameRects
     ASSERT(childIndex == oldChildRects.size());
 }
 
-void RenderFlexibleBox::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOffset, PaintInfo& paintInfoForChild, bool usePrintRect)
+void RenderFlexibleBox::paintChildren(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
-    for (RenderBox* child = m_orderIterator.first(); child; child = m_orderIterator.next()) {
-        if (!paintChild(child, paintInfo, paintOffset, paintInfoForChild, usePrintRect))
-            return;
-    }
+    for (RenderBox* child = m_orderIterator.first(); child; child = m_orderIterator.next())
+        paintChild(child, paintInfo, paintOffset);
 }
 
 void RenderFlexibleBox::repositionLogicalHeightDependentFlexItems(Vector<LineContext>& lineContexts)
@@ -526,6 +527,8 @@ LayoutUnit RenderFlexibleBox::mainAxisContentExtent(LayoutUnit contentLogicalHei
         // FIXME: Remove this std:max once we enable saturated layout arithmetic. It's just here to handle overflow.
         LayoutUnit borderBoxLogicalHeight = std::max(contentLogicalHeight, contentLogicalHeight + borderPaddingAndScrollbar);
         computeLogicalHeight(borderBoxLogicalHeight, logicalTop(), computedValues);
+        if (computedValues.m_extent == LayoutUnit::max())
+            return computedValues.m_extent;
         return std::max(LayoutUnit(0), computedValues.m_extent - borderPaddingAndScrollbar);
     }
     return contentLogicalWidth();
@@ -536,11 +539,9 @@ LayoutUnit RenderFlexibleBox::computeMainAxisExtentForChild(RenderBox* child, Si
     // FIXME: This is wrong for orthogonal flows. It should use the flexbox's writing-mode, not the child's in order
     // to figure out the logical height/width.
     if (isColumnFlow()) {
-        if (child->style()->logicalHeight().isIntrinsic() || child->style()->logicalMinHeight().isIntrinsic() ||
-            child->style()->logicalMaxHeight().isIntrinsic()) {
-            if (child->needsLayout())
-                child->layout();
-        }
+        // We don't have to check for "auto" here - computeContentLogicalHeight will just return -1 for that case anyway.
+        if (size.isIntrinsic())
+            child->layoutIfNeeded();
         return child->computeContentLogicalHeight(size, child->logicalHeight() - child->borderAndPaddingLogicalHeight());
     }
     // FIXME: Figure out how this should work for regions and pass in the appropriate values.
@@ -738,10 +739,19 @@ LayoutUnit RenderFlexibleBox::mainAxisScrollbarExtentForChild(RenderBox* child) 
     return isHorizontalFlow() ? child->verticalScrollbarWidth() : child->horizontalScrollbarHeight();
 }
 
-LayoutUnit RenderFlexibleBox::preferredMainAxisContentExtentForChild(RenderBox* child)
+LayoutUnit RenderFlexibleBox::preferredMainAxisContentExtentForChild(RenderBox* child, bool hasInfiniteLineLength)
 {
+    bool hasOverrideSize = child->hasOverrideWidth() || child->hasOverrideHeight();
+    if (hasOverrideSize)
+        child->clearOverrideSize();
+
     Length flexBasis = flexBasisForChild(child);
-    if (flexBasis.isAuto()) {
+    if (flexBasis.isAuto() || (flexBasis.isFixed() && !flexBasis.value() && hasInfiniteLineLength)) {
+        if (hasOrthogonalFlow(child)) {
+            if (hasOverrideSize)
+                child->setChildNeedsLayout(true, MarkOnlyThis);
+            child->layoutIfNeeded();
+        }
         LayoutUnit mainAxisExtent = hasOrthogonalFlow(child) ? child->logicalHeight() : child->maxPreferredLogicalWidth();
         ASSERT(mainAxisExtent - mainAxisBorderAndPaddingExtentForChild(child) >= 0);
         return mainAxisExtent - mainAxisBorderAndPaddingExtentForChild(child);
@@ -759,12 +769,13 @@ void RenderFlexibleBox::layoutFlexItems(bool relayoutChildren, Vector<LineContex
 
     m_orderIterator.first();
     LayoutUnit crossAxisOffset = flowAwareBorderBefore() + flowAwarePaddingBefore();
-    while (computeNextFlexLine(orderedChildren, preferredMainAxisExtent, totalFlexGrow, totalWeightedFlexShrink, minMaxAppliedMainAxisExtent)) {
+    bool hasInfiniteLineLength = false;
+    while (computeNextFlexLine(orderedChildren, preferredMainAxisExtent, totalFlexGrow, totalWeightedFlexShrink, minMaxAppliedMainAxisExtent, hasInfiniteLineLength)) {
         LayoutUnit availableFreeSpace = mainAxisContentExtent(preferredMainAxisExtent) - preferredMainAxisExtent;
         FlexSign flexSign = (minMaxAppliedMainAxisExtent < preferredMainAxisExtent + availableFreeSpace) ? PositiveFlexibility : NegativeFlexibility;
         InflexibleFlexItemSize inflexibleItems;
         Vector<LayoutUnit> childSizes;
-        while (!resolveFlexibleLengths(flexSign, orderedChildren, availableFreeSpace, totalFlexGrow, totalWeightedFlexShrink, inflexibleItems, childSizes)) {
+        while (!resolveFlexibleLengths(flexSign, orderedChildren, availableFreeSpace, totalFlexGrow, totalWeightedFlexShrink, inflexibleItems, childSizes, hasInfiniteLineLength)) {
             ASSERT(totalFlexGrow >= 0 && totalWeightedFlexShrink >= 0);
             ASSERT(inflexibleItems.size() > 0);
         }
@@ -908,14 +919,6 @@ void RenderFlexibleBox::computeMainAxisPreferredSizes(OrderHashSet& orderValues)
         if (child->isOutOfFlowPositioned())
             continue;
 
-        child->clearOverrideSize();
-
-        // Only need to layout here if we will need to get the logicalHeight of the child in computeNextFlexLine.
-        if (hasOrthogonalFlow(child) && flexBasisForChild(child).isAuto()) {
-            child->setChildNeedsLayout(true, MarkOnlyThis);
-            child->layout();
-        }
-
         // Before running the flex algorithm, 'auto' has a margin of 0.
         // Also, if we're not auto sizing, we don't do a layout that computes the start/end margins.
         if (isHorizontalFlow()) {
@@ -944,7 +947,7 @@ LayoutUnit RenderFlexibleBox::adjustChildSizeForMinAndMax(RenderBox* child, Layo
     return std::max(childSize, minExtent);
 }
 
-bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren, LayoutUnit& preferredMainAxisExtent, double& totalFlexGrow, double& totalWeightedFlexShrink, LayoutUnit& minMaxAppliedMainAxisExtent)
+bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren, LayoutUnit& preferredMainAxisExtent, double& totalFlexGrow, double& totalWeightedFlexShrink, LayoutUnit& minMaxAppliedMainAxisExtent, bool& hasInfiniteLineLength)
 {
     orderedChildren.clear();
     preferredMainAxisExtent = 0;
@@ -955,6 +958,8 @@ bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren
         return false;
 
     LayoutUnit lineBreakLength = mainAxisContentExtent(LayoutUnit::max());
+    hasInfiniteLineLength = lineBreakLength == LayoutUnit::max();
+
     bool lineHasInFlowItem = false;
 
     for (RenderBox* child = m_orderIterator.currentChild(); child; child = m_orderIterator.next()) {
@@ -963,7 +968,7 @@ bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren
             continue;
         }
 
-        LayoutUnit childMainAxisExtent = preferredMainAxisContentExtentForChild(child);
+        LayoutUnit childMainAxisExtent = preferredMainAxisContentExtentForChild(child, hasInfiniteLineLength);
         LayoutUnit childMainAxisMarginBoxExtent = mainAxisBorderAndPaddingExtentForChild(child) + childMainAxisExtent;
         childMainAxisMarginBoxExtent += isHorizontalFlow() ? child->marginWidth() : child->marginHeight();
 
@@ -981,12 +986,12 @@ bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren
     return true;
 }
 
-void RenderFlexibleBox::freezeViolations(const Vector<Violation>& violations, LayoutUnit& availableFreeSpace, double& totalFlexGrow, double& totalWeightedFlexShrink, InflexibleFlexItemSize& inflexibleItems)
+void RenderFlexibleBox::freezeViolations(const Vector<Violation>& violations, LayoutUnit& availableFreeSpace, double& totalFlexGrow, double& totalWeightedFlexShrink, InflexibleFlexItemSize& inflexibleItems, bool hasInfiniteLineLength)
 {
     for (size_t i = 0; i < violations.size(); ++i) {
         RenderBox* child = violations[i].child;
         LayoutUnit childSize = violations[i].childSize;
-        LayoutUnit preferredChildSize = preferredMainAxisContentExtentForChild(child);
+        LayoutUnit preferredChildSize = preferredMainAxisContentExtentForChild(child, hasInfiniteLineLength);
         availableFreeSpace -= childSize - preferredChildSize;
         totalFlexGrow -= child->style()->flexGrow();
         totalWeightedFlexShrink -= child->style()->flexShrink() * preferredChildSize;
@@ -995,7 +1000,7 @@ void RenderFlexibleBox::freezeViolations(const Vector<Violation>& violations, La
 }
 
 // Returns true if we successfully ran the algorithm and sized the flex items.
-bool RenderFlexibleBox::resolveFlexibleLengths(FlexSign flexSign, const OrderedFlexItemList& children, LayoutUnit& availableFreeSpace, double& totalFlexGrow, double& totalWeightedFlexShrink, InflexibleFlexItemSize& inflexibleItems, Vector<LayoutUnit>& childSizes)
+bool RenderFlexibleBox::resolveFlexibleLengths(FlexSign flexSign, const OrderedFlexItemList& children, LayoutUnit& availableFreeSpace, double& totalFlexGrow, double& totalWeightedFlexShrink, InflexibleFlexItemSize& inflexibleItems, Vector<LayoutUnit>& childSizes, bool hasInfiniteLineLength)
 {
     childSizes.clear();
     LayoutUnit totalViolation = 0;
@@ -1012,7 +1017,7 @@ bool RenderFlexibleBox::resolveFlexibleLengths(FlexSign flexSign, const OrderedF
         if (inflexibleItems.contains(child))
             childSizes.append(inflexibleItems.get(child));
         else {
-            LayoutUnit preferredChildSize = preferredMainAxisContentExtentForChild(child);
+            LayoutUnit preferredChildSize = preferredMainAxisContentExtentForChild(child, hasInfiniteLineLength);
             LayoutUnit childSize = preferredChildSize;
             double extraSpace = 0;
             if (availableFreeSpace > 0 && totalFlexGrow > 0 && flexSign == PositiveFlexibility && std::isfinite(totalFlexGrow))
@@ -1020,7 +1025,7 @@ bool RenderFlexibleBox::resolveFlexibleLengths(FlexSign flexSign, const OrderedF
             else if (availableFreeSpace < 0 && totalWeightedFlexShrink > 0 && flexSign == NegativeFlexibility && std::isfinite(totalWeightedFlexShrink))
                 extraSpace = availableFreeSpace * child->style()->flexShrink() * preferredChildSize / totalWeightedFlexShrink;
             if (std::isfinite(extraSpace))
-                childSize += roundedLayoutUnit(extraSpace);
+                childSize += LayoutUnit::fromFloatRound(extraSpace);
 
             LayoutUnit adjustedChildSize = adjustChildSizeForMinAndMax(child, childSize);
             childSizes.append(adjustedChildSize);
@@ -1036,7 +1041,7 @@ bool RenderFlexibleBox::resolveFlexibleLengths(FlexSign flexSign, const OrderedF
     }
 
     if (totalViolation)
-        freezeViolations(totalViolation < 0 ? maxViolations : minViolations, availableFreeSpace, totalFlexGrow, totalWeightedFlexShrink, inflexibleItems);
+        freezeViolations(totalViolation < 0 ? maxViolations : minViolations, availableFreeSpace, totalFlexGrow, totalWeightedFlexShrink, inflexibleItems, hasInfiniteLineLength);
     else
         availableFreeSpace -= usedFreeSpace;
 

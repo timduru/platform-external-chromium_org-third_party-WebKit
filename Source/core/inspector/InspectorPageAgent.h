@@ -121,6 +121,7 @@ public:
     virtual void setCompositingBordersVisible(ErrorString*, bool);
     virtual void captureScreenshot(ErrorString*, String* data);
     virtual void handleJavaScriptDialog(ErrorString*, bool accept, const String* promptText);
+    virtual void setShowViewportSizeOnResize(ErrorString*, bool show, const bool* showGrid);
 
     // Geolocation override helpers.
     GeolocationPosition* overrideGeolocationPosition(GeolocationPosition*);
@@ -130,9 +131,9 @@ public:
 
     // InspectorInstrumentation API
     void didClearWindowObjectInWorld(Frame*, DOMWrapperWorld*);
-    void domContentEventFired();
-    void loadEventFired();
-    void frameNavigated(DocumentLoader*);
+    void domContentLoadedEventFired(Frame*);
+    void loadEventFired(Frame*);
+    void didCommitLoad(Frame*, DocumentLoader*);
     void frameDetachedFromParent(Frame*);
     void loaderDetachedFromFrame(DocumentLoader*);
     void frameStartedLoading(Frame*);

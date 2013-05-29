@@ -269,11 +269,9 @@ static PassRefPtr<AccessibilityObject> createFromRenderer(RenderObject* renderer
     if (node && node->isMediaControlElement())
         return AccessibilityMediaControl::create(renderer);
 
-#if ENABLE(SVG)
     if (renderer->isSVGRoot())
         return AccessibilitySVGRoot::create(renderer);
-#endif
-    
+
     if (renderer->isBoxModelObject()) {
         RenderBoxModelObject* cssBox = toRenderBoxModelObject(renderer);
         if (cssBox->isListBox())
@@ -961,7 +959,7 @@ void AXObjectCache::postPlatformNotification(AccessibilityObject* obj, AXNotific
     if (!obj || !obj->document() || !obj->documentFrameView() || !obj->documentFrameView()->frame() || !obj->documentFrameView()->frame()->page())
         return;
 
-    ChromeClient* client = obj->documentFrameView()->frame()->page()->chrome()->client();
+    ChromeClient* client = obj->documentFrameView()->frame()->page()->chrome().client();
     if (!client)
         return;
 

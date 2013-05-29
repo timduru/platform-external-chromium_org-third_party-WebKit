@@ -29,109 +29,23 @@
 //////////////////////////////////////////////////////////////////////////////
 // CONSTANTS
 //////////////////////////////////////////////////////////////////////////////
-var ALL = 'ALL';
 var FORWARD = 'forward';
 var BACKWARD = 'backward';
 var GTEST_MODIFIERS = ['FLAKY', 'FAILS', 'MAYBE', 'DISABLED'];
-var TEST_URL_BASE_PATH_IN_VERSION_CONTROL = 'http://src.chromium.org/viewvc/blink/trunk/LayoutTests/';
-var TEST_URL_BASE_PATH = "http://svn.webkit.org/repository/webkit/trunk/LayoutTests/";
-var EXPECTATIONS_URL_BASE_PATH = TEST_URL_BASE_PATH + "platform/";
+var TEST_URL_BASE_PATH_FOR_BROWSING = 'http://src.chromium.org/viewvc/blink/trunk/LayoutTests/';
+var TEST_URL_BASE_PATH_FOR_XHR = 'http://src.chromium.org/blink/trunk/LayoutTests/';
 var TEST_RESULTS_BASE_PATH = 'http://build.chromium.org/f/chromium/layout_test_results/';
 var GPU_RESULTS_BASE_PATH = 'http://chromium-browser-gpu-tests.commondatastorage.googleapis.com/runs/'
 
-var PLATFORMS = {
-    'CHROMIUM': {
-        expectationsDirectory:  null, /* FIXME: cleanup post blink split 'chromium', */
-        subPlatforms: {
-            'LION': { fallbackPlatforms: ['CHROMIUM'] },
-            'SNOWLEOPARD': { fallbackPlatforms: ['CHROMIUM'] },
-            'XP': { fallbackPlatforms: ['CHROMIUM'] },
-            'VISTA': { fallbackPlatforms: ['CHROMIUM'] },
-            'WIN7': { fallbackPlatforms: ['CHROMIUM'] },
-            'LUCID': { fallbackPlatforms: ['CHROMIUM'] },
-            'ANDROID': { fallbackPlatforms: ['CHROMIUM'], expectationsDirectory: null /* 'chromium-android' */ }
-        },
-        platformModifierUnions: {
-            'MAC': ['CHROMIUM_LION', 'CHROMIUM_SNOWLEOPARD'],
-            'WIN': ['CHROMIUM_XP', 'CHROMIUM_VISTA', 'CHROMIUM_WIN7'],
-            'LINUX': ['CHROMIUM_LUCID']
-        }
-    },
-    'APPLE': {
-        subPlatforms: {
-            'MAC': {
-                expectationsDirectory: 'mac',
-                subPlatforms: {
-                    'LION': {
-                        expectationsDirectory: 'mac-lion',
-                        subPlatforms: {
-                            'WK1': { fallbackPlatforms: ['APPLE_MAC_LION', 'APPLE_MAC'] },
-                            'WK2': { fallbackPlatforms: ['APPLE_MAC_LION', 'APPLE_MAC', 'WK2'] }
-                        }
-                    },
-                    'SNOWLEOPARD': {
-                        expectationsDirectory: null,
-                        subPlatforms: {
-                            'WK1': { fallbackPlatforms: ['APPLE_MAC_SNOWLEOPARD', 'APPLE_MAC'] },
-                            'WK2': { fallbackPlatforms: ['APPLE_MAC_SNOWLEOPARD', 'APPLE_MAC', 'WK2'] }
-                        }
-                    }
-                }
-            },
-            'WIN': {
-                expectationsDirectory: 'win',
-                subPlatforms: {
-                    'XP': { fallbackPlatforms: ['APPLE_WIN'] },
-                    'WIN7': { fallbackPlatforms: ['APPLE_WIN'] }
-                }
-            }
-        }
-    },
-    'GTK': {
-        expectationsDirectory: 'gtk',
-        subPlatforms: {
-            'LINUX': {
-                subPlatforms: {
-                    'WK1': { fallbackPlatforms: ['GTK'] },
-                    'WK2': { fallbackPlatforms: ['GTK', 'WK2'], expectationsDirectory: 'gtk-wk2' }
-                }
-            }
-        }
-    },
-    'QT': {
-        expectationsDirectory: 'qt',
-        subPlatforms: {
-            'LINUX': { fallbackPlatforms: ['QT'] }
-        }
-    },
-    'EFL': {
-        expectationsDirectory: 'efl',
-        subPlatforms: {
-            'LINUX': {
-                subPlatforms: {
-                    'WK1': { fallbackPlatforms: ['EFL'], expectationsDirectory: 'efl-wk1' },
-                    'WK2': { fallbackPlatforms: ['EFL', 'WK2'], expectationsDirectory: 'efl-wk2' }
-                }
-            }
-        }
-    },
-    'WK2': {
-        basePlatform: true,
-        expectationsDirectory: 'wk2'
-    }
-};
-
-var BUILD_TYPES = {'DEBUG': 'DBG', 'RELEASE': 'RELEASE'};
-var MIN_SECONDS_FOR_SLOW_TEST = 4;
-var MIN_SECONDS_FOR_SLOW_TEST_DEBUG = 2 * MIN_SECONDS_FOR_SLOW_TEST;
-var FAIL_RESULTS = ['IMAGE', 'IMAGE+TEXT', 'TEXT', 'MISSING'];
+var RELEASE_TIMEOUT = 6;
+var DEBUG_TIMEOUT = 12;
+var SLOW_MULTIPLIER = 5;
 var CHUNK_SIZE = 25;
-var MAX_RESULTS = 1500;
 
 // FIXME: Figure out how to make this not be hard-coded.
 var VIRTUAL_SUITES = {
-    'platform/chromium/virtual/gpu/fast/canvas': 'fast/canvas',
-    'platform/chromium/virtual/gpu/canvas/philip': 'canvas/philip'
+    'virtual/gpu/fast/canvas': 'fast/canvas',
+    'virtual/gpu/canvas/philip': 'canvas/philip'
 };
 
 var resourceLoader;
@@ -148,8 +62,6 @@ function generatePage(historyInstance)
     // result expands to all tests that ever have the given result
     if (historyInstance.dashboardSpecificState.tests || historyInstance.dashboardSpecificState.result)
         generatePageForIndividualTests(individualTests());
-    else if (historyInstance.dashboardSpecificState.expectationsUpdate)
-        generatePageForExpectationsUpdate();
     else
         generatePageForBuilder(historyInstance.dashboardSpecificState.builder || currentBuilderGroup().defaultBuilder());
 
@@ -162,22 +74,11 @@ function generatePage(historyInstance)
 function handleValidHashParameter(historyInstance, key, value)
 {
     switch(key) {
+    case 'result':
     case 'tests':
         history.validateParameter(historyInstance.dashboardSpecificState, key, value,
             function() {
                 return string.isValidName(value);
-            });
-        return true;
-
-    case 'result':
-        value = value.toUpperCase();
-        history.validateParameter(historyInstance.dashboardSpecificState, key, value,
-            function() {
-                for (var result in LAYOUT_TEST_EXPECTATIONS_MAP_) {
-                    if (value == LAYOUT_TEST_EXPECTATIONS_MAP_[result])
-                        return true;
-                }
-                return false;
             });
         return true;
 
@@ -211,7 +112,6 @@ function handleValidHashParameter(historyInstance, key, value)
         return true;
 
     case 'resultsHeight':
-    case 'updateIndex':
     case 'revision':
         history.validateParameter(historyInstance.dashboardSpecificState, key, Number(value),
             function() {
@@ -220,17 +120,14 @@ function handleValidHashParameter(historyInstance, key, value)
         return true;
 
     case 'showChrome':
-    case 'showCorrectExpectations':
-    case 'showWrongExpectations':
     case 'showExpectations':
     case 'showFlaky':
     case 'showLargeExpectations':
-    case 'legacyExpectationsSemantics':
-    case 'showSkipped':
+    case 'showNonFlaky':
     case 'showSlow':
+    case 'showSkip':
     case 'showUnexpectedPasses':
-    case 'showWontFixSkip':
-    case 'expectationsUpdate':
+    case 'showWontFix':
         historyInstance.dashboardSpecificState[key] = value == 'true';
         return true;
 
@@ -263,18 +160,17 @@ var defaultDashboardSpecificStateValues = {
     sortOrder: BACKWARD,
     sortColumn: 'flakiness',
     showExpectations: false,
-    showFlaky: true,
+    // FIXME: Show flaky tests by default if you have a builder picked.
+    // Ideally, we'd fix the dashboard to not pick a default builder and have
+    // you pick one. In the interim, this is a good way to make the default
+    // page load faster since we don't need to generate/layout a large table.
+    showFlaky: false,
     showLargeExpectations: false,
-    legacyExpectationsSemantics: true,
     showChrome: true,
-    showCorrectExpectations: false,
-    showWrongExpectations: false,
-    showWontFixSkip: false,
-    showSlow: false,
-    showSkipped: false,
+    showWontFix: false,
+    showNonFlaky: false,
+    showSkip: false,
     showUnexpectedPasses: false,
-    expectationsUpdate: false,
-    updateIndex: 0,
     resultsHeight: 300,
     revision: null,
     tests: '',
@@ -287,7 +183,6 @@ var DB_SPECIFIC_INVALIDATING_PARAMETERS = {
     'testType': 'builder',
     'group': 'builder'
 };
-
 
 var flakinessConfig = {
     defaultStateValues: defaultDashboardSpecificStateValues,
@@ -305,35 +200,9 @@ g_history.parseCrossDashboardParameters();
 // GLOBALS
 //////////////////////////////////////////////////////////////////////////////
 
-var g_perBuilderPlatformAndBuildType = {};
 var g_perBuilderFailures = {};
-// Map of builder to arrays of tests that are listed in the expectations file
-// but have for that builder.
-var g_perBuilderWithExpectationsButNoFailures = {};
-// Map of builder to arrays of paths that are skipped. This shows the raw
-// path used in TestExpectations rather than the test path since we
-// don't actually have any data here for skipped tests.
-var g_perBuilderSkippedPaths = {};
 // Maps test path to an array of {builder, testResults} objects.
 var g_testToResultsMap = {};
-// Tests that the user wants to update expectations for.
-var g_confirmedTests = {};
-
-function traversePlatformsTree(callback)
-{
-    function traverse(platformObject, parentPlatform) {
-        Object.keys(platformObject).forEach(function(platformName) {
-            var platform = platformObject[platformName];
-            platformName = parentPlatform ? parentPlatform + platformName : platformName;
-
-            if (platform.subPlatforms)
-                traverse(platform.subPlatforms, platformName + '_');
-            else if (!platform.basePlatform)
-                callback(platform, platformName);
-        });
-    }
-    traverse(PLATFORMS, null);
-}
 
 function createResultsObjectForTest(test, builder)
 {
@@ -344,94 +213,13 @@ function createResultsObjectForTest(test, builder)
         html: '',
         flips: 0,
         slowestTime: 0,
-        slowestNonTimeoutCrashTime: 0,
-        meetsExpectations: true,
-        isWontFixSkip: false,
         isFlaky: false,
-        // Sorted string of missing expectations
-        missing: '',
-        // String of extra expectations (i.e. expectations that never occur).
-        extra: '',
-        modifiers: '',
-        bugs: '',
+        bugs: [],
         expectations : '',
         rawResults: '',
         // List of all the results the test actually has.
         actualResults: []
     };
-}
-
-function matchingElement(stringToMatch, elementsMap)
-{
-    for (var element in elementsMap) {
-        if (string.contains(stringToMatch, elementsMap[element]))
-            return element;
-    }
-}
-
-function chromiumPlatform(builderNameUpperCase)
-{
-    if (string.contains(builderNameUpperCase, 'MAC')) {
-        if (string.contains(builderNameUpperCase, '10.7'))
-            return 'CHROMIUM_LION';
-        // The webkit.org 'Chromium Mac Release (Tests)' bot runs SnowLeopard.
-        return 'CHROMIUM_SNOWLEOPARD';
-    }
-    if (string.contains(builderNameUpperCase, 'WIN7'))
-        return 'CHROMIUM_WIN7';
-    if (string.contains(builderNameUpperCase, 'VISTA'))
-        return 'CHROMIUM_VISTA';
-    if (string.contains(builderNameUpperCase, 'WIN') || string.contains(builderNameUpperCase, 'XP'))
-        return 'CHROMIUM_XP';
-    if (string.contains(builderNameUpperCase, 'LINUX'))
-        return 'CHROMIUM_LUCID';
-    if (string.contains(builderNameUpperCase, 'ANDROID'))
-        return 'CHROMIUM_ANDROID';
-    // The interactive bot is XP, but doesn't have an OS in it's name.
-    if (string.contains(builderNameUpperCase, 'INTERACTIVE'))
-        return 'CHROMIUM_XP';
-}
-
-
-function platformAndBuildType(builderName)
-{
-    if (!g_perBuilderPlatformAndBuildType[builderName]) {
-        var builderNameUpperCase = builderName.toUpperCase();
-        
-        var platform = chromiumPlatform(builderNameUpperCase);
-        
-        if (!platform)
-            console.error('Could not resolve platform for builder: ' + builderName);
-
-        var buildType = string.contains(builderNameUpperCase, 'DBG') || string.contains(builderNameUpperCase, 'DEBUG') ? 'DEBUG' : 'RELEASE';
-        g_perBuilderPlatformAndBuildType[builderName] = {platform: platform, buildType: buildType};
-    }
-    return g_perBuilderPlatformAndBuildType[builderName];
-}
-
-function isDebug(builderName)
-{
-    return platformAndBuildType(builderName).buildType == 'DEBUG';
-}
-
-// Returns the expectation string for the given single character result.
-// This string should match the expectations that are put into
-// test_expectations.py.
-//
-// For example, if we start explicitly listing IMAGE result failures,
-// this function should start returning 'IMAGE'.
-function expectationsFileStringForResult(result)
-{
-    // For the purposes of comparing against the expecations of a test,
-    // consider simplified diff failures as just text failures since
-    // the test_expectations file doesn't treat them specially.
-    if (result == 'S')
-        return 'TEXT';
-
-    if (result == 'N')
-        return '';
-
-    return expectationsMap()[result];
 }
 
 var TestTrie = function(builders, resultsByBuilder)
@@ -562,22 +350,6 @@ function individualTestsForSubstringList()
     return testsArray;
 }
 
-// Returns whether this test's slowest time is above the cutoff for
-// being a slow test.
-function isSlowTest(resultsForTest)
-{
-    var maxTime = isDebug(resultsForTest.builder) ? MIN_SECONDS_FOR_SLOW_TEST_DEBUG : MIN_SECONDS_FOR_SLOW_TEST;
-    return resultsForTest.slowestNonTimeoutCrashTime > maxTime;
-}
-
-// Returns whether this test's slowest time is *well* below the cutoff for
-// being a slow test.
-function isFastTest(resultsForTest)
-{
-    var maxTime = isDebug(resultsForTest.builder) ? MIN_SECONDS_FOR_SLOW_TEST_DEBUG : MIN_SECONDS_FOR_SLOW_TEST;
-    return resultsForTest.slowestNonTimeoutCrashTime < maxTime / 2;
-}
-
 function allTestsWithResult(result)
 {
     processTestRunsForAllBuilders();
@@ -585,7 +357,7 @@ function allTestsWithResult(result)
 
     getAllTestsTrie().forEach(function(triePath) {
         for (var i = 0; i < g_testToResultsMap[triePath].length; i++) {
-            if (g_testToResultsMap[triePath][i].actualResults.indexOf(result) != -1) {
+            if (g_testToResultsMap[triePath][i].actualResults.indexOf(result.toUpperCase()) != -1) {
                 retVal.push(triePath);
                 break;
             }
@@ -593,372 +365,6 @@ function allTestsWithResult(result)
     });
 
     return retVal;
-}
-
-
-// Adds all the tests for the given builder to the testMapToPopulate.
-function addTestsForBuilder(builder, testMapToPopulate)
-{
-    var tests = g_resultsByBuilder[builder].tests;
-    for (var test in tests) {
-        testMapToPopulate[test] = true;
-    }
-}
-
-// Map of all tests to true values by platform and build type.
-// e.g. g_allTestsByPlatformAndBuildType['XP']['DEBUG'] will have the union
-// of all tests run on the xp-debug builders.
-var g_allTestsByPlatformAndBuildType = {};
-traversePlatformsTree(function(platform, platformName) {
-    g_allTestsByPlatformAndBuildType[platformName] = {};
-});
-
-// Map of all tests to true values by platform and build type.
-// e.g. g_allTestsByPlatformAndBuildType['WIN']['DEBUG'] will have the union
-// of all tests run on the win-debug builders.
-function allTestsWithSamePlatformAndBuildType(platform, buildType)
-{
-    if (!g_allTestsByPlatformAndBuildType[platform][buildType]) {
-        var tests = {};
-        for (var thisBuilder in currentBuilders()) {
-            var thisBuilderBuildInfo = platformAndBuildType(thisBuilder);
-            if (thisBuilderBuildInfo.buildType == buildType && thisBuilderBuildInfo.platform == platform) {
-                addTestsForBuilder(thisBuilder, tests);
-            }
-        }
-        g_allTestsByPlatformAndBuildType[platform][buildType] = tests;
-    }
-
-    return g_allTestsByPlatformAndBuildType[platform][buildType];
-}
-
-function getExpectations(test, platform, buildType)
-{
-    var testObject = g_allExpectations[test];
-    if (!testObject)
-        return null;
-
-    var platformObject = testObject[platform];
-    if (!platformObject)
-        return null;
-        
-    return platformObject[buildType];
-}
-
-function filterBugs(modifiers)
-{
-    var bugs = modifiers.match(/\b(Bug|webkit.org|crbug.com|code.google.com)\S*/g);
-    if (!bugs)
-        return {bugs: '', modifiers: modifiers};
-    for (var j = 0; j < bugs.length; j++)
-        modifiers = modifiers.replace(bugs[j], '');
-    return {bugs: bugs.join(' '), modifiers: string.collapseWhitespace(string.trimString(modifiers))};
-}
-
-function populateExpectationsData(resultsObject)
-{
-    var buildInfo = platformAndBuildType(resultsObject.builder);
-    var expectations = getExpectations(resultsObject.test, buildInfo.platform, buildInfo.buildType);
-    if (!expectations)
-        return;
-
-    resultsObject.expectations = expectations.expectations;
-    var filteredModifiers = filterBugs(expectations.modifiers);
-    resultsObject.modifiers = filteredModifiers.modifiers;
-    resultsObject.bugs = filteredModifiers.bugs;
-    resultsObject.isWontFixSkip = string.contains(expectations.modifiers, 'WONTFIX') || string.contains(expectations.modifiers, 'SKIP'); 
-}
-
-function platformObjectForName(platformName)
-{
-    var platformsList = platformName.split("_");
-    var platformObject = PLATFORMS[platformsList.shift()];
-    platformsList.forEach(function(platformName) {
-        platformObject = platformObject.subPlatforms[platformName];
-    });
-    return platformObject;
-}
-
-// Data structure to hold the processed expectations.
-// g_allExpectations[testPath][platform][buildType] gets the object that has
-// expectations and modifiers properties for this platform/buildType.
-//
-// platform and buildType both go through fallback sets of keys from most
-// specific key to least specific. For example, on Windows XP, we first
-// check the platform WIN-XP, if there's no such object, we check WIN,
-// then finally we check ALL. For build types, we check the current
-// buildType, then ALL.
-var g_allExpectations;
-
-function getParsedExpectations(data)
-{
-    var expectations = [];
-    var lines = data.split('\n');
-    lines.forEach(function(line) {
-        line = string.trimString(line);
-        if (!line || string.startsWith(line, '#'))
-            return;
-
-        // This code mimics _tokenize_line_using_new_format() in
-        // Tools/Scripts/webkitpy/layout_tests/models/test_expectations.py
-        //
-        // FIXME: consider doing more error checking here.
-        //
-        // FIXME: Clean this all up once we've fully cut over to the new syntax.
-        var tokens = line.split(/\s+/)
-        var parsed_bugs = [];
-        var parsed_modifiers = [];
-        var parsed_path;
-        var parsed_expectations = [];
-        var state = 'start';
-
-        // This clones _modifier_tokens_list in test_expectations.py.
-        // FIXME: unify with the platforms constants at the top of the file.
-        var modifier_tokens = {
-            'Release': 'RELEASE',
-            'Debug': 'DEBUG',
-            'Mac': 'MAC',
-            'Win': 'WIN',
-            'Linux': 'LINUX',
-            'SnowLeopard': 'SNOWLEOPARD',
-            'Lion': 'LION',
-            'MountainLion': 'MOUNTAINLION',
-            'Win7': 'WIN7',
-            'XP': 'XP',
-            'Vista': 'VISTA',
-            'Android': 'ANDROID',
-        };
-
-        var expectation_tokens = {
-            'Crash': 'CRASH',
-            'Failure': 'FAIL',
-            'ImageOnlyFailure': 'IMAGE',
-            'Missing': 'MISSING',
-            'Pass': 'PASS',
-            'Rebaseline': 'REBASELINE',
-            'Skip': 'SKIP',
-            'Slow': 'SLOW',
-            'Timeout': 'TIMEOUT',
-            'WontFix': 'WONTFIX',
-        };
-
-        var reachedEol = false;
-
-        // States
-        // - start: Next tokens are bugs or a path.
-        // - modifier: Parsed bugs and a '['. Next token is a modifier.
-        // - path: Parsed modifiers and a ']'. Next token is a path.
-        // - path_found: Parsed a path. Next token is '[' or EOL.
-        // - expectations: Parsed a path and a '['. Next tokens are
-        //                 expectations.
-        // - done: Parsed expectations and a ']'. Next is EOL.
-        // - error: Error occurred. Ignore this line.
-        tokens.forEach(function(token) {
-          if (reachedEol)
-              return;
-
-          if (state == 'start' &&
-              (token.indexOf('Bug') == 0 ||
-               token.indexOf('webkit.org') == 0 ||
-               token.indexOf('crbug.com') == 0 ||
-               token.indexOf('code.google.com') == 0)) {
-              parsed_bugs.push(token);
-          } else if (token == '[') {
-              if (state == 'start') {
-                  state = 'modifier';
-              } else if (state == 'path_found') {
-                  state = 'expectations';
-              } else {
-                  console.error('Unexpected \'[\' (state = ' + state + '): ' + line);
-                  state = 'error';
-                  return;
-              }
-          } else if (token == ']') {
-              if (state == 'modifier') {
-                  state = 'path';
-              } else if (state == 'expectations') {
-                  state = 'done';
-              } else {
-                  state = 'error';
-                  return;
-              }
-          } else if (state == 'modifier') {
-              var modifier = modifier_tokens[token];
-              if (!modifier) {
-                  console.error('Unknown modifier: ' + modifier);
-                  state = 'error';
-                  return;
-              }
-              parsed_modifiers.push(modifier);
-          } else if (state == 'expectations') {
-              if (token == 'Rebaseline' || token == 'Skip' || token == 'Slow' || token == 'WontFix') {
-                  parsed_modifiers.push(token.toUpperCase());
-              } else {
-                  var expectation = expectation_tokens[token];
-                  if (!expectation) {
-                      console.error('Unknown expectation: ' + expectation);
-                      state = 'error';
-                      return;
-                  }
-                  parsed_expectations.push(expectation);
-              }
-          } else if (token == '#') {
-              reachedEol = true;
-          } else if (state == 'path' || state == 'start') {
-              parsed_path = token;
-              state = 'path_found';
-          } else {
-              console.error('Unexpected token (state = ' + state + '): ' + token);
-              state = 'error';
-          }
-        });
-
-        if (state != 'path_found' && state != 'done')
-            return;
-
-        if (!parsed_expectations.length) {
-            if (parsed_modifiers.indexOf('Slow') == -1) {
-                parsed_modifiers.push('Skip');
-                parsed_expectations = ['Pass'];
-            }
-        }
-
-        // FIXME: Should we include line number and comment lines here?
-        expectations.push({
-            modifiers: parsed_bugs.concat(parsed_modifiers).join(' '),
-            path: parsed_path,
-            expectations: parsed_expectations.join(' '),
-        });
-    });
-    return expectations;
-}
-
-
-function addTestToAllExpectationsForPlatform(test, platformName, expectations, modifiers)
-{
-    if (!g_allExpectations[test])
-        g_allExpectations[test] = {};
-
-    if (!g_allExpectations[test][platformName])
-        g_allExpectations[test][platformName] = {};
-
-    var allBuildTypes = [];
-    modifiers.split(' ').forEach(function(modifier) {
-        if (modifier in BUILD_TYPES) {
-            allBuildTypes.push(modifier);
-            return;
-        }
-    });
-    if (!allBuildTypes.length)
-        allBuildTypes = Object.keys(BUILD_TYPES);
-
-    allBuildTypes.forEach(function(buildType) {
-        g_allExpectations[test][platformName][buildType] = {modifiers: modifiers, expectations: expectations};
-    });
-}
-
-function processExpectationsForPlatform(platformObject, platformName, expectationsArray)
-{
-    if (!g_allExpectations)
-        g_allExpectations = {};
-
-    if (!expectationsArray)
-        return;
-
-    // Sort the array to hit more specific paths last. More specific
-    // paths (e.g. foo/bar/baz.html) override entries for less-specific ones (e.g. foo/bar).
-    expectationsArray.sort(alphanumericCompare('path'));
-
-    for (var i = 0; i < expectationsArray.length; i++) {
-        var path = expectationsArray[i].path;
-        var modifiers = expectationsArray[i].modifiers;
-        var expectations = expectationsArray[i].expectations;
-
-        var shouldProcessExpectation = false;
-        var hasPlatformModifierUnions = false;
-        if (platformObject.fallbackPlatforms) {
-            platformObject.fallbackPlatforms.forEach(function(fallbackPlatform) {
-                if (shouldProcessExpectation)
-                    return;
-
-                var fallbackPlatformObject = platformObjectForName(fallbackPlatform);
-                if (!fallbackPlatformObject.platformModifierUnions)
-                    return;
-
-                modifiers.split(' ').forEach(function(modifier) {
-                    if (modifier in fallbackPlatformObject.platformModifierUnions) {
-                        hasPlatformModifierUnions = true;
-                        if (fallbackPlatformObject.platformModifierUnions[modifier].indexOf(platformName) != -1)
-                            shouldProcessExpectation = true;
-                    }
-                });
-            });
-        }
-
-        if (!hasPlatformModifierUnions)
-            shouldProcessExpectation = true;
-
-        if (!shouldProcessExpectation)
-            continue;
-
-        getAllTestsTrie().forEach(function(triePath) {
-            addTestToAllExpectationsForPlatform(triePath, platformName, expectations, modifiers);
-        }, path);
-    }
-}
-
-function processExpectations()
-{
-    // FIXME: An expectations-by-platform object should be passed into this function rather than checking
-    // for a global object. That way this function can be better tested and meaningful errors can
-    // be reported when expectations for a given platform are not found in that object.
-    if (!g_expectationsByPlatform)
-        return;
-
-    traversePlatformsTree(function(platform, platformName) {
-        if (platform.fallbackPlatforms) {
-            platform.fallbackPlatforms.forEach(function(fallbackPlatform) {
-                if (fallbackPlatform in g_expectationsByPlatform)
-                    processExpectationsForPlatform(platform, platformName, g_expectationsByPlatform[fallbackPlatform]);
-            });
-        }
-
-        if (platformName in g_expectationsByPlatform)
-            processExpectationsForPlatform(platform, platformName, g_expectationsByPlatform[platformName]);
-    });
-
-    g_expectationsByPlatform = undefined;
-}
-
-function processMissingTestsWithExpectations(builder, platform, buildType)
-{
-    var noFailures = [];
-    var skipped = [];
-
-    var allTestsForPlatformAndBuildType = allTestsWithSamePlatformAndBuildType(platform, buildType);
-    for (var test in g_allExpectations) {
-        var expectations = getExpectations(test, platform, buildType);
-
-        if (!expectations)
-            continue;
-
-        // Test has expectations, but no result in the builders results.
-        // This means it's either SKIP or passes on all builds.
-        if (!allTestsForPlatformAndBuildType[test] && !string.contains(expectations.modifiers, 'WONTFIX')) {
-            if (string.contains(expectations.modifiers, 'SKIP'))
-                skipped.push(test);
-            else if (!expectations.expectations.match(/^\s*PASS\s*$/)) {
-                // Don't show tests expected to always pass. This is used in ways like
-                // the following:
-                // foo/bar = FAIL
-                // foo/bar/baz.html = PASS
-                noFailures.push({test: test, expectations: expectations.expectations, modifiers: expectations.modifiers});
-            }
-        }
-    }
-
-    g_perBuilderSkippedPaths[builder] = skipped.sort();
-    g_perBuilderWithExpectationsButNoFailures[builder] = noFailures.sort();
 }
 
 function processTestResultsForBuilderAsync(builder)
@@ -982,25 +388,23 @@ function processTestRunsForBuilder(builderName)
         g_perBuilderFailures[builderName] = [];
         return;
     }
-
-    processExpectations();
    
-    var buildInfo = platformAndBuildType(builderName);
-    var platform = buildInfo.platform;
-    var buildType = buildInfo.buildType;
-    processMissingTestsWithExpectations(builderName, platform, buildType);
-
     var failures = [];
     var allTestsForThisBuilder = g_resultsByBuilder[builderName].tests;
 
     for (var test in allTestsForThisBuilder) {
         var resultsForTest = createResultsObjectForTest(test, builderName);
-        populateExpectationsData(resultsForTest);
 
         var rawTest = g_resultsByBuilder[builderName].tests[test];
         resultsForTest.rawTimes = rawTest.times;
         var rawResults = rawTest.results;
         resultsForTest.rawResults = rawResults;
+
+        if (rawTest.expected)
+            resultsForTest.expectations = rawTest.expected;
+
+        if (rawTest.bugs)
+            resultsForTest.bugs = rawTest.bugs;
 
         // FIXME: Switch to resultsByBuild
         var times = resultsForTest.rawTimes;
@@ -1019,16 +423,10 @@ function processTestRunsForBuilder(builderName)
             if (rawResults && rawResults[resultsIndex])
                 currentResult = rawResults[resultsIndex][RLE.VALUE];
 
-            var time = times[i][RLE.VALUE]
-
-            // Ignore times for crashing/timeout runs for the sake of seeing if
-            // a test should be marked slow.
-            if (currentResult != 'C' && currentResult != 'T')
-                resultsForTest.slowestNonTimeoutCrashTime = Math.max(resultsForTest.slowestNonTimeoutCrashTime, time);
-            resultsForTest.slowestTime = Math.max(resultsForTest.slowestTime, time);
+            resultsForTest.slowestTime = Math.max(resultsForTest.slowestTime, times[i][RLE.VALUE]);
         }
 
-        processMissingAndExtraExpectations(resultsForTest);
+        determineFlakiness(g_resultsByBuilder[builderName][FAILURE_MAP_KEY], resultsForTest);
         failures.push(resultsForTest);
 
         if (!g_testToResultsMap[test])
@@ -1039,7 +437,7 @@ function processTestRunsForBuilder(builderName)
     g_perBuilderFailures[builderName] = failures;
 }
 
-function processMissingAndExtraExpectations(resultsForTest)
+function determineFlakiness(failureMap, resultsForTest)
 {
     // Heuristic for determining whether expectations apply to a given test:
     // -If a test result happens < MIN_RUNS_FOR_FLAKE, then consider it a flaky
@@ -1050,12 +448,6 @@ function processMissingAndExtraExpectations(resultsForTest)
     // This lets us rule out common cases of a test changing expectations for
     // a few runs, then being fixed or otherwise modified in a non-flaky way.
     var rawResults = resultsForTest.rawResults;
-
-    // If the first result is no-data that means the test is skipped or is
-    // being run on a different builder (e.g. moved from one shard to another).
-    // Ignore these results since we have no real data about what's going on.
-    if (rawResults[0][RLE.VALUE] == 'N')
-        return;
 
     // Only consider flake if it doesn't happen twice in a row.
     var MIN_RUNS_FOR_FLAKE = 2;
@@ -1084,109 +476,14 @@ function processMissingAndExtraExpectations(resultsForTest)
             continue;
         }
 
-        var expectation = expectationsFileStringForResult(result);
+        var expectation = failureMap[result];
         resultsMap[expectation] = true;
         numRealResults++;
     }
 
+    resultsForTest.actualResults = Object.keys(resultsMap);
     resultsForTest.flips = i - 1;
     resultsForTest.isFlaky = numRealResults > 1;
-
-    var missingExpectations = [];
-    var extraExpectations = [];
-
-    if (g_history.isLayoutTestResults()) {
-        var expectationsArray = resultsForTest.expectations ? resultsForTest.expectations.split(' ') : [];
-        extraExpectations = expectationsArray.filter(
-            function(element) {
-                // FIXME: Once all the FAIL lines are removed from
-                // TestExpectations, delete all the legacyExpectationsSemantics
-                // code.
-                if (g_history.dashboardSpecificState.legacyExpectationsSemantics) {
-                    if (element == 'FAIL') {
-                        for (var i = 0; i < FAIL_RESULTS.length; i++) {
-                            if (resultsMap[FAIL_RESULTS[i]])
-                                return false;
-                        }
-                        return true;
-                    }
-                }
-
-                return element && !resultsMap[element] && !string.contains(element, 'BUG');
-            });
-
-        for (var result in resultsMap) {
-            resultsForTest.actualResults.push(result);
-            var hasExpectation = false;
-            for (var i = 0; i < expectationsArray.length; i++) {
-                var expectation = expectationsArray[i];
-                // FIXME: Once all the FAIL lines are removed from
-                // TestExpectations, delete all the legacyExpectationsSemantics
-                // code.
-                if (g_history.dashboardSpecificState.legacyExpectationsSemantics) {
-                    if (expectation == 'FAIL') {
-                        for (var j = 0; j < FAIL_RESULTS.length; j++) {
-                            if (result == FAIL_RESULTS[j]) {
-                                hasExpectation = true;
-                                break;
-                            }
-                        }
-                    }
-                }
-
-                if (result == expectation)
-                    hasExpectation = true;
-
-                if (hasExpectation)
-                    break;
-            }
-            // If we have no expectations for a test and it only passes, then don't
-            // list PASS as a missing expectation. We only want to list PASS if it
-            // flaky passes, so there would be other expectations.
-            if (!hasExpectation && !(!expectationsArray.length && result == 'PASS' && numRealResults == 1))
-                missingExpectations.push(result);
-        }
-
-        // Only highlight tests that take > 2 seconds as needing to be marked as
-        // slow. There are too many tests that take ~2 seconds every couple
-        // hundred runs. It's not worth the manual maintenance effort.
-        // Also, if a test times out, then it should not be marked as slow.
-        var minTimeForNeedsSlow = isDebug(resultsForTest.builder) ? 2 : 1;
-        if (isSlowTest(resultsForTest) && !resultsMap['TIMEOUT'] && (!resultsForTest.modifiers || !string.contains(resultsForTest.modifiers, 'SLOW')))
-            missingExpectations.push('SLOW');
-        else if (isFastTest(resultsForTest) && resultsForTest.modifiers && string.contains(resultsForTest.modifiers, 'SLOW'))
-            extraExpectations.push('SLOW');
-
-        // If there are no missing results or modifiers besides build
-        // type, platform, or bug and the expectations are all extra
-        // that is, extraExpectations - expectations = PASS,
-        // include PASS as extra, since that means this line in
-        // test_expectations can be deleted..
-        if (!missingExpectations.length && !(resultsForTest.modifiers && realModifiers(resultsForTest.modifiers))) {
-            var extraPlusPass = extraExpectations.concat(['PASS']);
-            if (extraPlusPass.sort().toString() == expectationsArray.slice(0).sort().toString())
-                extraExpectations.push('PASS');
-        }
-
-    }
-
-    resultsForTest.meetsExpectations = !missingExpectations.length && !extraExpectations.length;
-    resultsForTest.missing = missingExpectations.sort().join(' ');
-    resultsForTest.extra = extraExpectations.sort().join(' ');
-}
-
-var BUG_URL_PREFIX = '<a href="http://';
-var BUG_URL_POSTFIX = '/$1">crbug.com/$1</a> ';
-var WEBKIT_BUG_URL_POSTFIX = '/$1">webkit.org/b/$1</a> ';
-var INTERNAL_BUG_REPLACE_VALUE = BUG_URL_PREFIX + 'b' + BUG_URL_POSTFIX;
-var EXTERNAL_BUG_REPLACE_VALUE = BUG_URL_PREFIX + 'crbug.com' + BUG_URL_POSTFIX;
-var WEBKIT_BUG_REPLACE_VALUE = BUG_URL_PREFIX + 'webkit.org/b' + WEBKIT_BUG_URL_POSTFIX;
-
-function htmlForBugs(bugs)
-{
-    bugs = bugs.replace(/crbug.com\/(\d+)(\ |$)/g, EXTERNAL_BUG_REPLACE_VALUE);
-    bugs = bugs.replace(/webkit.org\/b\/(\d+)(\ |$)/g, WEBKIT_BUG_REPLACE_VALUE);
-    return bugs;
 }
 
 function linkHTMLToOpenWindow(url, text)
@@ -1200,10 +497,11 @@ function isFailure(builder, testName, index)
 {
     var currentIndex = 0;
     var rawResults = g_resultsByBuilder[builder].tests[testName].results;
+    var failureMap = g_resultsByBuilder[builder][FAILURE_MAP_KEY];
     for (var i = 0; i < rawResults.length; i++) {
         currentIndex += rawResults[i][RLE.LENGTH];
         if (currentIndex > index)
-            return isFailingResult(rawResults[i][RLE.VALUE]);
+            return isFailingResult(failureMap, rawResults[i][RLE.VALUE]);
     }
     console.error('Index exceeds number of results: ' + index);
 }
@@ -1213,11 +511,12 @@ function indexesForFailures(builder, testName)
 {
     var rawResults = g_resultsByBuilder[builder].tests[testName].results;
     var buildNumbers = g_resultsByBuilder[builder].buildNumbers;
+    var failureMap = g_resultsByBuilder[builder][FAILURE_MAP_KEY];
     var index = 0;
     var failures = [];
     for (var i = 0; i < rawResults.length; i++) {
         var numResults = rawResults[i][RLE.LENGTH];
-        if (isFailingResult(rawResults[i][RLE.VALUE])) {
+        if (isFailingResult(failureMap, rawResults[i][RLE.VALUE])) {
             for (var j = 0; j < numResults; j++)
                 failures.push(index + j);
         }
@@ -1246,8 +545,10 @@ function showPopupForBuild(e, builder, index, opt_testName)
     var master = builderMaster(builder);
     var buildBasePath = master.logPath(builder, buildNumber);
 
-    html += '<ul><li>' + linkHTMLToOpenWindow(buildBasePath, 'Build log') +
-        '</li><li>Blink: ' + ui.html.blinkRevisionLink(g_resultsByBuilder[builder], index) + '</li>';
+    html += '<ul><li>' + linkHTMLToOpenWindow(buildBasePath, 'Build log');
+
+    if (g_resultsByBuilder[builder][BLINK_REVISIONS_KEY])
+        html += '</li><li>Blink: ' + ui.html.blinkRevisionLink(g_resultsByBuilder[builder], index) + '</li>';
 
     html += '</li><li>Chromium: ' + ui.html.chromiumRevisionLink(g_resultsByBuilder[builder], index) + '</li>';
 
@@ -1264,6 +565,11 @@ function showPopupForBuild(e, builder, index, opt_testName)
     ui.popup.show(e.target, html);
 }
 
+function classNameForFailureString(failure)
+{
+    return failure.replace(/(\+|\ )/, '');
+}
+
 function htmlForTestResults(test)
 {
     var html = '';
@@ -1275,21 +581,18 @@ function htmlForTestResults(test)
 
     var indexToReplaceCurrentResult = -1;
     var indexToReplaceCurrentTime = -1;
-    var currentResultArray, currentTimeArray, currentResult, innerHTML, resultString;
     for (var i = 0; i < buildNumbers.length; i++) {
+        var currentResultArray, currentTimeArray, innerHTML, resultString;
+
         if (i > indexToReplaceCurrentResult) {
             currentResultArray = results.shift();
             if (currentResultArray) {
-                currentResult = currentResultArray[RLE.VALUE];
-                // Treat simplified diff failures as just text failures.
-                if (currentResult == 'S')
-                    currentResult = 'F';
+                resultString = g_resultsByBuilder[builder][FAILURE_MAP_KEY][currentResultArray[RLE.VALUE]];
                 indexToReplaceCurrentResult += currentResultArray[RLE.LENGTH];
             } else {
-                currentResult = 'N';
+                resultString = NO_DATA;
                 indexToReplaceCurrentResult += buildNumbers.length;
             }
-            resultString = expectationsFileStringForResult(currentResult);
         }
 
         if (i > indexToReplaceCurrentTime) {
@@ -1304,70 +607,27 @@ function htmlForTestResults(test)
             innerHTML = currentTime || '&nbsp;';
         }
 
-        html += '<td title="' + (resultString || 'NO DATA') + '. Click for more info." class="results ' + currentResult +
+        html += '<td title="' + resultString + '. Click for more info." class="results ' + classNameForFailureString(resultString) +
           '" onclick=\'showPopupForBuild(event, "' + builder + '",' + i + ',"' + test.test + '")\'>' + innerHTML;
     }
     return html;
 }
 
-function htmlForTestsWithExpectationsButNoFailures(builder)
+function shouldShowTest(testResult)
 {
-    var tests = g_perBuilderWithExpectationsButNoFailures[builder];
-    var skippedPaths = g_perBuilderSkippedPaths[builder];
-    var showUnexpectedPassesLink =  linkHTMLToToggleState('showUnexpectedPasses', 'tests that have not failed in last ' + g_resultsByBuilder[builder].buildNumbers.length + ' runs');
-    var showSkippedLink = linkHTMLToToggleState('showSkipped', 'skipped tests in TestExpectations');
-    
-    var html = '';
-    if (g_history.isLayoutTestResults() && (tests.length || skippedPaths.length)) {
-        var buildInfo = platformAndBuildType(builder);
-        html += '<h2 style="display:inline-block">Expectations for ' + buildInfo.platform + '-' + buildInfo.buildType + '</h2> ';
-        if (!g_history.dashboardSpecificState.showUnexpectedPasses && tests.length)
-            html += showUnexpectedPassesLink;
-        html += ' ';
-        if (!g_history.dashboardSpecificState.showSkipped && skippedPaths.length)
-            html += showSkippedLink;
-    }
-
-    var open = '<div onclick="selectContents(this)">';
-
-    if (g_history.dashboardSpecificState.showUnexpectedPasses && tests.length) {
-        html += '<div id="passing-tests">' + showUnexpectedPassesLink;
-        for (var i = 0; i < tests.length; i++)
-            html += open + tests[i].test + '</div>';
-        html += '</div>';
-    }
-
-    if (g_history.dashboardSpecificState.showSkipped && skippedPaths.length)
-        html += '<div id="skipped-tests">' + showSkippedLink + open + skippedPaths.join('</div>' + open) + '</div></div>';
-    return html + '<br>';
-}
-
-// Returns whether we should exclude test results from the test table.
-function shouldHideTest(testResult)
-{
-    // For non-layout tests, we always show everything.
     if (!g_history.isLayoutTestResults())
-        return false;
+        return true;
 
-    if (testResult.isWontFixSkip)
-        return !g_history.dashboardSpecificState.showWontFixSkip;
+    if (testResult.expectations == 'WONTFIX')
+        return g_history.dashboardSpecificState.showWontFix;
+
+    if (testResult.expectations == 'SKIP')
+        return g_history.dashboardSpecificState.showSkip;
 
     if (testResult.isFlaky)
-        return !g_history.dashboardSpecificState.showFlaky;
+        return g_history.dashboardSpecificState.showFlaky;
 
-    if (isSlowTest(testResult))
-        return !g_history.dashboardSpecificState.showSlow;
-
-    if (testResult.meetsExpectations)
-        return !g_history.dashboardSpecificState.showCorrectExpectations;
-
-    return !g_history.dashboardSpecificState.showWrongExpectations;
-}
-
-// Sets the browser's selection to the element's contents.
-function selectContents(element)
-{
-    window.getSelection().selectAllChildren(element);
+    return g_history.dashboardSpecificState.showNonFlaky;
 }
 
 function createBugHTML(test)
@@ -1379,12 +639,12 @@ function createBugHTML(test)
         '[insert probable cause]');
     
     url = 'https://code.google.com/p/chromium/issues/entry?template=Layout%20Test%20Failure&summary=' + title + '&comment=' + description;
-    return '<a href="' + url + '" class="file-bug">FILE BUG</a>';
+    return '<a href="' + url + '">File new bug</a>';
 }
 
 function isCrossBuilderView()
 {
-    return g_history.dashboardSpecificState.tests || g_history.dashboardSpecificState.result || g_history.dashboardSpecificState.expectationsUpdate;
+    return g_history.dashboardSpecificState.tests || g_history.dashboardSpecificState.result;
 }
 
 function tableHeaders(opt_getAll)
@@ -1397,22 +657,28 @@ function tableHeaders(opt_getAll)
         headers.push('test');
 
     if (g_history.isLayoutTestResults() || opt_getAll)
-        headers.push('bugs', 'modifiers', 'expectations');
+        headers.push('bugs', 'expectations');
 
     headers.push('slowest run', 'flakiness (numbers are runtimes in seconds)');
     return headers;
 }
 
+function linkifyBugs(bugs)
+{
+    var html = '';
+    bugs.forEach(function(bug) {
+        var bugHtml;
+        if (string.startsWith(bug, 'Bug('))
+            bugHtml = bug;
+        else
+            bugHtml = '<a href="http://' + bug + '">' + bug + '</a>';
+        html += '<div>' + bugHtml + '</div>'
+    });
+    return html;
+}
+
 function htmlForSingleTestRow(test)
 {
-    if (!isCrossBuilderView() && shouldHideTest(test)) {
-        // The innerHTML call is considerably faster if we exclude the rows for
-        // items we're not showing than if we hide them using display:none.
-        // For the crossBuilderView, we want to show all rows the user is
-        // explicitly listing tests to view.
-        return '';
-    }
-
     var headers = tableHeaders();
     var html = '';
     for (var i = 0; i < headers.length; i++) {
@@ -1426,9 +692,8 @@ function htmlForSingleTestRow(test)
 
             html += '<tr><td class="' + testCellClassName + '">' + testCellHTML;
         } else if (string.startsWith(header, 'bugs'))
-            html += '<td class=options-container>' + (test.bugs ? htmlForBugs(test.bugs) : createBugHTML(test));
-        else if (string.startsWith(header, 'modifiers'))
-            html += '<td class=options-container>' + test.modifiers;
+            // FIXME: linkify bugs.
+            html += '<td class=options-container>' + (linkifyBugs(test.bugs) || createBugHTML(test));
         else if (string.startsWith(header, 'expectations'))
             html += '<td class=options-container>' + test.expectations;
         else if (string.startsWith(header, 'slowest'))
@@ -1548,243 +813,6 @@ function sortTests(tests, column, order)
     }
 
     tests.sort(sortFunctionGetter(resultsProperty, order == BACKWARD));
-}
-
-// Sorts a space separated expectations string in alphanumeric order.
-// @param {string} str The expectations string.
-// @return {string} The sorted string.
-function sortExpectationsString(str)
-{
-    return str.split(' ').sort().join(' ');
-}
-
-function addUpdate(testsNeedingUpdate, test, builderName, missing, extra)
-{
-    if (!testsNeedingUpdate[test])
-        testsNeedingUpdate[test] = {};
-
-    var buildInfo = platformAndBuildType(builderName);
-    var builder = buildInfo.platform + ' ' + buildInfo.buildType;
-    if (!testsNeedingUpdate[test][builder])
-        testsNeedingUpdate[test][builder] = {};
-
-    if (missing)
-        testsNeedingUpdate[test][builder].missing = sortExpectationsString(missing);
-
-    if (extra)
-        testsNeedingUpdate[test][builder].extra = sortExpectationsString(extra);
-}
-
-
-// From a string of modifiers, returns a string of modifiers that
-// are for real result changes, like SLOW, and excludes modifiers
-// that specificy things like platform, build_type, bug.
-// @param {string} modifierString String containing all modifiers.
-// @return {string} String containing only modifiers that effect the results.
-function realModifiers(modifierString)
-{
-    var modifiers = modifierString.split(' ');;
-    return modifiers.filter(function(modifier) {
-        if (modifier in BUILD_TYPES || string.startsWith(modifier, 'BUG'))
-            return false;
-
-        var matchesPlatformOrUnion = false;
-        traversePlatformsTree(function(platform, platformName) {
-            if (matchesPlatformOrUnion)
-                return;
-
-            if (platform.fallbackPlatforms) {
-                platform.fallbackPlatforms.forEach(function(fallbackPlatform) {
-                    if (matchesPlatformOrUnion)
-                        return;
-
-                    var fallbackPlatformObject = platformObjectForName(fallbackPlatform);
-                    if (!fallbackPlatformObject.platformModifierUnions)
-                        return;
-
-                    matchesPlatformOrUnion = modifier in fallbackPlatformObject.subPlatforms || modifier in fallbackPlatformObject.platformModifierUnions;
-                });
-            }
-        });
-
-        return !matchesPlatformOrUnion;
-    }).join(' ');
-}
-
-function generatePageForExpectationsUpdate()
-{
-    // Always show all runs when auto-updating expectations.
-    if (!g_history.crossDashboardState.showAllRuns)
-        g_history.setQueryParameter('showAllRuns', true);
-
-    processTestRunsForAllBuilders();
-    var testsNeedingUpdate = {};
-    for (var test in g_testToResultsMap) {
-        var results = g_testToResultsMap[test];
-        for (var i = 0; i < results.length; i++) {
-            var thisResult = results[i];
-            
-            if (!thisResult.missing && !thisResult.extra)
-                continue;
-
-            var allPassesOrNoDatas = thisResult.rawResults.filter(function (x) { return x[1] != "P" && x[1] != "N"; }).length == 0;
-
-            if (allPassesOrNoDatas)
-                continue;
-
-            addUpdate(testsNeedingUpdate, test, thisResult.builder, thisResult.missing, thisResult.extra);
-        }
-    }
-
-    for (var builder in currentBuilders()) {
-        var tests = g_perBuilderWithExpectationsButNoFailures[builder]
-        for (var i = 0; i < tests.length; i++) {
-            // Anything extra in this case is what is listed in expectations
-            // plus modifiers other than bug, platform, build type.
-            var modifiers = realModifiers(tests[i].modifiers);
-            var extras = tests[i].expectations;
-            extras += modifiers ? ' ' + modifiers : '';
-            addUpdate(testsNeedingUpdate, tests[i].test, builder, null, extras);
-        }
-    }
-
-    // Get the keys in alphabetical order, so it is easy to process groups
-    // of tests.
-    var keys = Object.keys(testsNeedingUpdate).sort();
-    showUpdateInfoForTest(testsNeedingUpdate, keys);
-}
-
-// Show the test results and the json for differing expectations, and
-// allow the user to include or exclude this update.
-//
-// @param {Object} testsNeedingUpdate Tests that need updating.
-// @param {Array.<string>} keys Keys into the testNeedingUpdate object.
-function showUpdateInfoForTest(testsNeedingUpdate, keys)
-{
-    var test = keys[g_history.dashboardSpecificState.updateIndex];
-    document.body.innerHTML = '';
-
-    // FIXME: Make this DOM creation less verbose.
-    var index = document.createElement('div');
-    index.style.cssFloat = 'right';
-    index.textContent = (g_history.dashboardSpecificState.updateIndex + 1) + ' of ' + keys.length + ' tests';
-    document.body.appendChild(index);
-
-    var buttonRegion = document.createElement('div');
-    var includeBtn = document.createElement('input');
-    includeBtn.type = 'button';
-    includeBtn.value = 'include selected';
-    includeBtn.addEventListener('click', partial(handleUpdate, testsNeedingUpdate, keys), false);
-    buttonRegion.appendChild(includeBtn);
-
-    var previousBtn = document.createElement('input');
-    previousBtn.type = 'button';
-    previousBtn.value = 'previous';
-    previousBtn.addEventListener('click',
-        function() {
-          setUpdateIndex(g_history.dashboardSpecificState.updateIndex - 1, testsNeedingUpdate, keys);
-        },
-        false);
-    buttonRegion.appendChild(previousBtn);
-
-    var nextBtn = document.createElement('input');
-    nextBtn.type = 'button';
-    nextBtn.value = 'next';
-    nextBtn.addEventListener('click', partial(nextUpdate, testsNeedingUpdate, keys), false);
-    buttonRegion.appendChild(nextBtn);
-
-    var doneBtn = document.createElement('input');
-    doneBtn.type = 'button';
-    doneBtn.value = 'done';
-    doneBtn.addEventListener('click', finishUpdate, false);
-    buttonRegion.appendChild(doneBtn);
-
-    document.body.appendChild(buttonRegion);
-
-    var updates = testsNeedingUpdate[test];
-    var checkboxes = document.createElement('div');
-    for (var builder in updates) {
-        // Create a checkbox for each builder.
-        var checkboxRegion = document.createElement('div');
-        var checkbox = document.createElement('input');
-        checkbox.type = 'checkbox';
-        checkbox.id = builder;
-        checkbox.checked = true;
-        checkboxRegion.appendChild(checkbox);
-        checkboxRegion.appendChild(document.createTextNode(builder + ' : ' + JSON.stringify(updates[builder])));
-        checkboxes.appendChild(checkboxRegion);
-    }
-    document.body.appendChild(checkboxes);
-
-    var div = document.createElement('div');
-    div.innerHTML = htmlForIndividualTestOnAllBuildersWithResultsLinks(test);
-    document.body.appendChild(div);
-    appendExpectations();
-}
-
-
-// When the user has finished selecting expectations to update, provide them
-// with json to copy over.
-function finishUpdate()
-{
-    document.body.innerHTML = 'The next step is to copy the output below ' +
-        'into a local file and save it.  Then, run<br><code>python ' +
-        'src/webkit/tools/layout_tests/webkitpy/layout_tests/update_expectat' +
-        'ions_from_dashboard.py path/to/local/file</code><br>in order to ' +
-        'update the expectations file.<br><textarea id="results" '+
-        'style="width:600px;height:600px;"> ' +
-        JSON.stringify(g_confirmedTests) + '</textarea>';
-    results.focus();
-    document.execCommand('SelectAll');
-}
-
-// Handle user click on "include selected" button.
-// Includes the tests that are selected and exclude the rest.
-// @param {Object} testsNeedingUpdate Tests that need updating.
-// @param {Array.<string>} keys Keys into the testNeedingUpdate object.
-function handleUpdate(testsNeedingUpdate, keys)
-{
-    var test = keys[g_history.dashboardSpecificState.updateIndex];
-    var updates = testsNeedingUpdate[test];
-    for (var builder in updates) {
-        // Add included tests, and delete excluded tests if
-        // they were previously included.
-        if ($(builder).checked) {
-            if (!g_confirmedTests[test])
-                g_confirmedTests[test] = {};
-            g_confirmedTests[test][builder] = testsNeedingUpdate[test][builder];
-        } else if (g_confirmedTests[test] && g_confirmedTests[test][builder]) {
-            delete g_confirmedTests[test][builder];
-            if (!Object.keys(g_confirmedTests[test]).length)
-                delete g_confirmedTests[test];
-        }
-    }
-    nextUpdate(testsNeedingUpdate, keys);
-}
-
-
-// Move to the next item to update.
-// @param {Object} testsNeedingUpdate Tests that need updating.
-// @param {Array.<string>} keys Keys into the testNeedingUpdate object.
-function nextUpdate(testsNeedingUpdate, keys)
-{
-    setUpdateIndex(g_history.dashboardSpecificState.updateIndex + 1, testsNeedingUpdate, keys);
-}
-
-
-// Advance the index we are updating at.  If we walk over the end
-// or beginning, just loop.
-// @param {string} newIndex The index into the keys to move to.
-// @param {Object} testsNeedingUpdate Tests that need updating.
-// @param {Array.<string>} keys Keys into the testNeedingUpdate object.
-function setUpdateIndex(newIndex, testsNeedingUpdate, keys)
-{
-    if (newIndex == -1)
-        newIndex = keys.length - 1;
-    else if (newIndex == keys.length)
-        newIndex = 0;
-    g_history.setQueryParameter("updateIndex", newIndex);
-    showUpdateInfoForTest(testsNeedingUpdate, keys);
 }
 
 function htmlForIndividualTestOnAllBuilders(test)
@@ -1932,15 +960,14 @@ function addExpectationItem(expectationsContainers, parentContainer, platform, p
     };
 
     var url = base + platformPart + path;
-    if (isImage || !string.startsWith(base, 'http://svn.webkit.org')) {
+    if (isImage) {
         var dummyNode = document.createElement(isImage ? 'img' : 'script');
         dummyNode.src = url;
         dummyNode.onload = function() {
             var item;
             if (isImage) {
                 item = dummyNode;
-                if (string.startsWith(base, 'http://svn.webkit.org'))
-                    maybeAddPngChecksum(item, url);
+                maybeAddPngChecksum(item, url);
             } else {
                 item = document.createElement('iframe');
                 item.src = url;
@@ -2191,27 +1218,6 @@ function appendNonWebKitResults(container, url, itemClassName, opt_title)
     container.appendChild(dummyNode);
 }
 
-function buildInfoForRevision(builder, revision)
-{
-    var revisions = g_resultsByBuilder[builder][BLINK_REVISION_KEY];
-    var revisionStart = 0, revisionEnd = 0, buildNumber = 0;
-    for (var i = 0; i < revisions.length; i++) {
-        if (revision > revisions[i]) {
-            revisionStart = revisions[i - 1];
-            revisionEnd = revisions[i];
-            buildNumber = g_resultsByBuilder[builder].buildNumbers[i - 1];
-            break;
-        }
-    }
-
-    if (revisionEnd)
-      revisionEnd++;
-    else
-      revisionEnd = '';
-
-    return {revisionStart: revisionStart, revisionEnd: revisionEnd, buildNumber: buildNumber};
-}
-
 function lookupVirtualTestSuite(test) {
     for (var suite in VIRTUAL_SUITES) {
         if (test.indexOf(suite) != -1)
@@ -2234,15 +1240,15 @@ function loadBaselinesForTest(expectationsContainers, expectationsContainer, tes
     var suite = lookupVirtualTestSuite(test);
 
     if (!suite)
-        addExpectationItem(expectationsContainers, expectationsContainer, null, test, TEST_URL_BASE_PATH);
+        addExpectationItem(expectationsContainers, expectationsContainer, null, test, TEST_URL_BASE_PATH_FOR_XHR);
 
     addExpectations(expectationsContainers, expectationsContainer,
-        TEST_URL_BASE_PATH, '', text, png, reftest_html_file, reftest_mismatch_html_file, suite);
+        TEST_URL_BASE_PATH_FOR_XHR, '', text, png, reftest_html_file, reftest_mismatch_html_file, suite);
 
     var fallbacks = allFallbacks();
     for (var i = 0; i < fallbacks.length; i++) {
       var fallback = 'platform/' + fallbacks[i];
-      addExpectations(expectationsContainers, expectationsContainer, TEST_URL_BASE_PATH, fallback, text, png,
+      addExpectations(expectationsContainers, expectationsContainer, TEST_URL_BASE_PATH_FOR_XHR, fallback, text, png,
           reftest_html_file, reftest_mismatch_html_file, suite);
     }
 
@@ -2362,7 +1368,7 @@ function htmlForIndividualTests(tests)
             if (g_history.isLayoutTestResults()) {
                 var suite = lookupVirtualTestSuite(test);
                 var base = suite ? baseTest(test, suite) : test;
-                var versionControlUrl = TEST_URL_BASE_PATH_IN_VERSION_CONTROL + base;
+                var versionControlUrl = TEST_URL_BASE_PATH_FOR_BROWSING + base;
                 testNameHtml += '<h2>' + linkHTMLToOpenWindow(versionControlUrl, test) + '</h2>';
             } else
                 testNameHtml += '<h2>' + test + '</h2>';
@@ -2407,18 +1413,17 @@ function linkHTMLToToggleState(key, linkText)
 function headerForTestTableHtml()
 {
     return '<h2 style="display:inline-block">Failing tests</h2>' +
-        checkBoxToToggleState('showWontFixSkip', 'WONTFIX/SKIP') +
-        checkBoxToToggleState('showCorrectExpectations', 'tests with correct expectations') +
-        checkBoxToToggleState('showWrongExpectations', 'tests with wrong expectations') +
-        checkBoxToToggleState('showFlaky', 'flaky') +
-        checkBoxToToggleState('showSlow', 'slow');
+        checkBoxToToggleState('showFlaky', 'Show flaky') +
+        checkBoxToToggleState('showNonFlaky', 'Show non-flaky') +
+        checkBoxToToggleState('showSkip', 'Show Skip') +
+        checkBoxToToggleState('showWontFix', 'Show WontFix');
 }
 
 function generatePageForBuilder(builderName)
 {
     processTestRunsForBuilder(builderName);
 
-    var results = g_perBuilderFailures[builderName];
+    var results = g_perBuilderFailures[builderName].filter(shouldShowTest);
     sortTests(results, g_history.dashboardSpecificState.sortColumn, g_history.dashboardSpecificState.sortOrder);
 
     var testsHTML = '';
@@ -2428,17 +1433,16 @@ function generatePageForBuilder(builderName)
             tableRowsHTML += htmlForSingleTestRow(results[i])
         testsHTML = htmlForTestTable(tableRowsHTML);
     } else {
-        testsHTML = '<div>No tests found. ';
         if (g_history.isLayoutTestResults())
-            testsHTML += 'Try showing tests with correct expectations.</div>';
+            testsHTML += '<div>Fill in one of the text inputs or checkboxes above to show failures.</div>';
         else
-            testsHTML += 'This means no tests have failed!</div>';
+            testsHTML += '<div>No tests have failed!</div>';
     }
 
     var html = htmlForNavBar();
 
     if (g_history.isLayoutTestResults())
-        html += htmlForTestsWithExpectationsButNoFailures(builderName) + headerForTestTableHtml();
+        html += headerForTestTableHtml();
 
     html += '<br>' + testsHTML;
     appendHTML(html);
@@ -2458,7 +1462,6 @@ var VALID_KEYS_FOR_CROSS_BUILDER_VIEW = {
     showChrome: 1,
     showExpectations: 1,
     showLargeExpectations: 1,
-    legacyExpectationsSemantics: 1,
     resultsHeight: 1,
     revision: 1
 };
@@ -2499,20 +1502,26 @@ function showLegend()
 
     var html = '<div id=legend-toggle onclick="hideLegend()">Hide ' +
         'legend [type esc]</div><div id=legend-contents>';
-    for (var expectation in expectationsMap())
-        html += '<div class=' + expectation + '>' + expectationsMap()[expectation] + '</div>';
+
+    // Just grab the first failureMap. Technically, different builders can have different maps if they
+    // haven't all cycled after the map was changed, but meh.
+    var failureMap = g_resultsByBuilder[Object.keys(g_resultsByBuilder)[0]][FAILURE_MAP_KEY];
+    for (var expectation in failureMap) {
+        var failureString = failureMap[expectation];
+        html += '<div class=' + classNameForFailureString(failureString) + '>' + failureString + '</div>';
+    }
 
     if (g_history.isLayoutTestResults()) {
       html += '</div><br style="clear:both">' +
-          '</div><h3>Test expectatons fallback order.</h3>';
+          '</div><h3>Test expectations fallback order.</h3>';
 
       for (var platform in g_fallbacksMap)
           html += '<div class=fallback-header>' + platform + '</div>' + htmlForFallbackHelp(g_fallbacksMap[platform]);
 
-      html += '<div>TIMES:</div>' +
-          htmlForSlowTimes(MIN_SECONDS_FOR_SLOW_TEST) +
-          '<div>DEBUG TIMES:</div>' +
-          htmlForSlowTimes(MIN_SECONDS_FOR_SLOW_TEST_DEBUG);
+      html += '<div>RELEASE TIMEOUTS:</div>' +
+          htmlForSlowTimes(RELEASE_TIMEOUT) +
+          '<div>DEBUG TIMEOUTS:</div>' +
+          htmlForSlowTimes(DEBUG_TIMEOUT);
     }
 
     legend.innerHTML = html;
@@ -2520,9 +1529,8 @@ function showLegend()
 
 function htmlForSlowTimes(minTime)
 {
-    return '<ul><li>&lt;1 second == !SLOW</li><li>&gt;1 second && &lt;' +
-        minTime + ' seconds == SLOW || !SLOW is fine</li><li>&gt;' +
-        minTime + ' seconds == SLOW</li></ul>';
+    return '<ul><li>' + minTime + ' seconds</li><li>' +
+        SLOW_MULTIPLIER * minTime + ' seconds if marked Slow in TestExpectations</li></ul>';
 }
 
 function postHeightChangedMessage()

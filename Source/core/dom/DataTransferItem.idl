@@ -29,8 +29,7 @@
  */
 
 [
-    NoInterfaceObject,
-    ImplementationLacksVTable
+    NoInterfaceObject
 ] interface DataTransferItem {
     readonly attribute DOMString kind;
     readonly attribute DOMString type;

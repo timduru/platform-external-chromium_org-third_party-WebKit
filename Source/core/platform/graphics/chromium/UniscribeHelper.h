@@ -44,6 +44,7 @@ class UniscribeTest_TooBig_Test; // A gunit test for UniscribeHelper.
 
 namespace WebCore {
 
+class FloatRect;
 class FontFeatureSettings;
 class GraphicsContext;
 
@@ -196,8 +197,10 @@ public:
     // be pre-set.
     //
     // The y position is the upper left corner, NOT the baseline.
-    void draw(GraphicsContext* graphicsContext, HDC dc, int x, int y, int from,
-              int to);
+    void draw(GraphicsContext* graphicsContext, HDC dc,
+              int x, int y,
+              const FloatRect& textRect,
+              int from, int to);
 
     // Returns the first glyph assigned to the character at the given offset.
     // This function is used to retrieve glyph information when Uniscribe is
@@ -370,7 +373,7 @@ private:
     // of fonts. When there's no more font available, returns false
     // without touching any of out params. Need to call ResetFontIndex
     // to start scanning of the font list from the beginning.
-    virtual bool nextWinFontData(HFONT*, SCRIPT_CACHE**, SCRIPT_FONTPROPERTIES**, int* ascent)
+    virtual bool nextWinFontData(HFONT&, SCRIPT_CACHE*&, SCRIPT_FONTPROPERTIES*&, int&, WORD&)
     {
         return false;
     }

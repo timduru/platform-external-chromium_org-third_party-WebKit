@@ -49,12 +49,10 @@
 #include "core/page/Page.h"
 #include "core/page/SpatialNavigation.h"
 #include "core/platform/Scrollbar.h"
-#include "core/platform/ScrollbarTheme.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/PaintInfo.h"
-#include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderScrollbar.h"
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderTheme.h"
@@ -434,7 +432,9 @@ void RenderListBox::paintItemForeground(PaintInfo& paintInfo, const LayoutPoint&
     }
 
     // Draw the item text
-    paintInfo.context->drawBidiText(itemFont, textRun, roundedIntPoint(r.location()));
+    TextRunPaintInfo textRunPaintInfo(textRun);
+    textRunPaintInfo.bounds = r;
+    paintInfo.context->drawBidiText(itemFont, textRunPaintInfo, roundedIntPoint(r.location()));
 }
 
 void RenderListBox::paintItemBackground(PaintInfo& paintInfo, const LayoutPoint& paintOffset, int listIndex)

@@ -33,9 +33,8 @@
 #include "core/html/BaseMultipleFieldsDateAndTimeInputType.h"
 
 #include "CSSValueKeywords.h"
+#include "RuntimeEnabledFeatures.h"
 #include "core/dom/KeyboardEvent.h"
-#include "core/dom/NodeTraversal.h"
-#include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/DateTimeFieldsState.h"
 #include "core/html/FormController.h"
@@ -307,10 +306,8 @@ void BaseMultipleFieldsDateAndTimeInputType::createShadowSubtree()
     container->appendChild(spinButton);
 
     bool shouldAddPickerIndicator = false;
-#if ENABLE(DATALIST_ELEMENT)
     if (InputType::themeSupportsDataListUI(this))
         shouldAddPickerIndicator = true;
-#endif
     RefPtr<RenderTheme> theme = document->page() ? document->page()->theme() : RenderTheme::defaultTheme();
     if (theme->supportsCalendarPicker(formControlType())) {
         shouldAddPickerIndicator = true;
@@ -343,6 +340,12 @@ void BaseMultipleFieldsDateAndTimeInputType::destroyShadowSubtree()
         m_pickerIndicatorElement->removePickerIndicatorOwner();
         m_pickerIndicatorElement = 0;
     }
+
+    // If a field element has focus, set focus back to the <input> itself before
+    // deleting the field. This prevents unnecessary focusout/blur events.
+    if (element()->focused())
+        element()->focus();
+
     BaseDateAndTimeInputType::destroyShadowSubtree();
 }
 
@@ -502,12 +505,10 @@ void BaseMultipleFieldsDateAndTimeInputType::valueAttributeChanged()
         updateInnerTextValue();
 }
 
-#if ENABLE(DATALIST_ELEMENT)
 void BaseMultipleFieldsDateAndTimeInputType::listAttributeTargetChanged()
 {
     updatePickerIndicatorVisibility();
 }
-#endif
 
 void BaseMultipleFieldsDateAndTimeInputType::updatePickerIndicatorVisibility()
 {
@@ -515,18 +516,18 @@ void BaseMultipleFieldsDateAndTimeInputType::updatePickerIndicatorVisibility()
         showPickerIndicator();
         return;
     }
-#if ENABLE(DATALIST_ELEMENT)
-    if (HTMLDataListElement* dataList = element()->dataList()) {
-        RefPtr<HTMLCollection> options = dataList->options();
-        for (unsigned i = 0; HTMLOptionElement* option = toHTMLOptionElement(options->item(i)); ++i) {
-            if (element()->isValidValue(option->value())) {
-                showPickerIndicator();
-                return;
+    if (RuntimeEnabledFeatures::dataListElementEnabled()) {
+        if (HTMLDataListElement* dataList = element()->dataList()) {
+            RefPtr<HTMLCollection> options = dataList->options();
+            for (unsigned i = 0; HTMLOptionElement* option = toHTMLOptionElement(options->item(i)); ++i) {
+                if (element()->isValidValue(option->value())) {
+                    showPickerIndicator();
+                    return;
+                }
             }
         }
+        hidePickerIndicator();
     }
-    hidePickerIndicator();
-#endif
 }
 
 void BaseMultipleFieldsDateAndTimeInputType::hidePickerIndicator()
