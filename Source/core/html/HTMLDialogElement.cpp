@@ -26,7 +26,6 @@
 #include "config.h"
 #include "core/html/HTMLDialogElement.h"
 
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/FrameView.h"
 #include "core/rendering/RenderBlock.h"
@@ -69,7 +68,7 @@ static bool needsCenteredPositioning(const RenderStyle* style)
 
 PassRefPtr<RenderStyle> HTMLDialogElement::customStyleForRenderer()
 {
-    RefPtr<RenderStyle> originalStyle = document()->styleResolver()->styleForElement(this);
+    RefPtr<RenderStyle> originalStyle = originalStyleForRenderer();
     RefPtr<RenderStyle> style = RenderStyle::clone(originalStyle.get());
 
     // Override top to remain centered after style recalcs.
@@ -99,7 +98,7 @@ void HTMLDialogElement::positionAndReattach()
     m_topIsValid = true;
 
     // FIXME: It's inefficient to reattach here. We could do better by mutating style directly and forcing another layout.
-    lazyReattach();
+    reattach();
 }
 
 void HTMLDialogElement::show()

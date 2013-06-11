@@ -68,11 +68,11 @@
 #include "core/platform/text/TextBreakIterator.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderWidget.h"
-#include <public/WebPoint.h>
-#include <public/WebString.h>
-#include <public/WebURL.h>
-#include <public/WebURLResponse.h>
-#include <public/WebVector.h>
+#include "public/platform/WebPoint.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebURL.h"
+#include "public/platform/WebURLResponse.h"
+#include "public/platform/WebVector.h"
 #include <wtf/text/WTFString.h>
 
 using namespace WebCore;
@@ -166,11 +166,6 @@ static String selectMisspellingAsync(Frame* selectedFrame, DocumentMarker& marke
     RefPtr<Range> markerRange = selectionRange->cloneRange(ASSERT_NO_EXCEPTION);
     markerRange->setStart(markerRange->startContainer(), marker.startOffset());
     markerRange->setEnd(markerRange->endContainer(), marker.endOffset());
-    if (selection.isCaret()) {
-        selection = VisibleSelection(markerRange.get());
-        selectedFrame->selection()->setSelection(selection, WordGranularity);
-        selectionRange = selection.toNormalizedRange();
-    }
 
     if (markerRange->text().stripWhiteSpace(&IsWhiteSpaceOrPunctuation) != selectionRange->text().stripWhiteSpace(&IsWhiteSpaceOrPunctuation))
         return String();
@@ -294,17 +289,15 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
     }
 
     if (r.isSelected()) {
-        if (!r.innerNonSharedNode()->hasTagName(HTMLNames::inputTag) || !static_cast<HTMLInputElement*>(r.innerNonSharedNode())->isPasswordField())
+        if (!r.innerNonSharedNode()->hasTagName(HTMLNames::inputTag) || !toHTMLInputElement(r.innerNonSharedNode())->isPasswordField())
             data.selectedText = selectedFrame->editor()->selectedText().stripWhiteSpace();
     }
 
     if (r.isContentEditable()) {
         data.isEditable = true;
 #if ENABLE(INPUT_SPEECH)
-        if (r.innerNonSharedNode()->hasTagName(HTMLNames::inputTag)) {
-            data.isSpeechInputEnabled = 
-                static_cast<HTMLInputElement*>(r.innerNonSharedNode())->isSpeechEnabled();
-        }  
+        if (r.innerNonSharedNode()->hasTagName(HTMLNames::inputTag))
+            data.isSpeechInputEnabled = toHTMLInputElement(r.innerNonSharedNode())->isSpeechEnabled();
 #endif
         // When Chrome enables asynchronous spellchecking, its spellchecker adds spelling markers to misspelled
         // words and attaches suggestions to these markers in the background. Therefore, when a user right-clicks
@@ -339,7 +332,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
         }
         HTMLFormElement* form = selectedFrame->selection()->currentForm();
         if (form && r.innerNonSharedNode()->hasTagName(HTMLNames::inputTag)) {
-            HTMLInputElement* selectedElement = static_cast<HTMLInputElement*>(r.innerNonSharedNode());
+            HTMLInputElement* selectedElement = toHTMLInputElement(r.innerNonSharedNode());
             if (selectedElement) {
                 WebSearchableFormData ws = WebSearchableFormData(WebFormElement(form), WebInputElement(selectedElement));
                 if (ws.url().isValid())

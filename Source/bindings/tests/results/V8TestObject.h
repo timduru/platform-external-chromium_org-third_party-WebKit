@@ -32,21 +32,23 @@ class V8TestObject {
 public:
     static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
     static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
-    static v8::Persistent<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
+    static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static TestObj* toNative(v8::Handle<v8::Object> object)
     {
         return reinterpret_cast<TestObj*>(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
     static void derefObject(void*);
     static WrapperTypeInfo info;
-    static v8::Handle<v8::Value> customMethodMethodCustom(const v8::Arguments&);
-    static v8::Handle<v8::Value> customMethodWithArgsMethodCustom(const v8::Arguments&);
-    static v8::Handle<v8::Value> classMethod2MethodCustom(const v8::Arguments&);
+    static void customMethodMethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
+    static void customMethodWithArgsMethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
+    static void classMethod2MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
-    static v8::Handle<v8::Value> customAttrAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo&);
-    static void customAttrAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::AccessorInfo&);
+    static void customAttrAttrGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void customAttrAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
     static v8::Handle<v8::Value> indexedPropertyGetter(uint32_t, const v8::AccessorInfo&);
     static v8::Handle<v8::Value> namedPropertyGetter(v8::Local<v8::String>, const v8::AccessorInfo&);
+    static v8::Handle<v8::Array> namedPropertyEnumerator(const v8::AccessorInfo&);
+    static v8::Handle<v8::Integer> namedPropertyQuery(v8::Local<v8::String>, const v8::AccessorInfo&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
     static void installPerContextProperties(v8::Handle<v8::Object>, TestObj*, v8::Isolate*);
     static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*);

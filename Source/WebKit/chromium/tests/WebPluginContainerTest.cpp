@@ -46,9 +46,9 @@
 #include "WebView.h"
 #include "WebViewImpl.h"
 #include "core/dom/Element.h"
-#include <public/Platform.h>
-#include <public/WebThread.h>
-#include <public/WebUnitTestSupport.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebThread.h"
+#include "public/platform/WebUnitTestSupport.h"
 
 using namespace WebKit;
 
@@ -111,6 +111,37 @@ TEST_F(WebPluginContainerTest, WindowToLocalPointTest)
     ASSERT_EQ(0, point3.y);
     WebPoint point4 = pluginContainerTwo->windowToLocalPoint(WebPoint(-10, 10));
     ASSERT_EQ(10, point4.x);
+    ASSERT_EQ(10, point4.y);
+
+    webView->close();
+}
+
+TEST_F(WebPluginContainerTest, LocalToWindowPointTest)
+{
+    URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("plugin_container.html"));
+    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "plugin_container.html", true, new TestPluginWebFrameClient());
+    ASSERT(webView);
+    webView->settings()->setPluginsEnabled(true);
+    webView->resize(WebSize(300, 300));
+    webView->layout();
+    FrameTestHelpers::runPendingTasks();
+
+    WebPluginContainer* pluginContainerOne = getWebPluginContainer(webView, WebString::fromUTF8("translated-plugin"));
+    ASSERT(pluginContainerOne);
+    WebPoint point1 = pluginContainerOne->localToWindowPoint(WebPoint(0, 0));
+    ASSERT_EQ(10, point1.x);
+    ASSERT_EQ(10, point1.y);
+    WebPoint point2 = pluginContainerOne->localToWindowPoint(WebPoint(90, 90));
+    ASSERT_EQ(100, point2.x);
+    ASSERT_EQ(100, point2.y);
+
+    WebPluginContainer* pluginContainerTwo = getWebPluginContainer(webView, WebString::fromUTF8("rotated-plugin"));
+    ASSERT(pluginContainerTwo);
+    WebPoint point3 = pluginContainerTwo->localToWindowPoint(WebPoint(10, 0));
+    ASSERT_EQ(0, point3.x);
+    ASSERT_EQ(10, point3.y);
+    WebPoint point4 = pluginContainerTwo->localToWindowPoint(WebPoint(10, 10));
+    ASSERT_EQ(-10, point4.x);
     ASSERT_EQ(10, point4.y);
 
     webView->close();

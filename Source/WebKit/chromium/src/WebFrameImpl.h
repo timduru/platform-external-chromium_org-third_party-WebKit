@@ -37,7 +37,7 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameDestructionObserver.h"
 #include "core/platform/graphics/FloatRect.h"
-#include <public/WebFileSystemType.h>
+#include "public/platform/WebFileSystemType.h"
 #include <wtf/Compiler.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
@@ -86,8 +86,6 @@ public:
     virtual WebSize minimumScrollOffset() const;
     virtual WebSize maximumScrollOffset() const;
     virtual WebSize contentsSize() const;
-    virtual int contentsPreferredWidth() const;
-    virtual int documentElementScrollHeight() const;
     virtual bool hasVisibleContent() const;
     virtual WebRect visibleContentRect() const;
     virtual bool hasHorizontalScrollbar() const;
@@ -174,7 +172,7 @@ public:
     virtual bool firstRectForCharacterRange(unsigned location, unsigned length, WebRect&) const;
     virtual size_t characterIndexForPoint(const WebPoint&) const;
     virtual bool executeCommand(const WebString&, const WebNode& = WebNode());
-    virtual bool executeCommand(const WebString&, const WebString& value);
+    virtual bool executeCommand(const WebString&, const WebString& value, const WebNode& = WebNode());
     virtual bool isCommandEnabled(const WebString&) const;
     virtual void enableContinuousSpellChecking(bool);
     virtual bool isContinuousSpellCheckingEnabled() const;
@@ -260,6 +258,11 @@ public:
     // If the frame hosts a PluginDocument, this method returns the WebPluginContainerImpl
     // that hosts the plugin.
     static WebPluginContainerImpl* pluginContainerFromFrame(WebCore::Frame*);
+
+    // If the frame hosts a PluginDocument, this method returns the WebPluginContainerImpl
+    // that hosts the plugin. If the provided node is a plugin, then it runs its
+    // WebPluginContainerImpl.
+    static WebPluginContainerImpl* pluginContainerFromNode(WebCore::Frame*, const WebNode&);
 
     WebViewImpl* viewImpl() const;
 

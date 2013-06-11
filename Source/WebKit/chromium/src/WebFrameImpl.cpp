@@ -71,16 +71,16 @@
 #include "config.h"
 #include "WebFrameImpl.h"
 
-#include <public/Platform.h>
-#include <public/WebFileSystem.h>
-#include <public/WebFileSystemType.h>
-#include <public/WebFloatPoint.h>
-#include <public/WebFloatRect.h>
-#include <public/WebPoint.h>
-#include <public/WebRect.h>
-#include <public/WebSize.h>
-#include <public/WebURLError.h>
-#include <public/WebVector.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebFileSystem.h"
+#include "public/platform/WebFileSystemType.h"
+#include "public/platform/WebFloatPoint.h"
+#include "public/platform/WebFloatRect.h"
+#include "public/platform/WebPoint.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebSize.h"
+#include "public/platform/WebURLError.h"
+#include "public/platform/WebVector.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/HashMap.h>
 #include <algorithm>
@@ -309,6 +309,14 @@ WebPluginContainerImpl* WebFrameImpl::pluginContainerFromFrame(Frame* frame)
     return static_cast<WebPluginContainerImpl *>(pluginDocument->pluginWidget());
 }
 
+WebPluginContainerImpl* WebFrameImpl::pluginContainerFromNode(WebCore::Frame* frame, const WebNode& node)
+{
+    WebPluginContainerImpl* pluginContainer = pluginContainerFromFrame(frame);
+    if (pluginContainer)
+        return pluginContainer;
+    return static_cast<WebPluginContainerImpl*>(node.pluginContainer());
+}
+
 // Simple class to override some of PrintContext behavior. Some of the methods
 // made virtual so that they can be overridden by ChromePluginPrintContext.
 class ChromePrintContext : public PrintContext {
@@ -378,7 +386,7 @@ public:
         int totalHeight = numPages * (pageSizeInPixels.height() + 1) - 1;
 
         // Fill the whole background by white.
-        graphicsContext.setFillColor(Color(255, 255, 255), ColorSpaceDeviceRGB);
+        graphicsContext.setFillColor(Color::white);
         graphicsContext.fillRect(FloatRect(0, 0, pageWidth, totalHeight));
 
         graphicsContext.save();
@@ -388,8 +396,8 @@ public:
             // Draw a line for a page boundary if this isn't the first page.
             if (pageIndex > 0) {
                 graphicsContext.save();
-                graphicsContext.setStrokeColor(Color(0, 0, 255), ColorSpaceDeviceRGB);
-                graphicsContext.setFillColor(Color(0, 0, 255), ColorSpaceDeviceRGB);
+                graphicsContext.setStrokeColor(Color(0, 0, 255));
+                graphicsContext.setFillColor(Color(0, 0, 255));
                 graphicsContext.drawLine(IntPoint(0, currentHeight), IntPoint(pageWidth, currentHeight));
                 graphicsContext.restore();
             }
@@ -617,22 +625,6 @@ void WebFrameImpl::setScrollOffset(const WebSize& offset)
 WebSize WebFrameImpl::contentsSize() const
 {
     return frame()->view()->contentsSize();
-}
-
-int WebFrameImpl::contentsPreferredWidth() const
-{
-    if (frame()->document() && frame()->document()->renderView()) {
-        FontCachePurgePreventer fontCachePurgePreventer;
-        return frame()->document()->renderView()->minPreferredLogicalWidth();
-    }
-    return 0;
-}
-
-int WebFrameImpl::documentElementScrollHeight() const
-{
-    if (frame()->document() && frame()->document()->documentElement())
-        return frame()->document()->documentElement()->scrollHeight();
-    return 0;
 }
 
 bool WebFrameImpl::hasVisibleContent() const
@@ -1202,9 +1194,7 @@ bool WebFrameImpl::executeCommand(const WebString& name, const WebNode& node)
     if (command[command.length() - 1] == UChar(':'))
         command = command.substring(0, command.length() - 1);
 
-    WebPluginContainerImpl* pluginContainer = pluginContainerFromFrame(frame());
-    if (!pluginContainer)
-        pluginContainer = static_cast<WebPluginContainerImpl*>(node.pluginContainer());
+    WebPluginContainerImpl* pluginContainer = pluginContainerFromNode(frame(), node);
     if (pluginContainer && pluginContainer->executeEditCommand(name))
         return true;
 
@@ -1233,10 +1223,14 @@ bool WebFrameImpl::executeCommand(const WebString& name, const WebNode& node)
     return result;
 }
 
-bool WebFrameImpl::executeCommand(const WebString& name, const WebString& value)
+bool WebFrameImpl::executeCommand(const WebString& name, const WebString& value, const WebNode& node)
 {
     ASSERT(frame());
     String webName = name;
+
+    WebPluginContainerImpl* pluginContainer = pluginContainerFromNode(frame(), node);
+    if (pluginContainer && pluginContainer->executeEditCommand(name, value))
+        return true;
 
     // moveToBeginningOfDocument and moveToEndfDocument are only handled by WebKit for editable nodes.
     if (!frame()->editor()->canEdit() && webName == "moveToBeginningOfDocument")

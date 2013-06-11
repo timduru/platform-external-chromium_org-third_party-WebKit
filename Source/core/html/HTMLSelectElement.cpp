@@ -1337,7 +1337,10 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
             }
             event->setDefaultHandled();
         }
-    } else if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton && document()->frame()->eventHandler()->autoscrollRenderer() != renderer()) {
+    } else if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton && renderer() && !toRenderBox(renderer())->autoscrollInProgress()) {
+        // We didn't start this click/drag on any options.
+        if (m_lastOnChangeSelection.isEmpty())
+            return;
         // This makes sure we fire dispatchFormControlChangeEvent for a single
         // click. For drag selection, onChange will fire when the autoscroll
         // timer stops.
@@ -1568,6 +1571,16 @@ void HTMLSelectElement::finishParsingChildren()
     HTMLFormControlElementWithState::finishParsingChildren();
     m_isParsingInProgress = false;
     updateListItemSelectedStates();
+}
+
+bool HTMLSelectElement::anonymousIndexedSetter(unsigned index, PassRefPtr<HTMLOptionElement> value, ExceptionCode& ec)
+{
+    if (!value) {
+        ec = TYPE_MISMATCH_ERR;
+        return false;
+    }
+    setOption(index, value.get(), ec);
+    return true;
 }
 
 } // namespace

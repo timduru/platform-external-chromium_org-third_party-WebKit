@@ -123,6 +123,7 @@
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLHeadElement.h"
 #include "core/html/HTMLIFrameElement.h"
+#include "core/html/HTMLImportsController.h"
 #include "core/html/HTMLLinkElement.h"
 #include "core/html/HTMLMapElement.h"
 #include "core/html/HTMLNameCollection.h"
@@ -145,7 +146,6 @@
 #include "core/loader/TextResourceDecoder.h"
 #include "core/loader/cache/CachedCSSStyleSheet.h"
 #include "core/loader/cache/CachedResourceLoader.h"
-#include "core/page/CaptionUserPreferences.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/ContentSecurityPolicy.h"
@@ -400,24 +400,45 @@ Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentCla
     , TreeScope(this)
     , m_styleResolverThrowawayTimer(this, &Document::styleResolverThrowawayTimerFired)
     , m_lastStyleResolverAccessTime(0)
+    , m_didCalculateStyleResolver(false)
+    , m_ignorePendingStylesheets(false)
+    , m_needsNotifyRemoveAllPendingStylesheet(false)
+    , m_hasNodesWithPlaceholderStyle(false)
+    , m_pendingSheetLayout(NoLayoutWithPendingSheets)
+    , m_frame(frame)
+    , m_domWindow(0)
     , m_activeParserCount(0)
     , m_contextFeatures(ContextFeatures::defaultSwitch())
+    , m_wellFormed(false)
+    , m_printing(false)
+    , m_paginatedForScreen(false)
+    , m_ignoreAutofocus(false)
     , m_compatibilityMode(NoQuirksMode)
     , m_compatibilityModeLocked(false)
+    , m_textColor(Color::black)
     , m_didPostCheckFocusedNodeTask(false)
     , m_domTreeVersion(++s_globalTreeVersion)
+    , m_listenerTypes(0)
     , m_mutationObserverTypes(0)
     , m_styleSheetCollection(DocumentStyleSheetCollection::create(this))
     , m_visitedLinkState(VisitedLinkState::create(this))
+    , m_visuallyOrdered(false)
     , m_readyState(Complete)
+    , m_bParsing(false)
     , m_styleRecalcTimer(this, &Document::styleRecalcTimerFired)
+    , m_inStyleRecalc(false)
+    , m_closeAfterStyleRecalc(false)
+    , m_gotoAnchorNeededAfterStylesheetsLoad(false)
     , m_pendingStyleRecalcShouldForce(false)
     , m_frameElementsShouldIgnoreScrolling(false)
     , m_containsValidityStyleRules(false)
     , m_updateFocusAppearanceRestoresSelection(false)
     , m_ignoreDestructiveWriteCount(0)
     , m_titleSetExplicitly(false)
+    , m_markers(adoptPtr(new DocumentMarkerController))
     , m_updateFocusAppearanceTimer(this, &Document::updateFocusAppearanceTimerFired)
+    , m_cssTarget(0)
+    , m_processingLoadEvent(false)
     , m_loadEventFinished(false)
     , m_startTime(currentTime())
     , m_overMinimumLayoutThreshold(false)
@@ -452,6 +473,8 @@ Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentCla
     , m_writeRecursionDepth(0)
     , m_wheelEventHandlerCount(0)
     , m_lastHandledUserGestureTimestamp(0)
+    , m_prerenderer(Prerenderer::create(this))
+    , m_textAutosizer(TextAutosizer::create(this))
     , m_pendingTasksTimer(this, &Document::pendingTasksTimerFired)
     , m_scheduledTasksAreSuspended(false)
     , m_sharedObjectPoolClearTimer(this, &Document::sharedObjectPoolClearTimerFired)
@@ -464,63 +487,31 @@ Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentCla
     , m_didAssociateFormControlsTimer(this, &Document::didAssociateFormControlsTimerFired)
 {
     ScriptWrappable::init(this);
-    m_printing = false;
-    m_paginatedForScreen = false;
 
-    m_ignoreAutofocus = false;
-
-    m_frame = frame;
-    if (m_frame)
+    if (m_frame) {
         provideContextFeaturesToDocumentFrom(this, m_frame->page());
+
+        m_cachedResourceLoader = m_frame->loader()->activeDocumentLoader()->cachedResourceLoader();
+    }
+
+    if (!m_cachedResourceLoader)
+        m_cachedResourceLoader = CachedResourceLoader::create(0);
+    m_cachedResourceLoader->setDocument(this);
 
     // We depend on the url getting immediately set in subframes, but we
     // also depend on the url NOT getting immediately set in opened windows.
     // See fast/dom/early-frame-url.html
     // and fast/dom/location-new-window-no-crash.html, respectively.
     // FIXME: Can/should we unify this behavior?
-    if ((frame && frame->ownerElement()) || !url.isEmpty())
+    if ((m_frame && m_frame->ownerElement()) || !url.isEmpty())
         setURL(url);
-
-    m_markers = adoptPtr(new DocumentMarkerController);
-
-    if (m_frame)
-        m_cachedResourceLoader = m_frame->loader()->activeDocumentLoader()->cachedResourceLoader();
-    if (!m_cachedResourceLoader)
-        m_cachedResourceLoader = CachedResourceLoader::create(0);
-    m_cachedResourceLoader->setDocument(this);
-
-    m_prerenderer = Prerenderer::create(this);
-    m_textAutosizer = TextAutosizer::create(this);
-    m_visuallyOrdered = false;
-    m_bParsing = false;
-    m_wellFormed = false;
-
-    m_textColor = Color::black;
-    m_listenerTypes = 0;
-    m_inStyleRecalc = false;
-    m_closeAfterStyleRecalc = false;
-
-    m_gotoAnchorNeededAfterStylesheetsLoad = false;
-
-    m_didCalculateStyleResolver = false;
-    m_ignorePendingStylesheets = false;
-    m_needsNotifyRemoveAllPendingStylesheet = false;
-    m_hasNodesWithPlaceholderStyle = false;
-    m_pendingSheetLayout = NoLayoutWithPendingSheets;
-
-    m_cssTarget = 0;
 
     resetLinkColor();
     resetVisitedLinkColor();
     resetActiveLinkColor();
 
-    m_processingLoadEvent = false;
-
     initSecurityContext();
     initDNSPrefetch();
-
-    static int docID = 0;
-    m_docID = docID++;
 
     for (unsigned i = 0; i < WTF_ARRAY_LENGTH(m_nodeListCounts); i++)
         m_nodeListCounts[i] = 0;
@@ -562,9 +553,6 @@ Document::~Document()
 
     if (Document* ownerDocument = this->ownerDocument())
         ownerDocument->didRemoveEventTargetNode(this);
-    // FIXME: Should we reset m_domWindow when we detach from the Frame?
-    if (m_domWindow)
-        m_domWindow->reset();
 
     m_scriptRunner.clear();
 
@@ -638,6 +626,7 @@ void Document::dispose()
     detachParser();
 
     m_registry.clear();
+    m_imports.clear();
 
     // removeDetachedChildren() doesn't always unregister IDs,
     // so tear down scope information upfront to avoid having stale references in the map.
@@ -861,6 +850,23 @@ CustomElementRegistry* Document::ensureCustomElementRegistry()
         m_registry = adoptRef(new CustomElementRegistry(this));
     }
     return m_registry.get();
+}
+
+HTMLImportsController* Document::ensureImports()
+{
+    if (!m_imports)
+        m_imports = HTMLImportsController::create(this);
+    return m_imports.get();
+}
+
+void Document::didLoadAllImports()
+{
+    executeScriptsWaitingForResourcesIfNeeded();
+}
+
+bool Document::haveImportsLoaded() const
+{
+    return !m_imports || m_imports->haveLoaded();
 }
 
 PassRefPtr<DocumentFragment> Document::createDocumentFragment()
@@ -1663,7 +1669,7 @@ void Document::recalcStyle(StyleChange change)
                 renderer()->setStyle(documentStyle.release());
         }
 
-        for (Node* n = firstChild(); n; n = n->nextSibling()) {
+        for (Node* n = lastChild(); n; n = n->previousSibling()) {
             if (!n->isElementNode())
                 continue;
             Element* element = toElement(n);
@@ -2024,9 +2030,9 @@ void Document::setVisuallyOrdered()
 
 PassRefPtr<DocumentParser> Document::createParser()
 {
-    if (isHTMLDocument()) {
+    if (isHTMLDocument() || (RuntimeEnabledFeatures::parseSVGAsHTMLEnabled() && isSVGDocument())) {
         bool reportErrors = InspectorInstrumentation::collectingHTMLParseErrors(this->page());
-        return HTMLDocumentParser::create(toHTMLDocument(this), reportErrors);
+        return HTMLDocumentParser::create(this, reportErrors);
     }
     // FIXME: this should probably pass the frame instead
     return XMLDocumentParser::create(this, view());
@@ -2215,8 +2221,9 @@ void Document::implicitClose()
     if (!doload)
         return;
 
-    // Call to dispatchWindowLoadEvent can blow us from underneath.
-    RefPtr<Document> protect(this);
+    // The call to dispatchWindowLoadEvent can detach the DOMWindow and cause it (and its
+    // attached Document) to be destroyed.
+    RefPtr<DOMWindow> protect(this->domWindow());
 
     m_processingLoadEvent = true;
 
@@ -2294,16 +2301,14 @@ void Document::implicitClose()
         // The AX cache may have been cleared at this point, but we need to make sure it contains an
         // AX object to send the notification to. getOrCreate will make sure that an valid AX object
         // exists in the cache (we ignore the return value because we don't need it here). This is
-        // only safe to call when a layout is not in progress, so it can not be used in postNotification.
-        if (AXObjectCache* cache = axObjectCache()) {
-            cache->getOrCreate(renderObject);
-            if (this == topDocument())
-                cache->postNotification(renderObject, AXObjectCache::AXLoadComplete, true);
-            else {
-                // AXLoadComplete can only be posted on the top document, so if it's a document
-                // in an iframe that just finished loading, post AXLayoutComplete instead.
-                cache->postNotification(renderObject, AXObjectCache::AXLayoutComplete, true);
-            }
+        // only safe to call when a layout is not in progress, so it can not be used in postNotification.    
+        axObjectCache()->getOrCreate(renderObject);
+        if (this == topDocument())
+            axObjectCache()->postNotification(renderObject, AXObjectCache::AXLoadComplete, true);
+        else {
+            // AXLoadComplete can only be posted on the top document, so if it's a document
+            // in an iframe that just finished loading, post AXLayoutComplete instead.
+            axObjectCache()->postNotification(renderObject, AXObjectCache::AXLayoutComplete, true);
         }
     }
 
@@ -2625,13 +2630,20 @@ void Document::didRemoveAllPendingStylesheet()
     m_needsNotifyRemoveAllPendingStylesheet = false;
 
     styleResolverChanged(RecalcStyleIfNeeded);
-
-    if (ScriptableDocumentParser* parser = scriptableDocumentParser())
-        parser->executeScriptsWaitingForStylesheets();
+    executeScriptsWaitingForResourcesIfNeeded();
 
     if (m_gotoAnchorNeededAfterStylesheetsLoad && view())
         view()->scrollToFragment(m_url);
 }
+
+void Document::executeScriptsWaitingForResourcesIfNeeded()
+{
+    if (!haveStylesheetsAndImportsLoaded())
+        return;
+    if (ScriptableDocumentParser* parser = scriptableDocumentParser())
+        parser->executeScriptsWaitingForResources();
+}
+
 
 CSSStyleSheet* Document::elementSheet()
 {
@@ -2697,9 +2709,7 @@ void Document::processHttpEquiv(const String& equiv, const String& content)
     else if (equalIgnoringCase(equiv, "x-frame-options")) {
         if (frame) {
             FrameLoader* frameLoader = frame->loader();
-            unsigned long requestIdentifier = 0;
-            if (frameLoader->activeDocumentLoader() && frameLoader->activeDocumentLoader()->mainResourceLoader())
-                requestIdentifier = frameLoader->activeDocumentLoader()->mainResourceLoader()->identifier();
+            unsigned long requestIdentifier = loader()->mainResourceIdentifier();
             if (frameLoader->shouldInterruptLoadForXFrameOptions(content, url(), requestIdentifier)) {
                 String message = "Refused to display '" + url().elidedString() + "' in a frame because it set 'X-Frame-Options' to '" + content + "'.";
                 frameLoader->stopAllLoaders();
@@ -3101,6 +3111,13 @@ void Document::hoveredNodeDetached(Node* node)
     m_hoverNode = node->parentNode();
     while (m_hoverNode && !m_hoverNode->renderer())
         m_hoverNode = m_hoverNode->parentNode();
+
+    // If the mouse cursor is not visible, do not clear existing
+    // hover effects on the ancestors of |node| and do not invoke
+    // new hover effects on any other element.
+    if (!page()->isCursorVisible())
+        return;
+
     if (frame())
         frame()->eventHandler()->scheduleHoverStateUpdate();
 }
@@ -3426,30 +3443,6 @@ void Document::textNodeSplit(Text* oldNode)
     // FIXME: This should update markers for spelling and grammar checking.
 }
 
-void Document::createDOMWindow()
-{
-    ASSERT(m_frame);
-    ASSERT(!m_domWindow);
-
-    m_domWindow = DOMWindow::create(this);
-
-    ASSERT(m_domWindow->document() == this);
-    ASSERT(m_domWindow->frame() == m_frame);
-}
-
-void Document::takeDOMWindowFrom(Document* document)
-{
-    ASSERT(m_frame);
-    ASSERT(!m_domWindow);
-    ASSERT(document->domWindow());
-
-    m_domWindow = document->m_domWindow.release();
-    m_domWindow->didSecureTransitionTo(this);
-
-    ASSERT(m_domWindow->document() == this);
-    ASSERT(m_domWindow->frame() == m_frame);
-}
-
 void Document::setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener> listener)
 {
     DOMWindow* domWindow = this->domWindow();
@@ -3475,16 +3468,6 @@ void Document::dispatchWindowEvent(PassRefPtr<Event> event,  PassRefPtr<EventTar
     domWindow->dispatchEvent(event, target);
 }
 
-void Document::dispatchWindowLoadEvent()
-{
-    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
-    DOMWindow* domWindow = this->domWindow();
-    if (!domWindow)
-        return;
-    domWindow->dispatchLoadEvent();
-    m_loadEventFinished = true;
-}
-
 void Document::enqueueWindowEvent(PassRefPtr<Event> event)
 {
     event->setTarget(domWindow());
@@ -3505,6 +3488,16 @@ PassRefPtr<Event> Document::createEvent(const String& eventType, ExceptionCode& 
 
     ec = NOT_SUPPORTED_ERR;
     return 0;
+}
+
+void Document::dispatchWindowLoadEvent()
+{
+    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+    DOMWindow* domWindow = this->domWindow();
+    if (!domWindow)
+        return;
+    domWindow->dispatchLoadEvent();
+    m_loadEventFinished = true;
 }
 
 void Document::addMutationEventListenerTypeIfEnabled(ListenerType listenerType)
@@ -3840,26 +3833,6 @@ void Document::documentWillBecomeInactive()
 {
     if (renderer())
         renderView()->setIsInWindow(false);
-}
-
-void Document::registerForCaptionPreferencesChangedCallbacks(Element* e)
-{
-    if (page())
-        page()->group().captionPreferences()->setInterestedInCaptionPreferenceChanges();
-
-    m_captionPreferencesChangedElements.add(e);
-}
-
-void Document::unregisterForCaptionPreferencesChangedCallbacks(Element* e)
-{
-    m_captionPreferencesChangedElements.remove(e);
-}
-
-void Document::captionPreferencesChanged()
-{
-    HashSet<Element*>::iterator end = m_captionPreferencesChangedElements.end();
-    for (HashSet<Element*>::iterator it = m_captionPreferencesChangedElements.begin(); it != end; ++it)
-        (*it)->captionPreferencesChanged();
 }
 
 void Document::setShouldCreateRenderers(bool f)
@@ -5516,7 +5489,6 @@ void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_prerenderer, "prerenderer");
     info.addMember(m_listsInvalidatedAtDocument, "listsInvalidatedAtDocument");
     info.addMember(m_styleResolverThrowawayTimer, "styleResolverThrowawayTimer");
-    info.addMember(m_domWindow, "domWindow");
     info.addMember(m_parser, "parser");
     info.addMember(m_contextFeatures, "contextFeatures");
     info.addMember(m_focusedNode, "focusedNode");

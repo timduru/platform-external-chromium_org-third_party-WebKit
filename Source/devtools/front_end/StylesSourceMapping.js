@@ -87,7 +87,7 @@ WebInspector.StylesSourceMapping.prototype = {
         if (!url)
             return;
 
-        this._cssModel.setSourceMapping(url, this);
+        header.pushSourceMapping(this);
         var map = this._urlToHeadersByFrameId[url];
         if (!map) {
             map = new StringMap();
@@ -113,7 +113,6 @@ WebInspector.StylesSourceMapping.prototype = {
         if (!url)
             return;
 
-        this._cssModel.setSourceMapping(url, null);
         var map = this._urlToHeadersByFrameId[url];
         console.assert(map);
         var headersById = map.get(header.frameId);
@@ -161,11 +160,12 @@ WebInspector.StylesSourceMapping.prototype = {
      */
     _bindUISourceCode: function(uiSourceCode, header)
     {
+        if (uiSourceCode.styleFile() || header.isInline)
+            return;
         var url = uiSourceCode.url;
         uiSourceCode.setSourceMapping(this);
-        if (!uiSourceCode.styleFile() && !header.isInline)
-            uiSourceCode.setStyleFile(new WebInspector.StyleFile(uiSourceCode));
-        this._cssModel.updateLocations();
+        uiSourceCode.setStyleFile(new WebInspector.StyleFile(uiSourceCode));
+        header.updateLocations();
     },
 
     /**

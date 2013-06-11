@@ -32,18 +32,23 @@
 #define WebString_h
 
 #include "WebCommon.h"
+#include "WebPrivatePtr.h"
 
 #if WEBKIT_IMPLEMENTATION
 #include <wtf/Forward.h>
 #else
 #include <base/nullable_string16.h>
 #include <base/string16.h>
+#include <base/strings/latin1_string_conversions.h>
 #endif
+
+namespace WTF {
+class StringImpl;
+}
 
 namespace WebKit {
 
 class WebCString;
-class WebStringPrivate;
 
 // A UTF-16 string container.  It is inexpensive to copy a WebString
 // object.
@@ -54,14 +59,14 @@ class WebString {
 public:
     ~WebString() { reset(); }
 
-    WebString() : m_private(0) { }
+    WebString() { }
 
-    WebString(const WebUChar* data, size_t len) : m_private(0)
+    WebString(const WebUChar* data, size_t len)
     {
         assign(data, len);
     }
 
-    WebString(const WebString& s) : m_private(0) { assign(s); }
+    WebString(const WebString& s) { assign(s); }
 
     WebString& operator=(const WebString& s)
     {
@@ -76,13 +81,12 @@ public:
     WEBKIT_EXPORT bool equals(const WebString& s) const;
 
     WEBKIT_EXPORT size_t length() const;
-    WEBKIT_EXPORT const WebUChar* data() const;
 
     // Caller must check bounds.
     WEBKIT_EXPORT WebUChar at(unsigned) const;
 
     bool isEmpty() const { return !length(); }
-    bool isNull() const { return !m_private; }
+    bool isNull() const { return m_private.isNull(); }
 
     WEBKIT_EXPORT WebCString utf8() const;
 
@@ -90,7 +94,6 @@ public:
     WEBKIT_EXPORT static WebString fromUTF8(const char* data);
 
     template <int N> WebString(const char (&data)[N])
-        : m_private(0)
     {
         assign(fromUTF8(data, N - 1));
     }
@@ -111,7 +114,7 @@ public:
     operator WTF::AtomicString() const;
 #else
 
-    WebString(const string16& s) : m_private(0)
+    WebString(const string16& s)
     {
         assign(s.data(), s.length());
     }
@@ -124,11 +127,10 @@ public:
 
     operator string16() const
     {
-        size_t len = length();
-        return len ? string16(data(), len) : string16();
+        return base::Latin1OrUTF16ToUTF16(length(), data8(), data16());
     }
 
-    WebString(const NullableString16& s) : m_private(0)
+    WebString(const NullableString16& s)
     {
         if (s.is_null())
             reset();
@@ -147,10 +149,7 @@ public:
 
     operator NullableString16() const
     {
-        if (!m_private)
-            return NullableString16(string16(), true);
-        size_t len = length();
-        return NullableString16(len ? string16(data(), len) : string16(), false);
+        return NullableString16(operator string16(), m_private.isNull());
     }
 
     template <class UTF8String>
@@ -161,9 +160,13 @@ public:
 #endif
 
 private:
-    void assign(WebStringPrivate*);
+    WEBKIT_EXPORT bool is8Bit() const;
+    WEBKIT_EXPORT const WebLChar* data8() const;
+    WEBKIT_EXPORT const WebUChar* data16() const;
 
-    WebStringPrivate* m_private;
+    void assign(WTF::StringImpl*);
+
+    WebPrivatePtr<WTF::StringImpl> m_private;
 };
 
 inline bool operator==(const WebString& a, const WebString& b)

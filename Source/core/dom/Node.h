@@ -31,6 +31,7 @@
 #include "core/dom/SimulatedClickOptions.h"
 #include "core/dom/TreeScope.h"
 #include "core/editing/EditingBoundary.h"
+#include "core/inspector/InspectorCounters.h"
 #include "core/page/FocusDirection.h"
 #include "core/platform/KURLHash.h"
 #include "core/platform/TreeShared.h"
@@ -155,6 +156,15 @@ public:
         DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20,
     };
 
+    static void init();
+    static void shutdown();
+#if ENABLE(PARTITION_ALLOC)
+    // All Nodes are placed in their own heap partition for security.
+    // See http://crbug.com/246860 for detail.
+    void* operator new(size_t);
+    void operator delete(void*);
+#endif
+
     static bool isSupported(const String& feature, const String& version);
 
     static void startIgnoringLeaks();
@@ -260,8 +270,6 @@ public:
     bool isDocumentFragment() const { return getFlag(IsDocumentFragmentFlag); }
     bool isShadowRoot() const { return isDocumentFragment() && isTreeScope(); }
     bool isInsertionPoint() const { return getFlag(NeedsShadowTreeWalkerFlag) && isInsertionPointNode(); }
-    // Returns Node rather than InsertionPoint. Should be used only for language bindings.
-    Node* insertionParentForBinding() const;
 
     bool needsShadowTreeWalker() const;
     bool needsShadowTreeWalkerSlow() const;
@@ -392,8 +400,12 @@ public:
     bool isV8CollectableDuringMinorGC() const { return getFlag(V8CollectableDuringMinorGCFlag); }
     void setV8CollectableDuringMinorGC(bool flag) { setFlag(flag, V8CollectableDuringMinorGCFlag); }
 
-    void lazyAttach();
-    void lazyReattach();
+    enum ShouldSetAttached {
+        SetAttached,
+        DoNotSetAttached
+    };
+    void lazyAttach(ShouldSetAttached = SetAttached);
+    void lazyReattach(ShouldSetAttached = SetAttached);
 
     virtual void setFocus(bool flag);
     virtual void setActive(bool flag = true, bool pause = false);
@@ -604,16 +616,17 @@ public:
     PassRefPtr<Element> querySelector(const AtomicString& selectors, ExceptionCode&);
     PassRefPtr<NodeList> querySelectorAll(const AtomicString& selectors, ExceptionCode&);
 
-    unsigned short compareDocumentPosition(Node*);
+    unsigned short compareDocumentPosition(const Node*) const;
 
     enum ShadowTreesTreatment {
         TreatShadowTreesAsDisconnected,
         TreatShadowTreesAsComposed
     };
 
-    unsigned short compareDocumentPositionInternal(Node*, ShadowTreesTreatment);
+    unsigned short compareDocumentPositionInternal(const Node*, ShadowTreesTreatment) const;
 
     virtual Node* toNode();
+    // Obsolete. Use toHTMLInputElement.
     virtual HTMLInputElement* toInputElement();
 
     virtual const AtomicString& interfaceName() const;
@@ -747,7 +760,24 @@ protected:
         CreateInsertionPoint = CreateHTMLElement | NeedsShadowTreeWalkerFlag,
         CreateEditingText = CreateText | HasNameOrIsEditingTextFlag,
     };
-    Node(Document*, ConstructionType);
+
+    Node(TreeScope* treeScope, ConstructionType type)
+        : m_nodeFlags(type)
+        , m_parentOrShadowHostNode(0)
+        , m_treeScope(treeScope)
+        , m_previous(0)
+        , m_next(0)
+    {
+        ScriptWrappable::init(this);
+        if (!m_treeScope)
+            m_treeScope = TreeScope::noDocumentInstance();
+        m_treeScope->guardRef();
+
+#if !defined(NDEBUG) || (defined(DUMP_NODE_STATISTICS) && DUMP_NODE_STATISTICS)
+        trackForDebugging();
+#endif
+        InspectorCounters::incrementCounter(InspectorCounters::NodeCounter);
+    }
 
     virtual void didMoveToNewDocument(Document* oldDocument);
     
@@ -871,11 +901,11 @@ inline void Node::lazyReattachIfAttached()
         lazyReattach();
 }
 
-inline void Node::lazyReattach()
+inline void Node::lazyReattach(ShouldSetAttached shouldSetAttached)
 {
     if (attached())
         detach();
-    lazyAttach();
+    lazyAttach(shouldSetAttached);
 }
 
 // Need a template since ElementShadow is not a Node, but has the style recalc methods.

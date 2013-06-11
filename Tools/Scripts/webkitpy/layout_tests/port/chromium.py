@@ -421,6 +421,12 @@ class ChromiumPort(Port):
             VirtualTestSuite('virtual/gpu/compositedscrolling/scrollbars',
                              'scrollbars',
                              ['--enable-accelerated-overflow-scroll']),
+            VirtualTestSuite('virtual/threaded/animations',
+                             'animations',
+                             ['--enable-threaded-compositing']),
+            VirtualTestSuite('virtual/threaded/transitions',
+                             'transitions',
+                             ['--enable-threaded-compositing']),
         ]
 
     #
@@ -434,7 +440,7 @@ class ChromiumPort(Port):
         return self._build_path_with_configuration(None, *comps)
 
     def _build_path_with_configuration(self, configuration, *comps):
-        # Note that we don't implement --root or do the option caching that the
+        # Note that we don't do the option caching that the
         # base class does, because finding the right directory is relatively
         # fast.
         configuration = configuration or self.get_option('configuration')

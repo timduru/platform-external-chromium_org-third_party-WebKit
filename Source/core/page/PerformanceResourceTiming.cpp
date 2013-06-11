@@ -36,7 +36,6 @@
 #include "core/dom/Document.h"
 #include "core/loader/DocumentLoadTiming.h"
 #include "core/loader/DocumentLoader.h"
-#include "core/platform/KURL.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/network/ResourceResponse.h"
 #include "weborigin/SecurityOrigin.h"
@@ -121,18 +120,10 @@ double PerformanceResourceTiming::domainLookupStart() const
     if (!m_shouldReportDetails)
         return 0.0;
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     if (!m_timing || m_timing->dnsStart == 0.0)
-#else
-    if (!m_timing || m_timing->dnsStart < 0)
-#endif
         return fetchStart();
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), m_timing->dnsStart);
-#else
-    return resourceTimeToDocumentMilliseconds(m_timing->dnsStart);
-#endif
 }
 
 double PerformanceResourceTiming::domainLookupEnd() const
@@ -140,18 +131,10 @@ double PerformanceResourceTiming::domainLookupEnd() const
     if (!m_shouldReportDetails)
         return 0.0;
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     if (!m_timing || m_timing->dnsEnd == 0.0)
-#else
-    if (!m_timing || m_timing->dnsEnd < 0)
-#endif
         return domainLookupStart();
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), m_timing->dnsEnd);
-#else
-    return resourceTimeToDocumentMilliseconds(m_timing->dnsEnd);
-#endif
 }
 
 double PerformanceResourceTiming::connectStart() const
@@ -159,7 +142,6 @@ double PerformanceResourceTiming::connectStart() const
     if (!m_shouldReportDetails)
         return 0.0;
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     // connectStart will be zero when a network request is not made.
     if (!m_timing || m_timing->connectStart == 0.0 || m_didReuseConnection)
         return domainLookupEnd();
@@ -168,22 +150,8 @@ double PerformanceResourceTiming::connectStart() const
     double connectStart = m_timing->connectStart;
     if (m_timing->dnsEnd > 0.0)
         connectStart = m_timing->dnsEnd;
-#else
-    // connectStart will be -1 when a network request is not made.
-    if (!m_timing || m_timing->connectStart < 0 || m_didReuseConnection)
-        return domainLookupEnd();
 
-    // connectStart includes any DNS time, so we may need to trim that off.
-    int connectStart = m_timing->connectStart;
-    if (m_timing->dnsEnd >= 0)
-        connectStart = m_timing->dnsEnd;
-#endif
-
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), connectStart);
-#else
-    return resourceTimeToDocumentMilliseconds(m_timing->connectStart);
-#endif
 }
 
 double PerformanceResourceTiming::connectEnd() const
@@ -191,20 +159,11 @@ double PerformanceResourceTiming::connectEnd() const
     if (!m_shouldReportDetails)
         return 0.0;
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     // connectStart will be zero when a network request is not made.
     if (!m_timing || m_timing->connectEnd == 0.0 || m_didReuseConnection)
-#else
-    // connectStart will be -1 when a network request is not made.
-    if (!m_timing || m_timing->connectEnd < 0 || m_didReuseConnection)
-#endif
         return connectStart();
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), m_timing->connectEnd);
-#else
-    return resourceTimeToDocumentMilliseconds(m_timing->connectEnd);
-#endif
 }
 
 double PerformanceResourceTiming::secureConnectionStart() const
@@ -212,18 +171,10 @@ double PerformanceResourceTiming::secureConnectionStart() const
     if (!m_shouldReportDetails)
         return 0.0;
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     if (!m_timing || m_timing->sslStart == 0.0) // Secure connection not negotiated.
-#else
-    if (!m_timing || m_timing->sslStart < 0) // Secure connection not negotiated.
-#endif
         return 0.0;
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), m_timing->sslStart);
-#else
-    return resourceTimeToDocumentMilliseconds(m_timing->sslStart);
-#endif
 }
 
 double PerformanceResourceTiming::requestStart() const
@@ -234,11 +185,7 @@ double PerformanceResourceTiming::requestStart() const
     if (!m_timing)
         return connectEnd();
 
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), m_timing->sendStart);
-#else
-    return resourceTimeToDocumentMilliseconds(m_timing->sendStart);
-#endif
 }
 
 double PerformanceResourceTiming::responseStart() const
@@ -248,12 +195,9 @@ double PerformanceResourceTiming::responseStart() const
 
     if (!m_timing)
         return requestStart();
+
     // FIXME: This number isn't exactly correct. See the notes in PerformanceTiming::responseStart().
-#ifdef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
     return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), m_timing->receiveHeadersEnd);
-#else
-    return resourceTimeToDocumentMilliseconds(m_timing->receiveHeadersEnd);
-#endif
 }
 
 double PerformanceResourceTiming::responseEnd() const
@@ -263,13 +207,5 @@ double PerformanceResourceTiming::responseEnd() const
 
     return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), m_finishTime);
 }
-
-#ifndef ENABLE_DOUBLE_RESOURCE_LOAD_TIMING
-double PerformanceResourceTiming::resourceTimeToDocumentMilliseconds(int deltaMilliseconds) const
-{
-    ASSERT(deltaMilliseconds >= 0);
-    return monotonicTimeToDocumentMilliseconds(m_requestingDocument.get(), m_timing->requestTime) + deltaMilliseconds;
-}
-#endif
 
 } // namespace WebCore

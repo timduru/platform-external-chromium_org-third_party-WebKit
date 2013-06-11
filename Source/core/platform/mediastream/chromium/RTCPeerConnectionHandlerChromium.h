@@ -33,8 +33,8 @@
 
 #include "core/platform/mediastream/MediaStreamDescriptor.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandler.h"
-#include <public/WebRTCPeerConnectionHandler.h>
-#include <public/WebRTCPeerConnectionHandlerClient.h>
+#include "public/platform/WebRTCPeerConnectionHandler.h"
+#include "public/platform/WebRTCPeerConnectionHandlerClient.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/PassRefPtr.h>
 
@@ -68,7 +68,7 @@ public:
     virtual bool addStream(PassRefPtr<MediaStreamDescriptor>, PassRefPtr<MediaConstraints>) OVERRIDE;
     virtual void removeStream(PassRefPtr<MediaStreamDescriptor>) OVERRIDE;
     virtual void getStats(PassRefPtr<RTCStatsRequest>) OVERRIDE;
-    virtual PassOwnPtr<RTCDataChannelHandler> createDataChannel(const String& label, bool reliable) OVERRIDE;
+    virtual PassOwnPtr<RTCDataChannelHandler> createDataChannel(const String& label, const WebKit::WebRTCDataChannelInit&) OVERRIDE;
     virtual PassOwnPtr<RTCDTMFSenderHandler> createDTMFSender(PassRefPtr<MediaStreamComponent>) OVERRIDE;
     virtual void stop() OVERRIDE;
 

@@ -32,7 +32,7 @@ class V8TestEventTarget {
 public:
     static bool HasInstance(v8::Handle<v8::Value>, v8::Isolate*, WrapperWorldType);
     static bool HasInstanceInAnyWorld(v8::Handle<v8::Value>, v8::Isolate*);
-    static v8::Persistent<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
+    static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static TestEventTarget* toNative(v8::Handle<v8::Object> object)
     {
         return reinterpret_cast<TestEventTarget*>(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
@@ -45,6 +45,8 @@ public:
     static v8::Handle<v8::Value> namedPropertyGetter(v8::Local<v8::String>, const v8::AccessorInfo&);
     static v8::Handle<v8::Value> namedPropertySetter(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::AccessorInfo&);
     static v8::Handle<v8::Boolean> namedPropertyDeleter(v8::Local<v8::String>, const v8::AccessorInfo&);
+    static v8::Handle<v8::Array> namedPropertyEnumerator(const v8::AccessorInfo&);
+    static v8::Handle<v8::Integer> namedPropertyQuery(v8::Local<v8::String>, const v8::AccessorInfo&);
     static const int eventListenerCacheIndex = v8DefaultWrapperInternalFieldCount + 0;
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 1;
     static void installPerContextProperties(v8::Handle<v8::Object>, TestEventTarget*, v8::Isolate*) { }

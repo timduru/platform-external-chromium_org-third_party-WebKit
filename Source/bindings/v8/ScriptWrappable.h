@@ -37,6 +37,13 @@
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include <v8.h>
 
+// Helper to call webCoreInitializeScriptWrappableForInterface in the global namespace.
+template <class C> inline void initializeScriptWrappableHelper(C* object)
+{
+    void webCoreInitializeScriptWrappableForInterface(C*);
+    webCoreInitializeScriptWrappableForInterface(object);
+}
+
 namespace WebCore {
 
 class ScriptWrappable : public MemoryReporterTag {
@@ -52,8 +59,7 @@ public:
     // a cleaner solution someday.
     template <class C> static void init(C* object)
     {
-        void initializeScriptWrappableForInterface(C*);
-        initializeScriptWrappableForInterface(object);
+        initializeScriptWrappableHelper(object);
     }
 
     void setWrapper(v8::Handle<v8::Object> wrapper, v8::Isolate* isolate, const WrapperConfiguration& configuration)
@@ -160,11 +166,11 @@ private:
     inline bool containsWrapper() const { return (m_wrapperOrTypeInfo & 1) == 1; }
     inline bool containsTypeInfo() const { return m_wrapperOrTypeInfo && (m_wrapperOrTypeInfo & 1) == 0; }
 
-    inline void disposeWrapper(v8::Persistent<v8::Value> value, v8::Isolate* isolate, const WrapperTypeInfo* info)
+    inline void disposeWrapper(v8::Persistent<v8::Object>* value, const WrapperTypeInfo* info)
     {
         ASSERT(containsWrapper());
-        ASSERT(reinterpret_cast<uintptr_t>(*value) == (m_wrapperOrTypeInfo & ~1));
-        value.Dispose(isolate);
+        ASSERT(*reinterpret_cast<uintptr_t*>(value) == (m_wrapperOrTypeInfo & ~1));
+        value->Dispose();
         setTypeInfo(info);
     }
 
@@ -182,7 +188,7 @@ private:
         WrapperTypeInfo* info = toWrapperTypeInfo(*wrapper);
         ASSERT(info->derefObjectFunction);
 
-        key->disposeWrapper(*wrapper, isolate, info);
+        key->disposeWrapper(wrapper, info);
         // FIXME: I noticed that 50%~ of minor GC cycle times can be consumed
         // inside key->deref(), which causes Node destructions. We should
         // make Node destructions incremental.

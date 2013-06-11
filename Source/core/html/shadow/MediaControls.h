@@ -85,7 +85,6 @@ class MediaControls : public HTMLDivElement {
 
     virtual void changedClosedCaptionsVisibility();
     virtual void refreshClosedCaptionsButtonVisibility();
-    virtual void toggleClosedCaptionTrackList() { }
     virtual void closedCaptionTracksChanged();
 
     virtual void enteredFullscreen();
@@ -101,7 +100,6 @@ class MediaControls : public HTMLDivElement {
     virtual void showTextTrackDisplay();
     virtual void hideTextTrackDisplay();
     virtual void updateTextTrackDisplay();
-    virtual void textTrackPreferencesChanged();
 
 protected:
     explicit MediaControls(Document*);

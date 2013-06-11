@@ -83,8 +83,6 @@ public:
 
     // Returns the root object for the entire document.
     AccessibilityObject* rootObject();
-    // Returns the root object for a specific frame.
-    AccessibilityObject* rootObjectForFrame(Frame*);
     
     // For AX objects with elements that back them.
     AccessibilityObject* getOrCreate(RenderObject*);
@@ -130,16 +128,10 @@ public:
 
 #if HAVE(ACCESSIBILITY)
     static void enableAccessibility() { gAccessibilityEnabled = true; }
-    // Enhanced user interface accessibility can be toggled by the assistive technology.
-    static void setEnhancedUserInterfaceAccessibility(bool flag) { gAccessibilityEnhancedUserInterfaceEnabled = flag; }
-    
     static bool accessibilityEnabled() { return gAccessibilityEnabled; }
-    static bool accessibilityEnhancedUserInterfaceEnabled() { return gAccessibilityEnhancedUserInterfaceEnabled; }
 #else
     static void enableAccessibility() { }
-    static void setEnhancedUserInterfaceAccessibility(bool) { }
     static bool accessibilityEnabled() { return false; }
-    static bool accessibilityEnhancedUserInterfaceEnabled() { return false; }
 #endif
 
     void removeAXID(AccessibilityObject*);
@@ -227,7 +219,6 @@ private:
     HashSet<Node*> m_textMarkerNodes;
     OwnPtr<AXComputedObjectAttributeCache> m_computedObjectAttributeCache;
     static bool gAccessibilityEnabled;
-    static bool gAccessibilityEnhancedUserInterfaceEnabled;
     
     HashSet<AXID> m_idsInUse;
     
@@ -258,7 +249,6 @@ inline AccessibilityObject* AXObjectCache::getOrCreate(RenderObject*) { return 0
 inline AccessibilityObject* AXObjectCache::getOrCreate(Node*) { return 0; }
 inline AccessibilityObject* AXObjectCache::getOrCreate(Widget*) { return 0; }
 inline AccessibilityObject* AXObjectCache::rootObject() { return 0; }
-inline AccessibilityObject* AXObjectCache::rootObjectForFrame(Frame*) { return 0; }
 inline Element* AXObjectCache::rootAXEditableElement(Node*) { return 0; }
 inline bool nodeHasRole(Node*, const String&) { return false; }
 inline void AXObjectCache::startCachingComputedObjectAttributesUntilTreeMutates() { }

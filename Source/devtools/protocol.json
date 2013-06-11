@@ -12,6 +12,10 @@
             {
                 "name": "disable",
                 "description": "Disables inspector domain notifications."
+            },
+            {
+                "name": "reset",
+                "description": "Resets all domains."
             }
         ],
         "events": [
@@ -742,6 +746,11 @@
         "description": "Console domain defines methods and events for interaction with the JavaScript console. Console collects messages created by means of the <a href='http://getfirebug.com/wiki/index.php/Console_API'>JavaScript Console API</a>. One needs to enable this domain using <code>enable</code> command in order to start receiving the console messages. Browser collects messages issued while console domain is not enabled as well and reports them using <code>messageAdded</code> notification upon enabling.",
         "types": [
             {
+                "id": "Timestamp",
+                "type": "number",
+                "description": "Number of seconds since epoch."
+            },
+            {
                 "id": "ConsoleMessage",
                 "type": "object",
                 "description": "Console message.",
@@ -755,7 +764,8 @@
                     { "name": "repeatCount", "type": "integer", "optional": true, "description": "Repeat count for repeated messages." },
                     { "name": "parameters", "type": "array", "items": { "$ref": "Runtime.RemoteObject" }, "optional": true, "description": "Message parameters in case of the formatted message." },
                     { "name": "stackTrace", "$ref": "StackTrace", "optional": true, "description": "JavaScript stack trace for assertions and error messages." },
-                    { "name": "networkRequestId", "$ref": "Network.RequestId", "optional": true, "description": "Identifier of the network request associated with this message." }
+                    { "name": "networkRequestId", "$ref": "Network.RequestId", "optional": true, "description": "Identifier of the network request associated with this message." },
+                    { "name": "timestamp", "$ref": "Timestamp", "description": "Timestamp, when this message was fired.", "hidden": true }
                 ]
             },
             {
@@ -824,7 +834,8 @@
             {
                 "name": "messageRepeatCountUpdated",
                 "parameters": [
-                    { "name": "count", "type": "integer", "description": "New repeat count value." }
+                    { "name": "count", "type": "integer", "description": "New repeat count value." },
+                    { "name": "timestamp", "$ref": "Timestamp", "description": "Timestamp of most recent message in batch.", "hidden": true }
                 ],
                 "description": "Issued when subsequent message(s) are equal to the previous one(s)."
             },
@@ -1037,6 +1048,19 @@
                     { "name": "cacheDisabled", "type": "boolean", "description": "Cache disabled state." }
                 ],
                 "description": "Toggles ignoring cache for each request. If <code>true</code>, cache will not be used."
+            },  
+            {
+                "name": "loadResourceForFrontend",
+                "async": true,
+                "parameters": [
+                    { "name": "frameId", "$ref": "FrameId", "description": "Frame to load the resource from." },
+                    { "name": "url", "type": "string", "description": "URL of the resource to load." }
+                ],
+                "returns": [
+                    { "name": "content", "type": "string", "description": "Resource content." }
+                ],
+                "description": "Loads a resource in the context of a frame on the inspected page without cross origin checks.",
+                "hidden": true
             }
         ],
         "events": [
@@ -3028,8 +3052,9 @@
                 "name": "paused",
                 "parameters": [
                     { "name": "callFrames", "type": "array", "items": { "$ref": "CallFrame" }, "description": "Call stack the virtual machine stopped on." },
-                    { "name": "reason", "type": "string", "enum": [ "XHR", "DOM", "EventListener", "exception", "assert", "CSPViolation", "other" ], "description": "Pause reason." },
-                    { "name": "data", "type": "object", "optional": true, "description": "Object containing break-specific auxiliary properties." }
+                    { "name": "reason", "type": "string", "enum": [ "XHR", "DOM", "EventListener", "exception", "assert", "CSPViolation", "debugCommand", "other" ], "description": "Pause reason." },
+                    { "name": "data", "type": "object", "optional": true, "description": "Object containing break-specific auxiliary properties." },
+                    { "name": "hitBreakpoints", "type": "array", "optional": true, "items": { "type": "string" }, "description": "Hit breakpoints IDs", "hidden": true }
                 ],
                 "description": "Fired when the virtual machine stopped on breakpoint or exception or any other stop criteria."
             },

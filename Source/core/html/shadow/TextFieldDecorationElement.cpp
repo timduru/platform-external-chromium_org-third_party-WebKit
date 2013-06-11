@@ -33,7 +33,6 @@
 
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Event.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/shadow/ElementShadow.h"
@@ -125,8 +124,7 @@ inline HTMLInputElement* TextFieldDecorationElement::hostInput()
 {
     // TextFieldDecorationElement is created only by C++ code, and it is always
     // in <input> shadow.
-    ASSERT_WITH_SECURITY_IMPLICATION(!shadowHost() || shadowHost()->hasTagName(inputTag));
-    return static_cast<HTMLInputElement*>(shadowHost());
+    return toHTMLInputElement(shadowHost());
 }
 
 bool TextFieldDecorationElement::isTextFieldDecoration() const
@@ -154,7 +152,7 @@ void TextFieldDecorationElement::updateImage()
 
 PassRefPtr<RenderStyle> TextFieldDecorationElement::customStyleForRenderer()
 {
-    RefPtr<RenderStyle> originalStyle = document()->styleResolver()->styleForElement(this);
+    RefPtr<RenderStyle> originalStyle = originalStyleForRenderer();
     RefPtr<RenderStyle> style = RenderStyle::clone(originalStyle.get());
     RenderStyle* inputStyle = hostInput()->renderStyle();
     ASSERT(inputStyle);

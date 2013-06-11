@@ -44,10 +44,10 @@
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderProgress.h"
 #include "core/rendering/RenderSlider.h"
-#include <public/Platform.h>
-#include <public/WebColor.h>
-#include <public/WebRect.h>
-#include <public/win/WebThemeEngine.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebColor.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/win/WebThemeEngine.h"
 #include <wtf/CurrentTime.h>
 
 
@@ -254,7 +254,7 @@ static int cssValueIdToSysColorIndex(int cssValueId)
     }
 }
 
-Color RenderThemeChromiumWin::systemColor(int cssValueId) const
+Color RenderThemeChromiumWin::systemColor(CSSValueID cssValueId) const
 {
     int sysColorIndex = cssValueIdToSysColorIndex(cssValueId);
     if (isRunningLayoutTest() || (sysColorIndex == -1))
@@ -582,7 +582,7 @@ bool RenderThemeChromiumWin::paintTextFieldInternal(RenderObject* o,
     return false;
 }
 
-void RenderThemeChromiumWin::adjustInnerSpinButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
+void RenderThemeChromiumWin::adjustInnerSpinButtonStyle(RenderStyle* style, Element*) const
 {
     int width = ScrollbarTheme::theme()->scrollbarThickness();
     style->setWidth(Length(width, Fixed));
@@ -628,7 +628,7 @@ double RenderThemeChromiumWin::animationDurationForProgressBar(RenderProgress* r
     return progressAnimationFrameRate;
 }
 
-void RenderThemeChromiumWin::adjustProgressBarStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderThemeChromiumWin::adjustProgressBarStyle(RenderStyle*, Element*) const
 {
 }
 

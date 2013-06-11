@@ -915,7 +915,7 @@ void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, int x1, 
                 bool wasAntialiased = graphicsContext->shouldAntialias();
                 StrokeStyle oldStrokeStyle = graphicsContext->strokeStyle();
                 graphicsContext->setShouldAntialias(antialias);
-                graphicsContext->setStrokeColor(color, m_style->colorSpace());
+                graphicsContext->setStrokeColor(color);
                 graphicsContext->setStrokeThickness(thickness);
                 graphicsContext->setStrokeStyle(style == DASHED ? DashedStroke : DottedStroke);
 
@@ -941,8 +941,8 @@ void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, int x1, 
             if (adjacentWidth1 == 0 && adjacentWidth2 == 0) {
                 StrokeStyle oldStrokeStyle = graphicsContext->strokeStyle();
                 graphicsContext->setStrokeStyle(NoStroke);
-                graphicsContext->setFillColor(color, m_style->colorSpace());
-                
+                graphicsContext->setFillColor(color);
+
                 bool wasAntialiased = graphicsContext->shouldAntialias();
                 graphicsContext->setShouldAntialias(antialias);
 
@@ -1063,7 +1063,7 @@ void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, int x1, 
         case SOLID: {
             StrokeStyle oldStrokeStyle = graphicsContext->strokeStyle();
             graphicsContext->setStrokeStyle(NoStroke);
-            graphicsContext->setFillColor(color, m_style->colorSpace());
+            graphicsContext->setFillColor(color);
             ASSERT(x2 >= x1);
             ASSERT(y2 >= y1);
             if (!adjacentWidth1 && !adjacentWidth2) {
@@ -1184,7 +1184,7 @@ void RenderObject::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRec
             path.addRect(outer);
             path.addRect(inner);
             graphicsContext->setFillRule(RULE_EVENODD);
-            graphicsContext->setFillColor(outlineColor, styleToUse->colorSpace());
+            graphicsContext->setFillColor(outlineColor);
             graphicsContext->fillPath(path);
             return;
         }
@@ -1359,7 +1359,7 @@ void RenderObject::repaintUsingContainer(const RenderLayerModelObject* repaintCo
     if (repaintContainer->isRenderView()) {
         ASSERT(repaintContainer == v);
         bool viewHasCompositedLayer = v->hasLayer() && v->layer()->isComposited();
-        if (!viewHasCompositedLayer || v->layer()->backing()->paintsIntoWindow()) {
+        if (!viewHasCompositedLayer) {
             LayoutRect repaintRectangle = r;
             if (viewHasCompositedLayer &&  v->layer()->transform())
                 repaintRectangle = enclosingIntRect(v->layer()->transform()->mapRect(r));
@@ -1801,6 +1801,20 @@ void RenderObject::setPseudoStyle(PassRefPtr<RenderStyle> pseudoStyle)
     setStyle(pseudoStyle);
 }
 
+inline bool RenderObject::hasImmediateNonWhitespaceTextChild() const
+{
+    for (const RenderObject* r = firstChild(); r; r = r->nextSibling()) {
+        if (r->isText() && !toRenderText(r)->isAllCollapsibleWhitespace())
+            return true;
+    }
+    return false;
+}
+
+inline bool RenderObject::shouldRepaintForStyleDifference(StyleDifference diff) const
+{
+    return diff == StyleDifferenceRepaint || (diff == StyleDifferenceRepaintIfText && hasImmediateNonWhitespaceTextChild());
+}
+
 void RenderObject::setStyle(PassRefPtr<RenderStyle> style)
 {
     if (m_style == style) {
@@ -1860,7 +1874,7 @@ void RenderObject::setStyle(PassRefPtr<RenderStyle> style)
             setNeedsSimplifiedNormalFlowLayout();
     }
     
-    if (updatedDiff == StyleDifferenceRepaintLayer || updatedDiff == StyleDifferenceRepaint) {
+    if (updatedDiff == StyleDifferenceRepaintLayer || shouldRepaintForStyleDifference(updatedDiff)) {
         // Do a repaint with the new style now, e.g., for example if we go from
         // not having an outline to having an outline.
         repaint();
@@ -1901,7 +1915,7 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
             }
         }
 
-        if (m_parent && (diff == StyleDifferenceRepaint || newStyle->outlineSize() < m_style->outlineSize()))
+        if (m_parent && (newStyle->outlineSize() < m_style->outlineSize() || shouldRepaintForStyleDifference(diff)))
             repaint();
         if (isFloating() && (m_style->floating() != newStyle->floating()))
             // For changes in float styles, we need to conceivably remove ourselves
@@ -2399,8 +2413,8 @@ void RenderObject::willBeDestroyed()
     // has a null frame, so we assert this. However, we don't want release builds to crash which is why we
     // check that the frame is not null.
     ASSERT(frame());
-    if (frame() && frame()->eventHandler()->autoscrollRenderer() == this)
-        frame()->eventHandler()->stopAutoscrollTimer(true);
+    if (frame() && frame()->page())
+        frame()->page()->stopAutoscrollIfNeeded(this);
 
     animation()->cancelAnimations(this);
 
@@ -2796,12 +2810,10 @@ bool RenderObject::hasBlendMode() const
 static Color decorationColor(RenderStyle* style)
 {
     Color result;
-#if ENABLE(CSS3_TEXT)
     // Check for text decoration color first.
-    result = style->visitedDependentColor(CSSPropertyWebkitTextDecorationColor);
+    result = style->visitedDependentColor(CSSPropertyTextDecorationColor);
     if (result.isValid())
         return result;
-#endif // CSS3_TEXT
     if (style->textStrokeWidth() > 0) {
         // Prefer stroke color if possible but not if it's fully transparent.
         result = style->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
@@ -2956,9 +2968,48 @@ AnimationController* RenderObject::animation() const
     return frame()->animation();
 }
 
+bool RenderObject::isInert() const
+{
+    const RenderObject* renderer = this;
+    while (!renderer->node())
+        renderer = renderer->parent();
+    const Node* parentNode = renderer->node();
+    while (parentNode && !parentNode->isElementNode())
+        parentNode = parentNode->parentNode();
+    return parentNode && toElement(parentNode)->isInert();
+}
+
 void RenderObject::imageChanged(CachedImage* image, const IntRect* rect)
 {
     imageChanged(static_cast<WrappedImagePtr>(image), rect);
+}
+
+RenderObject* RenderObject::hoverAncestor() const
+{
+    // When searching for the hover ancestor and encountering a named flow thread,
+    // the search will continue with the DOM ancestor of the top-most element
+    // in the named flow thread.
+    // See https://code.google.com/p/chromium/issues/detail?id=243278
+    RenderObject* hoverAncestor = parent();
+
+    // Skip anonymous blocks. There's no point in treating them as hover ancestors
+    // and it would also prevent us from continuing the search on the DOM tree
+    // when reaching the named flow thread.
+    if (hoverAncestor && hoverAncestor->isAnonymousBlock())
+        hoverAncestor = hoverAncestor->parent();
+
+    if (hoverAncestor && hoverAncestor->isRenderNamedFlowThread()) {
+        hoverAncestor = 0;
+
+        Node* node = this->node();
+        if (node) {
+            Node* domAncestorNode = node->parentNode();
+            if (domAncestorNode)
+                hoverAncestor = domAncestorNode->renderer();
+        }
+    }
+
+    return hoverAncestor;
 }
 
 Element* RenderObject::offsetParent() const

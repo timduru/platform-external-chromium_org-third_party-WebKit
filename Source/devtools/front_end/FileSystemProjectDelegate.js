@@ -134,7 +134,7 @@ WebInspector.FileSystemProjectDelegate.prototype = {
      */
     canRename: function()
     {
-        return false;
+        return true;
     },
 
     /**
@@ -144,7 +144,8 @@ WebInspector.FileSystemProjectDelegate.prototype = {
      */
     rename: function(path, newName, callback)
     {
-        callback(false);
+        var filePath = this._filePathForPath(path);
+        this._fileSystem.renameFile(filePath, newName, callback);
     },
 
     /**
@@ -194,26 +195,21 @@ WebInspector.FileSystemProjectDelegate.prototype = {
 
     populate: function()
     {
-        this._fileSystem.requestFilesRecursive("", fileLoaded.bind(this));
-
-        function fileLoaded(filePath)
-        {
-            var path = filePath.split("/");
-            path.shift();
-            console.assert(path.length);
-            var fullPath = this._fileSystem.path() + filePath;
-            var url = this._workspace.urlForPath(fullPath);
-            var contentType = this._contentTypeForPath(path);
-            var fileDescriptor = new WebInspector.FileDescriptor(path, "file://" + fullPath, url, contentType, true);
-            this._addFile(fileDescriptor);
-        }
+        this._fileSystem.requestFilesRecursive("", this._addFile.bind(this));
     },
 
     /**
-     * @param {WebInspector.FileDescriptor} fileDescriptor
+     * @param {string} filePath
      */
-    _addFile: function(fileDescriptor)
+    _addFile: function(filePath)
     {
+        var path = filePath.split("/");
+        path.shift();
+        console.assert(path.length);
+        var fullPath = this._fileSystem.path() + filePath;
+        var url = this._workspace.urlForPath(fullPath);
+        var contentType = this._contentTypeForPath(path);
+        var fileDescriptor = new WebInspector.FileDescriptor(path, "file://" + fullPath, url, contentType, true);
         this.dispatchEventToListeners(WebInspector.ProjectDelegate.Events.FileAdded, fileDescriptor);
     },
 

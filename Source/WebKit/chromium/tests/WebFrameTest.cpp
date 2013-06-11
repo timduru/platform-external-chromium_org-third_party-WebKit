@@ -68,12 +68,13 @@
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
+#include "core/rendering/TextAutosizer.h"
 #include "v8.h"
-#include <public/Platform.h>
-#include <public/WebFloatRect.h>
-#include <public/WebThread.h>
-#include <public/WebUnitTestSupport.h>
-#include <public/WebURLResponse.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebFloatRect.h"
+#include "public/platform/WebThread.h"
+#include "public/platform/WebUnitTestSupport.h"
+#include "public/platform/WebURLResponse.h"
 #include <wtf/dtoa/utils.h>
 #include <wtf/Forward.h>
 
@@ -326,6 +327,55 @@ TEST_F(WebFrameTest, FrameViewNeedsLayoutOnFixedLayoutResize)
     webViewImpl->layout();
 }
 
+TEST_F(WebFrameTest, ChangeInFixedLayoutTriggersTextAutosizingRecalculate)
+{
+    registerMockedHttpURLLoad("fixed_layout.html");
+
+    FixedLayoutTestWebViewClient client;
+    int viewportWidth = 640;
+    int viewportHeight = 480;
+
+    // Make sure we initialize to minimum scale, even if the window size
+    // only becomes available after the load begins.
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setViewportEnabled(true);
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+
+    WebCore::Document* document = webViewImpl->page()->mainFrame()->document();
+    document->settings()->setTextAutosizingEnabled(true);
+    EXPECT_TRUE(document->settings()->textAutosizingEnabled());
+    webViewImpl->resize(WebSize(viewportWidth, viewportHeight));
+    webViewImpl->layout();
+
+    WebCore::RenderObject* renderer = document->renderer();
+    bool multiplierSetAtLeastOnce = false;
+    while (renderer) {
+        if (renderer->style()) {
+            renderer->style()->setTextAutosizingMultiplier(2);
+            EXPECT_EQ(2, renderer->style()->textAutosizingMultiplier());
+            multiplierSetAtLeastOnce = true;
+        }
+        renderer = renderer->nextInPreOrder();
+    }
+    EXPECT_TRUE(multiplierSetAtLeastOnce);
+
+    WebCore::ViewportArguments arguments = document->viewportArguments();
+    arguments.width += 10;
+    webViewImpl->updatePageDefinedPageScaleConstraints(arguments);
+
+    bool multiplierCheckedAtLeastOnce = false;
+    renderer = document->renderer();
+    while (renderer) {
+        if (renderer->style()) {
+            EXPECT_EQ(1, renderer->style()->textAutosizingMultiplier());
+            multiplierCheckedAtLeastOnce = true;
+        }
+        renderer = renderer->nextInPreOrder();
+    }
+    EXPECT_TRUE(multiplierCheckedAtLeastOnce);
+}
+
 TEST_F(WebFrameTest, DeviceScaleFactorUsesDefaultWithoutViewportTag)
 {
     registerMockedHttpURLLoad("no_viewport_tag.html");
@@ -497,6 +547,7 @@ TEST_F(WebFrameTest, NoWideViewportIgnoresPageViewportWidth)
     // The page sets viewport width to 3000, but with UseWideViewport == false is must be ignored.
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
     EXPECT_EQ(viewportWidth, webViewImpl->mainFrameImpl()->frameView()->contentsSize().width());
+    EXPECT_EQ(viewportHeight, webViewImpl->mainFrameImpl()->frameView()->contentsSize().height());
 }
 
 TEST_F(WebFrameTest, NoWideViewportIgnoresPageViewportWidthButAccountsScale)
@@ -519,6 +570,7 @@ TEST_F(WebFrameTest, NoWideViewportIgnoresPageViewportWidthButAccountsScale)
     // While the initial scale specified by the page must be accounted.
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
     EXPECT_EQ(viewportWidth / 2, webViewImpl->mainFrameImpl()->frameView()->contentsSize().width());
+    EXPECT_EQ(viewportHeight / 2, webViewImpl->mainFrameImpl()->frameView()->contentsSize().height());
 }
 
 TEST_F(WebFrameTest, WideViewportSetsTo980WithAutoWidth)
@@ -539,6 +591,7 @@ TEST_F(WebFrameTest, WideViewportSetsTo980WithAutoWidth)
 
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
     EXPECT_EQ(980, webViewImpl->mainFrameImpl()->frameView()->contentsSize().width());
+    EXPECT_EQ(980.0 / viewportWidth * viewportHeight, webViewImpl->mainFrameImpl()->frameView()->contentsSize().height());
 }
 
 TEST_F(WebFrameTest, PageViewportInitialScaleOverridesLoadWithOverviewMode)
@@ -1586,7 +1639,7 @@ public:
 
         ~Notification()
         {
-            context.Dispose(context->GetIsolate());
+            context.Dispose();
         }
 
         bool Equals(Notification* other)
@@ -1713,7 +1766,8 @@ TEST_F(WebFrameTest, ContextNotificationsReload)
 
 TEST_F(WebFrameTest, ContextNotificationsIsolatedWorlds)
 {
-    v8::HandleScope handleScope;
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    v8::HandleScope handleScope(isolate);
 
     registerMockedHttpURLLoad("context_notifications_test.html");
     registerMockedHttpURLLoad("context_notifications_test_frame.html");
@@ -1737,7 +1791,7 @@ TEST_F(WebFrameTest, ContextNotificationsIsolatedWorlds)
     ASSERT_EQ(m_webView->mainFrame(), notification->frame);
 
     // We don't have an API to enumarate isolated worlds for a frame, but we can at least assert that the context we got is *not* the main world's context.
-    ASSERT_NE(m_webView->mainFrame()->mainWorldScriptContext(), notification->context);
+    ASSERT_NE(m_webView->mainFrame()->mainWorldScriptContext(), v8::Local<v8::Context>::New(isolate, notification->context));
 
     m_webView->close();
     m_webView = 0;
@@ -3036,6 +3090,68 @@ TEST_F(WebFrameTest, MarkerHashIdentifiers) {
     m_webView->spellingMarkers(&documentMarkers);
     EXPECT_EQ(1U, documentMarkers.size());
     EXPECT_EQ(kHash, documentMarkers[0]);
+
+    m_webView->close();
+    m_webView = 0;
+}
+
+class StubbornSpellCheckClient : public WebSpellCheckClient {
+public:
+    StubbornSpellCheckClient() : m_completion(0) { }
+    virtual ~StubbornSpellCheckClient() { }
+
+    virtual void requestCheckingOfText(
+        const WebKit::WebString&,
+        const WebKit::WebVector<uint32_t>&,
+        const WebKit::WebVector<unsigned>&,
+        WebKit::WebTextCheckingCompletion* completion) OVERRIDE
+    {
+        m_completion = completion;
+    }
+
+    void kick()
+    {
+        if (!m_completion)
+            return;
+        Vector<WebTextCheckingResult> results;
+        const int misspellingStartOffset = 1;
+        const int misspellingLength = 8;
+        results.append(WebTextCheckingResult(WebTextCheckingTypeSpelling, misspellingStartOffset, misspellingLength));
+        m_completion->didFinishCheckingText(results);
+        m_completion = 0;
+    }
+
+private:
+    WebKit::WebTextCheckingCompletion* m_completion;
+};
+
+TEST_F(WebFrameTest, SlowSpellcheckMarkerPosition)
+{
+    registerMockedHttpURLLoad("spell.html");
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "spell.html");
+
+    StubbornSpellCheckClient spellcheck;
+    m_webView->setSpellCheckClient(&spellcheck);
+
+    WebFrameImpl* frame = static_cast<WebFrameImpl*>(m_webView->mainFrame());
+    WebInputElement webInputElement = frame->document().getElementById("data").to<WebInputElement>();
+    Document* document = frame->frame()->document();
+    Element* element = document->getElementById("data");
+
+    m_webView->settings()->setAsynchronousSpellCheckingEnabled(true);
+    m_webView->settings()->setUnifiedTextCheckerEnabled(true);
+    m_webView->settings()->setEditingBehavior(WebSettings::EditingBehaviorWin);
+
+    element->focus();
+    document->execCommand("InsertText", false, "wellcome ");
+    webInputElement.setSelectionRange(0, 0);
+    document->execCommand("InsertText", false, "he");
+
+    spellcheck.kick();
+
+    WebVector<uint32_t> documentMarkers;
+    m_webView->spellingMarkers(&documentMarkers);
+    EXPECT_EQ(0U, documentMarkers.size());
 
     m_webView->close();
     m_webView = 0;

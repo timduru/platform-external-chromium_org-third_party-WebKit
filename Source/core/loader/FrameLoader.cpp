@@ -73,7 +73,6 @@
 #include "core/loader/FormSubmission.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/loader/FrameNetworkingContext.h"
 #include "core/loader/ProgressTracker.h"
 #include "core/loader/TextResourceDecoder.h"
 #include "core/loader/UniqueIdentifier.h"
@@ -213,9 +212,6 @@ FrameLoader::~FrameLoader()
         (*it)->loader()->m_opener = 0;
 
     m_client->frameLoaderDestroyed();
-
-    if (m_networkingContext)
-        m_networkingContext->invalidate();
 }
 
 void FrameLoader::init()
@@ -226,8 +222,6 @@ void FrameLoader::init()
     m_provisionalDocumentLoader->startLoadingMainResource();
     m_frame->document()->cancelParsing();
     m_stateMachine.advanceTo(FrameLoaderStateMachine::DisplayingInitialEmptyDocument);
-
-    m_networkingContext = m_client->createNetworkingContext();
     m_progressTracker = FrameProgressTracker::create(m_frame);
 }
 
@@ -511,8 +505,8 @@ void FrameLoader::clear(bool clearWindowProperties, bool clearScriptObjects, boo
 
     // Do this after detaching the document so that the unload event works.
     if (clearWindowProperties) {
-        InspectorInstrumentation::frameWindowDiscarded(m_frame, m_frame->document()->domWindow());
-        m_frame->document()->domWindow()->reset();
+        InspectorInstrumentation::frameWindowDiscarded(m_frame, m_frame->domWindow());
+        m_frame->domWindow()->reset();
         m_frame->script()->clearWindowShell();
     }
 
@@ -521,9 +515,9 @@ void FrameLoader::clear(bool clearWindowProperties, bool clearScriptObjects, boo
     if (clearFrameView && m_frame->view())
         m_frame->view()->clear();
 
-    // Do not drop the document before the ScriptController and view are cleared
+    // Do not drop the DOMWindow (and Document) before the ScriptController and view are cleared
     // as some destructors might still try to access the document.
-    m_frame->setDocument(0);
+    m_frame->setDOMWindow(0);
 
     m_subframeLoader.clear();
 
@@ -1028,9 +1022,6 @@ void FrameLoader::loadFrameRequest(const FrameLoadRequest& request, bool lockBac
     else
         loadType = FrameLoadTypeStandard;
 
-    if (loadType == FrameLoadTypeReload || loadType == FrameLoadTypeReloadFromOrigin)
-        resourceRequest.setCachePolicy(ReloadIgnoringCacheData);
-
     loadURL(resourceRequest, request.frameName(), loadType, event, formState.get());
 
     // FIXME: It's possible this targetFrame will not be the same frame that was targeted by the actual
@@ -1113,10 +1104,9 @@ void FrameLoader::load(const FrameLoadRequest& passedRequest)
     const KURL& unreachableURL = request.substituteData().failingURL();
 
     FrameLoadType type;
-    if (shouldTreatURLAsSameAsCurrent(r.url())) {
-        r.setCachePolicy(ReloadIgnoringCacheData);
+    if (shouldTreatURLAsSameAsCurrent(r.url()))
         type = FrameLoadTypeSame;
-    } else if (shouldTreatURLAsSameAsCurrent(unreachableURL) && m_loadType == FrameLoadTypeReload)
+    else if (shouldTreatURLAsSameAsCurrent(unreachableURL) && m_loadType == FrameLoadTypeReload)
         type = FrameLoadTypeReload;
     else
         type = FrameLoadTypeStandard;
@@ -1192,16 +1182,8 @@ void FrameLoader::reload(bool endToEndReload, const KURL& overrideURL, const Str
     else if (!documentLoader->unreachableURL().isEmpty())
         request.setURL(documentLoader->unreachableURL());
 
-    bool isFormSubmission = request.httpMethod() == "POST";
-    if (overrideEncoding.isEmpty())
-        request.setCachePolicy(ReloadIgnoringCacheData);
-    else if (isFormSubmission)
-        request.setCachePolicy(ReturnCacheDataDontLoad);
-    else
-        request.setCachePolicy(ReturnCacheDataElseLoad);
-
     FrameLoadType type = endToEndReload ? FrameLoadTypeReloadFromOrigin : FrameLoadTypeReload;
-    NavigationAction action(request, type, isFormSubmission);
+    NavigationAction action(request, type, request.httpMethod() == "POST");
     loadWithNavigationAction(request, action, type, 0, defaultSubstituteDataForURL(request.url()), overrideEncoding);
 }
 
@@ -1846,30 +1828,6 @@ void FrameLoader::addExtraFieldsToRequest(ResourceRequest& request)
 
     applyUserAgent(request);
 
-    if (!isMainResource) {
-        if (request.isConditional())
-            request.setCachePolicy(ReloadIgnoringCacheData);
-        else if (documentLoader()->isLoadingInAPISense()) {
-            // If we inherit cache policy from a main resource, we use the DocumentLoader's
-            // original request cache policy for two reasons:
-            // 1. For POST requests, we mutate the cache policy for the main resource,
-            //    but we do not want this to apply to subresources
-            // 2. Delegates that modify the cache policy using willSendRequest: should
-            //    not affect any other resources. Such changes need to be done
-            //    per request.
-            ResourceRequestCachePolicy mainDocumentOriginalCachePolicy = documentLoader()->originalRequest().cachePolicy();
-            // Back-forward navigations try to load main resource from cache only to avoid re-submitting form data, and start over (with a warning dialog) if that fails.
-            // This policy is set on initial request too, but should not be inherited.
-            ResourceRequestCachePolicy subresourceCachePolicy = (mainDocumentOriginalCachePolicy == ReturnCacheDataDontLoad) ? ReturnCacheDataElseLoad : mainDocumentOriginalCachePolicy;
-            request.setCachePolicy(subresourceCachePolicy);
-        } else
-            request.setCachePolicy(UseProtocolCachePolicy);
-
-    // FIXME: Other FrameLoader functions have duplicated code for setting cache policy of main request when reloading.
-    // It seems better to manage it explicitly than to hide the logic inside addExtraFieldsToRequest().
-    } else if (m_loadType == FrameLoadTypeReload || m_loadType == FrameLoadTypeReloadFromOrigin || request.isConditional())
-        request.setCachePolicy(ReloadIgnoringCacheData);
-
     if (request.cachePolicy() == ReloadIgnoringCacheData) {
         if (m_loadType == FrameLoadTypeReload)
             request.setHTTPHeaderField("Cache-Control", "max-age=0");
@@ -1937,7 +1895,7 @@ unsigned long FrameLoader::loadResourceSynchronously(const ResourceRequest& requ
     if (error.isNull()) {
         ASSERT(!newRequest.isNull());
         documentLoader()->applicationCacheHost()->willStartLoadingSynchronously(newRequest);
-        ResourceHandle::loadResourceSynchronously(networkingContext(), newRequest, storedCredentials, error, response, data);
+        ResourceHandle::loadResourceSynchronously(newRequest, storedCredentials, error, response, data);
     }
     int encodedDataLength = response.resourceLoadInfo() ? static_cast<int>(response.resourceLoadInfo()->encodedDataLength) : -1;
     notifier()->sendRemainingDelegateMessages(m_documentLoader.get(), identifier, response, data.data(), data.size(), encodedDataLength, error);
@@ -2231,19 +2189,12 @@ void FrameLoader::loadedResourceFromMemoryCache(CachedResource* resource)
     if (!page)
         return;
 
-    if (!resource->shouldSendResourceLoadCallbacks() || m_documentLoader->haveToldClientAboutLoad(resource->url().string()))
+    if (!resource->shouldSendResourceLoadCallbacks())
         return;
 
     // Main resource delegate messages are synthesized in MainResourceLoader, so we must not send them here.
     if (resource->type() == CachedResource::MainResource)
         return;
-
-    if (!page->areMemoryCacheClientCallsEnabled()) {
-        InspectorInstrumentation::didLoadResourceFromMemoryCache(page, m_documentLoader.get(), resource);
-        m_documentLoader->recordMemoryCacheLoadForFutureClientNotification(resource->url());
-        m_documentLoader->didTellClientAboutLoad(resource->url());
-        return;
-    }
 
     ResourceRequest request(resource->url());
     m_client->dispatchDidLoadResourceFromMemoryCache(m_documentLoader.get(), request, resource->response(), resource->encodedSize());
@@ -2387,17 +2338,13 @@ void FrameLoader::loadDifferentDocumentItem(HistoryItem* item)
     RefPtr<FormData> formData = item->formData();
     ResourceRequest request(item->url());
     request.setHTTPReferrer(item->referrer());
-
-    NavigationAction action;
     if (formData) {
         request.setHTTPMethod("POST");
         request.setHTTPBody(formData);
         request.setHTTPContentType(item->formContentType());
         RefPtr<SecurityOrigin> securityOrigin = SecurityOrigin::createFromString(item->referrer());
         addHTTPOriginIfNeeded(request, securityOrigin->toString());
-        request.setCachePolicy(ReturnCacheDataDontLoad);
-    } else
-        request.setCachePolicy(ReturnCacheDataElseLoad);
+    }
 
     loadWithNavigationAction(request, NavigationAction(request, FrameLoadTypeBackForward, false), FrameLoadTypeBackForward, 0, defaultSubstituteDataForURL(request.url()));
 }
@@ -2506,38 +2453,6 @@ void FrameLoader::dispatchDidCommitLoad()
 
 }
 
-void FrameLoader::tellClientAboutPastMemoryCacheLoads()
-{
-    ASSERT(m_frame->page());
-    ASSERT(m_frame->page()->areMemoryCacheClientCallsEnabled());
-
-    if (!m_documentLoader)
-        return;
-
-    Vector<String> pastLoads;
-    m_documentLoader->takeMemoryCacheLoadsForClientNotification(pastLoads);
-
-    size_t size = pastLoads.size();
-    for (size_t i = 0; i < size; ++i) {
-        CachedResource* resource = memoryCache()->resourceForURL(KURL(ParsedURLString, pastLoads[i]));
-
-        // FIXME: These loads, loaded from cache, but now gone from the cache by the time
-        // Page::setMemoryCacheClientCallsEnabled(true) is called, will not be seen by the client.
-        // Consider if there's some efficient way of remembering enough to deliver this client call.
-        // We have the URL, but not the rest of the response or the length.
-        if (!resource)
-            continue;
-
-        ResourceRequest request(resource->url());
-        m_client->dispatchDidLoadResourceFromMemoryCache(m_documentLoader.get(), request, resource->response(), resource->encodedSize());
-    }
-}
-
-NetworkingContext* FrameLoader::networkingContext() const
-{
-    return m_networkingContext.get();
-}
-
 void FrameLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Loader);
@@ -2552,7 +2467,6 @@ void FrameLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_opener, "opener");
     info.addMember(m_openedFrames, "openedFrames");
     info.addMember(m_outgoingReferrer, "outgoingReferrer");
-    info.addMember(m_networkingContext, "networkingContext");
     info.addMember(m_requestedHistoryItem, "requestedHistoryItem");
 }
 

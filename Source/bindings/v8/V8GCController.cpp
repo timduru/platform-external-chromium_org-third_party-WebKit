@@ -38,7 +38,6 @@
 #include "bindings/v8/RetainedDOMInfo.h"
 #include "bindings/v8/V8AbstractEventListener.h"
 #include "bindings/v8/V8Binding.h"
-#include "bindings/v8/V8RecursionScope.h"
 #include "bindings/v8/WrapperTypeInfo.h"
 #include "core/dom/Attr.h"
 #include "core/dom/NodeTraversal.h"
@@ -73,7 +72,9 @@ static void addReferencesForNodeWithEventListeners(v8::Isolate* isolate, Node* n
         if (!v8listener->hasExistingListenerObject())
             continue;
 
-        isolate->SetReference(wrapper, v8listener->existingListenerObjectPersistentHandle());
+        // FIXME: update this to use the upcasting function which v8 will provide.
+        v8::Persistent<v8::Value>* value = reinterpret_cast<v8::Persistent<v8::Value>*>(&(v8listener->existingListenerObjectPersistentHandle()));
+        isolate->SetReference(wrapper, *value);
     }
 }
 
@@ -109,7 +110,7 @@ public:
         UNUSED_PARAM(m_isolate);
     }
 
-    virtual void VisitPersistentHandle(v8::Persistent<v8::Value> value, uint16_t classId) OVERRIDE
+    virtual void VisitPersistentHandle(v8::Persistent<v8::Value>* value, uint16_t classId) OVERRIDE
     {
         // A minor DOM GC can collect only Nodes.
         if (classId != v8DOMNodeClassId)
@@ -126,17 +127,19 @@ public:
         if (m_nodesInNewSpace.size() >= wrappersHandledByEachMinorGC)
             return;
 
-        ASSERT(value->IsObject());
-        v8::Persistent<v8::Object> wrapper = v8::Persistent<v8::Object>::Cast(value);
-        ASSERT(V8DOMWrapper::maybeDOMWrapper(value));
-        ASSERT(V8Node::HasInstanceInAnyWorld(wrapper, m_isolate));
-        Node* node = V8Node::toNative(wrapper);
+        // Casting to a Handle is safe here, since the Persistent cannot get GCd
+        // during the GC prologue.
+        ASSERT((*reinterpret_cast<v8::Handle<v8::Value>*>(value))->IsObject());
+        v8::Handle<v8::Object>* wrapper = reinterpret_cast<v8::Handle<v8::Object>*>(value);
+        ASSERT(V8DOMWrapper::maybeDOMWrapper(*wrapper));
+        ASSERT(V8Node::HasInstanceInAnyWorld(*wrapper, m_isolate));
+        Node* node = V8Node::toNative(*wrapper);
         // A minor DOM GC can handle only node wrappers in the main world.
         // Note that node->wrapper().IsEmpty() returns true for nodes that
         // do not have wrappers in the main world.
         if (node->containsWrapper()) {
-            WrapperTypeInfo* type = toWrapperTypeInfo(wrapper);
-            ActiveDOMObject* activeDOMObject = type->toActiveDOMObject(wrapper);
+            WrapperTypeInfo* type = toWrapperTypeInfo(*wrapper);
+            ActiveDOMObject* activeDOMObject = type->toActiveDOMObject(*wrapper);
             if (activeDOMObject && activeDOMObject->hasPendingActivity())
                 return;
             m_nodesInNewSpace.append(node);
@@ -217,7 +220,9 @@ private:
             UnsafePersistent<v8::Object> unsafeWrapper = (*nodeIterator)->unsafePersistent();
             v8::Persistent<v8::Object>* wrapper = unsafeWrapper.persistent();
             wrapper->MarkPartiallyDependent(isolate);
-            isolate->SetObjectGroupId(*wrapper, id);
+            // FIXME: update this to use the upcasting function which v8 will provide
+            v8::Persistent<v8::Value>* value = reinterpret_cast<v8::Persistent<v8::Value>*>(wrapper);
+            isolate->SetObjectGroupId(*value, id);
         }
     }
 
@@ -234,21 +239,24 @@ public:
     {
     }
 
-    virtual void VisitPersistentHandle(v8::Persistent<v8::Value> value, uint16_t classId) OVERRIDE
+    virtual void VisitPersistentHandle(v8::Persistent<v8::Value>* value, uint16_t classId) OVERRIDE
     {
-        ASSERT(value->IsObject());
-        v8::Persistent<v8::Object> wrapper = v8::Persistent<v8::Object>::Cast(value);
+        // Casting to a Handle is safe here, since the Persistent cannot get GCd
+        // during the GC prologue.
+        ASSERT((*reinterpret_cast<v8::Handle<v8::Value>*>(value))->IsObject());
 
         if (classId != v8DOMNodeClassId && classId != v8DOMObjectClassId)
             return;
 
-        ASSERT(V8DOMWrapper::maybeDOMWrapper(value));
+        v8::Handle<v8::Object>* wrapper = reinterpret_cast<v8::Handle<v8::Object>*>(value);
 
-        if (value.IsIndependent(m_isolate))
+        ASSERT(V8DOMWrapper::maybeDOMWrapper(*wrapper));
+
+        if (value->IsIndependent(m_isolate))
             return;
 
-        WrapperTypeInfo* type = toWrapperTypeInfo(wrapper);
-        void* object = toNative(wrapper);
+        WrapperTypeInfo* type = toWrapperTypeInfo(*wrapper);
+        void* object = toNative(*wrapper);
 
         if (V8MessagePort::info.equals(type)) {
             // Mark each port as in-use if it's entangled. For simplicity's sake,
@@ -256,37 +264,38 @@ public:
             // implementation can't tell the difference.
             MessagePort* port = static_cast<MessagePort*>(object);
             if (port->isEntangled() || port->hasPendingActivity())
-                m_isolate->SetObjectGroupId(wrapper, liveRootId());
+                m_isolate->SetObjectGroupId(*value, liveRootId());
         } else if (V8MutationObserver::info.equals(type)) {
             // FIXME: Allow opaqueRootForGC to operate on multiple roots and move this logic into V8MutationObserverCustom.
             MutationObserver* observer = static_cast<MutationObserver*>(object);
             HashSet<Node*> observedNodes = observer->getObservedNodes();
             for (HashSet<Node*>::iterator it = observedNodes.begin(); it != observedNodes.end(); ++it) {
                 v8::UniqueId id(reinterpret_cast<intptr_t>(V8GCController::opaqueRootForGC(*it, m_isolate)));
-                m_isolate->SetReferenceFromGroup(id, wrapper);
+                m_isolate->SetReferenceFromGroup(id, *value);
             }
         } else {
-            ActiveDOMObject* activeDOMObject = type->toActiveDOMObject(wrapper);
+            ActiveDOMObject* activeDOMObject = type->toActiveDOMObject(*wrapper);
             if (activeDOMObject && activeDOMObject->hasPendingActivity())
-                m_isolate->SetObjectGroupId(wrapper, liveRootId());
+                m_isolate->SetObjectGroupId(*value, liveRootId());
         }
 
         if (classId == v8DOMNodeClassId) {
             UNUSED_PARAM(m_isolate);
-            ASSERT(V8Node::HasInstanceInAnyWorld(wrapper, m_isolate));
-            ASSERT(!wrapper.IsIndependent(m_isolate));
+            ASSERT(V8Node::HasInstanceInAnyWorld(*wrapper, m_isolate));
+            ASSERT(!value->IsIndependent(m_isolate));
 
             Node* node = static_cast<Node*>(object);
 
             if (node->hasEventListeners())
-                addReferencesForNodeWithEventListeners(m_isolate, node, wrapper);
+                addReferencesForNodeWithEventListeners(m_isolate, node, v8::Persistent<v8::Object>::Cast(*value));
             Node* root = V8GCController::opaqueRootForGC(node, m_isolate);
-            m_isolate->SetObjectGroupId(wrapper, v8::UniqueId(reinterpret_cast<intptr_t>(root)));
+            m_isolate->SetObjectGroupId(*value, v8::UniqueId(reinterpret_cast<intptr_t>(root)));
             if (m_constructRetainedObjectInfos)
                 m_groupsWhichNeedRetainerInfo.append(root);
         } else if (classId == v8DOMObjectClassId) {
-            void* root = type->opaqueRootForGC(object, wrapper, m_isolate);
-            m_isolate->SetObjectGroupId(wrapper, v8::UniqueId(reinterpret_cast<intptr_t>(root)));
+            ASSERT(!value->IsIndependent(m_isolate));
+            void* root = type->opaqueRootForGC(object, m_isolate);
+            m_isolate->SetObjectGroupId(*value, v8::UniqueId(reinterpret_cast<intptr_t>(root)));
         } else {
             ASSERT_NOT_REACHED();
         }
@@ -312,9 +321,10 @@ private:
     v8::UniqueId liveRootId()
     {
         const v8::Persistent<v8::Value>& liveRoot = V8PerIsolateData::from(m_isolate)->ensureLiveRoot();
-        v8::UniqueId id(reinterpret_cast<intptr_t>(*liveRoot));
+        const intptr_t* idPointer = reinterpret_cast<const intptr_t*>(&liveRoot);
+        v8::UniqueId id(*idPointer);
         if (!m_liveRootGroupIdSet) {
-            m_isolate->SetObjectGroupId(*liveRoot, id);
+            m_isolate->SetObjectGroupId(liveRoot, id);
             m_liveRootGroupIdSet = true;
         }
         return id;
@@ -438,6 +448,10 @@ void V8GCController::hintForCollectGarbage()
 void V8GCController::collectGarbage(v8::Isolate* isolate)
 {
     v8::HandleScope handleScope(isolate);
+    v8::Local<v8::Context> context = v8::Context::New(isolate);
+    if (context.IsEmpty())
+        return;
+    v8::Context::Scope contextScope(context);
     V8ScriptRunner::compileAndRunInternalScript(v8String("if (gc) gc();", isolate), isolate);
 }
 

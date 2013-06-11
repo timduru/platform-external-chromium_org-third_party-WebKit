@@ -32,8 +32,6 @@
   # The following defines turn WebKit features on and off.
   'variables': {
     'feature_defines': [
-      'ENABLE_3D_PLUGIN=1',
-      'ENABLE_BATTERY_STATUS=0',
       'ENABLE_CANVAS_USES_MAILBOX=0', # Requires crbug.com/230137 to be fixed
       'ENABLE_CSS3_TEXT=0',
       'ENABLE_CSS_DEVICE_ADAPTATION=0',
@@ -41,10 +39,9 @@
       'ENABLE_CSS_REGIONS=1',
       'ENABLE_CUSTOM_SCHEME_HANDLER=0',
       'ENABLE_ENCRYPTED_MEDIA_V2=1',
-      'ENABLE_SVG=1',
+      'ENABLE_GRAPHICS_CONTEXT_ANNOTATIONS=<(enable_graphics_context_annotations)',
       'ENABLE_SVG_FONTS=1',
       'ENABLE_TOUCH_ICON_LOADING=<(enable_touch_icon_loading)',
-      'ENABLE_WEBGL=1',
       'ENABLE_XHR_TIMEOUT=0',
       # WTF_USE_DYNAMIC_ANNOTATIONS=1 may be defined in build/common.gypi
       # We can't define it here because it should be present only
@@ -53,8 +50,10 @@
     # We have to nest variables inside variables so that they can be overridden
     # through GYP_DEFINES.
     'variables': {
+      'enable_graphics_context_annotations%': 0,
       'enable_touch_icon_loading%' : 0,
     },
+    'enable_graphics_context_annotations%': '<(enable_graphics_context_annotations)',
     'conditions': [
       ['use_concatenated_impulse_responses==1', {
         # Use concatenated HRTF impulse responses
@@ -65,7 +64,6 @@
           'ENABLE_CALENDAR_PICKER=0',
           'ENABLE_FAST_MOBILE_SCROLLING=1',
           'ENABLE_INPUT_SPEECH=0',
-          'ENABLE_INPUT_TYPE_COLOR=0',
           'ENABLE_LEGACY_NOTIFICATIONS=0',
           'ENABLE_MEDIA_CAPTURE=1',
           'ENABLE_NOTIFICATIONS=0',
@@ -79,7 +77,6 @@
         'feature_defines': [
           'ENABLE_CALENDAR_PICKER=1',
           'ENABLE_INPUT_SPEECH=1',
-          'ENABLE_INPUT_TYPE_COLOR=1',
           'ENABLE_INPUT_MULTIPLE_FIELDS_UI=1',
           'ENABLE_LEGACY_NOTIFICATIONS=1',
           'ENABLE_MEDIA_CAPTURE=0',
@@ -133,6 +130,11 @@
       ['use_default_render_theme==1', {
         'feature_defines': [
           'ENABLE_DEFAULT_RENDER_THEME=1',
+        ],
+      }],
+      ['OS=="linux" and target_arch=="x64"', {
+        'feature_defines': [
+          'ENABLE_PARTITION_ALLOC=0',
         ],
       }],
     ],

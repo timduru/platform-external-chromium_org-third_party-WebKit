@@ -85,7 +85,6 @@ article, aside, footer, header, hgroup, main, nav, section {
 
 marquee {
     display: inline-block;
-    overflow: -webkit-marquee
 }
 
 address {
@@ -440,7 +439,7 @@ input::-webkit-clear-button {
     display: inline-block;
     -webkit-flex: none;
     -webkit-user-modify: read-only !important;
-    margin-left: 2px;
+    -webkit-margin-start: 2px;
 }
 
 input[type="search"]::-webkit-search-cancel-button {
@@ -829,8 +828,6 @@ input[type="radio"] {
     box-sizing: border-box;
 }
 
-#if defined(ENABLE_INPUT_TYPE_COLOR) && ENABLE_INPUT_TYPE_COLOR
-
 input[type="color"] {
     -webkit-appearance: square-button;
     width: 44px;
@@ -852,8 +849,6 @@ input[type="color"]::-webkit-color-swatch {
     -webkit-flex: 1;
     -webkit-user-modify: read-only !important;
 }
-
-#endif // defined(ENABLE_INPUT_TYPE_COLOR) && ENABLE_INPUT_TYPE_COLOR
 
 #if defined(ENABLE_CALENDAR_PICKER) && ENABLE_CALENDAR_PICKER
 input::-webkit-calendar-picker-indicator {

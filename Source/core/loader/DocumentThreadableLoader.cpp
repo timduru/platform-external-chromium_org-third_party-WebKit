@@ -31,20 +31,17 @@
 #include "config.h"
 #include "core/loader/DocumentThreadableLoader.h"
 
-#include "bindings/v8/ScriptController.h"
 #include "core/dom/Document.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/CrossOriginAccessControl.h"
 #include "core/loader/CrossOriginPreflightResultCache.h"
 #include "core/loader/DocumentThreadableLoaderClient.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/ProgressTracker.h"
 #include "core/loader/ResourceLoader.h"
 #include "core/loader/ThreadableLoaderClient.h"
 #include "core/loader/cache/CachedRawResource.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
-#include "core/loader/cache/CachedResourceRequestInitiators.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/Frame.h"
 #include "core/platform/network/ResourceError.h"
@@ -52,7 +49,6 @@
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/Assertions.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -395,7 +391,7 @@ void DocumentThreadableLoader::loadRequest(const ResourceRequest& request, Secur
         m_resource = m_document->cachedResourceLoader()->requestRawResource(newRequest);
         if (m_resource) {
             if (m_resource->loader()) {
-                unsigned long identifier = m_resource->loader()->identifier();
+                unsigned long identifier = m_resource->identifier();
                 InspectorInstrumentation::documentThreadableLoaderStartedLoadingForClient(m_document, identifier, m_client);
             }
             m_resource->addClient(this);

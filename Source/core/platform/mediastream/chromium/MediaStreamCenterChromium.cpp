@@ -34,13 +34,13 @@
 
 #include "core/platform/mediastream/MediaStreamDescriptor.h"
 #include "core/platform/mediastream/MediaStreamSourcesQueryClient.h"
-#include <public/Platform.h>
-#include <public/WebMediaStream.h>
-#include <public/WebMediaStreamCenter.h>
-#include <public/WebMediaStreamSourcesRequest.h>
-#include <public/WebMediaStreamTrack.h>
-#include <wtf/MainThread.h>
-#include <wtf/PassOwnPtr.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebMediaStream.h"
+#include "public/platform/WebMediaStreamCenter.h"
+#include "public/platform/WebMediaStreamSourcesRequest.h"
+#include "public/platform/WebMediaStreamTrack.h"
+#include "wtf/MainThread.h"
+#include "wtf/PassOwnPtr.h"
 
 namespace WebCore {
 
@@ -70,6 +70,11 @@ void MediaStreamCenterChromium::queryMediaStreamSources(PassRefPtr<MediaStreamSo
     }
 }
 
+bool MediaStreamCenterChromium::getSourceInfos(const String& url, WebKit::WebVector<WebKit::WebSourceInfo>& sourceInfos)
+{
+    return m_private && m_private->getSourceInfos(url, sourceInfos);
+}
+
 void MediaStreamCenterChromium::didSetMediaStreamTrackEnabled(MediaStreamDescriptor* stream,  MediaStreamComponent* component)
 {
     if (m_private) {
@@ -82,12 +87,12 @@ void MediaStreamCenterChromium::didSetMediaStreamTrackEnabled(MediaStreamDescrip
 
 bool MediaStreamCenterChromium::didAddMediaStreamTrack(MediaStreamDescriptor* stream, MediaStreamComponent* component)
 {
-    return m_private ? m_private->didAddMediaStreamTrack(stream, component) : false;
+    return m_private && m_private->didAddMediaStreamTrack(stream, component);
 }
 
 bool MediaStreamCenterChromium::didRemoveMediaStreamTrack(MediaStreamDescriptor* stream, MediaStreamComponent* component)
 {
-    return m_private ? m_private->didRemoveMediaStreamTrack(stream, component) : false;
+    return m_private && m_private->didRemoveMediaStreamTrack(stream, component);
 }
 
 void MediaStreamCenterChromium::didStopLocalMediaStream(MediaStreamDescriptor* stream)

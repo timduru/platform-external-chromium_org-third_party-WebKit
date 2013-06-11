@@ -26,16 +26,11 @@
 # (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
 # OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
-from datetime import datetime
+import json
 import logging
+import re
 import sys
 import traceback
-
-# FIXME: Once we're on python 2.7, just use json directly.
-try:
-    from django.utils import simplejson
-except:
-    import json as simplejson
 
 from model.testfile import TestFile
 
@@ -52,6 +47,7 @@ JSON_RESULTS_MAX_BUILDS_SMALL = 100
 BUG_KEY = "bugs"
 BUILD_NUMBERS_KEY = "buildNumbers"
 EXPECTED_KEY = "expected"
+ACTUAL_KEY = "actual"
 FAILURE_MAP_KEY = "failure_map"
 FAILURES_BY_TYPE_KEY = "num_failures_by_type"
 FIXABLE_COUNTS_KEY = "fixableCounts"
@@ -118,8 +114,8 @@ class JsonResults(object):
         return data
 
     @classmethod
-    def _generate_file_data(cls, json, sort_keys=False):
-        return simplejson.dumps(json, separators=(',', ':'), sort_keys=sort_keys)
+    def _generate_file_data(cls, jsonObject, sort_keys=False):
+        return json.dumps(jsonObject, separators=(',', ':'), sort_keys=sort_keys)
 
     @classmethod
     def _load_json(cls, file_data):
@@ -129,7 +125,7 @@ class JsonResults(object):
             return None
 
         try:
-            return simplejson.loads(json_results_str)
+            return json.loads(json_results_str)
         except:
             logging.debug(json_results_str)
             logging.error("Failed to load json results: %s", traceback.print_exception(*sys.exc_info()))
@@ -240,11 +236,11 @@ class JsonResults(object):
                 aggregated_item.insert(0, item)
 
     @classmethod
-    def _normalize_results(cls, aggregated_json, num_runs):
+    def _normalize_results(cls, aggregated_json, num_runs, run_time_pruning_threshold):
         names_to_delete = []
         for test_name in aggregated_json:
             if _is_directory(aggregated_json[test_name]):
-                cls._normalize_results(aggregated_json[test_name], num_runs)
+                cls._normalize_results(aggregated_json[test_name], num_runs, run_time_pruning_threshold)
                 # If normalizing deletes all the children of this directory, also delete the directory.
                 if not aggregated_json[test_name]:
                     names_to_delete.append(test_name)
@@ -252,14 +248,14 @@ class JsonResults(object):
                 leaf = aggregated_json[test_name]
                 leaf[RESULTS_KEY] = cls._remove_items_over_max_number_of_builds(leaf[RESULTS_KEY], num_runs)
                 leaf[TIMES_KEY] = cls._remove_items_over_max_number_of_builds(leaf[TIMES_KEY], num_runs)
-                if cls._should_delete_leaf(leaf):
+                if cls._should_delete_leaf(leaf, run_time_pruning_threshold):
                     names_to_delete.append(test_name)
 
         for test_name in names_to_delete:
             del aggregated_json[test_name]
 
     @classmethod
-    def _should_delete_leaf(cls, leaf):
+    def _should_delete_leaf(cls, leaf, run_time_pruning_threshold):
         if leaf.get(EXPECTED_KEY, PASS_STRING) != PASS_STRING:
             return False
 
@@ -272,7 +268,7 @@ class JsonResults(object):
                 return False
 
         for time in leaf[TIMES_KEY]:
-            if time[1] >= JSON_RESULTS_MIN_TIME:
+            if time[1] >= run_time_pruning_threshold:
                 return False
 
         return True
@@ -293,6 +289,7 @@ class JsonResults(object):
     def _convert_gtest_json_to_aggregate_results_format(cls, json):
         # FIXME: Change gtests over to uploading the full results format like layout-tests
         # so we don't have to do this normalizing.
+        # http://crbug.com/247192.
 
         if FAILURES_BY_TYPE_KEY in json:
             # This is already in the right format.
@@ -311,20 +308,31 @@ class JsonResults(object):
     def _check_json(cls, builder, json):
         version = json[VERSIONS_KEY]
         if version > JSON_RESULTS_HIERARCHICAL_VERSION:
-            logging.error("Results JSON version '%s' is not supported.", version)
-            return False
+            return "Results JSON version '%s' is not supported." % version
 
         if not builder in json:
-            logging.error("Builder '%s' is not in json results.", builder)
-            return False
+            return "Builder '%s' is not in json results." % builder
 
         results_for_builder = json[builder]
         if not BUILD_NUMBERS_KEY in results_for_builder:
-            logging.error("Missing build number in json results.")
-            return False
+            return "Missing build number in json results."
 
         cls._convert_gtest_json_to_aggregate_results_format(json[builder])
-        return True
+
+        # FIXME: Remove this once all the bots have cycled with this code.
+        # The failure map was moved from the top-level to being below the builder
+        # like everything else.
+        if FAILURE_MAP_KEY in json:
+            del json[FAILURE_MAP_KEY]
+
+        # FIXME: Remove this code once the gtests switch over to uploading the full_results.json format.
+        # Once the bots have cycled with this code, we can move this loop into _convert_gtest_json_to_aggregate_results_format.
+        KEYS_TO_DELETE = ["fixableCount", "fixableCounts", "allFixableCount"]
+        for key in KEYS_TO_DELETE:
+            if key in json[builder]:
+                del json[builder][key]
+
+        return ""
 
     @classmethod
     def _populate_tests_from_full_results(cls, full_results, new_results):
@@ -335,7 +343,7 @@ class JsonResults(object):
             time = int(round(full_results[TIME_KEY])) if TIME_KEY in full_results else 0
             new_results[TIMES_KEY] = [[1, time]]
 
-            actual_failures = full_results['actual']
+            actual_failures = full_results[ACTUAL_KEY]
             # Treat unexpected skips like NOTRUNs to avoid exploding the results JSON files
             # when a bot exits early (e.g. due to too many crashes/timeouts).
             if expected != SKIP_STRING and actual_failures == SKIP_STRING:
@@ -382,12 +390,9 @@ class JsonResults(object):
                 # FIXME: Use dict comprehensions once we update the server to python 2.7.
                 FAILURES_BY_TYPE_KEY: dict((key, [value]) for key, value in failures_by_type.items()),
                 TESTS_KEY: tests,
-                # FIXME: Have the consumers of these use num_failures_by_type directly and stop include these counts.
-                'allFixableCount': [num_total_tests],
-                'fixableCount': [num_failing_tests],
-                FIXABLE_COUNTS_KEY: [fixableCounts],
                 # FIXME: Have all the consumers of this switch over to the full_results_format keys
-                # so we don't have to do this silly conversion.
+                # so we don't have to do this silly conversion. Or switch the full_results_format keys
+                # to be camel-case.
                 BUILD_NUMBERS_KEY: [full_results_format['build_number']],
                 'chromeRevision': [full_results_format['chromium_revision']],
                 'blinkRevision': [full_results_format['blink_revision']],
@@ -399,57 +404,62 @@ class JsonResults(object):
     @classmethod
     def _get_incremental_json(cls, builder, incremental_string, is_full_results_format):
         if not incremental_string:
-            logging.warning("Nothing to merge.")
-            return None
+            return "No incremental JSON data to merge.", 403
 
         logging.info("Loading incremental json.")
         incremental_json = cls._load_json(incremental_string)
         if not incremental_json:
-            return None
+            return "Incremental JSON data is not valid JSON.", 403
 
         if is_full_results_format:
             logging.info("Converting full results format to aggregate.")
             incremental_json = cls._convert_full_results_format_to_aggregate(incremental_json)
 
         logging.info("Checking incremental json.")
-        if not cls._check_json(builder, incremental_json):
-            return None
-        return incremental_json
+        check_json_error_string = cls._check_json(builder, incremental_json)
+        if check_json_error_string:
+            return check_json_error_string, 403
+        return incremental_json, 200
 
     @classmethod
     def _get_aggregated_json(cls, builder, aggregated_string):
         logging.info("Loading existing aggregated json.")
         aggregated_json = cls._load_json(aggregated_string)
         if not aggregated_json:
-            return None
+            return None, 200
 
         logging.info("Checking existing aggregated json.")
-        if not cls._check_json(builder, aggregated_json):
-            return None
+        check_json_error_string = cls._check_json(builder, aggregated_json)
+        if check_json_error_string:
+            return check_json_error_string, 500
 
-        return aggregated_json
+        return aggregated_json, 200
 
     @classmethod
     def merge(cls, builder, aggregated_string, incremental_json, num_runs, sort_keys=False):
-        aggregated_json = cls._get_aggregated_json(builder, aggregated_string)
+        aggregated_json, status_code = cls._get_aggregated_json(builder, aggregated_string)
         if not aggregated_json:
             aggregated_json = incremental_json
+        elif status_code != 200:
+            return aggregated_json, status_code
         else:
             if aggregated_json[builder][BUILD_NUMBERS_KEY][0] == incremental_json[builder][BUILD_NUMBERS_KEY][0]:
-                logging.error("Incremental JSON's build number is the latest build number in the aggregated JSON: %d." % aggregated_json[builder][BUILD_NUMBERS_KEY][0])
-                return None
+                status_string = "Incremental JSON's build number %s is the latest build number in the aggregated JSON." % str(aggregated_json[builder][BUILD_NUMBERS_KEY][0])
+                return status_string, 409
 
             logging.info("Merging json results.")
             try:
                 cls._merge_json(aggregated_json[builder], incremental_json[builder], num_runs)
             except:
-                logging.error("Failed to merge json results: %s", traceback.print_exception(*sys.exc_info()))
-                return None
+                return "Failed to merge json results: %s", traceback.print_exception(*sys.exc_info()), 500
 
         aggregated_json[VERSIONS_KEY] = JSON_RESULTS_HIERARCHICAL_VERSION
         aggregated_json[builder][FAILURE_MAP_KEY] = CHAR_TO_FAILURE
-        cls._normalize_results(aggregated_json[builder][TESTS_KEY], num_runs)
-        return cls._generate_file_data(aggregated_json, sort_keys)
+
+        is_debug_builder = re.search(r"(Debug|Dbg)", builder, re.I)
+        run_time_pruning_threshold = 2 * JSON_RESULTS_MIN_TIME if is_debug_builder else JSON_RESULTS_MIN_TIME
+        cls._normalize_results(aggregated_json[builder][TESTS_KEY], num_runs, run_time_pruning_threshold)
+        return cls._generate_file_data(aggregated_json, sort_keys), 200
 
     @classmethod
     def _get_file(cls, master, builder, test_type, filename):
@@ -474,24 +484,22 @@ class JsonResults(object):
 
     @classmethod
     def update_files(cls, builder, incremental_string, small_file, large_file, is_full_results_format):
-        incremental_json = cls._get_incremental_json(builder, incremental_string, is_full_results_format)
-        if not incremental_json:
-            return False
+        incremental_json, status_code = cls._get_incremental_json(builder, incremental_string, is_full_results_format)
+        if status_code != 200:
+            return incremental_json, status_code
 
-        small_file_updated = cls.update_file(builder, small_file, incremental_json, JSON_RESULTS_MAX_BUILDS_SMALL)
-        if not small_file_updated:
-            logging.info("Update for %s failed." % JSON_RESULTS_FILE_SMALL)
+        status_string, status_code = cls.update_file(builder, small_file, incremental_json, JSON_RESULTS_MAX_BUILDS_SMALL)
+        if status_code != 200:
+            return status_string, status_code
 
-        large_file_updated = cls.update_file(builder, large_file, incremental_json, JSON_RESULTS_MAX_BUILDS)
-        if not large_file_updated:
-            logging.info("Update for %s failed." % JSON_RESULTS_FILE)
-
-        return small_file_updated and large_file_updated
+        return cls.update_file(builder, large_file, incremental_json, JSON_RESULTS_MAX_BUILDS)
 
     @classmethod
     def update_file(cls, builder, file, incremental_json, num_runs):
-        new_results = cls.merge(builder, file.data, incremental_json, num_runs)
-        return new_results and file.save(new_results)
+        new_results, status_code = cls.merge(builder, file.data, incremental_json, num_runs)
+        if status_code != 200:
+            return new_results, status_code
+        return TestFile.save_file(file, new_results)
 
     @classmethod
     def _delete_results_and_times(cls, tests):
@@ -509,7 +517,9 @@ class JsonResults(object):
             return None
 
         logging.debug("Checking test results json...")
-        if not cls._check_json(builder, json):
+
+        check_json_error_string = cls._check_json(builder, json)
+        if check_json_error_string:
             return None
 
         test_list_json = {}

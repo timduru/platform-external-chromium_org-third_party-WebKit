@@ -35,7 +35,7 @@ var TEST_RESULTS_SERVER = 'http://test-results.appspot.com/';
 
 function pathToBuilderResultsFile(builderName) {
     return TEST_RESULTS_SERVER + 'testfile?builder=' + builderName +
-           '&master=' + builderMaster(builderName).name +
+           '&master=' + builders.master(builderName).name +
            '&testtype=' + g_history.crossDashboardState.testType + '&name=';
 }
 
@@ -95,7 +95,7 @@ loader.Loader.prototype = {
     {
         this._loadNext();
     },
-    showErrors: function() 
+    showErrors: function()
     {
         this._errors.show();
     },
@@ -111,13 +111,17 @@ loader.Loader.prototype = {
     },
     _loadBuildersList: function()
     {
-        loadBuildersList(currentBuilderGroupName(), this._history.crossDashboardState.testType);
+        builders.loadBuildersList(currentBuilderGroupName(), this._history.crossDashboardState.testType);
         this._loadNext();
     },
     _loadResultsFiles: function()
     {
-        for (var builderName in currentBuilders())
-            this._loadResultsFileForBuilder(builderName);
+        var builderNames = Object.keys(currentBuilders());
+        if (builderNames.length)
+            builderNames.forEach(this._loadResultsFileForBuilder.bind(this));
+        else
+            this._loadNext();
+
     },
     _loadResultsFileForBuilder: function(builderName)
     {
@@ -163,6 +167,12 @@ loader.Loader.prototype = {
     {
         var builds = JSON.parse(fileData);
 
+        if (builderName == 'version' || builderName == 'failure_map')
+             return;
+
+        var ONE_DAY_SECONDS = 60 * 60 * 24;
+        var ONE_WEEK_SECONDS = ONE_DAY_SECONDS * 7;
+
         // If a test suite stops being run on a given builder, we don't want to show it.
         // Assume any builder without a run in two weeks for a given test suite isn't
         // running that suite anymore.
@@ -174,7 +184,7 @@ loader.Loader.prototype = {
         if ((Date.now() / 1000) - lastRunSeconds > ONE_DAY_SECONDS)
             this._staleBuilders.push(builderName);
 
-        builds[builderName][TESTS_KEY] = loader.Loader._flattenTrie(builds[builderName][TESTS_KEY]);
+        builds[builderName][results.TESTS] = loader.Loader._flattenTrie(builds[builderName][results.TESTS]);
         g_resultsByBuilder[builderName] = builds[builderName];
     },
     _handleResultsFileLoadError: function(builderName)
@@ -198,8 +208,8 @@ loader.Loader.prototype = {
     },
     _haveResultsFilesLoaded: function()
     {
-        for (var builder in currentBuilders()) {
-            if (!g_resultsByBuilder[builder])
+        for (var builderName in currentBuilders()) {
+            if (!g_resultsByBuilder[builderName] && this._buildersThatFailedToLoad.indexOf(builderName) < 0)
                 return false;
         }
         return true;

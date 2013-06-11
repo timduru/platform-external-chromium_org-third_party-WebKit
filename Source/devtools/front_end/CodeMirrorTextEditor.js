@@ -37,6 +37,8 @@ importScript("cm/matchbrackets.js");
 importScript("cm/closebrackets.js");
 importScript("cm/markselection.js");
 importScript("cm/showhint.js");
+importScript("cm/comment.js");
+importScript("cm/overlay.js");
 
 /**
  * @constructor
@@ -55,14 +57,6 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
     this.registerRequiredCSS("cm/showhint.css");
     this.registerRequiredCSS("cm/cmdevtools.css");
 
-    function autocompleteCommand()
-    {
-        if (!this._dictionary || this._codeMirror.somethingSelected())
-            return;
-        CodeMirror.showHint(this._codeMirror, this._autocomplete.bind(this));
-    }
-    CodeMirror.commands.autocomplete = autocompleteCommand.bind(this);
-
     this._codeMirror = window.CodeMirror(this.element, {
         lineNumbers: true,
         gutters: ["CodeMirror-linenumbers"],
@@ -72,8 +66,12 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
         electricChars: false,
         autoCloseBrackets: true
     });
+    this._codeMirror._codeMirrorTextEditor = this;
+    this._codeMirror.setOption("mode", null);
 
-    var extraKeys = {"Ctrl-Space": "autocomplete"};
+    var extraKeys = {};
+    extraKeys["Ctrl-Space"] = "autocomplete";
+    extraKeys[(WebInspector.isMac() ? "Cmd-" : "Ctrl-") + "/"] = "toggleComment";
     var indent = WebInspector.settings.textEditorIndent.get();
     if (indent === WebInspector.TextUtils.Indent.TabCharacter) {
         this._codeMirror.setOption("indentWithTabs", true);
@@ -89,6 +87,7 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
         }
     }
     this._codeMirror.setOption("extraKeys", extraKeys);
+    this._codeMirror.setOption("flattenSpans", false);
 
     this._tokenHighlighter = new WebInspector.CodeMirrorTextEditor.TokenHighlighter(this._codeMirror);
     this._blockIndentController = new WebInspector.CodeMirrorTextEditor.BlockIndentController(this._codeMirror);
@@ -110,7 +109,20 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
     this.element.addEventListener("keydown", this._handleKeyDown.bind(this), false);
     this.element.tabIndex = 0;
     this._setupSelectionColor();
+    this._setupWhitespaceHighlight();
 }
+
+WebInspector.CodeMirrorTextEditor.autocompleteCommand = function(codeMirror)
+{
+    var textEditor = codeMirror._codeMirrorTextEditor;
+    if (!textEditor._dictionary || codeMirror.somethingSelected())
+        return;
+    CodeMirror.showHint(codeMirror, textEditor._autocomplete.bind(textEditor));
+}
+CodeMirror.commands.autocomplete = WebInspector.CodeMirrorTextEditor.autocompleteCommand;
+
+WebInspector.CodeMirrorTextEditor.SyntaxHighlightLineLengthThreshold = 1000;
+WebInspector.CodeMirrorTextEditor.MaximumNumberOfWhitespacesPerSingleSpan = 16;
 
 WebInspector.CodeMirrorTextEditor.prototype = {
 
@@ -132,12 +144,31 @@ WebInspector.CodeMirrorTextEditor.prototype = {
         var backgroundColor = WebInspector.getSelectionBackgroundColor();
         var backgroundColorRule = backgroundColor ? ".CodeMirror .CodeMirror-selected { background-color: " + backgroundColor + ";}" : "";
         var foregroundColor = WebInspector.getSelectionForegroundColor();
-        var foregroundColorRule = foregroundColor ? ".CodeMirror .CodeMirror-selectedtext { color: " + foregroundColor + "!important;}" : "";
+        var foregroundColorRule = foregroundColor ? ".CodeMirror .CodeMirror-selectedtext:not(.CodeMirror-persist-highlight) { color: " + foregroundColor + "!important;}" : "";
         if (!foregroundColorRule && !backgroundColorRule)
             return;
 
         var style = document.createElement("style");
         style.textContent = backgroundColorRule + foregroundColorRule;
+        document.head.appendChild(style);
+    },
+
+    _setupWhitespaceHighlight: function()
+    {
+        if (WebInspector.CodeMirrorTextEditor._whitespaceStyleInjected)
+            return;
+        WebInspector.CodeMirrorTextEditor._whitespaceStyleInjected = true;
+        const classBase = ".cm-whitespace-";
+        const spaceChar = "·";
+        var spaceChars = "";
+        var rules = "";
+        for(var i = 1; i <= WebInspector.CodeMirrorTextEditor.MaximumNumberOfWhitespacesPerSingleSpan; ++i) {
+            spaceChars += spaceChar;
+            var rule = classBase + i + "::before { content: '" + spaceChars + "';}\n";
+            rules += rule;
+        }
+        var style = document.createElement("style");
+        style.textContent = rules;
         document.head.appendChild(style);
     },
 
@@ -299,16 +330,67 @@ WebInspector.CodeMirrorTextEditor.prototype = {
         this._codeMirror.markClean();
     },
 
+    _hasLongLines: function()
+    {
+        function lineIterator(lineHandle)
+        {
+            if (lineHandle.text.length > WebInspector.CodeMirrorTextEditor.SyntaxHighlightLineLengthThreshold)
+                hasLongLines = true;
+        }
+        var hasLongLines = false;
+        this._codeMirror.eachLine(lineIterator);
+        return hasLongLines;
+    },
+
+    _whitespaceOverlayMode: function(mimeType)
+    {
+        var modeName = mimeType + "+whitespaces";
+        if (CodeMirror.modes[modeName])
+            return modeName;
+
+        function modeConstructor(config, parserConfig)
+        {
+            function nextToken(stream)
+            {
+                if (stream.peek() === " ") {
+                    var spaces = 0;
+                    while (spaces < WebInspector.CodeMirrorTextEditor.MaximumNumberOfWhitespacesPerSingleSpan && stream.peek() === " ") {
+                        ++spaces;
+                        stream.next();
+                    }
+                    return "whitespace whitespace-" + spaces;
+                }
+                while (!stream.eol() && stream.peek() !== " ")
+                    stream.next();
+                return null;
+            }
+            var whitespaceMode = {
+                token: nextToken
+            };
+            return CodeMirror.overlayMode(CodeMirror.getMode(config, mimeType), whitespaceMode, false);
+        }
+        CodeMirror.defineMode(modeName, modeConstructor);
+        return modeName;
+    },
+
     /**
      * @param {string} mimeType
      */
     set mimeType(mimeType)
     {
-        this._codeMirror.setOption("mode", mimeType);
-        switch(mimeType) {
-            case "text/html": this._codeMirror.setOption("theme", "web-inspector-html"); break;
-            case "text/css": this._codeMirror.setOption("theme", "web-inspector-css"); break;
-            case "text/javascript": this._codeMirror.setOption("theme", "web-inspector-js"); break;
+        if (this._hasLongLines()) {
+            this._codeMirror.setOption("mode", null);
+            return;
+        }
+        var showWhitespaces = WebInspector.settings.showWhitespacesInEditor.get();
+        this._codeMirror.setOption("mode", showWhitespaces ? this._whitespaceOverlayMode(mimeType) : mimeType);
+        switch (mimeType) {
+        case "text/html": this._codeMirror.setOption("theme", "web-inspector-html"); break;
+        case "text/css":
+        case "text/x-scss":
+            this._codeMirror.setOption("theme", "web-inspector-css");
+            break;
+        case "text/javascript": this._codeMirror.setOption("theme", "web-inspector-js"); break;
         }
     },
 
@@ -343,6 +425,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
      */
     highlightRange: function(range, cssClass)
     {
+        cssClass = "CodeMirror-persist-highlight " + cssClass;
         var pos = this._toPos(range);
         ++pos.end.ch;
         return this._codeMirror.markText(pos.start, pos.end, {
@@ -394,12 +477,12 @@ WebInspector.CodeMirrorTextEditor.prototype = {
     revealLine: function(lineNumber)
     {
         var pos = new CodeMirror.Pos(lineNumber, 0);
-        var topLine = this._topScrolledLine();
-        var bottomLine = this._bottomScrolledLine();
+        var scrollInfo = this._codeMirror.getScrollInfo();
+        var topLine = this._codeMirror.lineAtHeight(scrollInfo.top, "local");
+        var bottomLine = this._codeMirror.lineAtHeight(scrollInfo.top + scrollInfo.clientHeight, "local");
 
         var margin = null;
         var lineMargin = 3;
-        var scrollInfo = this._codeMirror.getScrollInfo();
         if ((lineNumber < topLine + lineMargin) || (lineNumber >= bottomLine - lineMargin)) {
             // scrollIntoView could get into infinite loop if margin exceeds half of the clientHeight.
             margin = (scrollInfo.clientHeight*0.9/2) >>> 0;
@@ -647,42 +730,12 @@ WebInspector.CodeMirrorTextEditor.prototype = {
         this._delegate.selectionChanged(this._toRange(start, end));
     },
 
-    _coordsCharLocal: function(coords)
-    {
-        var top = coords.top;
-        var totalLines = this._codeMirror.lineCount();
-        var begin = 0;
-        var end = totalLines - 1;
-        while (end - begin > 1) {
-            var middle = (begin + end) >> 1;
-            coords = this._codeMirror.charCoords(new CodeMirror.Pos(middle, 0), "local");
-            if (coords.top >= top)
-                end = middle;
-            else
-                begin = middle;
-        }
-
-        return end;
-    },
-
-    _topScrolledLine: function()
-    {
-        var scrollInfo = this._codeMirror.getScrollInfo();
-        // Workaround for CodeMirror's coordsChar incorrect result for "local" mode.
-        return this._coordsCharLocal(scrollInfo);
-    },
-
-    _bottomScrolledLine: function()
-    {
-        var scrollInfo = this._codeMirror.getScrollInfo();
-        scrollInfo.top += scrollInfo.clientHeight;
-        // Workaround for CodeMirror's coordsChar incorrect result for "local" mode.
-        return this._coordsCharLocal(scrollInfo);
-    },
-
     _scroll: function()
     {
-        this._delegate.scrollChanged(this._topScrolledLine());
+        if (this._scrollTimer)
+            clearTimeout(this._scrollTimer);
+        var topmostLineNumber = this._codeMirror.lineAtHeight(this._codeMirror.getScrollInfo().top, "local");
+        this._scrollTimer = setTimeout(this._delegate.scrollChanged.bind(this._delegate, topmostLineNumber), 100);
     },
 
     /**

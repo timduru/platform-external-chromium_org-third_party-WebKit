@@ -36,9 +36,7 @@
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/V8HiddenPropertyName.h"
 #include "bindings/v8/WorkerScriptController.h"
-#include "core/dom/Node.h"
 #include "core/page/Frame.h"
-#include "core/page/Page.h"
 #include "core/workers/WorkerContext.h"
 #include <v8.h>
 #include "wtf/Assertions.h"
@@ -49,7 +47,7 @@ ScriptState::ScriptState(v8::Handle<v8::Context> context)
     : m_context(context)
     , m_isolate(context->GetIsolate())
 {
-    m_context.get().MakeWeak(context->GetIsolate(), this, &makeWeakCallback);
+    m_context.getUnsafe().MakeWeak(context->GetIsolate(), this, &makeWeakCallback);
 }
 
 ScriptState::~ScriptState()
@@ -68,7 +66,7 @@ ScriptExecutionContext* ScriptState::scriptExecutionContext() const
     return toScriptExecutionContext(m_context.get());
 }
 
-ScriptState* ScriptState::forContext(v8::Local<v8::Context> context)
+ScriptState* ScriptState::forContext(v8::Handle<v8::Context> context)
 {
     v8::Context::Scope contextScope(context);
 
@@ -96,46 +94,22 @@ void ScriptState::makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::Cont
     delete scriptState;
 }
 
-DOMWindow* domWindowFromScriptState(ScriptState* scriptState)
-{
-    return scriptState->domWindow();
-}
-
-ScriptExecutionContext* scriptExecutionContextFromScriptState(ScriptState* scriptState)
-{
-    return scriptState->scriptExecutionContext();
-}
-
-bool evalEnabled(ScriptState* scriptState)
+bool ScriptState::evalEnabled() const
 {
     v8::HandleScope handleScope;
-    return scriptState->context()->IsCodeGenerationFromStringsAllowed();
+    return context()->IsCodeGenerationFromStringsAllowed();
 }
 
-void setEvalEnabled(ScriptState* scriptState, bool enabled)
+void ScriptState::setEvalEnabled(bool enabled)
 {
     v8::HandleScope handleScope;
-    return scriptState->context()->AllowCodeGenerationFromStrings(enabled);
+    return context()->AllowCodeGenerationFromStrings(enabled);
 }
 
 ScriptState* mainWorldScriptState(Frame* frame)
 {
     v8::HandleScope handleScope;
     return ScriptState::forContext(frame->script()->mainWorldContext());
-}
-
-ScriptState* scriptStateFromNode(DOMWrapperWorld*, Node* node)
-{
-    // This should be never reached with V8 bindings (WebKit only uses it
-    // for non-JS bindings)
-    ASSERT_NOT_REACHED();
-    return 0;
-}
-
-ScriptState* scriptStateFromPage(DOMWrapperWorld*, Page* page)
-{
-    // This should be only reached with V8 bindings from single process layout tests.
-    return mainWorldScriptState(page->mainFrame());
 }
 
 ScriptState* scriptStateFromWorkerContext(WorkerContext* workerContext)

@@ -262,14 +262,14 @@ bool FEMorphology::applySkia()
         paint.setImageFilter(new SkErodeImageFilter(radiusX, radiusY))->unref();
 
     dstContext->saveLayer(0, &paint);
-    dstContext->drawImage(image.get(), ColorSpaceDeviceRGB, drawingRegion.location(), CompositeCopy);
+    dstContext->drawImage(image.get(), drawingRegion.location(), CompositeCopy);
     dstContext->restoreLayer();
     return true;
 }
 
 SkImageFilter* FEMorphology::createImageFilter(SkiaImageFilterBuilder* builder)
 {
-    SkAutoTUnref<SkImageFilter> input(builder->build(inputEffect(0)));
+    SkAutoTUnref<SkImageFilter> input(builder->build(inputEffect(0), operatingColorSpace()));
     SkScalar radiusX = SkFloatToScalar(m_radiusX);
     SkScalar radiusY = SkFloatToScalar(m_radiusY);
     if (m_type == FEMORPHOLOGY_OPERATOR_DILATE)

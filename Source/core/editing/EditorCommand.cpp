@@ -31,7 +31,6 @@
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
-#include "core/css/CSSComputedStyleDeclaration.h"
 #include "core/css/CSSValueList.h"
 #include "core/css/StylePropertySet.h"
 #include "core/dom/DocumentFragment.h"
@@ -45,7 +44,6 @@
 #include "core/editing/ReplaceSelectionCommand.h"
 #include "core/editing/TypingCommand.h"
 #include "core/editing/UnlinkCommand.h"
-#include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
 #include "core/html/HTMLFontElement.h"
 #include "core/html/HTMLHRElement.h"
@@ -123,7 +121,7 @@ static bool executeApplyStyle(Frame* frame, EditorCommandSource source, EditActi
     return applyCommandToFrame(frame, source, action, style.get());
 }
 
-static bool executeApplyStyle(Frame* frame, EditorCommandSource source, EditAction action, CSSPropertyID propertyID, int propertyValue)
+static bool executeApplyStyle(Frame* frame, EditorCommandSource source, EditAction action, CSSPropertyID propertyID, CSSValueID propertyValue)
 {
     RefPtr<MutableStylePropertySet> style = MutableStylePropertySet::create();
     style->setProperty(propertyID, propertyValue);
@@ -420,7 +418,7 @@ static bool executeFontName(Frame* frame, Event*, EditorCommandSource source, co
 
 static bool executeFontSize(Frame* frame, Event*, EditorCommandSource source, const String& value)
 {
-    int size;
+    CSSValueID size;
     if (!HTMLFontElement::cssValueFromFontSizeNumber(value, size))
         return false;
     return executeApplyStyle(frame, source, EditActionChangeAttributes, CSSPropertyFontSize, size);

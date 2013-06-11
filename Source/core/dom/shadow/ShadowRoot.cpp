@@ -139,16 +139,16 @@ void ShadowRoot::recalcStyle(StyleChange change)
     // ShadowRoot doesn't support custom callbacks.
     ASSERT(!hasCustomStyleCallbacks());
 
-    StyleResolver* styleResolver = document()->styleResolver();
-    styleResolver->pushParentShadowRoot(this);
-
     // When we're set to lazyAttach we'll have a FullStyleChange and we'll need
     // to promote the change to a Force for all our descendants so they get a
     // recalc and will attach.
     if (styleChangeType() == FullStyleChange)
         change = Force;
 
-    for (Node* child = firstChild(); child; child = child->nextSibling()) {
+    StyleResolver* styleResolver = document()->styleResolver();
+    styleResolver->pushParentShadowRoot(this);
+
+    for (Node* child = lastChild(); child; child = child->previousSibling()) {
         if (child->isElementNode())
             toElement(child)->recalcStyle(change);
         else if (child->isTextNode())
@@ -160,6 +160,14 @@ void ShadowRoot::recalcStyle(StyleChange change)
     clearChildNeedsStyleRecalc();
 }
 
+bool ShadowRoot::isActive() const
+{
+    for (ShadowRoot* shadowRoot = youngerShadowRoot(); shadowRoot; shadowRoot = shadowRoot->youngerShadowRoot())
+        if (!ScopeContentDistribution::hasShadowElement(shadowRoot))
+            return false;
+    return true;
+}
+
 void ShadowRoot::setApplyAuthorStyles(bool value)
 {
     if (isOrphan())
@@ -169,9 +177,10 @@ void ShadowRoot::setApplyAuthorStyles(bool value)
         return;
 
     m_applyAuthorStyles = value;
-    // FIXME: Why do we need to recalc style on all other shadow roots too?
-    if (attached())
-        host()->setNeedsStyleRecalc();
+    if (!isActive())
+        return;
+
+    setNeedsStyleRecalc();
 }
 
 void ShadowRoot::setResetStyleInheritance(bool value)
@@ -183,9 +192,10 @@ void ShadowRoot::setResetStyleInheritance(bool value)
         return;
 
     m_resetStyleInheritance = value;
-    // FIXME: Why do we need to recalc style on all other shadow roots too?
-    if (attached())
-        host()->setNeedsStyleRecalc();
+    if (!isActive())
+        return;
+
+    setNeedsStyleRecalc();
 }
 
 void ShadowRoot::attach()

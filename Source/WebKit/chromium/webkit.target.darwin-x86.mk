@@ -11,9 +11,8 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_Platform_Platform_gyp_webkit_platform_gyp)/webkit_platform.stamp \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_core_gyp_webcore_gyp)/webcore.stamp \
-	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_core_gyp_webcore_derived_gyp)/third_party_WebKit_Source_core_core_gyp_webcore_derived_gyp.a \
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_webcore_gyp)/webcore.stamp \
+	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_core_webcore_derived_gyp)/third_party_WebKit_Source_core_webcore_derived_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_gyp)/skia_skia_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_icu_icuuc_gyp)/icuuc.stamp \
 	$(call intermediates-dir-for,GYP,third_party_npapi_npapi_gyp)/npapi.stamp \
@@ -35,6 +34,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCString.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebData.cpp \
+	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceMotionData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFilterOperation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFilterOperations.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFloatQuad.cpp \
@@ -58,6 +58,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeClientImpl.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebScrollbarThemeGeometryNative.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSocketStreamError.cpp \
+	third_party/WebKit/Source/core/platform/chromium/support/WebSourceInfo.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesizerClientImpl.cpp \
@@ -75,7 +76,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/AsyncFileWriterChromium.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/AutofillPopupMenuClient.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/BackForwardClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/BatteryClientImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/DateTimeChooserImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/ChromeClientImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/ColorChooserPopupUIController.cpp \
@@ -94,20 +94,16 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/ExternalPopupMenu.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/FindInPageCoordinates.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/FrameLoaderClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/FrameNetworkingContextImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/GeolocationClientProxy.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/GraphicsLayerFactoryChromium.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebHelperPluginImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/IDBCallbacksProxy.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/IDBCursorBackendProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/IDBDatabaseCallbacksProxy.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/IDBDatabaseBackendProxy.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/IDBFactoryBackendProxy.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/InbandTextTrackPrivateImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/InspectorClientImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/InspectorFrontendClientImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/LinkHighlight.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/NonCompositedContentHost.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/PrerendererClientImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/android/WebInputEventFactory.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/linux/WebFontRendering.cpp \
@@ -156,6 +152,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMMessageEvent.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMMouseEvent.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMMutationEvent.cpp \
+	third_party/WebKit/Source/WebKit/chromium/src/WebDOMProgressEvent.cpp \
+	third_party/WebKit/Source/WebKit/chromium/src/WebDOMResourceProgressEvent.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDatabase.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDataSourceImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDevToolsAgentImpl.cpp \
@@ -187,11 +185,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/WebHitTestResult.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebIconLoadingCompletionImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebIDBCallbacksImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBCursorImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebIDBDatabaseCallbacksImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebIDBDatabaseError.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBDatabaseImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBFactoryImpl.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebIDBKey.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebIDBKeyPath.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebIDBKeyRange.cpp \
@@ -314,7 +309,6 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
-	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
@@ -322,8 +316,6 @@ MY_DEFS := \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
-	'-DENABLE_3D_PLUGIN=1' \
-	'-DENABLE_BATTERY_STATUS=0' \
 	'-DENABLE_CANVAS_USES_MAILBOX=0' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
@@ -331,16 +323,14 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
-	'-DENABLE_SVG=1' \
+	'-DENABLE_GRAPHICS_CONTEXT_ANNOTATIONS=0' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
-	'-DENABLE_INPUT_TYPE_COLOR=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
@@ -386,7 +376,7 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/third_party/WebKit/Source/Platform/chromium \
+	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/webkit \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
@@ -444,7 +434,7 @@ LOCAL_LDFLAGS := \
 
 
 LOCAL_STATIC_LIBRARIES := \
-	third_party_WebKit_Source_core_core_gyp_webcore_derived_gyp \
+	third_party_WebKit_Source_core_webcore_derived_gyp \
 	skia_skia_gyp
 
 # Enable grouping to fix circular references

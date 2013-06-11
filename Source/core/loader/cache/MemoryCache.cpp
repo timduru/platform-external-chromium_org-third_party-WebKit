@@ -73,7 +73,14 @@ MemoryCache::MemoryCache()
     , m_deadDecodedDataDeletionInterval(cDefaultDecodedDataDeletionInterval)
     , m_liveSize(0)
     , m_deadSize(0)
+#ifdef MEMORY_CACHE_STATS
+    , m_statsTimer(this, &MemoryCache::dumpStats)
+#endif
 {
+#ifdef MEMORY_CACHE_STATS
+    const double statsIntervalInSeconds = 15;
+    m_statsTimer.startRepeating(statsIntervalInSeconds);
+#endif
 }
 
 KURL MemoryCache::removeFragmentIdentifierIfNeeded(const KURL& originalURL)
@@ -406,32 +413,6 @@ void MemoryCache::insertInLRUList(CachedResource* resource)
 
 }
 
-void MemoryCache::removeResourcesWithOrigin(SecurityOrigin* origin)
-{
-    Vector<CachedResource*> resourcesWithOrigin;
-
-    CachedResourceMap::iterator e = m_resources.end();
-
-    for (CachedResourceMap::iterator it = m_resources.begin(); it != e; ++it) {
-        CachedResource* resource = it->value;
-        RefPtr<SecurityOrigin> resourceOrigin = SecurityOrigin::createFromString(resource->url());
-        if (!resourceOrigin)
-            continue;
-        if (resourceOrigin->equal(origin))
-            resourcesWithOrigin.append(resource);
-    }
-
-    for (size_t i = 0; i < resourcesWithOrigin.size(); ++i)
-        remove(resourcesWithOrigin[i]);
-}
-
-void MemoryCache::getOriginsWithCache(SecurityOriginSet& origins)
-{
-    CachedResourceMap::iterator e = m_resources.end();
-    for (CachedResourceMap::iterator it = m_resources.begin(); it != e; ++it)
-        origins.add(SecurityOrigin::createFromString(it->value->url()));
-}
-
 void MemoryCache::removeFromLiveDecodedResourcesList(CachedResource* resource)
 {
     // If we've never been accessed, then we're brand new and not in any list.
@@ -522,22 +503,18 @@ void MemoryCache::adjustSize(bool live, int delta)
     }
 }
 
-
-void MemoryCache::removeUrlFromCache(ScriptExecutionContext* context, const String& urlString)
+void MemoryCache::removeURLFromCache(ScriptExecutionContext* context, const KURL& url)
 {
     if (context->isWorkerContext()) {
-      WorkerContext* workerContext = static_cast<WorkerContext*>(context);
-      workerContext->thread()->workerLoaderProxy().postTaskToLoader(
-          createCallbackTask(&removeUrlFromCacheImpl, urlString));
-      return;
+        WorkerContext* workerContext = static_cast<WorkerContext*>(context);
+        workerContext->thread()->workerLoaderProxy().postTaskToLoader(createCallbackTask(&removeURLFromCacheInternal, url));
+        return;
     }
-    removeUrlFromCacheImpl(context, urlString);
+    removeURLFromCacheInternal(context, url);
 }
 
-void MemoryCache::removeUrlFromCacheImpl(ScriptExecutionContext*, const String& urlString)
+void MemoryCache::removeURLFromCacheInternal(ScriptExecutionContext*, const KURL& url)
 {
-    KURL url(KURL(), urlString);
-
     if (CachedResource* resource = memoryCache()->resourceForURL(url))
         memoryCache()->remove(resource);
 }
@@ -548,9 +525,11 @@ void MemoryCache::TypeStatistic::addResource(CachedResource* o)
     bool purgeable = o->isPurgeable() && !purged; 
     int pageSize = (o->encodedSize() + o->overheadSize() + 4095) & ~4095;
     count++;
-    size += purged ? 0 : o->size(); 
+    size += purged ? 0 : o->size();
     liveSize += o->hasClients() ? o->size() : 0;
     decodedSize += o->decodedSize();
+    encodedSize += o->encodedSize();
+    encodedSizeDuplicatedInDataURLs += o->url().protocolIsData() ? o->encodedSize() : 0;
     purgeableSize += purgeable ? pageSize : 0;
     purgedSize += purged ? pageSize : 0;
 }
@@ -621,8 +600,9 @@ void MemoryCache::pruneToPercentage(float targetPercentLive)
 }
 
 
-#ifndef NDEBUG
-void MemoryCache::dumpStats()
+#ifdef MEMORY_CACHE_STATS
+
+void MemoryCache::dumpStats(Timer<MemoryCache>*)
 {
     Statistics s = getStatistics();
     printf("%-13s %-13s %-13s %-13s %-13s %-13s %-13s\n", "", "Count", "Size", "LiveSize", "DecodedSize", "PurgeableSize", "PurgedSize");
@@ -633,6 +613,13 @@ void MemoryCache::dumpStats()
     printf("%-13s %13d %13d %13d %13d %13d %13d\n", "JavaScript", s.scripts.count, s.scripts.size, s.scripts.liveSize, s.scripts.decodedSize, s.scripts.purgeableSize, s.scripts.purgedSize);
     printf("%-13s %13d %13d %13d %13d %13d %13d\n", "Fonts", s.fonts.count, s.fonts.size, s.fonts.liveSize, s.fonts.decodedSize, s.fonts.purgeableSize, s.fonts.purgedSize);
     printf("%-13s %-13s %-13s %-13s %-13s %-13s %-13s\n\n", "-------------", "-------------", "-------------", "-------------", "-------------", "-------------", "-------------");
+
+    printf("Duplication of encoded data from data URLs\n");
+    printf("%-13s %13d of %13d\n", "Images",     s.images.encodedSizeDuplicatedInDataURLs,         s.images.encodedSize);
+    printf("%-13s %13d of %13d\n", "CSS",        s.cssStyleSheets.encodedSizeDuplicatedInDataURLs, s.cssStyleSheets.encodedSize);
+    printf("%-13s %13d of %13d\n", "XSL",        s.xslStyleSheets.encodedSizeDuplicatedInDataURLs, s.xslStyleSheets.encodedSize);
+    printf("%-13s %13d of %13d\n", "JavaScript", s.scripts.encodedSizeDuplicatedInDataURLs,        s.scripts.encodedSize);
+    printf("%-13s %13d of %13d\n", "Fonts",      s.fonts.encodedSizeDuplicatedInDataURLs,          s.fonts.encodedSize);
 }
 
 void MemoryCache::dumpLRULists(bool includeLive) const
@@ -652,6 +639,7 @@ void MemoryCache::dumpLRULists(bool includeLive) const
         }
     }
 }
-#endif
+
+#endif // MEMORY_CACHE_STATS
 
 } // namespace WebCore

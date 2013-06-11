@@ -245,6 +245,11 @@ WebInspector.evaluateInConsole = function(expression, showResultOnly) {}
 
 WebInspector.queryParamsObject = {}
 
+/**
+ * @param {Element} element
+ */
+WebInspector.showAnchorLocation = function(element) {}
+
 WebInspector.Events = {
     InspectorLoaded: "InspectorLoaded",
     InspectorClosing: "InspectorClosing"
@@ -387,6 +392,7 @@ CodeMirror.prototype = {
     lastLine: function() { },
     lineCount: function() { },
     lineInfo: function(line) { },
+    lineAtHeight: function(height) { },
     linkedDoc: function(options) { },
     markClean: function() { },
     markText: function(from, to, options) { },
@@ -427,6 +433,10 @@ CodeMirror.prototype.lineCount;
 CodeMirror.Pass;
 CodeMirror.showHint = function(codeMirror, hintintFunction) { };
 CodeMirror.commands = {};
+CodeMirror.modes = {};
+CodeMirror.getMode = function(options, spec) { };
+CodeMirror.overlayMode = function(mode1, mode2, squashSpans) { };
+CodeMirror.defineMode = function(modeName, modeConstructor) { };
 
 /** @constructor */
 CodeMirror.Pos = function(line, ch) { }
@@ -464,3 +474,9 @@ WebInspector.reload = function() { }
 
 /** @type {boolean} */
 window.dispatchStandaloneTestRunnerMessages;
+
+WebInspector.settings.continuousPainting = /** type {WebInspector.Setting} */ { }
+WebInspector.settings.showDebugBorders = /** type {WebInspector.Setting} */ { }
+WebInspector.settings.showFPSCounter = /** type {WebInspector.Setting} */ { }
+WebInspector.settings.showPaintRects = /** type {WebInspector.Setting} */ { }
+WebInspector.settings.showFPSCounter = /** type {WebInspector.Setting} */ { }

@@ -40,8 +40,6 @@
 #include "core/dom/DocumentFragment.h"
 #include "core/dom/Node.h"
 #include "core/html/HTMLDocument.h"
-#include "core/html/HTMLElement.h"
-#include "core/html/HTMLHeadElement.h"
 #include "core/html/parser/HTMLDocumentParser.h"
 #include "core/inspector/DOMEditor.h"
 #include "core/inspector/InspectorHistory.h"
@@ -315,10 +313,8 @@ bool DOMPatchSupport::innerPatchChildren(ContainerNode* parentNode, const Vector
     HashSet<size_t, WTF::IntHash<size_t>, WTF::UnsignedWithZeroKeyHashTraits<size_t> > usedNewOrdinals;
     for (size_t i = 0; i < oldList.size(); ++i) {
         if (oldMap[i].first) {
-            if (!usedNewOrdinals.contains(oldMap[i].second)) {
-                usedNewOrdinals.add(oldMap[i].second);
+            if (usedNewOrdinals.add(oldMap[i].second).isNewEntry)
                 continue;
-            }
             oldMap[i].first = 0;
             oldMap[i].second = 0;
         }

@@ -2449,7 +2449,7 @@ void RenderBlock::updateBlockChildDirtyBitsBeforeLayout(bool relayoutChildren, R
 {
     // FIXME: Technically percentage height objects only need a relayout if their percentage isn't going to be turned into
     // an auto value. Add a method to determine this, so that we can avoid the relayout.
-    if (relayoutChildren || (child->hasRelativeLogicalHeight() && !isRenderView()) || child->hasViewportPercentageLogicalHeight())
+    if (relayoutChildren || (child->hasRelativeLogicalHeight() && !isRenderView()))
         child->setChildNeedsLayout(true, MarkOnlyThis);
 
     // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
@@ -2889,6 +2889,8 @@ void RenderBlock::repaintOverhangingFloats(bool paintAllDescendants)
  
 void RenderBlock::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
+    ANNOTATE_GRAPHICS_CONTEXT(paintInfo, this);
+
     LayoutPoint adjustedPaintOffset = paintOffset + location();
     
     PaintPhase phase = paintInfo.phase;
@@ -3626,7 +3628,7 @@ LayoutRect RenderBlock::blockSelectionGap(RenderBlock* rootBlock, const LayoutPo
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(logicalLeft, logicalTop, logicalWidth, logicalHeight));
     if (paintInfo)
-        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selectionBackgroundColor(), style()->colorSpace());
+        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selectionBackgroundColor());
     return gapRect;
 }
 
@@ -3642,7 +3644,7 @@ LayoutRect RenderBlock::logicalLeftSelectionGap(RenderBlock* rootBlock, const La
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(rootBlockLogicalLeft, rootBlockLogicalTop, rootBlockLogicalWidth, logicalHeight));
     if (paintInfo)
-        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selObj->selectionBackgroundColor(), selObj->style()->colorSpace());
+        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selObj->selectionBackgroundColor());
     return gapRect;
 }
 
@@ -3658,7 +3660,7 @@ LayoutRect RenderBlock::logicalRightSelectionGap(RenderBlock* rootBlock, const L
 
     LayoutRect gapRect = rootBlock->logicalRectToPhysicalRect(rootBlockPhysicalPosition, LayoutRect(rootBlockLogicalLeft, rootBlockLogicalTop, rootBlockLogicalWidth, logicalHeight));
     if (paintInfo)
-        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selObj->selectionBackgroundColor(), selObj->style()->colorSpace());
+        paintInfo->context->fillRect(pixelSnappedIntRect(gapRect), selObj->selectionBackgroundColor());
     return gapRect;
 }
 
@@ -4752,7 +4754,7 @@ void RenderBlock::markShapeInsideDescendantsForLayout()
 
 void RenderBlock::markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove, bool inLayout)
 {
-    if (!everHadLayout())
+    if (!everHadLayout() && !containsFloats())
         return;
 
     MarkingBehavior markParents = inLayout ? MarkOnlyThis : MarkContainingBlockChain;
@@ -6064,11 +6066,10 @@ void RenderBlock::computeInlinePreferredLogicalWidths(LayoutUnit& minLogicalWidt
                 }
 
                 // Add in text-indent.  This is added in only once.
-                LayoutUnit ti = 0;
                 if (!addedTextIndent && !child->isFloating()) {
-                    ti = textIndent;
-                    childMin += ti.ceilToFloat();
-                    childMax += ti.ceilToFloat();
+                    float ceiledTextIndent = textIndent.ceilToFloat();
+                    childMin += ceiledTextIndent;
+                    childMax += ceiledTextIndent;
 
                     if (childMin < 0)
                         textIndent = adjustFloatForSubPixelLayout(childMin);

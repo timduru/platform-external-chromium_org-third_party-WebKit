@@ -87,7 +87,7 @@ static inline bool isCSSTokenAString(int yytype)
 
 %}
 
-%expect 29
+%expect 1
 
 %nonassoc LOWEST_PREC
 
@@ -212,7 +212,6 @@ static inline bool isCSSTokenAString(int yytype)
 %type <relation> combinator
 
 %type <rule> charset
-%type <rule> ignored_charset
 %type <rule> ruleset
 %type <rule> media
 %type <rule> import
@@ -223,7 +222,6 @@ static inline bool isCSSTokenAString(int yytype)
 %type <rule> host
 %type <rule> keyframes
 %type <rule> invalid_rule
-%type <rule> invalid_at
 %type <rule> rule
 %type <rule> valid_rule
 %type <ruleList> block_rule_body
@@ -248,10 +246,11 @@ static inline bool isCSSTokenAString(int yytype)
 %type <string> medium
 %type <marginBox> margin_sym
 
-%type <string> media_feature
 %type <mediaList> media_list
 %type <mediaList> maybe_media_list
+%type <mediaList> mq_list
 %type <mediaQuery> media_query
+%type <mediaQuery> valid_media_query
 %type <mediaQueryRestrictor> maybe_media_restrictor
 %type <valueList> maybe_media_value
 %type <mediaQueryExp> media_query_exp
@@ -282,7 +281,6 @@ static inline bool isCSSTokenAString(int yytype)
 %type <selectorList> selector_list
 %type <selectorList> simple_selector_list
 %type <selectorList> region_selector
-%type <selector> selector_with_trailing_whitespace
 %type <selector> class
 %type <selector> attrib
 %type <selector> pseudo
@@ -324,7 +322,7 @@ static inline bool isCSSTokenAString(int yytype)
 %%
 
 stylesheet:
-    maybe_space maybe_charset maybe_sgml rule_list
+    maybe_charset maybe_sgml rule_list
   | internal_decls maybe_space
   | internal_rule maybe_space
   | internal_selector maybe_space
@@ -365,8 +363,8 @@ internal_value:
 ;
 
 webkit_mediaquery:
-     WEBKIT_MEDIAQUERY_SYM WHITESPACE maybe_space media_query '}' {
-         parser->m_mediaQuery = parser->sinkFloatingMediaQuery($4);
+     WEBKIT_MEDIAQUERY_SYM maybe_space valid_media_query '}' {
+         parser->m_mediaQuery = parser->sinkFloatingMediaQuery($3);
      }
 ;
 
@@ -423,16 +421,6 @@ charset:
   }
 ;
 
-ignored_charset:
-    CHARSET_SYM rule_error_recovery ';' {
-        // Ignore any @charset rule not at the beginning of the style sheet.
-        $$ = 0;
-    }
-    | CHARSET_SYM rule_error_recovery invalid_block {
-        $$ = 0;
-    }
-;
-
 rule_list:
    /* empty */
  | rule_list rule maybe_sgml {
@@ -462,9 +450,7 @@ rule:
     valid_rule {
         parser->m_hadSyntacticallyValidCSSRule = true;
     }
-  | ignored_charset
   | invalid_rule
-  | invalid_at
   ;
 
 block_rule_body:
@@ -514,9 +500,7 @@ block_valid_rule:
 
 block_rule:
     block_valid_rule
-  | ignored_charset
   | invalid_rule
-  | invalid_at
   | namespace
   | import
   | region
@@ -575,31 +559,22 @@ STRING
 | URI
 ;
 
-media_feature:
-    IDENT maybe_space {
-        $$ = $1;
-    }
-    ;
-
 maybe_media_value:
     /*empty*/ {
         $$ = 0;
     }
-    | ':' maybe_space expr maybe_space {
+    | ':' maybe_space expr {
         $$ = $3;
     }
     ;
 
 media_query_exp:
-    maybe_media_restrictor maybe_space '(' maybe_space media_feature maybe_space maybe_media_value ')' maybe_space {
-        // If restrictor is specified, media query expression is invalid.
-        // Create empty media query expression and continue parsing media query.
-        if ($1 != MediaQuery::None)
-            $$ = parser->createFloatingMediaQueryExp("", 0);
-        else {
-            parser->tokenToLowerCase($5);
-            $$ = parser->createFloatingMediaQueryExp($5, $7);
-        }
+    '(' maybe_space IDENT maybe_space maybe_media_value closing_parenthesis maybe_space {
+        parser->tokenToLowerCase($3);
+        $$ = parser->createFloatingMediaQueryExp($3, $5);
+    }
+    | '(' error error_recovery closing_parenthesis {
+        YYERROR;
     }
     ;
 
@@ -608,9 +583,9 @@ media_query_exp_list:
         $$ = parser->createFloatingMediaQueryExpList();
         $$->append(parser->sinkFloatingMediaQueryExp($1));
     }
-    | media_query_exp_list maybe_space MEDIA_AND maybe_space media_query_exp {
+    | media_query_exp_list MEDIA_AND maybe_space media_query_exp {
         $$ = $1;
-        $$->append(parser->sinkFloatingMediaQueryExp($5));
+        $$->append(parser->sinkFloatingMediaQueryExp($4));
     }
     ;
 
@@ -627,31 +602,37 @@ maybe_media_restrictor:
     /*empty*/ {
         $$ = MediaQuery::None;
     }
-    | MEDIA_ONLY {
+    | MEDIA_ONLY maybe_space {
         $$ = MediaQuery::Only;
     }
-    | MEDIA_NOT {
+    | MEDIA_NOT maybe_space {
         $$ = MediaQuery::Not;
     }
     ;
 
-media_query:
+valid_media_query:
     media_query_exp_list {
         $$ = parser->createFloatingMediaQuery(parser->sinkFloatingMediaQueryExpList($1));
     }
-    |
-    maybe_media_restrictor maybe_space medium maybe_and_media_query_exp_list {
-        parser->tokenToLowerCase($3);
-        $$ = parser->createFloatingMediaQuery($1, $3, parser->sinkFloatingMediaQueryExpList($4));
+    | maybe_media_restrictor medium maybe_and_media_query_exp_list {
+        parser->tokenToLowerCase($2);
+        $$ = parser->createFloatingMediaQuery($1, $2, parser->sinkFloatingMediaQueryExpList($3));
+    }
+    ;
+
+media_query:
+    valid_media_query
+    | error rule_error_recovery {
+        $$ = parser->createFloatingNotAllQuery();
     }
     ;
 
 maybe_media_list:
-     /* empty */ {
+    /* empty */ {
         $$ = parser->createMediaQuerySet();
-     }
-     | media_list
-     ;
+    }
+    | media_list
+    ;
 
 media_list:
     media_query {
@@ -659,15 +640,26 @@ media_list:
         $$->addMediaQuery(parser->sinkFloatingMediaQuery($1));
         parser->updateLastMediaLine($$);
     }
-    | media_list ',' maybe_space media_query {
+    | mq_list media_query {
         $$ = $1;
-        if ($$) {
-            $$->addMediaQuery(parser->sinkFloatingMediaQuery($4));
-            parser->updateLastMediaLine($$);
-        }
+        $$->addMediaQuery(parser->sinkFloatingMediaQuery($2));
+        parser->updateLastMediaLine($$);
     }
-    | media_list error {
-        $$ = 0;
+    | mq_list {
+        $$ = $1;
+        $$->addMediaQuery(parser->sinkFloatingMediaQuery(parser->createFloatingNotAllQuery()));
+        parser->updateLastMediaLine($$);
+    }
+    ;
+
+mq_list:
+    media_query ',' maybe_space {
+        $$ = parser->createMediaQuerySet();
+        $$->addMediaQuery(parser->sinkFloatingMediaQuery($1));
+    }
+    | mq_list media_query ',' maybe_space {
+        $$ = $1;
+        $$->addMediaQuery(parser->sinkFloatingMediaQuery($2));
     }
     ;
 
@@ -695,6 +687,10 @@ media:
     }
     | before_media_rule MEDIA_SYM at_rule_header_end_maybe_space '{' at_rule_body_start maybe_space block_rule_body closing_brace {
         $$ = parser->createMediaRule(0, $7);
+    }
+    | before_media_rule MEDIA_SYM maybe_space media_list ';' {
+        $$ = 0;
+        parser->endRuleBody(true);
     }
     | before_media_rule MEDIA_SYM at_rule_recovery {
         $$ = 0;
@@ -770,7 +766,7 @@ supports_condition_in_parens:
         $$ = $3;
     }
     | supports_declaration_condition
-    | '(' error error_location error_recovery ')' {
+    | '(' error error_location error_recovery ')' maybe_space {
         parser->reportError($3, CSSParser::InvalidSupportsConditionError);
         $$ = false;
     }
@@ -883,7 +879,7 @@ before_page_rule:
     ;
 
 page:
-    before_page_rule PAGE_SYM maybe_space page_selector at_rule_header_end_maybe_space
+    before_page_rule PAGE_SYM maybe_space page_selector at_rule_header_end
     '{' at_rule_body_start maybe_space_before_declaration declarations_and_margins closing_brace {
         if ($4)
             $$ = parser->createPageRule(parser->sinkFloatingSelector($4));
@@ -902,18 +898,18 @@ page:
     ;
 
 page_selector:
-    IDENT {
+    IDENT maybe_space {
         $$ = parser->createFloatingSelectorWithTagName(QualifiedName(nullAtom, $1, parser->m_defaultNamespace));
         $$->setForPage();
     }
-    | IDENT pseudo_page {
+    | IDENT pseudo_page maybe_space {
         $$ = $2;
         if ($$) {
             $$->prependTagSelector(QualifiedName(nullAtom, $1, parser->m_defaultNamespace));
             $$->setForPage();
         }
     }
-    | pseudo_page {
+    | pseudo_page maybe_space {
         $$ = $1;
         if ($$)
             $$->setForPage();
@@ -1089,6 +1085,9 @@ filter:
         parser->m_inFilterRule = false;
         $$ = parser->createFilterRule($4);
     }
+  | before_filter_rule WEBKIT_FILTER_RULE_SYM at_rule_recovery {
+        $$ = 0;
+    }
     ;
 
 combinator:
@@ -1175,23 +1174,12 @@ relative_selector:
     }
     ;
 
-selector_with_trailing_whitespace:
-    selector WHITESPACE {
-        $$ = $1;
-    }
-    ;
-
 selector:
-    simple_selector {
-        $$ = $1;
-    }
-    | selector_with_trailing_whitespace
+    simple_selector
+    | selector WHITESPACE
+    | selector WHITESPACE simple_selector
     {
-        $$ = $1;
-    }
-    | selector_with_trailing_whitespace simple_selector
-    {
-        $$ = $2;
+        $$ = $3;
         if (!$1)
             $$ = 0;
         else if ($$) {
@@ -1435,7 +1423,7 @@ pseudo:
     | ':' ':' CUEFUNCTION selector_recovery ')' {
         YYERROR;
     }
-    | ':' ':' DISTRIBUTEDFUNCTION maybe_space relative_selector maybe_space ')' {
+    | ':' ':' DISTRIBUTEDFUNCTION maybe_space relative_selector ')' {
         if (!$5)
             $$ = 0;
         else {
@@ -1666,7 +1654,7 @@ valid_expr:
         if ($$) {
             if ($2) {
                 CSSParserValue v;
-                v.id = 0;
+                v.id = CSSValueInvalid;
                 v.unit = CSSParserValue::Operator;
                 v.iValue = $2;
                 $$->addValue(v);
@@ -1697,21 +1685,21 @@ operator:
 term:
   unary_term maybe_space { $$ = $1; }
   | unary_operator unary_term maybe_space { $$ = $2; $$.fValue *= $1; }
-  | STRING maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_STRING; }
+  | STRING maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_STRING; }
   | IDENT maybe_space {
       $$.id = cssValueKeywordID($1);
       $$.unit = CSSPrimitiveValue::CSS_IDENT;
       $$.string = $1;
   }
   /* We might need to actually parse the number from a dimension, but we can't just put something that uses $$.string into unary_term. */
-  | DIMEN maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_DIMENSION; }
-  | unary_operator DIMEN maybe_space { $$.id = 0; $$.string = $2; $$.unit = CSSPrimitiveValue::CSS_DIMENSION; }
-  | URI maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_URI; }
-  | UNICODERANGE maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_UNICODE_RANGE; }
-  | HEX maybe_space { $$.id = 0; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_PARSER_HEXCOLOR; }
-  | '#' maybe_space { $$.id = 0; $$.string = CSSParserString(); $$.unit = CSSPrimitiveValue::CSS_PARSER_HEXCOLOR; } /* Handle error case: "color: #;" */
+  | DIMEN maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_DIMENSION; }
+  | unary_operator DIMEN maybe_space { $$.id = CSSValueInvalid; $$.string = $2; $$.unit = CSSPrimitiveValue::CSS_DIMENSION; }
+  | URI maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_URI; }
+  | UNICODERANGE maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_UNICODE_RANGE; }
+  | HEX maybe_space { $$.id = CSSValueInvalid; $$.string = $1; $$.unit = CSSPrimitiveValue::CSS_PARSER_HEXCOLOR; }
+  | '#' maybe_space { $$.id = CSSValueInvalid; $$.string = CSSParserString(); $$.unit = CSSPrimitiveValue::CSS_PARSER_HEXCOLOR; } /* Handle error case: "color: #;" */
   | VARFUNCTION maybe_space IDENT closing_parenthesis maybe_space {
-      $$.id = 0;
+      $$.id = CSSValueInvalid;
       $$.string = $3;
       $$.unit = CSSPrimitiveValue::CSS_VARIABLE_NAME;
   }
@@ -1726,7 +1714,7 @@ term:
       $$ = $1;
   }
   | '%' maybe_space { /* Handle width: %; */
-      $$.id = 0; $$.unit = 0;
+      $$.id = CSSValueInvalid; $$.unit = 0;
   }
   ;
 
@@ -1773,7 +1761,7 @@ function:
             CSSParserFunction* f = parser->createFloatingFunction();
             f->name = $1;
             f->args = parser->sinkFloatingValueList($3);
-            $$.id = 0;
+            $$.id = CSSValueInvalid;
             $$.unit = CSSParserValue::Function;
             $$.function = f;
         } else
@@ -1784,7 +1772,7 @@ function:
         f->name = $1;
         CSSParserValueList* valueList = parser->createFloatingValueList();
         f->args = parser->sinkFloatingValueList(valueList);
-        $$.id = 0;
+        $$.id = CSSValueInvalid;
         $$.unit = CSSParserValue::Function;
         $$.function = f;
     } |
@@ -1796,7 +1784,7 @@ function:
 calc_func_term:
   unary_term { $$ = $1; }
   | VARFUNCTION maybe_space IDENT closing_parenthesis {
-      $$.id = 0;
+      $$.id = CSSValueInvalid;
       $$.string = $3;
       $$.unit = CSSPrimitiveValue::CSS_VARIABLE_NAME;
   }
@@ -1828,7 +1816,7 @@ calc_func_paren_expr:
         if ($3) {
             $$ = $3;
             CSSParserValue v;
-            v.id = 0;
+            v.id = CSSValueInvalid;
             v.unit = CSSParserValue::Operator;
             v.iValue = '(';
             $$->insertValueAt(0, v);
@@ -1856,7 +1844,7 @@ valid_calc_func_expr:
         if ($1 && $2) {
             $$ = $1;
             CSSParserValue v;
-            v.id = 0;
+            v.id = CSSValueInvalid;
             v.unit = CSSParserValue::Operator;
             v.iValue = $2;
             $$->addValue(v);
@@ -1869,7 +1857,7 @@ valid_calc_func_expr:
         if ($1 && $2 && $3) {
             $$ = $1;
             CSSParserValue v;
-            v.id = 0;
+            v.id = CSSValueInvalid;
             v.unit = CSSParserValue::Operator;
             v.iValue = $2;
             $$->addValue(v);
@@ -1888,7 +1876,7 @@ calc_func_expr_list:
         if ($1 && $4) {
             $$ = $1;
             CSSParserValue v;
-            v.id = 0;
+            v.id = CSSValueInvalid;
             v.unit = CSSParserValue::Operator;
             v.iValue = ',';
             $$->addValue(v);
@@ -1903,7 +1891,7 @@ calc_function:
         CSSParserFunction* f = parser->createFloatingFunction();
         f->name = $1;
         f->args = parser->sinkFloatingValueList($3);
-        $$.id = 0;
+        $$.id = CSSValueInvalid;
         $$.unit = CSSParserValue::Function;
         $$.function = f;
     }
@@ -1927,7 +1915,7 @@ min_or_max_function:
         CSSParserFunction* f = parser->createFloatingFunction();
         f->name = $1;
         f->args = parser->sinkFloatingValueList($3);
-        $$.id = 0;
+        $$.id = CSSValueInvalid;
         $$.unit = CSSParserValue::Function;
         $$.function = f;
     } 
@@ -1937,12 +1925,9 @@ min_or_max_function:
     ;
 
 invalid_at:
-    ATKEYWORD at_rule_recovery {
-        $$ = 0;
-    }
-  | margin_sym at_rule_recovery {
-        $$ = 0;
-    }
+    ATKEYWORD at_rule_recovery
+  | margin_sym at_rule_recovery
+  | error CHARSET_SYM at_rule_recovery
     ;
 
 at_rule_recovery:
@@ -1955,6 +1940,9 @@ at_rule_end:
 
 invalid_rule:
     error rule_error_recovery at_invalid_rule_header_end invalid_block {
+        $$ = 0;
+    }
+  | invalid_at {
         $$ = 0;
     }
     ;

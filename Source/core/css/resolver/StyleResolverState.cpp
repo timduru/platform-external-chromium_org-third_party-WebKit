@@ -45,6 +45,7 @@ void StyleResolverState::cacheBorderAndBackground()
 void StyleResolverState::clear()
 {
     m_element = 0;
+    m_childIndex = 0;
     m_styledElement = 0;
     m_parentStyle = 0;
     m_parentNode = 0;
@@ -54,9 +55,10 @@ void StyleResolverState::clear()
     m_pendingSVGDocuments.clear();
 }
 
-void StyleResolverState::initElement(Element* e)
+void StyleResolverState::initElement(Element* e, int childIndex)
 {
     m_element = e;
+    m_childIndex = childIndex;
     m_styledElement = e && e->isStyledElement() ? static_cast<StyledElement*>(e) : 0;
     m_elementLinkState = e ? e->document()->visitedLinkState()->determineLinkState(e) : NotInsideLink;
 }
@@ -88,10 +90,10 @@ void StyleResolverState::initForStyleResolve(Document* document, Element* e, Ren
 }
 
 
-static Color colorForCSSValue(int cssValueId)
+static Color colorForCSSValue(CSSValueID cssValueId)
 {
     struct ColorValue {
-        int cssValueId;
+        CSSValueID cssValueId;
         RGBA32 color;
     };
 
@@ -115,7 +117,7 @@ static Color colorForCSSValue(int cssValueId)
         { CSSValueTransparent, 0x00000000 },
         { CSSValueWhite, 0xFFFFFFFF },
         { CSSValueYellow, 0xFFFFFF00 },
-        { 0, 0 }
+        { CSSValueInvalid, CSSValueInvalid }
     };
 
     for (const ColorValue* col = colorValues; col->cssValueId; ++col) {
@@ -130,8 +132,8 @@ Color StyleResolverState::colorFromPrimitiveValue(CSSPrimitiveValue* value, bool
     if (value->isRGBColor())
         return Color(value->getRGBA32Value());
 
-    int ident = value->getIdent();
-    switch (ident) {
+    CSSValueID valueID = value->getValueID();
+    switch (valueID) {
     case 0:
         return Color();
     case CSSValueWebkitText:
@@ -145,7 +147,7 @@ Color StyleResolverState::colorFromPrimitiveValue(CSSPrimitiveValue* value, bool
     case CSSValueCurrentcolor:
         return style()->color();
     default:
-        return colorForCSSValue(ident);
+        return colorForCSSValue(valueID);
     }
 }
 

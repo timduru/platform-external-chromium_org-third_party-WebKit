@@ -30,17 +30,11 @@
 #include "config.h"
 #include "core/page/Frame.h"
 
-#include "CSSPropertyNames.h"
-#include "HTMLNames.h"
-#include "WebKitFontFamilyNames.h"
-#include "XMLNSNames.h"
-#include "XMLNames.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptSourceCode.h"
 #include "bindings/v8/ScriptValue.h"
 #include "bindings/v8/npruntime_impl.h"
 #include "core/css/CSSComputedStyleDeclaration.h"
-#include "core/css/MediaFeatureNames.h"
 #include "core/css/StylePropertySet.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Event.h"
@@ -100,11 +94,6 @@
 #include <wtf/PassOwnPtr.h>
 #include <wtf/RefCountedLeakCounter.h>
 #include <wtf/StdLibExtras.h>
-#include <wtf/text/StringStatics.h>
-
-#include "MathMLNames.h"
-#include "SVGNames.h"
-#include "XLinkNames.h"
 
 using namespace std;
 
@@ -137,21 +126,6 @@ static inline float parentTextZoomFactor(Frame* frame)
     return parent->textZoomFactor();
 }
 
-void init()
-{
-    AtomicString::init();
-    HTMLNames::init();
-    SVGNames::init();
-    XLinkNames::init();
-    MathMLNames::init();
-    XMLNSNames::init();
-    XMLNames::init();
-    WebKitFontFamilyNames::init();
-    MediaFeatureNames::init();
-    WTF::StringStatics::init();
-    QualifiedName::init();
-}
-
 inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoaderClient* frameLoaderClient)
     : m_page(page)
     , m_treeNode(this, parentFromOwnerElement(ownerElement))
@@ -171,7 +145,6 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     , m_inViewSourceMode(false)
 {
     ASSERT(page);
-    WebCore::init();
 
     if (ownerElement) {
         page->incrementSubframeCount();
@@ -242,9 +215,9 @@ void Frame::setView(PassRefPtr<FrameView> view)
     // Prepare for destruction now, so any unload event handlers get run and the DOMWindow is
     // notified. If we wait until the view is destroyed, then things won't be hooked up enough for
     // these calls to work.
-    if (!view && m_doc && m_doc->attached()) {
+    if (!view && document() && document()->attached()) {
         // FIXME: We don't call willRemove here. Why is that OK?
-        m_doc->prepareForDestruction();
+        document()->prepareForDestruction();
     }
 
     if (m_view)
@@ -261,43 +234,6 @@ void Frame::setView(PassRefPtr<FrameView> view)
     // Since this part may be getting reused as a result of being
     // pulled from the back/forward cache, reset this flag.
     loader()->resetMultipleFormSubmissionProtection();
-}
-
-void Frame::setDocument(PassRefPtr<Document> newDoc)
-{
-    ASSERT(!newDoc || newDoc->frame() == this);
-    if (m_doc && m_doc->attached()) {
-        // FIXME: We don't call willRemove here. Why is that OK?
-        m_doc->detach();
-    }
-
-    m_doc = newDoc;
-    ASSERT(!m_doc || m_doc->domWindow());
-    ASSERT(!m_doc || m_doc->domWindow()->frame() == this);
-
-    if (m_page && m_view) {
-        if (ScrollingCoordinator* scrollingCoordinator = m_page->scrollingCoordinator()) {
-            scrollingCoordinator->scrollableAreaScrollbarLayerDidChange(m_view.get(), HorizontalScrollbar);
-            scrollingCoordinator->scrollableAreaScrollbarLayerDidChange(m_view.get(), VerticalScrollbar);
-            scrollingCoordinator->scrollableAreaScrollLayerDidChange(m_view.get());
-        }
-    }
-
-    selection()->updateSecureKeyboardEntryIfActive();
-
-    if (m_doc && !m_doc->attached())
-        m_doc->attach();
-
-    if (m_doc) {
-        m_script->updateDocument();
-        m_doc->updateViewportArguments();
-    }
-
-    if (m_page && m_page->mainFrame() == this) {
-        notifyChromeClientWheelEventHandlerCountChanged();
-        if (m_doc && m_doc->hasTouchEventHandlers())
-            m_page->chrome().client()->needTouchEvents(true);
-    }
 }
 
 #if ENABLE(ORIENTATION_EVENTS)
@@ -318,12 +254,12 @@ void Frame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSiz
 {
     // In setting printing, we should not validate resources already cached for the document.
     // See https://bugs.webkit.org/show_bug.cgi?id=43704
-    ResourceCacheValidationSuppressor validationSuppressor(m_doc->cachedResourceLoader());
+    ResourceCacheValidationSuppressor validationSuppressor(document()->cachedResourceLoader());
 
-    m_doc->setPrinting(printing);
+    document()->setPrinting(printing);
     view()->adjustMediaTypeForPrinting(printing);
 
-    m_doc->styleResolverChanged(RecalcStyleImmediately);
+    document()->styleResolverChanged(RecalcStyleImmediately);
     if (shouldUsePrintingLayout()) {
         view()->forceLayoutForPagination(pageSize, originalPageSize, maximumShrinkRatio, shouldAdjustViewSize);
     } else {
@@ -341,7 +277,7 @@ bool Frame::shouldUsePrintingLayout() const
 {
     // Only top frame being printed should be fit to page size.
     // Subframes should be constrained by parents only.
-    return m_doc->printing() && (!tree()->parent() || !tree()->parent()->m_doc->printing());
+    return document()->printing() && (!tree()->parent() || !tree()->parent()->document()->printing());
 }
 
 FloatSize Frame::resizePageRectsKeepingRatio(const FloatSize& originalSize, const FloatSize& expectedSize)
@@ -362,6 +298,16 @@ FloatSize Frame::resizePageRectsKeepingRatio(const FloatSize& originalSize, cons
         resultSize.setWidth(floorf(resultSize.height() * ratio));
     }
     return resultSize;
+}
+
+void Frame::setDOMWindow(PassRefPtr<DOMWindow> domWindow)
+{
+    m_domWindow = domWindow;
+}
+
+Document* Frame::document() const
+{
+    return m_domWindow ? m_domWindow->document() : 0;
 }
 
 RenderView* Frame::contentRenderer() const
@@ -418,8 +364,8 @@ void Frame::clearTimers()
 
 void Frame::dispatchVisibilityStateChangeEvent()
 {
-    if (m_doc)
-        m_doc->dispatchVisibilityStateChangeEvent();
+    if (document())
+        document()->dispatchVisibilityStateChangeEvent();
 
     Vector<RefPtr<Frame> > childFrames;
     for (Frame* child = tree()->firstChild(); child; child = child->tree()->nextSibling())
@@ -432,7 +378,7 @@ void Frame::dispatchVisibilityStateChangeEvent()
 void Frame::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_doc, "doc");
+    info.addMember(m_domWindow, "domWindow");
     info.ignoreMember(m_view);
     info.addMember(m_ownerElement, "ownerElement");
     info.addMember(m_page, "page");
@@ -723,7 +669,7 @@ DragImageRef Frame::nodeImage(Node* node)
 
     // When generating the drag image for an element, ignore the document background.
     m_view->setBaseBackgroundColor(Color::transparent);
-    m_doc->updateLayout();
+    document()->updateLayout();
     m_view->setNodeToDraw(node); // Enable special sub-tree drawing mode.
 
     // Document::updateLayout may have blown away the original RenderObject.
@@ -740,7 +686,7 @@ DragImageRef Frame::nodeImage(Node* node)
     paintingRect.setWidth(paintingRect.width() * deviceScaleFactor);
     paintingRect.setHeight(paintingRect.height() * deviceScaleFactor);
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor, ColorSpaceDeviceRGB));
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor));
     if (!buffer)
         return 0;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
@@ -759,7 +705,7 @@ DragImageRef Frame::dragImageForSelection()
 
     const ScopedFramePaintingState state(this, 0);
     m_view->setPaintBehavior(PaintBehaviorSelectionOnly);
-    m_doc->updateLayout();
+    document()->updateLayout();
 
     IntRect paintingRect = enclosingIntRect(selection()->bounds());
 
@@ -769,7 +715,7 @@ DragImageRef Frame::dragImageForSelection()
     paintingRect.setWidth(paintingRect.width() * deviceScaleFactor);
     paintingRect.setHeight(paintingRect.height() * deviceScaleFactor);
 
-    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor, ColorSpaceDeviceRGB));
+    OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor));
     if (!buffer)
         return 0;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());

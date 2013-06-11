@@ -12,14 +12,13 @@ core/loader/appcache/DOMApplicationCache
 core/page/DOMWindow
 core/page/EventSource
 core/page/Performance
-core/svg/SVGElementInstance conditional=SVG
+core/svg/SVGElementInstance
 core/workers/DedicatedWorkerContext
 core/workers/SharedWorker
 core/workers/SharedWorkerContext
 core/workers/Worker
 core/xml/XMLHttpRequest
 core/xml/XMLHttpRequestUpload
-modules/battery/BatteryManager conditional=BATTERY_STATUS
 modules/encryptedmedia/MediaKeySession conditional=ENCRYPTED_MEDIA_V2
 modules/filesystem/FileWriter
 modules/indexeddb/IDBDatabase
@@ -38,6 +37,7 @@ modules/speech/SpeechRecognition
 modules/speech/SpeechSynthesisUtterance
 modules/webaudio/AudioContext conditional=WEB_AUDIO
 modules/webaudio/AudioNode conditional=WEB_AUDIO
+modules/webmidi/MIDIAccess
 modules/webmidi/MIDIInput
 modules/webmidi/MIDIPort
 modules/websockets/WebSocket

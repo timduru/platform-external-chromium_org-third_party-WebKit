@@ -57,12 +57,10 @@
 #include "core/accessibility/AccessibilityTableHeaderContainer.h"
 #include "core/accessibility/AccessibilityTableRow.h"
 #include "core/dom/Document.h"
-#include "core/editing/Editor.h"
 #include "core/html/HTMLAreaElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLLabelElement.h"
-#include "core/html/shadow/MediaControlElements.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/FocusController.h"
@@ -102,7 +100,6 @@ void AXComputedObjectAttributeCache::setIgnored(AXID id, AccessibilityObjectIncl
 }
     
 bool AXObjectCache::gAccessibilityEnabled = false;
-bool AXObjectCache::gAccessibilityEnhancedUserInterfaceEnabled = false;
 
 AXObjectCache::AXObjectCache(const Document* doc)
     : m_notificationPostTimer(this, &AXObjectCache::notificationPostTimerFired)
@@ -399,16 +396,6 @@ AccessibilityObject* AXObjectCache::rootObject()
     return getOrCreate(m_document->view());
 }
 
-AccessibilityObject* AXObjectCache::rootObjectForFrame(Frame* frame)
-{
-    if (!gAccessibilityEnabled)
-        return 0;
-
-    if (!frame)
-        return 0;
-    return getOrCreate(frame->view());
-}    
-    
 AccessibilityObject* AXObjectCache::getOrCreate(AccessibilityRole role)
 {
     RefPtr<AccessibilityObject> obj = 0;

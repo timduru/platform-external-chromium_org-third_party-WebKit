@@ -32,32 +32,33 @@
 #include "bindings/v8/V8AdaptorFunction.h"
 
 #include "bindings/v8/V8PerIsolateData.h"
+#include "bindings/v8/V8ScriptRunner.h"
 #include "wtf/Vector.h"
 
 namespace WebCore {
 
 WrapperTypeInfo V8AdaptorFunction::info = { V8AdaptorFunction::getTemplate, 0, 0, 0, 0, 0, 0, WrapperTypeObjectPrototype };
 
-v8::Persistent<v8::FunctionTemplate> V8AdaptorFunction::getTemplate(v8::Isolate* isolate, WrapperWorldType worldType)
+v8::Handle<v8::FunctionTemplate> V8AdaptorFunction::getTemplate(v8::Isolate* isolate, WrapperWorldType worldType)
 {
     ASSERT(isolate);
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->rawTemplateMap(worldType).find(&info);
     if (result != data->rawTemplateMap(worldType).end())
-        return result->value;
+        return result->value.newLocal(isolate);
     // The lifetime is of newTemplate is delegated to the TemplateMap thus this won't be leaked.
-    v8::Persistent<v8::FunctionTemplate> newTemplate(isolate, v8::FunctionTemplate::New());
-    data->rawTemplateMap(worldType).add(&info, configureTemplate(newTemplate));
+    v8::Handle<v8::FunctionTemplate> newTemplate = configureTemplate(v8::FunctionTemplate::New());
+    data->rawTemplateMap(worldType).add(&info, UnsafePersistent<v8::FunctionTemplate>(isolate, newTemplate));
     return newTemplate;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8AdaptorFunction::configureTemplate(v8::Persistent<v8::FunctionTemplate> functionTemplate)
+v8::Handle<v8::FunctionTemplate> V8AdaptorFunction::configureTemplate(v8::Handle<v8::FunctionTemplate> functionTemplate)
 {
     functionTemplate->SetCallHandler(&V8AdaptorFunction::invocationCallback);
     return functionTemplate;
 }
 
-v8::Handle<v8::Value> V8AdaptorFunction::invocationCallback(const v8::Arguments& args)
+void V8AdaptorFunction::invocationCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     v8::Handle<v8::Object> wrapped = v8::Handle<v8::Object>::Cast(args.Callee()->GetHiddenValue(V8HiddenPropertyName::adaptorFunctionPeer()));
     // FIXME: This can be faster if we can access underlying native callback directly.
@@ -65,9 +66,11 @@ v8::Handle<v8::Value> V8AdaptorFunction::invocationCallback(const v8::Arguments&
     Vector<v8::Handle<v8::Value> > argArray(args.Length());
     for (int i = 0; i < args.Length(); ++i)
         argArray.append(args[i]);
-    if (args.IsConstructCall())
-        return wrapped->CallAsConstructor(argArray.size(), argArray.data());
-    return wrapped->CallAsFunction(args.This(), argArray.size(), argArray.data());
+    if (args.IsConstructCall()) {
+        v8SetReturnValue(args, V8ScriptRunner::callAsConstructor(wrapped, argArray.size(), argArray.data()));
+        return;
+    }
+    v8SetReturnValue(args, V8ScriptRunner::callAsFunction(wrapped, args.This(), argArray.size(), argArray.data()));
 }
 
 v8::Handle<v8::Function> V8AdaptorFunction::wrap(v8::Handle<v8::Object> object, const AtomicString& name, v8::Isolate* isolate)

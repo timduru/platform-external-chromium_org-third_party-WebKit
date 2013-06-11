@@ -43,7 +43,7 @@ public:
 
     explicit CachedResourceRequest(const ResourceRequest&, const AtomicString& initiator, const String& charset = String(), ResourceLoadPriority = ResourceLoadPriorityUnresolved);
     CachedResourceRequest(const ResourceRequest&, const AtomicString& initiator, const ResourceLoaderOptions&);
-    CachedResourceRequest(const ResourceRequest&, const AtomicString& initiator, ResourceLoadPriority);
+    CachedResourceRequest(const ResourceRequest&, const CachedResourceInitiatorInfo&);
     ~CachedResourceRequest();
 
     ResourceRequest& mutableResourceRequest() { return m_resourceRequest; }
@@ -52,13 +52,11 @@ public:
     void setCharset(const String& charset) { m_charset = charset; }
     const ResourceLoaderOptions& options() const { return m_options; }
     void setOptions(const ResourceLoaderOptions& options) { m_options = options; }
-    void setPriority(ResourceLoadPriority priority) { m_priority = priority; }
     ResourceLoadPriority priority() const { return m_priority; }
     bool forPreload() const { return m_forPreload; }
     void setForPreload(bool forPreload) { m_forPreload = forPreload; }
     DeferOption defer() const { return m_defer; }
     void setDefer(DeferOption defer) { m_defer = defer; }
-    const CachedResourceInitiatorInfo& initiatorInfo() const { return m_initiatorInfo; }
     void setContentSecurityCheck(ContentSecurityPolicyCheck contentSecurityPolicyOption) { m_options.contentSecurityPolicyOption = contentSecurityPolicyOption; }
 
 private:
@@ -68,7 +66,6 @@ private:
     ResourceLoadPriority m_priority;
     bool m_forPreload;
     DeferOption m_defer;
-    CachedResourceInitiatorInfo m_initiatorInfo;
 };
 
 } // namespace WebCore

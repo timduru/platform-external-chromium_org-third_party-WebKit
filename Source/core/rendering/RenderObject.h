@@ -623,7 +623,7 @@ public:
     // is true if the renderer returned is an ancestor of repaintContainer.
     RenderObject* container(const RenderLayerModelObject* repaintContainer = 0, bool* repaintContainerSkipped = 0) const;
 
-    virtual RenderObject* hoverAncestor() const { return parent(); }
+    virtual RenderObject* hoverAncestor() const;
 
     Element* offsetParent() const;
 
@@ -919,7 +919,7 @@ public:
 
     AnimationController* animation() const;
 
-    bool isInert() const { return node() && node()->isElementNode() && toElement(node())->isInert(); }
+    bool isInert() const;
     bool visibleToHitTestRequest(const HitTestRequest& request) const { return style()->visibility() == VISIBLE && (request.ignorePointerEventsNone() || style()->pointerEvents() != PE_NONE) && !isInert(); }
     bool visibleToHitTesting() const { return style()->visibility() == VISIBLE && style()->pointerEvents() != PE_NONE && !isInert(); }
 
@@ -985,6 +985,9 @@ private:
     RenderFlowThread* locateFlowThreadContainingBlock() const;
     void removeFromRenderFlowThread();
     void removeFromRenderFlowThreadRecursive(RenderFlowThread*);
+
+    bool shouldRepaintForStyleDifference(StyleDifference) const;
+    bool hasImmediateNonWhitespaceTextChild() const;
 
     RenderStyle* cachedFirstLineStyle() const;
     StyleDifference adjustStyleDifference(StyleDifference, unsigned contextSensitiveProperties) const;

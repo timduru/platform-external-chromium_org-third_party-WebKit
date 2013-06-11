@@ -602,13 +602,15 @@ public:
     // Part of the issue is with subtree relayout: we don't check if our ancestors have some descendant flags dirty, missing some updates.
     bool hasSelfPaintingLayerDescendant() const { return m_hasSelfPaintingLayerDescendant; }
 
-    // This returns true if we have an out of flow positioned descendant whose
-    // containing block is not a descendant of ours. If this is true, we cannot
-    // automatically opt into composited scrolling since this out of flow
-    // positioned descendant would become clipped by us, possibly altering the 
-    // rendering of the page.
-    // FIXME: We should ASSERT(!m_hasOutOfFlowPositionedDescendantDirty); here but we may hit the same bugs as visible content above.
+    // FIXME: We should ASSERT(!m_hasOutOfFlowPositionedDescendantDirty) here. See above.
     bool hasOutOfFlowPositionedDescendant() const { return m_hasOutOfFlowPositionedDescendant; }
+
+    void setHasOutOfFlowPositionedDescendant(bool hasDescendant) { m_hasOutOfFlowPositionedDescendant = hasDescendant; }
+    void setHasOutOfFlowPositionedDescendantDirty(bool dirty) { m_hasOutOfFlowPositionedDescendantDirty = dirty; }
+
+    bool hasUnclippedDescendant() const { return m_hasUnclippedDescendant; }
+    void setHasUnclippedDescendant(bool hasDescendant) { m_hasUnclippedDescendant = hasDescendant; }
+    void updateHasUnclippedDescendant();
 
     // Gets the nearest enclosing positioned ancestor layer (also includes
     // the <html> layer and the root layer).
@@ -867,13 +869,25 @@ public:
     enum PaintOrderListType {BeforePromote, AfterPromote};
     void computePaintOrderList(PaintOrderListType type, Vector<RefPtr<Node> >&);
 
+    enum ForceNeedsCompositedScrollingMode {
+        DoNotForceCompositedScrolling = 0,
+        CompositedScrollingAlwaysOn = 1,
+        CompositedScrollingAlwaysOff = 2
+    };
+
+    void setForceNeedsCompositedScrolling(ForceNeedsCompositedScrollingMode);
+
 private:
-    enum CollectLayersBehavior { StopAtStackingContexts, StopAtStackingContainers };
+    enum CollectLayersBehavior {
+        ForceLayerToStackingContainer,
+        OverflowScrollCanBeStackingContainers,
+        OnlyStackingContextsCanBeStackingContainers
+    };
 
     void updateZOrderLists();
     void rebuildZOrderLists();
     // See the comment for collectLayers for information about the layerToForceAsStackingContainer parameter.
-    void rebuildZOrderLists(CollectLayersBehavior, OwnPtr<Vector<RenderLayer*> >&, OwnPtr<Vector<RenderLayer*> >&, const RenderLayer* layerToForceAsStackingContainer = 0);
+    void rebuildZOrderLists(OwnPtr<Vector<RenderLayer*> >&, OwnPtr<Vector<RenderLayer*> >&, const RenderLayer* layerToForceAsStackingContainer = 0, CollectLayersBehavior = OverflowScrollCanBeStackingContainers);
     void clearZOrderLists();
 
     void updateNormalFlowList();
@@ -885,9 +899,11 @@ private:
     void setAncestorChainHasSelfPaintingLayerDescendant();
     void dirtyAncestorChainHasSelfPaintingLayerDescendantStatus();
 
+    void setAncestorChainHasOutOfFlowPositionedDescendant();
+    void dirtyAncestorChainHasOutOfFlowPositionedDescendantStatus();
+
     bool acceleratedCompositingForOverflowScrollEnabled() const;
-    void updateDescendantsAreContiguousInStackingOrder();
-    void updateDescendantsAreContiguousInStackingOrderRecursive(const HashMap<const RenderLayer*, int>&, int& minIndex, int& maxIndex, int& count, bool firstIteration);
+    void updateCanBeStackingContainer();
     void collectBeforePromotionZOrderList(RenderLayer* ancestorStackingContext, OwnPtr<Vector<RenderLayer*> >& posZOrderListBeforePromote, OwnPtr<Vector<RenderLayer*> >& negZOrderListBeforePromote);
     void collectAfterPromotionZOrderList(RenderLayer* ancestorStackingContext, OwnPtr<Vector<RenderLayer*> >& posZOrderListAfterPromote, OwnPtr<Vector<RenderLayer*> >& negZOrderListAfterPromote);
 
@@ -909,11 +925,11 @@ private:
     void updateScrollbarsAfterStyleChange(const RenderStyle* oldStyle);
     void updateScrollbarsAfterLayout();
 
-    void setAncestorChainHasOutOfFlowPositionedDescendant(RenderObject* containingBlock);
-    void dirtyAncestorChainHasOutOfFlowPositionedDescendantStatus();
     void updateOutOfFlowPositioned(const RenderStyle* oldStyle);
 
-    void updateNeedsCompositedScrolling();
+    virtual void updateNeedsCompositedScrolling() OVERRIDE;
+    void setNeedsCompositedScrolling(bool);
+    void didUpdateNeedsCompositedScrolling();
 
     // Returns true if the position changed.
     bool updateLayerPosition();
@@ -950,7 +966,7 @@ private:
     // post-promotion layer lists, by allowing us to treat a layer as if it is a
     // stacking context, without adding a new member to RenderLayer or modifying
     // the style (which could cause extra allocations).
-    void collectLayers(bool includeHiddenLayers, CollectLayersBehavior, OwnPtr<Vector<RenderLayer*> >&, OwnPtr<Vector<RenderLayer*> >&, const RenderLayer* layerToForceAsStackingContainer = 0);
+    void collectLayers(bool includeHiddenLayers, OwnPtr<Vector<RenderLayer*> >&, OwnPtr<Vector<RenderLayer*> >&, const RenderLayer* layerToForceAsStackingContainer = 0, CollectLayersBehavior = OverflowScrollCanBeStackingContainers);
 
     struct LayerPaintingInfo {
         LayerPaintingInfo(RenderLayer* inRootLayer, const LayoutRect& inDirtyRect, PaintBehavior inPaintBehavior, const LayoutSize& inSubPixelAccumulation, RenderObject* inPaintingRoot = 0, RenderRegion*inRegion = 0, OverlapTestRequestMap* inOverlapTestRequests = 0)
@@ -1034,6 +1050,7 @@ private:
     bool hasScrollableVerticalOverflow() const;
 
     bool shouldBeNormalFlowOnly() const;
+    bool shouldBeNormalFlowOnlyIgnoringCompositedScrolling() const;
 
     bool shouldBeSelfPaintingLayer() const;
 
@@ -1077,7 +1094,7 @@ private:
     void dirtyAncestorChainVisibleDescendantStatus();
     void setAncestorChainHasVisibleDescendant();
 
-    void updateDescendantDependentFlags(HashSet<const RenderObject*>* outOfFlowDescendantContainingBlocks = 0);
+    void updateDescendantDependentFlags();
 
     // This flag is computed by RenderLayerCompositor, which knows more about 3d hierarchies than we do.
     void setHas3DTransformedDescendant(bool b) { m_has3DTransformedDescendant = b; }
@@ -1165,19 +1182,22 @@ protected:
     bool m_hasSelfPaintingLayerDescendant : 1;
     bool m_hasSelfPaintingLayerDescendantDirty : 1;
 
-    // If we have no out of flow positioned descendants and no non-descendant
-    // appears between our descendants in stacking order, then we may become a
-    // stacking context.
     bool m_hasOutOfFlowPositionedDescendant : 1;
     bool m_hasOutOfFlowPositionedDescendantDirty : 1;
+
+    // This is true if we have an out-of-flow positioned descendant whose
+    // containing block is our ancestor. If this is the case, the descendant
+    // may fall outside of our clip preventing things like opting into
+    // composited scrolling (which causes clipping of all descendants).
+    bool m_hasUnclippedDescendant : 1;
 
     bool m_needsCompositedScrolling : 1;
 
     // If this is true, then no non-descendant appears between any of our
     // descendants in stacking order. This is one of the requirements of being
     // able to safely become a stacking context.
-    bool m_descendantsAreContiguousInStackingOrder : 1;
-    bool m_descendantsAreContiguousInStackingOrderDirty : 1;
+    bool m_canBePromotedToStackingContainer : 1;
+    bool m_canBePromotedToStackingContainerDirty : 1;
 
     const bool m_isRootLayer : 1;
 
@@ -1259,7 +1279,7 @@ protected:
     
     IntPoint m_cachedOverlayScrollbarOffset;
 
-    OwnPtr<RenderMarquee> m_marquee; // Used by layers with overflow:marquee
+    OwnPtr<RenderMarquee> m_marquee; // Used for <marquee>.
     
     // Cached normal flow values for absolute positioned elements with static left/top values.
     LayoutUnit m_staticInlinePosition;
@@ -1297,6 +1317,8 @@ protected:
     };
 
     CompositingProperties m_compositingProperties;
+
+    ForceNeedsCompositedScrollingMode m_forceNeedsCompositedScrolling;
 
 private:
     IntRect m_blockSelectionGapsBounds;

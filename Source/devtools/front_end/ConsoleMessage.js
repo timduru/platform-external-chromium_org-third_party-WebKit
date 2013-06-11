@@ -149,7 +149,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
                 }
             } else {
                 if (this.url) {
-                    var isExternal = !WebInspector.resourceForURL(this.url);
+                    var isExternal = !WebInspector.resourceForURL(this.url) && !WebInspector.workspace.uiSourceCodeForURL(this.url);
                     this._anchorElement = WebInspector.linkifyURLAsNode(this.url, this.url, "console-message-url", isExternal);
                 }
                 this._messageElement = this._format([this._messageText]);
@@ -275,7 +275,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
         for (var i = 0; i < parameters.length; ++i) {
             // Inline strings when formatting.
             if (shouldFormatMessage && parameters[i].type === "string")
-                formattedResult.appendChild(document.createTextNode(parameters[i].description));
+                formattedResult.appendChild(WebInspector.linkifyStringAsFragment(parameters[i].description));
             else
                 formattedResult.appendChild(this._formatParameter(parameters[i], false, true));
             if (i < parameters.length - 1)

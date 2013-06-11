@@ -34,8 +34,8 @@
 #include "core/platform/HostWindow.h"
 #include "core/rendering/RenderObject.h"
 #include "wtf/CurrentTime.h"
-#include <public/WebRect.h>
-#include <public/WebString.h>
+#include "public/platform/WebRect.h"
+#include "public/platform/WebString.h"
 
 using namespace WebCore;
 
@@ -117,7 +117,7 @@ bool ValidationMessageClientImpl::isValidationMessageVisible(const Element& anch
 void ValidationMessageClientImpl::checkAnchorStatus(Timer<ValidationMessageClientImpl>*)
 {
     ASSERT(m_currentAnchor);
-    if (monotonicallyIncreasingTime() >= m_finishTime) {
+    if (monotonicallyIncreasingTime() >= m_finishTime || !currentView()) {
         hideValidationMessage(*m_currentAnchor);
         return;
     }

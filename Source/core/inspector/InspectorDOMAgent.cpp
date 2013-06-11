@@ -31,19 +31,9 @@
 #include "config.h"
 #include "core/inspector/InspectorDOMAgent.h"
 
-#include "CSSPropertyNames.h"
 #include "HTMLNames.h"
 #include "InspectorFrontend.h"
 #include "bindings/v8/ScriptEventListener.h"
-#include "core/css/CSSComputedStyleDeclaration.h"
-#include "core/css/CSSPropertySourceData.h"
-#include "core/css/CSSRule.h"
-#include "core/css/CSSRuleList.h"
-#include "core/css/CSSStyleRule.h"
-#include "core/css/CSSStyleSheet.h"
-#include "core/css/StylePropertySet.h"
-#include "core/css/StyleSheetList.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
 #include "core/dom/CharacterData.h"
 #include "core/dom/ContainerNode.h"
@@ -51,12 +41,8 @@
 #include "core/dom/DocumentFragment.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
-#include "core/dom/Event.h"
-#include "core/dom/EventContext.h"
 #include "core/dom/EventListener.h"
-#include "core/dom/EventNames.h"
 #include "core/dom/EventTarget.h"
-#include "core/dom/MutationEvent.h"
 #include "core/dom/Node.h"
 #include "core/dom/NodeList.h"
 #include "core/dom/NodeTraversal.h"
@@ -65,7 +51,6 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/fileapi/File.h"
 #include "core/fileapi/FileList.h"
-#include "core/html/HTMLElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLTemplateElement.h"
@@ -73,31 +58,21 @@
 #include "core/inspector/DOMPatchSupport.h"
 #include "core/inspector/IdentifiersFactory.h"
 #include "core/inspector/InjectedScriptManager.h"
-#include "core/inspector/InspectorClient.h"
 #include "core/inspector/InspectorHistory.h"
 #include "core/inspector/InspectorOverlay.h"
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InstrumentingAgents.h"
-#include "core/loader/CookieJar.h"
 #include "core/loader/DocumentLoader.h"
-#include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
-#include "core/platform/Cookie.h"
-#include "core/platform/Pasteboard.h"
 #include "core/platform/PlatformMouseEvent.h"
 #include "core/platform/PlatformTouchEvent.h"
-#include "core/platform/graphics/IntRect.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderView.h"
-#include "core/rendering/style/RenderStyle.h"
-#include "core/rendering/style/RenderStyleConstants.h"
 #include "core/xml/XPathResult.h"
 
-#include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
 
 #include <wtf/HashSet.h>
@@ -180,7 +155,6 @@ static Node* hoveredNodeForPoint(Frame* frame, const IntPoint& point, bool ignor
     HitTestRequest request(hitType);
     HitTestResult result(frame->view()->windowToContents(point));
     frame->contentRenderer()->hitTest(request, result);
-    result.setToShadowHostIfInUserAgentShadowRoot();
     Node* node = result.innerNode();
     while (node && node->nodeType() == Node::TEXT_NODE)
         node = node->parentNode();
@@ -1094,7 +1068,7 @@ bool InspectorDOMAgent::handleTouchEvent(Frame* frame, const PlatformTouchEvent&
 
 void InspectorDOMAgent::inspect(Node* inspectedNode)
 {
-    if (!m_frontend)
+    if (!m_frontend || !inspectedNode)
         return;
 
     Node* node = inspectedNode;
@@ -1399,14 +1373,7 @@ PassRefPtr<TypeBuilder::DOM::Node> InspectorDOMAgent::buildObjectForNode(Node* n
         .setLocalName(localName)
         .setNodeValue(nodeValue);
 
-    if (node->isContainerNode()) {
-        int nodeCount = innerChildNodeCount(node);
-        value->setChildNodeCount(nodeCount);
-        RefPtr<TypeBuilder::Array<TypeBuilder::DOM::Node> > children = buildArrayForContainerChildren(node, depth, nodesMap);
-        if (children->length() > 0)
-            value->setChildren(children.release());
-    }
-
+    bool forcePushChildren = false;
     if (node->isElementNode()) {
         Element* element = toElement(node);
         value->setAttributes(buildArrayForElementAttributes(element));
@@ -1426,10 +1393,13 @@ PassRefPtr<TypeBuilder::DOM::Node> InspectorDOMAgent::buildObjectForNode(Node* n
             for (ShadowRoot* root = shadow->youngestShadowRoot(); root; root = root->olderShadowRoot())
                 shadowRoots->addItem(buildObjectForNode(root, 0, nodesMap));
             value->setShadowRoots(shadowRoots);
+            forcePushChildren = true;
         }
 
-        if (element->hasTagName(templateTag))
+        if (element->hasTagName(templateTag)) {
             value->setTemplateContent(buildObjectForNode(static_cast<HTMLTemplateElement*>(element)->content(), 0, nodesMap));
+            forcePushChildren = true;
+        }
     } else if (node->isDocumentNode()) {
         Document* document = toDocument(node);
         value->setDocumentURL(documentURLString(document));
@@ -1445,6 +1415,17 @@ PassRefPtr<TypeBuilder::DOM::Node> InspectorDOMAgent::buildObjectForNode(Node* n
         value->setName(attribute->name());
         value->setValue(attribute->value());
     }
+
+    if (node->isContainerNode()) {
+        int nodeCount = innerChildNodeCount(node);
+        value->setChildNodeCount(nodeCount);
+        if (forcePushChildren && !depth)
+            depth = 1;
+        RefPtr<TypeBuilder::Array<TypeBuilder::DOM::Node> > children = buildArrayForContainerChildren(node, depth, nodesMap);
+        if (children->length() > 0 || depth) // Push children along with shadow in any case.
+            value->setChildren(children.release());
+    }
+
     return value.release();
 }
 
@@ -1569,7 +1550,7 @@ Node* InspectorDOMAgent::innerParentNode(Node* node)
         Document* document = toDocument(node);
         return document->ownerElement();
     }
-    return node->parentNode();
+    return node->parentOrShadowHostNode();
 }
 
 bool InspectorDOMAgent::isWhitespace(Node* node)

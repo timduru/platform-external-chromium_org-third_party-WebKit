@@ -70,7 +70,7 @@ PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionCode& ec)
     RefPtr<Text> newText = cloneWithData(oldStr.substring(offset));
     setDataWithoutUpdate(oldStr.substring(0, offset));
 
-    dispatchModifiedEvent(oldStr);
+    didModifyData(oldStr);
 
     if (parentNode())
         parentNode()->insertBefore(newText.get(), nextSibling(), ec);
@@ -216,7 +216,9 @@ bool Text::textRendererIsNeeded(const NodeRenderingContext& context)
     
     if (context.style()->preserveNewline()) // pre/pre-wrap/pre-line always make renderers.
         return true;
-    
+
+    // FIXME: We should resolve this function's dependencies on next and previous renderers
+    // lazily to avoid potentially N^2 walks through the DOM.
     RenderObject* prev = context.previousRenderer();
     if (prev && prev->isBR()) // <span><br/> <br/></span>
         return false;
@@ -294,13 +296,10 @@ void Text::recalcTextStyle(StyleChange change)
 
 void Text::updateTextRenderer(unsigned offsetOfReplacedData, unsigned lengthOfReplacedData)
 {
-    if (!attached() && !needsStyleRecalc())
+    if (!attached())
         return;
     RenderText* textRenderer = toRenderText(renderer());
     if (!textRenderer || !textRendererIsNeeded(NodeRenderingContext(this, textRenderer->style()))) {
-        // FIXME: Editing code expects that inserting a text node will produce a renderer
-        // immediately so it can inspect the style of the text nodes. We should fix this
-        // so we can lazyReattach here.
         reattach();
         return;
     }
@@ -317,15 +316,15 @@ PassRefPtr<Text> Text::cloneWithData(const String& data)
     return create(document(), data);
 }
 
-PassRefPtr<Text> Text::createWithLengthLimit(Document* document, const String& data, unsigned start, unsigned maxChars)
+PassRefPtr<Text> Text::createWithLengthLimit(Document* document, const String& data, unsigned start, unsigned lengthLimit)
 {
     unsigned dataLength = data.length();
 
-    if (!start && dataLength <= maxChars)
+    if (!start && dataLength <= lengthLimit)
         return create(document, data);
 
     RefPtr<Text> result = Text::create(document, String());
-    result->parserAppendData(data, start, maxChars);
+    result->parserAppendData(data, start, lengthLimit);
 
     return result;
 }

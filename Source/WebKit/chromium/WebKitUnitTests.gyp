@@ -34,6 +34,7 @@
         'WebKit.gypi',
         '../../wtf/wtf.gypi',
         '../../core/core.gypi',
+        '../../modules/modules.gypi',
     ],
     'targets': [
         {
@@ -42,7 +43,7 @@
             'variables': { 'enable_wexit_time_destructors': 1, },
             'msvs_guid': '7CEFE800-8403-418A-AD6A-2D52C6FC3EAD',
             'dependencies': [
-                'WebKit.gyp:webkit',
+                '../../../public/blink.gyp:blink',
                 '../../../Tools/DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:DumpRenderTree_resources',
                 '<(DEPTH)/base/base.gyp:base',
                 '<(DEPTH)/base/base.gyp:base_i18n',
@@ -60,11 +61,6 @@
             'include_dirs': [
                 'public',
                 'src',
-                # WebKit unit tests are allowed to include WebKit and WebCore header files, which may include headers in the
-                # Platform API as <public/WebFoo.h>. Thus we need to have the Platform API include path, but we can't depend
-                # directly on Platform.gyp:webkit_platform since platform cannot link as a separate library. Instead, we just
-                # add the include path directly.
-                '../../Platform/chromium',
             ],
             'conditions': [
                 ['component=="shared_library"', {
@@ -73,13 +69,14 @@
                     ],
                 }, {
                     'dependencies': [
-                        '../../core/core.gyp/core.gyp:webcore',
+                        '../../core/core.gyp:webcore',
                     ],
                     'defines': [
                         'WEBKIT_IMPLEMENTATION=1',
                     ],
                     'sources': [
                         '<@(core_unittest_files)',
+                        '<@(modules_unittest_files)',
                         '<@(webkit_unittest_files)',
                     ],
                     'conditions': [

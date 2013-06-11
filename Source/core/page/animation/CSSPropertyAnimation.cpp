@@ -33,17 +33,12 @@
 #include <algorithm>
 #include "CSSPropertyNames.h"
 #include "core/css/CSSCrossfadeValue.h"
-#include "core/css/CSSImageGeneratorValue.h"
 #include "core/css/CSSImageValue.h"
 #include "core/css/CSSPrimitiveValue.h"
 #include "core/css/StylePropertyShorthand.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/loader/cache/CachedImage.h"
 #include "core/page/animation/AnimationBase.h"
 #include "core/platform/FloatConversion.h"
-#include "core/platform/graphics/transforms/IdentityTransformOperation.h"
-#include "core/platform/graphics/transforms/Matrix3DTransformOperation.h"
-#include "core/platform/graphics/transforms/MatrixTransformOperation.h"
 #include "core/rendering/ClipPathOperation.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/style/RenderStyle.h"
@@ -145,7 +140,7 @@ static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, Clip
 static inline PassRefPtr<ExclusionShapeValue> blendFunc(const AnimationBase*, ExclusionShapeValue* from, ExclusionShapeValue* to, double progress)
 {
     // FIXME Bug 102723: Shape-inside should be able to animate a value of 'outside-shape' when shape-outside is set to a BasicShape
-    if (from->type() != ExclusionShapeValue::SHAPE || to->type() != ExclusionShapeValue::SHAPE)
+    if (from->type() != ExclusionShapeValue::Shape || to->type() != ExclusionShapeValue::Shape)
         return to;
 
     const BasicShape* fromShape = from->shape();

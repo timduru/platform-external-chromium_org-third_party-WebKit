@@ -78,6 +78,7 @@ class WebURL;
 class WebURLResponse;
 class WebUserMediaClient;
 class WebView;
+class WebWidget;
 struct WebConsoleMessage;
 struct WebContextMenuData;
 struct WebPluginParams;
@@ -104,6 +105,7 @@ class WEBTESTRUNNER_EXPORT WebTestProxyBase {
 public:
     void setInterfaces(WebTestInterfaces*);
     void setDelegate(WebTestDelegate*);
+    void setWidget(WebKit::WebWidget*);
 
     void reset();
 
@@ -180,7 +182,7 @@ protected:
     void didCancelClientRedirect(WebKit::WebFrame*);
     void didStartProvisionalLoad(WebKit::WebFrame*);
     void didReceiveServerRedirectForProvisionalLoad(WebKit::WebFrame*);
-    void didFailProvisionalLoad(WebKit::WebFrame*, const WebKit::WebURLError&);
+    bool didFailProvisionalLoad(WebKit::WebFrame*, const WebKit::WebURLError&);
     void didCommitProvisionalLoad(WebKit::WebFrame*, bool isNewNavigation);
     void didReceiveTitle(WebKit::WebFrame*, const WebKit::WebString& title, WebKit::WebTextDirection);
     void didChangeIcon(WebKit::WebFrame*, WebKit::WebIconURL::Type);
@@ -217,8 +219,12 @@ private:
     SkCanvas* canvas();
     void displayRepaintMask();
 
+    WebKit::WebWidget* webWidget();
+    WebKit::WebView* webView();
+
     TestInterfaces* m_testInterfaces;
     WebTestDelegate* m_delegate;
+    WebKit::WebWidget* m_webWidget;
 
     std::auto_ptr<SpellCheckClient> m_spellcheck;
     std::auto_ptr<WebUserMediaClientMock> m_userMediaClient;
@@ -467,7 +473,10 @@ public:
     }
     virtual void didFailProvisionalLoad(WebKit::WebFrame* frame, const WebKit::WebURLError& error)
     {
-        WebTestProxyBase::didFailProvisionalLoad(frame, error);
+        // If the test finished, don't notify the embedder of the failed load,
+        // as we already destroyed the document loader.
+        if (WebTestProxyBase::didFailProvisionalLoad(frame, error))
+            return;
         Base::didFailProvisionalLoad(frame, error);
     }
     virtual void didCommitProvisionalLoad(WebKit::WebFrame* frame, bool isNewNavigation)

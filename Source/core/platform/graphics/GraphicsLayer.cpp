@@ -34,6 +34,7 @@
 #include "core/platform/graphics/FloatPoint.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/GraphicsContext.h"
+#include "core/platform/graphics/GraphicsLayerFactory.h"
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/platform/graphics/chromium/AnimationTranslationUtil.h"
 #include "core/platform/graphics/chromium/TransformSkMatrix44Conversions.h"
@@ -52,15 +53,15 @@
 #include "wtf/text/StringHash.h"
 #include "wtf/text/WTFString.h"
 
-#include <public/Platform.h>
-#include <public/WebAnimation.h>
-#include <public/WebCompositorSupport.h>
-#include <public/WebFilterOperation.h>
-#include <public/WebFilterOperations.h>
-#include <public/WebFloatPoint.h>
-#include <public/WebFloatRect.h>
-#include <public/WebPoint.h>
-#include <public/WebSize.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebAnimation.h"
+#include "public/platform/WebCompositorSupport.h"
+#include "public/platform/WebFilterOperation.h"
+#include "public/platform/WebFilterOperations.h"
+#include "public/platform/WebFloatPoint.h"
+#include "public/platform/WebFloatRect.h"
+#include "public/platform/WebPoint.h"
+#include "public/platform/WebSize.h"
 
 #ifndef NDEBUG
 #include <stdio.h>
@@ -102,6 +103,11 @@ void KeyframeValueList::insert(PassOwnPtr<const AnimationValue> value)
     m_values.append(value);
 }
 
+PassOwnPtr<GraphicsLayer> GraphicsLayer::create(GraphicsLayerFactory* factory, GraphicsLayerClient* client)
+{
+    return factory->createGraphicsLayer(client);
+}
+
 GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     : m_client(client)
     , m_anchorPoint(0.5f, 0.5f, 0)
@@ -126,22 +132,21 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_contentsLayerId(0)
     , m_linkHighlight(0)
     , m_contentsLayerPurpose(NoContentsLayer)
-    , m_inSetChildren(false)
     , m_scrollableArea(0)
 {
 #ifndef NDEBUG
     if (m_client)
         m_client->verifyNotPainting();
 #endif
+
+    m_opaqueRectTrackingContentLayerDelegate = adoptPtr(new OpaqueRectTrackingContentLayerDelegate(this));
+    m_layer = adoptPtr(Platform::current()->compositorSupport()->createContentLayer(m_opaqueRectTrackingContentLayerDelegate.get()));
+    m_layer->layer()->setDrawsContent(m_drawsContent && m_contentsVisible);
+    m_layer->layer()->setScrollClient(this);
+    m_layer->setAutomaticallyComputeRasterScale(true);
 }
 
 GraphicsLayer::~GraphicsLayer()
-{
-    resetTrackedRepaints();
-    ASSERT(!m_parent); // willBeDestroyed should have been called already.
-}
-
-void GraphicsLayer::willBeDestroyed()
 {
     if (m_linkHighlight) {
         m_linkHighlight->clearCurrentGraphicsLayer();
@@ -161,6 +166,9 @@ void GraphicsLayer::willBeDestroyed()
 
     removeAllChildren();
     removeFromParent();
+
+    resetTrackedRepaints();
+    ASSERT(!m_parent);
 }
 
 void GraphicsLayer::setParent(GraphicsLayer* layer)
@@ -181,29 +189,22 @@ bool GraphicsLayer::hasAncestor(GraphicsLayer* ancestor) const
 
 bool GraphicsLayer::setChildren(const Vector<GraphicsLayer*>& newChildren)
 {
-    // FIXME: change m_inSetChildren mechanism to addChildInternal()
-    m_inSetChildren = true;
-
     // If the contents of the arrays are the same, nothing to do.
-    if (newChildren == m_children) {
-        m_inSetChildren = false;
+    if (newChildren == m_children)
         return false;
-    }
 
     removeAllChildren();
 
     size_t listSize = newChildren.size();
     for (size_t i = 0; i < listSize; ++i)
-        addChild(newChildren[i]);
+        addChildInternal(newChildren[i]);
 
     updateChildList();
-
-    m_inSetChildren = false;
 
     return true;
 }
 
-void GraphicsLayer::addChild(GraphicsLayer* childLayer)
+void GraphicsLayer::addChildInternal(GraphicsLayer* childLayer)
 {
     ASSERT(childLayer != this);
     
@@ -213,8 +214,14 @@ void GraphicsLayer::addChild(GraphicsLayer* childLayer)
     childLayer->setParent(this);
     m_children.append(childLayer);
 
-    if (!m_inSetChildren)
-        updateChildList();
+    // Don't call updateChildList here, this function is used in cases where it
+    // should not be called until all children are processed.
+}
+
+void GraphicsLayer::addChild(GraphicsLayer* childLayer)
+{
+    addChildInternal(childLayer);
+    updateChildList();
 }
 
 void GraphicsLayer::addChildAtIndex(GraphicsLayer* childLayer, int index)
@@ -552,10 +559,6 @@ void GraphicsLayer::updateNames()
     String debugName = "Layer for " + m_nameBase;
     m_layer->layer()->setDebugName(debugName);
 
-    if (m_transformLayer) {
-        String debugName = "TransformLayer for " + m_nameBase;
-        m_transformLayer->setDebugName(debugName);
-    }
     if (WebLayer* contentsLayer = contentsLayerIfRegistered()) {
         String debugName = "ContentsLayer for " + m_nameBase;
         contentsLayer->setDebugName(debugName);
@@ -568,15 +571,12 @@ void GraphicsLayer::updateNames()
 
 void GraphicsLayer::updateChildList()
 {
-    WebLayer* childHost = m_transformLayer ? m_transformLayer.get() : m_layer->layer();
+    WebLayer* childHost = m_layer->layer();
     childHost->removeAllChildren();
 
     clearContentsLayerIfUnregistered();
 
-    if (m_transformLayer) {
-        // Add the primary layer first. Even if we have negative z-order children, the primary layer always comes behind.
-        childHost->addChild(m_layer->layer());
-    } else if (m_contentsLayer) {
+    if (m_contentsLayer) {
         // FIXME: add the contents layer in the correct order with negative z-order children.
         // This does not cause visible rendering issues because currently contents layers are only used
         // for replaced elements that don't have children.
@@ -593,108 +593,6 @@ void GraphicsLayer::updateChildList()
 
     if (m_linkHighlight)
         childHost->addChild(m_linkHighlight->layer());
-
-    if (m_transformLayer && m_contentsLayer) {
-        // If we have a transform layer, then the contents layer is parented in the
-        // primary layer (which is itself a child of the transform layer).
-        m_layer->layer()->removeAllChildren();
-        m_layer->layer()->addChild(m_contentsLayer);
-    }
-}
-
-void GraphicsLayer::updateLayerPosition()
-{
-    platformLayer()->setPosition(m_position);
-}
-
-void GraphicsLayer::updateLayerSize()
-{
-    IntSize layerSize(m_size.width(), m_size.height());
-    if (m_transformLayer) {
-        m_transformLayer->setBounds(layerSize);
-        m_layer->layer()->setPosition(FloatPoint());
-    }
-
-    m_layer->layer()->setBounds(layerSize);
-
-    // Note that we don't resize m_contentsLayer-> It's up the caller to do that.
-}
-
-void GraphicsLayer::updateAnchorPoint()
-{
-    platformLayer()->setAnchorPoint(FloatPoint(m_anchorPoint.x(), m_anchorPoint.y()));
-    platformLayer()->setAnchorPointZ(m_anchorPoint.z());
-}
-
-void GraphicsLayer::updateTransform()
-{
-    platformLayer()->setTransform(TransformSkMatrix44Conversions::convert(m_transform));
-}
-
-void GraphicsLayer::updateChildrenTransform()
-{
-    platformLayer()->setSublayerTransform(TransformSkMatrix44Conversions::convert(m_childrenTransform));
-}
-
-void GraphicsLayer::updateMasksToBounds()
-{
-    m_layer->layer()->setMasksToBounds(m_masksToBounds);
-}
-
-void GraphicsLayer::updateLayerPreserves3D()
-{
-    if (m_preserves3D && !m_transformLayer) {
-        m_transformLayer = adoptPtr(Platform::current()->compositorSupport()->createLayer());
-        m_transformLayer->setPreserves3D(true);
-        setAnimationDelegateForLayer(m_transformLayer.get());
-        m_layer->layer()->transferAnimationsTo(m_transformLayer.get());
-
-        // Copy the position from this layer.
-        updateLayerPosition();
-        updateLayerSize();
-        updateAnchorPoint();
-        updateTransform();
-        updateChildrenTransform();
-
-        m_layer->layer()->setPosition(FloatPoint::zero());
-
-        m_layer->layer()->setAnchorPoint(FloatPoint(0.5f, 0.5f));
-        m_layer->layer()->setTransform(SkMatrix44::I());
-
-        // Set the old layer to opacity of 1. Further down we will set the opacity on the transform layer.
-        m_layer->layer()->setOpacity(1);
-
-        // Move this layer to be a child of the transform layer.
-        if (parent())
-            parent()->platformLayer()->replaceChild(m_layer->layer(), m_transformLayer.get());
-        m_transformLayer->addChild(m_layer->layer());
-
-        updateChildList();
-    } else if (!m_preserves3D && m_transformLayer) {
-        // Replace the transformLayer in the parent with this layer.
-        m_layer->layer()->removeFromParent();
-        if (parent())
-            parent()->platformLayer()->replaceChild(m_transformLayer.get(), m_layer->layer());
-
-        setAnimationDelegateForLayer(m_layer->layer());
-        m_transformLayer->transferAnimationsTo(m_layer->layer());
-
-        // Release the transform layer.
-        m_transformLayer->setAnimationDelegate(0);
-        m_transformLayer.clear();
-
-        updateLayerPosition();
-        updateLayerSize();
-        updateAnchorPoint();
-        updateTransform();
-        updateChildrenTransform();
-
-        updateChildList();
-    }
-
-    m_layer->layer()->setPreserves3D(m_preserves3D);
-    platformLayer()->setOpacity(m_opacity);
-    updateNames();
 }
 
 void GraphicsLayer::updateLayerIsDrawable()
@@ -713,11 +611,6 @@ void GraphicsLayer::updateLayerIsDrawable()
         if (m_linkHighlight)
             m_linkHighlight->invalidate();
     }
-}
-
-void GraphicsLayer::updateLayerBackgroundColor()
-{
-    m_layer->layer()->setBackgroundColor(m_backgroundColor.rgb());
 }
 
 void GraphicsLayer::updateContentsRect()
@@ -1046,7 +939,6 @@ void GraphicsLayer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_name, "name");
     info.addMember(m_nameBase, "nameBase");
     info.addMember(m_layer, "layer");
-    info.addMember(m_transformLayer, "transformLayer");
     info.addMember(m_imageLayer, "imageLayer");
     info.addMember(m_contentsLayer, "contentsLayer");
     info.addMember(m_linkHighlight, "linkHighlight");
@@ -1076,13 +968,14 @@ void GraphicsLayer::setCompositingReasons(WebKit::WebCompositingReasons reasons)
 void GraphicsLayer::setPosition(const FloatPoint& point)
 {
     m_position = point;
-    updateLayerPosition();
+    platformLayer()->setPosition(m_position);
 }
 
 void GraphicsLayer::setAnchorPoint(const FloatPoint3D& point)
 {
     m_anchorPoint = point;
-    updateAnchorPoint();
+    platformLayer()->setAnchorPoint(FloatPoint(m_anchorPoint.x(), m_anchorPoint.y()));
+    platformLayer()->setAnchorPointZ(m_anchorPoint.z());
 }
 
 void GraphicsLayer::setSize(const FloatSize& size)
@@ -1098,19 +991,21 @@ void GraphicsLayer::setSize(const FloatSize& size)
         return;
 
     m_size = clampedSize;
-    updateLayerSize();
+
+    m_layer->layer()->setBounds(flooredIntSize(m_size));
+    // Note that we don't resize m_contentsLayer. It's up the caller to do that.
 }
 
 void GraphicsLayer::setTransform(const TransformationMatrix& transform)
 {
     m_transform = transform;
-    updateTransform();
+    platformLayer()->setTransform(TransformSkMatrix44Conversions::convert(m_transform));
 }
 
 void GraphicsLayer::setChildrenTransform(const TransformationMatrix& transform)
 {
     m_childrenTransform = transform;
-    updateChildrenTransform();
+    platformLayer()->setSublayerTransform(TransformSkMatrix44Conversions::convert(m_childrenTransform));
 }
 
 void GraphicsLayer::setPreserves3D(bool preserves3D)
@@ -1119,13 +1014,13 @@ void GraphicsLayer::setPreserves3D(bool preserves3D)
         return;
 
     m_preserves3D = preserves3D;
-    updateLayerPreserves3D();
+    m_layer->layer()->setPreserves3D(m_preserves3D);
 }
 
 void GraphicsLayer::setMasksToBounds(bool masksToBounds)
 {
     m_masksToBounds = masksToBounds;
-    updateMasksToBounds();
+    m_layer->layer()->setMasksToBounds(m_masksToBounds);
 }
 
 void GraphicsLayer::setDrawsContent(bool drawsContent)
@@ -1156,7 +1051,7 @@ void GraphicsLayer::setBackgroundColor(const Color& color)
         return;
 
     m_backgroundColor = color;
-    updateLayerBackgroundColor();
+    m_layer->layer()->setBackgroundColor(m_backgroundColor.rgb());
 }
 
 void GraphicsLayer::setContentsOpaque(bool opaque)
@@ -1269,7 +1164,7 @@ void GraphicsLayer::setContentsToMedia(PlatformLayer* layer)
 
 bool GraphicsLayer::addAnimation(const KeyframeValueList& values, const IntSize& boxSize, const CSSAnimationData* animation, const String& animationName, double timeOffset)
 {
-    setAnimationDelegateForLayer(platformLayer());
+    platformLayer()->setAnimationDelegate(this);
 
     int animationId = 0;
 
@@ -1317,7 +1212,7 @@ void GraphicsLayer::resumeAnimations()
 
 PlatformLayer* GraphicsLayer::platformLayer() const
 {
-    return m_transformLayer ? m_transformLayer.get() : m_layer->layer();
+    return m_layer->layer();
 }
 
 static bool copyWebCoreFilterOperationsToWebFilterOperations(const FilterOperations& filters, WebFilterOperations& webFilters)
@@ -1439,6 +1334,29 @@ void GraphicsLayer::setLinkHighlight(LinkHighlightClient* linkHighlight)
 {
     m_linkHighlight = linkHighlight;
     updateChildList();
+}
+
+void GraphicsLayer::paint(GraphicsContext& context, const IntRect& clip)
+{
+    paintGraphicsLayerContents(context, clip);
+}
+
+
+void GraphicsLayer::notifyAnimationStarted(double startTime)
+{
+    if (m_client)
+        m_client->notifyAnimationStarted(this, startTime);
+}
+
+void GraphicsLayer::notifyAnimationFinished(double)
+{
+    // Do nothing.
+}
+
+void GraphicsLayer::didScroll()
+{
+    if (m_scrollableArea)
+        m_scrollableArea->scrollToOffsetWithoutAnimation(m_scrollableArea->minimumScrollPosition() + toIntSize(m_layer->layer()->scrollPosition()));
 }
 
 } // namespace WebCore

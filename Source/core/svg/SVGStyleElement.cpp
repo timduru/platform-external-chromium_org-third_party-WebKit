@@ -26,9 +26,6 @@
 
 #include "SVGNames.h"
 #include "core/css/CSSStyleSheet.h"
-#include "core/dom/Attribute.h"
-#include "core/dom/Document.h"
-#include "core/dom/ExceptionCode.h"
 #include <wtf/StdLibExtras.h>
 
 namespace WebCore {
@@ -139,8 +136,13 @@ Node::InsertionNotificationRequest SVGStyleElement::insertedInto(ContainerNode* 
 {
     SVGElement::insertedInto(rootParent);
     if (rootParent->inDocument())
-        StyleElement::insertedIntoDocument(document(), this);
+        return InsertionShouldCallDidNotifySubtreeInsertions;
     return InsertionDone;
+}
+
+void SVGStyleElement::didNotifySubtreeInsertions(ContainerNode* insertionPoint)
+{
+    StyleElement::processStyleSheet(document(), this);
 }
 
 void SVGStyleElement::removedFrom(ContainerNode* rootParent)

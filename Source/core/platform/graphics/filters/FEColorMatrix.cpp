@@ -155,7 +155,7 @@ void FEColorMatrix::applySoftware()
     if (!resultImage)
         return;
 
-    resultImage->context()->drawImageBuffer(in->asImageBuffer(), ColorSpaceDeviceRGB, drawingRegionOfInputImage(in->absolutePaintRect()));
+    resultImage->context()->drawImageBuffer(in->asImageBuffer(), drawingRegionOfInputImage(in->absolutePaintRect()));
 
     IntRect imageRect(IntPoint(), absolutePaintRect().size());
     RefPtr<Uint8ClampedArray> pixelArray = resultImage->getUnmultipliedImageData(imageRect);
@@ -283,7 +283,7 @@ bool FEColorMatrix::applySkia()
 
 SkImageFilter* FEColorMatrix::createImageFilter(SkiaImageFilterBuilder* builder)
 {
-    SkAutoTUnref<SkImageFilter> input(builder->build(inputEffect(0)));
+    SkAutoTUnref<SkImageFilter> input(builder->build(inputEffect(0), operatingColorSpace()));
     SkAutoTUnref<SkColorFilter> filter(createColorFilter(m_type, m_values.data()));
     return SkColorFilterImageFilter::Create(filter, input);
 }

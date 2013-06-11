@@ -219,7 +219,7 @@ bool ScriptElement::prepareScript(const TextPosition& scriptStartPosition, Legac
         m_willBeParserExecuted = true;
     } else if (hasSourceAttribute() && m_parserInserted && !asyncAttributeValue())
         m_willBeParserExecuted = true;
-    else if (!hasSourceAttribute() && m_parserInserted && !document->haveStylesheetsLoaded()) {
+    else if (!hasSourceAttribute() && m_parserInserted && !document->haveStylesheetsAndImportsLoaded()) {
         m_willBeParserExecuted = true;
         m_readyToBeParserExecuted = true;
     } else if (hasSourceAttribute() && !asyncAttributeValue() && !m_forceAsync) {
@@ -400,8 +400,10 @@ String ScriptElement::scriptContent() const
             firstTextNode = t;
     }
 
-    if (firstTextNode && !foundMultipleTextNodes)
+    if (firstTextNode && !foundMultipleTextNodes) {
+        firstTextNode->atomize();
         return firstTextNode->data();
+    }
 
     return content.toString();
 }

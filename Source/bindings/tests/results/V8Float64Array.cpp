@@ -42,51 +42,57 @@
 
 namespace WebCore {
 
-#if defined(OS_WIN)
-// In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
-// These prototypes do not pick up the surrounding namespace, so drop out of WebCore as a workaround.
-} // namespace WebCore
-using WebCore::ScriptWrappable;
-using WebCore::V8Float64Array;
-#endif
-void initializeScriptWrappableForInterface(Float64Array* object)
+static void initializeScriptWrappableForInterface(Float64Array* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8Float64Array::info);
     else
         ASSERT_NOT_REACHED();
 }
-#if defined(OS_WIN)
+
+} // namespace WebCore
+
+// In ScriptWrappable::init, the use of a local function declaration has an issue on Windows:
+// the local declaration does not pick up the surrounding namespace. Therefore, we provide this function
+// in the global namespace.
+// (More info on the MSVC bug here: http://connect.microsoft.com/VisualStudio/feedback/details/664619/the-namespace-of-local-function-declarations-in-c)
+void webCoreInitializeScriptWrappableForInterface(Float64Array* object)
+{
+    WebCore::initializeScriptWrappableForInterface(object);
+}
+
 namespace WebCore {
-#endif
 WrapperTypeInfo V8Float64Array::info = { V8Float64Array::GetTemplate, V8Float64Array::derefObject, 0, 0, 0, V8Float64Array::installPerContextPrototypeProperties, &V8ArrayBufferView::info, WrapperTypeObjectPrototype };
 
 namespace Float64ArrayV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
-static v8::Handle<v8::Value> fooMethod(const v8::Arguments& args)
+static void fooMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1)
-        return throwNotEnoughArgumentsError(args.GetIsolate());
+    if (args.Length() < 1) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
     Float64Array* imp = V8Float64Array::toNative(args.Holder());
-    V8TRYCATCH(Float32Array*, array, V8Float32Array::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Float32Array::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
-    return toV8(imp->foo(array), args.Holder(), args.GetIsolate());
+    V8TRYCATCH_VOID(Float32Array*, array, V8Float32Array::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8Float32Array::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
+    v8SetReturnValue(args, toV8(imp->foo(array), args.Holder(), args.GetIsolate()));
+    return;
 }
 
-static v8::Handle<v8::Value> fooMethodCallback(const v8::Arguments& args)
+static void fooMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return Float64ArrayV8Internal::fooMethod(args);
+    Float64ArrayV8Internal::fooMethod(args);
 }
 
-static v8::Handle<v8::Value> setMethod(const v8::Arguments& args)
+static void setMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return setWebGLArrayHelper<Float64Array, V8Float64Array>(args);
+    setWebGLArrayHelper<Float64Array, V8Float64Array>(args);
 }
 
-static v8::Handle<v8::Value> setMethodCallback(const v8::Arguments& args)
+static void setMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return Float64ArrayV8Internal::setMethod(args);
+    Float64ArrayV8Internal::setMethod(args);
 }
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -124,7 +130,7 @@ void V8Float64Array::constructorCallback(const v8::FunctionCallbackInfo<v8::Valu
     Float64ArrayV8Internal::constructor(args);
 }
 
-static v8::Persistent<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+static v8::Handle<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::Handle<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     desc->ReadOnlyPrototype();
 
@@ -152,18 +158,18 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::
     return desc;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8Float64Array::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8Float64Array::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&info);
     if (result != data->templateMap(currentWorldType).end())
-        return result->value;
+        return result->value.newLocal(isolate);
 
-    v8::HandleScope handleScope;
-    v8::Persistent<v8::FunctionTemplate> templ =
+    v8::HandleScope handleScope(isolate);
+    v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8Float64ArrayTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
-    data->templateMap(currentWorldType).add(&info, templ);
-    return templ;
+    data->templateMap(currentWorldType).add(&info, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
+    return handleScope.Close(templ);
 }
 
 bool V8Float64Array::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)

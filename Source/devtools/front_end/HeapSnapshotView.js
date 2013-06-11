@@ -164,15 +164,8 @@ WebInspector.HeapSnapshotView.prototype = {
         var minId = event.data.minId;
         var maxId = event.data.maxId;
         this.selectedSizeText.setText(WebInspector.UIString("Selected size: %s", Number.bytesToString(event.data.size)));
-        if (this.constructorsDataGrid._minNodeId !== minId || this.constructorsDataGrid._maxNodeId !== maxId) {
-            // FIXME(loislo): we should implement rangeFilter method in constructorsDataGrid.
-            this.constructorsDataGrid._minNodeId = minId;
-            this.constructorsDataGrid._maxNodeId = maxId;
-            if (this.constructorsDataGrid.snapshot) {
-                this.constructorsDataGrid._profileIndex = 1;
-                this.constructorsDataGrid._populateChildren();
-            }
-        }
+        if (this.constructorsDataGrid.snapshot)
+            this.constructorsDataGrid.setSelectionRange(minId, maxId);
     },
 
     dispose: function()
@@ -1074,7 +1067,7 @@ WebInspector.TrackingHeapSnapshotProfileType.prototype = {
             var count = samples[i+1];
             var size  = samples[i+2];
             this._profileSamples.sizes[index] = size;
-            if (size > this._profileSamples.max[index])
+            if (!this._profileSamples.max[index] || size > this._profileSamples.max[index])
                 this._profileSamples.max[index] = size;
         }
         this._lastUpdatedIndex = index;
@@ -1501,6 +1494,8 @@ WebInspector.HeapTrackingOverviewGrid = function(heapProfileHeader)
     this._windowLeft = 0.0;
     this._windowRight = totalTime && timestamps.length ? (timestamps[timestamps.length - 1] - timestamps[0]) / totalTime : 1.0;
     this._overviewGrid.setWindow(this._windowLeft, this._windowRight);
+    this._yScaleFactor = 0.0;
+    this._yScaleFactorLastUpdate = 0;
 }
 
 WebInspector.HeapTrackingOverviewGrid.IdsRangeChanged = "IdsRangeChanged";
@@ -1528,11 +1523,13 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
             return;
         var profileSamples = this._profileSamples;
         var sizes = profileSamples.sizes;
-        var usedSizes = profileSamples.max;
+        var topSizes = profileSamples.max;
         var timestamps = profileSamples.timestamps;
+        var startTime = timestamps[0];
+        var endTime = timestamps[timestamps.length - 1];
 
         var scaleFactor = width / profileSamples.totalTime;
-        var maxUsedSize = 0;
+        var maxSize = 0;
         /**
           * @param {Array.<number>} sizes
           * @param {function(number, number):void} callback
@@ -1542,7 +1539,7 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
             var size = 0;
             var currentX = 0;
             for (var i = 1; i < timestamps.length; ++i) {
-                var x  = Math.floor((timestamps[i] - startTime) * scaleFactor);
+                var x = Math.floor((timestamps[i] - startTime) * scaleFactor);
                 if (x !== currentX) {
                     if (size)
                         callback(currentX, size);
@@ -1558,24 +1555,34 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
           * @param {number} x
           * @param {number} size
           */
-        function maxUsedSizeCallback(x, size)
+        function maxSizeCallback(x, size)
         {
-            maxUsedSize = Math.max(maxUsedSize, size);
+            maxSize = Math.max(maxSize, size);
         }
 
-        aggregateAndCall(usedSizes, maxUsedSizeCallback);
+        aggregateAndCall(sizes, maxSizeCallback);
 
         this._overviewCanvas.width = width * window.devicePixelRatio;
         this._overviewCanvas.height = height * window.devicePixelRatio;
         this._overviewCanvas.style.width = width + "px";
         this._overviewCanvas.style.height = height + "px";
-        var yScaleFactor = height / (maxUsedSize * 1.1);
+
+        var targetYScaleFactor = maxSize ? height / (maxSize * 1.1) : 0.0;
+        var now = Date.now();
+        if (this._yScaleFactor) {
+            var timeDeltaMs = now - this._yScaleFactorLastUpdate;
+            var maxScaleChangeSpeedPerSec = 10; // 10x per second
+            var maxChangePerDelta = Math.pow(maxScaleChangeSpeedPerSec, timeDeltaMs / 1000);
+            var scaleChange = targetYScaleFactor / this._yScaleFactor;
+            this._yScaleFactor *= Number.constrain(scaleChange, 1 / maxChangePerDelta, maxChangePerDelta);
+        } else
+            this._yScaleFactor = targetYScaleFactor;
+        var yScaleFactor = this._yScaleFactor;
+        this._yScaleFactorLastUpdate = now;
 
         var context = this._overviewCanvas.getContext("2d");
         context.scale(window.devicePixelRatio, window.devicePixelRatio);
 
-        var startTime = timestamps[0];
-        var endTime = timestamps[timestamps.length - 1];
         context.beginPath();
         context.lineWidth = 2;
         context.strokeStyle = "rgba(192, 192, 192, 0.6)";
@@ -1588,14 +1595,15 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
         var gridY;
         var gridValue;
         var gridLabelHeight = 14;
-        if (maxUsedSize) {
+        if (maxSize) {
             const maxGridValue = (height - gridLabelHeight) / yScaleFactor;
             // The round value calculation is a bit tricky, because
-            // it has a form k*10^n*1024^m, where k=[1..9], n=[0..3], m is an integer,
-            // e.g. a round value 20KB is 20480 bytes.
+            // it has a form k*10^n*1024^m, where k=[1,5], n=[0..3], m is an integer,
+            // e.g. a round value 10KB is 10240 bytes.
             gridValue = Math.pow(1024, Math.floor(Math.log(maxGridValue) / Math.log(1024)));
             gridValue *= Math.pow(10, Math.floor(Math.log(maxGridValue / gridValue) / Math.log(10)));
-            gridValue *= Math.floor(maxGridValue / gridValue);
+            if (gridValue * 5 <= maxGridValue)
+                gridValue *= 5;
             gridY = Math.round(height - gridValue * yScaleFactor - 0.5) + 0.5;
             context.beginPath();
             context.lineWidth = 1;
@@ -1619,7 +1627,7 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
         context.beginPath();
         context.lineWidth = 2;
         context.strokeStyle = "rgba(192, 192, 192, 0.6)";
-        aggregateAndCall(usedSizes, drawBarCallback);
+        aggregateAndCall(topSizes, drawBarCallback);
         context.stroke();
         context.closePath();
 

@@ -369,6 +369,8 @@ WebInspector.suggestReload = function()
 
 WebInspector.reload = function()
 {
+    InspectorAgent.reset();
+
     var queryParams = window.location.search;
     var url = window.location.href;
     url = url.substring(0, url.length - queryParams.length);
@@ -380,8 +382,6 @@ WebInspector.reload = function()
     var names = Object.keys(queryParamsObject);
     for (var i = 0; i < names.length; ++i)
         url += (i ? "&" : "?") + names[i] + "=" + queryParamsObject[names[i]];
-
-    InspectorBackend.disconnect();
     document.location = url;
 }
 
@@ -559,17 +559,10 @@ WebInspector._doLoadedDoneWithCapabilities = function()
 
     ProfilerAgent.enable();
 
-    if (WebInspector.settings.showPaintRects.get())
-        PageAgent.setShowPaintRects(true);
-
-    if (WebInspector.settings.showDebugBorders.get())
-        PageAgent.setShowDebugBorders(true);
-
-    if (WebInspector.settings.continuousPainting.get())
-        PageAgent.setContinuousPaintingEnabled(true);
-
-    if (WebInspector.settings.showFPSCounter.get())
-        PageAgent.setShowFPSCounter(true);
+    WebInspector.settings.showPaintRects = WebInspector.settings.createBackendSetting("showPaintRects", false, PageAgent.setShowPaintRects.bind(PageAgent));
+    WebInspector.settings.showDebugBorders = WebInspector.settings.createBackendSetting("showDebugBorders", false, PageAgent.setShowDebugBorders.bind(PageAgent));
+    WebInspector.settings.continuousPainting = WebInspector.settings.createBackendSetting("continuousPainting", false, PageAgent.setContinuousPaintingEnabled.bind(PageAgent));
+    WebInspector.settings.showFPSCounter = WebInspector.settings.createBackendSetting("showFPSCounter", false, PageAgent.setShowFPSCounter.bind(PageAgent));
 
     WebInspector.settings.showMetricsRulers.addChangeListener(showRulersChanged);
     function showRulersChanged()
@@ -577,8 +570,6 @@ WebInspector._doLoadedDoneWithCapabilities = function()
         PageAgent.setShowViewportSizeOnResize(true, WebInspector.settings.showMetricsRulers.get());
     }
     showRulersChanged();
-
-    this.domAgent._emulateTouchEventsChanged();
 
     WebInspector.WorkerManager.loadCompleted();
     InspectorFrontendAPI.loadCompleted();
@@ -655,7 +646,11 @@ WebInspector.documentClick = function(event)
 
     function followLink()
     {
-        if (WebInspector.isBeingEdited(event.target) || WebInspector._showAnchorLocation(anchor))
+        if (WebInspector.isBeingEdited(event.target))
+            return;
+        if (WebInspector.openAnchorLocationRegistry.dispatch({ url: anchor.href, lineNumber: anchor.lineNumber}))
+            return;
+        if (WebInspector.showAnchorLocation(anchor))
             return;
 
         const profileMatch = WebInspector.ProfilesPanelDescriptor.ProfileURLRegExp.exec(anchor.href);
@@ -785,6 +780,7 @@ WebInspector.documentKeyDown = function(event)
 
     switch (event.keyIdentifier) {
         case "U+004F": // O key
+        case "U+0050": // P key
             if (!event.shiftKey && !event.altKey && WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event)) {
                 WebInspector.showPanel("scripts").showGoToSourceDialog();
                 event.consume(true);
@@ -1018,10 +1014,8 @@ WebInspector._updateFocusedNode = function(nodeId)
     WebInspector.showPanel("elements").revealAndSelectNode(nodeId);
 }
 
-WebInspector._showAnchorLocation = function(anchor)
+WebInspector.showAnchorLocation = function(anchor)
 {
-    if (WebInspector.openAnchorLocationRegistry.dispatch({ url: anchor.href, lineNumber: anchor.lineNumber}))
-        return true;
     var preferredPanel = this.panels[anchor.preferredPanel];
     if (preferredPanel && WebInspector._showAnchorLocationInPanel(anchor, preferredPanel))
         return true;

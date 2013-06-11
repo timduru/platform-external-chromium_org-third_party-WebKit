@@ -38,24 +38,26 @@
 
 namespace WebCore {
 
-#if defined(OS_WIN)
-// In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
-// These prototypes do not pick up the surrounding namespace, so drop out of WebCore as a workaround.
-} // namespace WebCore
-using WebCore::ScriptWrappable;
-using WebCore::V8TestOverloadedConstructors;
-using WebCore::TestOverloadedConstructors;
-#endif
-void initializeScriptWrappableForInterface(TestOverloadedConstructors* object)
+static void initializeScriptWrappableForInterface(TestOverloadedConstructors* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestOverloadedConstructors::info);
     else
         ASSERT_NOT_REACHED();
 }
-#if defined(OS_WIN)
+
+} // namespace WebCore
+
+// In ScriptWrappable::init, the use of a local function declaration has an issue on Windows:
+// the local declaration does not pick up the surrounding namespace. Therefore, we provide this function
+// in the global namespace.
+// (More info on the MSVC bug here: http://connect.microsoft.com/VisualStudio/feedback/details/664619/the-namespace-of-local-function-declarations-in-c)
+void webCoreInitializeScriptWrappableForInterface(WebCore::TestOverloadedConstructors* object)
+{
+    WebCore::initializeScriptWrappableForInterface(object);
+}
+
 namespace WebCore {
-#endif
 WrapperTypeInfo V8TestOverloadedConstructors::info = { V8TestOverloadedConstructors::GetTemplate, V8TestOverloadedConstructors::derefObject, 0, 0, 0, V8TestOverloadedConstructors::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace TestOverloadedConstructorsV8Internal {
@@ -149,12 +151,12 @@ void V8TestOverloadedConstructors::constructorCallback(const v8::FunctionCallbac
     TestOverloadedConstructorsV8Internal::constructor(args);
 }
 
-static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestOverloadedConstructorsTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+static v8::Handle<v8::FunctionTemplate> ConfigureV8TestOverloadedConstructorsTemplate(v8::Handle<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     desc->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestOverloadedConstructors", v8::Persistent<v8::FunctionTemplate>(), V8TestOverloadedConstructors::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestOverloadedConstructors", v8::Local<v8::FunctionTemplate>(), V8TestOverloadedConstructors::internalFieldCount,
         0, 0,
         0, 0, isolate, currentWorldType);
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
@@ -166,18 +168,18 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestOverloadedConstructor
     return desc;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8TestOverloadedConstructors::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestOverloadedConstructors::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&info);
     if (result != data->templateMap(currentWorldType).end())
-        return result->value;
+        return result->value.newLocal(isolate);
 
-    v8::HandleScope handleScope;
-    v8::Persistent<v8::FunctionTemplate> templ =
+    v8::HandleScope handleScope(isolate);
+    v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestOverloadedConstructorsTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
-    data->templateMap(currentWorldType).add(&info, templ);
-    return templ;
+    data->templateMap(currentWorldType).add(&info, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
+    return handleScope.Close(templ);
 }
 
 bool V8TestOverloadedConstructors::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)

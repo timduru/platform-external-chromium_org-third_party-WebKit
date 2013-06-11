@@ -31,16 +31,16 @@
 #include "core/page/FrameView.h"
 #include "core/platform/ScrollView.h"
 #include "core/platform/graphics/Gradient.h"
+#include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/ImageBuffer.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/mac/LocalCurrentGraphicsContext.h"
 #include "core/platform/mac/NSScrollerImpDetails.h"
 #include "core/platform/mac/ScrollAnimatorMac.h"
+#include "public/platform/mac/WebThemeEngine.h"
 #include "skia/ext/skia_utils_mac.h"
-#include <public/mac/WebThemeEngine.h>
-#include <public/Platform.h>
-#include <public/WebRect.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebRect.h"
 
 namespace WebCore {
 
@@ -256,7 +256,7 @@ bool ScrollbarThemeChromiumMac::paint(ScrollbarThemeClient* scrollbar, GraphicsC
     }
 
     if (!canDrawDirectly)
-        context->drawImageBuffer(imageBuffer.get(), ColorSpaceDeviceRGB, scrollbar->frameRect().location());
+        context->drawImageBuffer(imageBuffer.get(), scrollbar->frameRect().location());
 
     return true;
 }
@@ -274,8 +274,8 @@ void ScrollbarThemeChromiumMac::paintGivenTickmarks(GraphicsContext* context, Sc
 
     GraphicsContextStateSaver stateSaver(*context);
     context->setShouldAntialias(false);
-    context->setStrokeColor(Color(0xCC, 0xAA, 0x00, 0xFF), ColorSpaceDeviceRGB);
-    context->setFillColor(Color(0xFF, 0xDD, 0x00, 0xFF), ColorSpaceDeviceRGB);
+    context->setStrokeColor(Color(0xCC, 0xAA, 0x00, 0xFF));
+    context->setFillColor(Color(0xFF, 0xDD, 0x00, 0xFF));
 
     for (Vector<IntRect>::const_iterator i = tickmarks.begin(); i != tickmarks.end(); ++i) {
         // Calculate how far down (in %) the tick-mark should appear.

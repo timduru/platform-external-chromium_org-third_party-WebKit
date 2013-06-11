@@ -31,14 +31,10 @@
 #include "core/html/HTMLFormElement.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FormState.h"
-#include "core/loader/FrameNetworkingContext.h"
 #include "core/page/Frame.h"
+#include "core/platform/ColorChooser.h"
 #include "core/platform/DateTimeChooser.h"
 #include "core/platform/FileChooser.h"
-
-#if ENABLE(INPUT_TYPE_COLOR)
-#include "core/platform/ColorChooser.h"
-#endif
 
 namespace WebCore {
 
@@ -76,12 +72,10 @@ PassRefPtr<PopupMenu> EmptyChromeClient::createPopupMenu(Frame&, PopupMenuClient
     return adoptRef(new EmptyPopupMenu());
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
 PassOwnPtr<ColorChooser> EmptyChromeClient::createColorChooser(ColorChooserClient*, const Color&)
 {
     return nullptr;
 }
-#endif
 
 PassRefPtr<DateTimeChooser> EmptyChromeClient::openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&)
 {
@@ -128,11 +122,6 @@ PassRefPtr<Widget> EmptyFrameLoaderClient::createPlugin(const IntSize&, HTMLPlug
 PassRefPtr<Widget> EmptyFrameLoaderClient::createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL&, const Vector<String>&, const Vector<String>&)
 {
     return 0;
-}
-
-PassRefPtr<FrameNetworkingContext> EmptyFrameLoaderClient::createNetworkingContext()
-{
-    return PassRefPtr<FrameNetworkingContext>();
 }
 
 void EmptyTextCheckerClient::requestCheckingOfString(PassRefPtr<TextCheckingRequest>)

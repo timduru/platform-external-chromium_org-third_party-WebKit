@@ -39,7 +39,6 @@
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8HiddenPropertyName.h"
-#include "bindings/v8/V8RecursionScope.h"
 #include "bindings/v8/V8ScriptRunner.h"
 #include "core/dom/Document.h"
 #include "core/dom/Node.h"
@@ -85,8 +84,6 @@ v8::Local<v8::Value> V8LazyEventListener::callListenerFunction(ScriptExecutionCo
     if (handlerFunction.IsEmpty() || receiver.IsEmpty())
         return v8::Local<v8::Value>();
 
-    v8::Handle<v8::Value> parameters[1] = { jsEvent };
-
     // FIXME: Can |context| be 0 here?
     if (!context)
         return v8::Local<v8::Value>();
@@ -101,12 +98,13 @@ v8::Local<v8::Value> V8LazyEventListener::callListenerFunction(ScriptExecutionCo
     if (!frame->script()->canExecuteScripts(AboutToExecuteScript))
         return v8::Local<v8::Value>();
 
-    return frame->script()->callFunction(handlerFunction, receiver, 1, parameters);
+    v8::Handle<v8::Value> parameters[1] = { jsEvent };
+    return frame->script()->callFunction(handlerFunction, receiver, WTF_ARRAY_LENGTH(parameters), parameters);
 }
 
-static v8::Handle<v8::Value> V8LazyEventListenerToString(const v8::Arguments& args)
+static void V8LazyEventListenerToString(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return args.Holder()->GetHiddenValue(V8HiddenPropertyName::toStringString());
+    v8SetReturnValue(args, args.Holder()->GetHiddenValue(V8HiddenPropertyName::toStringString()));
 }
 
 void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
@@ -166,7 +164,7 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
 
     v8::Handle<v8::String> codeExternalString = v8String(code, isolate);
 
-    v8::Local<v8::Value> result = V8ScriptRunner::compileAndRunInternalScript(codeExternalString, isolate, v8Context, m_sourceURL, m_position, 0);
+    v8::Local<v8::Value> result = V8ScriptRunner::compileAndRunInternalScript(codeExternalString, isolate, m_sourceURL, m_position);
     if (result.IsEmpty())
         return;
 
@@ -193,11 +191,7 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
         return;
 
     // FIXME: Remove this code when we stop doing the 'with' hack above.
-    v8::Local<v8::Value> innerValue;
-    {
-        V8RecursionScope::MicrotaskSuppression scope;
-        innerValue = intermediateFunction->Call(thisObject, 0, 0);
-    }
+    v8::Local<v8::Value> innerValue = V8ScriptRunner::callInternalFunction(intermediateFunction, thisObject, 0, 0, isolate);
     if (innerValue.IsEmpty() || !innerValue->IsFunction())
         return;
 
@@ -211,10 +205,10 @@ void V8LazyEventListener::prepareListenerObject(ScriptExecutionContext* context)
     // source returned (sometimes a RegExp is applied as well) for some
     // other use. That fails miserably if the actual wrapper source is
     // returned.
-    v8::Persistent<v8::FunctionTemplate>& toStringTemplate =
+    v8::Handle<v8::FunctionTemplate> toStringTemplate =
         V8PerIsolateData::current()->lazyEventListenerToStringTemplate();
     if (toStringTemplate.IsEmpty())
-        toStringTemplate.Reset(isolate, v8::FunctionTemplate::New(V8LazyEventListenerToString));
+        toStringTemplate = v8::FunctionTemplate::New(V8LazyEventListenerToString);
     v8::Local<v8::Function> toStringFunction;
     if (!toStringTemplate.IsEmpty())
         toStringFunction = toStringTemplate->GetFunction();

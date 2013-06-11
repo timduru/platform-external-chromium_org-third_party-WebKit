@@ -94,7 +94,8 @@ WebInspector.DebuggerModel.BreakReason = {
     XHR: "XHR",
     Exception: "exception",
     Assert: "assert",
-    CSPViolation: "CSPViolation"
+    CSPViolation: "CSPViolation",
+    DebugCommand: "debugCommand"
 }
 
 WebInspector.DebuggerModel.prototype = {
@@ -304,7 +305,7 @@ WebInspector.DebuggerModel.prototype = {
     {
         callback(error);
         if (!error && callFrames && callFrames.length)
-            this._pausedScript(callFrames, this._debuggerPausedDetails.reason, this._debuggerPausedDetails.auxData);
+            this._pausedScript(callFrames, this._debuggerPausedDetails.reason, this._debuggerPausedDetails.auxData, this._debuggerPausedDetails.breakpointIds);
     },
 
     /**
@@ -346,10 +347,11 @@ WebInspector.DebuggerModel.prototype = {
      * @param {Array.<DebuggerAgent.CallFrame>} callFrames
      * @param {string} reason
      * @param {*} auxData
+     * @param {Array.<string>} breakpointIds
      */
-    _pausedScript: function(callFrames, reason, auxData)
+    _pausedScript: function(callFrames, reason, auxData, breakpointIds)
     {
-        this._setDebuggerPausedDetails(new WebInspector.DebuggerPausedDetails(this, callFrames, reason, auxData));
+        this._setDebuggerPausedDetails(new WebInspector.DebuggerPausedDetails(this, callFrames, reason, auxData, breakpointIds));
     },
 
     _resumedScript: function()
@@ -584,7 +586,7 @@ WebInspector.DebuggerModel.prototype = {
             DebuggerAgent.stepInto();
         else {
             if (newCallFrames && newCallFrames.length)
-                this._pausedScript(newCallFrames, this._debuggerPausedDetails.reason, this._debuggerPausedDetails.auxData);
+                this._pausedScript(newCallFrames, this._debuggerPausedDetails.reason, this._debuggerPausedDetails.auxData, this._debuggerPausedDetails.breakpointIds);
 
         }
     },
@@ -613,10 +615,11 @@ WebInspector.DebuggerDispatcher.prototype = {
      * @param {Array.<DebuggerAgent.CallFrame>} callFrames
      * @param {string} reason
      * @param {Object=} auxData
+     * @param {Array.<string>=} breakpointIds
      */
-    paused: function(callFrames, reason, auxData)
+    paused: function(callFrames, reason, auxData, breakpointIds)
     {
-        this._debuggerModel._pausedScript(callFrames, reason, auxData);
+        this._debuggerModel._pausedScript(callFrames, reason, auxData, breakpointIds || []);
     },
 
     resumed: function()
@@ -810,8 +813,9 @@ WebInspector.DebuggerModel.CallFrame.prototype = {
  * @param {Array.<DebuggerAgent.CallFrame>} callFrames
  * @param {string} reason
  * @param {*} auxData
+ * @param {Array.<string>} breakpointIds
  */
-WebInspector.DebuggerPausedDetails = function(model, callFrames, reason, auxData)
+WebInspector.DebuggerPausedDetails = function(model, callFrames, reason, auxData, breakpointIds)
 {
     this.callFrames = [];
     for (var i = 0; i < callFrames.length; ++i) {
@@ -822,6 +826,7 @@ WebInspector.DebuggerPausedDetails = function(model, callFrames, reason, auxData
     }
     this.reason = reason;
     this.auxData = auxData;
+    this.breakpointIds = breakpointIds;
 }
 
 WebInspector.DebuggerPausedDetails.prototype = {

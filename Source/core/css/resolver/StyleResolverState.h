@@ -24,8 +24,8 @@
 
 #include "CSSPropertyNames.h"
 
+#include "core/css/CSSSVGDocumentValue.h"
 #include "core/css/CSSValueList.h"
-#include "core/css/WebKitCSSSVGDocumentValue.h"
 #include "core/dom/Element.h"
 #include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/filters/FilterOperations.h"
@@ -43,13 +43,14 @@ class RenderRegion;
 class StyledElement;
 
 typedef HashMap<CSSPropertyID, RefPtr<CSSValue> > PendingImagePropertyMap;
-typedef HashMap<FilterOperation*, RefPtr<WebKitCSSSVGDocumentValue> > PendingSVGDocumentMap;
+typedef HashMap<FilterOperation*, RefPtr<CSSSVGDocumentValue> > PendingSVGDocumentMap;
 
 class StyleResolverState {
 WTF_MAKE_NONCOPYABLE(StyleResolverState);
 public:
     StyleResolverState()
     : m_element(0)
+    , m_childIndex(0)
     , m_styledElement(0)
     , m_parentNode(0)
     , m_parentStyle(0)
@@ -67,7 +68,7 @@ public:
     , m_backgroundData(BackgroundFillLayer) { }
 
     public:
-    void initElement(Element*);
+    void initElement(Element*, int childIndex);
     void initForStyleResolve(Document*, Element*, RenderStyle* parentStyle = 0, RenderRegion* regionForStyling = 0);
     void clear();
 
@@ -75,6 +76,7 @@ public:
 
     Document* document() const { return m_element->document(); }
     Element* element() const { return m_element; }
+    int childIndex() const { return m_childIndex; }
     StyledElement* styledElement() const { return m_styledElement; }
     void setStyle(PassRefPtr<RenderStyle> style) { m_style = style; }
     RenderStyle* style() const { return m_style.get(); }
@@ -122,10 +124,8 @@ public:
     bool useSVGZoomRules() const { return m_element && m_element->isSVGElement(); }
 
 private:
-    // FIXME(bug 108563): to make it easier to review, these member
-    // variables are public. However we should add methods to access
-    // these variables.
     Element* m_element;
+    int m_childIndex;
     RefPtr<RenderStyle> m_style;
     StyledElement* m_styledElement;
     ContainerNode* m_parentNode;

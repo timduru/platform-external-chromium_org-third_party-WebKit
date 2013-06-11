@@ -105,45 +105,16 @@ static inline bool shouldUpdateHeaderAfterRevalidation(const AtomicString& heade
     return true;
 }
 
-static ResourceLoadPriority defaultPriorityForResourceType(CachedResource::Type type)
-{
-    switch (type) {
-    case CachedResource::MainResource:
-        return ResourceLoadPriorityVeryHigh;
-    case CachedResource::CSSStyleSheet:
-        return ResourceLoadPriorityHigh;
-    case CachedResource::Script:
-    case CachedResource::FontResource:
-    case CachedResource::RawResource:
-        return ResourceLoadPriorityMedium;
-    case CachedResource::ImageResource:
-        return ResourceLoadPriorityLow;
-    case CachedResource::XSLStyleSheet:
-        return ResourceLoadPriorityHigh;
-    case CachedResource::SVGDocumentResource:
-        return ResourceLoadPriorityLow;
-    case CachedResource::LinkPrefetch:
-        return ResourceLoadPriorityVeryLow;
-    case CachedResource::LinkSubresource:
-        return ResourceLoadPriorityVeryLow;
-    case CachedResource::TextTrackResource:
-        return ResourceLoadPriorityLow;
-    case CachedResource::ShaderResource:
-        return ResourceLoadPriorityMedium;
-    }
-    ASSERT_NOT_REACHED();
-    return ResourceLoadPriorityLow;
-}
-
 DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("CachedResource"));
 
 CachedResource::CachedResource(const ResourceRequest& request, Type type)
     : m_resourceRequest(request)
-    , m_loadPriority(defaultPriorityForResourceType(type))
     , m_responseTimestamp(currentTime())
     , m_decodedDataDeletionTimer(this, &CachedResource::decodedDataDeletionTimerFired)
+    , m_cancelTimer(this, &CachedResource::cancelTimerFired)
     , m_lastDecodedAccessTime(0)
     , m_loadFinishTime(0)
+    , m_identifier(0)
     , m_encodedSize(0)
     , m_decodedSize(0)
     , m_accessCount(0)
@@ -217,27 +188,6 @@ void CachedResource::load(CachedResourceLoader* cachedResourceLoader, const Reso
 
     if (!accept().isEmpty())
         m_resourceRequest.setHTTPAccept(accept());
-
-    if (isCacheValidator()) {
-        CachedResource* resourceToRevalidate = m_resourceToRevalidate;
-        ASSERT(resourceToRevalidate->canUseCacheValidator());
-        ASSERT(resourceToRevalidate->isLoaded());
-        const String& lastModified = resourceToRevalidate->response().httpHeaderField("Last-Modified");
-        const String& eTag = resourceToRevalidate->response().httpHeaderField("ETag");
-        if (!lastModified.isEmpty() || !eTag.isEmpty()) {
-            ASSERT(cachedResourceLoader->cachePolicy(type()) != CachePolicyReload);
-            if (cachedResourceLoader->cachePolicy(type()) == CachePolicyRevalidate)
-                m_resourceRequest.setHTTPHeaderField("Cache-Control", "max-age=0");
-            if (!lastModified.isEmpty())
-                m_resourceRequest.setHTTPHeaderField("If-Modified-Since", lastModified);
-            if (!eTag.isEmpty())
-                m_resourceRequest.setHTTPHeaderField("If-None-Match", eTag);
-        }
-    }
-
-    if (type() == CachedResource::LinkPrefetch || type() == CachedResource::LinkSubresource)
-        m_resourceRequest.setHTTPHeaderField("Purpose", "prefetch");
-    m_resourceRequest.setPriority(loadPriority());
 
     // FIXME: It's unfortunate that the cache layer and below get to know anything about fragment identifiers.
     // We should look into removing the expectation of that knowledge from the platform network stacks.
@@ -495,6 +445,22 @@ void CachedResource::removeClient(CachedResourceClient* client)
     // This object may be dead here.
 }
 
+void CachedResource::allClientsRemoved()
+{
+    if (m_type == MainResource || m_type == RawResource)
+        cancelTimerFired(&m_cancelTimer);
+    else if (!m_cancelTimer.isActive())
+        m_cancelTimer.startOneShot(0);
+}
+
+void CachedResource::cancelTimerFired(Timer<CachedResource>* timer)
+{
+    ASSERT_UNUSED(timer, timer == &m_cancelTimer);
+    if (hasClients() || !m_loader)
+        return;
+    m_loader->cancelIfNotFinishing();
+}
+
 void CachedResource::destroyDecodedDataIfNeeded()
 {
     if (!m_decodedSize)
@@ -560,9 +526,6 @@ void CachedResource::setEncodedSize(unsigned size)
     if (size == m_encodedSize)
         return;
 
-    // The size cannot ever shrink (unless it is being nulled out because of an error).  If it ever does, assert.
-    ASSERT(size == 0 || size >= m_encodedSize);
-    
     int delta = size - m_encodedSize;
 
     // The object must now be moved to a different queue, since its size has been changed.
@@ -570,9 +533,9 @@ void CachedResource::setEncodedSize(unsigned size)
     // queue.
     if (inCache())
         memoryCache()->removeFromLRUList(this);
-    
+
     m_encodedSize = size;
-   
+
     if (inCache()) { 
         // Now insert into the new LRU list.
         memoryCache()->insertInLRUList(this);
@@ -637,6 +600,8 @@ void CachedResource::switchClientsToRevalidatedResource()
     ASSERT(!inCache());
 
     LOG(ResourceLoading, "CachedResource %p switchClientsToRevalidatedResource %p", this, m_resourceToRevalidate);
+
+    m_resourceToRevalidate->m_identifier = m_identifier;
 
     m_switchingClientsToRevalidatedResource = true;
     HashSet<CachedResourceHandleBase*>::iterator end = m_handlesToRevalidate.end();
@@ -838,18 +803,18 @@ bool CachedResource::makePurgeable(bool purgeable)
             return false;
 
         m_purgeableData = m_data->releasePurgeableBuffer();
-        m_purgeableData->setPurgePriority(purgePriority());
-        m_purgeableData->makePurgeable(true);
+        m_purgeableData->unlock();
         m_data.clear();
         return true;
     }
 
     if (!m_purgeableData)
         return true;
+
     ASSERT(!m_data);
     ASSERT(!hasClients());
 
-    if (!m_purgeableData->makePurgeable(false))
+    if (!m_purgeableData->lock())
         return false; 
 
     m_data = SharedBuffer::adoptPurgeableBuffer(m_purgeableData.release());
@@ -872,17 +837,11 @@ unsigned CachedResource::overheadSize() const
     return sizeof(CachedResource) + m_response.memoryUsage() + kAverageClientsHashMapSize + m_resourceRequest.url().string().length() * 2;
 }
 
-void CachedResource::setLoadPriority(ResourceLoadPriority loadPriority)
+void CachedResource::didChangePriority(ResourceLoadPriority loadPriority)
 {
-    if (loadPriority == ResourceLoadPriorityUnresolved)
-        loadPriority = defaultPriorityForResourceType(type());
-    if (loadPriority == m_loadPriority)
-        return;
-    m_loadPriority = loadPriority;
     if (m_loader)
         m_loader->didChangePriority(loadPriority);
 }
-
 
 CachedResource::CachedResourceCallback::CachedResourceCallback(CachedResource* resource, CachedResourceClient* client)
     : m_resource(resource)

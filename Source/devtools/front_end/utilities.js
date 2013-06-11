@@ -192,6 +192,18 @@ Number.constrain = function(num, min, max)
     return num;
 }
 
+/**
+ * @param {string} value
+ * @return {string}
+ */
+Number.toFixedIfFloating = function(value)
+{
+    if (!value || isNaN(value))
+        return value;
+    var number = Number(value);
+    return number % 1 ? number.toFixed(3) : String(number);
+}
+
 Date.prototype.toISO8601Compact = function()
 {
     function leadZero(x)
@@ -1128,7 +1140,7 @@ function importScript(scriptName)
     if (!xhr.responseText)
         throw "empty response arrived for script '" + scriptName + "'";
     var sourceURL = WebInspector.ParsedURL.completeURL(window.location.href, scriptName); 
-    window.eval(xhr.responseText + "\n//@ sourceURL=" + sourceURL);
+    window.eval(xhr.responseText + "\n//# sourceURL=" + sourceURL);
 }
 
 var loadScript = importScript;

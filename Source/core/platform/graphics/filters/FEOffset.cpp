@@ -103,12 +103,12 @@ void FEOffset::applySoftware()
     FloatRect drawingRegion = drawingRegionOfInputImage(in->absolutePaintRect());
     Filter* filter = this->filter();
     drawingRegion.move(filter->applyHorizontalScale(m_dx), filter->applyVerticalScale(m_dy));
-    resultImage->context()->drawImageBuffer(in->asImageBuffer(), ColorSpaceDeviceRGB, drawingRegion);
+    resultImage->context()->drawImageBuffer(in->asImageBuffer(), drawingRegion);
 }
 
 SkImageFilter* FEOffset::createImageFilter(SkiaImageFilterBuilder* builder)
 {
-    SkAutoTUnref<SkImageFilter> input(builder->build(inputEffect(0)));
+    SkAutoTUnref<SkImageFilter> input(builder->build(inputEffect(0), operatingColorSpace()));
     return new SkOffsetImageFilter(SkFloatToScalar(m_dx), SkFloatToScalar(m_dy), input);
 }
 

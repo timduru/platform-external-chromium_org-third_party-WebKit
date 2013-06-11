@@ -25,18 +25,22 @@
 #include "core/css/CSSComputedStyleDeclaration.h"
 
 #include "CSSPropertyNames.h"
-#include "WebKitFontFamilyNames.h"
+#include "FontFamilyNames.h"
 #include "core/css/BasicShapeFunctions.h"
+#include "core/css/CSSArrayFunctionValue.h"
 #include "core/css/CSSAspectRatioValue.h"
 #include "core/css/CSSBorderImage.h"
+#include "core/css/CSSFilterValue.h"
 #include "core/css/CSSFunctionValue.h"
 #include "core/css/CSSLineBoxContainValue.h"
+#include "core/css/CSSMixFunctionValue.h"
 #include "core/css/CSSParser.h"
 #include "core/css/CSSPrimitiveValue.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/CSSReflectValue.h"
 #include "core/css/CSSSelector.h"
 #include "core/css/CSSTimingFunctionValue.h"
+#include "core/css/CSSTransformValue.h"
 #include "core/css/CSSValueList.h"
 #include "core/css/CSSValuePool.h"
 #include "core/css/FontFeatureValue.h"
@@ -46,7 +50,6 @@
 #include "core/css/ShadowValue.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StylePropertyShorthand.h"
-#include "core/css/WebKitCSSTransformValue.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
@@ -64,15 +67,12 @@
 #include "core/rendering/style/RenderStyle.h"
 #include <wtf/text/StringBuilder.h>
 
-#include "core/css/WebKitCSSArrayFunctionValue.h"
-#include "core/css/WebKitCSSMixFunctionValue.h"
 #include "core/platform/graphics/filters/custom/CustomFilterArrayParameter.h"
 #include "core/platform/graphics/filters/custom/CustomFilterNumberParameter.h"
 #include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "core/platform/graphics/filters/custom/CustomFilterParameter.h"
 #include "core/platform/graphics/filters/custom/CustomFilterTransformParameter.h"
 
-#include "core/css/WebKitCSSFilterValue.h"
 #include "core/rendering/style/StyleCustomFilterProgram.h"
 
 namespace WebCore {
@@ -171,10 +171,10 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyTabSize,
     CSSPropertyTextAlign,
     CSSPropertyTextDecoration,
+    CSSPropertyTextDecorationLine,
+    CSSPropertyTextDecorationStyle,
+    CSSPropertyTextDecorationColor,
 #if ENABLE(CSS3_TEXT)
-    CSSPropertyWebkitTextDecorationLine,
-    CSSPropertyWebkitTextDecorationStyle,
-    CSSPropertyWebkitTextDecorationColor,
     CSSPropertyWebkitTextAlignLast,
     CSSPropertyWebkitTextUnderlinePosition,
 #endif // CSS3_TEXT
@@ -231,7 +231,6 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitBoxReflect,
     CSSPropertyWebkitBoxShadow,
     CSSPropertyWebkitClipPath,
-    CSSPropertyWebkitColorCorrection,
     CSSPropertyWebkitColumnBreakAfter,
     CSSPropertyWebkitColumnBreakBefore,
     CSSPropertyWebkitColumnBreakInside,
@@ -257,15 +256,15 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitFontKerning,
     CSSPropertyWebkitFontSmoothing,
     CSSPropertyWebkitFontVariantLigatures,
-    CSSPropertyWebkitGridAutoColumns,
-    CSSPropertyWebkitGridAutoFlow,
-    CSSPropertyWebkitGridAutoRows,
-    CSSPropertyWebkitGridColumns,
-    CSSPropertyWebkitGridRows,
-    CSSPropertyWebkitGridStart,
-    CSSPropertyWebkitGridEnd,
-    CSSPropertyWebkitGridBefore,
-    CSSPropertyWebkitGridAfter,
+    CSSPropertyGridAutoColumns,
+    CSSPropertyGridAutoFlow,
+    CSSPropertyGridAutoRows,
+    CSSPropertyGridColumns,
+    CSSPropertyGridRows,
+    CSSPropertyGridStart,
+    CSSPropertyGridEnd,
+    CSSPropertyGridBefore,
+    CSSPropertyGridAfter,
     CSSPropertyWebkitHighlight,
     CSSPropertyWebkitHyphenateCharacter,
     CSSPropertyWebkitHyphenateLimitAfter,
@@ -390,7 +389,7 @@ static const Vector<CSSPropertyID>& computableProperties()
     return properties;
 }
 
-static int valueForRepeatRule(int rule)
+static CSSValueID valueForRepeatRule(int rule)
 {
     switch (rule) {
         case RepeatImageRule:
@@ -733,11 +732,11 @@ static LayoutRect sizingBox(RenderObject* renderer)
     return box->style()->boxSizing() == BORDER_BOX ? box->borderBoxRect() : box->computedCSSContentBoxRect();
 }
 
-static PassRefPtr<WebKitCSSTransformValue> matrixTransformValue(const TransformationMatrix& transform, const RenderStyle* style)
+static PassRefPtr<CSSTransformValue> matrixTransformValue(const TransformationMatrix& transform, const RenderStyle* style)
 {
-    RefPtr<WebKitCSSTransformValue> transformValue;
+    RefPtr<CSSTransformValue> transformValue;
     if (transform.isAffine()) {
-        transformValue = WebKitCSSTransformValue::create(WebKitCSSTransformValue::MatrixTransformOperation);
+        transformValue = CSSTransformValue::create(CSSTransformValue::MatrixTransformOperation);
 
         transformValue->append(cssValuePool().createValue(transform.a(), CSSPrimitiveValue::CSS_NUMBER));
         transformValue->append(cssValuePool().createValue(transform.b(), CSSPrimitiveValue::CSS_NUMBER));
@@ -746,7 +745,7 @@ static PassRefPtr<WebKitCSSTransformValue> matrixTransformValue(const Transforma
         transformValue->append(zoomAdjustedNumberValue(transform.e(), style));
         transformValue->append(zoomAdjustedNumberValue(transform.f(), style));
     } else {
-        transformValue = WebKitCSSTransformValue::create(WebKitCSSTransformValue::Matrix3DTransformOperation);
+        transformValue = CSSTransformValue::create(CSSTransformValue::Matrix3DTransformOperation);
 
         transformValue->append(cssValuePool().createValue(transform.m11(), CSSPrimitiveValue::CSS_NUMBER));
         transformValue->append(cssValuePool().createValue(transform.m12(), CSSPrimitiveValue::CSS_NUMBER));
@@ -793,7 +792,7 @@ static PassRefPtr<CSSValue> computedTransform(RenderObject* renderer, const Rend
 
 static PassRefPtr<CSSValue> valueForCustomFilterArrayParameter(const CustomFilterArrayParameter* arrayParameter)
 {
-    RefPtr<WebKitCSSArrayFunctionValue> arrayParameterValue = WebKitCSSArrayFunctionValue::create();
+    RefPtr<CSSArrayFunctionValue> arrayParameterValue = CSSArrayFunctionValue::create();
     for (unsigned i = 0, size = arrayParameter->size(); i < size; ++i)
         arrayParameterValue->append(cssValuePool().createValue(arrayParameter->valueAt(i), CSSPrimitiveValue::CSS_NUMBER));
     return arrayParameterValue.release();
@@ -843,7 +842,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
 
     RefPtr<CSSValueList> list = CSSValueList::createSpaceSeparated();
 
-    RefPtr<WebKitCSSFilterValue> filterValue;
+    RefPtr<CSSFilterValue> filterValue;
 
     Vector<RefPtr<FilterOperation> >::const_iterator end = style->filter().operations().end();
     for (Vector<RefPtr<FilterOperation> >::const_iterator it = style->filter().operations().begin(); it != end; ++it) {
@@ -851,67 +850,67 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
         switch (filterOperation->getOperationType()) {
         case FilterOperation::REFERENCE: {
             ReferenceFilterOperation* referenceOperation = static_cast<ReferenceFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::ReferenceFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::ReferenceFilterOperation);
             filterValue->append(cssValuePool().createValue(referenceOperation->url(), CSSPrimitiveValue::CSS_STRING));
             break;
         }
         case FilterOperation::GRAYSCALE: {
             BasicColorMatrixFilterOperation* colorMatrixOperation = static_cast<BasicColorMatrixFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::GrayscaleFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::GrayscaleFilterOperation);
             filterValue->append(cssValuePool().createValue(colorMatrixOperation->amount(), CSSPrimitiveValue::CSS_NUMBER));
             break;
         }
         case FilterOperation::SEPIA: {
             BasicColorMatrixFilterOperation* colorMatrixOperation = static_cast<BasicColorMatrixFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::SepiaFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::SepiaFilterOperation);
             filterValue->append(cssValuePool().createValue(colorMatrixOperation->amount(), CSSPrimitiveValue::CSS_NUMBER));
             break;
         }
         case FilterOperation::SATURATE: {
             BasicColorMatrixFilterOperation* colorMatrixOperation = static_cast<BasicColorMatrixFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::SaturateFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::SaturateFilterOperation);
             filterValue->append(cssValuePool().createValue(colorMatrixOperation->amount(), CSSPrimitiveValue::CSS_NUMBER));
             break;
         }
         case FilterOperation::HUE_ROTATE: {
             BasicColorMatrixFilterOperation* colorMatrixOperation = static_cast<BasicColorMatrixFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::HueRotateFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::HueRotateFilterOperation);
             filterValue->append(cssValuePool().createValue(colorMatrixOperation->amount(), CSSPrimitiveValue::CSS_DEG));
             break;
         }
         case FilterOperation::INVERT: {
             BasicComponentTransferFilterOperation* componentTransferOperation = static_cast<BasicComponentTransferFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::InvertFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::InvertFilterOperation);
             filterValue->append(cssValuePool().createValue(componentTransferOperation->amount(), CSSPrimitiveValue::CSS_NUMBER));
             break;
         }
         case FilterOperation::OPACITY: {
             BasicComponentTransferFilterOperation* componentTransferOperation = static_cast<BasicComponentTransferFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::OpacityFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::OpacityFilterOperation);
             filterValue->append(cssValuePool().createValue(componentTransferOperation->amount(), CSSPrimitiveValue::CSS_NUMBER));
             break;
         }
         case FilterOperation::BRIGHTNESS: {
             BasicComponentTransferFilterOperation* brightnessOperation = static_cast<BasicComponentTransferFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::BrightnessFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::BrightnessFilterOperation);
             filterValue->append(cssValuePool().createValue(brightnessOperation->amount(), CSSPrimitiveValue::CSS_NUMBER));
             break;
         }
         case FilterOperation::CONTRAST: {
             BasicComponentTransferFilterOperation* contrastOperation = static_cast<BasicComponentTransferFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::ContrastFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::ContrastFilterOperation);
             filterValue->append(cssValuePool().createValue(contrastOperation->amount(), CSSPrimitiveValue::CSS_NUMBER));
             break;
         }
         case FilterOperation::BLUR: {
             BlurFilterOperation* blurOperation = static_cast<BlurFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::BlurFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::BlurFilterOperation);
             filterValue->append(zoomAdjustedPixelValue(blurOperation->stdDeviation().value(), style));
             break;
         }
         case FilterOperation::DROP_SHADOW: {
             DropShadowFilterOperation* dropShadowOperation = static_cast<DropShadowFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::DropShadowFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::DropShadowFilterOperation);
             // We want our computed style to look like that of a text shadow (has neither spread nor inset style).
             ShadowData shadowData = ShadowData(dropShadowOperation->location(), dropShadowOperation->stdDeviation(), 0, Normal, dropShadowOperation->color());
             filterValue->append(valueForShadow(&shadowData, CSSPropertyTextShadow, style));
@@ -923,7 +922,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
             break;
         case FilterOperation::CUSTOM: {
             CustomFilterOperation* customOperation = static_cast<CustomFilterOperation*>(filterOperation);
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::CustomFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::CustomFilterOperation);
             
             // The output should be verbose, even if the values are the default ones.
             
@@ -939,7 +938,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
             const CustomFilterProgramMixSettings mixSettings = program->mixSettings();
             if (program->fragmentShader()) {
                 if (program->programType() == PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE) {
-                    RefPtr<WebKitCSSMixFunctionValue> mixFunction = WebKitCSSMixFunctionValue::create();
+                    RefPtr<CSSMixFunctionValue> mixFunction = CSSMixFunctionValue::create();
                     mixFunction->append(program->fragmentShader()->cssValue());
                     mixFunction->append(cssValuePool().createValue(mixSettings.blendMode));
                     mixFunction->append(cssValuePool().createValue(mixSettings.compositeOperator));
@@ -980,7 +979,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
             break;
         }
         default:
-            filterValue = WebKitCSSFilterValue::create(WebKitCSSFilterValue::UnknownFilterOperation);
+            filterValue = CSSFilterValue::create(CSSFilterValue::UnknownFilterOperation);
             break;
         }
         list->append(filterValue.release());
@@ -1223,11 +1222,11 @@ void CSSComputedStyleDeclaration::setCssText(const String&, ExceptionCode& ec)
     ec = NO_MODIFICATION_ALLOWED_ERR;
 }
 
-static int cssIdentifierForFontSizeKeyword(int keywordSize)
+static CSSValueID cssIdentifierForFontSizeKeyword(int keywordSize)
 {
     ASSERT_ARG(keywordSize, keywordSize);
     ASSERT_ARG(keywordSize, keywordSize <= 8);
-    return CSSValueXxSmall + keywordSize - 1;
+    return static_cast<CSSValueID>(CSSValueXxSmall + keywordSize - 1);
 }
 
 PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getFontSizeCSSValuePreferringKeyword() const
@@ -1283,7 +1282,7 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
     return getPropertyCSSValue(propertyID, UpdateLayout);
 }
 
-static int identifierForFamily(const AtomicString& family)
+static CSSValueID identifierForFamily(const AtomicString& family)
 {
     if (family == cursiveFamily)
         return CSSValueCursive;
@@ -1297,12 +1296,12 @@ static int identifierForFamily(const AtomicString& family)
         return CSSValueSansSerif;
     if (family == serifFamily)
         return CSSValueSerif;
-    return 0;
+    return CSSValueInvalid;
 }
 
 static PassRefPtr<CSSPrimitiveValue> valueForFamily(const AtomicString& family)
 {
-    if (int familyIdentifier = identifierForFamily(family))
+    if (CSSValueID familyIdentifier = identifierForFamily(family))
         return cssValuePool().createIdentifierValue(familyIdentifier);
     return cssValuePool().createValue(family.string(), CSSPrimitiveValue::CSS_STRING);
 }
@@ -1323,7 +1322,6 @@ static PassRefPtr<CSSValue> renderTextDecorationFlagsToCSSValue(int textDecorati
     return list;
 }
 
-#if ENABLE(CSS3_TEXT)
 static PassRefPtr<CSSValue> renderTextDecorationStyleFlagsToCSSValue(TextDecorationStyle textDecorationStyle)
 {
     switch (textDecorationStyle) {
@@ -1342,7 +1340,6 @@ static PassRefPtr<CSSValue> renderTextDecorationStyleFlagsToCSSValue(TextDecorat
     ASSERT_NOT_REACHED();
     return cssValuePool().createExplicitInitialValue();
 }
-#endif // CSS3_TEXT
 
 static PassRefPtr<CSSValue> fillRepeatToCSSValue(EFillRepeat xRepeat, EFillRepeat yRepeat)
 {
@@ -1919,29 +1916,31 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             }
             return list.release();
         }
-        case CSSPropertyWebkitGridAutoColumns:
+        case CSSPropertyGridAutoColumns:
             return valueForGridTrackSize(style->gridAutoColumns(), style.get(), m_node->document()->renderView());
-        case CSSPropertyWebkitGridAutoFlow:
+        case CSSPropertyGridAutoFlow:
             return cssValuePool().createValue(style->gridAutoFlow());
-        case CSSPropertyWebkitGridAutoRows:
+        case CSSPropertyGridAutoRows:
             return valueForGridTrackSize(style->gridAutoRows(), style.get(), m_node->document()->renderView());
-        case CSSPropertyWebkitGridColumns:
+        case CSSPropertyGridColumns:
             return valueForGridTrackList(style->gridColumns(), style->namedGridColumnLines(), style.get(), m_node->document()->renderView());
-        case CSSPropertyWebkitGridRows:
+        case CSSPropertyGridRows:
             return valueForGridTrackList(style->gridRows(), style->namedGridRowLines(), style.get(), m_node->document()->renderView());
 
-        case CSSPropertyWebkitGridStart:
+        case CSSPropertyGridStart:
             return valueForGridPosition(style->gridStart());
-        case CSSPropertyWebkitGridEnd:
+        case CSSPropertyGridEnd:
             return valueForGridPosition(style->gridEnd());
-        case CSSPropertyWebkitGridBefore:
+        case CSSPropertyGridBefore:
             return valueForGridPosition(style->gridBefore());
-        case CSSPropertyWebkitGridAfter:
+        case CSSPropertyGridAfter:
             return valueForGridPosition(style->gridAfter());
-        case CSSPropertyWebkitGridColumn:
-            return getCSSPropertyValuesForGridShorthand(webkitGridColumnShorthand());
-        case CSSPropertyWebkitGridRow:
-            return getCSSPropertyValuesForGridShorthand(webkitGridRowShorthand());
+        case CSSPropertyGridColumn:
+            return getCSSPropertyValuesForGridShorthand(gridColumnShorthand());
+        case CSSPropertyGridRow:
+            return getCSSPropertyValuesForGridShorthand(gridRowShorthand());
+        case CSSPropertyGridArea:
+            return getCSSPropertyValuesForGridShorthand(gridAreaShorthand());
 
         case CSSPropertyHeight:
             if (renderer) {
@@ -2132,14 +2131,13 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyTextAlign:
             return cssValuePool().createValue(style->textAlign());
         case CSSPropertyTextDecoration:
+        case CSSPropertyTextDecorationLine:
             return renderTextDecorationFlagsToCSSValue(style->textDecoration());
-#if ENABLE(CSS3_TEXT)
-        case CSSPropertyWebkitTextDecorationLine:
-            return renderTextDecorationFlagsToCSSValue(style->textDecoration());
-        case CSSPropertyWebkitTextDecorationStyle:
+        case CSSPropertyTextDecorationStyle:
             return renderTextDecorationStyleFlagsToCSSValue(style->textDecorationStyle());
-        case CSSPropertyWebkitTextDecorationColor:
+        case CSSPropertyTextDecorationColor:
             return currentColorOrValidColor(style.get(), style->textDecorationColor());
+#if ENABLE(CSS3_TEXT)
         case CSSPropertyWebkitTextAlignLast:
             return cssValuePool().createValue(style->textAlignLast());
         case CSSPropertyWebkitTextUnderlinePosition:
@@ -2536,8 +2534,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         }
         case CSSPropertyPointerEvents:
             return cssValuePool().createValue(style->pointerEvents());
-        case CSSPropertyWebkitColorCorrection:
-            return cssValuePool().createValue(style->colorSpace());
         case CSSPropertyWebkitLineGrid:
             if (style->lineGrid().isNull())
                 return cssValuePool().createIdentifierValue(CSSValueNone);
@@ -2589,14 +2585,24 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWebkitShapeInside:
             if (!style->shapeInside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
-            else if (style->shapeInside()->type() == ExclusionShapeValue::OUTSIDE)
+            if (style->shapeInside()->type() == ExclusionShapeValue::Outside)
                 return cssValuePool().createIdentifierValue(CSSValueOutsideShape);
-            ASSERT(style->shapeInside()->type() == ExclusionShapeValue::SHAPE);
+            if (style->shapeInside()->type() == ExclusionShapeValue::Image) {
+                if (style->shapeInside()->image())
+                    return style->shapeInside()->image()->cssValue();
+                return cssValuePool().createIdentifierValue(CSSValueNone);
+            }
+            ASSERT(style->shapeInside()->type() == ExclusionShapeValue::Shape);
             return valueForBasicShape(style->shapeInside()->shape());
         case CSSPropertyWebkitShapeOutside:
             if (!style->shapeOutside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
-            ASSERT(style->shapeOutside()->type() == ExclusionShapeValue::SHAPE);
+            if (style->shapeOutside()->type() == ExclusionShapeValue::Image) {
+                if (style->shapeOutside()->image())
+                    return style->shapeOutside()->image()->cssValue();
+                return cssValuePool().createIdentifierValue(CSSValueNone);
+            }
+            ASSERT(style->shapeOutside()->type() == ExclusionShapeValue::Shape);
             return valueForBasicShape(style->shapeOutside()->shape());
         case CSSPropertyWebkitWrapThrough:
             return cssValuePool().createValue(style->wrapThrough());
@@ -2835,9 +2841,9 @@ bool CSSComputedStyleDeclaration::cssPropertyMatches(CSSPropertyID propertyID, c
         m_node->document()->updateLayoutIgnorePendingStylesheets();
         RenderStyle* style = m_node->computedStyle(m_pseudoElementSpecifier);
         if (style && style->fontDescription().keywordSize()) {
-            int sizeValue = cssIdentifierForFontSizeKeyword(style->fontDescription().keywordSize());
+            CSSValueID sizeValue = cssIdentifierForFontSizeKeyword(style->fontDescription().keywordSize());
             const CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(propertyValue);
-            if (primitiveValue->isIdent() && primitiveValue->getIdent() == sizeValue)
+            if (primitiveValue->isValueID() && primitiveValue->getValueID() == sizeValue)
                 return true;
         }
     }

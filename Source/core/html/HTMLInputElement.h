@@ -94,10 +94,7 @@ public:
     bool isPasswordField() const;
     bool isCheckbox() const;
     bool isRangeControl() const;
-
-#if ENABLE(INPUT_TYPE_COLOR)
     bool isColorControl() const;
-#endif
 
     // FIXME: It's highly likely that any call site calling this function should instead
     // be using a different one. Many input elements behave like text fields, and in addition
@@ -260,10 +257,8 @@ public:
 
     void cacheSelectionInResponseToSetValue(int caretOffset) { cacheSelection(caretOffset, caretOffset, SelectionHasNoDirection); }
 
-#if ENABLE(INPUT_TYPE_COLOR)
     // For test purposes.
     void selectColorInColorChooser(const Color&);
-#endif
 
     String defaultToolTip() const;
 
@@ -315,6 +310,7 @@ private:
 
     virtual void willChangeForm() OVERRIDE;
     virtual void didChangeForm() OVERRIDE;
+    static void addToRadioButtonGroupCallback(Node*);
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
@@ -426,6 +422,22 @@ private:
     OwnPtr<HTMLImageLoader> m_imageLoader;
     OwnPtr<ListAttributeTargetObserver> m_listAttributeTargetObserver;
 };
+
+inline HTMLInputElement* toHTMLInputElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::inputTag));
+    return static_cast<HTMLInputElement*>(node);
+}
+
+inline const HTMLInputElement* toHTMLInputElement(const Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::inputTag));
+    return static_cast<const HTMLInputElement*>(node);
+}
+
+// This will catch anyone doing an unnecessary cast.
+void toHTMLElement(const HTMLElement*);
+
 
 } //namespace
 #endif

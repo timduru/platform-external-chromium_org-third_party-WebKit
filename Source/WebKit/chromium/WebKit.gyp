@@ -42,8 +42,7 @@
             'type': '<(component)',
             'variables': { 'enable_wexit_time_destructors': 1, },
             'dependencies': [
-                '../../Platform/Platform.gyp/Platform.gyp:webkit_platform',
-                '../../core/core.gyp/core.gyp:webcore',
+                '../../core/core.gyp:webcore',
                 '../../modules/modules.gyp:modules',
                 '<(DEPTH)/skia/skia.gyp:skia',
                 '<(DEPTH)/third_party/angle/src/build_angle.gyp:translator_glsl',
@@ -52,7 +51,6 @@
                 '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
             ],
             'export_dependent_settings': [
-                '../../Platform/Platform.gyp/Platform.gyp:webkit_platform',
                 '<(DEPTH)/skia/skia.gyp:skia',
                 '<(DEPTH)/third_party/icu/icu.gyp:icuuc',
                 '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
@@ -78,8 +76,6 @@
                 'public/WebAudioSourceProvider.h',
                 'public/WebAudioSourceProviderClient.h',
                 'public/WebAutofillClient.h',
-                'public/WebBatteryStatus.h',
-                'public/WebBatteryStatusClient.h',
                 'public/WebBindings.h',
                 'public/WebBlob.h',
                 'public/WebCache.h',
@@ -101,6 +97,8 @@
                 'public/WebDOMMessageEvent.h',
                 'public/WebDOMMouseEvent.h',
                 'public/WebDOMMutationEvent.h',
+                'public/WebDOMProgressEvent.h',
+                'public/WebDOMResourceProgressEvent.h',
                 'public/WebDataSource.h',
                 'public/WebDatabase.h',
                 'public/WebDatabaseObserver.h',
@@ -274,8 +272,6 @@
                 'src/AutofillPopupMenuClient.h',
                 'src/BackForwardClientImpl.cpp',
                 'src/BackForwardClientImpl.h',
-                'src/BatteryClientImpl.cpp',
-                'src/BatteryClientImpl.h',
                 'src/DateTimeChooserImpl.cpp',
                 'src/DateTimeChooserImpl.h',
                 'src/ChromeClientImpl.cpp',
@@ -312,8 +308,6 @@
                 'src/FindInPageCoordinates.h',
                 'src/FrameLoaderClientImpl.cpp',
                 'src/FrameLoaderClientImpl.h',
-                'src/FrameNetworkingContextImpl.cpp',
-                'src/FrameNetworkingContextImpl.h',
                 'src/GeolocationClientProxy.cpp',
                 'src/GeolocationClientProxy.h',
                 'src/GraphicsLayerFactoryChromium.cpp',
@@ -321,12 +315,8 @@
                 'src/gtk/WebInputEventFactory.cpp',
                 'src/WebHelperPluginImpl.cpp',
                 'src/WebHelperPluginImpl.h',
-                'src/IDBCallbacksProxy.cpp',
-                'src/IDBCallbacksProxy.h',
                 'src/IDBCursorBackendProxy.cpp',
                 'src/IDBCursorBackendProxy.h',
-                'src/IDBDatabaseCallbacksProxy.cpp',
-                'src/IDBDatabaseCallbacksProxy.h',
                 'src/IDBDatabaseBackendProxy.cpp',
                 'src/IDBDatabaseBackendProxy.h',
                 'src/IDBFactoryBackendProxy.cpp',
@@ -339,8 +329,6 @@
                 'src/InspectorFrontendClientImpl.h',
                 'src/LinkHighlight.cpp',
                 'src/LinkHighlight.h',
-                'src/NonCompositedContentHost.cpp',
-                'src/NonCompositedContentHost.h',
                 'src/PrerendererClientImpl.h',
                 'src/PrerendererClientImpl.cpp',
                 'src/android/WebInputEventFactory.cpp',
@@ -418,6 +406,8 @@
                 'src/WebDOMMessageEvent.cpp',
                 'src/WebDOMMouseEvent.cpp',
                 'src/WebDOMMutationEvent.cpp',
+                'src/WebDOMProgressEvent.cpp',
+                'src/WebDOMResourceProgressEvent.cpp',
                 'src/WebDatabase.cpp',
                 'src/WebDataSourceImpl.cpp',
                 'src/WebDataSourceImpl.h',
@@ -459,15 +449,9 @@
                 'src/WebIconLoadingCompletionImpl.h',
                 'src/WebIDBCallbacksImpl.cpp',
                 'src/WebIDBCallbacksImpl.h',
-                'src/WebIDBCursorImpl.cpp',
-                'src/WebIDBCursorImpl.h',
                 'src/WebIDBDatabaseCallbacksImpl.cpp',
                 'src/WebIDBDatabaseCallbacksImpl.h',
                 'src/WebIDBDatabaseError.cpp',
-                'src/WebIDBDatabaseImpl.cpp',
-                'src/WebIDBDatabaseImpl.h',
-                'src/WebIDBFactoryImpl.cpp',
-                'src/WebIDBFactoryImpl.h',
                 'src/WebIDBKey.cpp',
                 'src/WebIDBKeyPath.cpp',
                 'src/WebIDBKeyRange.cpp',
@@ -576,8 +560,8 @@
                         'WEBKIT_IMPLEMENTATION=1',
                     ],
                     'dependencies': [
-                        '../../core/core.gyp/core.gyp:webcore_derived',
-                        '../../core/core.gyp/core.gyp:webcore_test_support',
+                        '../../core/core.gyp:webcore_derived',
+                        '../../core/core.gyp:webcore_test_support',
                         '<(DEPTH)/base/base.gyp:test_support_base',
                         '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
                         '<(DEPTH)/testing/gtest.gyp:gtest',
@@ -614,14 +598,6 @@
                         'src/WebTestingSupport.cpp',
                         'public/WebTestingSupport.h',
                         'tests/WebUnitTests.cpp',   # Components test runner support.
-                    ],
-                    'sources!': [
-                        # We should not include files depending on webkit_support.
-                        # These tests depend on webkit_support and
-                        # functions defined only in !WEBKIT_IMPLEMENTATION.
-                        'tests/IDBBackingStoreTest.cpp',
-                        'tests/IDBCleanupOnIOErrorTest.cpp',
-                        'tests/LevelDBTest.cpp',
                     ],
                     'conditions': [
                         ['OS=="win" or OS=="mac"', {
@@ -700,6 +676,12 @@
                     'include_dirs': [
                         'public/mac',
                     ],
+                    'link_settings': {
+                        'libraries': [
+                            '$(SDKROOT)/System/Library/Frameworks/Accelerate.framework',
+                            '$(SDKROOT)/System/Library/Frameworks/OpenGL.framework',
+                        ],
+                    },
                 }, { # else: OS!="mac"
                     'sources/': [
                         ['exclude', '/mac/'],
@@ -716,18 +698,6 @@
                         'chromium_code': 1,
                     }
                 }],
-                ['"ENABLE_WEBGL=1" in feature_defines', {
-                    'conditions': [
-                        ['OS=="mac"', {
-                            'link_settings': {
-                                'libraries': [
-                                    '$(SDKROOT)/System/Library/Frameworks/Accelerate.framework',
-                                    '$(SDKROOT)/System/Library/Frameworks/OpenGL.framework',
-                                ],
-                            },
-                        }],
-                    ],
-                }],
                 ['use_default_render_theme==1', {
                     'include_dirs': [
                         'public/default',
@@ -741,7 +711,7 @@
             ],
             'direct_dependent_settings': {
                 'include_dirs': [
-                    '../../Platform/chromium/',
+                    '../../../',
                 ],
             },
             'target_conditions': [
@@ -762,12 +732,12 @@
                     'type': 'static_library',
                     'dependencies': [
                         '../../wtf/wtf.gyp:wtf',
-                        '../../core/core.gyp/core.gyp:webcore_test_support',
+                        '../../core/core.gyp:webcore_test_support',
                     ],
                     'include_dirs': [
                         'public',
                         '../../core/testing/v8', # for WebCoreTestSupport.h, needed to link in window.internals code.
-                        '../../Platform/chromium/',
+                        '../../../',
                     ],
                     'sources': [
                         'src/WebTestingSupport.cpp',

@@ -27,12 +27,13 @@
 
 #include "core/html/canvas/WebGLRenderingContext.h"
 
+#include "RuntimeEnabledFeatures.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/html/HTMLCanvasElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/ImageData.h"
-#include "core/html/canvas/EXTDrawBuffers.h"
+#include "core/html/canvas/EXTFragDepth.h"
 #include "core/html/canvas/EXTTextureFilterAnisotropic.h"
 #include "core/html/canvas/OESElementIndexUint.h"
 #include "core/html/canvas/OESStandardDerivatives.h"
@@ -52,6 +53,7 @@
 #include "core/html/canvas/WebGLDebugRendererInfo.h"
 #include "core/html/canvas/WebGLDebugShaders.h"
 #include "core/html/canvas/WebGLDepthTexture.h"
+#include "core/html/canvas/WebGLDrawBuffers.h"
 #include "core/html/canvas/WebGLFramebuffer.h"
 #include "core/html/canvas/WebGLLoseContext.h"
 #include "core/html/canvas/WebGLProgram.h"
@@ -286,7 +288,7 @@ namespace {
         }
 
     private:
-        bool hasMoreCharacters()
+        bool hasMoreCharacters() const
         {
             return (m_position < m_length);
         }
@@ -303,7 +305,7 @@ namespace {
 
         void process(UChar);
 
-        bool peek(UChar& character)
+        bool peek(UChar& character) const
         {
             if (m_position + 1 >= m_length)
                 return false;
@@ -322,7 +324,7 @@ namespace {
             ++m_position;
         }
 
-        bool isNewline(UChar character)
+        static bool isNewline(UChar character)
         {
             // Don't attempt to canonicalize newline related characters.
             return (character == '\n' || character == '\r');
@@ -569,6 +571,33 @@ WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, Pa
         setupFlags();
         initializeNewContext();
     }
+
+    // Register extensions.
+    static const char* unprefixed[] = { "", 0, };
+    static const char* webkitPrefix[] = { "WEBKIT_", 0, };
+    static const char* bothPrefixes[] = { "", "WEBKIT_", 0, };
+
+    registerExtension<EXTTextureFilterAnisotropic>(m_extTextureFilterAnisotropic, false, false, true, webkitPrefix);
+    registerExtension<OESElementIndexUint>(m_oesElementIndexUint, false, false, false, unprefixed);
+    registerExtension<OESStandardDerivatives>(m_oesStandardDerivatives, false, false, false, unprefixed);
+    registerExtension<OESTextureFloat>(m_oesTextureFloat, false, false, false, unprefixed);
+    registerExtension<OESTextureFloatLinear>(m_oesTextureFloatLinear, false, false, false, unprefixed);
+    registerExtension<OESTextureHalfFloat>(m_oesTextureHalfFloat, false, false, false, unprefixed);
+    registerExtension<OESTextureHalfFloatLinear>(m_oesTextureHalfFloatLinear, false, false, false, unprefixed);
+    registerExtension<OESVertexArrayObject>(m_oesVertexArrayObject, false, false, false, unprefixed);
+    registerExtension<WebGLCompressedTextureATC>(m_webglCompressedTextureATC, false, false, true, webkitPrefix);
+    registerExtension<WebGLCompressedTexturePVRTC>(m_webglCompressedTexturePVRTC, false, false, true, webkitPrefix);
+    registerExtension<WebGLCompressedTextureS3TC>(m_webglCompressedTextureS3TC, false, false, true, bothPrefixes);
+    registerExtension<WebGLDepthTexture>(m_webglDepthTexture, false, false, true, bothPrefixes);
+    registerExtension<WebGLLoseContext>(m_webglLoseContext, false, false, false, bothPrefixes);
+
+    // Register draft extensions.
+    registerExtension<EXTFragDepth>(m_extFragDepth, false, true, false, unprefixed);
+    registerExtension<WebGLDrawBuffers>(m_webglDrawBuffers, false, true, false, unprefixed);
+
+    // Register privileged extensions.
+    registerExtension<WebGLDebugRendererInfo>(m_webglDebugRendererInfo, true, false, false, unprefixed);
+    registerExtension<WebGLDebugShaders>(m_webglDebugShaders, true, false, false, unprefixed);
 }
 
 void WebGLRenderingContext::initializeNewContext()
@@ -1519,6 +1548,18 @@ PassRefPtr<WebGLRenderbuffer> WebGLRenderingContext::createRenderbuffer()
     return o;
 }
 
+WebGLRenderbuffer* WebGLRenderingContext::ensureEmulatedStencilBuffer(GC3Denum target, WebGLRenderbuffer* renderbuffer)
+{
+    if (isContextLost())
+        return 0;
+    if (!renderbuffer->emulatedStencilBuffer()) {
+        renderbuffer->setEmulatedStencilBuffer(createRenderbuffer());
+        m_context->bindRenderbuffer(target, objectOrZero(renderbuffer->emulatedStencilBuffer()));
+        m_context->bindRenderbuffer(target, objectOrZero(m_renderbufferBinding.get()));
+    }
+    return renderbuffer->emulatedStencilBuffer();
+}
+
 PassRefPtr<WebGLShader> WebGLRenderingContext::createShader(GC3Denum type, ExceptionCode& ec)
 {
     UNUSED_PARAM(ec);
@@ -1791,7 +1832,6 @@ void WebGLRenderingContext::drawElements(GC3Denum mode, GC3Dsizei count, GC3Denu
         return;
     }
 
-    unsigned numElements = 0;
     if (!validateRenderingState()) {
         synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "drawElements", "attribs not setup correctly");
         return;
@@ -1879,8 +1919,18 @@ void WebGLRenderingContext::framebufferRenderbuffer(GC3Denum target, GC3Denum at
     Platform3DObject bufferObject = objectOrZero(buffer);
     switch (attachment) {
     case GraphicsContext3D::DEPTH_STENCIL_ATTACHMENT:
-        m_context->framebufferRenderbuffer(target, GraphicsContext3D::DEPTH_ATTACHMENT, renderbuffertarget, bufferObject);
-        m_context->framebufferRenderbuffer(target, GraphicsContext3D::STENCIL_ATTACHMENT, renderbuffertarget, bufferObject);
+        if (isDepthStencilSupported() || !buffer) {
+            m_context->framebufferRenderbuffer(target, GraphicsContext3D::DEPTH_ATTACHMENT, renderbuffertarget, bufferObject);
+            m_context->framebufferRenderbuffer(target, GraphicsContext3D::STENCIL_ATTACHMENT, renderbuffertarget, bufferObject);
+        } else {
+            WebGLRenderbuffer* emulatedStencilBuffer = ensureEmulatedStencilBuffer(renderbuffertarget, buffer);
+            if (!emulatedStencilBuffer) {
+                synthesizeGLError(GraphicsContext3D::OUT_OF_MEMORY, "framebufferRenderbuffer", "out of memory");
+                return;
+            }
+            m_context->framebufferRenderbuffer(target, GraphicsContext3D::DEPTH_ATTACHMENT, renderbuffertarget, bufferObject);
+            m_context->framebufferRenderbuffer(target, GraphicsContext3D::STENCIL_ATTACHMENT, renderbuffertarget, objectOrZero(emulatedStencilBuffer));
+        }
         break;
     default:
         m_context->framebufferRenderbuffer(target, attachment, renderbuffertarget, bufferObject);
@@ -2081,10 +2131,11 @@ GC3Denum WebGLRenderingContext::getError()
     return m_context->getError();
 }
 
-bool WebGLRenderingContext::matchesNameWithPrefixes(const String& name, const String& baseName, const char** prefixes)
+bool WebGLRenderingContext::ExtensionTracker::matchesNameWithPrefixes(const String& name) const
 {
+    const char** prefixes = m_prefixes;
     for (; *prefixes; ++prefixes) {
-        String prefixedName = String(*prefixes) + baseName;
+        String prefixedName = String(*prefixes) + getExtensionName();
         if (equalIgnoringCase(prefixedName, name)) {
             return true;
         }
@@ -2097,44 +2148,17 @@ WebGLExtension* WebGLRenderingContext::getExtension(const String& name)
     if (isContextLost())
         return 0;
 
-    static const char* unprefixed[] = { "", NULL, };
-    static const char* webkitPrefix[] = { "WEBKIT_", NULL, };
-    static const char* bothPrefixes[] = { "", "WEBKIT_", NULL, };
-
-    WebGLExtension* extension = 0;
-    if (getExtensionIfMatch<EXTDrawBuffers>(name, m_extDrawBuffers, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<EXTTextureFilterAnisotropic>(name, m_extTextureFilterAnisotropic, webkitPrefix, extension))
-        return extension;
-    if (getExtensionIfMatch<OESElementIndexUint>(name, m_oesElementIndexUint, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<OESStandardDerivatives>(name, m_oesStandardDerivatives, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<OESTextureFloat>(name, m_oesTextureFloat, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<OESTextureFloatLinear>(name, m_oesTextureFloatLinear, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<OESTextureHalfFloat>(name, m_oesTextureHalfFloat, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<OESTextureHalfFloatLinear>(name, m_oesTextureHalfFloatLinear, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<OESVertexArrayObject>(name, m_oesVertexArrayObject, unprefixed, extension))
-        return extension;
-    if (getExtensionIfMatch<WebGLCompressedTextureATC>(name, m_webglCompressedTextureATC, webkitPrefix, extension))
-        return extension;
-    if (getExtensionIfMatch<WebGLCompressedTexturePVRTC>(name, m_webglCompressedTexturePVRTC, webkitPrefix, extension))
-        return extension;
-    if (getExtensionIfMatch<WebGLCompressedTextureS3TC>(name, m_webglCompressedTextureS3TC, bothPrefixes, extension))
-        return extension;
-    if (getExtensionIfMatch<WebGLDepthTexture>(name, m_webglDepthTexture, bothPrefixes, extension))
-        return extension;
-    if (getExtensionIfMatch<WebGLLoseContext>(name, m_webglLoseContext, bothPrefixes, extension))
-        return extension;
-    if (allowPrivilegedExtensions()) {
-        if (getExtensionIfMatch<WebGLDebugRendererInfo>(name, m_webglDebugRendererInfo, unprefixed, extension))
-            return extension;
-        if (getExtensionIfMatch<WebGLDebugShaders>(name, m_webglDebugShaders, unprefixed, extension))
-            return extension;
+    for (size_t i = 0; i < m_extensions.size(); ++i) {
+        ExtensionTracker* tracker = m_extensions[i];
+        if (tracker->matchesNameWithPrefixes(name)) {
+            if (tracker->getPrivileged() && !allowPrivilegedExtensions())
+                return 0;
+            if (tracker->getDraft() && !RuntimeEnabledFeatures::webGLDraftExtensionsEnabled())
+                return 0;
+            if (!tracker->supported(this))
+                return 0;
+            return tracker->getExtension(this);
+        }
     }
 
     return 0;
@@ -2405,17 +2429,17 @@ WebGLGetInfo WebGLRenderingContext::getParameter(GC3Denum pname, ExceptionCode& 
         synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getParameter", "invalid parameter name, EXT_texture_filter_anisotropic not enabled");
         return WebGLGetInfo();
     case Extensions3D::MAX_COLOR_ATTACHMENTS_EXT: // EXT_draw_buffers BEGIN
-        if (m_extDrawBuffers)
+        if (m_webglDrawBuffers)
             return WebGLGetInfo(getMaxColorAttachments());
-        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getParameter", "invalid parameter name, EXT_draw_buffers not enabled");
+        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getParameter", "invalid parameter name, WEBGL_draw_buffers not enabled");
         return WebGLGetInfo();
     case Extensions3D::MAX_DRAW_BUFFERS_EXT:
-        if (m_extDrawBuffers)
+        if (m_webglDrawBuffers)
             return WebGLGetInfo(getMaxDrawBuffers());
-        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getParameter", "invalid parameter name, EXT_draw_buffers not enabled");
+        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getParameter", "invalid parameter name, WEBGL_draw_buffers not enabled");
         return WebGLGetInfo();
     default:
-        if (m_extDrawBuffers
+        if (m_webglDrawBuffers
             && pname >= Extensions3D::DRAW_BUFFER0_EXT
             && pname < static_cast<GC3Denum>(Extensions3D::DRAW_BUFFER0_EXT + getMaxDrawBuffers())) {
             GC3Dint value = GraphicsContext3D::NONE;
@@ -2480,38 +2504,6 @@ WebGLGetInfo WebGLRenderingContext::getRenderbufferParameter(GC3Denum target, GC
         return WebGLGetInfo();
     }
 
-    if (m_renderbufferBinding->getInternalFormat() == GraphicsContext3D::DEPTH_STENCIL
-        && !m_renderbufferBinding->isValid()) {
-        ASSERT(!isDepthStencilSupported());
-        int value = 0;
-        switch (pname) {
-        case GraphicsContext3D::RENDERBUFFER_WIDTH:
-            value = m_renderbufferBinding->getWidth();
-            break;
-        case GraphicsContext3D::RENDERBUFFER_HEIGHT:
-            value = m_renderbufferBinding->getHeight();
-            break;
-        case GraphicsContext3D::RENDERBUFFER_RED_SIZE:
-        case GraphicsContext3D::RENDERBUFFER_GREEN_SIZE:
-        case GraphicsContext3D::RENDERBUFFER_BLUE_SIZE:
-        case GraphicsContext3D::RENDERBUFFER_ALPHA_SIZE:
-            value = 0;
-            break;
-        case GraphicsContext3D::RENDERBUFFER_DEPTH_SIZE:
-            value = 24;
-            break;
-        case GraphicsContext3D::RENDERBUFFER_STENCIL_SIZE:
-            value = 8;
-            break;
-        case GraphicsContext3D::RENDERBUFFER_INTERNAL_FORMAT:
-            return WebGLGetInfo(m_renderbufferBinding->getInternalFormat());
-        default:
-            synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getRenderbufferParameter", "invalid parameter name");
-            return WebGLGetInfo();
-        }
-        return WebGLGetInfo(value);
-    }
-
     GC3Dint value = 0;
     switch (pname) {
     case GraphicsContext3D::RENDERBUFFER_WIDTH:
@@ -2521,8 +2513,16 @@ WebGLGetInfo WebGLRenderingContext::getRenderbufferParameter(GC3Denum target, GC
     case GraphicsContext3D::RENDERBUFFER_BLUE_SIZE:
     case GraphicsContext3D::RENDERBUFFER_ALPHA_SIZE:
     case GraphicsContext3D::RENDERBUFFER_DEPTH_SIZE:
-    case GraphicsContext3D::RENDERBUFFER_STENCIL_SIZE:
         m_context->getRenderbufferParameteriv(target, pname, &value);
+        return WebGLGetInfo(value);
+    case GraphicsContext3D::RENDERBUFFER_STENCIL_SIZE:
+        if (m_renderbufferBinding->emulatedStencilBuffer()) {
+            m_context->bindRenderbuffer(target, objectOrZero(m_renderbufferBinding->emulatedStencilBuffer()));
+            m_context->getRenderbufferParameteriv(target, pname, &value);
+            m_context->bindRenderbuffer(target, objectOrZero(m_renderbufferBinding.get()));
+        } else {
+            m_context->getRenderbufferParameteriv(target, pname, &value);
+        }
         return WebGLGetInfo(value);
     case GraphicsContext3D::RENDERBUFFER_INTERNAL_FORMAT:
         return WebGLGetInfo(m_renderbufferBinding->getInternalFormat());
@@ -2611,24 +2611,14 @@ Vector<String> WebGLRenderingContext::getSupportedExtensions()
     if (isContextLost())
         return result;
 
-    appendIfSupported<EXTDrawBuffers>(result, false);
-    appendIfSupported<EXTTextureFilterAnisotropic>(result, true);
-    appendIfSupported<OESElementIndexUint>(result, false);
-    appendIfSupported<OESStandardDerivatives>(result, false);
-    appendIfSupported<OESTextureFloat>(result, false);
-    appendIfSupported<OESTextureFloatLinear>(result, false);
-    appendIfSupported<OESTextureHalfFloat>(result, false);
-    appendIfSupported<OESTextureHalfFloatLinear>(result, false);
-    appendIfSupported<OESVertexArrayObject>(result, false);
-    appendIfSupported<WebGLCompressedTextureATC>(result, true);
-    appendIfSupported<WebGLCompressedTexturePVRTC>(result, true);
-    appendIfSupported<WebGLCompressedTextureS3TC>(result, true);
-    appendIfSupported<WebGLDepthTexture>(result, true);
-    appendIfSupported<WebGLLoseContext>(result, false);
-
-    if (allowPrivilegedExtensions()) {
-        appendIfSupported<WebGLDebugShaders>(result, false);
-        appendIfSupported<WebGLDebugRendererInfo>(result, false);
+    for (size_t i = 0; i < m_extensions.size(); ++i) {
+        ExtensionTracker* tracker = m_extensions[i];
+        if (tracker->getPrivileged() && !allowPrivilegedExtensions())
+            continue;
+        if (tracker->getDraft() && !RuntimeEnabledFeatures::webGLDraftExtensionsEnabled())
+            continue;
+        if (tracker->supported(this))
+            result.append(String(tracker->getPrefixed()  ? "WEBKIT_" : "") + tracker->getExtensionName());
     }
 
     return result;
@@ -3145,15 +3135,26 @@ void WebGLRenderingContext::renderbufferStorage(GC3Denum target, GC3Denum intern
     case GraphicsContext3D::STENCIL_INDEX8:
         m_context->renderbufferStorage(target, internalformat, width, height);
         m_renderbufferBinding->setInternalFormat(internalformat);
-        m_renderbufferBinding->setIsValid(true);
         m_renderbufferBinding->setSize(width, height);
+        m_renderbufferBinding->deleteEmulatedStencilBuffer(m_context.get());
         break;
     case GraphicsContext3D::DEPTH_STENCIL:
         if (isDepthStencilSupported()) {
             m_context->renderbufferStorage(target, Extensions3D::DEPTH24_STENCIL8, width, height);
+        } else {
+            WebGLRenderbuffer* emulatedStencilBuffer = ensureEmulatedStencilBuffer(target, m_renderbufferBinding.get());
+            if (!emulatedStencilBuffer) {
+                synthesizeGLError(GraphicsContext3D::OUT_OF_MEMORY, "renderbufferStorage", "out of memory");
+                return;
+            }
+            m_context->renderbufferStorage(target, GraphicsContext3D::DEPTH_COMPONENT16, width, height);
+            m_context->bindRenderbuffer(target, objectOrZero(emulatedStencilBuffer));
+            m_context->renderbufferStorage(target, GraphicsContext3D::STENCIL_INDEX8, width, height);
+            m_context->bindRenderbuffer(target, objectOrZero(m_renderbufferBinding.get()));
+            emulatedStencilBuffer->setSize(width, height);
+            emulatedStencilBuffer->setInternalFormat(GraphicsContext3D::STENCIL_INDEX8);
         }
         m_renderbufferBinding->setSize(width, height);
-        m_renderbufferBinding->setIsValid(isDepthStencilSupported());
         m_renderbufferBinding->setInternalFormat(internalformat);
         break;
     default:
@@ -4991,7 +4992,7 @@ bool WebGLRenderingContext::validateFramebufferFuncParameters(const char* functi
     case GraphicsContext3D::DEPTH_STENCIL_ATTACHMENT:
         break;
     default:
-        if (m_extDrawBuffers
+        if (m_webglDrawBuffers
             && attachment > GraphicsContext3D::COLOR_ATTACHMENT0
             && attachment < static_cast<GC3Denum>(GraphicsContext3D::COLOR_ATTACHMENT0 + getMaxColorAttachments()))
             break;
@@ -5443,7 +5444,7 @@ IntSize WebGLRenderingContext::clampedCanvasSize()
 
 GC3Dint WebGLRenderingContext::getMaxDrawBuffers()
 {
-    if (isContextLost() || !m_extDrawBuffers)
+    if (isContextLost() || !m_webglDrawBuffers)
         return 0;
     if (!m_maxDrawBuffers)
         m_context->getIntegerv(Extensions3D::MAX_DRAW_BUFFERS_EXT, &m_maxDrawBuffers);
@@ -5455,7 +5456,7 @@ GC3Dint WebGLRenderingContext::getMaxDrawBuffers()
 
 GC3Dint WebGLRenderingContext::getMaxColorAttachments()
 {
-    if (isContextLost() || !m_extDrawBuffers)
+    if (isContextLost() || !m_webglDrawBuffers)
         return 0;
     if (!m_maxColorAttachments)
         m_context->getIntegerv(Extensions3D::MAX_COLOR_ATTACHMENTS_EXT, &m_maxColorAttachments);

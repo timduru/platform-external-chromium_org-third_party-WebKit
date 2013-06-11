@@ -50,9 +50,10 @@ typedef pair<NodeCallback, RefPtr<Node> > CallbackInfo;
 typedef Vector<CallbackInfo> NodeCallbackQueue;
 
 static NodeCallbackQueue* s_postAttachCallbackQueue;
+static NodeCallbackQueue* s_insertionCallbackQueue;
 
+static size_t s_insertionDepth;
 static size_t s_attachDepth;
-static bool s_shouldReEnableMemoryCacheCallsAfterAttach;
 
 ChildNodesLazySnapshot* ChildNodesLazySnapshot::latestSnapshot = 0;
 
@@ -670,17 +671,6 @@ void ContainerNode::parserAppendChild(PassRefPtr<Node> newChild)
 
 void ContainerNode::suspendPostAttachCallbacks()
 {
-    if (!s_attachDepth) {
-        ASSERT(!s_shouldReEnableMemoryCacheCallsAfterAttach);
-        if (Page* page = document()->page()) {
-            // FIXME: How can this call be specific to one Page, while the
-            // s_attachDepth is a global? Doesn't make sense.
-            if (page->areMemoryCacheClientCallsEnabled()) {
-                page->setMemoryCacheClientCallsEnabled(false);
-                s_shouldReEnableMemoryCacheCallsAfterAttach = true;
-            }
-        }
-    }
     ++s_attachDepth;
 }
 
@@ -691,13 +681,31 @@ void ContainerNode::resumePostAttachCallbacks()
 
         if (s_postAttachCallbackQueue)
             dispatchPostAttachCallbacks();
-        if (s_shouldReEnableMemoryCacheCallsAfterAttach) {
-            s_shouldReEnableMemoryCacheCallsAfterAttach = false;
-            if (Page* page = document()->page())
-                page->setMemoryCacheClientCallsEnabled(true);
-        }
     }
     --s_attachDepth;
+}
+
+void ContainerNode::suspendInsertionCallbacks()
+{
+    ++s_insertionDepth;
+}
+
+void ContainerNode::resumeInsertionCallbacks()
+{
+    if (s_insertionDepth == 1 && s_insertionCallbackQueue)
+        dispatchInsertionCallbacks();
+    --s_insertionDepth;
+}
+
+void ContainerNode::queueInsertionCallback(NodeCallback callback, Node* node)
+{
+    if (!s_insertionDepth) {
+        (*callback)(node);
+        return;
+    }
+    if (!s_insertionCallbackQueue)
+        s_insertionCallbackQueue = new NodeCallbackQueue;
+    s_insertionCallbackQueue->append(CallbackInfo(callback, node));
 }
 
 void ContainerNode::queuePostAttachCallback(NodeCallback callback, Node* node)
@@ -899,6 +907,15 @@ static void dispatchChildRemovalEvents(Node* child)
         for (; c; c = NodeTraversal::next(c.get(), child))
             c->dispatchScopedEvent(MutationEvent::create(eventNames().DOMNodeRemovedFromDocumentEvent, false));
     }
+}
+
+void ContainerNode::dispatchInsertionCallbacks()
+{
+    for (size_t i = s_insertionCallbackQueue->size(); i; --i) {
+        const CallbackInfo& info = (*s_insertionCallbackQueue)[i - 1];
+        info.first(info.second.get());
+    }
+    s_insertionCallbackQueue->clear();
 }
 
 static void updateTreeAfterInsertion(ContainerNode* parent, Node* child, AttachBehavior attachBehavior)

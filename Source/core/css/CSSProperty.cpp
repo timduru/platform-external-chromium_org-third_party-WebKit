@@ -303,6 +303,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyTextAlign:
     case CSSPropertyTextAnchor:
     case CSSPropertyTextDecoration:
+    case CSSPropertyTextDecorationLine:
     case CSSPropertyTextIndent:
     case CSSPropertyTextRendering:
     case CSSPropertyTextShadow:
@@ -313,7 +314,6 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitBorderHorizontalSpacing:
     case CSSPropertyWebkitBorderVerticalSpacing:
     case CSSPropertyWebkitBoxDirection:
-    case CSSPropertyWebkitColorCorrection:
     case CSSPropertyWebkitFontFeatureSettings:
     case CSSPropertyWebkitFontKerning:
     case CSSPropertyWebkitFontSmoothing:
@@ -339,7 +339,6 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitTapHighlightColor:
     case CSSPropertyWebkitTextCombine:
 #if ENABLE(CSS3_TEXT)
-    case CSSPropertyWebkitTextDecorationLine:
     case CSSPropertyWebkitTextAlignLast:
     case CSSPropertyWebkitTextUnderlinePosition:
 #endif // CSS3_TEXT
@@ -471,6 +470,8 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyStopColor:
     case CSSPropertyStopOpacity:
     case CSSPropertyTableLayout:
+    case CSSPropertyTextDecorationStyle:
+    case CSSPropertyTextDecorationColor:
     case CSSPropertyTextLineThroughColor:
     case CSSPropertyTextLineThroughMode:
     case CSSPropertyTextLineThroughStyle:
@@ -566,17 +567,18 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitFlexShrink:
     case CSSPropertyWebkitFlexWrap:
     case CSSPropertyWebkitFontSizeDelta:
-    case CSSPropertyWebkitGridAfter:
-    case CSSPropertyWebkitGridAutoColumns:
-    case CSSPropertyWebkitGridAutoFlow:
-    case CSSPropertyWebkitGridAutoRows:
-    case CSSPropertyWebkitGridBefore:
-    case CSSPropertyWebkitGridColumn:
-    case CSSPropertyWebkitGridColumns:
-    case CSSPropertyWebkitGridEnd:
-    case CSSPropertyWebkitGridRow:
-    case CSSPropertyWebkitGridRows:
-    case CSSPropertyWebkitGridStart:
+    case CSSPropertyGridAfter:
+    case CSSPropertyGridAutoColumns:
+    case CSSPropertyGridAutoFlow:
+    case CSSPropertyGridAutoRows:
+    case CSSPropertyGridBefore:
+    case CSSPropertyGridColumn:
+    case CSSPropertyGridColumns:
+    case CSSPropertyGridEnd:
+    case CSSPropertyGridRow:
+    case CSSPropertyGridRows:
+    case CSSPropertyGridStart:
+    case CSSPropertyGridArea:
     case CSSPropertyWebkitJustifyContent:
     case CSSPropertyWebkitLineClamp:
     case CSSPropertyWebkitLogicalHeight:
@@ -627,10 +629,6 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitPerspectiveOrigin:
     case CSSPropertyWebkitPerspectiveOriginX:
     case CSSPropertyWebkitPerspectiveOriginY:
-#if ENABLE(CSS3_TEXT)
-    case CSSPropertyWebkitTextDecorationStyle:
-    case CSSPropertyWebkitTextDecorationColor:
-#endif // CSS3_TEXT
     case CSSPropertyWebkitTransform:
     case CSSPropertyWebkitTransformOrigin:
     case CSSPropertyWebkitTransformOriginX:

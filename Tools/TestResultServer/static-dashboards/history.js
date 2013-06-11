@@ -36,14 +36,17 @@ history.DEFAULT_CROSS_DASHBOARD_STATE_VALUES = {
     showAllRuns: false,
     testType: 'layout-tests',
     useTestData: false,
-}    
+}
 
 history.validateParameter = function(state, key, value, validateFn)
 {
-    if (validateFn())
+    if (validateFn()) {
         state[key] = value;
-    else
+        return true;
+    } else {
         console.log(key + ' value is not valid: ' + value);
+        return false;
+    }
 }
 
 history.isTreeMap = function()
@@ -71,12 +74,26 @@ history.queryHashAsMap = function()
     // FIXME: remove support for mapping from the master parameter to the group
     // one once the waterfall starts to pass in the builder name instead.
     if (paramsMap.master) {
-        paramsMap.group = LEGACY_BUILDER_MASTERS_TO_GROUPS[paramsMap.master];
-        if (!paramsMap.group)
-            console.log('ERROR: Unknown master name: ' + paramsMap.master);
-        window.location.hash = window.location.hash.replace('master=' + paramsMap.master, 'group=' + paramsMap.group);
-        delete paramsMap.master;
+        var errors = new ui.Errors();
+        if (paramsMap.master == 'TryServer')
+            errors.addError('ERROR: You got here from the trybot waterfall. The try bots do not record data in the flakiness dashboard. Showing results for the regular waterfall.');
+        else if (!builders.masters[paramsMap.master])
+            errors.addError('ERROR: Unknown master name: ' + paramsMap.master);
+
+        if (errors.hasErrors()) {
+            errors.show();
+            window.location.hash = window.location.hash.replace('master=' + paramsMap.master, '');
+        } else {
+            paramsMap.group = builders.masters[paramsMap.master].groups[0];
+            window.location.hash = window.location.hash.replace('master=' + paramsMap.master, 'group=' + encodeURIComponent(paramsMap.group));
+            delete paramsMap.master;
+        }
     }
+
+    // FIXME: Find a better way to do this. For layout-tests, we want the default group to be
+    // the ToT blink group. For other test types, we want it to be the Deps group.
+    if (!paramsMap.group && (!paramsMap.testType || paramsMap.testType == 'layout-tests'))
+        paramsMap.group = builders.groupNamesForTestType('layout-tests')[1];
 
     return paramsMap;
 }
@@ -120,7 +137,7 @@ history.History = function(configuration)
     }
 }
 
-var RELOAD_REQUIRING_PARAMETERS = ['showAllRuns', 'group', 'testType'];
+history.reloadRequiringParameters = ['showAllRuns', 'group', 'testType'];
 
 var CROSS_DB_INVALIDATING_PARAMETERS = {
     'testType': 'group'
@@ -163,11 +180,11 @@ history.History.prototype = {
         var oldDashboardSpecificState = this.dashboardSpecificState;
 
         this.parseCrossDashboardParameters();
-        
+
         // Some parameters require loading different JSON files when the value changes. Do a reload.
         if (Object.keys(oldCrossDashboardState).length) {
             for (var key in this.crossDashboardState) {
-                if (oldCrossDashboardState[key] != this.crossDashboardState[key] && RELOAD_REQUIRING_PARAMETERS.indexOf(key) != -1) {
+                if (oldCrossDashboardState[key] != this.crossDashboardState[key] && history.reloadRequiringParameters.indexOf(key) != -1) {
                     window.location.reload();
                     return false;
                 }
@@ -210,16 +227,13 @@ history.History.prototype = {
         switch(key) {
         case 'testType':
             history.validateParameter(this.crossDashboardState, key, value,
-                function() { return TEST_TYPES.indexOf(value) != -1; });
+                function() { return builders.testTypes.indexOf(value) != -1; });
             return true;
 
         case 'group':
             history.validateParameter(this.crossDashboardState, key, value,
                 function() {
-                  return value in LAYOUT_TESTS_BUILDER_GROUPS ||
-                      value in CHROMIUM_GPU_TESTS_BUILDER_GROUPS ||
-                      value in CHROMIUM_INSTRUMENTATION_TESTS_BUILDER_GROUPS ||
-                      value in CHROMIUM_GTESTS_BUILDER_GROUPS;
+                    return builders.getAllGroupNames().indexOf(value) != -1;
                 });
             return true;
 
@@ -235,7 +249,7 @@ history.History.prototype = {
     queryParameterValue: function(parameter)
     {
         return this.dashboardSpecificState[parameter] || this.crossDashboardState[parameter];
-    }, 
+    },
     // Sets the page state. Takes varargs of key, value pairs.
     setQueryParameter: function(var_args)
     {
@@ -280,7 +294,7 @@ history.History.prototype = {
                 state.push(key + '=' + encodeURIComponent(value));
         }
         return state.join('&');
-    }, 
+    },
     _permaLinkURLHash: function(opt_state)
     {
         var state = opt_state || this._combinedDashboardState();
@@ -291,7 +305,7 @@ history.History.prototype = {
         var combinedState = Object.create(this.dashboardSpecificState);
         for (var key in this.crossDashboardState)
             combinedState[key] = this.crossDashboardState[key];
-        return combinedState;    
+        return combinedState;
     },
     _defaultValue: function(key)
     {

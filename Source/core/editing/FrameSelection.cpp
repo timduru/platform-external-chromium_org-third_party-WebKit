@@ -33,13 +33,10 @@
 #include "core/dom/CharacterData.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
-#include "core/dom/ExceptionCode.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Range.h"
-#include "core/editing/DeleteSelectionCommand.h"
 #include "core/editing/Editor.h"
 #include "core/editing/RenderedPosition.h"
-#include "core/editing/TextIterator.h"
 #include "core/editing/TypingCommand.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
@@ -63,7 +60,6 @@
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderText.h"
-#include "core/rendering/RenderTextControl.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
@@ -1462,14 +1458,17 @@ void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoi
         return;
 
     Color caretColor = Color::black;
-    ColorSpace colorSpace = ColorSpaceDeviceRGB;
-    Element* element = node->rootEditableElement();
-    if (element && element->renderer()) {
-        caretColor = element->renderer()->style()->visitedDependentColor(CSSPropertyColor);
-        colorSpace = element->renderer()->style()->colorSpace();
-    }
 
-    context->fillRect(caret, caretColor, colorSpace);
+    Element* element;
+    if (node->isElementNode())
+        element = toElement(node);
+    else
+        element = node->parentElement();
+
+    if (element && element->renderer())
+        caretColor = element->renderer()->style()->visitedDependentColor(CSSPropertyColor);
+
+    context->fillRect(caret, caretColor);
 }
 
 void FrameSelection::debugRenderer(RenderObject *r, bool selected) const
@@ -1685,7 +1684,7 @@ bool FrameSelection::setSelectedRange(Range* range, EAffinity affinity, bool clo
 bool FrameSelection::isInPasswordField() const
 {
     HTMLTextFormControlElement* textControl = enclosingTextFormControl(start());
-    return textControl && textControl->hasTagName(inputTag) && static_cast<HTMLInputElement*>(textControl)->isPasswordField();
+    return textControl && textControl->hasTagName(inputTag) && toHTMLInputElement(textControl)->isPasswordField();
 }
 
 void FrameSelection::focusedOrActiveStateChanged()

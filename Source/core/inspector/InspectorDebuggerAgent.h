@@ -54,6 +54,8 @@ class InspectorObject;
 class InspectorState;
 class InspectorValue;
 class InstrumentingAgents;
+class ScriptArguments;
+class ScriptCallStack;
 class ScriptDebugServer;
 class ScriptValue;
 
@@ -62,6 +64,11 @@ typedef String ErrorString;
 class InspectorDebuggerAgent : public InspectorBaseAgent<InspectorDebuggerAgent>, public ScriptDebugListener, public InspectorBackendDispatcher::DebuggerCommandHandler {
     WTF_MAKE_NONCOPYABLE(InspectorDebuggerAgent); WTF_MAKE_FAST_ALLOCATED;
 public:
+    enum BreakpointSource {
+        UserBreakpointSource,
+        DebugCommandBreakpointSource
+    };
+
     static const char* backtraceObjectGroup;
 
     virtual ~InspectorDebuggerAgent();
@@ -74,7 +81,8 @@ public:
 
     bool isPaused();
     bool runningNestedMessageLoop();
-    void addMessageToConsole(MessageSource, MessageType);
+    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String&, PassRefPtr<ScriptCallStack>, unsigned long);
+    void addMessageToConsole(MessageSource, MessageType, MessageLevel, const String&, ScriptState*, PassRefPtr<ScriptArguments>, unsigned long);
 
     // Part of the protocol.
     virtual void enable(ErrorString*);
@@ -132,6 +140,9 @@ public:
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
+    void setBreakpoint(const String& scriptId, int lineNumber, int columnNumber, BreakpointSource);
+    void removeBreakpoint(const String& scriptId, int lineNumber, int columnNumber, BreakpointSource);
+
 protected:
     InspectorDebuggerAgent(InstrumentingAgents*, InspectorCompositeState*, InjectedScriptManager*);
 
@@ -141,15 +152,17 @@ protected:
     virtual void unmuteConsole() = 0;
     InjectedScriptManager* injectedScriptManager() { return m_injectedScriptManager; }
     virtual InjectedScript injectedScriptForEval(ErrorString*, const int* executionContextId) = 0;
+    virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL) = 0;
 
     virtual void enable();
     virtual void disable();
-    virtual void didPause(ScriptState*, const ScriptValue& callFrames, const ScriptValue& exception);
+    virtual void didPause(ScriptState*, const ScriptValue& callFrames, const ScriptValue& exception, const Vector<String>& hitBreakpoints);
     virtual void didContinue();
     void reset();
 
 private:
     void cancelPauseOnNextStatement();
+    void addMessageToConsole(MessageSource, MessageType);
 
     bool enabled();
 
@@ -160,7 +173,8 @@ private:
 
     void setPauseOnExceptionsImpl(ErrorString*, int);
 
-    PassRefPtr<TypeBuilder::Debugger::Location> resolveBreakpoint(const String& breakpointId, const String& scriptId, const ScriptBreakpoint&);
+    PassRefPtr<TypeBuilder::Debugger::Location> resolveBreakpoint(const String& breakpointId, const String& scriptId, const ScriptBreakpoint&, BreakpointSource);
+    void removeBreakpoint(const String& breakpointId);
     void clear();
     bool assertPaused(ErrorString*);
     void clearBreakDetails();
@@ -169,6 +183,7 @@ private:
 
     typedef HashMap<String, Script> ScriptsMap;
     typedef HashMap<String, Vector<String> > BreakpointIdToDebugServerBreakpointIdsMap;
+    typedef HashMap<String, std::pair<String, BreakpointSource> > DebugServerBreakpointToBreakpointIdAndSourceMap;
 
     InjectedScriptManager* m_injectedScriptManager;
     InspectorFrontend::Debugger* m_frontend;
@@ -176,6 +191,7 @@ private:
     ScriptValue m_currentCallStack;
     ScriptsMap m_scripts;
     BreakpointIdToDebugServerBreakpointIdsMap m_breakpointIdToDebugServerBreakpointIds;
+    DebugServerBreakpointToBreakpointIdAndSourceMap m_serverBreakpoints;
     String m_continueToLocationBreakpointId;
     InspectorFrontend::Debugger::Reason::Enum m_breakReason;
     RefPtr<InspectorObject> m_breakAuxData;

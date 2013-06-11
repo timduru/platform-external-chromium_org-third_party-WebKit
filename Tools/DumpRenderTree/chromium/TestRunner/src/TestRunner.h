@@ -41,7 +41,7 @@
 #include "WebTextDirection.h"
 #include <deque>
 #include <memory>
-#include <public/WebURL.h>
+#include "public/platform/WebURL.h"
 #include <set>
 #include <string>
 
@@ -495,13 +495,7 @@ private:
     ///////////////////////////////////////////////////////////////////////////
     // Internal helpers
     void checkResponseMimeType();
-    void completeNotifyDone(bool isTimeout);
-    class NotifyDoneTimedOutTask: public WebMethodTask<TestRunner> {
-    public:
-        NotifyDoneTimedOutTask(TestRunner* object): WebMethodTask<TestRunner>(object) { }
-        virtual void runIfValid() { m_object->completeNotifyDone(true); }
-    };
-
+    void completeNotifyDone();
     class HostMethodTask : public WebMethodTask<TestRunner> {
     public:
         typedef void (TestRunner::*CallbackMethodType)();

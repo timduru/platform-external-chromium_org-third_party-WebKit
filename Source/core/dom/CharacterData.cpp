@@ -41,6 +41,11 @@ using namespace std;
 
 namespace WebCore {
 
+void CharacterData::atomize()
+{
+    m_data = AtomicString(m_data);
+}
+
 void CharacterData::setData(const String& data, ExceptionCode&)
 {
     const String& nonNullData = !data.isNull() ? data : emptyString();
@@ -207,21 +212,27 @@ void CharacterData::setDataAndUpdate(const String& newData, unsigned offsetOfRep
         document()->frame()->selection()->textWasReplaced(this, offsetOfReplacedData, oldLength, newLength);
 
     document()->incDOMTreeVersion();
-    dispatchModifiedEvent(oldData);
+    didModifyData(oldData);
+}
+
+void CharacterData::didModifyData(const String& oldData)
+{
+    if (OwnPtr<MutationObserverInterestGroup> mutationRecipients = MutationObserverInterestGroup::createForCharacterDataMutation(this))
+        mutationRecipients->enqueueMutationRecord(MutationRecord::createCharacterData(this, oldData));
+
+    if (parentNode())
+        parentNode()->childrenChanged();
+
+    if (!isInShadowTree())
+        dispatchModifiedEvent(oldData);
+    InspectorInstrumentation::characterDataModified(document(), this);
 }
 
 void CharacterData::dispatchModifiedEvent(const String& oldData)
 {
-    if (OwnPtr<MutationObserverInterestGroup> mutationRecipients = MutationObserverInterestGroup::createForCharacterDataMutation(this))
-        mutationRecipients->enqueueMutationRecord(MutationRecord::createCharacterData(this, oldData));
-    if (!isInShadowTree()) {
-        if (parentNode())
-            parentNode()->childrenChanged();
-        if (document()->hasListenerType(Document::DOMCHARACTERDATAMODIFIED_LISTENER))
-            dispatchScopedEvent(MutationEvent::create(eventNames().DOMCharacterDataModifiedEvent, true, 0, oldData, m_data));
-        dispatchSubtreeModifiedEvent();
-    }
-    InspectorInstrumentation::characterDataModified(document(), this);
+    if (document()->hasListenerType(Document::DOMCHARACTERDATAMODIFIED_LISTENER))
+        dispatchScopedEvent(MutationEvent::create(eventNames().DOMCharacterDataModifiedEvent, true, 0, oldData, m_data));
+    dispatchSubtreeModifiedEvent();
 }
 
 void CharacterData::checkCharDataOperation(unsigned offset, ExceptionCode& ec)

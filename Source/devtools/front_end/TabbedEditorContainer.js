@@ -112,6 +112,14 @@ WebInspector.TabbedEditorContainer.prototype = {
         this._innerShowFile(uiSourceCode, true);
     },
 
+    /**
+     * @return {Array.<string>}
+     */
+    historyUris: function()
+    {
+        return this._history._urls();
+    },
+
     _addScrollAndSelectionListeners: function()
     {
         if (!this._currentView)
@@ -420,6 +428,7 @@ WebInspector.TabbedEditorContainer.prototype = {
     {
         var uiSourceCode = /** @type {WebInspector.UISourceCode} */ (event.target);
         this._updateFileTitle(uiSourceCode);
+        this._updateHistory();
     },
 
     _uiSourceCodeWorkingCopyChanged: function(event)
@@ -650,6 +659,18 @@ WebInspector.TabbedEditorContainer.History.prototype = {
                 break;
         }
         return serializedHistory;
+    },
+
+
+    /**
+     * @return {Array.<string>}
+     */
+    _urls: function()
+    {
+        var result = [];
+        for (var i = 0; i < this._items.length; ++i)
+            result.push(this._items[i].url);
+        return result;
     },
 
     __proto__: WebInspector.Object.prototype

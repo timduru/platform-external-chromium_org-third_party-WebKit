@@ -35,7 +35,6 @@
 #include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/BeforeTextInsertedEvent.h"
 #include "core/dom/Document.h"
 #include "core/dom/EventNames.h"
@@ -51,6 +50,7 @@
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/fileapi/FileList.h"
+#include "core/html/ColorInputType.h"
 #include "core/html/FileInputType.h"
 #include "core/html/FormController.h"
 #include "core/html/HTMLCollection.h"
@@ -73,10 +73,6 @@
 #include "core/rendering/RenderTheme.h"
 #include <wtf/MathExtras.h>
 #include <wtf/StdLibExtras.h>
-
-#if ENABLE(INPUT_TYPE_COLOR)
-#include "core/html/ColorInputType.h"
-#endif
 
 using namespace std;
 
@@ -776,8 +772,8 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
             // This renderer and its children have quite different layouts and styles depending on
             // whether the speech button is visible or not. So we reset the whole thing and recreate
             // to get the right styles and layout.
-            detach();
             m_inputType->destroyShadowSubtree();
+            detach();
             m_inputType->createShadowSubtree();
             if (!attached())
                 attach();
@@ -1479,11 +1475,18 @@ void HTMLInputElement::didChangeForm()
     addToRadioButtonGroup();
 }
 
+void HTMLInputElement::addToRadioButtonGroupCallback(Node* node)
+{
+    ASSERT(node && node->toInputElement());
+    HTMLInputElement* inputElement = node->toInputElement();
+    inputElement->addToRadioButtonGroup();
+}
+
 Node::InsertionNotificationRequest HTMLInputElement::insertedInto(ContainerNode* insertionPoint)
 {
     HTMLTextFormControlElement::insertedInto(insertionPoint);
-    if (insertionPoint->inDocument() && !form())
-        addToRadioButtonGroup();
+    if (insertionPoint->inDocument() && !form() && checkedRadioButtons())
+        queueInsertionCallback(addToRadioButtonGroupCallback, this);
     resetListAttributeTargetObserver();
     return InsertionDone;
 }
@@ -1535,14 +1538,12 @@ void HTMLInputElement::requiredAttributeChanged()
     m_inputType->requiredAttributeChanged();
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
 void HTMLInputElement::selectColorInColorChooser(const Color& color)
 {
     if (!m_inputType->isColorControl())
         return;
     static_cast<ColorInputType*>(m_inputType.get())->didChooseColor(color);
 }
-#endif
 
 HTMLElement* HTMLInputElement::list() const
 {
@@ -1629,12 +1630,10 @@ bool HTMLInputElement::isRangeControl() const
     return m_inputType->isRangeControl();
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
 bool HTMLInputElement::isColorControl() const
 {
     return m_inputType->isColorControl();
 }
-#endif
 
 bool HTMLInputElement::isText() const
 {
@@ -1933,7 +1932,7 @@ void HTMLInputElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) con
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 PassRefPtr<RenderStyle> HTMLInputElement::customStyleForRenderer()
 {
-    return m_inputType->customStyleForRenderer(document()->styleResolver()->styleForElement(this));
+    return m_inputType->customStyleForRenderer(originalStyleForRenderer());
 }
 #endif
 

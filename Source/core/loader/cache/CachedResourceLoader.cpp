@@ -41,6 +41,7 @@
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/PingLoader.h"
+#include "core/loader/UniqueIdentifier.h"
 #include "core/loader/cache/CachedCSSStyleSheet.h"
 #include "core/loader/cache/CachedDocument.h"
 #include "core/loader/cache/CachedFont.h"
@@ -96,6 +97,39 @@ static CachedResource* createResource(CachedResource::Type type, ResourceRequest
     }
     ASSERT_NOT_REACHED();
     return 0;
+}
+
+static ResourceLoadPriority loadPriority(CachedResource::Type type, const CachedResourceRequest& request)
+{
+    if (request.priority() != ResourceLoadPriorityUnresolved)
+        return request.priority();
+
+    switch (type) {
+    case CachedResource::MainResource:
+        return ResourceLoadPriorityVeryHigh;
+    case CachedResource::CSSStyleSheet:
+        return ResourceLoadPriorityHigh;
+    case CachedResource::Script:
+    case CachedResource::FontResource:
+    case CachedResource::RawResource:
+        return ResourceLoadPriorityMedium;
+    case CachedResource::ImageResource:
+        return request.forPreload() ? ResourceLoadPriorityVeryLow : ResourceLoadPriorityLow;
+    case CachedResource::XSLStyleSheet:
+        return ResourceLoadPriorityHigh;
+    case CachedResource::SVGDocumentResource:
+        return ResourceLoadPriorityLow;
+    case CachedResource::LinkPrefetch:
+        return ResourceLoadPriorityVeryLow;
+    case CachedResource::LinkSubresource:
+        return ResourceLoadPriorityLow;
+    case CachedResource::TextTrackResource:
+        return ResourceLoadPriorityLow;
+    case CachedResource::ShaderResource:
+        return ResourceLoadPriorityMedium;
+    }
+    ASSERT_NOT_REACHED();
+    return ResourceLoadPriorityUnresolved;
 }
 
 CachedResourceLoader::CachedResourceLoader(DocumentLoader* documentLoader)
@@ -388,8 +422,16 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
     if (!resource)
         return 0;
 
-    if (!request.forPreload() || policy != Use)
-        resource->setLoadPriority(request.priority());
+    if (policy != Use)
+        resource->setIdentifier(createUniqueIdentifier());
+
+    if (!request.forPreload() || policy != Use) {
+        ResourceLoadPriority priority = loadPriority(type, request);
+        if (priority != resource->resourceRequest().priority()) {
+            resource->resourceRequest().setPriority(priority);
+            resource->didChangePriority(priority);
+        }
+    }
 
     if ((policy != Use || resource->stillNeedsLoad()) && CachedResourceRequest::NoDefer == request.defer()) {
         if (!frame())
@@ -476,6 +518,34 @@ void CachedResourceLoader::determineTargetType(ResourceRequest& request, CachedR
     request.setTargetType(targetType);
 }
 
+ResourceRequestCachePolicy CachedResourceLoader::resourceRequestCachePolicy(const ResourceRequest& request, CachedResource::Type type)
+{
+    if (type == CachedResource::MainResource) {
+        FrameLoadType frameLoadType = frame()->loader()->loadType();
+        bool isReload = frameLoadType == FrameLoadTypeReload || frameLoadType == FrameLoadTypeReloadFromOrigin;
+        if (request.httpMethod() == "POST" && (isReload || frameLoadType == FrameLoadTypeBackForward))
+            return ReturnCacheDataDontLoad;
+        if (!m_documentLoader->overrideEncoding().isEmpty() || frameLoadType == FrameLoadTypeBackForward)
+            return ReturnCacheDataElseLoad;
+        if (isReload || frameLoadType == FrameLoadTypeSame || request.isConditional())
+            return ReloadIgnoringCacheData;
+        return UseProtocolCachePolicy;
+    }
+
+    if (request.isConditional())
+        return ReloadIgnoringCacheData;
+
+    if (m_documentLoader->isLoadingInAPISense()) {
+        // For POST requests, we mutate the main resource's cache policy to avoid form resubmission.
+        // This policy should not be inherited by subresources.
+        ResourceRequestCachePolicy mainResourceCachePolicy = m_documentLoader->request().cachePolicy();
+        if (mainResourceCachePolicy == ReturnCacheDataDontLoad)
+            return ReturnCacheDataElseLoad;
+        return mainResourceCachePolicy;
+    }
+    return UseProtocolCachePolicy;
+}
+
 void CachedResourceLoader::addAdditionalRequestHeaders(ResourceRequest& request, CachedResource::Type type)
 {
     if (!frame())
@@ -505,8 +575,12 @@ void CachedResourceLoader::addAdditionalRequestHeaders(ResourceRequest& request,
         FrameLoader::addHTTPOriginIfNeeded(request, outgoingOrigin);
     }
 
+    if (request.cachePolicy() == UseProtocolCachePolicy)
+        request.setCachePolicy(resourceRequestCachePolicy(request, type));
     if (request.targetType() == ResourceRequest::TargetIsUnspecified)
         determineTargetType(request, type);
+    if (type == CachedResource::LinkPrefetch || type == CachedResource::LinkSubresource)
+        request.setHTTPHeaderField("Purpose", "prefetch");
     frameLoader->addExtraFieldsToRequest(request);
 }
 
@@ -514,11 +588,26 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::revalidateResource(co
 {
     ASSERT(resource);
     ASSERT(resource->inCache());
+    ASSERT(resource->isLoaded());
     ASSERT(resource->canUseCacheValidator());
     ASSERT(!resource->resourceToRevalidate());
 
-    addAdditionalRequestHeaders(resource->resourceRequest(), resource->type());
-    CachedResourceHandle<CachedResource> newResource = createResource(resource->type(), resource->resourceRequest(), resource->encoding());
+    ResourceRequest revalidatingRequest(resource->resourceRequest());
+    addAdditionalRequestHeaders(revalidatingRequest, resource->type());
+
+    const String& lastModified = resource->response().httpHeaderField("Last-Modified");
+    const String& eTag = resource->response().httpHeaderField("ETag");
+    if (!lastModified.isEmpty() || !eTag.isEmpty()) {
+        ASSERT(cachePolicy(resource->type()) != CachePolicyReload);
+        if (cachePolicy(resource->type()) == CachePolicyRevalidate)
+            revalidatingRequest.setHTTPHeaderField("Cache-Control", "max-age=0");
+        if (!lastModified.isEmpty())
+            revalidatingRequest.setHTTPHeaderField("If-Modified-Since", lastModified);
+        if (!eTag.isEmpty())
+            revalidatingRequest.setHTTPHeaderField("If-None-Match", eTag);
+    }
+
+    CachedResourceHandle<CachedResource> newResource = createResource(resource->type(), revalidatingRequest, resource->encoding());
     
     LOG(ResourceLoading, "Resource %p created to revalidate %p", newResource.get(), resource);
     newResource->setResourceToRevalidate(resource);
@@ -545,7 +634,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::loadResource(CachedRe
 
 void CachedResourceLoader::storeResourceTimingInitiatorInformation(const CachedResourceHandle<CachedResource>& resource, const CachedResourceRequest& request)
 {
-    CachedResourceInitiatorInfo info = request.initiatorInfo();
+    CachedResourceInitiatorInfo info = request.options().initiatorInfo;
     info.startTime = monotonicallyIncreasingTime();
 
     if (resource->type() == CachedResource::MainResource) {
@@ -788,7 +877,7 @@ void CachedResourceLoader::performPostLoadActions()
 
 void CachedResourceLoader::notifyLoadedFromMemoryCache(CachedResource* resource)
 {
-    if (!resource || !frame() || resource->status() != CachedResource::Cached)
+    if (!frame() || resource->status() != CachedResource::Cached || m_validatedURLs.contains(resource->url()))
         return;
 
     // FIXME: If the WebKit client changes or cancels the request, WebCore does not respect this and continues the load.
@@ -816,9 +905,6 @@ void CachedResourceLoader::preload(CachedResource::Type type, CachedResourceRequ
 {
     bool delaySubresourceLoad = true;
     delaySubresourceLoad = false;
-    // FIXME: All ports should take advantage of this, but first must support ResourceHandle::didChangePriority().
-    if (type == CachedResource::ImageResource)
-        request.setPriority(ResourceLoadPriorityVeryLow);
     if (delaySubresourceLoad) {
         bool hasRendering = m_document->body() && m_document->body()->renderer();
         bool canBlockParser = type == CachedResource::Script || type == CachedResource::CSSStyleSheet;
@@ -978,7 +1064,7 @@ void CachedResourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
 
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    static ResourceLoaderOptions options(SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck, CheckContentSecurityPolicy);
+    DEFINE_STATIC_LOCAL(ResourceLoaderOptions, options, (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck, CheckContentSecurityPolicy));
     return options;
 }
 

@@ -37,6 +37,7 @@
 #include "WebWorkerClientImpl.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8RecursionScope.h"
+#include "core/Init.h"
 #include "core/dom/CustomElementRegistry.h"
 #include "core/dom/MutationObserver.h"
 #include "core/page/Frame.h"
@@ -45,8 +46,8 @@
 #include "core/platform/EventTracer.h"
 #include "core/platform/LayoutTestSupport.h"
 #include "core/platform/Logging.h"
+#include "core/platform/graphics/MediaPlayer.h"
 #include "core/platform/graphics/chromium/ImageDecodingStore.h"
-#include "core/platform/graphics/chromium/MediaPlayerPrivateChromium.h"
 #include "core/workers/WorkerContextProxy.h"
 #include "wtf/Assertions.h"
 #include "wtf/CryptographicallyRandomNumber.h"
@@ -56,9 +57,9 @@
 #include "wtf/UnusedParam.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/TextEncoding.h"
-#include <public/Platform.h>
-#include <public/WebPrerenderingSupport.h>
-#include <public/WebThread.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebPrerenderingSupport.h"
+#include "public/platform/WebThread.h"
 #include <v8.h>
 
 namespace WebKit {
@@ -165,7 +166,7 @@ void initializeWithoutV8(Platform* platform)
 
     WebCore::setIDBFactoryBackendInterfaceCreateFunction(WebKit::IDBFactoryBackendProxy::create);
 
-    WebCore::MediaPlayerPrivate::setMediaEngineRegisterSelfFunction(WebKit::WebMediaPlayerClientImpl::registerSelf);
+    WebCore::MediaPlayer::setMediaEngineCreateFunction(WebKit::WebMediaPlayerClientImpl::create);
 
     WebCore::WorkerContextProxy::setCreateDelegate(WebWorkerClientImpl::createWorkerContextProxy);
 }
@@ -185,6 +186,7 @@ void shutdown()
         s_endOfTaskRunner = 0;
     }
     WebCore::ImageDecodingStore::shutdown();
+    WebCore::shutdown();
     Platform::shutdown();
     WebPrerenderingSupport::shutdown();
 }

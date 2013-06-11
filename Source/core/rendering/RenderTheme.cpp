@@ -53,9 +53,9 @@
 #include "core/rendering/RenderMeter.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/RenderStyle.h"
-#include <public/Platform.h>
-#include <public/WebFallbackThemeEngine.h>
-#include <public/WebRect.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebFallbackThemeEngine.h"
+#include "public/platform/WebRect.h"
 
 #if ENABLE(INPUT_SPEECH)
 #include "core/rendering/RenderInputSpeech.h"
@@ -92,7 +92,7 @@ RenderTheme::RenderTheme()
 {
 }
 
-void RenderTheme::adjustStyle(StyleResolver* styleResolver, RenderStyle* style, Element* e, bool UAHasAppearance, const BorderData& border, const FillLayer& background, const Color& backgroundColor)
+void RenderTheme::adjustStyle(RenderStyle* style, Element* e, bool UAHasAppearance, const BorderData& border, const FillLayer& background, const Color& backgroundColor)
 {
     // Force inline and table display styles to be inline-block (except for table- which is block)
     ControlPart part = style->appearance();
@@ -116,7 +116,7 @@ void RenderTheme::adjustStyle(StyleResolver* styleResolver, RenderStyle* style, 
         return;
 
     if (shouldUseFallbackTheme(style)) {
-        adjustStyleUsingFallbackTheme(styleResolver, style, e);
+        adjustStyleUsingFallbackTheme(style, e);
         return;
     }
 
@@ -203,24 +203,24 @@ void RenderTheme::adjustStyle(StyleResolver* styleResolver, RenderStyle* style, 
     switch (style->appearance()) {
 #if !USE(NEW_THEME)
     case CheckboxPart:
-        return adjustCheckboxStyle(styleResolver, style, e);
+        return adjustCheckboxStyle(style, e);
     case RadioPart:
-        return adjustRadioStyle(styleResolver, style, e);
+        return adjustRadioStyle(style, e);
     case PushButtonPart:
     case SquareButtonPart:
     case ButtonPart:
-        return adjustButtonStyle(styleResolver, style, e);
+        return adjustButtonStyle(style, e);
     case InnerSpinButtonPart:
-        return adjustInnerSpinButtonStyle(styleResolver, style, e);
+        return adjustInnerSpinButtonStyle(style, e);
 #endif
     case TextFieldPart:
-        return adjustTextFieldStyle(styleResolver, style, e);
+        return adjustTextFieldStyle(style, e);
     case TextAreaPart:
-        return adjustTextAreaStyle(styleResolver, style, e);
+        return adjustTextAreaStyle(style, e);
     case MenulistPart:
-        return adjustMenuListStyle(styleResolver, style, e);
+        return adjustMenuListStyle(style, e);
     case MenulistButtonPart:
-        return adjustMenuListButtonStyle(styleResolver, style, e);
+        return adjustMenuListButtonStyle(style, e);
     case MediaPlayButtonPart:
     case MediaCurrentTimePart:
     case MediaTimeRemainingPart:
@@ -228,35 +228,35 @@ void RenderTheme::adjustStyle(StyleResolver* styleResolver, RenderStyle* style, 
     case MediaExitFullscreenButtonPart:
     case MediaMuteButtonPart:
     case MediaVolumeSliderContainerPart:
-        return adjustMediaControlStyle(styleResolver, style, e);
+        return adjustMediaControlStyle(style, e);
     case MediaSliderPart:
     case MediaVolumeSliderPart:
     case MediaFullScreenVolumeSliderPart:
     case SliderHorizontalPart:
     case SliderVerticalPart:
-        return adjustSliderTrackStyle(styleResolver, style, e);
+        return adjustSliderTrackStyle(style, e);
     case SliderThumbHorizontalPart:
     case SliderThumbVerticalPart:
-        return adjustSliderThumbStyle(styleResolver, style, e);
+        return adjustSliderThumbStyle(style, e);
     case SearchFieldPart:
-        return adjustSearchFieldStyle(styleResolver, style, e);
+        return adjustSearchFieldStyle(style, e);
     case SearchFieldCancelButtonPart:
-        return adjustSearchFieldCancelButtonStyle(styleResolver, style, e);
+        return adjustSearchFieldCancelButtonStyle(style, e);
     case SearchFieldDecorationPart:
-        return adjustSearchFieldDecorationStyle(styleResolver, style, e);
+        return adjustSearchFieldDecorationStyle(style, e);
     case SearchFieldResultsDecorationPart:
-        return adjustSearchFieldResultsDecorationStyle(styleResolver, style, e);
+        return adjustSearchFieldResultsDecorationStyle(style, e);
     case ProgressBarPart:
-        return adjustProgressBarStyle(styleResolver, style, e);
+        return adjustProgressBarStyle(style, e);
     case MeterPart:
     case RelevancyLevelIndicatorPart:
     case ContinuousCapacityLevelIndicatorPart:
     case DiscreteCapacityLevelIndicatorPart:
     case RatingLevelIndicatorPart:
-        return adjustMeterStyle(styleResolver, style, e);
+        return adjustMeterStyle(style, e);
 #if ENABLE(INPUT_SPEECH)
     case InputSpeechButtonPart:
-        return adjustInputFieldSpeechButtonStyle(styleResolver, style, e);
+        return adjustInputFieldSpeechButtonStyle(style, e);
 #endif
     default:
         break;
@@ -485,11 +485,12 @@ String RenderTheme::extraDefaultStyleSheet()
 
     if (RuntimeEnabledFeatures::dataListElementEnabled()) {
         runtimeCSS.appendLiteral("datalist {display: none ;}");
-#if ENABLE(INPUT_TYPE_COLOR)
-        runtimeCSS.appendLiteral("input[type=\"color\"][list] { -webkit-appearance: menulist; width: 88px; height: 23px;}");
-        runtimeCSS.appendLiteral("input[type=\"color\"][list]::-webkit-color-swatch-wrapper { padding-left: 8px; padding-right: 24px;}");
-        runtimeCSS.appendLiteral("input[type=\"color\"][list]::-webkit-color-swatch { border-color: #000000;}");
-#endif
+
+        if (RuntimeEnabledFeatures::inputTypeColorEnabled()) {
+            runtimeCSS.appendLiteral("input[type=\"color\"][list] { -webkit-appearance: menulist; width: 88px; height: 23px;}");
+            runtimeCSS.appendLiteral("input[type=\"color\"][list]::-webkit-color-swatch-wrapper { padding-left: 8px; padding-right: 24px;}");
+            runtimeCSS.appendLiteral("input[type=\"color\"][list]::-webkit-color-swatch { border-color: #000000;}");
+        }
     }
     if (RuntimeEnabledFeatures::dialogElementEnabled()) {
         runtimeCSS.appendLiteral("dialog:not([open]) { display: none; }");
@@ -646,9 +647,16 @@ bool RenderTheme::isControlContainer(ControlPart appearance) const
 
 static bool isBackgroundOrBorderStyled(const RenderStyle& style, const BorderData& border, const FillLayer& background, const Color& backgroundColor)
 {
+    // Code below excludes the background-repeat from comparison by resetting it
+    FillLayer backgroundCopy = background;
+    FillLayer backgroundLayersCopy = *style.backgroundLayers();
+    backgroundCopy.setRepeatX(NoRepeatFill);
+    backgroundCopy.setRepeatY(NoRepeatFill);
+    backgroundLayersCopy.setRepeatX(NoRepeatFill);
+    backgroundLayersCopy.setRepeatY(NoRepeatFill);
     // Test the style to see if the UA border and background match.
     return style.border() != border
-        || *style.backgroundLayers() != background
+        || backgroundLayersCopy != backgroundCopy
         || style.visitedDependentColor(CSSPropertyBackgroundColor) != backgroundColor;
 }
 
@@ -848,7 +856,7 @@ bool RenderTheme::isSpinUpButtonPartHovered(const RenderObject* o) const
 
 #if !USE(NEW_THEME)
 
-void RenderTheme::adjustCheckboxStyle(StyleResolver*, RenderStyle* style, Element*) const
+void RenderTheme::adjustCheckboxStyle(RenderStyle* style, Element*) const
 {
     // A summary of the rules for checkbox designed to match WinIE:
     // width/height - honored (WinIE actually scales its control for small widths, but lets it overflow for small heights.)
@@ -863,7 +871,7 @@ void RenderTheme::adjustCheckboxStyle(StyleResolver*, RenderStyle* style, Elemen
     style->resetBorder();
 }
 
-void RenderTheme::adjustRadioStyle(StyleResolver*, RenderStyle* style, Element*) const
+void RenderTheme::adjustRadioStyle(RenderStyle* style, Element*) const
 {
     // A summary of the rules for checkbox designed to match WinIE:
     // width/height - honored (WinIE actually scales its control for small widths, but lets it overflow for small heights.)
@@ -878,7 +886,7 @@ void RenderTheme::adjustRadioStyle(StyleResolver*, RenderStyle* style, Element*)
     style->resetBorder();
 }
 
-void RenderTheme::adjustButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
+void RenderTheme::adjustButtonStyle(RenderStyle* style, Element*) const
 {
     // Most platforms will completely honor all CSS, and so we have no need to
     // adjust the style at all by default. We will still allow the theme a crack
@@ -886,27 +894,27 @@ void RenderTheme::adjustButtonStyle(StyleResolver*, RenderStyle* style, Element*
     setButtonSize(style);
 }
 
-void RenderTheme::adjustInnerSpinButtonStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustInnerSpinButtonStyle(RenderStyle*, Element*) const
 {
 }
 #endif
 
-void RenderTheme::adjustTextFieldStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustTextFieldStyle(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustTextAreaStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustTextAreaStyle(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustMenuListStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustMenuListStyle(RenderStyle*, Element*) const
 {
 }
 
 #if ENABLE(INPUT_SPEECH)
-void RenderTheme::adjustInputFieldSpeechButtonStyle(StyleResolver* styleResolver, RenderStyle* style, Element* element) const
+void RenderTheme::adjustInputFieldSpeechButtonStyle(RenderStyle* style, Element* element) const
 {
-    RenderInputSpeech::adjustInputFieldSpeechButtonStyle(styleResolver, style, element);
+    RenderInputSpeech::adjustInputFieldSpeechButtonStyle(style, element);
 }
 
 bool RenderTheme::paintInputFieldSpeechButton(RenderObject* object, const PaintInfo& paintInfo, const IntRect& rect)
@@ -915,7 +923,7 @@ bool RenderTheme::paintInputFieldSpeechButton(RenderObject* object, const PaintI
 }
 #endif
 
-void RenderTheme::adjustMeterStyle(StyleResolver*, RenderStyle* style, Element*) const
+void RenderTheme::adjustMeterStyle(RenderStyle* style, Element*) const
 {
 }
 
@@ -1002,7 +1010,7 @@ void RenderTheme::paintSliderTicks(RenderObject* o, const PaintInfo& paintInfo, 
     }
     RefPtr<HTMLCollection> options = dataList->options();
     GraphicsContextStateSaver stateSaver(*paintInfo.context);
-    paintInfo.context->setFillColor(o->style()->visitedDependentColor(CSSPropertyColor), ColorSpaceDeviceRGB);
+    paintInfo.context->setFillColor(o->style()->visitedDependentColor(CSSPropertyColor));
     for (unsigned i = 0; Node* node = options->item(i); i++) {
         ASSERT(node->hasTagName(optionTag));
         HTMLOptionElement* optionElement = toHTMLOptionElement(node);
@@ -1031,7 +1039,7 @@ double RenderTheme::animationDurationForProgressBar(RenderProgress*) const
     return 0;
 }
 
-void RenderTheme::adjustProgressBarStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustProgressBarStyle(RenderStyle*, Element*) const
 {
 }
 
@@ -1040,19 +1048,19 @@ bool RenderTheme::shouldHaveSpinButton(HTMLInputElement* inputElement) const
     return inputElement->isSteppable() && !inputElement->isRangeControl();
 }
 
-void RenderTheme::adjustMenuListButtonStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustMenuListButtonStyle(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustMediaControlStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustMediaControlStyle(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustSliderTrackStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustSliderTrackStyle(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustSliderThumbStyle(StyleResolver*, RenderStyle* style, Element* element) const
+void RenderTheme::adjustSliderThumbStyle(RenderStyle* style, Element* element) const
 {
     adjustSliderThumbSize(style, element);
 }
@@ -1061,19 +1069,19 @@ void RenderTheme::adjustSliderThumbSize(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustSearchFieldStyle(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldCancelButtonStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustSearchFieldCancelButtonStyle(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldDecorationStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustSearchFieldDecorationStyle(RenderStyle*, Element*) const
 {
 }
 
-void RenderTheme::adjustSearchFieldResultsDecorationStyle(StyleResolver*, RenderStyle*, Element*) const
+void RenderTheme::adjustSearchFieldResultsDecorationStyle(RenderStyle*, Element*) const
 {
 }
 
@@ -1092,7 +1100,7 @@ void RenderTheme::platformColorsDidChange()
     Page::scheduleForcedStyleRecalcForAllPages();
 }
 
-Color RenderTheme::systemColor(int cssValueId) const
+Color RenderTheme::systemColor(CSSValueID cssValueId) const
 {
     switch (cssValueId) {
     case CSSValueActiveborder:
@@ -1153,6 +1161,20 @@ Color RenderTheme::systemColor(int cssValueId) const
         return 0xFFCCCCCC;
     case CSSValueWindowtext:
         return 0xFF000000;
+    case CSSValueInternalActiveListBoxSelection:
+        return activeListBoxSelectionBackgroundColor();
+        break;
+    case CSSValueInternalActiveListBoxSelectionText:
+        return activeListBoxSelectionForegroundColor();
+        break;
+    case CSSValueInternalInactiveListBoxSelection:
+        return inactiveListBoxSelectionBackgroundColor();
+        break;
+    case CSSValueInternalInactiveListBoxSelectionText:
+        return inactiveListBoxSelectionForegroundColor();
+        break;
+    default:
+        break;
     }
     return Color();
 }
@@ -1238,9 +1260,7 @@ bool RenderTheme::supportsDataListUI(const AtomicString& type) const
 {
     return type == InputTypeNames::text() || type == InputTypeNames::search() || type == InputTypeNames::url()
         || type == InputTypeNames::telephone() || type == InputTypeNames::email() || type == InputTypeNames::number()
-#if ENABLE(INPUT_TYPE_COLOR)
         || type == InputTypeNames::color()
-#endif
         || type == InputTypeNames::date()
         || type == InputTypeNames::datetime()
         || type == InputTypeNames::datetimelocal()
@@ -1266,14 +1286,14 @@ bool RenderTheme::shouldUseFallbackTheme(RenderStyle*) const
     return false;
 }
 
-void RenderTheme::adjustStyleUsingFallbackTheme(StyleResolver* styleResolver, RenderStyle* style, Element* e)
+void RenderTheme::adjustStyleUsingFallbackTheme(RenderStyle* style, Element* e)
 {
     ControlPart part = style->appearance();
     switch (part) {
     case CheckboxPart:
-        return adjustCheckboxStyleUsingFallbackTheme(styleResolver, style, e);
+        return adjustCheckboxStyleUsingFallbackTheme(style, e);
     case RadioPart:
-        return adjustRadioStyleUsingFallbackTheme(styleResolver, style, e);
+        return adjustRadioStyleUsingFallbackTheme(style, e);
     default:
         break;
     }
@@ -1324,7 +1344,7 @@ bool RenderTheme::paintCheckboxUsingFallbackTheme(RenderObject* o, const PaintIn
     return false;
 }
 
-void RenderTheme::adjustCheckboxStyleUsingFallbackTheme(StyleResolver*, RenderStyle* style, Element*) const
+void RenderTheme::adjustCheckboxStyleUsingFallbackTheme(RenderStyle* style, Element*) const
 {
     // If the width and height are both specified, then we have nothing to do.
     if (!style->width().isIntrinsicOrAuto() && !style->height().isAuto())
@@ -1366,7 +1386,7 @@ bool RenderTheme::paintRadioUsingFallbackTheme(RenderObject* o, const PaintInfo&
     return false;
 }
 
-void RenderTheme::adjustRadioStyleUsingFallbackTheme(StyleResolver*, RenderStyle* style, Element*) const
+void RenderTheme::adjustRadioStyleUsingFallbackTheme(RenderStyle* style, Element*) const
 {
     // If the width and height are both specified, then we have nothing to do.
     if (!style->width().isIntrinsicOrAuto() && !style->height().isAuto())

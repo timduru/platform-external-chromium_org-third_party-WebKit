@@ -271,7 +271,7 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     }
 
     // Our opaqueness might have changed without triggering layout.
-    if (diff == StyleDifferenceRepaint || diff == StyleDifferenceRepaintLayer) {
+    if (diff == StyleDifferenceRepaint || diff == StyleDifferenceRepaintIfText || diff == StyleDifferenceRepaintLayer) {
         RenderObject* parentToInvalidate = parent();
         for (unsigned i = 0; i < backgroundObscurationTestMaxDepth && parentToInvalidate; ++i) {
             parentToInvalidate->invalidateBackgroundObscurationStatus();
@@ -713,6 +713,11 @@ void RenderBox::autoscroll(const IntPoint& position)
 {
     if (layer())
         layer()->autoscroll(position);
+}
+
+bool RenderBox::autoscrollInProgress() const
+{
+    return frame() && frame()->page() && frame()->page()->autoscrollInProgress(this);
 }
 
 // There are two kinds of renderer that can autoscroll.
@@ -1774,7 +1779,11 @@ void RenderBox::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState
 
 LayoutSize RenderBox::offsetFromContainer(RenderObject* o, const LayoutPoint& point, bool* offsetDependsOnPoint) const
 {
-    ASSERT(o == container());
+    // A region "has" boxes inside it without being their container.
+    // FIXME: change container() / containingBlock() to count for boxes being positioned relative to the region, not the
+    // FlowThread. This requires a separate patch as a simple test with such a change in container() causes 129 out of
+    // 337 regions tests to fail.
+    ASSERT(o == container() || o->isRenderRegion());
 
     LayoutSize offset;    
     if (hasPaintOffset())
@@ -2212,7 +2221,7 @@ bool RenderBox::sizesLogicalWidthToFitContent(SizeType widthType) const
     // FIXME: Think about block-flow here.  Need to find out how marquee direction relates to
     // block-flow (as well as how marquee overflow should relate to block flow).
     // https://bugs.webkit.org/show_bug.cgi?id=46472
-    if (parent()->style()->overflowX() == OMARQUEE) {
+    if (parent()->isHTMLMarquee()) {
         EMarqueeDirection dir = parent()->style()->marqueeDirection();
         if (dir == MAUTO || dir == MFORWARD || dir == MBACKWARD || dir == MLEFT || dir == MRIGHT)
             return true;
@@ -2261,6 +2270,16 @@ void RenderBox::computeInlineDirectionMargins(RenderBlock* containingBlock, Layo
         marginStart = minimumValueForLength(marginStartLength, containerWidth, renderView);
         marginEnd = minimumValueForLength(marginEndLength, containerWidth, renderView);
         return;
+    }
+
+    if (containingBlock->isFlexibleBox()) {
+        // We need to let flexbox handle the margin adjustment - otherwise, flexbox
+        // will think we're wider than we actually are and calculate line sizes wrong.
+        // See also http://dev.w3.org/csswg/css-flexbox/#auto-margins
+        if (marginStartLength.isAuto())
+            marginStartLength.setValue(0);
+        if (marginEndLength.isAuto())
+            marginEndLength.setValue(0);
     }
 
     // Case One: The object is being centered in the containing block's available logical width.
@@ -4510,21 +4529,18 @@ LayoutSize RenderBox::topLeftLocationOffset() const
 
 bool RenderBox::hasRelativeDimensions() const
 {
+    // FIXME: This should probably include viewport percentage heights as well.
     return style()->height().isPercent() || style()->width().isPercent()
-            || style()->maxHeight().isPercent() || style()->maxWidth().isPercent()
-            || style()->minHeight().isPercent() || style()->minWidth().isPercent();
+        || style()->maxHeight().isPercent() || style()->maxWidth().isPercent()
+        || style()->minHeight().isPercent() || style()->minWidth().isPercent();
 }
 
 bool RenderBox::hasRelativeLogicalHeight() const
 {
     return style()->logicalHeight().isPercent()
-            || style()->logicalMinHeight().isPercent()
-            || style()->logicalMaxHeight().isPercent();
-}
-
-bool RenderBox::hasViewportPercentageLogicalHeight() const
-{
-    return style()->logicalHeight().isViewportPercentage()
+        || style()->logicalMinHeight().isPercent()
+        || style()->logicalMaxHeight().isPercent()
+        || style()->logicalHeight().isViewportPercentage()
         || style()->logicalMinHeight().isViewportPercentage()
         || style()->logicalMaxHeight().isViewportPercentage();
 }

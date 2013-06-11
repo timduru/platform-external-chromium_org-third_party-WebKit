@@ -27,7 +27,10 @@
 #ifndef ScopedStyleResolver_h
 #define ScopedStyleResolver_h
 
+#include "core/css/CSSKeyframeRule.h"
+#include "core/css/CSSKeyframesRule.h"
 #include "core/css/CSSRuleList.h"
+#include "core/css/CSSSVGDocumentValue.h"
 #include "core/css/CSSToStyleMap.h"
 #include "core/css/CSSValueList.h"
 #include "core/css/DocumentRuleSets.h"
@@ -38,9 +41,6 @@
 #include "core/css/SelectorChecker.h"
 #include "core/css/SelectorFilter.h"
 #include "core/css/SiblingTraversalStrategies.h"
-#include "core/css/WebKitCSSSVGDocumentValue.h"
-#include "core/css/WebKitCSSKeyframeRule.h"
-#include "core/css/WebKitCSSKeyframesRule.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
 #include "core/platform/LinkHash.h"
 #include "core/platform/ScrollTypes.h"
@@ -119,7 +119,7 @@ public:
     bool hasOnlyScopeResolverForDocument() const { return m_scopeResolverForDocument && m_authorStyles.size() == 1; }
     ScopedStyleResolver* scopedStyleResolverForDocument() { return m_scopeResolverForDocument; }
 
-    void resolveScopeStyles(const Element*, Vector<std::pair<ScopedStyleResolver*, bool>, 8>& resolvers);
+    void resolveScopeStyles(const Element*, Vector<ScopedStyleResolver*, 8>&);
     ScopedStyleResolver* scopedResolverFor(const Element*);
 
     void pushStyleCache(const ContainerNode* scope, const ContainerNode* parent);
@@ -133,7 +133,7 @@ private:
 
     bool cacheIsValid(const ContainerNode* parent) const { return parent && parent == m_cache.nodeForScopeStyles; }
     void resolveStyleCache(const ContainerNode* scope);
-    ScopedStyleResolver* enclosingScopedStyleResolverFor(const ContainerNode* scope, int& authorStyleBoundsIndex);
+    ScopedStyleResolver* enclosingScopedStyleResolverFor(const ContainerNode* scope);
 
 private:
     HashMap<const ContainerNode*, OwnPtr<ScopedStyleResolver> > m_authorStyles;
@@ -141,16 +141,12 @@ private:
 
     struct ScopeStyleCache {
         ScopedStyleResolver* scopeResolver;
-        int scopeResolverBoundsIndex;
         const ContainerNode* nodeForScopeStyles;
-        int authorStyleBoundsIndex;
 
         void clear()
         {
             scopeResolver = 0;
-            scopeResolverBoundsIndex = 0;
             nodeForScopeStyles = 0;
-            authorStyleBoundsIndex = 0;
         }
     };
     ScopeStyleCache m_cache;

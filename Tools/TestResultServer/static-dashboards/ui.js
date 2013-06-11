@@ -70,8 +70,8 @@ ui.popup.show = function(target, html)
 ui.popup._handleMouseDown = function(e) {
     // Clear the open popup, unless the click was inside the popup.
     var popup = $('popup');
-    if (popup && e.target != popup && !(popup.compareDocumentPosition(e.target) & 16)) 
-        ui.popup.hide();    
+    if (popup && e.target != popup && !(popup.compareDocumentPosition(e.target) & 16))
+        ui.popup.hide();
 }
 
 ui.html = {};
@@ -82,7 +82,15 @@ ui.html.checkbox = function(queryParameter, label, isChecked, opt_extraJavaScrip
     return '<label style="padding-left: 2em">' +
         '<input type="checkbox" onchange="g_history.toggleQueryParameter(\'' + queryParameter + '\');' + js + '" ' +
             (isChecked ? 'checked' : '') + '>' + label +
-        '</label> ';
+        '</label>';
+}
+
+ui.html.range = function(queryParameter, label, min, max, initialValue)
+{
+    return '<label>' +
+        label +
+        '<input type=range onchange="g_history.setQueryParameter(\'' + queryParameter + '\', this.value)" min=' + min + ' max=' + max + ' value=' + initialValue + '>' +
+    '</label>';
 }
 
 ui.html.select = function(label, queryParameter, options)
@@ -100,18 +108,28 @@ ui.html.select = function(label, queryParameter, options)
     return html;
 }
 
-// Returns the HTML for the select element to switch to different testTypes.
-ui.html.testTypeSwitcher = function(opt_noBuilderMenu, opt_extraHtml, opt_includeNoneBuilder)
+ui.html.navbar = function(opt_extraHtml)
 {
     var html = '<div style="border-bottom:1px dashed">';
-    html += '' +
+    html = ui.html._dashboardLink('Overview', 'overview.html') +
         ui.html._dashboardLink('Stats', 'aggregate_results.html') +
         ui.html._dashboardLink('Timeline', 'timeline_explorer.html') +
         ui.html._dashboardLink('Results', 'flakiness_dashboard.html') +
         ui.html._dashboardLink('Treemap', 'treemap.html');
 
-    html += ui.html.select('Test type', 'testType', TEST_TYPES);
+    if (opt_extraHtml)
+        html += opt_extraHtml;
 
+    if (!history.isTreeMap())
+        html += ui.html.checkbox('showAllRuns', 'Use all recorded runs', g_history.crossDashboardState.showAllRuns);
+
+    return html + '</div>';
+}
+
+// Returns the HTML for the select element to switch to different testTypes.
+ui.html.testTypeSwitcher = function(opt_noBuilderMenu, opt_extraHtml, opt_includeNoneBuilder)
+{
+    var html = ui.html.select('Test type', 'testType', builders.testTypes);
     if (!opt_noBuilderMenu) {
         var buildersForMenu = Object.keys(currentBuilders());
         if (opt_includeNoneBuilder)
@@ -119,15 +137,11 @@ ui.html.testTypeSwitcher = function(opt_noBuilderMenu, opt_extraHtml, opt_includ
         html += ui.html.select('Builder', 'builder', buildersForMenu);
     }
 
-    html += ui.html.select('Group', 'group',
-        Object.keys(currentBuilderGroupCategory()));
-
-    if (!history.isTreeMap())
-        html += ui.html.checkbox('showAllRuns', 'Show all runs', g_history.crossDashboardState.showAllRuns);
+    html += ui.html.select('Group', 'group', builders.groupNamesForTestType(g_history.crossDashboardState.testType));
 
     if (opt_extraHtml)
         html += opt_extraHtml;
-    return html + '</div>';
+    return ui.html.navbar(html);
 }
 
 ui.html._loadDashboard = function(fileName)
@@ -153,12 +167,12 @@ ui.html._dashboardLink = function(html, fileName)
     return ui.html._topLink(html, onClick, isSelected);
 }
 
-ui.html._revisionLink = function(resultsKey, results, index)
+ui.html._revisionLink = function(resultsKey, testResults, index)
 {
-    var currentRevision = parseInt(results[resultsKey][index], 10);
-    var previousRevision = parseInt(results[resultsKey][index + 1], 10);
+    var currentRevision = parseInt(testResults[resultsKey][index], 10);
+    var previousRevision = parseInt(testResults[resultsKey][index + 1], 10);
 
-    var isChrome = resultsKey == CHROME_REVISIONS_KEY;
+    var isChrome = resultsKey == results.CHROME_REVISIONS;
     var singleUrl = 'http://src.chromium.org/viewvc/' + (isChrome ? 'chrome' : 'blink') + '?view=rev&revision=' + currentRevision;
 
     if (currentRevision == previousRevision)
@@ -173,14 +187,14 @@ ui.html._revisionLink = function(resultsKey, results, index)
     return '<a href="' + rangeUrl + '">r' + (previousRevision + 1) + ' to r' + currentRevision + '</a>';
 }
 
-ui.html.chromiumRevisionLink = function(results, index)
+ui.html.chromiumRevisionLink = function(testResults, index)
 {
-    return ui.html._revisionLink(CHROME_REVISIONS_KEY, results, index);
+    return ui.html._revisionLink(results.CHROME_REVISIONS, testResults, index);
 }
 
-ui.html.blinkRevisionLink = function(results, index)
+ui.html.blinkRevisionLink = function(testResults, index)
 {
-    return ui.html._revisionLink(BLINK_REVISIONS_KEY, results, index);
+    return ui.html._revisionLink(results.BLINK_REVISIONS, testResults, index);
 }
 
 
@@ -197,7 +211,7 @@ ui.Errors.prototype = {
             this._containerElement = document.createElement('H2');
             this._containerElement.style.color = 'red';
             this._containerElement.id = 'errors';
-            document.body.appendChild(this._containerElement);
+            document.documentElement.insertBefore(this._containerElement, document.body);
         }
 
         this._containerElement.innerHTML = this._messages;
@@ -206,6 +220,10 @@ ui.Errors.prototype = {
     addError: function(message)
     {
         this._messages += message + '<br>';
+    },
+    hasErrors: function()
+    {
+        return !!this._messages;
     }
 }
 

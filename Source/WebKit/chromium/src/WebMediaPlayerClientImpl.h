@@ -31,8 +31,10 @@
 #ifndef WebMediaPlayerClientImpl_h
 #define WebMediaPlayerClientImpl_h
 
+#include "core/platform/KURL.h"
 #include "core/platform/audio/AudioSourceProvider.h"
-#include "core/platform/graphics/MediaPlayerPrivate.h"
+#include "core/platform/graphics/InbandTextTrackPrivate.h"
+#include "core/platform/graphics/MediaPlayer.h"
 #if defined(OS_ANDROID)
 #include "GrTexture.h"
 #include "SkBitmap.h"
@@ -44,7 +46,10 @@
 #include "wtf/PassOwnPtr.h"
 #include "wtf/Threading.h"
 
-namespace WebCore { class AudioSourceProviderClient; }
+namespace WebCore {
+class AudioSourceProviderClient;
+class MediaSourceBase;
+}
 
 namespace WebKit {
 
@@ -54,12 +59,10 @@ class WebMediaPlayer;
 
 // This class serves as a bridge between WebCore::MediaPlayer and
 // WebKit::WebMediaPlayer.
-class WebMediaPlayerClientImpl : public WebCore::MediaPlayerPrivateInterface, public WebMediaPlayerClient {
+class WebMediaPlayerClientImpl : public WebCore::MediaPlayer, public WebMediaPlayerClient {
 
 public:
-    static bool isEnabled();
-    static void setIsEnabled(bool);
-    static void registerSelf(WebCore::MediaEngineRegistrar);
+    static PassOwnPtr<WebCore::MediaPlayer> create(WebCore::MediaPlayerClient*);
 
     // Returns the encapsulated WebKit::WebMediaPlayer.
     WebMediaPlayer* mediaPlayer() const;
@@ -68,15 +71,11 @@ public:
     virtual ~WebMediaPlayerClientImpl();
     virtual void networkStateChanged();
     virtual void readyStateChanged();
-    virtual void volumeChanged(double);
-    virtual void muteChanged(bool);
     virtual void timeChanged();
     virtual void repaint();
     virtual void durationChanged();
-    virtual void rateChanged();
     virtual void sizeChanged();
     virtual void setOpaque(bool);
-    virtual void sawUnsupportedTracks();
     virtual double volume() const;
     virtual void playbackStateChanged();
     virtual WebMediaPlayer::Preload preload() const;
@@ -91,74 +90,67 @@ public:
     virtual void addTextTrack(WebInbandTextTrack*);
     virtual void removeTextTrack(WebInbandTextTrack*);
 
-    // MediaPlayerPrivateInterface methods:
-    virtual void load(const WTF::String& url);
-    virtual void load(const WTF::String& url, PassRefPtr<WebCore::WebKitMediaSource>);
+    // MediaPlayer methods:
+    virtual void load(const WTF::String& url) OVERRIDE;
+    virtual void load(const WTF::String& url, PassRefPtr<WebCore::MediaSourceBase>) OVERRIDE;
 
-    virtual WebKit::WebLayer* platformLayer() const;
-    virtual void play();
-    virtual void pause();
-    virtual void prepareToPlay();
-    virtual bool supportsFullscreen() const;
-    virtual bool supportsSave() const;
-    virtual WebCore::IntSize naturalSize() const;
-    virtual bool hasVideo() const;
-    virtual bool hasAudio() const;
-    virtual void setVisible(bool);
-    virtual double duration() const;
-    virtual double currentTime() const;
-    virtual void seek(double time);
-    virtual bool seeking() const;
-    virtual void setRate(double);
-    virtual bool paused() const;
-    virtual void setVolume(double);
-    virtual WebCore::MediaPlayer::NetworkState networkState() const;
-    virtual WebCore::MediaPlayer::ReadyState readyState() const;
-    virtual double maxTimeSeekable() const;
-    virtual WTF::PassRefPtr<WebCore::TimeRanges> buffered() const;
-    virtual int dataRate() const;
-    virtual bool totalBytesKnown() const;
-    virtual unsigned totalBytes() const;
-    virtual bool didLoadingProgress() const;
-    virtual void setSize(const WebCore::IntSize&);
-    virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect&);
-    virtual void paintCurrentFrameInContext(WebCore::GraphicsContext*, const WebCore::IntRect&);
-    virtual bool copyVideoTextureToPlatformTexture(WebCore::GraphicsContext3D*, Platform3DObject texture, GC3Dint level, GC3Denum type, GC3Denum internalFormat, bool premultiplyAlpha, bool flipY);
-    virtual void setPreload(WebCore::MediaPlayer::Preload);
-    virtual bool hasSingleSecurityOrigin() const;
-    virtual bool didPassCORSAccessCheck() const;
-    virtual WebCore::MediaPlayer::MovieLoadType movieLoadType() const;
-    virtual double mediaTimeForTimeValue(double timeValue) const;
-    virtual unsigned decodedFrameCount() const;
-    virtual unsigned droppedFrameCount() const;
-    virtual unsigned audioDecodedByteCount() const;
-    virtual unsigned videoDecodedByteCount() const;
+    virtual WebKit::WebLayer* platformLayer() const OVERRIDE;
+    virtual void play() OVERRIDE;
+    virtual void pause() OVERRIDE;
+    virtual void prepareToPlay() OVERRIDE;
+    virtual bool supportsFullscreen() const OVERRIDE;
+    virtual bool supportsSave() const OVERRIDE;
+    virtual WebCore::IntSize naturalSize() const OVERRIDE;
+    virtual bool hasVideo() const OVERRIDE;
+    virtual bool hasAudio() const OVERRIDE;
+    virtual double duration() const OVERRIDE;
+    virtual double currentTime() const OVERRIDE;
+    virtual void seek(double time) OVERRIDE;
+    virtual bool seeking() const OVERRIDE;
+    virtual double rate() const OVERRIDE;
+    virtual void setRate(double) OVERRIDE;
+    virtual bool paused() const OVERRIDE;
+    virtual void setVolume(double) OVERRIDE;
+    virtual void setMuted(bool) OVERRIDE;
+    virtual WebCore::MediaPlayer::NetworkState networkState() const OVERRIDE;
+    virtual WebCore::MediaPlayer::ReadyState readyState() const OVERRIDE;
+    virtual double maxTimeSeekable() const OVERRIDE;
+    virtual WTF::PassRefPtr<WebCore::TimeRanges> buffered() const OVERRIDE;
+    virtual bool didLoadingProgress() const OVERRIDE;
+    virtual void paint(WebCore::GraphicsContext*, const WebCore::IntRect&) OVERRIDE;
+    virtual void paintCurrentFrameInContext(WebCore::GraphicsContext*, const WebCore::IntRect&) OVERRIDE;
+    virtual bool copyVideoTextureToPlatformTexture(WebCore::GraphicsContext3D*, Platform3DObject texture, GC3Dint level, GC3Denum type, GC3Denum internalFormat, bool premultiplyAlpha, bool flipY) OVERRIDE;
+    virtual void setPreload(WebCore::MediaPlayer::Preload) OVERRIDE;
+    virtual bool hasSingleSecurityOrigin() const OVERRIDE;
+    virtual bool didPassCORSAccessCheck() const OVERRIDE;
+    virtual double mediaTimeForTimeValue(double timeValue) const OVERRIDE;
+    virtual unsigned decodedFrameCount() const OVERRIDE;
+    virtual unsigned droppedFrameCount() const OVERRIDE;
+    virtual unsigned audioDecodedByteCount() const OVERRIDE;
+    virtual unsigned videoDecodedByteCount() const OVERRIDE;
 #if USE(NATIVE_FULLSCREEN_VIDEO)
-    virtual void enterFullscreen();
-    virtual void exitFullscreen();
-    virtual bool canEnterFullscreen() const;
+    virtual void enterFullscreen() OVERRIDE;
+    virtual void exitFullscreen() OVERRIDE;
+    virtual bool canEnterFullscreen() const OVERRIDE;
 #endif
 
 #if ENABLE(WEB_AUDIO)
-    virtual WebCore::AudioSourceProvider* audioSourceProvider();
+    virtual WebCore::AudioSourceProvider* audioSourceProvider() OVERRIDE;
 #endif
 
-    virtual bool supportsAcceleratedRendering() const;
+    virtual bool supportsAcceleratedRendering() const OVERRIDE;
 
     virtual WebCore::MediaPlayer::MediaKeyException generateKeyRequest(const String& keySystem, const unsigned char* initData, unsigned initDataLength) OVERRIDE;
     virtual WebCore::MediaPlayer::MediaKeyException addKey(const String& keySystem, const unsigned char* key, unsigned keyLength, const unsigned char* initData, unsigned initDataLength, const String& sessionId) OVERRIDE;
     virtual WebCore::MediaPlayer::MediaKeyException cancelKeyRequest(const String& keySystem, const String& sessionId) OVERRIDE;
 
-protected:
-    WebMediaPlayerClientImpl();
 private:
+    explicit WebMediaPlayerClientImpl(WebCore::MediaPlayerClient*);
+
     void startDelayedLoad();
     void loadRequested();
     void loadInternal();
 
-    static PassOwnPtr<WebCore::MediaPlayerPrivateInterface> create(WebCore::MediaPlayer*);
-    static WebCore::MediaPlayer::SupportsType supportsType(
-        const WTF::String& type, const WTF::String& codecs, const String& keySystem, const WebCore::KURL&);
     bool acceleratedRenderingInUse();
 
 #if defined(OS_ANDROID)
@@ -170,7 +162,7 @@ private:
     SkBitmap m_bitmap;
 #endif
 
-    WebCore::MediaPlayer* m_mediaPlayer;
+    WebCore::MediaPlayerClient* m_client;
     OwnPtr<WebMediaPlayer> m_webMediaPlayer;
     WebCore::KURL m_url;
     bool m_isMediaStream;
@@ -180,7 +172,9 @@ private:
     WebLayer* m_videoLayer;
     bool m_opaque;
     bool m_needsWebLayerForVideo;
-    static bool m_isEnabled;
+    double m_volume;
+    bool m_muted;
+    double m_rate;
 
 #if ENABLE(WEB_AUDIO)
     // AudioClientImpl wraps an AudioSourceProviderClient.
@@ -230,7 +224,7 @@ private:
     AudioSourceProviderImpl m_audioSourceProvider;
 #endif
 
-    RefPtr<WebCore::WebKitMediaSource> m_mediaSource;
+    RefPtr<WebCore::MediaSourceBase> m_mediaSource;
 };
 
 } // namespace WebKit

@@ -59,13 +59,13 @@
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/network/ResourceResponse.h"
 #include "core/rendering/RenderView.h"
-#include <public/Platform.h>
-#include <public/WebRect.h>
-#include <public/WebString.h>
-#include <public/WebURL.h>
-#include <public/WebURLError.h>
-#include <public/WebURLRequest.h>
-#include <public/WebURLResponse.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebURL.h"
+#include "public/platform/WebURLError.h"
+#include "public/platform/WebURLRequest.h"
+#include "public/platform/WebURLResponse.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MathExtras.h>
 #include <wtf/Noncopyable.h>
@@ -124,6 +124,8 @@ private:
         HashSet<Page*>::const_iterator end =  page->group().pages().end();
         for (HashSet<Page*>::const_iterator it =  page->group().pages().begin(); it != end; ++it) {
             WebViewImpl* view = WebViewImpl::fromPage(*it);
+            if (!view)
+                continue;
             m_frozenViews.add(view);
             views.append(view);
             view->setIgnoreInputEvents(true);
@@ -388,7 +390,7 @@ void WebDevToolsAgentImpl::reattach(const WebString& savedState)
         return;
 
     ClientMessageLoopAdapter::ensureClientMessageLoopCreated(m_client);
-    inspectorController()->reconnectFrontend(this, savedState);
+    inspectorController()->reuseFrontend(this, savedState);
     WebKit::Platform::current()->currentThread()->addTaskObserver(this);
     m_attached = true;
 }

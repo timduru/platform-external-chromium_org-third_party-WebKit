@@ -42,16 +42,21 @@ function resetGlobals()
     for (var key in history.DEFAULT_CROSS_DASHBOARD_STATE_VALUES)
         historyInstance.crossDashboardState[key] = history.DEFAULT_CROSS_DASHBOARD_STATE_VALUES[key];
 
-    LOAD_BUILDBOT_DATA([{
-        name: 'ChromiumWebkit',
-        url: 'dummyurl', 
-        tests: {'layout-tests': {'builders': ['WebKit Linux', 'WebKit Linux (dbg)', 'WebKit Mac10.7', 'WebKit Win', 'WebKit Win (dbg)']}}
-    }]);
- 
-    for (var group in LAYOUT_TESTS_BUILDER_GROUPS)
-        LAYOUT_TESTS_BUILDER_GROUPS[group] = null;
+    LOAD_BUILDBOT_DATA({
+        'masters': [{
+            name: 'ChromiumWebkit',
+            url: 'dummyurl',
+            tests: {'layout-tests': {'builders': ['WebKit Linux', 'WebKit Linux (dbg)', 'WebKit Linux (deps)', 'WebKit Mac10.7', 'WebKit Win', 'WebKit Win (dbg)']}},
+            groups: ['@ToT Blink', '@ToT Chromium'],
+        },{
+            name :'ChromiumWin',
+            url: 'dummyurl2',
+            tests: {'interactive_ui_tests': {'builders': ['XP Tests (1)', 'Win7 Tests (1)']}},
+            groups: ['@ToT Chromium'],
+        }],
+    });
 
-    return historyInstance;
+   return historyInstance;
 }
 
 var FAILURE_MAP = {"A": "AUDIO", "C": "CRASH", "F": "TEXT", "I": "IMAGE", "O": "MISSING",
@@ -77,17 +82,18 @@ test('headerForTestTableHtml', 1, function() {
 });
 
 test('htmlForTestTypeSwitcherGroup', 6, function() {
+    resetGlobals();
     var historyInstance = new history.History(flakinessConfig);
     // FIXME(jparent): Remove this once global isn't used.
     g_history = historyInstance;
     var container = document.createElement('div');
-    historyInstance.crossDashboardState.testType = 'ui_tests';
+    historyInstance.crossDashboardState.testType = 'interactive_ui_tests';
     container.innerHTML = ui.html.testTypeSwitcher(true);
     var selects = container.querySelectorAll('select');
     equal(selects.length, 2);
     var group = selects[1];
     equal(group.parentNode.textContent.indexOf('Group:'), 0);
-    equal(group.children.length, 3);
+    equal(group.children.length, 1);
 
     historyInstance.crossDashboardState.testType = 'layout-tests';
     container.innerHTML = ui.html.testTypeSwitcher(true);
@@ -95,20 +101,20 @@ test('htmlForTestTypeSwitcherGroup', 6, function() {
     equal(selects.length, 2);
     var group = selects[1];
     equal(group.parentNode.textContent.indexOf('Group:'), 0);
-    equal(group.children.length, 3);
+    equal(group.children.length, 2);
 });
 
 test('htmlForIndividualTestOnAllBuilders', 1, function() {
     resetGlobals();
-    loadBuildersList('@ToT - chromium.org', 'layout-tests');
-    equal(htmlForIndividualTestOnAllBuilders('foo/nonexistant.html'), '<div class="not-found">Test not found. Either it does not exist, is skipped or passes on all platforms.</div>');
+    builders.loadBuildersList('@ToT Blink', 'layout-tests');
+    equal(htmlForIndividualTestOnAllBuilders('foo/nonexistant.html'), '<div class="not-found">Test not found. Either it does not exist, is skipped or passes on all recorded runs.</div>');
 });
 
 test('htmlForIndividualTestOnAllBuildersWithResultsLinksNonexistant', 1, function() {
     resetGlobals();
-    loadBuildersList('@ToT - chromium.org', 'layout-tests');
+    builders.loadBuildersList('@ToT Blink', 'layout-tests');
     equal(htmlForIndividualTestOnAllBuildersWithResultsLinks('foo/nonexistant.html'),
-        '<div class="not-found">Test not found. Either it does not exist, is skipped or passes on all platforms.</div>' +
+        '<div class="not-found">Test not found. Either it does not exist, is skipped or passes on all recorded runs.</div>' +
         '<div class=expectations test=foo/nonexistant.html>' +
             '<div>' +
                 '<span class=link onclick="g_history.setQueryParameter(\'showExpectations\', true)">Show results</span> | ' +
@@ -120,7 +126,7 @@ test('htmlForIndividualTestOnAllBuildersWithResultsLinksNonexistant', 1, functio
 
 test('htmlForIndividualTestOnAllBuildersWithResultsLinks', 1, function() {
     resetGlobals();
-    loadBuildersList('@ToT - chromium.org', 'layout-tests');
+    builders.loadBuildersList('@ToT Blink', 'layout-tests');
 
     var builderName = 'WebKit Linux';
     g_resultsByBuilder[builderName] = {buildNumbers: [2, 1], blinkRevision: [1234, 1233], failure_map: FAILURE_MAP};
@@ -149,7 +155,7 @@ test('htmlForIndividualTestOnAllBuildersWithResultsLinks', 1, function() {
                 '<td title="NO DATA. Click for more info." class="results NODATA" onclick=\'showPopupForBuild(event, "WebKit Linux",1,"dummytest.html")\'>&nbsp;' +
             '</tbody>' +
         '</table>' +
-        '<div>The following builders either don\'t run this test (e.g. it\'s skipped) or all runs passed:</div>' +
+        '<div>The following builders either don\'t run this test (e.g. it\'s skipped) or all recorded runs passed:</div>' +
         '<div class=skipped-builder-list>' +
             '<div class=skipped-builder>WebKit Linux (dbg)</div><div class=skipped-builder>WebKit Mac10.7</div><div class=skipped-builder>WebKit Win</div><div class=skipped-builder>WebKit Win (dbg)</div>' +
         '</div>' +
@@ -162,7 +168,7 @@ test('htmlForIndividualTestOnAllBuildersWithResultsLinks', 1, function() {
 
 test('htmlForIndividualTests', 4, function() {
     var historyInstance = resetGlobals();
-    loadBuildersList('@ToT - chromium.org', 'layout-tests');
+    builders.loadBuildersList('@ToT Blink', 'layout-tests');
     var test1 = 'foo/nonexistant.html';
     var test2 = 'bar/nonexistant.html';
 
@@ -171,7 +177,7 @@ test('htmlForIndividualTests', 4, function() {
     var tests = [test1, test2];
     equal(htmlForIndividualTests(tests),
         '<h2><a href="' + TEST_URL_BASE_PATH_FOR_BROWSING + 'foo/nonexistant.html" target="_blank">foo/nonexistant.html</a></h2>' +
-        htmlForIndividualTestOnAllBuilders(test1) + 
+        htmlForIndividualTestOnAllBuilders(test1) +
         '<div class=expectations test=foo/nonexistant.html>' +
             '<div><span class=link onclick=\"g_history.setQueryParameter(\'showExpectations\', true)\">Show results</span> | ' +
             '<span class=link onclick=\"g_history.setQueryParameter(\'showLargeExpectations\', true)\">Show large thumbnails</span> | ' +
@@ -219,7 +225,6 @@ test('linkifyBugs', 4, function() {
 test('htmlForSingleTestRow', 1, function() {
     var historyInstance = resetGlobals();
     var builder = 'dummyBuilder';
-    BUILDER_TO_MASTER[builder] = CHROMIUM_WEBKIT_BUILDER_MASTER;
     var test = createResultsObjectForTest('foo/exists.html', builder);
     historyInstance.dashboardSpecificState.showNonFlaky = true;
     g_resultsByBuilder[builder] = {buildNumbers: [2, 1], blinkRevision: [1234, 1233], failure_map: FAILURE_MAP};
@@ -244,49 +249,6 @@ test('baseTest', 2, function() {
     equal(baseTest('fast/canvas/foo.html', ''), 'fast/canvas/foo.html');
     equal(baseTest('virtual/gpu/fast/canvas/foo.html', 'virtual/gpu/fast/canvas'), 'fast/canvas/foo.html');
 });
-
-// FIXME: Create builders_tests.js and move this there.
-
-test('isChromiumWebkitTipOfTreeTestRunner', 1, function() {
-    var builderList = ["WebKit Linux", "WebKit Linux (dbg)", "WebKit Linux 32", "WebKit Mac10.6", "WebKit Mac10.6 (dbg)",
-        "WebKit Mac10.6 (deps)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)", "WebKit Win (deps)",
-        "WebKit Win7", "Linux (Content Shell)"];
-    var expectedBuilders = ["WebKit Linux", "WebKit Linux (dbg)", "WebKit Linux 32", "WebKit Mac10.6",
-        "WebKit Mac10.6 (dbg)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)", "WebKit Win7"];
-    deepEqual(builderList.filter(isChromiumWebkitTipOfTreeTestRunner), expectedBuilders);
-});
-
-test('isChromiumWebkitDepsTestRunner', 1, function() {
-    var builderList = ["Chrome Frame Tests", "GPU Linux (NVIDIA)", "GPU Linux (dbg) (NVIDIA)", "GPU Mac", "GPU Mac (dbg)", "GPU Win7 (NVIDIA)", "GPU Win7 (dbg) (NVIDIA)", "Linux Perf", "Linux Tests",
-        "Linux Valgrind", "Mac Builder (dbg)", "Mac10.6 Perf", "Mac10.6 Tests", "Vista Perf", "Vista Tests", "WebKit Linux", "WebKit Linux ASAN",  "WebKit Linux (dbg)", "WebKit Linux (deps)", "WebKit Linux 32",
-        "WebKit Mac10.6", "WebKit Mac10.6 (dbg)", "WebKit Mac10.6 (deps)", "WebKit Mac10.7", "WebKit Win", "WebKit Win (dbg)(1)", "WebKit Win (dbg)(2)", "WebKit Win (deps)",
-        "WebKit Win7", "Win (dbg)", "Win Builder"];
-    var expectedBuilders = ["WebKit Linux (deps)", "WebKit Mac10.6 (deps)", "WebKit Win (deps)"];
-    deepEqual(builderList.filter(isChromiumWebkitDepsTestRunner), expectedBuilders);
-});
-
-test('builderGroupIsToTWebKitAttribute', 2, function() {
-    var dummyMaster = new builders.BuilderMaster('Chromium', 'dummyurl', {'layout-tests': {'builders': ['WebKit Linux', 'WebKit Linux (dbg)', 'WebKit Mac10.7', 'WebKit Win']}});
-    var testBuilderGroups = {
-        '@ToT - dummy.org': new BuilderGroup(BuilderGroup.TOT_WEBKIT),
-        '@DEPS - dummy.org': new BuilderGroup(BuilderGroup.DEPS_WEBKIT),
-    }
-
-    var testJSONData = "{ \"Dummy Builder 1\": null, \"Dummy Builder 2\": null }";
-    requestBuilderList(testBuilderGroups, 'ChromiumWebkit', '@ToT - dummy.org', testBuilderGroups['@ToT - dummy.org'], 'layout-tests');
-    equal(testBuilderGroups['@ToT - dummy.org'].isToTWebKit, true);
-    requestBuilderList(testBuilderGroups, 'ChromiumWebkit', '@DEPS - dummy.org', testBuilderGroups['@DEPS - dummy.org'], 'layout-tests');
-    equal(testBuilderGroups['@DEPS - dummy.org'].isToTWebKit, false);
-});
-
-test('requestBuilderListAddsBuilderGroupEntry', 1, function() {
-    var testBuilderGroups = { '@ToT - dummy.org': null };
-    var builderGroup = new BuilderGroup(BuilderGroup.TOT_WEBKIT);
-    var groupName = '@ToT - dummy.org';
-    requestBuilderList(testBuilderGroups, 'ChromiumWebkit', groupName, builderGroup, 'layout-tests');
-
-    equal(testBuilderGroups['@ToT - dummy.org'], builderGroup);
-})
 
 test('sortTests', 4, function() {
     var test1 = createResultsObjectForTest('foo/test1.html', 'dummyBuilder');
@@ -392,14 +354,14 @@ test('TestTrie', 3, function() {
 
 test('changeTestTypeInvalidatesGroup', 1, function() {
     var historyInstance = resetGlobals();
-    var originalGroup = '@ToT - chromium.org';
+    var originalGroup = '@ToT Blink';
     var originalTestType = 'layout-tests';
-    loadBuildersList(originalGroup, originalTestType);
+    builders.loadBuildersList(originalGroup, originalTestType);
     historyInstance.crossDashboardState.group = originalGroup;
     historyInstance.crossDashboardState.testType = originalTestType;
 
     historyInstance.invalidateQueryParameters({'testType': 'ui_tests'});
-    notEqual(historyInstance.crossDashboardState.group, originalGroup, "group should have been invalidated");   
+    notEqual(historyInstance.crossDashboardState.group, originalGroup, "group should have been invalidated");
 });
 
 test('shouldShowTest', 9, function() {

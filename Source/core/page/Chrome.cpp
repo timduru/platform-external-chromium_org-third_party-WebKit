@@ -22,15 +22,13 @@
 #include "config.h"
 #include "core/page/Chrome.h"
 
-#include <public/WebScreenInfo.h>
+#include "public/platform/WebScreenInfo.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/Vector.h>
 #include "HTMLNames.h"
 #include "core/dom/Document.h"
-#include "core/fileapi/FileList.h"
-#include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/ChromeClient.h"
@@ -39,24 +37,13 @@
 #include "core/page/Page.h"
 #include "core/page/PageGroupLoadDeferrer.h"
 #include "core/page/PopupOpeningObserver.h"
-#include "core/page/Settings.h"
-#include "core/page/WindowFeatures.h"
+#include "core/platform/ColorChooser.h"
 #include "core/platform/DateTimeChooser.h"
 #include "core/platform/FileChooser.h"
-#include "core/platform/FileIconLoader.h"
 #include "core/platform/graphics/FloatRect.h"
-#include "core/platform/graphics/Icon.h"
 #include "core/platform/network/DNS.h"
-#include "core/platform/network/ResourceHandle.h"
 #include "core/rendering/HitTestResult.h"
-#include "core/rendering/RenderObject.h"
 #include "core/storage/StorageNamespace.h"
-#include "modules/geolocation/Geolocation.h"
-#include "weborigin/SecurityOrigin.h"
-
-#if ENABLE(INPUT_TYPE_COLOR)
-#include "core/platform/ColorChooser.h"
-#endif
 
 namespace WebCore {
 
@@ -370,7 +357,7 @@ void Chrome::setToolTip(const HitTestResult& result)
     if (toolTip.isEmpty()) {
         if (Node* node = result.innerNonSharedNode()) {
             if (node->hasTagName(inputTag)) {
-                HTMLInputElement* input = static_cast<HTMLInputElement*>(node);
+                HTMLInputElement* input = toHTMLInputElement(node);
                 toolTip = input->defaultToolTip();
 
                 // FIXME: We should obtain text direction of tooltip from
@@ -397,13 +384,11 @@ void Chrome::enumerateChosenDirectory(FileChooser* fileChooser)
     m_client->enumerateChosenDirectory(fileChooser);
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
 PassOwnPtr<ColorChooser> Chrome::createColorChooser(ColorChooserClient* client, const Color& initialColor)
 {
     notifyPopupOpeningObservers();
     return m_client->createColorChooser(client, initialColor);
 }
-#endif
 
 PassRefPtr<DateTimeChooser> Chrome::openDateTimeChooser(DateTimeChooserClient* client, const DateTimeChooserParameters& parameters)
 {

@@ -73,7 +73,7 @@ static HTMLTokenizer::State tokenizerStateForContextElement(Element* contextElem
     return HTMLTokenizer::DataState;
 }
 
-HTMLDocumentParser::HTMLDocumentParser(HTMLDocument* document, bool reportErrors)
+HTMLDocumentParser::HTMLDocumentParser(Document* document, bool reportErrors)
     : ScriptableDocumentParser(document)
     , m_options(document)
     , m_token(m_options.useThreading ? nullptr : adoptPtr(new HTMLToken))
@@ -898,7 +898,7 @@ void HTMLDocumentParser::notifyFinished(CachedResource* cachedResource)
         resumeParsingAfterScriptExecution();
 }
 
-void HTMLDocumentParser::executeScriptsWaitingForStylesheets()
+void HTMLDocumentParser::executeScriptsWaitingForResources()
 {
     // Document only calls this when the Document owns the DocumentParser
     // so this will not be called in the DocumentFragment case.
@@ -906,13 +906,13 @@ void HTMLDocumentParser::executeScriptsWaitingForStylesheets()
     // Ignore calls unless we have a script blocking the parser waiting on a
     // stylesheet load.  Otherwise we are currently parsing and this
     // is a re-entrant call from encountering a </ style> tag.
-    if (!m_scriptRunner->hasScriptsWaitingForStylesheets())
+    if (!m_scriptRunner->hasScriptsWaitingForResources())
         return;
 
     // pumpTokenizer can cause this parser to be detached from the Document,
     // but we need to ensure it isn't deleted yet.
     RefPtr<HTMLDocumentParser> protect(this);
-    m_scriptRunner->executeScriptsWaitingForStylesheets();
+    m_scriptRunner->executeScriptsWaitingForResources();
     if (!isWaitingForScripts())
         resumeParsingAfterScriptExecution();
 }

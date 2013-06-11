@@ -1,9 +1,8 @@
-# Please run Tools/Scripts/check-blink-deps after modifying this file.
-
 include_rules = [
     "+bindings",
     "+core",
     "+mozilla",
+    "+public/platform",
     "+sys",
     "+unicode",
     "+weborigin",
@@ -12,7 +11,6 @@ include_rules = [
     "-modules",
 # core/ should not depend on modules/ at all, but there are a number of pieces
 # of code that do. Please don't add to this list of exceptions.
-    "+modules/battery",
     "+modules/device_orientation",
     "+modules/filesystem",
     "+modules/gamepad",

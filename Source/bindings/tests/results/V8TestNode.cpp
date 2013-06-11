@@ -35,24 +35,26 @@
 
 namespace WebCore {
 
-#if defined(OS_WIN)
-// In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
-// These prototypes do not pick up the surrounding namespace, so drop out of WebCore as a workaround.
-} // namespace WebCore
-using WebCore::ScriptWrappable;
-using WebCore::V8TestNode;
-using WebCore::TestNode;
-#endif
-void initializeScriptWrappableForInterface(TestNode* object)
+static void initializeScriptWrappableForInterface(TestNode* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestNode::info);
     else
         ASSERT_NOT_REACHED();
 }
-#if defined(OS_WIN)
+
+} // namespace WebCore
+
+// In ScriptWrappable::init, the use of a local function declaration has an issue on Windows:
+// the local declaration does not pick up the surrounding namespace. Therefore, we provide this function
+// in the global namespace.
+// (More info on the MSVC bug here: http://connect.microsoft.com/VisualStudio/feedback/details/664619/the-namespace-of-local-function-declarations-in-c)
+void webCoreInitializeScriptWrappableForInterface(WebCore::TestNode* object)
+{
+    WebCore::initializeScriptWrappableForInterface(object);
+}
+
 namespace WebCore {
-#endif
 WrapperTypeInfo V8TestNode::info = { V8TestNode::GetTemplate, V8TestNode::derefObject, 0, V8TestNode::toEventTarget, 0, V8TestNode::installPerContextPrototypeProperties, &V8Node::info, WrapperTypeObjectPrototype };
 
 namespace TestNodeV8Internal {
@@ -86,7 +88,7 @@ void V8TestNode::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& 
     TestNodeV8Internal::constructor(args);
 }
 
-static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestNodeTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+static v8::Handle<v8::FunctionTemplate> ConfigureV8TestNodeTemplate(v8::Handle<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     desc->ReadOnlyPrototype();
 
@@ -103,18 +105,18 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestNodeTemplate(v8::Pers
     return desc;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8TestNode::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestNode::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&info);
     if (result != data->templateMap(currentWorldType).end())
-        return result->value;
+        return result->value.newLocal(isolate);
 
-    v8::HandleScope handleScope;
-    v8::Persistent<v8::FunctionTemplate> templ =
+    v8::HandleScope handleScope(isolate);
+    v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestNodeTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
-    data->templateMap(currentWorldType).add(&info, templ);
-    return templ;
+    data->templateMap(currentWorldType).add(&info, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
+    return handleScope.Close(templ);
 }
 
 bool V8TestNode::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)

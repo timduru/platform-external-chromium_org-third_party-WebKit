@@ -30,23 +30,18 @@
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
 #include "core/css/CSSComputedStyleDeclaration.h"
-#include "core/css/CSSParser.h"
 #include "core/css/CSSValuePool.h"
 #include "core/css/StylePropertySet.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/NodeList.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Range.h"
 #include "core/dom/Text.h"
 #include "core/editing/EditingStyle.h"
-#include "core/editing/Editor.h"
 #include "core/editing/HTMLInterchange.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
-#include "core/html/HTMLFontElement.h"
-#include "core/page/Frame.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderText.h"
 #include <wtf/StdLibExtras.h>
@@ -1297,18 +1292,16 @@ bool ApplyStyleCommand::mergeStartWithPreviousIfIdentical(const Position& start,
 bool ApplyStyleCommand::mergeEndWithNextIfIdentical(const Position& start, const Position& end)
 {
     Node* endNode = end.containerNode();
-    int endOffset = end.computeOffsetInContainerNode();
 
     if (isAtomicNode(endNode)) {
+        int endOffset = end.computeOffsetInContainerNode();
         if (offsetIsBeforeLastNodeOffset(endOffset, endNode))
             return false;
 
-        unsigned parentLastOffset = end.deprecatedNode()->parentNode()->childNodes()->length() - 1;
         if (end.deprecatedNode()->nextSibling())
             return false;
 
         endNode = end.deprecatedNode()->parentNode();
-        endOffset = parentLastOffset;
     }
 
     if (!endNode->isElementNode() || endNode->hasTagName(brTag))

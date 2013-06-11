@@ -24,7 +24,9 @@
 #define CSSParser_h
 
 #include "CSSPropertyNames.h"
+#include "CSSValueKeywords.h"
 #include "core/css/CSSCalculationValue.h"
+#include "core/css/CSSFilterValue.h"
 #include "core/css/CSSGradientValue.h"
 #include "core/css/CSSParserMode.h"
 #include "core/css/CSSParserValues.h"
@@ -32,21 +34,23 @@
 #include "core/css/CSSPropertySourceData.h"
 #include "core/css/CSSSelector.h"
 #include "core/css/MediaQuery.h"
-#include "core/css/WebKitCSSFilterValue.h"
 #include "core/page/UseCounter.h"
 #include "core/platform/graphics/Color.h"
-#include <wtf/HashMap.h>
-#include <wtf/HashSet.h>
-#include <wtf/OwnArrayPtr.h>
-#include <wtf/text/AtomicString.h>
-#include <wtf/Vector.h>
+#include "wtf/HashMap.h"
+#include "wtf/HashSet.h"
+#include "wtf/OwnArrayPtr.h"
+#include "wtf/Vector.h"
+#include "wtf/text/AtomicString.h"
 
 namespace WebCore {
 
 class AnimationParseContext;
+class CSSArrayFunctionValue;
 class CSSBorderImageSliceValue;
+class CSSMixFunctionValue;
 class CSSPrimitiveValue;
 class CSSSelectorList;
+class CSSShaderValue;
 class CSSValue;
 class CSSValueList;
 class CSSBasicShape;
@@ -63,10 +67,6 @@ class StyleRuleKeyframes;
 class StyleKeyframe;
 class StyleSheetContents;
 class StyledElement;
-
-class WebKitCSSArrayFunctionValue;
-class WebKitCSSMixFunctionValue;
-class WebKitCSSShaderValue;
 
 struct CSSParserLocation;
 
@@ -98,7 +98,7 @@ public:
     static bool parseColor(RGBA32& color, const String&, bool strict = false);
     static bool parseSystemColor(RGBA32& color, const String&, Document*);
     static PassRefPtr<CSSValueList> parseFontFaceValue(const AtomicString&);
-    PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(int ident, CSSParserValue*);
+    PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(CSSValueID ident, CSSParserValue*);
     bool parseDeclaration(MutableStylePropertySet*, const String&, SourceDataHandler*, StyleSheetContents* contextStyleSheet);
     static PassRefPtr<ImmutableStylePropertySet> parseInlineStyleDeclaration(const String&, Element*);
     PassOwnPtr<MediaQuery> parseMediaQuery(const String&);
@@ -177,6 +177,7 @@ public:
     PassRefPtr<CSSBasicShape> parseBasicShapeCircle(CSSParserValueList* args);
     PassRefPtr<CSSBasicShape> parseBasicShapeEllipse(CSSParserValueList* args);
     PassRefPtr<CSSBasicShape> parseBasicShapePolygon(CSSParserValueList* args);
+    PassRefPtr<CSSBasicShape> parseBasicShapeInsetRectangle(CSSParserValueList* args);
 
     bool parseFont(bool important);
     PassRefPtr<CSSValueList> parseFontFamily();
@@ -235,19 +236,19 @@ public:
     PassRefPtr<CSSValue> parseImageSet(CSSParserValueList*);
 
     PassRefPtr<CSSValueList> parseFilter();
-    PassRefPtr<WebKitCSSFilterValue> parseBuiltinFilterArguments(CSSParserValueList*, WebKitCSSFilterValue::FilterOperationType);
-    PassRefPtr<WebKitCSSMixFunctionValue> parseMixFunction(CSSParserValue*);
-    PassRefPtr<WebKitCSSArrayFunctionValue> parseCustomFilterArrayFunction(CSSParserValue*);
+    PassRefPtr<CSSFilterValue> parseBuiltinFilterArguments(CSSParserValueList*, CSSFilterValue::FilterOperationType);
+    PassRefPtr<CSSMixFunctionValue> parseMixFunction(CSSParserValue*);
+    PassRefPtr<CSSArrayFunctionValue> parseCustomFilterArrayFunction(CSSParserValue*);
     PassRefPtr<CSSValueList> parseCustomFilterTransform(CSSParserValueList*);
     PassRefPtr<CSSValueList> parseCustomFilterParameters(CSSParserValueList*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunctionWithAtRuleReferenceSyntax(CSSParserValue*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunctionWithInlineSyntax(CSSParserValue*);
-    PassRefPtr<WebKitCSSFilterValue> parseCustomFilterFunction(CSSParserValue*);
+    PassRefPtr<CSSFilterValue> parseCustomFilterFunctionWithAtRuleReferenceSyntax(CSSParserValue*);
+    PassRefPtr<CSSFilterValue> parseCustomFilterFunctionWithInlineSyntax(CSSParserValue*);
+    PassRefPtr<CSSFilterValue> parseCustomFilterFunction(CSSParserValue*);
     bool parseFilterRuleSrc();
-    PassRefPtr<WebKitCSSShaderValue> parseFilterRuleSrcUriAndFormat(CSSParserValueList*);
+    PassRefPtr<CSSShaderValue> parseFilterRuleSrcUriAndFormat(CSSParserValueList*);
 
-    static bool isBlendMode(int ident);
-    static bool isCompositeOperator(int ident);
+    static bool isBlendMode(CSSValueID);
+    static bool isCompositeOperator(CSSValueID);
 
     PassRefPtr<CSSValueList> parseTransform();
     PassRefPtr<CSSValue> parseTransformValue(CSSParserValue*);
@@ -320,6 +321,7 @@ public:
     PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > > sinkFloatingMediaQueryExpList(Vector<OwnPtr<MediaQueryExp> >*);
     MediaQuery* createFloatingMediaQuery(MediaQuery::Restrictor, const String&, PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > >);
     MediaQuery* createFloatingMediaQuery(PassOwnPtr<Vector<OwnPtr<MediaQueryExp> > >);
+    MediaQuery* createFloatingNotAllQuery();
     PassOwnPtr<MediaQuery> sinkFloatingMediaQuery(MediaQuery*);
 
     Vector<RefPtr<StyleKeyframe> >* createFloatingKeyframeVector();
@@ -664,7 +666,7 @@ private:
 
 CSSPropertyID cssPropertyID(const CSSParserString&);
 CSSPropertyID cssPropertyID(const String&);
-int cssValueKeywordID(const CSSParserString&);
+CSSValueID cssValueKeywordID(const CSSParserString&);
 
 class ShorthandScope {
     WTF_MAKE_FAST_ALLOCATED;

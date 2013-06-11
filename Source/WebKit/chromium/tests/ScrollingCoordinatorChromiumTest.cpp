@@ -34,15 +34,15 @@
 #include "WebSettings.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
-#include "core/platform/graphics/chromium/GraphicsLayerChromium.h"
+#include "core/platform/graphics/GraphicsLayer.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
-#include <public/Platform.h>
-#include <public/WebLayer.h>
-#include <public/WebLayerPositionConstraint.h>
-#include <public/WebLayerTreeView.h>
-#include <public/WebUnitTestSupport.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebLayer.h"
+#include "public/platform/WebLayerPositionConstraint.h"
+#include "public/platform/WebLayerTreeView.h"
+#include "public/platform/WebUnitTestSupport.h"
 
 using namespace WebCore;
 using namespace WebKit;
@@ -295,8 +295,8 @@ TEST_F(ScrollingCoordinatorChromiumTest, overflowScrolling)
     ASSERT_TRUE(layerBacking->hasScrollingLayer());
     ASSERT(layerBacking->scrollingContentsLayer());
 
-    GraphicsLayerChromium* graphicsLayerChromium = static_cast<GraphicsLayerChromium*>(layerBacking->scrollingContentsLayer());
-    ASSERT_EQ(layer, graphicsLayerChromium->scrollableArea());
+    GraphicsLayer* graphicsLayer = layerBacking->scrollingContentsLayer();
+    ASSERT_EQ(layer, graphicsLayer->scrollableArea());
 
     WebLayer* webScrollLayer = static_cast<WebLayer*>(layerBacking->scrollingContentsLayer()->platformLayer());
     ASSERT_TRUE(webScrollLayer->scrollable());
@@ -338,7 +338,7 @@ TEST_F(ScrollingCoordinatorChromiumTest, iframeScrolling)
     ASSERT_TRUE(innerCompositor->inCompositingMode());
     ASSERT_TRUE(innerCompositor->scrollLayer());
 
-    GraphicsLayerChromium* scrollLayer = static_cast<GraphicsLayerChromium*>(innerCompositor->scrollLayer());
+    GraphicsLayer* scrollLayer = innerCompositor->scrollLayer();
     ASSERT_EQ(innerFrameView, scrollLayer->scrollableArea());
 
     WebLayer* webScrollLayer = static_cast<WebLayer*>(scrollLayer->platformLayer());
@@ -381,7 +381,7 @@ TEST_F(ScrollingCoordinatorChromiumTest, rtlIframe)
     ASSERT_TRUE(innerCompositor->inCompositingMode());
     ASSERT_TRUE(innerCompositor->scrollLayer());
 
-    GraphicsLayerChromium* scrollLayer = static_cast<GraphicsLayerChromium*>(innerCompositor->scrollLayer());
+    GraphicsLayer* scrollLayer = innerCompositor->scrollLayer();
     ASSERT_EQ(innerFrameView, scrollLayer->scrollableArea());
 
     WebLayer* webScrollLayer = static_cast<WebLayer*>(scrollLayer->platformLayer());

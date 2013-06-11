@@ -27,7 +27,6 @@
 #include "core/loader/FrameLoaderTypes.h"
 #include "core/loader/ResourceLoaderOptions.h"
 #include "core/loader/cache/CachePolicy.h"
-#include "core/platform/PurgePriority.h"
 #include "core/platform/Timer.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceLoadPriority.h"
@@ -97,14 +96,16 @@ public:
     void setResourceError(const ResourceError& error) { m_error = error; }
     const ResourceError& resourceError() const { return m_error; }
 
+    void setIdentifier(unsigned long identifier) { m_identifier = identifier; }
+    unsigned long identifier() const { return m_identifier; }
+
     virtual bool shouldIgnoreHTTPStatusCodeErrors() const { return false; }
 
     ResourceRequest& resourceRequest() { return m_resourceRequest; }
     const KURL& url() const { return m_resourceRequest.url();}
     Type type() const { return static_cast<Type>(m_type); }
-    
-    ResourceLoadPriority loadPriority() const { return m_loadPriority; }
-    void setLoadPriority(ResourceLoadPriority);
+
+    void didChangePriority(ResourceLoadPriority);
 
     void addClient(CachedResourceClient*);
     void removeClient(CachedResourceClient*);
@@ -121,7 +122,7 @@ public:
 
     virtual void didAddClient(CachedResourceClient*);
     virtual void didRemoveClient(CachedResourceClient*) { }
-    virtual void allClientsRemoved() { }
+    virtual void allClientsRemoved();
     void destroyDecodedDataIfNeeded();
 
     unsigned count() const { return m_clients.size(); }
@@ -198,8 +199,8 @@ public:
 
     // List of acceptable MIME types separated by ",".
     // A MIME type may contain a wildcard, e.g. "text/*".
-    String accept() const { return m_accept; }
-    void setAccept(const String& accept) { m_accept = accept; }
+    AtomicString accept() const { return m_accept; }
+    void setAccept(const AtomicString& accept) { m_accept = accept; }
 
     bool wasCanceled() const { return m_error.isCancellation(); }
     bool errorOccurred() const { return m_status == LoadError || m_status == DecodeError; }
@@ -273,10 +274,9 @@ protected:
     bool hasClient(CachedResourceClient* client) { return m_clients.contains(client) || m_clientsAwaitingCallback.contains(client); }
 
     ResourceRequest m_resourceRequest;
-    String m_accept;
+    AtomicString m_accept;
     RefPtr<ResourceLoader> m_loader;
     ResourceLoaderOptions m_options;
-    ResourceLoadPriority m_loadPriority;
 
     ResourceResponse m_response;
     double m_responseTimestamp;
@@ -284,15 +284,15 @@ protected:
     RefPtr<SharedBuffer> m_data;
     OwnPtr<PurgeableBuffer> m_purgeableData;
     Timer<CachedResource> m_decodedDataDeletionTimer;
+    Timer<CachedResource> m_cancelTimer;
 
 private:
     bool addClientToSet(CachedResourceClient*);
     void decodedDataDeletionTimerFired(Timer<CachedResource>*);
+    void cancelTimerFired(Timer<CachedResource>*);
 
     void revalidationSucceeded(const ResourceResponse&);
     void revalidationFailed();
-
-    virtual PurgePriority purgePriority() const { return PurgeDefault; }
 
     double currentAge() const;
     double freshnessLifetime() const;
@@ -307,6 +307,8 @@ private:
 
     double m_lastDecodedAccessTime; // Used as a "thrash guard" in the cache
     double m_loadFinishTime;
+
+    unsigned long m_identifier;
 
     unsigned m_encodedSize;
     unsigned m_decodedSize;

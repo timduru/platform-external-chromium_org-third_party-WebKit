@@ -30,11 +30,11 @@
 #include "core/dom/GenericEventQueue.h"
 #include "core/html/HTMLElement.h"
 #include "core/html/MediaControllerInterface.h"
-#include "core/platform/graphics/MediaPlayer.h"
-
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackCue.h"
 #include "core/platform/PODIntervalTree.h"
+#include "core/platform/graphics/MediaPlayer.h"
+#include "public/platform/WebMimeRegistry.h"
 
 namespace WebCore {
 
@@ -42,13 +42,15 @@ namespace WebCore {
 class AudioSourceProvider;
 class MediaElementAudioSourceNode;
 #endif
+class ContentType;
 class Event;
 class HTMLSourceElement;
 class HTMLTrackElement;
+class KURL;
 class MediaController;
 class MediaControls;
 class MediaError;
-class KURL;
+class MediaSourceBase;
 class TextTrackList;
 class TimeRanges;
 #if ENABLE(ENCRYPTED_MEDIA_V2)
@@ -69,14 +71,13 @@ class HTMLMediaElement : public HTMLElement, public MediaPlayerClient, public Ac
     , private TextTrackClient
 {
 public:
+    static WebKit::WebMimeRegistry::SupportsType supportsType(const ContentType&, const String& keySystem = String());
+
     MediaPlayer* player() const { return m_player.get(); }
 
     virtual bool isVideo() const = 0;
     virtual bool hasVideo() const { return false; }
     virtual bool hasAudio() const;
-
-    void rewind(double timeDelta);
-    void returnToRealtime();
 
     // Eventually overloaded in HTMLVideoElement
     virtual bool supportsFullscreen() const { return false; };
@@ -91,8 +92,6 @@ public:
         TextTrackChangesNotification = 1 << 2
     };
     void scheduleDelayedAction(DelayedActionType);
-    
-    MediaPlayer::MovieLoadType movieLoadType() const;
     
     bool inActiveDocument() const { return m_inActiveDocument; }
     
@@ -227,11 +226,6 @@ public:
     void configureTextTracks();
     void configureTextTrackGroup(const TrackGroup&);
 
-    void setSelectedTextTrack(TextTrack*);
-    static int textTracksOffIndex() { return -1; }
-    static int textTracksIndexNotFound() { return -2; }
-
-    bool userPrefersCaptions() const;
     bool textTracksAreReady() const;
     void configureTextTrackDisplay();
     void updateTextTrackDisplay();
@@ -363,13 +357,8 @@ private:
     virtual void mediaPlayerNetworkStateChanged() OVERRIDE;
     virtual void mediaPlayerReadyStateChanged() OVERRIDE;
     virtual void mediaPlayerTimeChanged() OVERRIDE;
-    virtual void mediaPlayerVolumeChanged() OVERRIDE;
-    virtual void mediaPlayerMuteChanged() OVERRIDE;
     virtual void mediaPlayerDurationChanged() OVERRIDE;
-    virtual void mediaPlayerRateChanged() OVERRIDE;
     virtual void mediaPlayerPlaybackStateChanged() OVERRIDE;
-    virtual void mediaPlayerSawUnsupportedTracks() OVERRIDE;
-    virtual void mediaPlayerResourceNotSupported() OVERRIDE;
     virtual void mediaPlayerRepaint() OVERRIDE;
     virtual void mediaPlayerSizeChanged() OVERRIDE;
     virtual void mediaPlayerEngineUpdated() OVERRIDE;
@@ -424,7 +413,6 @@ private:
     HTMLTrackElement* showingTrackWithSameKind(HTMLTrackElement*) const;
 
     void markCaptionAndSubtitleTracksAsUnconfigured();
-    virtual void captionPreferencesChanged() OVERRIDE;
 
     // These "internal" functions do not check user gesture restrictions.
     void loadInternal();
@@ -433,10 +421,6 @@ private:
 
     void prepareForLoad();
     void allowVideoRendering();
-
-    bool processingMediaPlayerCallback() const { return m_processingMediaPlayerCallback > 0; }
-    void beginProcessingMediaPlayerCallback() { ++m_processingMediaPlayerCallback; }
-    void endProcessingMediaPlayerCallback() { ASSERT(m_processingMediaPlayerCallback); --m_processingMediaPlayerCallback; }
 
     void updateVolume();
     void updatePlayState();
@@ -475,7 +459,6 @@ private:
     bool isBlocked() const;
     bool isBlockedOnMediaController() const;
     bool hasCurrentSrc() const { return !m_currentSrc.isEmpty(); }
-    bool isLiveStream() const { return movieLoadType() == MediaPlayer::LiveStream; }
     bool isAutoplaying() const { return m_autoplaying; }
 
     Timer<HTMLMediaElement> m_loadTimer;
@@ -520,11 +503,7 @@ private:
 
     DisplayMode m_displayMode;
 
-    // Counter incremented while processing a callback from the media player, so we can avoid
-    // calling the media engine recursively.
-    int m_processingMediaPlayerCallback;
-
-    RefPtr<WebKitMediaSource> m_mediaSource;
+    RefPtr<MediaSourceBase> m_mediaSource;
 
     mutable double m_cachedTime;
     mutable double m_cachedTimeWallClockUpdateTime;

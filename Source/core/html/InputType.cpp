@@ -91,9 +91,8 @@ static PassOwnPtr<InputTypeFactoryMap> createInputTypeFactoryMap()
     OwnPtr<InputTypeFactoryMap> map = adoptPtr(new InputTypeFactoryMap);
     map->add(InputTypeNames::button(), ButtonInputType::create);
     map->add(InputTypeNames::checkbox(), CheckboxInputType::create);
-#if ENABLE(INPUT_TYPE_COLOR)
-    map->add(InputTypeNames::color(), ColorInputType::create);
-#endif
+    if (RuntimeEnabledFeatures::inputTypeColorEnabled())
+        map->add(InputTypeNames::color(), ColorInputType::create);
     map->add(InputTypeNames::date(), DateInputType::create);
     map->add(InputTypeNames::datetimelocal(), DateTimeLocalInputType::create);
     map->add(InputTypeNames::email(), EmailInputType::create);
@@ -474,6 +473,12 @@ void InputType::destroyShadowSubtree()
     }
 }
 
+Element* InputType::elementById(const AtomicString& id) const
+{
+    ShadowRoot* shadowRoot = element()->userAgentShadowRoot();
+    return shadowRoot ? shadowRoot->getElementById(id) : 0;
+}
+
 Decimal InputType::parseToNumber(const String&, const Decimal& defaultValue) const
 {
     ASSERT_NOT_REACHED();
@@ -828,12 +833,10 @@ bool InputType::isSteppable() const
     return false;
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
 bool InputType::isColorControl() const
 {
     return false;
 }
-#endif
 
 bool InputType::shouldRespectHeightAndWidthAttributes()
 {

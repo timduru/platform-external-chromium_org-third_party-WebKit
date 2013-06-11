@@ -52,13 +52,13 @@
 #include "core/platform/graphics/GraphicsLayer.h"
 #include "core/platform/graphics/IntPoint.h"
 #include "core/platform/graphics/IntRect.h"
-#include <public/WebFloatQuad.h>
-#include <public/WebGestureCurveTarget.h>
-#include <public/WebLayer.h>
-#include <public/WebPoint.h>
-#include <public/WebRect.h>
-#include <public/WebSize.h>
-#include <public/WebString.h>
+#include "public/platform/WebFloatQuad.h"
+#include "public/platform/WebGestureCurveTarget.h"
+#include "public/platform/WebLayer.h"
+#include "public/platform/WebPoint.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebSize.h"
+#include "public/platform/WebString.h"
 #include <wtf/OwnPtr.h>
 #include <wtf/RefCounted.h>
 
@@ -89,13 +89,11 @@ class Widget;
 namespace WebKit {
 class AutocompletePopupMenuClient;
 class AutofillPopupMenuClient;
-class BatteryClientImpl;
 class ContextFeaturesClientImpl;
 class ContextMenuClientImpl;
 class DeviceOrientationClientProxy;
 class GeolocationClientProxy;
 class LinkHighlight;
-class NonCompositedContentHost;
 class PrerendererClientImpl;
 class SpeechInputClientImpl;
 class SpeechRecognitionClientProxy;
@@ -233,6 +231,7 @@ public:
     virtual void restoreScrollAndScaleState();
     virtual void resetScrollAndScaleState();
     virtual void setIgnoreViewportTagScaleLimits(bool);
+    virtual WebSize contentsPreferredMinimumSize();
 
     virtual float deviceScaleFactor() const;
     virtual void setDeviceScaleFactor(float);
@@ -307,9 +306,6 @@ public:
     virtual void showContextMenu();
     virtual void addPageOverlay(WebPageOverlay*, int /* zOrder */);
     virtual void removePageOverlay(WebPageOverlay*);
-#if ENABLE(BATTERY_STATUS)
-    virtual void updateBatteryStatus(const WebBatteryStatus&);
-#endif
     virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&);
     virtual WebViewBenchmarkSupport* benchmarkSupport();
     virtual void setShowPaintRects(bool);
@@ -519,9 +515,6 @@ public:
     void setRootGraphicsLayer(WebCore::GraphicsLayer*);
     void scheduleCompositingLayerSync();
     void scrollRootLayerRect(const WebCore::IntSize& scrollDelta, const WebCore::IntRect& clipRect);
-    void paintRootLayer(WebCore::GraphicsContext&, const WebCore::IntRect& contentRect);
-    NonCompositedContentHost* nonCompositedContentHost();
-    void setBackgroundColor(const WebCore::Color&);
     WebCore::GraphicsLayerFactory* graphicsLayerFactory() const;
     void registerForAnimations(WebLayer*);
     void scheduleAnimation();
@@ -809,7 +802,6 @@ private:
     WebViewBenchmarkSupportImpl m_benchmarkSupport;
 
     WebCore::IntRect m_rootLayerScrollDamage;
-    OwnPtr<NonCompositedContentHost> m_nonCompositedContentHost;
     WebLayerTreeView* m_layerTreeView;
     WebLayer* m_rootLayer;
     WebCore::GraphicsLayer* m_rootGraphicsLayer;
@@ -828,9 +820,6 @@ private:
 
     OwnPtr<DeviceOrientationClientProxy> m_deviceOrientationClientProxy;
     OwnPtr<GeolocationClientProxy> m_geolocationClientProxy;
-#if ENABLE(BATTERY_STATUS)
-    OwnPtr<BatteryClientImpl> m_batteryClient;
-#endif
 
     float m_emulatedTextZoomFactor;
 

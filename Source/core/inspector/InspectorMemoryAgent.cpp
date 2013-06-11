@@ -34,19 +34,13 @@
 #include "InspectorFrontend.h"
 #include "bindings/v8/ScriptGCEvent.h"
 #include "bindings/v8/ScriptProfiler.h"
-#include "core/dom/CharacterData.h"
 #include "core/dom/Document.h"
-#include "core/dom/EventListenerMap.h"
 #include "core/dom/Node.h"
-#include "core/dom/NodeTraversal.h"
-#include "core/dom/StyledElement.h"
 #include "core/inspector/BindingVisitors.h"
 #include "core/inspector/HeapGraphSerializer.h"
 #include "core/inspector/InspectorClient.h"
 #include "core/inspector/InspectorDOMStorageAgent.h"
-#include "core/inspector/InspectorState.h"
 #include "core/inspector/InspectorValues.h"
-#include "core/inspector/InstrumentingAgents.h"
 #include "core/inspector/MemoryInstrumentationImpl.h"
 #include "core/loader/cache/MemoryCache.h"
 #include "core/page/Frame.h"
@@ -364,7 +358,6 @@ PassRefPtr<InspectorObject> InspectorMemoryAgent::getProcessMemoryDistributionIm
     reportRenderTreeInfo(memoryInstrumentationClient, m_page);
     collectDomTreeInfo(memoryInstrumentation, m_page); // FIXME: collect for all pages?
 
-    PlatformMemoryInstrumentation::reportStaticMembersMemoryUsage(&memoryInstrumentation);
     WebCoreMemoryInstrumentation::reportStaticMembersMemoryUsage(&memoryInstrumentation);
 
     memoryInstrumentation.addRootObject(this);

@@ -30,9 +30,9 @@
 
 #include "HTMLNames.h"
 #include "SVGNames.h"
-#include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentEventQueue.h"
+#include "core/dom/DocumentMarkerController.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/EventPathWalker.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
@@ -51,12 +51,9 @@
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/html/HTMLFrameSetElement.h"
 #include "core/html/HTMLInputElement.h"
-#include "core/html/PluginDocument.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/cache/CachedImage.h"
-#include "core/page/AutoscrollController.h"
 #include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
 #include "core/page/DragController.h"
 #include "core/page/DragState.h"
 #include "core/page/EditorClient.h"
@@ -70,7 +67,6 @@
 #include "core/page/SpatialNavigation.h"
 #include "core/page/TouchAdjustment.h"
 #include "core/platform/Cursor.h"
-#include "core/platform/NotImplemented.h"
 #include "core/platform/PlatformEvent.h"
 #include "core/platform/PlatformGestureEvent.h"
 #include "core/platform/PlatformKeyboardEvent.h"
@@ -82,18 +78,14 @@
 #include "core/platform/chromium/ChromiumDataObject.h"
 #include "core/platform/chromium/ClipboardChromium.h"
 #include "core/platform/graphics/FloatPoint.h"
-#include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/Image.h"
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/HitTestResult.h"
-#include "core/rendering/RenderFrameSet.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderTextControlSingleLine.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/style/CursorList.h"
-#include "core/rendering/style/StyleCachedImage.h"
-#include "core/rendering/style/StyleCachedImageSet.h"
 #include "core/svg/SVGDocument.h"
 #include "core/svg/SVGElementInstance.h"
 #include "core/svg/SVGUseElement.h"
@@ -281,7 +273,6 @@ EventHandler::EventHandler(Frame* frame)
     , m_mouseDownWasSingleClickInSelection(false)
     , m_selectionInitiationState(HaveNotStartedSelection)
     , m_hoverTimer(this, &EventHandler::hoverTimerFired)
-    , m_autoscrollController(adoptPtr(new AutoscrollController(frame)))
     , m_mouseDownMayStartAutoscroll(false)
     , m_mouseDownWasInSubframe(false)
     , m_fakeMouseMoveEventTimer(this, &EventHandler::fakeMouseMoveEventTimerFired)
@@ -430,10 +421,43 @@ void EventHandler::selectClosestWordFromHitTestResult(const HitTestResult& resul
     }
 }
 
+void EventHandler::selectClosestMisspellingFromHitTestResult(const HitTestResult& result, AppendTrailingWhitespace appendTrailingWhitespace)
+{
+    Node* innerNode = result.targetNode();
+    VisibleSelection newSelection;
+
+    if (innerNode && innerNode->renderer()) {
+        VisiblePosition pos(innerNode->renderer()->positionForPoint(result.localPoint()));
+        if (pos.isNotNull()) {
+            RefPtr<Range> range = makeRange(pos, pos);
+            Vector<DocumentMarker*> markers = innerNode->document()->markers()->markersInRange(
+                range.get(), DocumentMarker::Spelling | DocumentMarker::Grammar);
+            if (markers.size() == 1) {
+                range->setStart(innerNode, markers[0]->startOffset());
+                range->setEnd(innerNode, markers[0]->endOffset());
+                newSelection = VisibleSelection(range.get());
+            }
+        }
+
+        if (appendTrailingWhitespace == ShouldAppendTrailingWhitespace && newSelection.isRange())
+            newSelection.appendTrailingWhitespace();
+
+        updateSelectionForMouseDownDispatchingSelectStart(innerNode, expandSelectionToRespectUserSelectAll(innerNode, newSelection), WordGranularity);
+    }
+}
+
 void EventHandler::selectClosestWordFromMouseEvent(const MouseEventWithHitTestResults& result)
 {
     if (m_mouseDownMayStartSelect) {
         selectClosestWordFromHitTestResult(result.hitTestResult(),
+            (result.event().clickCount() == 2 && m_frame->editor()->isSelectTrailingWhitespaceEnabled()) ? ShouldAppendTrailingWhitespace : DontAppendTrailingWhitespace);
+    }
+}
+
+void EventHandler::selectClosestMisspellingFromMouseEvent(const MouseEventWithHitTestResults& result)
+{
+    if (m_mouseDownMayStartSelect) {
+        selectClosestMisspellingFromHitTestResult(result.hitTestResult(),
             (result.event().clickCount() == 2 && m_frame->editor()->isSelectTrailingWhitespaceEnabled()) ? ShouldAppendTrailingWhitespace : DontAppendTrailingWhitespace);
     }
 }
@@ -668,8 +692,10 @@ bool EventHandler::handleMouseDraggedEvent(const MouseEventWithHitTestResults& e
     m_mouseDownMayStartDrag = false;
 
     if (m_mouseDownMayStartAutoscroll && !panScrollInProgress()) {
-        m_autoscrollController->startAutoscrollForSelection(renderer);
-        m_mouseDownMayStartAutoscroll = false;
+        if (Page* page = m_frame->page()) {
+            page->startAutoscrollForSelection(renderer);
+            m_mouseDownMayStartAutoscroll = false;
+        }
     }
 
     if (m_selectionInitiationState != ExtendedSelection) {
@@ -779,7 +805,8 @@ bool EventHandler::handleMouseUp(const MouseEventWithHitTestResults& event)
 
 bool EventHandler::handleMouseReleaseEvent(const MouseEventWithHitTestResults& event)
 {
-    if (autoscrollInProgress())
+    Page* page = m_frame->page();
+    if (page && page->autoscrollInProgress())
         stopAutoscrollTimer();
 
     if (handleMouseUp(event))
@@ -831,44 +858,23 @@ bool EventHandler::handleMouseReleaseEvent(const MouseEventWithHitTestResults& e
 
 #if ENABLE(PAN_SCROLLING)
 
-void EventHandler::didPanScrollStart()
-{
-    m_autoscrollController->didPanScrollStart();
-}
-
-void EventHandler::didPanScrollStop()
-{
-    m_autoscrollController->didPanScrollStop();
-}
-
 void EventHandler::startPanScrolling(RenderObject* renderer)
 {
     if (!renderer->isBox())
         return;
-    m_autoscrollController->startPanScrolling(toRenderBox(renderer), lastKnownMousePosition());
+    Page* page = m_frame->page();
+    if (!page)
+        return;
+    page->startPanScrolling(toRenderBox(renderer), lastKnownMousePosition());
     invalidateClick();
 }
 
 #endif // ENABLE(PAN_SCROLLING)
 
-RenderObject* EventHandler::autoscrollRenderer() const
-{
-    return m_autoscrollController->autoscrollRenderer();
-}
-
-void EventHandler::updateAutoscrollRenderer()
-{
-    m_autoscrollController->updateAutoscrollRenderer();
-}
-
-bool EventHandler::autoscrollInProgress() const
-{
-    return m_autoscrollController->autoscrollInProgress();
-}
-
 bool EventHandler::panScrollInProgress() const
 {
-    return m_autoscrollController->panScrollInProgress();
+    Page* page = m_frame->page();
+    return page && page->panScrollInProgress();
 }
 
 DragSourceAction EventHandler::updateDragSourceActionsAllowed() const
@@ -926,9 +932,12 @@ HitTestResult EventHandler::hitTestResultAtPoint(const LayoutPoint& point, HitTe
     return result;
 }
 
-void EventHandler::stopAutoscrollTimer(bool rendererIsBeingDestroyed)
+void EventHandler::stopAutoscrollTimer()
 {
-    m_autoscrollController->stopAutoscrollTimer(rendererIsBeingDestroyed);
+    Page* page = m_frame->page();
+    if (!page)
+        return;
+    page->stopAutoscrollTimer();
 }
 
 Node* EventHandler::mousePressNode() const
@@ -1054,7 +1063,7 @@ Frame* EventHandler::subframeForTargetNode(Node* node)
 
 static bool isSubmitImage(Node* node)
 {
-    return node && node->hasTagName(inputTag) && static_cast<HTMLInputElement*>(node)->isImageButton();
+    return node && node->hasTagName(inputTag) && toHTMLInputElement(node)->isImageButton();
 }
 
 // Returns true if the node's editable block is not current focused for editing
@@ -1617,7 +1626,8 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
         gestureIndicator = adoptPtr(new UserGestureIndicator(DefinitelyProcessingUserGesture));
 
 #if ENABLE(PAN_SCROLLING)
-    m_autoscrollController->handleMouseReleaseEvent(mouseEvent);
+    if (Page* page = m_frame->page())
+        page->handleMouseReleaseForPanScrolling(m_frame, mouseEvent);
 #endif
 
     m_mousePressed = false;
@@ -1789,7 +1799,8 @@ bool EventHandler::updateDragAndDrop(const PlatformMouseEvent& event, Clipboard*
     if (newTarget && newTarget->isTextNode())
         newTarget = EventPathWalker::parent(newTarget.get());
 
-    m_autoscrollController->updateDragAndDrop(newTarget.get(), event.position(), event.timestamp());
+    if (Page* page = m_frame->page())
+        page->updateDragAndDrop(newTarget.get(), event.position(), event.timestamp());
 
     if (m_dragTarget != newTarget) {
         // FIXME: this ordering was explicitly chosen to match WinIE. However,
@@ -2687,15 +2698,18 @@ bool EventHandler::sendContextMenuEvent(const PlatformMouseEvent& event)
     HitTestRequest request(HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
     MouseEventWithHitTestResults mev = doc->prepareMouseEvent(request, viewportPos, event);
 
-    if (m_frame->editor()->behavior().shouldSelectOnContextualMenuClick()
-        && !m_frame->selection()->contains(viewportPos)
+    if (!m_frame->selection()->contains(viewportPos)
         && !mev.scrollbar()
         // FIXME: In the editable case, word selection sometimes selects content that isn't underneath the mouse.
         // If the selection is non-editable, we do word selection to make it easier to use the contextual menu items
         // available for text selections.  But only if we're above text.
         && (m_frame->selection()->isContentEditable() || (mev.targetNode() && mev.targetNode()->isTextNode()))) {
         m_mouseDownMayStartSelect = true; // context menu events are always allowed to perform a selection
-        selectClosestWordOrLinkFromMouseEvent(mev);
+
+        if (mev.hitTestResult().isMisspelled())
+            selectClosestMisspellingFromMouseEvent(mev);
+        else if (m_frame->editor()->behavior().shouldSelectOnContextualMenuClick())
+            selectClosestWordOrLinkFromMouseEvent(mev);
     }
 
     swallowEvent = !dispatchMouseEvent(eventNames().contextmenuEvent, mev.targetNode(), true, 0, event, false);
@@ -3055,47 +3069,6 @@ static FocusDirection focusDirectionForKey(const AtomicString& keyIdentifier)
     return retVal;
 }
 
-static void handleKeyboardSelectionMovement(FrameSelection* selection, KeyboardEvent* event)
-{
-    if (!event)
-        return;
-
-    bool isOptioned = event->getModifierState("Alt");
-    bool isCommanded = event->getModifierState("Meta");
-
-    SelectionDirection direction = DirectionForward;
-    TextGranularity granularity = CharacterGranularity;
-
-    switch (focusDirectionForKey(event->keyIdentifier())) {
-    case FocusDirectionNone:
-        return;
-    case FocusDirectionForward:
-    case FocusDirectionBackward:
-        ASSERT_NOT_REACHED();
-        return;
-    case FocusDirectionUp:
-        direction = DirectionBackward;
-        granularity = isCommanded ? DocumentBoundary : LineGranularity;
-        break;
-    case FocusDirectionDown:
-        direction = DirectionForward;
-        granularity = isCommanded ? DocumentBoundary : LineGranularity;
-        break;
-    case FocusDirectionLeft:
-        direction = DirectionLeft;
-        granularity = (isCommanded) ? LineBoundary : (isOptioned) ? WordGranularity : CharacterGranularity;
-        break;
-    case FocusDirectionRight:
-        direction = DirectionRight;
-        granularity = (isCommanded) ? LineBoundary : (isOptioned) ? WordGranularity : CharacterGranularity;
-        break;
-    }
-
-    FrameSelection::EAlteration alternation = event->getModifierState("Shift") ? FrameSelection::AlterationExtend : FrameSelection::AlterationMove;
-    selection->modify(alternation, direction, granularity, UserTriggered);
-    event->setDefaultHandled();
-}
-    
 void EventHandler::defaultKeyboardEventHandler(KeyboardEvent* event)
 {
     if (event->type() == eventNames().keydownEvent) {
@@ -3111,10 +3084,6 @@ void EventHandler::defaultKeyboardEventHandler(KeyboardEvent* event)
             if (direction != FocusDirectionNone)
                 defaultArrowEventHandler(direction, event);
         }
-
-        // provides KB navigation and selection for enhanced accessibility users
-        if (AXObjectCache::accessibilityEnhancedUserInterfaceEnabled())
-            handleKeyboardSelectionMovement(m_frame->selection(), event);
     }
     if (event->type() == eventNames().keypressEvent) {
         m_frame->editor()->handleKeyboardEvent(event);

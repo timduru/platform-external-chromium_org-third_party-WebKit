@@ -96,7 +96,6 @@ DocumentLoader::DocumentLoader(const ResourceRequest& req, const SubstituteData&
     , m_substituteData(substituteData)
     , m_originalRequestCopy(req)
     , m_request(req)
-    , m_originalSubstituteDataWasValid(substituteData.isValid())
     , m_committed(false)
     , m_isStopping(false)
     , m_gotFirstByte(false)
@@ -141,6 +140,11 @@ PassRefPtr<SharedBuffer> DocumentLoader::mainResourceData() const
     if (m_mainResource)
         return m_mainResource->resourceBuffer();
     return 0;
+}
+
+unsigned long DocumentLoader::mainResourceIdentifier() const
+{
+    return m_mainResource ? m_mainResource->identifier() : m_identifierForLoadWithoutResourceLoader;
 }
 
 Document* DocumentLoader::document() const
@@ -541,7 +545,7 @@ void DocumentLoader::responseReceived(CachedResource* resource, const ResourceRe
     if (it != response.httpHeaderFields().end()) {
         String content = it->value;
         ASSERT(m_mainResource);
-        unsigned long identifier = m_identifierForLoadWithoutResourceLoader ? m_identifierForLoadWithoutResourceLoader : m_mainResource->identifier();
+        unsigned long identifier = mainResourceIdentifier();
         ASSERT(identifier);
         if (frameLoader()->shouldInterruptLoadForXFrameOptions(content, response.url(), identifier)) {
             InspectorInstrumentation::continueAfterXFrameOptionsDenied(m_frame, this, identifier, response);
@@ -574,7 +578,7 @@ void DocumentLoader::responseReceived(CachedResource* resource, const ResourceRe
         frameLoader()->notifier()->dispatchDidReceiveResponse(this, m_identifierForLoadWithoutResourceLoader, m_response, 0);
 
     if (!shouldContinueForResponse()) {
-        InspectorInstrumentation::continueWithPolicyIgnore(m_frame, this, mainResourceLoader()->identifier(), m_response);
+        InspectorInstrumentation::continueWithPolicyIgnore(m_frame, this, m_mainResource->identifier(), m_response);
         stopLoadingForPolicyChange();
         return;
     }
@@ -641,14 +645,6 @@ void DocumentLoader::commitData(const char* bytes, size_t length)
         m_writer.begin(documentURL(), false);
         m_writer.setDocumentWasLoadedAsPartOfNavigation();
 
-        if (SecurityPolicy::allowSubstituteDataAccessToLocal() && m_originalSubstituteDataWasValid) {
-            // If this document was loaded with substituteData, then the document can
-            // load local resources. See https://bugs.webkit.org/show_bug.cgi?id=16756
-            // and https://bugs.webkit.org/show_bug.cgi?id=19760 for further
-            // discussion.
-            m_frame->document()->securityOrigin()->grantLoadLocalResources();
-        }
-
         if (frameLoader()->stateMachine()->creatingInitialEmptyDocument())
             return;
         
@@ -691,8 +687,6 @@ void DocumentLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_response, "response");
     info.addMember(m_archiveResourceCollection, "archiveResourceCollection");
     info.addMember(m_archive, "archive");
-    info.addMember(m_resourcesClientKnowsAbout, "resourcesClientKnowsAbout");
-    info.addMember(m_resourcesLoadedFromMemoryCacheForClientNotification, "resourcesLoadedFromMemoryCacheForClientNotification");
     info.addMember(m_applicationCacheHost, "applicationCacheHost");
 }
 
@@ -1013,11 +1007,6 @@ void DocumentLoader::startLoadingMainResource()
         m_applicationCacheHost = adoptPtr(new ApplicationCacheHost(this));
         maybeLoadEmpty();
         return;
-    }
-
-    if (!mainResourceLoader()) {
-        m_identifierForLoadWithoutResourceLoader = createUniqueIdentifier();
-        frameLoader()->notifier()->dispatchWillSendRequest(this, m_identifierForLoadWithoutResourceLoader, request, ResourceResponse());
     }
     m_mainResource->addClient(this);
 

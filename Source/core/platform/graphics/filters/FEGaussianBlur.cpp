@@ -333,14 +333,14 @@ bool FEGaussianBlur::applySkia()
 
     dstContext->saveLayer(0, &paint);
     paint.setColor(0xFFFFFFFF);
-    dstContext->drawImage(image.get(), ColorSpaceDeviceRGB, drawingRegion.location(), CompositeCopy);
+    dstContext->drawImage(image.get(), drawingRegion.location(), CompositeCopy);
     dstContext->restoreLayer();
     return true;
 }
 
 SkImageFilter* FEGaussianBlur::createImageFilter(SkiaImageFilterBuilder* builder)
 {
-    SkAutoTUnref<SkImageFilter> input(builder->build(inputEffect(0)));
+    SkAutoTUnref<SkImageFilter> input(builder->build(inputEffect(0), operatingColorSpace()));
     return new SkBlurImageFilter(SkFloatToScalar(m_stdX), SkFloatToScalar(m_stdY), input);
 }
 

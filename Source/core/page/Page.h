@@ -42,6 +42,7 @@
 
 namespace WebCore {
 
+class AutoscrollController;
 class BackForwardClient;
 class BackForwardController;
 class Chrome;
@@ -64,10 +65,12 @@ class InspectorController;
 class Node;
 class PageConsole;
 class PageGroup;
+class PlatformMouseEvent;
 class PluginData;
 class PointerLockController;
 class ProgressTracker;
 class Range;
+class RenderBox;
 class RenderObject;
 class RenderTheme;
 class VisibleSelection;
@@ -142,7 +145,8 @@ public:
 
     void goToItem(HistoryItem*);
 
-    enum PageGroupType { PrivatePageGroup, SharedPageGroup };
+    // FIXME: InspectorPageGroup is only needed to support single process debugger layout tests, it should be removed when DumpRenderTree is gone.
+    enum PageGroupType { InspectorPageGroup, PrivatePageGroup, SharedPageGroup };
     void setGroupType(PageGroupType);
     void clearPageGroup();
     PageGroup& group()
@@ -165,6 +169,19 @@ public:
     PointerLockController* pointerLockController() const { return m_pointerLockController.get(); }
     ValidationMessageClient* validationMessageClient() const { return m_validationMessageClient; }
     void setValidationMessageClient(ValidationMessageClient* client) { m_validationMessageClient = client; }
+
+    bool autoscrollInProgress() const;
+    bool autoscrollInProgress(const RenderBox*) const;
+    bool panScrollInProgress() const;
+    void startAutoscrollForSelection(RenderObject*);
+    void stopAutoscrollIfNeeded(RenderObject*);
+    void stopAutoscrollTimer();
+    void updateAutoscrollRenderer();
+    void updateDragAndDrop(Node* targetNode, const IntPoint& eventPosition, double eventTime);
+#if ENABLE(PAN_SCROLLING)
+    void handleMouseReleaseForPanScrolling(Frame*, const PlatformMouseEvent&);
+    void startPanScrolling(RenderBox*, const IntPoint&);
+#endif
 
     ScrollingCoordinator* scrollingCoordinator();
 
@@ -213,9 +230,6 @@ public:
     StorageNamespace* sessionStorage(bool optionalCreate = true);
     void setSessionStorage(PassRefPtr<StorageNamespace>);
 
-    void setMemoryCacheClientCallsEnabled(bool);
-    bool areMemoryCacheClientCallsEnabled() const { return m_areMemoryCacheClientCallsEnabled; }
-
     // Don't allow more than a certain number of frames in a page.
     // This seems like a reasonable upper bound, and otherwise mutually
     // recursive frameset pages can quickly bring the program to its knees
@@ -246,8 +260,6 @@ public:
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
-    void captionPreferencesChanged();
-
     double timerAlignmentInterval() const;
 
     class MultisamplingChangedObserver {
@@ -270,6 +282,7 @@ private:
 
     void setTimerAlignmentInterval(double);
 
+    OwnPtr<AutoscrollController> m_autoscrollController;
     OwnPtr<Chrome> m_chrome;
     OwnPtr<DragCaretController> m_dragCaretController;
 
@@ -301,8 +314,6 @@ private:
     bool m_tabKeyCyclesThroughElements;
     bool m_defersLoading;
     unsigned m_defersLoadingCallCount;
-
-    bool m_areMemoryCacheClientCallsEnabled;
 
     float m_pageScaleFactor;
     float m_deviceScaleFactor;

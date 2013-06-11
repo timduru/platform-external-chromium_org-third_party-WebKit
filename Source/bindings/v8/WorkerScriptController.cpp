@@ -49,8 +49,8 @@
 #include "core/workers/WorkerThread.h"
 #include <v8.h>
 
-#include <public/Platform.h>
-#include <public/WebWorkerRunLoop.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebWorkerRunLoop.h"
 
 namespace WebCore {
 
@@ -94,8 +94,7 @@ bool WorkerScriptController::initializeContextIfNeeded()
     if (!m_context.isEmpty())
         return true;
 
-    v8::Persistent<v8::ObjectTemplate> globalTemplate;
-    m_context.set(m_isolate, v8::Context::New(m_isolate, 0, globalTemplate));
+    m_context.set(m_isolate, v8::Context::New(m_isolate));
     if (m_context.isEmpty())
         return false;
 
@@ -154,7 +153,7 @@ ScriptValue WorkerScriptController::evaluate(const String& script, const String&
     v8::TryCatch block;
 
     v8::Handle<v8::String> scriptString = v8String(script, m_isolate);
-    v8::Handle<v8::Script> compiledScript = V8ScriptRunner::compileScript(scriptString, fileName, scriptStartPosition, 0, m_isolate);
+    v8::Handle<v8::Script> compiledScript = V8ScriptRunner::compileScript(scriptString, fileName, scriptStartPosition, m_isolate);
     v8::Local<v8::Value> result = V8ScriptRunner::runCompiledScript(compiledScript, m_workerContext);
 
     if (!block.CanContinue()) {
@@ -236,7 +235,7 @@ void WorkerScriptController::disableEval(const String& errorMessage)
 
 void WorkerScriptController::setException(const ScriptValue& exception)
 {
-    throwError(*exception.v8Value(), m_isolate);
+    throwError(exception.v8Value(), m_isolate);
 }
 
 WorkerScriptController* WorkerScriptController::controllerForContext()

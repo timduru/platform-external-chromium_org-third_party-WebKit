@@ -39,6 +39,7 @@
 #include "WebInputEvent.h"
 #include "WebInputEventConversion.h"
 #include "WebPlugin.h"
+#include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "core/page/Chrome.h"
 #include "core/page/EventHandler.h"
@@ -71,21 +72,21 @@
 #include "core/platform/ScrollbarTheme.h"
 #include "core/platform/chromium/KeyboardCodes.h"
 #include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/chromium/GraphicsLayerChromium.h"
+#include "core/platform/graphics/GraphicsLayer.h"
 #include "core/plugins/IFrameShimSupport.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderBox.h"
-#include <public/Platform.h>
-#include <public/WebClipboard.h>
-#include <public/WebCompositorSupport.h>
-#include <public/WebDragData.h>
-#include <public/WebExternalTextureLayer.h>
-#include <public/WebRect.h>
-#include <public/WebString.h>
-#include <public/WebURL.h>
-#include <public/WebURLError.h>
-#include <public/WebURLRequest.h>
-#include <public/WebVector.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebClipboard.h"
+#include "public/platform/WebCompositorSupport.h"
+#include "public/platform/WebDragData.h"
+#include "public/platform/WebExternalTextureLayer.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebURL.h"
+#include "public/platform/WebURLError.h"
+#include "public/platform/WebURLRequest.h"
+#include "public/platform/WebVector.h"
 
 using namespace WebCore;
 
@@ -292,9 +293,9 @@ void WebPluginContainerImpl::setWebLayer(WebLayer* layer)
     if (!m_webLayer || !layer)
         m_element->setNeedsStyleRecalc(WebCore::SyntheticStyleChange);
     if (m_webLayer)
-        GraphicsLayerChromium::unregisterContentsLayer(m_webLayer);
+        GraphicsLayer::unregisterContentsLayer(m_webLayer);
     if (layer)
-        GraphicsLayerChromium::registerContentsLayer(layer);
+        GraphicsLayer::registerContentsLayer(layer);
     m_webLayer = layer;
 }
 
@@ -346,6 +347,11 @@ bool WebPluginContainerImpl::executeEditCommand(const WebString& name)
 
     copy();
     return true;
+}
+
+bool WebPluginContainerImpl::executeEditCommand(const WebString& name, const WebString& value)
+{
+    return m_webPlugin->executeEditCommand(name, value);
 }
 
 WebElement WebPluginContainerImpl::element()
@@ -486,7 +492,7 @@ void WebPluginContainerImpl::requestTouchEventType(TouchEventRequestType request
 {
     if (m_touchEventRequestType == requestType)
         return;
-    
+
     if (requestType != TouchEventRequestTypeNone && m_touchEventRequestType == TouchEventRequestTypeNone)
         m_element->document()->didAddTouchEventHandler(m_element);
     else if (requestType == TouchEventRequestTypeNone && m_touchEventRequestType != TouchEventRequestTypeNone)
@@ -514,6 +520,15 @@ WebPoint WebPluginContainerImpl::windowToLocalPoint(const WebPoint& point)
         return point;
     WebPoint windowPoint = view->windowToContents(point);
     return roundedIntPoint(m_element->renderer()->absoluteToLocal(LayoutPoint(windowPoint), UseTransforms));
+}
+
+WebPoint WebPluginContainerImpl::localToWindowPoint(const WebPoint& point)
+{
+    ScrollView* view = parent();
+    if (!view)
+        return point;
+    IntPoint absolutePoint = roundedIntPoint(m_element->renderer()->localToAbsolute(LayoutPoint(point), UseTransforms));
+    return view->contentsToWindow(absolutePoint);
 }
 
 void WebPluginContainerImpl::didReceiveResponse(const ResourceResponse& response)
@@ -606,7 +621,7 @@ void WebPluginContainerImpl::willEndLiveResize()
 bool WebPluginContainerImpl::paintCustomOverhangArea(GraphicsContext* context, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect)
 {
     context->save();
-    context->setFillColor(Color(0xCC, 0xCC, 0xCC), ColorSpaceDeviceRGB);
+    context->setFillColor(Color(0xCC, 0xCC, 0xCC));
     context->fillRect(intersection(horizontalOverhangArea, dirtyRect));
     context->fillRect(intersection(verticalOverhangArea, dirtyRect));
     context->restore();
@@ -633,7 +648,7 @@ WebPluginContainerImpl::~WebPluginContainerImpl()
         m_pluginLoadObservers[i]->clearPluginContainer();
     m_webPlugin->destroy();
     if (m_webLayer)
-        GraphicsLayerChromium::unregisterContentsLayer(m_webLayer);
+        GraphicsLayer::unregisterContentsLayer(m_webLayer);
 }
 
 void WebPluginContainerImpl::handleMouseEvent(MouseEvent* event)
@@ -752,6 +767,11 @@ void WebPluginContainerImpl::handleKeyboardEvent(KeyboardEvent* event)
         webEvent.modifiers |= currentInputEvent->modifiers &
             (WebInputEvent::CapsLockOn | WebInputEvent::NumLockOn);
     }
+
+    // Give the client a chance to issue edit comamnds.
+    WebViewImpl* view = WebViewImpl::fromPage(m_element->document()->frame()->page());
+    if (m_webPlugin->supportsEditCommands() && view->client())
+        view->client()->handleCurrentKeyboardEvent();
 
     WebCursorInfo cursorInfo;
     if (m_webPlugin->handleInputEvent(webEvent, cursorInfo))

@@ -24,17 +24,18 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "core/css/CSSRuleList.h"
+#include "core/css/CSSSVGDocumentValue.h"
 #include "core/css/CSSToStyleMap.h"
 #include "core/css/CSSValueList.h"
 #include "core/css/DocumentRuleSets.h"
 #include "core/css/InspectorCSSOMWrappers.h"
 #include "core/css/MediaQueryExp.h"
+#include "core/css/PseudoStyleRequest.h"
 #include "core/css/RuleFeature.h"
 #include "core/css/RuleSet.h"
 #include "core/css/SelectorChecker.h"
 #include "core/css/SelectorFilter.h"
 #include "core/css/SiblingTraversalStrategies.h"
-#include "core/css/WebKitCSSSVGDocumentValue.h"
 #include "core/css/resolver/ScopedStyleResolver.h"
 #include "core/css/resolver/StyleResolverState.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
@@ -51,12 +52,8 @@
 
 namespace WebCore {
 
-enum ESmartMinimumForFontSize { DoNotUseSmartMinimumForFontSize, UseSmartMinimumForFontFize };
-
 class CSSCursorImageValue;
 class CSSFontSelector;
-class CSSFontFace;
-class CSSFontFaceRule;
 class CSSImageGeneratorValue;
 class CSSImageSetValue;
 class CSSImageValue;
@@ -68,29 +65,20 @@ class CSSSelector;
 class CSSStyleSheet;
 class CSSValue;
 class ContainerNode;
-class CustomFilterOperation;
-class CustomFilterParameter;
-class CustomFilterParameterList;
-class CustomFilterProgram;
-struct CustomFilterProgramMixSettings;
 class DeprecatedStyleBuilder;
 class Document;
 class Element;
 class ElementRuleCollector;
 class Frame;
 class FrameView;
-class KURL;
 class KeyframeList;
 class KeyframeValue;
 class MediaQueryEvaluator;
 class Node;
 class RenderRegion;
-class RenderScrollbar;
 class RuleData;
 class RuleSet;
-class ScopedStyleResolver;
 class Settings;
-class StaticCSSRuleList;
 class StyleCustomFilterProgramCache;
 class StyleImage;
 class StyleKeyframe;
@@ -105,10 +93,6 @@ class StyleShader;
 class StyleSheet;
 class StyleSheetList;
 class StyledElement;
-class ViewportStyleResolver;
-class WebKitCSSFilterValue;
-class WebKitCSSShaderValue;
-class WebKitCSSSVGDocumentValue;
 
 class MediaQueryResult {
     WTF_MAKE_NONCOPYABLE(MediaQueryResult); WTF_MAKE_FAST_ALLOCATED;
@@ -139,20 +123,6 @@ enum RuleMatchingBehavior {
     MatchOnlyUserAgentRules,
 };
 
-class PseudoStyleRequest {
-public:
-    PseudoStyleRequest(PseudoId pseudoId, RenderScrollbar* scrollbar = 0, ScrollbarPart scrollbarPart = NoPart)
-        : pseudoId(pseudoId)
-        , scrollbarPart(scrollbarPart)
-        , scrollbar(scrollbar)
-    {
-    }
-
-    PseudoId pseudoId;
-    ScrollbarPart scrollbarPart;
-    RenderScrollbar* scrollbar;
-};
-
 class MatchRequest {
 public:
     MatchRequest(RuleSet* ruleSet, bool includeEmptyRules = false, const ContainerNode* scope = 0)
@@ -178,7 +148,13 @@ public:
     void popParentShadowRoot(const ShadowRoot*);
 
     PassRefPtr<RenderStyle> styleForElement(Element*, RenderStyle* parentStyle = 0, StyleSharingBehavior = AllowStyleSharing,
-        RuleMatchingBehavior = MatchAllRules, RenderRegion* regionForStyling = 0);
+        RuleMatchingBehavior = MatchAllRules, RenderRegion* regionForStyling = 0, int childIndex = 0);
+
+    // childIndex's origin is 1, and avoids unnecessary tree walks to resolve nth/nth-last selectors.
+    PassRefPtr<RenderStyle> styleForElement(Element* element, int childIndex)
+    {
+        return styleForElement(element, 0, AllowStyleSharing, MatchAllRules, 0, childIndex);
+    }
 
     void keyframeStylesForAnimation(Element*, const RenderStyle*, KeyframeList&);
 
@@ -216,7 +192,7 @@ public:
     }
 
 private:
-    void initElement(Element*);
+    void initElement(Element*, int childIndex = 0);
     RenderStyle* locateSharedStyle();
     bool styleSharingCandidateMatchesRuleSet(RuleSet*);
     Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
@@ -238,13 +214,6 @@ public:
     PassRefPtr<CSSRuleList> styleRulesForElement(Element*, unsigned rulesToInclude = AllButEmptyCSSRules);
     PassRefPtr<CSSRuleList> pseudoStyleRulesForElement(Element*, PseudoId, unsigned rulesToInclude = AllButEmptyCSSRules);
 
-    // Given a CSS keyword in the range (xx-small to -webkit-xxx-large), this function will return
-    // the correct font size scaled relative to the user's default (medium).
-    static float fontSizeForKeyword(Document*, int keyword, bool shouldUseFixedDefaultSize);
-
-    // Given a font size in pixel, this function will return legacy font size between 1 and 7.
-    static int legacyFontSize(Document*, int pixelFontSize, bool shouldUseFixedDefaultSize);
-
 public:
     void applyPropertyToStyle(CSSPropertyID, CSSValue*, RenderStyle*);
 
@@ -252,13 +221,7 @@ public:
 
     void updateFont();
     void initializeFontStyle(Settings*);
-
-    static float getComputedSizeFromSpecifiedSize(Document*, float zoomFactor, bool isAbsoluteSize, float specifiedSize, ESmartMinimumForFontSize = UseSmartMinimumForFontFize);
-
     void setFontSize(FontDescription&, float size);
-
-private:
-    static float getComputedSizeFromSpecifiedSize(Document*, RenderStyle*, bool isAbsoluteSize, float specifiedSize, bool useSVGZoomRules);
 
 public:
     bool useSVGZoomRules();
@@ -373,8 +336,6 @@ private:
     template <StyleApplicationPass pass>
     void applyAnimatedProperties(const Element* target);
     void resolveVariables(CSSPropertyID, CSSValue*, Vector<std::pair<CSSPropertyID, String> >& knownExpressions);
-    static bool isValidRegionStyleProperty(CSSPropertyID);
-    static bool isValidCueStyleProperty(CSSPropertyID);
     void matchPageRules(MatchResult&, RuleSet*, bool isLeftPage, bool isFirstPage, const String& pageName);
     void matchPageRulesForList(Vector<StyleRulePage*>& matchedRules, const Vector<StyleRulePage*>&, bool isLeftPage, bool isFirstPage, const String& pageName);
     Settings* documentSettings() { return m_document->settings(); }
@@ -431,7 +392,6 @@ private:
     PassRefPtr<StyleImage> loadPendingImage(StylePendingImage*);
     void loadPendingImages();
 
-    static unsigned computeMatchedPropertiesHash(const MatchedProperties*, unsigned size);
     struct MatchedPropertiesCacheItem {
         void reportMemoryUsage(MemoryObjectInfo*) const;
         Vector<MatchedProperties> matchedProperties;

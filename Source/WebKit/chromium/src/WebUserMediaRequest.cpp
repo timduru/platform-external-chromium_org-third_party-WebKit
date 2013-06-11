@@ -32,11 +32,11 @@
 
 #include "WebUserMediaRequest.h"
 
-#include <public/WebMediaConstraints.h>
-#include <public/WebMediaStream.h>
-#include <public/WebMediaStreamSource.h>
-#include <public/WebString.h>
-#include <public/WebVector.h>
+#include "public/platform/WebMediaConstraints.h"
+#include "public/platform/WebMediaStream.h"
+#include "public/platform/WebMediaStreamSource.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebVector.h"
 #include <wtf/Vector.h>
 #include "WebDocument.h"
 #include "WebSecurityOrigin.h"
@@ -103,10 +103,16 @@ void WebUserMediaRequest::requestSucceeded(const WebMediaStream& streamDescripto
     m_private->succeed(streamDescriptor);
 }
 
-void WebUserMediaRequest::requestFailed()
+void WebUserMediaRequest::requestFailed(const WebString& description)
 {
     ASSERT(!isNull());
-    m_private->fail();
+    m_private->fail(description);
+}
+
+void WebUserMediaRequest::requestFailedConstraint(const WebString& constraintName, const WebString& description)
+{
+    ASSERT(!isNull());
+    m_private->failConstraint(constraintName, description);
 }
 
 bool WebUserMediaRequest::equals(const WebUserMediaRequest& other) const

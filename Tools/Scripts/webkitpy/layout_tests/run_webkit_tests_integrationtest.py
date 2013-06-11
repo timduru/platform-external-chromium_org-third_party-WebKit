@@ -346,15 +346,6 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         tests_run = get_tests_run(['--order=none'] + tests_to_run)
         self.assertEqual(tests_run, ['http/tests/ssl/text.html', 'perf/foo/test.html', 'http/tests/passes/image.html', 'http/tests/passes/text.html'])
 
-    def test_gc_between_tests(self):
-        self.assertTrue(passing_run(['--gc-between-tests']))
-
-    def test_complex_text(self):
-        self.assertTrue(passing_run(['--complex-text']))
-
-    def test_threaded(self):
-        self.assertTrue(passing_run(['--threaded']))
-
     def test_repeat_each(self):
         tests_to_run = ['passes/image.html', 'passes/text.html']
         tests_run = get_tests_run(['--repeat-each', '2'] + tests_to_run)
@@ -547,29 +538,6 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         _, regular_output, _ = logging_run(['failures/unexpected/checksum-with-matching-image.html'], tests_included=True, host=host)
         self.assertTrue(host.filesystem.read_text_file('/tmp/layout-test-results/full_results.json').find('"num_regressions":0') != -1)
 
-    def test_crash_log(self):
-        # FIXME: Need to rewrite these tests to not be mac-specific, or move them elsewhere.
-        # Currently CrashLog uploading only works on Darwin.
-        if not self._platform.is_mac():
-            return
-        mock_crash_report = make_mock_crash_report_darwin('DumpRenderTree', 12345)
-        host = MockHost()
-        host.filesystem.write_text_file('/Users/mock/Library/Logs/DiagnosticReports/DumpRenderTree_2011-06-13-150719_quadzen.crash', mock_crash_report)
-        _, regular_output, _ = logging_run(['failures/unexpected/crash-with-stderr.html'], tests_included=True, host=host)
-        expected_crash_log = mock_crash_report
-        self.assertEqual(host.filesystem.read_text_file('/tmp/layout-test-results/failures/unexpected/crash-with-stderr-crash-log.txt'), expected_crash_log)
-
-    def test_web_process_crash_log(self):
-        # FIXME: Need to rewrite these tests to not be mac-specific, or move them elsewhere.
-        # Currently CrashLog uploading only works on Darwin.
-        if not self._platform.is_mac():
-            return
-        mock_crash_report = make_mock_crash_report_darwin('WebProcess', 12345)
-        host = MockHost()
-        host.filesystem.write_text_file('/Users/mock/Library/Logs/DiagnosticReports/WebProcess_2011-06-13-150719_quadzen.crash', mock_crash_report)
-        logging_run(['failures/unexpected/web-process-crash-with-stderr.html'], tests_included=True, host=host)
-        self.assertEqual(host.filesystem.read_text_file('/tmp/layout-test-results/failures/unexpected/web-process-crash-with-stderr-crash-log.txt'), mock_crash_report)
-
     def test_exit_after_n_failures_upload(self):
         host = MockHost()
         details, regular_output, user = logging_run(
@@ -682,6 +650,21 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         self.assertTrue('Clobbering old results' in err.getvalue())
         self.assertTrue('flaky/text.html' in err.getvalue())
         self.assertTrue(host.filesystem.exists('/tmp/layout-test-results/failures/flaky/text-actual.txt'))
+        self.assertFalse(host.filesystem.exists('retries'))
+
+    def test_retrying_chrashed_tests(self):
+        host = MockHost()
+        details, err, _ = logging_run(['--retry-failures', '--retry-crashes', 'failures/unexpected/crash.html'], tests_included=True, host=host)
+        self.assertEqual(details.exit_code, 1)
+        self.assertTrue('Retrying' in err.getvalue())
+
+        # Now we test that --clobber-old-results does remove the old entries and the old retries,
+        # and that we don't retry again.
+        host = MockHost()
+        details, err, _ = logging_run(['--no-retry-failures', '--clobber-old-results', 'failures/unexpected/crash.html'], tests_included=True, host=host)
+        self.assertEqual(details.exit_code, 1)
+        self.assertTrue('Clobbering old results' in err.getvalue())
+        self.assertTrue('unexpected/crash.html' in err.getvalue())
         self.assertFalse(host.filesystem.exists('retries'))
 
     def test_retrying_force_pixel_tests(self):

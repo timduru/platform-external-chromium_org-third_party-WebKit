@@ -33,9 +33,9 @@
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderProgress.h"
-#include <public/default/WebThemeEngine.h>
-#include <public/Platform.h>
-#include <public/WebRect.h>
+#include "public/platform/default/WebThemeEngine.h"
+#include "public/platform/Platform.h"
+#include "public/platform/WebRect.h"
 
 namespace WebCore {
 
@@ -87,7 +87,7 @@ RenderThemeChromiumDefault::~RenderThemeChromiumDefault()
 {
 }
 
-Color RenderThemeChromiumDefault::systemColor(int cssValueId) const
+Color RenderThemeChromiumDefault::systemColor(CSSValueID cssValueId) const
 {
     static const Color defaultButtonGrayColor(0xffdddddd);
     static const Color defaultMenuColor(0xfff7f7f7);
@@ -375,7 +375,7 @@ bool RenderThemeChromiumDefault::paintSliderThumb(RenderObject* o, const PaintIn
     return false;
 }
 
-void RenderThemeChromiumDefault::adjustInnerSpinButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
+void RenderThemeChromiumDefault::adjustInnerSpinButtonStyle(RenderStyle* style, Element*) const
 {
     IntSize size = WebKit::Platform::current()->themeEngine()->getSize(WebKit::WebThemeEngine::PartInnerSpinButton);
 

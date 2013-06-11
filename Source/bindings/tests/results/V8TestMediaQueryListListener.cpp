@@ -35,43 +35,48 @@
 
 namespace WebCore {
 
-#if defined(OS_WIN)
-// In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
-// These prototypes do not pick up the surrounding namespace, so drop out of WebCore as a workaround.
-} // namespace WebCore
-using WebCore::ScriptWrappable;
-using WebCore::V8TestMediaQueryListListener;
-using WebCore::TestMediaQueryListListener;
-#endif
-void initializeScriptWrappableForInterface(TestMediaQueryListListener* object)
+static void initializeScriptWrappableForInterface(TestMediaQueryListListener* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestMediaQueryListListener::info);
     else
         ASSERT_NOT_REACHED();
 }
-#if defined(OS_WIN)
+
+} // namespace WebCore
+
+// In ScriptWrappable::init, the use of a local function declaration has an issue on Windows:
+// the local declaration does not pick up the surrounding namespace. Therefore, we provide this function
+// in the global namespace.
+// (More info on the MSVC bug here: http://connect.microsoft.com/VisualStudio/feedback/details/664619/the-namespace-of-local-function-declarations-in-c)
+void webCoreInitializeScriptWrappableForInterface(WebCore::TestMediaQueryListListener* object)
+{
+    WebCore::initializeScriptWrappableForInterface(object);
+}
+
 namespace WebCore {
-#endif
 WrapperTypeInfo V8TestMediaQueryListListener::info = { V8TestMediaQueryListListener::GetTemplate, V8TestMediaQueryListListener::derefObject, 0, 0, 0, V8TestMediaQueryListListener::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace TestMediaQueryListListenerV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
-static v8::Handle<v8::Value> methodMethod(const v8::Arguments& args)
+static void methodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1)
-        return throwNotEnoughArgumentsError(args.GetIsolate());
+    if (args.Length() < 1) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
     TestMediaQueryListListener* imp = V8TestMediaQueryListListener::toNative(args.Holder());
-    V8TRYCATCH(RefPtr<MediaQueryListListener>, listener, MediaQueryListListener::create(args[0]));
+    V8TRYCATCH_VOID(RefPtr<MediaQueryListListener>, listener, MediaQueryListListener::create(args[0]));
     imp->method(listener);
-    return v8Undefined();
+
+    return;
 }
 
-static v8::Handle<v8::Value> methodMethodCallback(const v8::Arguments& args)
+static void methodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return TestMediaQueryListListenerV8Internal::methodMethod(args);
+    TestMediaQueryListListenerV8Internal::methodMethod(args);
 }
 
 } // namespace TestMediaQueryListListenerV8Internal
@@ -80,12 +85,12 @@ static const V8DOMConfiguration::BatchedMethod V8TestMediaQueryListListenerMetho
     {"method", TestMediaQueryListListenerV8Internal::methodMethodCallback, 0, 1},
 };
 
-static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestMediaQueryListListenerTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+static v8::Handle<v8::FunctionTemplate> ConfigureV8TestMediaQueryListListenerTemplate(v8::Handle<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     desc->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestMediaQueryListListener", v8::Persistent<v8::FunctionTemplate>(), V8TestMediaQueryListListener::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestMediaQueryListListener", v8::Local<v8::FunctionTemplate>(), V8TestMediaQueryListListener::internalFieldCount,
         0, 0,
         V8TestMediaQueryListListenerMethods, WTF_ARRAY_LENGTH(V8TestMediaQueryListListenerMethods), isolate, currentWorldType);
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
@@ -99,18 +104,18 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestMediaQueryListListene
     return desc;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8TestMediaQueryListListener::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestMediaQueryListListener::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&info);
     if (result != data->templateMap(currentWorldType).end())
-        return result->value;
+        return result->value.newLocal(isolate);
 
-    v8::HandleScope handleScope;
-    v8::Persistent<v8::FunctionTemplate> templ =
+    v8::HandleScope handleScope(isolate);
+    v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestMediaQueryListListenerTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
-    data->templateMap(currentWorldType).add(&info, templ);
-    return templ;
+    data->templateMap(currentWorldType).add(&info, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
+    return handleScope.Close(templ);
 }
 
 bool V8TestMediaQueryListListener::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)

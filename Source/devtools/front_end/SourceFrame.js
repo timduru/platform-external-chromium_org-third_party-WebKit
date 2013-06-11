@@ -44,11 +44,8 @@ WebInspector.SourceFrame = function(contentProvider)
 
     var textEditorDelegate = new WebInspector.TextEditorDelegateForSourceFrame(this);
 
-    if (WebInspector.settings.codemirror.get()) {
-        loadScript("CodeMirrorTextEditor.js");
-        this._textEditor = new WebInspector.CodeMirrorTextEditor(this._url, textEditorDelegate);
-    } else
-        this._textEditor = new WebInspector.DefaultTextEditor(this._url, textEditorDelegate);
+    loadScript("CodeMirrorTextEditor.js");
+    this._textEditor = new WebInspector.CodeMirrorTextEditor(this._url, textEditorDelegate);
 
     this._currentSearchResultIndex = -1;
     this._searchResults = [];
@@ -60,7 +57,7 @@ WebInspector.SourceFrame = function(contentProvider)
     this._textEditor.setReadOnly(!this.canEditSource());
 
     this._shortcuts = {};
-    this._shortcuts[WebInspector.KeyboardShortcut.makeKey("s", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta)] = this._commitEditing.bind(this);
+    this.addShortcut(WebInspector.KeyboardShortcut.makeKey("s", WebInspector.KeyboardShortcut.Modifiers.CtrlOrMeta), this._commitEditing.bind(this));
     this.element.addEventListener("keydown", this._handleKeyDown.bind(this), false);
 
     this._sourcePosition = new WebInspector.StatusBarText("", "source-frame-cursor-position");
@@ -96,6 +93,15 @@ WebInspector.SourceFrame.Events = {
 }
 
 WebInspector.SourceFrame.prototype = {
+    /**
+     * @param {number} key
+     * @param {function()} handler
+     */
+    addShortcut: function(key, handler)
+    {
+        this._shortcuts[key] = handler;
+    },
+
     wasShown: function()
     {
         this._ensureContentLoaded();
@@ -323,14 +329,14 @@ WebInspector.SourceFrame.prototype = {
      */
     setContent: function(content, contentEncoded, mimeType)
     {
-        this._textEditor.mimeType = this._simplifyMimeType(mimeType);
-
         if (!this._loaded) {
             this._loaded = true;
             this._textEditor.setText(content || "");
             this._textEditor.markClean();
         } else
             this._textEditor.editRange(this._textEditor.range(), content || "");
+
+        this._textEditor.mimeType = this._simplifyMimeType(mimeType);
 
         this._textEditor.beginUpdates();
 

@@ -113,7 +113,7 @@ public:
         StepAttribute,
         PageVisits,
         HTMLMarqueeElement,
-        CSSOverflowMarquee,
+        UnusedSlot02, // Removed, was tracking overflow: -webkit-marquee.
         Reflection,
         CursorVisibility, // Removed, was -webkit-cursor-visibility.
         StorageInfo,
@@ -139,6 +139,7 @@ public:
         XMLDocument,
         XSLProcessingInstruction,
         XSLTProcessor,
+        SVGSwitchElement,
         // Add new features immediately above this line. Don't change assigned numbers of each items.
         NumberOfFeatures, // This enum value must be last.
     };

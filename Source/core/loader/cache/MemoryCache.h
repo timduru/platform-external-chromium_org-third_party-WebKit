@@ -57,6 +57,9 @@ struct SecurityOriginHash;
 // -------|-----+++++++++++++++|
 // -------|-----+++++++++++++++|+++++
 
+// Enable this macro to periodically log information about the memory cache.
+#undef MEMORY_CACHE_STATS
+
 class MemoryCache {
     WTF_MAKE_NONCOPYABLE(MemoryCache); WTF_MAKE_FAST_ALLOCATED;
 public:
@@ -75,12 +78,26 @@ public:
         int size;
         int liveSize;
         int decodedSize;
+        int encodedSize;
+        int encodedSizeDuplicatedInDataURLs;
         int purgeableSize;
         int purgedSize;
-        TypeStatistic() : count(0), size(0), liveSize(0), decodedSize(0), purgeableSize(0), purgedSize(0) { }
+
+        TypeStatistic()
+            : count(0)
+            , size(0)
+            , liveSize(0)
+            , decodedSize(0)
+            , encodedSize(0)
+            , encodedSizeDuplicatedInDataURLs(0)
+            , purgeableSize(0)
+            , purgedSize(0)
+        {
+        }
+
         void addResource(CachedResource*);
     };
-    
+
     struct Statistics {
         TypeStatistic images;
         TypeStatistic cssStyleSheets;
@@ -88,7 +105,7 @@ public:
         TypeStatistic xslStyleSheets;
         TypeStatistic fonts;
     };
-    
+
     CachedResource* resourceForURL(const KURL&);
     
     void add(CachedResource*);
@@ -125,14 +142,9 @@ public:
     void addToLiveResourcesSize(CachedResource*);
     void removeFromLiveResourcesSize(CachedResource*);
 
-    static void removeUrlFromCache(ScriptExecutionContext*, const String& urlString);
+    static void removeURLFromCache(ScriptExecutionContext*, const KURL&);
 
-    // Function to collect cache statistics for the caches window in the Safari Debug menu.
     Statistics getStatistics();
-
-    typedef HashSet<RefPtr<SecurityOrigin> > SecurityOriginSet;
-    void removeResourcesWithOrigin(SecurityOrigin*);
-    void getOriginsWithCache(SecurityOriginSet& origins);
 
     unsigned minDeadCapacity() const { return m_minDeadCapacity; }
     unsigned maxDeadCapacity() const { return m_maxDeadCapacity; }
@@ -147,8 +159,9 @@ private:
     ~MemoryCache(); // Not implemented to make sure nobody accidentally calls delete -- WebCore does not delete singletons.
        
     LRUList* lruListFor(CachedResource*);
-#ifndef NDEBUG
-    void dumpStats();
+
+#ifdef MEMORY_CACHE_STATS
+    void dumpStats(Timer<MemoryCache>*);
     void dumpLRULists(bool includeLive) const;
 #endif
 
@@ -166,7 +179,7 @@ private:
 
     void evict(CachedResource*);
 
-    static void removeUrlFromCacheImpl(ScriptExecutionContext*, const String& urlString);
+    static void removeURLFromCacheInternal(ScriptExecutionContext*, const KURL&);
 
     bool m_inPruneResources;
 
@@ -189,6 +202,10 @@ private:
     // A URL-based map of all resources that are in the cache (including the freshest version of objects that are currently being 
     // referenced by a Web page).
     HashMap<String, CachedResource*> m_resources;
+
+#ifdef MEMORY_CACHE_STATS
+    Timer<MemoryCache> m_statsTimer;
+#endif
 };
 
 // Function to obtain the global cache.

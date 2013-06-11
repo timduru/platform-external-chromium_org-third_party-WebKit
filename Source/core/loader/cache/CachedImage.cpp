@@ -25,16 +25,12 @@
 #include "core/loader/cache/CachedImage.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "core/loader/FrameLoaderTypes.h"
-#include "core/loader/ResourceLoader.h"
 #include "core/loader/cache/CachedImageClient.h"
 #include "core/loader/cache/CachedResourceClient.h"
 #include "core/loader/cache/CachedResourceClientWalker.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/MemoryCache.h"
 #include "core/page/FrameView.h"
-#include "core/page/Page.h"
-#include "core/page/Settings.h"
 #include "core/platform/SharedBuffer.h"
 #include "core/platform/graphics/BitmapImage.h"
 #include "core/rendering/RenderObject.h"
@@ -131,6 +127,7 @@ void CachedImage::allClientsRemoved()
     m_pendingContainerSizeRequests.clear();
     if (m_image && !errorOccurred())
         m_image->resetAnimation();
+    CachedResource::allClientsRemoved();
 }
 
 pair<Image*, float> CachedImage::brokenImage(float deviceScaleFactor) const
@@ -283,8 +280,10 @@ void CachedImage::clear()
 
 void CachedImage::setCustomAcceptHeader()
 {
+    DEFINE_STATIC_LOCAL(const AtomicString, acceptWebP, ("image/webp,*/*;q=0.8", AtomicString::ConstructFromLiteral));
+
     if (RuntimeEnabledFeatures::webPInAcceptHeaderEnabled())
-        setAccept("image/webp,*/*;q=0.8");
+        setAccept(acceptWebP);
 }
 
 inline void CachedImage::createImage()

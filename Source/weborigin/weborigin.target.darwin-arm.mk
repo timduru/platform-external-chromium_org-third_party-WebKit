@@ -11,7 +11,10 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
-	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp
+	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp \
+	$(call intermediates-dir-for,GYP,build_temp_gyp_googleurl_gyp)/googleurl.stamp \
+	$(call intermediates-dir-for,GYP,third_party_icu_icui18n_gyp)/icui18n.stamp \
+	$(call intermediates-dir-for,GYP,third_party_icu_icuuc_gyp)/icuuc.stamp
 
 GYP_GENERATED_OUTPUTS :=
 
@@ -76,15 +79,13 @@ MY_DEFS := \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
-	'-DENABLE_DOUBLE_RESOURCE_LOAD_TIMING' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
-	'-DENABLE_3D_PLUGIN=1' \
-	'-DENABLE_BATTERY_STATUS=0' \
+	'-DWEBORIGIN_IMPLEMENTATION=1' \
 	'-DENABLE_CANVAS_USES_MAILBOX=0' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
@@ -92,16 +93,14 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
-	'-DENABLE_SVG=1' \
+	'-DENABLE_GRAPHICS_CONTEXT_ANNOTATIONS=0' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_WEBGL=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
 	'-DENABLE_INPUT_SPEECH=0' \
-	'-DENABLE_INPUT_TYPE_COLOR=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
@@ -130,9 +129,10 @@ LOCAL_C_INCLUDES := \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
+	$(LOCAL_PATH)/third_party/WebKit \
+	$(LOCAL_PATH) \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
-	$(LOCAL_PATH) \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

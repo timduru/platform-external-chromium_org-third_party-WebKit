@@ -43,11 +43,13 @@
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 
-#include <public/WebCompositingReasons.h>
-#include <public/WebContentLayer.h>
-#include <public/WebImageLayer.h>
-#include <public/WebLayer.h>
-#include <public/WebSolidColorLayer.h>
+#include "public/platform/WebAnimationDelegate.h"
+#include "public/platform/WebCompositingReasons.h"
+#include "public/platform/WebContentLayer.h"
+#include "public/platform/WebImageLayer.h"
+#include "public/platform/WebLayer.h"
+#include "public/platform/WebLayerScrollClient.h"
+#include "public/platform/WebSolidColorLayer.h"
 
 enum LayerTreeAsTextBehaviorFlags {
     LayerTreeAsTextBehaviorNormal = 0,
@@ -62,6 +64,10 @@ enum DebugIDSpecialValues {
     DebugIDNoPlatformLayer = -1,
     DebugIDNoCompositedLayer = -2
 };
+
+namespace WebKit {
+class GraphicsLayerFactoryChromium;
+}
 
 namespace WebCore {
 
@@ -207,7 +213,7 @@ protected:
 // GraphicsLayer is an abstraction for a rendering surface with backing store,
 // which may have associated transformation and animations.
 
-class GraphicsLayer {
+class GraphicsLayer : public GraphicsContextPainter, public WebKit::WebAnimationDelegate, public WebKit::WebLayerScrollClient {
     WTF_MAKE_NONCOPYABLE(GraphicsLayer); WTF_MAKE_FAST_ALLOCATED;
 public:
     enum ContentsLayerPurpose {
@@ -219,9 +225,6 @@ public:
 
     static PassOwnPtr<GraphicsLayer> create(GraphicsLayerFactory*, GraphicsLayerClient*);
 
-    // FIXME: Replace all uses of this create function with the one that takes a GraphicsLayerFactory.
-    static PassOwnPtr<GraphicsLayer> create(GraphicsLayerClient*);
-    
     virtual ~GraphicsLayer();
 
     GraphicsLayerClient* client() const { return m_client; }
@@ -447,9 +450,20 @@ public:
     static void registerContentsLayer(WebKit::WebLayer*);
     static void unregisterContentsLayer(WebKit::WebLayer*);
 
+    // GraphicsContextPainter implementation.
+    virtual void paint(GraphicsContext&, const IntRect& clip) OVERRIDE;
+
+    // WebAnimationDelegate implementation.
+    virtual void notifyAnimationStarted(double startTime) OVERRIDE;
+    virtual void notifyAnimationFinished(double finishTime) OVERRIDE;
+
+    // WebLayerScrollClient implementation.
+    virtual void didScroll() OVERRIDE;
+
 protected:
-    // Should be called from derived class destructors. Should call willBeDestroyed() on super.
-    void willBeDestroyed();
+    // Adds a child without calling updateChildList(), so that adding children
+    // can be batched before updating.
+    void addChildInternal(GraphicsLayer*);
 
     // This method is used by platform GraphicsLayer classes to clear the filters
     // when compositing is not done in hardware. It is not virtual, so the caller
@@ -470,7 +484,9 @@ protected:
     GraphicsLayer* replicatedLayer() const { return m_replicatedLayer; }
     void setReplicatedLayer(GraphicsLayer* layer) { m_replicatedLayer = layer; }
 
-    GraphicsLayer(GraphicsLayerClient*);
+    // Any factory classes that want to create a GraphicsLayer need to be friends.
+    friend class WebKit::GraphicsLayerFactoryChromium;
+    explicit GraphicsLayer(GraphicsLayerClient*);
 
     static void writeIndent(TextStream&, int indent);
 
@@ -482,25 +498,13 @@ protected:
     // Helper functions used by settors to keep layer's the state consistent.
     void updateNames();
     void updateChildList();
-    void updateLayerPosition();
-    void updateLayerSize();
-    void updateAnchorPoint();
-    void updateTransform();
-    void updateChildrenTransform();
-    void updateMasksToBounds();
-    void updateLayerPreserves3D();
     void updateLayerIsDrawable();
-    void updateLayerBackgroundColor();
     void updateContentsRect();
 
     void setContentsTo(ContentsLayerPurpose, WebKit::WebLayer*);
     void setupContentsLayer(WebKit::WebLayer*);
     void clearContentsLayerIfUnregistered();
     WebKit::WebLayer* contentsLayerIfRegistered();
-
-    // Temporary virtual helper while migrating code. Set the animation
-    // delegate to "this" from the derived class.
-    virtual void setAnimationDelegateForLayer(WebKit::WebLayer*) = 0;
 
     GraphicsLayerClient* m_client;
     String m_name;
@@ -554,7 +558,6 @@ protected:
     Color m_contentsSolidColor;
 
     OwnPtr<WebKit::WebContentLayer> m_layer;
-    OwnPtr<WebKit::WebLayer> m_transformLayer;
     OwnPtr<WebKit::WebImageLayer> m_imageLayer;
     OwnPtr<WebKit::WebSolidColorLayer> m_contentsSolidColorLayer;
     WebKit::WebLayer* m_contentsLayer;

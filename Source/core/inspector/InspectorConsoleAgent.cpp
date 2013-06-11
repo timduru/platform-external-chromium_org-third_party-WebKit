@@ -96,6 +96,7 @@ void InspectorConsoleAgent::enable(ErrorString*)
 
     if (m_expiredConsoleMessageCount) {
         ConsoleMessage expiredMessage(!isWorkerAgent(), OtherMessageSource, LogMessageType, WarningMessageLevel, String::format("%d console messages are not shown.", m_expiredConsoleMessageCount));
+        expiredMessage.setTimestamp(0);
         expiredMessage.addToFrontend(m_frontend, m_injectedScriptManager, false);
     }
 
@@ -192,7 +193,7 @@ Vector<unsigned> InspectorConsoleAgent::consoleMessageArgumentCounts()
     return result;
 }
 
-void InspectorConsoleAgent::startTiming(const String& title)
+void InspectorConsoleAgent::startConsoleTiming(Frame*, const String& title)
 {
     // Follow Firebug's behavior of requiring a title that is not null or
     // undefined for timing functions
@@ -202,7 +203,7 @@ void InspectorConsoleAgent::startTiming(const String& title)
     m_times.add(title, monotonicallyIncreasingTime());
 }
 
-void InspectorConsoleAgent::stopTiming(const String& title, PassRefPtr<ScriptCallStack> callStack)
+void InspectorConsoleAgent::stopConsoleTiming(Frame*, const String& title, PassRefPtr<ScriptCallStack> callStack)
 {
     // Follow Firebug's behavior of requiring a title that is not null or
     // undefined for timing functions
@@ -222,7 +223,7 @@ void InspectorConsoleAgent::stopTiming(const String& title, PassRefPtr<ScriptCal
     addMessageToConsole(ConsoleAPIMessageSource, TimingMessageType, DebugMessageLevel, message, lastCaller.sourceURL(), lastCaller.lineNumber());
 }
 
-void InspectorConsoleAgent::count(ScriptState* state, PassRefPtr<ScriptArguments> arguments)
+void InspectorConsoleAgent::consoleCount(ScriptState* state, PassRefPtr<ScriptArguments> arguments)
 {
     RefPtr<ScriptCallStack> callStack(createScriptCallStackForConsole(state));
     const ScriptCallFrame& lastCaller = callStack->at(0);
@@ -269,8 +270,6 @@ void InspectorConsoleAgent::didFinishXHRLoading(ThreadableLoaderClient*, unsigne
         String message = "XHR finished loading: \"" + url + "\".";
         addMessageToConsole(NetworkMessageSource, LogMessageType, DebugMessageLevel, message, sendURL, sendLineNumber, 0, requestIdentifier);
     }
-
-
 }
 
 void InspectorConsoleAgent::didReceiveResourceResponse(unsigned long requestIdentifier, DocumentLoader* loader, const ResourceResponse& response, ResourceLoader*)

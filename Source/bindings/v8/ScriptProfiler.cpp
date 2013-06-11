@@ -120,6 +120,14 @@ ScriptObject ScriptProfiler::objectByHeapObjectId(unsigned id)
 
     v8::Handle<v8::Object> object = value.As<v8::Object>();
 
+    if (object->InternalFieldCount() >= v8DefaultWrapperInternalFieldCount) {
+        v8::Handle<v8::Value> wrapper = object->GetInternalField(v8DOMWrapperObjectIndex);
+        // Skip wrapper boilerplates which are like regular wrappers but don't have
+        // native object.
+        if (!wrapper.IsEmpty() && wrapper->IsUndefined())
+            return ScriptObject();
+    }
+
     ScriptState* scriptState = ScriptState::forContext(object->CreationContext());
     return ScriptObject(scriptState, object);
 }
@@ -271,15 +279,16 @@ void ScriptProfiler::visitNodeWrappers(WrappedNodeVisitor* visitor)
         {
         }
 
-        virtual void VisitPersistentHandle(v8::Persistent<v8::Value> value, uint16_t classId) OVERRIDE
+        virtual void VisitPersistentHandle(v8::Persistent<v8::Value>* value, uint16_t classId) OVERRIDE
         {
             if (classId != v8DOMNodeClassId)
                 return;
-            UNUSED_PARAM(m_isolate);
-            ASSERT(V8Node::HasInstance(value, m_isolate, worldType(m_isolate)));
-            ASSERT(value->IsObject());
-            v8::Persistent<v8::Object> wrapper = v8::Persistent<v8::Object>::Cast(value);
-            m_visitor->visitNode(V8Node::toNative(wrapper));
+            // Casting to Handle is safe here, since the Persistent cannot get
+            // GCd during visiting.
+            v8::Handle<v8::Object>* wrapper = reinterpret_cast<v8::Handle<v8::Object>*>(value);
+            ASSERT(V8Node::HasInstance(*wrapper, m_isolate, worldType(m_isolate)));
+            ASSERT((*wrapper)->IsObject());
+            m_visitor->visitNode(V8Node::toNative(*wrapper));
         }
 
     private:
@@ -304,15 +313,17 @@ void ScriptProfiler::visitExternalArrays(ExternalArrayVisitor* visitor)
         {
         }
 
-        virtual void VisitPersistentHandle(v8::Persistent<v8::Value> value, uint16_t classId) OVERRIDE
+        virtual void VisitPersistentHandle(v8::Persistent<v8::Value>* value, uint16_t classId) OVERRIDE
         {
             if (classId != v8DOMObjectClassId)
                 return;
-            ASSERT(value->IsObject());
-            v8::Persistent<v8::Object> wrapper = v8::Persistent<v8::Object>::Cast(value);
-            if (!toWrapperTypeInfo(wrapper)->isSubclass(&V8ArrayBufferView::info))
+            // Casting to Handle is safe here, since the Persistent cannot get
+            // GCd during visiting.
+            ASSERT((*reinterpret_cast<v8::Handle<v8::Value>*>(value))->IsObject());
+            v8::Handle<v8::Object>* wrapper = reinterpret_cast<v8::Handle<v8::Object>*>(value);
+            if (!toWrapperTypeInfo(*wrapper)->isSubclass(&V8ArrayBufferView::info))
                 return;
-            m_visitor->visitJSExternalArray(V8ArrayBufferView::toNative(wrapper));
+            m_visitor->visitJSExternalArray(V8ArrayBufferView::toNative(*wrapper));
         }
 
     private:
@@ -344,4 +355,3 @@ ProfileNameIdleTimeMap* ScriptProfiler::currentProfileNameIdleTimeMap()
 }
 
 } // namespace WebCore
-

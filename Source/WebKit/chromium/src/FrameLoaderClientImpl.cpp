@@ -32,7 +32,6 @@
 #include "config.h"
 #include "FrameLoaderClientImpl.h"
 
-#include "FrameNetworkingContextImpl.h"
 #include "HTMLNames.h"
 #include "core/dom/Document.h"
 #include "core/dom/MessageEvent.h"
@@ -82,12 +81,12 @@
 #include "core/platform/chromium/support/WrappedResourceRequest.h"
 #include "core/platform/chromium/support/WrappedResourceResponse.h"
 #include "core/platform/network/SocketStreamHandleInternal.h"
-#include <public/Platform.h>
-#include <public/WebMimeRegistry.h>
-#include <public/WebSocketStreamHandle.h>
-#include <public/WebURL.h>
-#include <public/WebURLError.h>
-#include <public/WebVector.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebMimeRegistry.h"
+#include "public/platform/WebSocketStreamHandle.h"
+#include "public/platform/WebURL.h"
+#include "public/platform/WebURLError.h"
+#include "public/platform/WebVector.h"
 #include <wtf/StringExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/text/WTFString.h>
@@ -288,14 +287,6 @@ void FrameLoaderClientImpl::dispatchWillSendRequest(
     DocumentLoader* loader, unsigned long identifier, ResourceRequest& request,
     const ResourceResponse& redirectResponse)
 {
-    if (loader) {
-        // Avoid repeating a form submission when navigating back or forward.
-        if (loader == loader->frameLoader()->provisionalDocumentLoader()
-            && request.httpMethod() == "POST"
-            && isBackForwardLoadType(loader->frameLoader()->loadType()))
-            request.setCachePolicy(ReturnCacheDataDontLoad);
-    }
-
     // FrameLoader::loadEmptyDocumentSynchronously() creates an empty document
     // with no URL.  We don't like that, so we'll rename it to about:blank.
     if (request.url().isEmpty())
@@ -1305,9 +1296,11 @@ PassOwnPtr<WebPluginLoadObserver> FrameLoaderClientImpl::pluginLoadObserver()
     return ds->releasePluginLoadObserver();
 }
 
-PassRefPtr<FrameNetworkingContext> FrameLoaderClientImpl::createNetworkingContext()
+WebCookieJar* FrameLoaderClientImpl::cookieJar() const
 {
-    return FrameNetworkingContextImpl::create(m_webFrame->frame());
+    if (!m_webFrame->client())
+        return 0;
+    return m_webFrame->client()->cookieJar(m_webFrame);
 }
 
 bool FrameLoaderClientImpl::willCheckAndDispatchMessageEvent(

@@ -262,13 +262,12 @@ void WebSocket::connect(const String& url, const Vector<String>& protocols, Exce
     }
     HashSet<String> visited;
     for (size_t i = 0; i < protocols.size(); ++i) {
-        if (visited.contains(protocols[i])) {
+        if (!visited.add(protocols[i]).isNewEntry) {
             scriptExecutionContext()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "WebSocket protocols contain duplicates: '" + encodeProtocolString(protocols[i]) + "'");
             m_state = CLOSED;
             ec = SYNTAX_ERR;
             return;
         }
-        visited.add(protocols[i]);
     }
 
     String protocolString;
@@ -544,7 +543,7 @@ void WebSocket::didReceiveBinaryData(PassOwnPtr<Vector<char> > binaryData)
 
 void WebSocket::didReceiveMessageError()
 {
-    LOG(Network, "WebSocket %p didReceiveErrorMessage()", this);
+    LOG(Network, "WebSocket %p didReceiveMessageError()", this);
     ASSERT(scriptExecutionContext());
     dispatchEvent(Event::create(eventNames().errorEvent, false, false));
 }

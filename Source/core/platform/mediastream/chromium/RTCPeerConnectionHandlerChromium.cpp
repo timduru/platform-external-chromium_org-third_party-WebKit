@@ -42,18 +42,18 @@
 #include "core/platform/mediastream/RTCVoidRequest.h"
 #include "core/platform/mediastream/chromium/RTCDTMFSenderHandlerChromium.h"
 #include "core/platform/mediastream/chromium/RTCDataChannelHandlerChromium.h"
-#include <public/Platform.h>
-#include <public/WebMediaConstraints.h>
-#include <public/WebMediaStream.h>
-#include <public/WebMediaStreamTrack.h>
-#include <public/WebRTCConfiguration.h>
-#include <public/WebRTCDataChannelHandler.h>
-#include <public/WebRTCDTMFSenderHandler.h>
-#include <public/WebRTCICECandidate.h>
-#include <public/WebRTCSessionDescription.h>
-#include <public/WebRTCSessionDescriptionRequest.h>
-#include <public/WebRTCStatsRequest.h>
-#include <public/WebRTCVoidRequest.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebMediaConstraints.h"
+#include "public/platform/WebMediaStream.h"
+#include "public/platform/WebMediaStreamTrack.h"
+#include "public/platform/WebRTCConfiguration.h"
+#include "public/platform/WebRTCDataChannelHandler.h"
+#include "public/platform/WebRTCDTMFSenderHandler.h"
+#include "public/platform/WebRTCICECandidate.h"
+#include "public/platform/WebRTCSessionDescription.h"
+#include "public/platform/WebRTCSessionDescriptionRequest.h"
+#include "public/platform/WebRTCStatsRequest.h"
+#include "public/platform/WebRTCVoidRequest.h"
 #include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
@@ -149,9 +149,9 @@ void RTCPeerConnectionHandlerChromium::getStats(PassRefPtr<RTCStatsRequest> requ
     m_webHandler->getStats(request);
 }
 
-PassOwnPtr<RTCDataChannelHandler> RTCPeerConnectionHandlerChromium::createDataChannel(const String& label, bool reliable)
+PassOwnPtr<RTCDataChannelHandler> RTCPeerConnectionHandlerChromium::createDataChannel(const String& label, const WebKit::WebRTCDataChannelInit& init)
 {
-    WebKit::WebRTCDataChannelHandler* webHandler = m_webHandler->createDataChannel(label, reliable);
+    WebKit::WebRTCDataChannelHandler* webHandler = m_webHandler->createDataChannel(label, init);
     if (!webHandler)
         return nullptr;
 

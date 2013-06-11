@@ -340,10 +340,12 @@ String StylePropertySerializer::getPropertyValue(CSSPropertyID propertyID) const
         return getShorthandValue(webkitFlexShorthand());
     case CSSPropertyWebkitFlexFlow:
         return getShorthandValue(webkitFlexFlowShorthand());
-    case CSSPropertyWebkitGridColumn:
-        return getShorthandValue(webkitGridColumnShorthand());
-    case CSSPropertyWebkitGridRow:
-        return getShorthandValue(webkitGridRowShorthand());
+    case CSSPropertyGridColumn:
+        return getShorthandValue(gridColumnShorthand());
+    case CSSPropertyGridRow:
+        return getShorthandValue(gridRowShorthand());
+    case CSSPropertyGridArea:
+        return getShorthandValue(gridAreaShorthand());
     case CSSPropertyFont:
         return fontValue();
     case CSSPropertyMargin:
@@ -594,8 +596,8 @@ String StylePropertySerializer::getLayeredShorthandValue(const StylePropertyShor
                     if (value->isImplicitInitialValue() || yValue->isImplicitInitialValue())
                         continue;
 
-                    int xId = toCSSPrimitiveValue(value.get())->getIdent();
-                    int yId = toCSSPrimitiveValue(yValue.get())->getIdent();
+                    CSSValueID xId = toCSSPrimitiveValue(value.get())->getValueID();
+                    CSSValueID yId = toCSSPrimitiveValue(yValue.get())->getValueID();
                     if (xId != yId) {
                         if (xId == CSSValueRepeat && yId == CSSValueNoRepeat) {
                             useRepeatXShorthand = true;

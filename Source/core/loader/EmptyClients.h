@@ -44,7 +44,7 @@
 #include "core/platform/text/TextCheckerClient.h"
 #include "modules/device_orientation/DeviceMotionClient.h"
 
-#include <public/WebScreenInfo.h>
+#include "public/platform/WebScreenInfo.h"
 #include <v8.h>
 
 /*
@@ -145,9 +145,7 @@ public:
 
     virtual void enumerateChosenDirectory(FileChooser*) OVERRIDE { }
 
-#if ENABLE(INPUT_TYPE_COLOR)
     virtual PassOwnPtr<ColorChooser> createColorChooser(ColorChooserClient*, const Color&) OVERRIDE;
-#endif
 
     virtual PassRefPtr<DateTimeChooser> openDateTimeChooser(DateTimeChooserClient*, const DateTimeChooserParameters&) OVERRIDE;
 
@@ -276,7 +274,7 @@ public:
     virtual void willReleaseScriptContext(v8::Handle<v8::Context>, int worldId) OVERRIDE { }
     virtual bool allowScriptExtension(const String& extensionName, int extensionGroup, int worldId) OVERRIDE { return false; }
 
-    virtual PassRefPtr<FrameNetworkingContext> createNetworkingContext() OVERRIDE;
+    virtual WebKit::WebCookieJar* cookieJar() const { return 0; }
 
     virtual void didRequestAutocomplete(PassRefPtr<FormState>) OVERRIDE;
 };

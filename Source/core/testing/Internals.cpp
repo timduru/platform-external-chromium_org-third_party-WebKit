@@ -90,6 +90,7 @@
 #include "core/page/Settings.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
+#include "core/platform/ColorChooser.h"
 #include "core/platform/Cursor.h"
 #include "core/platform/Language.h"
 #include "core/platform/graphics/IntRect.h"
@@ -102,17 +103,8 @@
 #include "wtf/dtoa.h"
 #include "wtf/text/StringBuffer.h"
 
-#if ENABLE(INPUT_TYPE_COLOR)
-#include "core/platform/ColorChooser.h"
-#endif
-
-#if ENABLE(BATTERY_STATUS)
-#include "modules/battery/BatteryController.h"
-#endif
-
 #include "core/page/PagePopupController.h"
 #include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/chromium/GraphicsLayerChromium.h"
 #include "core/platform/graphics/filters/FilterOperation.h"
 #include "core/platform/graphics/filters/FilterOperations.h"
 #include "core/rendering/RenderLayerBacking.h"
@@ -121,9 +113,6 @@
 #include "core/testing/MockCDM.h"
 #include "modules/encryptedmedia/CDM.h"
 #endif
-
-#include "core/page/CaptionUserPreferences.h"
-#include "core/page/PageGroup.h"
 
 #include "core/platform/mock/PlatformSpeechSynthesizerMock.h"
 #include "modules/speech/DOMWindowSpeechSynthesis.h"
@@ -203,7 +192,6 @@ void Internals::resetToConsistentState(Page* page)
     delete s_pagePopupDriver;
     s_pagePopupDriver = 0;
     page->chrome().client()->resetPagePopupDriver();
-    page->group().captionPreferences()->setTestingMode(false);
     if (!page->mainFrame()->editor()->isContinuousSpellCheckingEnabled())
         page->mainFrame()->editor()->toggleContinuousSpellChecking();
     if (page->mainFrame()->editor()->isOverwriteModeEnabled())
@@ -214,8 +202,6 @@ Internals::Internals(Document* document)
     : ContextDestructionObserver(document)
     , m_runtimeFlags(InternalRuntimeFlags::create())
 {
-    if (document && document->page())
-        document->page()->group().captionPreferences()->setTestingMode(true);
 }
 
 Document* Internals::contextDocument() const
@@ -374,6 +360,23 @@ bool Internals::hasSelectorForPseudoClassInShadow(Element* host, const String& p
 
     ASSERT_NOT_REACHED();
     return false;
+}
+
+unsigned short Internals::compareTreeScopePosition(const Node* node1, const Node* node2, ExceptionCode& ec) const
+{
+    if (!node1 || !node2) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+    const TreeScope* treeScope1 = node1->isDocumentNode() ? static_cast<const TreeScope*>(toDocument(node1)) :
+        node1->isShadowRoot() ? static_cast<const TreeScope*>(toShadowRoot(node1)) : 0;
+    const TreeScope* treeScope2 = node2->isDocumentNode() ? static_cast<const TreeScope*>(toDocument(node2)) :
+        node2->isShadowRoot() ? static_cast<const TreeScope*>(toShadowRoot(node2)) : 0;
+    if (!treeScope1 || !treeScope2) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+    return treeScope1->comparePosition(treeScope2);
 }
 
 unsigned Internals::numberOfActiveAnimations() const
@@ -673,7 +676,6 @@ String Internals::visiblePlaceholder(Element* element)
     return String();
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
 void Internals::selectColorInColorChooser(Element* element, const String& colorValue)
 {
     if (!element->hasTagName(inputTag))
@@ -683,7 +685,6 @@ void Internals::selectColorInColorChooser(Element* element, const String& colorV
         return;
     inputElement->selectColorInColorChooser(Color(colorValue));
 }
-#endif
 
 Vector<String> Internals::formControlStateOfPreviousHistoryItem(ExceptionCode& ec)
 {
@@ -1312,24 +1313,6 @@ void Internals::emitInspectorDidCancelFrame()
     inspectorController->didCancelFrame();
 }
 
-void Internals::setBatteryStatus(Document* document, const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode& ec)
-{
-    if (!document || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
-        return;
-    }
-
-#if ENABLE(BATTERY_STATUS)
-    BatteryController::from(document->page())->didChangeBatteryStatus(eventType, BatteryStatus::create(charging, chargingTime, dischargingTime, level));
-#else
-    UNUSED_PARAM(eventType);
-    UNUSED_PARAM(charging);
-    UNUSED_PARAM(chargingTime);
-    UNUSED_PARAM(dischargingTime);
-    UNUSED_PARAM(level);
-#endif
-}
-
 bool Internals::hasSpellingMarker(Document* document, int from, int length, ExceptionCode&)
 {
     if (!document || !document->frame())
@@ -1529,6 +1512,30 @@ String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionC
         layerTreeFlags |= LayerTreeFlagsIncludePaintingPhases;
 
     return document->frame()->layerTreeAsText(layerTreeFlags);
+}
+
+void Internals::setNeedsCompositedScrolling(Element* element, unsigned needsCompositedScrolling, ExceptionCode& ec)
+{
+    if (!element) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    element->document()->updateLayout();
+
+    RenderObject* renderer = element->renderer();
+    if (!renderer || !renderer->isBox()) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    RenderLayer* layer = toRenderBox(renderer)->layer();
+    if (!layer) {
+        ec = INVALID_ACCESS_ERR;
+        return;
+    }
+
+    layer->setForceNeedsCompositedScrolling(static_cast<RenderLayer::ForceNeedsCompositedScrollingMode>(needsCompositedScrolling));
 }
 
 String Internals::repaintRectsAsText(Document* document, ExceptionCode& ec) const

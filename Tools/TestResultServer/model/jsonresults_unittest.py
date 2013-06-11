@@ -33,12 +33,7 @@ except ImportError:
     print "ERROR: Add the TestResultServer, google_appengine and yaml/lib directories to your PYTHONPATH"
     raise
 
-# FIXME: Once we're on python 2.7, just use json directly.
-try:
-    from django.utils import simplejson
-except:
-    import json as simplejson
-
+import json
 import unittest
 
 FULL_RESULT_EXAMPLE = """ADD_RESULTS({
@@ -143,25 +138,22 @@ JSON_RESULTS_OLD_TEMPLATE = (
     '"tests":{[TESTDATA_TESTS]}'
     '},'
     '"version":[VERSION]'
-    '}') % simplejson.dumps(CHAR_TO_FAILURE)
+    '}') % json.dumps(CHAR_TO_FAILURE)
 
 JSON_RESULTS_COUNTS = '{"' + '":[[TESTDATA_COUNT]],"'.join([char for char in CHAR_TO_FAILURE.values()]) + '":[[TESTDATA_COUNT]]}'
 
 JSON_RESULTS_TEMPLATE = (
     '{"[BUILDER_NAME]":{'
-    '"allFixableCount":[[TESTDATA_COUNT]],'
     '"blinkRevision":[[TESTDATA_WEBKITREVISION]],'
     '"buildNumbers":[[TESTDATA_BUILDNUMBERS]],'
     '"chromeRevision":[[TESTDATA_CHROMEREVISION]],'
     '"failure_map": %s,'
-    '"fixableCount":[[TESTDATA_COUNT]],'
-    '"fixableCounts":[[TESTDATA_COUNTS]],'
     '"num_failures_by_type":%s,'
     '"secondsSinceEpoch":[[TESTDATA_TIMES]],'
     '"tests":{[TESTDATA_TESTS]}'
     '},'
     '"version":[VERSION]'
-    '}') % (simplejson.dumps(CHAR_TO_FAILURE), JSON_RESULTS_COUNTS)
+    '}') % (json.dumps(CHAR_TO_FAILURE), JSON_RESULTS_COUNTS)
 
 JSON_RESULTS_COUNTS_TEMPLATE = '{"' + '":[TESTDATA],"'.join([char for char in CHAR_TO_FAILURE]) + '":[TESTDATA]}'
 
@@ -188,8 +180,8 @@ class JsonResultsTest(unittest.TestCase):
     # Use this to get better error messages than just string compare gives.
     def assert_json_equal(self, a, b):
         self.maxDiff = None
-        a = simplejson.loads(a) if isinstance(a, str) else a
-        b = simplejson.loads(b) if isinstance(b, str) else b
+        a = json.loads(a) if isinstance(a, str) else a
+        b = json.loads(b) if isinstance(b, str) else b
         self.assertEqual(a, b)
 
     def test_strip_prefix_suffix(self):
@@ -228,23 +220,24 @@ class JsonResultsTest(unittest.TestCase):
 
         version = str(test_data["version"]) if "version" in test_data else "4"
         json_string = json_string.replace("[VERSION]", version)
-        json_string = json_string.replace("{[TESTDATA_TESTS]}", simplejson.dumps(tests, separators=(',', ':'), sort_keys=True))
+        json_string = json_string.replace("{[TESTDATA_TESTS]}", json.dumps(tests, separators=(',', ':'), sort_keys=True))
         return json_string
 
     def _test_merge(self, aggregated_data, incremental_data, expected_data, max_builds=jsonresults.JSON_RESULTS_MAX_BUILDS):
-        aggregated_results = self._make_test_json(aggregated_data)
-        incremental_json = JsonResults._get_incremental_json(self._builder, self._make_test_json(incremental_data), is_full_results_format=False)
-        merged_results = JsonResults.merge(self._builder, aggregated_results, incremental_json, num_runs=max_builds, sort_keys=True)
+        aggregated_results = self._make_test_json(aggregated_data, builder_name=self._builder)
+        incremental_json, _ = JsonResults._get_incremental_json(self._builder, self._make_test_json(incremental_data, builder_name=self._builder), is_full_results_format=False)
+        merged_results, status_code = JsonResults.merge(self._builder, aggregated_results, incremental_json, num_runs=max_builds, sort_keys=True)
 
         if expected_data:
-            expected_results = self._make_test_json(expected_data)
+            expected_results = self._make_test_json(expected_data, builder_name=self._builder)
             self.assert_json_equal(merged_results, expected_results)
+            self.assertEqual(status_code, 200)
         else:
-            self.assertFalse(merged_results)
+            self.assertTrue(status_code != 200)
 
     def _test_get_test_list(self, input_data, expected_data):
         input_results = self._make_test_json(input_data)
-        expected_results = JSON_RESULTS_TEST_LIST_TEMPLATE.replace("{[TESTDATA_TESTS]}", simplejson.dumps(expected_data, separators=(',', ':')))
+        expected_results = JSON_RESULTS_TEST_LIST_TEMPLATE.replace("{[TESTDATA_TESTS]}", json.dumps(expected_data, separators=(',', ':')))
         actual_results = JsonResults.get_test_list(self._builder, input_results)
         self.assert_json_equal(actual_results, expected_results)
 
@@ -286,7 +279,8 @@ class JsonResultsTest(unittest.TestCase):
 
         incremental_string = ""
 
-        self.assertFalse(JsonResults.update_files(small_file.builder, incremental_string, small_file, large_file, is_full_results_format=False))
+        self.assertEqual(JsonResults.update_files(small_file.builder, incremental_string, small_file, large_file, is_full_results_format=False),
+            ('No incremental JSON data to merge.', 403))
         self.assert_json_equal(small_file.data, aggregated_string)
         self.assert_json_equal(large_file.data, aggregated_string)
 
@@ -313,7 +307,8 @@ class JsonResultsTest(unittest.TestCase):
         }
         incremental_string = self._make_test_json(incremental_data, builder_name=small_file.builder)
 
-        self.assertFalse(JsonResults.update_files(small_file.builder, incremental_string, small_file, large_file, is_full_results_format=False))
+        self.assertEqual(JsonResults.update_files(small_file.builder, incremental_string, small_file, large_file, is_full_results_format=False),
+            ('No incremental JSON data to merge.', 403))
         self.assert_json_equal(small_file.data, aggregated_string)
         self.assert_json_equal(large_file.data, aggregated_string)
 
@@ -327,9 +322,9 @@ class JsonResultsTest(unittest.TestCase):
                 }
             }
         }
-        incremental_results = JsonResults._get_incremental_json(self._builder, self._make_test_json(incremental_data), is_full_results_format=False)
+        incremental_results, _ = JsonResults._get_incremental_json(self._builder, self._make_test_json(incremental_data), is_full_results_format=False)
         aggregated_results = ""
-        merged_results = JsonResults.merge(self._builder, aggregated_results, incremental_results, num_runs=jsonresults.JSON_RESULTS_MAX_BUILDS, sort_keys=True)
+        merged_results, _ = JsonResults.merge(self._builder, aggregated_results, incremental_results, num_runs=jsonresults.JSON_RESULTS_MAX_BUILDS, sort_keys=True)
         self.assert_json_equal(merged_results, incremental_results)
 
     def test_failures_by_type_added(self):
@@ -351,8 +346,8 @@ class JsonResultsTest(unittest.TestCase):
                 }
             }
         }, json_string=JSON_RESULTS_OLD_TEMPLATE)
-        incremental_json = JsonResults._get_incremental_json(self._builder, incremental_results, is_full_results_format=False)
-        merged_results = JsonResults.merge(self._builder, aggregated_results, incremental_json, num_runs=200, sort_keys=True)
+        incremental_json, _ = JsonResults._get_incremental_json(self._builder, incremental_results, is_full_results_format=False)
+        merged_results, _ = JsonResults.merge(self._builder, aggregated_results, incremental_json, num_runs=200, sort_keys=True)
         self.assert_json_equal(merged_results, self._make_test_json({
             "builds": ["3", "2", "1"],
             "tests": {
@@ -366,13 +361,10 @@ class JsonResultsTest(unittest.TestCase):
     def test_merge_full_results_format(self):
         expected_incremental_results = {
             "Webkit": {
-                "allFixableCount": [35],
                 "blinkRevision": ["1234"],
                 "buildNumbers": ["3"],
                 "chromeRevision": ["5678"],
                 "failure_map": CHAR_TO_FAILURE,
-                "fixableCount": [25],
-                "fixableCounts": [{AUDIO: 0, CRASH: 3, TEXT: 3, IMAGE: 1, MISSING: 0, PASS: 10, TIMEOUT: 16, SKIP: 2, IMAGE_PLUS_TEXT: 0}],
                 "num_failures_by_type": {"AUDIO": [0], "CRASH": [3], "IMAGE": [1], "IMAGE+TEXT": [0], "MISSING": [0], "PASS": [10], "SKIP": [2], "TEXT": [3], "TIMEOUT": [16]},
                 "secondsSinceEpoch": [1368146629],
                 "tests": {
@@ -417,8 +409,8 @@ class JsonResultsTest(unittest.TestCase):
         }
 
         aggregated_results = ""
-        incremental_json = JsonResults._get_incremental_json(self._builder, FULL_RESULT_EXAMPLE, is_full_results_format=True)
-        merged_results = JsonResults.merge("Webkit", aggregated_results, incremental_json, num_runs=jsonresults.JSON_RESULTS_MAX_BUILDS, sort_keys=True)
+        incremental_json, _ = JsonResults._get_incremental_json(self._builder, FULL_RESULT_EXAMPLE, is_full_results_format=True)
+        merged_results, _ = JsonResults.merge("Webkit", aggregated_results, incremental_json, num_runs=jsonresults.JSON_RESULTS_MAX_BUILDS, sort_keys=True)
         self.assert_json_equal(merged_results, expected_incremental_results)
 
     def test_merge_empty_aggregated_results(self):
@@ -819,7 +811,6 @@ class JsonResultsTest(unittest.TestCase):
 
 
     def test_merge_keep_test_with_all_pass_but_slow_time(self):
-        # Do not remove test where all run pass but max running time >= 5 seconds
         self._test_merge(
             # Aggregated results
             {"builds": ["2", "1"],
@@ -842,6 +833,37 @@ class JsonResultsTest(unittest.TestCase):
              "tests": {"001.html": {
                            "results": [[201, PASS]],
                            "times": [[1, 1], [200, jsonresults.JSON_RESULTS_MIN_TIME]]},
+                       "002.html": {
+                           "results": [[1, PASS], [10, TEXT]],
+                           "times": [[11, 0]]}}})
+
+    def test_merge_pruning_slow_tests_for_debug_builders(self):
+        self._builder = "MockBuilder(dbg)"
+        self._test_merge(
+            # Aggregated results
+            {"builds": ["2", "1"],
+             "tests": {"001.html": {
+                           "results": [[200, PASS]],
+                           "times": [[200, 2 * jsonresults.JSON_RESULTS_MIN_TIME]]},
+                       "002.html": {
+                           "results": [[10, TEXT]],
+                           "times": [[10, 0]]}}},
+            # Incremental results
+            {"builds": ["3"],
+             "tests": {"001.html": {
+                           "results": [[1, PASS]],
+                           "times": [[1, 1]]},
+                       "002.html": {
+                           "results": [[1, PASS]],
+                           "times": [[1, 0]]},
+                       "003.html": {
+                           "results": [[1, PASS]],
+                           "times": [[1, jsonresults.JSON_RESULTS_MIN_TIME]]}}},
+            # Expected results
+            {"builds": ["3", "2", "1"],
+             "tests": {"001.html": {
+                           "results": [[201, PASS]],
+                           "times": [[1, 1], [200, 2 * jsonresults.JSON_RESULTS_MIN_TIME]]},
                        "002.html": {
                            "results": [[1, PASS], [10, TEXT]],
                            "times": [[11, 0]]}}})

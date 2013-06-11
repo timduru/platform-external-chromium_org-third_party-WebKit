@@ -38,12 +38,19 @@ class ScriptExecutionContext;
 
 class V8ScriptRunner {
 public:
-    static PassOwnPtr<v8::ScriptData> precompileScript(v8::Handle<v8::String>, CachedScript*);
-    static v8::Local<v8::Script> compileScript(v8::Handle<v8::String>, const String&, const TextPosition&, v8::ScriptData*, v8::Isolate*);
+    // For the following methods, the caller sites have to hold
+    // a HandleScope and a ContextScope.
+    static v8::Local<v8::Script> compileScript(v8::Handle<v8::String>, const String&, const TextPosition&, v8::Isolate*);
     static v8::Local<v8::Value> runCompiledScript(v8::Handle<v8::Script>, ScriptExecutionContext*);
-    static v8::Local<v8::Value> compileAndRunInternalScript(v8::Handle<v8::String>, v8::Isolate*, v8::Local<v8::Context> = v8::Local<v8::Context>(), const String& = String(), const TextPosition& = TextPosition(), v8::ScriptData* = 0);
-    static v8::Local<v8::Value> callInternalFunction(v8::Handle<v8::Function>, v8::Local<v8::Context>, v8::Handle<v8::Object>, int argc, v8::Handle<v8::Value> args[], v8::Isolate*);
+    static v8::Local<v8::Value> compileAndRunInternalScript(v8::Handle<v8::String>, v8::Isolate*, const String& = String(), const TextPosition& = TextPosition());
+    static v8::Local<v8::Value> callInternalFunction(v8::Handle<v8::Function>, v8::Handle<v8::Object>, int argc, v8::Handle<v8::Value> args[], v8::Isolate*);
     static v8::Local<v8::Value> callFunction(v8::Handle<v8::Function>, ScriptExecutionContext*, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[]);
+    static v8::Local<v8::Value> callAsFunction(v8::Handle<v8::Object>, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[]);
+    static v8::Local<v8::Value> callAsConstructor(v8::Handle<v8::Object>, int argc, v8::Handle<v8::Value> args[]);
+    static v8::Local<v8::Object> instantiateObject(v8::Handle<v8::ObjectTemplate>);
+    static v8::Local<v8::Object> instantiateObject(v8::Handle<v8::Function>, int argc = 0, v8::Handle<v8::Value> argv[] = 0);
+    static v8::Local<v8::Object> instantiateObjectInDocument(v8::Handle<v8::Function>, ScriptExecutionContext*, int argc = 0, v8::Handle<v8::Value> argv[] = 0);
+
 };
 
 } // namespace WebCore

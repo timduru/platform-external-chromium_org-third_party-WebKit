@@ -31,33 +31,29 @@
 #ifndef ScriptState_h
 #define ScriptState_h
 
-#include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ScopedPersistent.h"
 #include "bindings/v8/V8Utilities.h"
 #include <v8.h>
 #include "wtf/Noncopyable.h"
-#include "wtf/RefCounted.h"
 
 namespace WebCore {
 
 class DOMWindow;
 class DOMWrapperWorld;
 class Frame;
-class Node;
-class Page;
 class ScriptExecutionContext;
 class WorkerContext;
 
 class ScriptState {
     WTF_MAKE_NONCOPYABLE(ScriptState);
 public:
-    bool hadException() { return !m_exception.IsEmpty(); }
+    bool hadException() { return !m_exception.isEmpty(); }
     void setException(v8::Local<v8::Value> exception)
     {
-        m_exception = exception;
+        m_exception.set(m_isolate, exception);
     }
-    v8::Local<v8::Value> exception() { return m_exception; }
-    void clearException() { m_exception.Clear(); }
+    v8::Local<v8::Value> exception() { return m_exception.newLocal(m_isolate); }
+    void clearException() { m_exception.clear(); }
 
     v8::Local<v8::Context> context() const
     {
@@ -71,8 +67,10 @@ public:
 
     DOMWindow* domWindow() const;
     ScriptExecutionContext* scriptExecutionContext() const;
+    bool evalEnabled() const;
+    void setEvalEnabled(bool);
 
-    static ScriptState* forContext(v8::Local<v8::Context>);
+    static ScriptState* forContext(v8::Handle<v8::Context>);
     static ScriptState* current();
 
 protected:
@@ -89,7 +87,7 @@ private:
 
     static void makeWeakCallback(v8::Isolate*, v8::Persistent<v8::Context>*, ScriptState*);
 
-    v8::Local<v8::Value> m_exception;
+    ScopedPersistent<v8::Value> m_exception;
     ScopedPersistent<v8::Context> m_context;
     v8::Isolate* m_isolate;
 };
@@ -123,20 +121,9 @@ private:
     ScopedPersistent<v8::Context> m_context;
 };
 
-DOMWindow* domWindowFromScriptState(ScriptState*);
-ScriptExecutionContext* scriptExecutionContextFromScriptState(ScriptState*);
-
-bool evalEnabled(ScriptState*);
-void setEvalEnabled(ScriptState*, bool);
-
 ScriptState* mainWorldScriptState(Frame*);
 
-ScriptState* scriptStateFromNode(DOMWrapperWorld*, Node*);
-ScriptState* scriptStateFromPage(DOMWrapperWorld*, Page*);
 ScriptState* scriptStateFromWorkerContext(WorkerContext*);
-
-inline DOMWrapperWorld* debuggerWorld() { return mainThreadNormalWorld(); }
-inline DOMWrapperWorld* pluginWorld() { return mainThreadNormalWorld(); }
 
 }
 

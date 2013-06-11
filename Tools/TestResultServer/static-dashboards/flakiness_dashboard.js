@@ -43,10 +43,26 @@ var SLOW_MULTIPLIER = 5;
 var CHUNK_SIZE = 25;
 
 // FIXME: Figure out how to make this not be hard-coded.
+// Probably just include in the results.json files and get it from there.
 var VIRTUAL_SUITES = {
     'virtual/gpu/fast/canvas': 'fast/canvas',
-    'virtual/gpu/canvas/philip': 'canvas/philip'
+    'virtual/gpu/canvas/philip': 'canvas/philip',
+    'virtual/threaded/compositing/visibility': 'compositing/visibility',
+    'virtual/threaded/compositing/webgl': 'compositing/webgl',
+    'virtual/gpu/fast/hidpi': 'fast/hidpi',
+    'virtual/softwarecompositing': 'compositing',
+    'virtual/deferred/fast/images': 'fast/images',
+    'virtual/gpu/compositedscrolling/overflow': 'compositing/overflow',
+    'virtual/gpu/compositedscrolling/scrollbars': 'scrollbars',
 };
+
+var ACTUAL_RESULT_SUFFIXES = ['expected.txt', 'expected.png', 'actual.txt', 'actual.png', 'diff.txt', 'diff.png', 'wdiff.html', 'crash-log.txt'];
+
+var EXPECTATIONS_ORDER = ACTUAL_RESULT_SUFFIXES.filter(function(suffix) {
+    return !string.endsWith(suffix, 'png');
+}).map(function(suffix) {
+    return suffix.split('.')[0]
+});
 
 var resourceLoader;
 
@@ -227,6 +243,10 @@ var TestTrie = function(builders, resultsByBuilder)
     this._trie = {};
 
     for (var builder in builders) {
+        if (!resultsByBuilder[builder]) {
+            console.warn("No results for builder: ", builder)
+            continue;
+        }
         var testsForBuilder = resultsByBuilder[builder].tests;
         for (var test in testsForBuilder)
             this._addTest(test.split('/'), this._trie);
@@ -388,7 +408,7 @@ function processTestRunsForBuilder(builderName)
         g_perBuilderFailures[builderName] = [];
         return;
     }
-   
+
     var failures = [];
     var allTestsForThisBuilder = g_resultsByBuilder[builderName].tests;
 
@@ -406,27 +426,33 @@ function processTestRunsForBuilder(builderName)
         if (rawTest.bugs)
             resultsForTest.bugs = rawTest.bugs;
 
+        var failureMap = g_resultsByBuilder[builderName][results.FAILURE_MAP];
         // FIXME: Switch to resultsByBuild
         var times = resultsForTest.rawTimes;
         var numTimesSeen = 0;
         var numResultsSeen = 0;
         var resultsIndex = 0;
-        var currentResult;
-        for (var i = 0; i < times.length; i++) {
-            numTimesSeen += times[i][RLE.LENGTH];
+        var resultsMap = {}
 
-            while (rawResults[resultsIndex] && numTimesSeen > (numResultsSeen + rawResults[resultsIndex][RLE.LENGTH])) {
-                numResultsSeen += rawResults[resultsIndex][RLE.LENGTH];
+        for (var i = 0; i < times.length; i++) {
+            numTimesSeen += times[i][results.RLE.LENGTH];
+
+            while (rawResults[resultsIndex] && numTimesSeen > (numResultsSeen + rawResults[resultsIndex][results.RLE.LENGTH])) {
+                numResultsSeen += rawResults[resultsIndex][results.RLE.LENGTH];
                 resultsIndex++;
             }
 
-            if (rawResults && rawResults[resultsIndex])
-                currentResult = rawResults[resultsIndex][RLE.VALUE];
+            if (rawResults && rawResults[resultsIndex]) {
+                var result = rawResults[resultsIndex][results.RLE.VALUE];
+                resultsMap[failureMap[result]] = true;
+            }
 
-            resultsForTest.slowestTime = Math.max(resultsForTest.slowestTime, times[i][RLE.VALUE]);
+            resultsForTest.slowestTime = Math.max(resultsForTest.slowestTime, times[i][results.RLE.VALUE]);
         }
 
-        determineFlakiness(g_resultsByBuilder[builderName][FAILURE_MAP_KEY], resultsForTest);
+        resultsForTest.actualResults = Object.keys(resultsMap);
+
+        results.determineFlakiness(failureMap, rawResults, resultsForTest);
         failures.push(resultsForTest);
 
         if (!g_testToResultsMap[test])
@@ -435,55 +461,6 @@ function processTestRunsForBuilder(builderName)
     }
 
     g_perBuilderFailures[builderName] = failures;
-}
-
-function determineFlakiness(failureMap, resultsForTest)
-{
-    // Heuristic for determining whether expectations apply to a given test:
-    // -If a test result happens < MIN_RUNS_FOR_FLAKE, then consider it a flaky
-    // result and include it in the list of expected results.
-    // -Otherwise, grab the first contiguous set of runs with the same result
-    // for >= MIN_RUNS_FOR_FLAKE and ignore all following runs >=
-    // MIN_RUNS_FOR_FLAKE.
-    // This lets us rule out common cases of a test changing expectations for
-    // a few runs, then being fixed or otherwise modified in a non-flaky way.
-    var rawResults = resultsForTest.rawResults;
-
-    // Only consider flake if it doesn't happen twice in a row.
-    var MIN_RUNS_FOR_FLAKE = 2;
-    var resultsMap = {}
-    var numResultsSeen = 0;
-    var haveSeenNonFlakeResult = false;
-    var numRealResults = 0;
-
-    var seenResults = {};
-    for (var i = 0; i < rawResults.length; i++) {
-        var numResults = rawResults[i][RLE.LENGTH];
-        numResultsSeen += numResults;
-
-        var result = rawResults[i][RLE.VALUE];
-
-        var hasMinRuns = numResults >= MIN_RUNS_FOR_FLAKE;
-        if (haveSeenNonFlakeResult && hasMinRuns)
-            continue;
-        else if (hasMinRuns)
-            haveSeenNonFlakeResult = true;
-        else if (!seenResults[result]) {
-            // Only consider a short-lived result if we've seen it more than once.
-            // Otherwise, we include lots of false-positives due to tests that fail
-            // for a couple runs and then start passing.
-            seenResults[result] = true;
-            continue;
-        }
-
-        var expectation = failureMap[result];
-        resultsMap[expectation] = true;
-        numRealResults++;
-    }
-
-    resultsForTest.actualResults = Object.keys(resultsMap);
-    resultsForTest.flips = i - 1;
-    resultsForTest.isFlaky = numRealResults > 1;
 }
 
 function linkHTMLToOpenWindow(url, text)
@@ -497,11 +474,11 @@ function isFailure(builder, testName, index)
 {
     var currentIndex = 0;
     var rawResults = g_resultsByBuilder[builder].tests[testName].results;
-    var failureMap = g_resultsByBuilder[builder][FAILURE_MAP_KEY];
+    var failureMap = g_resultsByBuilder[builder][results.FAILURE_MAP];
     for (var i = 0; i < rawResults.length; i++) {
-        currentIndex += rawResults[i][RLE.LENGTH];
+        currentIndex += rawResults[i][results.RLE.LENGTH];
         if (currentIndex > index)
-            return isFailingResult(failureMap, rawResults[i][RLE.VALUE]);
+            return results.isFailingResult(failureMap, rawResults[i][results.RLE.VALUE]);
     }
     console.error('Index exceeds number of results: ' + index);
 }
@@ -511,12 +488,12 @@ function indexesForFailures(builder, testName)
 {
     var rawResults = g_resultsByBuilder[builder].tests[testName].results;
     var buildNumbers = g_resultsByBuilder[builder].buildNumbers;
-    var failureMap = g_resultsByBuilder[builder][FAILURE_MAP_KEY];
+    var failureMap = g_resultsByBuilder[builder][results.FAILURE_MAP];
     var index = 0;
     var failures = [];
     for (var i = 0; i < rawResults.length; i++) {
-        var numResults = rawResults[i][RLE.LENGTH];
-        if (isFailingResult(failureMap, rawResults[i][RLE.VALUE])) {
+        var numResults = rawResults[i][results.RLE.LENGTH];
+        if (results.isFailingResult(failureMap, rawResults[i][results.RLE.VALUE])) {
             for (var j = 0; j < numResults; j++)
                 failures.push(index + j);
         }
@@ -542,12 +519,12 @@ function showPopupForBuild(e, builder, index, opt_testName)
     }
 
     var buildNumber = g_resultsByBuilder[builder].buildNumbers[index];
-    var master = builderMaster(builder);
+    var master = builders.master(builder);
     var buildBasePath = master.logPath(builder, buildNumber);
 
     html += '<ul><li>' + linkHTMLToOpenWindow(buildBasePath, 'Build log');
 
-    if (g_resultsByBuilder[builder][BLINK_REVISIONS_KEY])
+    if (g_resultsByBuilder[builder][results.BLINK_REVISIONS])
         html += '</li><li>Blink: ' + ui.html.blinkRevisionLink(g_resultsByBuilder[builder], index) + '</li>';
 
     html += '</li><li>Chromium: ' + ui.html.chromiumRevisionLink(g_resultsByBuilder[builder], index) + '</li>';
@@ -573,10 +550,10 @@ function classNameForFailureString(failure)
 function htmlForTestResults(test)
 {
     var html = '';
-    var results = test.rawResults.concat();
+    var testResults = test.rawResults.concat();
     var times = test.rawTimes.concat();
     var builder = test.builder;
-    var master = builderMaster(builder);
+    var master = builders.master(builder);
     var buildNumbers = g_resultsByBuilder[builder].buildNumbers;
 
     var indexToReplaceCurrentResult = -1;
@@ -585,12 +562,12 @@ function htmlForTestResults(test)
         var currentResultArray, currentTimeArray, innerHTML, resultString;
 
         if (i > indexToReplaceCurrentResult) {
-            currentResultArray = results.shift();
+            currentResultArray = testResults.shift();
             if (currentResultArray) {
-                resultString = g_resultsByBuilder[builder][FAILURE_MAP_KEY][currentResultArray[RLE.VALUE]];
-                indexToReplaceCurrentResult += currentResultArray[RLE.LENGTH];
+                resultString = g_resultsByBuilder[builder][results.FAILURE_MAP][currentResultArray[results.RLE.VALUE]];
+                indexToReplaceCurrentResult += currentResultArray[results.RLE.LENGTH];
             } else {
-                resultString = NO_DATA;
+                resultString = results.NO_DATA;
                 indexToReplaceCurrentResult += buildNumbers.length;
             }
         }
@@ -599,8 +576,8 @@ function htmlForTestResults(test)
             currentTimeArray = times.shift();
             var currentTime = 0;
             if (currentResultArray) {
-              currentTime = currentTimeArray[RLE.VALUE];
-              indexToReplaceCurrentTime += currentTimeArray[RLE.LENGTH];
+              currentTime = currentTimeArray[results.RLE.VALUE];
+              indexToReplaceCurrentTime += currentTimeArray[results.RLE.LENGTH];
             } else
               indexToReplaceCurrentTime += buildNumbers.length;
 
@@ -621,7 +598,7 @@ function shouldShowTest(testResult)
     if (testResult.expectations == 'WONTFIX')
         return g_history.dashboardSpecificState.showWontFix;
 
-    if (testResult.expectations == 'SKIP')
+    if (testResult.expectations == results.SKIP)
         return g_history.dashboardSpecificState.showSkip;
 
     if (testResult.isFlaky)
@@ -637,7 +614,7 @@ function createBugHTML(test)
     var description = encodeURIComponent('The following layout test is ' + symptom + ' on ' +
         '[insert platform]\n\n' + test.test + '\n\nProbable cause:\n\n' +
         '[insert probable cause]');
-    
+
     url = 'https://code.google.com/p/chromium/issues/entry?template=Layout%20Test%20Failure&summary=' + title + '&comment=' + description;
     return '<a href="' + url + '">File new bug</a>';
 }
@@ -821,8 +798,8 @@ function htmlForIndividualTestOnAllBuilders(test)
 
     var testResults = g_testToResultsMap[test];
     if (!testResults)
-        return '<div class="not-found">Test not found. Either it does not exist, is skipped or passes on all platforms.</div>';
-        
+        return '<div class="not-found">Test not found. Either it does not exist, is skipped or passes on all recorded runs.</div>';
+
     var html = '';
     var shownBuilders = [];
     for (var j = 0; j < testResults.length; j++) {
@@ -838,7 +815,7 @@ function htmlForIndividualTestOnAllBuilders(test)
 
     var skippedBuildersHtml = '';
     if (skippedBuilders.length) {
-        skippedBuildersHtml = '<div>The following builders either don\'t run this test (e.g. it\'s skipped) or all runs passed:</div>' +
+        skippedBuildersHtml = '<div>The following builders either don\'t run this test (e.g. it\'s skipped) or all recorded runs passed:</div>' +
             '<div class=skipped-builder-list><div class=skipped-builder>' + skippedBuilders.join('</div><div class=skipped-builder>') + '</div></div>';
     }
 
@@ -869,24 +846,6 @@ function htmlForIndividualTestOnAllBuildersWithResultsLinks(test)
     return html;
 }
 
-function getExpectationsContainer(expectationsContainers, parentContainer, expectationsType)
-{
-    if (!expectationsContainers[expectationsType]) {
-        var container = document.createElement('div');
-        container.className = 'expectations-container';
-        parentContainer.appendChild(container);
-        expectationsContainers[expectationsType] = container;
-    }
-    return expectationsContainers[expectationsType];
-}
-
-function ensureTrailingSlash(path)
-{
-    if (path.match(/\/$/))
-        return path;
-    return path + '/';
-}
-
 function maybeAddPngChecksum(expectationDiv, pngUrl)
 {
     // pngUrl gets served from the browser cache since we just loaded it in an
@@ -914,220 +873,134 @@ function maybeAddPngChecksum(expectationDiv, pngUrl)
         true);
 }
 
-// Adds a specific expectation. If it's an image, it's only added on the
-// image's onload handler. If it's a text file, then a script tag is appended
-// as a hack to see if the file 404s (necessary since it's cross-domain).
-// Once all the expectations for a specific type have loaded or errored
-// (e.g. all the text results), then we go through and identify which platform
-// uses which expectation.
-//
-// @param {Object} expectationsContainers Map from expectations type to
-//     container DIV.
-// @param {Element} parentContainer Container element for
-//     expectationsContainer divs.
-// @param {string} platform Platform string. Empty string for non-platform
-//     specific expectations.
-// @param {string} path Relative path to the expectation.
-// @param {string} base Base path for the expectation URL.
-// @param {string} opt_builder Builder whose actual results this expectation
-//     points to.
-// @param {string} opt_suite "virtual suite" that the test belongs to, if any.
-function addExpectationItem(expectationsContainers, parentContainer, platform, path, base, opt_builder, opt_suite)
+function getOrCreate(className, parent)
 {
-    var parts = path.split('.')
-    var fileExtension = parts[parts.length - 1];
-    if (fileExtension == 'html')
-        fileExtension = 'txt';
-    
-    var container = getExpectationsContainer(expectationsContainers, parentContainer, fileExtension);
-    var isImage = path.match(/\.png$/);
+    var element = parent.querySelector('.' + className);
+    if (!element) {
+        element = document.createElement('div');
+        element.className = className;
+        parent.appendChild(element);
+    }
+    return element;
+}
 
-    // FIXME: Stop using script tags once all the places we pull from support CORS.
-    var platformPart = platform ? ensureTrailingSlash(platform) : '';
-    var suitePart = opt_suite ? ensureTrailingSlash(opt_suite) : '';
+function handleExpectationsItemLoad(title, item, itemType, parent)
+{
+    item.className = 'expectation';
+    if (g_history.dashboardSpecificState.showLargeExpectations)
+        item.className += ' large';
 
-    var childContainer = document.createElement('span');
-    childContainer.className = 'unloaded';
+    var titleContainer = document.createElement('h3');
+    titleContainer.className = 'expectations-title';
+    titleContainer.textContent = title;
+
+    var itemContainer = document.createElement('span');
+    itemContainer.appendChild(titleContainer);
+    itemContainer.className = 'expectations-item ' + title;
+    itemContainer.appendChild(item);
+
+    // Separate text and image results into separate divs..
+    var typeContainer = getOrCreate(itemType, parent);
+
+    // Insert results in a consistent order.
+    var index = EXPECTATIONS_ORDER.indexOf(title);
+    while (index < EXPECTATIONS_ORDER.length) {
+        index++;
+        var elementAfter = typeContainer.querySelector('.' + EXPECTATIONS_ORDER[index]);
+        if (elementAfter) {
+            typeContainer.insertBefore(itemContainer, elementAfter);
+            break;
+        }
+    }
+    if (!itemContainer.parentNode)
+        typeContainer.appendChild(itemContainer);
+
+    handleFinishedLoadingExpectations(parent);
+}
+
+function addExpectationItem(expectationsContainers, parentContainer, url, opt_builder)
+{
+    // Group expectations by builder, putting test and reference files first.
+    var builder = opt_builder || "Test and reference files";
+    var container = expectationsContainers[builder];
+
+    if (!container) {
+        container = document.createElement('div');
+        container.className = 'expectations-container';
+        container.setAttribute('data-builder', builder);
+        parentContainer.appendChild(container);
+        expectationsContainers[builder] = container;
+    }
+
+    var numUnloaded = container.getAttribute('data-unloaded') || 0;
+    container.setAttribute('data-unloaded', ++numUnloaded);
+
+    var isImage = url.match(/\.png$/);
 
     var appendExpectationsItem = function(item) {
-        childContainer.appendChild(expectationsTitle(platformPart + suitePart, path, opt_builder));
-        childContainer.className = 'expectations-item';
-        item.className = 'expectation ' + fileExtension;
-        if (g_history.dashboardSpecificState.showLargeExpectations)
-            item.className += ' large';
-        childContainer.appendChild(item);
+        var itemType = isImage ? 'image' : 'text';
+        handleExpectationsItemLoad(expectationsTitle(url), item, itemType, container);
+    };
+
+    var handleLoadError = function() {
         handleFinishedLoadingExpectations(container);
     };
 
-    var url = base + platformPart + path;
     if (isImage) {
-        var dummyNode = document.createElement(isImage ? 'img' : 'script');
-        dummyNode.src = url;
+        var dummyNode = document.createElement('img');
         dummyNode.onload = function() {
-            var item;
-            if (isImage) {
-                item = dummyNode;
-                maybeAddPngChecksum(item, url);
-            } else {
-                item = document.createElement('iframe');
-                item.src = url;
-            }
+            var item = dummyNode;
+            maybeAddPngChecksum(item, url);
             appendExpectationsItem(item);
         }
-        dummyNode.onerror = function() {
-            childContainer.parentNode.removeChild(childContainer);
-            handleFinishedLoadingExpectations(container);
-        }
-
-        // Append script elements now so that they load. Images load without being
-        // appended to the DOM.
-        if (!isImage)
-            childContainer.appendChild(dummyNode);
+        dummyNode.onerror = handleLoadError;
+        dummyNode.src = url;
     } else {
         loader.request(url,
             function(xhr) {
                 var item = document.createElement('pre');
-                item.innerText = xhr.responseText;
+                if (string.endsWith(url, '-wdiff.html'))
+                    item.innerHTML = xhr.responseText;
+                else
+                    item.textContent = xhr.responseText;
                 appendExpectationsItem(item);
             },
-            function(xhr) {/* Do nothing on errors since they're expected */});
+            handleLoadError);
     }
-
-    container.appendChild(childContainer);
 }
 
-
-// Identifies which expectations are used on which platform once all the
-// expectations of a given type have loaded (e.g. the container for png
-// expectations for this test had no child elements with the class
-// "unloaded").
-//
-// @param {string} container Element containing the expectations for a given
-//     test and a given type (e.g. png).
 function handleFinishedLoadingExpectations(container)
 {
-    if (container.getElementsByClassName('unloaded').length)
+    var numUnloaded = container.getAttribute('data-unloaded') - 1;
+    container.setAttribute('data-unloaded', numUnloaded);
+    if (numUnloaded)
         return;
 
-    var titles = container.getElementsByClassName('expectations-title');
-    for (var platform in g_fallbacksMap) {
-        var fallbacks = g_fallbacksMap[platform];
-        var winner = null;
-        var winningIndex = -1;
-        for (var i = 0; i < titles.length; i++) {
-            var title = titles[i];
-
-            if (!winner && title.platform == "") {
-                winner = title;
-                continue;
-            }
-
-            var rawPlatform = title.platform && title.platform.replace('platform/', '');
-            for (var j = 0; j < fallbacks.length; j++) {
-                if ((winningIndex == -1 || winningIndex > j) && rawPlatform == fallbacks[j]) {
-                    winningIndex = j;
-                    winner = title;
-                    break;
-                }
-            }
-        }
-        if (winner)
-            winner.getElementsByClassName('platforms')[0].innerHTML += '<div class=used-platform>' + platform + '</div>';
-        else {
-            console.log('No expectations identified for this test. This means ' +
-                'there is a logic bug in the dashboard for which expectations a ' +
-                'platform uses or src.chromium.org is giving 5XXs.');
-        }
+    if (!container.firstChild) {
+        container.remove();
+        return;
     }
 
-    consolidateUsedPlatforms(container);
+    var builder = container.getAttribute('data-builder');
+    if (!builder)
+        return;
+
+    var header = document.createElement('h2');
+    header.textContent = builder;
+    container.insertBefore(header, container.firstChild);
 }
 
-// Consolidate platforms when all sub-platforms for a given platform are represented.
-// e.g., if all of the WIN- platforms are there, replace them with just WIN.
-function consolidateUsedPlatforms(container)
+function expectationsTitle(url)
 {
-    var allPlatforms = Object.keys(g_fallbacksMap);
+    var matchingSuffixes = ACTUAL_RESULT_SUFFIXES.filter(function(suffix) {
+        return string.endsWith(url, suffix);
+    });
 
-    var platformElements = container.getElementsByClassName('platforms');
-    for (var i = 0, platformsLength = platformElements.length; i < platformsLength; i++) {
-        var usedPlatforms = platformElements[i].getElementsByClassName('used-platform');
-        if (!usedPlatforms.length)
-            continue;
+    if (matchingSuffixes.length)
+        return matchingSuffixes[0].split('.')[0];
 
-        var platforms = {};
-        platforms['MAC'] = {};
-        platforms['WIN'] = {};
-        platforms['LINUX'] = {};
-        allPlatforms.forEach(function(platform) {
-            if (string.startsWith(platform, 'MAC'))
-                platforms['MAC'][platform] = 1;
-            else if (string.startsWith(platform, 'WIN'))
-                platforms['WIN'][platform] = 1;
-            else if (string.startsWith(platform, 'LINUX'))
-                platforms['LINUX'][platform] = 1;
-        });
-
-        for (var j = 0, usedPlatformsLength = usedPlatforms.length; j < usedPlatformsLength; j++) {
-            for (var platform in platforms)
-                delete platforms[platform][usedPlatforms[j].textContent];
-        }
-
-        for (var platform in platforms) {
-            if (!Object.keys(platforms[platform]).length) {
-                var nodesToRemove = [];
-                for (var j = 0, usedPlatformsLength = usedPlatforms.length; j < usedPlatformsLength; j++) {
-                    var usedPlatform = usedPlatforms[j];
-                    if (string.startsWith(usedPlatform.textContent, platform))
-                        nodesToRemove.push(usedPlatform);
-                }
-
-                nodesToRemove.forEach(function(element) { element.parentNode.removeChild(element); });
-                platformElements[i].insertAdjacentHTML('afterBegin', '<div class=used-platform>' + platform + '</div>');
-            }
-        }
-    }
-}
-
-function addExpectations(expectationsContainers, container, base,
-    platform, text, png, reftest_html_file, reftest_mismatch_html_file, suite)
-{
-    var builder = '';
-    addExpectationItem(expectationsContainers, container, platform, text, base, builder, suite);
-    addExpectationItem(expectationsContainers, container, platform, png, base, builder, suite);
-    addExpectationItem(expectationsContainers, container, platform, reftest_html_file, base, builder, suite);
-    addExpectationItem(expectationsContainers, container, platform, reftest_mismatch_html_file, base, builder, suite);
-}
-
-function expectationsTitle(platform, path, builder)
-{
-    var header = document.createElement('h3');
-    header.className = 'expectations-title';
-
-    var innerHTML;
-    if (builder) {
-        var resultsType;
-        if (string.endsWith(path, '-crash-log.txt'))
-            resultsType = 'STACKTRACE';
-        else if (string.endsWith(path, '-actual.txt') || string.endsWith(path, '-actual.png'))
-            resultsType = 'ACTUAL RESULTS';
-        else if (string.endsWith(path, '-wdiff.html'))
-            resultsType = 'WDIFF';
-        else
-            resultsType = 'DIFF';
-
-        innerHTML = resultsType + ': ' + builder;
-    } else if (platform === "") {
-        var parts = path.split('/');
-        innerHTML = parts[parts.length - 1];
-    } else
-        innerHTML = platform || path;
-
-    header.innerHTML = '<div class=title>' + innerHTML +
-        '</div><div style="float:left">&nbsp;</div>' +
-        '<div class=platforms style="float:right"></div>';
-    header.platform = platform;
-    return header;
+    var parts = url.split('/');
+    return parts[parts.length - 1];
 }
 
 function loadExpectations(expectationsContainer)
@@ -1136,12 +1009,12 @@ function loadExpectations(expectationsContainer)
     if (g_history.isLayoutTestResults())
         loadExpectationsLayoutTests(test, expectationsContainer);
     else {
-        var results = g_testToResultsMap[test];
-        for (var i = 0; i < results.length; i++)
+        var testResults = g_testToResultsMap[test];
+        for (var i = 0; i < testResults.length; i++)
             if (g_history.isGPUTestResults())
-                loadGPUResultsForBuilder(results[i].builder, test, expectationsContainer);
+                loadGPUResultsForBuilder(testResults[i].builder, test, expectationsContainer);
             else
-                loadNonWebKitResultsForBuilder(results[i].builder, test, expectationsContainer);
+                loadNonWebKitResultsForBuilder(testResults[i].builder, test, expectationsContainer);
     }
 }
 
@@ -1160,7 +1033,7 @@ function loadGPUResultsForBuilder(builder, test, expectationsContainer)
     var failureIndex = indexesForFailures(builder, test)[0];
 
     var buildNumber = g_resultsByBuilder[builder].buildNumbers[failureIndex];
-    var pathToLog = builderMaster(builder).logPath(builder, buildNumber) + pathToFailureLog(test);
+    var pathToLog = builders.master(builder).logPath(builder, buildNumber) + pathToFailureLog(test);
 
     var chromeRevision = g_resultsByBuilder[builder].chromeRevision[failureIndex];
     var resultsUrl = GPU_RESULTS_BASE_PATH + gpuResultsPath(chromeRevision, builder);
@@ -1182,7 +1055,7 @@ function loadNonWebKitResultsForBuilder(builder, test, expectationsContainer)
         // FIXME: This doesn't seem to work anymore. Did the paths change?
         // Once that's resolved, see if we need to try each GTEST_MODIFIERS prefix as well.
         var buildNumber = g_resultsByBuilder[builder].buildNumbers[failureIndexes[i]];
-        var pathToLog = builderMaster(builder).logPath(builder, buildNumber) + pathToFailureLog(test);
+        var pathToLog = builders.master(builder).logPath(builder, buildNumber) + pathToFailureLog(test);
         appendNonWebKitResults(container, pathToLog, 'non-webkit-results');
     }
 }
@@ -1231,51 +1104,35 @@ function baseTest(test, suite) {
     return base ? test.replace(suite, base) : test;
 }
 
-function loadBaselinesForTest(expectationsContainers, expectationsContainer, test) {
+function loadTestAndReferenceFiles(expectationsContainers, expectationsContainer, test) {
     var testWithoutSuffix = test.substring(0, test.lastIndexOf('.'));
-    var text = testWithoutSuffix + "-expected.txt";
-    var png = testWithoutSuffix + "-expected.png";
     var reftest_html_file = testWithoutSuffix + "-expected.html";
     var reftest_mismatch_html_file = testWithoutSuffix + "-expected-mismatch.html";
+
     var suite = lookupVirtualTestSuite(test);
-
-    if (!suite)
-        addExpectationItem(expectationsContainers, expectationsContainer, null, test, TEST_URL_BASE_PATH_FOR_XHR);
-
-    addExpectations(expectationsContainers, expectationsContainer,
-        TEST_URL_BASE_PATH_FOR_XHR, '', text, png, reftest_html_file, reftest_mismatch_html_file, suite);
-
-    var fallbacks = allFallbacks();
-    for (var i = 0; i < fallbacks.length; i++) {
-      var fallback = 'platform/' + fallbacks[i];
-      addExpectations(expectationsContainers, expectationsContainer, TEST_URL_BASE_PATH_FOR_XHR, fallback, text, png,
-          reftest_html_file, reftest_mismatch_html_file, suite);
+    if (suite) {
+        loadTestAndReferenceFiles(expectationsContainers, expectationsContainer, baseTest(test, suite));
+        return;
     }
 
-    if (suite)
-        loadBaselinesForTest(expectationsContainers, expectationsContainer, baseTest(test, suite));
+    addExpectationItem(expectationsContainers, expectationsContainer, TEST_URL_BASE_PATH_FOR_XHR + test);
+    addExpectationItem(expectationsContainers, expectationsContainer, TEST_URL_BASE_PATH_FOR_XHR + reftest_html_file);
+    addExpectationItem(expectationsContainers, expectationsContainer, TEST_URL_BASE_PATH_FOR_XHR + reftest_mismatch_html_file);
 }
 
 function loadExpectationsLayoutTests(test, expectationsContainer)
 {
     // Map from file extension to container div for expectations of that type.
     var expectationsContainers = {};
+    loadTestAndReferenceFiles(expectationsContainers, expectationsContainer, test);
 
-    var revisionContainer = document.createElement('div');
-    revisionContainer.textContent = "Showing results for: "
-    expectationsContainer.appendChild(revisionContainer);
-    loadBaselinesForTest(expectationsContainers, expectationsContainer, test);
-        
     var testWithoutSuffix = test.substring(0, test.lastIndexOf('.'));
-    var actualResultSuffixes = ['-actual.txt', '-actual.png', '-crash-log.txt', '-diff.txt', '-wdiff.html', '-diff.png'];
 
     for (var builder in currentBuilders()) {
         var actualResultsBase = TEST_RESULTS_BASE_PATH + currentBuilders()[builder] + '/results/layout-test-results/';
-
-        for (var i = 0; i < actualResultSuffixes.length; i++) {
-            addExpectationItem(expectationsContainers, expectationsContainer, null,
-                testWithoutSuffix + actualResultSuffixes[i], actualResultsBase, builder);
-        }
+        ACTUAL_RESULT_SUFFIXES.forEach(function(suffix) {{
+            addExpectationItem(expectationsContainers, expectationsContainer, actualResultsBase + testWithoutSuffix + '-' + suffix, builder);
+        }})
     }
 
     // Add a clearing element so floated elements don't bleed out of their
@@ -1283,33 +1140,6 @@ function loadExpectationsLayoutTests(test, expectationsContainer)
     var br = document.createElement('br');
     br.style.clear = 'both';
     expectationsContainer.appendChild(br);
-}
-
-var g_allFallbacks;
-
-// Returns the reverse sorted, deduped list of all platform fallback
-// directories.
-function allFallbacks()
-{
-    if (!g_allFallbacks) {
-        var holder = {};
-        for (var platform in g_fallbacksMap) {
-            var fallbacks = g_fallbacksMap[platform];
-            for (var i = 0; i < fallbacks.length; i++)
-                holder[fallbacks[i]] = 1;
-        }
-
-        g_allFallbacks = [];
-        for (var fallback in holder)
-            g_allFallbacks.push(fallback);
-
-        g_allFallbacks.sort(function(a, b) {
-            if (a == b)
-                return 0;
-            return a < b;
-        });
-    }
-    return g_allFallbacks;
 }
 
 function appendExpectations()
@@ -1341,8 +1171,10 @@ function generatePageForIndividualTests(tests)
     performChunkedAction(tests, function(chunk) {
         appendHTML(htmlForIndividualTests(chunk));
     }, appendExpectations, 500);
-    if (g_history.dashboardSpecificState.showChrome)
+    if (g_history.dashboardSpecificState.showChrome) {
         $('tests-input').value = g_history.dashboardSpecificState.tests;
+        $('result-input').value = g_history.dashboardSpecificState.result;
+    }
 }
 
 function performChunkedAction(tests, handleChunk, onComplete, timeout, opt_index) {
@@ -1423,14 +1255,14 @@ function generatePageForBuilder(builderName)
 {
     processTestRunsForBuilder(builderName);
 
-    var results = g_perBuilderFailures[builderName].filter(shouldShowTest);
-    sortTests(results, g_history.dashboardSpecificState.sortColumn, g_history.dashboardSpecificState.sortOrder);
+    var filteredResults = g_perBuilderFailures[builderName].filter(shouldShowTest);
+    sortTests(filteredResults, g_history.dashboardSpecificState.sortColumn, g_history.dashboardSpecificState.sortOrder);
 
     var testsHTML = '';
-    if (results.length) {
+    if (filteredResults.length) {
         var tableRowsHTML = '';
-        for (var i = 0; i < results.length; i++)
-            tableRowsHTML += htmlForSingleTestRow(results[i])
+        for (var i = 0; i < filteredResults.length; i++)
+            tableRowsHTML += htmlForSingleTestRow(filteredResults[i])
         testsHTML = htmlForTestTable(tableRowsHTML);
     } else {
         if (g_history.isLayoutTestResults())
@@ -1478,19 +1310,6 @@ function hideLegend()
         legend.parentNode.removeChild(legend);
 }
 
-var g_fallbacksMap = {};
-g_fallbacksMap['WIN-XP'] = ['chromium-win-xp', 'chromium-win', 'chromium'];
-g_fallbacksMap['WIN-7'] = ['chromium-win', 'chromium'];
-g_fallbacksMap['MAC-SNOWLEOPARD'] = ['chromium-mac-snowleopard', 'chromium-mac', 'chromium'];
-g_fallbacksMap['MAC-LION'] = ['chromium-mac', 'chromium'];
-g_fallbacksMap['LINUX-32'] = ['chromium-linux-x86', 'chromium-linux', 'chromium-win', 'chromium'];
-g_fallbacksMap['LINUX-64'] = ['chromium-linux', 'chromium-win', 'chromium'];
-
-function htmlForFallbackHelp(fallbacks)
-{
-    return '<ol class=fallback-list><li>' + fallbacks.join('</li><li>') + '</li></ol>';
-}
-
 function showLegend()
 {
     var legend = $('legend');
@@ -1505,7 +1324,7 @@ function showLegend()
 
     // Just grab the first failureMap. Technically, different builders can have different maps if they
     // haven't all cycled after the map was changed, but meh.
-    var failureMap = g_resultsByBuilder[Object.keys(g_resultsByBuilder)[0]][FAILURE_MAP_KEY];
+    var failureMap = g_resultsByBuilder[Object.keys(g_resultsByBuilder)[0]][results.FAILURE_MAP];
     for (var expectation in failureMap) {
         var failureString = failureMap[expectation];
         html += '<div class=' + classNameForFailureString(failureString) + '>' + failureString + '</div>';
@@ -1513,10 +1332,7 @@ function showLegend()
 
     if (g_history.isLayoutTestResults()) {
       html += '</div><br style="clear:both">' +
-          '</div><h3>Test expectations fallback order.</h3>';
-
-      for (var platform in g_fallbacksMap)
-          html += '<div class=fallback-header>' + platform + '</div>' + htmlForFallbackHelp(g_fallbacksMap[platform]);
+          '</div>';
 
       html += '<div>RELEASE TIMEOUTS:</div>' +
           htmlForSlowTimes(RELEASE_TIMEOUT) +

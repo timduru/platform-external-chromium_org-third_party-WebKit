@@ -42,7 +42,7 @@
 
 namespace WebCore {
 
-v8::Handle<v8::Value> V8MessageEvent::dataAttrGetterCustom(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+void V8MessageEvent::dataAttrGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     MessageEvent* event = V8MessageEvent::toNative(info.Holder());
 
@@ -84,10 +84,10 @@ v8::Handle<v8::Value> V8MessageEvent::dataAttrGetterCustom(v8::Local<v8::String>
     // This custom handler (dataAccessGetter) will not be called again.
     v8::PropertyAttribute dataAttr = static_cast<v8::PropertyAttribute>(v8::DontDelete | v8::ReadOnly);
     info.Holder()->ForceSet(name, result, dataAttr);
-    return result;
+    v8SetReturnValue(info, result);
 }
 
-v8::Handle<v8::Value> V8MessageEvent::initMessageEventMethodCustom(const v8::Arguments& args)
+void V8MessageEvent::initMessageEventMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     MessageEvent* event = V8MessageEvent::toNative(args.Holder());
     String typeArg = toWebCoreString(args[0]);
@@ -109,15 +109,14 @@ v8::Handle<v8::Value> V8MessageEvent::initMessageEventMethodCustom(const v8::Arg
     if (!isUndefinedOrNull(args[7])) {
         portArray = adoptPtr(new MessagePortArray);
         if (!getMessagePortArray(args[7], *portArray, args.GetIsolate()))
-            return v8::Undefined();
+            return;
     }
     event->initMessageEvent(typeArg, canBubbleArg, cancelableArg, dataArg, originArg, lastEventIdArg, sourceArg, portArray.release());
-    return v8::Undefined();
 }
 
-v8::Handle<v8::Value> V8MessageEvent::webkitInitMessageEventMethodCustom(const v8::Arguments& args)
+void V8MessageEvent::webkitInitMessageEventMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return initMessageEventMethodCustom(args);
+    initMessageEventMethodCustom(args);
 }
 
 

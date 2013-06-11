@@ -26,9 +26,6 @@
 #include "config.h"
 #include "core/storage/Storage.h"
 
-#include "core/page/Frame.h"
-#include "core/page/Page.h"
-#include "core/page/Settings.h"
 #include <wtf/PassRefPtr.h>
 #include <wtf/text/WTFString.h>
 
@@ -79,6 +76,11 @@ bool Storage::anonymousNamedSetter(const AtomicString& name, const AtomicString&
     return true;
 }
 
+bool Storage::anonymousIndexedSetter(unsigned index, const AtomicString& value, ExceptionCode& ec)
+{
+    return anonymousNamedSetter(String::number(index), value, ec);
+}
+
 bool Storage::anonymousNamedDeleter(const AtomicString& name, ExceptionCode& ec)
 {
     bool found = contains(name, ec);
@@ -95,5 +97,22 @@ bool Storage::anonymousIndexedDeleter(unsigned index, ExceptionCode& ec)
     return anonymousNamedDeleter(String::number(index), ec);
 }
 
+void Storage::namedPropertyEnumerator(Vector<String>& names, ExceptionCode& ec)
+{
+    unsigned length = this->length(ec);
+    if (ec)
+        return;
+    names.resize(length);
+    for (unsigned i = 0; i < length; ++i) {
+        String key = this->key(i, ec);
+        if (ec)
+            return;
+        ASSERT(!key.isNull());
+        String val = getItem(key, ec);
+        if (ec)
+            return;
+        names[i] = key;
+    }
+}
 
 }

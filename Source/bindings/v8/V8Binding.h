@@ -62,7 +62,7 @@ namespace WebCore {
     v8::Handle<v8::Value> throwError(V8ErrorType, const char*, v8::Isolate*);
 
     // Schedule a JavaScript error to be thrown.
-    v8::Handle<v8::Value> throwError(v8::Local<v8::Value>, v8::Isolate*);
+    v8::Handle<v8::Value> throwError(v8::Handle<v8::Value>, v8::Isolate*);
 
     // A helper for throwing JavaScript TypeError.
     v8::Handle<v8::Value> throwTypeError(const char*, v8::Isolate*);
@@ -90,6 +90,41 @@ namespace WebCore {
     inline v8::Handle<v8::Value> v8NullWithCheck(v8::Isolate* isolate)
     {
         return isolate ? v8Null(isolate) : v8::Handle<v8::Value>(v8::Null());
+    }
+
+    template<typename T, typename V>
+    inline void v8SetReturnValue(const T& args, V v)
+    {
+        args.GetReturnValue().Set(v);
+    }
+
+    template<typename T>
+    inline void v8SetReturnValueBool(const T& args, bool v)
+    {
+        args.GetReturnValue().Set(v);
+    }
+
+    template<typename T>
+    inline void v8SetReturnValueInt(const T& args, int v)
+    {
+        args.GetReturnValue().Set(v);
+    }
+
+    template<typename T>
+    inline void v8SetReturnValueUnsigned(const T& args, unsigned v)
+    {
+        // FIXME: this is temporary workaround to a v8 bug
+        if (V8_LIKELY((v & (1 << 31)) == 0)) {
+            args.GetReturnValue().Set(static_cast<int32_t>(v));
+            return;
+        }
+        args.GetReturnValue().Set(v8::Integer::NewFromUnsigned(v, args.GetReturnValue().GetIsolate()));
+    }
+
+    template<typename T>
+    inline void v8SetReturnValueNull(const T& args)
+    {
+        args.GetReturnValue().SetNull();
     }
 
     // Convert v8 types to a WTF::String. If the V8 string is not already
@@ -380,7 +415,7 @@ namespace WebCore {
     }
 
     template <class T>
-    Vector<T> toNativeArguments(const v8::Arguments& args, int startIndex)
+    Vector<T> toNativeArguments(const v8::FunctionCallbackInfo<v8::Value>& args, int startIndex)
     {
         ASSERT(startIndex <= args.Length());
         Vector<T> result;
@@ -391,7 +426,7 @@ namespace WebCore {
         return result;
     }
 
-    Vector<v8::Handle<v8::Value> > toVectorOfArguments(const v8::Arguments& args);
+    Vector<v8::Handle<v8::Value> > toVectorOfArguments(const v8::FunctionCallbackInfo<v8::Value>& args);
 
     // Validates that the passed object is a sequence type per WebIDL spec
     // http://www.w3.org/TR/2012/WD-WebIDL-20120207/#es-sequence
@@ -466,7 +501,7 @@ namespace WebCore {
         return std::isfinite(value) ? v8::Date::New(value) : v8NullWithCheck(isolate);
     }
 
-    v8::Persistent<v8::FunctionTemplate> createRawTemplate(v8::Isolate*);
+    v8::Handle<v8::FunctionTemplate> createRawTemplate(v8::Isolate*);
 
     PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value>, v8::Isolate*);
     PassRefPtr<XPathNSResolver> toXPathNSResolver(v8::Handle<v8::Value>, v8::Isolate*);
@@ -501,6 +536,13 @@ namespace WebCore {
     v8::Local<v8::Value> handleMaxRecursionDepthExceeded();
 
     void crashIfV8IsDead();
+
+    template <class T>
+    v8::Handle<T> unsafeHandleFromRawValue(const T* value)
+    {
+        const v8::Handle<T>* handle = reinterpret_cast<const v8::Handle<T>*>(&value);
+        return *handle;
+    }
 
 } // namespace WebCore
 

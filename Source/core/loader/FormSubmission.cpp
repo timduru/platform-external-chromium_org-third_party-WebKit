@@ -42,11 +42,9 @@
 #include "core/loader/FormState.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
-#include "core/page/Frame.h"
 #include "core/platform/network/FormData.h"
 #include "core/platform/network/FormDataBuilder.h"
 #include "wtf/CurrentTime.h"
-#include "wtf/RandomNumber.h"
 #include "wtf/text/TextEncoding.h"
 
 namespace WebCore {
@@ -188,8 +186,8 @@ PassRefPtr<FormSubmission> FormSubmission::create(HTMLFormElement* form, const A
         HTMLElement* element = toHTMLElement(control);
         if (!element->isDisabledFormControl())
             control->appendFormData(*domFormData, isMultiPartForm);
-        if (element->hasLocalName(inputTag)) {
-            HTMLInputElement* input = static_cast<HTMLInputElement*>(control);
+        if (element->hasTagName(inputTag)) {
+            HTMLInputElement* input = toHTMLInputElement(element);
             if (input->isTextField())
                 formValues.append(pair<String, String>(input->name().string(), input->value()));
             if (input->isPasswordField() && !input->value().isEmpty())

@@ -58,9 +58,7 @@ class Event;
 class FormState;
 class FormSubmission;
 class FrameLoaderClient;
-class FrameNetworkingContext;
 class NavigationAction;
-class NetworkingContext;
 class Page;
 class ResourceError;
 class ResourceRequest;
@@ -172,7 +170,6 @@ public:
     void didFirstLayout();
 
     void loadedResourceFromMemoryCache(CachedResource*);
-    void tellClientAboutPastMemoryCacheLoads();
 
     void checkLoadComplete();
     void detachFromParent();
@@ -256,8 +253,6 @@ public:
         UnloadDismissal = 3
     };
     PageDismissalType pageDismissalEventBeingDispatched() const { return m_pageDismissalEventBeingDispatched; }
-
-    NetworkingContext* networkingContext() const;
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
@@ -382,8 +377,6 @@ private:
     bool m_suppressOpenerInNewFrame;
 
     SandboxFlags m_forcedSandboxFlags;
-
-    RefPtr<FrameNetworkingContext> m_networkingContext;
 
     RefPtr<HistoryItem> m_requestedHistoryItem;
 };

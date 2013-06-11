@@ -225,6 +225,8 @@ void MediaControls::changedVolume()
 {
     if (m_volumeSlider)
         m_volumeSlider->setVolume(m_mediaController->volume());
+    if (m_panelMuteButton && m_panelMuteButton->renderer())
+        m_panelMuteButton->renderer()->repaint();
 }
 
 void MediaControls::changedClosedCaptionsVisibility()
@@ -381,13 +383,6 @@ void MediaControls::updateTextTrackDisplay()
         createTextTrackDisplay();
 
     m_textDisplayContainer->updateDisplay();
-}
-    
-void MediaControls::textTrackPreferencesChanged()
-{
-    if (m_textDisplayContainer)
-        m_textDisplayContainer->updateSizes(true);
-    closedCaptionTracksChanged();
 }
 
 }

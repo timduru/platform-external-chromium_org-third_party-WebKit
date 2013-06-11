@@ -605,26 +605,15 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         || rareNonInheritedData->m_maskBoxImage != other->rareNonInheritedData->m_maskBoxImage)
         return StyleDifferenceRepaintLayer;
 
-    if (inherited->color != other->inherited->color
-        || inherited_flags._visibility != other->inherited_flags._visibility
-        || inherited_flags._text_decorations != other->inherited_flags._text_decorations
+    if (inherited_flags._visibility != other->inherited_flags._visibility
         || inherited_flags.m_printColorAdjust != other->inherited_flags.m_printColorAdjust
         || inherited_flags._insideLink != other->inherited_flags._insideLink
         || surround->border != other->surround->border
         || *m_background.get() != *other->m_background.get()
-        || visual->textDecoration != other->visual->textDecoration
         || rareInheritedData->userModify != other->rareInheritedData->userModify
         || rareInheritedData->userSelect != other->rareInheritedData->userSelect
         || rareNonInheritedData->userDrag != other->rareNonInheritedData->userDrag
         || rareNonInheritedData->m_borderFit != other->rareNonInheritedData->m_borderFit
-#if ENABLE(CSS3_TEXT)
-        || rareNonInheritedData->m_textDecorationStyle != other->rareNonInheritedData->m_textDecorationStyle
-        || rareNonInheritedData->m_textDecorationColor != other->rareNonInheritedData->m_textDecorationColor
-#endif // CSS3_TEXT
-        || rareInheritedData->textFillColor != other->rareInheritedData->textFillColor
-        || rareInheritedData->textStrokeColor != other->rareInheritedData->textStrokeColor
-        || rareInheritedData->textEmphasisColor != other->rareInheritedData->textEmphasisColor
-        || rareInheritedData->textEmphasisFill != other->rareInheritedData->textEmphasisFill
         || rareInheritedData->m_imageRendering != other->rareInheritedData->m_imageRendering)
         return StyleDifferenceRepaint;
         
@@ -647,6 +636,17 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             || rareNonInheritedData->m_perspectiveOriginY != other->rareNonInheritedData->m_perspectiveOriginY)
             return StyleDifferenceRecompositeLayer;
     }
+
+    if (inherited->color != other->inherited->color
+        || inherited_flags._text_decorations != other->inherited_flags._text_decorations
+        || visual->textDecoration != other->visual->textDecoration
+        || rareNonInheritedData->m_textDecorationStyle != other->rareNonInheritedData->m_textDecorationStyle
+        || rareNonInheritedData->m_textDecorationColor != other->rareNonInheritedData->m_textDecorationColor
+        || rareInheritedData->textFillColor != other->rareInheritedData->textFillColor
+        || rareInheritedData->textStrokeColor != other->rareInheritedData->textStrokeColor
+        || rareInheritedData->textEmphasisColor != other->rareInheritedData->textEmphasisColor
+        || rareInheritedData->textEmphasisFill != other->rareInheritedData->textEmphasisFill)
+        return StyleDifferenceRepaintIfText;
 
     // Cursors are not checked, since they will be set appropriately in response to mouse events,
     // so they don't need to cause any repaint or layout.
@@ -1327,11 +1327,9 @@ Color RenderStyle::colorIncludingFallback(int colorProperty, bool visitedLink) c
     case CSSPropertyWebkitColumnRuleColor:
         result = visitedLink ? visitedLinkColumnRuleColor() : columnRuleColor();
         break;
-#if ENABLE(CSS3_TEXT)
-    case CSSPropertyWebkitTextDecorationColor:
+    case CSSPropertyTextDecorationColor:
         // Text decoration color fallback is handled in RenderObject::decorationColor.
         return visitedLink ? visitedLinkTextDecorationColor() : textDecorationColor();
-#endif // CSS3_TEXT
     case CSSPropertyWebkitTextEmphasisColor:
         result = visitedLink ? visitedLinkTextEmphasisColor() : textEmphasisColor();
         break;
@@ -1363,11 +1361,9 @@ Color RenderStyle::visitedDependentColor(int colorProperty) const
 
     Color visitedColor = colorIncludingFallback(colorProperty, true);
 
-#if ENABLE(CSS3_TEXT)
     // Text decoration color validity is preserved (checked in RenderObject::decorationColor).
-    if (colorProperty == CSSPropertyWebkitTextDecorationColor)
+    if (colorProperty == CSSPropertyTextDecorationColor)
         return visitedColor;
-#endif // CSS3_TEXT
 
     // FIXME: Technically someone could explicitly specify the color transparent, but for now we'll just
     // assume that if the background color is transparent that it wasn't set. Note that it's weird that

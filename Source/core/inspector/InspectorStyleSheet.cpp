@@ -30,6 +30,7 @@
 #include "SVGNames.h"
 #include "core/css/CSSHostRule.h"
 #include "core/css/CSSImportRule.h"
+#include "core/css/CSSKeyframesRule.h"
 #include "core/css/CSSMediaRule.h"
 #include "core/css/CSSParser.h"
 #include "core/css/CSSPropertySourceData.h"
@@ -40,21 +41,17 @@
 #include "core/css/CSSSupportsRule.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StyleRule.h"
-#include "core/css/StyleRuleImport.h"
 #include "core/css/StyleSheetContents.h"
-#include "core/css/StyleSheetList.h"
-#include "core/css/WebKitCSSKeyframesRule.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/dom/Node.h"
-#include "core/html/HTMLHeadElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/inspector/ContentSearchUtils.h"
 #include "core/inspector/InspectorCSSAgent.h"
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorValues.h"
-#include "core/page/ContentSecurityPolicy.h"
+#include "core/page/Page.h"
+#include "core/page/PageConsole.h"
 #include "core/platform/text/RegularExpression.h"
 
 #include <wtf/OwnPtr.h>
@@ -511,7 +508,7 @@ static PassRefPtr<CSSRuleList> asCSSRuleList(CSSRule* rule)
         return static_cast<CSSMediaRule*>(rule)->cssRules();
 
     if (rule->type() == CSSRule::WEBKIT_KEYFRAMES_RULE)
-        return static_cast<WebKitCSSKeyframesRule*>(rule)->cssRules();
+        return static_cast<CSSKeyframesRule*>(rule)->cssRules();
 
     if (rule->type() == CSSRule::HOST_RULE)
         return static_cast<CSSHostRule*>(rule)->cssRules();
@@ -775,10 +772,9 @@ void InspectorStyle::populateAllProperties(Vector<InspectorStyleProperty>& resul
 
     for (int i = 0, size = m_style->length(); i < size; ++i) {
         String name = m_style->item(i);
-        if (sourcePropertyNames.contains(name.lower()))
+        if (!sourcePropertyNames.add(name.lower()).isNewEntry)
             continue;
 
-        sourcePropertyNames.add(name.lower());
         result.append(InspectorStyleProperty(CSSPropertySourceData(name, m_style->getPropertyValue(name), !m_style->getPropertyPriority(name).isEmpty(), false, true, SourceRange()), false));
     }
 }
@@ -874,8 +870,7 @@ PassRefPtr<TypeBuilder::CSS::CSSStyle> InspectorStyle::styleWithProperties() con
 
                 String shorthand = m_style->getPropertyShorthand(name);
                 if (!shorthand.isEmpty()) {
-                    if (!foundShorthands.contains(shorthand)) {
-                        foundShorthands.add(shorthand);
+                    if (foundShorthands.add(shorthand).isNewEntry) {
                         RefPtr<TypeBuilder::CSS::ShorthandEntry> entry = TypeBuilder::CSS::ShorthandEntry::create()
                             .setName(shorthand)
                             .setValue(shorthandValue(shorthand));
@@ -1485,10 +1480,13 @@ String InspectorStyleSheet::sourceURL() const
     String styleSheetText;
     bool success = getText(&styleSheetText);
     if (success) {
-        String commentValue = ContentSearchUtils::findSourceURL(styleSheetText, ContentSearchUtils::CSSMagicComment);
+        bool deprecated;
+        String commentValue = ContentSearchUtils::findSourceURL(styleSheetText, ContentSearchUtils::CSSMagicComment, &deprecated);
         if (!commentValue.isEmpty()) {
+            if (deprecated)
+                m_pageAgent->page()->console()->addMessage(NetworkMessageSource, WarningMessageLevel, "\"/*@ sourceURL=\" source URL declaration is deprecated, \"/*# sourceURL=\" declaration should be used instead.", finalURL(), 0);
             m_sourceURL = commentValue;
-            return m_sourceURL;
+            return commentValue;
         }
     }
     m_sourceURL = "";
@@ -1530,26 +1528,21 @@ bool InspectorStyleSheet::startsAtZero() const
 
 String InspectorStyleSheet::sourceMapURL() const
 {
-    DEFINE_STATIC_LOCAL(String, sourceMapHttpHeader, (ASCIILiteral("X-SourceMap")));
-
     if (m_origin != TypeBuilder::CSS::StyleSheetOrigin::Regular)
         return String();
 
     String styleSheetText;
     bool success = getText(&styleSheetText);
     if (success) {
-        String commentValue = ContentSearchUtils::findSourceMapURL(styleSheetText, ContentSearchUtils::CSSMagicComment);
-        if (!commentValue.isEmpty())
+        bool deprecated;
+        String commentValue = ContentSearchUtils::findSourceMapURL(styleSheetText, ContentSearchUtils::CSSMagicComment, &deprecated);
+        if (!commentValue.isEmpty()) {
+            if (deprecated)
+                m_pageAgent->page()->console()->addMessage(NetworkMessageSource, WarningMessageLevel, "\"/*@ sourceMappingURL=\" source mapping URL declaration is deprecated, \"/*# sourceMappingURL=\" declaration should be used instead.", finalURL(), 0);
             return commentValue;
+        }
     }
-
-    if (finalURL().isEmpty())
-        return String();
-
-    CachedResource* resource = m_pageAgent->cachedResource(m_pageAgent->mainFrame(), KURL(ParsedURLString, finalURL()));
-    if (resource)
-        return resource->response().httpHeaderField(sourceMapHttpHeader);
-    return String();
+    return m_pageAgent->resourceSourceMapURL(finalURL());
 }
 
 InspectorCSSId InspectorStyleSheet::ruleOrStyleId(CSSStyleDeclaration* style) const

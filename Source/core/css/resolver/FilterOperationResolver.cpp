@@ -29,12 +29,13 @@
 #include "config.h"
 #include "core/css/resolver/FilterOperationResolver.h"
 
+
+#include "core/css/CSSFilterValue.h"
+#include "core/css/CSSMixFunctionValue.h"
 #include "core/css/CSSParser.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
+#include "core/css/CSSShaderValue.h"
 #include "core/css/ShadowValue.h"
-#include "core/css/WebKitCSSFilterValue.h"
-#include "core/css/WebKitCSSMixFunctionValue.h"
-#include "core/css/WebKitCSSShaderValue.h"
 #include "core/css/resolver/TransformBuilder.h"
 #include "core/platform/graphics/filters/custom/CustomFilterArrayParameter.h"
 #include "core/platform/graphics/filters/custom/CustomFilterConstants.h"
@@ -56,34 +57,34 @@ static Length convertToFloatLength(CSSPrimitiveValue* primitiveValue, RenderStyl
 }
 
 
-static FilterOperation::OperationType filterOperationForType(WebKitCSSFilterValue::FilterOperationType type)
+static FilterOperation::OperationType filterOperationForType(CSSFilterValue::FilterOperationType type)
 {
     switch (type) {
-    case WebKitCSSFilterValue::ReferenceFilterOperation:
+    case CSSFilterValue::ReferenceFilterOperation:
         return FilterOperation::REFERENCE;
-    case WebKitCSSFilterValue::GrayscaleFilterOperation:
+    case CSSFilterValue::GrayscaleFilterOperation:
         return FilterOperation::GRAYSCALE;
-    case WebKitCSSFilterValue::SepiaFilterOperation:
+    case CSSFilterValue::SepiaFilterOperation:
         return FilterOperation::SEPIA;
-    case WebKitCSSFilterValue::SaturateFilterOperation:
+    case CSSFilterValue::SaturateFilterOperation:
         return FilterOperation::SATURATE;
-    case WebKitCSSFilterValue::HueRotateFilterOperation:
+    case CSSFilterValue::HueRotateFilterOperation:
         return FilterOperation::HUE_ROTATE;
-    case WebKitCSSFilterValue::InvertFilterOperation:
+    case CSSFilterValue::InvertFilterOperation:
         return FilterOperation::INVERT;
-    case WebKitCSSFilterValue::OpacityFilterOperation:
+    case CSSFilterValue::OpacityFilterOperation:
         return FilterOperation::OPACITY;
-    case WebKitCSSFilterValue::BrightnessFilterOperation:
+    case CSSFilterValue::BrightnessFilterOperation:
         return FilterOperation::BRIGHTNESS;
-    case WebKitCSSFilterValue::ContrastFilterOperation:
+    case CSSFilterValue::ContrastFilterOperation:
         return FilterOperation::CONTRAST;
-    case WebKitCSSFilterValue::BlurFilterOperation:
+    case CSSFilterValue::BlurFilterOperation:
         return FilterOperation::BLUR;
-    case WebKitCSSFilterValue::DropShadowFilterOperation:
+    case CSSFilterValue::DropShadowFilterOperation:
         return FilterOperation::DROP_SHADOW;
-    case WebKitCSSFilterValue::CustomFilterOperation:
+    case CSSFilterValue::CustomFilterOperation:
         return FilterOperation::CUSTOM;
-    case WebKitCSSFilterValue::UnknownFilterOperation:
+    case CSSFilterValue::UnknownFilterOperation:
         return FilterOperation::NONE;
     }
     return FilterOperation::NONE;
@@ -94,7 +95,7 @@ static bool sortParametersByNameComparator(const RefPtr<CustomFilterParameter>& 
     return codePointCompareLessThan(a->name(), b->name());
 }
 
-static StyleShader* cachedOrPendingStyleShaderFromValue(WebKitCSSShaderValue* value, StyleResolverState& state)
+static StyleShader* cachedOrPendingStyleShaderFromValue(CSSShaderValue* value, StyleResolverState& state)
 {
     StyleShader* shader = value->cachedOrPendingShader();
     if (shader && shader->isPendingShader())
@@ -104,8 +105,8 @@ static StyleShader* cachedOrPendingStyleShaderFromValue(WebKitCSSShaderValue* va
 
 static StyleShader* styleShader(CSSValue* value, StyleResolverState& state)
 {
-    if (value->isWebKitCSSShaderValue())
-        return cachedOrPendingStyleShaderFromValue(static_cast<WebKitCSSShaderValue*>(value), state);
+    if (value->isCSSShaderValue())
+        return cachedOrPendingStyleShaderFromValue(static_cast<CSSShaderValue*>(value), state);
     return 0;
 }
 
@@ -163,14 +164,14 @@ static PassRefPtr<CustomFilterParameter> parseCustomFilterParameter(const String
     if (!values->length())
         return 0;
 
-    if (parameterValue->isWebKitCSSArrayFunctionValue())
+    if (parameterValue->isCSSArrayFunctionValue())
         return parseCustomFilterArrayParameter(name, values);
 
     // If the first value of the list is a transform function,
     // then we could safely assume that all the remaining items
     // are transforms. parseCustomFilterTransformParameter will
     // return 0 if that assumption is incorrect.
-    if (values->itemWithoutBoundsCheck(0)->isWebKitCSSTransformValue())
+    if (values->itemWithoutBoundsCheck(0)->isCSSTransformValue())
         return parseCustomFilterTransformParameter(name, values, state);
 
     // We can have only arrays of booleans or numbers, so use the first value to choose between those two.
@@ -204,9 +205,8 @@ static bool parseCustomFilterParameterList(CSSValue* parametersValue, CustomFilt
 
         String name = primitiveValue->getStringValue();
         // Do not allow duplicate parameter names.
-        if (knownParameterNames.contains(name))
+        if (!knownParameterNames.add(name).isNewEntry)
             return false;
-        knownParameterNames.add(name);
 
         iterator.advance();
 
@@ -225,14 +225,14 @@ static bool parseCustomFilterParameterList(CSSValue* parametersValue, CustomFilt
     return true;
 }
 
-static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithAtRuleReferenceSyntax(WebKitCSSFilterValue* filterValue)
+static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithAtRuleReferenceSyntax(CSSFilterValue* filterValue)
 {
     // FIXME: Implement style resolution for the custom filter at-rule reference syntax.
     UNUSED_PARAM(filterValue);
     return 0;
 }
 
-static PassRefPtr<CustomFilterProgram> lookupCustomFilterProgram(WebKitCSSShaderValue* vertexShader, WebKitCSSShaderValue* fragmentShader,
+static PassRefPtr<CustomFilterProgram> lookupCustomFilterProgram(CSSShaderValue* vertexShader, CSSShaderValue* fragmentShader,
     CustomFilterProgramType programType, const CustomFilterProgramMixSettings& mixSettings, CustomFilterMeshType meshType,
     StyleCustomFilterProgramCache* customFilterProgramCache, StyleResolverState& state)
 {
@@ -251,7 +251,7 @@ static PassRefPtr<CustomFilterProgram> lookupCustomFilterProgram(WebKitCSSShader
     return program.release();
 }
 
-static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithInlineSyntax(WebKitCSSFilterValue* filterValue, StyleCustomFilterProgramCache* customFilterProgramCache, StyleResolverState& state)
+static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithInlineSyntax(CSSFilterValue* filterValue, StyleCustomFilterProgramCache* customFilterProgramCache, StyleResolverState& state)
 {
     CSSValue* shadersValue = filterValue->itemWithoutBoundsCheck(0);
     ASSERT_WITH_SECURITY_IMPLICATION(shadersValue->isValueList());
@@ -260,27 +260,27 @@ static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithInlineSy
     unsigned shadersListLength = shadersList->length();
     ASSERT(shadersListLength);
 
-    WebKitCSSShaderValue* vertexShader = toWebKitCSSShaderValue(shadersList->itemWithoutBoundsCheck(0));
-    WebKitCSSShaderValue* fragmentShader = 0;
+    CSSShaderValue* vertexShader = toCSSShaderValue(shadersList->itemWithoutBoundsCheck(0));
+    CSSShaderValue* fragmentShader = 0;
     CustomFilterProgramType programType = PROGRAM_TYPE_BLENDS_ELEMENT_TEXTURE;
     CustomFilterProgramMixSettings mixSettings;
 
     if (shadersListLength > 1) {
         CSSValue* fragmentShaderOrMixFunction = shadersList->itemWithoutBoundsCheck(1);
-        if (fragmentShaderOrMixFunction->isWebKitCSSMixFunctionValue()) {
-            WebKitCSSMixFunctionValue* mixFunction = static_cast<WebKitCSSMixFunctionValue*>(fragmentShaderOrMixFunction);
+        if (fragmentShaderOrMixFunction->isCSSMixFunctionValue()) {
+            CSSMixFunctionValue* mixFunction = static_cast<CSSMixFunctionValue*>(fragmentShaderOrMixFunction);
             CSSValueListIterator iterator(mixFunction);
 
             ASSERT(mixFunction->length());
-            fragmentShader = toWebKitCSSShaderValue(iterator.value());
+            fragmentShader = toCSSShaderValue(iterator.value());
             iterator.advance();
 
             ASSERT(mixFunction->length() <= 3);
             while (iterator.hasMore()) {
                 CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(iterator.value());
-                if (CSSParser::isBlendMode(primitiveValue->getIdent()))
+                if (CSSParser::isBlendMode(primitiveValue->getValueID()))
                     mixSettings.blendMode = *primitiveValue;
-                else if (CSSParser::isCompositeOperator(primitiveValue->getIdent()))
+                else if (CSSParser::isCompositeOperator(primitiveValue->getValueID()))
                     mixSettings.compositeOperator = *primitiveValue;
                 else
                     ASSERT_NOT_REACHED();
@@ -288,7 +288,7 @@ static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithInlineSy
             }
         } else {
             programType = PROGRAM_TYPE_NO_ELEMENT_TEXTURE;
-            fragmentShader = toWebKitCSSShaderValue(fragmentShaderOrMixFunction);
+            fragmentShader = toCSSShaderValue(fragmentShaderOrMixFunction);
         }
     }
 
@@ -329,7 +329,7 @@ static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithInlineSy
 
         if (iterator.hasMore() && iterator.isPrimitiveValue()) {
             CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(iterator.value());
-            if (primitiveValue->getIdent() == CSSValueDetached) {
+            if (primitiveValue->getValueID() == CSSValueDetached) {
                 meshType = MeshTypeDetached;
                 iterator.advance();
             }
@@ -354,7 +354,7 @@ static PassRefPtr<CustomFilterOperation> createCustomFilterOperationWithInlineSy
     return CustomFilterOperation::create(program.release(), parameterList, meshRows, meshColumns, meshType);
 }
 
-static PassRefPtr<CustomFilterOperation> createCustomFilterOperation(WebKitCSSFilterValue* filterValue, StyleCustomFilterProgramCache* customFilterProgramCache, StyleResolverState& state)
+static PassRefPtr<CustomFilterOperation> createCustomFilterOperation(CSSFilterValue* filterValue, StyleCustomFilterProgramCache* customFilterProgramCache, StyleResolverState& state)
 {
     ASSERT(filterValue->length());
     bool isAtRuleReferenceSyntax = filterValue->itemWithoutBoundsCheck(0)->isPrimitiveValue();
@@ -371,7 +371,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
 
     if (inValue->isPrimitiveValue()) {
         CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(inValue);
-        if (primitiveValue->getIdent() == CSSValueNone)
+        if (primitiveValue->getValueID() == CSSValueNone)
             return true;
     }
 
@@ -382,10 +382,10 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
     FilterOperations operations;
     for (CSSValueListIterator i = inValue; i.hasMore(); i.advance()) {
         CSSValue* currValue = i.value();
-        if (!currValue->isWebKitCSSFilterValue())
+        if (!currValue->isCSSFilterValue())
             continue;
 
-        WebKitCSSFilterValue* filterValue = static_cast<WebKitCSSFilterValue*>(i.value());
+        CSSFilterValue* filterValue = static_cast<CSSFilterValue*>(i.value());
         FilterOperation::OperationType operationType = filterOperationForType(filterValue->operationType());
 
         if (operationType == FilterOperation::VALIDATED_CUSTOM) {
@@ -406,10 +406,10 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
                 continue;
             CSSValue* argument = filterValue->itemWithoutBoundsCheck(0);
 
-            if (!argument->isWebKitCSSSVGDocumentValue())
+            if (!argument->isCSSSVGDocumentValue())
                 continue;
 
-            WebKitCSSSVGDocumentValue* svgDocumentValue = static_cast<WebKitCSSSVGDocumentValue*>(argument);
+            CSSSVGDocumentValue* svgDocumentValue = static_cast<CSSSVGDocumentValue*>(argument);
             KURL url = state.document()->completeURL(svgDocumentValue->url());
 
             RefPtr<ReferenceFilterOperation> operation = ReferenceFilterOperation::create(svgDocumentValue->url(), url.fragmentIdentifier(), operationType);
@@ -439,9 +439,9 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
 
         CSSPrimitiveValue* firstValue = filterValue->length() && filterValue->itemWithoutBoundsCheck(0)->isPrimitiveValue() ? toCSSPrimitiveValue(filterValue->itemWithoutBoundsCheck(0)) : 0;
         switch (filterValue->operationType()) {
-        case WebKitCSSFilterValue::GrayscaleFilterOperation:
-        case WebKitCSSFilterValue::SepiaFilterOperation:
-        case WebKitCSSFilterValue::SaturateFilterOperation: {
+        case CSSFilterValue::GrayscaleFilterOperation:
+        case CSSFilterValue::SepiaFilterOperation:
+        case CSSFilterValue::SaturateFilterOperation: {
             double amount = 1;
             if (filterValue->length() == 1) {
                 amount = firstValue->getDoubleValue();
@@ -452,7 +452,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
             operations.operations().append(BasicColorMatrixFilterOperation::create(amount, operationType));
             break;
         }
-        case WebKitCSSFilterValue::HueRotateFilterOperation: {
+        case CSSFilterValue::HueRotateFilterOperation: {
             double angle = 0;
             if (filterValue->length() == 1)
                 angle = firstValue->computeDegrees();
@@ -460,11 +460,11 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
             operations.operations().append(BasicColorMatrixFilterOperation::create(angle, operationType));
             break;
         }
-        case WebKitCSSFilterValue::InvertFilterOperation:
-        case WebKitCSSFilterValue::BrightnessFilterOperation:
-        case WebKitCSSFilterValue::ContrastFilterOperation:
-        case WebKitCSSFilterValue::OpacityFilterOperation: {
-            double amount = (filterValue->operationType() == WebKitCSSFilterValue::BrightnessFilterOperation) ? 0 : 1;
+        case CSSFilterValue::InvertFilterOperation:
+        case CSSFilterValue::BrightnessFilterOperation:
+        case CSSFilterValue::ContrastFilterOperation:
+        case CSSFilterValue::OpacityFilterOperation: {
+            double amount = (filterValue->operationType() == CSSFilterValue::BrightnessFilterOperation) ? 0 : 1;
             if (filterValue->length() == 1) {
                 amount = firstValue->getDoubleValue();
                 if (firstValue->isPercentage())
@@ -474,7 +474,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
             operations.operations().append(BasicComponentTransferFilterOperation::create(amount, operationType));
             break;
         }
-        case WebKitCSSFilterValue::BlurFilterOperation: {
+        case CSSFilterValue::BlurFilterOperation: {
             Length stdDeviation = Length(0, Fixed);
             if (filterValue->length() >= 1)
                 stdDeviation = convertToFloatLength(firstValue, style, rootStyle, zoomFactor);
@@ -484,7 +484,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
             operations.operations().append(BlurFilterOperation::create(stdDeviation, operationType));
             break;
         }
-        case WebKitCSSFilterValue::DropShadowFilterOperation: {
+        case CSSFilterValue::DropShadowFilterOperation: {
             if (filterValue->length() != 1)
                 return false;
 
@@ -502,7 +502,7 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
             operations.operations().append(DropShadowFilterOperation::create(location, blur, color.isValid() ? color : Color::transparent, operationType));
             break;
         }
-        case WebKitCSSFilterValue::UnknownFilterOperation:
+        case CSSFilterValue::UnknownFilterOperation:
         default:
             ASSERT_NOT_REACHED();
             break;

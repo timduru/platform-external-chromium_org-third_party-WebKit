@@ -32,6 +32,7 @@
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8HiddenPropertyName.h"
 #include "bindings/v8/V8ObjectConstructor.h"
+#include "bindings/v8/V8ScriptRunner.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "wtf/MemoryInstrumentationHashMap.h"
 #include "wtf/MemoryInstrumentationVector.h"
@@ -84,11 +85,11 @@ void V8PerIsolateData::ensureInitialized(v8::Isolate* isolate)
         create(isolate);
 }
 
-v8::Persistent<v8::Value> V8PerIsolateData::ensureLiveRoot()
+v8::Persistent<v8::Value>& V8PerIsolateData::ensureLiveRoot()
 {
     if (m_liveRoot.isEmpty())
         m_liveRoot.set(m_isolate, v8::Null());
-    return m_liveRoot.get();
+    return m_liveRoot.getUnsafe();
 }
 
 void V8PerIsolateData::dispose(v8::Isolate* isolate)
@@ -135,29 +136,28 @@ bool V8PerIsolateData::hasPrivateTemplate(WrapperWorldType currentWorldType, voi
     return m_templatesForNonMainWorld.find(privatePointer) != m_templatesForNonMainWorld.end();
 }
 
-v8::Persistent<v8::FunctionTemplate> V8PerIsolateData::privateTemplate(WrapperWorldType currentWorldType, void* privatePointer, v8::InvocationCallback callback, v8::Handle<v8::Value> data, v8::Handle<v8::Signature> signature, int length)
+v8::Handle<v8::FunctionTemplate> V8PerIsolateData::privateTemplate(WrapperWorldType currentWorldType, void* privatePointer, v8::FunctionCallback callback, v8::Handle<v8::Value> data, v8::Handle<v8::Signature> signature, int length)
 {
-    v8::Persistent<v8::FunctionTemplate> privateTemplate;
     TemplateMap& templates = templateMap(currentWorldType);
     TemplateMap::iterator result = templates.find(privatePointer);
     if (result != templates.end())
-        return result->value;
-    v8::Persistent<v8::FunctionTemplate> newPrivateTemplate(m_isolate, v8::FunctionTemplate::New(callback, data, signature, length));
-    templates.add(privatePointer, newPrivateTemplate);
-    return newPrivateTemplate;
+        return result->value.newLocal(m_isolate);
+    v8::Local<v8::FunctionTemplate> templ = v8::FunctionTemplate::New(callback, data, signature, length);
+    templates.add(privatePointer, UnsafePersistent<v8::FunctionTemplate>(m_isolate, templ));
+    return templ;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8PerIsolateData::rawTemplate(WrapperTypeInfo* info, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8PerIsolateData::rawTemplate(WrapperTypeInfo* info, WrapperWorldType currentWorldType)
 {
     TemplateMap& templates = rawTemplateMap(currentWorldType);
     TemplateMap::iterator result = templates.find(info);
     if (result != templates.end())
-        return result->value;
+        return result->value.newLocal(m_isolate);
 
-    v8::HandleScope handleScope;
-    v8::Persistent<v8::FunctionTemplate> templ = createRawTemplate(m_isolate);
-    templates.add(info, templ);
-    return templ;
+    v8::HandleScope handleScope(m_isolate);
+    v8::Handle<v8::FunctionTemplate> templ = createRawTemplate(m_isolate);
+    templates.add(info, UnsafePersistent<v8::FunctionTemplate>(m_isolate, templ));
+    return handleScope.Close(templ);
 }
 
 v8::Local<v8::Context> V8PerIsolateData::ensureRegexContext()
@@ -175,7 +175,8 @@ bool V8PerIsolateData::hasInstance(WrapperTypeInfo* info, v8::Handle<v8::Value> 
     TemplateMap::iterator result = templates.find(info);
     if (result == templates.end())
         return false;
-    return result->value->HasInstance(value);
+    v8::HandleScope handleScope(m_isolate);
+    return result->value.newLocal(m_isolate)->HasInstance(value);
 }
 
 void V8PerIsolateData::visitExternalStrings(ExternalStringVisitor* visitor)
@@ -197,7 +198,7 @@ void V8PerIsolateData::visitExternalStrings(ExternalStringVisitor* visitor)
     v8::V8::VisitExternalResources(&v8Visitor);
 }
 
-v8::Handle<v8::Value> V8PerIsolateData::constructorOfToString(const v8::Arguments& args)
+void V8PerIsolateData::constructorOfToString(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     // The DOM constructors' toString functions grab the current toString
     // for Functions by taking the toString function of itself and then
@@ -208,9 +209,11 @@ v8::Handle<v8::Value> V8PerIsolateData::constructorOfToString(const v8::Argument
     // toString of the DOM constructor itself to change. This is extremely
     // obscure and unlikely to be a problem.
     v8::Handle<v8::Value> value = args.Callee()->Get(v8::String::NewSymbol("toString"));
-    if (!value->IsFunction()) 
-        return v8::String::Empty(args.GetIsolate());
-    return v8::Handle<v8::Function>::Cast(value)->Call(args.This(), 0, 0);
+    if (!value->IsFunction()) {
+        v8SetReturnValue(args, v8::String::Empty(args.GetIsolate()));
+        return;
+    }
+    v8SetReturnValue(args, V8ScriptRunner::callInternalFunction(v8::Handle<v8::Function>::Cast(value), args.This(), 0, 0, v8::Isolate::GetCurrent()));
 }
 
 } // namespace WebCore

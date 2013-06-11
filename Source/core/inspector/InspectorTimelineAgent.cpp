@@ -34,7 +34,6 @@
 #include "InspectorFrontend.h"
 #include "core/dom/Event.h"
 #include "core/inspector/IdentifiersFactory.h"
-#include "core/inspector/InspectorClient.h"
 #include "core/inspector/InspectorCounters.h"
 #include "core/inspector/InspectorDOMAgent.h"
 #include "core/inspector/InspectorInstrumentation.h"
@@ -42,6 +41,7 @@
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InstrumentingAgents.h"
+#include "core/inspector/ScriptCallStack.h"
 #include "core/inspector/TimelineRecordFactory.h"
 #include "core/inspector/TimelineTraceEventProcessor.h"
 #include "core/loader/DocumentLoader.h"
@@ -50,9 +50,7 @@
 #include "core/page/FrameView.h"
 #include "core/platform/MemoryUsageSupport.h"
 #include "core/platform/chromium/TraceEvent.h"
-#include "core/platform/graphics/IntRect.h"
 #include "core/platform/network/ResourceRequest.h"
-#include "core/platform/network/ResourceResponse.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderView.h"
 #include "core/xml/XMLHttpRequest.h"
@@ -499,7 +497,7 @@ void InspectorTimelineAgent::didScheduleResourceRequest(Document* document, cons
     appendRecord(TimelineRecordFactory::createScheduleResourceRequestData(url), TimelineRecordType::ScheduleResourceRequest, true, document->frame());
 }
 
-void InspectorTimelineAgent::willSendRequest(unsigned long identifier, DocumentLoader* loader, const ResourceRequest& request, const ResourceResponse&)
+void InspectorTimelineAgent::willSendRequest(unsigned long identifier, DocumentLoader* loader, const ResourceRequest& request, const ResourceResponse&, const CachedResourceInitiatorInfo&)
 {
     String requestId = IdentifiersFactory::requestId(identifier);
     appendRecord(TimelineRecordFactory::createResourceSendRequestData(requestId, request), TimelineRecordType::ResourceSendRequest, true, loader->frame());
@@ -549,26 +547,25 @@ void InspectorTimelineAgent::didFailLoading(unsigned long identifier, DocumentLo
     didFinishLoadingResource(identifier, true, 0, loader->frame());
 }
 
-void InspectorTimelineAgent::didTimeStamp(Frame* frame, const String& message)
+void InspectorTimelineAgent::consoleTimeStamp(Frame* frame, PassRefPtr<ScriptArguments> arguments)
 {
+    String message;
+    arguments->getFirstArgumentAsString(message);
     appendRecord(TimelineRecordFactory::createTimeStampData(message), TimelineRecordType::TimeStamp, true, frame);
 }
 
-void InspectorTimelineAgent::time(Frame* frame, const String& message)
+void InspectorTimelineAgent::startConsoleTiming(Frame* frame, const String& message)
 {
     appendRecord(TimelineRecordFactory::createTimeStampData(message), TimelineRecordType::Time, true, frame);
 }
 
-void InspectorTimelineAgent::timeEnd(Frame* frame, const String& message)
+void InspectorTimelineAgent::stopConsoleTiming(Frame* frame, const String& message, PassRefPtr<ScriptCallStack>)
 {
     appendRecord(TimelineRecordFactory::createTimeStampData(message), TimelineRecordType::TimeEnd, true, frame);
 }
 
 void InspectorTimelineAgent::domContentLoadedEventFired(Frame* frame)
 {
-    if (frame->page()->mainFrame() != frame)
-        return;
-
     bool isMainFrame = frame && m_pageAgent && (frame == m_pageAgent->mainFrame());
     appendRecord(TimelineRecordFactory::createMarkData(isMainFrame), TimelineRecordType::MarkDOMContent, false, frame);
 }

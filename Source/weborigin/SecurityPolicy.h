@@ -30,6 +30,7 @@
 #define SecurityPolicy_h
 
 #include "weborigin/ReferrerPolicy.h"
+#include "weborigin/WebOriginExport.h"
 #include "wtf/text/WTFString.h"
 
 namespace WebCore {
@@ -37,7 +38,7 @@ namespace WebCore {
 class KURL;
 class SecurityOrigin;
 
-class SecurityPolicy {
+class WEBORIGIN_EXPORT SecurityPolicy {
 public:
     // True if the referrer should be omitted according to the
     // ReferrerPolicyDefault. If you intend to send a referrer header, you
@@ -48,16 +49,6 @@ public:
     // navigation to a given URL. If the referrer returned is empty, the
     // referrer header should be omitted.
     static String generateReferrerHeader(ReferrerPolicy, const KURL&, const String& referrer);
-
-    enum LocalLoadPolicy {
-        AllowLocalLoadsForAll, // No restriction on local loads.
-        AllowLocalLoadsForLocalAndSubstituteData,
-        AllowLocalLoadsForLocalOnly,
-    };
-
-    static void setLocalLoadPolicy(LocalLoadPolicy);
-    static bool restrictAccessToLocal();
-    static bool allowSubstituteDataAccessToLocal();
 
     static void addOriginAccessWhitelistEntry(const SecurityOrigin& sourceOrigin, const String& destinationProtocol, const String& destinationDomain, bool allowDestinationSubdomains);
     static void removeOriginAccessWhitelistEntry(const SecurityOrigin& sourceOrigin, const String& destinationProtocol, const String& destinationDomain, bool allowDestinationSubdomains);

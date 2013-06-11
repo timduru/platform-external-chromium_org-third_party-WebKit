@@ -292,21 +292,24 @@ unsigned SharedBuffer::getSomeData(const char*& someData, unsigned position) con
     return 0;
 }
 
-PassRefPtr<SharedBuffer> utf8Buffer(const String& string)
+PassRefPtr<ArrayBuffer> SharedBuffer::getAsArrayBuffer() const
 {
-    // Allocate a buffer big enough to hold all the characters.
-    const int length = string.length();
-    Vector<char> buffer(length * 3);
+    RefPtr<ArrayBuffer> arrayBuffer = ArrayBuffer::createUninitialized(static_cast<unsigned>(size()), 1);
 
-    // Convert to runs of 8-bit characters.
-    char* p = buffer.data();
-    const UChar* d = string.characters();
-    WTF::Unicode::ConversionResult result = WTF::Unicode::convertUTF16ToUTF8(&d, d + length, &p, p + buffer.size(), true);
-    if (result != WTF::Unicode::conversionOK)
+    const char* segment = 0;
+    unsigned position = 0;
+    while (unsigned segmentSize = getSomeData(segment, position)) {
+        memcpy(static_cast<char*>(arrayBuffer->data()) + position, segment, segmentSize);
+        position += segmentSize;
+    }
+
+    if (position != arrayBuffer->byteLength()) {
+        ASSERT_NOT_REACHED();
+        // Don't return the incomplete ArrayBuffer.
         return 0;
+    }
 
-    buffer.shrink(p - buffer.data());
-    return SharedBuffer::adoptVector(buffer);
+    return arrayBuffer;
 }
 
 } // namespace WebCore

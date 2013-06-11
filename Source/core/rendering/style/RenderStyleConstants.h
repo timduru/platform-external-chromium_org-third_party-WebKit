@@ -35,18 +35,20 @@ enum PrintColorAdjust {
 };
 
 // The difference between two styles.  The following values are used:
-// (1) StyleDifferenceEqual - The two styles are identical
-// (2) StyleDifferenceRecompositeLayer - The layer needs its position and transform updated, but no repaint
+// (1) StyleDifferenceEqual - The two styles are identical.
+// (2) StyleDifferenceRecompositeLayer - The layer needs its position and transform updated, but no repaint.
 // (3) StyleDifferenceRepaint - The object just needs to be repainted.
-// (4) StyleDifferenceRepaintLayer - The layer and its descendant layers needs to be repainted.
-// (5) StyleDifferenceLayoutPositionedMovementOnly - Only the position of this positioned object has been updated
-// (6) StyleDifferenceSimplifiedLayout - Only overflow needs to be recomputed
-// (7) StyleDifferenceSimplifiedLayoutAndPositionedMovement - Both positioned movement and simplified layout updates are required.
-// (8) StyleDifferenceLayout - A full layout is required.
+// (4) StyleDifferenceRepaintIfText - The object needs to be repainted if it contains text.
+// (5) StyleDifferenceRepaintLayer - The layer and its descendant layers needs to be repainted.
+// (6) StyleDifferenceLayoutPositionedMovementOnly - Only the position of this positioned object has been updated.
+// (7) StyleDifferenceSimplifiedLayout - Only overflow needs to be recomputed.
+// (8) StyleDifferenceSimplifiedLayoutAndPositionedMovement - Both positioned movement and simplified layout updates are required.
+// (9) StyleDifferenceLayout - A full layout is required.
 enum StyleDifference {
     StyleDifferenceEqual,
     StyleDifferenceRecompositeLayer,
     StyleDifferenceRepaint,
+    StyleDifferenceRepaintIfText,
     StyleDifferenceRepaintLayer,
     StyleDifferenceLayoutPositionedMovementOnly,
     StyleDifferenceSimplifiedLayout,
@@ -117,7 +119,7 @@ enum EBoxSizing { CONTENT_BOX, BORDER_BOX };
 // Random visual rendering model attributes. Not inherited.
 
 enum EOverflow {
-    OVISIBLE, OHIDDEN, OSCROLL, OAUTO, OOVERLAY, OMARQUEE, OPAGEDX, OPAGEDY
+    OVISIBLE, OHIDDEN, OSCROLL, OAUTO, OOVERLAY, OPAGEDX, OPAGEDY
 };
 
 enum EVerticalAlign {
@@ -344,12 +346,10 @@ inline TextDecoration& operator|= (TextDecoration& a, TextDecoration b) { return
 
 enum TextDecorationStyle {
     TextDecorationStyleSolid,
-#if ENABLE(CSS3_TEXT)
     TextDecorationStyleDouble,
     TextDecorationStyleDotted,
     TextDecorationStyleDashed,
     TextDecorationStyleWavy
-#endif // CSS3_TEXT
 };
 
 #if ENABLE(CSS3_TEXT)

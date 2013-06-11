@@ -31,13 +31,11 @@
 #include "config.h"
 #include "core/inspector/PageConsoleAgent.h"
 
-#include "bindings/v8/ScriptObject.h"
 #include "core/dom/Node.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/inspector/InjectedScriptHost.h"
 #include "core/inspector/InjectedScriptManager.h"
-#include "core/inspector/InspectorAgent.h"
 #include "core/inspector/InspectorDOMAgent.h"
-#include "core/page/DOMWindow.h"
 
 namespace WebCore {
 
@@ -74,12 +72,18 @@ private:
 void PageConsoleAgent::addInspectedNode(ErrorString* errorString, int nodeId)
 {
     Node* node = m_inspectorDOMAgent->nodeForId(nodeId);
-    if (!node || node->isInShadowTree()) {
+    if (!node) {
         *errorString = "nodeId is not valid";
         return;
+    }
+    while (node->isInShadowTree()) {
+        Node* ancestor = node->highestAncestor();
+        if (!ancestor->isShadowRoot() || toShadowRoot(ancestor)->type() == ShadowRoot::AuthorShadowRoot)
+            break;
+        // User agent shadow root, keep climbing up.
+        node = toShadowRoot(ancestor)->host();
     }
     m_injectedScriptManager->injectedScriptHost()->addInspectedObject(adoptPtr(new InspectableNode(node)));
 }
 
 } // namespace WebCore
-

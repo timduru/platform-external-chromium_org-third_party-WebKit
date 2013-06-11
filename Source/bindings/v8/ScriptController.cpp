@@ -47,7 +47,6 @@
 #include "bindings/v8/V8HiddenPropertyName.h"
 #include "bindings/v8/V8NPObject.h"
 #include "bindings/v8/V8PerContextData.h"
-#include "bindings/v8/V8RecursionScope.h"
 #include "bindings/v8/V8ScriptRunner.h"
 #include "bindings/v8/npruntime_impl.h"
 #include "bindings/v8/npruntime_priv.h"
@@ -231,11 +230,10 @@ v8::Local<v8::Value> ScriptController::compileAndRunScript(const ScriptSourceCod
         tryCatch.SetVerbose(true);
 
         v8::Handle<v8::String> code = v8String(source.source(), m_isolate);
-        OwnPtr<v8::ScriptData> scriptData = V8ScriptRunner::precompileScript(code, source.cachedScript());
 
         // NOTE: For compatibility with WebCore, ScriptSourceCode's line starts at
         // 1, whereas v8 starts at 0.
-        v8::Handle<v8::Script> script = V8ScriptRunner::compileScript(code, source.url(), source.startPosition(), scriptData.get(), m_isolate);
+        v8::Handle<v8::Script> script = V8ScriptRunner::compileScript(code, source.url(), source.startPosition(), m_isolate);
 
         // Keep Frame (and therefore ScriptController) alive.
         RefPtr<Frame> protect(m_frame);
@@ -641,6 +639,8 @@ bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
 
     const int javascriptSchemeLength = sizeof("javascript:") - 1;
 
+    bool locationChangeBefore = m_frame->navigationScheduler()->locationChangePending();
+
     String decodedURL = decodeURLEscapeSequences(url.string());
     ScriptValue result = executeScript(decodedURL.substring(javascriptSchemeLength));
 
@@ -655,6 +655,9 @@ bool ScriptController::executeScriptIfJavaScriptURL(const KURL& url)
 
     // We're still in a frame, so there should be a DocumentLoader.
     ASSERT(m_frame->document()->loader());
+
+    if (!locationChangeBefore && m_frame->navigationScheduler()->locationChangePending())
+        return true;
         
     // DocumentWriter::replaceDocument can cause the DocumentLoader to get deref'ed and possible destroyed,
     // so protect it with a RefPtr.

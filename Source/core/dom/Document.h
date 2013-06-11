@@ -104,6 +104,7 @@ class HTMLDocument;
 class HTMLElement;
 class HTMLFrameOwnerElement;
 class HTMLHeadElement;
+class HTMLImportsController;
 class HTMLIFrameElement;
 class HTMLMapElement;
 class HTMLNameCollection;
@@ -429,6 +430,7 @@ public:
     void notifyRemovePendingSheetIfNeeded();
 
     bool haveStylesheetsLoaded() const;
+    bool haveStylesheetsAndImportsLoaded() const { return haveImportsLoaded() && haveStylesheetsLoaded(); }
 
     // This is a DOM function.
     StyleSheetList* styleSheets();
@@ -692,10 +694,8 @@ public:
     void textNodesMerged(Text* oldNode, unsigned offset);
     void textNodeSplit(Text* oldNode);
 
-    void createDOMWindow();
-    void takeDOMWindowFrom(Document*);
-
-    DOMWindow* domWindow() const { return m_domWindow.get(); }
+    void setDOMWindow(DOMWindow* domWindow) { m_domWindow = domWindow; }
+    DOMWindow* domWindow() const { return m_domWindow; }
     // In DOM Level 2, the Document's DOMWindow is called the defaultView.
     DOMWindow* defaultView() const { return domWindow(); } 
 
@@ -703,7 +703,6 @@ public:
     void setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener>);
     EventListener* getWindowAttributeEventListener(const AtomicString& eventType);
     void dispatchWindowEvent(PassRefPtr<Event>, PassRefPtr<EventTarget> = 0);
-    void dispatchWindowLoadEvent();
 
     PassRefPtr<Event> createEvent(const String& eventType, ExceptionCode&);
 
@@ -849,8 +848,6 @@ public:
     Document* parentDocument() const;
     Document* topDocument() const;
 
-    int docID() const { return m_docID; }
-    
     ScriptRunner* scriptRunner() { return m_scriptRunner.get(); }
 
     void applyXSLTransform(ProcessingInstruction* pi);
@@ -908,10 +905,6 @@ public:
     void finishedParsing();
 
     void documentWillBecomeInactive();
-
-    void registerForCaptionPreferencesChangedCallbacks(Element*);
-    void unregisterForCaptionPreferencesChangedCallbacks(Element*);
-    void captionPreferencesChanged();
 
     void setShouldCreateRenderers(bool);
     bool shouldCreateRenderers();
@@ -1062,6 +1055,11 @@ public:
     CustomElementRegistry* registry() const { return m_registry.get(); }
     CustomElementRegistry* ensureCustomElementRegistry();
 
+    HTMLImportsController* ensureImports();
+    HTMLImportsController* imports() const { return m_imports.get(); }
+    bool haveImportsLoaded() const;
+    void didLoadAllImports();
+
     void adjustFloatQuadsForScrollAndAbsoluteZoom(Vector<FloatQuad>&, RenderObject*);
     void adjustFloatRectForScrollAndAbsoluteZoom(FloatRect&, RenderObject*);
 
@@ -1152,6 +1150,8 @@ private:
 
     void createStyleResolver();
 
+    void executeScriptsWaitingForResourcesIfNeeded();
+
     void seamlessParentUpdatedStylesheets();
 
     PassRefPtr<NodeList> handleZeroPadding(const HitTestRequest&, HitTestResult&) const;
@@ -1174,6 +1174,11 @@ private:
     void pushFullscreenElementStack(Element*);
     void addDocumentToFullScreenChangeEventQueue(Document*);
 
+    // Note that dispatching a window load event may cause the DOMWindow to be detached from
+    // the Frame, so callers should take a reference to the DOMWindow (which owns us) to
+    // prevent the Document from getting blown away from underneath them.
+    void dispatchWindowLoadEvent();
+
     void addListenerType(ListenerType listenerType) { m_listenerTypes |= listenerType; }
     void addMutationEventListenerTypeIfEnabled(ListenerType);
 
@@ -1185,7 +1190,6 @@ private:
 
     OwnPtr<StyleResolver> m_styleResolver;
     bool m_didCalculateStyleResolver;
-    bool m_hasDirtyStyleResolver;
     bool m_hasNodesWithPlaceholderStyle;
     bool m_needsNotifyRemoveAllPendingStylesheet;
     // But sometimes you need to ignore pending stylesheet count to
@@ -1198,7 +1202,7 @@ private:
     PendingSheetLayout m_pendingSheetLayout;
 
     Frame* m_frame;
-    RefPtr<DOMWindow> m_domWindow;
+    DOMWindow* m_domWindow;
 
     RefPtr<CachedResourceLoader> m_cachedResourceLoader;
     RefPtr<DocumentParser> m_parser;
@@ -1316,8 +1320,6 @@ private:
     OwnPtr<TransformSource> m_transformSource;
     RefPtr<Document> m_transformSourceDocument;
 
-    int m_docID; // A unique document identifier used for things like document-specific mapped attributes.
-
     String m_xmlEncoding;
     String m_xmlVersion;
     unsigned m_xmlStandalone : 2;
@@ -1344,8 +1346,6 @@ private:
 
     bool m_createRenderers;
     Vector<IconURL> m_iconURLs;
-
-    HashSet<Element*> m_captionPreferencesChangedElements;
 
     HashMap<StringImpl*, Element*, CaseFoldingHash> m_elementsByAccessKey;
     bool m_accessKeyMapValid;
@@ -1410,6 +1410,7 @@ private:
     OwnPtr<TextAutosizer> m_textAutosizer;
 
     RefPtr<CustomElementRegistry> m_registry;
+    OwnPtr<HTMLImportsController> m_imports;
 
     bool m_scheduledTasksAreSuspended;
     
@@ -1488,24 +1489,6 @@ void toDocument(const Document*);
 inline bool Node::isDocumentNode() const
 {
     return this == documentInternal();
-}
-
-inline Node::Node(Document* document, ConstructionType type)
-    : m_nodeFlags(type)
-    , m_parentOrShadowHostNode(0)
-    , m_treeScope(document)
-    , m_previous(0)
-    , m_next(0)
-{
-    ScriptWrappable::init(this);
-    if (!m_treeScope)
-        m_treeScope = TreeScope::noDocumentInstance();
-    m_treeScope->guardRef();
-
-#if !defined(NDEBUG) || (defined(DUMP_NODE_STATISTICS) && DUMP_NODE_STATISTICS)
-    trackForDebugging();
-#endif
-    InspectorCounters::incrementCounter(InspectorCounters::NodeCounter);
 }
 
 Node* eventTargetNodeForDocument(Document*);

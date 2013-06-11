@@ -37,42 +37,45 @@
 
 namespace WebCore {
 
-#if defined(OS_WIN)
-// In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
-// These prototypes do not pick up the surrounding namespace, so drop out of WebCore as a workaround.
-} // namespace WebCore
-using WebCore::ScriptWrappable;
-using WebCore::V8TestInterfaceImplementedAs;
-using WebCore::RealClass;
-#endif
-void initializeScriptWrappableForInterface(RealClass* object)
+static void initializeScriptWrappableForInterface(RealClass* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestInterfaceImplementedAs::info);
     else
         ASSERT_NOT_REACHED();
 }
-#if defined(OS_WIN)
+
+} // namespace WebCore
+
+// In ScriptWrappable::init, the use of a local function declaration has an issue on Windows:
+// the local declaration does not pick up the surrounding namespace. Therefore, we provide this function
+// in the global namespace.
+// (More info on the MSVC bug here: http://connect.microsoft.com/VisualStudio/feedback/details/664619/the-namespace-of-local-function-declarations-in-c)
+void webCoreInitializeScriptWrappableForInterface(WebCore::RealClass* object)
+{
+    WebCore::initializeScriptWrappableForInterface(object);
+}
+
 namespace WebCore {
-#endif
 WrapperTypeInfo V8TestInterfaceImplementedAs::info = { V8TestInterfaceImplementedAs::GetTemplate, V8TestInterfaceImplementedAs::derefObject, 0, 0, 0, V8TestInterfaceImplementedAs::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace RealClassV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
-static v8::Handle<v8::Value> aAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+static void aAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
-    return v8String(imp->a(), info.GetIsolate(), ReturnUnsafeHandle);
+    v8SetReturnValue(info, v8String(imp->a(), info.GetIsolate(), ReturnUnsafeHandle));
+    return;
 }
 
-static v8::Handle<v8::Value> aAttrGetterCallback(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+static void aAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    return RealClassV8Internal::aAttrGetter(name, info);
+    RealClassV8Internal::aAttrGetter(name, info);
 }
 
-static void aAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+static void aAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
@@ -80,23 +83,24 @@ static void aAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, 
     return;
 }
 
-static void aAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+static void aAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     RealClassV8Internal::aAttrSetter(name, value, info);
 }
 
-static v8::Handle<v8::Value> bAttrGetter(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+static void bAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
-    return toV8Fast(imp->b(), info, imp);
+    v8SetReturnValue(info, toV8Fast(imp->b(), info, imp));
+    return;
 }
 
-static v8::Handle<v8::Value> bAttrGetterCallback(v8::Local<v8::String> name, const v8::AccessorInfo& info)
+static void bAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    return RealClassV8Internal::bAttrGetter(name, info);
+    RealClassV8Internal::bAttrGetter(name, info);
 }
 
-static void bAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+static void bAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
     V8TRYCATCH_VOID(RealClass*, v, V8TestInterfaceImplementedAs::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8TestInterfaceImplementedAs::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
@@ -104,37 +108,43 @@ static void bAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, 
     return;
 }
 
-static void bAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::AccessorInfo& info)
+static void bAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     RealClassV8Internal::bAttrSetter(name, value, info);
 }
 
-static v8::Handle<v8::Value> func1Method(const v8::Arguments& args)
+static void func1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1)
-        return throwNotEnoughArgumentsError(args.GetIsolate());
+    if (args.Length() < 1) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(args.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, a, args[0]);
-    return v8String(imp->func1(a), args.GetIsolate(), ReturnUnsafeHandle);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, a, args[0]);
+    v8SetReturnValue(args, v8String(imp->func1(a), args.GetIsolate(), ReturnUnsafeHandle));
+    return;
 }
 
-static v8::Handle<v8::Value> func1MethodCallback(const v8::Arguments& args)
+static void func1MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return RealClassV8Internal::func1Method(args);
+    RealClassV8Internal::func1Method(args);
 }
 
-static v8::Handle<v8::Value> funcTestInterfaceImplementedAsParamMethod(const v8::Arguments& args)
+static void funcTestInterfaceImplementedAsParamMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1)
-        return throwNotEnoughArgumentsError(args.GetIsolate());
+    if (args.Length() < 1) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(args.Holder());
-    V8TRYCATCH(RealClass*, orange, V8TestInterfaceImplementedAs::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8TestInterfaceImplementedAs::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
-    return v8String(imp->funcTestInterfaceImplementedAsParam(orange), args.GetIsolate(), ReturnUnsafeHandle);
+    V8TRYCATCH_VOID(RealClass*, orange, V8TestInterfaceImplementedAs::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8TestInterfaceImplementedAs::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
+    v8SetReturnValue(args, v8String(imp->funcTestInterfaceImplementedAsParam(orange), args.GetIsolate(), ReturnUnsafeHandle));
+    return;
 }
 
-static v8::Handle<v8::Value> funcTestInterfaceImplementedAsParamMethodCallback(const v8::Arguments& args)
+static void funcTestInterfaceImplementedAsParamMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return RealClassV8Internal::funcTestInterfaceImplementedAsParamMethod(args);
+    RealClassV8Internal::funcTestInterfaceImplementedAsParamMethod(args);
 }
 
 } // namespace RealClassV8Internal
@@ -150,12 +160,12 @@ static const V8DOMConfiguration::BatchedMethod V8TestInterfaceImplementedAsMetho
     {"func1", RealClassV8Internal::func1MethodCallback, 0, 1},
 };
 
-static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestInterfaceImplementedAsTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+static v8::Handle<v8::FunctionTemplate> ConfigureV8TestInterfaceImplementedAsTemplate(v8::Handle<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     desc->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestInterfaceImplementedAs", v8::Persistent<v8::FunctionTemplate>(), V8TestInterfaceImplementedAs::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestInterfaceImplementedAs", v8::Local<v8::FunctionTemplate>(), V8TestInterfaceImplementedAs::internalFieldCount,
         V8TestInterfaceImplementedAsAttrs, WTF_ARRAY_LENGTH(V8TestInterfaceImplementedAsAttrs),
         V8TestInterfaceImplementedAsMethods, WTF_ARRAY_LENGTH(V8TestInterfaceImplementedAsMethods), isolate, currentWorldType);
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
@@ -175,18 +185,18 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestInterfaceImplementedA
     return desc;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8TestInterfaceImplementedAs::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestInterfaceImplementedAs::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&info);
     if (result != data->templateMap(currentWorldType).end())
-        return result->value;
+        return result->value.newLocal(isolate);
 
-    v8::HandleScope handleScope;
-    v8::Persistent<v8::FunctionTemplate> templ =
+    v8::HandleScope handleScope(isolate);
+    v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestInterfaceImplementedAsTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
-    data->templateMap(currentWorldType).add(&info, templ);
-    return templ;
+    data->templateMap(currentWorldType).add(&info, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
+    return handleScope.Close(templ);
 }
 
 bool V8TestInterfaceImplementedAs::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)

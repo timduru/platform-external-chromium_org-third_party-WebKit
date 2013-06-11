@@ -31,6 +31,7 @@
 #include "config.h"
 #include "core/inspector/PageDebuggerAgent.h"
 
+#include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/PageScriptDebugServer.h"
 #include "core/inspector/InspectorOverlay.h"
 #include "core/inspector/InspectorPageAgent.h"
@@ -50,6 +51,7 @@ PageDebuggerAgent::PageDebuggerAgent(InstrumentingAgents* instrumentingAgents, I
     , m_pageAgent(pageAgent)
     , m_overlay(overlay)
 {
+    m_overlay->overlayHost()->setListener(this);
 }
 
 PageDebuggerAgent::~PageDebuggerAgent()
@@ -91,6 +93,23 @@ void PageDebuggerAgent::muteConsole()
 void PageDebuggerAgent::unmuteConsole()
 {
     PageConsole::unmute();
+}
+
+void PageDebuggerAgent::overlayResumed()
+{
+    ErrorString error;
+    resume(&error);
+}
+
+void PageDebuggerAgent::overlaySteppedOver()
+{
+    ErrorString error;
+    stepOver(&error);
+}
+
+void PageDebuggerAgent::addConsoleMessage(MessageSource source, MessageLevel level, const String& message, const String& sourceURL)
+{
+    m_pageAgent->page()->console()->addMessage(source, level, message, sourceURL, 0);
 }
 
 InjectedScript PageDebuggerAgent::injectedScriptForEval(ErrorString* errorString, const int* executionContextId)

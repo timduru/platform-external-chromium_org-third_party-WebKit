@@ -38,6 +38,7 @@
 #include "WebPageSerializerImpl.h"
 #include "WebView.h"
 #include "WebViewImpl.h"
+#include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/html/HTMLAllCollection.h"
 #include "core/html/HTMLFrameOwnerElement.h"
@@ -47,10 +48,11 @@
 #include "core/page/Frame.h"
 #include "core/page/PageSerializer.h"
 #include "core/platform/KURL.h"
-#include <public/WebCString.h>
-#include <public/WebString.h>
-#include <public/WebURL.h>
-#include <public/WebVector.h>
+#include "core/platform/SerializedResource.h"
+#include "public/platform/WebCString.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebURL.h"
+#include "public/platform/WebVector.h"
 #include <wtf/text/StringConcatenate.h>
 #include <wtf/Vector.h>
 
@@ -65,8 +67,7 @@ KURL getSubResourceURLFromElement(Element* element)
     if (element->hasTagName(HTMLNames::imgTag) || element->hasTagName(HTMLNames::scriptTag))
         attributeName = &HTMLNames::srcAttr;
     else if (element->hasTagName(HTMLNames::inputTag)) {
-        HTMLInputElement* input = static_cast<HTMLInputElement*>(element);
-        if (input->isImageButton())
+        if (toHTMLInputElement(element)->isImageButton())
             attributeName = &HTMLNames::srcAttr;
     } else if (element->hasTagName(HTMLNames::bodyTag)
                || element->hasTagName(HTMLNames::tableTag)
@@ -182,12 +183,12 @@ namespace WebKit {
 
 void WebPageSerializer::serialize(WebView* view, WebVector<WebPageSerializer::Resource>* resourcesParam)
 {
-    Vector<PageSerializer::Resource> resources;
+    Vector<SerializedResource> resources;
     PageSerializer serializer(&resources);
     serializer.serialize(static_cast<WebViewImpl*>(view)->page());
 
     Vector<Resource> result;
-    for (Vector<PageSerializer::Resource>::const_iterator iter = resources.begin(); iter != resources.end(); ++iter) {
+    for (Vector<SerializedResource>::const_iterator iter = resources.begin(); iter != resources.end(); ++iter) {
         Resource resource;
         resource.url = iter->url;
         resource.mimeType = iter->mimeType.ascii();
@@ -199,16 +200,25 @@ void WebPageSerializer::serialize(WebView* view, WebVector<WebPageSerializer::Re
     *resourcesParam = result;         
 }
 
+static PassRefPtr<SharedBuffer> serializePageToMHTML(Page* page, MHTMLArchive::EncodingPolicy encodingPolicy)
+{
+    Vector<SerializedResource> resources;
+    PageSerializer serializer(&resources);
+    serializer.serialize(page);
+    Document* document = page->mainFrame()->document();
+    return MHTMLArchive::generateMHTMLData(resources, encodingPolicy, document->title(), document->suggestedMIMEType());
+}
+
 WebCString WebPageSerializer::serializeToMHTML(WebView* view)
 {
-    RefPtr<SharedBuffer> mhtml = MHTMLArchive::generateMHTMLData(static_cast<WebViewImpl*>(view)->page());
+    RefPtr<SharedBuffer> mhtml = serializePageToMHTML(static_cast<WebViewImpl*>(view)->page(), MHTMLArchive::UseDefaultEncoding);
     // FIXME: we are copying all the data here. Idealy we would have a WebSharedData().
     return WebCString(mhtml->data(), mhtml->size());
 }
 
 WebCString WebPageSerializer::serializeToMHTMLUsingBinaryEncoding(WebView* view)
 {
-    RefPtr<SharedBuffer> mhtml = MHTMLArchive::generateMHTMLDataUsingBinaryEncoding(static_cast<WebViewImpl*>(view)->page());
+    RefPtr<SharedBuffer> mhtml = serializePageToMHTML(static_cast<WebViewImpl*>(view)->page(), MHTMLArchive::UseBinaryEncoding);
     // FIXME: we are copying all the data here. Idealy we would have a WebSharedData().
     return WebCString(mhtml->data(), mhtml->size());
 }

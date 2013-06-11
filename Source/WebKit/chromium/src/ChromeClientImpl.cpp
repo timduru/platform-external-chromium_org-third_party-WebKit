@@ -34,12 +34,10 @@
 
 #include "core/accessibility/AXObjectCache.h"
 #include "core/accessibility/AccessibilityObject.h"
-#if ENABLE(INPUT_TYPE_COLOR)
 #include "core/platform/ColorChooser.h"
 #include "core/platform/ColorChooserClient.h"
 #include "ColorChooserPopupUIController.h"
 #include "ColorChooserUIController.h"
-#endif
 #include "DateTimeChooserImpl.h"
 #include "ExternalDateTimeChooser.h"
 #include "ExternalPopupMenu.h"
@@ -68,19 +66,17 @@
 #include "core/platform/FileIconLoader.h"
 #include "core/platform/PlatformScreen.h"
 #include "core/platform/graphics/FloatRect.h"
+#include "core/platform/graphics/GraphicsLayer.h"
 #include "core/platform/graphics/Icon.h"
 #include "core/platform/graphics/IntRect.h"
-#include "core/platform/graphics/chromium/GraphicsLayerChromium.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderWidget.h"
 #include "modules/geolocation/Geolocation.h"
 #include "weborigin/SecurityOrigin.h"
-#if ENABLE(INPUT_TYPE_COLOR)
 #include "WebColorChooser.h"
-#endif
-#include <public/Platform.h>
-#include <public/WebRect.h>
-#include <public/WebURLRequest.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebURLRequest.h"
 #include <wtf/text/CString.h>
 #include <wtf/text/StringBuilder.h>
 #include <wtf/text/StringConcatenate.h>
@@ -617,7 +613,6 @@ void ChromeClientImpl::print(Frame* frame)
         m_webView->client()->printPage(WebFrameImpl::fromFrame(frame));
 }
 
-#if ENABLE(INPUT_TYPE_COLOR)
 PassOwnPtr<ColorChooser> ChromeClientImpl::createColorChooser(ColorChooserClient* chooserClient, const Color&)
 {
     OwnPtr<ColorChooserUIController> controller;
@@ -635,7 +630,6 @@ PassOwnPtr<WebColorChooser> ChromeClientImpl::createWebColorChooser(WebColorChoo
         return nullptr;
     return adoptPtr(client->createColorChooser(chooserClient, initialColor));
 }
-#endif
 
 PassRefPtr<DateTimeChooser> ChromeClientImpl::openDateTimeChooser(DateTimeChooserClient* pickerClient, const DateTimeChooserParameters& parameters)
 {

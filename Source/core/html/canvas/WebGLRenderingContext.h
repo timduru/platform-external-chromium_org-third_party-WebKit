@@ -43,7 +43,8 @@
 namespace WebCore {
 
 class DrawingBuffer;
-class EXTDrawBuffers;
+class WebGLDrawBuffers;
+class EXTFragDepth;
 class EXTTextureFilterAnisotropic;
 class HTMLImageElement;
 class HTMLVideoElement;
@@ -326,7 +327,7 @@ public:
     virtual void stop();
 
   private:
-    friend class EXTDrawBuffers;
+    friend class WebGLDrawBuffers;
     friend class WebGLFramebuffer;
     friend class WebGLObject;
     friend class OESVertexArrayObject;
@@ -365,31 +366,9 @@ public:
     // Adds a compressed texture format.
     void addCompressedTextureFormat(GC3Denum);
 
-    // Template to help getSupportedExtensions
-    template<typename T>
-    void appendIfSupported(Vector<String>& strings, bool prefixed)
-    {
-        if (T::supported(this))
-            strings.append(String(prefixed ? "WEBKIT_" : "") + T::getExtensionName());
-    }
-
-    bool matchesNameWithPrefixes(const String& name, const String& baseName, const char** prefixes);
-
-    // Templates to help getExtension
-    template<typename T>
-    bool getExtensionIfMatch(const String& name, OwnPtr<T>& extensionPtr, const char** prefixes, WebGLExtension*& extension)
-    {
-        if (matchesNameWithPrefixes(name, T::getExtensionName(), prefixes) && (extensionPtr || T::supported(this))) {
-            if (!extensionPtr) {
-                extensionPtr = T::create(this);
-            }
-            extension = extensionPtr.get();
-            return true;
-        }
-        return false;
-    }
-
     PassRefPtr<Image> videoFrameToImage(HTMLVideoElement*, BackingStoreCopy, ExceptionCode&);
+
+    WebGLRenderbuffer* ensureEmulatedStencilBuffer(GC3Denum target, WebGLRenderbuffer*);
 
     RefPtr<GraphicsContext3D> m_context;
     RefPtr<WebGLContextGroup> m_contextGroup;
@@ -522,7 +501,7 @@ public:
     int m_numGLErrorsToConsoleAllowed;
 
     // Enabled extension objects.
-    OwnPtr<EXTDrawBuffers> m_extDrawBuffers;
+    OwnPtr<EXTFragDepth> m_extFragDepth;
     OwnPtr<EXTTextureFilterAnisotropic> m_extTextureFilterAnisotropic;
     OwnPtr<OESTextureFloat> m_oesTextureFloat;
     OwnPtr<OESTextureFloatLinear> m_oesTextureFloatLinear;
@@ -534,10 +513,88 @@ public:
     OwnPtr<WebGLLoseContext> m_webglLoseContext;
     OwnPtr<WebGLDebugRendererInfo> m_webglDebugRendererInfo;
     OwnPtr<WebGLDebugShaders> m_webglDebugShaders;
+    OwnPtr<WebGLDrawBuffers> m_webglDrawBuffers;
     OwnPtr<WebGLCompressedTextureATC> m_webglCompressedTextureATC;
     OwnPtr<WebGLCompressedTexturePVRTC> m_webglCompressedTexturePVRTC;
     OwnPtr<WebGLCompressedTextureS3TC> m_webglCompressedTextureS3TC;
     OwnPtr<WebGLDepthTexture> m_webglDepthTexture;
+
+    class ExtensionTracker {
+    public:
+        ExtensionTracker(bool privileged, bool draft, bool prefixed, const char** prefixes)
+            : m_privileged(privileged)
+            , m_draft(draft)
+            , m_prefixed(prefixed)
+            , m_prefixes(prefixes)
+        {
+        }
+
+        bool getPrefixed() const
+        {
+            return m_prefixed;
+        }
+
+        bool getPrivileged() const
+        {
+            return m_privileged;
+        }
+
+        bool getDraft() const
+        {
+            return m_draft;
+        }
+
+        bool matchesNameWithPrefixes(const String&) const;
+
+        virtual WebGLExtension* getExtension(WebGLRenderingContext*) const = 0;
+        virtual bool supported(WebGLRenderingContext*) const = 0;
+        virtual const char* getExtensionName() const = 0;
+
+    private:
+        bool m_privileged;
+        bool m_draft;
+        bool m_prefixed;
+        const char** m_prefixes;
+    };
+
+    template <typename T>
+    class TypedExtensionTracker : public ExtensionTracker {
+    public:
+        TypedExtensionTracker(OwnPtr<T>& extensionField, bool privileged, bool draft, bool prefixed, const char** prefixes)
+            : ExtensionTracker(privileged, draft, prefixed, prefixes)
+            , m_extensionField(extensionField)
+        {
+        }
+
+        virtual WebGLExtension* getExtension(WebGLRenderingContext* context) const
+        {
+            if (!m_extensionField)
+                m_extensionField = T::create(context);
+
+            return m_extensionField.get();
+        }
+
+        virtual bool supported(WebGLRenderingContext* context) const
+        {
+            return T::supported(context);
+        }
+
+        virtual const char* getExtensionName() const
+        {
+            return T::getExtensionName();
+        }
+
+    private:
+        OwnPtr<T>& m_extensionField;
+    };
+
+    Vector<ExtensionTracker*> m_extensions;
+
+    template <typename T>
+    void registerExtension(OwnPtr<T>& extensionPtr, bool privileged, bool draft, bool prefixed, const char** prefixes)
+    {
+        m_extensions.append(new TypedExtensionTracker<T>(extensionPtr, privileged, draft, prefixed, prefixes));
+    }
 
     // Errors raised by synthesizeGLError() while the context is lost.
     Vector<GC3Denum> lost_context_errors_;

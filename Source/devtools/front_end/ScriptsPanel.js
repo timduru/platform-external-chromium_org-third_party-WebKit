@@ -121,7 +121,6 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     }
 
     this.sidebarPanes.callstack.registerShortcuts(this.registerShortcuts.bind(this));
-    this.registerShortcuts(WebInspector.ScriptsPanelDescriptor.ShortcutKeys.EvaluateSelectionInConsole, this._evaluateSelectionInConsole.bind(this));
     this.registerShortcuts(WebInspector.ScriptsPanelDescriptor.ShortcutKeys.GoToMember, this._showOutlineDialog.bind(this));
     this.registerShortcuts(WebInspector.ScriptsPanelDescriptor.ShortcutKeys.ToggleBreakpoint, this._toggleBreakpoint.bind(this));
 
@@ -295,6 +294,8 @@ WebInspector.ScriptsPanel.prototype = {
             this.sidebarPanes.callstack.setStatus(WebInspector.UIString("Paused on assertion."));
         else if (details.reason === WebInspector.DebuggerModel.BreakReason.CSPViolation)
             this.sidebarPanes.callstack.setStatus(WebInspector.UIString("Paused on a script blocked due to Content Security Policy directive: \"%s\".", details.auxData["directiveText"]));
+        else if (details.reason === WebInspector.DebuggerModel.BreakReason.DebugCommand)
+            this.sidebarPanes.callstack.setStatus(WebInspector.UIString("Paused on a debugged function"));
         else {
             function didGetUILocation(uiLocation)
             {
@@ -763,19 +764,6 @@ WebInspector.ScriptsPanel.prototype = {
             WebInspector.inspectorView.element.addStyleClass("breakpoints-deactivated");
             this.sidebarPanes.jsBreakpoints.listElement.addStyleClass("breakpoints-list-deactivated");
         }
-    },
-
-    /**
-     * @param {Event=} event
-     * @return {boolean}
-     */
-    _evaluateSelectionInConsole: function(event)
-    {
-        var selection = window.getSelection();
-        if (selection.type !== "Range" || selection.isCollapsed)
-            return false;
-        WebInspector.evaluateInConsole(selection.toString());
-        return true;
     },
 
     _createDebugToolbar: function()
@@ -1260,7 +1248,11 @@ WebInspector.ScriptsPanel.prototype = {
 
     showGoToSourceDialog: function()
     {
-        WebInspector.OpenResourceDialog.show(this, this.editorView.mainElement);
+        var uris = this._editorContainer.historyUris();
+        var defaultScores = {};
+        for (var i = 1; i < uris.length; ++i) // Skip current element
+            defaultScores[uris[i]] = uris.length - i;
+        WebInspector.OpenResourceDialog.show(this, this.editorView.mainElement, undefined, defaultScores);
     },
 
     _dockSideChanged: function()

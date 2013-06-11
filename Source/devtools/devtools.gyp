@@ -332,12 +332,14 @@
             'front_end/cm/codemirror.js',
             'front_end/cm/css.js',
             'front_end/cm/showhint.js',
+            'front_end/cm/comment.js',
             'front_end/cm/htmlmixed.js',
             'front_end/cm/closebrackets.js',
             'front_end/cm/matchbrackets.js',
             'front_end/cm/javascript.js',
             'front_end/cm/xml.js',
             'front_end/cm/markselection.js',
+            'front_end/cm/overlay.js',
         ],
 
         'devtools_modules_js_files': [

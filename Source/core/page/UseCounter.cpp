@@ -262,7 +262,6 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     case CSSPropertyWebkitBoxPack: return 210;
     case CSSPropertyWebkitBoxReflect: return 211;
     case CSSPropertyWebkitBoxShadow: return 212;
-    case CSSPropertyWebkitColorCorrection: return 213;
     case CSSPropertyWebkitColumnAxis: return 214;
     case CSSPropertyWebkitColumnBreakAfter: return 215;
     case CSSPropertyWebkitColumnBreakBefore: return 216;
@@ -295,15 +294,15 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     case CSSPropertyWebkitFlexWrap: return 239;
     case CSSPropertyWebkitJustifyContent: return 240;
     case CSSPropertyWebkitFontSizeDelta: return 241;
-    case CSSPropertyWebkitGridColumns: return 242;
-    case CSSPropertyWebkitGridRows: return 243;
-    case CSSPropertyWebkitGridStart: return 244;
-    case CSSPropertyWebkitGridEnd: return 245;
-    case CSSPropertyWebkitGridBefore: return 246;
-    case CSSPropertyWebkitGridAfter: return 247;
-    case CSSPropertyWebkitGridColumn: return 248;
-    case CSSPropertyWebkitGridRow: return 249;
-    case CSSPropertyWebkitGridAutoFlow: return 250;
+    case CSSPropertyGridColumns: return 242;
+    case CSSPropertyGridRows: return 243;
+    case CSSPropertyGridStart: return 244;
+    case CSSPropertyGridEnd: return 245;
+    case CSSPropertyGridBefore: return 246;
+    case CSSPropertyGridAfter: return 247;
+    case CSSPropertyGridColumn: return 248;
+    case CSSPropertyGridRow: return 249;
+    case CSSPropertyGridAutoFlow: return 250;
     case CSSPropertyWebkitHighlight: return 251;
     case CSSPropertyWebkitHyphenateCharacter: return 252;
     case CSSPropertyWebkitHyphenateLimitAfter: return 253;
@@ -462,10 +461,10 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     case CSSPropertyWebkitBlendMode: return 399;
     case CSSPropertyWebkitBackgroundBlendMode: return 400;
 #endif
+    case CSSPropertyTextDecorationLine: return 401;
+    case CSSPropertyTextDecorationStyle: return 402;
+    case CSSPropertyTextDecorationColor: return 403;
 #if defined(ENABLE_CSS3_TEXT) && ENABLE_CSS3_TEXT
-    case CSSPropertyWebkitTextDecorationLine: return 401;
-    case CSSPropertyWebkitTextDecorationStyle: return 402;
-    case CSSPropertyWebkitTextDecorationColor: return 403;
     case CSSPropertyWebkitTextAlignLast: return 404;
     case CSSPropertyWebkitTextUnderlinePosition: return 405;
 #endif
@@ -486,11 +485,12 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     case CSSPropertyWebkitBoxDecorationBreak: return 414;
     case CSSPropertyWebkitTapHighlightColor: return 415;
     case CSSPropertyBufferedRendering: return 416;
-    case CSSPropertyWebkitGridAutoRows: return 417;
-    case CSSPropertyWebkitGridAutoColumns: return 418;
+    case CSSPropertyGridAutoRows: return 417;
+    case CSSPropertyGridAutoColumns: return 418;
     case CSSPropertyBackgroundBlendMode: return 419;
     case CSSPropertyMixBlendMode: return 420;
     case CSSPropertyTouchAction: return 421;
+    case CSSPropertyGridArea: return 422;
 
     // Add new features above this line (don't change the assigned numbers of the existing
     // items) and update maximumCSSSampleId() with the new maximum value.
@@ -505,7 +505,7 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     return 0;
 }
 
-static int maximumCSSSampleId() { return 421; }
+static int maximumCSSSampleId() { return 422; }
 
 UseCounter::UseCounter()
 {

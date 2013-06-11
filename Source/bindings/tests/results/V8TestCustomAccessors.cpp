@@ -34,43 +34,48 @@
 
 namespace WebCore {
 
-#if defined(OS_WIN)
-// In ScriptWrappable, the use of extern function prototypes inside templated static methods has an issue on windows.
-// These prototypes do not pick up the surrounding namespace, so drop out of WebCore as a workaround.
-} // namespace WebCore
-using WebCore::ScriptWrappable;
-using WebCore::V8TestCustomAccessors;
-using WebCore::TestCustomAccessors;
-#endif
-void initializeScriptWrappableForInterface(TestCustomAccessors* object)
+static void initializeScriptWrappableForInterface(TestCustomAccessors* object)
 {
     if (ScriptWrappable::wrapperCanBeStoredInObject(object))
         ScriptWrappable::setTypeInfoInObject(object, &V8TestCustomAccessors::info);
     else
         ASSERT_NOT_REACHED();
 }
-#if defined(OS_WIN)
+
+} // namespace WebCore
+
+// In ScriptWrappable::init, the use of a local function declaration has an issue on Windows:
+// the local declaration does not pick up the surrounding namespace. Therefore, we provide this function
+// in the global namespace.
+// (More info on the MSVC bug here: http://connect.microsoft.com/VisualStudio/feedback/details/664619/the-namespace-of-local-function-declarations-in-c)
+void webCoreInitializeScriptWrappableForInterface(WebCore::TestCustomAccessors* object)
+{
+    WebCore::initializeScriptWrappableForInterface(object);
+}
+
 namespace WebCore {
-#endif
 WrapperTypeInfo V8TestCustomAccessors::info = { V8TestCustomAccessors::GetTemplate, V8TestCustomAccessors::derefObject, 0, 0, 0, V8TestCustomAccessors::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
 namespace TestCustomAccessorsV8Internal {
 
 template <typename T> void V8_USE(T) { }
 
-static v8::Handle<v8::Value> anotherFunctionMethod(const v8::Arguments& args)
+static void anotherFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1)
-        return throwNotEnoughArgumentsError(args.GetIsolate());
+    if (args.Length() < 1) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
     TestCustomAccessors* imp = V8TestCustomAccessors::toNative(args.Holder());
-    V8TRYCATCH_FOR_V8STRINGRESOURCE(V8StringResource<>, str, args[0]);
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, str, args[0]);
     imp->anotherFunction(str);
-    return v8Undefined();
+
+    return;
 }
 
-static v8::Handle<v8::Value> anotherFunctionMethodCallback(const v8::Arguments& args)
+static void anotherFunctionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    return TestCustomAccessorsV8Internal::anotherFunctionMethod(args);
+    TestCustomAccessorsV8Internal::anotherFunctionMethod(args);
 }
 
 } // namespace TestCustomAccessorsV8Internal
@@ -79,12 +84,12 @@ static const V8DOMConfiguration::BatchedMethod V8TestCustomAccessorsMethods[] = 
     {"anotherFunction", TestCustomAccessorsV8Internal::anotherFunctionMethodCallback, 0, 1},
 };
 
-static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestCustomAccessorsTemplate(v8::Persistent<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
+static v8::Handle<v8::FunctionTemplate> ConfigureV8TestCustomAccessorsTemplate(v8::Handle<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     desc->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestCustomAccessors", v8::Persistent<v8::FunctionTemplate>(), V8TestCustomAccessors::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestCustomAccessors", v8::Local<v8::FunctionTemplate>(), V8TestCustomAccessors::internalFieldCount,
         0, 0,
         V8TestCustomAccessorsMethods, WTF_ARRAY_LENGTH(V8TestCustomAccessorsMethods), isolate, currentWorldType);
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
@@ -92,7 +97,7 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestCustomAccessorsTempla
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
     UNUSED_PARAM(instance); // In some cases, it will not be used.
     UNUSED_PARAM(proto); // In some cases, it will not be used.
-    desc->InstanceTemplate()->SetIndexedPropertyHandler(V8TestCustomAccessors::indexedPropertyGetter, V8TestCustomAccessors::indexedPropertySetter, 0, V8TestCustomAccessors::indexedPropertyDeleter, nodeCollectionIndexedPropertyEnumerator<TestCustomAccessors>);
+    desc->InstanceTemplate()->SetIndexedPropertyHandler(V8TestCustomAccessors::indexedPropertyGetter, V8TestCustomAccessors::indexedPropertySetter, 0, V8TestCustomAccessors::indexedPropertyDeleter);
     desc->InstanceTemplate()->SetNamedPropertyHandler(V8TestCustomAccessors::namedPropertyGetter, V8TestCustomAccessors::namedPropertySetter, V8TestCustomAccessors::namedPropertyQuery, V8TestCustomAccessors::namedPropertyDeleter, V8TestCustomAccessors::namedPropertyEnumerator);
 
     // Custom toString template
@@ -100,18 +105,18 @@ static v8::Persistent<v8::FunctionTemplate> ConfigureV8TestCustomAccessorsTempla
     return desc;
 }
 
-v8::Persistent<v8::FunctionTemplate> V8TestCustomAccessors::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
+v8::Handle<v8::FunctionTemplate> V8TestCustomAccessors::GetTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     V8PerIsolateData* data = V8PerIsolateData::from(isolate);
     V8PerIsolateData::TemplateMap::iterator result = data->templateMap(currentWorldType).find(&info);
     if (result != data->templateMap(currentWorldType).end())
-        return result->value;
+        return result->value.newLocal(isolate);
 
-    v8::HandleScope handleScope;
-    v8::Persistent<v8::FunctionTemplate> templ =
+    v8::HandleScope handleScope(isolate);
+    v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestCustomAccessorsTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
-    data->templateMap(currentWorldType).add(&info, templ);
-    return templ;
+    data->templateMap(currentWorldType).add(&info, UnsafePersistent<v8::FunctionTemplate>(isolate, templ));
+    return handleScope.Close(templ);
 }
 
 bool V8TestCustomAccessors::HasInstance(v8::Handle<v8::Value> value, v8::Isolate* isolate, WrapperWorldType currentWorldType)

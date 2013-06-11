@@ -37,8 +37,8 @@
 #include "core/rendering/RenderProgress.h"
 #include "core/rendering/RenderSlider.h"
 
-#include <public/android/WebThemeEngine.h>
-#include <public/Platform.h>
+#include "public/platform/android/WebThemeEngine.h"
+#include "public/platform/Platform.h"
 
 namespace WebCore {
 
@@ -57,7 +57,7 @@ RenderThemeChromiumAndroid::~RenderThemeChromiumAndroid()
 {
 }
 
-Color RenderThemeChromiumAndroid::systemColor(int cssValueId) const
+Color RenderThemeChromiumAndroid::systemColor(CSSValueID cssValueId) const
 {
     if (isRunningLayoutTest() && cssValueId == CSSValueButtonface) {
         // Match Chromium Linux' button color in layout tests.
@@ -78,7 +78,7 @@ String RenderThemeChromiumAndroid::extraDefaultStyleSheet()
         String(themeChromiumAndroidUserAgentStyleSheet, sizeof(themeChromiumAndroidUserAgentStyleSheet));
 }
 
-void RenderThemeChromiumAndroid::adjustInnerSpinButtonStyle(StyleResolver*, RenderStyle* style, Element*) const
+void RenderThemeChromiumAndroid::adjustInnerSpinButtonStyle(RenderStyle* style, Element*) const
 {
     if (isRunningLayoutTest()) {
         // Match Chromium Linux spin button style in layout tests.

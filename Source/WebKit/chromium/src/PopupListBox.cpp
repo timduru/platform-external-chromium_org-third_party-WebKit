@@ -46,6 +46,7 @@
 #include "core/platform/chromium/FramelessScrollViewClient.h"
 #include "core/platform/chromium/KeyboardCodes.h"
 #include "core/platform/graphics/Font.h"
+#include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/FontSelector.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/IntRect.h"
@@ -375,7 +376,7 @@ void PopupListBox::paint(GraphicsContext* gc, const IntRect& rect)
 
     // Special case for an empty popup.
     if (!numItems())
-        gc->fillRect(r, Color::white, ColorSpaceDeviceRGB);
+        gc->fillRect(r, Color::white);
 
     gc->restore();
 
@@ -422,9 +423,9 @@ void PopupListBox::paintRow(GraphicsContext* gc, const IntRect& rect, int rowInd
     // If we have a transparent background, make sure it has a color to blend
     // against.
     if (backColor.hasAlpha())
-        gc->fillRect(rowRect, Color::white, ColorSpaceDeviceRGB);
+        gc->fillRect(rowRect, Color::white);
 
-    gc->fillRect(rowRect, backColor, ColorSpaceDeviceRGB);
+    gc->fillRect(rowRect, backColor);
 
     // It doesn't look good but Autofill requires special style for separator.
     // Autofill doesn't have padding and #dcdcdc color.
@@ -434,14 +435,16 @@ void PopupListBox::paintRow(GraphicsContext* gc, const IntRect& rect, int rowInd
             rowRect.x() + padding,
             rowRect.y() + (rowRect.height() - separatorHeight) / 2,
             rowRect.width() - 2 * padding, separatorHeight);
-        gc->fillRect(separatorRect, style.menuType() == PopupMenuStyle::AutofillPopup ? Color(0xdc, 0xdc, 0xdc) : textColor, ColorSpaceDeviceRGB);
+        gc->fillRect(separatorRect, style.menuType() == PopupMenuStyle::AutofillPopup ? Color(0xdc, 0xdc, 0xdc) : textColor);
         return;
     }
 
     if (!style.isVisible())
         return;
 
-    gc->setFillColor(textColor, ColorSpaceDeviceRGB);
+    gc->setFillColor(textColor);
+
+    FontCachePurgePreventer fontCachePurgePreventer;
 
     Font itemFont = getRowFont(rowIndex);
     // FIXME: http://crbug.com/19872 We should get the padding of individual option
@@ -500,7 +503,7 @@ void PopupListBox::paintRow(GraphicsContext* gc, const IntRect& rect, int rowInd
         remainingWidth -= (imageRect.width() + labelToIconPadding);
         imageRect.setX(rowRect.width() - rightPadding - imageRect.width());
         imageRect.setY(rowRect.y() + (rowRect.height() - imageRect.height()) / 2);
-        gc->drawImage(image.get(), ColorSpaceDeviceRGB, imageRect);
+        gc->drawImage(image.get(), imageRect);
     }
 
     // Draw the the label if applicable.
@@ -524,7 +527,7 @@ void PopupListBox::paintRow(GraphicsContext* gc, const IntRect& rect, int rowInd
     TextRunPaintInfo labelTextRunPaintInfo(labelTextRun);
     labelTextRunPaintInfo.bounds = rowRect;
 
-    gc->setFillColor(labelColor, ColorSpaceDeviceRGB);
+    gc->setFillColor(labelColor);
     gc->drawBidiText(itemFont, labelTextRunPaintInfo, IntPoint(textX, textY));
 }
 

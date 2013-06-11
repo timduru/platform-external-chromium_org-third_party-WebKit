@@ -101,10 +101,8 @@ public:
     // inflexible because it's harder to add new input types if there is
     // scattered code with special cases for various types.
 
-#if ENABLE(INPUT_TYPE_COLOR)
-    virtual bool isColorControl() const;
-#endif
     virtual bool isCheckbox() const;
+    virtual bool isColorControl() const;
     virtual bool isDateField() const;
     virtual bool isDateTimeLocalField() const;
     virtual bool isEmailField() const;
@@ -214,6 +212,7 @@ public:
 
     virtual void createShadowSubtree();
     virtual void destroyShadowSubtree();
+    Element* elementById(const AtomicString& id) const;
 
     virtual HTMLElement* containerElement() const { return 0; }
     virtual HTMLElement* innerBlockElement() const { return 0; }

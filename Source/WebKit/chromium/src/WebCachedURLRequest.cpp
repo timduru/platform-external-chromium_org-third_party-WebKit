@@ -33,7 +33,7 @@
 
 #include "core/loader/cache/CachedResourceRequest.h"
 #include "core/platform/chromium/support/WrappedResourceRequest.h"
-#include <public/WebURLRequest.h>
+#include "public/platform/WebURLRequest.h"
 
 using namespace WebCore;
 
@@ -66,7 +66,7 @@ bool WebCachedURLRequest::forPreload() const
 
 WebString WebCachedURLRequest::initiatorName() const
 {
-    return WebString(m_private->initiatorInfo().name);
+    return WebString(m_private->options().initiatorInfo.name);
 }
 
 WebCachedURLRequest::WebCachedURLRequest(CachedResourceRequest* request)

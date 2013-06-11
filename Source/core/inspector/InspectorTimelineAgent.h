@@ -45,6 +45,7 @@
 #include <wtf/WeakPtr.h>
 
 namespace WebCore {
+struct CachedResourceInitiatorInfo;
 class DOMWindow;
 class Document;
 class DocumentLoader;
@@ -68,6 +69,8 @@ class ResourceError;
 class ResourceLoader;
 class ResourceRequest;
 class ResourceResponse;
+class ScriptArguments;
+class ScriptCallStack;
 class ScriptExecutionContext;
 class TimelineTraceEventProcessor;
 class WebSocketHandshakeRequest;
@@ -168,15 +171,15 @@ public:
     bool willEvaluateScript(Frame*, const String&, int);
     void didEvaluateScript();
 
-    void didTimeStamp(Frame*, const String&);
+    void consoleTimeStamp(Frame*, PassRefPtr<ScriptArguments>);
     void domContentLoadedEventFired(Frame*);
     void loadEventFired(Frame*);
 
-    void time(Frame*, const String&);
-    void timeEnd(Frame*, const String&);
+    void startConsoleTiming(Frame*, const String&);
+    void stopConsoleTiming(Frame*, const String&, PassRefPtr<ScriptCallStack>);
 
     void didScheduleResourceRequest(Document*, const String& url);
-    void willSendRequest(unsigned long, DocumentLoader*, const ResourceRequest&, const ResourceResponse&);
+    void willSendRequest(unsigned long, DocumentLoader*, const ResourceRequest&, const ResourceResponse&, const CachedResourceInitiatorInfo&);
     bool willReceiveResourceResponse(Frame*, unsigned long, const ResourceResponse&);
     void didReceiveResourceResponse(unsigned long, DocumentLoader*, const ResourceResponse&, ResourceLoader*);
     void didFinishLoading(unsigned long, DocumentLoader*, double monotonicFinishTime);

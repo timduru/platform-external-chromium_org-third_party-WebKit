@@ -23,7 +23,6 @@
 
 #include <wtf/CurrentTime.h>
 #include "bindings/v8/ScriptController.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/MouseEvent.h"
 #include "core/dom/NodeList.h"
 #include "core/dom/NodeRenderStyle.h"
@@ -155,9 +154,7 @@ RenderObject* HTMLPlugInImageElement::createRenderer(RenderArena* arena, RenderS
 
 void HTMLPlugInImageElement::willRecalcStyle(StyleChange)
 {
-    // FIXME: setNeedsWidgetUpdate is used by subclasses to signal that they need
-    // their renderer replaced on the next style recalc. It's not clear why they
-    // don't just do lazyReattach instead. This code looks like a terrible hack.
+    // FIXME: Why is this necessary?  Manual re-attach is almost always wrong.
     if (!useFallbackContent() && needsWidgetUpdate() && renderer() && !isImageType())
         reattach();
 }

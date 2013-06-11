@@ -29,12 +29,12 @@
     [Reflect] attribute DOMString height;
     [Reflect] attribute DOMString hspace;
     [Reflect] attribute DOMString name;
-    [Reflect] attribute DOMString object;
+    [Reflect] attribute DOMString _object;  // "object" is a reserved word
     [Reflect] attribute DOMString vspace;
     [Reflect] attribute DOMString width;
-    [Custom] getter boolean (unsigned long index);
+    [Custom, NotEnumerable] getter boolean (unsigned long index);
     [Custom] setter boolean (unsigned long index, Node value);
-    [Custom] getter Node (DOMString name);
+    [Custom, NotEnumerable] getter Node (DOMString name);
     [Custom] setter Node (DOMString name, Node value);
 };
 

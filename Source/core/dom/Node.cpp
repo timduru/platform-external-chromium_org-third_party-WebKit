@@ -34,7 +34,6 @@
 #include "core/css/CSSSelectorList.h"
 #include "core/css/CSSStyleRule.h"
 #include "core/css/CSSStyleSheet.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/BeforeLoadEvent.h"
@@ -113,13 +112,14 @@
 #include "core/rendering/RenderTextControl.h"
 #include "core/rendering/RenderView.h"
 #include "core/storage/StorageEvent.h"
-#include <wtf/HashSet.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/RefCountedLeakCounter.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/UnusedParam.h>
-#include <wtf/Vector.h>
+#include "wtf/HashSet.h"
+#include "wtf/PartitionAlloc.h"
+#include "wtf/PassOwnPtr.h"
+#include "wtf/RefCountedLeakCounter.h"
+#include "wtf/UnusedParam.h"
+#include "wtf/Vector.h"
+#include "wtf/text/CString.h"
+#include "wtf/text/StringBuilder.h"
 
 #ifndef NDEBUG
 #include "core/rendering/RenderLayer.h"
@@ -130,6 +130,34 @@ using namespace std;
 namespace WebCore {
 
 using namespace HTMLNames;
+
+#if ENABLE(PARTITION_ALLOC)
+static PartitionRoot root;
+
+void* Node::operator new(size_t size)
+{
+    return partitionAlloc(&root, size);
+}
+
+void Node::operator delete(void* ptr)
+{
+    partitionFree(ptr);
+}
+#endif // ENABLE(PARTITION_ALLOC)
+
+void Node::init()
+{
+#if ENABLE(PARTITION_ALLOC)
+    partitionAllocInit(&root);
+#endif
+}
+
+void Node::shutdown()
+{
+#if ENABLE(PARTITION_ALLOC)
+    partitionAllocShutdown(&root);
+#endif
+}
 
 bool Node::isSupported(const String& feature, const String& version)
 {
@@ -865,19 +893,15 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
         markAncestorsWithChildNeedsStyleRecalc();
 }
 
-void Node::lazyAttach()
+void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
 {
-    // It's safe to synchronously attach here because we're in the middle of style recalc
-    // while it's not safe to mark nodes as needing style recalc except in the loop in
-    // Element::recalcStyle because we may mark an ancestor as not needing recalc and
-    // then the node would never get updated. One place this currently happens is
-    // HTMLObjectElement::renderFallbackContent which may call lazyAttach from inside
-    // attach which was triggered by a recalcStyle.
-    if (document()->inStyleRecalc()) {
-        attach();
-        return;
+    for (Node* n = this; n; n = NodeTraversal::next(n, this)) {
+        if (n->hasChildNodes())
+            n->setChildNeedsStyleRecalc();
+        n->setStyleChange(FullStyleChange);
+        if (shouldSetAttached == SetAttached)
+            n->setAttached();
     }
-    setStyleChange(FullStyleChange);
     markAncestorsWithChildNeedsStyleRecalc();
 }
 
@@ -1284,14 +1308,6 @@ Element* Node::parentOrShadowHostElement() const
         return 0;
 
     return toElement(parent);
-}
-
-Node* Node::insertionParentForBinding() const
-{
-    Node* node = resolveReprojection(this);
-    while (node && node->containingShadowRoot() && node->containingShadowRoot()->type() == ShadowRoot::UserAgentShadowRoot)
-        node = resolveReprojection(node);
-    return node;
 }
 
 bool Node::needsShadowTreeWalkerSlow() const
@@ -1748,12 +1764,12 @@ bool Node::offsetInCharacters() const
     return false;
 }
 
-unsigned short Node::compareDocumentPosition(Node* otherNode)
+unsigned short Node::compareDocumentPosition(const Node* otherNode) const
 {
     return compareDocumentPositionInternal(otherNode, TreatShadowTreesAsDisconnected);
 }
 
-unsigned short Node::compareDocumentPositionInternal(Node* otherNode, ShadowTreesTreatment treatment)
+unsigned short Node::compareDocumentPositionInternal(const Node* otherNode, ShadowTreesTreatment treatment) const
 {
     // It is not clear what should be done if |otherNode| is 0.
     if (!otherNode)
@@ -1762,19 +1778,19 @@ unsigned short Node::compareDocumentPositionInternal(Node* otherNode, ShadowTree
     if (otherNode == this)
         return DOCUMENT_POSITION_EQUIVALENT;
     
-    Attr* attr1 = nodeType() == ATTRIBUTE_NODE ? static_cast<Attr*>(this) : 0;
-    Attr* attr2 = otherNode->nodeType() == ATTRIBUTE_NODE ? static_cast<Attr*>(otherNode) : 0;
+    const Attr* attr1 = nodeType() == ATTRIBUTE_NODE ? static_cast<const Attr*>(this) : 0;
+    const Attr* attr2 = otherNode->nodeType() == ATTRIBUTE_NODE ? static_cast<const Attr*>(otherNode) : 0;
     
-    Node* start1 = attr1 ? attr1->ownerElement() : this;
-    Node* start2 = attr2 ? attr2->ownerElement() : otherNode;
+    const Node* start1 = attr1 ? attr1->ownerElement() : this;
+    const Node* start2 = attr2 ? attr2->ownerElement() : otherNode;
     
     // If either of start1 or start2 is null, then we are disconnected, since one of the nodes is
     // an orphaned attribute node.
     if (!start1 || !start2)
         return DOCUMENT_POSITION_DISCONNECTED | DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 
-    Vector<Node*, 16> chain1;
-    Vector<Node*, 16> chain2;
+    Vector<const Node*, 16> chain1;
+    Vector<const Node*, 16> chain2;
     if (attr1)
         chain1.append(attr1);
     if (attr2)
@@ -1782,7 +1798,7 @@ unsigned short Node::compareDocumentPositionInternal(Node* otherNode, ShadowTree
     
     if (attr1 && attr2 && start1 == start2 && start1) {
         // We are comparing two attributes on the same node. Crawl our attribute map and see which one we hit first.
-        Element* owner1 = attr1->ownerElement();
+        const Element* owner1 = attr1->ownerElement();
         owner1->synchronizeAllAttributes();
         unsigned length = owner1->attributeCount();
         for (unsigned i = 0; i < length; ++i) {
@@ -1811,7 +1827,7 @@ unsigned short Node::compareDocumentPositionInternal(Node* otherNode, ShadowTree
         return DOCUMENT_POSITION_DISCONNECTED | DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC;
 
     // We need to find a common ancestor container, and then compare the indices of the two immediate children.
-    Node* current;
+    const Node* current;
     for (current = start1; current; current = current->parentOrShadowHostNode())
         chain1.append(current);
     for (current = start2; current; current = current->parentOrShadowHostNode())
@@ -1830,8 +1846,8 @@ unsigned short Node::compareDocumentPositionInternal(Node* otherNode, ShadowTree
 
     // Walk the two chains backwards and look for the first difference.
     for (unsigned i = min(index1, index2); i; --i) {
-        Node* child1 = chain1[--index1];
-        Node* child2 = chain2[--index2];
+        const Node* child1 = chain1[--index1];
+        const Node* child2 = chain2[--index2];
         if (child1 != child2) {
             // If one of the children is an attribute, it wins.
             if (child1->nodeType() == ATTRIBUTE_NODE)

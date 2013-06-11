@@ -34,23 +34,18 @@
 #include <wtf/PassRefPtr.h>
 #include <wtf/RefPtr.h>
 #include "InspectorFrontend.h"
+#include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ScriptController.h"
-#include "bindings/v8/ScriptFunctionCall.h"
-#include "bindings/v8/ScriptObject.h"
 #include "core/dom/Document.h"
 #include "core/inspector/InjectedScriptHost.h"
 #include "core/inspector/InjectedScriptManager.h"
 #include "core/inspector/InspectorController.h"
-#include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/InspectorState.h"
 #include "core/inspector/InspectorValues.h"
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
-#include "core/page/Settings.h"
-#include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/network/ResourceRequest.h"
 #include "weborigin/SecurityOrigin.h"
 
 using namespace std;
@@ -134,6 +129,11 @@ void InspectorAgent::enable(ErrorString*)
 void InspectorAgent::disable(ErrorString*)
 {
     m_state->setBoolean(InspectorAgentState::inspectorAgentEnabled, false);
+}
+
+void InspectorAgent::reset(ErrorString*)
+{
+    m_inspectedPage->inspectorController()->reconnectFrontend();
 }
 
 void InspectorAgent::domContentLoadedEventFired(Frame* frame)

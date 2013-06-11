@@ -33,26 +33,26 @@
 
 #include "config.h"
 
-#include <public/WebClipboard.h>
-#include <public/WebCompositingReasons.h>
-#include <public/WebFileError.h>
-#include <public/WebFileInfo.h>
-#include <public/WebFileSystem.h>
-#include <public/WebFilterOperation.h>
-#include <public/WebIDBCursor.h>
-#include <public/WebIDBDatabase.h>
-#include <public/WebIDBDatabaseException.h>
-#include <public/WebIDBFactory.h>
-#include <public/WebIDBKey.h>
-#include <public/WebIDBKeyPath.h>
-#include <public/WebIDBMetadata.h>
-#include <public/WebMediaStreamSource.h>
-#include <public/WebReferrerPolicy.h>
-#include <public/WebRTCDataChannelHandlerClient.h>
-#include <public/WebRTCPeerConnectionHandlerClient.h>
-#include <public/WebScrollbar.h>
-#include <public/WebURLRequest.h>
-#include <public/WebURLResponse.h>
+#include "public/platform/WebClipboard.h"
+#include "public/platform/WebCompositingReasons.h"
+#include "public/platform/WebFileError.h"
+#include "public/platform/WebFileInfo.h"
+#include "public/platform/WebFileSystem.h"
+#include "public/platform/WebFilterOperation.h"
+#include "public/platform/WebIDBCursor.h"
+#include "public/platform/WebIDBDatabase.h"
+#include "public/platform/WebIDBDatabaseException.h"
+#include "public/platform/WebIDBFactory.h"
+#include "public/platform/WebIDBKey.h"
+#include "public/platform/WebIDBKeyPath.h"
+#include "public/platform/WebIDBMetadata.h"
+#include "public/platform/WebMediaStreamSource.h"
+#include "public/platform/WebReferrerPolicy.h"
+#include "public/platform/WebRTCDataChannelHandlerClient.h"
+#include "public/platform/WebRTCPeerConnectionHandlerClient.h"
+#include "public/platform/WebScrollbar.h"
+#include "public/platform/WebURLRequest.h"
+#include "public/platform/WebURLResponse.h"
 #include <wtf/Assertions.h>
 #include <wtf/text/StringImpl.h>
 #include "WebAccessibilityNotification.h"
@@ -103,6 +103,7 @@
 #include "core/platform/FileMetadata.h"
 #include "core/platform/graphics/FontDescription.h"
 #include "core/platform/graphics/FontSmoothingMode.h"
+#include "core/platform/graphics/InbandTextTrackPrivate.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/platform/graphics/MediaSourcePrivate.h"
 #include "core/platform/graphics/filters/FilterOperation.h"
@@ -406,11 +407,6 @@ COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::ReadyStateHaveMetadata, MediaPlayer
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::ReadyStateHaveCurrentData, MediaPlayer::HaveCurrentData);
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::ReadyStateHaveFutureData, MediaPlayer::HaveFutureData);
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::ReadyStateHaveEnoughData, MediaPlayer::HaveEnoughData);
-
-COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::MovieLoadTypeUnknown, MediaPlayer::Unknown);
-COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::MovieLoadTypeDownload, MediaPlayer::Download);
-COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::MovieLoadTypeStoredStream, MediaPlayer::StoredStream);
-COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::MovieLoadTypeLiveStream, MediaPlayer::LiveStream);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::PreloadNone, MediaPlayer::None);
 COMPILE_ASSERT_MATCHING_ENUM(WebMediaPlayer::PreloadMetaData, MediaPlayer::MetaData);

@@ -105,6 +105,8 @@ void RenderReplaced::intrinsicSizeChanged()
 
 void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
+    ANNOTATE_GRAPHICS_CONTEXT(paintInfo, this);
+
     if (!shouldPaint(paintInfo, paintOffset))
         return;
     
@@ -156,13 +158,13 @@ void RenderReplaced::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
         if (style()->hasBorderRadius())
             paintInfo.context->restore();
     }
-        
+
     // The selection tint never gets clipped by border-radius rounding, since we want it to run right up to the edges of
     // surrounding content.
     if (drawSelectionTint) {
         LayoutRect selectionPaintingRect = localSelectionRect();
         selectionPaintingRect.moveBy(adjustedPaintOffset);
-        paintInfo.context->fillRect(pixelSnappedIntRect(selectionPaintingRect), selectionBackgroundColor(), style()->colorSpace());
+        paintInfo.context->fillRect(pixelSnappedIntRect(selectionPaintingRect), selectionBackgroundColor());
     }
 }
 
@@ -174,7 +176,7 @@ bool RenderReplaced::shouldPaint(PaintInfo& paintInfo, const LayoutPoint& paintO
 
     if (!paintInfo.shouldPaintWithinRoot(this))
         return false;
-        
+
     // if we're invisible or haven't received a layout yet, then just bail.
     if (style()->visibility() != VISIBLE)
         return false;
@@ -190,7 +192,7 @@ bool RenderReplaced::shouldPaint(PaintInfo& paintInfo, const LayoutPoint& paintO
         top = min(selTop, top);
         bottom = max(selBottom, bottom);
     }
-    
+
     LayoutRect localRepaintRect = paintInfo.rect;
     localRepaintRect.inflate(maximalOutlineSize(paintInfo.phase));
     if (adjustedPaintOffset.x() + visualOverflowRect().x() >= localRepaintRect.maxX() || adjustedPaintOffset.x() + visualOverflowRect().maxX() <= localRepaintRect.x())
@@ -245,6 +247,13 @@ bool RenderReplaced::hasReplacedLogicalHeight() const
         return true;
 
     return false;
+}
+
+bool RenderReplaced::needsPreferredWidthsRecalculation() const
+{
+    // If the height is a percentage and the width is auto, then the containingBlocks's height changing can cause
+    // this node to change it's preferred width because it maintains aspect ratio.
+    return hasRelativeLogicalHeight() && style()->logicalWidth().isAuto() && !hasAutoHeightOrContainingBlockWithAutoHeight();
 }
 
 static inline bool rendererHasAspectRatio(const RenderObject* renderer)

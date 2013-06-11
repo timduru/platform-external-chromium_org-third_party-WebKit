@@ -111,6 +111,7 @@
        'outputs': [
          '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
          '<(SHARED_INTERMEDIATE_DIR)/DOMWindowConstructors.idl',
+         '<(SHARED_INTERMEDIATE_DIR)/WorkerContextConstructors.idl',
        ],
        'msvs_cygwin_shell': 0,
        'action': [
@@ -122,6 +123,8 @@
          '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
          '--window-constructors-file',
          '<(SHARED_INTERMEDIATE_DIR)/DOMWindowConstructors.idl',
+         '--workercontext-constructors-file',
+         '<(SHARED_INTERMEDIATE_DIR)/WorkerContextConstructors.idl',
          '<@(write_file_only_if_changed)',
        ],
        'message': 'Resolving partial interfaces dependencies in all IDL files',
@@ -133,7 +136,7 @@
       'hard_dependency': 1,
       'dependencies': [
         'supplemental_dependencies',
-        '../core/core.gyp/core_derived_sources.gyp:generate_test_support_idls',
+        '../core/core_derived_sources.gyp:generate_test_support_idls',
       ],
       'sources': [
         '<@(idl_files)',
@@ -142,7 +145,7 @@
       'actions': [{
         'action_name': 'derived_sources_all_in_one',
         'inputs': [
-          '../core/core.gyp/scripts/action_derivedsourcesallinone.py',
+          '../core/scripts/action_derivedsourcesallinone.py',
           '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
         ],
         'outputs': [
@@ -150,7 +153,7 @@
         ],
         'action': [
           'python',
-          '../core/core.gyp/scripts/action_derivedsourcesallinone.py',
+          '../core/scripts/action_derivedsourcesallinone.py',
           '<(SHARED_INTERMEDIATE_DIR)/supplemental_dependency.tmp',
           '--',
           '<@(derived_sources_aggregate_files)',
@@ -168,6 +171,7 @@
           '../core/scripts/preprocessor.pm',
           '<!@pymod_do_main(supplemental_idl_files <@(idl_files))',
           '<(SHARED_INTERMEDIATE_DIR)/DOMWindowConstructors.idl',
+          '<(SHARED_INTERMEDIATE_DIR)/WorkerContextConstructors.idl',
         ],
         'outputs': [
           # FIXME:  The .cpp file should be in webkit/bindings once

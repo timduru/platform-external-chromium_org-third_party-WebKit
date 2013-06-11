@@ -31,24 +31,23 @@
 #include "config.h"
 #include "WebViewImpl.h"
 
-#include <public/Platform.h>
-#include <public/WebDragData.h>
-#include <public/WebFloatPoint.h>
-#include <public/WebGestureCurve.h>
-#include <public/WebImage.h>
-#include <public/WebLayer.h>
-#include <public/WebLayerTreeView.h>
-#include <public/WebPoint.h>
-#include <public/WebRect.h>
-#include <public/WebString.h>
-#include <public/WebVector.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebDragData.h"
+#include "public/platform/WebFloatPoint.h"
+#include "public/platform/WebGestureCurve.h"
+#include "public/platform/WebImage.h"
+#include "public/platform/WebLayer.h"
+#include "public/platform/WebLayerTreeView.h"
+#include "public/platform/WebPoint.h"
+#include "public/platform/WebRect.h"
+#include "public/platform/WebString.h"
+#include "public/platform/WebVector.h"
 #include <wtf/CurrentTime.h>
 #include <wtf/MainThread.h>
 #include <wtf/RefPtr.h>
 #include <wtf/TemporaryChange.h>
 #include <wtf/Uint8ClampedArray.h>
 #include "AutofillPopupMenuClient.h"
-#include "BatteryClientImpl.h"
 #include "CSSValueKeywords.h"
 #include "CompositionUnderlineVectorBuilder.h"
 #include "ContextFeaturesClientImpl.h"
@@ -57,7 +56,6 @@
 #include "GraphicsLayerFactoryChromium.h"
 #include "HTMLNames.h"
 #include "LinkHighlight.h"
-#include "NonCompositedContentHost.h"
 #include "PageWidgetDelegate.h"
 #include "PopupContainer.h"
 #include "PrerendererClientImpl.h"
@@ -152,7 +150,7 @@
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
-#include "modules/battery/BatteryController.h"
+#include "core/rendering/TextAutosizer.h"
 #include "modules/geolocation/GeolocationController.h"
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
@@ -282,6 +280,12 @@ void WebView::resetVisitedLinkState()
 void WebView::willEnterModalLoop()
 {
     PageGroup* pageGroup = PageGroup::sharedGroup();
+
+    // We allow deferring inspector only when it is running in a separate process (no pages in a shared group)
+    // to support debugger tests in DRT.
+    if (pageGroup->pages().isEmpty())
+        pageGroup = PageGroup::inspectorGroup();
+
     if (pageGroup->pages().isEmpty())
         pageGroupLoadDeferrerStack().append(static_cast<PageGroupLoadDeferrer*>(0));
     else {
@@ -305,10 +309,6 @@ void WebViewImpl::initializeMainFrame(WebFrameClient* frameClient)
     RefPtr<WebFrameImpl> frame = WebFrameImpl::create(frameClient);
 
     frame->initializeAsMainFrame(page());
-
-    // Restrict the access to the local file system
-    // (see WebView.mm WebView::_commonInitializationWithFrameName).
-    SecurityPolicy::setLocalLoadPolicy(SecurityPolicy::AllowLocalLoadsForLocalOnly);
 }
 
 void WebViewImpl::initializeHelperPluginFrame(WebFrameClient* client)
@@ -418,9 +418,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_speechRecognitionClient(SpeechRecognitionClientProxy::create(client ? client->speechRecognizer() : 0))
     , m_deviceOrientationClientProxy(adoptPtr(new DeviceOrientationClientProxy(client ? client->deviceOrientationClient() : 0)))
     , m_geolocationClientProxy(adoptPtr(new GeolocationClientProxy(client ? client->geolocationClient() : 0)))
-#if ENABLE(BATTERY_STATUS)
-    , m_batteryClient(adoptPtr(new BatteryClientImpl(client ? client->batteryStatusClient() : 0)))
-#endif
     , m_emulatedTextZoomFactor(1)
     , m_userMediaClientImpl(this)
 #if ENABLE(NAVIGATOR_CONTENT_UTILS)
@@ -458,11 +455,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     provideDeviceOrientationTo(m_page.get(), m_deviceOrientationClientProxy.get());
     provideGeolocationTo(m_page.get(), m_geolocationClientProxy.get());
     m_geolocationClientProxy->setController(GeolocationController::from(m_page.get()));
-
-#if ENABLE(BATTERY_STATUS)
-    provideBatteryTo(m_page.get(), m_batteryClient.get());
-    m_batteryClient->setController(BatteryController::from(m_page.get()));
-#endif
 
     m_page->setGroupType(Page::SharedPageGroup);
 
@@ -1714,13 +1706,6 @@ void WebViewImpl::didExitFullScreen()
     m_fullScreenFrame.clear();
 }
 
-#if ENABLE(BATTERY_STATUS)
-void WebViewImpl::updateBatteryStatus(const WebBatteryStatus& status)
-{
-    m_batteryClient->updateBatteryStatus(status);
-}
-#endif
-
 void WebViewImpl::animate(double monotonicFrameBeginTime)
 {
     TRACE_EVENT0("webkit", "WebViewImpl::animate");
@@ -1760,6 +1745,8 @@ void WebViewImpl::layout()
 {
     TRACE_EVENT0("webkit", "WebViewImpl::layout");
     PageWidgetDelegate::layout(m_page.get());
+    if (m_layerTreeView)
+        m_layerTreeView->setBackgroundColor(backgroundColor());
 
     if (m_linkHighlight)
         m_linkHighlight->updateGeometry();
@@ -2213,7 +2200,7 @@ WebTextInputType WebViewImpl::textInputType()
         return WebTextInputTypeNone;
 
     if (node->hasTagName(HTMLNames::inputTag)) {
-        HTMLInputElement* input = static_cast<HTMLInputElement*>(node);
+        HTMLInputElement* input = toHTMLInputElement(node);
 
         if (input->isDisabledOrReadOnly())
             return WebTextInputTypeNone;
@@ -2412,6 +2399,8 @@ bool WebViewImpl::isSelectionEditable() const
 
 WebColor WebViewImpl::backgroundColor() const
 {
+    if (isTransparent())
+        return Color::transparent;
     if (!m_page)
         return Color::white;
     FrameView* view = m_page->mainFrame()->view();
@@ -2903,8 +2892,7 @@ void WebViewImpl::enableFixedLayoutMode(bool enable)
 
     frame->view()->setUseFixedLayout(enable);
 
-    // Also notify the base layer, which RenderLayerCompositor does not see.
-    if (m_nonCompositedContentHost)
+    if (m_isAcceleratedCompositingActive)
         updateLayerTreeViewport();
 }
 
@@ -3010,7 +2998,13 @@ void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportArguments&
     if (settingsImpl()->supportDeprecatedTargetDensityDPI())
         m_pageScaleConstraintsSet.adjustPageDefinedConstraintsForAndroidWebView(arguments, m_size, page()->settings()->layoutFallbackWidth(), deviceScaleFactor(), page()->settings()->useWideViewport(), page()->settings()->loadWithOverviewMode());
 
-    setFixedLayoutSize(flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize));
+    WebSize layoutSize = flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize);
+
+    if (page()->settings() && page()->settings()->textAutosizingEnabled() && page()->mainFrame()
+        && layoutSize.width != fixedLayoutSize().width)
+            page()->mainFrame()->document()->textAutosizer()->recalculateMultipliers();
+
+    setFixedLayoutSize(layoutSize);
 }
 
 IntSize WebViewImpl::contentsSize() const
@@ -3019,6 +3013,18 @@ IntSize WebViewImpl::contentsSize() const
     if (!root)
         return IntSize();
     return root->documentRect().size();
+}
+
+WebSize WebViewImpl::contentsPreferredMinimumSize()
+{
+    Document* document = m_page->mainFrame()->document();
+    if (!document || !document->renderView() || !document->documentElement())
+        return WebSize();
+
+    layout();
+    IntSize preferredMinimumSize(document->renderView()->minPreferredLogicalWidth(), document->documentElement()->scrollHeight());
+    preferredMinimumSize.scale(zoomLevelToZoomFactor(zoomLevel()));
+    return preferredMinimumSize;
 }
 
 float WebViewImpl::minimumPageScaleFactor() const
@@ -3360,12 +3366,12 @@ void WebViewImpl::inspectElementAt(const WebPoint& point)
     if (point.x == -1 || point.y == -1)
         m_page->inspectorController()->inspect(0);
     else {
-        HitTestResult result = hitTestResultForWindowPos(point);
+        HitTestRequest::HitTestRequestType hitType = HitTestRequest::Move | HitTestRequest::ReadOnly | HitTestRequest::AllowChildFrameContent | HitTestRequest::IgnorePointerEventsNone;
+        HitTestRequest request(hitType);
 
-        if (!result.innerNonSharedNode())
-            return;
-
-        m_page->inspectorController()->inspect(result.innerNonSharedNode());
+        HitTestResult result(m_page->mainFrame()->view()->windowToContents(point));
+        m_page->mainFrame()->contentRenderer()->hitTest(request, result);
+        m_page->inspectorController()->inspect(result.innerNode());
     }
 }
 
@@ -3508,9 +3514,6 @@ void WebViewImpl::setIsTransparent(bool isTransparent)
 
     // Future frames check this to know whether to be transparent.
     m_isTransparent = isTransparent;
-
-    if (m_nonCompositedContentHost)
-        m_nonCompositedContentHost->setOpaque(!isTransparent);
 }
 
 bool WebViewImpl::isTransparent() const
@@ -3604,6 +3607,14 @@ void WebViewImpl::layoutUpdated(WebFrameImpl* webframe)
 {
     if (!m_client || webframe != mainFrameImpl())
         return;
+
+    if (m_layerTreeViewCommitsDeferred) {
+        // If we finished a layout while in deferred commit mode,
+        // that means it's time to start producing frames again so un-defer.
+        if (m_layerTreeView)
+            m_layerTreeView->setDeferCommits(false);
+        m_layerTreeViewCommitsDeferred = false;
+    }
 
     if (m_shouldAutoResize && mainFrameImpl()->frame() && mainFrameImpl()->frame()->view()) {
         WebSize frameSize = mainFrameImpl()->frame()->view()->frameRect().size();
@@ -3797,16 +3808,6 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
     m_rootLayer = layer ? layer->platformLayer() : 0;
 
     setIsAcceleratedCompositingActive(layer);
-    if (m_nonCompositedContentHost) {
-        GraphicsLayer* scrollLayer = 0;
-        if (layer) {
-            Document* document = page()->mainFrame()->document();
-            RenderView* renderView = document->renderView();
-            RenderLayerCompositor* compositor = renderView->compositor();
-            scrollLayer = compositor->scrollLayer();
-        }
-        m_nonCompositedContentHost->setScrollLayer(scrollLayer);
-    }
 
     if (m_layerTreeView) {
         if (m_rootLayer)
@@ -3830,38 +3831,11 @@ void WebViewImpl::scrollRootLayerRect(const IntSize&, const IntRect&)
 
 void WebViewImpl::invalidateRect(const IntRect& rect)
 {
-    if (m_layerTreeViewCommitsDeferred) {
-        // If we receive an invalidation from WebKit while in deferred commit mode,
-        // that means it's time to start producing frames again so un-defer.
-        if (m_layerTreeView)
-            m_layerTreeView->setDeferCommits(false);
-        m_layerTreeViewCommitsDeferred = false;
-    }
     if (m_isAcceleratedCompositingActive) {
         ASSERT(m_layerTreeView);
-
-        if (!page())
-            return;
-
-        FrameView* view = page()->mainFrame()->view();
-        IntRect dirtyRect = view->windowToContents(rect);
         updateLayerTreeViewport();
-        m_nonCompositedContentHost->invalidateRect(dirtyRect);
     } else if (m_client)
         m_client->didInvalidateRect(rect);
-}
-
-NonCompositedContentHost* WebViewImpl::nonCompositedContentHost()
-{
-    return m_nonCompositedContentHost.get();
-}
-
-void WebViewImpl::setBackgroundColor(const WebCore::Color& color)
-{
-    WebCore::Color documentBackgroundColor = color.isValid() ? color : WebCore::Color::white;
-    WebColor webDocumentBackgroundColor = documentBackgroundColor.rgb();
-    m_nonCompositedContentHost->setBackgroundColor(documentBackgroundColor);
-    m_layerTreeView->setBackgroundColor(webDocumentBackgroundColor);
 }
 
 WebCore::GraphicsLayerFactory* WebViewImpl::graphicsLayerFactory() const
@@ -3890,22 +3864,6 @@ void WebViewImpl::scheduleAnimation()
             m_client->scheduleAnimation();
     } else
             m_client->scheduleAnimation();
-}
-
-void WebViewImpl::paintRootLayer(GraphicsContext& context, const IntRect& contentRect)
-{
-    double paintStart = currentTime();
-    if (!page())
-        return;
-    FrameView* view = page()->mainFrame()->view();
-    context.setUseHighResMarkers(page()->deviceScaleFactor() > 1.5f);
-    view->paintContents(&context, contentRect);
-    double paintEnd = currentTime();
-    double pixelsPerSec = (contentRect.width() * contentRect.height()) / (paintEnd - paintStart);
-    WebKit::Platform::current()->histogramCustomCounts("Renderer4.AccelRootPaintDurationMS", (paintEnd - paintStart) * 1000, 0, 120, 30);
-    WebKit::Platform::current()->histogramCustomCounts("Renderer4.AccelRootPaintMegapixPerSecond", pixelsPerSec / 1000000, 10, 210, 30);
-
-    setBackgroundColor(view->documentBackgroundColor());
 }
 
 void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
@@ -3940,10 +3898,6 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
     } else {
         TRACE_EVENT0("webkit", "WebViewImpl::setIsAcceleratedCompositingActive(true)");
 
-        m_nonCompositedContentHost = NonCompositedContentHost::create(this, graphicsLayerFactory());
-        m_nonCompositedContentHost->setShowDebugBorders(page()->settings()->showDebugBorders());
-        m_nonCompositedContentHost->setOpaque(!isTransparent());
-
         m_client->initializeLayerTreeView();
         m_layerTreeView = m_client->layerTreeView();
         if (m_layerTreeView) {
@@ -3953,6 +3907,7 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
             m_layerTreeView->setVisible(visible);
             m_layerTreeView->setDeviceScaleFactor(page()->deviceScaleFactor());
             m_layerTreeView->setPageScaleFactorAndLimits(pageScaleFactor(), minimumPageScaleFactor(), maximumPageScaleFactor());
+            m_layerTreeView->setBackgroundColor(backgroundColor());
             m_layerTreeView->setHasTransparentBackground(isTransparent());
             updateLayerTreeViewport();
             m_client->didActivateCompositor(0);
@@ -3965,7 +3920,6 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
             m_layerTreeView->setShowDebugBorders(m_showDebugBorders);
             m_layerTreeView->setContinuousPaintingEnabled(m_continuousPaintingEnabled);
         } else {
-            m_nonCompositedContentHost.clear();
             m_isAcceleratedCompositingActive = false;
             m_client->didDeactivateCompositor();
             m_compositorCreationFailed = true;
@@ -4029,11 +3983,9 @@ void WebViewImpl::didExitCompositingMode()
 
 void WebViewImpl::updateLayerTreeViewport()
 {
-    if (!page() || !m_nonCompositedContentHost || !m_layerTreeView)
+    if (!page() || !m_layerTreeView)
         return;
 
-    FrameView* view = page()->mainFrame()->view();
-    m_nonCompositedContentHost->setViewport(m_size, view->contentsSize(), view->scrollPosition(), view->scrollOrigin());
     m_layerTreeView->setPageScaleFactorAndLimits(pageScaleFactor(), minimumPageScaleFactor(), maximumPageScaleFactor());
 }
 

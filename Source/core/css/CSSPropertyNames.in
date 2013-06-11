@@ -156,6 +156,9 @@ table-layout
 tab-size
 text-align
 text-decoration
+text-decoration-line
+text-decoration-style
+text-decoration-color
 text-indent
 text-line-through-color
 text-line-through-mode
@@ -246,7 +249,6 @@ z-index
 -webkit-box-pack
 -webkit-box-reflect
 -webkit-box-shadow
--webkit-color-correction
 -webkit-column-axis
 -webkit-column-break-after
 -webkit-column-break-before
@@ -275,17 +277,18 @@ z-index
 -webkit-flex-wrap
 -webkit-justify-content
 -webkit-font-size-delta
--webkit-grid-auto-columns
--webkit-grid-auto-rows
--webkit-grid-columns
--webkit-grid-rows
--webkit-grid-start
--webkit-grid-end
--webkit-grid-before
--webkit-grid-after
--webkit-grid-column
--webkit-grid-row
--webkit-grid-auto-flow
+grid-auto-columns
+grid-auto-rows
+grid-columns
+grid-rows
+grid-start
+grid-end
+grid-before
+grid-after
+grid-column
+grid-row
+grid-auto-flow
+grid-area
 -webkit-highlight
 -webkit-hyphenate-character
 -webkit-hyphenate-limit-after
@@ -352,9 +355,6 @@ z-index
 -webkit-ruby-position
 -webkit-text-combine
 -epub-text-combine alias_for=-webkit-text-combine
--webkit-text-decoration-line condition=CSS3_TEXT
--webkit-text-decoration-style condition=CSS3_TEXT
--webkit-text-decoration-color condition=CSS3_TEXT
 -webkit-text-align-last condition=CSS3_TEXT
 -webkit-text-underline-position condition=CSS3_TEXT
 -webkit-text-decorations-in-effect

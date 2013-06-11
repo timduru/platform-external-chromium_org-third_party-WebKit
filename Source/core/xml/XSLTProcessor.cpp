@@ -26,17 +26,12 @@
 
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/DocumentFragment.h"
-#include "core/dom/Text.h"
 #include "core/editing/markup.h"
-#include "core/html/HTMLBodyElement.h"
-#include "core/html/HTMLDocument.h"
-#include "core/loader/FrameLoader.h"
 #include "core/loader/TextResourceDecoder.h"
-#include "core/loader/cache/CachedResourceLoader.h"
 #include "core/page/ContentSecurityPolicy.h"
+#include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
-#include "core/page/Page.h"
 #include "weborigin/SecurityOrigin.h"
 
 #include <wtf/Assertions.h>
@@ -87,14 +82,13 @@ PassRefPtr<Document> XSLTProcessor::createDocumentFromSource(const String& sourc
 
         if (Document* oldDocument = frame->document()) {
             result->setTransformSourceDocument(oldDocument);
-            result->takeDOMWindowFrom(oldDocument);
             result->setSecurityOrigin(oldDocument->securityOrigin());
             result->setCookieURL(oldDocument->cookieURL());
             result->setFirstPartyForCookies(oldDocument->firstPartyForCookies());
             result->contentSecurityPolicy()->copyStateFrom(oldDocument->contentSecurityPolicy());
         }
 
-        frame->setDocument(result);
+        frame->domWindow()->setDocument(result);
     }
 
     RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create(sourceMIMEType);

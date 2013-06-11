@@ -708,6 +708,7 @@ void FrameView::updateCompositingLayersAfterLayout()
 
     // This call will make sure the cached hasAcceleratedCompositing is updated from the pref
     renderView->compositor()->cacheAcceleratedCompositingFlags();
+    renderView->compositor()->updateCompositingRequirementsState();
     renderView->compositor()->updateCompositingLayers(CompositingUpdateAfterLayout);
 }
 
@@ -1580,6 +1581,17 @@ void FrameView::setScrollPosition(const IntPoint& scrollPoint)
     ScrollView::setScrollPosition(newScrollPosition);
 }
 
+void FrameView::setScrollPositionNonProgrammatically(const IntPoint& scrollPoint)
+{
+    IntPoint newScrollPosition = adjustScrollPositionWithinRange(scrollPoint);
+
+    if (newScrollPosition == scrollPosition())
+        return;
+
+    TemporaryChange<bool> changeInProgrammaticScroll(m_inProgrammaticScroll, false);
+    notifyScrollPositionChanged(newScrollPosition);
+}
+
 void FrameView::setViewportConstrainedObjectsNeedLayout()
 {
     if (!hasViewportConstrainedObjects())
@@ -2043,6 +2055,8 @@ bool FrameView::isTransparent() const
 void FrameView::setTransparent(bool isTransparent)
 {
     m_isTransparent = isTransparent;
+    if (renderView() && renderView()->layer()->backing())
+        renderView()->layer()->backing()->updateContentsOpaque();
 }
 
 bool FrameView::hasOpaqueBackground() const
@@ -2062,6 +2076,8 @@ void FrameView::setBaseBackgroundColor(const Color& backgroundColor)
     else
         m_baseBackgroundColor = backgroundColor;
 
+    if (renderView() && renderView()->layer()->backing())
+        renderView()->layer()->backing()->updateContentsOpaque();
     recalculateScrollbarOverlayStyle();
 }
 
@@ -2131,26 +2147,26 @@ void FrameView::scrollToAnchor()
     m_maintainScrollPositionAnchor = anchorNode;
 }
 
-bool FrameView::updateWidget(RenderObject* object)
+void FrameView::updateWidget(RenderObject* object)
 {
     ASSERT(!object->node() || object->node()->isElementNode());
-    RefPtr<Element> ownerElement = toElement(object->node());
+    Element* ownerElement = toElement(object->node());
     // The object may have already been destroyed (thus node cleared),
     // but FrameView holds a manual ref, so it won't have been deleted.
     ASSERT(m_widgetUpdateSet->contains(object));
     if (!ownerElement)
-        return true;
+        return;
 
     if (object->isEmbeddedObject()) {
         RenderEmbeddedObject* embeddedObject = static_cast<RenderEmbeddedObject*>(object);
         // No need to update if it's already crashed or known to be missing.
         if (embeddedObject->showsUnavailablePluginIndicator())
-            return true;
+            return;
 
         // FIXME: This could turn into a real virtual dispatch if we defined
         // updateWidget(PluginCreationOption) on HTMLElement.
         if (ownerElement->hasTagName(objectTag) || ownerElement->hasTagName(embedTag) || ownerElement->hasTagName(appletTag)) {
-            HTMLPlugInImageElement* pluginElement = toHTMLPlugInImageElement(ownerElement.get());
+            HTMLPlugInImageElement* pluginElement = toHTMLPlugInImageElement(ownerElement);
             if (pluginElement->needsWidgetUpdate())
                 pluginElement->updateWidget(CreateAnyWidgetType);
         } else
@@ -2158,14 +2174,8 @@ bool FrameView::updateWidget(RenderObject* object)
 
         // Caution: it's possible the object was destroyed again, since loading a
         // plugin may run any arbitrary JavaScript.
-        if (ownerElement->renderer() != embeddedObject) {
-            m_widgetUpdateSet->clear();
-            return false;
-        }
         embeddedObject->updateWidgetPosition();
     }
-
-    return true;
 }
 
 bool FrameView::updateWidgets()
@@ -2190,8 +2200,7 @@ bool FrameView::updateWidgets()
 
     for (size_t i = 0; i < size; ++i) {
         RenderObject* object = objects[i];
-        if (!updateWidget(object))
-            return false;
+        updateWidget(object);
         m_widgetUpdateSet->remove(object);
     }
 
@@ -2283,8 +2292,6 @@ void FrameView::performPostLayoutTasks()
         InspectorInstrumentation::mediaQueryResultChanged(m_frame->document());
     }
 
-    // Refetch render view since it can be destroyed by updateWidget() call above.
-    renderView = this->renderView();
     if (renderView && !renderView->printing()) {
         IntSize currentSize;
         currentSize = visibleContentRect(IncludeScrollbars).size();
@@ -2692,25 +2699,22 @@ void FrameView::updateAnnotatedRegions()
 
 void FrameView::updateScrollCorner()
 {
-    RenderObject* renderer = 0;
     RefPtr<RenderStyle> cornerStyle;
     IntRect cornerRect = scrollCornerRect();
-    
-    if (!cornerRect.isEmpty()) {
+    Document* doc = m_frame->document();
+
+    if (doc && !cornerRect.isEmpty()) {
         // Try the <body> element first as a scroll corner source.
-        Document* doc = m_frame->document();
-        Element* body = doc ? doc->body() : 0;
-        if (body && body->renderer()) {
-            renderer = body->renderer();
-            cornerStyle = renderer->getUncachedPseudoStyle(PseudoStyleRequest(SCROLLBAR_CORNER), renderer->style());
+        if (Element* body = doc->body()) {
+            if (RenderObject* renderer = body->renderer())
+                cornerStyle = renderer->getUncachedPseudoStyle(PseudoStyleRequest(SCROLLBAR_CORNER), renderer->style());
         }
         
         if (!cornerStyle) {
             // If the <body> didn't have a custom style, then the root element might.
-            Element* docElement = doc ? doc->documentElement() : 0;
-            if (docElement && docElement->renderer()) {
-                renderer = docElement->renderer();
-                cornerStyle = renderer->getUncachedPseudoStyle(PseudoStyleRequest(SCROLLBAR_CORNER), renderer->style());
+            if (Element* docElement = doc->documentElement()) {
+                if (RenderObject* renderer = docElement->renderer())
+                    cornerStyle = renderer->getUncachedPseudoStyle(PseudoStyleRequest(SCROLLBAR_CORNER), renderer->style());
             }
         }
         
@@ -2723,7 +2727,7 @@ void FrameView::updateScrollCorner()
 
     if (cornerStyle) {
         if (!m_scrollCorner)
-            m_scrollCorner = RenderScrollbarPart::createAnonymous(renderer->document());
+            m_scrollCorner = RenderScrollbarPart::createAnonymous(doc);
         m_scrollCorner->setStyle(cornerStyle.release());
         invalidateScrollCorner(cornerRect);
     } else if (m_scrollCorner) {
@@ -2744,7 +2748,7 @@ void FrameView::paintScrollCorner(GraphicsContext* context, const IntRect& corne
     if (m_scrollCorner) {
         bool needsBackgorund = m_frame->page() && m_frame->page()->mainFrame() == m_frame;
         if (needsBackgorund)
-            context->fillRect(cornerRect, baseBackgroundColor(), ColorSpaceDeviceRGB);
+            context->fillRect(cornerRect, baseBackgroundColor());
         m_scrollCorner->paintIntoRect(context, cornerRect.location(), cornerRect);
         return;
     }
@@ -2758,7 +2762,7 @@ void FrameView::paintScrollbar(GraphicsContext* context, Scrollbar* bar, const I
     if (needsBackgorund) {
         IntRect toFill = bar->frameRect();
         toFill.intersect(rect);
-        context->fillRect(toFill, baseBackgroundColor(), ColorSpaceDeviceRGB);
+        context->fillRect(toFill, baseBackgroundColor());
     }
 
     ScrollView::paintScrollbar(context, bar, rect);
@@ -2894,9 +2898,9 @@ void FrameView::paintContents(GraphicsContext* p, const IntRect& rect)
         fillWithRed = false; // Element images are transparent, don't fill with red.
     else
         fillWithRed = true;
-    
+
     if (fillWithRed)
-        p->fillRect(rect, Color(0xFF, 0, 0), ColorSpaceDeviceRGB);
+        p->fillRect(rect, Color(0xFF, 0, 0));
 #endif
 
     RenderView* renderView = this->renderView();

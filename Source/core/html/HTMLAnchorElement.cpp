@@ -24,9 +24,9 @@
 #include "config.h"
 #include "core/html/HTMLAnchorElement.h"
 
-#include <public/Platform.h>
-#include <public/WebPrescientNetworking.h>
-#include <public/WebURL.h>
+#include "public/platform/Platform.h"
+#include "public/platform/WebPrescientNetworking.h"
+#include "public/platform/WebURL.h"
 #include <wtf/text/StringBuilder.h>
 #include "HTMLNames.h"
 #include "core/dom/Attribute.h"
@@ -791,6 +791,12 @@ void HTMLAnchorElement::PrefetchEventHandler::handleClick(Event* event)
 
 bool HTMLAnchorElement::PrefetchEventHandler::shouldPrefetch(const KURL& url)
 {
+    if (m_anchorElement->hasEventListeners(eventNames().clickEvent))
+        return false;
+
+    if (!url.protocolIsInHTTPFamily())
+        return false;
+
     Document* document = m_anchorElement->document();
     if (!document)
         return false;

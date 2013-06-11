@@ -34,7 +34,6 @@
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/loader/UniqueIdentifier.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/page/Frame.h"
@@ -69,7 +68,6 @@ PassRefPtr<ResourceLoader> ResourceLoader::create(DocumentLoader* documentLoader
 ResourceLoader::ResourceLoader(DocumentLoader* documentLoader, CachedResource* resource, ResourceLoaderOptions options)
     : m_frame(documentLoader->frame())
     , m_documentLoader(documentLoader)
-    , m_identifier(0)
     , m_loadingMultipartContent(false)
     , m_notifiedLoadComplete(false)
     , m_defersLoading(m_frame->page()->defersLoading())
@@ -110,8 +108,6 @@ void ResourceLoader::releaseResources()
 
     m_state = Terminated;
 
-    m_identifier = 0;
-
     if (m_handle) {
         // Clear out the ResourceHandle's client so that it doesn't try to call
         // us back after we release it, unless it has been replaced by someone else.
@@ -131,7 +127,6 @@ bool ResourceLoader::init(const ResourceRequest& r)
     
     ResourceRequest clientRequest(r);
 
-    m_identifier = createUniqueIdentifier();
     willSendRequest(0, clientRequest, ResourceResponse());
     if (clientRequest.isNull()) {
         cancel();
@@ -159,7 +154,7 @@ void ResourceLoader::start()
     }
 
     if (m_state != Terminated)
-        m_handle = ResourceHandle::create(m_frame->loader()->networkingContext(), m_request, this, m_defersLoading, m_options.sniffContent == SniffContent, m_options.allowCredentials);
+        m_handle = ResourceHandle::create(m_request, this, m_defersLoading, m_options.sniffContent == SniffContent, m_options.allowCredentials);
 }
 
 void ResourceLoader::setDefersLoading(bool defers)
@@ -198,13 +193,13 @@ void ResourceLoader::didFinishLoadingOnePart(double finishTime)
         return;
     m_notifiedLoadComplete = true;
     if (m_options.sendLoadCallbacks == SendCallbacks)
-        frameLoader()->notifier()->didFinishLoad(this, finishTime);
+        frameLoader()->notifier()->dispatchDidFinishLoading(m_documentLoader.get(), m_resource->identifier(), finishTime);
 }
 
 void ResourceLoader::didChangePriority(ResourceLoadPriority loadPriority)
 {
     if (handle()) {
-        frameLoader()->client()->dispatchDidChangeResourcePriority(identifier(), loadPriority);
+        frameLoader()->client()->dispatchDidChangeResourcePriority(m_resource->identifier(), loadPriority);
         handle()->didChangePriority(loadPriority);
     }
 }
@@ -247,8 +242,8 @@ void ResourceLoader::cancel(const ResourceError& error)
         m_handle = 0;
     }
 
-    if (m_options.sendLoadCallbacks == SendCallbacks && m_identifier && !m_notifiedLoadComplete)
-        frameLoader()->notifier()->didFailToLoad(this, nonNullError);
+    if (m_options.sendLoadCallbacks == SendCallbacks && !m_notifiedLoadComplete)
+        frameLoader()->notifier()->dispatchDidFail(m_documentLoader.get(), m_resource->identifier(), nonNullError);
 
     if (m_state == Finishing)
         m_resource->error(CachedResource::LoadError);
@@ -289,9 +284,9 @@ void ResourceLoader::willSendRequest(ResourceHandle*, ResourceRequest& request, 
         return;
 
     if (m_options.sendLoadCallbacks == SendCallbacks)
-        frameLoader()->notifier()->willSendRequest(this, request, redirectResponse);
+        frameLoader()->notifier()->dispatchWillSendRequest(m_documentLoader.get(), m_resource->identifier(), request, redirectResponse, m_options.initiatorInfo);
     else
-        InspectorInstrumentation::willSendRequest(m_frame.get(), m_identifier, m_frame->loader()->documentLoader(), request, redirectResponse);
+        InspectorInstrumentation::willSendRequest(m_frame.get(), m_resource->identifier(), m_documentLoader.get(), request, redirectResponse, m_options.initiatorInfo);
 
     m_request = request;
 
@@ -325,7 +320,7 @@ void ResourceLoader::didReceiveResponse(ResourceHandle*, const ResourceResponse&
         return;
 
     if (m_options.sendLoadCallbacks == SendCallbacks)
-        frameLoader()->notifier()->didReceiveResponse(this, response);
+        frameLoader()->notifier()->dispatchDidReceiveResponse(m_documentLoader.get(), m_resource->identifier(), response);
 
     // FIXME: Main resources have a different set of rules for multipart than images do.
     // Hopefully we can merge those 2 paths.
@@ -354,7 +349,11 @@ void ResourceLoader::didReceiveResponse(ResourceHandle*, const ResourceResponse&
 
 void ResourceLoader::didReceiveData(ResourceHandle*, const char* data, int length, int encodedDataLength)
 {
-    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willReceiveResourceData(m_frame.get(), identifier(), encodedDataLength);
+    // It is possible to receive data on uninitialized resources if it had an error status code, and we are running a nested message
+    // loop. When this occurs, ignoring the data is the correct action.
+    if (m_resource->response().httpStatusCode() >= 400 && !m_resource->shouldIgnoreHTTPStatusCodeErrors())
+        return;
+    InspectorInstrumentationCookie cookie = InspectorInstrumentation::willReceiveResourceData(m_frame.get(), m_resource->identifier(), encodedDataLength);
     ASSERT(m_state == Initialized);
 
     // Reference the object in this method since the additional processing can do
@@ -365,7 +364,7 @@ void ResourceLoader::didReceiveData(ResourceHandle*, const char* data, int lengt
     // However, with today's computers and networking speeds, this won't happen in practice.
     // Could be an issue with a giant local file.
     if (m_options.sendLoadCallbacks == SendCallbacks && m_frame)
-        frameLoader()->notifier()->didReceiveData(this, data, length, static_cast<int>(encodedDataLength));
+        frameLoader()->notifier()->dispatchDidReceiveData(m_documentLoader.get(), m_resource->identifier(), data, length, static_cast<int>(encodedDataLength));
 
     m_resource->appendData(data, length);
 
@@ -409,7 +408,7 @@ void ResourceLoader::didFail(ResourceHandle*, const ResourceError& error)
     if (!m_notifiedLoadComplete) {
         m_notifiedLoadComplete = true;
         if (m_options.sendLoadCallbacks == SendCallbacks)
-            frameLoader()->notifier()->didFailToLoad(this, error);
+            frameLoader()->notifier()->dispatchDidFail(m_documentLoader.get(), m_resource->identifier(), error);
     }
 
     releaseResources();

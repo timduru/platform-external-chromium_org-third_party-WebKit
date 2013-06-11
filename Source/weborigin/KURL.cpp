@@ -187,6 +187,13 @@ KURL::KURL(ParsedURLStringTag, const String& url)
     }
 }
 
+KURL KURL::createIsolated(ParsedURLStringTag, const String& url)
+{
+    // FIXME: We should be able to skip this extra copy and created an
+    // isolated KURL more efficiently.
+    return KURL(ParsedURLString, url).copy();
+}
+
 // Constructs a new URL given a base URL and a possibly relative input URL.
 // This assumes UTF-8 encoding.
 KURL::KURL(const KURL& base, const String& relative)
@@ -205,7 +212,7 @@ KURL::KURL(const CString& canonicalSpec, const url_parse::Parsed& parsed, bool i
     : m_isValid(isValid)
     , m_protocolIsInHTTPFamily(false)
     , m_parsed(parsed)
-    , m_string(String::fromUTF8(canonicalSpec))
+    , m_string(AtomicString::fromUTF8(canonicalSpec.data(), canonicalSpec.length()))
 {
     initProtocolIsInHTTPFamily();
     initInnerURL();
@@ -732,7 +739,7 @@ void KURL::init(const KURL& base, const CHAR* relative, int relativeLength, cons
 
     // See FIXME in KURLPrivate in the header. If canonicalization has not
     // changed the string, we can avoid an extra allocation by using assignment.
-    m_string = String::fromUTF8(output.data(), output.length());
+    m_string = AtomicString::fromUTF8(output.data(), output.length());
 }
 
 void KURL::initInnerURL()
@@ -832,7 +839,7 @@ void KURL::replaceComponents(const url_canon::Replacements<CHAR>& replacements)
     m_isValid = url_util::ReplaceComponents(utf8.data(), utf8.length(), m_parsed, replacements, 0, &output, &newParsed);
 
     m_parsed = newParsed;
-    m_string = String::fromUTF8(output.data(), output.length());
+    m_string = AtomicString::fromUTF8(output.data(), output.length());
 }
 
 void KURL::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const

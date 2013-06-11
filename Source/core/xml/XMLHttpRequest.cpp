@@ -29,11 +29,9 @@
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
 #include <wtf/UnusedParam.h>
-#include "bindings/v8/ScriptController.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/Event.h"
-#include "core/dom/EventException.h"
 #include "core/dom/EventListener.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/ExceptionCode.h"
@@ -44,13 +42,10 @@
 #include "core/html/DOMFormData.h"
 #include "core/html/HTMLDocument.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/inspector/ScriptCallStack.h"
-#include "core/inspector/ScriptProfile.h"
 #include "core/loader/CrossOriginAccessControl.h"
 #include "core/loader/TextResourceDecoder.h"
 #include "core/loader/ThreadableLoader.h"
 #include "core/loader/cache/CachedResourceRequestInitiators.h"
-#include "core/loader/cache/MemoryCache.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/Settings.h"
 #include "core/platform/HistogramSupport.h"
@@ -180,6 +175,7 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext* context, PassRefPtr<Secur
     , m_uploadEventsAllowed(true)
     , m_uploadComplete(false)
     , m_sameOriginRequest(true)
+    , m_allowCrossOriginRequests(false)
     , m_receivedLength(0)
     , m_lastSendLineNumber(0)
     , m_exceptionCode(0)
@@ -309,7 +305,7 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer(ExceptionCode& ec)
         return 0;
 
     if (!m_responseArrayBuffer.get() && m_binaryResponseBuilder.get() && m_binaryResponseBuilder->size() > 0) {
-        m_responseArrayBuffer = ArrayBuffer::create(const_cast<char*>(m_binaryResponseBuilder->data()), static_cast<unsigned>(m_binaryResponseBuilder->size()));
+        m_responseArrayBuffer = m_binaryResponseBuilder->getAsArrayBuffer();
         m_binaryResponseBuilder.clear();
     }
 
@@ -689,7 +685,13 @@ void XMLHttpRequest::sendBytesData(const void* data, size_t length, ExceptionCod
     createRequest(ec);
 }
 
-void XMLHttpRequest::sendFromInspector(PassRefPtr<FormData> formData, ExceptionCode& ec)
+void XMLHttpRequest::sendForInspector(ExceptionCode& ec)
+{
+    m_allowCrossOriginRequests = true;
+    send(ec);
+}
+
+void XMLHttpRequest::sendForInspectorXHRReplay(PassRefPtr<FormData> formData, ExceptionCode& ec)
 {
     m_requestEntityBody = formData ? formData->deepCopy() : 0;
     createRequest(ec);
@@ -743,7 +745,7 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.preflightPolicy = uploadEvents ? ForcePreflight : ConsiderPreflight;
     options.allowCredentials = (m_sameOriginRequest || m_includeCredentials) ? AllowStoredCredentials : DoNotAllowStoredCredentials;
     options.credentialsRequested = m_includeCredentials ? ClientRequestedCredentials : ClientDidNotRequestCredentials;
-    options.crossOriginRequestPolicy = UseAccessControl;
+    options.crossOriginRequestPolicy = m_allowCrossOriginRequests ? AllowCrossOriginRequests : UseAccessControl;
     options.securityOrigin = securityOrigin();
     options.initiator = cachedResourceRequestInitiators().xmlhttprequest;
     options.contentSecurityPolicyEnforcement = ContentSecurityPolicy::shouldBypassMainWorld(scriptExecutionContext()) ? DoNotEnforceContentSecurityPolicy : EnforceConnectSrcDirective;
@@ -772,6 +774,7 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
             setPendingActivity(this);
         }
     } else {
+        request.setPriority(ResourceLoadPriorityVeryHigh);
         InspectorInstrumentation::willLoadXHRSynchronously(scriptExecutionContext());
         ThreadableLoader::loadResourceSynchronously(scriptExecutionContext(), request, *this, options);
         InspectorInstrumentation::didLoadXHRSynchronously(scriptExecutionContext());
@@ -924,7 +927,7 @@ void XMLHttpRequest::setRequestHeaderInternal(const AtomicString& name, const St
 {
     HTTPHeaderMap::AddResult result = m_requestHeaders.add(name, value);
     if (!result.isNewEntry)
-        result.iterator->value.append(", " + value);
+        result.iterator->value = result.iterator->value + ", " + value;
 }
 
 String XMLHttpRequest::getRequestHeader(const AtomicString& name) const

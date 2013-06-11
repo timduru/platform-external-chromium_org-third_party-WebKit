@@ -76,7 +76,7 @@ v8::Handle<v8::Value> throwError(V8ErrorType errorType, const char* message, v8:
     return V8ThrowException::throwError(errorType, message, isolate);
 }
 
-v8::Handle<v8::Value> throwError(v8::Local<v8::Value> exception, v8::Isolate* isolate)
+v8::Handle<v8::Value> throwError(v8::Handle<v8::Value> exception, v8::Isolate* isolate)
 {
     return V8ThrowException::throwError(exception, isolate);
 }
@@ -101,7 +101,7 @@ v8::Handle<v8::Value> v8Array(PassRefPtr<DOMStringList> stringList, v8::Isolate*
     return result;
 }
 
-Vector<v8::Handle<v8::Value> > toVectorOfArguments(const v8::Arguments& args)
+Vector<v8::Handle<v8::Value> > toVectorOfArguments(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     Vector<v8::Handle<v8::Value> > result;
     size_t length = args.Length();
@@ -260,11 +260,11 @@ uint64_t toUInt64(v8::Handle<v8::Value> value, IntegerConversionConfiguration co
     return integer;
 }
 
-v8::Persistent<v8::FunctionTemplate> createRawTemplate(v8::Isolate* isolate)
+v8::Handle<v8::FunctionTemplate> createRawTemplate(v8::Isolate* isolate)
 {
-    v8::HandleScope scope;
+    v8::HandleScope scope(isolate);
     v8::Local<v8::FunctionTemplate> result = v8::FunctionTemplate::New(V8ObjectConstructor::isValidConstructorMode);
-    return v8::Persistent<v8::FunctionTemplate>::New(isolate, result);
+    return scope.Close(result);
 }        
 
 PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value> value, v8::Isolate* isolate)

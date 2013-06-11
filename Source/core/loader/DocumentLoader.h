@@ -63,7 +63,6 @@ namespace WebCore {
     class Page;
     class ResourceLoader;
     class SharedBuffer;
-    class SubstituteResource;
 
     typedef HashSet<RefPtr<ResourceLoader> > ResourceLoaderSet;
 
@@ -82,8 +81,9 @@ namespace WebCore {
         void detachFromFrame();
 
         FrameLoader* frameLoader() const;
-        ResourceLoader* mainResourceLoader() const;
         PassRefPtr<SharedBuffer> mainResourceData() const;
+
+        unsigned long mainResourceIdentifier() const;
         
         DocumentWriter* writer() const { return &m_writer; }
 
@@ -149,19 +149,6 @@ namespace WebCore {
         void subresourceLoaderFinishedLoadingOnePart(ResourceLoader*);
 
         void setDeferMainResourceDataLoad(bool defer) { m_deferMainResourceDataLoad = defer; }
-        
-        void didTellClientAboutLoad(const String& url)
-        { 
-            // Don't include data urls here, as if a lot of data is loaded
-            // that way, we hold on to the (large) url string for too long.
-            if (protocolIs(url, "data"))
-                return;
-            if (!url.isEmpty())
-                m_resourcesClientKnowsAbout.add(url);
-        }
-        bool haveToldClientAboutLoad(const String& url) { return m_resourcesClientKnowsAbout.contains(url); }
-        void recordMemoryCacheLoadForFutureClientNotification(const String& url);
-        void takeMemoryCacheLoadsForClientNotification(Vector<String>& loads);
 
         DocumentLoadTiming* timing() { return &m_documentLoadTiming; }
         void resetTiming() { m_documentLoadTiming = DocumentLoadTiming(); }
@@ -192,6 +179,7 @@ namespace WebCore {
         void setMainDocumentError(const ResourceError&);
         void commitLoad(const char*, int);
         void clearMainResourceLoader();
+        ResourceLoader* mainResourceLoader() const;
 
         void setupForReplace();
         void maybeFinishLoadingMultipartContent();
@@ -255,7 +243,6 @@ namespace WebCore {
     
         ResourceError m_mainDocumentError;    
 
-        bool m_originalSubstituteDataWasValid;
         bool m_committed;
         bool m_isStopping;
         bool m_gotFirstByte;
@@ -277,9 +264,6 @@ namespace WebCore {
         OwnPtr<ArchiveResourceCollection> m_archiveResourceCollection;
         RefPtr<MHTMLArchive> m_archive;
 
-        HashSet<String> m_resourcesClientKnowsAbout;
-        Vector<String> m_resourcesLoadedFromMemoryCacheForClientNotification;
-
         bool m_loadingMainResource;
         DocumentLoadTiming m_documentLoadTiming;
 
@@ -291,18 +275,6 @@ namespace WebCore {
         friend class ApplicationCacheHost;  // for substitute resource delivery
         OwnPtr<ApplicationCacheHost> m_applicationCacheHost;
     };
-
-    inline void DocumentLoader::recordMemoryCacheLoadForFutureClientNotification(const String& url)
-    {
-        m_resourcesLoadedFromMemoryCacheForClientNotification.append(url);
-    }
-
-    inline void DocumentLoader::takeMemoryCacheLoadsForClientNotification(Vector<String>& loadsSet)
-    {
-        loadsSet.swap(m_resourcesLoadedFromMemoryCacheForClientNotification);
-        m_resourcesLoadedFromMemoryCacheForClientNotification.clear();
-    }
-
 }
 
 #endif // DocumentLoader_h

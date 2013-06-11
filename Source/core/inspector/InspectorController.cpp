@@ -34,7 +34,6 @@
 #include "InspectorBackendDispatcher.h"
 #include "InspectorFrontend.h"
 #include "bindings/v8/DOMWrapperWorld.h"
-#include "bindings/v8/ScriptObject.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/inspector/IdentifiersFactory.h"
 #include "core/inspector/InjectedScriptHost.h"
@@ -69,11 +68,8 @@
 #include "core/inspector/PageConsoleAgent.h"
 #include "core/inspector/PageDebuggerAgent.h"
 #include "core/inspector/PageRuntimeAgent.h"
-#include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/PlatformMouseEvent.h"
-#include "core/platform/PlatformTouchEvent.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/UnusedParam.h>
 
@@ -246,7 +242,16 @@ void InspectorController::disconnectFrontend()
     InspectorInstrumentation::unregisterInstrumentingAgents(m_instrumentingAgents.get());
 }
 
-void InspectorController::reconnectFrontend(InspectorFrontendChannel* frontendChannel, const String& inspectorStateCookie)
+void InspectorController::reconnectFrontend()
+{
+    if (!m_inspectorFrontend)
+        return;
+    InspectorFrontendChannel* frontendChannel = m_inspectorFrontend->inspector()->getInspectorFrontendChannel();
+    disconnectFrontend();
+    connectFrontend(frontendChannel);
+}
+
+void InspectorController::reuseFrontend(InspectorFrontendChannel* frontendChannel, const String& inspectorStateCookie)
 {
     ASSERT(!m_inspectorFrontend);
     connectFrontend(frontendChannel);
@@ -332,6 +337,9 @@ Node* InspectorController::highlightedNode() const
 
 bool InspectorController::handleMouseEvent(Frame* frame, const PlatformMouseEvent& event)
 {
+    // Overlay should not consume events.
+    m_overlay->handleMouseEvent(event);
+
     if (event.type() == PlatformEvent::MouseMoved) {
         m_domAgent->handleMouseMove(frame, event);
         return false;
@@ -343,6 +351,8 @@ bool InspectorController::handleMouseEvent(Frame* frame, const PlatformMouseEven
 
 bool InspectorController::handleTouchEvent(Frame* frame, const PlatformTouchEvent& event)
 {
+    // Overlay should not consume events.
+    m_overlay->handleTouchEvent(event);
     return m_domAgent->handleTouchEvent(frame, event);
 }
 

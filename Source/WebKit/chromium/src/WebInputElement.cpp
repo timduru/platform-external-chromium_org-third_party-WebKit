@@ -42,7 +42,7 @@
 #include "core/html/HTMLInputElement.h"
 #include "core/html/shadow/TextControlInnerElements.h"
 #include "core/html/shadow/TextFieldDecorationElement.h"
-#include <public/WebString.h>
+#include "public/platform/WebString.h"
 #include <wtf/PassRefPtr.h>
 
 using namespace WebCore;
@@ -247,6 +247,11 @@ int WebInputElement::defaultMaxLength()
     return HTMLInputElement::maximumLength;
 }
 
+WebString WebInputElement::directionForFormData() const
+{
+    return constUnwrap<HTMLInputElement>()->directionForFormData();
+}
+
 WebElement WebInputElement::decorationElementFor(WebTextFieldDecoratorClient* decoratorClient)
 {
     ShadowRoot* shadowRoot = unwrap<HTMLInputElement>()->youngestShadowRoot();
@@ -272,7 +277,7 @@ WebInputElement& WebInputElement::operator=(const PassRefPtr<HTMLInputElement>& 
 
 WebInputElement::operator PassRefPtr<HTMLInputElement>() const
 {
-    return static_cast<HTMLInputElement*>(m_private.get());
+    return toHTMLInputElement(m_private.get());
 }
 
 WebInputElement* toWebInputElement(WebElement* webElement)

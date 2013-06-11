@@ -179,9 +179,7 @@ bool WebRuntimeFeatures::isDirectoryUploadEnabled()
 
 void WebRuntimeFeatures::enableEncryptedMedia(bool enable)
 {
-    // FIXME: Change to setEncryptedMediaEnabled() once Chromium
-    // starts calling enableLegacyEncryptedMedia().
-    RuntimeEnabledFeatures::setLegacyEncryptedMediaEnabled(enable);
+    RuntimeEnabledFeatures::setEncryptedMediaEnabled(enable);
     // FIXME: Hack to allow MediaKeyError to be enabled for either version.
     RuntimeEnabledFeatures::setEncryptedMediaAnyVersionEnabled(
         RuntimeEnabledFeatures::encryptedMediaEnabled()
@@ -190,9 +188,7 @@ void WebRuntimeFeatures::enableEncryptedMedia(bool enable)
 
 bool WebRuntimeFeatures::isEncryptedMediaEnabled()
 {
-    // FIXME: Change to encryptedMediaEnabled() once Chromium
-    // starts calling isLegacyEncryptedMediaEnabled()
-    return RuntimeEnabledFeatures::legacyEncryptedMediaEnabled();
+    return RuntimeEnabledFeatures::encryptedMediaEnabled();
 }
 
 void WebRuntimeFeatures::enableLegacyEncryptedMedia(bool enable)
@@ -362,26 +358,22 @@ bool WebRuntimeFeatures::isLocalStorageEnabled()
 
 void WebRuntimeFeatures::enableMediaPlayer(bool enable)
 {
-    WebMediaPlayerClientImpl::setIsEnabled(enable);
+    RuntimeEnabledFeatures::setMediaEnabled(enable);
 }
 
 bool WebRuntimeFeatures::isMediaPlayerEnabled()
 {
-    return WebMediaPlayerClientImpl::isEnabled();
+    return RuntimeEnabledFeatures::mediaEnabled();
 }
 
 void WebRuntimeFeatures::enableMediaSource(bool enable)
 {
-    // FIXME: Change to setMediaSourceEnabled() once Chromium
-    // starts calling enableWebKitMediaSource().
-    RuntimeEnabledFeatures::setWebKitMediaSourceEnabled(enable);
+    RuntimeEnabledFeatures::setMediaSourceEnabled(enable);
 }
 
 bool WebRuntimeFeatures::isMediaSourceEnabled()
 {
-    // FIXME: Change to mediaSourceEnabled() once Chromium
-    // starts calling isWebKitMediaSourceEnabled()
-    return RuntimeEnabledFeatures::webKitMediaSourceEnabled();
+    return RuntimeEnabledFeatures::mediaSourceEnabled();
 }
 
 void WebRuntimeFeatures::enableWebKitMediaSource(bool enable)
@@ -428,6 +420,16 @@ void WebRuntimeFeatures::enablePagePopup(bool enable)
 bool WebRuntimeFeatures::isPagePopupEnabled()
 {
     return RuntimeEnabledFeatures::pagePopupEnabled();
+}
+
+void WebRuntimeFeatures::enableParseSVGAsHTML(bool enable)
+{
+    RuntimeEnabledFeatures::setParseSVGAsHTMLEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isParseSVGAsHTMLEnabled()
+{
+    return RuntimeEnabledFeatures::parseSVGAsHTMLEnabled();
 }
 
 void WebRuntimeFeatures::enablePeerConnection(bool enable)
@@ -550,6 +552,16 @@ bool WebRuntimeFeatures::isWebAudioEnabled()
     return RuntimeEnabledFeatures::webAudioEnabled();
 }
 
+void WebRuntimeFeatures::enableWebGLDraftExtensions(bool enable)
+{
+    RuntimeEnabledFeatures::setWebGLDraftExtensionsEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isWebGLDraftExtensionsEnabled()
+{
+    return RuntimeEnabledFeatures::webGLDraftExtensionsEnabled();
+}
+
 void WebRuntimeFeatures::enableWebMIDI(bool enable)
 {
     return RuntimeEnabledFeatures::setWebMIDIEnabled(enable);
@@ -578,6 +590,16 @@ void WebRuntimeFeatures::enableDataListElement(bool enable)
 bool WebRuntimeFeatures::isDataListElementEnabled()
 {
     return RuntimeEnabledFeatures::dataListElementEnabled();
+}
+
+void WebRuntimeFeatures::enableInputTypeColor(bool enable)
+{
+    RuntimeEnabledFeatures::setInputTypeColorEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isInputTypeColorEnabled()
+{
+    return RuntimeEnabledFeatures::inputTypeColorEnabled();
 }
 
 } // namespace WebKit

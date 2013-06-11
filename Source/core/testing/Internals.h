@@ -110,6 +110,7 @@ public:
     bool hasSelectorForClassInShadow(Element* host, const String& className, ExceptionCode&);
     bool hasSelectorForAttributeInShadow(Element* host, const String& attributeName, ExceptionCode&);
     bool hasSelectorForPseudoClassInShadow(Element* host, const String& pseudoClass, ExceptionCode&);
+    unsigned short compareTreeScopePosition(const Node*, const Node*, ExceptionCode&) const;
 
     bool attached(Node*, ExceptionCode&);
 
@@ -121,9 +122,7 @@ public:
     Node* previousNodeByWalker(Node*, ExceptionCode&);
 
     String visiblePlaceholder(Element*);
-#if ENABLE(INPUT_TYPE_COLOR)
     void selectColorInColorChooser(Element*, const String& colorValue);
-#endif
     Vector<String> formControlStateOfPreviousHistoryItem(ExceptionCode&);
     void setFormControlStateOfPreviousHistoryItem(const Vector<String>&, ExceptionCode&);
     void setEnableMockPagePopup(bool, ExceptionCode&);
@@ -200,8 +199,6 @@ public:
     InternalRuntimeFlags* runtimeFlags() const;
     unsigned workerThreadCount() const;
 
-    void setBatteryStatus(Document*, const String& eventType, bool charging, double chargingTime, double dischargingTime, double level, ExceptionCode&);
-
     void setDeviceProximity(Document*, const String& eventType, double value, double min, double max, ExceptionCode&);
 
     enum {
@@ -214,8 +211,16 @@ public:
     String layerTreeAsText(Document*, unsigned flags, ExceptionCode&) const;
     String layerTreeAsText(Document*, ExceptionCode&) const;
 
-    PassRefPtr<NodeList> paintOrderListBeforePromote(Element* element, ExceptionCode& ec);
-    PassRefPtr<NodeList> paintOrderListAfterPromote(Element* element, ExceptionCode& ec);
+    PassRefPtr<NodeList> paintOrderListBeforePromote(Element*, ExceptionCode&);
+    PassRefPtr<NodeList> paintOrderListAfterPromote(Element*, ExceptionCode&);
+
+    enum {
+        // Values need to be kept in sync with Internals.idl.
+        DoNotForceCompositedScrolling = 0,
+        CompositedScrollingAlwaysOn = 1,
+        CompositedScrollingAlwaysOff = 2
+    };
+    void setNeedsCompositedScrolling(Element*, unsigned value, ExceptionCode&);
 
     String repaintRectsAsText(Document*, ExceptionCode&) const;
     String scrollingStateTreeAsText(Document*, ExceptionCode&) const;

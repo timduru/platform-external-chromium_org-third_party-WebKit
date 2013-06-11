@@ -45,6 +45,7 @@ class WebRTCSessionDescriptionRequest;
 class WebRTCStatsRequest;
 class WebRTCVoidRequest;
 class WebString;
+struct WebRTCDataChannelInit;
 
 class WebRTCPeerConnectionHandler {
 public:
@@ -63,7 +64,7 @@ public:
     virtual bool addStream(const WebMediaStream&, const WebMediaConstraints&) = 0;
     virtual void removeStream(const WebMediaStream&) = 0;
     virtual void getStats(const WebRTCStatsRequest&) = 0;
-    virtual WebRTCDataChannelHandler* createDataChannel(const WebString& label, bool reliable) = 0;
+    virtual WebRTCDataChannelHandler* createDataChannel(const WebString& label, const WebRTCDataChannelInit&) = 0;
     virtual WebRTCDTMFSenderHandler* createDTMFSender(const WebMediaStreamTrack&) = 0;
     virtual void stop() = 0;
 };

@@ -33,6 +33,7 @@
 #include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/Font.h"
+#include "core/platform/graphics/GraphicsContextAnnotation.h"
 #include "core/platform/graphics/GraphicsContextState.h"
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/ImageOrientation.h"
@@ -109,8 +110,7 @@ public:
     void setStrokeStyle(StrokeStyle style) { m_state->m_strokeStyle = style; }
 
     Color strokeColor() const { return m_state->m_strokeColor; }
-    ColorSpace strokeColorSpace() const { return m_state->m_strokeColorSpace; }
-    void setStrokeColor(const Color&, ColorSpace);
+    void setStrokeColor(const Color&);
 
     Pattern* strokePattern() const { return m_state->m_strokePattern.get(); }
     void setStrokePattern(PassRefPtr<Pattern>);
@@ -127,8 +127,7 @@ public:
     void setFillRule(WindRule fillRule) { m_state->m_fillRule = fillRule; }
 
     Color fillColor() const { return m_state->m_fillColor; }
-    ColorSpace fillColorSpace() const { return m_state->m_fillColorSpace; }
-    void setFillColor(const Color&, ColorSpace);
+    void setFillColor(const Color&);
     SkColor effectiveFillColor() const { return m_state->applyAlpha(m_state->m_fillColor.rgb()); }
 
     void setFillPattern(PassRefPtr<Pattern>);
@@ -204,6 +203,9 @@ public:
 
     bool updatingControlTints() const { return m_updatingControlTints; }
     void setUpdatingControlTints(bool updatingTints) { m_updatingControlTints = updatingTints; }
+
+    AnnotationModeFlags annotationMode() const { return m_annotationMode; }
+    void setAnnotationMode(const AnnotationModeFlags mode) { m_annotationMode = mode; }
     // ---------- End state management methods -----------------
 
     // Get the contents of the image buffer
@@ -234,42 +236,41 @@ public:
     void strokeEllipse(const FloatRect&);
 
     void fillRect(const FloatRect&);
-    void fillRect(const FloatRect&, const Color&, ColorSpace);
-    void fillRect(const FloatRect& rect, Gradient& gradient) { gradient.fill(this, rect); }
-    void fillRect(const FloatRect&, const Color&, ColorSpace, CompositeOperator);
-    void fillRoundedRect(const IntRect&, const IntSize& topLeft, const IntSize& topRight, const IntSize& bottomLeft, const IntSize& bottomRight, const Color&, ColorSpace);
-    void fillRoundedRect(const RoundedRect&, const Color&, ColorSpace);
-    void fillRectWithRoundedHole(const IntRect&, const RoundedRect& roundedHoleRect, const Color&, ColorSpace);
+    void fillRect(const FloatRect&, const Color&);
+    void fillRect(const FloatRect&, const Color&, CompositeOperator);
+    void fillRoundedRect(const IntRect&, const IntSize& topLeft, const IntSize& topRight, const IntSize& bottomLeft, const IntSize& bottomRight, const Color&);
+    void fillRoundedRect(const RoundedRect&, const Color&);
+    void fillRectWithRoundedHole(const IntRect&, const RoundedRect& roundedHoleRect, const Color&);
 
     void clearRect(const FloatRect&);
 
     void strokeRect(const FloatRect&, float lineWidth);
 
-    void drawImage(Image*, ColorSpace styleColorSpace, const IntPoint&, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation);
-    void drawImage(Image*, ColorSpace styleColorSpace, const IntRect&, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
-    void drawImage(Image*, ColorSpace styleColorSpace, const IntPoint& destPoint, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation);
-    void drawImage(Image*, ColorSpace styleColorSpace, const FloatRect& destRect);
-    void drawImage(Image*, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
-    void drawImage(Image*, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator, BlendMode, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
+    void drawImage(Image*, const IntPoint&, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation);
+    void drawImage(Image*, const IntRect&, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
+    void drawImage(Image*, const IntPoint& destPoint, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation);
+    void drawImage(Image*, const FloatRect& destRect);
+    void drawImage(Image*, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
+    void drawImage(Image*, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator, BlendMode, RespectImageOrientationEnum = DoNotRespectImageOrientation, bool useLowQualityScale = false);
 
-    void drawTiledImage(Image*, ColorSpace styleColorSpace, const IntRect& destRect, const IntPoint& srcPoint, const IntSize& tileSize,
+    void drawTiledImage(Image*, const IntRect& destRect, const IntPoint& srcPoint, const IntSize& tileSize,
         CompositeOperator = CompositeSourceOver, bool useLowQualityScale = false, BlendMode = BlendModeNormal);
-    void drawTiledImage(Image*, ColorSpace styleColorSpace, const IntRect& destRect, const IntRect& srcRect,
+    void drawTiledImage(Image*, const IntRect& destRect, const IntRect& srcRect,
         const FloatSize& tileScaleFactor, Image::TileRule hRule = Image::StretchTile, Image::TileRule vRule = Image::StretchTile,
         CompositeOperator = CompositeSourceOver, bool useLowQualityScale = false);
 
-    void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const IntPoint&, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal);
-    void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const IntRect&, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
-    void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const IntPoint& destPoint, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal);
-    void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const IntRect& destRect, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
-    void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const FloatRect& destRect);
-    void drawImageBuffer(ImageBuffer*, ColorSpace styleColorSpace, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
+    void drawImageBuffer(ImageBuffer*, const IntPoint&, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal);
+    void drawImageBuffer(ImageBuffer*, const IntRect&, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
+    void drawImageBuffer(ImageBuffer*, const IntPoint& destPoint, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal);
+    void drawImageBuffer(ImageBuffer*, const IntRect& destRect, const IntRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
+    void drawImageBuffer(ImageBuffer*, const FloatRect& destRect);
+    void drawImageBuffer(ImageBuffer*, const FloatRect& destRect, const FloatRect& srcRect, CompositeOperator = CompositeSourceOver, BlendMode = BlendModeNormal, bool useLowQualityScale = false);
 
     // These methods write to the canvas and modify the opaque region, if tracked.
     // Also drawLine(const IntPoint& point1, const IntPoint& point2) and fillRoundedRect
     void writePixels(const SkBitmap&, int x, int y, SkCanvas::Config8888 = SkCanvas::kNative_Premul_Config8888);
     void drawBitmap(const SkBitmap&, SkScalar, SkScalar, const SkPaint* = 0);
-    void drawBitmapRect(const SkBitmap&, const SkIRect*, const SkRect&, const SkPaint* = 0);
+    void drawBitmapRect(const SkBitmap&, const SkRect*, const SkRect&, const SkPaint* = 0);
     void drawOval(const SkRect&, const SkPaint&);
     void drawPath(const SkPath&, const SkPaint&);
     // After drawing directly to the context's canvas, use this function to notify the context so
@@ -295,7 +296,7 @@ public:
     void drawText(const Font&, const TextRunPaintInfo&, const FloatPoint&);
     void drawEmphasisMarks(const Font&, const TextRunPaintInfo&, const AtomicString& mark, const FloatPoint&);
     void drawBidiText(const Font&, const TextRunPaintInfo&, const FloatPoint&, Font::CustomFontNotReadyAction = Font::DoNotPaintIfFontNotReady);
-    void drawHighlightForText(const Font&, const TextRun&, const FloatPoint&, int h, const Color& backgroundColor, ColorSpace, int from = 0, int to = -1);
+    void drawHighlightForText(const Font&, const TextRun&, const FloatPoint&, int h, const Color& backgroundColor, int from = 0, int to = -1);
 
     void drawLineForText(const FloatPoint&, float width, bool printing);
     enum DocumentMarkerLineStyle {
@@ -359,6 +360,9 @@ public:
     bool isCompatibleWithBuffer(ImageBuffer*) const;
 
     static void adjustLineToPixelBoundaries(FloatPoint& p1, FloatPoint& p2, float strokeWidth, StrokeStyle);
+
+    void beginAnnotation(const GraphicsContextAnnotation&);
+    void endAnnotation();
 
 private:
     static void addCornerArc(SkPath*, const SkRect&, const IntSize&, int);
@@ -447,7 +451,10 @@ private:
     unsigned m_deferredSaveFlags;
     Vector<DeferredSaveState> m_saveStateStack;
 
+    AnnotationModeFlags m_annotationMode;
+
 #if !ASSERT_DISABLED
+    unsigned m_annotationCount;
     unsigned m_transparencyCount;
 #endif
     // Tracks the region painted opaque via the GraphicsContext.

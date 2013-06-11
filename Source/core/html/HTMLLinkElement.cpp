@@ -34,9 +34,11 @@
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
+#include "core/dom/DocumentFragment.h"
 #include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventSender.h"
+#include "core/html/HTMLImportsController.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/cache/CachedCSSStyleSheet.h"
 #include "core/loader/cache/CachedResourceLoader.h"
@@ -135,7 +137,7 @@ bool HTMLLinkElement::shouldLoadLink()
     return continueLoad;
 }
 
-LinkStyle* HTMLLinkElement::linkStyleToProcess()
+LinkResource* HTMLLinkElement::linkResourceToProcess()
 {
     bool visible = inDocument() && !m_isInShadowTree;
     if (!visible) {
@@ -144,17 +146,43 @@ LinkStyle* HTMLLinkElement::linkStyleToProcess()
     }
 
     if (!m_link) {
-        m_link = adoptPtr(new LinkStyle(this));
-        if (fastHasAttribute(disabledAttr))
-            m_link->setDisabledState(true);
+        if (m_relAttribute.isImport() && RuntimeEnabledFeatures::htmlImportsEnabled())
+            m_link = LinkImport::create(this);
+        else {
+            RefPtr<LinkStyle> link = LinkStyle::create(this);
+            if (fastHasAttribute(disabledAttr))
+                link->setDisabledState(true);
+            m_link = link.release();
+        }
     }
 
     return m_link.get();
 }
 
+LinkStyle* HTMLLinkElement::linkStyle() const
+{
+    if (!m_link || m_link->type() != LinkResource::Style)
+        return 0;
+    return static_cast<LinkStyle*>(m_link.get());
+}
+
+LinkImport* HTMLLinkElement::linkImport() const
+{
+    if (!m_link || m_link->type() != LinkResource::Import)
+        return 0;
+    return static_cast<LinkImport*>(m_link.get());
+}
+
+DocumentFragment* HTMLLinkElement::import() const
+{
+    if (LinkImport* link = linkImport())
+        return linkImport()->importedFragment();
+    return 0;
+}
+
 void HTMLLinkElement::process()
 {
-    if (LinkStyle* link = linkStyleToProcess())
+    if (LinkResource* link = linkResourceToProcess())
         link->process();
 }
 
@@ -188,8 +216,8 @@ void HTMLLinkElement::removedFrom(ContainerNode* insertionPoint)
     }
     document()->styleSheetCollection()->removeStyleSheetCandidateNode(this);
 
-    if (LinkStyle* link = linkStyle())
-        link->ownerRemoved();
+    if (m_link)
+        m_link->ownerRemoved();
 
     if (document()->renderer())
         document()->styleResolverChanged(DeferRecalcStyle);
@@ -334,8 +362,13 @@ void HTMLLinkElement::setSizes(const String& value)
 }
 
 
+PassRefPtr<LinkStyle> LinkStyle::create(HTMLLinkElement* owner)
+{
+    return adoptRef(new LinkStyle(owner));
+}
+
 LinkStyle::LinkStyle(HTMLLinkElement* owner)
-    : m_owner(owner)
+    : LinkResource(owner)
     , m_disabledState(Unset)
     , m_pendingSheetType(None)
     , m_loading(false)
@@ -375,6 +408,7 @@ void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const 
         ASSERT(!restoredSheet->isLoading());
 
         m_sheet = CSSStyleSheet::create(restoredSheet, m_owner);
+        m_sheet->setMediaQueries(MediaQuerySet::create(m_owner->media()));
         m_sheet->setTitle(m_owner->title());
 
         m_loading = false;
@@ -386,7 +420,7 @@ void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const 
     RefPtr<StyleSheetContents> styleSheet = StyleSheetContents::create(href, parserContext);
 
     m_sheet = CSSStyleSheet::create(styleSheet, m_owner);
-    m_sheet->setMediaQueries(MediaQuerySet::createAllowingDescriptionSyntax(m_owner->media()));
+    m_sheet->setMediaQueries(MediaQuerySet::create(m_owner->media()));
     m_sheet->setTitle(m_owner->title());
 
     styleSheet->parseAuthorStyleSheet(cachedStyleSheet, m_owner->document()->securityOrigin());
@@ -511,24 +545,20 @@ void LinkStyle::process()
 {
     ASSERT(m_owner->shouldProcessStyle());
     String type = m_owner->typeValue().lower();
-    KURL url = m_owner->getNonEmptyURLAttribute(hrefAttr);
+    LinkRequestBuilder builder(m_owner);
 
-    if (m_owner->relAttribute().iconType() != InvalidIcon && url.isValid() && !url.isEmpty()) {
+    if (m_owner->relAttribute().iconType() != InvalidIcon && builder.url().isValid() && !builder.url().isEmpty()) {
         if (!m_owner->shouldLoadLink())
             return;
         if (document()->frame())
             document()->frame()->loader()->didChangeIcons(m_owner->relAttribute().iconType());
     }
 
-    if (!m_owner->loadLink(type, url))
+    if (!m_owner->loadLink(type, builder.url()))
         return;
 
     if ((m_disabledState != Disabled) && m_owner->relAttribute().isStyleSheet()
-        && document()->frame() && url.isValid()) {
-
-        String charset = m_owner->getAttribute(charsetAttr);
-        if (charset.isEmpty() && document()->frame())
-            charset = document()->charset();
+        && document()->frame() && builder.url().isValid()) {
 
         if (m_cachedSheet) {
             removePendingSheet();
@@ -544,7 +574,7 @@ void LinkStyle::process()
         bool mediaQueryMatches = true;
         if (!m_owner->media().isEmpty()) {
             RefPtr<RenderStyle> documentStyle = StyleResolver::styleForDocument(document());
-            RefPtr<MediaQuerySet> media = MediaQuerySet::createAllowingDescriptionSyntax(m_owner->media());
+            RefPtr<MediaQuerySet> media = MediaQuerySet::create(m_owner->media());
             MediaQueryEvaluator evaluator(document()->frame()->view()->mediaType(), document()->frame(), documentStyle.get());
             mediaQueryMatches = evaluator.eval(media.get());
         }
@@ -555,8 +585,7 @@ void LinkStyle::process()
         addPendingSheet(blocking ? Blocking : NonBlocking);
 
         // Load stylesheets that are not needed for the rendering immediately with low priority.
-        ResourceLoadPriority priority = blocking ? ResourceLoadPriorityUnresolved : ResourceLoadPriorityVeryLow;
-        CachedResourceRequest request(ResourceRequest(document()->completeURL(url)), m_owner->localName(), charset, priority);
+        CachedResourceRequest request = builder.build(blocking);
         m_cachedSheet = document()->cachedResourceLoader()->requestCSSStyleSheet(request);
 
         if (m_cachedSheet)

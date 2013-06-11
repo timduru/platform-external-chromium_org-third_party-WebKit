@@ -51,7 +51,7 @@ static inline bool featureWithCSSValueID(const AtomicString& mediaFeature, const
         || mediaFeature == MediaFeatureNames::scanMediaFeature;
 }
 
-static inline bool featureWithValidIdent(const AtomicString& mediaFeature, int ident)
+static inline bool featureWithValidIdent(const AtomicString& mediaFeature, CSSValueID ident)
 {
     if (mediaFeature == MediaFeatureNames::orientationMediaFeature)
         return ident == CSSValuePortrait || ident == CSSValueLandscape;
@@ -210,7 +210,7 @@ inline MediaQueryExp::MediaQueryExp(const AtomicString& mediaFeature, CSSParserV
             // Media features that use CSSValueIDs.
             if (featureWithCSSValueID(mediaFeature, value)) {
                 m_value = CSSPrimitiveValue::createIdentifier(value->id);
-                if (!featureWithValidIdent(mediaFeature, toCSSPrimitiveValue(m_value.get())->getIdent()))
+                if (!featureWithValidIdent(mediaFeature, toCSSPrimitiveValue(m_value.get())->getValueID()))
                     m_value.clear();
             }
 
@@ -279,9 +279,6 @@ MediaQueryExp::~MediaQueryExp()
 
 String MediaQueryExp::serialize() const
 {
-    if (!m_serializationCache.isNull())
-        return m_serializationCache;
-
     StringBuilder result;
     result.append("(");
     result.append(m_mediaFeature.lower());
@@ -291,15 +288,13 @@ String MediaQueryExp::serialize() const
     }
     result.append(")");
 
-    const_cast<MediaQueryExp*>(this)->m_serializationCache = result.toString();
-    return m_serializationCache;
+    return result.toString();
 }
 
 void MediaQueryExp::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
     info.addMember(m_mediaFeature, "mediaFeature");
-    info.addMember(m_serializationCache, "serializationCache");
     info.addMember(m_value, "value");
 }
 

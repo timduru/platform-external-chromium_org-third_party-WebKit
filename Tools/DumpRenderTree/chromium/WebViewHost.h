@@ -39,7 +39,7 @@
 #include "WebTestDelegate.h"
 #include "WebTestProxy.h"
 #include "WebViewClient.h"
-#include <public/WebFileSystemType.h>
+#include "public/platform/WebFileSystemType.h"
 #include <wtf/HashMap.h>
 #include <wtf/HashSet.h>
 #include <wtf/Vector.h>
@@ -114,9 +114,6 @@ class WebViewHost : public WebKit::WebViewClient, public WebKit::WebFrameClient,
     virtual std::string pathToLocalResource(const std::string& url) OVERRIDE;
     virtual void setLocale(const std::string&) OVERRIDE;
     virtual void testFinished() OVERRIDE;
-    virtual void testTimedOut() OVERRIDE;
-    virtual bool isBeingDebugged() OVERRIDE;
-    virtual int layoutTestTimeout() OVERRIDE;
     virtual void closeRemainingWindows() OVERRIDE;
     virtual int navigationEntryCount() OVERRIDE;
     virtual void goToOffset(int) OVERRIDE;

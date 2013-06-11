@@ -40,7 +40,7 @@
 #include "core/html/shadow/MediaControls.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackList.h"
-#include "core/page/CaptionUserPreferences.h"
+#include "core/html/track/TextTrackRegionList.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
@@ -681,7 +681,7 @@ const AtomicString& MediaControlTextTrackContainerElement::textTrackContainerEle
     DEFINE_STATIC_LOCAL(AtomicString, id, ("-webkit-media-text-track-container", AtomicString::ConstructFromLiteral));
     return id;
 }
-    
+
 const AtomicString& MediaControlTextTrackContainerElement::shadowPseudoId() const
 {
     return textTrackContainerElementShadowPseudoId();
@@ -747,9 +747,31 @@ void MediaControlTextTrackContainerElement::updateDisplay()
             continue;
 
         RefPtr<TextTrackCueBox> displayBox = cue->getDisplayTree(m_videoDisplaySize.size());
-        if (displayBox->hasChildNodes() && !contains(static_cast<Node*>(displayBox.get())))
-            // Note: the display tree of a cue is removed when the active flag of the cue is unset.
-            appendChild(displayBox, ASSERT_NO_EXCEPTION, AttachNow);
+
+#if ENABLE(WEBVTT_REGIONS)
+        String regionId = cue->regionId();
+        TextTrackRegion* region = cue->track()->regions()->getRegionById(regionId);
+        if (!region) {
+            // If cue has an empty text track cue region identifier or there is no
+            // WebVTT region whose region identifier is identical to cue's text
+            // track cue region identifier, run the following substeps:
+#endif
+            if (displayBox->hasChildNodes() && !contains(static_cast<Node*>(displayBox.get())))
+                // Note: the display tree of a cue is removed when the active flag of the cue is unset.
+                appendChild(displayBox, ASSERT_NO_EXCEPTION, AttachNow);
+#if ENABLE(WEBVTT_REGIONS)
+        } else {
+            // Let region be the WebVTT region whose region identifier
+            // matches the text track cue region identifier of cue.
+            RefPtr<HTMLDivElement> regionNode = region->getDisplayTree();
+
+            // Append the region to the viewport, if it was not already.
+            if (!contains(regionNode.get()))
+                appendChild(region->getDisplayTree());
+
+            region->appendTextTrackCueBox(displayBox);
+        }
+#endif
     }
 
     // 11. Return output.
@@ -780,11 +802,10 @@ void MediaControlTextTrackContainerElement::updateSizes(bool forceUpdate)
 
     float smallestDimension = std::min(m_videoDisplaySize.size().height(), m_videoDisplaySize.size().width());
 
-    bool important;
-    float fontSize = smallestDimension * (document()->page()->group().captionPreferences()->captionFontSizeScale(important));
+    float fontSize = smallestDimension * 0.05f;
     if (fontSize != m_fontSize) {
         m_fontSize = fontSize;
-        setInlineStyleProperty(CSSPropertyFontSize, String::number(fontSize) + "px", important);
+        setInlineStyleProperty(CSSPropertyFontSize, String::number(fontSize) + "px");
     }
 
     CueList activeCues = mediaElement->currentlyActiveCues();

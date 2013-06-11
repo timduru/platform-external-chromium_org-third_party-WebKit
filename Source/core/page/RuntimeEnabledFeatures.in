@@ -21,6 +21,7 @@ CSSExclusions status=experimental
 CSSRegions status=experimental
 CSSTouchAction status=test
 CSSVariables status=experimental
+CSS3TextDecorations status=experimental
 CustomDOMElements status=experimental
 Database status=stable
 DataListElement status=stable
@@ -41,16 +42,19 @@ Geolocation status=stable
 HTMLImports status=test
 IMEAPI status=test
 IndexedDB status=stable
+InputTypeColor status=stable
 InputTypeWeek status=stable
 JavaScriptI18NAPI status=stable
 LangAttributeAwareFormControlUI
 LazyLayout
 LegacyEncryptedMedia status=stable
 LocalStorage status=stable
-Media custom
+Media status=stable
+MediaSource status=experimental
 MediaStream status=stable
 Notifications status=stable
 PagePopup status=stable
+ParseSVGAsHTML
 PeerConnection depends_on=MediaStream, status=stable
 Quota status=stable
 RequestAutocomplete status=test
@@ -65,6 +69,7 @@ Touch status=stable
 VideoTrack status=stable
 WebAnimations
 WebAudio condition=WEB_AUDIO, status=stable
+WebGLDraftExtensions status=experimental
 WebMIDI status=test
 WebKitMediaSource status=stable
 WebPInAcceptHeader
