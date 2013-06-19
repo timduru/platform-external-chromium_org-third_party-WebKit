@@ -158,13 +158,13 @@ static void cachedReadonlyValueAttrGetterCallback(v8::Local<v8::String> name, co
 } // namespace TestSerializedScriptValueInterfaceV8Internal
 
 static const V8DOMConfiguration::BatchedAttribute V8TestSerializedScriptValueInterfaceAttrs[] = {
-    // Attribute 'value' (Type: 'attribute' ExtAttr: '')
+    // Attribute 'value'
     {"value", TestSerializedScriptValueInterfaceV8Internal::valueAttrGetterCallback, TestSerializedScriptValueInterfaceV8Internal::valueAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'readonlyValue' (Type: 'attribute' ExtAttr: '')
+    // Attribute 'readonlyValue'
     {"readonlyValue", TestSerializedScriptValueInterfaceV8Internal::readonlyValueAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'cachedValue' (Type: 'attribute' ExtAttr: 'CachedAttribute')
+    // Attribute 'cachedValue'
     {"cachedValue", TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrGetterCallback, TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'cachedReadonlyValue' (Type: 'attribute' ExtAttr: 'CachedAttribute')
+    // Attribute 'cachedReadonlyValue'
     {"cachedReadonlyValue", TestSerializedScriptValueInterfaceV8Internal::cachedReadonlyValueAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
 
@@ -218,7 +218,6 @@ v8::Handle<v8::Object> V8TestSerializedScriptValueInterface::createWrapper(PassR
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
-
     installPerContextProperties(wrapper, impl.get(), isolate);
     V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;

@@ -90,6 +90,7 @@
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentMarkerController.h"
+#include "core/dom/FullscreenController.h"
 #include "core/dom/KeyboardEvent.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/Text.h"
@@ -139,6 +140,7 @@
 #include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/ColorSpace.h"
 #include "core/platform/graphics/Extensions3D.h"
+#include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/FontDescription.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsContext3D.h"
@@ -849,7 +851,7 @@ WebViewBenchmarkSupport* WebViewImpl::benchmarkSupport()
 
 void WebViewImpl::setShowFPSCounter(bool show)
 {
-    if (isAcceleratedCompositingActive()) {
+    if (m_layerTreeView) {
         TRACE_EVENT0("webkit", "WebViewImpl::setShowFPSCounter");
         m_layerTreeView->setShowFPSCounter(show);
     }
@@ -858,7 +860,7 @@ void WebViewImpl::setShowFPSCounter(bool show)
 
 void WebViewImpl::setShowPaintRects(bool show)
 {
-    if (isAcceleratedCompositingActive()) {
+    if (m_layerTreeView) {
         TRACE_EVENT0("webkit", "WebViewImpl::setShowPaintRects");
         m_layerTreeView->setShowPaintRects(show);
     }
@@ -867,14 +869,14 @@ void WebViewImpl::setShowPaintRects(bool show)
 
 void WebViewImpl::setShowDebugBorders(bool show)
 {
-    if (isAcceleratedCompositingActive())
+    if (m_layerTreeView)
         m_layerTreeView->setShowDebugBorders(show);
     m_showDebugBorders = show;
 }
 
 void WebViewImpl::setContinuousPaintingEnabled(bool enabled)
 {
-    if (isAcceleratedCompositingActive()) {
+    if (m_layerTreeView) {
         TRACE_EVENT0("webkit", "WebViewImpl::setContinuousPaintingEnabled");
         m_layerTreeView->setContinuousPaintingEnabled(enabled);
     }
@@ -987,7 +989,7 @@ bool WebViewImpl::autocompleteHandleKeyEvent(const WebKeyboardEvent& event)
         if (!m_autofillPopupClient->canRemoveSuggestionAtIndex(selectedIndex))
             return false;
 
-        WebString name = WebInputElement(element->toInputElement()).nameForAutofill();
+        WebString name = WebInputElement(toHTMLInputElement(element)).nameForAutofill();
         WebString value = m_autofillPopupClient->itemText(selectedIndex);
         m_autofillClient->removeAutocompleteSuggestion(name, value);
         // Update the entries in the currently showing popup to reflect the
@@ -1659,7 +1661,7 @@ void WebViewImpl::willEnterFullScreen()
     // Ensure that this element's document is still attached.
     Document* doc = m_provisionalFullScreenElement->document();
     if (doc->frame()) {
-        doc->webkitWillEnterFullScreenForElement(m_provisionalFullScreenElement.get());
+        FullscreenController::from(doc)->webkitWillEnterFullScreenForElement(m_provisionalFullScreenElement.get());
         m_fullScreenFrame = doc->frame();
     }
     m_provisionalFullScreenElement.clear();
@@ -1671,8 +1673,8 @@ void WebViewImpl::didEnterFullScreen()
         return;
 
     if (Document* doc = m_fullScreenFrame->document()) {
-        if (doc->webkitIsFullScreen())
-            doc->webkitDidEnterFullScreenForElement(0);
+        if (FullscreenController::isFullScreen(doc))
+            FullscreenController::from(doc)->webkitDidEnterFullScreenForElement(0);
     }
 }
 
@@ -1682,13 +1684,16 @@ void WebViewImpl::willExitFullScreen()
         return;
 
     if (Document* doc = m_fullScreenFrame->document()) {
-        if (doc->webkitIsFullScreen()) {
+        FullscreenController* fullscreen = FullscreenController::fromIfExists(doc);
+        if (!fullscreen)
+            return;
+        if (fullscreen->isFullScreen(doc)) {
             // When the client exits from full screen we have to call webkitCancelFullScreen to
             // notify the document. While doing that, suppress notifications back to the client.
             m_isCancelingFullScreen = true;
-            doc->webkitCancelFullScreen();
+            fullscreen->webkitCancelFullScreen();
             m_isCancelingFullScreen = false;
-            doc->webkitWillExitFullScreenForElement(0);
+            fullscreen->webkitWillExitFullScreenForElement(0);
         }
     }
 }
@@ -1699,8 +1704,10 @@ void WebViewImpl::didExitFullScreen()
         return;
 
     if (Document* doc = m_fullScreenFrame->document()) {
-        if (doc->webkitIsFullScreen())
-            doc->webkitDidExitFullScreenForElement(0);
+        if (FullscreenController* fullscreen = FullscreenController::fromIfExists(doc)) {
+            if (fullscreen->webkitIsFullScreen())
+                fullscreen->webkitDidExitFullScreenForElement(0);
+        }
     }
 
     m_fullScreenFrame.clear();
@@ -3022,6 +3029,7 @@ WebSize WebViewImpl::contentsPreferredMinimumSize()
         return WebSize();
 
     layout();
+    FontCachePurgePreventer fontCachePurgePreventer; // Required by minPreferredLogicalWidth().
     IntSize preferredMinimumSize(document->renderView()->minPreferredLogicalWidth(), document->documentElement()->scrollHeight());
     preferredMinimumSize.scale(zoomLevelToZoomFactor(zoomLevel()));
     return preferredMinimumSize;
@@ -3371,7 +3379,10 @@ void WebViewImpl::inspectElementAt(const WebPoint& point)
 
         HitTestResult result(m_page->mainFrame()->view()->windowToContents(point));
         m_page->mainFrame()->contentRenderer()->hitTest(request, result);
-        m_page->inspectorController()->inspect(result.innerNode());
+        Node* node = result.innerNode();
+        if (!node && m_page->mainFrame()->document())
+            node = m_page->mainFrame()->document()->documentElement();
+        m_page->inspectorController()->inspect(node);
     }
 }
 
@@ -3440,8 +3451,8 @@ void WebViewImpl::applyAutofillSuggestions(
         return;
     }
 
-    HTMLInputElement* inputElem = focusedNode->toInputElement();
-    ASSERT(inputElem);
+    ASSERT(focusedNode->hasTagName(HTMLNames::inputTag));
+    HTMLInputElement* inputElem = toHTMLInputElement(focusedNode.get());
 
     // The first time the Autofill popup is shown we'll create the client and
     // the popup.

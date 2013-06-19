@@ -37,10 +37,10 @@
 #include "core/dom/EventNames.h"
 #include "core/dom/EventTarget.h"
 #include "core/loader/ThreadableLoaderClient.h"
-#include "core/platform/KURL.h"
 #include "core/platform/SharedBuffer.h"
 #include "core/platform/text/TextDirection.h"
 #include "modules/notifications/NotificationClient.h"
+#include "weborigin/KURL.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
@@ -115,8 +115,7 @@ public:
     TextDirection direction() const { return dir() == "rtl" ? RTL : LTR; }
 
 #if ENABLE(LEGACY_NOTIFICATIONS)
-    EventListener* ondisplay() { return getAttributeEventListener(eventNames().showEvent); }
-    void setOndisplay(PassRefPtr<EventListener> listener) { setAttributeEventListener(eventNames().showEvent, listener); }
+    DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(display, show);
 #endif
     DEFINE_ATTRIBUTE_EVENT_LISTENER(show);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(error);

@@ -70,6 +70,7 @@
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderImage.h"
+#include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
 #include "weborigin/SecurityOrigin.h"
 
@@ -280,13 +281,18 @@ static HTMLInputElement* asFileInput(Node* node)
 {
     ASSERT(node);
 
-    HTMLInputElement* inputElement = node->toInputElement();
-
+    if (!node->hasTagName(HTMLNames::inputTag))
+        return 0;
+    HTMLInputElement* inputElement = toHTMLInputElement(node);
     // If this is a button inside of the a file input, move up to the file input.
-    if (inputElement && inputElement->isTextButton() && inputElement->treeScope()->rootNode()->isShadowRoot())
-        inputElement = toShadowRoot(inputElement->treeScope()->rootNode())->host()->toInputElement();
+    if (inputElement->isTextButton() && inputElement->treeScope()->rootNode()->isShadowRoot()) {
+        Element* host = toShadowRoot(inputElement->treeScope()->rootNode())->host();
+        if (!host->hasTagName(HTMLNames::inputTag))
+            return 0;
+        inputElement = toHTMLInputElement(host);
+    }
 
-    return inputElement && inputElement->isFileUpload() ? inputElement : 0;
+    return inputElement->isFileUpload() ? inputElement : 0;
 }
 
 // This can return null if an empty document is loaded.
@@ -798,17 +804,22 @@ bool DragController::startDrag(Frame* src, const DragState& state, DragOperation
         }
 
         if (!dragImage) {
-            FontRenderingMode renderingMode = src->settings() ? src->settings()->fontRenderingMode() : NormalRenderingMode;
+            FontDescription fontDescription;
+            RenderTheme::defaultTheme()->systemFont(WebCore::CSSValueNone, fontDescription);
             float deviceScaleFactor = src->page() ? src->page()->deviceScaleFactor() : 1;
-            dragImage = createDragImageForLink(linkURL, hitTestResult.textContent(), renderingMode, deviceScaleFactor);
+            dragImage = createDragImageForLink(linkURL, hitTestResult.textContent(), fontDescription, deviceScaleFactor);
             IntSize size = dragImageSize(dragImage);
             m_dragOffset = IntPoint(-size.width() / 2, -LinkDragBorderInset);
             dragLoc = IntPoint(mouseDraggedPoint.x() + m_dragOffset.x(), mouseDraggedPoint.y() + m_dragOffset.y());
         }
         doSystemDrag(dragImage, dragLoc, mouseDraggedPoint, clipboard, src, true);
     } else if (state.m_dragType == DragSourceActionDHTML) {
-        ASSERT(m_dragSourceAction & DragSourceActionDHTML);
-        doSystemDrag(dragImage, dragLoc, dragOrigin, clipboard, src, false);
+        if (dragImage) {
+            ASSERT(m_dragSourceAction & DragSourceActionDHTML);
+            doSystemDrag(dragImage, dragLoc, dragOrigin, clipboard, src, false);
+        } else {
+            startedDrag = false;
+        }
     } else {
         // draggableNode() determined an image or link node was draggable, but it turns out the
         // image or link had no URL, so there is nothing to drag.

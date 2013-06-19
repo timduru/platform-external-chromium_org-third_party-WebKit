@@ -67,11 +67,10 @@ public:
 private:
     HTMLOptionElement(const QualifiedName&, Document*);
 
-    virtual bool supportsFocus() const;
-    virtual bool isFocusable() const;
+    virtual bool rendererIsFocusable() const OVERRIDE;
     virtual bool rendererIsNeeded(const NodeRenderingContext&) { return false; }
-    virtual void attach();
-    virtual void detach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 

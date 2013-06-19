@@ -26,7 +26,6 @@
 #include "config.h"
 #include "core/platform/DragImage.h"
 
-#include "core/platform/KURL.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/FontDescription.h"
@@ -35,6 +34,7 @@
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/StringTruncator.h"
 #include "core/platform/graphics/TextRun.h"
+#include "weborigin/KURL.h"
 
 namespace WebCore {
     
@@ -51,14 +51,13 @@ const float kMaxDragLabelStringWidth = (kMaxDragLabelWidth - 2 * kDragLabelBorde
 const float kDragLinkLabelFontSize = 11;
 const float kDragLinkUrlFontSize = 10;
 
-static Font dragLabelFont(int size, FontWeight fontWeight, FontRenderingMode renderingMode)
+static Font deriveDragLabelFont(int size, FontWeight fontWeight, const FontDescription& systemFont)
 {
-    FontDescription description;
+    FontDescription description = systemFont;
     description.setWeight(fontWeight);
 
     description.setSpecifiedSize(size);
     description.setComputedSize(size);
-    description.setRenderingMode(renderingMode);
     Font result(description, 0, 0);
     result.update(0);
     return result;
@@ -103,10 +102,10 @@ DragImageRef createDragImageForSelection(DragImageRef image, float dragImageAlph
     return image;
 }
 
-DragImageRef createDragImageForLink(const KURL& url, const String& inLabel, FontRenderingMode renderingMode, float deviceScaleFactor)
+DragImageRef createDragImageForLink(const KURL& url, const String& inLabel, const FontDescription& systemFont, float deviceScaleFactor)
 {
-    const Font labelFont = dragLabelFont(kDragLinkLabelFontSize, FontWeightBold, renderingMode);
-    const Font urlFont = dragLabelFont(kDragLinkUrlFontSize, FontWeightNormal, renderingMode);
+    const Font labelFont = deriveDragLabelFont(kDragLinkLabelFontSize, FontWeightBold, systemFont);
+    const Font urlFont = deriveDragLabelFont(kDragLinkUrlFontSize, FontWeightNormal, systemFont);
     FontCachePurgePreventer fontCachePurgePreventer;
 
     bool drawURLString = true;

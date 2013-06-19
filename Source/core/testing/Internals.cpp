@@ -45,6 +45,7 @@
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/Element.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/dom/FullscreenController.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/PseudoElement.h"
 #include "core/dom/Range.h"
@@ -108,11 +109,6 @@
 #include "core/platform/graphics/filters/FilterOperation.h"
 #include "core/platform/graphics/filters/FilterOperations.h"
 #include "core/rendering/RenderLayerBacking.h"
-
-#if ENABLE(ENCRYPTED_MEDIA_V2)
-#include "core/testing/MockCDM.h"
-#include "modules/encryptedmedia/CDM.h"
-#endif
 
 #include "core/platform/mock/PlatformSpeechSynthesizerMock.h"
 #include "modules/speech/DOMWindowSpeechSynthesis.h"
@@ -680,10 +676,7 @@ void Internals::selectColorInColorChooser(Element* element, const String& colorV
 {
     if (!element->hasTagName(inputTag))
         return;
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement)
-        return;
-    inputElement->selectColorInColorChooser(Color(colorValue));
+    toHTMLInputElement(element)->selectColorInColorChooser(Color(colorValue));
 }
 
 Vector<String> Internals::formControlStateOfPreviousHistoryItem(ExceptionCode& ec)
@@ -917,8 +910,8 @@ bool Internals::wasLastChangeUserEdit(Element* textField, ExceptionCode& ec)
         return false;
     }
 
-    if (HTMLInputElement* inputElement = textField->toInputElement())
-        return inputElement->lastChangeWasUserEdit();
+    if (textField->hasTagName(inputTag))
+        return toHTMLInputElement(textField)->lastChangeWasUserEdit();
 
     // FIXME: We should be using hasTagName instead but Windows port doesn't link QualifiedNames properly.
     if (textField->tagName() == "TEXTAREA")
@@ -935,8 +928,8 @@ bool Internals::elementShouldAutoComplete(Element* element, ExceptionCode& ec)
         return false;
     }
 
-    if (HTMLInputElement* inputElement = element->toInputElement())
-        return inputElement->shouldAutocomplete();
+    if (element->hasTagName(inputTag))
+        return toHTMLInputElement(element)->shouldAutocomplete();
 
     ec = INVALID_NODE_TYPE_ERR;
     return false;
@@ -949,13 +942,12 @@ String Internals::suggestedValue(Element* element, ExceptionCode& ec)
         return String();
     }
 
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement) {
+    if (!element->hasTagName(inputTag)) {
         ec = INVALID_NODE_TYPE_ERR;
         return String();
     }
 
-    return inputElement->suggestedValue();
+    return toHTMLInputElement(element)->suggestedValue();
 }
 
 void Internals::setSuggestedValue(Element* element, const String& value, ExceptionCode& ec)
@@ -965,13 +957,12 @@ void Internals::setSuggestedValue(Element* element, const String& value, Excepti
         return;
     }
 
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement) {
+    if (!element->hasTagName(inputTag)) {
         ec = INVALID_NODE_TYPE_ERR;
         return;
     }
 
-    inputElement->setSuggestedValue(value);
+    toHTMLInputElement(element)->setSuggestedValue(value);
 }
 
 void Internals::setEditingValue(Element* element, const String& value, ExceptionCode& ec)
@@ -981,23 +972,21 @@ void Internals::setEditingValue(Element* element, const String& value, Exception
         return;
     }
 
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement) {
+    if (!element->hasTagName(inputTag)) {
         ec = INVALID_NODE_TYPE_ERR;
         return;
     }
 
-    inputElement->setEditingValue(value);
+    toHTMLInputElement(element)->setEditingValue(value);
 }
 
 void Internals::setAutofilled(Element* element, bool enabled, ExceptionCode& ec)
 {
-    HTMLInputElement* inputElement = element->toInputElement();
-    if (!inputElement) {
+    if (!element->hasTagName(inputTag)) {
         ec = INVALID_ACCESS_ERR;
         return;
     }
-    inputElement->setAutofilled(enabled);
+    toHTMLInputElement(element)->setAutofilled(enabled);
 }
 
 void Internals::scrollElementToRect(Element* element, long x, long y, long w, long h, ExceptionCode& ec)
@@ -1458,6 +1447,11 @@ String Internals::layerTreeAsText(Document* document, ExceptionCode& ec) const
     return layerTreeAsText(document, 0, ec);
 }
 
+String Internals::elementLayerTreeAsText(Element* element, ExceptionCode& ec) const
+{
+    return elementLayerTreeAsText(element, 0, ec);
+}
+
 static PassRefPtr<NodeList> paintOrderList(Element* element, ExceptionCode& ec, RenderLayer::PaintOrderListType type)
 {
     if (!element) {
@@ -1501,17 +1495,36 @@ String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionC
         return String();
     }
 
-    LayerTreeFlags layerTreeFlags = 0;
-    if (flags & LAYER_TREE_INCLUDES_VISIBLE_RECTS)
-        layerTreeFlags |= LayerTreeFlagsIncludeVisibleRects;
-    if (flags & LAYER_TREE_INCLUDES_TILE_CACHES)
-        layerTreeFlags |= LayerTreeFlagsIncludeTileCaches;
-    if (flags & LAYER_TREE_INCLUDES_REPAINT_RECTS)
-        layerTreeFlags |= LayerTreeFlagsIncludeRepaintRects;
-    if (flags & LAYER_TREE_INCLUDES_PAINTING_PHASES)
-        layerTreeFlags |= LayerTreeFlagsIncludePaintingPhases;
+    return document->frame()->layerTreeAsText(flags);
+}
 
-    return document->frame()->layerTreeAsText(layerTreeFlags);
+String Internals::elementLayerTreeAsText(Element* element, unsigned flags, ExceptionCode& ec) const
+{
+    if (!element) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    element->document()->updateLayout();
+
+    RenderObject* renderer = element->renderer();
+    if (!renderer || !renderer->isBox()) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    RenderLayer* layer = toRenderBox(renderer)->layer();
+    if (!layer) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    if (!layer->backing() || !layer->backing()->graphicsLayer()) {
+        // Don't raise exception in these cases which may be normally used in tests.
+        return String();
+    }
+
+    return layer->backing()->graphicsLayer()->layerTreeAsText(flags);
 }
 
 void Internals::setNeedsCompositedScrolling(Element* element, unsigned needsCompositedScrolling, ExceptionCode& ec)
@@ -1716,28 +1729,28 @@ void Internals::webkitWillEnterFullScreenForElement(Document* document, Element*
 {
     if (!document)
         return;
-    document->webkitWillEnterFullScreenForElement(element);
+    FullscreenController::from(document)->webkitWillEnterFullScreenForElement(element);
 }
 
 void Internals::webkitDidEnterFullScreenForElement(Document* document, Element* element)
 {
     if (!document)
         return;
-    document->webkitDidEnterFullScreenForElement(element);
+    FullscreenController::from(document)->webkitDidEnterFullScreenForElement(element);
 }
 
 void Internals::webkitWillExitFullScreenForElement(Document* document, Element* element)
 {
     if (!document)
         return;
-    document->webkitWillExitFullScreenForElement(element);
+    FullscreenController::from(document)->webkitWillExitFullScreenForElement(element);
 }
 
 void Internals::webkitDidExitFullScreenForElement(Document* document, Element* element)
 {
     if (!document)
         return;
-    document->webkitDidExitFullScreenForElement(element);
+    FullscreenController::from(document)->webkitDidExitFullScreenForElement(element);
 }
 
 void Internals::registerURLSchemeAsBypassingContentSecurityPolicy(const String& scheme)
@@ -1894,13 +1907,6 @@ void Internals::forceReload(bool endToEnd)
 {
     frame()->loader()->reload(endToEnd);
 }
-
-#if ENABLE(ENCRYPTED_MEDIA_V2)
-void Internals::initializeMockCDM()
-{
-    CDM::registerCDMFactory(MockCDM::create, MockCDM::supportsKeySytem);
-}
-#endif
 
 String Internals::markerTextForListItem(Element* element, ExceptionCode& ec)
 {

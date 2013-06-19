@@ -206,7 +206,6 @@ CSSParserContext::CSSParserContext(CSSParserMode mode, const KURL& baseURL)
     , isHTMLDocument(false)
     , isCSSCustomFilterEnabled(false)
     , isCSSStickyPositionEnabled(false)
-    , isCSSGridLayoutEnabled(false)
     , needsSiteSpecificQuirks(false)
 {
 }
@@ -218,7 +217,6 @@ CSSParserContext::CSSParserContext(Document* document, const KURL& baseURL, cons
     , isHTMLDocument(document->isHTMLDocument())
     , isCSSCustomFilterEnabled(document->settings() ? document->settings()->isCSSCustomFilterEnabled() : false)
     , isCSSStickyPositionEnabled(document->cssStickyPositionEnabled())
-    , isCSSGridLayoutEnabled(document->cssGridLayoutEnabled())
     , needsSiteSpecificQuirks(document->settings() ? document->settings()->needsSiteSpecificQuirks() : false)
 {
 }
@@ -231,7 +229,6 @@ bool operator==(const CSSParserContext& a, const CSSParserContext& b)
         && a.isHTMLDocument == b.isHTMLDocument
         && a.isCSSCustomFilterEnabled == b.isCSSCustomFilterEnabled
         && a.isCSSStickyPositionEnabled == b.isCSSStickyPositionEnabled
-        && a.isCSSGridLayoutEnabled == b.isCSSGridLayoutEnabled
         && a.needsSiteSpecificQuirks == b.needsSiteSpecificQuirks;
 }
 
@@ -268,9 +265,7 @@ CSSParser::CSSParser(const CSSParserContext& context, UseCounter* counter)
     , m_ruleHeaderType(CSSRuleSourceData::UNKNOWN_RULE)
     , m_allowImportRules(true)
     , m_allowNamespaceDeclarations(true)
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     , m_inViewport(false)
-#endif
     , m_useCounter(counter)
 {
 #if YYDEBUG > 0
@@ -607,8 +602,8 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         // -webkit-flex | -webkit-inline-flex | -webkit-grid | -webkit-inline-grid | lazy-block
         if ((valueID >= CSSValueInline && valueID <= CSSValueWebkitInlineFlex) || valueID == CSSValueNone)
             return true;
-        if (parserContext.isCSSGridLayoutEnabled && (valueID == CSSValueGrid || valueID == CSSValueInlineGrid))
-            return true;
+        if (valueID == CSSValueGrid || valueID == CSSValueInlineGrid)
+            return RuntimeEnabledFeatures::cssGridLayoutEnabled();
         if (valueID == CSSValueLazyBlock)
             return RuntimeEnabledFeatures::lazyLayoutEnabled();
         break;
@@ -805,7 +800,7 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         break;
     case CSSPropertyGridAutoFlow:
         if (valueID == CSSValueNone || valueID == CSSValueRow || valueID == CSSValueColumn)
-            return true;
+            return RuntimeEnabledFeatures::cssGridLayoutEnabled();
         break;
     case CSSPropertyWebkitLineAlign:
         if (valueID == CSSValueNone || valueID == CSSValueEdges)
@@ -835,12 +830,6 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (valueID == CSSValueNone || valueID == CSSValueSlide || valueID == CSSValueScroll || valueID == CSSValueAlternate)
             return true;
         break;
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-    case CSSPropertyWebkitOverflowScrolling:
-        if (valueID == CSSValueAuto || valueID == CSSValueTouch)
-            return true;
-        break;
-#endif
     case CSSPropertyWebkitPrintColorAdjust:
         if (valueID == CSSValueExact || valueID == CSSValueEconomy)
             return true;
@@ -854,7 +843,7 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (RuntimeEnabledFeatures::cssRegionsEnabled() && (valueID == CSSValueAuto || valueID == CSSValueAvoid))
             return true;
         break;
-    case CSSPropertyWebkitRegionOverflow:
+    case CSSPropertyWebkitRegionFragment:
         if (RuntimeEnabledFeatures::cssRegionsEnabled() && (valueID == CSSValueAuto || valueID == CSSValueBreak))
             return true;
         break;
@@ -1015,14 +1004,11 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     case CSSPropertyWebkitMarginTopCollapse:
     case CSSPropertyWebkitMarqueeDirection:
     case CSSPropertyWebkitMarqueeStyle:
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-    case CSSPropertyWebkitOverflowScrolling:
-#endif
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRegionBreakAfter:
     case CSSPropertyWebkitRegionBreakBefore:
     case CSSPropertyWebkitRegionBreakInside:
-    case CSSPropertyWebkitRegionOverflow:
+    case CSSPropertyWebkitRegionFragment:
     case CSSPropertyWebkitRtlOrdering:
     case CSSPropertyWebkitRubyPosition:
 #if ENABLE(CSS3_TEXT)
@@ -1349,19 +1335,17 @@ bool CSSParser::parseDeclaration(MutableStylePropertySet* declaration, const Str
     return ok;
 }
 
-PassOwnPtr<MediaQuery> CSSParser::parseMediaQuery(const String& string)
+PassRefPtr<MediaQuerySet> CSSParser::parseMediaQueryList(const String& string)
 {
-    if (string.isEmpty())
-        return nullptr;
-
-    ASSERT(!m_mediaQuery);
+    ASSERT(!m_mediaList);
 
     // can't use { because tokenizer state switches from mediaquery to initial state when it sees { token.
     // instead insert one " " (which is caught by maybe_space in CSSGrammar.y)
-    setupParser("@-webkit-mediaquery ", string, "} ");
+    setupParser("@-internal-medialist ", string, "");
     cssyyparse(this);
 
-    return m_mediaQuery.release();
+    ASSERT(m_mediaList.get());
+    return m_mediaList.release();
 }
 
 static inline void filterProperties(bool important, const CSSParser::ParsedPropertyVector& input, Vector<CSSProperty, 256>& output, size_t& unusedEntries, BitArray<numCSSProperties>& seenProperties, HashSet<AtomicString>& seenVariables)
@@ -1410,12 +1394,32 @@ void CSSParser::addPropertyWithPrefixingVariant(CSSPropertyID propId, PassRefPtr
     CSSPropertyID prefixingVariant = prefixingVariantForPropertyId(propId);
     if (prefixingVariant == propId)
         return;
-    addProperty(prefixingVariant, val.release(), important, implicit);
+
+    if (m_currentShorthand) {
+        // We can't use ShorthandScope here as we can already be inside one (e.g we are parsing CSSTransition).
+        m_currentShorthand = prefixingVariantForPropertyId(m_currentShorthand);
+        addProperty(prefixingVariant, val.release(), important, implicit);
+        m_currentShorthand = prefixingVariantForPropertyId(m_currentShorthand);
+    } else {
+        addProperty(prefixingVariant, val.release(), important, implicit);
+    }
 }
 
 void CSSParser::addProperty(CSSPropertyID propId, PassRefPtr<CSSValue> value, bool important, bool implicit)
 {
-    m_parsedProperties.append(CSSProperty(propId, value, important, m_currentShorthand, m_implicitShorthand || implicit));
+    CSSPrimitiveValue* primitiveValue = value->isPrimitiveValue() ? toCSSPrimitiveValue(value.get()) : 0;
+    // This property doesn't belong to a shorthand or is a CSS variable (which will be resolved later).
+    if (!m_currentShorthand || (primitiveValue && primitiveValue->isVariableName())) {
+        m_parsedProperties.append(CSSProperty(propId, value, important, false, CSSPropertyInvalid, m_implicitShorthand || implicit));
+        return;
+    }
+
+    const Vector<StylePropertyShorthand> shorthands = matchingShorthandsForLonghand(propId);
+    // The longhand does not belong to multiple shorthands.
+    if (shorthands.size() == 1)
+        m_parsedProperties.append(CSSProperty(propId, value, important, true, CSSPropertyInvalid, m_implicitShorthand || implicit));
+    else
+        m_parsedProperties.append(CSSProperty(propId, value, important, true, indexOfShorthandForLonghand(m_currentShorthand, shorthands), m_implicitShorthand || implicit));
 }
 
 void CSSParser::rollbackLastProperties(int num)
@@ -1705,10 +1709,12 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         return true;
     }
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
-    if (inViewport())
+    if (inViewport()) {
+        if (!RuntimeEnabledFeatures::cssViewportEnabled())
+            return false;
+
         return parseViewportProperty(propId, important);
-#endif
+    }
 
     bool validPrimitive = false;
     RefPtr<CSSValue> parsedValue;
@@ -2113,11 +2119,8 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
 
     case CSSPropertyTextDecoration:
     case CSSPropertyWebkitTextDecorationsInEffect:
-        // none | [ underline || overline || line-through || blink ] | inherit
-        return parseTextDecoration(propId, important);
-
     case CSSPropertyTextDecorationLine:
-        // none | [ underline || overline || line-through ] | inherit
+        // none | [ underline || overline || line-through || blink ] | inherit
         return parseTextDecoration(propId, important);
 
     case CSSPropertyTextDecorationStyle:
@@ -2427,14 +2430,14 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
 
     case CSSPropertyGridAutoColumns:
     case CSSPropertyGridAutoRows:
-        if (!cssGridLayoutEnabled())
+        if (!RuntimeEnabledFeatures::cssGridLayoutEnabled())
             return false;
         parsedValue = parseGridTrackSize();
         break;
 
     case CSSPropertyGridColumns:
     case CSSPropertyGridRows:
-        if (!cssGridLayoutEnabled())
+        if (!RuntimeEnabledFeatures::cssGridLayoutEnabled())
             return false;
         return parseGridTrackList(propId, important);
 
@@ -2442,20 +2445,17 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyGridEnd:
     case CSSPropertyGridBefore:
     case CSSPropertyGridAfter:
-        if (!cssGridLayoutEnabled())
+        if (!RuntimeEnabledFeatures::cssGridLayoutEnabled())
             return false;
-
         parsedValue = parseGridPosition();
         break;
 
     case CSSPropertyGridColumn:
     case CSSPropertyGridRow:
-    case CSSPropertyGridArea: {
-        if (!cssGridLayoutEnabled())
+    case CSSPropertyGridArea:
+        if (!RuntimeEnabledFeatures::cssGridLayoutEnabled())
             return false;
-
         return parseGridItemPositionShorthand(propId, important);
-    }
 
     case CSSPropertyWebkitMarginCollapse: {
         if (num == 1) {
@@ -2814,14 +2814,11 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyWebkitMarginTopCollapse:
     case CSSPropertyWebkitMarqueeDirection:
     case CSSPropertyWebkitMarqueeStyle:
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-    case CSSPropertyWebkitOverflowScrolling:
-#endif
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRegionBreakAfter:
     case CSSPropertyWebkitRegionBreakBefore:
     case CSSPropertyWebkitRegionBreakInside:
-    case CSSPropertyWebkitRegionOverflow:
+    case CSSPropertyWebkitRegionFragment:
     case CSSPropertyWebkitRtlOrdering:
     case CSSPropertyWebkitRubyPosition:
 #if ENABLE(CSS3_TEXT)
@@ -2843,7 +2840,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         // These properties should be handled before in isValidKeywordPropertyAndValue().
         ASSERT_NOT_REACHED();
         return false;
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     // Properties bellow are validated inside parseViewportProperty, because we
     // check for parser state inViewportScope. We need to invalidate if someone
     // adds them outside a @viewport rule.
@@ -2853,7 +2849,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyUserZoom:
         validPrimitive = false;
         break;
-#endif
     default:
         return parseSVGValue(propId, important);
     }
@@ -3068,7 +3063,8 @@ void CSSParser::storeVariableDeclaration(const CSSParserString& name, PassOwnPtr
             return;
         builder.append(cssValue->cssText());
     }
-    addProperty(CSSPropertyVariable, CSSVariableValue::create(variableName, builder.toString().lower()), important, false);
+
+    addProperty(CSSPropertyVariable, CSSVariableValue::create(variableName, builder.toString()), important, false);
 }
 
 void CSSParser::addAnimationValue(RefPtr<CSSValue>& lval, PassRefPtr<CSSValue> rval)
@@ -4505,6 +4501,8 @@ bool CSSParser::parseIntegerOrStringFromGridPosition(RefPtr<CSSPrimitiveValue>& 
 
 PassRefPtr<CSSValue> CSSParser::parseGridPosition()
 {
+    ASSERT(RuntimeEnabledFeatures::cssGridLayoutEnabled());
+
     CSSParserValue* value = m_valueList->current();
     if (value->id == CSSValueAuto) {
         m_valueList->next();
@@ -4553,6 +4551,8 @@ PassRefPtr<CSSValue> CSSParser::parseGridPosition()
 
 bool CSSParser::parseGridItemPositionShorthand(CSSPropertyID shorthandId, bool important)
 {
+    ASSERT(RuntimeEnabledFeatures::cssGridLayoutEnabled());
+
     ShorthandScope scope(this, shorthandId);
     const StylePropertyShorthand& shorthand = shorthandForProperty(shorthandId);
     if (!parseValue(shorthand.properties()[0], important))
@@ -4583,6 +4583,8 @@ bool CSSParser::parseGridItemPositionShorthand(CSSPropertyID shorthandId, bool i
 
 bool CSSParser::parseGridTrackList(CSSPropertyID propId, bool important)
 {
+    ASSERT(RuntimeEnabledFeatures::cssGridLayoutEnabled());
+
     CSSParserValue* value = m_valueList->current();
     if (value->id == CSSValueNone) {
         if (m_valueList->next())
@@ -4617,6 +4619,8 @@ bool CSSParser::parseGridTrackList(CSSPropertyID propId, bool important)
 
 PassRefPtr<CSSPrimitiveValue> CSSParser::parseGridTrackSize()
 {
+    ASSERT(RuntimeEnabledFeatures::cssGridLayoutEnabled());
+
     CSSParserValue* currentValue = m_valueList->current();
     m_valueList->next();
 
@@ -8680,11 +8684,6 @@ static bool validFlowName(const String& flowName)
             || equalIgnoringCase(flowName, "none"));
 }
 
-bool CSSParser::cssGridLayoutEnabled() const
-{
-    return m_context.isCSSGridLayoutEnabled;
-}
-
 bool CSSParser::parseFlowThread(const String& flowName)
 {
     setupParser("@-internal-decls{-webkit-flow-into:", flowName, "}");
@@ -8866,15 +8865,10 @@ bool CSSParser::parseTextDecoration(CSSPropertyID propId, bool important)
     bool isValid = true;
     while (isValid && value) {
         switch (value->id) {
-        case CSSValueBlink:
-            // Blink value is not accepted by text-decoration-line.
-            isValid = propId != CSSPropertyTextDecorationLine;
-            if (isValid)
-                list->append(cssValuePool().createIdentifierValue(value->id));
-            break;
         case CSSValueUnderline:
         case CSSValueOverline:
         case CSSValueLineThrough:
+        case CSSValueBlink:
             list->append(cssValuePool().createIdentifierValue(value->id));
             break;
         default:
@@ -9475,6 +9469,18 @@ template <>
 inline UChar* CSSParser::tokenStart<UChar>()
 {
     return m_tokenStart.ptr16;
+}
+
+template <>
+inline LChar* CSSParser::dataStart<LChar>()
+{
+    return m_dataStart8.get();
+}
+
+template <>
+inline UChar* CSSParser::dataStart<UChar>()
+{
+    return m_dataStart16.get();
 }
 
 CSSParserLocation CSSParser::currentLocation()
@@ -10111,7 +10117,7 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
         return;
 
     case 'c':
-        if (length == 8 && isEqualToCSSIdentifier(name + 2, "harset"))
+        if (length == 8 && isEqualToCSSIdentifier(name + 2, "harset") && name == dataStart<CharacterType>())
             m_token = CHARSET_SYM;
         return;
 
@@ -10220,6 +10226,11 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
         }
         return;
 
+    case 'v':
+        if (length == 9 && isEqualToCSSIdentifier(name + 2, "iewport"))
+            m_token = VIEWPORT_RULE_SYM;
+        return;
+
     case '-':
         switch (length) {
         case 15:
@@ -10253,30 +10264,20 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
                 m_token = INTERNAL_VALUE_SYM;
             return;
 
-        case 17:
-            if (hasEscape)
-                return;
-
-#if ENABLE(CSS_DEVICE_ADAPTATION)
-            else if (isASCIIAlphaCaselessEqual(name[16], 't') && isEqualToCSSIdentifier(name + 2, "webkit-viewpor"))
-                m_token = WEBKIT_VIEWPORT_RULE_SYM;
-#endif
-            return;
-
         case 18:
             if (isEqualToCSSIdentifier(name + 2, "webkit-keyframes"))
                 m_token = WEBKIT_KEYFRAMES_SYM;
             return;
 
         case 19:
-            if (!hasEscape && isASCIIAlphaCaselessEqual(name[18], 'r') && isEqualToCSSIdentifier(name + 2, "internal-selecto")) {
+            if (!hasEscape && isASCIIAlphaCaselessEqual(name[18], 'r') && isEqualToCSSIdentifier(name + 2, "internal-selecto"))
                 m_token = INTERNAL_SELECTOR_SYM;
-                return;
-            }
+            return;
 
-            if (isEqualToCSSIdentifier(name + 2, "webkit-mediaquery")) {
+        case 20:
+            if (isEqualToCSSIdentifier(name + 2, "internal-medialist")) {
                 m_parsingMode = MediaQueryMode;
-                m_token = WEBKIT_MEDIAQUERY_SYM;
+                m_token = INTERNAL_MEDIALIST_SYM;
             }
             return;
 
@@ -10786,6 +10787,14 @@ CSSParserFunction* CSSParser::createFloatingFunction()
     return function;
 }
 
+CSSParserFunction* CSSParser::createFloatingFunction(const CSSParserString& name, PassOwnPtr<CSSParserValueList> args)
+{
+    CSSParserFunction* function = createFloatingFunction();
+    function->name = name;
+    function->args = args;
+    return function;
+}
+
 PassOwnPtr<CSSParserFunction> CSSParser::sinkFloatingFunction(CSSParserFunction* function)
 {
     if (function) {
@@ -11056,7 +11065,7 @@ void CSSParser::reportError(const CSSParserLocation& location, ErrorType error)
         break;
 
     case InvalidRuleError:
-        builder.appendLiteral("Invalid CSS rule: ");
+        builder.appendLiteral("Invalid CSS rule at: ");
         break;
 
     default:
@@ -11460,9 +11469,11 @@ unsigned CSSParser::safeUserStringTokenOffset()
     return min(tokenStartOffset(), static_cast<unsigned>(m_length - 1 - m_parsedTextSuffixLength)) - m_parsedTextPrefixLength;
 }
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
 StyleRuleBase* CSSParser::createViewportRule()
 {
+    if (!RuntimeEnabledFeatures::cssViewportEnabled())
+        return 0;
+
     m_allowImportRules = m_allowNamespaceDeclarations = false;
 
     RefPtr<StyleRuleViewport> rule = StyleRuleViewport::create();
@@ -11479,19 +11490,21 @@ StyleRuleBase* CSSParser::createViewportRule()
 
 bool CSSParser::parseViewportProperty(CSSPropertyID propId, bool important)
 {
+    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled());
+
     CSSParserValue* value = m_valueList->current();
     if (!value)
         return false;
 
-    int id = value->id;
+    CSSValueID id = value->id;
     bool validPrimitive = false;
 
     switch (propId) {
-    case CSSPropertyMinWidth: // auto | device-width | device-height | <length> | <percentage>
+    case CSSPropertyMinWidth: // auto | <length> | <percentage>
     case CSSPropertyMaxWidth:
     case CSSPropertyMinHeight:
     case CSSPropertyMaxHeight:
-        if (id == CSSValueAuto || id == CSSValueDeviceWidth || id == CSSValueDeviceHeight)
+        if (id == CSSValueAuto)
             validPrimitive = true;
         else
             validPrimitive = (!id && validUnit(value, FLength | FPercent | FNonNeg));
@@ -11537,6 +11550,7 @@ bool CSSParser::parseViewportProperty(CSSPropertyID propId, bool important)
 
 bool CSSParser::parseViewportShorthand(CSSPropertyID propId, CSSPropertyID first, CSSPropertyID second, bool important)
 {
+    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled());
     unsigned numValues = m_valueList->size();
 
     if (numValues > 2)
@@ -11554,7 +11568,6 @@ bool CSSParser::parseViewportShorthand(CSSPropertyID propId, CSSPropertyID first
 
     return parseViewportProperty(second, important);
 }
-#endif
 
 template <typename CharacterType>
 static CSSPropertyID cssPropertyID(const CharacterType* propertyName, unsigned length)
@@ -11571,16 +11584,7 @@ static CSSPropertyID cssPropertyID(const CharacterType* propertyName, unsigned l
 
     const char* name = buffer;
     const Property* hashTableEntry = findProperty(name, length);
-    const CSSPropertyID propertyID = hashTableEntry ? static_cast<CSSPropertyID>(hashTableEntry->id) : CSSPropertyInvalid;
-
-    static const int cssPropertyHistogramSize = numCSSProperties;
-    if (hasPrefix(buffer, length, "-webkit-") && propertyID != CSSPropertyInvalid) {
-        int histogramValue = propertyID - firstCSSProperty;
-        ASSERT(0 <= histogramValue && histogramValue < cssPropertyHistogramSize);
-        HistogramSupport::histogramEnumeration("CSS.PrefixUsage", histogramValue, cssPropertyHistogramSize);
-    }
-
-    return propertyID;
+    return hashTableEntry ? static_cast<CSSPropertyID>(hashTableEntry->id) : CSSPropertyInvalid;
 }
 
 CSSPropertyID cssPropertyID(const String& string)

@@ -40,6 +40,10 @@
 #include "core/platform/graphics/chromium/VDMXParser.h"
 #include <wtf/unicode/Unicode.h>
 
+#if OS(WINDOWS)
+#include "core/platform/win/HWndDC.h"
+#endif
+
 namespace WebCore {
 
 // This is the largest VDMX table which we'll try to load and parse.
@@ -113,8 +117,12 @@ void SimpleFontData::platformInit()
         m_fontMetrics.setHasXHeight(false);
     }
 
-
     float lineGap = SkScalarToFloat(metrics.fLeading);
+#if OS(WINDOWS)
+    // FIXME: Windows code uses tmExternalLeading from TEXTMETRIC, SkPaint::FontMetrics does not seem to
+    // offer an equivalent. The formula below tries to proximate it based on fLeading.
+    lineGap = floorf(lineGap * 0.45);
+#endif
     m_fontMetrics.setLineGap(lineGap);
     m_fontMetrics.setLineSpacing(lroundf(ascent) + lroundf(descent) + lroundf(lineGap));
 

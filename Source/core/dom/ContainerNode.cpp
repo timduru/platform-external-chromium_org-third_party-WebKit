@@ -27,12 +27,15 @@
 #include "core/dom/ContainerNodeAlgorithms.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/dom/FullscreenController.h"
 #include "core/dom/MutationEvent.h"
 #include "core/dom/NodeRareData.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/html/HTMLCollection.h"
 #include "core/page/Page.h"
+#include "core/rendering/InlineTextBox.h"
+#include "core/rendering/RenderText.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderWidget.h"
 #include <wtf/CurrentTime.h>
@@ -50,9 +53,7 @@ typedef pair<NodeCallback, RefPtr<Node> > CallbackInfo;
 typedef Vector<CallbackInfo> NodeCallbackQueue;
 
 static NodeCallbackQueue* s_postAttachCallbackQueue;
-static NodeCallbackQueue* s_insertionCallbackQueue;
 
-static size_t s_insertionDepth;
 static size_t s_attachDepth;
 
 ChildNodesLazySnapshot* ChildNodesLazySnapshot::latestSnapshot = 0;
@@ -468,7 +469,8 @@ bool ContainerNode::removeChild(Node* oldChild, ExceptionCode& ec)
 
     document()->removeFocusedNodeOfSubtree(child.get());
 
-    document()->removeFullScreenElementOfSubtree(child.get());
+    if (FullscreenController* fullscreen = FullscreenController::fromIfExists(document()))
+        fullscreen->removeFullScreenElementOfSubtree(child.get());
 
     // Events fired when blurring currently focused node might have moved this
     // child into a different parent.
@@ -559,7 +561,8 @@ void ContainerNode::removeChildren()
     // exclude this node when looking for removed focusedNode since only children will be removed
     document()->removeFocusedNodeOfSubtree(this, true);
 
-    document()->removeFullScreenElementOfSubtree(this, true);
+    if (FullscreenController* fullscreen = FullscreenController::fromIfExists(document()))
+        fullscreen->removeFullScreenElementOfSubtree(this, true);
 
     // Do any prep work needed before actually starting to detach
     // and remove... e.g. stop loading frames, fire unload events.
@@ -578,7 +581,7 @@ void ContainerNode::removeChildren()
         }
 
         childrenChanged(false, 0, 0, -static_cast<int>(removedChildren.size()));
-        
+
         for (size_t i = 0; i < removedChildren.size(); ++i)
             ChildNodeRemovalNotifier(this).notify(removedChildren[i].get());
     }
@@ -685,29 +688,6 @@ void ContainerNode::resumePostAttachCallbacks()
     --s_attachDepth;
 }
 
-void ContainerNode::suspendInsertionCallbacks()
-{
-    ++s_insertionDepth;
-}
-
-void ContainerNode::resumeInsertionCallbacks()
-{
-    if (s_insertionDepth == 1 && s_insertionCallbackQueue)
-        dispatchInsertionCallbacks();
-    --s_insertionDepth;
-}
-
-void ContainerNode::queueInsertionCallback(NodeCallback callback, Node* node)
-{
-    if (!s_insertionDepth) {
-        (*callback)(node);
-        return;
-    }
-    if (!s_insertionCallbackQueue)
-        s_insertionCallbackQueue = new NodeCallbackQueue;
-    s_insertionCallbackQueue->append(CallbackInfo(callback, node));
-}
-
 void ContainerNode::queuePostAttachCallback(NodeCallback callback, Node* node)
 {
     if (!s_postAttachCallbackQueue)
@@ -731,17 +711,17 @@ void ContainerNode::dispatchPostAttachCallbacks()
     s_postAttachCallbackQueue->clear();
 }
 
-void ContainerNode::attach()
+void ContainerNode::attach(const AttachContext& context)
 {
     attachChildren();
-    Node::attach();
+    Node::attach(context);
 }
 
-void ContainerNode::detach()
+void ContainerNode::detach(const AttachContext& context)
 {
     detachChildren();
     clearChildNeedsStyleRecalc();
-    Node::detach();
+    Node::detach(context);
 }
 
 void ContainerNode::childrenChanged(bool changedByParser, Node*, Node*, int childCountDelta)
@@ -759,6 +739,138 @@ void ContainerNode::cloneChildNodes(ContainerNode *clone)
         clone->appendChild(n->cloneNode(true), ec);
 }
 
+
+bool ContainerNode::getUpperLeftCorner(FloatPoint& point) const
+{
+    if (!renderer())
+        return false;
+    // What is this code really trying to do?
+    RenderObject* o = renderer();
+    RenderObject* p = o;
+
+    if (!o->isInline() || o->isReplaced()) {
+        point = o->localToAbsolute(FloatPoint(), UseTransforms);
+        return true;
+    }
+
+    // find the next text/image child, to get a position
+    while (o) {
+        p = o;
+        if (o->firstChild()) {
+            o = o->firstChild();
+        } else if (o->nextSibling()) {
+            o = o->nextSibling();
+        } else {
+            RenderObject* next = 0;
+            while (!next && o->parent()) {
+                o = o->parent();
+                next = o->nextSibling();
+            }
+            o = next;
+
+            if (!o)
+                break;
+        }
+        ASSERT(o);
+
+        if (!o->isInline() || o->isReplaced()) {
+            point = o->localToAbsolute(FloatPoint(), UseTransforms);
+            return true;
+        }
+
+        if (p->node() && p->node() == this && o->isText() && !o->isBR() && !toRenderText(o)->firstTextBox()) {
+            // do nothing - skip unrendered whitespace that is a child or next sibling of the anchor
+        } else if ((o->isText() && !o->isBR()) || o->isReplaced()) {
+            point = FloatPoint();
+            if (o->isText() && toRenderText(o)->firstTextBox()) {
+                point.move(toRenderText(o)->linesBoundingBox().x(), toRenderText(o)->firstTextBox()->root()->lineTop());
+            } else if (o->isBox()) {
+                RenderBox* box = toRenderBox(o);
+                point.moveBy(box->location());
+            }
+            point = o->container()->localToAbsolute(point, UseTransforms);
+            return true;
+        }
+    }
+
+    // If the target doesn't have any children or siblings that could be used to calculate the scroll position, we must be
+    // at the end of the document. Scroll to the bottom. FIXME: who said anything about scrolling?
+    if (!o && document()->view()) {
+        point = FloatPoint(0, document()->view()->contentsHeight());
+        return true;
+    }
+    return false;
+}
+
+bool ContainerNode::getLowerRightCorner(FloatPoint& point) const
+{
+    if (!renderer())
+        return false;
+
+    RenderObject* o = renderer();
+    if (!o->isInline() || o->isReplaced()) {
+        RenderBox* box = toRenderBox(o);
+        point = o->localToAbsolute(LayoutPoint(box->size()), UseTransforms);
+        return true;
+    }
+
+    // find the last text/image child, to get a position
+    while (o) {
+        if (o->lastChild()) {
+            o = o->lastChild();
+        } else if (o->previousSibling()) {
+            o = o->previousSibling();
+        } else {
+            RenderObject* prev = 0;
+        while (!prev) {
+            o = o->parent();
+            if (!o)
+                return false;
+            prev = o->previousSibling();
+        }
+        o = prev;
+        }
+        ASSERT(o);
+        if (o->isText() || o->isReplaced()) {
+            point = FloatPoint();
+            if (o->isText()) {
+                RenderText* text = toRenderText(o);
+                IntRect linesBox = text->linesBoundingBox();
+                if (!linesBox.maxX() && !linesBox.maxY())
+                    continue;
+                point.moveBy(linesBox.maxXMaxYCorner());
+            } else {
+                RenderBox* box = toRenderBox(o);
+                point.moveBy(box->frameRect().maxXMaxYCorner());
+            }
+            point = o->container()->localToAbsolute(point, UseTransforms);
+            return true;
+        }
+    }
+    return true;
+}
+
+// FIXME: This override is only needed for inline anchors without an
+// InlineBox and it does not belong in ContainerNode as it reaches into
+// the render and line box trees.
+// https://code.google.com/p/chromium/issues/detail?id=248354
+LayoutRect ContainerNode::boundingBox() const
+{
+    FloatPoint upperLeft, lowerRight;
+    bool foundUpperLeft = getUpperLeftCorner(upperLeft);
+    bool foundLowerRight = getLowerRightCorner(lowerRight);
+
+    // If we've found one corner, but not the other,
+    // then we should just return a point at the corner that we did find.
+    if (foundUpperLeft != foundLowerRight) {
+        if (foundUpperLeft)
+            lowerRight = upperLeft;
+        else
+            upperLeft = lowerRight;
+    }
+
+    return enclosingLayoutRect(FloatRect(upperLeft, lowerRight.expandedTo(upperLeft) - upperLeft));
+}
 
 void ContainerNode::setFocus(bool received)
 {
@@ -792,6 +904,18 @@ void ContainerNode::setHovered(bool over)
     if (over == hovered()) return;
 
     Node::setHovered(over);
+
+    if (!renderer()) {
+        // When setting hover to false, the style needs to be recalc'd even when
+        // there's no renderer (imagine setting display:none in the :hover class,
+        // if a nil renderer would prevent this element from recalculating its
+        // style, it would never go back to its normal style and remain
+        // stuck in its hovered style).
+        if (!over)
+            setNeedsStyleRecalc();
+
+        return;
+    }
 
     // note that we need to recalc the style
     // FIXME: Move to Element
@@ -907,15 +1031,6 @@ static void dispatchChildRemovalEvents(Node* child)
         for (; c; c = NodeTraversal::next(c.get(), child))
             c->dispatchScopedEvent(MutationEvent::create(eventNames().DOMNodeRemovedFromDocumentEvent, false));
     }
-}
-
-void ContainerNode::dispatchInsertionCallbacks()
-{
-    for (size_t i = s_insertionCallbackQueue->size(); i; --i) {
-        const CallbackInfo& info = (*s_insertionCallbackQueue)[i - 1];
-        info.first(info.second.get());
-    }
-    s_insertionCallbackQueue->clear();
 }
 
 static void updateTreeAfterInsertion(ContainerNode* parent, Node* child, AttachBehavior attachBehavior)

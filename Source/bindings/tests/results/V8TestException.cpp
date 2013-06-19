@@ -74,7 +74,7 @@ static void nameAttrGetterCallback(v8::Local<v8::String> name, const v8::Propert
 } // namespace TestExceptionV8Internal
 
 static const V8DOMConfiguration::BatchedAttribute V8TestExceptionAttrs[] = {
-    // Attribute 'name' (Type: 'attribute' ExtAttr: '')
+    // Attribute 'name'
     {"name", TestExceptionV8Internal::nameAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
 
@@ -128,7 +128,6 @@ v8::Handle<v8::Object> V8TestException::createWrapper(PassRefPtr<TestException> 
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
-
     installPerContextProperties(wrapper, impl.get(), isolate);
     V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;

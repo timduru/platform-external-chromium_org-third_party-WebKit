@@ -37,7 +37,6 @@
 #include "core/dom/ActiveDOMObject.h"
 #include "core/dom/ErrorEvent.h"
 #include "core/dom/Event.h"
-#include "core/dom/EventException.h"
 #include "core/dom/MessagePort.h"
 #include "core/html/DOMURL.h"
 #include "core/inspector/InspectorConsoleInstrumentation.h"
@@ -48,12 +47,12 @@
 #include "core/page/DOMTimer.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/WorkerNavigator.h"
-#include "core/platform/KURL.h"
 #include "core/platform/NotImplemented.h"
 #include "core/workers/WorkerLocation.h"
 #include "core/workers/WorkerObjectProxy.h"
 #include "core/workers/WorkerScriptLoader.h"
 #include "core/workers/WorkerThread.h"
+#include "weborigin/KURL.h"
 #include "weborigin/SecurityOrigin.h"
 
 #if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
@@ -82,7 +81,7 @@ public:
     virtual bool isCleanupTask() const { return true; }
 };
 
-WorkerContext::WorkerContext(const KURL& url, const String& userAgent, PassOwnPtr<GroupSettings> settings, WorkerThread* thread, PassRefPtr<SecurityOrigin> topOrigin)
+WorkerContext::WorkerContext(const KURL& url, const String& userAgent, PassOwnPtr<GroupSettings> settings, WorkerThread* thread, PassRefPtr<SecurityOrigin> topOrigin, double timeOrigin)
     : m_url(url)
     , m_userAgent(userAgent)
     , m_groupSettings(settings)
@@ -92,6 +91,7 @@ WorkerContext::WorkerContext(const KURL& url, const String& userAgent, PassOwnPt
     , m_closing(false)
     , m_eventQueue(WorkerEventQueue::create(this))
     , m_topOrigin(topOrigin)
+    , m_timeOrigin(timeOrigin)
 {
     ScriptWrappable::init(this);
     setSecurityOrigin(SecurityOrigin::create(url));

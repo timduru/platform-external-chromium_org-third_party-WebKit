@@ -908,7 +908,7 @@ WebInspector.HeapSnapshotProfileType.prototype = {
     {
     },
 
-    get  treeItemTitle()
+    get treeItemTitle()
     {
         return WebInspector.UIString("HEAP SNAPSHOTS");
     },
@@ -1040,7 +1040,7 @@ WebInspector.HeapSnapshotProfileType.prototype = {
  */
 WebInspector.TrackingHeapSnapshotProfileType = function(profilesPanel)
 {
-    WebInspector.ProfileType.call(this, WebInspector.TrackingHeapSnapshotProfileType.TypeId, WebInspector.UIString("Track Allocations"));
+    WebInspector.ProfileType.call(this, WebInspector.TrackingHeapSnapshotProfileType.TypeId, WebInspector.UIString("Record Heap Allocations"));
     this._profilesPanel = profilesPanel;
     WebInspector.HeapProfilerDispatcher._dispatcher.register(this);
 }
@@ -1083,7 +1083,7 @@ WebInspector.TrackingHeapSnapshotProfileType.prototype = {
         var profileSamples = this._profileSamples;
         if (!profileSamples)
             return;
-        var currentIndex = profileSamples.ids.length;
+        var currentIndex = Math.max(profileSamples.ids.length, profileSamples.max.length - 1);
         profileSamples.ids[currentIndex] = lastSeenObjectId;
         if (!profileSamples.max[currentIndex]) {
             profileSamples.max[currentIndex] = 0;
@@ -1165,12 +1165,21 @@ WebInspector.TrackingHeapSnapshotProfileType.prototype = {
 
     get treeItemTitle()
     {
-        return WebInspector.UIString("TRACK HEAP SNAPSHOTS");
+        return WebInspector.UIString("HEAP TIMELINES");
     },
 
     get description()
     {
-        return WebInspector.UIString("Run heap profiler continuously to track JavaScript allocations over time.");
+        return WebInspector.UIString("Record JavaScript object allocations over time. Use this profile type to isolate memory leaks.");
+    },
+
+    _reset: function()
+    {
+        WebInspector.HeapSnapshotProfileType.prototype._reset.call(this);
+        if (this._recording)
+            this._stopRecordingProfile();
+        this._profileSamples = null;
+        this._lastSeenIndex = -1;
     },
 
     /**
@@ -1494,8 +1503,8 @@ WebInspector.HeapTrackingOverviewGrid = function(heapProfileHeader)
     this._windowLeft = 0.0;
     this._windowRight = totalTime && timestamps.length ? (timestamps[timestamps.length - 1] - timestamps[0]) / totalTime : 1.0;
     this._overviewGrid.setWindow(this._windowLeft, this._windowRight);
-    this._yScaleFactor = 0.0;
-    this._yScaleFactorLastUpdate = 0;
+    this._yScale = new WebInspector.HeapTrackingOverviewGrid.SmoothScale();
+    this._xScale = new WebInspector.HeapTrackingOverviewGrid.SmoothScale();
 }
 
 WebInspector.HeapTrackingOverviewGrid.IdsRangeChanged = "IdsRangeChanged";
@@ -1528,7 +1537,7 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
         var startTime = timestamps[0];
         var endTime = timestamps[timestamps.length - 1];
 
-        var scaleFactor = width / profileSamples.totalTime;
+        var scaleFactor = this._xScale.nextScale(width / profileSamples.totalTime);
         var maxSize = 0;
         /**
           * @param {Array.<number>} sizes
@@ -1562,23 +1571,12 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
 
         aggregateAndCall(sizes, maxSizeCallback);
 
+        var yScaleFactor = this._yScale.nextScale(maxSize ? height / (maxSize * 1.1) : 0.0);
+
         this._overviewCanvas.width = width * window.devicePixelRatio;
         this._overviewCanvas.height = height * window.devicePixelRatio;
         this._overviewCanvas.style.width = width + "px";
         this._overviewCanvas.style.height = height + "px";
-
-        var targetYScaleFactor = maxSize ? height / (maxSize * 1.1) : 0.0;
-        var now = Date.now();
-        if (this._yScaleFactor) {
-            var timeDeltaMs = now - this._yScaleFactorLastUpdate;
-            var maxScaleChangeSpeedPerSec = 10; // 10x per second
-            var maxChangePerDelta = Math.pow(maxScaleChangeSpeedPerSec, timeDeltaMs / 1000);
-            var scaleChange = targetYScaleFactor / this._yScaleFactor;
-            this._yScaleFactor *= Number.constrain(scaleChange, 1 / maxChangePerDelta, maxChangePerDelta);
-        } else
-            this._yScaleFactor = targetYScaleFactor;
-        var yScaleFactor = this._yScaleFactor;
-        this._yScaleFactorLastUpdate = now;
 
         var context = this._overviewCanvas.getContext("2d");
         context.scale(window.devicePixelRatio, window.devicePixelRatio);
@@ -1586,7 +1584,7 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
         context.beginPath();
         context.lineWidth = 2;
         context.strokeStyle = "rgba(192, 192, 192, 0.6)";
-        var currentX  = Math.floor((endTime - startTime) * scaleFactor);
+        var currentX = (endTime - startTime) * scaleFactor;
         context.moveTo(currentX, height - 1);
         context.lineTo(currentX, 0);
         context.stroke();
@@ -1595,7 +1593,7 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
         var gridY;
         var gridValue;
         var gridLabelHeight = 14;
-        if (maxSize) {
+        if (yScaleFactor) {
             const maxGridValue = (height - gridLabelHeight) / yScaleFactor;
             // The round value calculation is a bit tricky, because
             // it has a form k*10^n*1024^m, where k=[1,5], n=[0..3], m is an integer,
@@ -1685,6 +1683,8 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
     update: function()
     {
         this._updateTimerId = null;
+        if (!this.isShowing())
+            return;
         this._updateBoundaries();
         this._overviewCalculator._updateBoundaries(this);
         this._overviewGrid.updateDividers(this._overviewCalculator);
@@ -1722,6 +1722,37 @@ WebInspector.HeapTrackingOverviewGrid.prototype = {
     },
 
     __proto__: WebInspector.View.prototype
+}
+
+
+/**
+ * @constructor
+ */
+WebInspector.HeapTrackingOverviewGrid.SmoothScale = function()
+{
+    this._lastUpdate = 0;
+    this._currentScale = 0.0;
+}
+
+WebInspector.HeapTrackingOverviewGrid.SmoothScale.prototype = {
+    /**
+     * @param {number} target
+     * @return {number}
+     */
+    nextScale: function(target) {
+        target = target || this._currentScale;
+        if (this._currentScale) {
+            var now = Date.now();
+            var timeDeltaMs = now - this._lastUpdate;
+            this._lastUpdate = now;
+            var maxChangePerSec = 20;
+            var maxChangePerDelta = Math.pow(maxChangePerSec, timeDeltaMs / 1000);
+            var scaleChange = target / this._currentScale;
+            this._currentScale *= Number.constrain(scaleChange, 1 / maxChangePerDelta, maxChangePerDelta);
+        } else
+            this._currentScale = target;
+        return this._currentScale;
+    }
 }
 
 

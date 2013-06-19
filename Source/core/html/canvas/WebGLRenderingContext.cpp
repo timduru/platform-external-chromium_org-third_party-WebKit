@@ -33,6 +33,7 @@
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/ImageData.h"
+#include "core/html/canvas/ANGLEInstancedArrays.h"
 #include "core/html/canvas/EXTFragDepth.h"
 #include "core/html/canvas/EXTTextureFilterAnisotropic.h"
 #include "core/html/canvas/OESElementIndexUint.h"
@@ -62,6 +63,7 @@
 #include "core/html/canvas/WebGLShaderPrecisionFormat.h"
 #include "core/html/canvas/WebGLTexture.h"
 #include "core/html/canvas/WebGLUniformLocation.h"
+#include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/cache/CachedImage.h"
@@ -592,6 +594,7 @@ WebGLRenderingContext::WebGLRenderingContext(HTMLCanvasElement* passedCanvas, Pa
     registerExtension<WebGLLoseContext>(m_webglLoseContext, false, false, false, bothPrefixes);
 
     // Register draft extensions.
+    registerExtension<ANGLEInstancedArrays>(m_angleInstancedArrays, false, true, false, unprefixed);
     registerExtension<EXTFragDepth>(m_extFragDepth, false, true, false, unprefixed);
     registerExtension<WebGLDrawBuffers>(m_webglDrawBuffers, false, true, false, unprefixed);
 
@@ -693,7 +696,6 @@ void WebGLRenderingContext::setupFlags()
 
     m_isGLES2NPOTStrict = !m_context->getExtensions()->isEnabled("GL_OES_texture_npot");
     m_isDepthStencilSupported = m_context->getExtensions()->isEnabled("GL_OES_packed_depth_stencil");
-    m_isRobustnessEXTSupported = m_context->getExtensions()->isEnabled("GL_EXT_robustness");
 }
 
 bool WebGLRenderingContext::allowPrivilegedExtensions() const
@@ -708,6 +710,11 @@ void WebGLRenderingContext::addCompressedTextureFormat(GC3Denum format)
 {
     if (!m_compressedTextureFormats.contains(format))
         m_compressedTextureFormats.append(format);
+}
+
+void WebGLRenderingContext::removeAllCompressedTextureFormats()
+{
+    m_compressedTextureFormats.clear();
 }
 
 WebGLRenderingContext::~WebGLRenderingContext()
@@ -731,6 +738,11 @@ WebGLRenderingContext::~WebGLRenderingContext()
     m_blackTextureCubeMap = 0;
 
     detachAndRemoveAllObjects();
+
+    // release all extensions
+    for (size_t i = 0; i < m_extensions.size(); ++i)
+        delete m_extensions[i];
+
     destroyGraphicsContext3D();
     m_contextGroup->removeContext(this);
 
@@ -1758,32 +1770,8 @@ void WebGLRenderingContext::drawArrays(GC3Denum mode, GC3Dint first, GC3Dsizei c
 {
     UNUSED_PARAM(ec);
 
-    if (isContextLost() || !validateDrawMode("drawArrays", mode))
+    if (!validateDrawArrays("drawArrays", mode, first, count))
         return;
-
-    if (!validateStencilSettings("drawArrays"))
-        return;
-
-    if (first < 0 || count < 0) {
-        synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "drawArrays", "first or count < 0");
-        return;
-    }
-
-    if (!count) {
-        markContextChanged();
-        return;
-    }
-
-    if (!validateRenderingState()) {
-        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "drawArrays", "attribs not setup correctly");
-        return;
-    }
-
-    const char* reason = "framebuffer incomplete";
-    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), &reason)) {
-        synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION, "drawArrays", reason);
-        return;
-    }
 
     clearIfComposited();
 
@@ -1797,56 +1785,46 @@ void WebGLRenderingContext::drawElements(GC3Denum mode, GC3Dsizei count, GC3Denu
 {
     UNUSED_PARAM(ec);
 
-    if (isContextLost() || !validateDrawMode("drawElements", mode))
+    if (!validateDrawElements("drawElements", mode, count, type, offset))
         return;
 
-    if (!validateStencilSettings("drawElements"))
-        return;
-
-    switch (type) {
-    case GraphicsContext3D::UNSIGNED_BYTE:
-    case GraphicsContext3D::UNSIGNED_SHORT:
-        break;
-    case GraphicsContext3D::UNSIGNED_INT:
-        if (m_oesElementIndexUint)
-            break;
-        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "drawElements", "invalid type");
-        return;
-    default:
-        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "drawElements", "invalid type");
-        return;
-    }
-
-    if (count < 0 || offset < 0) {
-        synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "drawElements", "count or offset < 0");
-        return;
-    }
-
-    if (!count) {
-        markContextChanged();
-        return;
-    }
-
-    if (!m_boundVertexArrayObject->getElementArrayBuffer()) {
-        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "drawElements", "no ELEMENT_ARRAY_BUFFER bound");
-        return;
-    }
-
-    if (!validateRenderingState()) {
-        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "drawElements", "attribs not setup correctly");
-        return;
-    }
-
-    const char* reason = "framebuffer incomplete";
-    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), &reason)) {
-        synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION, "drawElements", reason);
-        return;
-    }
     clearIfComposited();
 
     handleTextureCompleteness("drawElements", true);
     m_context->drawElements(mode, count, type, static_cast<GC3Dintptr>(offset));
     handleTextureCompleteness("drawElements", false);
+    markContextChanged();
+}
+
+void WebGLRenderingContext::drawArraysInstancedANGLE(GC3Denum mode, GC3Dint first, GC3Dsizei count, GC3Dsizei primcount)
+{
+    if (!validateDrawArrays("drawArraysInstancedANGLE", mode, first, count))
+        return;
+
+    if (!validateDrawInstanced("drawArraysInstancedANGLE", primcount))
+        return;
+
+    clearIfComposited();
+
+    handleTextureCompleteness("drawArraysInstancedANGLE", true);
+    m_context->getExtensions()->drawArraysInstancedANGLE(mode, first, count, primcount);
+    handleTextureCompleteness("drawArraysInstancedANGLE", false);
+    markContextChanged();
+}
+
+void WebGLRenderingContext::drawElementsInstancedANGLE(GC3Denum mode, GC3Dsizei count, GC3Denum type, GC3Dintptr offset, GC3Dsizei primcount)
+{
+    if (!validateDrawElements("drawElementsInstancedANGLE", mode, count, type, offset))
+        return;
+
+    if (!validateDrawInstanced("drawElementsInstancedANGLE", primcount))
+        return;
+
+    clearIfComposited();
+
+    handleTextureCompleteness("drawElementsInstancedANGLE", true);
+    m_context->getExtensions()->drawElementsInstancedANGLE(mode, count, type, static_cast<GC3Dintptr>(offset), primcount);
+    handleTextureCompleteness("drawElementsInstancedANGLE", false);
     markContextChanged();
 }
 
@@ -2143,7 +2121,7 @@ bool WebGLRenderingContext::ExtensionTracker::matchesNameWithPrefixes(const Stri
     return false;
 }
 
-WebGLExtension* WebGLRenderingContext::getExtension(const String& name)
+PassRefPtr<WebGLExtension> WebGLRenderingContext::getExtension(const String& name)
 {
     if (isContextLost())
         return 0;
@@ -2762,30 +2740,21 @@ WebGLGetInfo WebGLRenderingContext::getUniform(WebGLProgram* program, const WebG
                 switch (baseType) {
                 case GraphicsContext3D::FLOAT: {
                     GC3Dfloat value[16] = {0};
-                    if (m_isRobustnessEXTSupported)
-                        m_context->getExtensions()->getnUniformfvEXT(objectOrZero(program), location, 16 * sizeof(GC3Dfloat), value);
-                    else
-                        m_context->getUniformfv(objectOrZero(program), location, value);
+                    m_context->getUniformfv(objectOrZero(program), location, value);
                     if (length == 1)
                         return WebGLGetInfo(value[0]);
                     return WebGLGetInfo(Float32Array::create(value, length));
                 }
                 case GraphicsContext3D::INT: {
                     GC3Dint value[4] = {0};
-                    if (m_isRobustnessEXTSupported)
-                        m_context->getExtensions()->getnUniformivEXT(objectOrZero(program), location, 4 * sizeof(GC3Dint), value);
-                    else
-                        m_context->getUniformiv(objectOrZero(program), location, value);
+                    m_context->getUniformiv(objectOrZero(program), location, value);
                     if (length == 1)
                         return WebGLGetInfo(value[0]);
                     return WebGLGetInfo(Int32Array::create(value, length));
                 }
                 case GraphicsContext3D::BOOL: {
                     GC3Dint value[4] = {0};
-                    if (m_isRobustnessEXTSupported)
-                        m_context->getExtensions()->getnUniformivEXT(objectOrZero(program), location, 4 * sizeof(GC3Dint), value);
-                    else
-                        m_context->getUniformiv(objectOrZero(program), location, value);
+                    m_context->getUniformiv(objectOrZero(program), location, value);
                     if (length > 1) {
                         bool boolValue[16] = {0};
                         for (unsigned j = 0; j < length; j++)
@@ -2836,6 +2805,10 @@ WebGLGetInfo WebGLRenderingContext::getVertexAttrib(GC3Duint index, GC3Denum pna
         return WebGLGetInfo();
     }
     const WebGLVertexArrayObjectOES::VertexAttribState& state = m_boundVertexArrayObject->getVertexAttribState(index);
+
+    if (m_angleInstancedArrays && pname == Extensions3D::VERTEX_ATTRIB_ARRAY_DIVISOR_ANGLE)
+        return WebGLGetInfo(state.divisor);
+
     switch (pname) {
     case GraphicsContext3D::VERTEX_ATTRIB_ARRAY_BUFFER_BINDING:
         if (!state.bufferBinding || !state.bufferBinding->object())
@@ -3072,16 +3045,14 @@ void WebGLRenderingContext::readPixels(GC3Dint x, GC3Dint y, GC3Dsizei width, GC
     // Calculate array size, taking into consideration of PACK_ALIGNMENT.
     unsigned int totalBytesRequired = 0;
     unsigned int padding = 0;
-    if (!m_isRobustnessEXTSupported) {
-        GC3Denum error = m_context->computeImageSizeInBytes(format, type, width, height, m_packAlignment, &totalBytesRequired, &padding);
-        if (error != GraphicsContext3D::NO_ERROR) {
-            synthesizeGLError(error, "readPixels", "invalid dimensions");
-            return;
-        }
-        if (pixels->byteLength() < totalBytesRequired) {
-            synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "readPixels", "ArrayBufferView not large enough for dimensions");
-            return;
-        }
+    GC3Denum error = m_context->computeImageSizeInBytes(format, type, width, height, m_packAlignment, &totalBytesRequired, &padding);
+    if (error != GraphicsContext3D::NO_ERROR) {
+        synthesizeGLError(error, "readPixels", "invalid dimensions");
+        return;
+    }
+    if (pixels->byteLength() < totalBytesRequired) {
+        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, "readPixels", "ArrayBufferView not large enough for dimensions");
+        return;
     }
 
     clearIfComposited();
@@ -3089,15 +3060,10 @@ void WebGLRenderingContext::readPixels(GC3Dint x, GC3Dint y, GC3Dsizei width, GC
 
     {
         ScopedDrawingBufferBinder binder(m_drawingBuffer.get(), m_framebufferBinding.get());
-        if (m_isRobustnessEXTSupported)
-            m_context->getExtensions()->readnPixelsEXT(x, y, width, height, format, type, pixels->byteLength(), data);
-        else
-            m_context->readPixels(x, y, width, height, format, type, data);
+        m_context->readPixels(x, y, width, height, format, type, data);
     }
 
 #if OS(DARWIN)
-    if (m_isRobustnessEXTSupported) // we haven't computed padding
-        m_context->computeImageSizeInBytes(format, type, width, height, m_packAlignment, &totalBytesRequired, &padding);
     // FIXME: remove this section when GL driver bug on Mac is fixed, i.e.,
     // when alpha is off, readPixels should set alpha to 255 instead of 0.
     if (!m_framebufferBinding && !m_context->getContextAttributes().alpha) {
@@ -4131,6 +4097,20 @@ void WebGLRenderingContext::vertexAttribPointer(GC3Duint index, GC3Dint size, GC
     m_context->vertexAttribPointer(index, size, type, normalized, stride, static_cast<GC3Dintptr>(offset));
 }
 
+void WebGLRenderingContext::vertexAttribDivisorANGLE(GC3Duint index, GC3Duint divisor)
+{
+    if (isContextLost())
+        return;
+
+    if (index >= m_maxVertexAttribs) {
+        synthesizeGLError(GraphicsContext3D::INVALID_VALUE, "vertexAttribDivisorANGLE", "index out of range");
+        return;
+    }
+
+    m_boundVertexArrayObject->setVertexAttribDivisor(index, divisor);
+    m_context->getExtensions()->vertexAttribDivisorANGLE(index, divisor);
+}
+
 void WebGLRenderingContext::viewport(GC3Dint x, GC3Dint y, GC3Dsizei width, GC3Dsizei height)
 {
     if (isContextLost())
@@ -4173,6 +4153,14 @@ void WebGLRenderingContext::loseContextImpl(WebGLRenderingContext::LostContextMo
 
     detachAndRemoveAllObjects();
 
+    // Lose all the extensions.
+    for (size_t i = 0; i < m_extensions.size(); ++i) {
+        ExtensionTracker* tracker = m_extensions[i];
+        tracker->loseExtension();
+    }
+
+    removeAllCompressedTextureFormats();
+
     if (mode != RealLostContext)
         destroyGraphicsContext3D();
 
@@ -4205,7 +4193,7 @@ void WebGLRenderingContext::forceRestoreContext()
         m_restoreTimer.startOneShot(0);
 }
 
-PlatformLayer* WebGLRenderingContext::platformLayer() const
+WebKit::WebLayer* WebGLRenderingContext::platformLayer() const
 {
     return m_drawingBuffer->platformLayer();
 }
@@ -4967,6 +4955,8 @@ void WebGLRenderingContext::printGLErrorToConsole(const String& message)
 
     if (!m_numGLErrorsToConsoleAllowed)
         printWarningToConsole("WebGL: too many errors, no more errors will be reported to the console for this context.");
+
+    return;
 }
 
 void WebGLRenderingContext::printWarningToConsole(const String& message)
@@ -5171,6 +5161,108 @@ bool WebGLRenderingContext::validateHTMLVideoElement(const char* functionName, H
         return false;
     }
     return true;
+}
+
+bool WebGLRenderingContext::validateDrawArrays(const char* functionName, GC3Denum mode, GC3Dint first, GC3Dsizei count)
+{
+    if (isContextLost() || !validateDrawMode(functionName, mode))
+        return false;
+
+    if (!validateStencilSettings(functionName))
+        return false;
+
+    if (first < 0 || count < 0) {
+        synthesizeGLError(GraphicsContext3D::INVALID_VALUE, functionName, "first or count < 0");
+        return false;
+    }
+
+    if (!count) {
+        markContextChanged();
+        return false;
+    }
+
+    if (!validateRenderingState()) {
+        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, functionName, "attribs not setup correctly");
+        return false;
+    }
+
+    const char* reason = "framebuffer incomplete";
+    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), &reason)) {
+        synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION, functionName, reason);
+        return false;
+    }
+
+    return true;
+}
+
+bool WebGLRenderingContext::validateDrawElements(const char* functionName, GC3Denum mode, GC3Dsizei count, GC3Denum type, long long offset)
+{
+    if (isContextLost() || !validateDrawMode(functionName, mode))
+        return false;
+
+    if (!validateStencilSettings(functionName))
+        return false;
+
+    switch (type) {
+    case GraphicsContext3D::UNSIGNED_BYTE:
+    case GraphicsContext3D::UNSIGNED_SHORT:
+        break;
+    case GraphicsContext3D::UNSIGNED_INT:
+        if (m_oesElementIndexUint)
+            break;
+        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, functionName, "invalid type");
+        return false;
+    default:
+        synthesizeGLError(GraphicsContext3D::INVALID_ENUM, functionName, "invalid type");
+        return false;
+    }
+
+    if (count < 0 || offset < 0) {
+        synthesizeGLError(GraphicsContext3D::INVALID_VALUE, functionName, "count or offset < 0");
+        return false;
+    }
+
+    if (!count) {
+        markContextChanged();
+        return false;
+    }
+
+    if (!m_boundVertexArrayObject->getElementArrayBuffer()) {
+        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, functionName, "no ELEMENT_ARRAY_BUFFER bound");
+        return false;
+    }
+
+    if (!validateRenderingState()) {
+        synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, functionName, "attribs not setup correctly");
+        return false;
+    }
+
+    const char* reason = "framebuffer incomplete";
+    if (m_framebufferBinding && !m_framebufferBinding->onAccess(graphicsContext3D(), &reason)) {
+        synthesizeGLError(GraphicsContext3D::INVALID_FRAMEBUFFER_OPERATION, functionName, reason);
+        return false;
+    }
+
+    return true;
+}
+
+// Helper function to validate draw*Instanced calls
+bool WebGLRenderingContext::validateDrawInstanced(const char* functionName, GC3Dsizei primcount)
+{
+    if (primcount < 0) {
+        synthesizeGLError(GraphicsContext3D::INVALID_VALUE, functionName, "primcount < 0");
+        return false;
+    }
+
+    // Ensure at least one enabled vertex attrib has a divisor of 0.
+    for (unsigned i = 0; i < m_maxVertexAttribs; ++i) {
+        const WebGLVertexArrayObjectOES::VertexAttribState& state = m_boundVertexArrayObject->getVertexAttribState(i);
+        if (state.enabled && !state.divisor)
+            return true;
+    }
+
+    synthesizeGLError(GraphicsContext3D::INVALID_OPERATION, functionName, "at least one enabled attribute must have a divisor of 0");
+    return false;
 }
 
 void WebGLRenderingContext::vertexAttribfImpl(const char* functionName, GC3Duint index, GC3Dsizei expectedSize, GC3Dfloat v0, GC3Dfloat v1, GC3Dfloat v2, GC3Dfloat v3)
@@ -5383,7 +5475,7 @@ namespace {
         case GraphicsContext3D::CONTEXT_LOST_WEBGL:
             return "CONTEXT_LOST_WEBGL";
         default:
-            return String::format("WebGL ERROR(%04x)", error);
+            return String::format("WebGL ERROR(0x%04X)", error);
         }
     }
 
@@ -5391,9 +5483,10 @@ namespace {
 
 void WebGLRenderingContext::synthesizeGLError(GC3Denum error, const char* functionName, const char* description, ConsoleDisplayPreference display)
 {
+    String errorType = GetErrorString(error);
     if (m_synthesizedErrorsToConsole && display == DisplayInConsole) {
-      String str = String("WebGL: ") + GetErrorString(error) +  ": " + String(functionName) + ": " + String(description);
-      printGLErrorToConsole(str);
+        String message = String("WebGL: ") + errorType +  ": " + String(functionName) + ": " + String(description);
+        printGLErrorToConsole(message);
     }
     if (!isContextLost())
         m_context->synthesizeGLError(error);
@@ -5401,6 +5494,7 @@ void WebGLRenderingContext::synthesizeGLError(GC3Denum error, const char* functi
         if (lost_context_errors_.find(error) == WTF::notFound)
             lost_context_errors_.append(error);
     }
+    InspectorInstrumentation::didFireWebGLError(canvas()->document(), errorType);
 }
 
 

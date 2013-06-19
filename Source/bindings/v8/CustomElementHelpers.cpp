@@ -34,13 +34,19 @@
 
 #include "HTMLNames.h"
 #include "SVGNames.h"
-#include "V8CustomElementConstructor.h"
+#include "V8Document.h"
 #include "V8HTMLElementWrapperFactory.h"
 #include "V8SVGElementWrapperFactory.h"
 #include "bindings/v8/DOMDataStore.h"
 #include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ScriptController.h"
+#include "bindings/v8/ScriptState.h"
+#include "bindings/v8/UnsafePersistent.h"
+#include "bindings/v8/V8HiddenPropertyName.h"
+#include "bindings/v8/V8PerContextData.h"
 #include "core/dom/CustomElementRegistry.h"
+#include "core/dom/Element.h"
+#include "core/dom/ExceptionCode.h"
 #include "core/dom/Node.h"
 #include "core/html/HTMLElement.h"
 #include "core/html/HTMLUnknownElement.h"
@@ -48,18 +54,34 @@
 
 namespace WebCore {
 
+void CustomElementHelpers::didRegisterDefinition(CustomElementDefinition* definition, ScriptExecutionContext* executionContext, const HashSet<Element*>& upgradeCandidates, const ScriptValue& prototypeValue)
+{
+    ASSERT(v8::Isolate::GetCurrent());
+    v8::Handle<v8::Context> context = toV8Context(executionContext, mainThreadNormalWorld());
+    ASSERT(context == v8::Isolate::GetCurrent()->GetCurrentContext());
+
+    // Bindings retrieve the prototype when needed from per-context data.
+    v8::Handle<v8::Object> prototype = v8::Handle<v8::Object>::Cast(prototypeValue.v8Value());
+    v8::Persistent<v8::Object> persistentPrototype(context->GetIsolate(), prototype);
+    V8PerContextData::from(context)->customElementPrototypes()->add(definition->type(), UnsafePersistent<v8::Object>(persistentPrototype));
+
+    // Upgrade any wrappers already created for this definition
+    upgradeWrappers(context, upgradeCandidates, prototype);
+}
+
 v8::Handle<v8::Object> CustomElementHelpers::createWrapper(PassRefPtr<Element> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate, const CreateWrapperFunction& createTypeExtensionUpgradeCandidateWrapper)
 {
     ASSERT(impl);
 
-    // The constructor and registered lifecycle callbacks should be visible only from main world.
-    // FIXME: This shouldn't be needed once each custom element has its own FunctionTemplate
-    // https://bugs.webkit.org/show_bug.cgi?id=108138
-
     // FIXME: creationContext.IsEmpty() should never happen. Remove
     // this when callers (like InspectorController::inspect) are fixed
     // to never pass an empty creation context.
-    if (!CustomElementHelpers::isFeatureAllowed(creationContext.IsEmpty() ? v8::Context::GetCurrent() : creationContext->CreationContext())) {
+    v8::Handle<v8::Context> context = creationContext.IsEmpty() ? isolate->GetCurrentContext() : creationContext->CreationContext();
+
+    // The constructor and registered lifecycle callbacks should be visible only from main world.
+    // FIXME: This shouldn't be needed once each custom element has its own FunctionTemplate
+    // https://bugs.webkit.org/show_bug.cgi?id=108138
+    if (!CustomElementHelpers::isFeatureAllowed(context)) {
         v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &V8HTMLElement::info, impl.get(), isolate);
         if (!wrapper.IsEmpty())
             V8DOMWrapper::associateObjectWithWrapper(impl, &V8HTMLElement::info, wrapper, isolate, WrapperConfiguration::Dependent);
@@ -71,8 +93,7 @@ v8::Handle<v8::Object> CustomElementHelpers::createWrapper(PassRefPtr<Element> i
     if (!definition)
         return createUpgradeCandidateWrapper(impl, creationContext, isolate, createTypeExtensionUpgradeCandidateWrapper);
 
-    v8::Handle<v8::Object> prototype = v8::Handle<v8::Object>::Cast(definition->prototype().v8Value());
-
+    v8::Handle<v8::Object> prototype = V8PerContextData::from(context)->customElementPrototypes()->get(definition->type()).newLocal(isolate);
     WrapperTypeInfo* typeInfo = CustomElementHelpers::findWrapperType(prototype);
     if (!typeInfo) {
         // FIXME: When can this happen?
@@ -121,27 +142,79 @@ v8::Handle<v8::Object> CustomElementHelpers::createUpgradeCandidateWrapper(PassR
     }
 }
 
-bool CustomElementHelpers::initializeConstructorWrapper(CustomElementConstructor* constructor, const ScriptValue& prototype, ScriptState* state)
+static void constructCustomElement(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    ASSERT(isFeatureAllowed(state));
-    ASSERT(!prototype.v8Value().IsEmpty() && prototype.v8Value()->IsObject());
-    v8::Handle<v8::Value> wrapperValue = toV8(constructor, state->context()->Global(), state->context()->GetIsolate());
-    if (wrapperValue.IsEmpty() || !wrapperValue->IsObject())
-        return false;
-    v8::Handle<v8::Function> wrapper = v8::Handle<v8::Function>::Cast(wrapperValue);
-    // - Object::ForceSet() nor Object::SetAccessor Doesn't work against the "prototype" property of function objects.
-    // - Set()-ing here is safe because
-    //   - Hooking Object.prototype's defineProperty() with "prototype" or "constructor" also doesn't affect on these properties of function objects and
-    //   - Using Set() is okay becaues each function has "prototype" property from start and Objects.prototype cannot intercept the property access.
-    v8::Handle<v8::String> prototypeKey = v8String("prototype", state->context()->GetIsolate());
-    ASSERT(wrapper->HasOwnProperty(prototypeKey));
-    wrapper->Set(prototypeKey, prototype.v8Value(), v8::ReadOnly);
+    v8::Isolate* isolate = args.GetIsolate();
 
-    v8::Handle<v8::String> constructorKey = v8String("constructor", state->context()->GetIsolate());
-    v8::Handle<v8::Object> prototypeObject = v8::Handle<v8::Object>::Cast(prototype.v8Value());
-    ASSERT(!prototypeObject->HasOwnProperty(constructorKey));
-    prototypeObject->ForceSet(constructorKey, wrapper, v8::ReadOnly);
-    return true;
+    if (!args.IsConstructCall()) {
+        throwTypeError("DOM object constructor cannot be called as a function.", isolate);
+        return;
+    }
+
+    if (args.Length() > 0) {
+        throwTypeError(0, isolate);
+        return;
+    }
+
+    Document* document = V8Document::toNative(v8::Handle<v8::Object>::Cast(args.Callee()->GetHiddenValue(V8HiddenPropertyName::document())));
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, namespaceURI, args.Callee()->GetHiddenValue(V8HiddenPropertyName::namespaceURI()));
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, name, args.Callee()->GetHiddenValue(V8HiddenPropertyName::name()));
+    v8::Handle<v8::Value> maybeType = args.Callee()->GetHiddenValue(V8HiddenPropertyName::type());
+    V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, type, maybeType);
+
+    ExceptionCode ec = 0;
+    CustomElementRegistry::CallbackDeliveryScope deliveryScope;
+    RefPtr<Element> element = document->createElementNS(namespaceURI, name, maybeType->IsNull() ? nullAtom : type, ec);
+    if (ec) {
+        setDOMException(ec, isolate);
+        return;
+    }
+    v8SetReturnValue(args, toV8Fast(element.release(), args, document));
+}
+
+ScriptValue CustomElementHelpers::createConstructor(ScriptState* state, const ScriptValue& prototypeValue, Document* document, const AtomicString& namespaceURI, const AtomicString& name, const AtomicString& type)
+{
+    v8::Isolate* isolate = state->isolate();
+
+    v8::HandleScope handleScope;
+    v8::TryCatch tryCatch;
+    v8::Local<v8::FunctionTemplate> constructorTemplate = v8::FunctionTemplate::New();
+    constructorTemplate->SetCallHandler(constructCustomElement);
+    v8::Handle<v8::Function> constructor = constructorTemplate->GetFunction();
+    if (tryCatch.HasCaught()) {
+        state->setException(tryCatch.Exception());
+        return ScriptValue();
+    }
+    if (constructor.IsEmpty()) {
+        state->setException(v8::Local<v8::Value>::New(setDOMException(INVALID_STATE_ERR, isolate)));
+        return ScriptValue();
+    }
+
+    v8::Handle<v8::String> v8Name = v8String(name, isolate);
+    v8::Handle<v8::Value> v8Type = v8StringOrNull(type, isolate);
+
+    constructor->SetName(v8Type->IsNull() ? v8Name : v8::Handle<v8::String>::Cast(v8Type));
+
+    V8HiddenPropertyName::setNamedHiddenReference(constructor, "document", toV8(document, state->context()->Global(), isolate));
+    V8HiddenPropertyName::setNamedHiddenReference(constructor, "namespaceURI", v8String(namespaceURI, isolate));
+    V8HiddenPropertyName::setNamedHiddenReference(constructor, "name", v8Name);
+    V8HiddenPropertyName::setNamedHiddenReference(constructor, "type", v8Type);
+
+    // Neither Object::ForceSet nor Object::SetAccessor can set the
+    // "prototype" property of function objects, so we use Set()
+    // instead. This is safe because each function has "prototype"
+    // property from birth so the Function, etc. prototypes will not
+    // intercept the property access.
+    v8::Handle<v8::Object> prototype = v8::Handle<v8::Object>::Cast(prototypeValue.v8Value());
+    v8::Handle<v8::String> prototypeKey = v8String("prototype", isolate);
+    ASSERT(constructor->HasOwnProperty(prototypeKey));
+    constructor->Set(prototypeKey, prototype, v8::ReadOnly);
+
+    prototype->ForceSet(v8String("constructor", isolate), constructor, v8::ReadOnly);
+
+    ASSERT(!tryCatch.HasCaught());
+
+    return ScriptValue(constructor);
 }
 
 static bool hasValidPrototypeChainFor(v8::Handle<v8::Object> prototypeObject, WrapperTypeInfo* typeInfo, v8::Handle<v8::Context> context)
@@ -236,16 +309,10 @@ const QualifiedName* CustomElementHelpers::findLocalName(v8::Handle<v8::Object> 
     return 0;
 }
 
-void CustomElementHelpers::upgradeWrappers(ScriptExecutionContext* executionContext, const HashSet<Element*>& elements, const ScriptValue& prototype)
+void CustomElementHelpers::upgradeWrappers(v8::Handle<v8::Context> context, const HashSet<Element*>& elements, v8::Handle<v8::Object> prototype)
 {
     if (elements.isEmpty())
         return;
-
-    v8::HandleScope handleScope;
-    v8::Handle<v8::Context> context = toV8Context(executionContext, mainThreadNormalWorld());
-    v8::Context::Scope scope(context);
-
-    v8::Handle<v8::Value> v8Prototype = prototype.v8Value();
 
     for (HashSet<Element*>::const_iterator it = elements.begin(); it != elements.end(); ++it) {
         v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperForMainWorld(*it);
@@ -254,7 +321,7 @@ void CustomElementHelpers::upgradeWrappers(ScriptExecutionContext* executionCont
             // retrieved; we don't need to eagerly create the wrapper.
             continue;
         }
-        wrapper->SetPrototype(v8Prototype);
+        wrapper->SetPrototype(prototype);
     }
 }
 

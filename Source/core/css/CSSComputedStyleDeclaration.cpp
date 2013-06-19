@@ -298,9 +298,6 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitMaskRepeat,
     CSSPropertyWebkitMaskSize,
     CSSPropertyWebkitOrder,
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-    CSSPropertyWebkitOverflowScrolling,
-#endif
     CSSPropertyWebkitPerspective,
     CSSPropertyWebkitPerspectiveOrigin,
     CSSPropertyWebkitPrintColorAdjust,
@@ -331,10 +328,10 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitWritingMode,
     CSSPropertyWebkitFlowInto,
     CSSPropertyWebkitFlowFrom,
-    CSSPropertyWebkitRegionOverflow,
     CSSPropertyWebkitRegionBreakAfter,
     CSSPropertyWebkitRegionBreakBefore,
     CSSPropertyWebkitRegionBreakInside,
+    CSSPropertyWebkitRegionFragment,
     CSSPropertyWebkitAppRegion,
     CSSPropertyWebkitWrapFlow,
     CSSPropertyWebkitShapeMargin,
@@ -2415,12 +2412,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWebkitMarginTopCollapse:
         case CSSPropertyWebkitMarginBeforeCollapse:
             return cssValuePool().createValue(style->marginBeforeCollapse());
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-        case CSSPropertyWebkitOverflowScrolling:
-            if (!style->useTouchOverflowScrolling())
-                return cssValuePool().createIdentifierValue(CSSValueAuto);
-            return cssValuePool().createIdentifierValue(CSSValueTouch);
-#endif
         case CSSPropertyWebkitPerspective:
             if (!style->hasPerspective())
                 return cssValuePool().createIdentifierValue(CSSValueNone);
@@ -2574,8 +2565,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             if (style->regionThread().isNull())
                 return cssValuePool().createIdentifierValue(CSSValueNone);
             return cssValuePool().createValue(style->regionThread(), CSSPrimitiveValue::CSS_STRING);
-        case CSSPropertyWebkitRegionOverflow:
-            return cssValuePool().createValue(style->regionOverflow());
+        case CSSPropertyWebkitRegionFragment:
+            return cssValuePool().createValue(style->regionFragment());
         case CSSPropertyWebkitWrapFlow:
             return cssValuePool().createValue(style->wrapFlow());
         case CSSPropertyWebkitShapeMargin:
@@ -2748,13 +2739,12 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWebkitTransformOriginZ:
             break;
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
+        /* @viewport rule properties */
         case CSSPropertyMaxZoom:
         case CSSPropertyMinZoom:
         case CSSPropertyOrientation:
         case CSSPropertyUserZoom:
             break;
-#endif
 
         case CSSPropertyBufferedRendering:
         case CSSPropertyClipPath:
@@ -2995,8 +2985,8 @@ PassRefPtr<CSSValueList> CSSComputedStyleDeclaration::getBackgroundShorthandValu
                                                                     CSSPropertyBackgroundClip };
 
     RefPtr<CSSValueList> list = CSSValueList::createSlashSeparated();
-    list->append(getCSSPropertyValuesForShorthandProperties(StylePropertyShorthand(propertiesBeforeSlashSeperator, WTF_ARRAY_LENGTH(propertiesBeforeSlashSeperator))));
-    list->append(getCSSPropertyValuesForShorthandProperties(StylePropertyShorthand(propertiesAfterSlashSeperator, WTF_ARRAY_LENGTH(propertiesAfterSlashSeperator))));
+    list->append(getCSSPropertyValuesForShorthandProperties(StylePropertyShorthand(CSSPropertyBackground, propertiesBeforeSlashSeperator, WTF_ARRAY_LENGTH(propertiesBeforeSlashSeperator))));
+    list->append(getCSSPropertyValuesForShorthandProperties(StylePropertyShorthand(CSSPropertyBackground, propertiesAfterSlashSeperator, WTF_ARRAY_LENGTH(propertiesAfterSlashSeperator))));
     return list.release();
 }
 

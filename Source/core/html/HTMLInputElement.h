@@ -50,8 +50,6 @@ public:
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitspeechchange);
 
-    virtual HTMLInputElement* toInputElement() { return this; }
-
     virtual bool shouldAutocomplete() const;
 
     // For ValidityState
@@ -189,7 +187,7 @@ public:
 
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
-    virtual void detach();
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
 
     // FIXME: For isActivatedSubmit and setActivatedSubmit, we should use the NVI-idiom here by making
     // it private virtual in all classes and expose a public method in HTMLFormControlElement to call
@@ -310,7 +308,6 @@ private:
 
     virtual void willChangeForm() OVERRIDE;
     virtual void didChangeForm() OVERRIDE;
-    static void addToRadioButtonGroupCallback(Node*);
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
@@ -344,7 +341,7 @@ private:
 
     virtual void copyNonAttributePropertiesFromElement(const Element&);
 
-    virtual void attach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
 
     virtual bool appendFormData(FormDataList&, bool);
 

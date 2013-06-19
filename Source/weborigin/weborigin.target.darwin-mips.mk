@@ -12,7 +12,6 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp \
-	$(call intermediates-dir-for,GYP,build_temp_gyp_googleurl_gyp)/googleurl.stamp \
 	$(call intermediates-dir-for,GYP,third_party_icu_icui18n_gyp)/icui18n.stamp \
 	$(call intermediates-dir-for,GYP,third_party_icu_icuuc_gyp)/icuuc.stamp
 
@@ -77,6 +76,7 @@ MY_CFLAGS := \
 MY_CFLAGS_C :=
 
 MY_DEFS := \
+	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISABLE_NACL' \
@@ -88,9 +88,8 @@ MY_DEFS := \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBORIGIN_IMPLEMENTATION=1' \
-	'-DENABLE_CANVAS_USES_MAILBOX=0' \
+	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
@@ -99,6 +98,7 @@ MY_DEFS := \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -113,6 +113,7 @@ MY_DEFS := \
 	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
@@ -132,9 +133,9 @@ LOCAL_C_INCLUDES := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
-	$(LOCAL_PATH) \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
+	$(LOCAL_PATH) \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

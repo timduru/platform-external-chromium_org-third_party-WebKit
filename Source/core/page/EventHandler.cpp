@@ -36,6 +36,7 @@
 #include "core/dom/EventNames.h"
 #include "core/dom/EventPathWalker.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
+#include "core/dom/FullscreenController.h"
 #include "core/dom/KeyboardEvent.h"
 #include "core/dom/MouseEvent.h"
 #include "core/dom/TextEvent.h"
@@ -2118,10 +2119,15 @@ bool EventHandler::shouldTurnVerticalTicksIntoHorizontal(const HitTestResult& re
 
 bool EventHandler::handleWheelEvent(const PlatformWheelEvent& e)
 {
+#define RETURN_WHEEL_EVENT_HANDLED() \
+    { \
+        setFrameWasScrolledByUser(); \
+        return true; \
+    }
+
     Document* doc = m_frame->document();
 
-    RenderObject* docRenderer = doc->renderer();
-    if (!docRenderer)
+    if (!doc->renderer())
         return false;
     
     RefPtr<FrameView> protector(m_frame->view());
@@ -2129,14 +2135,12 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& e)
     FrameView* view = m_frame->view();
     if (!view)
         return false;
-    setFrameWasScrolledByUser();
+
     LayoutPoint vPoint = view->windowToContents(e.position());
 
     HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::DisallowShadowContent);
     HitTestResult result(vPoint);
     doc->renderView()->hitTest(request, result);
-
-    bool useLatchedWheelEventNode = e.useLatchedEventNode();
 
     Node* node = result.innerNode();
     // Wheel events should not dispatch to text nodes.
@@ -2144,7 +2148,7 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& e)
         node = EventPathWalker::parent(node);
 
     bool isOverWidget;
-    if (useLatchedWheelEventNode) {
+    if (e.useLatchedEventNode()) {
         if (!m_latchedWheelEventNode) {
             m_latchedWheelEventNode = node;
             m_widgetIsLatched = result.isOverWidget();
@@ -2175,20 +2179,22 @@ bool EventHandler::handleWheelEvent(const PlatformWheelEvent& e)
         if (isOverWidget && target && target->isWidget()) {
             Widget* widget = toRenderWidget(target)->widget();
             if (widget && passWheelEventToWidget(e, widget))
-                return true;
+                RETURN_WHEEL_EVENT_HANDLED();
         }
 
         if (node && !node->dispatchWheelEvent(event))
-            return true;
+            RETURN_WHEEL_EVENT_HANDLED();
     }
 
 
     // We do another check on the frame view because the event handler can run JS which results in the frame getting destroyed.
     view = m_frame->view();
-    if (!view)
+    if (!view || !view->wheelEvent(event))
         return false;
-    
-    return view->wheelEvent(event);
+
+    RETURN_WHEEL_EVENT_HANDLED();
+
+#undef RETURN_WHEEL_EVENT_HANDLED
 }
 
 void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEvent)
@@ -2938,10 +2944,9 @@ bool EventHandler::handleAccessKey(const PlatformKeyboardEvent& evt)
     return true;
 }
 
-bool EventHandler::isKeyEventAllowedInFullScreen(const PlatformKeyboardEvent& keyEvent) const
+bool EventHandler::isKeyEventAllowedInFullScreen(FullscreenController* fullscreen, const PlatformKeyboardEvent& keyEvent) const
 {
-    Document* document = m_frame->document();
-    if (document->webkitFullScreenKeyboardInputAllowed())
+    if (fullscreen->webkitFullScreenKeyboardInputAllowed())
         return true;
 
     if (keyEvent.type() == PlatformKeyboardEvent::Char) {
@@ -2962,8 +2967,10 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
 {
     RefPtr<FrameView> protector(m_frame->view()); 
 
-    if (m_frame->document()->webkitIsFullScreen() && !isKeyEventAllowedInFullScreen(initialKeyEvent))
-        return false;
+    if (FullscreenController* fullscreen = FullscreenController::fromIfExists(m_frame->document())) {
+        if (fullscreen->webkitIsFullScreen() && !isKeyEventAllowedInFullScreen(fullscreen, initialKeyEvent))
+            return false;
+    }
 
     if (initialKeyEvent.windowsVirtualKeyCode() == VK_CAPITAL)
         capsLockStateMayHaveChanged();
@@ -3626,12 +3633,12 @@ bool EventHandler::handleTouchEvent(const PlatformTouchEvent& event)
             } else if (m_originatingTouchPointDocument.get() && m_originatingTouchPointDocument->frame()) {
                 LayoutPoint pagePointInOriginatingDocument = documentPointForWindowPoint(m_originatingTouchPointDocument->frame(), point.pos());
                 result = hitTestResultInFrame(m_originatingTouchPointDocument->frame(), pagePointInOriginatingDocument, hitType);
-                if (!result.innerNode())
-                    continue;
             } else
                 continue;
+
             Node* node = result.innerNode();
-            ASSERT(node);
+            if (!node)
+                continue;
 
             // Touch events should not go to text nodes
             if (node->isTextNode())

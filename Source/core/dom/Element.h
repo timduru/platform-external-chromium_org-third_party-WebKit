@@ -406,17 +406,18 @@ public:
 
     virtual void copyNonAttributePropertiesFromElement(const Element&) { }
 
-    virtual void attach();
-    virtual void detach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    void recalcStyle(StyleChange = NoChange, int childIndex = 0);
+    void recalcStyle(StyleChange = NoChange);
     void didAffectSelector(AffectedSelectorMask);
 
     ElementShadow* shadow() const;
     ElementShadow* ensureShadow();
     PassRefPtr<ShadowRoot> createShadowRoot(ExceptionCode&);
     ShadowRoot* shadowRoot() const;
+    void ensureDistribution();
 
     bool hasAuthorShadowRoot() const { return shadowRoot(); }
 
@@ -494,11 +495,8 @@ public:
     virtual void finishParsingChildren();
     virtual void beginParsingChildren() OVERRIDE FINAL;
 
-    bool hasPseudoElements() const;
     PseudoElement* pseudoElement(PseudoId) const;
     RenderObject* pseudoElementRenderer(PseudoId) const;
-    bool childNeedsShadowWalker() const;
-    void didShadowTreeAwareChildrenChange();
 
     virtual bool matchesReadOnlyPseudoClass() const;
     virtual bool matchesReadWritePseudoClass() const;
@@ -576,8 +574,8 @@ public:
 
     bool isSpellCheckingEnabled() const;
 
-    PassRefPtr<RenderStyle> styleForRenderer(int childIndex = 0);
-    PassRefPtr<RenderStyle> originalStyleForRenderer(int childIndex = 0);
+    PassRefPtr<RenderStyle> styleForRenderer();
+    PassRefPtr<RenderStyle> originalStyleForRenderer();
 
     RenderRegion* renderRegion() const;
     const AtomicString& webkitRegionOverset() const;
@@ -623,6 +621,7 @@ protected:
     void setTabIndexExplicitly(short);
     virtual bool supportsFocus() const OVERRIDE;
     virtual short tabIndex() const OVERRIDE;
+    virtual bool rendererIsFocusable() const OVERRIDE;
 
     PassRefPtr<HTMLCollection> ensureCachedHTMLCollection(CollectionType);
     HTMLCollection* cachedHTMLCollection(CollectionType);
@@ -635,7 +634,6 @@ protected:
 private:
     void updatePseudoElement(PseudoId, StyleChange);
     void createPseudoElementIfNeeded(PseudoId);
-    void setPseudoElement(PseudoId, PassRefPtr<PseudoElement>);
 
     virtual bool areAuthorShadowsAllowed() const { return true; }
     virtual void didAddUserAgentShadowRoot(ShadowRoot*) { }
@@ -715,7 +713,7 @@ private:
     void detachAttrNodeFromElementWithValue(Attr*, const AtomicString& value);
     void detachAttrNodeAtIndex(Attr*, size_t index);
 
-    void createRendererIfNeeded();
+    void createRendererIfNeeded(const AttachContext&);
 
     bool isJavaScriptURLAttribute(const Attribute&) const;
 

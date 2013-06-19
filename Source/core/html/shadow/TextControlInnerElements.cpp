@@ -145,8 +145,8 @@ const AtomicString& SearchFieldDecorationElement::shadowPseudoId() const
     Element* host = shadowHost();
     if (!host)
         return resultsDecorationId;
-    if (HTMLInputElement* input = host->toInputElement()) {
-        if (input->maxResults() < 0)
+    if (host->hasTagName(inputTag)) {
+        if (toHTMLInputElement(host)->maxResults() < 0)
             return decorationId;
         return resultsDecorationId;
     }
@@ -183,22 +183,18 @@ inline SearchFieldCancelButtonElement::SearchFieldCancelButtonElement(Document* 
 
 PassRefPtr<SearchFieldCancelButtonElement> SearchFieldCancelButtonElement::create(Document* document)
 {
-    return adoptRef(new SearchFieldCancelButtonElement(document));
+    RefPtr<SearchFieldCancelButtonElement> element = adoptRef(new SearchFieldCancelButtonElement(document));
+    element->setPseudo(AtomicString("-webkit-search-cancel-button", AtomicString::ConstructFromLiteral));
+    return element.release();
 }
 
-const AtomicString& SearchFieldCancelButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, pseudoId, ("-webkit-search-cancel-button", AtomicString::ConstructFromLiteral));
-    return pseudoId;
-}
-
-void SearchFieldCancelButtonElement::detach()
+void SearchFieldCancelButtonElement::detach(const AttachContext& context)
 {
     if (m_capturing) {
         if (Frame* frame = document()->frame())
             frame->eventHandler()->setCapturingMouseEventsNode(0);
     }
-    HTMLDivElement::detach();
+    HTMLDivElement::detach(context);
 }
 
 
@@ -275,7 +271,9 @@ InputFieldSpeechButtonElement::~InputFieldSpeechButtonElement()
 
 PassRefPtr<InputFieldSpeechButtonElement> InputFieldSpeechButtonElement::create(Document* document)
 {
-    return adoptRef(new InputFieldSpeechButtonElement(document));
+    RefPtr<InputFieldSpeechButtonElement> element = adoptRef(new InputFieldSpeechButtonElement(document));
+    element->setPseudo(AtomicString("-webkit-input-speech-button", AtomicString::ConstructFromLiteral));
+    return element.release();
 }
 
 void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
@@ -401,15 +399,15 @@ void InputFieldSpeechButtonElement::setRecognitionResult(int, const SpeechInputR
         renderer()->repaint();
 }
 
-void InputFieldSpeechButtonElement::attach()
+void InputFieldSpeechButtonElement::attach(const AttachContext& context)
 {
     ASSERT(!m_listenerId);
     if (SpeechInput* input = SpeechInput::from(document()->page()))
         m_listenerId = input->registerListener(this);
-    HTMLDivElement::attach();
+    HTMLDivElement::attach(context);
 }
 
-void InputFieldSpeechButtonElement::detach()
+void InputFieldSpeechButtonElement::detach(const AttachContext& context)
 {
     if (m_capturing) {
         if (Frame* frame = document()->frame())
@@ -423,7 +421,7 @@ void InputFieldSpeechButtonElement::detach()
         m_listenerId = 0;
     }
 
-    HTMLDivElement::detach();
+    HTMLDivElement::detach(context);
 }
 
 void InputFieldSpeechButtonElement::startSpeechInput()
@@ -444,13 +442,6 @@ void InputFieldSpeechButtonElement::stopSpeechInput()
     if (m_state == Recording)
         speechInput()->stopRecording(m_listenerId);
 }
-
-const AtomicString& InputFieldSpeechButtonElement::shadowPseudoId() const
-{
-    DEFINE_STATIC_LOCAL(AtomicString, pseudoId, ("-webkit-input-speech-button", AtomicString::ConstructFromLiteral));
-    return pseudoId;
-}
-
 #endif // ENABLE(INPUT_SPEECH)
 
 }

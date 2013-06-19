@@ -70,6 +70,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/MemoryInstrumentation.cpp \
 	third_party/WebKit/Source/wtf/NullPtr.cpp \
 	third_party/WebKit/Source/wtf/NumberOfCores.cpp \
+	third_party/WebKit/Source/wtf/PageAllocator.cpp \
 	third_party/WebKit/Source/wtf/ParallelJobsGeneric.cpp \
 	third_party/WebKit/Source/wtf/PartitionAlloc.cpp \
 	third_party/WebKit/Source/wtf/PrintStream.cpp \
@@ -142,6 +143,7 @@ MY_CFLAGS := \
 MY_CFLAGS_C :=
 
 MY_DEFS := \
+	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
@@ -154,9 +156,8 @@ MY_DEFS := \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWTF_IMPLEMENTATION=1' \
-	'-DENABLE_CANVAS_USES_MAILBOX=0' \
+	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
@@ -165,6 +166,7 @@ MY_DEFS := \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -179,6 +181,7 @@ MY_DEFS := \
 	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \

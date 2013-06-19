@@ -58,8 +58,8 @@ V8AbstractEventListener::V8AbstractEventListener(bool isAttribute, PassRefPtr<DO
 V8AbstractEventListener::~V8AbstractEventListener()
 {
     if (!m_listener.isEmpty()) {
-        v8::HandleScope scope;
-        V8EventListenerList::clearWrapper(v8::Local<v8::Object>::New(m_listener.get()), m_isAttribute);
+        v8::HandleScope scope(m_isolate);
+        V8EventListenerList::clearWrapper(m_listener.newLocal(m_isolate), m_isAttribute);
     }
     ThreadLocalInspectorCounters::current().decrementCounter(ThreadLocalInspectorCounters::JSEventListenerCounter);
 }
@@ -96,7 +96,7 @@ void V8AbstractEventListener::handleEvent(ScriptExecutionContext* context, Event
 void V8AbstractEventListener::setListenerObject(v8::Handle<v8::Object> listener)
 {
     m_listener.set(m_isolate, listener);
-    m_listener.getUnsafe().MakeWeak(m_isolate, this, &makeWeakCallback);
+    m_listener.getUnsafe().MakeWeak(this, &makeWeakCallback);
 }
 
 void V8AbstractEventListener::invokeEventHandler(ScriptExecutionContext* context, Event* event, v8::Local<v8::Value> jsEvent)

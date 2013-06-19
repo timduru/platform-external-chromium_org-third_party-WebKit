@@ -89,6 +89,7 @@
 #include "core/dom/Attribute.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/DocumentStyleSheetCollection.h"
+#include "core/dom/FullscreenController.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/Text.h"
@@ -219,9 +220,7 @@ StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
     , m_document(document)
     , m_matchAuthorAndUserStyles(matchAuthorAndUserStyles)
     , m_fontSelector(CSSFontSelector::create(document))
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     , m_viewportStyleResolver(ViewportStyleResolver::create(document))
-#endif
     , m_styleBuilder(DeprecatedStyleBuilder::sharedStyleBuilder())
     , m_styleMap(this)
 {
@@ -277,7 +276,7 @@ void StyleResolver::appendAuthorStyleSheets(unsigned firstNew, const Vector<RefP
             continue;
 
         StyleSheetContents* sheet = cssSheet->contents();
-        ScopedStyleResolver* resolver = ensureScopedStyleResolver(ScopedStyleResolver::scopeFor(cssSheet));
+        ScopedStyleResolver* resolver = ensureScopedStyleResolver(ScopedStyleResolver::scopingNodeFor(cssSheet));
         ASSERT(resolver);
         resolver->addRulesFromSheet(sheet, *m_medium, this);
         m_inspectorCSSOMWrappers.collectFromStyleSheetIfNeeded(cssSheet);
@@ -294,9 +293,8 @@ void StyleResolver::appendAuthorStyleSheets(unsigned firstNew, const Vector<RefP
     if (document()->renderer() && document()->renderer()->style())
         document()->renderer()->style()->font().update(fontSelector());
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
-    viewportStyleResolver()->resolve();
-#endif
+    if (RuntimeEnabledFeatures::cssViewportEnabled())
+        viewportStyleResolver()->resolve();
 }
 
 void StyleResolver::resetAuthorStyle()
@@ -375,10 +373,7 @@ void StyleResolver::addKeyframeStyle(PassRefPtr<StyleRuleKeyframes> rule)
 StyleResolver::~StyleResolver()
 {
     m_fontSelector->clearDocument();
-
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     m_viewportStyleResolver->clearDocument();
-#endif
 }
 
 void StyleResolver::sweepMatchedPropertiesCache(Timer<StyleResolver>*)
@@ -439,7 +434,7 @@ inline void StyleResolver::matchShadowDistributedRules(ElementRuleCollector& col
 
 void StyleResolver::matchHostRules(ScopedStyleResolver* resolver, ElementRuleCollector& collector, bool includeEmptyRules)
 {
-    if (m_state.element() != resolver->scope())
+    if (m_state.element() != resolver->scopingNode())
         return;
     resolver->matchHostRules(collector, includeEmptyRules);
 }
@@ -447,13 +442,13 @@ void StyleResolver::matchHostRules(ScopedStyleResolver* resolver, ElementRuleCol
 void StyleResolver::matchScopedAuthorRules(ElementRuleCollector& collector, bool includeEmptyRules)
 {
     // fast path
-    if (m_styleTree.hasOnlyScopeResolverForDocument()) {
+    if (m_styleTree.hasOnlyScopedResolverForDocument()) {
         m_styleTree.scopedStyleResolverForDocument()->matchAuthorRules(collector, includeEmptyRules, true);
         return;
     }
 
     Vector<ScopedStyleResolver*, 8> stack;
-    m_styleTree.resolveScopeStyles(m_state.element(), stack);
+    m_styleTree.resolveScopedStyles(m_state.element(), stack);
     if (stack.isEmpty())
         return;
 
@@ -566,10 +561,10 @@ void StyleResolver::matchAllRules(ElementRuleCollector& collector, bool matchAut
         collector.matchedResult().isCacheable = false;
 }
 
-inline void StyleResolver::initElement(Element* e, int childIndex)
+inline void StyleResolver::initElement(Element* e)
 {
     if (m_state.element() != e) {
-        m_state.initElement(e, childIndex);
+        m_state.initElement(e);
         if (e && e == e->document()->documentElement()) {
             e->document()->setDirectionSetOnDocumentElement(false);
             e->document()->setWritingModeSetOnDocumentElement(false);
@@ -606,7 +601,7 @@ Node* StyleResolver::locateCousinList(Element* parent, unsigned& visitedNodeCoun
     RenderStyle* parentStyle = p->renderStyle();
     unsigned subcount = 0;
     Node* thisCousin = p;
-    Node* currentNode = p->nextSibling();
+    Node* currentNode = p->previousSibling();
 
     // Reserve the tries for this level. This effectively makes sure that the algorithm
     // will never go deeper than cStyleSearchLevelThreshold levels into recursion.
@@ -624,7 +619,7 @@ Node* StyleResolver::locateCousinList(Element* parent, unsigned& visitedNodeCoun
             }
             if (subcount >= cStyleSearchThreshold)
                 return 0;
-            currentNode = currentNode->nextSibling();
+            currentNode = currentNode->previousSibling();
         }
         currentNode = locateCousinList(thisCousin->parentElement(), visitedNodeCount);
         thisCousin = currentNode;
@@ -645,12 +640,12 @@ bool StyleResolver::styleSharingCandidateMatchesRuleSet(RuleSet* ruleSet)
 bool StyleResolver::canShareStyleWithControl(StyledElement* element) const
 {
     const StyleResolverState& state = m_state;
-    HTMLInputElement* thisInputElement = element->toInputElement();
-    HTMLInputElement* otherInputElement = state.element()->toInputElement();
 
-    if (!thisInputElement || !otherInputElement)
+    if (!element->hasTagName(inputTag) || !state.element()->hasTagName(inputTag))
         return false;
 
+    HTMLInputElement* thisInputElement = toHTMLInputElement(element);
+    HTMLInputElement* otherInputElement = toHTMLInputElement(state.element());
     if (thisInputElement->elementData() != otherInputElement->elementData()) {
         if (thisInputElement->fastGetAttribute(typeAttr) != otherInputElement->fastGetAttribute(typeAttr))
             return false;
@@ -813,14 +808,17 @@ bool StyleResolver::canShareStyleWithElement(StyledElement* element) const
     if (element->isWebVTTElement() && state.element()->isWebVTTElement() && toWebVTTElement(element)->isPastNode() != toWebVTTElement(state.element())->isPastNode())
         return false;
 
-    if (element == element->document()->webkitCurrentFullScreenElement() || state.element() == state.document()->webkitCurrentFullScreenElement())
-        return false;
+    if (FullscreenController* fullscreen = FullscreenController::fromIfExists(state.document())) {
+        if (element == fullscreen->webkitCurrentFullScreenElement() || state.element() == fullscreen->webkitCurrentFullScreenElement())
+            return false;
+    }
+
     return true;
 }
 
 inline StyledElement* StyleResolver::findSiblingForStyleSharing(Node* node, unsigned& count) const
 {
-    for (; node; node = node->nextSibling()) {
+    for (; node; node = node->previousSibling()) {
         if (!node->isStyledElement())
             continue;
         if (canShareStyleWithElement(static_cast<StyledElement*>(node)))
@@ -865,11 +863,11 @@ RenderStyle* StyleResolver::locateSharedStyle()
     // FIXME: This shouldn't be a member variable. The style sharing code could be factored out of StyleResolver.
     state.setElementAffectedByClassRules(state.element() && state.element()->hasClass() && classNamesAffectedByRules(state.element()->classNames()));
 
-    // Check next siblings and their cousins.
+    // Check previous siblings and their cousins.
     unsigned count = 0;
     unsigned visitedNodeCount = 0;
     StyledElement* shareElement = 0;
-    Node* cousinList = state.styledElement()->nextSibling();
+    Node* cousinList = state.styledElement()->previousSibling();
     while (cousinList) {
         shareElement = findSiblingForStyleSharing(cousinList, count);
         if (shareElement)
@@ -1084,8 +1082,8 @@ static inline bool isAtShadowBoundary(const Element* element)
     return parentNode && parentNode->isShadowRoot();
 }
 
-PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderStyle* defaultParent, StyleSharingBehavior sharingBehavior,
-    RuleMatchingBehavior matchingBehavior, RenderRegion* regionForStyling, int childIndex)
+PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderStyle* defaultParent,
+    StyleSharingBehavior sharingBehavior, RuleMatchingBehavior matchingBehavior, RenderRegion* regionForStyling)
 {
     // Once an element has a renderer, we don't try to destroy it, since otherwise the renderer
     // will vanish if a style recalc happens during loading.
@@ -1100,7 +1098,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
     }
 
     StyleResolverState& state = m_state;
-    initElement(element, childIndex);
+    initElement(element);
     state.initForStyleResolve(document(), element, defaultParent, regionForStyling);
     if (sharingBehavior == AllowStyleSharing && !state.distributedToInsertionPoint()) {
         RenderStyle* sharedStyle = locateSharedStyle();
@@ -1347,8 +1345,8 @@ PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
     collector.matchPageRules(CSSDefaultStyleSheets::defaultPrintStyle);
     collector.matchPageRules(m_ruleSets.userStyle());
 
-    if (ScopedStyleResolver* scopeResolver = m_styleTree.scopedStyleResolverForDocument())
-        scopeResolver->matchPageRules(collector);
+    if (ScopedStyleResolver* scopedResolver = m_styleTree.scopedStyleResolverForDocument())
+        scopedResolver->matchPageRules(collector);
 
     m_state.setLineHeightValue(0);
     bool inheritedOnly = false;
@@ -1600,10 +1598,6 @@ void StyleResolver::adjustRenderStyle(RenderStyle* style, RenderStyle* parentSty
         || style->hasBlendMode()
         || style->position() == StickyPosition
         || (style->position() == FixedPosition && e && e->document()->page() && e->document()->page()->settings()->fixedPositionCreatesStackingContext())
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-        // Touch overflow scrolling creates a stacking context.
-        || ((style->overflowX() != OHIDDEN || style->overflowY() != OHIDDEN) && style->useTouchOverflowScrolling())
-#endif
         || (e && e->isInTopLayer())
         ))
         style->setZIndex(0);
@@ -1735,8 +1729,8 @@ bool StyleResolver::checkRegionStyle(Element* regionElement)
     // FIXME (BUG 72472): We don't add @-webkit-region rules of scoped style sheets for the moment,
     // so all region rules are global by default. Verify whether that can stand or needs changing.
 
-    if (ScopedStyleResolver* scopeResolver = m_styleTree.scopedStyleResolverForDocument())
-        if (scopeResolver->checkRegionStyle(regionElement))
+    if (ScopedStyleResolver* scopedResolver = m_styleTree.scopedStyleResolverForDocument())
+        if (scopedResolver->checkRegionStyle(regionElement))
             return true;
 
     if (m_ruleSets.userStyle()) {
@@ -1875,10 +1869,8 @@ static inline bool isValidVisitedLinkProperty(CSSPropertyID id)
     case CSSPropertyFill:
     case CSSPropertyOutlineColor:
     case CSSPropertyStroke:
+    case CSSPropertyTextDecorationColor:
     case CSSPropertyWebkitColumnRuleColor:
-#if ENABLE(CSS3_TEXT)
-    case CSSPropertyWebkitTextDecorationColor:
-#endif // CSS3_TEXT
     case CSSPropertyWebkitTextEmphasisColor:
     case CSSPropertyWebkitTextFillColor:
     case CSSPropertyWebkitTextStrokeColor:
@@ -2850,15 +2842,6 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
         state.style()->setTapHighlightColor(col);
         return;
     }
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-    case CSSPropertyWebkitOverflowScrolling: {
-        HANDLE_INHERIT_AND_INITIAL(useTouchOverflowScrolling, UseTouchOverflowScrolling);
-        if (!primitiveValue)
-            break;
-        state.style()->setUseTouchOverflowScrolling(primitiveValue->getValueID() == CSSValueTouch);
-        return;
-    }
-#endif
     case CSSPropertyInvalid:
         return;
     // Directional properties are resolved by resolveDirectionAwareProperty() before the switch.
@@ -3282,7 +3265,7 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
     case CSSPropertyWebkitRegionBreakAfter:
     case CSSPropertyWebkitRegionBreakBefore:
     case CSSPropertyWebkitRegionBreakInside:
-    case CSSPropertyWebkitRegionOverflow:
+    case CSSPropertyWebkitRegionFragment:
     case CSSPropertyWebkitRtlOrdering:
     case CSSPropertyWebkitRubyPosition:
     case CSSPropertyWebkitTextCombine:
@@ -3322,12 +3305,10 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
     case CSSPropertyWordWrap:
     case CSSPropertyZIndex:
     case CSSPropertyZoom:
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     case CSSPropertyMaxZoom:
     case CSSPropertyMinZoom:
     case CSSPropertyOrientation:
     case CSSPropertyUserZoom:
-#endif
         ASSERT_NOT_REACHED();
         return;
     default:

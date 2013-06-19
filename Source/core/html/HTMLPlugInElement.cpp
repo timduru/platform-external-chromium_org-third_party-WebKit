@@ -79,7 +79,7 @@ bool HTMLPlugInElement::willRespondToMouseClickEvents()
     return true;
 }
 
-void HTMLPlugInElement::detach()
+void HTMLPlugInElement::detach(const AttachContext& context)
 {
     m_instance.clear();
 
@@ -94,7 +94,7 @@ void HTMLPlugInElement::detach()
         m_NPObject = 0;
     }
 
-    HTMLFrameOwnerElement::detach();
+    HTMLFrameOwnerElement::detach(context);
 }
 
 void HTMLPlugInElement::resetInstance()
@@ -218,9 +218,9 @@ bool HTMLPlugInElement::isPluginElement() const
     return true;
 }
 
-bool HTMLPlugInElement::supportsFocus() const
+bool HTMLPlugInElement::rendererIsFocusable() const
 {
-    if (HTMLFrameOwnerElement::supportsFocus())
+    if (HTMLFrameOwnerElement::supportsFocus() && HTMLFrameOwnerElement::rendererIsFocusable())
         return true;
 
     if (useFallbackContent() || !renderer() || !renderer()->isEmbeddedObject())

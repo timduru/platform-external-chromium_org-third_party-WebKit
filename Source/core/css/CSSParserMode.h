@@ -31,7 +31,7 @@
 #ifndef CSSParserMode_h
 #define CSSParserMode_h
 
-#include "core/platform/KURL.h"
+#include "weborigin/KURL.h"
 
 namespace WebCore {
 
@@ -70,7 +70,6 @@ public:
     bool isCSSCustomFilterEnabled;
     bool isCSSStickyPositionEnabled;
     bool isCSSCompositingEnabled;
-    bool isCSSGridLayoutEnabled;
     bool isCSSTouchActionEnabled;
     bool needsSiteSpecificQuirks;
 };

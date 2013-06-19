@@ -34,6 +34,7 @@
 #include "core/inspector/InspectorAgent.h"
 #include "core/inspector/InspectorCSSAgent.h"
 #include "core/inspector/InspectorConsoleAgent.h"
+#include "core/inspector/InspectorController.h"
 #include "core/inspector/InspectorDebuggerAgent.h"
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorProfilerAgent.h"
@@ -41,6 +42,7 @@
 #include "core/inspector/InspectorTimelineAgent.h"
 #include "core/inspector/InspectorWorkerAgent.h"
 #include "core/inspector/InstrumentingAgents.h"
+#include "core/inspector/WorkerInspectorController.h"
 #include "core/loader/cache/CachedResourceInitiatorInfo.h"
 #include "core/workers/WorkerContext.h"
 
@@ -94,33 +96,6 @@ bool isDebuggerPausedImpl(InstrumentingAgents* instrumentingAgents)
     return false;
 }
 
-bool forcePseudoStateImpl(InstrumentingAgents* instrumentingAgents, Element* element, CSSSelector::PseudoType pseudoState)
-{
-    if (InspectorCSSAgent* cssAgent = instrumentingAgents->inspectorCSSAgent())
-        return cssAgent->forcePseudoState(element, pseudoState);
-    return false;
-}
-
-bool shouldApplyScreenWidthOverrideImpl(InstrumentingAgents* instrumentingAgents)
-{
-    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent()) {
-        long width = 0;
-        pageAgent->applyScreenWidthOverride(&width);
-        return !!width;
-    }
-    return false;
-}
-
-bool shouldApplyScreenHeightOverrideImpl(InstrumentingAgents* instrumentingAgents)
-{
-    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent()) {
-        long height = 0;
-        pageAgent->applyScreenHeightOverride(&height);
-        return !!height;
-    }
-    return false;
-}
-
 void continueAfterPingLoaderImpl(InstrumentingAgents* instrumentingAgents, unsigned long identifier, DocumentLoader* loader, ResourceRequest& request, const ResourceResponse& response)
 {
     willSendRequestImpl(instrumentingAgents, identifier, loader, request, response, CachedResourceInitiatorInfo());
@@ -159,27 +134,12 @@ void willDestroyCachedResourceImpl(CachedResource* cachedResource)
     }
 }
 
-String getCurrentUserInitiatedProfileNameImpl(InstrumentingAgents* instrumentingAgents, bool incrementProfileNumber)
-{
-    if (InspectorProfilerAgent* profilerAgent = instrumentingAgents->inspectorProfilerAgent())
-        return profilerAgent->getCurrentUserInitiatedProfileName(incrementProfileNumber);
-    return "";
-}
-
 bool profilerEnabledImpl(InstrumentingAgents* instrumentingAgents)
 {
     if (InspectorProfilerAgent* profilerAgent = instrumentingAgents->inspectorProfilerAgent())
         return profilerAgent->enabled();
     return false;
 }
-
-bool shouldPauseDedicatedWorkerOnStartImpl(InstrumentingAgents* instrumentingAgents)
-{
-    if (InspectorWorkerAgent* workerAgent = instrumentingAgents->inspectorWorkerAgent())
-        return workerAgent->shouldPauseDedicatedWorkerOnStart();
-    return false;
-}
-
 
 bool collectingHTMLParseErrorsImpl(InstrumentingAgents* instrumentingAgents)
 {
@@ -261,21 +221,6 @@ InstrumentingAgents* instrumentingAgentsForNonDocumentContext(ScriptExecutionCon
     return 0;
 }
 
-GeolocationPosition* overrideGeolocationPositionImpl(InstrumentingAgents* instrumentingAgents, GeolocationPosition* position)
-{
-    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent())
-        position = pageAgent->overrideGeolocationPosition(position);
-    return position;
-}
-
-DeviceOrientationData* overrideDeviceOrientationImpl(InstrumentingAgents* instrumentingAgents, DeviceOrientationData* deviceOrientation)
-{
-    if (InspectorPageAgent* pageAgent = instrumentingAgents->inspectorPageAgent())
-        deviceOrientation = pageAgent->overrideDeviceOrientation(deviceOrientation);
-    return deviceOrientation;
-}
-
-
 bool cssErrorFilter(const CSSParserString& content, int propertyId, int errorType)
 {
     return InspectorCSSAgent::cssErrorFilter(content, propertyId, errorType);
@@ -298,6 +243,21 @@ const char LayerId[] = "layerId";
 const char PageId[] = "pageId";
 const char NodeId[] = "nodeId";
 };
+
+InstrumentingAgents* instrumentationForPage(Page* page)
+{
+    ASSERT(isMainThread());
+    if (InspectorController* controller = page->inspectorController())
+        return controller->m_instrumentingAgents.get();
+    return 0;
+}
+
+InstrumentingAgents* instrumentationForWorkerContext(WorkerContext* workerContext)
+{
+    if (WorkerInspectorController* controller = workerContext->workerInspectorController())
+        return controller->m_instrumentingAgents.get();
+    return 0;
+}
 
 } // namespace WebCore
 

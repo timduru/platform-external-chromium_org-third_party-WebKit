@@ -166,9 +166,7 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext* context, PassRefPtr<Secur
     : ActiveDOMObject(context)
     , m_async(true)
     , m_includeCredentials(false)
-#if ENABLE(XHR_TIMEOUT)
     , m_timeoutMilliseconds(0)
-#endif
     , m_state(UNSENT)
     , m_createdDocument(false)
     , m_error(false)
@@ -181,6 +179,7 @@ XMLHttpRequest::XMLHttpRequest(ScriptExecutionContext* context, PassRefPtr<Secur
     , m_exceptionCode(0)
     , m_progressEventThrottle(this)
     , m_responseTypeCode(ResponseTypeDefault)
+    , m_protectionTimer(this, &XMLHttpRequest::dropProtection)
     , m_securityOrigin(securityOrigin)
 {
     initializeXMLHttpRequestStaticData();
@@ -213,13 +212,13 @@ XMLHttpRequest::State XMLHttpRequest::readyState() const
     return m_state;
 }
 
-String XMLHttpRequest::responseText(ExceptionCode& ec)
+ScriptString XMLHttpRequest::responseText(ExceptionCode& ec)
 {
     if (m_responseTypeCode != ResponseTypeDefault && m_responseTypeCode != ResponseTypeText) {
         ec = INVALID_STATE_ERR;
-        return "";
+        return ScriptString();
     }
-    return m_responseBuilder.toStringPreserveCapacity();
+    return m_responseText;
 }
 
 Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
@@ -247,7 +246,7 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
             else
                 m_responseDocument = Document::create(0, m_url);
             // FIXME: Set Last-Modified.
-            m_responseDocument->setContent(m_responseBuilder.toStringPreserveCapacity());
+            m_responseDocument->setContent(m_responseText.flattenToString());
             m_responseDocument->setSecurityOrigin(securityOrigin());
             m_responseDocument->setContextFeatures(document()->contextFeatures());
             if (!m_responseDocument->wellFormed())
@@ -312,7 +311,6 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer(ExceptionCode& ec)
     return m_responseArrayBuffer.get();
 }
 
-#if ENABLE(XHR_TIMEOUT)
 void XMLHttpRequest::setTimeout(unsigned long timeout, ExceptionCode& ec)
 {
     // FIXME: Need to trigger or update the timeout Timer here, if needed. http://webkit.org/b/98156
@@ -324,7 +322,6 @@ void XMLHttpRequest::setTimeout(unsigned long timeout, ExceptionCode& ec)
     }
     m_timeoutMilliseconds = timeout;
 }
-#endif
 
 void XMLHttpRequest::setResponseType(const String& responseType, ExceptionCode& ec)
 {
@@ -496,14 +493,12 @@ void XMLHttpRequest::open(const String& method, const KURL& url, bool async, Exc
             return;
         }
 
-#if ENABLE(XHR_TIMEOUT)
         // Similarly, timeouts are disabled for synchronous requests as well.
         if (m_timeoutMilliseconds > 0) {
             logConsoleError(scriptExecutionContext(), "Synchronous XMLHttpRequests must not have a timeout value set.");
             ec = INVALID_ACCESS_ERR;
             return;
         }
-#endif
     }
 
     m_method = uppercaseKnownHTTPMethod(method);
@@ -749,11 +744,7 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.securityOrigin = securityOrigin();
     options.initiator = cachedResourceRequestInitiators().xmlhttprequest;
     options.contentSecurityPolicyEnforcement = ContentSecurityPolicy::shouldBypassMainWorld(scriptExecutionContext()) ? DoNotEnforceContentSecurityPolicy : EnforceConnectSrcDirective;
-
-#if ENABLE(XHR_TIMEOUT)
-    if (m_timeoutMilliseconds)
-        request.setTimeoutInterval(m_timeoutMilliseconds / 1000.0);
-#endif
+    options.timeoutMilliseconds = m_timeoutMilliseconds;
 
     m_exceptionCode = 0;
     m_error = false;
@@ -834,7 +825,7 @@ void XMLHttpRequest::internalAbort()
     InspectorInstrumentation::didFailXHRLoading(scriptExecutionContext(), this);
 
     if (hadLoader)
-        dropProtection();
+        dropProtectionSoon();
 }
 
 void XMLHttpRequest::clearResponse()
@@ -845,7 +836,7 @@ void XMLHttpRequest::clearResponse()
 
 void XMLHttpRequest::clearResponseBuffers()
 {
-    m_responseBuilder.clear();
+    m_responseText.clear();
     m_createdDocument = false;
     m_responseDocument = 0;
     m_responseBlob = 0;
@@ -891,9 +882,15 @@ void XMLHttpRequest::abortError()
     }
 }
 
-void XMLHttpRequest::dropProtection()
+void XMLHttpRequest::dropProtectionSoon()
 {
+    if (m_protectionTimer.isActive())
+        return;
+    m_protectionTimer.startOneShot(0);
+}
 
+void XMLHttpRequest::dropProtection(Timer<XMLHttpRequest>*)
+{
     unsetPendingActivity(this);
 }
 
@@ -1056,12 +1053,10 @@ void XMLHttpRequest::didFail(const ResourceError& error)
         return;
     }
 
-#if ENABLE(XHR_TIMEOUT)
     if (error.isTimeout()) {
         didTimeout();
         return;
     }
-#endif
 
     // Network failures are already reported to Web Inspector by ResourceLoader.
     if (error.domain() == errorDomainWebKitInternal)
@@ -1085,11 +1080,9 @@ void XMLHttpRequest::didFinishLoading(unsigned long identifier, double)
         changeState(HEADERS_RECEIVED);
 
     if (m_decoder)
-        m_responseBuilder.append(m_decoder->flush());
+        m_responseText = m_responseText.concatenateWith(m_decoder->flush());
 
-    m_responseBuilder.shrinkToFit();
-
-    InspectorInstrumentation::didFinishXHRLoading(scriptExecutionContext(), this, identifier, m_responseBuilder.toStringPreserveCapacity(), m_url, m_lastSendURL, m_lastSendLineNumber);
+    InspectorInstrumentation::didFinishXHRLoading(scriptExecutionContext(), this, identifier, m_responseText, m_url, m_lastSendURL, m_lastSendLineNumber);
 
     bool hadLoader = m_loader;
     m_loader = 0;
@@ -1161,7 +1154,7 @@ void XMLHttpRequest::didReceiveData(const char* data, int len)
         len = strlen(data);
 
     if (useDecoder)
-        m_responseBuilder.append(m_decoder->decode(data, len));
+        m_responseText = m_responseText.concatenateWith(m_decoder->decode(data, len));
     else if (m_responseTypeCode == ResponseTypeArrayBuffer || m_responseTypeCode == ResponseTypeBlob) {
         // Buffer binary data.
         if (!m_binaryResponseBuilder)
@@ -1187,7 +1180,6 @@ void XMLHttpRequest::didReceiveData(const char* data, int len)
     }
 }
 
-#if ENABLE(XHR_TIMEOUT)
 void XMLHttpRequest::didTimeout()
 {
     // internalAbort() calls dropProtection(), which may release the last reference.
@@ -1215,7 +1207,6 @@ void XMLHttpRequest::didTimeout()
     }
     m_progressEventThrottle.dispatchEventAndLoadEnd(XMLHttpRequestProgressEvent::create(eventNames().timeoutEvent));
 }
-#endif
 
 bool XMLHttpRequest::canSuspend() const
 {
@@ -1279,7 +1270,7 @@ void XMLHttpRequest::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_response, "response");
     info.addMember(m_responseEncoding, "responseEncoding");
     info.addMember(m_decoder, "decoder");
-    info.addMember(m_responseBuilder, "responseBuilder");
+    info.addMember(m_responseText, "responseText");
     info.addMember(m_responseDocument, "responseDocument");
     info.addMember(m_binaryResponseBuilder, "binaryResponseBuilder");
     info.addMember(m_responseArrayBuffer, "responseArrayBuffer");

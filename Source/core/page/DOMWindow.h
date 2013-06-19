@@ -30,7 +30,6 @@
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/EventTarget.h"
 #include "core/page/FrameDestructionObserver.h"
-#include "core/platform/KURL.h"
 #include "core/platform/Supplementable.h"
 #include "wtf/Forward.h"
 
@@ -39,7 +38,6 @@ namespace WebCore {
     class CSSRuleList;
     class CSSStyleDeclaration;
     class Console;
-    class Crypto;
     class DOMApplicationCache;
     class DOMPoint;
     class DOMSelection;
@@ -123,7 +121,6 @@ namespace WebCore {
 
         Screen* screen() const;
         History* history() const;
-        Crypto* crypto() const;
         BarProp* locationbar() const;
         BarProp* menubar() const;
         BarProp* personalbar() const;
@@ -244,9 +241,7 @@ namespace WebCore {
         void resizeTo(float width, float height) const;
 
         // Timers
-        int setTimeout(PassOwnPtr<ScheduledAction>, int timeout, ExceptionCode&);
         void clearTimeout(int timeoutId);
-        int setInterval(PassOwnPtr<ScheduledAction>, int timeout, ExceptionCode&);
         void clearInterval(int timeoutId);
 
         // WebKit animation extensions
@@ -335,7 +330,7 @@ namespace WebCore {
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkitanimationiteration, webkitAnimationIteration);
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkitanimationend, webkitAnimationEnd);
         DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(webkittransitionend, webkitTransitionEnd);
-        DEFINE_MAPPED_ATTRIBUTE_EVENT_LISTENER(transitionend, transitionend);
+        DEFINE_ATTRIBUTE_EVENT_LISTENER(transitionend);
 
         void finishedLoading();
 
@@ -410,7 +405,6 @@ namespace WebCore {
 
         mutable RefPtr<Screen> m_screen;
         mutable RefPtr<History> m_history;
-        mutable RefPtr<Crypto>  m_crypto;
         mutable RefPtr<BarProp> m_locationbar;
         mutable RefPtr<BarProp> m_menubar;
         mutable RefPtr<BarProp> m_personalbar;

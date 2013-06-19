@@ -22,6 +22,7 @@
 #ifndef XMLHttpRequest_h
 #define XMLHttpRequest_h
 
+#include "bindings/v8/ScriptString.h"
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/ActiveDOMObject.h"
 #include "core/dom/EventListener.h"
@@ -32,9 +33,9 @@
 #include "core/platform/network/ResourceResponse.h"
 #include "core/xml/XMLHttpRequestProgressEventThrottle.h"
 #include "weborigin/SecurityOrigin.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/text/AtomicStringHash.h>
-#include <wtf/text/StringBuilder.h>
+#include "wtf/OwnPtr.h"
+#include "wtf/text/AtomicStringHash.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -71,9 +72,7 @@ public:
     };
 
     virtual void contextDestroyed();
-#if ENABLE(XHR_TIMEOUT)
     virtual void didTimeout();
-#endif
     virtual bool canSuspend() const;
     virtual void suspend(ReasonForSuspension);
     virtual void resume();
@@ -104,15 +103,13 @@ public:
     void overrideMimeType(const String& override);
     String getAllResponseHeaders(ExceptionCode&) const;
     String getResponseHeader(const AtomicString& name, ExceptionCode&) const;
-    String responseText(ExceptionCode&);
+    ScriptString responseText(ExceptionCode&);
     Document* responseXML(ExceptionCode&);
     Document* optionalResponseXML() const { return m_responseDocument.get(); }
     Blob* responseBlob(ExceptionCode&);
     Blob* optionalResponseBlob() const { return m_responseBlob.get(); }
-#if ENABLE(XHR_TIMEOUT)
     unsigned long timeout() const { return m_timeoutMilliseconds; }
     void setTimeout(unsigned long timeout, ExceptionCode&);
-#endif
 
     void sendForInspector(ExceptionCode&);
     void sendForInspectorXHRReplay(PassRefPtr<FormData>, ExceptionCode&);
@@ -145,9 +142,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(loadend);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(loadstart);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(progress);
-#if ENABLE(XHR_TIMEOUT)
     DEFINE_ATTRIBUTE_EVENT_LISTENER(timeout);
-#endif
 
     using RefCounted<XMLHttpRequest>::ref;
     using RefCounted<XMLHttpRequest>::deref;
@@ -181,7 +176,8 @@ private:
 
     void changeState(State newState);
     void callReadyStateChangeListener();
-    void dropProtection();
+    void dropProtectionSoon();
+    void dropProtection(Timer<XMLHttpRequest>* = 0);
     void internalAbort();
     void clearResponse();
     void clearResponseBuffers();
@@ -202,9 +198,7 @@ private:
     String m_mimeTypeOverride;
     bool m_async;
     bool m_includeCredentials;
-#if ENABLE(XHR_TIMEOUT)
     unsigned long m_timeoutMilliseconds;
-#endif
     RefPtr<Blob> m_responseBlob;
 
     RefPtr<ThreadableLoader> m_loader;
@@ -215,7 +209,7 @@ private:
 
     RefPtr<TextResourceDecoder> m_decoder;
 
-    StringBuilder m_responseBuilder;
+    ScriptString m_responseText;
     mutable bool m_createdDocument;
     mutable RefPtr<Document> m_responseDocument;
     
@@ -243,7 +237,7 @@ private:
 
     // An enum corresponding to the allowed string values for the responseType attribute.
     ResponseTypeCode m_responseTypeCode;
-
+    Timer<XMLHttpRequest> m_protectionTimer;
     RefPtr<SecurityOrigin> m_securityOrigin;
 };
 

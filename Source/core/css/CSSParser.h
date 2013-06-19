@@ -101,7 +101,7 @@ public:
     PassRefPtr<CSSPrimitiveValue> parseValidPrimitive(CSSValueID ident, CSSParserValue*);
     bool parseDeclaration(MutableStylePropertySet*, const String&, SourceDataHandler*, StyleSheetContents* contextStyleSheet);
     static PassRefPtr<ImmutableStylePropertySet> parseInlineStyleDeclaration(const String&, Element*);
-    PassOwnPtr<MediaQuery> parseMediaQuery(const String&);
+    PassRefPtr<MediaQuerySet> parseMediaQueryList(const String&);
 
     void addPropertyWithPrefixingVariant(CSSPropertyID, PassRefPtr<CSSValue>, bool important, bool implicit = false);
     void addProperty(CSSPropertyID, PassRefPtr<CSSValue>, bool important, bool implicit = false);
@@ -162,7 +162,6 @@ public:
     bool parseTransitionShorthand(CSSPropertyID, bool important);
     bool parseAnimationShorthand(bool important);
 
-    bool cssGridLayoutEnabled() const;
     PassRefPtr<CSSValue> parseGridPosition();
     bool parseIntegerOrStringFromGridPosition(RefPtr<CSSPrimitiveValue>& numericValue, RefPtr<CSSPrimitiveValue>& gridLineName);
     bool parseGridItemPositionShorthand(CSSPropertyID, bool important);
@@ -288,6 +287,7 @@ public:
     PassOwnPtr<CSSParserValueList> sinkFloatingValueList(CSSParserValueList*);
 
     CSSParserFunction* createFloatingFunction();
+    CSSParserFunction* createFloatingFunction(const CSSParserString& name, PassOwnPtr<CSSParserValueList> args);
     PassOwnPtr<CSSParserFunction> sinkFloatingFunction(CSSParserFunction*);
 
     CSSParserValue& sinkFloatingValue(CSSParserValue&);
@@ -356,7 +356,7 @@ public:
     StyleSheetContents* m_styleSheet;
     RefPtr<StyleRuleBase> m_rule;
     RefPtr<StyleKeyframe> m_keyframe;
-    OwnPtr<MediaQuery> m_mediaQuery;
+    RefPtr<MediaQuerySet> m_mediaList;
     OwnPtr<CSSParserValueList> m_valueList;
     bool m_supportsCondition;
 
@@ -404,11 +404,9 @@ public:
 
     void tokenToLowerCase(const CSSParserString& token);
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     void markViewportRuleBodyStart() { m_inViewport = true; }
     void markViewportRuleBodyEnd() { m_inViewport = false; }
     StyleRuleBase* createViewportRule();
-#endif
 
     PassRefPtr<CSSPrimitiveValue> createPrimitiveNumericValue(CSSParserValue*);
     PassRefPtr<CSSPrimitiveValue> createPrimitiveStringValue(CSSParserValue*);
@@ -454,6 +452,9 @@ private:
 
     template <typename CharacterType>
     inline CharacterType* tokenStart();
+
+    template <typename CharacterType>
+    inline CharacterType* dataStart();
 
     template <typename CharacterType>
     inline void setTokenStart(CharacterType*);
@@ -583,13 +584,11 @@ private:
     bool m_allowImportRules;
     bool m_allowNamespaceDeclarations;
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     bool parseViewportProperty(CSSPropertyID propId, bool important);
     bool parseViewportShorthand(CSSPropertyID propId, CSSPropertyID first, CSSPropertyID second, bool important);
 
     bool inViewport() const { return m_inViewport; }
     bool m_inViewport;
-#endif
 
     int (CSSParser::*m_lexFunc)(void*);
 

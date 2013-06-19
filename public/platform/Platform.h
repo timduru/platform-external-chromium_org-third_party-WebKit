@@ -51,6 +51,7 @@ namespace WebKit {
 
 class WebAudioBus;
 class WebBlobRegistry;
+class WebContentDecryptionModule;
 class WebClipboard;
 class WebCompositorSupport;
 class WebCookieJar;
@@ -129,6 +130,13 @@ public:
     // May return null.
     virtual WebSpeechSynthesizer* createSpeechSynthesizer(WebSpeechSynthesizerClient*) { return 0; }
 
+
+    // Media --------------------------------------------------------------
+
+    // May return null.
+    virtual WebContentDecryptionModule* createContentDecryptionModule(const WebString& keySystem) { return 0; }
+
+
     // Audio --------------------------------------------------------------
 
     virtual double audioHardwareSampleRate() { return 0; }
@@ -180,10 +188,17 @@ public:
     // Must return non-null.
     virtual WebFileSystem* fileSystem() { return 0; }
 
+
+    // IDN conversion ------------------------------------------------------
+
+    virtual WebString convertIDNToUnicode(const WebString& host, const WebString& languages) { return host; }
+
+
     // IndexedDB ----------------------------------------------------------
 
     // Must return non-null.
     virtual WebIDBFactory* idbFactory() { return 0; }
+
 
     // Gamepad -------------------------------------------------------------
 
@@ -287,6 +302,9 @@ public:
     // A suggestion to cache this metadata in association with this URL.
     virtual void cacheMetadata(const WebURL&, double responseTime, const char* data, size_t dataSize) { }
 
+    // Returns the decoded data url if url had a supported mimetype and parsing was successful.
+    virtual WebData parseDataURL(const WebURL&, WebString& mimetype, WebString& charset) { return WebData(); }
+
 
     // Plugins -------------------------------------------------------------
 
@@ -330,18 +348,6 @@ public:
     virtual bool loadAudioResource(WebAudioBus* destinationBus, const char* audioFileData, size_t dataSize, double sampleRate) { return false; }
 
 
-    // Sandbox ------------------------------------------------------------
-
-    // In some browsers, a "sandbox" restricts what operations a program
-    // is allowed to preform. Such operations are typically abstracted out
-    // via this API, but sometimes (like in HTML 5 database opening) WebKit
-    // needs to behave differently based on whether it's restricted or not.
-    // In these cases (and these cases only) you can call this function.
-    // It's OK for this value to be conservitive (i.e. true even if the
-    // sandbox isn't active).
-    virtual bool sandboxEnabled() { return false; }
-
-
     // Screen -------------------------------------------------------------
 
     // Supplies the system monitor color profile.
@@ -379,8 +385,15 @@ public:
     // Callable from a background WebKit thread.
     virtual void callOnMainThread(void (*func)(void*), void* context) { }
 
-    // Checks the partition/volume where fileName resides.
-    virtual long long availableDiskSpaceInBytes(const WebString& fileName) { return 0; }
+
+    // Vibration -----------------------------------------------------------
+
+    // Starts a vibration for the given duration in milliseconds. If there is currently an active
+    // vibration it will be cancelled before the new one is started.
+    virtual void vibrate(unsigned time) { }
+
+    // Cancels the current vibration, if there is one.
+    virtual void cancelVibration() { }
 
 
     // Testing -------------------------------------------------------------

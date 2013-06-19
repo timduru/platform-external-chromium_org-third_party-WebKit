@@ -58,15 +58,14 @@
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/FloatConversion.h"
-#include "core/platform/KURL.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
-#include "core/platform/graphics/StrokeStyleApplier.h"
 #include "core/platform/graphics/TextRun.h"
 #include "core/platform/graphics/transforms/AffineTransform.h"
 #include "core/rendering/RenderHTMLCanvas.h"
 #include "core/rendering/RenderLayer.h"
+#include "weborigin/KURL.h"
 #include "weborigin/SecurityOrigin.h"
 
 #include <wtf/CheckedArithmetic.h>
@@ -94,30 +93,6 @@ static bool isOriginClean(CachedImage* cachedImage, SecurityOrigin* securityOrig
         return true;
     return !securityOrigin->taintsCanvas(cachedImage->response().url());
 }
-
-class CanvasStrokeStyleApplier : public StrokeStyleApplier {
-public:
-    CanvasStrokeStyleApplier(CanvasRenderingContext2D* canvasContext)
-        : m_canvasContext(canvasContext)
-    {
-    }
-
-    virtual void strokeStyle(GraphicsContext* c)
-    {
-        c->setStrokeThickness(m_canvasContext->lineWidth());
-        c->setLineCap(m_canvasContext->getLineCap());
-        c->setLineJoin(m_canvasContext->getLineJoin());
-        c->setMiterLimit(m_canvasContext->miterLimit());
-        const Vector<float>& lineDash = m_canvasContext->getLineDash();
-        DashArray convertedLineDash(lineDash.size());
-        for (size_t i = 0; i < lineDash.size(); ++i)
-            convertedLineDash[i] = static_cast<DashArrayElement>(lineDash[i]);
-        c->setLineDash(convertedLineDash, m_canvasContext->lineDashOffset());
-    }
-
-private:
-    CanvasRenderingContext2D* m_canvasContext;
-};
 
 CanvasRenderingContext2D::CanvasRenderingContext2D(HTMLCanvasElement* canvas, const Canvas2DContextAttributes* attrs, bool usesCSSCompatibilityParseMode)
     : CanvasRenderingContext(canvas)
@@ -751,7 +726,7 @@ void CanvasRenderingContext2D::setTransform(float m11, float m12, float m21, flo
         return;
 
     realizeSaves();
-    
+
     c->setCTM(canvas()->baseTransform());
     modifiableState().m_transform = AffineTransform();
     m_path.transform(ctm);
@@ -898,7 +873,7 @@ static bool parseWinding(const String& windingRuleString, WindRule& windRule)
         windRule = RULE_EVENODD;
     else
         return false;
-    
+
     return true;
 }
 
@@ -933,7 +908,7 @@ void CanvasRenderingContext2D::fill(const String& windingRuleString)
             c->fillPath(m_path);
             didDraw(m_path.boundingRect());
         }
-        
+
         c->setFillRule(windRule);
     }
 }
@@ -993,7 +968,7 @@ bool CanvasRenderingContext2D::isPointInPath(const float x, const float y, const
     WindRule windRule = RULE_NONZERO;
     if (!parseWinding(windingRuleString, windRule))
         return false;
-    
+
     return m_path.contains(transformedPoint, windRule);
 }
 
@@ -1012,8 +987,13 @@ bool CanvasRenderingContext2D::isPointInStroke(const float x, const float y)
     if (!std::isfinite(transformedPoint.x()) || !std::isfinite(transformedPoint.y()))
         return false;
 
-    CanvasStrokeStyleApplier applier(this);
-    return m_path.strokeContains(&applier, transformedPoint);
+    StrokeData strokeData;
+    strokeData.setThickness(lineWidth());
+    strokeData.setLineCap(getLineCap());
+    strokeData.setLineJoin(getLineJoin());
+    strokeData.setMiterLimit(miterLimit());
+    strokeData.setLineDash(getLineDash(), lineDashOffset());
+    return m_path.strokeContains(transformedPoint, strokeData);
 }
 
 void CanvasRenderingContext2D::clearRect(float x, float y, float width, float height)
@@ -1833,7 +1813,7 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::getImageData(ImageBuffer::Coordi
     if (sw < 0) {
         sx += sw;
         sw = -sw;
-    }    
+    }
     if (sh < 0) {
         sy += sh;
         sh = -sh;
@@ -1945,6 +1925,8 @@ String CanvasRenderingContext2D::font() const
 
     if (fontDescription.italic())
         serializedFont.appendLiteral("italic ");
+    if (fontDescription.weight() == FontWeightBold)
+        serializedFont.appendLiteral("bold ");
     if (fontDescription.smallCaps() == FontSmallCapsOn)
         serializedFont.appendLiteral("small-caps ");
 
@@ -1975,8 +1957,14 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
     if (newFont == state().m_unparsedFont && state().m_realizedFont)
         return;
 
-    RefPtr<MutableStylePropertySet> parsedStyle = MutableStylePropertySet::create();
-    CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, newFont, true, strictToCSSParserMode(!m_usesCSSCompatibilityParseMode), 0);
+    MutableStylePropertyMap::iterator i = m_cachedFonts.find(newFont);
+    RefPtr<MutableStylePropertySet> parsedStyle = i != m_cachedFonts.end() ? i->value : 0;
+
+    if (!parsedStyle) {
+        parsedStyle = MutableStylePropertySet::create();
+        CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, newFont, true, strictToCSSParserMode(!m_usesCSSCompatibilityParseMode), 0);
+        m_cachedFonts.add(newFont, parsedStyle);
+    }
     if (parsedStyle->isEmpty())
         return;
 
@@ -2227,7 +2215,7 @@ const Font& CanvasRenderingContext2D::accessFont()
     return state().m_font;
 }
 
-PlatformLayer* CanvasRenderingContext2D::platformLayer() const
+WebKit::WebLayer* CanvasRenderingContext2D::platformLayer() const
 {
     return canvas()->buffer() ? canvas()->buffer()->platformLayer() : 0;
 }

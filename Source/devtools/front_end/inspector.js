@@ -441,8 +441,6 @@ WebInspector.doLoadedDone = function()
 
     WebInspector.WorkerManager.loaded();
 
-    PageAgent.canShowFPSCounter(WebInspector._initializeCapability.bind(WebInspector, "canShowFPSCounter", null));
-    PageAgent.canContinuouslyPaint(WebInspector._initializeCapability.bind(WebInspector, "canContinuouslyPaint", null));
     WorkerAgent.canInspectWorkers(WebInspector._initializeCapability.bind(WebInspector, "canInspectWorkers", WebInspector._doLoadedDoneWithCapabilities.bind(WebInspector)));
 }
 
@@ -485,8 +483,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
 
     this.isolatedFileSystemManager = new WebInspector.IsolatedFileSystemManager();
     this.isolatedFileSystemDispatcher = new WebInspector.IsolatedFileSystemDispatcher(this.isolatedFileSystemManager);
-    this.fileMapping = new WebInspector.FileMapping();
-    this.workspace = new WebInspector.Workspace(this.fileMapping, this.isolatedFileSystemManager.mapping());
+    this.workspace = new WebInspector.Workspace(this.isolatedFileSystemManager.mapping());
 
     this.cssModel = new WebInspector.CSSStyleModel(this.workspace);
     this.timelineManager = new WebInspector.TimelineManager();
@@ -559,6 +556,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
 
     ProfilerAgent.enable();
 
+    WebInspector.settings.forceCompositingMode = WebInspector.settings.createBackendSetting("forceCompositingMode", false, PageAgent.setForceCompositingMode.bind(PageAgent));
     WebInspector.settings.showPaintRects = WebInspector.settings.createBackendSetting("showPaintRects", false, PageAgent.setShowPaintRects.bind(PageAgent));
     WebInspector.settings.showDebugBorders = WebInspector.settings.createBackendSetting("showDebugBorders", false, PageAgent.setShowDebugBorders.bind(PageAgent));
     WebInspector.settings.continuousPainting = WebInspector.settings.createBackendSetting("continuousPainting", false, PageAgent.setContinuousPaintingEnabled.bind(PageAgent));
@@ -738,7 +736,7 @@ WebInspector._registerShortcuts = function()
         shortcut.Keys.F1,
         shortcut.makeDescriptor("?")
     ];
-    section.addAlternateKeys(keys, WebInspector.UIString("Show keyboard shortcuts"));
+    section.addAlternateKeys(keys, WebInspector.UIString("Show general settings"));
 }
 
 /**

@@ -176,7 +176,7 @@ static void TestActiveDOMObjectDomainSafeFunctionSetter(v8::Local<v8::String> na
 } // namespace TestActiveDOMObjectV8Internal
 
 static const V8DOMConfiguration::BatchedAttribute V8TestActiveDOMObjectAttrs[] = {
-    // Attribute 'excitingAttr' (Type: 'attribute' ExtAttr: '')
+    // Attribute 'excitingAttr'
     {"excitingAttr", TestActiveDOMObjectV8Internal::excitingAttrAttrGetterCallback, 0, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
 };
 
@@ -244,7 +244,6 @@ v8::Handle<v8::Object> V8TestActiveDOMObject::createWrapper(PassRefPtr<TestActiv
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
-
     installPerContextProperties(wrapper, impl.get(), isolate);
     V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;

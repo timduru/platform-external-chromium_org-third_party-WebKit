@@ -49,6 +49,7 @@ def _CommonChecks(input_api, output_api):
     results.extend(_CheckPatchFiles(input_api, output_api))
     results.extend(_CheckTestExpectations(input_api, output_api))
     results.extend(_CheckUnwantedDependencies(input_api, output_api))
+    results.extend(_CheckChromiumPlatformMacros(input_api, output_api))
     return results
 
 
@@ -172,7 +173,8 @@ def _CheckUnwantedDependencies(input_api, output_api):
         changed_lines = [line for line_num, line in f.ChangedContents()]
         added_includes.append([f.LocalPath(), changed_lines])
 
-    deps_checker = checkdeps.DepsChecker(input_api.PresubmitLocalPath())
+    deps_checker = checkdeps.DepsChecker(
+        input_api.os_path.join(input_api.PresubmitLocalPath(), 'Source'))
 
     error_descriptions = []
     warning_descriptions = []
@@ -196,6 +198,21 @@ def _CheckUnwantedDependencies(input_api, output_api):
                 '#include? See relevant DEPS file(s) for details and contacts.',
                 warning_descriptions))
     return results
+
+
+def _CheckChromiumPlatformMacros(input_api, output_api, source_file_filter=None):
+    """Ensures that Blink code uses WTF's platform macros instead of
+    Chromium's. Using the latter has resulted in at least one subtle
+    build breakage."""
+    os_macro_re = input_api.re.compile(r'^\s*#(el)?if.*\bOS_')
+    errors = input_api.canned_checks._FindNewViolationsOfRule(
+        lambda _, x: not os_macro_re.search(x),
+        input_api, source_file_filter)
+    errors = ['Found use of Chromium OS_* macro in %s. '
+        'Use WTF platform macros instead.' % violation for violation in errors]
+    if errors:
+        return [output_api.PresubmitPromptWarning('\n'.join(errors))]
+    return []
 
 
 def CheckChangeOnUpload(input_api, output_api):

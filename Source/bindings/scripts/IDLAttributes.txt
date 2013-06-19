@@ -28,6 +28,8 @@ CheckSecurityForNode
 Clamp
 Conditional=*
 Constructor
+ConstructorCallWith=ScriptExecutionContext
+ConstructorRaisesException
 ConstructorTemplate=Event|TypedArray
 Custom
 CustomConstructor
@@ -58,7 +60,6 @@ GlobalContext=WindowOnly|WorkerOnly|WindowAndWorker
 Immutable
 ImplementedAs=*
 InitializedByEventConstructor
-InterfaceName=*
 IsIndex
 MasqueradesAsUndefined
 MeasureAs=*
@@ -79,4 +80,3 @@ TreatReturnedNullStringAs=Null|Undefined
 TreatUndefinedAs=*
 URL
 Unforgeable
-WrapAsFunction

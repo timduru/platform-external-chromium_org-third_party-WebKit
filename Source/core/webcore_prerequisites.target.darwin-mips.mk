@@ -23,20 +23,20 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_wtf_wtf_gyp)/third_party_WebKit_Source_wtf_wtf_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_config_gyp)/config.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_WebKit_Source_weborigin_weborigin_gyp)/third_party_WebKit_Source_weborigin_weborigin_gyp.a \
-	$(call intermediates-dir-for,GYP,build_temp_gyp_googleurl_gyp)/googleurl.stamp \
+	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_angle_dx11_src_translator_glsl_gyp)/third_party_angle_dx11_src_translator_glsl_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,gpu_gles2_c_lib_gyp)/gpu_gles2_c_lib_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_gyp)/skia_skia_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_iccjpeg_iccjpeg_gyp)/third_party_iccjpeg_iccjpeg_gyp.a \
-	$(call intermediates-dir-for,GYP,third_party_libwebp_libwebp_gyp)/webp.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_libpng_libpng_gyp)/third_party_libpng_libpng_gyp.a \
+	$(call intermediates-dir-for,GYP,third_party_libwebp_libwebp_gyp)/webp.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_libxml_libxml_gyp)/third_party_libxml_libxml_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_libxslt_libxslt_gyp)/third_party_libxslt_libxslt_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_npapi_npapi_gyp)/npapi.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_ots_ots_gyp)/third_party_ots_ots_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_qcms_qcms_gyp)/third_party_qcms_qcms_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_sqlite_sqlite_gyp)/third_party_sqlite_sqlite_gyp.a \
-	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_angle_src_translator_glsl_gyp)/third_party_angle_src_translator_glsl_gyp.a \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,third_party_zlib_zlib_gyp)/third_party_zlib_zlib_gyp.a \
+	$(call intermediates-dir-for,STATIC_LIBRARIES,url_url_lib_gyp)/url_url_lib_gyp.a \
 	$(call intermediates-dir-for,GYP,v8_tools_gyp_v8_gyp)/v8.stamp \
 	$(call intermediates-dir-for,GYP,third_party_libjpeg_libjpeg_gyp)/libjpeg.stamp
 

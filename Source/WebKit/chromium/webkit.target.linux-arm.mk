@@ -31,12 +31,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/Platform.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebActiveGestureAnimation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebAudioBus.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebCString.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceMotionData.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebFilterOperation.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebFilterOperations.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebFloatQuad.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebHTTPBody.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebHTTPLoadInfo.cpp \
@@ -62,7 +59,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebSpeechSynthesizerClientImpl.cpp \
-	third_party/WebKit/Source/core/platform/chromium/support/WebString.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebThreadSafeData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebTransformKeyframe.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebURL.cpp \
@@ -142,7 +138,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCache.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCachedURLRequest.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebColorName.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebCommon.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebCrossOriginPreflightResultCache.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMActivityLogger.cpp \
 	third_party/WebKit/Source/WebKit/chromium/src/WebDOMCustomEvent.cpp \
@@ -302,6 +297,7 @@ MY_CFLAGS := \
 MY_CFLAGS_C :=
 
 MY_DEFS := \
+	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
@@ -314,9 +310,9 @@ MY_DEFS := \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
-	'-DENABLE_CANVAS_USES_MAILBOX=0' \
+	'-DINSIDE_WEBKIT' \
+	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
@@ -325,6 +321,7 @@ MY_DEFS := \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -339,6 +336,7 @@ MY_DEFS := \
 	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_BUILD_NO_IMAGE_ENCODE' \
 	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \
@@ -364,7 +362,7 @@ LOCAL_CFLAGS := $(MY_CFLAGS_C) $(MY_CFLAGS) $(MY_DEFS)
 LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/WebKit/Source/WebKit/chromium/public \
 	$(LOCAL_PATH)/third_party/WebKit/Source/WebKit/chromium/src \
-	$(LOCAL_PATH)/third_party/angle/include \
+	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/third_party/WebKit/Source/WebKit/chromium/public/android \
 	$(LOCAL_PATH)/third_party/WebKit/Source/WebKit/chromium/public/linux \

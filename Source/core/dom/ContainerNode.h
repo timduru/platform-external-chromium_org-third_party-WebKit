@@ -37,7 +37,7 @@ class HTMLCollection;
 
 typedef void (*NodeCallback)(Node*);
 
-namespace Private { 
+namespace Private {
     template<class GenericNode, class GenericNodeContainer>
     void addChildNodesToDeletionQueue(GenericNode*& head, GenericNode*& tail, GenericNodeContainer*);
 };
@@ -80,7 +80,6 @@ private:
 
 class ContainerNode : public Node {
     friend class PostAttachCallbackDisabler;
-    friend class InsertionCallbackDeferer;
 public:
     virtual ~ContainerNode();
 
@@ -114,8 +113,9 @@ public:
 
     void cloneChildNodes(ContainerNode* clone);
 
-    virtual void attach() OVERRIDE;
-    virtual void detach() OVERRIDE;
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual LayoutRect boundingBox() const OVERRIDE;
     virtual void setFocus(bool) OVERRIDE;
     virtual void setActive(bool active = true, bool pause = false) OVERRIDE;
     virtual void setHovered(bool = true) OVERRIDE;
@@ -141,8 +141,6 @@ public:
 protected:
     ContainerNode(TreeScope*, ConstructionType = CreateContainer);
 
-    static void queueInsertionCallback(NodeCallback, Node*);
-    static bool insertionCallbacksAreSuspended();
     static void queuePostAttachCallback(NodeCallback, Node*);
     static bool postAttachCallbacksAreSuspended();
 
@@ -165,10 +163,8 @@ private:
     void suspendPostAttachCallbacks();
     void resumePostAttachCallbacks();
 
-    static void dispatchInsertionCallbacks();
-
-    static void suspendInsertionCallbacks();
-    static void resumeInsertionCallbacks();
+    bool getUpperLeftCorner(FloatPoint&) const;
+    bool getLowerRightCorner(FloatPoint&) const;
 
     Node* m_firstChild;
     Node* m_lastChild;
@@ -267,14 +263,6 @@ inline Node* Node::highestAncestor() const
     return highest;
 }
 
-inline bool Node::needsShadowTreeWalker() const
-{
-    if (getFlag(NeedsShadowTreeWalkerFlag))
-        return true;
-    ContainerNode* parent = parentOrShadowHostNode();
-    return parent && parent->getFlag(NeedsShadowTreeWalkerFlag);
-}
-
 // This constant controls how much buffer is initially allocated
 // for a Node Vector that is used to store child Nodes of a given Node.
 // FIXME: Optimize the value.
@@ -293,7 +281,7 @@ class ChildNodesLazySnapshot {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     explicit ChildNodesLazySnapshot(Node* parentNode)
-        : m_currentNode(parentNode->lastChild())
+        : m_currentNode(parentNode->firstChild())
         , m_currentIndex(0)
     {
         m_nextSnapshot = latestSnapshot;
@@ -305,13 +293,13 @@ public:
         latestSnapshot = m_nextSnapshot;
     }
 
-    // Returns 0 if there is no previous Node.
-    PassRefPtr<Node> previousNode()
+    // Returns 0 if there is no next Node.
+    PassRefPtr<Node> nextNode()
     {
         if (LIKELY(!hasSnapshot())) {
             RefPtr<Node> node = m_currentNode;
             if (node)
-                m_currentNode = node->previousSibling();
+                m_currentNode = node->nextSibling();
             return node.release();
         }
         Vector<RefPtr<Node> >& nodeVector = *m_childNodes;
@@ -328,7 +316,7 @@ public:
         Node* node = m_currentNode.get();
         while (node) {
             m_childNodes->append(node);
-            node = node->previousSibling();
+            node = node->nextSibling();
         }
     }
 
@@ -351,22 +339,6 @@ private:
     unsigned m_currentIndex;
     OwnPtr<Vector<RefPtr<Node> > > m_childNodes; // Lazily instantiated.
     ChildNodesLazySnapshot* m_nextSnapshot;
-};
-
-// Used to ensure Radio Buttons resolve their checked state in document
-// order when a subtree of them is inserted. This is necessary because
-// we resolve style in reverse document order.
-class InsertionCallbackDeferer {
-public:
-    InsertionCallbackDeferer()
-    {
-        ContainerNode::suspendInsertionCallbacks();
-    }
-
-    ~InsertionCallbackDeferer()
-    {
-        ContainerNode::resumeInsertionCallbacks();
-    }
 };
 
 class PostAttachCallbackDisabler {

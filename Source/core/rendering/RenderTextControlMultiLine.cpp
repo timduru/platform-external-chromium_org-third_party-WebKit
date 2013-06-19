@@ -27,9 +27,10 @@
 
 namespace WebCore {
 
-RenderTextControlMultiLine::RenderTextControlMultiLine(Element* element)
+RenderTextControlMultiLine::RenderTextControlMultiLine(HTMLTextAreaElement* element)
     : RenderTextControl(element)
 {
+    ASSERT(element);
 }
 
 RenderTextControlMultiLine::~RenderTextControlMultiLine()
@@ -80,7 +81,7 @@ PassRefPtr<RenderStyle> RenderTextControlMultiLine::createInnerTextStyle(const R
 {
     RefPtr<RenderStyle> textBlockStyle = RenderStyle::create();
     textBlockStyle->inheritFrom(startStyle);
-    adjustInnerTextStyle(startStyle, textBlockStyle.get());
+    adjustInnerTextStyle(textBlockStyle.get());
     textBlockStyle->setDisplay(BLOCK);
 
     return textBlockStyle.release();

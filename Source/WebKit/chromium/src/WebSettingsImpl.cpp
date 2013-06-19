@@ -31,6 +31,8 @@
 #include "config.h"
 #include "WebSettingsImpl.h"
 
+// FIXME: Needed temporarily for Grid (see http://crbug.com/241619)
+#include "RuntimeEnabledFeatures.h"
 #include "core/page/Settings.h"
 #include "core/platform/graphics/FontRenderingMode.h"
 #include "core/platform/graphics/chromium/DeferredImageDecoder.h"
@@ -39,7 +41,7 @@
 #include "public/platform/WebString.h"
 #include "public/platform/WebURL.h"
 
-#if defined(OS_WIN)
+#if OS(WINDOWS)
 #include "core/rendering/RenderThemeChromiumWin.h"
 #endif
 
@@ -100,7 +102,7 @@ void WebSettingsImpl::setPictographFontFamily(const WebString& font, UScriptCode
 void WebSettingsImpl::setDefaultFontSize(int size)
 {
     m_settings->setDefaultFontSize(size);
-#if defined(OS_WIN)
+#if OS(WINDOWS)
     // RenderTheme is a singleton that needs to know the default font size to
     // draw some form controls. We let it know each time the size changes.
     WebCore::RenderThemeChromiumWin::setDefaultFontSize(size);
@@ -365,7 +367,13 @@ void WebSettingsImpl::setCSSStickyPositionEnabled(bool enabled)
 
 void WebSettingsImpl::setExperimentalCSSGridLayoutEnabled(bool enabled)
 {
-    m_settings->setCSSGridLayoutEnabled(enabled);
+    // FIXME: Remove once chromium doesn't call it anymore (see http://crbug.com/241619)
+    RuntimeEnabledFeatures::setCSSGridLayoutEnabled(enabled);
+}
+
+void WebSettingsImpl::setRegionBasedColumnsEnabled(bool enabled)
+{
+    m_settings->setRegionBasedColumnsEnabled(enabled);
 }
 
 void WebSettingsImpl::setExperimentalCSSCustomFilterEnabled(bool enabled)

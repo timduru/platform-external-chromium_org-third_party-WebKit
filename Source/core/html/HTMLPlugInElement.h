@@ -70,7 +70,7 @@ public:
 protected:
     HTMLPlugInElement(const QualifiedName& tagName, Document*);
 
-    virtual void detach();
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
     virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
 
@@ -85,7 +85,8 @@ private:
 
     virtual RenderWidget* renderWidgetForJSBindings() const = 0;
 
-    virtual bool supportsFocus() const OVERRIDE;
+    virtual bool supportsFocus() const OVERRIDE { return true; };
+    virtual bool rendererIsFocusable() const OVERRIDE;
 
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isPluginElement() const;

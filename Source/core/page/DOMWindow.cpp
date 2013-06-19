@@ -70,11 +70,9 @@
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/Console.h"
-#include "core/page/Crypto.h"
 #include "core/page/DOMPoint.h"
 #include "core/page/DOMTimer.h"
 #include "core/page/EventHandler.h"
-#include "core/page/FocusController.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/FrameView.h"
@@ -90,7 +88,6 @@
 #include "core/page/WindowFeatures.h"
 #include "core/page/WindowFocusAllowedIndicator.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/KURL.h"
 #include "core/platform/PlatformScreen.h"
 #include "core/platform/SuddenTermination.h"
 #include "core/platform/graphics/FloatRect.h"
@@ -98,6 +95,7 @@
 #include "core/storage/StorageArea.h"
 #include "core/storage/StorageNamespace.h"
 #include "modules/device_orientation/DeviceMotionController.h"
+#include "weborigin/KURL.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
 
@@ -440,7 +438,6 @@ DOMWindow::~DOMWindow()
 {
     ASSERT(!m_screen);
     ASSERT(!m_history);
-    ASSERT(!m_crypto);
     ASSERT(!m_locationbar);
     ASSERT(!m_menubar);
     ASSERT(!m_personalbar);
@@ -542,7 +539,6 @@ void DOMWindow::resetDOMWindowProperties()
 
     m_screen = 0;
     m_history = 0;
-    m_crypto = 0;
     m_locationbar = 0;
     m_menubar = 0;
     m_personalbar = 0;
@@ -590,15 +586,6 @@ History* DOMWindow::history() const
     if (!m_history)
         m_history = History::create(m_frame);
     return m_history.get();
-}
-
-Crypto* DOMWindow::crypto() const
-{
-    if (!isCurrentlyDisplayedInFrame())
-        return 0;
-    if (!m_crypto)
-        m_crypto = Crypto::create();
-    return m_crypto.get();
 }
 
 BarProp* DOMWindow::locationbar() const
@@ -904,11 +891,6 @@ void DOMWindow::focus(ScriptExecutionContext* context)
 
     if (!m_frame)
         return;
-
-    // Clear the current frame's focused node if a new frame is about to be focused.
-    Frame* focusedFrame = page->focusController()->focusedFrame();
-    if (focusedFrame && focusedFrame != m_frame)
-        focusedFrame->document()->setFocusedNode(0);
 
     m_frame->eventHandler()->focusDocumentView();
 }
@@ -1467,32 +1449,12 @@ void DOMWindow::resizeTo(float width, float height) const
     page->chrome().setWindowRect(adjustWindowRect(page, update));
 }
 
-int DOMWindow::setTimeout(PassOwnPtr<ScheduledAction> action, int timeout, ExceptionCode& ec)
-{
-    ScriptExecutionContext* context = scriptExecutionContext();
-    if (!context) {
-        ec = INVALID_ACCESS_ERR;
-        return -1;
-    }
-    return DOMTimer::install(context, action, timeout, true);
-}
-
 void DOMWindow::clearTimeout(int timeoutId)
 {
     ScriptExecutionContext* context = scriptExecutionContext();
     if (!context)
         return;
     DOMTimer::removeById(context, timeoutId);
-}
-
-int DOMWindow::setInterval(PassOwnPtr<ScheduledAction> action, int timeout, ExceptionCode& ec)
-{
-    ScriptExecutionContext* context = scriptExecutionContext();
-    if (!context) {
-        ec = INVALID_ACCESS_ERR;
-        return -1;
-    }
-    return DOMTimer::install(context, action, timeout, false);
 }
 
 void DOMWindow::clearInterval(int timeoutId)

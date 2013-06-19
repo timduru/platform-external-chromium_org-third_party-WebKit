@@ -25,6 +25,7 @@
 #include "core/dom/EventContext.h"
 #include "core/dom/EventPathWalker.h"
 #include "core/dom/FocusEvent.h"
+#include "core/dom/FullscreenController.h"
 #include "core/dom/MouseEvent.h"
 #include "core/dom/Touch.h"
 #include "core/dom/TouchEvent.h"
@@ -46,7 +47,7 @@ static inline EventDispatchBehavior determineDispatchBehavior(Event* event, Shad
 {
     // Video-only full screen is a mode where we use the shadow DOM as an implementation
     // detail that should not be detectable by the web content.
-    if (Element* element = target->toNode()->document()->webkitCurrentFullScreenElement()) {
+    if (Element* element = FullscreenController::currentFullScreenElementFrom(target->toNode()->document())) {
         // FIXME: We assume that if the full screen element is a media element that it's
         // the video-only full screen. Both here and elsewhere. But that is probably wrong.
         if (element->isMediaElement() && shadowRoot && shadowRoot->host() == element)
@@ -72,6 +73,12 @@ static inline EventDispatchBehavior determineDispatchBehavior(Event* event, Shad
     return RetargetEvent;
 }
 
+void EventRetargeter::ensureEventPath(Node* node, Event* event)
+{
+    calculateEventPath(node, event);
+    calculateAdjustedEventPathForEachNode(event->eventPath());
+}
+
 void EventRetargeter::calculateEventPath(Node* node, Event* event)
 {
     EventPath& eventPath = event->eventPath();
@@ -94,18 +101,20 @@ void EventRetargeter::calculateEventPath(Node* node, Event* event)
         else
             eventPath.append(adoptPtr(new EventContext(node, eventTargetRespectingTargetRules(node), targetStack.last())));
         if (!inDocument)
-            return;
+            break;
         if (!node->isShadowRoot())
             continue;
         if (determineDispatchBehavior(event, toShadowRoot(node), targetStack.last()) == StayInsideShadowDOM)
-            return;
+            break;
         if (!isSVGElement) {
             ASSERT(!targetStack.isEmpty());
             targetStack.removeLast();
         }
     }
+}
 
-    // Calculates eventPath for each node for Event.path() API.
+void EventRetargeter::calculateAdjustedEventPathForEachNode(EventPath& eventPath)
+{
     if (!RuntimeEnabledFeatures::experimentalShadowDOMEnabled())
         return;
     TreeScope* lastScope = 0;

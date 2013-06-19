@@ -394,7 +394,7 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     case CSSPropertyWebkitUserSelect: return 339;
     case CSSPropertyWebkitFlowInto: return 340;
     case CSSPropertyWebkitFlowFrom: return 341;
-    case CSSPropertyWebkitRegionOverflow: return 342;
+    case CSSPropertyWebkitRegionFragment: return 342;
     case CSSPropertyWebkitRegionBreakAfter: return 343;
     case CSSPropertyWebkitRegionBreakBefore: return 344;
     case CSSPropertyWebkitRegionBreakInside: return 345;
@@ -468,12 +468,10 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     case CSSPropertyWebkitTextAlignLast: return 404;
     case CSSPropertyWebkitTextUnderlinePosition: return 405;
 #endif
-#if defined(ENABLE_CSS_DEVICE_ADAPTATION) && ENABLE_CSS_DEVICE_ADAPTATION
     case CSSPropertyMaxZoom: return 406;
     case CSSPropertyMinZoom: return 407;
     case CSSPropertyOrientation: return 408;
     case CSSPropertyUserZoom: return 409;
-#endif
 #if defined(ENABLE_DASHBOARD_SUPPORT) && ENABLE_DASHBOARD_SUPPORT
     case CSSPropertyWebkitDashboardRegion: return 410;
 #endif
@@ -636,6 +634,12 @@ String UseCounter::deprecationMessage(Feature feature)
 
     case PrefixedTransitionMediaFeature:
         return "The '(-webkit-transition)' media query feature is deprecated; please consider using the more exact conditional \"@supports('(transition-property: prop_name)')\" instead.";
+
+    // Web Components
+    case HTMLShadowElementOlderShadowRoot:
+        return "HTMLShadowElement.olderShadowRoot is deprecated.";
+    case PrefixedDocumentRegister:
+        return "The document.webkitRegister method is deprecated. Use the document.register method instead.";
 
     // Features that aren't deprecated don't have a deprecation message.
     default:

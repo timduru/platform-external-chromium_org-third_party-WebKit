@@ -45,10 +45,11 @@
                 '../../core/core.gyp:webcore',
                 '../../modules/modules.gyp:modules',
                 '<(DEPTH)/skia/skia.gyp:skia',
-                '<(DEPTH)/third_party/angle/src/build_angle.gyp:translator_glsl',
+                '<(angle_path)/src/build_angle.gyp:translator_glsl',
                 '<(DEPTH)/third_party/icu/icu.gyp:icuuc',
                 '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
                 '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
+                'blink_common',
             ],
             'export_dependent_settings': [
                 '<(DEPTH)/skia/skia.gyp:skia',
@@ -59,11 +60,12 @@
             'include_dirs': [
                 'public',
                 'src',
-                '<(DEPTH)/third_party/angle/include',
+                '<(angle_path)/include',
                 '<(DEPTH)/third_party/skia/include/utils',
             ],
             'defines': [
                 'WEBKIT_IMPLEMENTATION=1',
+                'INSIDE_WEBKIT',
             ],
             'sources': [
                 '<@(webcore_platform_support_files)',
@@ -395,7 +397,6 @@
                 'src/WebCache.cpp',
                 'src/WebCachedURLRequest.cpp',
                 'src/WebColorName.cpp',
-                'src/WebCommon.cpp',
                 'src/WebCrossOriginPreflightResultCache.cpp',
                 'src/WebDOMActivityLogger.cpp',
                 'src/WebDOMCustomEvent.cpp',
@@ -557,15 +558,13 @@
                 ['component=="shared_library"', {
                     'defines': [
                         'WEBKIT_DLL',
-                        'WEBKIT_IMPLEMENTATION=1',
                     ],
                     'dependencies': [
                         '../../core/core.gyp:webcore_derived',
                         '../../core/core.gyp:webcore_test_support',
                         '<(DEPTH)/base/base.gyp:test_support_base',
-                        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
-                        '<(DEPTH)/testing/gtest.gyp:gtest',
                         '<(DEPTH)/testing/gmock.gyp:gmock',
+                        '<(DEPTH)/testing/gtest.gyp:gtest',
                         '<(DEPTH)/third_party/icu/icu.gyp:*',
                         '<(DEPTH)/third_party/libjpeg_turbo/libjpeg.gyp:libjpeg',
                         '<(DEPTH)/third_party/libpng/libpng.gyp:libpng',
@@ -574,6 +573,7 @@
                         '<(DEPTH)/third_party/modp_b64/modp_b64.gyp:modp_b64',
                         '<(DEPTH)/third_party/ots/ots.gyp:ots',
                         '<(DEPTH)/third_party/zlib/zlib.gyp:zlib',
+                        '<(DEPTH)/url/url.gyp:url_lib',
                         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
                         # We must not add webkit_support here because of cyclic dependency.
                     ],
@@ -583,7 +583,7 @@
                         ],
                     },
                     'export_dependent_settings': [
-                        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
+                        '<(DEPTH)/url/url.gyp:url_lib',
                         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
                     ],
                     'include_dirs': [
@@ -592,7 +592,6 @@
                         '../../core/testing/v8', # for WebCoreTestSupport.h, needed to link in window.internals code.
                     ],
                     'sources': [
-                        '<@(wtf_unittest_files)',
                         '<@(core_unittest_files)',
                         '<@(webkit_unittest_files)',
                         'src/WebTestingSupport.cpp',
@@ -744,6 +743,30 @@
                         'public/WebTestingSupport.h',
                     ],
                 }],
+            ],
+        },
+        {
+            'target_name': 'blink_common',
+            'type': '<(component)',
+            'variables': { 'enable_wexit_time_destructors': 1 },
+            'dependencies': [
+                '../../wtf/wtf.gyp:wtf',
+                '<(DEPTH)/skia/skia.gyp:skia',
+            ],
+            'defines': [
+                'INSIDE_WEBKIT',
+                'BLINK_COMMON_IMPLEMENTATION=1',
+            ],
+            'include_dirs': [
+                '../..',
+                '../../..',
+            ],
+            'sources': [
+                '../../core/platform/chromium/support/WebFilterOperation.cpp',
+                '../../core/platform/chromium/support/WebFilterOperations.cpp',
+                '../../core/platform/chromium/support/WebCString.cpp',
+                '../../core/platform/chromium/support/WebString.cpp',
+                'src/WebCommon.cpp',
             ],
         },
     ], # targets

@@ -768,21 +768,24 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
     }
 #if ENABLE(INPUT_SPEECH)
     else if (name == webkitspeechAttr) {
-        if (renderer()) {
-            // This renderer and its children have quite different layouts and styles depending on
-            // whether the speech button is visible or not. So we reset the whole thing and recreate
-            // to get the right styles and layout.
-            m_inputType->destroyShadowSubtree();
-            detach();
-            m_inputType->createShadowSubtree();
-            if (!attached())
-                attach();
-        } else {
-            m_inputType->destroyShadowSubtree();
-            m_inputType->createShadowSubtree();
+        if (m_inputType->shouldRespectSpeechAttribute() && RuntimeEnabledFeatures::speechInputEnabled()) {
+            // This renderer and its children have quite different layouts and
+            // styles depending on whether the speech button is visible or
+            // not. So we reset the whole thing and recreate to get the right
+            // styles and layout.
+            if (attached()) {
+                m_inputType->destroyShadowSubtree();
+                detach();
+                m_inputType->createShadowSubtree();
+                if (!attached())
+                    attach();
+            } else {
+                m_inputType->destroyShadowSubtree();
+                m_inputType->createShadowSubtree();
+            }
+            setFormControlValueMatchesRenderer(false);
+            setNeedsStyleRecalc();
         }
-        setFormControlValueMatchesRenderer(false);
-        setNeedsStyleRecalc();
         UseCounter::count(document(), UseCounter::PrefixedSpeechAttribute);
     } else if (name == onwebkitspeechchangeAttr)
         setAttributeEventListener(eventNames().webkitspeechchangeEvent, createAttributeEventListener(this, name, value));
@@ -818,14 +821,14 @@ RenderObject* HTMLInputElement::createRenderer(RenderArena* arena, RenderStyle* 
     return m_inputType->createRenderer(arena, style);
 }
 
-void HTMLInputElement::attach()
+void HTMLInputElement::attach(const AttachContext& context)
 {
     PostAttachCallbackDisabler disabler(this);
 
     if (!m_hasType)
         updateType();
 
-    HTMLTextFormControlElement::attach();
+    HTMLTextFormControlElement::attach(context);
 
     m_inputType->attach();
 
@@ -833,9 +836,9 @@ void HTMLInputElement::attach()
         document()->updateFocusAppearanceSoon(true /* restore selection */);
 }
 
-void HTMLInputElement::detach()
+void HTMLInputElement::detach(const AttachContext& context)
 {
-    HTMLTextFormControlElement::detach();
+    HTMLTextFormControlElement::detach(context);
     setFormControlValueMatchesRenderer(false);
     m_inputType->detach();
 }
@@ -1475,18 +1478,11 @@ void HTMLInputElement::didChangeForm()
     addToRadioButtonGroup();
 }
 
-void HTMLInputElement::addToRadioButtonGroupCallback(Node* node)
-{
-    ASSERT(node && node->toInputElement());
-    HTMLInputElement* inputElement = node->toInputElement();
-    inputElement->addToRadioButtonGroup();
-}
-
 Node::InsertionNotificationRequest HTMLInputElement::insertedInto(ContainerNode* insertionPoint)
 {
     HTMLTextFormControlElement::insertedInto(insertionPoint);
-    if (insertionPoint->inDocument() && !form() && checkedRadioButtons())
-        queueInsertionCallback(addToRadioButtonGroupCallback, this);
+    if (insertionPoint->inDocument() && !form())
+        addToRadioButtonGroup();
     resetListAttributeTargetObserver();
     return InsertionDone;
 }

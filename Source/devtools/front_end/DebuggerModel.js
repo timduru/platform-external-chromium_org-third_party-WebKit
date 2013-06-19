@@ -41,6 +41,7 @@ WebInspector.DebuggerModel = function()
      * @type {Object.<string, WebInspector.Script>}
      */
     this._scripts = {};
+    /** @type {!Object.<!string, !Array.<!WebInspector.Script>>} */
     this._scriptsBySourceURL = {};
 
     this._canSetScriptSource = false;
@@ -285,6 +286,16 @@ WebInspector.DebuggerModel.prototype = {
     },
 
     /**
+     * @return {!Array.<!WebInspector.Script>}
+     */
+    scriptsForSourceURL: function(sourceURL)
+    {
+        if (!sourceURL)
+            return [];
+        return this._scriptsBySourceURL[sourceURL] || [];
+    },
+
+    /**
      * @param {DebuggerAgent.ScriptId} scriptId
      * @param {string} newSource
      * @param {function(?Protocol.Error)} callback
@@ -346,7 +357,7 @@ WebInspector.DebuggerModel.prototype = {
     /**
      * @param {Array.<DebuggerAgent.CallFrame>} callFrames
      * @param {string} reason
-     * @param {*} auxData
+     * @param {Object|undefined} auxData
      * @param {Array.<string>} breakpointIds
      */
     _pausedScript: function(callFrames, reason, auxData, breakpointIds)
@@ -387,14 +398,15 @@ WebInspector.DebuggerModel.prototype = {
     _registerScript: function(script)
     {
         this._scripts[script.scriptId] = script;
-        if (script.sourceURL) {
-            var scripts = this._scriptsBySourceURL[script.sourceURL];
-            if (!scripts) {
-                scripts = [];
-                this._scriptsBySourceURL[script.sourceURL] = scripts;
-            }
-            scripts.push(script);
+        if (script.isAnonymousScript())
+            return;
+
+        var scripts = this._scriptsBySourceURL[script.sourceURL];
+        if (!scripts) {
+            scripts = [];
+            this._scriptsBySourceURL[script.sourceURL] = scripts;
         }
+        scripts.push(script);
     },
 
     /**
@@ -812,7 +824,7 @@ WebInspector.DebuggerModel.CallFrame.prototype = {
  * @param {WebInspector.DebuggerModel} model
  * @param {Array.<DebuggerAgent.CallFrame>} callFrames
  * @param {string} reason
- * @param {*} auxData
+ * @param {Object|undefined} auxData
  * @param {Array.<string>} breakpointIds
  */
 WebInspector.DebuggerPausedDetails = function(model, callFrames, reason, auxData, breakpointIds)

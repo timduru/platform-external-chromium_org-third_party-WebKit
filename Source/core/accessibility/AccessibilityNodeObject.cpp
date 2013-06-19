@@ -539,19 +539,6 @@ bool AccessibilityNodeObject::isMenuButton() const
     return roleValue() == MenuButtonRole;
 }
 
-bool AccessibilityNodeObject::isMenuRelated() const
-{
-    switch (roleValue()) {
-    case MenuRole:
-    case MenuBarRole:
-    case MenuButtonRole:
-    case MenuItemRole:
-        return true;
-    default:
-        return false;
-    }
-}
-
 bool AccessibilityNodeObject::isMultiSelectable() const
 {
     const AtomicString& ariaMultiSelectable = getAttribute(aria_multiselectableAttr);
@@ -566,14 +553,11 @@ bool AccessibilityNodeObject::isMultiSelectable() const
 bool AccessibilityNodeObject::isNativeCheckboxOrRadio() const
 {
     Node* node = this->node();
-    if (!node)
+    if (!node || !node->hasTagName(inputTag))
         return false;
 
-    HTMLInputElement* input = node->toInputElement();
-    if (input)
-        return input->isCheckbox() || input->isRadioButton();
-
-    return false;
+    HTMLInputElement* input = toHTMLInputElement(node);
+    return input->isCheckbox() || input->isRadioButton();
 }
 
 bool AccessibilityNodeObject::isNativeImage() const
@@ -614,52 +598,18 @@ bool AccessibilityNodeObject::isNativeTextControl() const
 bool AccessibilityNodeObject::isPasswordField() const
 {
     Node* node = this->node();
-    if (!node || !node->isHTMLElement())
+    if (!node || !node->hasTagName(inputTag))
         return false;
 
     if (ariaRoleAttribute() != UnknownRole)
         return false;
 
-    HTMLInputElement* inputElement = node->toInputElement();
-    if (!inputElement)
-        return false;
-
-    return inputElement->isPasswordField();
+    return toHTMLInputElement(node)->isPasswordField();
 }
 
 bool AccessibilityNodeObject::isProgressIndicator() const
 {
     return roleValue() == ProgressIndicatorRole;
-}
-
-bool AccessibilityNodeObject::isSearchField() const
-{
-    Node* node = this->node();
-    if (!node)
-        return false;
-
-    HTMLInputElement* inputElement = node->toInputElement();
-    if (!inputElement)
-        return false;
-
-    if (inputElement->isSearchField())
-        return true;
-
-    // Some websites don't label their search fields as such. However, they will
-    // use the word "search" in either the form or input type. This won't catch every case,
-    // but it will catch google.com for example.
-
-    // Check the node name of the input type, sometimes it's "search".
-    const AtomicString& nameAttribute = getAttribute(nameAttr);
-    if (nameAttribute.contains("search", false))
-        return true;
-
-    // Check the form action and the name, which will sometimes be "search".
-    HTMLFormElement* form = inputElement->form();
-    if (form && (form->name().contains("search", false) || form->action().contains("search", false)))
-        return true;
-
-    return false;
 }
 
 bool AccessibilityNodeObject::isSlider() const
@@ -674,9 +624,8 @@ bool AccessibilityNodeObject::isChecked() const
         return false;
 
     // First test for native checkedness semantics
-    HTMLInputElement* inputElement = node->toInputElement();
-    if (inputElement)
-        return inputElement->shouldAppearChecked();
+    if (node->hasTagName(inputTag))
+        return toHTMLInputElement(node)->shouldAppearChecked();
 
     // Else, if this is an ARIA checkbox or radio, respect the aria-checked attribute
     AccessibilityRole ariaRole = ariaRoleAttribute();
@@ -705,14 +654,10 @@ bool AccessibilityNodeObject::isEnabled() const
 bool AccessibilityNodeObject::isIndeterminate() const
 {
     Node* node = this->node();
-    if (!node)
+    if (!node || !node->hasTagName(inputTag))
         return false;
 
-    HTMLInputElement* inputElement = node->toInputElement();
-    if (!inputElement)
-        return false;
-
-    return inputElement->shouldAppearIndeterminate();
+    return toHTMLInputElement(node)->shouldAppearIndeterminate();
 }
 
 bool AccessibilityNodeObject::isPressed() const
@@ -878,7 +823,7 @@ String AccessibilityNodeObject::text() const
         if (node->hasTagName(textareaTag))
             return static_cast<HTMLTextAreaElement*>(node)->value();
         if (node->hasTagName(inputTag))
-            return node->toInputElement()->value();
+            return toHTMLInputElement(node)->value();
     }
 
     if (!node->isElementNode())

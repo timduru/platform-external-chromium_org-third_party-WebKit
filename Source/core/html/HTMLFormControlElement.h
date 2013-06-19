@@ -66,7 +66,6 @@ public:
 
     virtual bool isDisabledFormControl() const OVERRIDE;
 
-    virtual bool isFocusable() const;
     virtual bool isEnumeratable() const { return false; }
 
     bool isRequired() const;
@@ -112,12 +111,13 @@ protected:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void requiredAttributeChanged();
     virtual void disabledAttributeChanged();
-    virtual void attach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
-    virtual bool supportsFocus() const;
+    virtual bool supportsFocus() const OVERRIDE;
+    virtual bool rendererIsFocusable() const OVERRIDE;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
 
@@ -128,8 +128,6 @@ protected:
     // This must be called any time the result of willValidate() has changed.
     void setNeedsWillValidateCheck();
     virtual bool recalcWillValidate() const;
-
-    bool validationMessageShadowTreeContains(Node*) const;
 
 private:
     virtual void refFormAssociatedElement() { ref(); }

@@ -42,8 +42,6 @@ var Preferences = {
 }
 
 var Capabilities = {
-    canShowFPSCounter: false,
-    canContinuouslyPaint: false,
     canInspectWorkers: false
 }
 
@@ -102,6 +100,8 @@ WebInspector.Settings = function()
     this.workerInspectorWidth = this.createSetting("workerInspectorWidth", 600);
     this.workerInspectorHeight = this.createSetting("workerInspectorHeight", 600);
     this.messageURLFilters = this.createSetting("messageURLFilters", {});
+    this.messageSourceFilters = this.createSetting("messageSourceFilters", {"CSS": true});
+    this.messageLevelFilters = this.createSetting("messageLevelFilters", {});
     this.splitVerticallyWhenDockedToRight = this.createSetting("splitVerticallyWhenDockedToRight", true);
     this.visiblePanels = this.createSetting("visiblePanels", {});
     this.shortcutPanelSwitch = this.createSetting("shortcutPanelSwitch", false);
@@ -255,7 +255,6 @@ WebInspector.ExperimentsSettings = function()
     this.customizableToolbar = this._createExperiment("customizableToolbar", "Enable toolbar customization");
     this.tethering = this._createExperiment("tethering", "Enable port forwarding");
     this.drawerOverlay = this._createExperiment("drawerOverlay", "Open console as overlay");
-    this.heapObjectsTracking = this._createExperiment("heapObjectsTracking", "Enable heap objects tracking profile type");
     this.textEditorAutocomplete = this._createExperiment("textEditorAutocomplete", "Enable text editor autocompletion");
 
     this._cleanUpSetting();
@@ -397,7 +396,7 @@ WebInspector.VersionController = function()
 {
 }
 
-WebInspector.VersionController.currentVersion = 2;
+WebInspector.VersionController.currentVersion = 3;
 
 WebInspector.VersionController.prototype = {
     updateVersion: function()
@@ -432,6 +431,13 @@ WebInspector.VersionController.prototype = {
     {
         var versionSetting = WebInspector.settings.createSetting("previouslyViewedFiles", []);
         versionSetting.set([]);
+    },
+
+    _updateVersionFrom2To3: function()
+    {
+        var fileSystemMappingSetting = WebInspector.settings.createSetting("fileSystemMapping", {});
+        fileSystemMappingSetting.set({});
+        delete window.localStorage["fileMappingEntries"];
     },
 
     /**

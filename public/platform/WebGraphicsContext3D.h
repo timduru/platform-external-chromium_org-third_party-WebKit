@@ -182,10 +182,6 @@ public:
     virtual void discardBackbufferCHROMIUM() { }
     virtual void ensureBackbufferCHROMIUM() { }
 
-    // FIXME: this api is not used anymore.
-    // Query whether it is built on top of compliant GLES2 implementation.
-    virtual bool isGLES2Compliant() { return true; }
-
     virtual unsigned insertSyncPoint() { return 0; }
     virtual void waitSyncPoint(unsigned) { }
     // This call passes ownership of the WebGraphicsSyncPointCallback to the
@@ -198,12 +194,6 @@ public:
     // The RGBA channels are packed into "pixels" using SkBitmap's byte
     // ordering. Returns true on success.
     virtual bool readBackFramebuffer(unsigned char* pixels, size_t bufferSize, WebGLId framebuffer, int width, int height) = 0;
-
-    // FIXME: this api is not used anymore.
-    // Returns the id of the texture which is used for storing the contents of
-    // the framebuffer associated with this context. This texture is accessible
-    // by the gpu-based page compositor.
-    virtual WebGLId getPlatformTextureId() { return 0; }
 
     // Copies the contents of the off-screen render target used by the WebGL
     // context to the corresponding texture used by the compositor.
@@ -497,6 +487,11 @@ public:
     virtual void getImageParameterivCHROMIUM(WGC3Duint imageId, WGC3Denum pname, WGC3Dint* params) { }
     virtual void* mapImageCHROMIUM(WGC3Duint imageId, WGC3Denum access) { return 0; }
     virtual void unmapImageCHROMIUM(WGC3Duint imageId) { }
+
+    // GL_ANGLE_instanced_arrays
+    virtual void drawArraysInstancedANGLE(WGC3Denum mode, WGC3Dint first, WGC3Dsizei count, WGC3Dsizei primcount) { }
+    virtual void drawElementsInstancedANGLE(WGC3Denum mode, WGC3Dsizei count, WGC3Denum type, WGC3Dintptr offset, WGC3Dsizei primcount) { }
+    virtual void vertexAttribDivisorANGLE(WGC3Duint index, WGC3Duint divisor) { }
 
 protected:
     virtual GrGLInterface* onCreateGrGLInterface() { return 0; }

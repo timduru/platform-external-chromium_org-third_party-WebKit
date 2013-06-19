@@ -36,11 +36,12 @@
 #include "core/platform/graphics/GraphicsTypes.h"
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/Path.h"
-#include "core/platform/graphics/PlatformLayer.h"
 #include "core/platform/graphics/transforms/AffineTransform.h"
-#include <wtf/text/WTFString.h>
-#include <wtf/Vector.h>
+#include "wtf/HashMap.h"
+#include "wtf/Vector.h"
+#include "wtf/text/WTFString.h"
 
+namespace WebKit { class WebLayer; }
 
 namespace WebCore {
 
@@ -57,6 +58,7 @@ class ImageData;
 class TextMetrics;
 
 typedef int ExceptionCode;
+typedef HashMap<String, RefPtr<MutableStylePropertySet> > MutableStylePropertyMap;
 
 class CanvasRenderingContext2D : public CanvasRenderingContext, public CanvasPathMethods {
 public:
@@ -321,12 +323,13 @@ private:
 
     virtual bool isTransformInvertible() const { return state().m_invertibleCTM; }
 
-    virtual PlatformLayer* platformLayer() const OVERRIDE;
+    virtual WebKit::WebLayer* platformLayer() const OVERRIDE;
 
     Vector<State, 1> m_stateStack;
     unsigned m_unrealizedSaveCount;
     bool m_usesCSSCompatibilityParseMode;
     bool m_hasAlpha;
+    MutableStylePropertyMap m_cachedFonts;
 };
 
 } // namespace WebCore

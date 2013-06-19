@@ -24,13 +24,6 @@
 #include "core/loader/cache/MemoryCache.h"
 
 #include <stdio.h>
-#include <wtf/CurrentTime.h>
-#include <wtf/MathExtras.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/MemoryObjectInfo.h>
-#include <wtf/TemporaryChange.h>
-#include <wtf/text/CString.h>
 #include "core/dom/CrossThreadTask.h"
 #include "core/dom/Document.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
@@ -47,10 +40,20 @@
 #include "core/workers/WorkerThread.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityOriginHash.h"
+#include "wtf/Assertions.h"
+#include "wtf/CurrentTime.h"
+#include "wtf/MathExtras.h"
+#include "wtf/MemoryInstrumentationHashMap.h"
+#include "wtf/MemoryInstrumentationVector.h"
+#include "wtf/MemoryObjectInfo.h"
+#include "wtf/TemporaryChange.h"
+#include "wtf/text/CString.h"
 
 using namespace std;
 
 namespace WebCore {
+
+static MemoryCache* gMemoryCache;
 
 static const int cDefaultCacheCapacity = 8192 * 1024;
 static const double cMinDelayBeforeLiveDecodedPrune = 1; // Seconds.
@@ -59,10 +62,15 @@ static const double cDefaultDecodedDataDeletionInterval = 0;
 
 MemoryCache* memoryCache()
 {
-    static MemoryCache* staticCache = new MemoryCache;
     ASSERT(WTF::isMainThread());
+    if (!gMemoryCache)
+        gMemoryCache = new MemoryCache();
+    return gMemoryCache;
+}
 
-    return staticCache;
+void setMemoryCacheForTesting(MemoryCache* memoryCache)
+{
+    gMemoryCache = memoryCache;
 }
 
 MemoryCache::MemoryCache()
@@ -273,9 +281,11 @@ void MemoryCache::pruneDeadResourcesToSize(unsigned targetSize)
         while (current) {
             CachedResourceHandle<CachedResource> previous = current->m_prevInAllResourcesList;
             ASSERT(!previous || previous->inCache());
-            if (!current->hasClients() && !current->isPreloaded() && !current->isCacheValidator()
-                && targetSize && m_deadSize <= targetSize)
-                return;
+            if (!current->hasClients() && !current->isPreloaded() && !current->isCacheValidator()) {
+                evict(current);
+                if (targetSize && m_deadSize <= targetSize)
+                    return;
+            }
             if (previous && !previous->inCache())
                 break;
             current = previous.get();
@@ -314,8 +324,7 @@ void MemoryCache::evict(CachedResource* resource)
         // Remove from the appropriate LRU list.
         removeFromLRUList(resource);
         removeFromLiveDecodedResourcesList(resource);
-        if (!resource->isPurgeable())
-            adjustSize(resource->hasClients(), -static_cast<int>(resource->size()));
+        adjustSize(resource->hasClients(), -static_cast<int>(resource->size()));
     } else
         ASSERT(m_resources.get(resource->url()) != resource);
 
@@ -557,6 +566,7 @@ MemoryCache::Statistics MemoryCache::getStatistics()
             stats.fonts.addResource(resource);
             break;
         default:
+            stats.other.addResource(resource);
             break;
         }
     }
@@ -612,6 +622,7 @@ void MemoryCache::dumpStats(Timer<MemoryCache>*)
     printf("%-13s %13d %13d %13d %13d %13d %13d\n", "XSL", s.xslStyleSheets.count, s.xslStyleSheets.size, s.xslStyleSheets.liveSize, s.xslStyleSheets.decodedSize, s.xslStyleSheets.purgeableSize, s.xslStyleSheets.purgedSize);
     printf("%-13s %13d %13d %13d %13d %13d %13d\n", "JavaScript", s.scripts.count, s.scripts.size, s.scripts.liveSize, s.scripts.decodedSize, s.scripts.purgeableSize, s.scripts.purgedSize);
     printf("%-13s %13d %13d %13d %13d %13d %13d\n", "Fonts", s.fonts.count, s.fonts.size, s.fonts.liveSize, s.fonts.decodedSize, s.fonts.purgeableSize, s.fonts.purgedSize);
+    printf("%-13s %13d %13d %13d %13d %13d %13d\n", "Other", s.other.count, s.other.size, s.other.liveSize, s.other.decodedSize, s.other.purgeableSize, s.other.purgedSize);
     printf("%-13s %-13s %-13s %-13s %-13s %-13s %-13s\n\n", "-------------", "-------------", "-------------", "-------------", "-------------", "-------------", "-------------");
 
     printf("Duplication of encoded data from data URLs\n");
@@ -620,6 +631,7 @@ void MemoryCache::dumpStats(Timer<MemoryCache>*)
     printf("%-13s %13d of %13d\n", "XSL",        s.xslStyleSheets.encodedSizeDuplicatedInDataURLs, s.xslStyleSheets.encodedSize);
     printf("%-13s %13d of %13d\n", "JavaScript", s.scripts.encodedSizeDuplicatedInDataURLs,        s.scripts.encodedSize);
     printf("%-13s %13d of %13d\n", "Fonts",      s.fonts.encodedSizeDuplicatedInDataURLs,          s.fonts.encodedSize);
+    printf("%-13s %13d of %13d\n", "Other",      s.other.encodedSizeDuplicatedInDataURLs,          s.other.encodedSize);
 }
 
 void MemoryCache::dumpLRULists(bool includeLive) const

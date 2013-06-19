@@ -153,6 +153,7 @@
 #include "core/loader/FormState.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
+#include "core/loader/IconController.h"
 #include "core/loader/SubstituteData.h"
 #include "core/page/Chrome.h"
 #include "core/page/Console.h"
@@ -166,13 +167,13 @@
 #include "core/page/PrintContext.h"
 #include "core/page/Settings.h"
 #include "core/platform/AsyncFileSystem.h"
-#include "core/platform/KURL.h"
 #include "core/platform/ScrollTypes.h"
 #include "core/platform/ScrollbarTheme.h"
 #include "core/platform/chromium/ClipboardUtilitiesChromium.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/GraphicsContext.h"
+#include "core/platform/graphics/GraphicsLayerClient.h"
 #include "core/platform/graphics/skia/SkiaUtils.h"
 #include "core/platform/network/ResourceHandle.h"
 #include "core/platform/network/ResourceRequest.h"
@@ -189,6 +190,7 @@
 #include "modules/filesystem/DirectoryEntry.h"
 #include "modules/filesystem/FileEntry.h"
 #include "modules/filesystem/FileSystemType.h"
+#include "weborigin/KURL.h"
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityPolicy.h"
 
@@ -987,6 +989,7 @@ void WebFrameImpl::loadData(const WebData& data, const WebString& mimeType, cons
     if (replace) {
         // Do this to force WebKit to treat the load as replacing the currently
         // loaded page.
+        // FIXME: Can we use lock history instead?
         frame()->loader()->setReplacing();
     }
 }
@@ -2106,8 +2109,7 @@ WebString WebFrameImpl::layerTreeAsText(bool showDebugInfo) const
     if (!frame())
         return WebString();
     
-    LayerTreeFlags flags = showDebugInfo ? LayerTreeFlagsIncludeDebugInfo : 0;
-    return WebString(frame()->layerTreeAsText(flags));
+    return WebString(frame()->layerTreeAsText(showDebugInfo ? LayerTreeIncludesDebugInfo : LayerTreeNormal));
 }
 
 // WebFrameImpl public ---------------------------------------------------------

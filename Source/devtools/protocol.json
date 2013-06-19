@@ -338,26 +338,10 @@
                 "hidden": true
             },
             {
-                "name": "canShowFPSCounter",
-                "description": "Tells if backend supports a FPS counter display",
-                "returns": [
-                    { "name": "show", "type": "boolean", "description": "True if the FPS count can be shown" }
-                ],
-                "hidden": true
-            },
-            {
                 "name": "setShowFPSCounter",
                 "description": "Requests that backend shows the FPS counter",
                 "parameters": [
                     { "name": "show", "type": "boolean", "description": "True for showing the FPS counter" }
-                ],
-                "hidden": true
-            },
-            {
-                "name": "canContinuouslyPaint",
-                "description": "Tells if backend supports continuous painting",
-                "returns": [
-                    { "name": "value", "type": "boolean", "description": "True if continuous painting is available" }
                 ],
                 "hidden": true
             },
@@ -467,6 +451,14 @@
                 "parameters": [
                     { "name": "show", "type": "boolean", "description": "Whether to paint size or not." },
                     { "name": "showGrid", "type": "boolean", "optional": true, "description": "Whether to paint grid as well." }
+                ],
+                "hidden": true
+            },
+            {
+                "name": "setForceCompositingMode",
+                "description": "Force accelerated compositing mode for inspected page.",
+                "parameters": [
+                    { "name": "force", "type": "boolean", "description": "Whether to force accelerated compositing or not." }
                 ],
                 "hidden": true
             }
@@ -694,11 +686,12 @@
                 "name": "getProperties",
                 "parameters": [
                     { "name": "objectId", "$ref": "RemoteObjectId", "description": "Identifier of the object to return properties for." },
-                    { "name": "ownProperties", "optional": true, "type": "boolean", "description": "If true, returns properties belonging only to the element itself, not to its prototype chain." }
+                    { "name": "ownProperties", "optional": true, "type": "boolean", "description": "If true, returns properties belonging only to the element itself, not to its prototype chain." },
+                    { "name": "accessorPropertiesOnly", "optional": true, "type": "boolean", "description": "If true, returns accessor properties (with getter/setter) only; internal properties are not returned either.", "hidden": true }
                 ],
                 "returns": [
                     { "name": "result", "type": "array", "items": { "$ref": "PropertyDescriptor"}, "description": "Object properties." },
-                    { "name": "internalProperties", "optional": true, "type": "array", "items": { "$ref": "InternalPropertyDescriptor"}, "description": "Internal object properties.", "hidden": true }
+                    { "name": "internalProperties", "optional": true, "type": "array", "items": { "$ref": "InternalPropertyDescriptor"}, "description": "Internal object properties (only of the element itself).", "hidden": true }
                 ],
                 "description": "Returns properties of a given object. Object group of the result is inherited from the target object."
             },
@@ -2398,7 +2391,8 @@
                     { "name": "text", "type": "string", "description": "Media query text." },
                     { "name": "source", "type": "string", "enum": ["mediaRule", "importRule", "linkedSheet", "inlineSheet"], "description": "Source of the media query: \"mediaRule\" if specified by a @media rule, \"importRule\" if specified by an @import rule, \"linkedSheet\" if specified by a \"media\" attribute in a linked stylesheet's LINK tag, \"inlineSheet\" if specified by a \"media\" attribute in an inline stylesheet's STYLE tag." },
                     { "name": "sourceURL", "type": "string", "optional": true, "description": "URL of the document containing the media query description." },
-                    { "name": "sourceLine", "type": "integer", "optional": true, "description": "Line in the document containing the media query (not defined for the \"stylesheet\" source)." }
+                    { "name": "sourceLine", "type": "integer", "optional": true, "description": "Line in the document containing the media query (not defined for the \"linkedSheet\" source)." },
+                    { "name": "range", "$ref": "SourceRange", "optional": true, "description": "The associated rule (@media or @import) header range in the enclosing stylesheet (if available)." }
                 ],
                 "description": "CSS media query descriptor."
             },
@@ -3119,7 +3113,7 @@
                 "parameters": [
                     { "name": "eventName", "type": "string", "description": "Instrumentation name to stop on." }
                 ],
-                "description": "Sets breakpoint on particular native event.",
+                "description": "Removes breakpoint on particular native event.",
                 "hidden": true
             },
             {

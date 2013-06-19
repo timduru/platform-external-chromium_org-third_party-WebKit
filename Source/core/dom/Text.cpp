@@ -176,7 +176,7 @@ PassRefPtr<Text> Text::replaceWholeText(const String& newText)
         return 0;
     }
 
-    setData(newText, IGNORE_EXCEPTION);
+    setData(newText);
     return protectedThis.release();
 }
 
@@ -216,9 +216,7 @@ bool Text::textRendererIsNeeded(const NodeRenderingContext& context)
     
     if (context.style()->preserveNewline()) // pre/pre-wrap/pre-line always make renderers.
         return true;
-
-    // FIXME: We should resolve this function's dependencies on next and previous renderers
-    // lazily to avoid potentially N^2 walks through the DOM.
+    
     RenderObject* prev = context.previousRenderer();
     if (prev && prev->isBR()) // <span><br/> <br/></span>
         return false;
@@ -272,25 +270,30 @@ RenderText* Text::createTextRenderer(RenderArena* arena, RenderStyle* style)
     return new (arena) RenderText(this, dataImpl());
 }
 
-void Text::attach()
+void Text::attach(const AttachContext& context)
 {
     createTextRendererIfNeeded();
-    CharacterData::attach();
+    CharacterData::attach(context);
 }
 
 void Text::recalcTextStyle(StyleChange change)
 {
     RenderText* renderer = toRenderText(this->renderer());
 
-    if (change != NoChange && renderer)
-        renderer->setStyle(document()->styleResolver()->styleForText(this));
+    if (!renderer) {
+        if (needsStyleRecalc())
+            reattach();
+        clearNeedsStyleRecalc();
+        return;
+    }
 
     if (needsStyleRecalc()) {
-        if (renderer)
-            renderer->setText(dataImpl());
-        else
-            reattach();
+        renderer->setStyle(document()->styleResolver()->styleForText(this));
+        renderer->setText(dataImpl());
+    } else if (change != NoChange) {
+        renderer->setStyle(document()->styleResolver()->styleForText(this));
     }
+
     clearNeedsStyleRecalc();
 }
 

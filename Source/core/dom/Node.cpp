@@ -51,7 +51,6 @@
 #include "core/dom/EventContext.h"
 #include "core/dom/EventDispatchMediator.h"
 #include "core/dom/EventDispatcher.h"
-#include "core/dom/EventException.h"
 #include "core/dom/EventListener.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/ExceptionCode.h"
@@ -497,15 +496,6 @@ Node* Node::toNode()
     return this;
 }
 
-HTMLInputElement* Node::toInputElement()
-{
-    // If one of the below ASSERTs trigger, you are calling this function
-    // directly or indirectly from a constructor or destructor of this object.
-    // Don't do this!
-    ASSERT(!(isHTMLElement() && hasTagName(inputTag)));
-    return 0;
-}
-
 short Node::tabIndex() const
 {
     return 0;
@@ -685,7 +675,7 @@ void Node::normalize()
 
             // Both non-empty text nodes. Merge them.
             unsigned offset = text->length();
-            text->appendData(nextText->data(), IGNORE_EXCEPTION);
+            text->appendData(nextText->data());
             document()->textNodesMerged(nextText.get(), offset);
             nextText->remove(IGNORE_EXCEPTION);
         }
@@ -895,49 +885,35 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
 
 void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
 {
-    for (Node* n = this; n; n = NodeTraversal::next(n, this)) {
-        if (n->hasChildNodes())
-            n->setChildNeedsStyleRecalc();
-        n->setStyleChange(FullStyleChange);
-        if (shouldSetAttached == SetAttached)
-            n->setAttached();
+    // It's safe to synchronously attach here because we're in the middle of style recalc
+    // while it's not safe to mark nodes as needing style recalc except in the loop in
+    // Element::recalcStyle because we may mark an ancestor as not needing recalc and
+    // then the node would never get updated. One place this currently happens is
+    // HTMLObjectElement::renderFallbackContent which may call lazyAttach from inside
+    // attach which was triggered by a recalcStyle.
+    if (document()->inStyleRecalc()) {
+        attach();
+        return;
     }
+    setStyleChange(FullStyleChange);
     markAncestorsWithChildNeedsStyleRecalc();
+    if (shouldSetAttached == DoNotSetAttached)
+        return;
+    for (Node* node = this; node; node = NodeTraversal::next(node, this))
+        node->setAttached();
 }
 
 bool Node::supportsFocus() const
 {
     return false;
 }
-    
+
 bool Node::isFocusable() const
 {
     if (!inDocument() || !supportsFocus())
         return false;
-    
-    // Elements in canvas fallback content are not rendered, but they are allowed to be
-    // focusable as long as their canvas is displayed and visible.
-    if (isElementNode() && toElement(this)->isInCanvasSubtree()) {
-        const Element* e = toElement(this);
-        while (e && !e->hasLocalName(canvasTag))
-            e = e->parentElement();
-        ASSERT(e);
-        return e->renderer() && e->renderer()->style()->visibility() == VISIBLE;
-    }
 
-    if (renderer())
-        ASSERT(!renderer()->needsLayout());
-    else
-        // If the node is in a display:none tree it might say it needs style recalc but
-        // the whole document is actually up to date.
-        ASSERT(!document()->childNeedsStyleRecalc());
-
-    // FIXME: Even if we are not visible, we might have a child that is visible.
-    // Hyatt wants to fix that some day with a "has visible content" flag or the like.
-    if (!renderer() || renderer()->style()->visibility() != VISIBLE)
-        return false;
-
-    return true;
+    return rendererIsFocusable();
 }
 
 bool Node::isKeyboardFocusable(KeyboardEvent*) const
@@ -1097,7 +1073,7 @@ bool Node::containsIncludingHostElements(const Node* node) const
     return false;
 }
 
-void Node::attach()
+void Node::attach(const AttachContext&)
 {
     ASSERT(!attached());
     ASSERT(!renderer() || (renderer()->style() && (renderer()->parent() || renderer()->isRenderView())));
@@ -1140,7 +1116,7 @@ bool Node::inDetach() const
 }
 #endif
 
-void Node::detach()
+void Node::detach(const AttachContext& context)
 {
 #ifndef NDEBUG
     ASSERT(!detachingNode);
@@ -1151,13 +1127,17 @@ void Node::detach()
         renderer()->destroyAndCleanupAnonymousWrappers();
     setRenderer(0);
 
-    Document* doc = document();
-    if (isUserActionElement()) {
-        if (hovered())
-            doc->hoveredNodeDetached(this);
-        if (inActiveChain())
-            doc->activeChainNodeDetached(this);
-        doc->userActionElements().didDetach(this);
+    // Do not remove the element's hovered and active status
+    // if performing a reattach.
+    if (!context.performingReattach) {
+        Document* doc = document();
+        if (isUserActionElement()) {
+            if (hovered())
+                doc->hoveredNodeDetached(this);
+            if (inActiveChain())
+                doc->activeChainNodeDetached(this);
+            doc->userActionElements().didDetach(this);
+        }
     }
 
     clearFlag(IsAttachedFlag);
@@ -1308,11 +1288,6 @@ Element* Node::parentOrShadowHostElement() const
         return 0;
 
     return toElement(parent);
-}
-
-bool Node::needsShadowTreeWalkerSlow() const
-{
-    return (isShadowRoot() || (isElementNode() && (isInsertionPoint() || isPseudoElement() || toElement(this)->hasPseudoElements() || toElement(this)->shadow())));
 }
 
 bool Node::isBlockFlowElement() const

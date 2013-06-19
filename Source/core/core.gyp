@@ -118,7 +118,12 @@
             'inspector/InspectorInstrumentation.idl',
           ],
           'outputs': [
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorCanvasInstrumentationInl.h',
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorConsoleInstrumentationInl.h',
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorDatabaseInstrumentationInl.h',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorInstrumentationInl.h',
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorOverridesInl.h',
+            '<(SHARED_INTERMEDIATE_DIR)/webkit/InstrumentingAgentsInl.h',
             '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorInstrumentationImpl.cpp',
           ],
           'action': [
@@ -215,17 +220,17 @@
         'injected_script_source',
         'debugger_script_source',
         '../wtf/wtf.gyp:wtf',
-        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
         '<(DEPTH)/third_party/libpng/libpng.gyp:libpng',
+        '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(DEPTH)/third_party/libxml/libxml.gyp:libxml',
         '<(DEPTH)/third_party/libxslt/libxslt.gyp:libxslt',
-        '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
         '<(DEPTH)/third_party/qcms/qcms.gyp:qcms',
         '<(DEPTH)/third_party/sqlite/sqlite.gyp:sqlite',
         '<(DEPTH)/third_party/v8-i18n/build/all.gyp:v8-i18n',
+        '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
         '<(libjpeg_gyp_path):libjpeg',
       ],
@@ -300,7 +305,12 @@
         '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorTypeBuilder.cpp',
 
         # Additional .cpp files from the inspector_instrumentation_sources list.
+        '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorCanvasInstrumentationInl.h',
+        '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorConsoleInstrumentationInl.h',
+        '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorDatabaseInstrumentationInl.h',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorInstrumentationInl.h',
+        '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorOverridesInl.h',
+        '<(SHARED_INTERMEDIATE_DIR)/webkit/InstrumentingAgentsInl.h',
         '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorInstrumentationImpl.cpp',
 
         # Additional .cpp files for SVG.
@@ -350,40 +360,40 @@
         '../wtf/wtf.gyp:wtf',
         '../config.gyp:config',
         '../weborigin/weborigin.gyp:weborigin',
-        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
+        '<(angle_path)/src/build_angle.gyp:translator_glsl',
         '<(DEPTH)/gpu/gpu.gyp:gles2_c_lib',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
-        '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(DEPTH)/third_party/libpng/libpng.gyp:libpng',
+        '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(DEPTH)/third_party/libxml/libxml.gyp:libxml',
         '<(DEPTH)/third_party/libxslt/libxslt.gyp:libxslt',
         '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
         '<(DEPTH)/third_party/ots/ots.gyp:ots',
         '<(DEPTH)/third_party/qcms/qcms.gyp:qcms',
         '<(DEPTH)/third_party/sqlite/sqlite.gyp:sqlite',
-        '<(DEPTH)/third_party/angle/src/build_angle.gyp:translator_glsl',
         '<(DEPTH)/third_party/zlib/zlib.gyp:zlib',
+        '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
         '<(libjpeg_gyp_path):libjpeg',
       ],
       'export_dependent_settings': [
         '../wtf/wtf.gyp:wtf',
         '../config.gyp:config',
-        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
+        '<(angle_path)/src/build_angle.gyp:translator_glsl',
         '<(DEPTH)/gpu/gpu.gyp:gles2_c_lib',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/iccjpeg/iccjpeg.gyp:iccjpeg',
-        '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(DEPTH)/third_party/libpng/libpng.gyp:libpng',
+        '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
         '<(DEPTH)/third_party/libxml/libxml.gyp:libxml',
         '<(DEPTH)/third_party/libxslt/libxslt.gyp:libxslt',
         '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
         '<(DEPTH)/third_party/ots/ots.gyp:ots',
         '<(DEPTH)/third_party/qcms/qcms.gyp:qcms',
         '<(DEPTH)/third_party/sqlite/sqlite.gyp:sqlite',
-        '<(DEPTH)/third_party/angle/src/build_angle.gyp:translator_glsl',
         '<(DEPTH)/third_party/zlib/zlib.gyp:zlib',
+        '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
         '<(libjpeg_gyp_path):libjpeg',
       ],
@@ -391,11 +401,12 @@
         'defines': [
           'WEBCORE_NAVIGATOR_VENDOR="Google Inc."',
           'WEBKIT_IMPLEMENTATION=1',
+          'INSIDE_WEBKIT',
         ],
         'include_dirs': [
           '<@(webcore_include_dirs)',
           '<(DEPTH)/gpu',
-          '<(DEPTH)/third_party/angle/include/GLSLANG',
+          '<(angle_path)/include/GLSLANG',
         ],
         'msvs_disabled_warnings': [
           4138, 4244, 4291, 4305, 4344, 4355, 4521, 4099,
@@ -770,7 +781,7 @@
             ['exclude', 'platform/graphics/FontPlatformData\\.cpp$'],
           ],
         }],
-        ['OS != "linux" and OS != "mac"', {
+        ['OS != "linux" and OS != "mac" and (OS != "win" or (OS == "win" and "ENABLE_GDI_FONTS_ON_WINDOWS=1"))', {
           'sources/': [
             ['exclude', 'VDMX[^/]+\\.(cpp|h)$'],
           ],
@@ -787,7 +798,6 @@
             # platform/graphics/chromium, included by regex above, instead.
             ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
             ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
-            ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
 
             # SystemInfo.cpp is useful and we don't want to copy it.
             ['include', 'platform/win/SystemInfo\\.cpp$'],
@@ -796,6 +806,18 @@
             ['exclude', 'platform/text/LocaleICU\\.h$'],
             ['include', 'platform/text/win/LocaleWin\.cpp$'],
             ['include', 'platform/text/win/LocaleWin\.h$'],
+          ],
+          'conditions': [
+            ['"ENABLE_GDI_FONTS_ON_WINDOWS=1" in feature_defines', {
+              'sources/': [
+                ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
+              ],
+            },{ # ENABLE_GDI_FONTS_ON_WINDOWS!=1
+              'sources/': [
+                ['exclude', 'platform/graphics/chromium/SimpleFontDataChromiumWin\\.cpp$'],
+                ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
+              ],
+            }],
           ],
         },{ # OS!="win"
           'sources/': [
@@ -1015,19 +1037,19 @@
         # Exported.
         'webcore_derived',
         '../wtf/wtf.gyp:wtf',
-        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
         '<(DEPTH)/third_party/qcms/qcms.gyp:qcms',
+        '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
       ],
       'export_dependent_settings': [
         '../wtf/wtf.gyp:wtf',
         'webcore_derived',
-        '<(DEPTH)/build/temp_gyp/googleurl.gyp:googleurl',
         '<(DEPTH)/skia/skia.gyp:skia',
         '<(DEPTH)/third_party/npapi/npapi.gyp:npapi',
         '<(DEPTH)/third_party/qcms/qcms.gyp:qcms',
+        '<(DEPTH)/url/url.gyp:url_lib',
         '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
       ],
       'direct_dependent_settings': {
@@ -1078,6 +1100,7 @@
       ],
       'defines': [
         'WEBKIT_IMPLEMENTATION=1',
+        'INSIDE_WEBKIT',
       ],
       'include_dirs': [
         '<(bindings_dir)/v8',  # FIXME: Remove once http://crbug.com/236119 is fixed.

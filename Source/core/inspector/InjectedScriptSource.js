@@ -77,10 +77,15 @@ function bind(func, thisObject, var_args)
  */
 var InjectedScript = function()
 {
+    /** @type {number} */
     this._lastBoundObjectId = 1;
+    /** @type {!Object.<number, Object>} */
     this._idToWrappedObject = {};
+    /** @type {!Object.<number, string>} */
     this._idToObjectGroupName = {};
+    /** @type {!Object.<string, Array.<number>>} */
     this._objectGroups = {};
+    /** @type {!Object.<string, Object>} */
     this._modules = {};
 }
 
@@ -217,7 +222,7 @@ InjectedScript.prototype = {
     },
 
     /**
-     * @param {*} object
+     * @param {Object} object
      * @param {string=} objectGroupName
      * @return {string}
      */
@@ -279,9 +284,10 @@ InjectedScript.prototype = {
     /**
      * @param {string} objectId
      * @param {boolean} ownProperties
+     * @param {boolean} accessorPropertiesOnly
      * @return {Array.<RuntimeAgent.PropertyDescriptor>|boolean}
      */
-    getProperties: function(objectId, ownProperties)
+    getProperties: function(objectId, ownProperties, accessorPropertiesOnly)
     {
         var parsedObjectId = this._parseObjectId(objectId);
         var object = this._objectForId(parsedObjectId);
@@ -289,7 +295,7 @@ InjectedScript.prototype = {
 
         if (!this._isDefined(object))
             return false;
-        var descriptors = this._propertyDescriptors(object, ownProperties);
+        var descriptors = this._propertyDescriptors(object, ownProperties, accessorPropertiesOnly);
 
         // Go over properties, wrap object values.
         for (var i = 0; i < descriptors.length; ++i) {
@@ -367,7 +373,7 @@ InjectedScript.prototype = {
     },
 
     /**
-     * @param {string} id
+     * @param {number} id
      */
     _releaseObject: function(id)
     {
@@ -378,9 +384,10 @@ InjectedScript.prototype = {
     /**
      * @param {Object} object
      * @param {boolean} ownProperties
+     * @param {boolean} accessorPropertiesOnly
      * @return {Array.<Object>}
      */
-    _propertyDescriptors: function(object, ownProperties)
+    _propertyDescriptors: function(object, ownProperties, accessorPropertiesOnly)
     {
         var descriptors = [];
         var nameProcessed = {};
@@ -394,11 +401,14 @@ InjectedScript.prototype = {
 
                 try {
                     nameProcessed[name] = true;
-                    var descriptor = Object.getOwnPropertyDescriptor(/** @type {!Object} */ (object), name);
-                    if (!descriptor) {
+                    var descriptor = Object.getOwnPropertyDescriptor(/** @type {!Object} */ (o), name);
+                    if (descriptor) {
+                        if (accessorPropertiesOnly && !("get" in descriptor || "set" in descriptor))
+                            continue;
+                    } else {
                         // Not all bindings provide proper descriptors. Fall back to the writable, configurable property.
                         try {
-                            descriptor = { name: name, value: object[name], writable: false, configurable: false, enumerable: false};
+                            descriptor = { name: name, value: o[name], writable: false, configurable: false, enumerable: false};
                             if (o === object) 
                                 descriptor.isOwn = true;
                             descriptors.push(descriptor);
@@ -1154,7 +1164,7 @@ function CommandLineAPI(commandLineAPIImpl, callFrame)
 CommandLineAPI.members_ = [
     "$", "$$", "$x", "dir", "dirxml", "keys", "values", "profile", "profileEnd",
     "monitorEvents", "unmonitorEvents", "inspect", "copy", "clear", "getEventListeners",
-    "debug", "undebug", "table"
+    "debug", "undebug", "monitor", "unmonitor", "table"
 ];
 
 /**
@@ -1313,12 +1323,21 @@ CommandLineAPIImpl.prototype = {
 
     debug: function(fn)
     {
-        InjectedScriptHost.setBreakpoint(fn);
+        InjectedScriptHost.debugFunction(fn);
     },
 
     undebug: function(fn)
     {
-        InjectedScriptHost.removeBreakpoint(fn);
+        InjectedScriptHost.undebugFunction(fn);
+    },
+
+    monitor: function(fn)
+    {
+        InjectedScriptHost.monitorFunction(fn);
+    },
+
+    unmonitor: function(fn) {
+        InjectedScriptHost.unmonitorFunction(fn);
     },
 
     table: function()

@@ -37,6 +37,16 @@ struct SameSizeAsCSSProperty {
 
 COMPILE_ASSERT(sizeof(CSSProperty) == sizeof(SameSizeAsCSSProperty), CSSProperty_should_stay_small);
 
+CSSPropertyID StylePropertyMetadata::shorthandID() const
+{
+    if (!m_isSetFromShorthand)
+        return CSSPropertyInvalid;
+
+    const Vector<StylePropertyShorthand> shorthands = matchingShorthandsForLonghand(static_cast<CSSPropertyID>(m_propertyID));
+    ASSERT(shorthands.size() && m_indexInShorthandsVector >= 0 && m_indexInShorthandsVector < shorthands.size());
+    return shorthands.at(m_indexInShorthandsVector).id();
+}
+
 void CSSProperty::wrapValueInCommaSeparatedList()
 {
     RefPtr<CSSValue> value = m_value.release();
@@ -164,7 +174,7 @@ static CSSPropertyID resolveToPhysicalProperty(WritingMode writingMode, LogicalE
 static const StylePropertyShorthand& borderDirections()
 {
     static const CSSPropertyID properties[4] = { CSSPropertyBorderTop, CSSPropertyBorderRight, CSSPropertyBorderBottom, CSSPropertyBorderLeft };
-    DEFINE_STATIC_LOCAL(StylePropertyShorthand, borderDirections, (properties, WTF_ARRAY_LENGTH(properties)));
+    DEFINE_STATIC_LOCAL(StylePropertyShorthand, borderDirections, (CSSPropertyBorder, properties, WTF_ARRAY_LENGTH(properties)));
     return borderDirections;
 }
 
@@ -330,9 +340,6 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitLineBreak:
     case CSSPropertyWebkitLineGrid:
     case CSSPropertyWebkitLineSnap:
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-    case CSSPropertyWebkitOverflowScrolling:
-#endif
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRtlOrdering:
     case CSSPropertyWebkitRubyPosition:
@@ -643,10 +650,10 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitUserDrag:
     case CSSPropertyWebkitFlowInto:
     case CSSPropertyWebkitFlowFrom:
-    case CSSPropertyWebkitRegionOverflow:
     case CSSPropertyWebkitRegionBreakAfter:
     case CSSPropertyWebkitRegionBreakBefore:
     case CSSPropertyWebkitRegionBreakInside:
+    case CSSPropertyWebkitRegionFragment:
     case CSSPropertyWebkitWrapFlow:
     case CSSPropertyWebkitShapeMargin:
     case CSSPropertyWebkitShapePadding:
@@ -656,12 +663,10 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitWrapThrough:
     case CSSPropertyWebkitAppRegion:
     case CSSPropertyWidth:
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     case CSSPropertyMaxZoom:
     case CSSPropertyMinZoom:
     case CSSPropertyOrientation:
     case CSSPropertyUserZoom:
-#endif
     case CSSPropertyZIndex:
     case CSSPropertyZoom:
         return false;

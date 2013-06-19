@@ -28,16 +28,6 @@
 #include "config.h"
 #include "core/dom/Document.h"
 
-#include <wtf/CurrentTime.h>
-#include <wtf/HashFunctions.h>
-#include <wtf/MainThread.h>
-#include <wtf/MemoryInstrumentationHashCountedSet.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuffer.h>
 #include "CSSValueKeywords.h"
 #include "HTMLElementFactory.h"
 #include "HTMLNames.h"
@@ -66,12 +56,12 @@
 #include "core/dom/CDATASection.h"
 #include "core/dom/Comment.h"
 #include "core/dom/ContextFeatures.h"
-#include "core/dom/CustomElementConstructor.h"
 #include "core/dom/CustomElementRegistry.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/DOMNamedFlowCollection.h"
 #include "core/dom/DocumentEventQueue.h"
 #include "core/dom/DocumentFragment.h"
+#include "core/dom/DocumentLifecycleObserver.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/DocumentSharedObjectPool.h"
 #include "core/dom/DocumentStyleSheetCollection.h"
@@ -89,6 +79,7 @@
 #include "core/dom/NodeFilter.h"
 #include "core/dom/NodeIterator.h"
 #include "core/dom/NodeRareData.h"
+#include "core/dom/NodeRenderingTraversal.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/NodeWithIndex.h"
 #include "core/dom/PageTransitionEvent.h"
@@ -127,6 +118,7 @@
 #include "core/html/HTMLLinkElement.h"
 #include "core/html/HTMLMapElement.h"
 #include "core/html/HTMLNameCollection.h"
+#include "core/html/HTMLScriptElement.h"
 #include "core/html/HTMLStyleElement.h"
 #include "core/html/HTMLTitleElement.h"
 #include "core/html/PluginDocument.h"
@@ -165,6 +157,7 @@
 #include "core/page/PointerLockController.h"
 #include "core/page/Settings.h"
 #include "core/page/UserContentURLPattern.h"
+#include "core/page/ValidationMessageClient.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/DateComponents.h"
@@ -181,7 +174,6 @@
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderArena.h"
-#include "core/rendering/RenderFullScreen.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderNamedFlowThread.h"
 #include "core/rendering/RenderTextControl.h"
@@ -203,6 +195,17 @@
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
+#include "wtf/CurrentTime.h"
+#include "wtf/HashFunctions.h"
+#include "wtf/MainThread.h"
+#include "wtf/MemoryInstrumentationHashCountedSet.h"
+#include "wtf/MemoryInstrumentationHashMap.h"
+#include "wtf/MemoryInstrumentationHashSet.h"
+#include "wtf/MemoryInstrumentationVector.h"
+#include "wtf/PassRefPtr.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/UnusedParam.h"
+#include "wtf/text/StringBuffer.h"
 
 using namespace std;
 using namespace WTF;
@@ -388,6 +391,8 @@ private:
         document->didRunCheckFocusedNodeTask();
         if (!document->focusedNode())
             return;
+        if (document->childNeedsStyleRecalc())
+            return;
         if (document->focusedNode()->renderer() && document->focusedNode()->renderer()->needsLayout())
             return;
         if (!document->focusedNode()->isFocusable())
@@ -449,7 +454,6 @@ Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentCla
     , m_designMode(inherit)
     , m_hasAnnotatedRegions(false)
     , m_annotatedRegionsDirty(false)
-    , m_createRenderers(true)
     , m_accessKeyMapValid(false)
     , m_useSecureKeyboardEntryWhenActive(false)
     , m_documentClasses(documentClasses)
@@ -460,10 +464,7 @@ Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentCla
     , m_eventQueue(DocumentEventQueue::create(this))
     , m_weakFactory(this)
     , m_idAttributeName(idAttr)
-    , m_areKeysEnabledInFullScreen(0)
-    , m_fullScreenRenderer(0)
-    , m_fullScreenChangeDelayTimer(this, &Document::fullScreenChangeDelayTimerFired)
-    , m_isAnimatingFullScreen(false)
+    , m_hasFullscreenController(false)
     , m_loadEventDelayCount(0)
     , m_loadEventDelayTimer(this, &Document::loadEventDelayTimerFired)
     , m_referrerPolicy(ReferrerPolicyDefault)
@@ -620,8 +621,6 @@ void Document::dispose()
     m_documentElement = 0;
     m_contextFeatures = ContextFeatures::defaultSwitch();
     m_userActionElements.documentDidRemoveLastRef();
-    m_fullScreenElement = 0;
-    m_fullScreenElementStack.clear();
 
     detachParser();
 
@@ -643,6 +642,9 @@ void Document::dispose()
     if (m_scriptedAnimationController)
         m_scriptedAnimationController->clearDocumentPointer();
     m_scriptedAnimationController.clear();
+
+    if (m_lifecycleNotifier)
+        m_lifecycleNotifier->notifyDocumentWasDisposed();
 }
 
 Element* Document::getElementById(const AtomicString& id) const
@@ -828,16 +830,16 @@ PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, 
     return element;
 }
 
-PassRefPtr<CustomElementConstructor> Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, ExceptionCode& ec)
+ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, ExceptionCode& ec)
 {
     return registerElement(state, name, Dictionary(), ec);
 }
 
-PassRefPtr<CustomElementConstructor> Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, const Dictionary& options, ExceptionCode& ec)
+ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, const Dictionary& options, ExceptionCode& ec)
 {
     if (!isHTMLDocument() && !isXHTMLDocument()) {
         ec = NOT_SUPPORTED_ERR;
-        return 0;
+        return ScriptValue();
     }
 
     return ensureCustomElementRegistry()->registerElement(state, name, options, ec);
@@ -1110,11 +1112,6 @@ bool Document::cssStickyPositionEnabled() const
 bool Document::cssCompositingEnabled() const
 {
     return RuntimeEnabledFeatures::cssCompositingEnabled();
-}
-
-bool Document::cssGridLayoutEnabled() const
-{
-    return settings() && settings()->cssGridLayoutEnabled();
 }
 
 PassRefPtr<DOMNamedFlowCollection> Document::webkitGetNamedFlows()
@@ -1537,24 +1534,83 @@ PassRefPtr<Range> Document::createRange()
     return Range::create(this);
 }
 
-PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatToShow,
-    PassRefPtr<NodeFilter> filter, bool expandEntityReferences, ExceptionCode& ec)
+PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, ExceptionCode& ec)
 {
+    // FIXME: Probably this should be handled within the bindings layer and TypeError should be thrown.
     if (!root) {
         ec = NOT_SUPPORTED_ERR;
         return 0;
     }
-    return NodeIterator::create(root, whatToShow, filter, expandEntityReferences);
+    return NodeIterator::create(root, NodeFilter::SHOW_ALL, PassRefPtr<NodeFilter>());
 }
 
-PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToShow,
-    PassRefPtr<NodeFilter> filter, bool expandEntityReferences, ExceptionCode& ec)
+PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatToShow, ExceptionCode& ec)
 {
     if (!root) {
         ec = NOT_SUPPORTED_ERR;
         return 0;
     }
-    return TreeWalker::create(root, whatToShow, filter, expandEntityReferences);
+    // FIXME: It might be a good idea to emit a warning if |whatToShow| contains a bit that is not defined in
+    // NodeFilter.
+    return NodeIterator::create(root, whatToShow, PassRefPtr<NodeFilter>());
+}
+
+PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, ExceptionCode& ec)
+{
+    if (!root) {
+        ec = NOT_SUPPORTED_ERR;
+        return 0;
+    }
+    // FIXME: Ditto.
+    return NodeIterator::create(root, whatToShow, filter);
+}
+
+PassRefPtr<NodeIterator> Document::createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, bool expandEntityReferences, ExceptionCode& ec)
+{
+    if (!root) {
+        ec = NOT_SUPPORTED_ERR;
+        return 0;
+    }
+    // FIXME: Warn if |expandEntityReferences| is specified. This optional argument is deprecated in DOM4.
+    UNUSED_PARAM(expandEntityReferences);
+    return NodeIterator::create(root, whatToShow, filter);
+}
+
+PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, ExceptionCode& ec)
+{
+    if (!root) {
+        ec = NOT_SUPPORTED_ERR;
+        return 0;
+    }
+    return TreeWalker::create(root, NodeFilter::SHOW_ALL, PassRefPtr<NodeFilter>());
+}
+
+PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToShow, ExceptionCode& ec)
+{
+    if (!root) {
+        ec = NOT_SUPPORTED_ERR;
+        return 0;
+    }
+    return TreeWalker::create(root, whatToShow, PassRefPtr<NodeFilter>());
+}
+
+PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, ExceptionCode& ec)
+{
+    if (!root) {
+        ec = NOT_SUPPORTED_ERR;
+        return 0;
+    }
+    return TreeWalker::create(root, whatToShow, filter);
+}
+
+PassRefPtr<TreeWalker> Document::createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter> filter, bool expandEntityReferences, ExceptionCode& ec)
+{
+    UNUSED_PARAM(expandEntityReferences);
+    if (!root) {
+        ec = NOT_SUPPORTED_ERR;
+        return 0;
+    }
+    return TreeWalker::create(root, whatToShow, filter);
 }
 
 void Document::scheduleForcedStyleRecalc()
@@ -1669,7 +1725,7 @@ void Document::recalcStyle(StyleChange change)
                 renderer()->setStyle(documentStyle.release());
         }
 
-        for (Node* n = lastChild(); n; n = n->previousSibling()) {
+        for (Node* n = firstChild(); n; n = n->nextSibling()) {
             if (!n->isElementNode())
                 continue;
             Element* element = toElement(n);
@@ -1867,13 +1923,13 @@ void Document::clearStyleResolver()
     m_styleResolver.clear();
 }
 
-void Document::attach()
+void Document::attach(const AttachContext& context)
 {
     ASSERT(!attached());
     ASSERT(!m_axObjectCache || this != topDocument());
 
     if (!m_renderArena)
-        m_renderArena = adoptPtr(new RenderArena);
+        m_renderArena = RenderArena::create();
 
     // Create the rendering tree
     setRenderer(new (m_renderArena.get()) RenderView(this));
@@ -1881,23 +1937,24 @@ void Document::attach()
 
     recalcStyle(Force);
 
-    ContainerNode::attach();
+    ContainerNode::attach(context);
 }
 
-void Document::detach()
+void Document::detach(const AttachContext& context)
 {
     ASSERT(attached());
 
-    if (page())
+    if (page()) {
         page()->pointerLockController()->documentDetached(this);
+        if (ValidationMessageClient* client = page()->validationMessageClient())
+            client->documentDetached(*this);
+    }
 
     if (this == topDocument())
         clearAXObjectCache();
 
     stopActiveDOMObjects();
     m_eventQueue->close();
-    m_fullScreenChangeEventTargetQueue.clear();
-    m_fullScreenErrorEventTargetQueue.clear();
 
     // FIXME: consider using ActiveDOMObject.
     if (m_scriptedAnimationController)
@@ -1920,14 +1977,11 @@ void Document::detach()
     // indicate destruction mode,  i.e. attached() but renderer == 0
     setRenderer(0);
 
-    if (m_fullScreenRenderer)
-        setFullScreenRenderer(0);
-
     m_hoverNode = 0;
     m_focusedNode = 0;
     m_activeElement = 0;
 
-    ContainerNode::detach();
+    ContainerNode::detach(context);
 
     unscheduleStyleRecalc();
 
@@ -1947,6 +2001,9 @@ void Document::detach()
 
     if (m_mediaQueryMatcher)
         m_mediaQueryMatcher->documentDestroyed();
+
+    if (m_lifecycleNotifier)
+        m_lifecycleNotifier->notifyDocumentWasDetached();
 }
 
 void Document::prepareForDestruction()
@@ -2302,13 +2359,15 @@ void Document::implicitClose()
         // AX object to send the notification to. getOrCreate will make sure that an valid AX object
         // exists in the cache (we ignore the return value because we don't need it here). This is
         // only safe to call when a layout is not in progress, so it can not be used in postNotification.    
-        axObjectCache()->getOrCreate(renderObject);
-        if (this == topDocument())
-            axObjectCache()->postNotification(renderObject, AXObjectCache::AXLoadComplete, true);
-        else {
-            // AXLoadComplete can only be posted on the top document, so if it's a document
-            // in an iframe that just finished loading, post AXLayoutComplete instead.
-            axObjectCache()->postNotification(renderObject, AXObjectCache::AXLayoutComplete, true);
+        if (AXObjectCache* cache = axObjectCache()) {
+            cache->getOrCreate(renderObject);
+            if (this == topDocument()) {
+                cache->postNotification(renderObject, AXObjectCache::AXLoadComplete, true);
+            } else {
+                // AXLoadComplete can only be posted on the top document, so if it's a document
+                // in an iframe that just finished loading, post AXLayoutComplete instead.
+                cache->postNotification(renderObject, AXObjectCache::AXLayoutComplete, true);
+            }
         }
     }
 
@@ -3105,12 +3164,14 @@ void Document::removeFocusedNodeOfSubtree(Node* node, bool amongChildrenOnly)
 
 void Document::hoveredNodeDetached(Node* node)
 {
-    if (!m_hoverNode || (node != m_hoverNode && (!m_hoverNode->isTextNode() || node != m_hoverNode->parentNode())))
+    if (!m_hoverNode)
         return;
 
-    m_hoverNode = node->parentNode();
-    while (m_hoverNode && !m_hoverNode->renderer())
-        m_hoverNode = m_hoverNode->parentNode();
+    NodeRenderingTraversal::ParentDetails details;
+    if (node != m_hoverNode && (!m_hoverNode->isTextNode() || node != NodeRenderingTraversal::parent(m_hoverNode.get(), &details)))
+        return;
+
+    for (m_hoverNode = NodeRenderingTraversal::parent(node, &details); m_hoverNode && !m_hoverNode->renderer(); m_hoverNode = NodeRenderingTraversal::parent(m_hoverNode.get(), &details)) { }
 
     // If the mouse cursor is not visible, do not clear existing
     // hover effects on the ancestors of |node| and do not invoke
@@ -3124,12 +3185,17 @@ void Document::hoveredNodeDetached(Node* node)
 
 void Document::activeChainNodeDetached(Node* node)
 {
-    if (!m_activeElement || (node != m_activeElement && (!m_activeElement->isTextNode() || node != m_activeElement->parentNode())))
+    if (!m_activeElement)
         return;
 
-    m_activeElement = node->parentElement();
-    while (m_activeElement && !m_activeElement->renderer())
-        m_activeElement = m_activeElement->parentElement();
+    NodeRenderingTraversal::ParentDetails details;
+    if (node != m_activeElement && (!m_activeElement->isTextNode() || node != NodeRenderingTraversal::parent(m_activeElement.get(), &details)))
+        return;
+
+    Node* activeNode = NodeRenderingTraversal::parent(node, &details);
+    for (; activeNode && activeNode->isElementNode() && !activeNode->renderer(); activeNode = NodeRenderingTraversal::parent(activeNode, &details)) { }
+
+    m_activeElement = activeNode && activeNode->isElementNode() ? toElement(activeNode) : 0;
 }
 
 const Vector<AnnotatedRegionValue>& Document::annotatedRegions() const
@@ -3443,20 +3509,20 @@ void Document::textNodeSplit(Text* oldNode)
     // FIXME: This should update markers for spelling and grammar checking.
 }
 
-void Document::setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener> listener)
+void Document::setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener> listener, DOMWrapperWorld* isolatedWorld)
 {
     DOMWindow* domWindow = this->domWindow();
     if (!domWindow)
         return;
-    domWindow->setAttributeEventListener(eventType, listener);
+    domWindow->setAttributeEventListener(eventType, listener, isolatedWorld);
 }
 
-EventListener* Document::getWindowAttributeEventListener(const AtomicString& eventType)
+EventListener* Document::getWindowAttributeEventListener(const AtomicString& eventType, DOMWrapperWorld* isolatedWorld)
 {
     DOMWindow* domWindow = this->domWindow();
     if (!domWindow)
         return 0;
-    return domWindow->getAttributeEventListener(eventType);
+    return domWindow->getAttributeEventListener(eventType, isolatedWorld);
 }
 
 void Document::dispatchWindowEvent(PassRefPtr<Event> event,  PassRefPtr<EventTarget> target)
@@ -3835,16 +3901,6 @@ void Document::documentWillBecomeInactive()
         renderView()->setIsInWindow(false);
 }
 
-void Document::setShouldCreateRenderers(bool f)
-{
-    m_createRenderers = f;
-}
-
-bool Document::shouldCreateRenderers()
-{
-    return m_createRenderers;
-}
-
 // Support for Javascript execCommand, and related methods
 
 static Editor::Command command(Document* document, const String& commandName, bool userInterface = false)
@@ -3918,6 +3974,18 @@ KURL Document::openSearchDescriptionURL()
     }
 
     return KURL();
+}
+
+void Document::pushCurrentScript(PassRefPtr<HTMLScriptElement> newCurrentScript)
+{
+    ASSERT(newCurrentScript);
+    m_currentScriptStack.append(newCurrentScript);
+}
+
+void Document::popCurrentScript()
+{
+    ASSERT(!m_currentScriptStack.isEmpty());
+    m_currentScriptStack.removeLast();
 }
 
 void Document::applyXSLTransform(ProcessingInstruction* pi)
@@ -4601,446 +4669,6 @@ void Document::enqueuePopstateEvent(PassRefPtr<SerializedScriptValue> stateObjec
     dispatchWindowEvent(PopStateEvent::create(stateObject, domWindow() ? domWindow()->history() : 0));
 }
 
-bool Document::fullScreenIsAllowedForElement(Element* element) const
-{
-    ASSERT(element);
-    return isAttributeOnAllOwners(allowfullscreenAttr, webkitallowfullscreenAttr, element->document()->ownerElement());
-}
-
-void Document::requestFullScreenForElement(Element* element, unsigned short flags, FullScreenCheckType checkType)
-{
-    // The Mozilla Full Screen API <https://wiki.mozilla.org/Gecko:FullScreenAPI> has different requirements
-    // for full screen mode, and do not have the concept of a full screen element stack.
-    bool inLegacyMozillaMode = (flags & Element::LEGACY_MOZILLA_REQUEST);
-
-    do {
-        if (!element)
-            element = documentElement();
-
-        // 1. If any of the following conditions are true, terminate these steps and queue a task to fire
-        // an event named fullscreenerror with its bubbles attribute set to true on the context object's
-        // node document:
-
-        // The context object is not in a document.
-        if (!element->inDocument())
-            break;
-
-        // The context object's node document, or an ancestor browsing context's document does not have
-        // the fullscreen enabled flag set.
-        if (checkType == EnforceIFrameAllowFullScreenRequirement && !fullScreenIsAllowedForElement(element))
-            break;
-
-        // The context object's node document fullscreen element stack is not empty and its top element
-        // is not an ancestor of the context object. (NOTE: Ignore this requirement if the request was
-        // made via the legacy Mozilla-style API.)
-        if (!m_fullScreenElementStack.isEmpty() && !inLegacyMozillaMode) {
-            Element* lastElementOnStack = m_fullScreenElementStack.last().get();
-            if (lastElementOnStack == element || !lastElementOnStack->contains(element))
-                break;
-        }
-
-        // A descendant browsing context's document has a non-empty fullscreen element stack.
-        bool descendentHasNonEmptyStack = false;
-        for (Frame* descendant = frame() ? frame()->tree()->traverseNext() : 0; descendant; descendant = descendant->tree()->traverseNext()) {
-            if (descendant->document()->webkitFullscreenElement()) {
-                descendentHasNonEmptyStack = true;
-                break;
-            }
-        }
-        if (descendentHasNonEmptyStack && !inLegacyMozillaMode)
-            break;
-
-        // This algorithm is not allowed to show a pop-up:
-        //   An algorithm is allowed to show a pop-up if, in the task in which the algorithm is running, either:
-        //   - an activation behavior is currently being processed whose click event was trusted, or
-        //   - the event listener for a trusted click event is being handled.
-        if (!ScriptController::processingUserGesture())
-            break;
-
-        // There is a previously-established user preference, security risk, or platform limitation.
-        if (!page() || !page()->settings()->fullScreenEnabled())
-            break;
-
-        // 2. Let doc be element's node document. (i.e. "this")
-        Document* currentDoc = this;
-
-        // 3. Let docs be all doc's ancestor browsing context's documents (if any) and doc.
-        Deque<Document*> docs;
-
-        do {
-            docs.prepend(currentDoc);
-            currentDoc = currentDoc->ownerElement() ? currentDoc->ownerElement()->document() : 0;
-        } while (currentDoc);
-
-        // 4. For each document in docs, run these substeps:
-        Deque<Document*>::iterator current = docs.begin(), following = docs.begin();
-
-        do {
-            ++following;
-
-            // 1. Let following document be the document after document in docs, or null if there is no
-            // such document.
-            Document* currentDoc = *current;
-            Document* followingDoc = following != docs.end() ? *following : 0;
-
-            // 2. If following document is null, push context object on document's fullscreen element
-            // stack, and queue a task to fire an event named fullscreenchange with its bubbles attribute
-            // set to true on the document.
-            if (!followingDoc) {
-                currentDoc->pushFullscreenElementStack(element);
-                addDocumentToFullScreenChangeEventQueue(currentDoc);
-                continue;
-            }
-
-            // 3. Otherwise, if document's fullscreen element stack is either empty or its top element
-            // is not following document's browsing context container,
-            Element* topElement = currentDoc->webkitFullscreenElement();
-            if (!topElement || topElement != followingDoc->ownerElement()) {
-                // ...push following document's browsing context container on document's fullscreen element
-                // stack, and queue a task to fire an event named fullscreenchange with its bubbles attribute
-                // set to true on document.
-                currentDoc->pushFullscreenElementStack(followingDoc->ownerElement());
-                addDocumentToFullScreenChangeEventQueue(currentDoc);
-                continue;
-            }
-
-            // 4. Otherwise, do nothing for this document. It stays the same.
-        } while (++current != docs.end());
-
-        // 5. Return, and run the remaining steps asynchronously.
-        // 6. Optionally, perform some animation.
-        m_areKeysEnabledInFullScreen = flags & Element::ALLOW_KEYBOARD_INPUT;
-        page()->chrome().client()->enterFullScreenForElement(element);
-
-        // 7. Optionally, display a message indicating how the user can exit displaying the context object fullscreen.
-        return;
-    } while (0);
-
-    m_fullScreenErrorEventTargetQueue.append(element ? element : documentElement());
-    m_fullScreenChangeDelayTimer.startOneShot(0);
-}
-
-void Document::webkitCancelFullScreen()
-{
-    // The Mozilla "cancelFullScreen()" API behaves like the W3C "fully exit fullscreen" behavior, which
-    // is defined as:
-    // "To fully exit fullscreen act as if the exitFullscreen() method was invoked on the top-level browsing
-    // context's document and subsequently empty that document's fullscreen element stack."
-    if (!topDocument()->webkitFullscreenElement())
-        return;
-
-    // To achieve that aim, remove all the elements from the top document's stack except for the first before
-    // calling webkitExitFullscreen():
-    Vector<RefPtr<Element> > replacementFullscreenElementStack;
-    replacementFullscreenElementStack.append(topDocument()->webkitFullscreenElement());
-    topDocument()->m_fullScreenElementStack.swap(replacementFullscreenElementStack);
-
-    topDocument()->webkitExitFullscreen();
-}
-
-void Document::webkitExitFullscreen()
-{
-    // The exitFullscreen() method must run these steps:
-
-    // 1. Let doc be the context object. (i.e. "this")
-    Document* currentDoc = this;
-
-    // 2. If doc's fullscreen element stack is empty, terminate these steps.
-    if (m_fullScreenElementStack.isEmpty())
-        return;
-
-    // 3. Let descendants be all the doc's descendant browsing context's documents with a non-empty fullscreen
-    // element stack (if any), ordered so that the child of the doc is last and the document furthest
-    // away from the doc is first.
-    Deque<RefPtr<Document> > descendants;
-    for (Frame* descendant = frame() ? frame()->tree()->traverseNext() : 0; descendant; descendant = descendant->tree()->traverseNext()) {
-        if (descendant->document()->webkitFullscreenElement())
-            descendants.prepend(descendant->document());
-    }
-
-    // 4. For each descendant in descendants, empty descendant's fullscreen element stack, and queue a
-    // task to fire an event named fullscreenchange with its bubbles attribute set to true on descendant.
-    for (Deque<RefPtr<Document> >::iterator i = descendants.begin(); i != descendants.end(); ++i) {
-        (*i)->clearFullscreenElementStack();
-        addDocumentToFullScreenChangeEventQueue(i->get());
-    }
-
-    // 5. While doc is not null, run these substeps:
-    Element* newTop = 0;
-    while (currentDoc) {
-        // 1. Pop the top element of doc's fullscreen element stack.
-        currentDoc->popFullscreenElementStack();
-
-        //    If doc's fullscreen element stack is non-empty and the element now at the top is either
-        //    not in a document or its node document is not doc, repeat this substep.
-        newTop = currentDoc->webkitFullscreenElement();
-        if (newTop && (!newTop->inDocument() || newTop->document() != currentDoc))
-            continue;
-
-        // 2. Queue a task to fire an event named fullscreenchange with its bubbles attribute set to true
-        // on doc.
-        addDocumentToFullScreenChangeEventQueue(currentDoc);
-
-        // 3. If doc's fullscreen element stack is empty and doc's browsing context has a browsing context
-        // container, set doc to that browsing context container's node document.
-        if (!newTop && currentDoc->ownerElement()) {
-            currentDoc = currentDoc->ownerElement()->document();
-            continue;
-        }
-
-        // 4. Otherwise, set doc to null.
-        currentDoc = 0;
-    }
-
-    // 6. Return, and run the remaining steps asynchronously.
-    // 7. Optionally, perform some animation.
-
-    if (!page())
-        return;
-
-    // Only exit out of full screen window mode if there are no remaining elements in the
-    // full screen stack.
-    if (!newTop) {
-        page()->chrome().client()->exitFullScreenForElement(m_fullScreenElement.get());
-        return;
-    }
-
-    // Otherwise, notify the chrome of the new full screen element.
-    page()->chrome().client()->enterFullScreenForElement(newTop);
-}
-
-bool Document::webkitFullscreenEnabled() const
-{
-    // 4. The fullscreenEnabled attribute must return true if the context object and all ancestor
-    // browsing context's documents have their fullscreen enabled flag set, or false otherwise.
-
-    // Top-level browsing contexts are implied to have their allowFullScreen attribute set.
-    return isAttributeOnAllOwners(allowfullscreenAttr, webkitallowfullscreenAttr, ownerElement());
-}
-
-void Document::webkitWillEnterFullScreenForElement(Element* element)
-{
-    if (!attached())
-        return;
-
-    ASSERT(element);
-
-    // Protect against being called after the document has been removed from the page.
-    if (!page())
-        return;
-
-    ASSERT(page()->settings()->fullScreenEnabled());
-
-    if (m_fullScreenRenderer)
-        m_fullScreenRenderer->unwrapRenderer();
-
-    m_fullScreenElement = element;
-
-#if USE(NATIVE_FULLSCREEN_VIDEO)
-    if (element && element->isMediaElement())
-        return;
-#endif
-
-    // Create a placeholder block for a the full-screen element, to keep the page from reflowing
-    // when the element is removed from the normal flow.  Only do this for a RenderBox, as only
-    // a box will have a frameRect.  The placeholder will be created in setFullScreenRenderer()
-    // during layout.
-    RenderObject* renderer = m_fullScreenElement->renderer();
-    bool shouldCreatePlaceholder = renderer && renderer->isBox();
-    if (shouldCreatePlaceholder) {
-        m_savedPlaceholderFrameRect = toRenderBox(renderer)->frameRect();
-        m_savedPlaceholderRenderStyle = RenderStyle::clone(renderer->style());
-    }
-
-    if (m_fullScreenElement != documentElement())
-        RenderFullScreen::wrapRenderer(renderer, renderer ? renderer->parent() : 0, this);
-
-    m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(true);
-
-    recalcStyle(Force);
-}
-
-void Document::webkitDidEnterFullScreenForElement(Element*)
-{
-    if (!m_fullScreenElement)
-        return;
-
-    if (!attached())
-        return;
-
-    m_fullScreenElement->didBecomeFullscreenElement();
-
-    m_fullScreenChangeDelayTimer.startOneShot(0);
-}
-
-void Document::webkitWillExitFullScreenForElement(Element*)
-{
-    if (!m_fullScreenElement)
-        return;
-
-    if (!attached())
-        return;
-
-    m_fullScreenElement->willStopBeingFullscreenElement();
-}
-
-void Document::webkitDidExitFullScreenForElement(Element*)
-{
-    if (!m_fullScreenElement)
-        return;
-
-    if (!attached())
-        return;
-
-    m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
-
-    m_areKeysEnabledInFullScreen = false;
-
-    if (m_fullScreenRenderer)
-        m_fullScreenRenderer->unwrapRenderer();
-
-    m_fullScreenElement = 0;
-    scheduleForcedStyleRecalc();
-
-    // When webkitCancelFullScreen is called, we call webkitExitFullScreen on the topDocument(). That
-    // means that the events will be queued there. So if we have no events here, start the timer on
-    // the exiting document.
-    Document* exitingDocument = this;
-    if (m_fullScreenChangeEventTargetQueue.isEmpty() && m_fullScreenErrorEventTargetQueue.isEmpty())
-        exitingDocument = topDocument();
-    exitingDocument->m_fullScreenChangeDelayTimer.startOneShot(0);
-}
-
-void Document::setFullScreenRenderer(RenderFullScreen* renderer)
-{
-    if (renderer == m_fullScreenRenderer)
-        return;
-
-    if (renderer && m_savedPlaceholderRenderStyle)
-        renderer->createPlaceholder(m_savedPlaceholderRenderStyle.release(), m_savedPlaceholderFrameRect);
-    else if (renderer && m_fullScreenRenderer && m_fullScreenRenderer->placeholder()) {
-        RenderBlock* placeholder = m_fullScreenRenderer->placeholder();
-        renderer->createPlaceholder(RenderStyle::clone(placeholder->style()), placeholder->frameRect());
-    }
-
-    if (m_fullScreenRenderer)
-        m_fullScreenRenderer->destroy();
-    ASSERT(!m_fullScreenRenderer);
-
-    m_fullScreenRenderer = renderer;
-}
-
-void Document::fullScreenRendererDestroyed()
-{
-    m_fullScreenRenderer = 0;
-}
-
-void Document::fullScreenChangeDelayTimerFired(Timer<Document>*)
-{
-    // Since we dispatch events in this function, it's possible that the
-    // document will be detached and GC'd. We protect it here to make sure we
-    // can finish the function successfully.
-    RefPtr<Document> protectDocument(this);
-    Deque<RefPtr<Node> > changeQueue;
-    m_fullScreenChangeEventTargetQueue.swap(changeQueue);
-    Deque<RefPtr<Node> > errorQueue;
-    m_fullScreenErrorEventTargetQueue.swap(errorQueue);
-
-    while (!changeQueue.isEmpty()) {
-        RefPtr<Node> node = changeQueue.takeFirst();
-        if (!node)
-            node = documentElement();
-        // The dispatchEvent below may have blown away our documentElement.
-        if (!node)
-            continue;
-
-        // If the element was removed from our tree, also message the documentElement. Since we may
-        // have a document hierarchy, check that node isn't in another document.
-        if (!contains(node.get()) && !node->inDocument())
-            changeQueue.append(documentElement());
-
-        node->dispatchEvent(Event::create(eventNames().webkitfullscreenchangeEvent, true, false));
-    }
-
-    while (!errorQueue.isEmpty()) {
-        RefPtr<Node> node = errorQueue.takeFirst();
-        if (!node)
-            node = documentElement();
-        // The dispatchEvent below may have blown away our documentElement.
-        if (!node)
-            continue;
-
-        // If the element was removed from our tree, also message the documentElement. Since we may
-        // have a document hierarchy, check that node isn't in another document.
-        if (!contains(node.get()) && !node->inDocument())
-            errorQueue.append(documentElement());
-
-        node->dispatchEvent(Event::create(eventNames().webkitfullscreenerrorEvent, true, false));
-    }
-}
-
-void Document::fullScreenElementRemoved()
-{
-    m_fullScreenElement->setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
-    webkitCancelFullScreen();
-}
-
-void Document::removeFullScreenElementOfSubtree(Node* node, bool amongChildrenOnly)
-{
-    if (!m_fullScreenElement)
-        return;
-
-    bool elementInSubtree = false;
-    if (amongChildrenOnly)
-        elementInSubtree = m_fullScreenElement->isDescendantOf(node);
-    else
-        elementInSubtree = (m_fullScreenElement == node) || m_fullScreenElement->isDescendantOf(node);
-
-    if (elementInSubtree)
-        fullScreenElementRemoved();
-}
-
-void Document::setAnimatingFullScreen(bool flag)
-{
-    if (m_isAnimatingFullScreen == flag)
-        return;
-    m_isAnimatingFullScreen = flag;
-
-    if (m_fullScreenElement && m_fullScreenElement->isDescendantOf(this)) {
-        m_fullScreenElement->setNeedsStyleRecalc();
-        scheduleForcedStyleRecalc();
-    }
-}
-
-void Document::clearFullscreenElementStack()
-{
-    m_fullScreenElementStack.clear();
-}
-
-void Document::popFullscreenElementStack()
-{
-    if (m_fullScreenElementStack.isEmpty())
-        return;
-
-    m_fullScreenElementStack.removeLast();
-}
-
-void Document::pushFullscreenElementStack(Element* element)
-{
-    m_fullScreenElementStack.append(element);
-}
-
-void Document::addDocumentToFullScreenChangeEventQueue(Document* doc)
-{
-    ASSERT(doc);
-    Node* target = doc->webkitFullscreenElement();
-    if (!target)
-        target = doc->webkitCurrentFullScreenElement();
-    if (!target)
-        target = doc;
-    m_fullScreenChangeEventTargetQueue.append(target);
-}
-
 void Document::addToTopLayer(Element* element)
 {
     if (element->isInTopLayer())
@@ -5269,14 +4897,12 @@ IntSize Document::viewportSize() const
     return view()->visibleContentRect(ScrollableArea::IncludeScrollbars).size();
 }
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
 IntSize Document::initialViewportSize() const
 {
     if (!view())
         return IntSize();
-    return view()->initialViewportSize();
+    return view()->unscaledVisibleContentSize(ScrollableArea::IncludeScrollbars);
 }
-#endif
 
 Node* eventTargetNodeForDocument(Document* doc)
 {
@@ -5423,6 +5049,14 @@ void Document::updateHoverActiveState(const HitTestRequest& request, Element* in
     Vector<RefPtr<Node>, 32> nodesToAddToChain;
 
     if (oldHoverObj != newHoverObj) {
+        // If the old hovered node is not nil but it's renderer is, it was probably detached as part of the :hover style
+        // (for instance by setting display:none in the :hover pseudo-class). In this case, the old hovered element
+        // must be updated, to ensure it's normal style is re-applied.
+        if (oldHoverNode && !oldHoverObj) {
+            if (!mustBeInActiveChain || oldHoverNode->inActiveChain())
+                nodesToRemoveFromChain.append(oldHoverNode);
+        }
+
         // The old hover path only needs to be cleared up to (and not including) the common ancestor;
         for (RenderObject* curr = oldHoverObj; curr && curr != ancestor; curr = curr->hoverAncestor()) {
             if (curr->node() && !curr->isText() && (!mustBeInActiveChain || curr->node()->inActiveChain()))
@@ -5513,13 +5147,6 @@ void Document::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_renderer, "renderer");
     info.addMember(m_weakFactory, "weakFactory");
     info.addMember(m_idAttributeName, "idAttributeName");
-    info.addMember(m_fullScreenElement, "fullScreenElement");
-    info.addMember(m_fullScreenElementStack, "fullScreenElementStack");
-    info.addMember(m_fullScreenRenderer, "fullScreenRenderer");
-    info.addMember(m_fullScreenChangeDelayTimer, "fullScreenChangeDelayTimer");
-    info.addMember(m_fullScreenChangeEventTargetQueue, "fullScreenChangeEventTargetQueue");
-    info.addMember(m_fullScreenErrorEventTargetQueue, "fullScreenErrorEventTargetQueue");
-    info.addMember(m_savedPlaceholderRenderStyle, "savedPlaceholderRenderStyle");
     info.addMember(m_topLayerElements, "topLayerElements");
     info.addMember(m_loadEventDelayTimer, "loadEventDelayTimer");
     info.addMember(m_viewportArguments, "viewportArguments");
@@ -5597,6 +5224,13 @@ void Document::didAssociateFormControlsTimerFired(Timer<Document>* timer)
 
     frame()->page()->chrome().client()->didAssociateFormControls(associatedFormControls);
     m_associatedFormControls.clear();
+}
+
+void Document::addLifecycleObserver(DocumentLifecycleObserver* observer)
+{
+    if (!m_lifecycleNotifier)
+        m_lifecycleNotifier = DocumentLifecycleNotifier::create();
+    m_lifecycleNotifier->addObserver(observer);
 }
 
 } // namespace WebCore

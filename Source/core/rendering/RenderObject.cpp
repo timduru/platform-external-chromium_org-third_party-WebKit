@@ -59,6 +59,7 @@
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderLazyBlock.h"
 #include "core/rendering/RenderListItem.h"
+#include "core/rendering/RenderMarquee.h"
 #include "core/rendering/RenderMultiColumnBlock.h"
 #include "core/rendering/RenderNamedFlowThread.h"
 #include "core/rendering/RenderRegion.h"
@@ -282,11 +283,6 @@ bool RenderObject::isHR() const
 bool RenderObject::isLegend() const
 {
     return node() && node()->hasTagName(legendTag);
-}
-
-bool RenderObject::isHTMLMarquee() const
-{
-    return node() && node()->renderer() == this && node()->hasTagName(marqueeTag);
 }
 
 void RenderObject::setFlowThreadStateIncludingDescendants(FlowThreadState state)
@@ -1360,9 +1356,9 @@ void RenderObject::repaintUsingContainer(const RenderLayerModelObject* repaintCo
         ASSERT(repaintContainer == v);
         bool viewHasCompositedLayer = v->hasLayer() && v->layer()->isComposited();
         if (!viewHasCompositedLayer) {
-            LayoutRect repaintRectangle = r;
+            IntRect repaintRectangle = r;
             if (viewHasCompositedLayer &&  v->layer()->transform())
-                repaintRectangle = enclosingIntRect(v->layer()->transform()->mapRect(r));
+                repaintRectangle = v->layer()->transform()->mapRect(r);
             v->repaintViewRectangle(repaintRectangle);
             return;
         }
@@ -2233,7 +2229,7 @@ LayoutSize RenderObject::offsetFromContainer(RenderObject* o, const LayoutPoint&
         offset -= toRenderBox(o)->scrolledContentOffset();
 
     if (offsetDependsOnPoint)
-        *offsetDependsOnPoint = hasColumns();
+        *offsetDependsOnPoint = hasColumns() || o->isRenderFlowThread();
 
     return offset;
 }
@@ -2557,9 +2553,12 @@ void RenderObject::destroyAndCleanupAnonymousWrappers()
 
     RenderObject* destroyRoot = this;
     for (RenderObject* destroyRootParent = destroyRoot->parent(); destroyRootParent && destroyRootParent->isAnonymous(); destroyRoot = destroyRootParent, destroyRootParent = destroyRootParent->parent()) {
-        // Currently we only remove anonymous cells' and table sections' wrappers but we should remove all unneeded
-        // wrappers. See http://webkit.org/b/52123 as an example where this is needed.
-        if (!destroyRootParent->isTableCell() && !destroyRootParent->isTableSection())
+        // Anonymous block continuations are tracked and destroyed elsewhere (see the bottom of RenderBlock::removeChild)
+        if (destroyRootParent->isRenderBlock() && toRenderBlock(destroyRootParent)->isAnonymousBlockContinuation())
+            break;
+        // Render flow threads are tracked by the FlowThreadController, so we can't destroy them here.
+        // Column spans are tracked elsewhere.
+        if (destroyRootParent->isRenderFlowThread() || destroyRootParent->isAnonymousColumnSpanBlock())
             break;
 
         if (destroyRootParent->firstChild() != this || destroyRootParent->lastChild() != this)

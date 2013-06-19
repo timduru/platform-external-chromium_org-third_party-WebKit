@@ -60,12 +60,12 @@
 #include "core/html/HTMLTextFormControlElement.h"
 #include "core/page/Frame.h"
 #include "core/page/Settings.h"
-#include "core/platform/KURL.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/RenderObject.h"
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/unicode/CharacterNames.h>
+#include "weborigin/KURL.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/text/StringBuilder.h"
+#include "wtf/unicode/CharacterNames.h"
 
 using namespace std;
 
@@ -1063,7 +1063,7 @@ void replaceChildrenWithFragment(ContainerNode* container, PassRefPtr<DocumentFr
     }
 
     if (hasOneTextChild(containerNode.get()) && hasOneTextChild(fragment.get())) {
-        toText(containerNode->firstChild())->setData(toText(fragment->firstChild())->data(), ec);
+        toText(containerNode->firstChild())->setData(toText(fragment->firstChild())->data());
         return;
     }
 
@@ -1083,7 +1083,7 @@ void replaceChildrenWithText(ContainerNode* container, const String& text, Excep
     ChildListMutationScope mutation(containerNode.get());
 
     if (hasOneTextChild(containerNode.get())) {
-        toText(containerNode->firstChild())->setData(text, ec);
+        toText(containerNode->firstChild())->setData(text);
         return;
     }
 

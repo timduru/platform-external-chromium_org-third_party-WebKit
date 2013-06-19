@@ -26,6 +26,11 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
+	third_party/WebKit/Source/modules/crypto/Crypto.cpp \
+	third_party/WebKit/Source/modules/crypto/DOMWindowCrypto.cpp \
+	third_party/WebKit/Source/modules/crypto/SubtleCrypto.cpp \
+	third_party/WebKit/Source/modules/crypto/WorkerContextCrypto.cpp \
+	third_party/WebKit/Source/modules/crypto/WorkerCrypto.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceAcceleration.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionController.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionData.cpp \
@@ -33,7 +38,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionEvent.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceRotationRate.cpp \
 	third_party/WebKit/Source/modules/donottrack/NavigatorDoNotTrack.cpp \
-	third_party/WebKit/Source/modules/encryptedmedia/CDM.cpp \
 	third_party/WebKit/Source/modules/encryptedmedia/MediaKeyMessageEvent.cpp \
 	third_party/WebKit/Source/modules/encryptedmedia/MediaKeyNeededEvent.cpp \
 	third_party/WebKit/Source/modules/encryptedmedia/MediaKeys.cpp \
@@ -91,8 +95,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/indexeddb/PageGroupIndexedDatabase.cpp \
 	third_party/WebKit/Source/modules/indexeddb/WorkerContextIndexedDatabase.cpp \
 	third_party/WebKit/Source/modules/indexeddb/chromium/IDBFactoryBackendInterfaceChromium.cpp \
+	third_party/WebKit/Source/modules/mediasource/MediaSource.cpp \
 	third_party/WebKit/Source/modules/mediasource/MediaSourceBase.cpp \
 	third_party/WebKit/Source/modules/mediasource/MediaSourceRegistry.cpp \
+	third_party/WebKit/Source/modules/mediasource/SourceBuffer.cpp \
+	third_party/WebKit/Source/modules/mediasource/SourceBufferList.cpp \
 	third_party/WebKit/Source/modules/mediasource/WebKitMediaSource.cpp \
 	third_party/WebKit/Source/modules/mediasource/WebKitSourceBuffer.cpp \
 	third_party/WebKit/Source/modules/mediasource/WebKitSourceBufferList.cpp \
@@ -125,6 +132,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/notifications/NotificationCenter.cpp \
 	third_party/WebKit/Source/modules/notifications/NotificationController.cpp \
 	third_party/WebKit/Source/modules/notifications/WorkerContextNotifications.cpp \
+	third_party/WebKit/Source/modules/performance/WorkerContextPerformance.cpp \
+	third_party/WebKit/Source/modules/performance/WorkerPerformance.cpp \
 	third_party/WebKit/Source/modules/quota/DOMWindowQuota.cpp \
 	third_party/WebKit/Source/modules/quota/NavigatorStorageQuota.cpp \
 	third_party/WebKit/Source/modules/quota/StorageInfo.cpp \
@@ -145,6 +154,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/speech/SpeechSynthesisEvent.cpp \
 	third_party/WebKit/Source/modules/speech/SpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/modules/speech/SpeechSynthesisVoice.cpp \
+	third_party/WebKit/Source/modules/vibration/NavigatorVibration.cpp \
 	third_party/WebKit/Source/modules/webaudio/AudioBasicInspectorNode.cpp \
 	third_party/WebKit/Source/modules/webaudio/AudioBasicProcessorNode.cpp \
 	third_party/WebKit/Source/modules/webaudio/AudioBuffer.cpp \
@@ -202,7 +212,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseSync.cpp \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseTask.cpp \
 	third_party/WebKit/Source/modules/webdatabase/DatabaseThread.cpp \
+	third_party/WebKit/Source/modules/webdatabase/DatabaseTracker.cpp \
 	third_party/WebKit/Source/modules/webdatabase/DOMWindowWebDatabase.cpp \
+	third_party/WebKit/Source/modules/webdatabase/QuotaTracker.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLException.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLResultSet.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLResultSetRowList.cpp \
@@ -212,17 +224,17 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/webdatabase/SQLTransaction.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLTransactionBackend.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLTransactionBackendSync.cpp \
+	third_party/WebKit/Source/modules/webdatabase/SQLTransactionClient.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLTransactionCoordinator.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLTransactionStateMachine.cpp \
 	third_party/WebKit/Source/modules/webdatabase/SQLTransactionSync.cpp \
 	third_party/WebKit/Source/modules/webdatabase/WorkerContextWebDatabase.cpp \
-	third_party/WebKit/Source/modules/webdatabase/chromium/DatabaseTrackerChromium.cpp \
-	third_party/WebKit/Source/modules/webdatabase/chromium/QuotaTracker.cpp \
-	third_party/WebKit/Source/modules/webdatabase/chromium/SQLTransactionClientChromium.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIAccess.cpp \
+	third_party/WebKit/Source/modules/webmidi/MIDIAccessPromise.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIInput.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIOutput.cpp \
 	third_party/WebKit/Source/modules/webmidi/MIDIPort.cpp \
+	third_party/WebKit/Source/modules/webmidi/NavigatorWebMIDI.cpp \
 	third_party/WebKit/Source/modules/websockets/MainThreadWebSocketChannel.cpp \
 	third_party/WebKit/Source/modules/websockets/ThreadableWebSocketChannelClientWrapper.cpp \
 	third_party/WebKit/Source/modules/websockets/WebSocket.cpp \
@@ -280,6 +292,7 @@ MY_CFLAGS := \
 MY_CFLAGS_C :=
 
 MY_DEFS := \
+	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
@@ -292,9 +305,9 @@ MY_DEFS := \
 	'-DENABLE_EGLIMAGE=1' \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
-	'-DENABLE_CANVAS_USES_MAILBOX=0' \
+	'-DINSIDE_WEBKIT' \
+	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
@@ -303,6 +316,7 @@ MY_DEFS := \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -317,6 +331,7 @@ MY_DEFS := \
 	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_BUILD_NO_IMAGE_ENCODE' \
 	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \

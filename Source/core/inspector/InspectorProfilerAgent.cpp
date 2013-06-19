@@ -48,11 +48,10 @@
 #include "core/page/Console.h"
 #include "core/page/ConsoleTypes.h"
 #include "core/page/Page.h"
-#include "core/platform/KURL.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/text/StringConcatenate.h>
+#include "wtf/CurrentTime.h"
+#include "wtf/MemoryInstrumentationHashMap.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/text/StringConcatenate.h"
 
 namespace WebCore {
 
@@ -81,12 +80,10 @@ InspectorProfilerAgent::InspectorProfilerAgent(InstrumentingAgents* instrumentin
     , m_profileNameIdleTimeMap(ScriptProfiler::currentProfileNameIdleTimeMap())
     , m_previousTaskEndTime(0.0)
 {
-    m_instrumentingAgents->setInspectorProfilerAgent(this);
 }
 
 InspectorProfilerAgent::~InspectorProfilerAgent()
 {
-    m_instrumentingAgents->setInspectorProfilerAgent(0);
 }
 
 void InspectorProfilerAgent::addProfile(PassRefPtr<ScriptProfile> prpProfile, unsigned lineNumber, const String& sourceURL)
@@ -132,10 +129,12 @@ PassRefPtr<TypeBuilder::Profiler::ProfileHeader> InspectorProfilerAgent::createP
 void InspectorProfilerAgent::enable(ErrorString*)
 {
     m_state->setBoolean(ProfilerAgentState::profilerEnabled, true);
+    m_instrumentingAgents->setInspectorProfilerAgent(this);
 }
 
 void InspectorProfilerAgent::disable(ErrorString*)
 {
+    m_instrumentingAgents->setInspectorProfilerAgent(0);
     m_state->setBoolean(ProfilerAgentState::profilerEnabled, false);
     m_state->setBoolean(ProfilerAgentState::profileHeadersRequested, false);
 }

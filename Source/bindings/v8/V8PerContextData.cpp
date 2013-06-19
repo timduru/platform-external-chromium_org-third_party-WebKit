@@ -37,30 +37,30 @@
 
 namespace WebCore {
 
+template<typename Map>
+static void disposeMapWithUnsafePersistentValues(Map* map)
+{
+    typename Map::iterator it = map->begin();
+    for (; it != map->end(); ++it)
+        it->value.dispose();
+    map->clear();
+}
+
 void V8PerContextData::dispose()
 {
     v8::HandleScope handleScope(m_isolate);
     v8::Local<v8::Context>::New(m_isolate, m_context)->SetAlignedPointerInEmbedderData(v8ContextPerContextDataIndex, 0);
 
-    {
-        WrapperBoilerplateMap::iterator it = m_wrapperBoilerplates.begin();
-        for (; it != m_wrapperBoilerplates.end(); ++it)
-            it->value.dispose();
-        m_wrapperBoilerplates.clear();
-    }
+    disposeMapWithUnsafePersistentValues(&m_wrapperBoilerplates);
+    disposeMapWithUnsafePersistentValues(&m_constructorMap);
+    disposeMapWithUnsafePersistentValues(&m_customElementPrototypeMap);
 
-    {
-        ConstructorMap::iterator it = m_constructorMap.begin();
-        for (; it != m_constructorMap.end(); ++it)
-            it->value.dispose();
-        m_constructorMap.clear();
-    }
     m_context.Dispose();
 }
 
 #define V8_STORE_PRIMORDIAL(name, Name) \
 { \
-    ASSERT(m_##name##Prototype.get().IsEmpty()); \
+    ASSERT(m_##name##Prototype.isEmpty()); \
     v8::Handle<v8::String> symbol = v8::String::NewSymbol(#Name); \
     if (symbol.IsEmpty()) \
         return false; \
@@ -123,7 +123,7 @@ v8::Local<v8::Function> V8PerContextData::constructorForTypeSlowCase(WrapperType
             prototypeObject->SetAlignedPointerInInternalField(v8PrototypeTypeIndex, type);
         type->installPerContextPrototypeProperties(prototypeObject, m_isolate);
         if (type->wrapperTypePrototype == WrapperTypeErrorPrototype)
-            prototypeObject->SetPrototype(m_errorPrototype.get());
+            prototypeObject->SetPrototype(m_errorPrototype.newLocal(m_isolate));
     }
 
     m_constructorMap.set(type, UnsafePersistent<v8::Function>(m_isolate, function));

@@ -99,7 +99,7 @@ bool WorkerScriptController::initializeContextIfNeeded()
         return false;
 
     // Starting from now, use local context only.
-    v8::Local<v8::Context> context = v8::Local<v8::Context>::New(m_context.get());
+    v8::Local<v8::Context> context = m_context.newLocal(m_isolate);
 
     v8::Context::Scope scope(context);
 
@@ -141,19 +141,19 @@ ScriptValue WorkerScriptController::evaluate(const String& script, const String&
     if (!initializeContextIfNeeded())
         return ScriptValue();
 
+    v8::Handle<v8::Context> context = m_context.newLocal(m_isolate);
     if (!m_disableEvalPending.isEmpty()) {
-        m_context.get()->AllowCodeGenerationFromStrings(false);
-        m_context.get()->SetErrorMessageForCodeGenerationFromStrings(v8String(m_disableEvalPending, m_isolate));
+        context->AllowCodeGenerationFromStrings(false);
+        context->SetErrorMessageForCodeGenerationFromStrings(v8String(m_disableEvalPending, m_isolate));
         m_disableEvalPending = String();
     }
 
-    v8::Handle<v8::Context> context = m_context.newLocal(m_isolate);
     v8::Context::Scope scope(context);
 
     v8::TryCatch block;
 
     v8::Handle<v8::String> scriptString = v8String(script, m_isolate);
-    v8::Handle<v8::Script> compiledScript = V8ScriptRunner::compileScript(scriptString, fileName, scriptStartPosition, m_isolate);
+    v8::Handle<v8::Script> compiledScript = V8ScriptRunner::compileScript(scriptString, fileName, scriptStartPosition, 0, m_isolate);
     v8::Local<v8::Value> result = V8ScriptRunner::runCompiledScript(compiledScript, m_workerContext);
 
     if (!block.CanContinue()) {

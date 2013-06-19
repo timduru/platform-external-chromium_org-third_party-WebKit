@@ -79,10 +79,11 @@ Canvas2DLayerBridge::~Canvas2DLayerBridge()
     GraphicsLayer::unregisterContentsLayer(m_layer->layer());
     Canvas2DLayerManager::get().layerToBeDestroyed(this);
     m_canvas->setNotificationClient(0);
+    m_layer->clearTexture();
+    m_layer.clear();
 #if ENABLE(CANVAS_USES_MAILBOX)
     m_mailboxes.clear();
 #endif
-    m_layer->clearTexture();
 }
 
 void Canvas2DLayerBridge::limitPendingFrames()
@@ -207,15 +208,20 @@ bool Canvas2DLayerBridge::prepareMailbox(WebKit::WebExternalTextureMailbox* outM
     ASSERT(mailboxInfo->m_image.get());
     ASSERT(mailboxInfo->m_image->getTexture());
 
-    // Because we are changing the texture binding without going through skia,
-    // we must restore it to its previous value to keep skia's state cache in
-    // sync.
-    GC3Dint savedTexBinding = 0;
-    m_context->getIntegerv(GraphicsContext3D::TEXTURE_BINDING_2D, &savedTexBinding);
     m_context->bindTexture(GraphicsContext3D::TEXTURE_2D, mailboxInfo->m_image->getTexture()->getTextureHandle());
+    m_context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MAG_FILTER, GraphicsContext3D::LINEAR);
+    m_context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_MIN_FILTER, GraphicsContext3D::LINEAR);
+    m_context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_S, GraphicsContext3D::CLAMP_TO_EDGE);
+    m_context->texParameteri(GraphicsContext3D::TEXTURE_2D, GraphicsContext3D::TEXTURE_WRAP_T, GraphicsContext3D::CLAMP_TO_EDGE);
     context()->produceTextureCHROMIUM(GraphicsContext3D::TEXTURE_2D, mailboxInfo->m_mailbox.name);
+    context()->flush();
     mailboxInfo->m_mailbox.syncPoint = context()->insertSyncPoint();
-    m_context->bindTexture(GraphicsContext3D::TEXTURE_2D, savedTexBinding);
+    m_context->bindTexture(GraphicsContext3D::TEXTURE_2D, 0);
+    // Because we are changing the texture binding without going through skia,
+    // we must dirty the context.
+    // TODO(piman): expose finer granularity reset. We only really want to
+    // 'dirty' the current texture binding.
+    m_context->grContext()->resetContext();
 
     *outMailbox = mailboxInfo->m_mailbox;
     return true;
@@ -240,7 +246,11 @@ Canvas2DLayerBridge::MailboxInfo* Canvas2DLayerBridge::createMailboxInfo() {
     context()->genMailboxCHROMIUM(mailboxInfo->m_mailbox.name);
     // Worst case, canvas is triple buffered.  More than 3 active mailboxes
     // means there is a problem.
-    ASSERT(m_mailboxes.size() <= 3);
+    // For the single-threaded case, this value needs to be at least
+    // kMaxSwapBuffersPending+1 (in render_widget.h).
+    // Because of crbug.com/247874, it needs to be kMaxSwapBuffersPending+2.
+    // TODO(piman): fix this.
+    ASSERT(m_mailboxes.size() <= 4);
     ASSERT(mailboxInfo < m_mailboxes.end());
     return mailboxInfo;
 }

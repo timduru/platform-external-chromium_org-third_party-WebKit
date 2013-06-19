@@ -34,20 +34,10 @@
 #include "config.h"
 #include "weborigin/KURL.h"
 
+#include "wtf/testing/WTFTestHelpers.h"
 #include <gtest/gtest.h>
 
-namespace WTF {
-
-// Output stream operator so gTest's macros work with WebCore strings.
-static std::ostream& operator<<(std::ostream& out, const String& str)
-{
-    return str.isEmpty() ? out : out << str.utf8().data();
-}
-
-} // namespace WTF
-
 namespace {
-
 
 struct ComponentCase {
     const char* url;
@@ -303,13 +293,7 @@ TEST(KURLTest, Decode)
     EXPECT_EQ(invalidExpected, invalid);
 }
 
-// TODO: Re-enable this test on windows after getting it to load ICU data
-#if defined(WIN32)
-#define MAYBE_Encode DISABLED_Encode
-#else
-#define MAYBE_Encode Encode
-#endif
-TEST(KURLTest, MAYBE_Encode)
+TEST(KURLTest, Encode)
 {
     struct EncodeCase {
         const char* input;

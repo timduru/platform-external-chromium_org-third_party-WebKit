@@ -87,9 +87,9 @@ PassRefPtr<HTMLOptionElement> HTMLOptionElement::createForJSConstructor(Document
     return element.release();
 }
 
-void HTMLOptionElement::attach()
+void HTMLOptionElement::attach(const AttachContext& context)
 {
-    HTMLElement::attach();
+    HTMLElement::attach(context);
     // If after attaching nothing called styleForRenderer() on this node we
     // manually cache the value. This happens if our parent doesn't have a
     // renderer like <optgroup> or if it doesn't allow children like <select>.
@@ -97,21 +97,16 @@ void HTMLOptionElement::attach()
         updateNonRenderStyle();
 }
 
-void HTMLOptionElement::detach()
+void HTMLOptionElement::detach(const AttachContext& context)
 {
     m_style.clear();
-    HTMLElement::detach();
+    HTMLElement::detach(context);
 }
 
-bool HTMLOptionElement::supportsFocus() const
-{
-    return HTMLElement::supportsFocus();
-}
-
-bool HTMLOptionElement::isFocusable() const
+bool HTMLOptionElement::rendererIsFocusable() const
 {
     // Option elements do not have a renderer so we check the renderStyle instead.
-    return supportsFocus() && renderStyle() && renderStyle()->display() != NONE;
+    return renderStyle() && renderStyle()->display() != NONE;
 }
 
 String HTMLOptionElement::text() const
@@ -148,7 +143,7 @@ void HTMLOptionElement::setText(const String &text, ExceptionCode& ec)
     // Handle the common special case where there's exactly 1 child node, and it's a text node.
     Node* child = firstChild();
     if (child && child->isTextNode() && !child->nextSibling())
-        toText(child)->setData(text, ec);
+        toText(child)->setData(text);
     else {
         removeChildren();
         appendChild(Text::create(document(), text), ec);

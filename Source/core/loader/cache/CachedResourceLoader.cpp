@@ -50,6 +50,7 @@
 #include "core/loader/cache/CachedResourceRequest.h"
 #include "core/loader/cache/CachedScript.h"
 #include "core/loader/cache/CachedShader.h"
+#include "core/loader/cache/CachedTextTrack.h"
 #include "core/loader/cache/CachedXSLStyleSheet.h"
 #include "core/loader/cache/MemoryCache.h"
 #include "core/page/Console.h"
@@ -59,16 +60,16 @@
 #include "core/page/Performance.h"
 #include "core/page/Settings.h"
 #include "core/platform/Logging.h"
+#include "public/platform/Platform.h"
+#include "public/platform/WebURL.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
-
-#include "core/loader/cache/CachedTextTrack.h"
 
 #define PRELOAD_DEBUG 0
 
 namespace WebCore {
 
-static CachedResource* createResource(CachedResource::Type type, ResourceRequest& request, const String& charset)
+static CachedResource* createResource(CachedResource::Type type, const ResourceRequest& request, const String& charset)
 {
     switch (type) {
     case CachedResource::ImageResource:
@@ -132,6 +133,27 @@ static ResourceLoadPriority loadPriority(CachedResource::Type type, const Cached
     return ResourceLoadPriorityUnresolved;
 }
 
+static CachedResource* resourceFromDataURIRequest(const ResourceRequest& request)
+{
+    const KURL& url = request.url();
+    ASSERT(url.protocolIsData());
+
+    WebKit::WebString mimetype;
+    WebKit::WebString charset;
+    RefPtr<SharedBuffer> data = PassRefPtr<SharedBuffer>(WebKit::Platform::current()->parseDataURL(url, mimetype, charset));
+    if (!data)
+        return 0;
+    ResourceResponse response(url, mimetype, data->size(), charset, String());
+
+    CachedResource* resource = createResource(CachedResource::ImageResource, request, charset);
+    resource->responseReceived(response);
+    // FIXME: AppendData causes an unnecessary memcpy.
+    if (data->size())
+        resource->appendData(data->data(), data->size());
+    resource->finish();
+    return resource;
+}
+
 CachedResourceLoader::CachedResourceLoader(DocumentLoader* documentLoader)
     : m_document(0)
     , m_documentLoader(documentLoader)
@@ -181,8 +203,24 @@ CachedResourceHandle<CachedImage> CachedResourceLoader::requestImage(CachedResou
             return 0;
         }
     }
+
+    if (request.resourceRequest().url().protocolIsData())
+        preCacheDataURIImage(request);
+
     request.setDefer(clientDefersImage(request.resourceRequest().url()) ? CachedResourceRequest::DeferredByClient : CachedResourceRequest::NoDefer);
     return static_cast<CachedImage*>(requestResource(CachedResource::ImageResource, request).get());
+}
+
+void CachedResourceLoader::preCacheDataURIImage(const CachedResourceRequest& request)
+{
+    const KURL& url = request.resourceRequest().url();
+    ASSERT(url.protocolIsData());
+
+    if (CachedResource* existing = memoryCache()->resourceForURL(url))
+        return;
+
+    if (CachedResource* resource = resourceFromDataURIRequest(request.resourceRequest()))
+        memoryCache()->add(resource);
 }
 
 CachedResourceHandle<CachedFont> CachedResourceLoader::requestFont(CachedResourceRequest& request)
@@ -452,8 +490,13 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
         }
     }
 
-    // FIXME: Temporarily leave main resource caching disabled for chromium, see https://bugs.webkit.org/show_bug.cgi?id=107962
-    // Ensure main resources aren't preloaded, and other main resource loads are removed from cache to prevent reuse.
+    // FIXME: Temporarily leave main resource caching disabled for chromium,
+    // see https://bugs.webkit.org/show_bug.cgi?id=107962. Before caching main
+    // resources, we should be sure to understand the implications for memory
+    // use.
+    //
+    // Ensure main resources aren't preloaded, and other main resource loads
+    // are removed from cache to prevent reuse.
     if (type == CachedResource::MainResource) {
         ASSERT(policy != Use);
         ASSERT(policy != Revalidate);
@@ -664,6 +707,16 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
         return Reload;
     }
 
+    // Do not load from cache if images are not enabled. The load for this image will be blocked
+    // in CachedImage::load.
+    if (CachedResourceRequest::DeferredByClient == defer)
+        return Reload;
+
+    // Always use data uris.
+    // FIXME: Extend this to non-images.
+    if (type == CachedResource::ImageResource && request.url().protocolIsData())
+        return Use;
+
     if (!existingResource->canReuse(request))
         return Reload;
 
@@ -673,11 +726,6 @@ CachedResourceLoader::RevalidationPolicy CachedResourceLoader::determineRevalida
     if (request.isConditional())
         return Reload;
 
-    // Do not load from cache if images are not enabled. The load for this image will be blocked
-    // in CachedImage::load.
-    if (CachedResourceRequest::DeferredByClient == defer)
-        return Reload;
-    
     // Don't reload resources while pasting.
     if (m_allowStaleResources)
         return Use;

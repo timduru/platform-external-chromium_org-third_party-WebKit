@@ -16,8 +16,10 @@
 ApplicationCache status=stable
 AuthorShadowDOMForAnyElement
 CanvasPath status=test
+Crypto status=test
 CSSCompositing status=experimental
 CSSExclusions status=experimental
+CSSGridLayout status=experimental
 CSSRegions status=experimental
 CSSTouchAction status=test
 CSSVariables status=experimental
@@ -37,9 +39,11 @@ ExperimentalShadowDOM status=experimental
 FileSystem status=stable
 FontLoadEvents status=experimental
 Fullscreen status=stable
+CSSViewport status=experimental
 Gamepad status=stable
 Geolocation status=stable
 HTMLImports status=test
+HighResolutionTimeInWorkers status=experimental
 IMEAPI status=test
 IndexedDB status=stable
 InputTypeColor status=stable
@@ -66,6 +70,7 @@ SpeechInput status=stable
 SpeechSynthesis status=experimental
 StyleScoped status=experimental
 Touch status=stable
+Vibration status=test
 VideoTrack status=stable
 WebAnimations
 WebAudio condition=WEB_AUDIO, status=stable
@@ -73,3 +78,4 @@ WebGLDraftExtensions status=experimental
 WebMIDI status=test
 WebKitMediaSource status=stable
 WebPInAcceptHeader
+WOFF2 status=experimental

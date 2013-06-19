@@ -31,8 +31,6 @@
 #ifndef CSSViewportRule_h
 #define CSSViewportRule_h
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
-
 #include "core/css/CSSRule.h"
 
 namespace WebCore {
@@ -49,7 +47,7 @@ public:
     }
     ~CSSViewportRule();
 
-    virtual CSSRule::Type type() const OVERRIDE { return WEBKIT_VIEWPORT_RULE; }
+    virtual CSSRule::Type type() const OVERRIDE { return VIEWPORT_RULE; }
     virtual String cssText() const OVERRIDE;
     virtual void reattach(StyleRuleBase*) OVERRIDE;
     virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
@@ -66,5 +64,3 @@ private:
 } // namespace WebCore
 
 #endif // CSSViewportRule_h
-
-#endif // ENABLE(CSS_DEVICE_ADAPTATION)

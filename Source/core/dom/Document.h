@@ -28,6 +28,7 @@
 #ifndef Document_h
 #define Document_h
 
+#include "bindings/v8/ScriptValue.h"
 #include "core/dom/ContainerNode.h"
 #include "core/dom/DOMTimeStamp.h"
 #include "core/dom/DocumentEventQueue.h"
@@ -72,7 +73,6 @@ class CanvasRenderingContext;
 class CharacterData;
 class Comment;
 class ContextFeatures;
-class CustomElementConstructor;
 class CustomElementRegistry;
 class DOMImplementation;
 class DOMNamedFlowCollection;
@@ -82,6 +82,8 @@ class DOMWindow;
 class Database;
 class DatabaseThread;
 class DocumentFragment;
+class DocumentLifecycleNotifier;
+class DocumentLifecycleObserver;
 class DocumentLoader;
 class DocumentMarkerController;
 class DocumentParser;
@@ -108,6 +110,7 @@ class HTMLImportsController;
 class HTMLIFrameElement;
 class HTMLMapElement;
 class HTMLNameCollection;
+class HTMLScriptElement;
 class HitTestRequest;
 class HitTestResult;
 class IntPoint;
@@ -130,7 +133,6 @@ class ProcessingInstruction;
 class Range;
 class RegisteredEventListener;
 class RenderArena;
-class RenderFullScreen;
 class RenderView;
 class RequestAnimationFrameCallback;
 class SVGDocumentExtensions;
@@ -325,8 +327,6 @@ public:
 
     bool regionBasedColumnsEnabled() const;
 
-    bool cssGridLayoutEnabled() const;
-
     /**
      * Retrieve all nodes that intersect a rect in the window's document, until it is fully enclosed by
      * the boundaries of a node.
@@ -467,11 +467,15 @@ public:
 
     PassRefPtr<Range> createRange();
 
-    PassRefPtr<NodeIterator> createNodeIterator(Node* root, unsigned whatToShow,
-        PassRefPtr<NodeFilter>, bool expandEntityReferences, ExceptionCode&);
+    PassRefPtr<NodeIterator> createNodeIterator(Node* root, ExceptionCode&);
+    PassRefPtr<NodeIterator> createNodeIterator(Node* root, unsigned whatToShow, ExceptionCode&);
+    PassRefPtr<NodeIterator> createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter>, ExceptionCode&);
+    PassRefPtr<NodeIterator> createNodeIterator(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter>, bool expandEntityReferences, ExceptionCode&);
 
-    PassRefPtr<TreeWalker> createTreeWalker(Node* root, unsigned whatToShow,
-        PassRefPtr<NodeFilter>, bool expandEntityReferences, ExceptionCode&);
+    PassRefPtr<TreeWalker> createTreeWalker(Node* root, ExceptionCode&);
+    PassRefPtr<TreeWalker> createTreeWalker(Node* root, unsigned whatToShow, ExceptionCode&);
+    PassRefPtr<TreeWalker> createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter>, ExceptionCode&);
+    PassRefPtr<TreeWalker> createTreeWalker(Node* root, unsigned whatToShow, PassRefPtr<NodeFilter>, bool expandEntityReferences, ExceptionCode&);
 
     // Special support for editing
     PassRefPtr<CSSStyleDeclaration> createCSSStyleDeclaration();
@@ -496,8 +500,8 @@ public:
 
     CachedResourceLoader* cachedResourceLoader() { return m_cachedResourceLoader.get(); }
 
-    virtual void attach();
-    virtual void detach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     void prepareForDestruction();
 
     // Override ScriptExecutionContext methods to do additional work
@@ -700,8 +704,8 @@ public:
     DOMWindow* defaultView() const { return domWindow(); } 
 
     // Helper functions for forwarding DOMWindow event related tasks to the DOMWindow if it exists.
-    void setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener>);
-    EventListener* getWindowAttributeEventListener(const AtomicString& eventType);
+    void setWindowAttributeEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, DOMWrapperWorld* isolatedWorld = 0);
+    EventListener* getWindowAttributeEventListener(const AtomicString& eventType, DOMWrapperWorld* isolatedWorld);
     void dispatchWindowEvent(PassRefPtr<Event>, PassRefPtr<EventTarget> = 0);
 
     PassRefPtr<Event> createEvent(const String& eventType, ExceptionCode&);
@@ -850,6 +854,10 @@ public:
 
     ScriptRunner* scriptRunner() { return m_scriptRunner.get(); }
 
+    HTMLScriptElement* currentScript() const { return !m_currentScriptStack.isEmpty() ? m_currentScriptStack.last().get() : 0; }
+    void pushCurrentScript(PassRefPtr<HTMLScriptElement>);
+    void popCurrentScript();
+
     void applyXSLTransform(ProcessingInstruction* pi);
     PassRefPtr<Document> transformSourceDocument() { return m_transformSourceDocument; }
     void setTransformSourceDocument(Document* doc) { m_transformSourceDocument = doc; }
@@ -906,9 +914,6 @@ public:
 
     void documentWillBecomeInactive();
 
-    void setShouldCreateRenderers(bool);
-    bool shouldCreateRenderers();
-
     void setDecoder(PassRefPtr<TextResourceDecoder>);
     TextResourceDecoder* decoder() const { return m_decoder.get(); }
 
@@ -962,39 +967,9 @@ public:
     virtual DocumentEventQueue* eventQueue() const { return m_eventQueue.get(); }
 
     const QualifiedName& idAttributeName() const { return m_idAttributeName; }
-    
-    bool webkitIsFullScreen() const { return m_fullScreenElement.get(); }
-    bool webkitFullScreenKeyboardInputAllowed() const { return m_fullScreenElement.get() && m_areKeysEnabledInFullScreen; }
-    Element* webkitCurrentFullScreenElement() const { return m_fullScreenElement.get(); }
-    
-    enum FullScreenCheckType {
-        EnforceIFrameAllowFullScreenRequirement,
-        ExemptIFrameAllowFullScreenRequirement,
-    };
 
-    void requestFullScreenForElement(Element*, unsigned short flags, FullScreenCheckType);
-    void webkitCancelFullScreen();
-    
-    void webkitWillEnterFullScreenForElement(Element*);
-    void webkitDidEnterFullScreenForElement(Element*);
-    void webkitWillExitFullScreenForElement(Element*);
-    void webkitDidExitFullScreenForElement(Element*);
-    
-    void setFullScreenRenderer(RenderFullScreen*);
-    RenderFullScreen* fullScreenRenderer() const { return m_fullScreenRenderer; }
-    void fullScreenRendererDestroyed();
-
-    void fullScreenChangeDelayTimerFired(Timer<Document>*);
-    bool fullScreenIsAllowedForElement(Element*) const;
-    void fullScreenElementRemoved();
-    void removeFullScreenElementOfSubtree(Node*, bool amongChildrenOnly = false);
-    bool isAnimatingFullScreen() const { return m_isAnimatingFullScreen; }
-    void setAnimatingFullScreen(bool);
-
-    // W3C API
-    bool webkitFullscreenEnabled() const;
-    Element* webkitFullscreenElement() const { return !m_fullScreenElementStack.isEmpty() ? m_fullScreenElementStack.last().get() : 0; }
-    void webkitExitFullscreen();
+    bool hasFullscreenController() const { return m_hasFullscreenController; }
+    void setHasFullscreenController() { m_hasFullscreenController = true; }
 
     void webkitExitPointerLock();
     Element* webkitPointerLockElement() const;
@@ -1039,10 +1014,7 @@ public:
     void resumeScheduledTasks();
 
     IntSize viewportSize() const;
-
-#if ENABLE(CSS_DEVICE_ADAPTATION)
     IntSize initialViewportSize() const;
-#endif
 
     Prerenderer* prerenderer() { return m_prerenderer.get(); }
 
@@ -1050,8 +1022,8 @@ public:
 
     PassRefPtr<Element> createElement(const AtomicString& localName, const AtomicString& typeExtension, ExceptionCode&);
     PassRefPtr<Element> createElementNS(const AtomicString& namespaceURI, const String& qualifiedName, const AtomicString& typeExtension, ExceptionCode&);
-    PassRefPtr<CustomElementConstructor> registerElement(WebCore::ScriptState*, const AtomicString& name, ExceptionCode&);
-    PassRefPtr<CustomElementConstructor> registerElement(WebCore::ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionCode&);
+    ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, ExceptionCode&);
+    ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionCode&);
     CustomElementRegistry* registry() const { return m_registry.get(); }
     CustomElementRegistry* ensureCustomElementRegistry();
 
@@ -1104,6 +1076,8 @@ public:
     virtual const SecurityOrigin* topOrigin() const OVERRIDE;
 
     PassRefPtr<FontLoader> fontloader();
+
+    void addLifecycleObserver(DocumentLifecycleObserver*);
 
 protected:
     Document(Frame*, const KURL&, DocumentClassFlags = DefaultDocumentClass);
@@ -1168,11 +1142,6 @@ private:
     PageVisibilityState visibilityState() const;
 
     PassRefPtr<HTMLCollection> ensureCachedCollection(CollectionType);
-
-    void clearFullscreenElementStack();
-    void popFullscreenElementStack();
-    void pushFullscreenElementStack(Element*);
-    void addDocumentToFullScreenChangeEventQueue(Document*);
 
     // Note that dispatching a window load event may cause the DOMWindow to be detached from
     // the Frame, so callers should take a reference to the DOMWindow (which owns us) to
@@ -1295,7 +1264,7 @@ private:
     bool m_titleSetExplicitly;
     RefPtr<Element> m_titleElement;
 
-    OwnPtr<RenderArena> m_renderArena;
+    RefPtr<RenderArena> m_renderArena;
 
     OwnPtr<AXObjectCache> m_axObjectCache;
     OwnPtr<DocumentMarkerController> m_markers;
@@ -1316,6 +1285,8 @@ private:
     bool m_overMinimumLayoutThreshold;
     
     OwnPtr<ScriptRunner> m_scriptRunner;
+
+    Vector<RefPtr<HTMLScriptElement> > m_currentScriptStack;
 
     OwnPtr<TransformSource> m_transformSource;
     RefPtr<Document> m_transformSourceDocument;
@@ -1344,7 +1315,6 @@ private:
 
     HashMap<String, RefPtr<HTMLCanvasElement> > m_cssCanvasElements;
 
-    bool m_createRenderers;
     Vector<IconURL> m_iconURLs;
 
     HashMap<StringImpl*, Element*, CaseFoldingHash> m_elementsByAccessKey;
@@ -1367,16 +1337,7 @@ private:
 
     QualifiedName m_idAttributeName;
 
-    bool m_areKeysEnabledInFullScreen;
-    RefPtr<Element> m_fullScreenElement;
-    Vector<RefPtr<Element> > m_fullScreenElementStack;
-    RenderFullScreen* m_fullScreenRenderer;
-    Timer<Document> m_fullScreenChangeDelayTimer;
-    Deque<RefPtr<Node> > m_fullScreenChangeEventTargetQueue;
-    Deque<RefPtr<Node> > m_fullScreenErrorEventTargetQueue;
-    bool m_isAnimatingFullScreen;
-    LayoutRect m_savedPlaceholderFrameRect;
-    RefPtr<RenderStyle> m_savedPlaceholderRenderStyle;
+    bool m_hasFullscreenController; // For early return in FullscreenController::fromIfExists()
 
     Vector<RefPtr<Element> > m_topLayerElements;
 
@@ -1440,6 +1401,7 @@ private:
     Timer<Document> m_didAssociateFormControlsTimer;
     HashSet<RefPtr<Element> > m_associatedFormControls;
 
+    OwnPtr<DocumentLifecycleNotifier> m_lifecycleNotifier;
 };
 
 inline void Document::notifyRemovePendingSheetIfNeeded()

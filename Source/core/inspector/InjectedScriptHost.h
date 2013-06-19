@@ -32,7 +32,6 @@
 
 #include "bindings/v8/ScriptState.h"
 #include "bindings/v8/ScriptWrappable.h"
-#include "core/inspector/InspectorAgent.h"
 #include "core/page/ConsoleTypes.h"
 #include <wtf/RefCounted.h>
 #include <wtf/Vector.h>
@@ -41,18 +40,10 @@ namespace WebCore {
 
 class Database;
 class InjectedScript;
-class InspectorAgent;
-class InspectorConsoleAgent;
-class InspectorDOMAgent;
-class InspectorDOMStorageAgent;
-class InspectorDatabaseAgent;
-class InspectorDebuggerAgent;
-class InspectorFrontend;
-class InspectorObject;
 class InspectorValue;
+class InstrumentingAgents;
 class Node;
 class ScriptDebugServer;
-class ScriptObject;
 class ScriptValue;
 class Storage;
 
@@ -68,20 +59,10 @@ public:
     static PassRefPtr<InjectedScriptHost> create();
     ~InjectedScriptHost();
 
-    void init(InspectorAgent* inspectorAgent
-            , InspectorConsoleAgent* consoleAgent
-            , InspectorDatabaseAgent* databaseAgent
-            , InspectorDOMStorageAgent* domStorageAgent
-            , InspectorDOMAgent* domAgent
-            , InspectorDebuggerAgent* debuggerAgent
-        )
+    void init(InstrumentingAgents* instrumentingAgents, ScriptDebugServer* scriptDebugServer)
     {
-        m_inspectorAgent = inspectorAgent;
-        m_consoleAgent = consoleAgent;
-        m_databaseAgent = databaseAgent;
-        m_domStorageAgent = domStorageAgent;
-        m_domAgent = domAgent;
-        m_debuggerAgent = debuggerAgent;
+        m_instrumentingAgents = instrumentingAgents;
+        m_scriptDebugServer = scriptDebugServer;
     }
 
     static Node* scriptValueAsNode(ScriptValue);
@@ -106,20 +87,18 @@ public:
     void copyText(const String& text);
     String databaseIdImpl(Database*);
     String storageIdImpl(Storage*);
-    void setBreakpoint(const String& scriptId, int lineNumber, int columnNumber);
-    void removeBreakpoint(const String& scriptId, int lineNumber, int columnNumber);
+    void debugFunction(const String& scriptId, int lineNumber, int columnNumber);
+    void undebugFunction(const String& scriptId, int lineNumber, int columnNumber);
+    void monitorFunction(const String& scriptId, int lineNumber, int columnNumber, const String& functionName);
+    void unmonitorFunction(const String& scriptId, int lineNumber, int columnNumber);
 
-    ScriptDebugServer& scriptDebugServer();
+    ScriptDebugServer& scriptDebugServer() { return *m_scriptDebugServer; }
 
 private:
     InjectedScriptHost();
 
-    InspectorAgent* m_inspectorAgent;
-    InspectorConsoleAgent* m_consoleAgent;
-    InspectorDatabaseAgent* m_databaseAgent;
-    InspectorDOMStorageAgent* m_domStorageAgent;
-    InspectorDOMAgent* m_domAgent;
-    InspectorDebuggerAgent* m_debuggerAgent;
+    InstrumentingAgents* m_instrumentingAgents;
+    ScriptDebugServer* m_scriptDebugServer;
     Vector<OwnPtr<InspectableObject> > m_inspectedObjects;
     OwnPtr<InspectableObject> m_defaultInspectableObject;
 };

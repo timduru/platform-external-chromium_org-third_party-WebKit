@@ -36,6 +36,8 @@
 #include "core/platform/graphics/MediaPlayer.h"
 #include "public/platform/WebMimeRegistry.h"
 
+namespace WebKit { class WebLayer; }
+
 namespace WebCore {
 
 #if ENABLE(WEB_AUDIO)
@@ -84,7 +86,7 @@ public:
 
     virtual bool supportsSave() const;
     
-    PlatformLayer* platformLayer() const;
+    WebKit::WebLayer* platformLayer() const;
 
     enum DelayedActionType {
         LoadMediaResource = 1 << 0,
@@ -292,7 +294,7 @@ protected:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void finishParsingChildren();
     virtual bool isURLAttribute(const Attribute&) const OVERRIDE;
-    virtual void attach() OVERRIDE;
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
 
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 

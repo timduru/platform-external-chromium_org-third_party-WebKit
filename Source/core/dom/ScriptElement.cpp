@@ -275,6 +275,16 @@ bool ScriptElement::requestScript(const String& sourceUrl)
     return false;
 }
 
+bool isHTMLScriptElement(Element* element)
+{
+    return element->hasTagName(HTMLNames::scriptTag);
+}
+
+bool isSVGScriptElement(Element* element)
+{
+    return element->hasTagName(SVGNames::scriptTag);
+}
+
 void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
 {
     ASSERT(m_alreadyStarted);
@@ -298,10 +308,19 @@ void ScriptElement::executeScript(const ScriptSourceCode& sourceCode)
     if (frame) {
         {
             IgnoreDestructiveWriteCountIncrementer ignoreDesctructiveWriteCountIncrementer(m_isExternalScript ? document.get() : 0);
+
+            if (isHTMLScriptElement(m_element))
+                document->pushCurrentScript(toHTMLScriptElement(m_element));
+
             // Create a script from the script element node, using the script
             // block's source and the script block's type.
             // Note: This is where the script is compiled and actually executed.
             frame->script()->executeScriptInMainWorld(sourceCode);
+
+            if (isHTMLScriptElement(m_element)) {
+                ASSERT(document->currentScript() == m_element);
+                document->popCurrentScript();
+            }
         }
     }
 }
@@ -410,11 +429,11 @@ String ScriptElement::scriptContent() const
 
 ScriptElement* toScriptElementIfPossible(Element* element)
 {
-    if (element->isHTMLElement() && element->hasTagName(HTMLNames::scriptTag))
-        return static_cast<HTMLScriptElement*>(element);
+    if (isHTMLScriptElement(element))
+        return toHTMLScriptElement(element);
 
-    if (element->isSVGElement() && element->hasTagName(SVGNames::scriptTag))
-        return static_cast<SVGScriptElement*>(element);
+    if (isSVGScriptElement(element))
+        return toSVGScriptElement(element);
 
     return 0;
 }

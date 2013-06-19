@@ -77,6 +77,7 @@ public:
     }
 
     void handleEvent(Event* e);
+    void didChangeHREF() { m_hadHREFChanged = true; }
 
 private:
     explicit PrefetchEventHandler(HTMLAnchorElement*);
@@ -97,6 +98,7 @@ private:
     double m_mouseOverTimestamp;
     double m_mouseDownTimestamp;
     double m_tapDownTimestamp;
+    bool m_hadHREFChanged;
     bool m_hadTapUnconfirmed;
     bool m_hasIssuedPreconnect;
 };
@@ -147,12 +149,11 @@ bool HTMLAnchorElement::supportsFocus() const
 
 bool HTMLAnchorElement::isMouseFocusable() const
 {
-    // Anchor elements should be mouse focusable, https://bugs.webkit.org/show_bug.cgi?id=26856
+    // Links are focusable by default, but only allow links with tabindex or contenteditable to be mouse focusable.
+    // https://bugs.webkit.org/show_bug.cgi?id=26856
     if (isLink())
-        // Only allow links with tabIndex or contentEditable to be mouse focusable.
         return HTMLElement::supportsFocus();
 
-    // Allow tab index etc to control focus.
     return HTMLElement::isMouseFocusable();
 }
 
@@ -188,7 +189,7 @@ static void appendServerMapMousePosition(StringBuilder& url, Event* event)
     if (!target->hasTagName(imgTag))
         return;
 
-    HTMLImageElement* imageElement = static_cast<HTMLImageElement*>(event->target()->toNode());
+    HTMLImageElement* imageElement = toHTMLImageElement(event->target()->toNode());
     if (!imageElement || !imageElement->isServerMap())
         return;
 
@@ -285,6 +286,9 @@ void HTMLAnchorElement::parseAttribute(const QualifiedName& name, const AtomicSt
                 if (protocolIs(parsedURL, "http") || protocolIs(parsedURL, "https") || parsedURL.startsWith("//"))
                     prefetchDNS(document()->completeURL(parsedURL).host());
             }
+
+            if (wasLink)
+                prefetchEventHandler()->didChangeHREF();
         }
         invalidateCachedVisitedLinkHash();
     } else if (name == nameAttr || name == titleAttr) {
@@ -684,6 +688,7 @@ HTMLAnchorElement::PrefetchEventHandler::PrefetchEventHandler(HTMLAnchorElement*
 
 void HTMLAnchorElement::PrefetchEventHandler::reset()
 {
+    m_hadHREFChanged = false;
     m_mouseOverTimestamp = 0;
     m_mouseDownTimestamp = 0;
     m_hadTapUnconfirmed = false;
@@ -791,6 +796,9 @@ void HTMLAnchorElement::PrefetchEventHandler::handleClick(Event* event)
 
 bool HTMLAnchorElement::PrefetchEventHandler::shouldPrefetch(const KURL& url)
 {
+    if (m_hadHREFChanged)
+        return false;
+
     if (m_anchorElement->hasEventListeners(eventNames().clickEvent))
         return false;
 

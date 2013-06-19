@@ -40,10 +40,8 @@
 #include "core/html/VoidCallback.h"
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorState.h"
-#include "core/inspector/InstrumentingAgents.h"
 #include "core/loader/TextResourceDecoder.h"
 #include "core/page/Frame.h"
-#include "core/platform/KURL.h"
 #include "core/platform/MIMETypeRegistry.h"
 #include "modules/filesystem/DOMFileSystem.h"
 #include "modules/filesystem/DirectoryEntry.h"
@@ -58,6 +56,7 @@
 #include "modules/filesystem/LocalFileSystem.h"
 #include "modules/filesystem/Metadata.h"
 #include "modules/filesystem/MetadataCallback.h"
+#include "weborigin/KURL.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/ArrayBuffer.h"
 #include "wtf/text/Base64.h"
@@ -608,7 +607,6 @@ PassOwnPtr<InspectorFileSystemAgent> InspectorFileSystemAgent::create(Instrument
 
 InspectorFileSystemAgent::~InspectorFileSystemAgent()
 {
-    m_instrumentingAgents->setInspectorFileSystemAgent(0);
 }
 
 void InspectorFileSystemAgent::enable(ErrorString*)
@@ -710,7 +708,6 @@ InspectorFileSystemAgent::InspectorFileSystemAgent(InstrumentingAgents* instrume
     ASSERT(instrumentingAgents);
     ASSERT(state);
     ASSERT(m_pageAgent);
-    m_instrumentingAgents->setInspectorFileSystemAgent(this);
 }
 
 bool InspectorFileSystemAgent::assertEnabled(ErrorString* error)

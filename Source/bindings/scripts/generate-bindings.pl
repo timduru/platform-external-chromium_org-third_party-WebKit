@@ -38,6 +38,7 @@ use Cwd;
 
 use IDLParser;
 use CodeGeneratorV8;
+use IDLSerializer;
 
 my @idlDirectories;
 my $outputDirectory;
@@ -83,12 +84,12 @@ my @supplementedIdlFiles;
 if ($supplementalDependencyFile) {
     # The format of a supplemental dependency file:
     #
-    # DOMWindow.idl P.idl Q.idl R.idl
+    # Window.idl P.idl Q.idl R.idl
     # Document.idl S.idl
     # Event.idl
     # ...
     #
-    # The above indicates that DOMWindow.idl is supplemented by P.idl, Q.idl and R.idl,
+    # The above indicates that Window.idl is supplemented by P.idl, Q.idl and R.idl,
     # Document.idl is supplemented by S.idl, and Event.idl is supplemented by no IDLs.
     # The IDL that supplements another IDL (e.g. P.idl) never appears in the dependency file.
     open FH, "< $supplementalDependencyFile" or die "Cannot open $supplementalDependencyFile\n";
@@ -133,7 +134,7 @@ foreach my $idlFile (@supplementedIdlFiles) {
     my $document = $parser->Parse($idlFile, $defines, $preprocessor);
 
     foreach my $interface (@{$document->interfaces}) {
-        if ($interface->isPartial and $interface->name eq $targetInterfaceName) {
+        if (!$interface->isPartial || $interface->name eq $targetInterfaceName) {
             my $targetDataNode;
             foreach my $interface (@{$targetDocument->interfaces}) {
                 if ($interface->name eq $targetInterfaceName) {
@@ -146,36 +147,33 @@ foreach my $idlFile (@supplementedIdlFiles) {
             # Support for attributes of partial interfaces.
             foreach my $attribute (@{$interface->attributes}) {
                 # Record that this attribute is implemented by $interfaceName.
-                $attribute->signature->extendedAttributes->{"ImplementedBy"} = $interfaceName;
+                $attribute->extendedAttributes->{"ImplementedBy"} = $interfaceName if $interface->isPartial;
 
                 # Add interface-wide extended attributes to each attribute.
-                foreach my $extendedAttributeName (keys %{$interface->extendedAttributes}) {
-                    $attribute->signature->extendedAttributes->{$extendedAttributeName} = $interface->extendedAttributes->{$extendedAttributeName};
-                }
+                applyInterfaceExtendedAttributes($interface, $attribute->extendedAttributes);
+
                 push(@{$targetDataNode->attributes}, $attribute);
             }
 
             # Support for methods of partial interfaces.
             foreach my $function (@{$interface->functions}) {
                 # Record that this method is implemented by $interfaceName.
-                $function->signature->extendedAttributes->{"ImplementedBy"} = $interfaceName;
+                $function->extendedAttributes->{"ImplementedBy"} = $interfaceName if $interface->isPartial;
 
                 # Add interface-wide extended attributes to each method.
-                foreach my $extendedAttributeName (keys %{$interface->extendedAttributes}) {
-                    $function->signature->extendedAttributes->{$extendedAttributeName} = $interface->extendedAttributes->{$extendedAttributeName};
-                }
+                applyInterfaceExtendedAttributes($interface, $function->extendedAttributes);
+
                 push(@{$targetDataNode->functions}, $function);
             }
 
             # Support for constants of partial interfaces.
             foreach my $constant (@{$interface->constants}) {
                 # Record that this constant is implemented by $interfaceName.
-                $constant->extendedAttributes->{"ImplementedBy"} = $interfaceName;
+                $constant->extendedAttributes->{"ImplementedBy"} = $interfaceName if $interface->isPartial;
 
                 # Add interface-wide extended attributes to each constant.
-                foreach my $extendedAttributeName (keys %{$interface->extendedAttributes}) {
-                    $constant->extendedAttributes->{$extendedAttributeName} = $interface->extendedAttributes->{$extendedAttributeName};
-                }
+                applyInterfaceExtendedAttributes($interface, $constant->extendedAttributes);
+
                 push(@{$targetDataNode->constants}, $constant);
             }
         } else {
@@ -183,6 +181,10 @@ foreach my $idlFile (@supplementedIdlFiles) {
         }
     }
 }
+
+# FIXME: This code will be removed once IDLParser.pm and CodeGeneratorV8.pm
+# are connected via JSON files. See http://crbug.com/242795
+$targetDocument = deserializeJSON(serializeJSON($targetDocument));
 
 # Generate desired output for the target IDL file.
 my @dependentIdlFiles = ($targetDocument->fileName(), @supplementedIdlFiles);
@@ -258,15 +260,26 @@ sub checkIDLAttributes
         checkIfIDLAttributesExists($idlAttributes, $interface->extendedAttributes, $idlFile);
 
         foreach my $attribute (@{$interface->attributes}) {
-            checkIfIDLAttributesExists($idlAttributes, $attribute->signature->extendedAttributes, $idlFile);
+            checkIfIDLAttributesExists($idlAttributes, $attribute->extendedAttributes, $idlFile);
         }
 
         foreach my $function (@{$interface->functions}) {
-            checkIfIDLAttributesExists($idlAttributes, $function->signature->extendedAttributes, $idlFile);
+            checkIfIDLAttributesExists($idlAttributes, $function->extendedAttributes, $idlFile);
             foreach my $parameter (@{$function->parameters}) {
                 checkIfIDLAttributesExists($idlAttributes, $parameter->extendedAttributes, $idlFile);
             }
         }
+    }
+}
+
+sub applyInterfaceExtendedAttributes
+{
+    my $interface = shift;
+    my $extendedAttributes = shift;
+
+    foreach my $extendedAttributeName (keys %{$interface->extendedAttributes}) {
+        next if $extendedAttributeName eq "ImplementedAs";
+        $extendedAttributes->{$extendedAttributeName} = $interface->extendedAttributes->{$extendedAttributeName};
     }
 }
 

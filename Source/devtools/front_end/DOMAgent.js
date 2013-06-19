@@ -845,7 +845,6 @@ WebInspector.DOMAgent.Events = {
     NodeRemoved: "NodeRemoved",
     DocumentUpdated: "DocumentUpdated",
     ChildNodeCountUpdated: "ChildNodeCountUpdated",
-    InspectElementRequested: "InspectElementRequested",
     UndoRedoRequested: "UndoRedoRequested",
     UndoRedoCompleted: "UndoRedoCompleted",
     InspectNodeRequested: "InspectNodeRequested"
@@ -1153,7 +1152,7 @@ WebInspector.DOMAgent.prototype = {
         node.parentNode = host;
         this._idToDOMNode[node.id] = node;
         host._shadowRoots.push(node);
-        this.dispatchEventToListeners(WebInspector.DOMAgent.Events.NodeInserted, root);
+        this.dispatchEventToListeners(WebInspector.DOMAgent.Events.NodeInserted, node);
     },
 
     /**
@@ -1194,7 +1193,7 @@ WebInspector.DOMAgent.prototype = {
     {
         var node = this._idToDOMNode[nodeId];
         if (node)
-            this.dispatchEventToListeners(WebInspector.DOMAgent.Events.InspectElementRequested, node);
+            this.dispatchEventToListeners(WebInspector.DOMAgent.Events.InspectNodeRequested, nodeId);
     },
 
     /**

@@ -32,6 +32,7 @@
 
 #include "V8WebGLRenderingContext.h"
 
+#include "V8ANGLEInstancedArrays.h"
 #include "V8ArrayBufferView.h"
 #include "V8EXTFragDepth.h"
 #include "V8EXTTextureFilterAnisotropic.h"
@@ -178,6 +179,10 @@ static v8::Handle<v8::Value> toV8Object(WebGLExtension* extension, v8::Handle<v8
     v8::Handle<v8::Value> extensionObject;
     const char* referenceName = 0;
     switch (extension->getName()) {
+    case WebGLExtension::ANGLEInstancedArraysName:
+        extensionObject = toV8(static_cast<ANGLEInstancedArrays*>(extension), contextObject, isolate);
+        referenceName = "angleInstancedArraysName";
+        break;
     case WebGLExtension::EXTFragDepthName:
         extensionObject = toV8(static_cast<EXTFragDepth*>(extension), contextObject, isolate);
         referenceName = "extFragDepthName";
@@ -351,8 +356,8 @@ void V8WebGLRenderingContext::getExtensionMethodCustom(const v8::FunctionCallbac
         return;
     }
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, name, args[0]);
-    WebGLExtension* extension = imp->getExtension(name);
-    v8SetReturnValue(args, toV8Object(extension, args.Holder(), args.GetIsolate()));
+    RefPtr<WebGLExtension> extension(imp->getExtension(name));
+    v8SetReturnValue(args, toV8Object(extension.get(), args.Holder(), args.GetIsolate()));
 }
 
 void V8WebGLRenderingContext::getFramebufferAttachmentParameterMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)

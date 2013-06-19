@@ -41,6 +41,7 @@
 #include "core/dom/DocumentSharedObjectPool.h"
 #include "core/dom/ElementRareData.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/dom/FullscreenController.h"
 #include "core/dom/MutationObserverInterestGroup.h"
 #include "core/dom/MutationRecord.h"
 #include "core/dom/NamedNodeMap.h"
@@ -236,6 +237,38 @@ bool Element::supportsFocus() const
 short Element::tabIndex() const
 {
     return hasRareData() ? elementRareData()->tabIndex() : 0;
+}
+
+bool Element::rendererIsFocusable() const
+{
+    // Elements in canvas fallback content are not rendered, but they are allowed to be
+    // focusable as long as their canvas is displayed and visible.
+    if (isInCanvasSubtree()) {
+        const Element* e = this;
+        while (e && !e->hasLocalName(canvasTag))
+            e = e->parentElement();
+        ASSERT(e);
+        return e->renderer() && e->renderer()->style()->visibility() == VISIBLE;
+    }
+
+    // FIXME: These asserts should be in Node::isFocusable, but there are some
+    // callsites like Document::setFocusedNode that would currently fail on
+    // them. See crbug.com/251163
+    if (renderer()) {
+        ASSERT(!renderer()->needsLayout());
+    } else {
+        // We can't just use needsStyleRecalc() because if the node is in a
+        // display:none tree it might say it needs style recalc but the whole
+        // document is actually up to date.
+        ASSERT(!document()->childNeedsStyleRecalc());
+    }
+
+    // FIXME: Even if we are not visible, we might have a child that is visible.
+    // Hyatt wants to fix that some day with a "has visible content" flag or the like.
+    if (!renderer() || renderer()->style()->visibility() != VISIBLE)
+        return false;
+
+    return true;
 }
 
 DEFINE_VIRTUAL_ATTRIBUTE_EVENT_LISTENER(Element, blur);
@@ -550,7 +583,7 @@ Element* Element::bindingsOffsetParent()
     Element* element = offsetParent();
     if (!element || !element->isInShadowTree())
         return element;
-    return element->containingShadowRoot()->type() == ShadowRoot::UserAgentShadowRoot ? 0 : element;
+    return element->containingShadowRoot()->shouldExposeToBindings() ? element : 0;
 }
 
 Element* Element::offsetParent()
@@ -1258,18 +1291,18 @@ void Element::removedFrom(ContainerNode* insertionPoint)
         document()->accessSVGExtensions()->removeElementFromPendingResources(this);
 }
 
-void Element::createRendererIfNeeded()
+void Element::createRendererIfNeeded(const AttachContext& context)
 {
-    NodeRenderingContext(this).createRendererForElementIfNeeded();
+    NodeRenderingContext(this, context).createRendererForElementIfNeeded();
 }
 
-void Element::attach()
+void Element::attach(const AttachContext& context)
 {
     PostAttachCallbackDisabler callbackDisabler(this);
     StyleResolverParentPusher parentPusher(this);
     WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
 
-    createRendererIfNeeded();
+    createRendererIfNeeded(context);
 
     if (parentElement() && parentElement()->isInCanvasSubtree())
         setIsInCanvasSubtree(true);
@@ -1283,7 +1316,7 @@ void Element::attach()
     } else if (firstChild())
         parentPusher.push();
 
-    ContainerNode::attach();
+    ContainerNode::attach(context);
 
     createPseudoElementIfNeeded(AFTER);
 
@@ -1303,7 +1336,7 @@ void Element::unregisterNamedFlowContentNode()
         document()->renderView()->flowThreadController()->unregisterNamedFlowContentNode(this);
 }
 
-void Element::detach()
+void Element::detach(const AttachContext& context)
 {
     WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
     unregisterNamedFlowContentNode();
@@ -1321,7 +1354,7 @@ void Element::detach()
         detachChildrenIfNeeded();
         shadow->detach();
     }
-    ContainerNode::detach();
+    ContainerNode::detach(context);
 }
 
 bool Element::pseudoStyleCacheIsInvalid(const RenderStyle* currentStyle, RenderStyle* newStyle)
@@ -1362,22 +1395,22 @@ bool Element::pseudoStyleCacheIsInvalid(const RenderStyle* currentStyle, RenderS
     return false;
 }
 
-PassRefPtr<RenderStyle> Element::styleForRenderer(int childIndex)
+PassRefPtr<RenderStyle> Element::styleForRenderer()
 {
     if (hasCustomStyleCallbacks()) {
         if (RefPtr<RenderStyle> style = customStyleForRenderer())
             return style.release();
     }
 
-    return originalStyleForRenderer(childIndex);
+    return originalStyleForRenderer();
 }
 
-PassRefPtr<RenderStyle> Element::originalStyleForRenderer(int childIndex)
+PassRefPtr<RenderStyle> Element::originalStyleForRenderer()
 {
-    return document()->styleResolver()->styleForElement(this, childIndex);
+    return document()->styleResolver()->styleForElement(this);
 }
 
-void Element::recalcStyle(StyleChange change, int childIndex)
+void Element::recalcStyle(StyleChange change)
 {
     ASSERT(document()->inStyleRecalc());
 
@@ -1401,12 +1434,18 @@ void Element::recalcStyle(StyleChange change, int childIndex)
             // FIXME: This still recalcs style twice when changing display types, but saves
             // us from recalcing twice when going from none -> anything else which is more
             // common, especially during lazy attach.
-            newStyle = styleForRenderer(childIndex);
+            newStyle = styleForRenderer();
             localChange = Node::diff(currentStyle.get(), newStyle.get(), document());
+        } else if (attached() && isActiveInsertionPoint(this)) {
+            // Active InsertionPoints will never have renderers so there's no reason to
+            // reattach them repeatedly once they're already attached.
+            localChange = change;
         }
         if (localChange == Detach) {
-            // FIXME: The style gets computed twice by calling attach. We could do better if we passed the style along.
-            reattach();
+            AttachContext reattachContext;
+            reattachContext.resolvedStyle = newStyle.get();
+            reattach(reattachContext);
+
             // attach recalculates the style for all children. No need to do it twice.
             clearNeedsStyleRecalc();
             clearChildNeedsStyleRecalc();
@@ -1457,9 +1496,7 @@ void Element::recalcStyle(StyleChange change, int childIndex)
     // without doing way too much re-resolution.
     bool forceCheckOfNextElementSibling = false;
     bool forceCheckOfAnyElementSibling = false;
-    int indexForChild = 0;
     for (Node *n = firstChild(); n; n = n->nextSibling()) {
-        ++indexForChild;
         if (n->isTextNode()) {
             toText(n)->recalcTextStyle(change);
             continue;
@@ -1470,20 +1507,12 @@ void Element::recalcStyle(StyleChange change, int childIndex)
         bool childRulesChanged = element->needsStyleRecalc() && element->styleChangeType() == FullStyleChange;
         if ((forceCheckOfNextElementSibling || forceCheckOfAnyElementSibling))
             element->setNeedsStyleRecalc();
-        forceCheckOfNextElementSibling = childRulesChanged && hasDirectAdjacentRules;
-        forceCheckOfAnyElementSibling = forceCheckOfAnyElementSibling || (childRulesChanged && hasIndirectAdjacentRules);
-    }
-    // FIXME: Reversing the loop we call recalcStyle avoids an N^2 walk through the DOM to find the next renderer
-    // to insert before. The logic in NodeRenderingContext should be improved to make this unnecessary.
-    for (Node *n = lastChild(); n; n = n->previousSibling()) {
-        if (!n->isElementNode())
-            continue;
-        Element* element = toElement(n);
         if (shouldRecalcStyle(change, element)) {
             parentPusher.push();
-            element->recalcStyle(change, indexForChild);
+            element->recalcStyle(change);
         }
-        --indexForChild;
+        forceCheckOfNextElementSibling = childRulesChanged && hasDirectAdjacentRules;
+        forceCheckOfAnyElementSibling = forceCheckOfAnyElementSibling || (childRulesChanged && hasIndirectAdjacentRules);
     }
 
     if (shouldRecalcStyle(change, this))
@@ -2292,7 +2321,7 @@ void Element::updatePseudoElement(PseudoId pseudoId, StyleChange change)
         // when RenderObject::isChildAllowed on our parent returns false for the
         // PseudoElement's renderer for each style recalc.
         if (!renderer() || !pseudoElementRendererIsNeeded(renderer()->getCachedPseudoStyle(pseudoId)))
-            setPseudoElement(pseudoId, 0);
+            elementRareData()->setPseudoElement(pseudoId, 0);
     } else if (change >= Inherit || needsStyleRecalc())
         createPseudoElementIfNeeded(pseudoId);
 }
@@ -2311,23 +2340,12 @@ void Element::createPseudoElementIfNeeded(PseudoId pseudoId)
     ASSERT(!isPseudoElement());
     RefPtr<PseudoElement> element = PseudoElement::create(this, pseudoId);
     element->attach();
-    setPseudoElement(pseudoId, element.release());
-}
-
-bool Element::hasPseudoElements() const
-{
-    return hasRareData() && elementRareData()->hasPseudoElements();
+    ensureElementRareData()->setPseudoElement(pseudoId, element.release());
 }
 
 PseudoElement* Element::pseudoElement(PseudoId pseudoId) const
 {
     return hasRareData() ? elementRareData()->pseudoElement(pseudoId) : 0;
-}
-
-void Element::setPseudoElement(PseudoId pseudoId, PassRefPtr<PseudoElement> element)
-{
-    ensureElementRareData()->setPseudoElement(pseudoId, element);
-    resetNeedsShadowTreeWalker();
 }
 
 RenderObject* Element::pseudoElementRenderer(PseudoId pseudoId) const
@@ -2439,12 +2457,12 @@ bool Element::childShouldCreateRenderer(const NodeRenderingContext& childContext
 
 void Element::webkitRequestFullscreen()
 {
-    document()->requestFullScreenForElement(this, ALLOW_KEYBOARD_INPUT, Document::EnforceIFrameAllowFullScreenRequirement);
+    FullscreenController::from(document())->requestFullScreenForElement(this, ALLOW_KEYBOARD_INPUT, FullscreenController::EnforceIFrameAllowFullScreenRequirement);
 }
 
 void Element::webkitRequestFullScreen(unsigned short flags)
 {
-    document()->requestFullScreenForElement(this, (flags | LEGACY_MOZILLA_REQUEST), Document::EnforceIFrameAllowFullScreenRequirement);
+    FullscreenController::from(document())->requestFullScreenForElement(this, (flags | LEGACY_MOZILLA_REQUEST), FullscreenController::EnforceIFrameAllowFullScreenRequirement);
 }
 
 bool Element::containsFullScreenElement() const

@@ -677,7 +677,13 @@ void InspectorDOMAgent::setAttributesAsText(ErrorString* errorString, int elemen
 
     String markup = "<span " + text + "></span>";
     RefPtr<DocumentFragment> fragment = element->document()->createDocumentFragment();
-    fragment->parseXML(markup, 0, DisallowScriptingContent);
+
+    bool shouldIgnoreCase = element->document()->isHTMLDocument() && element->isHTMLElement();
+    // Not all elements can represent the context (i.e. IFRAME), hence using document.body.
+    if (shouldIgnoreCase && element->document()->body())
+        fragment->parseHTML(markup, element->document()->body(), DisallowScriptingContent);
+    else
+        fragment->parseXML(markup, 0, DisallowScriptingContent);
 
     Element* parsedElement = fragment->firstChild() && fragment->firstChild()->isElementNode() ? toElement(fragment->firstChild()) : 0;
     if (!parsedElement) {
@@ -685,7 +691,6 @@ void InspectorDOMAgent::setAttributesAsText(ErrorString* errorString, int elemen
         return;
     }
 
-    bool shouldIgnoreCase = element->document()->isHTMLDocument() && element->isHTMLElement();
     String caseAdjustedName = name ? (shouldIgnoreCase ? name->lower() : *name) : String();
 
     if (!parsedElement->hasAttributes() && name) {
@@ -1078,9 +1083,6 @@ void InspectorDOMAgent::inspect(Node* inspectedNode)
     int nodeId = pushNodePathToFrontend(node);
     if (nodeId)
         m_frontend->inspectNodeRequested(nodeId);
-
-    ErrorString error;
-    setSearchingForNode(&error, false, 0);
 }
 
 void InspectorDOMAgent::handleMouseMove(Frame* frame, const PlatformMouseEvent& event)
@@ -1104,6 +1106,7 @@ void InspectorDOMAgent::setSearchingForNode(ErrorString* errorString, bool enabl
     if (m_searchingForNode == enabled)
         return;
     m_searchingForNode = enabled;
+    m_overlay->setInspectModeEnabled(enabled);
     if (enabled) {
         m_inspectModeHighlightConfig = highlightConfigFromInspectorObject(errorString, highlightInspectorObject);
         if (!m_inspectModeHighlightConfig)
@@ -1271,8 +1274,7 @@ void InspectorDOMAgent::setFileInputFiles(ErrorString* errorString, int nodeId, 
     Node* node = assertNode(errorString, nodeId);
     if (!node)
         return;
-    HTMLInputElement* element = node->toInputElement();
-    if (!element || !element->isFileUpload()) {
+    if (!node->hasTagName(inputTag) || !toHTMLInputElement(node)->isFileUpload()) {
         *errorString = "Node is not a file input element";
         return;
     }
@@ -1286,7 +1288,7 @@ void InspectorDOMAgent::setFileInputFiles(ErrorString* errorString, int nodeId, 
         }
         fileList->append(File::create(path));
     }
-    element->setFiles(fileList);
+    toHTMLInputElement(node)->setFiles(fileList);
 }
 
 void InspectorDOMAgent::resolveNode(ErrorString* errorString, int nodeId, const String* const objectGroup, RefPtr<TypeBuilder::Runtime::RemoteObject>& result)

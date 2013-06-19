@@ -31,20 +31,21 @@
 #ifndef WebTestProxy_h
 #define WebTestProxy_h
 
-#include "WebKit/chromium/public/WebAccessibilityNotification.h"
-#include "WebKit/chromium/public/WebDOMMessageEvent.h"
-#include "WebKit/chromium/public/WebDragOperation.h"
-#include "WebKit/chromium/public/WebEditingAction.h"
-#include "WebKit/chromium/public/WebIconURL.h"
-#include "WebKit/chromium/public/WebNavigationPolicy.h"
-#include "WebKit/chromium/public/WebNavigationType.h"
-#include "WebKit/chromium/public/WebSecurityOrigin.h"
-#include "WebKit/chromium/public/WebTextAffinity.h"
-#include "WebKit/chromium/public/WebTextDirection.h"
+#include "WebTask.h"
 #include "WebTestCommon.h"
 #include "public/platform/WebRect.h"
 #include "public/platform/WebURLError.h"
 #include "public/platform/WebURLRequest.h"
+#include "public/web/WebAccessibilityNotification.h"
+#include "public/web/WebDOMMessageEvent.h"
+#include "public/web/WebDragOperation.h"
+#include "public/web/WebEditingAction.h"
+#include "public/web/WebIconURL.h"
+#include "public/web/WebNavigationPolicy.h"
+#include "public/web/WebNavigationType.h"
+#include "public/web/WebSecurityOrigin.h"
+#include "public/web/WebTextAffinity.h"
+#include "public/web/WebTextDirection.h"
 #include <map>
 #include <memory>
 #include <string>
@@ -77,6 +78,7 @@ class WebString;
 class WebURL;
 class WebURLResponse;
 class WebUserMediaClient;
+class WebValidationMessageClient;
 class WebView;
 class WebWidget;
 struct WebConsoleMessage;
@@ -94,6 +96,7 @@ namespace WebTestRunner {
 
 class MockWebSpeechInputController;
 class MockWebSpeechRecognizer;
+class MockWebValidationMessageClient;
 class SpellCheckClient;
 class TestInterfaces;
 class WebTestDelegate;
@@ -110,6 +113,7 @@ public:
     void reset();
 
     WebKit::WebSpellCheckClient *spellCheckClient() const;
+    WebKit::WebValidationMessageClient* validationMessageClient();
     WebKit::WebColorChooser* createColorChooser(WebKit::WebColorChooserClient*, const WebKit::WebColor&);
 
     std::string captureTree(bool debugRenderTree);
@@ -134,6 +138,8 @@ public:
     MockWebSpeechInputController* speechInputControllerMock();
     MockWebSpeechRecognizer* speechRecognizerMock();
 #endif
+
+    WebTaskList* taskList() { return &m_taskList; }
 
 protected:
     WebTestProxyBase();
@@ -218,6 +224,8 @@ private:
     void paintPagesWithBoundaries();
     SkCanvas* canvas();
     void displayRepaintMask();
+    void invalidateAll();
+    void animateNow();
 
     WebKit::WebWidget* webWidget();
     WebKit::WebView* webView();
@@ -226,6 +234,8 @@ private:
     WebTestDelegate* m_delegate;
     WebKit::WebWidget* m_webWidget;
 
+    WebTaskList m_taskList;
+
     std::auto_ptr<SpellCheckClient> m_spellcheck;
     std::auto_ptr<WebUserMediaClientMock> m_userMediaClient;
 
@@ -233,6 +243,7 @@ private:
     std::auto_ptr<SkCanvas> m_canvas;
     WebKit::WebRect m_paintRect;
     bool m_isPainting;
+    bool m_animateScheduled;
     std::map<unsigned, std::string> m_resourceIdentifierMap;
     std::map<unsigned, WebKit::WebURLRequest> m_requestMap;
 
@@ -243,6 +254,7 @@ private:
     std::auto_ptr<WebKit::WebDeviceOrientationClientMock> m_deviceOrientationClient;
     std::auto_ptr<MockWebSpeechRecognizer> m_speechRecognizer;
     std::auto_ptr<MockWebSpeechInputController> m_speechInputController;
+    std::auto_ptr<MockWebValidationMessageClient> m_validationMessageClient;
 
 private:
     WebTestProxyBase(WebTestProxyBase&);
@@ -265,22 +277,18 @@ public:
     virtual void didInvalidateRect(const WebKit::WebRect& rect)
     {
         WebTestProxyBase::didInvalidateRect(rect);
-        Base::didInvalidateRect(rect);
     }
     virtual void didScrollRect(int dx, int dy, const WebKit::WebRect& clipRect)
     {
         WebTestProxyBase::didScrollRect(dx, dy, clipRect);
-        Base::didScrollRect(dx, dy, clipRect);
     }
     virtual void scheduleComposite()
     {
         WebTestProxyBase::scheduleComposite();
-        Base::scheduleComposite();
     }
     virtual void scheduleAnimation()
     {
         WebTestProxyBase::scheduleAnimation();
-        Base::scheduleAnimation();
     }
     virtual void setWindowRect(const WebKit::WebRect& rect)
     {

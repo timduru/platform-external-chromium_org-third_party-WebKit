@@ -65,6 +65,7 @@ static const char* const animationFrameFiredEventName = "animationFrameFired";
 static const char* const setTimerEventName = "setTimer";
 static const char* const clearTimerEventName = "clearTimer";
 static const char* const timerFiredEventName = "timerFired";
+static const char* const webglErrorFiredEventName = "webglErrorFired";
 
 namespace DOMDebuggerAgentState {
 static const char eventListenerBreakpoints[] = "eventListenerBreakpoints";
@@ -72,12 +73,12 @@ static const char pauseOnAllXHRs[] = "pauseOnAllXHRs";
 static const char xhrBreakpoints[] = "xhrBreakpoints";
 }
 
-PassOwnPtr<InspectorDOMDebuggerAgent> InspectorDOMDebuggerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState, InspectorDOMAgent* domAgent, InspectorDebuggerAgent* debuggerAgent, InspectorAgent* inspectorAgent)
+PassOwnPtr<InspectorDOMDebuggerAgent> InspectorDOMDebuggerAgent::create(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState, InspectorDOMAgent* domAgent, InspectorDebuggerAgent* debuggerAgent)
 {
-    return adoptPtr(new InspectorDOMDebuggerAgent(instrumentingAgents, inspectorState, domAgent, debuggerAgent, inspectorAgent));
+    return adoptPtr(new InspectorDOMDebuggerAgent(instrumentingAgents, inspectorState, domAgent, debuggerAgent));
 }
 
-InspectorDOMDebuggerAgent::InspectorDOMDebuggerAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState, InspectorDOMAgent* domAgent, InspectorDebuggerAgent* debuggerAgent, InspectorAgent*)
+InspectorDOMDebuggerAgent::InspectorDOMDebuggerAgent(InstrumentingAgents* instrumentingAgents, InspectorCompositeState* inspectorState, InspectorDOMAgent* domAgent, InspectorDebuggerAgent* debuggerAgent)
     : InspectorBaseAgent<InspectorDOMDebuggerAgent>("DOMDebugger", instrumentingAgents, inspectorState)
     , m_domAgent(domAgent)
     , m_debuggerAgent(debuggerAgent)
@@ -378,7 +379,17 @@ void InspectorDOMDebuggerAgent::updateSubtreeBreakpoints(Node* node, uint32_t ro
         updateSubtreeBreakpoints(child, newRootMask, set);
 }
 
-void InspectorDOMDebuggerAgent::pauseOnNativeEventIfNeeded(bool isDOMEvent, const String& eventName, bool synchronous)
+void InspectorDOMDebuggerAgent::pauseOnNativeEventIfNeeded(PassRefPtr<InspectorObject> eventData, bool synchronous)
+{
+    if (!eventData)
+        return;
+    if (synchronous)
+        m_debuggerAgent->breakProgram(InspectorFrontend::Debugger::Reason::EventListener, eventData);
+    else
+        m_debuggerAgent->schedulePauseOnNextStatement(InspectorFrontend::Debugger::Reason::EventListener, eventData);
+}
+
+PassRefPtr<InspectorObject> InspectorDOMDebuggerAgent::preparePauseOnNativeEventData(bool isDOMEvent, const String& eventName)
 {
     String fullEventName = (isDOMEvent ? listenerEventCategoryType : instrumentationEventCategoryType) + eventName;
     if (m_pauseInNextEventListener)
@@ -386,50 +397,56 @@ void InspectorDOMDebuggerAgent::pauseOnNativeEventIfNeeded(bool isDOMEvent, cons
     else {
         RefPtr<InspectorObject> eventListenerBreakpoints = m_state->getObject(DOMDebuggerAgentState::eventListenerBreakpoints);
         if (eventListenerBreakpoints->find(fullEventName) == eventListenerBreakpoints->end())
-            return;
+            return 0;
     }
 
     RefPtr<InspectorObject> eventData = InspectorObject::create();
     eventData->setString("eventName", fullEventName);
-    if (synchronous)
-        m_debuggerAgent->breakProgram(InspectorFrontend::Debugger::Reason::EventListener, eventData.release());
-    else
-        m_debuggerAgent->schedulePauseOnNextStatement(InspectorFrontend::Debugger::Reason::EventListener, eventData.release());
+    return eventData.release();
 }
 
 void InspectorDOMDebuggerAgent::didInstallTimer(ScriptExecutionContext* context, int timerId, int timeout, bool singleShot)
 {
-    pauseOnNativeEventIfNeeded(false, setTimerEventName, true);
+    pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, setTimerEventName), true);
 }
 
 void InspectorDOMDebuggerAgent::didRemoveTimer(ScriptExecutionContext* context, int timerId)
 {
-    pauseOnNativeEventIfNeeded(false, clearTimerEventName, true);
+    pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, clearTimerEventName), true);
 }
 
 void InspectorDOMDebuggerAgent::willFireTimer(ScriptExecutionContext* context, int timerId)
 {
-    pauseOnNativeEventIfNeeded(false, timerFiredEventName, false);
+    pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, timerFiredEventName), false);
 }
 
 void InspectorDOMDebuggerAgent::didRequestAnimationFrame(Document* document, int callbackId)
 {
-    pauseOnNativeEventIfNeeded(false, requestAnimationFrameEventName, true);
+    pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, requestAnimationFrameEventName), true);
 }
 
 void InspectorDOMDebuggerAgent::didCancelAnimationFrame(Document* document, int callbackId)
 {
-    pauseOnNativeEventIfNeeded(false, cancelAnimationFrameEventName, true);
+    pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, cancelAnimationFrameEventName), true);
 }
 
 void InspectorDOMDebuggerAgent::willFireAnimationFrame(Document* document, int callbackId)
 {
-    pauseOnNativeEventIfNeeded(false, animationFrameFiredEventName, false);
+    pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(false, animationFrameFiredEventName), false);
 }
 
 void InspectorDOMDebuggerAgent::willHandleEvent(Event* event)
 {
-    pauseOnNativeEventIfNeeded(true, event->type(), false);
+    pauseOnNativeEventIfNeeded(preparePauseOnNativeEventData(true, event->type()), false);
+}
+
+void InspectorDOMDebuggerAgent::didFireWebGLError(const String& errorName)
+{
+    RefPtr<InspectorObject> eventData = preparePauseOnNativeEventData(false, webglErrorFiredEventName);
+    if (!eventData)
+        return;
+    eventData->setString("webglErrorName", errorName);
+    pauseOnNativeEventIfNeeded(eventData.release(), m_debuggerAgent->canBreakProgram());
 }
 
 void InspectorDOMDebuggerAgent::setXHRBreakpoint(ErrorString*, const String& url)

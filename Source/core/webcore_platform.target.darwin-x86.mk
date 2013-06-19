@@ -118,7 +118,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/ClipboardChromiumPosix.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ClipboardMimeTypes.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ClipboardUtilitiesChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/CursorChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/DragImageChromiumSkia.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FileSystemChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FileSystemChromiumLinux.cpp \
@@ -145,6 +144,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/SuddenTerminationChromium.cpp \
 	third_party/WebKit/Source/core/platform/graphics/ANGLEWebKitBridge.cpp \
 	third_party/WebKit/Source/core/platform/graphics/BitmapImage.cpp \
+	third_party/WebKit/Source/core/platform/graphics/ContentDecryptionModule.cpp \
+	third_party/WebKit/Source/core/platform/graphics/ContentDecryptionModuleSession.cpp \
 	third_party/WebKit/Source/core/platform/graphics/Color.cpp \
 	third_party/WebKit/Source/core/platform/graphics/CrossfadeGeneratedImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/DrawLooper.cpp \
@@ -183,6 +184,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/SimpleFontData.cpp \
 	third_party/WebKit/Source/core/platform/graphics/SVGGlyph.cpp \
 	third_party/WebKit/Source/core/platform/graphics/StringTruncator.cpp \
+	third_party/WebKit/Source/core/platform/graphics/StrokeData.cpp \
 	third_party/WebKit/Source/core/platform/graphics/SurrogatePairAwareTextIterator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/TextRun.cpp \
 	third_party/WebKit/Source/core/platform/graphics/WidthIterator.cpp \
@@ -250,14 +252,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzShaper.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeSanitizer.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeVerticalData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/FloatPointSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/FloatRectSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/FontCustomPlatformData.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/GlyphPageTreeNodeSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/ImageBufferSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/ImageSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/IntPointSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/IntRectSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/MemoryInstrumentationSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/NativeImageSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/OpaqueRegionSkia.cpp \
@@ -290,10 +288,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamComponent.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamDescriptor.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/MediaStreamSource.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/chromium/MediaStreamCenterChromium.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/chromium/RTCDTMFSenderHandlerChromium.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/chromium/RTCDataChannelHandlerChromium.cpp \
-	third_party/WebKit/Source/core/platform/mediastream/chromium/RTCPeerConnectionHandlerChromium.cpp \
+	third_party/WebKit/Source/core/platform/mediastream/RTCDTMFSenderHandler.cpp \
+	third_party/WebKit/Source/core/platform/mediastream/RTCDataChannelHandler.cpp \
+	third_party/WebKit/Source/core/platform/mediastream/RTCPeerConnectionHandler.cpp \
 	third_party/WebKit/Source/core/platform/mock/DeviceMotionClientMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/DeviceOrientationClientMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/GeolocationClientMock.cpp \
@@ -387,6 +384,7 @@ MY_CFLAGS := \
 MY_CFLAGS_C :=
 
 MY_DEFS := \
+	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
@@ -400,9 +398,9 @@ MY_DEFS := \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
-	'-DENABLE_CANVAS_USES_MAILBOX=0' \
+	'-DINSIDE_WEBKIT' \
+	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
@@ -411,6 +409,7 @@ MY_DEFS := \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -425,6 +424,7 @@ MY_DEFS := \
 	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_BUILD_NO_IMAGE_ENCODE' \
 	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \
@@ -461,7 +461,7 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/webkit \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
-	$(LOCAL_PATH)/third_party/angle/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/skia/config \
@@ -478,8 +478,8 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
-	$(LOCAL_PATH)/third_party/libwebp \
 	$(LOCAL_PATH)/third_party/libpng \
+	$(LOCAL_PATH)/third_party/libwebp \
 	$(LOCAL_PATH)/third_party/libxml/linux/include \
 	$(LOCAL_PATH)/third_party/libxml/src/include \
 	$(LOCAL_PATH)/third_party/libxslt \

@@ -73,6 +73,7 @@
 #include "core/loader/FormSubmission.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoaderClient.h"
+#include "core/loader/IconController.h"
 #include "core/loader/ProgressTracker.h"
 #include "core/loader/TextResourceDecoder.h"
 #include "core/loader/UniqueIdentifier.h"
@@ -181,7 +182,7 @@ FrameLoader::FrameLoader(Frame* frame, FrameLoaderClient* client)
     , m_history(frame)
     , m_notifer(frame)
     , m_subframeLoader(frame)
-    , m_icon(frame)
+    , m_icon(adoptPtr(new IconController(frame)))
     , m_mixedContentChecker(frame)
     , m_state(FrameStateProvisional)
     , m_loadType(FrameLoadTypeStandard)
@@ -348,8 +349,8 @@ void FrameLoader::stopLoading(UnloadEventPolicy unloadEventPolicy)
         if (m_frame->document()) {
             if (m_didCallImplicitClose && !m_wasUnloadEventEmitted) {
                 Node* currentFocusedNode = m_frame->document()->focusedNode();
-                if (currentFocusedNode && currentFocusedNode->toInputElement())
-                    currentFocusedNode->toInputElement()->endEditing();
+                if (currentFocusedNode && currentFocusedNode->hasTagName(inputTag))
+                    toHTMLInputElement(currentFocusedNode)->endEditing();
                 if (m_pageDismissalEventBeingDispatched == NoDismissal) {
                     if (unloadEventPolicy == UnloadEventPolicyUnloadAndPageHide) {
                         m_pageDismissalEventBeingDispatched = PageHideDismissal;
@@ -976,14 +977,6 @@ void FrameLoader::prepareForLoadStart()
     }
 }
 
-void FrameLoader::setupForReplace()
-{
-    setState(FrameStateProvisional);
-    m_provisionalDocumentLoader = m_documentLoader;
-    m_documentLoader = 0;
-    detachChildren();
-}
-
 void FrameLoader::loadFrameRequest(const FrameLoadRequest& request, bool lockBackForwardList,
     PassRefPtr<Event> event, PassRefPtr<FormState> formState, ShouldSendReferrer shouldSendReferrer)
 {    
@@ -1136,7 +1129,7 @@ void FrameLoader::loadWithNavigationAction(const ResourceRequest& request, const
     bool isFormSubmission = formState;
 
     if (shouldPerformFragmentNavigation(isFormSubmission, request.httpMethod(), type, request.url()))
-        checkNavigationPolicyAndContinueFragmentScroll(NavigationAction(request, type, isFormSubmission));
+        checkNavigationPolicyAndContinueFragmentScroll(action);
     else {
         setPolicyDocumentLoader(loader.get());
         checkNavigationPolicyAndContinueLoad(formState);

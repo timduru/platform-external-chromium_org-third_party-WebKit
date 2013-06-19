@@ -50,12 +50,12 @@
 // both allocating and (significantly) freeing.
 // - A minimal number of operations in the hot / fast path, with the slow paths
 // in separate functions, leading to the possibility of inlining.
-// - Each allocation page (which could be multiple physical pages) has a header
+// - Each partition page (which is usually multiple physical pages) has a header
 // structure which allows fast mapping of free() address to an underlying
 // bucket.
 // - No support for threading yet, leading to simpler design.
-// - The freelist for a given bucket is split across a number of pages,
-// enabling various simple tricks to try and minimize fragmentation.
+// - The freelist for a given bucket is split across a number of partition
+// pages, enabling various simple tricks to try and minimize fragmentation.
 // - Fine-grained bucket sizes leading to less waste and better packing.
 //
 // The following security properties are provided at this time:
@@ -74,8 +74,6 @@
 // - No randomness of freelist entries or bucket position.
 
 #include "wtf/Assertions.h"
-#include "wtf/CPU.h"
-#include "wtf/Compiler.h"
 #include "wtf/MainThread.h"
 
 #include <stdlib.h>
@@ -83,19 +81,20 @@
 namespace WTF {
 
 // Allocation granularity of sizeof(void*) bytes.
-#if CPU(X86_64)
-static const size_t kBucketShift = 3;
-#else
-static const size_t kBucketShift = 2;
-#endif
+static const size_t kBucketShift = (sizeof(void*) == 8) ? 3 : 2;
 // Support allocations up to kMaxAllocation bytes.
 static const size_t kMaxAllocation = 4096;
 static const size_t kNumBuckets = kMaxAllocation / (1 << kBucketShift);
-// Underlying storage pages are power-of-two multiples of PAGE_SIZE (4096).
-static const size_t kPageShift = 2;
-static const size_t kSystemPageSize = 4096;
-static const size_t kPageSize = kSystemPageSize << kPageShift;
-static const size_t kPageMask = ~(kPageSize - 1);
+// Underlying partition storage pages are a power-of-two size. It is typical
+// for a partition page to be based on multiple system pages. We rarely deal
+// with system pages. Most references to "page" refer to partition pages. We
+// do also have the concept of "super pages" -- these are the underlying
+// system allocations we make. Super pages can typically fit multiple
+// partition pages inside them. See PageAllocator.h for more details on
+// super pages.
+static const size_t kPartitionPageSize = 1 << 14; // 16KB
+static const size_t kPartitionPageOffsetMask = kPartitionPageSize - 1;
+static const size_t kPartitionPageBaseMask = ~kPartitionPageOffsetMask;
 // Special bucket id for free page metadata.
 static const size_t kFreePageBucket = 0;
 
@@ -122,20 +121,24 @@ struct PartitionFreepagelistEntry {
 struct PartitionBucket {
     PartitionRoot* root;
     PartitionPageHeader* currPage;
-    PartitionPageHeader seedPage;
     PartitionFreepagelistEntry* freePages;
     size_t numFullPages;
 };
 
 struct PartitionRoot {
-    char* pageBase;
+    PartitionPageHeader seedPage;
+    PartitionBucket seedBucket;
     PartitionBucket buckets[kNumBuckets];
+    char* nextSuperPage;
+    char* nextPartitionPage;
+    char* nextPartitionPageEnd;
+    bool initialized;
 };
 
 WTF_EXPORT void partitionAllocInit(PartitionRoot*);
 WTF_EXPORT void partitionAllocShutdown(PartitionRoot*);
 
-WTF_EXPORT NEVER_INLINE void* partitionAllocSlowPath(PartitionPageHeader*);
+WTF_EXPORT NEVER_INLINE void* partitionAllocSlowPath(PartitionBucket*);
 WTF_EXPORT NEVER_INLINE void partitionFreeSlowPath(PartitionPageHeader*);
 
 ALWAYS_INLINE PartitionFreelistEntry* partitionFreelistMask(PartitionFreelistEntry* ptr)
@@ -171,7 +174,7 @@ ALWAYS_INLINE void* partitionBucketAlloc(PartitionBucket* bucket)
         page->numAllocatedSlots++;
         return ret;
     }
-    return partitionAllocSlowPath(page);
+    return partitionAllocSlowPath(bucket);
 }
 
 ALWAYS_INLINE void* partitionAlloc(PartitionRoot* root, size_t size)
@@ -198,10 +201,10 @@ ALWAYS_INLINE void partitionFree(void* ptr)
     uintptr_t pointerAsUint = reinterpret_cast<uintptr_t>(ptr);
     // Checks that the pointer is after the page header. You can't free the
     // page header!
-    ASSERT((pointerAsUint & ~kPageMask) >= sizeof(PartitionPageHeader));
-    PartitionPageHeader* page = reinterpret_cast<PartitionPageHeader*>(pointerAsUint & kPageMask);
+    ASSERT((pointerAsUint & kPartitionPageOffsetMask) >= sizeof(PartitionPageHeader));
+    PartitionPageHeader* page = reinterpret_cast<PartitionPageHeader*>(pointerAsUint & kPartitionPageBaseMask);
     // Checks that the pointer is a multiple of bucket size.
-    ASSERT(!(((pointerAsUint & ~kPageMask) - sizeof(PartitionPageHeader)) % partitionBucketSize(page->bucket)));
+    ASSERT(!(((pointerAsUint & kPartitionPageOffsetMask) - sizeof(PartitionPageHeader)) % partitionBucketSize(page->bucket)));
     PartitionFreelistEntry* entry = static_cast<PartitionFreelistEntry*>(ptr);
     entry->next = partitionFreelistMask(page->freelistHead);
     page->freelistHead = entry;

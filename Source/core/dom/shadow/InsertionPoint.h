@@ -72,8 +72,8 @@ public:
     bool resetStyleInheritance() const;
     void setResetStyleInheritance(bool);
 
-    virtual void attach();
-    virtual void detach();
+    virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
+    virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
 
     bool shouldUseFallbackElements() const;
 
@@ -95,7 +95,7 @@ protected:
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual bool isInsertionPointNode() const OVERRIDE { return true; }
+    virtual void willRecalcStyle(StyleChange) OVERRIDE;
 
 private:
 

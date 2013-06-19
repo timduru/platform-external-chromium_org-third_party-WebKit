@@ -32,11 +32,21 @@
 #include "wtf/PartitionAlloc.h"
 
 #include "wtf/CryptographicallyRandomNumber.h"
+#include "wtf/OwnArrayPtr.h"
+#include "wtf/PageAllocator.h"
 #include <gtest/gtest.h>
 #include <stdlib.h>
 #include <string.h>
 
-#if OS(LINUX) && CPU(X86_64) && defined(NDEBUG)
+#if OS(UNIX)
+#include <sys/mman.h>
+
+#ifndef MAP_ANONYMOUS
+#define MAP_ANONYMOUS MAP_ANON
+#endif
+#endif // OS(UNIX)
+
+#if defined(NDEBUG)
 
 namespace {
 
@@ -60,38 +70,40 @@ static void TestShutdown()
     partitionAllocShutdown(&root);
 }
 
-static WTF::PartitionPageHeader* GetFullPage()
+static WTF::PartitionPageHeader* GetFullPage(size_t size)
 {
-    size_t bucketIdx = kTestAllocSize >> WTF::kBucketShift;
+    size_t bucketIdx = size >> WTF::kBucketShift;
     WTF::PartitionBucket* bucket = &root.buckets[bucketIdx];
-    size_t numSlots = (WTF::kPageSize - sizeof(WTF::PartitionPageHeader)) / kTestAllocSize;
+    size_t numSlots = (WTF::kPartitionPageSize - sizeof(WTF::PartitionPageHeader)) / size;
     void* first = 0;
     void* last = 0;
     size_t i;
     for (i = 0; i < numSlots; ++i) {
-        void* ptr = partitionAlloc(&root, kTestAllocSize);
+        void* ptr = partitionAlloc(&root, size);
         EXPECT_TRUE(ptr);
         if (!i)
             first = ptr;
         else if (i == numSlots - 1)
             last = ptr;
     }
-    EXPECT_EQ(reinterpret_cast<size_t>(first) & WTF::kPageMask, reinterpret_cast<size_t>(last) & WTF::kPageMask);
+    EXPECT_EQ(reinterpret_cast<size_t>(first) & WTF::kPartitionPageBaseMask, reinterpret_cast<size_t>(last) & WTF::kPartitionPageBaseMask);
     EXPECT_EQ(numSlots, static_cast<size_t>(bucket->currPage->numAllocatedSlots));
     EXPECT_EQ(0, bucket->currPage->freelistHead);
+    EXPECT_TRUE(bucket->currPage);
+    EXPECT_TRUE(bucket->currPage != &root.seedPage);
     return bucket->currPage;
 }
 
-static void FreeFullPage(WTF::PartitionPageHeader* page)
+static void FreeFullPage(WTF::PartitionPageHeader* page, size_t size)
 {
-    size_t numSlots = (WTF::kPageSize - sizeof(WTF::PartitionPageHeader)) / kTestAllocSize;
+    size_t numSlots = (WTF::kPartitionPageSize - sizeof(WTF::PartitionPageHeader)) / size;
     EXPECT_EQ(numSlots, static_cast<size_t>(abs(page->numAllocatedSlots)));
     char* ptr = reinterpret_cast<char*>(page);
     ptr += sizeof(WTF::PartitionPageHeader);
     size_t i;
     for (i = 0; i < numSlots; ++i) {
         partitionFree(ptr);
-        ptr += kTestAllocSize;
+        ptr += size;
     }
     EXPECT_EQ(0, page->numAllocatedSlots);
 }
@@ -104,13 +116,15 @@ TEST(WTF_PartitionAlloc, Basic)
     WTF::PartitionBucket* bucket = &root.buckets[bucketIdx];
 
     EXPECT_EQ(0, bucket->freePages);
-    EXPECT_EQ(&bucket->seedPage, bucket->currPage);
-    EXPECT_EQ(&bucket->seedPage, bucket->currPage->next);
-    EXPECT_EQ(&bucket->seedPage, bucket->currPage->prev);
+    EXPECT_EQ(&bucket->root->seedPage, bucket->currPage);
+    EXPECT_EQ(&bucket->root->seedPage, bucket->currPage->next);
+    EXPECT_EQ(&bucket->root->seedPage, bucket->currPage->prev);
 
     void* ptr = partitionAlloc(&root, kTestAllocSize);
     EXPECT_TRUE(ptr);
-    EXPECT_EQ(sizeof(WTF::PartitionPageHeader), reinterpret_cast<size_t>(ptr) & ~WTF::kPageMask);
+    EXPECT_EQ(sizeof(WTF::PartitionPageHeader), reinterpret_cast<size_t>(ptr) & WTF::kPartitionPageOffsetMask);
+    // Check that the offset appears to include a guard page.
+    EXPECT_EQ(WTF::kPartitionPageSize + sizeof(WTF::PartitionPageHeader), reinterpret_cast<size_t>(ptr) & WTF::kSuperPageOffsetMask);
 
     partitionFree(ptr);
     // Expect that a just-freed page doesn't get tossed to the freelist.
@@ -162,29 +176,32 @@ TEST(WTF_PartitionAlloc, MultiPages)
     size_t bucketIdx = kTestAllocSize >> WTF::kBucketShift;
     WTF::PartitionBucket* bucket = &root.buckets[bucketIdx];
 
-    WTF::PartitionPageHeader* page = GetFullPage();
-    FreeFullPage(page);
+    WTF::PartitionPageHeader* page = GetFullPage(kTestAllocSize);
+    FreeFullPage(page, kTestAllocSize);
     EXPECT_EQ(0, bucket->freePages);
+    EXPECT_EQ(page, bucket->currPage);
+    EXPECT_EQ(page, page->next);
+    EXPECT_EQ(page, page->prev);
 
-    page = GetFullPage();
-    WTF::PartitionPageHeader* page2 = GetFullPage();
+    page = GetFullPage(kTestAllocSize);
+    WTF::PartitionPageHeader* page2 = GetFullPage(kTestAllocSize);
 
     EXPECT_EQ(page2, bucket->currPage);
 
     // Fully free the non-current page, it should be freelisted.
-    FreeFullPage(page);
+    FreeFullPage(page, kTestAllocSize);
     EXPECT_EQ(0, page->numAllocatedSlots);
     EXPECT_TRUE(bucket->freePages);
     EXPECT_EQ(page, bucket->freePages->page);
     EXPECT_EQ(page2, bucket->currPage);
 
     // Allocate a new page, it should pull from the freelist.
-    page = GetFullPage();
+    page = GetFullPage(kTestAllocSize);
     EXPECT_FALSE(bucket->freePages);
     EXPECT_EQ(page, bucket->currPage);
 
-    FreeFullPage(page);
-    FreeFullPage(page2);
+    FreeFullPage(page, kTestAllocSize);
+    FreeFullPage(page2, kTestAllocSize);
     EXPECT_EQ(0, page->numAllocatedSlots);
     EXPECT_EQ(0, page2->numAllocatedSlots);
 
@@ -198,18 +215,18 @@ TEST(WTF_PartitionAlloc, PageTransitions)
     size_t bucketIdx = kTestAllocSize >> WTF::kBucketShift;
     WTF::PartitionBucket* bucket = &root.buckets[bucketIdx];
 
-    WTF::PartitionPageHeader* page1 = GetFullPage();
-    WTF::PartitionPageHeader* page2 = GetFullPage();
+    WTF::PartitionPageHeader* page1 = GetFullPage(kTestAllocSize);
+    WTF::PartitionPageHeader* page2 = GetFullPage(kTestAllocSize);
     EXPECT_EQ(page2, bucket->currPage);
-    EXPECT_EQ(page1, bucket->seedPage.next);
+    EXPECT_EQ(page1, page2->next);
+    EXPECT_EQ(page1, page2->prev);
     // Allocating another page at this point should cause us to scan over page1
     // (which is both full and NOT our current page), and evict it from the
     // freelist. Older code had a O(n^2) condition due to failure to do this.
-    WTF::PartitionPageHeader* page3 = GetFullPage();
+    WTF::PartitionPageHeader* page3 = GetFullPage(kTestAllocSize);
     EXPECT_EQ(page3, bucket->currPage);
-    EXPECT_EQ(page2, bucket->seedPage.next);
-    EXPECT_EQ(page3, bucket->seedPage.next->next);
-    EXPECT_EQ(&bucket->seedPage, bucket->seedPage.next->next->next);
+    EXPECT_EQ(page2, page3->next);
+    EXPECT_EQ(page3, page2->next);
 
     // Work out a pointer into page2 and free it.
     char* ptr = reinterpret_cast<char*>(page2) + sizeof(WTF::PartitionPageHeader);
@@ -229,13 +246,140 @@ TEST(WTF_PartitionAlloc, PageTransitions)
     EXPECT_EQ(ptr, newPtr);
     EXPECT_EQ(page1, bucket->currPage);
 
-    FreeFullPage(page3);
-    FreeFullPage(page2);
-    FreeFullPage(page1);
+    FreeFullPage(page3, kTestAllocSize);
+    FreeFullPage(page2, kTestAllocSize);
+    FreeFullPage(page1, kTestAllocSize);
 
     TestShutdown();
 }
 
+// Test some corner cases relating to page transitions in the internal
+// free page list metadata bucket.
+TEST(WTF_PartitionAlloc, FreePageListPageTransitions)
+{
+    TestSetup();
+    WTF::PartitionBucket* freePageBucket = &root.buckets[WTF::kFreePageBucket];
+    size_t bucketIdx = kTestAllocSize >> WTF::kBucketShift;
+    WTF::PartitionBucket* bucket = &root.buckets[bucketIdx];
+
+    size_t numToFillFreeListPage = (WTF::kPartitionPageSize - sizeof(WTF::PartitionPageHeader)) / sizeof(WTF::PartitionFreepagelistEntry);
+    OwnArrayPtr<WTF::PartitionPageHeader*> pages = adoptArrayPtr(new WTF::PartitionPageHeader*[numToFillFreeListPage + 1]);
+    size_t i;
+    // The +1 is because we need to account for the fact that the current page
+    // never gets thrown on the freelist.
+    for (i = 0; i < numToFillFreeListPage + 1; ++i) {
+        pages[i] = GetFullPage(kTestAllocSize);
+    }
+    EXPECT_EQ(pages[numToFillFreeListPage], bucket->currPage);
+    for (i = 0; i < numToFillFreeListPage + 1; ++i) {
+        FreeFullPage(pages[i], kTestAllocSize);
+    }
+    EXPECT_EQ(pages[numToFillFreeListPage], bucket->currPage);
+
+    // At this moment, we should have filled an entire partition page full of
+    // WTF::PartitionFreepagelistEntry, in the special free list entry bucket.
+    EXPECT_EQ(numToFillFreeListPage, freePageBucket->currPage->numAllocatedSlots);
+    EXPECT_EQ(0, freePageBucket->currPage->freelistHead);
+
+    // Allocate / free a full couple of pages of a different bucket size so
+    // we get control of a different free page list.
+    WTF::PartitionPageHeader* page1 = GetFullPage(kTestAllocSize * 2);
+    WTF::PartitionPageHeader* page2 = GetFullPage(kTestAllocSize * 2);
+    FreeFullPage(page1, kTestAllocSize * 2);
+    FreeFullPage(page2, kTestAllocSize * 2);
+
+    // Now, we have a second page for free page objects, with a single entry
+    // in it -- from a free page in the "kTestAllocSize * 2" bucket.
+    EXPECT_EQ(1, freePageBucket->currPage->numAllocatedSlots);
+    EXPECT_EQ(0, freePageBucket->freePages);
+
+    // If we re-allocate all kTestAllocSize allocations, we'll pull all the
+    // free pages and end up freeing the first page for free page objects.
+    // It's getting a bit tricky but a nice re-entrancy is going on:
+    // alloc(kTestAllocSize) -> pulls page from free page list ->
+    // free(PartitionFreepagelistEntry) -> last entry in page freed ->
+    // alloc(PartitionFreepagelistEntry).
+    for (i = 0; i < numToFillFreeListPage + 1; ++i) {
+        pages[i] = GetFullPage(kTestAllocSize);
+    }
+    EXPECT_EQ(pages[numToFillFreeListPage], bucket->currPage);
+    EXPECT_EQ(2, freePageBucket->currPage->numAllocatedSlots);
+    EXPECT_TRUE(freePageBucket->freePages);
+
+    // As part of the final free-up, we'll test another re-entrancy:
+    // free(kTestAllocSize) -> last entry in page freed ->
+    // alloc(PartitionFreepagelistEntry) -> pulls page from free page list ->
+    // free(PartitionFreepagelistEntry)
+    for (i = 0; i < numToFillFreeListPage + 1; ++i) {
+        FreeFullPage(pages[i], kTestAllocSize);
+    }
+    EXPECT_EQ(pages[numToFillFreeListPage], bucket->currPage);
+
+    TestShutdown();
+}
+
+// Test a large series of allocations that cross more than one underlying
+// 64KB super page allocation.
+TEST(WTF_PartitionAlloc, MultiPageAllocs)
+{
+    TestSetup();
+    // This is guaranteed to cross a super page boundary because the first
+    // partition page "slot" will be taken up by a guard page.
+    size_t numPagesNeeded = WTF::kSuperPageSize / WTF::kPartitionPageSize;
+    EXPECT_GT(numPagesNeeded, 1u);
+    OwnArrayPtr<WTF::PartitionPageHeader*> pages;
+    pages = adoptArrayPtr(new WTF::PartitionPageHeader*[numPagesNeeded]);
+    uintptr_t firstSuperPageBase = 0;
+    size_t i;
+    for (i = 0; i < numPagesNeeded; ++i) {
+        pages[i] = GetFullPage(kTestAllocSize);
+        if (!i)
+            firstSuperPageBase = (reinterpret_cast<uintptr_t>(pages[i]) & WTF::kSuperPageBaseMask);
+        if (i == numPagesNeeded - 1) {
+            uintptr_t secondSuperPageBase = reinterpret_cast<uintptr_t>(pages[i]) & WTF::kSuperPageBaseMask;
+            EXPECT_FALSE(secondSuperPageBase == firstSuperPageBase);
+            // If the two super pages are contiguous, also check that we didn't
+            // erroneously allocate a guard page for the second page.
+            if (secondSuperPageBase == firstSuperPageBase + WTF::kSuperPageSize)
+                EXPECT_EQ(0u, secondSuperPageBase & WTF::kSuperPageOffsetMask);
+        }
+    }
+    for (i = 0; i < numPagesNeeded; ++i) {
+        FreeFullPage(pages[i], kTestAllocSize);
+    }
+
+    TestShutdown();
+}
+
+#if OS(UNIX)
+
+// Test correct handling if our mapping collides with another.
+TEST(WTF_PartitionAlloc, MappingCollision)
+{
+    TestSetup();
+
+    WTF::PartitionPageHeader* page1 = GetFullPage(kTestAllocSize);
+    char* pageBase = reinterpret_cast<char*>(page1);
+    // Map a single system page either side of the mapping for our allocations,
+    // with the goal of tripping up alignment of the next mapping.
+    void* map1 = mmap(pageBase - WTF::kSystemPageSize, WTF::kSystemPageSize, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    EXPECT_TRUE(map1 && map1 != MAP_FAILED);
+    void* map2 = mmap(pageBase + WTF::kSuperPageSize, WTF::kSystemPageSize, PROT_NONE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
+    EXPECT_TRUE(map2 && map2 != MAP_FAILED);
+
+    WTF::PartitionPageHeader* page2 = GetFullPage(kTestAllocSize);
+    EXPECT_EQ(0u, reinterpret_cast<uintptr_t>(page2) & WTF::kPartitionPageOffsetMask);
+    FreeFullPage(page2, kTestAllocSize);
+
+    FreeFullPage(page1, kTestAllocSize);
+    munmap(map1, WTF::kSystemPageSize);
+    munmap(map2, WTF::kSystemPageSize);
+
+    TestShutdown();
+}
+
+#endif // OS(UNIX)
+
 } // namespace
 
-#endif // OS(LINUX) && CPU(X86_64)
+#endif // defined(NDEBUG)

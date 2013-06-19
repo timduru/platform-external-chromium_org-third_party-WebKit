@@ -134,9 +134,7 @@
 #endif /* OS(DARWIN) */
 
 #if !defined(HAVE_ACCESSIBILITY)
-#if !OS(ANDROID)
 #define HAVE_ACCESSIBILITY 1
-#endif
 #endif /* !defined(HAVE_ACCESSIBILITY) */
 
 #if OS(UNIX)
@@ -153,7 +151,7 @@
 #endif
 
 #if !defined(HAVE_VASPRINTF)
-#if !COMPILER(MSVC) && !COMPILER(MINGW)
+#if !COMPILER(MSVC)
 #define HAVE_VASPRINTF 1
 #endif
 #endif

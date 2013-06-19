@@ -203,11 +203,11 @@ static void focusPostAttach(Node* element)
     element->deref(); 
 }
 
-void HTMLFormControlElement::attach()
+void HTMLFormControlElement::attach(const AttachContext& context)
 {
     PostAttachCallbackDisabler disabler(this);
 
-    HTMLElement::attach();
+    HTMLElement::attach(context);
 
     // The call to updateFromElement() needs to go after the call through
     // to the base class's attach() because that can sometimes do a close
@@ -305,15 +305,13 @@ bool HTMLFormControlElement::supportsFocus() const
     return !isDisabledFormControl();
 }
 
-bool HTMLFormControlElement::isFocusable() const
+bool HTMLFormControlElement::rendererIsFocusable() const
 {
     // If there's a renderer, make sure the size isn't empty, but if there's no renderer,
-    // it might still be focusable if it's in a canvas subtree (handled in Node::isFocusable).
+    // it might still be focusable if it's in a canvas subtree (handled in Element::rendererIsFocusable).
     if (renderer() && (!renderer()->isBox() || toRenderBox(renderer())->size().isEmpty()))
         return false;
-    // HTMLElement::isFocusable handles visibility and calls suportsFocus which
-    // will cover the disabled case.
-    return HTMLElement::isFocusable();
+    return HTMLElement::rendererIsFocusable();
 }
 
 bool HTMLFormControlElement::isKeyboardFocusable(KeyboardEvent*) const
@@ -440,11 +438,6 @@ void HTMLFormControlElement::setCustomValidity(const String& error)
 {
     FormAssociatedElement::setCustomValidity(error);
     setNeedsValidityCheck();
-}
-
-bool HTMLFormControlElement::validationMessageShadowTreeContains(Node* node) const
-{
-    return m_validationMessage && m_validationMessage->shadowTreeContains(node);
 }
 
 void HTMLFormControlElement::dispatchBlurEvent(PassRefPtr<Node> newFocusedNode)

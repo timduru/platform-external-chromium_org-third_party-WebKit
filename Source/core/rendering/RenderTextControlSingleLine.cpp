@@ -39,13 +39,12 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-RenderTextControlSingleLine::RenderTextControlSingleLine(Element* element)
+RenderTextControlSingleLine::RenderTextControlSingleLine(HTMLInputElement* element)
     : RenderTextControl(element)
     , m_shouldDrawCapsLockIndicator(false)
     , m_desiredInnerTextLogicalHeight(-1)
 {
-    ASSERT(element->isHTMLElement());
-    ASSERT(element->toInputElement());
+    ASSERT(element->hasTagName(inputTag));
 }
 
 RenderTextControlSingleLine::~RenderTextControlSingleLine()
@@ -244,7 +243,7 @@ void RenderTextControlSingleLine::styleDidChange(StyleDifference diff, const Ren
     }
     RenderObject* innerTextRenderer = innerTextElement()->renderer();
     if (innerTextRenderer && diff == StyleDifferenceLayout)
-        innerTextRenderer->setNeedsLayout(true, MarkOnlyThis);
+        innerTextRenderer->setNeedsLayout(true, MarkContainingBlockChain);
     if (HTMLElement* placeholder = inputElement()->placeholderElement())
         placeholder->setInlineStyleProperty(CSSPropertyTextOverflow, textShouldBeTruncated() ? CSSValueEllipsis : CSSValueClip);
     setHasOverflowClip(false);
@@ -353,7 +352,7 @@ PassRefPtr<RenderStyle> RenderTextControlSingleLine::createInnerTextStyle(const 
 {
     RefPtr<RenderStyle> textBlockStyle = RenderStyle::create();   
     textBlockStyle->inheritFrom(startStyle);
-    adjustInnerTextStyle(startStyle, textBlockStyle.get());
+    adjustInnerTextStyle(textBlockStyle.get());
 
     textBlockStyle->setWhiteSpace(PRE);
     textBlockStyle->setOverflowWrap(NormalOverflowWrap);
@@ -467,7 +466,7 @@ bool RenderTextControlSingleLine::logicalScroll(ScrollLogicalDirection direction
 
 HTMLInputElement* RenderTextControlSingleLine::inputElement() const
 {
-    return node()->toInputElement();
+    return toHTMLInputElement(node());
 }
 
 }

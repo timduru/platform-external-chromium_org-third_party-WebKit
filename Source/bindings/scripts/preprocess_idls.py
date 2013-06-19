@@ -45,6 +45,8 @@ def parse_options():
         parser.error('Must specify an output file using --supplemental-dependency-file.')
     if options.window_constructors_file is None:
         parser.error('Must specify an output file using --window-constructors-file.')
+    if options.workercontext_constructors_file is None:
+        parser.error('Must specify an output file using --workercontext-constructors-file.')
     if options.idl_files_list is None:
         parser.error('Must specify the file listing all IDLs using --idl-files-list.')
     if options.write_file_only_if_changed is None:
@@ -67,6 +69,16 @@ def get_partial_interface_name_from_idl(file_contents):
         return match.group(1)
     return None
 
+
+# identifier-A implements identifier-B;
+# http://www.w3.org/TR/WebIDL/#idl-implements-statements
+def get_implementers_from_idl(file_contents, interface_name):
+    implementers = []
+    for match in re.finditer(r'(\w+)\s+implements\s+(\w+)\s*;', file_contents):
+        # identifier-B must be the current interface
+        assert match.group(2) == interface_name
+        implementers.append(match.group(1))
+    return implementers
 
 def is_callback_interface_from_idl(file_contents):
     match = re.search(r'callback\s+interface\s+\w+', file_contents)
@@ -104,12 +116,7 @@ def generate_constructor_attribute_list(interface_name, extended_attributes):
     else:
         extended_string = ''
 
-    # FIXME: Remove this once we remove [InterfaceName] IDL attribute, http://crbug.com/242137
-    if 'InterfaceName' in extended_attributes:
-        extended_interface_name = extended_attributes['InterfaceName']
-    else:
-        extended_interface_name = interface_name
-    attribute_string = 'attribute %sConstructor %s' % (interface_name, extended_interface_name)
+    attribute_string = 'attribute %(interface_name)sConstructor %(interface_name)s' % {'interface_name': interface_name}
     attributes_list = [extended_string + attribute_string]
 
     # In addition to the regular property, for every [NamedConstructor]
@@ -145,11 +152,17 @@ def parse_idl_files(idl_files, window_constructors_filename, workercontext_const
     for idl_file_name in idl_files:
         full_path = os.path.realpath(idl_file_name)
         idl_file_contents = get_file_contents(full_path)
+        # Handle partial interfaces
         partial_interface_name = get_partial_interface_name_from_idl(idl_file_contents)
         if partial_interface_name:
-            supplemental_dependencies[full_path] = partial_interface_name
+            supplemental_dependencies[full_path] = [partial_interface_name]
             continue
         interface_name, _ = os.path.splitext(os.path.basename(idl_file_name))
+        # Parse 'identifier-A implements identifier-B; statements
+        implementers = get_implementers_from_idl(idl_file_contents, interface_name)
+        for implementer in implementers:
+            supplemental_dependencies.setdefault(full_path, []).append(implementer)
+        # Handle [NoInterfaceObject]
         if not is_callback_interface_from_idl(idl_file_contents):
             extended_attributes = get_interface_extended_attributes_from_idl(idl_file_contents)
             if 'NoInterfaceObject' not in extended_attributes:
@@ -164,20 +177,21 @@ def parse_idl_files(idl_files, window_constructors_filename, workercontext_const
         supplementals[full_path] = []
 
     # Generate Global constructors
-    generate_global_constructors_partial_interface("DOMWindow", window_constructors_filename, window_constructor_attributes_list)
-    if 'DOMWindow' in interface_name_to_idl_file:
-        supplemental_dependencies[window_constructors_filename] = 'DOMWindow'
+    generate_global_constructors_partial_interface("Window", window_constructors_filename, window_constructor_attributes_list)
+    if 'Window' in interface_name_to_idl_file:
+        supplemental_dependencies[window_constructors_filename] = ['Window']
     generate_global_constructors_partial_interface("WorkerContext", workercontext_constructors_filename, workercontext_constructor_attributes_list)
     if 'WorkerContext' in interface_name_to_idl_file:
-        supplemental_dependencies[workercontext_constructors_filename] = 'WorkerContext'
+        supplemental_dependencies[workercontext_constructors_filename] = ['WorkerContext']
 
     # Resolve partial interfaces dependencies
-    for idl_file, base_file in supplemental_dependencies.iteritems():
-        target_idl_file = interface_name_to_idl_file[base_file]
-        supplementals[target_idl_file].append(idl_file)
-        if idl_file in supplementals:
-            # Should never occur. Might be needed in corner cases.
-            del supplementals[idl_file]
+    for idl_file, base_files in supplemental_dependencies.iteritems():
+        for base_file in base_files:
+            target_idl_file = interface_name_to_idl_file[base_file]
+            supplementals[target_idl_file].append(idl_file)
+            if idl_file in supplementals:
+                # Should never occur. Might be needed in corner cases.
+                del supplementals[idl_file]
     return supplementals
 
 
@@ -186,13 +200,13 @@ def write_dependency_file(filename, supplementals, only_if_changed=False):
 
     The format of a supplemental dependency file:
 
-    DOMWindow.idl P.idl Q.idl R.idl
+    Window.idl P.idl Q.idl R.idl
     Document.idl S.idl
     Event.idl
     ...
 
     The above indicates that:
-    DOMWindow.idl is supplemented by P.idl, Q.idl and R.idl,
+    Window.idl is supplemented by P.idl, Q.idl and R.idl,
     Document.idl is supplemented by S.idl, and
     Event.idl is supplemented by no IDLs.
 

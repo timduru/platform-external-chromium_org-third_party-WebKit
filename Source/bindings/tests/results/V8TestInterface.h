@@ -41,11 +41,20 @@ public:
     static void derefObject(void*);
     static WrapperTypeInfo info;
     static ActiveDOMObject* toActiveDOMObject(v8::Handle<v8::Object>);
+#if ENABLE(Condition22) || ENABLE(Condition23)
+    static void implementsMethod3MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
+#endif // ENABLE(Condition22) || ENABLE(Condition23)
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
-    static v8::Handle<v8::Value> namedPropertyGetter(v8::Local<v8::String>, const v8::AccessorInfo&);
-    static v8::Handle<v8::Value> namedPropertySetter(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::AccessorInfo&);
-    static v8::Handle<v8::Array> namedPropertyEnumerator(const v8::AccessorInfo&);
-    static v8::Handle<v8::Integer> namedPropertyQuery(v8::Local<v8::String>, const v8::AccessorInfo&);
+#if ENABLE(Condition22) || ENABLE(Condition23)
+    static void implementsStr3AttrGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
+#endif // ENABLE(Condition22) || ENABLE(Condition23)
+#if ENABLE(Condition22) || ENABLE(Condition23)
+    static void implementsStr3AttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
+#endif // ENABLE(Condition22) || ENABLE(Condition23)
+    static void namedPropertyGetter(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void namedPropertySetter(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<v8::Value>&);
+    static void namedPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>&);
+    static void namedPropertyQuery(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Integer>&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
     static void installPerContextProperties(v8::Handle<v8::Object>, TestInterface*, v8::Isolate*);
     static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }

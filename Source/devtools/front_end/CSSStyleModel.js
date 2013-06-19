@@ -445,6 +445,18 @@ WebInspector.CSSStyleModel.prototype = {
     },
 
     /**
+     * @param {string} url
+     * @return {Object.<NetworkAgent.FrameId, string>}
+     */
+    styleSheetIdsByFrameIdForURL: function(url)
+    {
+        var styleSheetIdsForFrame = this._styleSheetIdsForURL[url];
+        if (!styleSheetIdsForFrame)
+            return {};
+        return styleSheetIdsForFrame;
+    },
+
+    /**
      * @param {CSSAgent.NamedFlow} namedFlowPayload
      */
     _namedFlowCreated: function(namedFlowPayload)
@@ -546,18 +558,19 @@ WebInspector.CSSStyleModel.prototype = {
     },
 
     /**
-     * @param {WebInspector.CSSRule} cssRule
+     * @param {CSSAgent.StyleSheetId} styleSheetId
+     * @param {WebInspector.CSSLocation} rawLocation
      * @param {function(WebInspector.UILocation):(boolean|undefined)} updateDelegate
      * @return {?WebInspector.LiveLocation}
      */
-    createLiveLocation: function(cssRule, updateDelegate)
+    createLiveLocation: function(styleSheetId, rawLocation, updateDelegate)
     {
-        if (!cssRule.rawLocation)
+        if (!rawLocation)
             return null;
-        var header = this.styleSheetHeaderForId(cssRule.id.styleSheetId);
+        var header = this.styleSheetHeaderForId(styleSheetId);
         if (!header)
             return null;
-        return header.createLiveLocation(cssRule, updateDelegate);
+        return header.createLiveLocation(rawLocation, updateDelegate);
     },
 
     /**
@@ -891,9 +904,9 @@ WebInspector.CSSRule = function(payload, matchingSelectors)
     this.origin = payload.origin;
     this.style = WebInspector.CSSStyleDeclaration.parsePayload(payload.style);
     this.style.parentRule = this;
+    this._setRawLocationAndFrameId();
     if (payload.media)
-        this.media = WebInspector.CSSMedia.parseMediaArrayPayload(payload.media);
-    this._setRawLocation();
+        this.media = WebInspector.CSSMedia.parseMediaArrayPayload(payload.media, this.frameId);
 }
 
 /**
@@ -907,11 +920,12 @@ WebInspector.CSSRule.parsePayload = function(payload, matchingIndices)
 }
 
 WebInspector.CSSRule.prototype = {
-    _setRawLocation: function()
+    _setRawLocationAndFrameId: function()
     {
         if (!this.id)
             return;
         var styleSheetHeader = WebInspector.cssModel.styleSheetHeaderForId(this.id.styleSheetId);
+        this.frameId = styleSheetHeader.frameId;
         var url = styleSheetHeader.resourceURL();
         if (!url)
             return;
@@ -937,7 +951,7 @@ WebInspector.CSSRule.prototype = {
         if (!this.selectorRange)
             return 0;
         var styleSheetHeader = WebInspector.cssModel.styleSheetHeaderForId(this.id.styleSheetId);
-        return styleSheetHeader.startLine + this.selectorRange.startLine;
+        return styleSheetHeader.lineNumberInSource(this.selectorRange.startLine);
     },
 
     /**
@@ -949,7 +963,7 @@ WebInspector.CSSRule.prototype = {
             return undefined;
         var styleSheetHeader = WebInspector.cssModel.styleSheetHeaderForId(this.id.styleSheetId);
         console.assert(styleSheetHeader);
-        return (this.selectorRange.startLine ? 0 : styleSheetHeader.startColumn) + this.selectorRange.startColumn;
+        return styleSheetHeader.columnNumberInSource(this.selectorRange.startLine, this.selectorRange.startColumn);
     },
 
     get isUserAgent()
@@ -1185,13 +1199,16 @@ WebInspector.CSSProperty.prototype = {
 /**
  * @constructor
  * @param {CSSAgent.CSSMedia} payload
+ * @param {!NetworkAgent.FrameId} frameId
  */
-WebInspector.CSSMedia = function(payload)
+WebInspector.CSSMedia = function(payload, frameId)
 {
     this.text = payload.text;
     this.source = payload.source;
     this.sourceURL = payload.sourceURL || "";
     this.sourceLine = typeof payload.sourceLine === "undefined" || this.source === "linkedSheet" ? -1 : payload.sourceLine;
+    this.range = payload.range;
+    this.frameId = frameId;
 }
 
 WebInspector.CSSMedia.Source = {
@@ -1203,22 +1220,66 @@ WebInspector.CSSMedia.Source = {
 
 /**
  * @param {CSSAgent.CSSMedia} payload
+ * @param {!NetworkAgent.FrameId} frameId
  * @return {WebInspector.CSSMedia}
  */
-WebInspector.CSSMedia.parsePayload = function(payload)
+WebInspector.CSSMedia.parsePayload = function(payload, frameId)
 {
-    return new WebInspector.CSSMedia(payload);
+    return new WebInspector.CSSMedia(payload, frameId);
+}
+
+WebInspector.CSSMedia.prototype = {
+    /**
+     * @return {number|undefined}
+     */
+    lineNumberInSource: function()
+    {
+        if (!this.range)
+            return undefined;
+        var header = this.header();
+        if (!header)
+            return undefined;
+        return header.lineNumberInSource(this.range.startLine);
+    },
+
+    /**
+     * @return {number|undefined}
+     */
+    columnNumberInSource: function()
+    {
+        if (!this.range)
+            return undefined;
+        var header = this.header();
+        if (!header)
+            return undefined;
+        return header.columnNumberInSource(this.range.startLine, this.range.startColumn);
+    },
+
+    /**
+     * @return {?WebInspector.CSSStyleSheetHeader}
+     */
+    header: function()
+    {
+        var styleSheetIdsByFrameId = WebInspector.cssModel.styleSheetIdsByFrameIdForURL(this.sourceURL);
+        if (!styleSheetIdsByFrameId)
+            return null;
+        var mediaHeaderId = styleSheetIdsByFrameId[this.frameId];
+        if (!mediaHeaderId)
+            return null;
+        return WebInspector.cssModel.styleSheetHeaderForId(mediaHeaderId);
+    }
 }
 
 /**
  * @param {Array.<CSSAgent.CSSMedia>} payload
+ * @param {!NetworkAgent.FrameId} frameId
  * @return {Array.<WebInspector.CSSMedia>}
  */
-WebInspector.CSSMedia.parseMediaArrayPayload = function(payload)
+WebInspector.CSSMedia.parseMediaArrayPayload = function(payload, frameId)
 {
     var result = [];
     for (var i = 0; i < payload.length; ++i)
-        result.push(WebInspector.CSSMedia.parsePayload(payload[i]));
+        result.push(WebInspector.CSSMedia.parsePayload(payload[i], frameId));
     return result;
 }
 
@@ -1254,13 +1315,13 @@ WebInspector.CSSStyleSheetHeader.prototype = {
     },
 
     /**
-     * @param {WebInspector.CSSRule} cssRule
+     * @param {WebInspector.CSSLocation} rawLocation
      * @param {function(WebInspector.UILocation):(boolean|undefined)} updateDelegate
      * @return {?WebInspector.LiveLocation}
      */
-    createLiveLocation: function(cssRule, updateDelegate)
+    createLiveLocation: function(rawLocation, updateDelegate)
     {
-        var location = new WebInspector.CSSStyleModel.LiveLocation(cssRule.rawLocation, updateDelegate, this);
+        var location = new WebInspector.CSSStyleModel.LiveLocation(rawLocation, updateDelegate, this);
         this._locations.add(location);
         location.update();
         return location;
@@ -1304,12 +1365,6 @@ WebInspector.CSSStyleSheetHeader.prototype = {
         this.updateLocations();
     },
 
-    popSourceMapping: function()
-    {
-        this._sourceMappings.pop();
-        this.updateLocations();
-    },
-
     /**
      * @return {string}
      */
@@ -1331,6 +1386,25 @@ WebInspector.CSSStyleSheetHeader.prototype = {
             fakeURL += "/";
         fakeURL += "inspector-stylesheet";
         return fakeURL;
+    },
+
+    /**
+     * @param {number} lineNumberInStyleSheet
+     * @return {number}
+     */
+    lineNumberInSource: function(lineNumberInStyleSheet)
+    {
+        return this.startLine + lineNumberInStyleSheet;
+    },
+
+    /**
+     * @param {number} lineNumberInStyleSheet
+     * @param {number} columnNumberInStyleSheet
+     * @return {number|undefined}
+     */
+    columnNumberInSource: function(lineNumberInStyleSheet, columnNumberInStyleSheet)
+    {
+        return (lineNumberInStyleSheet ? 0 : this.startColumn) + columnNumberInStyleSheet;
     },
 
     /**

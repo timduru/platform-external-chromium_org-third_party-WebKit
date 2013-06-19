@@ -32,6 +32,7 @@
 #define InspectorInstrumentation_h
 
 #include "bindings/v8/ScriptState.h"
+#include "bindings/v8/ScriptString.h"
 #include "core/css/CSSImportRule.h"
 #include "core/css/CSSRule.h"
 #include "core/css/CSSSelector.h"
@@ -49,9 +50,9 @@
 #include "modules/websockets/WebSocketFrame.h"
 #include "modules/websockets/WebSocketHandshakeRequest.h"
 #include "modules/websockets/WebSocketHandshakeResponse.h"
-#include <wtf/RefPtr.h>
-#include <wtf/UnusedParam.h>
-#include <wtf/Vector.h>
+#include "wtf/RefPtr.h"
+#include "wtf/UnusedParam.h"
+#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -201,6 +202,10 @@ inline InstrumentingAgents* instrumentingAgentsForElement(Element* element)
 bool cssErrorFilter(const CSSParserString& content, int propertyId, int errorType);
 
 } // namespace InspectorInstrumentation
+
+InstrumentingAgents* instrumentationForPage(Page*);
+
+InstrumentingAgents* instrumentationForWorkerContext(WorkerContext*);
 
 } // namespace WebCore
 

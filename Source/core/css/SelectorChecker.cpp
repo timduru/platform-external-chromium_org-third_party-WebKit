@@ -33,6 +33,7 @@
 #include "core/css/CSSSelectorList.h"
 #include "core/css/SiblingTraversalStrategies.h"
 #include "core/dom/Document.h"
+#include "core/dom/FullscreenController.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/StyledElement.h"
 #include "core/dom/Text.h"
@@ -494,8 +495,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
             if (!selector->parseNth())
                 break;
             if (Element* parentElement = element->parentElement()) {
-                // FIXME: We should always have the index passed in to avoid needing countElementsBefore.
-                int count = context.childIndex ? context.childIndex : 1 + siblingTraversalStrategy.countElementsBefore(element);
+                int count = 1 + siblingTraversalStrategy.countElementsBefore(element);
                 if (m_mode == ResolvingStyle) {
                     RenderStyle* childStyle = context.elementStyle ? context.elementStyle : element->renderStyle();
                     element->setChildIndex(count);
@@ -528,8 +528,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                     parentElement->setChildrenAffectedByBackwardPositionalRules();
                 if (!parentElement->isFinishedParsingChildren())
                     return false;
-                // FIXME: We should always have the index passed in to avoid needing countElementsAfter.
-                int count = context.childIndex ? context.childIndex : 1 + siblingTraversalStrategy.countElementsAfter(element);
+                int count = 1 + siblingTraversalStrategy.countElementsAfter(element);
                 if (selector->matchNth(count))
                     return true;
             }
@@ -566,8 +565,8 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
         case CSSSelector::PseudoAutofill:
             if (!element || !element->isFormControlElement())
                 break;
-            if (HTMLInputElement* inputElement = element->toInputElement())
-                return inputElement->isAutofilled();
+            if (element->hasTagName(inputTag))
+                return toHTMLInputElement(element)->isAutofilled();
             break;
         case CSSSelector::PseudoAnyLink:
         case CSSSelector::PseudoLink:
@@ -651,13 +650,16 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
             {
                 if (!element)
                     break;
-                // Even though WinIE allows checked and indeterminate to co-exist, the CSS selector spec says that
-                // you can't be both checked and indeterminate. We will behave like WinIE behind the scenes and just
-                // obey the CSS spec here in the test for matching the pseudo.
-                HTMLInputElement* inputElement = element->toInputElement();
-                if (inputElement && inputElement->shouldAppearChecked() && !inputElement->shouldAppearIndeterminate())
-                    return true;
-                if (element->hasTagName(optionTag) && toHTMLOptionElement(element)->selected())
+                if (element->hasTagName(inputTag)) {
+                    HTMLInputElement* inputElement = toHTMLInputElement(element);
+                    // Even though WinIE allows checked and indeterminate to
+                    // co-exist, the CSS selector spec says that you can't be
+                    // both checked and indeterminate. We will behave like WinIE
+                    // behind the scenes and just obey the CSS spec here in the
+                    // test for matching the pseudo.
+                    if (inputElement->shouldAppearChecked() && !inputElement->shouldAppearIndeterminate())
+                        return true;
+                } else if (element->hasTagName(optionTag) && toHTMLOptionElement(element)->selected())
                     return true;
                 break;
             }
@@ -688,19 +690,25 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
             // context's Document is in the fullscreen state has the 'full-screen' pseudoclass applied.
             if (element->isFrameElementBase() && static_cast<HTMLFrameElementBase*>(element)->containsFullScreenElement())
                 return true;
-            if (!element->document()->webkitIsFullScreen())
-                return false;
-            return element == element->document()->webkitCurrentFullScreenElement();
+            if (FullscreenController* fullscreen = FullscreenController::fromIfExists(element->document())) {
+                if (!fullscreen->webkitIsFullScreen())
+                    return false;
+                return element == fullscreen->webkitCurrentFullScreenElement();
+            }
+            return false;
         case CSSSelector::PseudoAnimatingFullScreenTransition:
-            if (element != element->document()->webkitCurrentFullScreenElement())
-                return false;
-            return element->document()->isAnimatingFullScreen();
+            if (FullscreenController* fullscreen = FullscreenController::fromIfExists(element->document())) {
+                if (!fullscreen->isAnimatingFullScreen())
+                    return false;
+                return element == fullscreen->webkitCurrentFullScreenElement();
+            }
+            return false;
         case CSSSelector::PseudoFullScreenAncestor:
             return element->containsFullScreenElement();
         case CSSSelector::PseudoFullScreenDocument:
             // While a Document is in the fullscreen state, the 'full-screen-document' pseudoclass applies
             // to all elements of that Document.
-            if (!element->document()->webkitIsFullScreen())
+            if (!FullscreenController::isFullScreen(element->document()))
                 return false;
             return true;
         case CSSSelector::PseudoSeamlessDocument:

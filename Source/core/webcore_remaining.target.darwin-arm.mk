@@ -285,7 +285,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/inspector/InspectorTimelineAgent.cpp \
 	third_party/WebKit/Source/core/inspector/InspectorValues.cpp \
 	third_party/WebKit/Source/core/inspector/InspectorWorkerAgent.cpp \
-	third_party/WebKit/Source/core/inspector/InstrumentingAgents.cpp \
 	third_party/WebKit/Source/core/inspector/JavaScriptCallFrame.cpp \
 	third_party/WebKit/Source/core/inspector/MemoryInstrumentationImpl.cpp \
 	third_party/WebKit/Source/core/inspector/NetworkResourcesData.cpp \
@@ -363,7 +362,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/Console.cpp \
 	third_party/WebKit/Source/core/page/ContentSecurityPolicy.cpp \
 	third_party/WebKit/Source/core/page/ContextMenuController.cpp \
-	third_party/WebKit/Source/core/page/Crypto.cpp \
 	third_party/WebKit/Source/core/page/DeviceController.cpp \
 	third_party/WebKit/Source/core/page/DiagnosticLoggingKeys.cpp \
 	third_party/WebKit/Source/core/page/DOMSecurityPolicy.cpp \
@@ -528,6 +526,7 @@ MY_CFLAGS := \
 MY_CFLAGS_C :=
 
 MY_DEFS := \
+	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
@@ -541,9 +540,9 @@ MY_DEFS := \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
-	'-DENABLE_CANVAS_USES_MAILBOX=0' \
+	'-DINSIDE_WEBKIT' \
+	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
@@ -552,6 +551,7 @@ MY_DEFS := \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -566,6 +566,7 @@ MY_DEFS := \
 	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_BUILD_NO_IMAGE_ENCODE' \
 	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \
@@ -603,7 +604,7 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/webkit \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
-	$(LOCAL_PATH)/third_party/angle/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/skia/config \
@@ -620,8 +621,8 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
-	$(LOCAL_PATH)/third_party/libwebp \
 	$(LOCAL_PATH)/third_party/libpng \
+	$(LOCAL_PATH)/third_party/libwebp \
 	$(LOCAL_PATH)/third_party/libxml/linux/include \
 	$(LOCAL_PATH)/third_party/libxml/src/include \
 	$(LOCAL_PATH)/third_party/libxslt \

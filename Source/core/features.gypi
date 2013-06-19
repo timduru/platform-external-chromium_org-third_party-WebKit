@@ -32,9 +32,8 @@
   # The following defines turn WebKit features on and off.
   'variables': {
     'feature_defines': [
-      'ENABLE_CANVAS_USES_MAILBOX=0', # Requires crbug.com/230137 to be fixed
+      'ENABLE_CANVAS_USES_MAILBOX=1',
       'ENABLE_CSS3_TEXT=0',
-      'ENABLE_CSS_DEVICE_ADAPTATION=0',
       'ENABLE_CSS_EXCLUSIONS=1',
       'ENABLE_CSS_REGIONS=1',
       'ENABLE_CUSTOM_SCHEME_HANDLER=0',
@@ -43,6 +42,7 @@
       'ENABLE_SVG_FONTS=1',
       'ENABLE_TOUCH_ICON_LOADING=<(enable_touch_icon_loading)',
       'ENABLE_XHR_TIMEOUT=0',
+      'ENABLE_GDI_FONTS_ON_WINDOWS=1',
       # WTF_USE_DYNAMIC_ANNOTATIONS=1 may be defined in build/common.gypi
       # We can't define it here because it should be present only
       # in Debug or release_valgrind_build=1 builds.
@@ -132,9 +132,9 @@
           'ENABLE_DEFAULT_RENDER_THEME=1',
         ],
       }],
-      ['OS=="linux" and target_arch=="x64"', {
+      ['OS!="win"', {
         'feature_defines': [
-          'ENABLE_PARTITION_ALLOC=0',
+          'ENABLE_PARTITION_ALLOC=1',
         ],
       }],
     ],

@@ -14,19 +14,29 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "generateInspectorInstrumentation":
-$(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationInl.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationInl.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationInl.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationInl.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationInl.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInstrumentation.py $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/InspectorInstrumentation.idl $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInstrumentation.py $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/InspectorInstrumentation.idl $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Generating Inspector instrumentation code from InspectorInstrumentation.idl ($@)"
 	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit $(gyp_shared_intermediate_dir)/webcore; python inspector/CodeGeneratorInstrumentation.py inspector/InspectorInstrumentation.idl --output_h_dir "$(gyp_shared_intermediate_dir)/webkit" --output_cpp_dir "$(gyp_shared_intermediate_dir)/webcore"
 
-$(gyp_shared_intermediate_dir)/webcore/InspectorInstrumentationImpl.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationInl.h ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorConsoleInstrumentationInl.h: $(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorDatabaseInstrumentationInl.h: $(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationInl.h: $(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorOverridesInl.h: $(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h ;
+$(gyp_shared_intermediate_dir)/webkit/InstrumentingAgentsInl.h: $(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h ;
+$(gyp_shared_intermediate_dir)/webcore/InspectorInstrumentationImpl.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h ;
 
 
 GYP_GENERATED_OUTPUTS := \
+	$(gyp_shared_intermediate_dir)/webkit/InspectorCanvasInstrumentationInl.h \
+	$(gyp_shared_intermediate_dir)/webkit/InspectorConsoleInstrumentationInl.h \
+	$(gyp_shared_intermediate_dir)/webkit/InspectorDatabaseInstrumentationInl.h \
 	$(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationInl.h \
+	$(gyp_shared_intermediate_dir)/webkit/InspectorOverridesInl.h \
+	$(gyp_shared_intermediate_dir)/webkit/InstrumentingAgentsInl.h \
 	$(gyp_shared_intermediate_dir)/webcore/InspectorInstrumentationImpl.cpp
 
 # Make sure our deps and generated files are built first.

@@ -31,8 +31,6 @@
 #include "config.h"
 #include "core/css/CSSViewportRule.h"
 
-#if ENABLE(CSS_DEVICE_ADAPTATION)
-
 #include "core/css/PropertySetCSSStyleDeclaration.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StyleRule.h"
@@ -64,7 +62,7 @@ CSSStyleDeclaration* CSSViewportRule::style() const
 String CSSViewportRule::cssText() const
 {
     StringBuilder result;
-    result.appendLiteral("@-webkit-viewport { ");
+    result.appendLiteral("@viewport { ");
 
     String decls = m_viewportRule->properties()->asText();
     result.append(decls);
@@ -95,5 +93,3 @@ void CSSViewportRule::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) cons
 }
 
 } // namespace WebCore
-
-#endif // ENABLE(CSS_DEVICE_ADAPTATION)

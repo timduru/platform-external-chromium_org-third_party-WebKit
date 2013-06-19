@@ -19,7 +19,6 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_injected_canvas_script_source_gyp)/injected_canvas_script_source.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_injected_script_source_gyp)/injected_script_source.stamp \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_debugger_script_source_gyp)/debugger_script_source.stamp \
-	$(call intermediates-dir-for,GYP,build_temp_gyp_googleurl_gyp)/googleurl.stamp \
 	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_gyp)/skia_skia_gyp.a \
 	$(call intermediates-dir-for,GYP,third_party_libwebp_libwebp_gyp)/webp.stamp \
 	$(call intermediates-dir-for,GYP,third_party_npapi_npapi_gyp)/npapi.stamp \
@@ -215,16 +214,15 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ScriptProfiler.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptScope.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptState.cpp \
+	third_party/WebKit/Source/bindings/v8/ScriptString.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptValue.cpp \
 	third_party/WebKit/Source/bindings/v8/SerializedScriptValue.cpp \
 	third_party/WebKit/Source/bindings/v8/V8AbstractEventListener.cpp \
-	third_party/WebKit/Source/bindings/v8/V8AdaptorFunction.cpp \
 	third_party/WebKit/Source/bindings/v8/V8Binding.cpp \
 	third_party/WebKit/Source/bindings/v8/V8Callback.cpp \
 	third_party/WebKit/Source/bindings/v8/V8Collection.cpp \
 	third_party/WebKit/Source/bindings/v8/V8DOMConfiguration.cpp \
 	third_party/WebKit/Source/bindings/v8/V8ErrorHandler.cpp \
-	third_party/WebKit/Source/bindings/v8/V8DOMWindowShell.cpp \
 	third_party/WebKit/Source/bindings/v8/V8DOMWrapper.cpp \
 	third_party/WebKit/Source/bindings/v8/V8EventListener.cpp \
 	third_party/WebKit/Source/bindings/v8/V8EventListenerList.cpp \
@@ -246,6 +244,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/V8ThrowException.cpp \
 	third_party/WebKit/Source/bindings/v8/V8Utilities.cpp \
 	third_party/WebKit/Source/bindings/v8/V8ValueCache.cpp \
+	third_party/WebKit/Source/bindings/v8/V8WindowShell.cpp \
 	third_party/WebKit/Source/bindings/v8/V8WorkerContextEventListener.cpp \
 	third_party/WebKit/Source/bindings/v8/WorkerScriptController.cpp \
 	third_party/WebKit/Source/bindings/v8/WorkerScriptDebugServer.cpp \
@@ -263,13 +262,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8CanvasRenderingContextCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8ClipboardCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CryptoCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8CustomElementConstructorCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomSQLStatementErrorCallback.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8CustomXPathNSResolver.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8DOMPointCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8DOMStringMapCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8DOMWindowCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8DataViewCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8DedicatedWorkerContextCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8DeviceMotionEventCustom.cpp \
@@ -322,12 +317,14 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8SVGElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SVGLengthCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8SVGPathSegCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8StorageCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8StyleSheetCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8TextCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8TrackEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8WebGLRenderingContextCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8WebKitPointCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8WindowCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8WorkerContextCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8WorkerCryptoCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8WorkerCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8XMLHttpRequestCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8XSLTProcessorCustom.cpp \
@@ -373,6 +370,7 @@ MY_CFLAGS := \
 MY_CFLAGS_C :=
 
 MY_DEFS := \
+	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
@@ -386,9 +384,9 @@ MY_DEFS := \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
-	'-DENABLE_CANVAS_USES_MAILBOX=0' \
+	'-DINSIDE_WEBKIT' \
+	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
-	'-DENABLE_CSS_DEVICE_ADAPTATION=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
@@ -397,6 +395,7 @@ MY_DEFS := \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -411,6 +410,7 @@ MY_DEFS := \
 	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_BUILD_NO_IMAGE_ENCODE' \
 	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \
@@ -457,7 +457,7 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/third_party/angle/include/GLSLANG \
+	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(LOCAL_PATH)/third_party/ots/include \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(PWD)/external/icu4c/common \
@@ -477,10 +477,10 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/skia/ext \
 	$(LOCAL_PATH)/third_party/iccjpeg \
 	$(LOCAL_PATH)/third_party/libpng \
+	$(LOCAL_PATH)/third_party/libwebp \
 	$(LOCAL_PATH)/third_party/libxml/linux/include \
 	$(LOCAL_PATH)/third_party/libxml/src/include \
 	$(LOCAL_PATH)/third_party/libxslt \
-	$(LOCAL_PATH)/third_party/libwebp \
 	$(LOCAL_PATH)/third_party/npapi \
 	$(LOCAL_PATH)/third_party/npapi/bindings \
 	$(LOCAL_PATH)/third_party/qcms/src \

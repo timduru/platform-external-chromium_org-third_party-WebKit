@@ -211,12 +211,6 @@ WebInspector.Script.prototype = {
         this.updateLocations();
     },
 
-    popSourceMapping: function()
-    {
-        this._sourceMappings.pop();
-        this.updateLocations();
-    },
-
     updateLocations: function()
     {
         var items = this._locations.items();

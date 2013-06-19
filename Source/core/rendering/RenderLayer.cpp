@@ -421,11 +421,12 @@ void RenderLayer::updateLayerPositions(RenderGeometryMap* geometryMap, UpdateLay
     }
 
     // With all our children positioned, now update our marquee if we need to.
-    if (m_marquee) {
+    if (renderer()->isMarquee()) {
+        RenderMarquee* marquee = toRenderMarquee(renderer());
         // FIXME: would like to use TemporaryChange<> but it doesn't work with bitfields.
         bool oldUpdatingMarqueePosition = m_updatingMarqueePosition;
         m_updatingMarqueePosition = true;
-        m_marquee->updateMarqueePosition();
+        marquee->updateMarqueePosition();
         m_updatingMarqueePosition = oldUpdatingMarqueePosition;
     }
 
@@ -764,10 +765,11 @@ void RenderLayer::updateLayerPositionsAfterScroll(RenderGeometryMap* geometryMap
     // of an object, thus RenderReplica will still repaint itself properly as the layer position was
     // updated above.
 
-    if (m_marquee) {
+    if (renderer()->isMarquee()) {
+        RenderMarquee* marquee = toRenderMarquee(renderer());
         bool oldUpdatingMarqueePosition = m_updatingMarqueePosition;
         m_updatingMarqueePosition = true;
-        m_marquee->updateMarqueePosition();
+        marquee->updateMarqueePosition();
         m_updatingMarqueePosition = oldUpdatingMarqueePosition;
     }
 
@@ -1689,6 +1691,11 @@ void RenderLayer::addChild(RenderLayer* child, RenderLayer* beforeChild)
         setAncestorChainHasOutOfFlowPositionedDescendant();
     }
 
+    // When we first dirty a layer, we will also dirty all the siblings in that
+    // layer's stacking context. We need to manually do it here as well, in case
+    // we're adding this layer after the stacking context has already been
+    // updated.
+    child->m_canBePromotedToStackingContainerDirty = true;
     compositor()->layerWasAdded(this, child);
 }
 
@@ -1960,20 +1967,13 @@ bool RenderLayer::needsCompositedScrolling() const
 void RenderLayer::updateNeedsCompositedScrolling()
 {
     updateCanBeStackingContainer();
-
-    bool needsCompositedScrolling = false;
     updateDescendantDependentFlags();
 
     ASSERT(renderer()->view()->frameView() && renderer()->view()->frameView()->containsScrollableArea(this));
-    bool forceUseCompositedScrolling = acceleratedCompositingForOverflowScrollEnabled()
+    bool needsCompositedScrolling = acceleratedCompositingForOverflowScrollEnabled()
         && canBeStackingContainer()
         && !hasUnclippedDescendant();
 
-#if ENABLE(ACCELERATED_OVERFLOW_SCROLLING)
-    needsCompositedScrolling = forceUseCompositedScrolling || renderer()->style()->useTouchOverflowScrolling();
-#else
-    needsCompositedScrolling = forceUseCompositedScrolling;
-#endif
     // We gather a boolean value for use with Google UMA histograms to
     // quantify the actual effects of a set of patches attempting to
     // relax composited scrolling requirements, thereby increasing the
@@ -2126,7 +2126,7 @@ void RenderLayer::setScrollOffset(const IntPoint& newScrollOffset)
     if (!box)
         return;
 
-    if (!box->isHTMLMarquee()) {
+    if (!box->isMarquee()) {
         // Ensure that the dimensions will be computed if they need to be (for overflow:hidden blocks).
         if (m_scrollDimensionsDirty)
             computeScrollDimensions();
@@ -3151,7 +3151,7 @@ void RenderLayer::updateScrollInfoAfterLayout()
 
     computeScrollDimensions();
 
-    if (!box->isHTMLMarquee()) {
+    if (!box->isMarquee()) {
         // Layout may cause us to be at an invalid scroll position. In this case we need
         // to pull our scroll offsets back to the max (or push them up to the min).
         IntSize clampedScrollOffset = clampScrollOffset(adjustedScrollOffset());
@@ -5518,6 +5518,36 @@ static inline bool compareZIndex(RenderLayer* first, RenderLayer* second)
     return first->zIndex() < second->zIndex();
 }
 
+void RenderLayer::dirtyNormalFlowListCanBePromotedToStackingContainer()
+{
+    m_canBePromotedToStackingContainerDirty = true;
+
+    if (m_normalFlowListDirty || !normalFlowList())
+        return;
+
+    for (size_t index = 0; index < normalFlowList()->size(); ++index)
+        normalFlowList()->at(index)->dirtyNormalFlowListCanBePromotedToStackingContainer();
+}
+
+void RenderLayer::dirtySiblingStackingContextCanBePromotedToStackingContainer()
+{
+    RenderLayer* ancestorStackingContext = this->ancestorStackingContext();
+    if (!ancestorStackingContext)
+        return;
+
+    if (!ancestorStackingContext->m_zOrderListsDirty && ancestorStackingContext->posZOrderList()) {
+        for (size_t index = 0; index < ancestorStackingContext->posZOrderList()->size(); ++index)
+            ancestorStackingContext->posZOrderList()->at(index)->m_canBePromotedToStackingContainerDirty = true;
+    }
+
+    ancestorStackingContext->dirtyNormalFlowListCanBePromotedToStackingContainer();
+
+    if (!ancestorStackingContext->m_zOrderListsDirty && ancestorStackingContext->negZOrderList()) {
+        for (size_t index = 0; index < ancestorStackingContext->negZOrderList()->size(); ++index)
+            ancestorStackingContext->negZOrderList()->at(index)->m_canBePromotedToStackingContainerDirty = true;
+    }
+}
+
 void RenderLayer::dirtyZOrderLists()
 {
     ASSERT(m_layerListMutationAllowed);
@@ -5541,6 +5571,12 @@ void RenderLayer::dirtyZOrderLists()
 
 void RenderLayer::dirtyStackingContainerZOrderLists()
 {
+    // Any siblings in the ancestor stacking context could also be affected.
+    // Changing z-index, for example, could cause us to stack in between a
+    // sibling's descendants, meaning that we have to recompute
+    // m_canBePromotedToStackingContainer for that sibling.
+    dirtySiblingStackingContextCanBePromotedToStackingContainer();
+
     RenderLayer* stackingContainer = this->ancestorStackingContainer();
     if (stackingContainer)
         stackingContainer->dirtyZOrderLists();
@@ -6038,16 +6074,6 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
 {
     updateIsNormalFlowOnly();
 
-    if (renderer()->isHTMLMarquee() && renderer()->style()->marqueeBehavior() != MNONE && renderer()->isBox()) {
-        if (!m_marquee)
-            m_marquee = adoptPtr(new RenderMarquee(this));
-        UseCounter::count(renderer()->document(), UseCounter::HTMLMarqueeElement);
-        m_marquee->updateMarqueeStyle();
-    }
-    else if (m_marquee) {
-        m_marquee.clear();
-    }
-
     updateResizerAreaSet();
     updateScrollbarsAfterStyleChange(oldStyle);
     updateStackingContextsAfterStyleChange(oldStyle);
@@ -6349,7 +6375,6 @@ void RenderLayer::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_negZOrderList, "negZOrderList");
     info.addMember(m_normalFlowList, "normalFlowList");
     info.addMember(m_clipRectsCache, "clipRectsCache");
-    info.addMember(m_marquee, "marquee");
     info.addMember(m_transform, "transform");
     info.addWeakPointer(m_reflection);
     info.addWeakPointer(m_scrollCorner);

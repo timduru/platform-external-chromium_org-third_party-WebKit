@@ -46,7 +46,6 @@
 #include "HTMLNames.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
-#include "core/platform/KURL.h"
 
 using namespace WebCore;
 
@@ -73,7 +72,7 @@ void findPasswordFormFields(HTMLFormElement* form, PasswordFormFields* fields)
         if (!formElement->hasTagName(HTMLNames::inputTag))
             continue;
 
-        HTMLInputElement* inputElement = formElement->toInputElement();
+        HTMLInputElement* inputElement = toHTMLInputElement(formElement);
         if (inputElement->isDisabledFormControl())
             continue;
 

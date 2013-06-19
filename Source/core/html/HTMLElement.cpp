@@ -325,9 +325,7 @@ static void mergeWithNextTextNode(PassRefPtr<Node> node, ExceptionCode& ec)
     
     RefPtr<Text> textNode = toText(node.get());
     RefPtr<Text> textNext = toText(next);
-    textNode->appendData(textNext->data(), ec);
-    if (ec)
-        return;
+    textNode->appendData(textNext->data());
     if (textNext->parentNode()) // Might have been removed by mutation event.
         textNext->remove(ec);
 }
@@ -602,6 +600,11 @@ bool HTMLElement::hasCustomFocusLogic() const
 
 bool HTMLElement::supportsFocus() const
 {
+    // FIXME: supportsFocus() can be called when layout is not up to date.
+    // Logic that deals with the renderer should be moved to rendererIsFocusable().
+    // But supportsFocus must return true when the element is editable, or else
+    // it won't be focusable. Furthermore, supportsFocus cannot just return true
+    // always or else tabIndex() will change for all HTML elements.
     return Element::supportsFocus() || (rendererIsEditable() && parentNode() && !parentNode()->rendererIsEditable());
 }
 

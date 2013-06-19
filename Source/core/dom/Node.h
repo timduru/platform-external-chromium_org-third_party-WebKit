@@ -33,10 +33,10 @@
 #include "core/editing/EditingBoundary.h"
 #include "core/inspector/InspectorCounters.h"
 #include "core/page/FocusDirection.h"
-#include "core/platform/KURLHash.h"
 #include "core/platform/TreeShared.h"
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/rendering/style/RenderStyleConstants.h"
+#include "weborigin/KURLHash.h"
 #include <wtf/Forward.h>
 #include <wtf/ListHashSet.h>
 #include <wtf/text/AtomicString.h>
@@ -263,18 +263,12 @@ public:
     virtual bool isCharacterDataNode() const { return false; }
     virtual bool isFrameOwnerElement() const { return false; }
     virtual bool isPluginElement() const { return false; }
-    virtual bool isInsertionPointNode() const { return false; }
 
     bool isDocumentNode() const;
     bool isTreeScope() const { return treeScope()->rootNode() == this; }
     bool isDocumentFragment() const { return getFlag(IsDocumentFragmentFlag); }
     bool isShadowRoot() const { return isDocumentFragment() && isTreeScope(); }
-    bool isInsertionPoint() const { return getFlag(NeedsShadowTreeWalkerFlag) && isInsertionPointNode(); }
-
-    bool needsShadowTreeWalker() const;
-    bool needsShadowTreeWalkerSlow() const;
-    void setNeedsShadowTreeWalker() { setFlag(NeedsShadowTreeWalkerFlag); }
-    void resetNeedsShadowTreeWalker() { setFlag(needsShadowTreeWalkerSlow(), NeedsShadowTreeWalkerFlag); }
+    bool isInsertionPoint() const { return getFlag(IsInsertionPointFlag); }
 
     bool inNamedFlow() const { return getFlag(InNamedFlowFlag); }
     bool hasCustomStyleCallbacks() const { return getFlag(HasCustomStyleCallbacksFlag); }
@@ -413,11 +407,13 @@ public:
 
     virtual short tabIndex() const;
 
-    // Whether this kind of node can receive focus by default. Most nodes are
-    // not focusable but some elements, such as form controls and links, are.
+    // Whether this node can receive focus at all. Most nodes are not focusable
+    // but some elements, such as form controls and links, are. Unlike
+    // rendererIsFocusable(), this method may be called when layout is not up to
+    // date, so it must not use the renderer to determine focusability.
     virtual bool supportsFocus() const;
     // Whether the node can actually be focused.
-    virtual bool isFocusable() const;
+    bool isFocusable() const;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
     virtual Node* focusDelegate();
@@ -534,20 +530,27 @@ public:
     RenderBox* renderBox() const;
     RenderBoxModelObject* renderBoxModelObject() const;
 
+    struct AttachContext {
+        RenderStyle* resolvedStyle;
+        bool performingReattach;
+
+        AttachContext() : resolvedStyle(0), performingReattach(false) { }
+    };
+
     // Attaches this node to the rendering tree. This calculates the style to be applied to the node and creates an
     // appropriate RenderObject which will be inserted into the tree (except when the style has display: none). This
     // makes the node visible in the FrameView.
-    virtual void attach();
+    virtual void attach(const AttachContext& = AttachContext());
 
     // Detaches the node from the rendering tree, making it invisible in the rendered view. This method will remove
     // the node's rendering object from the rendering tree and delete it.
-    virtual void detach();
+    virtual void detach(const AttachContext& = AttachContext());
 
 #ifndef NDEBUG
     bool inDetach() const;
 #endif
 
-    void reattach();
+    void reattach(const AttachContext& = AttachContext());
     void lazyReattachIfAttached();
     ContainerNode* parentNodeForRenderingAndStyle();
     
@@ -626,8 +629,6 @@ public:
     unsigned short compareDocumentPositionInternal(const Node*, ShadowTreesTreatment) const;
 
     virtual Node* toNode();
-    // Obsolete. Use toHTMLInputElement.
-    virtual HTMLInputElement* toInputElement();
 
     virtual const AtomicString& interfaceName() const;
     virtual ScriptExecutionContext* scriptExecutionContext() const;
@@ -730,7 +731,7 @@ private:
         HasScopedHTMLStyleChildFlag = 1 << 22,
         HasEventTargetDataFlag = 1 << 23,
         V8CollectableDuringMinorGCFlag = 1 << 24,
-        NeedsShadowTreeWalkerFlag = 1 << 25,
+        IsInsertionPointFlag = 1 << 25,
         IsInShadowTreeFlag = 1 << 26,
         IsCustomElement = 1 << 27,
 
@@ -750,14 +751,14 @@ protected:
         CreateText = DefaultNodeFlags | IsTextFlag,
         CreateContainer = DefaultNodeFlags | IsContainerFlag, 
         CreateElement = CreateContainer | IsElementFlag, 
-        CreatePseudoElement =  CreateElement | InDocumentFlag | NeedsShadowTreeWalkerFlag,
-        CreateShadowRoot = CreateContainer | IsDocumentFragmentFlag | NeedsShadowTreeWalkerFlag | IsInShadowTreeFlag,
+        CreatePseudoElement =  CreateElement | InDocumentFlag,
+        CreateShadowRoot = CreateContainer | IsDocumentFragmentFlag | IsInShadowTreeFlag,
         CreateDocumentFragment = CreateContainer | IsDocumentFragmentFlag,
         CreateStyledElement = CreateElement | IsStyledElementFlag, 
         CreateHTMLElement = CreateStyledElement | IsHTMLFlag,
         CreateSVGElement = CreateStyledElement | IsSVGFlag,
         CreateDocument = CreateContainer | InDocumentFlag,
-        CreateInsertionPoint = CreateHTMLElement | NeedsShadowTreeWalkerFlag,
+        CreateInsertionPoint = CreateHTMLElement | IsInsertionPointFlag,
         CreateEditingText = CreateText | HasNameOrIsEditingTextFlag,
     };
 
@@ -795,6 +796,13 @@ protected:
 
     Document* documentInternal() const { return treeScope()->documentScope(); }
     void setTreeScope(TreeScope* scope) { m_treeScope = scope; }
+
+    // Subclasses may override this method to affect focusability. Unlike
+    // supportsFocus, this method must be called on an up-to-date layout, so it
+    // may use the renderer to reason about focusability. This method cannot be
+    // moved to RenderObject because some focusable nodes don't have renderers,
+    // e.g., HTMLOptionElement.
+    virtual bool rendererIsFocusable() const { return false; }
 
 private:
     friend class TreeShared<Node>;
@@ -888,11 +896,14 @@ inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
     return parentOrShadowHostNode();
 }
 
-inline void Node::reattach()
+inline void Node::reattach(const AttachContext& context)
 {
+    AttachContext reattachContext(context);
+    reattachContext.performingReattach = true;
+
     if (attached())
-        detach();
-    attach();
+        detach(reattachContext);
+    attach(reattachContext);
 }
 
 inline void Node::lazyReattachIfAttached()

@@ -1486,6 +1486,16 @@ void RenderBlock::computeExclusionShapeSize()
     }
 }
 
+void RenderBlock::updateRegionsAndExclusionsAfterChildLayout(RenderFlowThread* flowThread, bool heightChanged)
+{
+    // A previous sibling has changed dimension, so we need to relayout the shape with the content
+    ExclusionShapeInsideInfo* shapeInsideInfo = layoutExclusionShapeInsideInfo();
+    if (heightChanged && shapeInsideInfo)
+        shapeInsideInfo->dirtyShapeSize();
+
+    computeRegionRangeForBlock(flowThread);
+}
+
 void RenderBlock::computeRegionRangeForBlock(RenderFlowThread* flowThread)
 {
     if (flowThread)
@@ -1634,12 +1644,13 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
         }
     }
 
-    if (previousHeight != newHeight)
+    bool heightChanged = (previousHeight != newHeight);
+    if (heightChanged)
         relayoutChildren = true;
 
     layoutPositionedObjects(relayoutChildren || isRoot());
 
-    computeRegionRangeForBlock(flowThread);
+    updateRegionsAndExclusionsAfterChildLayout(flowThread, heightChanged);
 
     // Add overflow from children (unless we're multi-column, since in that case all our child overflow is clipped anyway).
     computeOverflow(oldClientAfterEdge);
@@ -5765,7 +5776,7 @@ void RenderBlock::computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, Lay
     if (!style()->autoWrap() && childrenInline()) {
         minLogicalWidth = maxLogicalWidth;
         // A horizontal marquee with inline children has no minimum width.
-        if (layer() && layer()->marquee() && layer()->marquee()->isHorizontal())
+        if (isMarquee() && toRenderMarquee(this)->isHorizontal())
             minLogicalWidth = 0;
     }
 
@@ -6388,7 +6399,7 @@ int RenderBlock::baselinePosition(FontBaseline baselineType, bool firstLine, Lin
         // We also give up on finding a baseline if we have a vertical scrollbar, or if we are scrolled
         // vertically (e.g., an overflow:hidden block that has had scrollTop moved) or if the baseline is outside
         // of our content box.
-        bool ignoreBaseline = (layer() && (layer()->marquee() || (direction == HorizontalLine ? (layer()->verticalScrollbar() || layer()->scrollYOffset() != 0)
+        bool ignoreBaseline = (layer() && (isMarquee() || (direction == HorizontalLine ? (layer()->verticalScrollbar() || layer()->scrollYOffset())
             : (layer()->horizontalScrollbar() || layer()->scrollXOffset() != 0)))) || (isWritingModeRoot() && !isRubyRun());
         
         int baselinePos = ignoreBaseline ? -1 : inlineBlockBaseline(direction);
@@ -7239,7 +7250,7 @@ bool RenderBlock::hasNextPage(LayoutUnit logicalOffset, PageBoundaryRule pageBou
     if (!region)
         return false;
     if (region->isLastRegion())
-        return region->isRenderRegionSet() || region->style()->regionOverflow() == BreakRegionOverflow
+        return region->isRenderRegionSet() || region->style()->regionFragment() == BreakRegionFragment
             || (pageBoundaryRule == IncludePageBoundary && pageOffset == region->logicalTopForFlowThreadContent());
     return true;
 }

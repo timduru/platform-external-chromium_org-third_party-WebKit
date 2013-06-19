@@ -1359,7 +1359,7 @@ void RenderBox::paintFillLayers(const PaintInfo& paintInfo, const Color& c, cons
             shouldDrawBackgroundInSeparateBuffer = true;
 
         // The clipOccludesNextLayers condition must be evaluated first to avoid short-circuiting.
-        if (curLayer->clipOccludesNextLayers(curLayer == fillLayer) && curLayer->hasOpaqueImage(this) && curLayer->image()->canRender(this, style()->effectiveZoom()) && curLayer->hasRepeatXY())
+        if (curLayer->clipOccludesNextLayers(curLayer == fillLayer) && curLayer->hasOpaqueImage(this) && curLayer->image()->canRender(this, style()->effectiveZoom()) && curLayer->hasRepeatXY() && curLayer->blendMode() == BlendModeNormal)
             break;
         curLayer = curLayer->next();
     }
@@ -1709,55 +1709,8 @@ void RenderBox::mapLocalToContainer(const RenderLayerModelObject* repaintContain
     }
 
     mode &= ~ApplyContainerFlip;
-    if (o->isRenderFlowThread()) {
-        // Transform from render flow coordinates into region coordinates.
-        RenderRegion* region = toRenderFlowThread(o)->mapFromFlowToRegion(transformState);
-        if (region)
-            region->mapLocalToContainer(region->containerForRepaint(), transformState, mode, wasFixed);
-        return;
-    }
 
     o->mapLocalToContainer(repaintContainer, transformState, mode, wasFixed);
-}
-
-const RenderObject* RenderBox::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
-{
-    ASSERT(ancestorToStopAt != this);
-
-    bool ancestorSkipped;
-    RenderObject* container = this->container(ancestorToStopAt, &ancestorSkipped);
-    if (!container)
-        return 0;
-
-    bool isFixedPos = style()->position() == FixedPosition;
-    bool hasTransform = hasLayer() && layer()->transform();
-
-    LayoutSize adjustmentForSkippedAncestor;
-    if (ancestorSkipped) {
-        // There can't be a transform between repaintContainer and o, because transforms create containers, so it should be safe
-        // to just subtract the delta between the ancestor and o.
-        adjustmentForSkippedAncestor = -ancestorToStopAt->offsetFromAncestorContainer(container);
-    }
-
-    bool offsetDependsOnPoint = false;
-    LayoutSize containerOffset = offsetFromContainer(container, LayoutPoint(), &offsetDependsOnPoint);
-
-    if (container->isRenderFlowThread())
-        offsetDependsOnPoint = true;
-    
-    bool preserve3D = container->style()->preserves3D() || style()->preserves3D();
-    if (shouldUseTransformFromContainer(container)) {
-        TransformationMatrix t;
-        getTransformFromContainer(container, containerOffset, t);
-        t.translateRight(adjustmentForSkippedAncestor.width(), adjustmentForSkippedAncestor.height());
-        
-        geometryMap.push(this, t, preserve3D, offsetDependsOnPoint, isFixedPos, hasTransform);
-    } else {
-        containerOffset += adjustmentForSkippedAncestor;
-        geometryMap.push(this, containerOffset, preserve3D, offsetDependsOnPoint, isFixedPos, hasTransform);
-    }
-    
-    return ancestorSkipped ? ancestorToStopAt : container;
 }
 
 void RenderBox::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
@@ -1811,6 +1764,9 @@ LayoutSize RenderBox::offsetFromContainer(RenderObject* o, const LayoutPoint& po
 
     if (style()->position() == AbsolutePosition && o->isInFlowPositioned() && o->isRenderInline())
         offset += toRenderInline(o)->offsetForInFlowPositionedInline(this);
+
+    if (offsetDependsOnPoint)
+        *offsetDependsOnPoint |= o->isRenderFlowThread();
 
     return offset;
 }
@@ -2207,7 +2163,7 @@ bool RenderBox::sizesLogicalWidthToFitContent(SizeType widthType) const
 {
     // Marquees in WinIE are like a mixture of blocks and inline-blocks.  They size as though they're blocks,
     // but they allow text to sit on the same line as the marquee.
-    if (isFloating() || (isInlineBlockOrInlineTable() && !isHTMLMarquee()))
+    if (isFloating() || (isInlineBlockOrInlineTable() && !isMarquee()))
         return true;
 
     // This code may look a bit strange.  Basically width:intrinsic should clamp the size when testing both
@@ -2221,7 +2177,7 @@ bool RenderBox::sizesLogicalWidthToFitContent(SizeType widthType) const
     // FIXME: Think about block-flow here.  Need to find out how marquee direction relates to
     // block-flow (as well as how marquee overflow should relate to block flow).
     // https://bugs.webkit.org/show_bug.cgi?id=46472
-    if (parent()->isHTMLMarquee()) {
+    if (parent()->isMarquee()) {
         EMarqueeDirection dir = parent()->style()->marqueeDirection();
         if (dir == MAUTO || dir == MFORWARD || dir == MBACKWARD || dir == MLEFT || dir == MRIGHT)
             return true;
@@ -4087,7 +4043,7 @@ VisiblePosition RenderBox::positionForPoint(const LayoutPoint& point)
 bool RenderBox::shrinkToAvoidFloats() const
 {
     // Floating objects don't shrink.  Objects that don't avoid floats don't shrink.  Marquees don't shrink.
-    if ((isInline() && !isHTMLMarquee()) || !avoidsFloats() || isFloating())
+    if ((isInline() && !isMarquee()) || !avoidsFloats() || isFloating())
         return false;
     
     // Only auto width objects can possibly shrink to avoid floats.

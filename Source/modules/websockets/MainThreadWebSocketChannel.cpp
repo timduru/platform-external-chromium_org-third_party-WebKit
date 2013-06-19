@@ -148,12 +148,9 @@ WebSocketChannel::SendResult MainThreadWebSocketChannel::send(const String& mess
     CString utf8 = message.utf8(String::StrictConversionReplacingUnpairedSurrogatesWithFFFD);
     enqueueTextFrame(utf8);
     processOutgoingFrameQueue();
-    // According to WebSocket API specification, WebSocket.send() should return void instead
-    // of boolean. However, our implementation still returns boolean due to compatibility
-    // concern (see bug 65850).
     // m_channel->send() may happen later, thus it's not always possible to know whether
     // the message has been sent to the socket successfully. In this case, we have no choice
-    // but to return true.
+    // but to return SendSuccess.
     return WebSocketChannel::SendSuccess;
 }
 
@@ -196,7 +193,7 @@ void MainThreadWebSocketChannel::close(int code, const String& reason)
     if (!m_handle)
         return;
     startClosingHandshake(code, reason);
-    if ((m_state == ChannelClosing || m_state == ChannelClosed) && !m_closingTimer.isActive())
+    if (!m_closingTimer.isActive())
         m_closingTimer.startOneShot(2 * TCPMaximumSegmentLifetime);
 }
 
@@ -476,7 +473,7 @@ void MainThreadWebSocketChannel::resumeTimerFired(Timer<MainThreadWebSocketChann
 
 void MainThreadWebSocketChannel::startClosingHandshake(int code, const String& reason)
 {
-    LOG(Network, "MainThreadWebSocketChannel %p startClosingHandshake() code=%d m_receivedClosingHandshake=%d", this, (m_state == ChannelClosing), m_receivedClosingHandshake);
+    LOG(Network, "MainThreadWebSocketChannel %p startClosingHandshake() code=%d m_state=%d m_receivedClosingHandshake=%d", this, code, m_state, m_receivedClosingHandshake);
     if (m_state == ChannelClosing || m_state == ChannelClosed)
         return;
     ASSERT(m_handle);
@@ -665,10 +662,8 @@ bool MainThreadWebSocketChannel::processFrame()
         skipBuffer(frameEnd - m_buffer.data());
         m_receivedClosingHandshake = true;
         startClosingHandshake(m_closeEventCode, m_closeEventReason);
-        if (m_state == ChannelClosing || m_state == ChannelClosed) {
-            m_outgoingFrameQueueStatus = OutgoingFrameQueueClosing;
-            processOutgoingFrameQueue();
-        }
+        m_outgoingFrameQueueStatus = OutgoingFrameQueueClosing;
+        processOutgoingFrameQueue();
         break;
 
     case WebSocketFrame::OpCodePing:

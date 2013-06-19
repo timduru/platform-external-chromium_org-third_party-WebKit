@@ -32,10 +32,10 @@ using namespace std;
 
 namespace WebCore {
 
-RenderTextControl::RenderTextControl(Element* element)
+RenderTextControl::RenderTextControl(HTMLTextFormControlElement* element)
     : RenderBlock(element)
 {
-    ASSERT(isHTMLTextFormControlElement(element));
+    ASSERT(element);
 }
 
 RenderTextControl::~RenderTextControl()
@@ -70,31 +70,19 @@ void RenderTextControl::styleDidChange(StyleDifference diff, const RenderStyle* 
     textFormControlElement()->updatePlaceholderVisibility(false);
 }
 
-static inline bool updateUserModifyProperty(Node* node, RenderStyle* style)
+static inline void updateUserModifyProperty(HTMLTextFormControlElement* node, RenderStyle* style)
 {
-    bool isDisabled = false;
-    bool isReadOnlyControl = false;
-
-    if (node->isElementNode()) {
-        Element* element = toElement(node);
-        isDisabled = element->isDisabledFormControl();
-        isReadOnlyControl = element->isTextFormControl() && toHTMLTextFormControlElement(element)->isReadOnly();
-    }
-
-    style->setUserModify((isReadOnlyControl || isDisabled) ? READ_ONLY : READ_WRITE_PLAINTEXT_ONLY);
-    return isDisabled;
+    style->setUserModify(node->isDisabledOrReadOnly() ? READ_ONLY : READ_WRITE_PLAINTEXT_ONLY);
 }
 
-void RenderTextControl::adjustInnerTextStyle(const RenderStyle* startStyle, RenderStyle* textBlockStyle) const
+void RenderTextControl::adjustInnerTextStyle(RenderStyle* textBlockStyle) const
 {
     // The inner block, if present, always has its direction set to LTR,
     // so we need to inherit the direction and unicode-bidi style from the element.
     textBlockStyle->setDirection(style()->direction());
     textBlockStyle->setUnicodeBidi(style()->unicodeBidi());
 
-    bool disabled = updateUserModifyProperty(node(), textBlockStyle);
-    if (disabled)
-        textBlockStyle->setColor(theme()->disabledTextColor(textBlockStyle->visitedDependentColor(CSSPropertyColor), startStyle->visitedDependentColor(CSSPropertyBackgroundColor)));
+    updateUserModifyProperty(textFormControlElement(), textBlockStyle);
 }
 
 int RenderTextControl::textBlockLogicalHeight() const
@@ -118,7 +106,7 @@ void RenderTextControl::updateFromElement()
 {
     Element* innerText = innerTextElement();
     if (innerText && innerText->renderer())
-        updateUserModifyProperty(node(), innerText->renderer()->style());
+        updateUserModifyProperty(textFormControlElement(), innerText->renderer()->style());
 }
 
 int RenderTextControl::scrollbarThickness() const

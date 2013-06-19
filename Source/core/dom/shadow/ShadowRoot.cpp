@@ -98,6 +98,15 @@ void ShadowRoot::dispose()
     removeDetachedChildren();
 }
 
+ShadowRoot* ShadowRoot::bindingsOlderShadowRoot() const
+{
+    ShadowRoot* older = olderShadowRoot();
+    while (older && !older->shouldExposeToBindings())
+        older = older->olderShadowRoot();
+    ASSERT(!older || older->shouldExposeToBindings());
+    return older;
+}
+
 PassRefPtr<Node> ShadowRoot::cloneNode(bool, ExceptionCode& ec)
 {
     ec = DATA_CLONE_ERR;
@@ -139,16 +148,24 @@ void ShadowRoot::recalcStyle(StyleChange change)
     // ShadowRoot doesn't support custom callbacks.
     ASSERT(!hasCustomStyleCallbacks());
 
+    StyleResolver* styleResolver = document()->styleResolver();
+    styleResolver->pushParentShadowRoot(this);
+
+    if (!attached()) {
+        attach();
+        // attach recalculates the style for all children. No need to do it twice.
+        clearNeedsStyleRecalc();
+        clearChildNeedsStyleRecalc();
+        return;
+    }
+
     // When we're set to lazyAttach we'll have a FullStyleChange and we'll need
     // to promote the change to a Force for all our descendants so they get a
     // recalc and will attach.
     if (styleChangeType() == FullStyleChange)
         change = Force;
 
-    StyleResolver* styleResolver = document()->styleResolver();
-    styleResolver->pushParentShadowRoot(this);
-
-    for (Node* child = lastChild(); child; child = child->previousSibling()) {
+    for (Node* child = firstChild(); child; child = child->nextSibling()) {
         if (child->isElementNode())
             toElement(child)->recalcStyle(change);
         else if (child->isTextNode())
@@ -198,11 +215,11 @@ void ShadowRoot::setResetStyleInheritance(bool value)
     setNeedsStyleRecalc();
 }
 
-void ShadowRoot::attach()
+void ShadowRoot::attach(const AttachContext& context)
 {
     StyleResolver* styleResolver = document()->styleResolver();
     styleResolver->pushParentShadowRoot(this);
-    DocumentFragment::attach();
+    DocumentFragment::attach(context);
     styleResolver->popParentShadowRoot(this);
 }
 
