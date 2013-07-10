@@ -204,7 +204,7 @@ void PageSerializer::serializeFrame(Frame* frame)
         return;
     }
     String text = accumulator.serializeNodes(document->documentElement(), IncludeNode);
-    CString frameHTML = textEncoding.encode(text.characters(), text.length(), WTF::EntitiesForUnencodables);
+    CString frameHTML = textEncoding.encode(text, WTF::EntitiesForUnencodables);
     m_resources->append(SerializedResource(url, document->suggestedMIMEType(), SharedBuffer::create(frameHTML.data(), frameHTML.length())));
     m_resourceURLs.add(url);
 
@@ -216,7 +216,7 @@ void PageSerializer::serializeFrame(Frame* frame)
         Element* element = toElement(node);
         // We have to process in-line style as it might contain some resources (typically background images).
         if (element->isStyledElement())
-            retrieveResourcesForProperties(static_cast<StyledElement*>(element)->inlineStyle(), document);
+            retrieveResourcesForProperties(element->inlineStyle(), document);
 
         if (element->hasTagName(HTMLNames::imgTag)) {
             HTMLImageElement* imageElement = toHTMLImageElement(element);
@@ -231,7 +231,7 @@ void PageSerializer::serializeFrame(Frame* frame)
                 ASSERT(m_resourceURLs.contains(url));
             }
         } else if (element->hasTagName(HTMLNames::styleTag)) {
-            HTMLStyleElement* styleElement = static_cast<HTMLStyleElement*>(element);
+            HTMLStyleElement* styleElement = toHTMLStyleElement(element);
             if (CSSStyleSheet* sheet = styleElement->sheet())
                 serializeCSSStyleSheet(sheet, KURL());
         }
@@ -272,7 +272,7 @@ void PageSerializer::serializeCSSStyleSheet(CSSStyleSheet* styleSheet, const KUR
         WTF::TextEncoding textEncoding(styleSheet->contents()->charset());
         ASSERT(textEncoding.isValid());
         String textString = cssText.toString();
-        CString text = textEncoding.encode(textString.characters(), textString.length(), WTF::EntitiesForUnencodables);
+        CString text = textEncoding.encode(textString, WTF::EntitiesForUnencodables);
         m_resources->append(SerializedResource(url, String("text/css"), SharedBuffer::create(text.data(), text.length())));
         m_resourceURLs.add(url);
     }

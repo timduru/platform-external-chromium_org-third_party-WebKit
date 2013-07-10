@@ -82,15 +82,10 @@ public:
 
     void clearObjectStyleInRegion(const RenderObject*);
 
-    enum RegionState {
-        RegionUndefined,
-        RegionEmpty,
-        RegionFit,
-        RegionOverset
-    };
+    RegionOversetState regionOversetState() const;
+    void setRegionOversetState(RegionOversetState);
 
-    RegionState regionState() const { return isValid() ? m_regionState : RegionUndefined; }
-    void setRegionState(RegionState regionState) { m_regionState = regionState; }
+    Element* element() const;
     
     // These methods represent the width and height of a "page" and for a RenderRegion they are just the
     // content width and content height of a region. For RenderRegionSets, however, they will be the width and
@@ -197,7 +192,6 @@ private:
     bool m_isValid : 1;
     bool m_hasCustomRegionStyle : 1;
     bool m_hasAutoLogicalHeight : 1;
-    RegionState m_regionState;
 };
 
 inline RenderRegion* toRenderRegion(RenderObject* object)

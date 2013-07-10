@@ -60,6 +60,7 @@ public:
     virtual void setAcceleratedCompositingFor3DTransformsEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForAnimationEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForCanvasEnabled(bool) = 0;
+    virtual void setAcceleratedCompositingForFiltersEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForFixedPositionEnabled(bool)  = 0;
     virtual void setAcceleratedCompositingForOverflowScrollEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForTransitionEnabled(bool)  = 0;
@@ -103,7 +104,6 @@ public:
     virtual void setCSSStickyPositionEnabled(bool) = 0;
     virtual void setExperimentalWebGLEnabled(bool) = 0;
     virtual void setExperimentalWebSocketEnabled(bool) = 0;
-    virtual void setPinchVirtualViewportEnabled(bool) = 0;
     virtual void setFantasyFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setFixedFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setFixedPositionCreatesStackingContext(bool) = 0;
@@ -134,6 +134,8 @@ public:
     virtual void setPasswordEchoEnabled(bool) = 0;
     virtual void setPerTilePaintingEnabled(bool) = 0;
     virtual void setPictographFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
+    virtual void setPinchOverlayScrollbarThickness(int) = 0;
+    virtual void setPinchVirtualViewportEnabled(bool) = 0;
     virtual void setPluginsEnabled(bool) = 0;
     virtual void setPrivilegedWebGLExtensionsEnabled(bool) = 0;
     virtual void setRenderVSyncNotificationEnabled(bool) = 0;
@@ -148,6 +150,13 @@ public:
     virtual void setShowPaintRects(bool) = 0;
     virtual void setShrinksStandaloneImagesToFit(bool) = 0;
     virtual void setSmartInsertDeleteEnabled(bool) = 0;
+    // Spatial navigation feature, when enabled, improves the experience
+    // of keyboard-controlling the web pages which originally were not designed
+    // for keyboard navigation. It allows to use arrow keys to move focus between
+    // the adjacent HTML elements. As a side effect, it extends the criteria for
+    // elements to be focusable to include any element which has click or keyboard
+    // event handlers specified. User can also trigger click handlers for such
+    // elements using SPACE or ENTER keys.
     virtual void setSpatialNavigationEnabled(bool) = 0;
     virtual void setStandardFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setSupportDeprecatedTargetDensityDPI(bool) = 0;

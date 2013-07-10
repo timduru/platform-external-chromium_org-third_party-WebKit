@@ -67,12 +67,11 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGUseElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(height)
     REGISTER_LOCAL_ANIMATED_PROPERTY(href)
     REGISTER_LOCAL_ANIMATED_PROPERTY(externalResourcesRequired)
-    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGStyledTransformableElement)
-    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTests)
+    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGGraphicsElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
 inline SVGUseElement::SVGUseElement(const QualifiedName& tagName, Document* document, bool wasInsertedByParser)
-    : SVGStyledTransformableElement(tagName, document)
+    : SVGGraphicsElement(tagName, document)
     , m_x(LengthModeWidth)
     , m_y(LengthModeHeight)
     , m_width(LengthModeWidth)
@@ -125,7 +124,6 @@ bool SVGUseElement::isSupportedAttribute(const QualifiedName& attrName)
 {
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty()) {
-        SVGTests::addSupportedAttributes(supportedAttributes);
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         SVGURIReference::addSupportedAttributes(supportedAttributes);
@@ -134,7 +132,7 @@ bool SVGUseElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::widthAttr);
         supportedAttributes.add(SVGNames::heightAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGUseElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -142,7 +140,7 @@ void SVGUseElement::parseAttribute(const QualifiedName& name, const AtomicString
     SVGParsingError parseError = NoError;
 
     if (!isSupportedAttribute(name))
-        SVGStyledTransformableElement::parseAttribute(name, value);
+        SVGGraphicsElement::parseAttribute(name, value);
     else if (name == SVGNames::xAttr)
         setXBaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::yAttr)
@@ -151,8 +149,7 @@ void SVGUseElement::parseAttribute(const QualifiedName& name, const AtomicString
         setWidthBaseValue(SVGLength::construct(LengthModeWidth, value, parseError, ForbidNegativeLengths));
     else if (name == SVGNames::heightAttr)
         setHeightBaseValue(SVGLength::construct(LengthModeHeight, value, parseError, ForbidNegativeLengths));
-    else if (SVGTests::parseAttribute(name, value)
-             || SVGLangSpace::parseAttribute(name, value)
+    else if (SVGLangSpace::parseAttribute(name, value)
              || SVGExternalResourcesRequired::parseAttribute(name, value)
              || SVGURIReference::parseAttribute(name, value)) {
     } else
@@ -171,7 +168,7 @@ static inline bool isWellFormedDocument(Document* document)
 Node::InsertionNotificationRequest SVGUseElement::insertedInto(ContainerNode* rootParent)
 {
     // This functions exists to assure assumptions made in the code regarding SVGElementInstance creation/destruction are satisfied.
-    SVGStyledTransformableElement::insertedInto(rootParent);
+    SVGGraphicsElement::insertedInto(rootParent);
     if (!rootParent->inDocument())
         return InsertionDone;
     ASSERT(!m_targetElementInstance || !isWellFormedDocument(document()));
@@ -184,7 +181,7 @@ Node::InsertionNotificationRequest SVGUseElement::insertedInto(ContainerNode* ro
 
 void SVGUseElement::removedFrom(ContainerNode* rootParent)
 {
-    SVGStyledTransformableElement::removedFrom(rootParent);
+    SVGGraphicsElement::removedFrom(rootParent);
     if (rootParent->inDocument())
         clearResourceReferences();
 }
@@ -211,7 +208,7 @@ Document* SVGUseElement::externalDocument() const
 void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
 {
     if (!isSupportedAttribute(attrName)) {
-        SVGStyledTransformableElement::svgAttributeChanged(attrName);
+        SVGGraphicsElement::svgAttributeChanged(attrName);
         return;
     }
 
@@ -227,9 +224,6 @@ void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
             RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
         return;
     }
-
-    if (SVGTests::handleAttributeChange(this, attrName))
-        return;
 
     if (SVGExternalResourcesRequired::handleAttributeChange(this, attrName))
         return;
@@ -362,7 +356,7 @@ static bool isDisallowedElement(Node* node)
         allowedElementTags.add(SVGNames::tspanTag);
         allowedElementTags.add(SVGNames::useTag);
     }
-    return !allowedElementTags.contains<QualifiedName, SVGAttributeHashTranslator>(element->tagQName());
+    return !allowedElementTags.contains<SVGAttributeHashTranslator>(element->tagQName());
 }
 
 static bool subtreeContainsDisallowedElement(Node* start)
@@ -525,9 +519,9 @@ void SVGUseElement::buildShadowAndInstanceTree(SVGElement* target)
 #endif
 }
 
-RenderObject* SVGUseElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGUseElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGTransformableContainer(this);
+    return new (document()->renderArena()) RenderSVGTransformableContainer(this);
 }
 
 static bool isDirectReference(const Node* node)
@@ -549,12 +543,12 @@ void SVGUseElement::toClipPath(Path& path)
     if (!n)
         return;
 
-    if (n->isSVGElement() && toSVGElement(n)->isStyledTransformable()) {
+    if (n->isSVGElement() && toSVGElement(n)->isSVGGraphicsElement()) {
         if (!isDirectReference(n))
             // Spec: Indirect references are an error (14.3.5)
             document()->accessSVGExtensions()->reportError("Not allowed to use indirect reference in <clip-path>");
         else {
-            toSVGStyledTransformableElement(n)->toClipPath(path);
+            toSVGGraphicsElement(n)->toClipPath(path);
             // FIXME: Avoid manual resolution of x/y here. Its potentially harmful.
             SVGLengthContext lengthContext(this);
             path.translate(FloatSize(x().value(lengthContext), y().value(lengthContext)));
@@ -974,7 +968,7 @@ bool SVGUseElement::instanceTreeIsLoading(SVGElementInstance* targetElementInsta
 
 void SVGUseElement::finishParsingChildren()
 {
-    SVGStyledTransformableElement::finishParsingChildren();
+    SVGGraphicsElement::finishParsingChildren();
     SVGExternalResourcesRequired::finishParsingChildren();
     if (m_wasInsertedByParser) {
         buildPendingResource();

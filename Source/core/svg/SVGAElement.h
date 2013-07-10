@@ -24,17 +24,13 @@
 
 #include "core/svg/SVGAnimatedBoolean.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
-#include "core/svg/SVGLangSpace.h"
-#include "core/svg/SVGStyledTransformableElement.h"
-#include "core/svg/SVGTests.h"
+#include "core/svg/SVGGraphicsElement.h"
 #include "core/svg/SVGURIReference.h"
 
 namespace WebCore {
 
-class SVGAElement FINAL : public SVGStyledTransformableElement,
+class SVGAElement FINAL : public SVGGraphicsElement,
                           public SVGURIReference,
-                          public SVGTests,
-                          public SVGLangSpace,
                           public SVGExternalResourcesRequired {
 public:
     static PassRefPtr<SVGAElement> create(const QualifiedName&, Document*);
@@ -51,7 +47,7 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
 
     virtual void defaultEventHandler(Event*);
     
@@ -70,11 +66,6 @@ private:
         DECLARE_ANIMATED_STRING(Href, href)
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
-
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 };
 
 } // namespace WebCore

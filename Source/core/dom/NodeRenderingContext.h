@@ -28,9 +28,8 @@
 
 #include "core/dom/NodeRenderingTraversal.h"
 
-#include <wtf/Noncopyable.h>
-#include <wtf/RefPtr.h>
-#include <wtf/text/AtomicString.h>
+#include "wtf/RefPtr.h"
+#include "wtf/text/AtomicString.h"
 
 namespace WebCore {
 
@@ -69,6 +68,7 @@ public:
 private:
     bool shouldCreateRenderer() const;
     void moveToFlowThreadIfNeeded();
+    bool elementInsideRegionNeedsRenderer();
 
     Node* m_node;
     ContainerNode* m_renderingParent;

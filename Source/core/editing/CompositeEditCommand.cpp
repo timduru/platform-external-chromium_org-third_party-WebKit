@@ -64,7 +64,6 @@
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/RenderText.h"
-#include <wtf/unicode/CharacterNames.h>
 
 using namespace std;
 
@@ -575,7 +574,7 @@ void CompositeEditCommand::deleteSelection(const VisibleSelection &selection, bo
         applyCommandToComposite(DeleteSelectionCommand::create(selection, smartDelete, mergeBlocksAfterDelete, replace, expandForSpecialElements, sanitizeMarkup));
 }
 
-void CompositeEditCommand::removeCSSProperty(PassRefPtr<StyledElement> element, CSSPropertyID property)
+void CompositeEditCommand::removeCSSProperty(PassRefPtr<Element> element, CSSPropertyID property)
 {
     applyCommandToComposite(RemoveCSSPropertyCommand::create(document(), element, property));
 }
@@ -593,7 +592,7 @@ void CompositeEditCommand::setNodeAttribute(PassRefPtr<Element> element, const Q
 static inline bool containsOnlyWhitespace(const String& text)
 {
     for (unsigned i = 0; i < text.length(); ++i) {
-        if (!isWhitespace(text.characters()[i]))
+        if (!isWhitespace(text[i]))
             return false;
     }
     
@@ -1000,7 +999,7 @@ void CompositeEditCommand::cloneParagraphUnderNewElement(Position& start, Positi
         for (size_t i = ancestors.size(); i != 0; --i) {
             Node* item = ancestors[i - 1].get();
             RefPtr<Node> child = item->cloneNode(isTableElement(item));
-            appendNode(child, static_cast<Element *>(lastNode.get()));
+            appendNode(child, toElement(lastNode.get()));
             lastNode = child.release();
         }
     }

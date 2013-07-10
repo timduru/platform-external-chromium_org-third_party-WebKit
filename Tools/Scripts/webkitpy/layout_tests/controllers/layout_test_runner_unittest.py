@@ -104,16 +104,7 @@ class LayoutTestRunnerTests(unittest.TestCase):
     def _run_tests(self, runner, tests):
         test_inputs = [TestInput(test, 6000) for test in tests]
         expectations = TestExpectations(runner._port, tests)
-        runner.run_tests(expectations, test_inputs, set(),
-            num_workers=1, needs_http=any('http' in test for test in tests), needs_websockets=any(['websocket' in test for test in tests]), retrying=False)
-
-    def test_http_locking(self):
-        runner = self._runner()
-        self._run_tests(runner, ['http/tests/passes/text.html', 'passes/text.html'])
-
-    def test_perf_locking(self):
-        runner = self._runner()
-        self._run_tests(runner, ['http/tests/passes/text.html', 'perf/foo/test.html'])
+        runner.run_tests(expectations, test_inputs, set(), num_workers=1, retrying=False)
 
     def test_interrupt_if_at_failure_limits(self):
         runner = self._runner()
@@ -164,58 +155,6 @@ class LayoutTestRunnerTests(unittest.TestCase):
         self.assertEqual(0, run_results.expected)
         self.assertEqual(1, run_results.unexpected)
 
-    def test_servers_started(self):
-
-        def start_http_server(number_of_servers=None):
-            self.http_started = True
-
-        def start_websocket_server():
-            self.websocket_started = True
-
-        def stop_http_server():
-            self.http_stopped = True
-
-        def stop_websocket_server():
-            self.websocket_stopped = True
-
-        host = MockHost()
-        port = host.port_factory.get('test-mac-leopard')
-        port.start_http_server = start_http_server
-        port.start_websocket_server = start_websocket_server
-        port.stop_http_server = stop_http_server
-        port.stop_websocket_server = stop_websocket_server
-
-        self.http_started = self.http_stopped = self.websocket_started = self.websocket_stopped = False
-        runner = self._runner(port=port)
-        runner._needs_http = True
-        runner._needs_websockets = False
-        runner.start_servers_with_lock(number_of_servers=4)
-        self.assertEqual(self.http_started, True)
-        self.assertEqual(self.websocket_started, False)
-        runner.stop_servers_with_lock()
-        self.assertEqual(self.http_stopped, True)
-        self.assertEqual(self.websocket_stopped, False)
-
-        self.http_started = self.http_stopped = self.websocket_started = self.websocket_stopped = False
-        runner._needs_http = True
-        runner._needs_websockets = True
-        runner.start_servers_with_lock(number_of_servers=4)
-        self.assertEqual(self.http_started, True)
-        self.assertEqual(self.websocket_started, True)
-        runner.stop_servers_with_lock()
-        self.assertEqual(self.http_stopped, True)
-        self.assertEqual(self.websocket_stopped, True)
-
-        self.http_started = self.http_stopped = self.websocket_started = self.websocket_stopped = False
-        runner._needs_http = False
-        runner._needs_websockets = False
-        runner.start_servers_with_lock(number_of_servers=4)
-        self.assertEqual(self.http_started, False)
-        self.assertEqual(self.websocket_started, False)
-        runner.stop_servers_with_lock()
-        self.assertEqual(self.http_stopped, False)
-        self.assertEqual(self.websocket_stopped, False)
-
 
 class SharderTests(unittest.TestCase):
 
@@ -230,6 +169,7 @@ class SharderTests(unittest.TestCase):
         "ietestcenter/Javascript/11.1.5_4-4-c-1.html",
         "dom/html/level2/html/HTMLAnchorElement06.html",
         "perf/object-keys.html",
+        "virtual/threaded/test.html",
     ]
 
     def get_test_input(self, test_file):
@@ -263,7 +203,8 @@ class SharderTests(unittest.TestCase):
                 'http/tests/xmlhttprequest/supported-xml-content-types.html',
                 'perf/object-keys.html'])])
         self.assert_shards(unlocked,
-            [('animations', ['animations/keyframes.html']),
+            [('virtual/threaded', ['virtual/threaded/test.html']),
+             ('animations', ['animations/keyframes.html']),
              ('dom/html/level2/html', ['dom/html/level2/html/HTMLAnchorElement03.html',
                                       'dom/html/level2/html/HTMLAnchorElement06.html']),
              ('fast/css', ['fast/css/display-none-inline-style-change-crash.html']),
@@ -282,7 +223,8 @@ class SharderTests(unittest.TestCase):
              ('.', ['fast/css/display-none-inline-style-change-crash.html']),
              ('.', ['dom/html/level2/html/HTMLAnchorElement03.html']),
              ('.', ['ietestcenter/Javascript/11.1.5_4-4-c-1.html']),
-             ('.', ['dom/html/level2/html/HTMLAnchorElement06.html'])])
+             ('.', ['dom/html/level2/html/HTMLAnchorElement06.html']),
+             ('.', ['virtual/threaded/test.html'])])
 
     def test_shard_in_two(self):
         locked, unlocked = self.get_shards(num_workers=1, fully_parallel=False)
@@ -299,7 +241,8 @@ class SharderTests(unittest.TestCase):
                'fast/css/display-none-inline-style-change-crash.html',
                'dom/html/level2/html/HTMLAnchorElement03.html',
                'ietestcenter/Javascript/11.1.5_4-4-c-1.html',
-               'dom/html/level2/html/HTMLAnchorElement06.html'])])
+               'dom/html/level2/html/HTMLAnchorElement06.html',
+               'virtual/threaded/test.html'])])
 
     def test_shard_in_two_has_no_locked_shards(self):
         locked, unlocked = self.get_shards(num_workers=1, fully_parallel=False,

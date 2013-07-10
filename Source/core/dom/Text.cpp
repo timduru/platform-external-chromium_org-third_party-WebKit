@@ -211,7 +211,8 @@ bool Text::textRendererIsNeeded(const NodeRenderingContext& context)
         return true;
 
     RenderObject* parent = context.parentRenderer();
-    if (parent->isTable() || parent->isTableRow() || parent->isTableSection() || parent->isRenderTableCol() || parent->isFrameSet())
+    if (parent->isTable() || parent->isTableRow() || parent->isTableSection() || parent->isRenderTableCol() || parent->isFrameSet()
+        || parent->isFlexibleBox() || parent->isRenderGrid())
         return false;
     
     if (context.style()->preserveNewline()) // pre/pre-wrap/pre-line always make renderers.
@@ -259,15 +260,15 @@ void Text::createTextRendererIfNeeded()
     NodeRenderingContext(this).createRendererForTextIfNeeded();
 }
 
-RenderText* Text::createTextRenderer(RenderArena* arena, RenderStyle* style)
+RenderText* Text::createTextRenderer(RenderStyle* style)
 {
     if (isSVGText(this) || isSVGShadowText(this))
-        return new (arena) RenderSVGInlineText(this, dataImpl());
+        return new (document()->renderArena()) RenderSVGInlineText(this, dataImpl());
 
     if (style->hasTextCombine())
-        return new (arena) RenderCombineText(this, dataImpl());
+        return new (document()->renderArena()) RenderCombineText(this, dataImpl());
 
-    return new (arena) RenderText(this, dataImpl());
+    return new (document()->renderArena()) RenderText(this, dataImpl());
 }
 
 void Text::attach(const AttachContext& context)
@@ -280,18 +281,13 @@ void Text::recalcTextStyle(StyleChange change)
 {
     RenderText* renderer = toRenderText(this->renderer());
 
-    if (!renderer) {
+    if (renderer) {
+        if (change != NoChange || needsStyleRecalc())
+            renderer->setStyle(document()->styleResolver()->styleForText(this));
         if (needsStyleRecalc())
-            reattach();
-        clearNeedsStyleRecalc();
-        return;
-    }
-
-    if (needsStyleRecalc()) {
-        renderer->setStyle(document()->styleResolver()->styleForText(this));
-        renderer->setText(dataImpl());
-    } else if (change != NoChange) {
-        renderer->setStyle(document()->styleResolver()->styleForText(this));
+            renderer->setText(dataImpl());
+    } else if (needsStyleRecalc()) {
+        reattach();
     }
 
     clearNeedsStyleRecalc();

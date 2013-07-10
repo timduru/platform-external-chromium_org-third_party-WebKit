@@ -33,7 +33,6 @@
 
 #include "core/html/InputType.h"
 #include "core/platform/DateComponents.h"
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
@@ -50,7 +49,7 @@ protected:
     virtual String visibleValue() const OVERRIDE;
 
 private:
-    virtual bool parseToDateComponentsInternal(const UChar*, unsigned length, DateComponents*) const = 0;
+    virtual bool parseToDateComponentsInternal(const String&, DateComponents*) const = 0;
     virtual DateComponents::Type dateType() const = 0;
     virtual double valueAsDate() const OVERRIDE;
     virtual void setValueAsDate(double, ExceptionCode&) const OVERRIDE;
@@ -65,6 +64,7 @@ private:
     virtual String localizeValue(const String&) const OVERRIDE;
     virtual bool supportsReadOnly() const OVERRIDE;
     virtual bool shouldRespectListAttribute() OVERRIDE;
+    virtual bool shouldShowFocusRingOnMouseFocus() const OVERRIDE;
 };
 
 } // namespace WebCore

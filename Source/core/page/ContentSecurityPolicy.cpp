@@ -33,22 +33,18 @@
 #include "core/dom/DOMStringList.h"
 #include "core/dom/Document.h"
 #include "core/dom/SecurityPolicyViolationEvent.h"
-#include "core/html/FormDataList.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/inspector/InspectorValues.h"
 #include "core/inspector/ScriptCallStack.h"
 #include "core/loader/PingLoader.h"
-#include "core/page/Console.h"
 #include "core/page/Frame.h"
-#include "core/page/PageConsole.h"
 #include "core/page/UseCounter.h"
+#include "core/platform/JSONValues.h"
 #include "core/platform/network/FormData.h"
 #include "weborigin/KURL.h"
 #include "weborigin/KnownPorts.h"
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/HashSet.h"
-#include "wtf/text/TextEncoding.h"
 #include "wtf/text/TextPosition.h"
 #include "wtf/text/WTFString.h"
 
@@ -200,8 +196,8 @@ static void skipWhile(const UChar*& position, const UChar* end)
 
 static bool isSourceListNone(const String& value)
 {
-    const UChar* begin = value.characters();
-    const UChar* end = value.characters() + value.length();
+    const UChar* begin = value.bloatedCharacters();
+    const UChar* end = value.bloatedCharacters() + value.length();
     skipWhile<isASCIISpace>(begin, end);
 
     const UChar* position = begin;
@@ -352,7 +348,7 @@ void CSPSourceList::parse(const String& value)
     // We represent 'none' as an empty m_list.
     if (isSourceListNone(value))
         return;
-    parse(value.characters(), value.characters() + value.length());
+    parse(value.bloatedCharacters(), value.bloatedCharacters() + value.length());
 }
 
 bool CSPSourceList::matches(const KURL& url)
@@ -537,7 +533,7 @@ bool CSPSourceList::parseNonce(const UChar* begin, const UChar* end, String& non
 {
     DEFINE_STATIC_LOCAL(const String, noncePrefix, (ASCIILiteral("'nonce-")));
 
-    if (!equalIgnoringCase(noncePrefix.characters(), begin, noncePrefix.length()))
+    if (!equalIgnoringCase(noncePrefix.bloatedCharacters(), begin, noncePrefix.length()))
         return true;
 
     const UChar* position = begin + noncePrefix.length();
@@ -731,7 +727,7 @@ public:
 private:
     void parse(const String& value)
     {
-        const UChar* begin = value.characters();
+        const UChar* begin = value.bloatedCharacters();
         const UChar* position = begin;
         const UChar* end = begin + value.length();
 
@@ -1202,7 +1198,7 @@ void CSPDirectiveList::parse(const String& policy)
     if (policy.isEmpty())
         return;
 
-    const UChar* position = policy.characters();
+    const UChar* position = policy.bloatedCharacters();
     const UChar* end = position + policy.length();
 
     while (position < end) {
@@ -1281,7 +1277,7 @@ void CSPDirectiveList::parseReportURI(const String& name, const String& value)
         m_policy->reportDuplicateDirective(name);
         return;
     }
-    const UChar* position = value.characters();
+    const UChar* position = value.bloatedCharacters();
     const UChar* end = position + value.length();
 
     while (position < end) {
@@ -1335,7 +1331,7 @@ void CSPDirectiveList::parseReflectedXSS(const String& name, const String& value
         return;
     }
 
-    const UChar* position = value.characters();
+    const UChar* position = value.bloatedCharacters();
     const UChar* end = position + value.length();
 
     skipWhile<isASCIISpace>(position, end);
@@ -1438,7 +1434,7 @@ void ContentSecurityPolicy::didReceiveHeader(const String& header, HeaderType ty
     // RFC2616, section 4.2 specifies that headers appearing multiple times can
     // be combined with a comma. Walk the header string, and parse each comma
     // separated chunk as a separate header.
-    const UChar* begin = header.characters();
+    const UChar* begin = header.bloatedCharacters();
     const UChar* position = begin;
     const UChar* end = begin + header.length();
     while (position < end) {
@@ -1734,7 +1730,7 @@ void ContentSecurityPolicy::reportViolation(const String& directiveText, const S
     // sent explicitly. As for which directive was violated, that's pretty
     // harmless information.
 
-    RefPtr<InspectorObject> cspReport = InspectorObject::create();
+    RefPtr<JSONObject> cspReport = JSONObject::create();
     cspReport->setString("document-uri", violationData.documentURI);
     cspReport->setString("referrer", violationData.referrer);
     cspReport->setString("violated-directive", violationData.violatedDirective);
@@ -1748,7 +1744,7 @@ void ContentSecurityPolicy::reportViolation(const String& directiveText, const S
         cspReport->setNumber("column-number", violationData.columnNumber);
     }
 
-    RefPtr<InspectorObject> reportObject = InspectorObject::create();
+    RefPtr<JSONObject> reportObject = JSONObject::create();
     reportObject->setObject("csp-report", cspReport.release());
 
     RefPtr<FormData> report = FormData::create(reportObject->toJSONString().utf8());
@@ -1806,7 +1802,7 @@ void ContentSecurityPolicy::reportInvalidSandboxFlags(const String& invalidFlags
 
 void ContentSecurityPolicy::reportInvalidReflectedXSS(const String& invalidValue) const
 {
-    logToConsole("The 'reflected-xss' Content Security Policy directive has the invalid value \"" + invalidValue + "\". Value values are \"allow\", \"filter\", and \"block\".");
+    logToConsole("The 'reflected-xss' Content Security Policy directive has the invalid value \"" + invalidValue + "\". Valid values are \"allow\", \"filter\", and \"block\".");
 }
 
 void ContentSecurityPolicy::reportInvalidDirectiveValueCharacter(const String& directiveName, const String& value) const

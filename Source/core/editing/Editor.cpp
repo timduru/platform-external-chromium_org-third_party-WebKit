@@ -28,12 +28,10 @@
 #include "core/editing/Editor.h"
 
 #include "CSSPropertyNames.h"
-#include "CSSValueKeywords.h"
 #include "HTMLNames.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/css/CSSComputedStyleDeclaration.h"
 #include "core/css/StylePropertySet.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Clipboard.h"
 #include "core/dom/ClipboardEvent.h"
 #include "core/dom/CompositionEvent.h"
@@ -47,9 +45,7 @@
 #include "core/dom/Text.h"
 #include "core/dom/TextEvent.h"
 #include "core/dom/UserTypingGestureIndicator.h"
-#include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/ApplyStyleCommand.h"
-#include "core/editing/CreateLinkCommand.h"
 #include "core/editing/DeleteSelectionCommand.h"
 #include "core/editing/IndentOutdentCommand.h"
 #include "core/editing/InsertListCommand.h"
@@ -59,15 +55,12 @@
 #include "core/editing/ReplaceSelectionCommand.h"
 #include "core/editing/SimplifyMarkupCommand.h"
 #include "core/editing/SpellChecker.h"
-#include "core/editing/SpellingCorrectionCommand.h"
 #include "core/editing/TextCheckingHelper.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/TypingCommand.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
-#include "core/html/HTMLFormControlElement.h"
-#include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/loader/cache/CachedResourceLoader.h"
@@ -75,22 +68,17 @@
 #include "core/page/EventHandler.h"
 #include "core/page/FocusController.h"
 #include "core/page/Frame.h"
-#include "core/page/FrameTree.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/platform/KillRing.h"
 #include "core/platform/Pasteboard.h"
 #include "core/platform/Sound.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/text/TextCheckerClient.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderBlock.h"
-#include "core/rendering/RenderPart.h"
 #include "core/rendering/RenderTextControl.h"
-#include <wtf/unicode/CharacterNames.h>
-#include <wtf/unicode/Unicode.h>
-#include <wtf/UnusedParam.h>
+#include "wtf/unicode/CharacterNames.h"
 
 namespace WebCore {
 
@@ -1259,7 +1247,13 @@ void Editor::setComposition(const String& text, const Vector<CompositionUnderlin
             // We should send a compositionstart event only when the given text is not empty because this
             // function doesn't create a composition node when the text is empty.
             if (!text.isEmpty()) {
-                target->dispatchEvent(CompositionEvent::create(eventNames().compositionstartEvent, m_frame->document()->domWindow(), text));
+                FrameSelection* selection = m_frame->selection();
+                String selectionText;
+                if (selection->isRange()) {
+                    RefPtr<Range> range = selection->toNormalizedRange();
+                    selectionText = plainText(range.get());
+                }
+                target->dispatchEvent(CompositionEvent::create(eventNames().compositionstartEvent, m_frame->document()->domWindow(), selectionText));
                 event = CompositionEvent::create(eventNames().compositionupdateEvent, m_frame->document()->domWindow(), text);
             }
         } else {
@@ -1509,7 +1503,7 @@ String Editor::misspelledWordAtCaretOrRange(Node* clickedNode) const
     int wordLength = word.length();
     int misspellingLocation = -1;
     int misspellingLength = 0;
-    textChecker()->checkSpellingOfString(word.characters(), wordLength, &misspellingLocation, &misspellingLength);
+    textChecker()->checkSpellingOfString(word.bloatedCharacters(), wordLength, &misspellingLocation, &misspellingLength);
 
     return misspellingLength == wordLength ? word : String();
 }
@@ -2127,7 +2121,7 @@ void Editor::applyEditingStyleToElement(Element* element) const
         return;
 
     // Mutate using the CSSOM wrapper so we get the same event behavior as a script.
-    CSSStyleDeclaration* style = static_cast<StyledElement*>(element)->style();
+    CSSStyleDeclaration* style = element->style();
     style->setPropertyInternal(CSSPropertyWordWrap, "break-word", false, IGNORE_EXCEPTION);
     style->setPropertyInternal(CSSPropertyWebkitLineBreak, "after-white-space", false, IGNORE_EXCEPTION);
 }
@@ -2354,5 +2348,11 @@ bool Editor::unifiedTextCheckerEnabled() const
 {
     return WebCore::unifiedTextCheckerEnabled(m_frame);
 }
+
+void Editor::toggleOverwriteModeEnabled()
+{
+    m_overwriteModeEnabled = !m_overwriteModeEnabled;
+    frame()->selection()->setShouldShowBlockCursor(m_overwriteModeEnabled);
+};
 
 } // namespace WebCore

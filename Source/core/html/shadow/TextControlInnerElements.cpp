@@ -29,23 +29,19 @@
 
 #include "HTMLNames.h"
 #include "bindings/v8/ScriptController.h"
-#include "core/dom/BeforeTextInsertedEvent.h"
 #include "core/dom/Document.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/MouseEvent.h"
 #include "core/dom/TextEvent.h"
 #include "core/dom/TextEventInputType.h"
 #include "core/html/HTMLInputElement.h"
-#include "core/html/HTMLTextAreaElement.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
-#include "core/page/Page.h"
 #include "core/page/SpeechInput.h"
 #include "core/page/SpeechInputEvent.h"
 #include "core/rendering/RenderSearchField.h"
 #include "core/rendering/RenderTextControl.h"
 #include "core/rendering/RenderView.h"
-#include "core/rendering/style/StyleInheritedData.h"
 
 namespace WebCore {
 
@@ -61,9 +57,9 @@ PassRefPtr<TextControlInnerContainer> TextControlInnerContainer::create(Document
     return adoptRef(new TextControlInnerContainer(document));
 }
     
-RenderObject* TextControlInnerContainer::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* TextControlInnerContainer::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderTextControlInnerContainer(this);
+    return new (document()->renderArena()) RenderTextControlInnerContainer(this);
 }
 
 TextControlInnerElement::TextControlInnerElement(Document* document)
@@ -115,9 +111,9 @@ void TextControlInnerTextElement::defaultEventHandler(Event* event)
         HTMLDivElement::defaultEventHandler(event);
 }
 
-RenderObject* TextControlInnerTextElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* TextControlInnerTextElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderTextControlInnerBlock(this);
+    return new (document()->renderArena()) RenderTextControlInnerBlock(this);
 }
 
 PassRefPtr<RenderStyle> TextControlInnerTextElement::customStyleForRenderer()
@@ -157,7 +153,7 @@ void SearchFieldDecorationElement::defaultEventHandler(Event* event)
 {
     // On mousedown, focus the search field
     HTMLInputElement* input = toHTMLInputElement(shadowHost());
-    if (input && event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (input && event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         input->focus();
         input->select();
         RenderSearchField* renderer = toRenderSearchField(input->renderer());
@@ -208,7 +204,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
         return;
     }
 
-    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         if (renderer() && renderer()->visibleToHitTesting()) {
             if (Frame* frame = document()->frame()) {
                 frame->eventHandler()->setCapturingMouseEventsNode(this);
@@ -219,7 +215,7 @@ void SearchFieldCancelButtonElement::defaultEventHandler(Event* event)
         input->select();
         event->setDefaultHandled();
     }
-    if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         if (m_capturing) {
             if (Frame* frame = document()->frame()) {
                 frame->eventHandler()->setCapturingMouseEventsNode(0);
@@ -296,7 +292,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
     }
 
     // On mouse down, select the text and set focus.
-    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         if (renderer() && renderer()->visibleToHitTesting()) {
             if (Frame* frame = document()->frame()) {
                 frame->eventHandler()->setCapturingMouseEventsNode(this);
@@ -309,7 +305,7 @@ void InputFieldSpeechButtonElement::defaultEventHandler(Event* event)
         event->setDefaultHandled();
     }
     // On mouse up, release capture cleanly.
-    if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         if (m_capturing && renderer() && renderer()->visibleToHitTesting()) {
             if (Frame* frame = document()->frame()) {
                 frame->eventHandler()->setCapturingMouseEventsNode(0);

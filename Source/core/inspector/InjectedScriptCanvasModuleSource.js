@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,11 +29,12 @@
  */
 
 /**
- * @param {InjectedScriptHost} InjectedScriptHost
+ * @param {InjectedScriptHostClass} InjectedScriptHost
  * @param {Window} inspectedWindow
  * @param {number} injectedScriptId
+ * @param {!InjectedScript} injectedScript
  */
-(function (InjectedScriptHost, inspectedWindow, injectedScriptId) {
+(function (InjectedScriptHost, inspectedWindow, injectedScriptId, injectedScript) {
 
 var TypeUtils = {
     /**
@@ -542,6 +543,24 @@ ReplayableCall.prototype = {
     },
 
     /**
+     * @return {string}
+     */
+    propertyName: function()
+    {
+        console.assert(this.isPropertySetter());
+        return /** @type {string} */ (this._args[0]);
+    },
+
+    /**
+     * @return {*}
+     */
+    propertyValue: function()
+    {
+        console.assert(this.isPropertySetter());
+        return this._args[1];
+    },
+
+    /**
      * @return {Array.<ReplayableResource|*>}
      */
     args: function()
@@ -583,7 +602,7 @@ ReplayableCall.prototype = {
     },
 
     /**
-     * @param {Cache} cache
+     * @param {!Cache} cache
      * @return {!Call}
      */
     replay: function(cache)
@@ -2663,8 +2682,8 @@ CallFormatter.prototype = {
             if (this._drawingMethodNames[functionName])
                 result.isDrawingCall = true;
         } else {
-            result.property = replayableCall.args()[0];
-            result.value = this.formatValue(replayableCall.args()[1]);
+            result.property = replayableCall.propertyName();
+            result.value = this.formatValue(replayableCall.propertyValue());
         }
         return result;
     },
@@ -2675,11 +2694,23 @@ CallFormatter.prototype = {
      */
     formatValue: function(value)
     {
-        if (value instanceof ReplayableResource)
-            var description = value.description();
-        else
-            var description = "" + value;
-        return { description: description };
+        if (value instanceof ReplayableResource) {
+            return {
+                description: value.description(),
+                resourceId: CallFormatter.makeStringResourceId(value.id())
+            };
+        }
+
+        var remoteObject = injectedScript.wrapObject(value, "", true, false);
+        var result = {
+            description: remoteObject.description || ("" + value),
+            type: /** @type {CanvasAgent.CallArgumentType} */ (remoteObject.type)
+        };
+        if (remoteObject.subtype)
+            result.subtype = /** @type {CanvasAgent.CallArgumentSubtype} */ (remoteObject.subtype);
+        if (remoteObject.objectId)
+            injectedScript.releaseObject(remoteObject.objectId);
+        return result;
     }
 }
 
@@ -2711,6 +2742,15 @@ CallFormatter.formatCall = function(replayableCall)
         formatter = CallFormatter._formatters[contextResource.name()] || new CallFormatter();
     }
     return formatter.formatCall(replayableCall);
+}
+
+/**
+ * @param {number} resourceId
+ * @return {CanvasAgent.ResourceId}
+ */
+CallFormatter.makeStringResourceId = function(resourceId)
+{
+    return "{\"injectedScriptId\":" + injectedScriptId + ",\"resourceId\":" + resourceId + "}";
 }
 
 /**
@@ -2761,12 +2801,12 @@ WebGLCallFormatter.EnumsInfo = [
     {"aname": "getBufferParameter", "enum": [0, 1]},
     {"aname": "getError", "hints": ["NO_ERROR"], "returnType": "enum"},
     {"aname": "getFramebufferAttachmentParameter", "enum": [0, 1, 2]},
-    {"aname": "getParameter", "enum": [0], "hints": ["ZERO", "ONE"]},
+    {"aname": "getParameter", "enum": [0]},
     {"aname": "getProgramParameter", "enum": [1]},
     {"aname": "getRenderbufferParameter", "enum": [0, 1]},
     {"aname": "getShaderParameter", "enum": [1]},
     {"aname": "getShaderPrecisionFormat", "enum": [0, 1]},
-    {"aname": "getTexParameter", "enum": [0, 1]},
+    {"aname": "getTexParameter", "enum": [0, 1], "returnType": "enum"},
     {"aname": "getVertexAttrib", "enum": [1]},
     {"aname": "getVertexAttribOffset", "enum": [1]},
     {"aname": "hint", "enum": [0, 1]},
@@ -3408,7 +3448,7 @@ InjectedCanvasModule.prototype = {
             var stackTrace = call.stackTrace();
             var callFrame = stackTrace ? stackTrace.callFrame(0) || {} : {};
             var item = CallFormatter.formatCall(call);
-            item.contextId = this._makeStringResourceId(contextResource.id());
+            item.contextId = CallFormatter.makeStringResourceId(contextResource.id());
             item.sourceURL = callFrame.sourceURL;
             item.lineNumber = callFrame.lineNumber;
             item.columnNumber = callFrame.columnNumber;
@@ -3416,19 +3456,6 @@ InjectedCanvasModule.prototype = {
             result.calls.push(item);
         }
         return result;
-    },
-
-    /**
-     * @param {*} obj
-     * @return {!CanvasAgent.CallArgument}
-     */
-    _makeCallArgument: function(obj)
-    {
-        if (obj instanceof ReplayableResource)
-            var description = obj.description();
-        else
-            var description = "" + obj;
-        return { description: description };
     },
 
     /**
@@ -3449,7 +3476,7 @@ InjectedCanvasModule.prototype = {
             resource = resource.contextResource();
             dataURL = resource.toDataURL();
         }
-        return this._makeResourceState(this._makeStringResourceId(resource.id()), traceLogId, dataURL);
+        return this._makeResourceState(CallFormatter.makeStringResourceId(resource.id()), traceLogId, dataURL);
     },
 
     /**
@@ -3506,20 +3533,51 @@ InjectedCanvasModule.prototype = {
     },
 
     /**
+     * @param {CanvasAgent.TraceLogId} traceLogId
+     * @param {number} callIndex
+     * @param {number} argumentIndex
+     * @param {string} objectGroup
+     * @return {!Object|string}
+     */
+    evaluateTraceLogCallArgument: function(traceLogId, callIndex, argumentIndex, objectGroup)
+    {
+        var traceLog = this._traceLogs[traceLogId];
+        if (!traceLog)
+            return "Error: Trace log with the given ID not found.";
+
+        var replayableCall = traceLog.replayableCalls()[callIndex];
+        if (!replayableCall)
+            return "Error: No call found at index " + callIndex;
+
+        var value;
+        if (replayableCall.isPropertySetter())
+            value = replayableCall.propertyValue();
+        else if (argumentIndex === -1)
+            value = replayableCall.result();
+        else {
+            var args = replayableCall.args();
+            if (argumentIndex < 0 || argumentIndex >= args.length)
+                return "Error: No argument found at index " + argumentIndex + " for call at index " + callIndex;
+            value = args[argumentIndex];
+        }
+
+        if (value instanceof ReplayableResource) {
+            var traceLogPlayer = this._traceLogPlayers[traceLogId];
+            var resource = traceLogPlayer && traceLogPlayer.replayWorldResource(value.id());
+            var resourceState = this._makeResourceState(CallFormatter.makeStringResourceId(value.id()), traceLogId, resource ? resource.toDataURL() : "");
+            return { resourceState: resourceState };
+        }
+
+        var remoteObject = injectedScript.wrapObject(value, objectGroup, true, false);
+        return { result: remoteObject };
+    },
+
+    /**
      * @return {CanvasAgent.TraceLogId}
      */
     _makeTraceLogId: function()
     {
         return "{\"injectedScriptId\":" + injectedScriptId + ",\"traceLogId\":" + (++this._lastTraceLogId) + "}";
-    },
-
-    /**
-     * @param {number} resourceId
-     * @return {CanvasAgent.ResourceId}
-     */
-    _makeStringResourceId: function(resourceId)
-    {
-        return "{\"injectedScriptId\":" + injectedScriptId + ",\"resourceId\":" + resourceId + "}";
     },
 
     /**

@@ -336,7 +336,7 @@ private:
     virtual bool supportsFocus() const;
     virtual bool isMouseFocusable() const;
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
@@ -376,7 +376,7 @@ private:
 
     virtual CORSMode mediaPlayerCORSMode() const OVERRIDE;
 
-    virtual void mediaPlayerNeedsStyleRecalc() OVERRIDE;
+    virtual void scheduleLayerUpdate() OVERRIDE;
 
     void loadTimerFired(Timer<HTMLMediaElement>*);
     void progressEventTimerFired(Timer<HTMLMediaElement>*);

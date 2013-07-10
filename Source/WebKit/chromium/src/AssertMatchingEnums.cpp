@@ -38,7 +38,6 @@
 #include "public/platform/WebFileError.h"
 #include "public/platform/WebFileInfo.h"
 #include "public/platform/WebFileSystem.h"
-#include "public/platform/WebFilterOperation.h"
 #include "public/platform/WebIDBCursor.h"
 #include "public/platform/WebIDBDatabase.h"
 #include "public/platform/WebIDBDatabaseException.h"
@@ -53,8 +52,9 @@
 #include "public/platform/WebScrollbar.h"
 #include "public/platform/WebURLRequest.h"
 #include "public/platform/WebURLResponse.h"
-#include <wtf/Assertions.h>
-#include <wtf/text/StringImpl.h>
+#include "public/web/WebNavigationPolicy.h"
+#include "wtf/Assertions.h"
+#include "wtf/text/StringImpl.h"
 #include "WebAccessibilityNotification.h"
 #include "WebAccessibilityObject.h"
 #include "WebApplicationCacheHost.h"
@@ -93,6 +93,7 @@
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/shadow/TextControlInnerElements.h"
+#include "core/loader/NavigationPolicy.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/PageVisibilityState.h"
@@ -114,13 +115,12 @@
 #include "core/platform/network/ResourceLoadPriority.h"
 #include "core/platform/network/ResourceResponse.h"
 #include "core/platform/text/TextChecking.h"
-#include "core/rendering/RenderLayer.h"
+#include "core/rendering/CompositingReasons.h"
 #include "modules/filesystem/FileSystemType.h"
 #include "modules/geolocation/GeolocationError.h"
 #include "modules/geolocation/GeolocationPosition.h"
 #include "modules/indexeddb/IDBCursor.h"
 #include "modules/indexeddb/IDBDatabaseBackendInterface.h"
-#include "modules/indexeddb/IDBDatabaseException.h"
 #include "modules/indexeddb/IDBKey.h"
 #include "modules/indexeddb/IDBKeyPath.h"
 #include "modules/indexeddb/IDBMetadata.h"
@@ -132,6 +132,9 @@
 
 #define COMPILE_ASSERT_MATCHING_ENUM(webkit_name, webcore_name) \
     COMPILE_ASSERT(int(WebKit::webkit_name) == int(WebCore::webcore_name), mismatching_enums)
+
+#define COMPILE_ASSERT_MATCHING_UINT64(webkit_name, webcore_name) \
+    COMPILE_ASSERT(WebKit::webkit_name == WebCore::webcore_name, mismatching_enums)
 
 // These constants are in WTF, bring them into WebCore so the ASSERT still works for them!
 namespace WebCore {
@@ -479,12 +482,12 @@ COMPILE_ASSERT_MATCHING_ENUM(WebView::UserContentInjectInTopFrameOnly, InjectInT
 COMPILE_ASSERT_MATCHING_ENUM(WebView::UserStyleInjectInExistingDocuments, InjectInExistingDocuments);
 COMPILE_ASSERT_MATCHING_ENUM(WebView::UserStyleInjectInSubsequentDocuments, InjectInSubsequentDocuments);
 
-COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionUnknownError, IDBDatabaseException::UnknownError);
-COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionConstraintError, IDBDatabaseException::ConstraintError);
-COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionDataError, IDBDatabaseException::DataError);
-COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionVersionError, IDBDatabaseException::VersionError);
-COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionAbortError, IDBDatabaseException::AbortError);
-COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionQuotaError, IDBDatabaseException::QuotaExceededError);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionUnknownError, UnknownError);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionConstraintError, ConstraintError);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionDataError, DataError);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionVersionError, VersionError);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionAbortError, ABORT_ERR);
+COMPILE_ASSERT_MATCHING_ENUM(WebIDBDatabaseExceptionQuotaError, QUOTA_EXCEEDED_ERR);
 
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::InvalidType, IDBKey::InvalidType);
 COMPILE_ASSERT_MATCHING_ENUM(WebIDBKey::ArrayType, IDBKey::ArrayType);
@@ -620,41 +623,49 @@ COMPILE_ASSERT_MATCHING_ENUM(WebURLRequest::PriorityMedium, ResourceLoadPriority
 COMPILE_ASSERT_MATCHING_ENUM(WebURLRequest::PriorityHigh, ResourceLoadPriorityHigh);
 COMPILE_ASSERT_MATCHING_ENUM(WebURLRequest::PriorityVeryHigh, ResourceLoadPriorityVeryHigh);
 
+COMPILE_ASSERT_MATCHING_ENUM(WebNavigationPolicyIgnore, NavigationPolicyIgnore);
+COMPILE_ASSERT_MATCHING_ENUM(WebNavigationPolicyDownload, NavigationPolicyDownload);
+COMPILE_ASSERT_MATCHING_ENUM(WebNavigationPolicyCurrentTab, NavigationPolicyCurrentTab);
+COMPILE_ASSERT_MATCHING_ENUM(WebNavigationPolicyNewBackgroundTab, NavigationPolicyNewBackgroundTab);
+COMPILE_ASSERT_MATCHING_ENUM(WebNavigationPolicyNewForegroundTab, NavigationPolicyNewForegroundTab);
+COMPILE_ASSERT_MATCHING_ENUM(WebNavigationPolicyNewWindow, NavigationPolicyNewWindow);
+COMPILE_ASSERT_MATCHING_ENUM(WebNavigationPolicyNewPopup, NavigationPolicyNewPopup);
+
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelDebug, DebugMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelLog, LogMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelWarning, WarningMessageLevel);
 COMPILE_ASSERT_MATCHING_ENUM(WebConsoleMessage::LevelError, ErrorMessageLevel);
 
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonUnknown, CompositingReasonNone);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReason3DTransform, CompositingReason3DTransform);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonVideo, CompositingReasonVideo);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonCanvas, CompositingReasonCanvas);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPlugin, CompositingReasonPlugin);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonIFrame, CompositingReasonIFrame);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonBackfaceVisibilityHidden, CompositingReasonBackfaceVisibilityHidden);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonAnimation, CompositingReasonAnimation);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonFilters, CompositingReasonFilters);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPositionFixed, CompositingReasonPositionFixed);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPositionSticky, CompositingReasonPositionSticky);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonOverflowScrollingTouch, CompositingReasonOverflowScrollingTouch);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonBlending, CompositingReasonBlending);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonAssumedOverlap, CompositingReasonAssumedOverlap);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonOverlap, CompositingReasonOverlap);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonNegativeZIndexChildren, CompositingReasonNegativeZIndexChildren);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonTransformWithCompositedDescendants, CompositingReasonTransformWithCompositedDescendants);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonOpacityWithCompositedDescendants, CompositingReasonOpacityWithCompositedDescendants);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonMaskWithCompositedDescendants, CompositingReasonMaskWithCompositedDescendants);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonReflectionWithCompositedDescendants, CompositingReasonReflectionWithCompositedDescendants);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonFilterWithCompositedDescendants, CompositingReasonFilterWithCompositedDescendants);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonBlendingWithCompositedDescendants, CompositingReasonBlendingWithCompositedDescendants);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonClipsCompositingDescendants, CompositingReasonClipsCompositingDescendants);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPerspective, CompositingReasonPerspective);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonPreserve3D, CompositingReasonPreserve3D);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonReflectionOfCompositedParent, CompositingReasonReflectionOfCompositedParent);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonRoot, CompositingReasonRoot);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForClip, CompositingReasonLayerForClip);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForScrollbar, CompositingReasonLayerForScrollbar);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForScrollingContainer, CompositingReasonLayerForScrollingContainer);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForForeground, CompositingReasonLayerForForeground);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForBackground, CompositingReasonLayerForBackground);
-COMPILE_ASSERT_MATCHING_ENUM(CompositingReasonLayerForMask, CompositingReasonLayerForMask);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonUnknown, CompositingReasonNone);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReason3DTransform, CompositingReason3DTransform);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonVideo, CompositingReasonVideo);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonCanvas, CompositingReasonCanvas);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonPlugin, CompositingReasonPlugin);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonIFrame, CompositingReasonIFrame);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonBackfaceVisibilityHidden, CompositingReasonBackfaceVisibilityHidden);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonAnimation, CompositingReasonAnimation);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonFilters, CompositingReasonFilters);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonPositionFixed, CompositingReasonPositionFixed);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonPositionSticky, CompositingReasonPositionSticky);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOverflowScrollingTouch, CompositingReasonOverflowScrollingTouch);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonBlending, CompositingReasonBlending);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonAssumedOverlap, CompositingReasonAssumedOverlap);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOverlap, CompositingReasonOverlap);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonNegativeZIndexChildren, CompositingReasonNegativeZIndexChildren);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonTransformWithCompositedDescendants, CompositingReasonTransformWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonOpacityWithCompositedDescendants, CompositingReasonOpacityWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonMaskWithCompositedDescendants, CompositingReasonMaskWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonReflectionWithCompositedDescendants, CompositingReasonReflectionWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonFilterWithCompositedDescendants, CompositingReasonFilterWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonBlendingWithCompositedDescendants, CompositingReasonBlendingWithCompositedDescendants);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonClipsCompositingDescendants, CompositingReasonClipsCompositingDescendants);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonPerspective, CompositingReasonPerspective);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonPreserve3D, CompositingReasonPreserve3D);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonReflectionOfCompositedParent, CompositingReasonReflectionOfCompositedParent);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonRoot, CompositingReasonRoot);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForClip, CompositingReasonLayerForClip);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForScrollbar, CompositingReasonLayerForScrollbar);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForScrollingContainer, CompositingReasonLayerForScrollingContainer);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForForeground, CompositingReasonLayerForForeground);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForBackground, CompositingReasonLayerForBackground);
+COMPILE_ASSERT_MATCHING_UINT64(CompositingReasonLayerForMask, CompositingReasonLayerForMask);

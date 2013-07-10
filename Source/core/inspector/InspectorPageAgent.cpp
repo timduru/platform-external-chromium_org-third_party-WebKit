@@ -35,7 +35,6 @@
 #include "InspectorFrontend.h"
 #include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ScriptController.h"
-#include "bindings/v8/ScriptObject.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/DeviceOrientationController.h"
 #include "core/dom/Document.h"
@@ -49,7 +48,6 @@
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/InspectorOverlay.h"
 #include "core/inspector/InspectorState.h"
-#include "core/inspector/InspectorValues.h"
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/loader/CookieJar.h"
 #include "core/loader/DocumentLoader.h"
@@ -68,15 +66,14 @@
 #include "core/page/PageConsole.h"
 #include "core/page/Settings.h"
 #include "core/platform/Cookie.h"
+#include "core/platform/JSONValues.h"
 #include "core/platform/text/RegularExpression.h"
 #include "modules/geolocation/GeolocationController.h"
-#include "modules/geolocation/GeolocationError.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/ListHashSet.h"
 #include "wtf/Vector.h"
 #include "wtf/text/Base64.h"
-#include "wtf/text/StringBuilder.h"
 #include "wtf/text/TextEncoding.h"
 
 using namespace std;
@@ -95,6 +92,7 @@ static const char pageAgentShowFPSCounter[] = "pageAgentShowFPSCounter";
 static const char pageAgentContinuousPaintingEnabled[] = "pageAgentContinuousPaintingEnabled";
 static const char pageAgentShowPaintRects[] = "pageAgentShowPaintRects";
 static const char pageAgentShowDebugBorders[] = "pageAgentShowDebugBorders";
+static const char pageAgentShowScrollBottleneckRects[] = "pageAgentShowScrollBottleneckRects";
 static const char touchEventEmulationEnabled[] = "touchEventEmulationEnabled";
 static const char pageAgentEmulatedMedia[] = "pageAgentEmulatedMedia";
 static const char showSizeOnResize[] = "showSizeOnResize";
@@ -363,6 +361,8 @@ void InspectorPageAgent::restore()
         setEmulatedMedia(0, emulatedMedia);
         bool continuousPaintingEnabled = m_state->getBoolean(PageAgentState::pageAgentContinuousPaintingEnabled);
         setContinuousPaintingEnabled(0, continuousPaintingEnabled);
+        bool showScrollBottleneckRects = m_state->getBoolean(PageAgentState::pageAgentShowScrollBottleneckRects);
+        setShowScrollBottleneckRects(0, showScrollBottleneckRects);
 
         int currentWidth = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenWidthOverride));
         int currentHeight = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenHeightOverride));
@@ -399,6 +399,7 @@ void InspectorPageAgent::disable(ErrorString*)
     setShowFPSCounter(0, false);
     setEmulatedMedia(0, "");
     setContinuousPaintingEnabled(0, false);
+    setShowScrollBottleneckRects(0, false);
     setShowViewportSizeOnResize(0, false, 0);
     if (m_didForceCompositingMode)
         setForceCompositingMode(0, false);
@@ -416,9 +417,9 @@ void InspectorPageAgent::disable(ErrorString*)
 
 void InspectorPageAgent::addScriptToEvaluateOnLoad(ErrorString*, const String& source, String* identifier)
 {
-    RefPtr<InspectorObject> scripts = m_state->getObject(PageAgentState::pageAgentScriptsToEvaluateOnLoad);
+    RefPtr<JSONObject> scripts = m_state->getObject(PageAgentState::pageAgentScriptsToEvaluateOnLoad);
     if (!scripts) {
-        scripts = InspectorObject::create();
+        scripts = JSONObject::create();
         m_state->setObject(PageAgentState::pageAgentScriptsToEvaluateOnLoad, scripts);
     }
     // Assure we don't override existing ids -- m_lastScriptIdentifier could get out of sync WRT actual
@@ -434,7 +435,7 @@ void InspectorPageAgent::addScriptToEvaluateOnLoad(ErrorString*, const String& s
 
 void InspectorPageAgent::removeScriptToEvaluateOnLoad(ErrorString* error, const String& identifier)
 {
-    RefPtr<InspectorObject> scripts = m_state->getObject(PageAgentState::pageAgentScriptsToEvaluateOnLoad);
+    RefPtr<JSONObject> scripts = m_state->getObject(PageAgentState::pageAgentScriptsToEvaluateOnLoad);
     if (!scripts || scripts->find(identifier) == scripts->end()) {
         *error = "Script not found";
         return;
@@ -711,8 +712,6 @@ void InspectorPageAgent::setShowDebugBorders(ErrorString*, bool show)
 {
     m_state->setBoolean(PageAgentState::pageAgentShowDebugBorders, show);
     m_client->setShowDebugBorders(show);
-    if (mainFrame() && mainFrame()->view())
-        mainFrame()->view()->invalidate();
 }
 
 void InspectorPageAgent::setShowFPSCounter(ErrorString*, bool show)
@@ -720,8 +719,7 @@ void InspectorPageAgent::setShowFPSCounter(ErrorString*, bool show)
     m_state->setBoolean(PageAgentState::pageAgentShowFPSCounter, show);
     m_client->setShowFPSCounter(show);
 
-    if (mainFrame() && mainFrame()->view())
-        mainFrame()->view()->invalidate();
+    updateOverridesTopOffset();
 }
 
 void InspectorPageAgent::setContinuousPaintingEnabled(ErrorString*, bool enabled)
@@ -729,8 +727,13 @@ void InspectorPageAgent::setContinuousPaintingEnabled(ErrorString*, bool enabled
     m_state->setBoolean(PageAgentState::pageAgentContinuousPaintingEnabled, enabled);
     m_client->setContinuousPaintingEnabled(enabled);
 
-    if (!enabled && mainFrame() && mainFrame()->view())
-        mainFrame()->view()->invalidate();
+    updateOverridesTopOffset();
+}
+
+void InspectorPageAgent::setShowScrollBottleneckRects(ErrorString*, bool show)
+{
+    m_state->setBoolean(PageAgentState::pageAgentShowScrollBottleneckRects, show);
+    m_client->setShowScrollBottleneckRects(show);
 }
 
 void InspectorPageAgent::getScriptExecutionStatus(ErrorString*, PageCommandHandler::Result::Enum* status)
@@ -780,10 +783,10 @@ void InspectorPageAgent::didClearWindowObjectInWorld(Frame* frame, DOMWrapperWor
     if (!m_frontend)
         return;
 
-    RefPtr<InspectorObject> scripts = m_state->getObject(PageAgentState::pageAgentScriptsToEvaluateOnLoad);
+    RefPtr<JSONObject> scripts = m_state->getObject(PageAgentState::pageAgentScriptsToEvaluateOnLoad);
     if (scripts) {
-        InspectorObject::const_iterator end = scripts->end();
-        for (InspectorObject::const_iterator it = scripts->begin(); it != end; ++it) {
+        JSONObject::const_iterator end = scripts->end();
+        for (JSONObject::const_iterator it = scripts->begin(); it != end; ++it) {
             String scriptText;
             if (it->value->asString(&scriptText))
                 frame->script()->executeScript(scriptText);
@@ -804,8 +807,10 @@ void InspectorPageAgent::domContentLoadedEventFired(Frame* frame)
         setForceCompositingMode(0, true);
 }
 
-void InspectorPageAgent::loadEventFired(Frame*)
+void InspectorPageAgent::loadEventFired(Frame* frame)
 {
+    if (frame->page()->mainFrame() != frame)
+        return;
     m_frontend->loadEventFired(currentTime());
 }
 
@@ -902,7 +907,7 @@ String InspectorPageAgent::resourceSourceMapURL(const String& url)
         return String();
     String deprecatedHeaderSourceMapURL = resource->response().httpHeaderField(deprecatedSourceMapHttpHeader);
     if (!deprecatedHeaderSourceMapURL.isEmpty()) {
-        m_page->console()->addMessage(NetworkMessageSource, WarningMessageLevel, "Resource is served with deprecated header X-SourceMap, SourceMap should be used instead.", url, 0);
+        // FIXME: add deprecated console message here.
         return deprecatedHeaderSourceMapURL;
     }
     return resource->response().httpHeaderField(sourceMapHttpHeader);
@@ -1107,6 +1112,7 @@ void InspectorPageAgent::updateViewMetrics(int width, int height, double fontSca
     if (document)
         document->styleResolverChanged(RecalcStyleImmediately);
     InspectorInstrumentation::mediaQueryResultChanged(document);
+    m_overlay->setOverride(InspectorOverlay::DeviceMetricsOverride, width && height);
 }
 
 void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
@@ -1114,6 +1120,19 @@ void InspectorPageAgent::updateTouchEventEmulationInPage(bool enabled)
     m_state->setBoolean(PageAgentState::touchEventEmulationEnabled, enabled);
     if (mainFrame() && mainFrame()->settings())
         mainFrame()->settings()->setTouchEventEmulationEnabled(enabled);
+    m_overlay->setOverride(InspectorOverlay::TouchOverride, enabled);
+}
+
+void InspectorPageAgent::updateOverridesTopOffset()
+{
+    static const int continousPaintingGraphHeight = 92;
+    static const int fpsGraphHeight = 73;
+    int topOffset = 0;
+    if (m_state->getBoolean(PageAgentState::pageAgentContinuousPaintingEnabled))
+        topOffset = continousPaintingGraphHeight;
+    else if (m_state->getBoolean(PageAgentState::pageAgentShowFPSCounter))
+        topOffset = fpsGraphHeight;
+    m_overlay->setOverridesTopOffset(topOffset);
 }
 
 void InspectorPageAgent::setGeolocationOverride(ErrorString* error, const double* latitude, const double* longitude, const double* accuracy)
@@ -1135,6 +1154,7 @@ void InspectorPageAgent::setGeolocationOverride(ErrorString* error, const double
         m_geolocationPosition.clear();
 
     controller->positionChanged(0); // Kick location update.
+    m_overlay->setOverride(InspectorOverlay::GeolocationOverride, true);
 }
 
 void InspectorPageAgent::clearGeolocationOverride(ErrorString*)
@@ -1147,6 +1167,7 @@ void InspectorPageAgent::clearGeolocationOverride(ErrorString*)
     GeolocationController* controller = GeolocationController::from(m_page);
     if (controller && m_platformGeolocationPosition.get())
         controller->positionChanged(m_platformGeolocationPosition.get());
+    m_overlay->setOverride(InspectorOverlay::GeolocationOverride, false);
 }
 
 GeolocationPosition* InspectorPageAgent::overrideGeolocationPosition(GeolocationPosition* position)
@@ -1172,11 +1193,13 @@ void InspectorPageAgent::setDeviceOrientationOverride(ErrorString* error, double
 
     m_deviceOrientation = DeviceOrientationData::create(true, alpha, true, beta, true, gamma);
     controller->didChangeDeviceOrientation(m_deviceOrientation.get());
+    m_overlay->setOverride(InspectorOverlay::DeviceOrientationOverride, true);
 }
 
 void InspectorPageAgent::clearDeviceOrientationOverride(ErrorString*)
 {
     m_deviceOrientation.clear();
+    m_overlay->setOverride(InspectorOverlay::DeviceOrientationOverride, false);
 }
 
 DeviceOrientationData* InspectorPageAgent::overrideDeviceOrientation(DeviceOrientationData* deviceOrientation)
@@ -1207,6 +1230,7 @@ void InspectorPageAgent::setEmulatedMedia(ErrorString*, const String& media)
         document->styleResolverChanged(RecalcStyleImmediately);
         document->updateLayout();
     }
+    m_overlay->setOverride(InspectorOverlay::CSSMediaOverride, !media.isEmpty());
 }
 
 void InspectorPageAgent::applyEmulatedMedia(String* media)
@@ -1233,20 +1257,6 @@ void InspectorPageAgent::setForceCompositingMode(ErrorString* errorString, bool 
     if (!mainFrame)
         return;
     mainFrame->view()->updateCompositingLayersAfterStyleChange();
-}
-
-void InspectorPageAgent::getCompositingBordersVisible(ErrorString* error, bool* outParam)
-{
-    Settings* settings = m_page->settings();
-    *outParam = settings->showDebugBorders() || settings->showRepaintCounter();
-}
-
-void InspectorPageAgent::setCompositingBordersVisible(ErrorString*, bool visible)
-{
-    Settings* settings = m_page->settings();
-
-    settings->setShowDebugBorders(visible);
-    settings->setShowRepaintCounter(visible);
 }
 
 void InspectorPageAgent::captureScreenshot(ErrorString*, String*)

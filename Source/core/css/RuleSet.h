@@ -24,10 +24,9 @@
 
 #include "core/css/RuleFeature.h"
 #include "core/css/StyleRule.h"
-#include <wtf/Forward.h>
-#include <wtf/HashMap.h>
-#include <wtf/HashSet.h>
-#include <wtf/text/AtomicString.h>
+#include "wtf/Forward.h"
+#include "wtf/HashMap.h"
+#include "wtf/LinkedStack.h"
 
 namespace WebCore {
 
@@ -52,6 +51,7 @@ class StyleRuleRegion;
 class StyleSheetContents;
 
 class RuleData {
+    NEW_DELETE_SAME_AS_MALLOC_FREE;
 public:
     RuleData(StyleRule*, unsigned selectorIndex, unsigned position, AddRuleFlags);
 
@@ -59,6 +59,9 @@ public:
     StyleRule* rule() const { return m_rule; }
     const CSSSelector* selector() const { return m_rule->selectorList().selectorAt(m_selectorIndex); }
     unsigned selectorIndex() const { return m_selectorIndex; }
+
+    bool isLastInArray() const { return m_isLastInArray; }
+    void setLastInArray(bool flag) { m_isLastInArray = flag; }
 
     bool hasFastCheckableSelector() const { return m_hasFastCheckableSelector; }
     bool hasMultipartSelector() const { return m_hasMultipartSelector; }
@@ -68,15 +71,13 @@ public:
     unsigned linkMatchType() const { return m_linkMatchType; }
     bool hasDocumentSecurityOrigin() const { return m_hasDocumentSecurityOrigin; }
     PropertyWhitelistType propertyWhitelistType(bool isMatchingUARules = false) const { return isMatchingUARules ? PropertyWhitelistNone : static_cast<PropertyWhitelistType>(m_propertyWhitelistType); }
-    // Try to balance between memory usage (there can be lots of RuleData objects) and good filtering performance.
-    static const unsigned maximumIdentifierCount = 4;
-    const unsigned* descendantSelectorIdentifierHashes() const { return m_descendantSelectorIdentifierHashes; }
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
     StyleRule* m_rule;
-    unsigned m_selectorIndex : 13;
+    unsigned m_selectorIndex : 12;
+    unsigned m_isLastInArray : 1; // We store an array of RuleData objects in a primitive array.
     // This number was picked fairly arbitrarily. We can probably lower it if we need to.
     // Some simple testing showed <100,000 RuleData's on large sites.
     unsigned m_position : 18;
@@ -88,15 +89,12 @@ private:
     unsigned m_linkMatchType : 2; //  SelectorChecker::LinkMatchMask
     unsigned m_hasDocumentSecurityOrigin : 1;
     unsigned m_propertyWhitelistType : 2;
-    // Use plain array instead of a Vector to minimize memory overhead.
-    unsigned m_descendantSelectorIdentifierHashes[maximumIdentifierCount];
 };
     
 struct SameSizeAsRuleData {
     void* a;
     unsigned b;
     unsigned c;
-    unsigned d[4];
 };
 
 COMPILE_ASSERT(sizeof(RuleData) == sizeof(SameSizeAsRuleData), RuleData_should_stay_small);
@@ -106,51 +104,32 @@ class RuleSet {
 public:
     static PassOwnPtr<RuleSet> create() { return adoptPtr(new RuleSet); }
 
-    typedef HashMap<AtomicStringImpl*, OwnPtr<Vector<RuleData> > > AtomRuleMap;
-
     void addRulesFromSheet(StyleSheetContents*, const MediaQueryEvaluator&, StyleResolver* = 0, const ContainerNode* = 0);
-
     void addStyleRule(StyleRule*, AddRuleFlags);
     void addRule(StyleRule*, unsigned selectorIndex, AddRuleFlags);
-    void addPageRule(StyleRulePage*);
-    void addToRuleSet(AtomicStringImpl* key, AtomRuleMap&, const RuleData&);
-    void addRegionRule(StyleRuleRegion*, bool hasDocumentSecurityOrigin);
-    void shrinkToFit();
-    void disableAutoShrinkToFit() { m_autoShrinkToFitEnabled = false; }
 
     const RuleFeatureSet& features() const { return m_features; }
 
-    const Vector<RuleData>* idRules(AtomicStringImpl* key) const { return m_idRules.get(key); }
-    const Vector<RuleData>* classRules(AtomicStringImpl* key) const { return m_classRules.get(key); }
-    const Vector<RuleData>* tagRules(AtomicStringImpl* key) const { return m_tagRules.get(key); }
-    const Vector<RuleData>* shadowPseudoElementRules(AtomicStringImpl* key) const { return m_shadowPseudoElementRules.get(key); }
-    const Vector<RuleData>* linkPseudoClassRules() const { return &m_linkPseudoClassRules; }
-    const Vector<RuleData>* cuePseudoRules() const { return &m_cuePseudoRules; }
-    const Vector<RuleData>* focusPseudoClassRules() const { return &m_focusPseudoClassRules; }
-    const Vector<RuleData>* universalRules() const { return &m_universalRules; }
-    const Vector<StyleRulePage*>& pageRules() const { return m_pageRules; }
+    const RuleData* idRules(AtomicStringImpl* key) const { ASSERT(!m_pendingRules); return m_idRules.get(key); }
+    const RuleData* classRules(AtomicStringImpl* key) const { ASSERT(!m_pendingRules); return m_classRules.get(key); }
+    const RuleData* tagRules(AtomicStringImpl* key) const { ASSERT(!m_pendingRules); return m_tagRules.get(key); }
+    const RuleData* shadowPseudoElementRules(AtomicStringImpl* key) const { ASSERT(!m_pendingRules); return m_shadowPseudoElementRules.get(key); }
+    const Vector<RuleData>* linkPseudoClassRules() const { ASSERT(!m_pendingRules); return &m_linkPseudoClassRules; }
+    const Vector<RuleData>* cuePseudoRules() const { ASSERT(!m_pendingRules); return &m_cuePseudoRules; }
+    const Vector<RuleData>* focusPseudoClassRules() const { ASSERT(!m_pendingRules); return &m_focusPseudoClassRules; }
+    const Vector<RuleData>* universalRules() const { ASSERT(!m_pendingRules); return &m_universalRules; }
+    const Vector<StyleRulePage*>& pageRules() const { ASSERT(!m_pendingRules); return m_pageRules; }
+
+    unsigned ruleCount() const { return m_ruleCount; }
+
+    void compactRulesIfNeeded()
+    {
+        if (!m_pendingRules)
+            return;
+        compactRules();
+    }
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
-
-private:
-    void addChildRules(const Vector<RefPtr<StyleRuleBase> >&, const MediaQueryEvaluator& medium, StyleResolver*, const ContainerNode* scope, bool hasDocumentSecurityOrigin, AddRuleFlags);
-    bool findBestRuleSetAndAdd(const CSSSelector*, RuleData&);
-
-public:
-    RuleSet();
-
-    AtomRuleMap m_idRules;
-    AtomRuleMap m_classRules;
-    AtomRuleMap m_tagRules;
-    AtomRuleMap m_shadowPseudoElementRules;
-    Vector<RuleData> m_linkPseudoClassRules;
-    Vector<RuleData> m_cuePseudoRules;
-    Vector<RuleData> m_focusPseudoClassRules;
-    Vector<RuleData> m_universalRules;
-    Vector<StyleRulePage*> m_pageRules;
-    unsigned m_ruleCount;
-    bool m_autoShrinkToFitEnabled;
-    RuleFeatureSet m_features;
 
     struct RuleSetSelectorPair {
         RuleSetSelectorPair(const CSSSelector* selector, PassOwnPtr<RuleSet> ruleSet) : selector(selector), ruleSet(ruleSet) { }
@@ -162,13 +141,54 @@ public:
     };
 
     Vector<RuleSetSelectorPair> m_regionSelectorsAndRuleSets;
-};
 
-inline RuleSet::RuleSet()
-    : m_ruleCount(0)
-    , m_autoShrinkToFitEnabled(true)
-{
-}
+private:
+    typedef HashMap<AtomicStringImpl*, OwnPtr<LinkedStack<RuleData> > > PendingRuleMap;
+    typedef HashMap<AtomicStringImpl*, OwnPtr<RuleData> > CompactRuleMap;
+
+    RuleSet()
+        : m_ruleCount(0)
+    {
+    }
+
+    void addToRuleSet(AtomicStringImpl* key, PendingRuleMap&, const RuleData&);
+    void addPageRule(StyleRulePage*);
+    void addRegionRule(StyleRuleRegion*, bool hasDocumentSecurityOrigin);
+
+    void addChildRules(const Vector<RefPtr<StyleRuleBase> >&, const MediaQueryEvaluator& medium, StyleResolver*, const ContainerNode* scope, bool hasDocumentSecurityOrigin, AddRuleFlags);
+    bool findBestRuleSetAndAdd(const CSSSelector*, RuleData&);
+
+    void compactRules();
+    static void compactPendingRules(PendingRuleMap&, CompactRuleMap&);
+
+    struct PendingRuleMaps {
+        PendingRuleMap idRules;
+        PendingRuleMap classRules;
+        PendingRuleMap tagRules;
+        PendingRuleMap shadowPseudoElementRules;
+    };
+
+    PendingRuleMaps* ensurePendingRules()
+    {
+        if (!m_pendingRules)
+            m_pendingRules = adoptPtr(new PendingRuleMaps);
+        return m_pendingRules.get();
+    }
+
+    CompactRuleMap m_idRules;
+    CompactRuleMap m_classRules;
+    CompactRuleMap m_tagRules;
+    CompactRuleMap m_shadowPseudoElementRules;
+    Vector<RuleData> m_linkPseudoClassRules;
+    Vector<RuleData> m_cuePseudoRules;
+    Vector<RuleData> m_focusPseudoClassRules;
+    Vector<RuleData> m_universalRules;
+    RuleFeatureSet m_features;
+    Vector<StyleRulePage*> m_pageRules;
+
+    unsigned m_ruleCount;
+    OwnPtr<PendingRuleMaps> m_pendingRules;
+};
 
 } // namespace WebCore
 

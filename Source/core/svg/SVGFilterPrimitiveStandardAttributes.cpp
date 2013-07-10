@@ -70,7 +70,7 @@ bool SVGFilterPrimitiveStandardAttributes::isSupportedAttribute(const QualifiedN
         supportedAttributes.add(SVGNames::heightAttr);
         supportedAttributes.add(SVGNames::resultAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGFilterPrimitiveStandardAttributes::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -137,9 +137,9 @@ void SVGFilterPrimitiveStandardAttributes::setStandardAttributes(FilterEffect* f
         filterEffect->setHasHeight(true);
 }
 
-RenderObject* SVGFilterPrimitiveStandardAttributes::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGFilterPrimitiveStandardAttributes::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGResourceFilterPrimitive(this);
+    return new (document()->renderArena()) RenderSVGResourceFilterPrimitive(this);
 }
 
 bool SVGFilterPrimitiveStandardAttributes::rendererIsNeeded(const NodeRenderingContext& context)

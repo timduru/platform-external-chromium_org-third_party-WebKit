@@ -66,6 +66,12 @@ enum ContentSecurityPolicyCheck {
     DoNotCheckContentSecurityPolicy
 };
 
+enum RequestOriginPolicy {
+    UseDefaultOriginRestrictionsForType,
+    RestrictToSameOrigin,
+    PotentiallyCrossOriginEnabled // Indicates "potentially CORS-enabled fetch" in HTML standard.
+};
+
 struct ResourceLoaderOptions {
     ResourceLoaderOptions()
         : sendLoadCallbacks(DoNotSendCallbacks)
@@ -75,7 +81,10 @@ struct ResourceLoaderOptions {
         , credentialsRequested(ClientDidNotRequestCredentials)
         , crossOriginCredentialPolicy(DoNotAskClientForCrossOriginCredentials)
         , securityCheck(DoSecurityCheck)
-        , contentSecurityPolicyOption(CheckContentSecurityPolicy) { }
+        , contentSecurityPolicyOption(CheckContentSecurityPolicy)
+        , requestOriginPolicy(UseDefaultOriginRestrictionsForType)
+    {
+    }
 
     ResourceLoaderOptions(
         SendCallbackPolicy sendLoadCallbacks,
@@ -85,7 +94,8 @@ struct ResourceLoaderOptions {
         CredentialRequest credentialsRequested,
         ClientCrossOriginCredentialPolicy crossOriginCredentialPolicy,
         SecurityCheckPolicy securityCheck,
-        ContentSecurityPolicyCheck contentSecurityPolicyOption)
+        ContentSecurityPolicyCheck contentSecurityPolicyOption,
+        RequestOriginPolicy requestOriginPolicy)
         : sendLoadCallbacks(sendLoadCallbacks)
         , sniffContent(sniffContent)
         , dataBufferingPolicy(dataBufferingPolicy)
@@ -94,6 +104,7 @@ struct ResourceLoaderOptions {
         , crossOriginCredentialPolicy(crossOriginCredentialPolicy)
         , securityCheck(securityCheck)
         , contentSecurityPolicyOption(contentSecurityPolicyOption)
+        , requestOriginPolicy(requestOriginPolicy)
     {
     }
     SendCallbackPolicy sendLoadCallbacks;
@@ -105,6 +116,7 @@ struct ResourceLoaderOptions {
     SecurityCheckPolicy securityCheck;
     ContentSecurityPolicyCheck contentSecurityPolicyOption;
     CachedResourceInitiatorInfo initiatorInfo;
+    RequestOriginPolicy requestOriginPolicy;
 };
 
 } // namespace WebCore

@@ -73,9 +73,9 @@ def _builder_options(builder_name):
 class PortFactory(object):
     PORT_CLASSES = (
         'chromium_android.ChromiumAndroidPort',
-        'chromium_linux.ChromiumLinuxPort',
+        'linux.LinuxPort',
         'chromium_mac.ChromiumMacPort',
-        'chromium_win.ChromiumWinPort',
+        'win.WinPort',
         'mock_drt.MockDRTPort',
         'test.TestPort',
     )
@@ -86,11 +86,11 @@ class PortFactory(object):
     def _default_port(self, options):
         platform = self._host.platform
         if platform.is_linux() or platform.is_freebsd():
-            return 'chromium-linux'
+            return 'linux'
         elif platform.is_mac():
             return 'chromium-mac'
         elif platform.is_win():
-            return 'chromium-win'
+            return 'win'
         raise NotImplementedError('unknown platform: %s' % platform)
 
     def get(self, port_name=None, options=None, **kwargs):
@@ -100,10 +100,17 @@ class PortFactory(object):
         port_name = port_name or self._default_port(options)
 
         # FIXME(dpranke): We special-case '--platform chromium' so that it can co-exist
-        # with '--platform chromium-mac' and '--platform chromium-linux' properly (we
+        # with '--platform chromium-mac' and '--platform linux' properly (we
         # can't look at the port_name prefix in this case).
         if port_name == 'chromium':
-            port_name = 'chromium-' + self._host.platform.os_name
+            # FIXME(steveblock): This hack will go away once all ports have
+            # been renamed to remove the 'chromium-' part.
+            if self._host.platform.os_name == 'win':
+                port_name = 'win'
+            elif self._host.platform.os_name == 'linux':
+                port_name = 'linux'
+            else:
+                port_name = 'chromium-' + self._host.platform.os_name
 
         for port_class in self.PORT_CLASSES:
             module_name, class_name = port_class.rsplit('.', 1)

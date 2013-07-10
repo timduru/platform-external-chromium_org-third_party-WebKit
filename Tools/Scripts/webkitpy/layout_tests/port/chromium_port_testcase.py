@@ -34,9 +34,9 @@ from webkitpy.common.system.systemhost_mock import MockSystemHost
 from webkitpy.tool.mocktool import MockOptions
 
 import chromium_android
-import chromium_linux
+import linux
 import chromium_mac
-import chromium_win
+import win
 
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port import port_testcase
@@ -107,19 +107,19 @@ class ChromiumPortTestCase(port_testcase.PortTestCase):
             self.default_configuration_called = True
             return 'default'
 
-    class TestLinuxPort(chromium_linux.ChromiumLinuxPort):
+    class TestLinuxPort(linux.LinuxPort):
         def __init__(self, options=None):
             options = options or MockOptions()
-            chromium_linux.ChromiumLinuxPort.__init__(self, MockSystemHost(os_name='linux', os_version='lucid'), 'chromium-linux-x86', options=options)
+            linux.LinuxPort.__init__(self, MockSystemHost(os_name='linux', os_version='lucid'), 'linux-x86', options=options)
 
         def default_configuration(self):
             self.default_configuration_called = True
             return 'default'
 
-    class TestWinPort(chromium_win.ChromiumWinPort):
+    class TestWinPort(win.WinPort):
         def __init__(self, options=None):
             options = options or MockOptions()
-            chromium_win.ChromiumWinPort.__init__(self, MockSystemHost(os_name='win', os_version='xp'), 'chromium-win-xp', options=options)
+            win.WinPort.__init__(self, MockSystemHost(os_name='win', os_version='xp'), 'win-xp', options=options)
 
         def default_configuration(self):
             self.default_configuration_called = True
@@ -168,7 +168,7 @@ class ChromiumPortTestCase(port_testcase.PortTestCase):
     def test_diff_image_crashed(self):
         port = ChromiumPortTestCase.TestLinuxPort()
         port._executive = MockExecutive2(exit_code=2)
-        self.assertEqual(port.diff_image("EXPECTED", "ACTUAL"), (None, 0, 'image diff returned an exit code of 2'))
+        self.assertEqual(port.diff_image("EXPECTED", "ACTUAL"), (None, 'image diff returned an exit code of 2'))
 
     def test_expectations_files(self):
         port = self.make_port()

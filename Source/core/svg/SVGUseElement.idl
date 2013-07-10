@@ -23,12 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-interface SVGUseElement : SVGStyledElement,
-                          SVGURIReference,
-                          SVGTests,
-                          SVGLangSpace,
-                          SVGExternalResourcesRequired,
-                          SVGTransformable {
+interface SVGUseElement : SVGGraphicsElement {
     readonly attribute SVGAnimatedLength   x;
     readonly attribute SVGAnimatedLength   y;
     readonly attribute SVGAnimatedLength   width;
@@ -37,4 +32,8 @@ interface SVGUseElement : SVGStyledElement,
     readonly attribute SVGElementInstance instanceRoot;
     readonly attribute SVGElementInstance animatedInstanceRoot;
 };
+
+SVGUseElement implements SVGExternalResourcesRequired;
+SVGUseElement implements SVGTests;
+SVGUseElement implements SVGURIReference;
 

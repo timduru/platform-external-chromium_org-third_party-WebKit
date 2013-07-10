@@ -214,12 +214,9 @@ bool WebPagePopupImpl::initializePage()
 
     DOMWindowPagePopup::install(frame->document()->domWindow(), m_popupClient);
 
-    DocumentWriter* writer = frame->loader()->activeDocumentLoader()->writer();
-    writer->setMIMEType("text/html");
-    writer->setEncoding("UTF-8", false);
-    writer->begin();
+    DocumentWriter* writer = frame->loader()->activeDocumentLoader()->beginWriting("text/html", "UTF-8");
     m_popupClient->writeDocument(*writer);
-    writer->end();
+    frame->loader()->activeDocumentLoader()->endWriting(writer);
     return true;
 }
 

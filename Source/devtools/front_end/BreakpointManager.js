@@ -48,7 +48,7 @@ WebInspector.BreakpointManager = function(breakpointStorage, debuggerModel, work
 
     this._debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.BreakpointResolved, this._breakpointResolved, this);
     this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._projectWillReset, this);
-    this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
+    this._workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
 }
 
 WebInspector.BreakpointManager.Events = {
@@ -483,8 +483,8 @@ WebInspector.BreakpointManager.Breakpoint.prototype = {
 
         var scriptFile = this._primaryUILocation.uiSourceCode.scriptFile();
         if (this._enabled && !(scriptFile && scriptFile.hasDivergedFromVM())) {
-            this._setInDebugger();
-            return;
+            if (this._setInDebugger())
+                return;
         }
 
         this._fakeBreakpointAtPrimaryLocation();
@@ -506,10 +506,15 @@ WebInspector.BreakpointManager.Breakpoint.prototype = {
         console.assert(!this._debuggerId);
         var rawLocation = this._primaryUILocation.uiLocationToRawLocation();
         var debuggerModelLocation = /** @type {WebInspector.DebuggerModel.Location} */ (rawLocation);
-        if (debuggerModelLocation)
+        if (debuggerModelLocation) {
             this._breakpointManager._debuggerModel.setBreakpointByScriptLocation(debuggerModelLocation, this._condition, this._didSetBreakpointInDebugger.bind(this));
-        else
+            return true;
+        }
+        if (this._primaryUILocation.uiSourceCode.url) {
             this._breakpointManager._debuggerModel.setBreakpointByURL(this._primaryUILocation.uiSourceCode.url, this._primaryUILocation.lineNumber, 0, this._condition, this._didSetBreakpointInDebugger.bind(this));
+            return true;
+        }
+        return false;
     },
 
     /**

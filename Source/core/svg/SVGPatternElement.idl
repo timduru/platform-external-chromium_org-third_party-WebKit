@@ -23,13 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-interface SVGPatternElement : SVGStyledElement,
-                              SVGURIReference,
-                              SVGTests,
-                              SVGLangSpace,
-                              SVGExternalResourcesRequired,
-                              SVGFitToViewBox
-                              /* SVGUnitTypes */ {
+interface SVGPatternElement : SVGStyledElement {
     readonly attribute SVGAnimatedEnumeration   patternUnits;
     readonly attribute SVGAnimatedEnumeration   patternContentUnits;
     readonly attribute SVGAnimatedTransformList patternTransform;
@@ -38,4 +32,9 @@ interface SVGPatternElement : SVGStyledElement,
     readonly attribute SVGAnimatedLength        width;
     readonly attribute SVGAnimatedLength        height;
 };
+
+SVGPatternElement implements SVGExternalResourcesRequired;
+SVGPatternElement implements SVGFitToViewBox;
+SVGPatternElement implements SVGTests;
+SVGPatternElement implements SVGURIReference;
 

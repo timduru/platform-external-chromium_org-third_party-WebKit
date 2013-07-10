@@ -43,7 +43,7 @@
 #include "public/platform/WebRect.h"
 #include "public/platform/WebURL.h"
 #include "public/platform/WebURLRequest.h"
-#include <wtf/Vector.h>
+#include "wtf/Vector.h"
 
 using namespace WebCore;
 
@@ -131,6 +131,11 @@ void InspectorClientImpl::setShowFPSCounter(bool show)
 void InspectorClientImpl::setContinuousPaintingEnabled(bool enabled)
 {
     m_inspectedWebView->setContinuousPaintingEnabled(enabled);
+}
+
+void InspectorClientImpl::setShowScrollBottleneckRects(bool show)
+{
+    m_inspectedWebView->setShowScrollBottleneckRects(show);
 }
 
 void InspectorClientImpl::getAllocatedObjects(HashSet<const void*>& set)

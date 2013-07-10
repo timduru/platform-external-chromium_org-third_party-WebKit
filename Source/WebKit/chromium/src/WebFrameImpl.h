@@ -38,10 +38,11 @@
 #include "core/page/FrameDestructionObserver.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "public/platform/WebFileSystemType.h"
-#include <wtf/Compiler.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/Compiler.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/RefCounted.h"
+#include "wtf/text/WTFString.h"
+#include <bindings/npruntime.h>
 
 namespace WebCore {
 class GraphicsContext;
@@ -107,7 +108,6 @@ public:
     virtual WebPerformance performance() const;
     virtual NPObject* windowObject() const;
     virtual void bindToWindowObject(const WebString& name, NPObject*);
-    virtual void bindToWindowObject(const WebString& name, NPObject*, void*);
     virtual void executeScript(const WebScriptSource&);
     virtual void executeScriptInIsolatedWorld(
         int worldID, const WebScriptSource* sources, unsigned numSources,
@@ -160,7 +160,6 @@ public:
     virtual void setReferrerForRequest(WebURLRequest&, const WebURL& referrer);
     virtual void dispatchWillSendRequest(WebURLRequest&);
     virtual WebURLLoader* createAssociatedURLLoader(const WebURLLoaderOptions&);
-    virtual void commitDocumentData(const char* data, size_t length);
     virtual unsigned unloadListenerCount() const;
     virtual bool willSuppressOpenerInNewFrame() const;
     virtual void replaceSelection(const WebString&);

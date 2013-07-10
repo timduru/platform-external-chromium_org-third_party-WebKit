@@ -121,7 +121,7 @@ bool SVGMarkerElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::markerHeightAttr);
         supportedAttributes.add(SVGNames::orientAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGMarkerElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -212,9 +212,9 @@ void SVGMarkerElement::setOrientToAngle(const SVGAngle& angle)
     svgAttributeChanged(orientAnglePropertyInfo()->attributeName);
 }
 
-RenderObject* SVGMarkerElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGMarkerElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGResourceMarker(this);
+    return new (document()->renderArena()) RenderSVGResourceMarker(this);
 }
 
 bool SVGMarkerElement::selfHasRelativeLengths() const

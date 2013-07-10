@@ -34,8 +34,6 @@
 #include "core/html/canvas/CanvasRenderingContext2D.h"
 
 #include "CSSPropertyNames.h"
-#include "HTMLNames.h"
-#include "RuntimeEnabledFeatures.h"
 #include "core/css/CSSFontSelector.h"
 #include "core/css/CSSParser.h"
 #include "core/css/StylePropertySet.h"
@@ -54,32 +52,24 @@
 #include "core/html/canvas/CanvasStyle.h"
 #include "core/html/canvas/DOMPath.h"
 #include "core/loader/cache/CachedImage.h"
-#include "core/page/Console.h"
-#include "core/page/Page.h"
-#include "core/page/Settings.h"
-#include "core/platform/FloatConversion.h"
+#include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/platform/graphics/TextRun.h"
 #include "core/platform/graphics/transforms/AffineTransform.h"
-#include "core/rendering/RenderHTMLCanvas.h"
 #include "core/rendering/RenderLayer.h"
-#include "weborigin/KURL.h"
 #include "weborigin/SecurityOrigin.h"
 
-#include <wtf/CheckedArithmetic.h>
-#include <wtf/MathExtras.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/Uint8ClampedArray.h>
-#include <wtf/UnusedParam.h>
+#include "wtf/CheckedArithmetic.h"
+#include "wtf/MathExtras.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/Uint8ClampedArray.h"
+#include "wtf/text/StringBuilder.h"
 
 using namespace std;
 
 namespace WebCore {
-
-using namespace HTMLNames;
 
 static const int defaultFontSize = 10;
 static const char* const defaultFontFamily = "sans-serif";
@@ -587,8 +577,6 @@ void CanvasRenderingContext2D::setGlobalCompositeOperation(const String& operati
     BlendMode blendMode = BlendModeNormal;
     if (!parseCompositeAndBlendOperator(operation, op, blendMode))
         return;
-    if (!RuntimeEnabledFeatures::cssCompositingEnabled() && blendMode != BlendModeNormal)
-        blendMode = BlendModeNormal;
     if ((state().m_globalComposite == op) && (state().m_globalBlend == blendMode))
         return;
     realizeSaves();
@@ -1163,10 +1151,12 @@ void CanvasRenderingContext2D::applyShadow()
     if (!c)
         return;
 
-    if (shouldDrawShadows())
-        c->setShadow(state().m_shadowOffset, state().m_shadowBlur, state().m_shadowColor);
-    else
+    if (shouldDrawShadows()) {
+        c->setShadow(state().m_shadowOffset, state().m_shadowBlur, state().m_shadowColor,
+            DrawLooper::ShadowIgnoresTransforms);
+    } else {
         c->clearShadow();
+    }
 }
 
 bool CanvasRenderingContext2D::shouldDrawShadows() const
@@ -2076,7 +2066,7 @@ PassRefPtr<TextMetrics> CanvasRenderingContext2D::measureText(const String& text
 {
     FontCachePurgePreventer fontCachePurgePreventer;
     RefPtr<TextMetrics> metrics = TextMetrics::create();
-    metrics->setWidth(accessFont().width(TextRun(text.characters(), text.length())));
+    metrics->setWidth(accessFont().width(TextRun(text)));
     return metrics.release();
 }
 

@@ -23,10 +23,6 @@
 #include "core/page/Chrome.h"
 
 #include "public/platform/WebScreenInfo.h"
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefPtr.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/Vector.h>
 #include "HTMLNames.h"
 #include "core/dom/Document.h"
 #include "core/html/HTMLInputElement.h"
@@ -43,7 +39,8 @@
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/network/DNS.h"
 #include "core/rendering/HitTestResult.h"
-#include "core/storage/StorageNamespace.h"
+#include "wtf/PassRefPtr.h"
+#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -148,21 +145,9 @@ void Chrome::focusedNodeChanged(Node* node) const
     m_client->focusedNodeChanged(node);
 }
 
-Page* Chrome::createWindow(Frame* frame, const FrameLoadRequest& request, const WindowFeatures& features, const NavigationAction& action) const
+void Chrome::show(NavigationPolicy policy) const
 {
-    Page* newPage = m_client->createWindow(frame, request, features, action);
-
-    if (newPage) {
-        if (StorageNamespace* oldSessionStorage = m_page->sessionStorage(false))
-            newPage->setSessionStorage(oldSessionStorage->copy());
-    }
-
-    return newPage;
-}
-
-void Chrome::show() const
-{
-    m_client->show();
+    m_client->show(policy);
 }
 
 bool Chrome::canRunModal() const

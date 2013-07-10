@@ -96,11 +96,11 @@ PassOwnPtr<ContextMenu> ContextMenuController::createContextMenu(Event* event)
     if (!event->isMouseEvent())
         return nullptr;
 
-    MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
+    MouseEvent* mouseEvent = toMouseEvent(event);
     HitTestResult result(mouseEvent->absoluteLocation());
 
     if (Frame* frame = event->target()->toNode()->document()->frame())
-        result = frame->eventHandler()->hitTestResultAtPoint(mouseEvent->absoluteLocation());
+        result = frame->eventHandler()->hitTestResultAtPoint(mouseEvent->absoluteLocation(), HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
 
     if (!result.innerNonSharedNode())
         return nullptr;

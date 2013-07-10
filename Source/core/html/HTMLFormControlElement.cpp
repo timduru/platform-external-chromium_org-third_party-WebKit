@@ -55,6 +55,7 @@ HTMLFormControlElement::HTMLFormControlElement(const QualifiedName& tagName, Doc
     , m_willValidate(true)
     , m_isValid(true)
     , m_wasChangedSinceLastFormControlChangeEvent(false)
+    , m_wasFocusedByMouse(false)
     , m_hasAutofocused(false)
 {
     setForm(form ? form : findFormAncestor());
@@ -316,13 +317,38 @@ bool HTMLFormControlElement::rendererIsFocusable() const
 
 bool HTMLFormControlElement::isKeyboardFocusable(KeyboardEvent*) const
 {
-    return isFocusable() && document()->frame();
+    // Skip tabIndex check in a parent class.
+    return isFocusable();
 }
 
-bool HTMLFormControlElement::isMouseFocusable() const
+bool HTMLFormControlElement::shouldShowFocusRingOnMouseFocus() const
 {
     return false;
 }
+
+void HTMLFormControlElement::dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode, FocusDirection direction)
+{
+    m_wasFocusedByMouse = direction == FocusDirectionMouse;
+    HTMLElement::dispatchFocusEvent(oldFocusedNode, direction);
+}
+
+bool HTMLFormControlElement::shouldHaveFocusAppearance() const
+{
+    ASSERT(focused());
+    return shouldShowFocusRingOnMouseFocus() || !m_wasFocusedByMouse;
+}
+
+void HTMLFormControlElement::willCallDefaultEventHandler(const Event& event)
+{
+    if (!event.isKeyboardEvent() || event.type() != eventNames().keydownEvent)
+        return;
+    if (!m_wasFocusedByMouse)
+        return;
+    m_wasFocusedByMouse = false;
+    if (renderer())
+        renderer()->repaint();
+}
+
 
 short HTMLFormControlElement::tabIndex() const
 {
@@ -396,10 +422,12 @@ void HTMLFormControlElement::hideVisibleValidationMessage()
         m_validationMessage->requestToHideMessage();
 }
 
-bool HTMLFormControlElement::checkValidity(Vector<RefPtr<FormAssociatedElement> >* unhandledInvalidControls)
+bool HTMLFormControlElement::checkValidity(Vector<RefPtr<FormAssociatedElement> >* unhandledInvalidControls, CheckValidityDispatchEvents dispatchEvents)
 {
     if (!willValidate() || isValidFormControlElement())
         return true;
+    if (dispatchEvents == CheckValidityDispatchEventsNone)
+        return false;
     // An event handler can deref this object.
     RefPtr<HTMLFormControlElement> protector(this);
     RefPtr<Document> originalDocument(document());
@@ -460,7 +488,7 @@ HTMLFormControlElement* HTMLFormControlElement::enclosingFormControlElement(Node
 {
     for (; node; node = node->parentNode()) {
         if (node->isElementNode() && toElement(node)->isFormControlElement())
-            return static_cast<HTMLFormControlElement*>(node);
+            return toHTMLFormControlElement(node);
     }
     return 0;
 }

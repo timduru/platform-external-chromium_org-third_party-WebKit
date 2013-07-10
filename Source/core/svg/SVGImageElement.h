@@ -25,17 +25,13 @@
 #include "core/svg/SVGAnimatedLength.h"
 #include "core/svg/SVGAnimatedPreserveAspectRatio.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
+#include "core/svg/SVGGraphicsElement.h"
 #include "core/svg/SVGImageLoader.h"
-#include "core/svg/SVGLangSpace.h"
-#include "core/svg/SVGStyledTransformableElement.h"
-#include "core/svg/SVGTests.h"
 #include "core/svg/SVGURIReference.h"
 
 namespace WebCore {
 
-class SVGImageElement FINAL : public SVGStyledTransformableElement,
-                              public SVGTests,
-                              public SVGLangSpace,
+class SVGImageElement FINAL : public SVGGraphicsElement,
                               public SVGExternalResourcesRequired,
                               public SVGURIReference {
 public:
@@ -56,7 +52,7 @@ private:
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
 
     virtual const AtomicString& imageSourceURL() const OVERRIDE;
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
@@ -75,11 +71,6 @@ private:
         DECLARE_ANIMATED_STRING(Href, href)
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
-
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 
     SVGImageLoader m_imageLoader;
 };

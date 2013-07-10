@@ -35,10 +35,10 @@
 #include "core/platform/Widget.h"
 #include "core/plugins/PluginView.h"
 
-#include <wtf/OwnPtr.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/text/WTFString.h>
-#include <wtf/Vector.h>
+#include "wtf/OwnPtr.h"
+#include "wtf/PassRefPtr.h"
+#include "wtf/text/WTFString.h"
+#include "wtf/Vector.h"
 
 struct NPObject;
 
@@ -74,6 +74,7 @@ public:
     // PluginView methods
     virtual WebLayer* platformLayer() const OVERRIDE;
     virtual NPObject* scriptableObject() OVERRIDE;
+    virtual NPP pluginNPP() OVERRIDE;
     virtual bool getFormValue(String&) OVERRIDE;
     virtual bool supportsKeyboardFocus() const OVERRIDE;
     virtual bool canProcessDrag() const OVERRIDE;
@@ -145,10 +146,10 @@ public:
     bool executeEditCommand(const WebString& name, const WebString& value);
 
     // Resource load events for the plugin's source data:
-    void didReceiveResponse(const WebCore::ResourceResponse&);
-    void didReceiveData(const char *data, int dataLength);
-    void didFinishLoading();
-    void didFailLoading(const WebCore::ResourceError&);
+    virtual void didReceiveResponse(const WebCore::ResourceResponse&) OVERRIDE;
+    virtual void didReceiveData(const char *data, int dataLength) OVERRIDE;
+    virtual void didFinishLoading() OVERRIDE;
+    virtual void didFailLoading(const WebCore::ResourceError&) OVERRIDE;
 
     void willDestroyPluginLoadObserver(WebPluginLoadObserver*);
 

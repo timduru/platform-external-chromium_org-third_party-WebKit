@@ -121,6 +121,16 @@ WebInspector.ExtensionServer.prototype = {
     },
 
     /**
+     * @param {string} type
+     * @return {boolean}
+     */
+    hasSubscribers: function(type)
+    {
+        return !!this._subscribers[type];
+    },
+
+    /**
+     * @param {string} type
      * @param {...*} vararg
      */
     _postNotification: function(type, vararg)
@@ -570,7 +580,7 @@ WebInspector.ExtensionServer.prototype = {
             WebInspector.networkManager, WebInspector.NetworkManager.EventTypes.RequestFinished, this._notifyRequestFinished);
         this._registerAutosubscriptionHandler(WebInspector.extensionAPI.Events.ResourceAdded,
             WebInspector.workspace,
-            WebInspector.UISourceCodeProvider.Events.UISourceCodeAdded,
+            WebInspector.Workspace.Events.UISourceCodeAdded,
             this._notifyResourceAdded);
         this._registerAutosubscriptionHandler(WebInspector.extensionAPI.Events.ElementsPanelObjectSelected,
             WebInspector.notifications,

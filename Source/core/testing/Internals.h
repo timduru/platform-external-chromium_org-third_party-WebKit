@@ -28,7 +28,7 @@
 #define Internals_h
 
 #include "core/css/CSSComputedStyleDeclaration.h"
-#include "core/dom/ContextDestructionObserver.h"
+#include "core/dom/ContextLifecycleObserver.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/NodeList.h"
 #include <wtf/ArrayBuffer.h>
@@ -62,8 +62,7 @@ class TypeConversions;
 
 typedef int ExceptionCode;
 
-class Internals : public RefCounted<Internals>
-                , public ContextDestructionObserver {
+class Internals : public RefCounted<Internals>, public ContextLifecycleObserver {
 public:
     static PassRefPtr<Internals> create(Document*);
     virtual ~Internals();
@@ -127,6 +126,8 @@ public:
     void setFormControlStateOfPreviousHistoryItem(const Vector<String>&, ExceptionCode&);
     void setEnableMockPagePopup(bool, ExceptionCode&);
     PassRefPtr<PagePopupController> pagePopupController();
+
+    PassRefPtr<ClientRect> unscaledViewportRect(ExceptionCode&);
 
     PassRefPtr<ClientRect> absoluteCaretBounds(ExceptionCode&);
 
@@ -277,6 +278,9 @@ public:
     String getImageSourceURL(Element*, ExceptionCode&);
 
     bool isSelectPopupVisible(Node*);
+
+    PassRefPtr<ClientRect> selectionBounds(ExceptionCode&);
+    String baseURL(Document*, ExceptionCode&);
 
 private:
     explicit Internals(Document*);

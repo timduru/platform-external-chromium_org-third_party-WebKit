@@ -33,15 +33,12 @@
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
 #include "core/dom/UserGestureIndicator.h"
-#include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLLabelElement.h"
 #include "core/html/HTMLSelectElement.h"
 #include "core/html/HTMLTextAreaElement.h"
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/unicode/CharacterNames.h>
+#include "wtf/text/StringBuilder.h"
 
 using namespace std;
 
@@ -595,6 +592,20 @@ bool AccessibilityNodeObject::isNativeTextControl() const
     return false;
 }
 
+bool AccessibilityNodeObject::isNonNativeTextControl() const
+{
+    if (isNativeTextControl())
+        return false;
+
+    if (hasContentEditableAttributeSet())
+        return true;
+
+    if (isARIATextControl())
+        return true;
+
+    return false;
+}
+
 bool AccessibilityNodeObject::isPasswordField() const
 {
     Node* node = this->node();
@@ -686,7 +697,7 @@ bool AccessibilityNodeObject::isReadOnly() const
         return true;
 
     if (node->hasTagName(textareaTag))
-        return static_cast<HTMLTextAreaElement*>(node)->isReadOnly();
+        return toHTMLFormControlElement(node)->isReadOnly();
 
     if (node->hasTagName(inputTag)) {
         HTMLInputElement* input = toHTMLInputElement(node);
@@ -704,7 +715,7 @@ bool AccessibilityNodeObject::isRequired() const
 
     Node* n = this->node();
     if (n && (n->isElementNode() && toElement(n)->isFormControlElement()))
-        return static_cast<HTMLFormControlElement*>(n)->isRequired();
+        return toHTMLFormControlElement(n)->isRequired();
 
     return false;
 }
@@ -819,12 +830,8 @@ String AccessibilityNodeObject::text() const
     if (!node)
         return String();
 
-    if (isNativeTextControl()) {
-        if (node->hasTagName(textareaTag))
-            return static_cast<HTMLTextAreaElement*>(node)->value();
-        if (node->hasTagName(inputTag))
-            return toHTMLInputElement(node)->value();
-    }
+    if (isNativeTextControl() && (node->hasTagName(textareaTag) || node->hasTagName(inputTag)))
+        return toHTMLTextFormControlElement(node)->value();
 
     if (!node->isElementNode())
         return String();
@@ -1414,9 +1421,41 @@ void AccessibilityNodeObject::childrenChanged()
         if (parent->supportsARIALiveRegion())
             axObjectCache()->postNotification(parent, parent->document(), AXObjectCache::AXLiveRegionChanged, true);
 
-        // If this element is an ARIA text control, notify the AT of changes.
-        if (parent->isARIATextControl() && !parent->isNativeTextControl() && !parent->node()->rendererIsEditable())
+        // If this element is an ARIA text box or content editable, post a "value changed" notification on it
+        // so that it behaves just like a native input element or textarea.
+        if (isNonNativeTextControl())
             axObjectCache()->postNotification(parent, parent->document(), AXObjectCache::AXValueChanged, true);
+    }
+}
+
+void AccessibilityNodeObject::selectionChanged()
+{
+    // When the selection changes, post the notification on the first ancestor that's an
+    // ARIA text box, or that's marked as contentEditable, otherwise post the notification
+    // on the web area.
+    if (isNonNativeTextControl() || isWebArea())
+        axObjectCache()->postNotification(this, document(), AXObjectCache::AXSelectedTextChanged, true);
+    else
+        AccessibilityObject::selectionChanged(); // Calls selectionChanged on parent.
+}
+
+void AccessibilityNodeObject::textChanged()
+{
+    // If this element supports ARIA live regions, or is part of a region with an ARIA editable role,
+    // then notify the AT of changes.
+    AXObjectCache* cache = axObjectCache();
+    for (Node* parentNode = node(); parentNode; parentNode = parentNode->parentNode()) {
+        AccessibilityObject* parent = cache->get(parentNode);
+        if (!parent)
+            continue;
+
+        if (parent->supportsARIALiveRegion())
+            cache->postNotification(parentNode, AXObjectCache::AXLiveRegionChanged, true);
+
+        // If this element is an ARIA text box or content editable, post a "value changed" notification on it
+        // so that it behaves just like a native input element or textarea.
+        if (parent->isNonNativeTextControl())
+            cache->postNotification(parentNode, AXObjectCache::AXValueChanged, true);
     }
 }
 
@@ -1456,10 +1495,10 @@ String AccessibilityNodeObject::alternativeTextForWebArea() const
     Node* owner = document->ownerElement();
     if (owner) {
         if (owner->hasTagName(frameTag) || owner->hasTagName(iframeTag)) {
-            const AtomicString& title = static_cast<HTMLFrameElementBase*>(owner)->getAttribute(titleAttr);
+            const AtomicString& title = toElement(owner)->getAttribute(titleAttr);
             if (!title.isEmpty())
                 return title;
-            return static_cast<HTMLFrameElementBase*>(owner)->getNameAttribute();
+            return toElement(owner)->getNameAttribute();
         }
         if (owner->isHTMLElement())
             return toHTMLElement(owner)->getNameAttribute();

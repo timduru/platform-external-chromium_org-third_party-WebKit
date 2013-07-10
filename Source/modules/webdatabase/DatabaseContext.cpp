@@ -75,7 +75,7 @@ namespace WebCore {
 // During shutdown, the DatabaseContext needs to:
 // 1. "outlive" the ScriptExecutionContext.
 //    - This is needed because the DatabaseContext needs to remove itself from the
-//      ScriptExecutionContext's ActiveDOMObject list and ContextDestructionObserver
+//      ScriptExecutionContext's ActiveDOMObject list and ContextLifecycleObserver
 //      list. This removal needs to be executed on the script's thread. Hence, we
 //      rely on the ScriptExecutionContext's shutdown process to call
 //      stop() and contextDestroyed() to give us a chance to clean these up from
@@ -131,15 +131,7 @@ DatabaseContext::~DatabaseContext()
 void DatabaseContext::contextDestroyed()
 {
     stopDatabases();
-
-    // Normally, willDestroyActiveDOMObject() is called in ~ActiveDOMObject().
-    // However, we're here because the destructor hasn't been called, and the
-    // ScriptExecutionContext we're associated with is about to be destructed.
-    // So, go ahead an unregister self from the ActiveDOMObject list, and
-    // set m_scriptExecutionContext to 0 so that ~ActiveDOMObject() doesn't
-    // try to do so again.
-    m_scriptExecutionContext->willDestroyActiveDOMObject(this);
-    m_scriptExecutionContext = 0;
+    ActiveDOMObject::contextDestroyed();
 }
 
 // stop() is from stopActiveDOMObjects() which indicates that the owner Frame
@@ -206,7 +198,7 @@ bool DatabaseContext::allowDatabaseAccess() const
         Document* document = toDocument(m_scriptExecutionContext);
         return document->page();
     }
-    ASSERT(m_scriptExecutionContext->isWorkerContext());
+    ASSERT(m_scriptExecutionContext->isWorkerGlobalScope());
     // allowDatabaseAccess is not yet implemented for workers.
     return true;
 }

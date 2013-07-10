@@ -207,7 +207,10 @@ class PerfTest(object):
         return driver.run_test(DriverInput(test_path, time_out_ms, image_hash=None, should_run_pixel_test=should_run_pixel_test), stop_when_done=False)
 
     def run_failed(self, output):
-        if output.text == None or output.error:
+        if output.error:
+            _log.error('error: %s\n%s' % (self.test_name(), output.error))
+
+        if output.text == None:
             pass
         elif output.timeout:
             _log.error('timeout: %s' % self.test_name())
@@ -215,9 +218,6 @@ class PerfTest(object):
             _log.error('crash: %s' % self.test_name())
         else:
             return False
-
-        if output.error:
-            _log.error('error: %s\n%s' % (self.test_name(), output.error))
 
         return True
 
@@ -234,7 +234,7 @@ class PerfTest(object):
         re.compile(r'^Unknown option:'),
         re.compile(r'^\[WARNING:proxy_service.cc'),
         re.compile(r'^\[INFO:'),
-        # These stderr messages come from content_shell on chromium-linux.
+        # These stderr messages come from content_shell on Linux.
         re.compile(r'INFO:SkFontHost_fontconfig.cpp'),
         re.compile(r'Running without the SUID sandbox'),
     ]

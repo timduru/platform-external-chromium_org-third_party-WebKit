@@ -1,13 +1,6 @@
 {
     'variables': {
         'test_runner_files': [
-            'chromium/TestRunner/public/WebTestDelegate.h',
-            'chromium/TestRunner/public/WebPreferences.h',
-            'chromium/TestRunner/public/WebTask.h',
-            'chromium/TestRunner/public/WebTestCommon.h',
-            'chromium/TestRunner/public/WebTestInterfaces.h',
-            'chromium/TestRunner/public/WebTestProxy.h',
-            'chromium/TestRunner/public/WebTestRunner.h',
             'chromium/TestRunner/src/AccessibilityControllerChromium.cpp',
             'chromium/TestRunner/src/AccessibilityControllerChromium.h',
             'chromium/TestRunner/src/AccessibilityUIElementChromium.cpp',
@@ -32,6 +25,8 @@
             'chromium/TestRunner/src/MockSpellCheck.h',
             'chromium/TestRunner/src/MockWebMediaStreamCenter.cpp',
             'chromium/TestRunner/src/MockWebMediaStreamCenter.h',
+            'chromium/TestRunner/src/MockWebMIDIAccessor.cpp',
+            'chromium/TestRunner/src/MockWebMIDIAccessor.h',
             'chromium/TestRunner/src/MockWebRTCDataChannelHandler.cpp',
             'chromium/TestRunner/src/MockWebRTCDataChannelHandler.h',
             'chromium/TestRunner/src/MockWebRTCDTMFSenderHandler.cpp',
@@ -88,6 +83,7 @@
             'TestNetscapePlugIn/Tests/GetURLWithJavaScriptURL.cpp',
             'TestNetscapePlugIn/Tests/GetURLWithJavaScriptURLDestroyingPlugin.cpp',
             'TestNetscapePlugIn/Tests/GetUserAgentWithNullNPPFromNPPNew.cpp',
+            'TestNetscapePlugIn/Tests/LeakWindowScriptableObject.cpp',
             'TestNetscapePlugIn/Tests/LogNPPSetWindow.cpp',
             'TestNetscapePlugIn/Tests/NPDeallocateCalledBeforeNPShutdown.cpp',
             'TestNetscapePlugIn/Tests/NPPNewFails.cpp',

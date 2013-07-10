@@ -59,12 +59,18 @@ WebInspector.SourceMap = function(sourceMappingURL, payload)
  */
 WebInspector.SourceMap.load = function(sourceMapURL, compiledURL, callback)
 {
-    NetworkAgent.loadResourceForFrontend(WebInspector.resourceTreeModel.mainFrame.id, sourceMapURL, contentLoaded.bind(this));
+    NetworkAgent.loadResourceForFrontend(WebInspector.resourceTreeModel.mainFrame.id, sourceMapURL, undefined, contentLoaded.bind(this));
 
-    function contentLoaded(error, content)
+    /**
+     * @param {?Protocol.Error} error
+     * @param {number} statusCode
+     * @param {NetworkAgent.Headers} headers
+     * @param {string} content
+     */
+    function contentLoaded(error, statusCode, headers, content)
     {
-        if (error || !content) {
-            console.error("Could not load content for " + sourceMapURL + " : " + error);
+        if (error || !content || statusCode >= 400) {
+            console.error("Could not load content for " + sourceMapURL + " : " + (error || ("HTTP status code: " + statusCode)));
             callback(null);
             return;
         }
@@ -103,16 +109,16 @@ WebInspector.SourceMap.prototype = {
     /**
      * @param {string} sourceURL
      * @param {WebInspector.ResourceType} contentType
-     * @param {string=} mimeType
      * @return {WebInspector.ContentProvider}
      */
-    sourceContentProvider: function(sourceURL, contentType, mimeType)
+    sourceContentProvider: function(sourceURL, contentType)
     {
-        // FIXME: We should detect mime type automatically (e.g. based on file extension)
+        var lastIndexOfDot = sourceURL.lastIndexOf(".");
+        var extension = lastIndexOfDot !== -1 ? sourceURL.substr(lastIndexOfDot + 1) : "";
+        var mimeType = WebInspector.ResourceType.mimeTypesForExtensions[extension.toLowerCase()];
         var sourceContent = this.sourceContent(sourceURL);
-        var contentProvider;
         if (sourceContent)
-            return new WebInspector.StaticContentProvider(contentType, sourceContent);
+            return new WebInspector.StaticContentProvider(contentType, sourceContent, mimeType);
         return new WebInspector.CompilerSourceMappingContentProvider(sourceURL, contentType, mimeType);
     },
 

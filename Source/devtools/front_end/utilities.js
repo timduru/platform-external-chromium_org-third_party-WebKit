@@ -36,11 +36,11 @@ Object.isEmpty = function(obj)
 
 Object.values = function(obj)
 {
-    var keys = Object.keys(obj);
-    var result = [];
+    var result = Object.keys(obj);
+    var length = result.length;
 
-    for (var i = 0; i < keys.length; ++i)
-        result.push(obj[keys[i]]);
+    for (var i = 0; i < length; ++i)
+        result[i] = obj[result[i]];
     return result;
 }
 
@@ -460,19 +460,26 @@ Object.defineProperty(Array.prototype, "peekLast",
  * @param {*} anObject
  * @param {Array.<*>} aList
  * @param {function(*, *)} aFunction
+ * @param {boolean=} insertionIndexAfter
  */
-function insertionIndexForObjectInListSortedByFunction(anObject, aList, aFunction)
+function insertionIndexForObjectInListSortedByFunction(anObject, aList, aFunction, insertionIndexAfter)
 {
     var index = binarySearch(anObject, aList, aFunction);
-    if (index < 0)
+    if (index < 0) {
         // See binarySearch implementation.
         return -index - 1;
-    else {
+    }
+
+    if (!insertionIndexAfter) {
         // Return the first occurance of an item in the list.
         while (index > 0 && aFunction(anObject, aList[index - 1]) === 0)
             index--;
         return index;
     }
+    // Return the last occurance of an item in the list.
+    while (index < aList.length && aFunction(anObject, aList[index]) === 0)
+        index++;
+    return index;
 }
 
 /**

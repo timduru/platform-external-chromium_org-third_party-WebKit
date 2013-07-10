@@ -33,7 +33,6 @@
 #include "RuntimeEnabledFeatures.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/NamedFlowCollection.h"
-#include "core/dom/ScriptExecutionContext.h"
 #include "core/dom/StaticNodeList.h"
 #include "core/dom/UIEvent.h"
 #include "core/rendering/RenderNamedFlowThread.h"
@@ -104,7 +103,7 @@ int NamedFlow::firstEmptyRegionIndex() const
     RenderRegionList::const_iterator iter = regionList.begin();
     for (int index = 0; iter != regionList.end(); ++index, ++iter) {
         const RenderRegion* renderRegion = *iter;
-        if (renderRegion->regionState() == RenderRegion::RegionEmpty)
+        if (renderRegion->regionOversetState() == RegionEmpty)
             return index;
     }
     return -1;
@@ -214,6 +213,19 @@ void NamedFlow::dispatchRegionLayoutUpdateEvent()
         return;
 
     RefPtr<Event> event = UIEvent::create(eventNames().webkitregionlayoutupdateEvent, false, false, m_flowManager->document()->defaultView(), 0);
+
+    dispatchEvent(event);
+}
+
+void NamedFlow::dispatchRegionOversetChangeEvent()
+{
+    ASSERT(!NoEventDispatchAssertion::isEventDispatchForbidden());
+
+    // If the flow is in the "NULL" state the event should not be dispatched any more.
+    if (flowState() == FlowStateNull)
+        return;
+
+    RefPtr<Event> event = UIEvent::create(eventNames().webkitregionoversetchangeEvent, false, false, m_flowManager->document()->defaultView(), 0);
 
     dispatchEvent(event);
 }

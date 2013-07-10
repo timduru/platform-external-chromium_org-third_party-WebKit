@@ -20,66 +20,45 @@
 #include "config.h"
 #include "core/page/Page.h"
 
-#include "bindings/v8/ScriptController.h"
 #include "core/dom/ClientRectList.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
-#include "core/dom/ExceptionCode.h"
-#include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/VisitedLinkState.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/editing/Editor.h"
 #include "core/history/BackForwardController.h"
 #include "core/history/HistoryItem.h"
-#include "core/html/HTMLElement.h"
-#include "core/html/VoidCallback.h"
 #include "core/inspector/InspectorController.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/FrameLoaderClient.h"
 #include "core/loader/ProgressTracker.h"
-#include "core/loader/TextResourceDecoder.h"
 #include "core/page/AutoscrollController.h"
 #include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
-#include "core/page/ContextMenuClient.h"
 #include "core/page/ContextMenuController.h"
 #include "core/page/DOMTimer.h"
-#include "core/page/DOMWindow.h"
 #include "core/page/DragController.h"
-#include "core/page/EditorClient.h"
 #include "core/page/FocusController.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/FrameView.h"
-#include "core/page/Navigator.h"
 #include "core/page/PageConsole.h"
 #include "core/page/PageGroup.h"
 #include "core/page/PointerLockController.h"
-#include "RuntimeEnabledFeatures.h"
 #include "core/page/Settings.h"
-#include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
-#include "core/platform/FileSystem.h"
-#include "core/platform/Logging.h"
-#include "core/platform/SharedBuffer.h"
-#include "core/platform/Widget.h"
 #include "core/platform/network/NetworkStateNotifier.h"
 #include "core/plugins/PluginData.h"
 #include "core/rendering/RenderArena.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
-#include "core/rendering/RenderWidget.h"
-#include "core/storage/StorageArea.h"
 #include "core/storage/StorageNamespace.h"
-#include "weborigin/SchemeRegistry.h"
 #include "wtf/HashMap.h"
+#include "wtf/MemoryInstrumentationHashSet.h"
 #include "wtf/RefCountedLeakCounter.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/Base64.h"
-#include "wtf/text/StringHash.h"
 
 namespace WebCore {
 
@@ -610,17 +589,9 @@ void Page::visitedStateChanged(PageGroup* group, LinkHash linkHash)
 
 StorageNamespace* Page::sessionStorage(bool optionalCreate)
 {
-    if (!m_sessionStorage && optionalCreate) {
-        // FIXME: the quota value here is not needed or used in blink, crbug/230987
-        const unsigned int kBogusQuota = UINT_MAX;
-        m_sessionStorage = StorageNamespace::sessionStorageNamespace(this, kBogusQuota);
-    }
+    if (!m_sessionStorage && optionalCreate)
+        m_sessionStorage = StorageNamespace::sessionStorageNamespace(this);
     return m_sessionStorage.get();
-}
-
-void Page::setSessionStorage(PassRefPtr<StorageNamespace> newStorage)
-{
-    m_sessionStorage = newStorage;
 }
 
 void Page::setTimerAlignmentInterval(double interval)

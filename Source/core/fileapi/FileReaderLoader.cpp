@@ -34,9 +34,9 @@
 
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/fileapi/Blob.h"
+#include "core/fileapi/BlobRegistry.h"
 #include "core/fileapi/BlobURL.h"
 #include "core/fileapi/FileReaderLoaderClient.h"
-#include "core/fileapi/ThreadableBlobRegistry.h"
 #include "core/loader/TextResourceDecoder.h"
 #include "core/loader/ThreadableLoader.h"
 #include "core/platform/network/ResourceRequest.h"
@@ -65,7 +65,7 @@ FileReaderLoader::FileReaderLoader(ReadType readType, FileReaderLoaderClient* cl
     , m_hasRange(false)
     , m_rangeStart(0)
     , m_rangeEnd(0)
-    , m_errorCode(0)
+    , m_errorCode(FileError::OK)
 {
 }
 
@@ -73,7 +73,7 @@ FileReaderLoader::~FileReaderLoader()
 {
     terminate();
     if (!m_urlForReading.isEmpty())
-        ThreadableBlobRegistry::unregisterBlobURL(m_urlForReading);
+        BlobRegistry::unregisterBlobURL(m_urlForReading);
 }
 
 void FileReaderLoader::start(ScriptExecutionContext* scriptExecutionContext, Blob* blob)
@@ -84,7 +84,7 @@ void FileReaderLoader::start(ScriptExecutionContext* scriptExecutionContext, Blo
         failed(FileError::SECURITY_ERR);
         return;
     }
-    ThreadableBlobRegistry::registerBlobURL(scriptExecutionContext->securityOrigin(), m_urlForReading, blob->url());
+    BlobRegistry::registerBlobURL(scriptExecutionContext->securityOrigin(), m_urlForReading, blob->url());
 
     // Construct and load the request.
     ResourceRequest request(m_urlForReading);
@@ -238,7 +238,7 @@ void FileReaderLoader::didFail(const ResourceError&)
     failed(FileError::NOT_READABLE_ERR);
 }
 
-void FileReaderLoader::failed(int errorCode)
+void FileReaderLoader::failed(FileError::ErrorCode errorCode)
 {
     m_errorCode = errorCode;
     cleanup();

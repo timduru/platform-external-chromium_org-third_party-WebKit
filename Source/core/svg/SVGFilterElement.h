@@ -29,7 +29,6 @@
 #include "core/svg/SVGAnimatedInteger.h"
 #include "core/svg/SVGAnimatedLength.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
-#include "core/svg/SVGLangSpace.h"
 #include "core/svg/SVGStyledElement.h"
 #include "core/svg/SVGURIReference.h"
 #include "core/svg/SVGUnitTypes.h"
@@ -38,7 +37,6 @@ namespace WebCore {
 
 class SVGFilterElement FINAL : public SVGStyledElement,
                                public SVGURIReference,
-                               public SVGLangSpace,
                                public SVGExternalResourcesRequired {
 public:
     static PassRefPtr<SVGFilterElement> create(const QualifiedName&, Document*);
@@ -55,7 +53,7 @@ private:
     virtual void svgAttributeChanged(const QualifiedName&);
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0);
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
+    virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
 
     virtual bool selfHasRelativeLengths() const;

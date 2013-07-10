@@ -32,9 +32,9 @@ from webkitpy.tool.mocktool import MockOptions
 from webkitpy.common.system.systemhost_mock import MockSystemHost
 
 from webkitpy.layout_tests.port import chromium_android
-from webkitpy.layout_tests.port import chromium_linux
+from webkitpy.layout_tests.port import linux
 from webkitpy.layout_tests.port import chromium_mac
-from webkitpy.layout_tests.port import chromium_win
+from webkitpy.layout_tests.port import win
 from webkitpy.layout_tests.port import factory
 from webkitpy.layout_tests.port import test
 
@@ -58,22 +58,22 @@ class FactoryTest(unittest.TestCase):
         self.assert_port(port_name='chromium', os_name='mac', os_version='lion',
                          cls=chromium_mac.ChromiumMacPort)
 
-    def test_chromium_linux(self):
-        self.assert_port(port_name='chromium-linux', cls=chromium_linux.ChromiumLinuxPort)
+    def test_linux(self):
+        self.assert_port(port_name='linux', cls=linux.LinuxPort)
         self.assert_port(port_name='chromium', os_name='linux', os_version='lucid',
-                         cls=chromium_linux.ChromiumLinuxPort)
+                         cls=linux.LinuxPort)
 
     def test_chromium_android(self):
         self.assert_port(port_name='chromium-android', cls=chromium_android.ChromiumAndroidPort)
         # NOTE: We can't check for port_name=chromium here, as this will append the host's
         # operating system, whereas host!=target for Android.
 
-    def test_chromium_win(self):
-        self.assert_port(port_name='chromium-win-xp', cls=chromium_win.ChromiumWinPort)
-        self.assert_port(port_name='chromium-win', os_name='win', os_version='xp',
-                         cls=chromium_win.ChromiumWinPort)
+    def test_win(self):
+        self.assert_port(port_name='win-xp', cls=win.WinPort)
+        self.assert_port(port_name='win', os_name='win', os_version='xp',
+                         cls=win.WinPort)
         self.assert_port(port_name='chromium', os_name='win', os_version='xp',
-                         cls=chromium_win.ChromiumWinPort)
+                         cls=win.WinPort)
 
     def test_unknown_specified(self):
         self.assertRaises(NotImplementedError, factory.PortFactory(MockSystemHost()).get, port_name='unknown')

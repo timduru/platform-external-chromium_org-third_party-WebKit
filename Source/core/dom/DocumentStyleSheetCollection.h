@@ -28,16 +28,17 @@
 #ifndef DocumentStyleSheetCollection_h
 #define DocumentStyleSheetCollection_h
 
-#include <wtf/FastAllocBase.h>
-#include <wtf/ListHashSet.h>
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
-#include <wtf/text/WTFString.h>
+#include "core/dom/Document.h"
+#include "core/dom/DocumentOrderedList.h"
+#include "wtf/FastAllocBase.h"
+#include "wtf/ListHashSet.h"
+#include "wtf/RefPtr.h"
+#include "wtf/Vector.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
 class CSSStyleSheet;
-class Document;
 class Node;
 class StyleSheet;
 class StyleSheetContents;
@@ -73,8 +74,7 @@ public:
 
     bool needsUpdateActiveStylesheetsOnStyleRecalc() const { return m_needsUpdateActiveStylesheetsOnStyleRecalc; }
 
-    enum UpdateFlag { FullUpdate, OptimizedUpdate };
-    bool updateActiveStyleSheets(UpdateFlag);
+    bool updateActiveStyleSheets(StyleResolverUpdateMode);
 
     String preferredStylesheetSetName() const { return m_preferredStylesheetSetName; }
     String selectedStylesheetSetName() const { return m_selectedStylesheetSetName; }
@@ -108,13 +108,13 @@ public:
 private:
     DocumentStyleSheetCollection(Document*);
 
-    void collectActiveStyleSheets(Vector<RefPtr<StyleSheet> >&);
+    void collectStyleSheets(Vector<RefPtr<StyleSheet> >& styleSheets, Vector<RefPtr<CSSStyleSheet> >& activeSheets);
     enum StyleResolverUpdateType {
         Reconstruct,
         Reset,
         Additive
     };
-    void analyzeStyleSheetChange(UpdateFlag, const Vector<RefPtr<CSSStyleSheet> >& newStylesheets, StyleResolverUpdateType&, bool& requiresFullStyleRecalc);
+    void analyzeStyleSheetChange(StyleResolverUpdateMode, const Vector<RefPtr<CSSStyleSheet> >& newStylesheets, StyleResolverUpdateType&, bool& requiresFullStyleRecalc);
 
     Document* m_document;
 
@@ -139,8 +139,7 @@ private:
     bool m_hadActiveLoadingStylesheet;
     bool m_needsUpdateActiveStylesheetsOnStyleRecalc;
 
-    typedef ListHashSet<Node*, 32> StyleSheetCandidateListHashSet;
-    StyleSheetCandidateListHashSet m_styleSheetCandidateNodes;
+    DocumentOrderedList m_styleSheetCandidateNodes;
 
     String m_preferredStylesheetSetName;
     String m_selectedStylesheetSetName;

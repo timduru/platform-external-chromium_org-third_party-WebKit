@@ -39,7 +39,7 @@
 #include "public/platform/WebFileSystem.h"
 #include "public/platform/WebFileSystemEntry.h"
 #include "public/platform/WebString.h"
-#include <wtf/Vector.h>
+#include "wtf/Vector.h"
 
 using namespace WebCore;
 
@@ -108,7 +108,7 @@ void WebFileSystemCallbacksImpl::didOpenFileSystem(const WebString& name, const 
     // This object is intended to delete itself on exit.
     OwnPtr<WebFileSystemCallbacksImpl> callbacks = adoptPtr(this);
 
-    if (m_context && m_context->isWorkerContext()) {
+    if (m_context && m_context->isWorkerGlobalScope()) {
         m_callbacks->didOpenFileSystem(name, rootURL, WorkerAsyncFileSystemChromium::create(m_context, m_synchronousType));
         return;
     }

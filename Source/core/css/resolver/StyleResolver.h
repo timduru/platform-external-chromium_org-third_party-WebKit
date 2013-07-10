@@ -24,9 +24,7 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "core/css/CSSRuleList.h"
-#include "core/css/CSSSVGDocumentValue.h"
 #include "core/css/CSSToStyleMap.h"
-#include "core/css/CSSValueList.h"
 #include "core/css/DocumentRuleSets.h"
 #include "core/css/InspectorCSSOMWrappers.h"
 #include "core/css/MediaQueryExp.h"
@@ -38,17 +36,13 @@
 #include "core/css/SiblingTraversalStrategies.h"
 #include "core/css/resolver/ScopedStyleResolver.h"
 #include "core/css/resolver/StyleResolverState.h"
+#include "core/css/resolver/StyleResourceLoader.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
-#include "core/platform/LinkHash.h"
-#include "core/platform/ScrollTypes.h"
-#include "core/platform/graphics/filters/custom/CustomFilterConstants.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
 #include "wtf/RefPtr.h"
 #include "wtf/Vector.h"
-#include "wtf/text/AtomicStringHash.h"
-#include "wtf/text/StringHash.h"
 
 namespace WebCore {
 
@@ -79,7 +73,6 @@ class RenderRegion;
 class RuleData;
 class RuleSet;
 class Settings;
-class StyleCustomFilterProgramCache;
 class StyleImage;
 class StyleKeyframe;
 class StylePendingImage;
@@ -92,7 +85,6 @@ class StyleRuleRegion;
 class StyleShader;
 class StyleSheet;
 class StyleSheetList;
-class StyledElement;
 
 class MediaQueryResult {
     WTF_MAKE_NONCOPYABLE(MediaQueryResult); WTF_MAKE_FAST_ALLOCATED;
@@ -128,11 +120,18 @@ public:
     MatchRequest(RuleSet* ruleSet, bool includeEmptyRules = false, const ContainerNode* scope = 0)
         : ruleSet(ruleSet)
         , includeEmptyRules(includeEmptyRules)
-        , scope(scope) { }
+        , scope(scope)
+    {
+        // Now that we're about to read from the RuleSet, we're done adding more
+        // rules to the set and we should make sure it's compacted.
+        ruleSet->compactRulesIfNeeded();
+    }
+
     const RuleSet* ruleSet;
     const bool includeEmptyRules;
     const ContainerNode* scope;
 };
+
 
 // This class selects a RenderStyle for a given element based on a collection of stylesheets.
 class StyleResolver {
@@ -160,9 +159,9 @@ public:
 
     static PassRefPtr<RenderStyle> styleForDocument(Document*, CSSFontSelector* = 0);
 
-    Color colorFromPrimitiveValue(CSSPrimitiveValue* value, bool forVisitedLink = false) const
+    Color resolveColorFromPrimitiveValue(CSSPrimitiveValue* value, bool forVisitedLink = false)
     {
-        return m_state.colorFromPrimitiveValue(value, forVisitedLink);
+        return m_state.resolveColorFromPrimitiveValue(value, forVisitedLink);
     }
     RenderStyle* style() const { return m_state.style(); }
     RenderStyle* parentStyle() const { return m_state.parentStyle(); }
@@ -174,11 +173,17 @@ public:
     // FIXME: It could be better to call m_ruleSets.appendAuthorStyleSheets() directly after we factor StyleRsolver further.
     // https://bugs.webkit.org/show_bug.cgi?id=108890
     void appendAuthorStyleSheets(unsigned firstNew, const Vector<RefPtr<CSSStyleSheet> >&);
+    // FIXME: resetAuthorStyle() will be removed when rulesets are reset in a per-scoping node manner.
     void resetAuthorStyle();
+    void resetAuthorStyle(const ContainerNode*);
+    void resetAtHostRules(const ContainerNode*);
 
     DocumentRuleSets& ruleSets() { return m_ruleSets; }
     const DocumentRuleSets& ruleSets() const { return m_ruleSets; }
     SelectorFilter& selectorFilter() { return m_selectorFilter; }
+
+    void setBuildScopedStyleTreeInDocumentOrder(bool enabled) { m_styleTree.setBuildInDocumentOrder(enabled); }
+    bool buildScopedStyleTreeInDocumentOrder() const { return m_styleTree.buildInDocumentOrder(); }
 
     ScopedStyleResolver* ensureScopedStyleResolver(const ContainerNode* scope)
     {
@@ -186,12 +191,11 @@ public:
     }
 
 private:
-    void initElement(Element*);
     RenderStyle* locateSharedStyle();
     bool styleSharingCandidateMatchesRuleSet(RuleSet*);
     Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
-    StyledElement* findSiblingForStyleSharing(Node*, unsigned& count) const;
-    bool canShareStyleWithElement(StyledElement*) const;
+    Element* findSiblingForStyleSharing(Node*, unsigned& count) const;
+    bool canShareStyleWithElement(Element*) const;
 
     PassRefPtr<RenderStyle> styleForKeyframe(const RenderStyle*, const StyleKeyframe*, KeyframeValue&);
 
@@ -220,8 +224,6 @@ public:
 public:
     bool useSVGZoomRules();
 
-    static bool colorFromPrimitiveValueIsDerivedFromElement(CSSPrimitiveValue*);
-
     bool hasSelectorForId(const AtomicString&) const;
     bool hasSelectorForClass(const AtomicString&) const;
     bool hasSelectorForAttribute(const AtomicString&) const;
@@ -242,11 +244,6 @@ public:
     bool usesBeforeAfterRules() const { return m_features.usesBeforeAfterRules; }
 
     void invalidateMatchedPropertiesCache();
-
-    void loadPendingShaders();
-    void loadPendingSVGDocuments();
-
-    void loadPendingResources();
 
     struct RuleRange {
         RuleRange(int& firstRuleIndex, int& lastRuleIndex): firstRuleIndex(firstRuleIndex), lastRuleIndex(lastRuleIndex) { }
@@ -375,14 +372,11 @@ private:
     void cacheBorderAndBackground();
 
 private:
-    bool canShareStyleWithControl(StyledElement*) const;
+    bool canShareStyleWithControl(Element*) const;
 
     void applyProperty(CSSPropertyID, CSSValue*);
 
     void applySVGProperty(CSSPropertyID, CSSValue*);
-
-    PassRefPtr<StyleImage> loadPendingImage(StylePendingImage*);
-    void loadPendingImages();
 
     struct MatchedPropertiesCacheItem {
         void reportMemoryUsage(MemoryObjectInfo*) const;
@@ -399,7 +393,7 @@ private:
     void sweepMatchedPropertiesCache(Timer<StyleResolver>*);
 
     bool classNamesAffectedByRules(const SpaceSplitString&) const;
-    bool sharingCandidateHasIdenticalStyleAffectingAttributes(StyledElement*) const;
+    bool sharingCandidateHasIdenticalStyleAffectingAttributes(Element*) const;
 
     unsigned m_matchedPropertiesCacheAdditionsSinceLastSweep;
 
@@ -432,8 +426,7 @@ private:
     InspectorCSSOMWrappers m_inspectorCSSOMWrappers;
 
     StyleResolverState m_state;
-
-    OwnPtr<StyleCustomFilterProgramCache> m_customFilterProgramCache;
+    StyleResourceLoader m_styleResourceLoader;
 
     friend class DeprecatedStyleBuilder;
     friend bool operator==(const MatchedProperties&, const MatchedProperties&);

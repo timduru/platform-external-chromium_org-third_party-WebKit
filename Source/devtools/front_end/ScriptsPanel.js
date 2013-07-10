@@ -26,6 +26,7 @@
 
 importScript("BreakpointsSidebarPane.js");
 importScript("CallStackSidebarPane.js");
+importScript("FilePathScoreFunction.js");
 importScript("FilteredItemSelectionDialog.js");
 importScript("UISourceCodeFrame.js");
 importScript("JavaScriptSourceFrame.js");
@@ -51,6 +52,7 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
 {
     WebInspector.Panel.call(this, "scripts");
     this.registerRequiredCSS("scriptsPanel.css");
+    this.registerRequiredCSS("textPrompt.css"); // Watch Expressions autocomplete.
 
     WebInspector.settings.navigatorWasOnceHidden = WebInspector.settings.createSetting("navigatorWasOnceHidden", false);
     WebInspector.settings.debuggerSidebarHidden = WebInspector.settings.createSetting("debuggerSidebarHidden", false);
@@ -91,8 +93,11 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     this._navigator.view.show(this.editorView.sidebarElement);
 
     var tabbedEditorPlaceholderText = WebInspector.isMac() ? WebInspector.UIString("Hit Cmd+O to open a file") : WebInspector.UIString("Hit Ctrl+O to open a file");
+
+    this._editorContentsElement = this.editorView.mainElement.createChild("div", "fill");
+    this._editorFooterElement = this.editorView.mainElement.createChild("div", "inspector-footer status-bar hidden");
     this._editorContainer = new WebInspector.TabbedEditorContainer(this, "previouslyViewedFiles", tabbedEditorPlaceholderText);
-    this._editorContainer.show(this.editorView.mainElement);
+    this._editorContainer.show(this._editorContentsElement);
 
     this._navigatorController = new WebInspector.NavigatorOverlayController(this.editorView, this._navigator.view, this._editorContainer.view);
 
@@ -160,13 +165,11 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.BreakpointsActiveStateChanged, this._breakpointsActiveStateChanged, this);
 
     WebInspector.startBatchUpdate();
-    var uiSourceCodes = this._workspace.uiSourceCodes();
-    for (var i = 0; i < uiSourceCodes.length; ++i)
-        this._addUISourceCode(uiSourceCodes[i]);
+    this._workspace.uiSourceCodes().forEach(this._addUISourceCode.bind(this));
     WebInspector.endBatchUpdate();
 
-    this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
-    this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeRemoved, this._uiSourceCodeRemoved, this);
+    this._workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
+    this._workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeRemoved, this._uiSourceCodeRemoved, this);
     this._workspace.addEventListener(WebInspector.Workspace.Events.ProjectWillReset, this._projectWillReset.bind(this), this);
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.GlobalObjectCleared, this._debuggerReset, this);
 
@@ -858,16 +861,14 @@ WebInspector.ScriptsPanel.prototype = {
 
     /**
      * @param {string} query
+     * @param {boolean} shouldJump
      */
-    performSearch: function(query)
+    performSearch: function(query, shouldJump)
     {
         WebInspector.searchController.updateSearchMatchesCount(0, this);
 
         if (!this.visibleView)
             return;
-
-        // Call searchCanceled since it will reset everything we need before doing a new search.
-        this.searchCanceled();
 
         this._searchView = this.visibleView;
         this._searchQuery = query;
@@ -878,11 +879,22 @@ WebInspector.ScriptsPanel.prototype = {
                 return;
 
             WebInspector.searchController.updateSearchMatchesCount(searchMatches, this);
-            view.jumpToNextSearchResult();
-            WebInspector.searchController.updateCurrentMatchIndex(view.currentSearchResultIndex, this);
         }
 
-        this._searchView.performSearch(query, finishedCallback.bind(this));
+        function currentMatchChanged(currentMatchIndex)
+        {
+            WebInspector.searchController.updateCurrentMatchIndex(currentMatchIndex, this);
+        }
+
+        this._searchView.performSearch(query, shouldJump, finishedCallback.bind(this), currentMatchChanged.bind(this));
+    },
+
+    /**
+     * @return {number}
+     */
+    minimalSearchQuerySize: function()
+    {
+        return 0;
     },
 
     jumpToNextSearchResult: function()
@@ -891,15 +903,11 @@ WebInspector.ScriptsPanel.prototype = {
             return;
 
         if (this._searchView !== this.visibleView) {
-            this.performSearch(this._searchQuery);
+            this.performSearch(this._searchQuery, true);
             return;
         }
 
-        if (this._searchView.showingLastSearchResult())
-            this._searchView.jumpToFirstSearchResult();
-        else
-            this._searchView.jumpToNextSearchResult();
-        WebInspector.searchController.updateCurrentMatchIndex(this._searchView.currentSearchResultIndex, this);
+        this._searchView.jumpToNextSearchResult();
         return true;
     },
 
@@ -909,17 +917,13 @@ WebInspector.ScriptsPanel.prototype = {
             return;
 
         if (this._searchView !== this.visibleView) {
-            this.performSearch(this._searchQuery);
+            this.performSearch(this._searchQuery, true);
             if (this._searchView)
                 this._searchView.jumpToLastSearchResult();
             return;
         }
 
-        if (this._searchView.showingFirstSearchResult())
-            this._searchView.jumpToLastSearchResult();
-        else
-            this._searchView.jumpToPreviousSearchResult();
-        WebInspector.searchController.updateCurrentMatchIndex(this._searchView.currentSearchResultIndex, this);
+        this._searchView.jumpToPreviousSearchResult();
     },
 
     /**
@@ -1233,7 +1237,8 @@ WebInspector.ScriptsPanel.prototype = {
                 console.error(error);
                 return;
             }
-            WebInspector.inspectorView.showPanelForAnchorNavigation(this);
+
+            WebInspector.inspectorView.setCurrentPanel(this);
             var uiLocation = WebInspector.debuggerModel.rawLocationToUILocation(response.location);
             this._showSourceLocation(uiLocation.uiSourceCode, uiLocation.lineNumber, uiLocation.columnNumber);
         }
@@ -1248,10 +1253,10 @@ WebInspector.ScriptsPanel.prototype = {
 
     showGoToSourceDialog: function()
     {
-        var uris = this._editorContainer.historyUris();
-        var defaultScores = {};
-        for (var i = 1; i < uris.length; ++i) // Skip current element
-            defaultScores[uris[i]] = uris.length - i;
+        var uiSourceCodes = this._editorContainer.historyUISourceCodes();
+        var defaultScores = new Map();
+        for (var i = 1; i < uiSourceCodes.length; ++i) // Skip current element
+            defaultScores.put(uiSourceCodes[i], uiSourceCodes.length - i);
         WebInspector.OpenResourceDialog.show(this, this.editorView.mainElement, undefined, defaultScores);
     },
 
@@ -1313,6 +1318,30 @@ WebInspector.ScriptsPanel.prototype = {
 
         if (WebInspector.settings.watchExpressions.get().length > 0)
             this.sidebarPanes.watchExpressions.expand();
+    },
+
+    /**
+     * @return {boolean}
+     */
+    canSetFooterElement: function()
+    {
+        return true;
+    },
+
+    /**
+     * @param {Element?} element
+     */
+    setFooterElement: function(element)
+    {
+        if (element) {
+            this._editorFooterElement.removeStyleClass("hidden");
+            this._editorFooterElement.appendChild(element);
+            this._editorContentsElement.style.bottom = this._editorFooterElement.offsetHeight + "px";
+        } else {
+            this._editorFooterElement.addStyleClass("hidden");
+            this._editorFooterElement.removeChildren();
+            this._editorContentsElement.style.bottom = 0;
+        }
     },
 
     __proto__: WebInspector.Panel.prototype

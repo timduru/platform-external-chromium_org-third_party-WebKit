@@ -192,6 +192,7 @@ public:
     IntRect absoluteCaretBounds();
     void setCaretRectNeedsUpdate() { CaretBase::setCaretRectNeedsUpdate(); }
 
+    void didChangeFocus();
     void willBeModified(EAlteration, SelectionDirection);
 
     bool isNone() const { return m_selection.isNone(); }
@@ -256,6 +257,9 @@ public:
     void revealSelection(const ScrollAlignment& = ScrollAlignment::alignCenterIfNeeded, RevealExtentOption = DoNotRevealExtent);
     void setSelectionFromNone();
 
+    bool shouldShowBlockCursor() const { return m_shouldShowBlockCursor; }
+    void setShouldShowBlockCursor(bool);
+
 private:
     enum EPositionType { START, END, BASE, EXTENT };
 
@@ -288,6 +292,7 @@ private:
     void setUseSecureKeyboardEntry(bool);
 
     void setCaretVisibility(CaretVisibility);
+    bool shouldBlinkCaret() const;
 
     bool dispatchSelectStart();
   
@@ -312,6 +317,7 @@ private:
     bool m_caretPaint : 1;
     bool m_isCaretBlinkingSuspended : 1;
     bool m_focused : 1;
+    bool m_shouldShowBlockCursor : 1;
 };
 
 inline EditingStyle* FrameSelection::typingStyle() const

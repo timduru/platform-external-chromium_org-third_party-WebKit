@@ -27,12 +27,6 @@
 #include "config.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationListHashSet.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/WTFString.h>
-#include <wtf/UnusedParam.h>
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/Document.h"
 #include "core/html/HTMLElement.h"
@@ -53,7 +47,6 @@
 #include "core/loader/cache/CachedTextTrack.h"
 #include "core/loader/cache/CachedXSLStyleSheet.h"
 #include "core/loader/cache/MemoryCache.h"
-#include "core/page/Console.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
@@ -64,6 +57,11 @@
 #include "public/platform/WebURL.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
+#include "wtf/MemoryInstrumentationHashMap.h"
+#include "wtf/MemoryInstrumentationHashSet.h"
+#include "wtf/MemoryInstrumentationListHashSet.h"
+#include "wtf/text/CString.h"
+#include "wtf/text/WTFString.h"
 
 #define PRELOAD_DEBUG 0
 
@@ -198,7 +196,7 @@ CachedResourceHandle<CachedImage> CachedResourceLoader::requestImage(CachedResou
     if (Frame* f = frame()) {
         if (f->loader()->pageDismissalEventBeingDispatched() != FrameLoader::NoDismissal) {
             KURL requestURL = request.resourceRequest().url();
-            if (requestURL.isValid() && canRequest(CachedResource::ImageResource, requestURL, CheckContentSecurityPolicy))
+            if (requestURL.isValid() && canRequest(CachedResource::ImageResource, requestURL, request.options(), request.forPreload()))
                 PingLoader::loadImage(f, requestURL);
             return 0;
         }
@@ -253,7 +251,7 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
         memoryCache()->remove(existing);
     }
 
-    request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy));
+    request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType));
     return static_cast<CachedCSSStyleSheet*>(requestResource(CachedResource::CSSStyleSheet, request).get());
 }
 
@@ -324,7 +322,7 @@ bool CachedResourceLoader::checkInsecureContent(CachedResource::Type type, const
     return true;
 }
 
-bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url, ContentSecurityPolicyCheck contentSecurityPolicyCheck, bool forPreload)
+bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url, const ResourceLoaderOptions& options, bool forPreload)
 {
     if (document() && !document()->securityOrigin()->canDisplay(url)) {
         if (!forPreload)
@@ -334,7 +332,7 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
     }
 
     // FIXME: Convert this to check the isolated world's Content Security Policy once webkit.org/b/104520 is solved.
-    bool shouldBypassMainWorldContentSecurityPolicy = (frame() && frame()->script()->shouldBypassMainWorldContentSecurityPolicy()) || (contentSecurityPolicyCheck == DoNotCheckContentSecurityPolicy);
+    bool shouldBypassMainWorldContentSecurityPolicy = (frame() && frame()->script()->shouldBypassMainWorldContentSecurityPolicy()) || (options.contentSecurityPolicyOption == DoNotCheckContentSecurityPolicy);
 
     // Some types of resources can be loaded only from the same origin.  Other
     // types of resources, like Images, Scripts, and CSS, can be loaded from
@@ -350,8 +348,12 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
     case CachedResource::LinkSubresource:
     case CachedResource::TextTrackResource:
     case CachedResource::ShaderResource:
-        // These types of resources can be loaded from any origin.
+        // By default these types of resources can be loaded from any origin.
         // FIXME: Are we sure about CachedResource::FontResource?
+        if (options.requestOriginPolicy == RestrictToSameOrigin && !m_document->securityOrigin()->canRequest(url)) {
+            printAccessDeniedMessage(url);
+            return false;
+        }
         break;
     case CachedResource::SVGDocumentResource:
     case CachedResource::XSLStyleSheet:
@@ -419,6 +421,31 @@ bool CachedResourceLoader::canRequest(CachedResource::Type type, const KURL& url
     return true;
 }
 
+bool CachedResourceLoader::canAccess(CachedResource* resource)
+{
+    // Redirects can change the response URL different from one of request.
+    if (!canRequest(resource->type(), resource->response().url(), resource->options(), false))
+        return false;
+
+    String error;
+    switch (resource->type()) {
+    case CachedResource::Script:
+        if (resource->options().requestOriginPolicy == PotentiallyCrossOriginEnabled
+            && !m_document->securityOrigin()->canRequest(resource->response().url())
+            && !resource->passesAccessControlCheck(m_document->securityOrigin(), error)) {
+            m_document->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Script from origin '" + SecurityOrigin::create(resource->response().url())->toString() + "' has been blocked from loading by Cross-Origin Resource Sharing policy: " + error);
+            return false;
+        }
+
+        break;
+    default:
+        ASSERT_NOT_REACHED(); // FIXME: generalize to non-script resources
+        return false;
+    }
+
+    return true;
+}
+
 CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(CachedResource::Type type, CachedResourceRequest& request)
 {
     KURL url = request.resourceRequest().url();
@@ -431,7 +458,7 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::requestResource(Cache
     if (!url.isValid())
         return 0;
 
-    if (!canRequest(type, url, request.options().contentSecurityPolicyOption, request.forPreload()))
+    if (!canRequest(type, url, request.options(), request.forPreload()))
         return 0;
 
     if (Frame* f = frame())
@@ -1112,7 +1139,7 @@ void CachedResourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
 
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    DEFINE_STATIC_LOCAL(ResourceLoaderOptions, options, (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck, CheckContentSecurityPolicy));
+    DEFINE_STATIC_LOCAL(ResourceLoaderOptions, options, (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType));
     return options;
 }
 

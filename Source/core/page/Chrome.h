@@ -22,11 +22,11 @@
 #ifndef Chrome_h
 #define Chrome_h
 
+#include "core/loader/NavigationPolicy.h"
 #include "core/page/FocusDirection.h"
 #include "core/platform/Cursor.h"
 #include "core/platform/HostWindow.h"
-#include <wtf/Forward.h>
-#include <wtf/RefPtr.h>
+#include "wtf/Forward.h"
 
 namespace WebCore {
 
@@ -42,7 +42,6 @@ class Frame;
 class Geolocation;
 class HitTestResult;
 class IntRect;
-class NavigationAction;
 class Node;
 class Page;
 class PopupMenu;
@@ -51,9 +50,7 @@ class PopupOpeningObserver;
 class SearchPopupMenu;
 
 struct DateTimeChooserParameters;
-struct FrameLoadRequest;
 struct ViewportArguments;
-struct WindowFeatures;
     
 class Chrome : public HostWindow {
 public:
@@ -90,8 +87,7 @@ public:
 
     void focusedNodeChanged(Node*) const;
 
-    Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&) const;
-    void show() const;
+    void show(NavigationPolicy = NavigationPolicyIgnore) const;
 
     bool canRunModal() const;
     bool canRunModalNow() const;

@@ -23,12 +23,11 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "MockWebSpeechRecognizer.h"
 
-#include "WebSpeechRecognitionResult.h"
-#include "WebSpeechRecognizerClient.h"
-#include "WebTestDelegate.h"
+#include "public/testing/WebTestDelegate.h"
+#include "public/web/WebSpeechRecognitionResult.h"
+#include "public/web/WebSpeechRecognizerClient.h"
 
 using namespace WebKit;
 using namespace std;

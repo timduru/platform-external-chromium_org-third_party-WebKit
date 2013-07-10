@@ -22,8 +22,9 @@
 #ifndef SVGElement_h
 #define SVGElement_h
 
-#include "core/dom/StyledElement.h"
+#include "core/dom/Element.h"
 #include "core/platform/Timer.h"
+#include "core/svg/SVGLangSpace.h"
 #include "core/svg/SVGLocatable.h"
 #include "core/svg/SVGParsingError.h"
 #include "core/svg/properties/SVGPropertyInfo.h"
@@ -41,7 +42,7 @@ class SVGElementInstance;
 class SVGElementRareData;
 class SVGSVGElement;
 
-class SVGElement : public StyledElement {
+class SVGElement : public Element, public SVGLangSpace {
 public:
     static PassRefPtr<SVGElement> create(const QualifiedName&, Document*);
     virtual ~SVGElement();
@@ -57,8 +58,7 @@ public:
     SVGDocumentExtensions* accessDocumentSVGExtensions();
 
     virtual bool isSVGStyledElement() const { return false; }
-    virtual bool isStyledTransformable() const { return false; }
-    virtual bool isStyledLocatable() const { return false; }
+    virtual bool isSVGGraphicsElement() const { return false; }
     virtual bool isSVGSVGElement() const { return false; }
     virtual bool isFilterEffect() const { return false; }
     virtual bool isGradientStop() const { return false; }
@@ -118,6 +118,8 @@ public:
 
     virtual bool addEventListener(const AtomicString& eventType, PassRefPtr<EventListener>, bool useCapture) OVERRIDE;
     virtual bool removeEventListener(const AtomicString& eventType, EventListener*, bool useCapture) OVERRIDE;
+
+    virtual bool shouldMoveToFlowThread(RenderStyle*) const OVERRIDE;
 
 protected:
     SVGElement(const QualifiedName&, Document*, ConstructionType = CreateSVGElement);

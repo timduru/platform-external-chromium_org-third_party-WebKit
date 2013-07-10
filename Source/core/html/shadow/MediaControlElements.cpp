@@ -32,7 +32,6 @@
 #include "core/html/shadow/MediaControlElements.h"
 
 #include "core/dom/EventNames.h"
-#include "core/dom/EventTarget.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/FullscreenController.h"
 #include "core/dom/MouseEvent.h"
@@ -40,21 +39,14 @@
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/shadow/MediaControls.h"
 #include "core/html/track/TextTrack.h"
-#include "core/html/track/TextTrackList.h"
-#include "core/html/track/TextTrackRegionList.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
-#include "core/page/PageGroup.h"
 #include "core/page/Settings.h"
-#include "core/platform/LocalizedStrings.h"
-#include "core/platform/graphics/GraphicsContext.h"
-#include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderMediaControlElements.h"
 #include "core/rendering/RenderSlider.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderVideo.h"
-#include "core/rendering/RenderView.h"
 
 namespace WebCore {
 
@@ -224,7 +216,7 @@ void MediaControlPanelElement::defaultEventHandler(Event* event)
     MediaControlDivElement::defaultEventHandler(event);
 
     if (event->isMouseEvent()) {
-        LayoutPoint location = static_cast<MouseEvent*>(event)->absoluteLocation();
+        LayoutPoint location = toMouseEvent(event)->absoluteLocation();
         if (event->type() == eventNames().mousedownEvent && event->target() == this) {
             startDrag(location);
             event->setDefaultHandled();
@@ -490,7 +482,7 @@ PassRefPtr<MediaControlTimelineElement> MediaControlTimelineElement::create(Docu
 void MediaControlTimelineElement::defaultEventHandler(Event* event)
 {
     // Left button is 0. Rejects mouse events not from left button.
-    if (event->isMouseEvent() && static_cast<MouseEvent*>(event)->button())
+    if (event->isMouseEvent() && toMouseEvent(event)->button())
         return;
 
     if (!attached())
@@ -672,9 +664,9 @@ PassRefPtr<MediaControlTextTrackContainerElement> MediaControlTextTrackContainer
     return element.release();
 }
 
-RenderObject* MediaControlTextTrackContainerElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* MediaControlTextTrackContainerElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderTextTrackContainerElement(this);
+    return new (document()->renderArena()) RenderTextTrackContainerElement(this);
 }
 
 const AtomicString& MediaControlTextTrackContainerElement::textTrackContainerElementShadowPseudoId()
@@ -757,7 +749,7 @@ void MediaControlTextTrackContainerElement::updateDisplay()
             // WebVTT region whose region identifier is identical to cue's text
             // track cue region identifier, run the following substeps:
 #endif
-            if (displayBox->hasChildNodes() && !contains(static_cast<Node*>(displayBox.get())))
+            if (displayBox->hasChildNodes() && !contains(displayBox.get()))
                 // Note: the display tree of a cue is removed when the active flag of the cue is unset.
                 appendChild(displayBox, ASSERT_NO_EXCEPTION, AttachNow);
 #if ENABLE(WEBVTT_REGIONS)

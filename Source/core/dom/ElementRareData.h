@@ -22,7 +22,6 @@
 #ifndef ElementRareData_h
 #define ElementRareData_h
 
-#include "core/animation/Animation.h"
 #include "core/dom/DatasetDOMStringMap.h"
 #include "core/dom/NamedNodeMap.h"
 #include "core/dom/NodeRareData.h"
@@ -31,7 +30,7 @@
 #include "core/html/ClassList.h"
 #include "core/html/ime/InputMethodContext.h"
 #include "core/rendering/style/StyleInheritedData.h"
-#include <wtf/OwnPtr.h>
+#include "wtf/OwnPtr.h"
 
 namespace WebCore {
 
@@ -63,6 +62,12 @@ public:
 
     bool isInCanvasSubtree() const { return m_isInCanvasSubtree; }
     void setIsInCanvasSubtree(bool value) { m_isInCanvasSubtree = value; }
+
+    bool isInsideRegion() const { return m_isInsideRegion; }
+    void setIsInsideRegion(bool value) { m_isInsideRegion = value; }
+
+    RegionOversetState regionOversetState() const { return m_regionOversetState; }
+    void setRegionOversetState(RegionOversetState state) { m_regionOversetState = state; }
 
     bool containsFullScreenElement() { return m_containsFullScreenElement; }
     void setContainsFullScreenElement(bool value) { m_containsFullScreenElement = value; }
@@ -164,6 +169,9 @@ private:
     unsigned m_childrenAffectedByForwardPositionalRules : 1;
     unsigned m_childrenAffectedByBackwardPositionalRules : 1;
 
+    unsigned m_isInsideRegion : 1;
+    RegionOversetState m_regionOversetState;
+
     LayoutSize m_minimumSizeForResizing;
     IntSize m_savedLayerScrollOffset;
     RefPtr<RenderStyle> m_computedStyle;
@@ -207,6 +215,8 @@ inline ElementRareData::ElementRareData(RenderObject* renderer)
     , m_childrenAffectedByDirectAdjacentRules(false)
     , m_childrenAffectedByForwardPositionalRules(false)
     , m_childrenAffectedByBackwardPositionalRules(false)
+    , m_isInsideRegion(false)
+    , m_regionOversetState(RegionUndefined)
     , m_minimumSizeForResizing(defaultMinimumSizeForResizing())
 {
 }

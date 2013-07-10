@@ -25,9 +25,7 @@
 #include "core/svg/SVGAnimatedEnumeration.h"
 #include "core/svg/SVGAnimatedLength.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
-#include "core/svg/SVGLangSpace.h"
-#include "core/svg/SVGStyledElement.h"
-#include "core/svg/SVGTests.h"
+#include "core/svg/SVGGraphicsElement.h"
 
 namespace WebCore {
 
@@ -66,9 +64,7 @@ struct SVGPropertyTraits<SVGLengthAdjustType> {
     }
 };
 
-class SVGTextContentElement : public SVGStyledElement,
-                              public SVGTests,
-                              public SVGLangSpace,
+class SVGTextContentElement : public SVGGraphicsElement,
                               public SVGExternalResourcesRequired {
 public:
     // Forward declare enumerations in the W3C naming scheme, for IDL generation.
@@ -122,11 +118,6 @@ private:
         DECLARE_ANIMATED_ENUMERATION(LengthAdjust, lengthAdjust, SVGLengthAdjustType)
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired) 
     END_DECLARE_ANIMATED_PROPERTIES
-
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 };
 
 inline SVGTextContentElement* toSVGTextContentElement(SVGElement* element)

@@ -51,8 +51,6 @@
 #include "core/rendering/RenderListBox.h"
 #include "core/rendering/RenderMenuList.h"
 #include "core/rendering/RenderTheme.h"
-#include <wtf/text/StringBuilder.h>
-#include <wtf/unicode/Unicode.h>
 
 using namespace std;
 using namespace WTF::Unicode;
@@ -142,8 +140,7 @@ bool HTMLSelectElement::hasPlaceholderLabelOption() const
     ASSERT(listIndex >= 0);
     if (listIndex < 0)
         return false;
-    HTMLOptionElement* option = static_cast<HTMLOptionElement*>(listItems()[listIndex]);
-    return !listIndex && option->value().isEmpty();
+    return !listIndex && toHTMLOptionElement(listItems()[listIndex])->value().isEmpty();
 }
 
 String HTMLSelectElement::validationMessage() const
@@ -215,7 +212,7 @@ void HTMLSelectElement::add(HTMLElement* element, HTMLElement* before, Exception
     if (!element || !(element->hasLocalName(optionTag) || element->hasLocalName(hrTag)))
         return;
 
-    insertBefore(element, before, ec);
+    insertBefore(element, before, ec, AttachLazily);
     setNeedsValidityCheck();
 }
 
@@ -240,8 +237,8 @@ String HTMLSelectElement::value() const
 {
     const Vector<HTMLElement*>& items = listItems();
     for (unsigned i = 0; i < items.size(); i++) {
-        if (items[i]->hasLocalName(optionTag) && static_cast<HTMLOptionElement*>(items[i])->selected())
-            return static_cast<HTMLOptionElement*>(items[i])->value();
+        if (items[i]->hasLocalName(optionTag) && toHTMLOptionElement(items[i])->selected())
+            return toHTMLOptionElement(items[i])->value();
     }
     return "";
 }
@@ -259,7 +256,7 @@ void HTMLSelectElement::setValue(const String &value)
     unsigned optionIndex = 0;
     for (unsigned i = 0; i < items.size(); i++) {
         if (items[i]->hasLocalName(optionTag)) {
-            if (static_cast<HTMLOptionElement*>(items[i])->value() == value) {
+            if (toHTMLOptionElement(items[i])->value() == value) {
                 setSelectedIndex(optionIndex);
                 return;
             }
@@ -315,18 +312,9 @@ void HTMLSelectElement::parseAttribute(const QualifiedName& name, const AtomicSt
         HTMLFormControlElementWithState::parseAttribute(name, value);
 }
 
-bool HTMLSelectElement::isKeyboardFocusable(KeyboardEvent* event) const
+bool HTMLSelectElement::shouldShowFocusRingOnMouseFocus() const
 {
-    if (renderer())
-        return isFocusable();
-    return HTMLFormControlElementWithState::isKeyboardFocusable(event);
-}
-
-bool HTMLSelectElement::isMouseFocusable() const
-{
-    if (renderer())
-        return isFocusable();
-    return HTMLFormControlElementWithState::isMouseFocusable();
+    return true;
 }
 
 bool HTMLSelectElement::canSelectAll() const
@@ -334,11 +322,11 @@ bool HTMLSelectElement::canSelectAll() const
     return !usesMenuList();
 }
 
-RenderObject* HTMLSelectElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* HTMLSelectElement::createRenderer(RenderStyle*)
 {
     if (usesMenuList())
-        return new (arena) RenderMenuList(this);
-    return new (arena) RenderListBox(this);
+        return new (document()->renderArena()) RenderMenuList(this);
+    return new (document()->renderArena()) RenderListBox(this);
 }
 
 bool HTMLSelectElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
@@ -373,6 +361,7 @@ void HTMLSelectElement::childrenChanged(bool changedByParser, Node* beforeChange
 {
     setRecalcListItems();
     setNeedsValidityCheck();
+    m_lastOnChangeSelection.clear();
 
     HTMLFormControlElementWithState::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
 }
@@ -641,6 +630,7 @@ void HTMLSelectElement::listBoxOnChange()
 
     // If the cached selection list is empty, or the size has changed, then fire
     // dispatchFormControlChangeEvent, and return early.
+    // FIXME: Why? This looks unreasonable.
     if (m_lastOnChangeSelection.isEmpty() || m_lastOnChangeSelection.size() != items.size()) {
         dispatchFormControlChangeEvent();
         return;
@@ -959,7 +949,7 @@ size_t HTMLSelectElement::searchOptionsForValue(const String& value, size_t list
     for (size_t i = listIndexStart; i < loopEndIndex; ++i) {
         if (!items[i]->hasLocalName(optionTag))
             continue;
-        if (static_cast<HTMLOptionElement*>(items[i])->value() == value)
+        if (toHTMLOptionElement(items[i])->value() == value)
             return i;
     }
     return notFound;
@@ -977,7 +967,7 @@ void HTMLSelectElement::restoreFormControlState(const FormControlState& state)
     for (size_t i = 0; i < itemsSize; ++i) {
         if (!items[i]->hasLocalName(optionTag))
             continue;
-        static_cast<HTMLOptionElement*>(items[i])->setSelectedState(false);
+        toHTMLOptionElement(items[i])->setSelectedState(false);
     }
 
     if (!multiple()) {
@@ -1108,7 +1098,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
         if (!renderer() || !event->isKeyboardEvent())
             return;
 
-        if (platformHandleKeydownEvent(static_cast<KeyboardEvent*>(event)))
+        if (platformHandleKeydownEvent(toKeyboardEvent(event)))
             return;
 
         // When using spatial navigation, we want to be able to navigate away
@@ -1119,7 +1109,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
                 return;
         }
 
-        const String& keyIdentifier = static_cast<KeyboardEvent*>(event)->keyIdentifier();
+        const String& keyIdentifier = toKeyboardEvent(event)->keyIdentifier();
         bool handled = true;
         const Vector<HTMLElement*>& listItems = this->listItems();
         int listIndex = optionToListIndex(selectedIndex());
@@ -1152,7 +1142,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
         if (!renderer() || !event->isKeyboardEvent())
             return;
 
-        int keyCode = static_cast<KeyboardEvent*>(event)->keyCode();
+        int keyCode = toKeyboardEvent(event)->keyCode();
         bool handled = false;
 
         if (keyCode == ' ' && isSpatialNavigationEnabled(document()->frame())) {
@@ -1209,7 +1199,7 @@ void HTMLSelectElement::menuListDefaultEventHandler(Event* event)
             event->setDefaultHandled();
     }
 
-    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         focus();
         if (renderer() && renderer()->isMenuList()) {
             if (RenderMenuList* menuList = toRenderMenuList(renderer())) {
@@ -1290,14 +1280,14 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
 {
     const Vector<HTMLElement*>& listItems = this->listItems();
 
-    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton) {
+    if (event->type() == eventNames().mousedownEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton) {
         focus();
         // Calling focus() may cause us to lose our renderer, in which case do not want to handle the event.
         if (!renderer())
             return;
 
         // Convert to coords relative to the list box if needed.
-        MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
+        MouseEvent* mouseEvent = toMouseEvent(event);
         IntPoint localOffset = roundedIntPoint(renderer()->absoluteToLocal(mouseEvent->absoluteLocation(), UseTransforms));
         int listIndex = toRenderListBox(renderer())->listIndexAtOffset(toIntSize(localOffset));
         if (listIndex >= 0) {
@@ -1314,7 +1304,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
             event->setDefaultHandled();
         }
     } else if (event->type() == eventNames().mousemoveEvent && event->isMouseEvent() && !toRenderBox(renderer())->canBeScrolledAndHasScrollableArea()) {
-        MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
+        MouseEvent* mouseEvent = toMouseEvent(event);
         if (mouseEvent->button() != LeftButton || !mouseEvent->buttonDown())
             return;
 
@@ -1337,7 +1327,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
             }
             event->setDefaultHandled();
         }
-    } else if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && static_cast<MouseEvent*>(event)->button() == LeftButton && renderer() && !toRenderBox(renderer())->autoscrollInProgress()) {
+    } else if (event->type() == eventNames().mouseupEvent && event->isMouseEvent() && toMouseEvent(event)->button() == LeftButton && renderer() && !toRenderBox(renderer())->autoscrollInProgress()) {
         // We didn't start this click/drag on any options.
         if (m_lastOnChangeSelection.isEmpty())
             return;
@@ -1348,7 +1338,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
     } else if (event->type() == eventNames().keydownEvent) {
         if (!event->isKeyboardEvent())
             return;
-        const String& keyIdentifier = static_cast<KeyboardEvent*>(event)->keyIdentifier();
+        const String& keyIdentifier = toKeyboardEvent(event)->keyIdentifier();
 
         bool handled = false;
         int endIndex = 0;
@@ -1407,12 +1397,12 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
             ASSERT_UNUSED(listItems, !listItems.size() || static_cast<size_t>(endIndex) < listItems.size());
             setActiveSelectionEndIndex(endIndex);
 
-            bool selectNewItem = !m_multiple || static_cast<KeyboardEvent*>(event)->shiftKey() || !isSpatialNavigationEnabled(document()->frame());
+            bool selectNewItem = !m_multiple || toKeyboardEvent(event)->shiftKey() || !isSpatialNavigationEnabled(document()->frame());
             if (selectNewItem)
                 m_activeSelectionState = true;
             // If the anchor is unitialized, or if we're going to deselect all
             // other options, then set the anchor index equal to the end index.
-            bool deselectOthers = !m_multiple || (!static_cast<KeyboardEvent*>(event)->shiftKey() && selectNewItem);
+            bool deselectOthers = !m_multiple || (!toKeyboardEvent(event)->shiftKey() && selectNewItem);
             if (m_activeSelectionAnchorIndex < 0 || deselectOthers) {
                 if (deselectOthers)
                     deselectItemsWithoutValidation();
@@ -1431,7 +1421,7 @@ void HTMLSelectElement::listBoxDefaultEventHandler(Event* event)
     } else if (event->type() == eventNames().keypressEvent) {
         if (!event->isKeyboardEvent())
             return;
-        int keyCode = static_cast<KeyboardEvent*>(event)->keyCode();
+        int keyCode = toKeyboardEvent(event)->keyCode();
 
         if (keyCode == '\r') {
             if (form())
@@ -1465,7 +1455,7 @@ void HTMLSelectElement::defaultEventHandler(Event* event)
         return;
 
     if (event->type() == eventNames().keypressEvent && event->isKeyboardEvent()) {
-        KeyboardEvent* keyboardEvent = static_cast<KeyboardEvent*>(event);
+        KeyboardEvent* keyboardEvent = toKeyboardEvent(event);
         if (!keyboardEvent->ctrlKey() && !keyboardEvent->altKey() && !keyboardEvent->metaKey() && isPrintableChar(keyboardEvent->charCode())) {
             typeAheadFind(keyboardEvent);
             event->setDefaultHandled();

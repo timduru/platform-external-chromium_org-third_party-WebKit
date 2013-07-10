@@ -136,11 +136,11 @@ WebInspector.JSHeapSnapshot.prototype = {
 
     distanceForUserRoot: function(node)
     {
-        if (node.isWindow())
-            return 1;
+        if (node.isUserRoot())
+            return 0;
         if (node.isDocumentDOMTreesRoot())
             return 0;
-        return -1;
+        return this._noDistance;
     },
 
     userObjectsMapAndFlag: function()
@@ -204,7 +204,7 @@ WebInspector.JSHeapSnapshot.prototype = {
         var list = [];
 
         for (var iter = this.rootNode().edges(); iter.hasNext(); iter.next()) {
-            if (iter.edge.node().isWindow())
+            if (iter.edge.node().isUserRoot())
                 list.push(iter.edge.node().nodeIndex / nodeFieldCount);
         }
 
@@ -359,10 +359,10 @@ WebInspector.JSHeapSnapshotNode.prototype = {
         return this._type() === this._snapshot._nodeSyntheticType;
     },
 
-    isWindow: function()
+    isUserRoot: function()
     {
-        const windowRE = /^Window/;
-        return windowRE.test(this.name());
+        var userRootRE = /^Window/;
+        return userRootRE.test(this.name());
     },
 
     isDocumentDOMTreesRoot: function()

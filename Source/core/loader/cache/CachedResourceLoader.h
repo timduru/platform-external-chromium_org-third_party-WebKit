@@ -32,12 +32,11 @@
 #include "core/loader/cache/CachedResourceInitiatorInfo.h"
 #include "core/loader/cache/CachedResourceRequest.h"
 #include "core/platform/Timer.h"
-#include "core/platform/network/ResourceLoadPriority.h"
-#include <wtf/Deque.h>
-#include <wtf/HashMap.h>
-#include <wtf/HashSet.h>
-#include <wtf/ListHashSet.h>
-#include <wtf/text/StringHash.h>
+#include "wtf/Deque.h"
+#include "wtf/HashMap.h"
+#include "wtf/HashSet.h"
+#include "wtf/ListHashSet.h"
+#include "wtf/text/StringHash.h"
 
 namespace WebCore {
 
@@ -124,8 +123,8 @@ public:
     void preload(CachedResource::Type, CachedResourceRequest&, const String& charset);
     void checkForPendingPreloads();
     void printPreloadStats();
-    bool canRequest(CachedResource::Type, const KURL&, ContentSecurityPolicyCheck, bool forPreload = false);
-    
+    bool canRequest(CachedResource::Type, const KURL&, const ResourceLoaderOptions&, bool forPreload = false);
+    bool canAccess(CachedResource*);
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
     static const ResourceLoaderOptions& defaultCachedResourceOptions();

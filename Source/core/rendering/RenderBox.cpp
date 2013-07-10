@@ -163,7 +163,7 @@ void RenderBox::willBeDestroyed()
 
     RenderBlock::removePercentHeightDescendantIfNeeded(this);
 
-    ExclusionShapeOutsideInfo::removeInfo(this);
+    ShapeOutsideInfo::removeInfo(this);
 
     RenderBoxModelObject::willBeDestroyed();
 }
@@ -311,20 +311,21 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
         frame()->view()->recalculateScrollbarOverlayStyle();
     }
 
-    updateExclusionShapeOutsideInfoAfterStyleChange(style()->shapeOutside(), oldStyle ? oldStyle->shapeOutside() : 0);
+    updateShapeOutsideInfoAfterStyleChange(style()->shapeOutside(), oldStyle ? oldStyle->shapeOutside() : 0);
 }
 
-void RenderBox::updateExclusionShapeOutsideInfoAfterStyleChange(const ExclusionShapeValue* shapeOutside, const ExclusionShapeValue* oldShapeOutside)
+void RenderBox::updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOutside, const ShapeValue* oldShapeOutside)
 {
     // FIXME: A future optimization would do a deep comparison for equality. (bug 100811)
     if (shapeOutside == oldShapeOutside)
         return;
 
     if (shapeOutside) {
-        ExclusionShapeOutsideInfo* exclusionShapeOutsideInfo = ExclusionShapeOutsideInfo::ensureInfo(this);
-        exclusionShapeOutsideInfo->dirtyShapeSize();
-    } else
-        ExclusionShapeOutsideInfo::removeInfo(this);
+        ShapeOutsideInfo* shapeOutsideInfo = ShapeOutsideInfo::ensureInfo(this);
+        shapeOutsideInfo->dirtyShapeSize();
+    } else {
+        ShapeOutsideInfo::removeInfo(this);
+    }
 }
 
 void RenderBox::updateFromStyle()
@@ -421,6 +422,37 @@ int RenderBox::pixelSnappedOffsetWidth() const
 int RenderBox::pixelSnappedOffsetHeight() const
 {
     return snapSizeToPixel(offsetHeight(), y() + clientTop());
+}
+
+bool RenderBox::requiresLayoutToDetermineWidth() const
+{
+    RenderStyle* style = this->style();
+    return !style->width().isFixed()
+        || !style->minWidth().isFixed()
+        || (!style->maxWidth().isUndefined() && !style->maxWidth().isFixed())
+        || !style->paddingLeft().isFixed()
+        || !style->paddingRight().isFixed()
+        || style->resize() != RESIZE_NONE
+        || style->boxSizing() == BORDER_BOX
+        || !isRenderBlock()
+        || !isBlockFlow()
+        || isFlexItemIncludingDeprecated();
+}
+
+LayoutUnit RenderBox::fixedOffsetWidth() const
+{
+    ASSERT(!requiresLayoutToDetermineWidth());
+
+    RenderStyle* style = this->style();
+
+    LayoutUnit width = std::max(LayoutUnit(style->minWidth().value()), LayoutUnit(style->width().value()));
+    if (style->maxWidth().isFixed())
+        width = std::min(LayoutUnit(style->maxWidth().value()), width);
+
+    LayoutUnit borderLeft = style->borderLeft().nonZero() ? style->borderLeft().width() : 0;
+    LayoutUnit borderRight = style->borderRight().nonZero() ? style->borderRight().width() : 0;
+
+    return width + borderLeft + borderRight + style->paddingLeft().value() + style->paddingRight().value();
 }
 
 int RenderBox::scrollWidth() const
@@ -2520,8 +2552,11 @@ LayoutUnit RenderBox::computeContentAndScrollbarLogicalHeightUsing(const Length&
 {
     // FIXME(cbiesinger): The css-sizing spec is considering changing what min-content/max-content should resolve to.
     // If that happens, this code will have to change.
-    if (height.isIntrinsic())
+    if (height.isIntrinsic()) {
+        if (intrinsicContentHeight == -1)
+            return -1; // Intrinsic height isn't available.
         return computeIntrinsicLogicalContentHeightUsing(height, intrinsicContentHeight, borderAndPaddingLogicalHeight());
+    }
     if (height.isFixed())
         return height.value();
     if (height.isPercent())

@@ -28,14 +28,12 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "MockWebRTCPeerConnectionHandler.h"
 
 #include "MockConstraints.h"
 #include "MockWebRTCDTMFSenderHandler.h"
 #include "MockWebRTCDataChannelHandler.h"
 #include "TestInterfaces.h"
-#include "WebTestDelegate.h"
 #include "public/platform/WebMediaConstraints.h"
 #include "public/platform/WebMediaStream.h"
 #include "public/platform/WebMediaStreamTrack.h"
@@ -48,6 +46,7 @@
 #include "public/platform/WebRTCVoidRequest.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebVector.h"
+#include "public/testing/WebTestDelegate.h"
 
 using namespace WebKit;
 

@@ -1,7 +1,0 @@
-namespace=DOMException
-
-core/dom/DOMException implementedAs=DOMCoreException
-core/fileapi/FileException
-core/svg/SVGException
-core/xml/XPathException
-modules/webdatabase/SQLException

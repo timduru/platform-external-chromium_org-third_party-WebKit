@@ -57,8 +57,6 @@ public:
 
     bool isId() const;
 
-    CSSStyleDeclaration* style();
-
     void setSpecified(bool specified) { m_specified = specified; }
 
     void attachToElement(Element*);
@@ -99,6 +97,18 @@ private:
     unsigned m_ignoreChildrenChanged : 31;
     bool m_specified : 1;
 };
+
+inline Attr* toAttr(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isAttributeNode());
+    return static_cast<Attr*>(node);
+}
+
+inline const Attr* toAttr(const Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isAttributeNode());
+    return static_cast<const Attr*>(node);
+}
 
 } // namespace WebCore
 

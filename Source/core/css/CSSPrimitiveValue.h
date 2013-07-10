@@ -120,7 +120,7 @@ public:
         // This is used internally for counter names (as opposed to counter values)
         CSS_COUNTER_NAME = 110,
 
-        // This is used by the CSS Exclusions draft
+        // This is used by the CSS Shapes draft
         CSS_SHAPE = 111,
 
         // Used by border images.
@@ -195,6 +195,7 @@ public:
     bool isViewportPercentageLength() const { return m_primitiveUnitType >= CSS_VW && m_primitiveUnitType <= CSS_VMAX; }
     bool isFlex() const { return primitiveType() == CSS_FR; }
     bool isValueID() const { return m_primitiveUnitType == CSS_VALUE_ID; }
+    bool colorIsDerivedFromElement() const;
 
     static PassRefPtr<CSSPrimitiveValue> createIdentifier(CSSValueID valueID) { return adoptRef(new CSSPrimitiveValue(valueID)); }
     static PassRefPtr<CSSPrimitiveValue> createIdentifier(CSSPropertyID propertyID) { return adoptRef(new CSSPrimitiveValue(propertyID)); }
@@ -305,7 +306,7 @@ public:
 
     template<typename T> inline operator T() const; // Defined in CSSPrimitiveValueMappings.h
 
-    String customCssText() const;
+    String customCssText(CssTextFormattingFlags = QuoteCSSStringIfNeeded) const;
     String customSerializeResolvingVariables(const HashMap<AtomicString, String>&) const;
     bool hasVariableReference() const;
 

@@ -39,16 +39,15 @@
 #include "core/svg/SVGDocumentExtensions.h"
 #include "core/svg/SVGElementInstance.h"
 #include "core/svg/SVGElementRareData.h"
+#include "core/svg/SVGGraphicsElement.h"
 #include "core/svg/SVGSVGElement.h"
-#include "core/svg/SVGStyledLocatableElement.h"
-#include "core/svg/SVGTextElement.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
 SVGElement::SVGElement(const QualifiedName& tagName, Document* document, ConstructionType constructionType)
-    : StyledElement(tagName, document, constructionType)
+    : Element(tagName, document, constructionType)
 {
     ScriptWrappable::init(this);
     setHasCustomStyleCallbacks();
@@ -90,7 +89,7 @@ SVGElement::~SVGElement()
 
 void SVGElement::willRecalcStyle(StyleChange change)
 {
-    if (!hasSVGRareData() || styleChangeType() == SyntheticStyleChange)
+    if (!hasSVGRareData() || needsLayerUpdate())
         return;
     // If the style changes because of a regular property change (not induced by SMIL animations themselves)
     // reset the "computed style without SMIL style properties", so the base value change gets reflected.
@@ -180,7 +179,7 @@ void SVGElement::removedFrom(ContainerNode* rootParent)
 {
     bool wasInDocument = rootParent->inDocument();
 
-    StyledElement::removedFrom(rootParent);
+    Element::removedFrom(rootParent);
 
     if (wasInDocument) {
         document()->accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);
@@ -255,12 +254,8 @@ const HashSet<SVGElementInstance*>& SVGElement::instancesForElement() const
 
 bool SVGElement::getBoundingBox(FloatRect& rect, SVGLocatable::StyleUpdateStrategy styleUpdateStrategy)
 {
-    if (isStyledLocatable()) {
-        rect = toSVGStyledLocatableElement(this)->getBBox(styleUpdateStrategy);
-        return true;
-    }
-    if (hasTagName(SVGNames::textTag)) {
-        rect = static_cast<SVGTextElement*>(this)->getBBox(styleUpdateStrategy);
+    if (isSVGGraphicsElement()) {
+        rect = toSVGGraphicsElement(this)->getBBox(styleUpdateStrategy);
         return true;
     }
     return false;
@@ -334,8 +329,9 @@ void SVGElement::parseAttribute(const QualifiedName& name, const AtomicString& v
         setAttributeEventListener(eventNames().focusoutEvent, createAttributeEventListener(this, name, value));
     else if (name == SVGNames::onactivateAttr)
         setAttributeEventListener(eventNames().DOMActivateEvent, createAttributeEventListener(this, name, value));
-    else
-        StyledElement::parseAttribute(name, value);
+    else if (SVGLangSpace::parseAttribute(name, value)) {
+    } else
+        Element::parseAttribute(name, value);
 }
 
 void SVGElement::animatedPropertyTypeForAttribute(const QualifiedName& attributeName, Vector<AnimatedPropertyType>& propertyTypes)
@@ -455,6 +451,12 @@ static bool hasLoadListener(Element* element)
     return false;
 }
 
+bool SVGElement::shouldMoveToFlowThread(RenderStyle* styleToUse) const
+{
+    // Allow only svg root elements to be directly collected by a render flow thread.
+    return parentNode() && !parentNode()->isSVGElement() && hasTagName(SVGNames::svgTag) && Element::shouldMoveToFlowThread(styleToUse);
+}
+
 void SVGElement::sendSVGLoadEventIfPossible(bool sendParentLoadEvents)
 {
     RefPtr<SVGElement> currentTarget = this;
@@ -500,7 +502,7 @@ Timer<SVGElement>* SVGElement::svgLoadEventTimer()
 
 void SVGElement::finishParsingChildren()
 {
-    StyledElement::finishParsingChildren();
+    Element::finishParsingChildren();
 
     // The outermost SVGSVGElement SVGLoad event is fired through Document::dispatchWindowLoadEvent.
     if (isOutermostSVGSVGElement())
@@ -535,7 +537,7 @@ bool SVGElement::childShouldCreateRenderer(const NodeRenderingContext& childCont
 
 void SVGElement::attributeChanged(const QualifiedName& name, const AtomicString& newValue, AttributeModificationReason)
 {
-    StyledElement::attributeChanged(name, newValue);
+    Element::attributeChanged(name, newValue);
 
     if (isIdAttributeName(name))
         document()->accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);

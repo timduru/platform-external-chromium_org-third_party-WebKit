@@ -415,24 +415,50 @@ static void gbkCallbackSubstitute(const void* context, UConverterFromUnicodeArgs
     UCNV_FROM_U_CALLBACK_SUBSTITUTE(context, fromUArgs, codeUnits, length, codePoint, reason, err);
 }
 
-CString TextCodecICU::encode(const UChar* characters, size_t length, UnencodableHandling handling)
+class TextCodecInput {
+public:
+    TextCodecInput(const TextEncoding& encoding, const UChar* characters, size_t length)
+        : m_begin(characters)
+        , m_end(characters + length)
+    {
+        if (encoding.hasTrivialDisplayString())
+            return;
+        m_buffer.reserveInitialCapacity(length);
+        m_buffer.append(characters, length);
+        initalizeFromBuffer(encoding);
+    }
+
+    TextCodecInput(const TextEncoding& encoding, const LChar* characters, size_t length)
+    {
+        m_buffer.reserveInitialCapacity(length);
+        for (size_t i = 0; i < length; ++i)
+            m_buffer.append(characters[i]);
+        initalizeFromBuffer(encoding);
+    }
+
+    const UChar* begin() const { return m_begin; }
+    const UChar* end() const { return m_end; }
+
+private:
+    void initalizeFromBuffer(const TextEncoding& encoding)
+    {
+        // FIXME: We should see if there is "force ASCII range" mode in ICU;
+        // until then, we change the backslash into a yen sign.
+        // Encoding will change the yen sign back into a backslash.
+        encoding.displayBuffer(m_buffer.data(), m_buffer.size());
+        m_begin = m_buffer.data();
+        m_end = m_begin + m_buffer.size();
+    }
+
+    const UChar* m_begin;
+    const UChar* m_end;
+    Vector<UChar> m_buffer;
+};
+
+CString TextCodecICU::encodeInternal(const TextCodecInput& input, UnencodableHandling handling)
 {
-    if (!length)
-        return "";
-
-    if (!m_converterICU)
-        createICUConverter();
-    if (!m_converterICU)
-        return CString();
-
-    // FIXME: We should see if there is "force ASCII range" mode in ICU;
-    // until then, we change the backslash into a yen sign.
-    // Encoding will change the yen sign back into a backslash.
-    String copy(characters, length);
-    copy = m_encoding.displayString(copy.impl());
-
-    const UChar* source = copy.characters();
-    const UChar* sourceLimit = source + copy.length();
+    const UChar* source = input.begin();
+    const UChar* end = input.end();
 
     UErrorCode err = U_ZERO_ERROR;
 
@@ -460,7 +486,7 @@ CString TextCodecICU::encode(const UChar* characters, size_t length, Unencodable
         char* target = buffer;
         char* targetLimit = target + ConversionBufferSize;
         err = U_ZERO_ERROR;
-        ucnv_fromUnicode(m_converterICU, &target, targetLimit, &source, sourceLimit, 0, true, &err);
+        ucnv_fromUnicode(m_converterICU, &target, targetLimit, &source, end, 0, true, &err);
         size_t count = target - buffer;
         result.grow(size + count);
         memcpy(result.data() + size, buffer, count);
@@ -468,6 +494,31 @@ CString TextCodecICU::encode(const UChar* characters, size_t length, Unencodable
     } while (err == U_BUFFER_OVERFLOW_ERROR);
 
     return CString(result.data(), size);
+}
+
+template<typename CharType>
+CString TextCodecICU::encodeCommon(const CharType* characters, size_t length, UnencodableHandling handling)
+{
+    if (!length)
+        return "";
+
+    if (!m_converterICU)
+        createICUConverter();
+    if (!m_converterICU)
+        return CString();
+
+    TextCodecInput input(m_encoding, characters, length);
+    return encodeInternal(input, handling);
+}
+
+CString TextCodecICU::encode(const UChar* characters, size_t length, UnencodableHandling handling)
+{
+    return encodeCommon(characters, length, handling);
+}
+
+CString TextCodecICU::encode(const LChar* characters, size_t length, UnencodableHandling handling)
+{
+    return encodeCommon(characters, length, handling);
 }
 
 } // namespace WTF

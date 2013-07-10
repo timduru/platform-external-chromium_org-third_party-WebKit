@@ -34,11 +34,10 @@
 #include <limits>
 #include "core/html/HTMLInputElement.h"
 #include "core/platform/text/PlatformLocale.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/DateMath.h>
-#include <wtf/MathExtras.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/CurrentTime.h"
+#include "wtf/DateMath.h"
+#include "wtf/MathExtras.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -110,7 +109,7 @@ bool BaseDateAndTimeInputType::parseToDateComponents(const String& source, DateC
     DateComponents ignoredResult;
     if (!out)
         out = &ignoredResult;
-    return parseToDateComponentsInternal(source.characters(), source.length(), out);
+    return parseToDateComponentsInternal(source, out);
 }
 
 String BaseDateAndTimeInputType::serialize(const Decimal& value) const
@@ -173,6 +172,11 @@ bool BaseDateAndTimeInputType::shouldRespectListAttribute()
 bool BaseDateAndTimeInputType::valueMissing(const String& value) const
 {
     return element()->isRequired() && value.isEmpty();
+}
+
+bool BaseDateAndTimeInputType::shouldShowFocusRingOnMouseFocus() const
+{
+    return true;
 }
 
 } // namespace WebCore

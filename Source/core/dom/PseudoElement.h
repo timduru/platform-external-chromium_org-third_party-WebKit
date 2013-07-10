@@ -28,9 +28,8 @@
 #define PseudoElement_h
 
 #include "core/dom/Element.h"
-#include "core/dom/Event.h"
 #include "core/rendering/style/RenderStyle.h"
-#include <wtf/Forward.h>
+#include "wtf/Forward.h"
 
 namespace WebCore {
 
@@ -45,6 +44,10 @@ public:
     virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
+
+    // As per http://dev.w3.org/csswg/css3-regions/#flow-into, pseudo-elements such as ::first-line, ::first-letter, ::before or ::after
+    // cannot be directly collected into a named flow.
+    virtual bool shouldMoveToFlowThread(RenderStyle*) const OVERRIDE { return false; }
 
     virtual bool canStartSelection() const OVERRIDE { return false; }
     virtual bool canContainRangeEndPoint() const OVERRIDE { return false; }

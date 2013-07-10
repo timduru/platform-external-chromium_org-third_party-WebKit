@@ -114,13 +114,6 @@ def parse_args(args):
             dest="pixel_tests", help="Enable pixel-to-pixel PNG comparisons"),
         optparse.make_option("--no-pixel", "--no-pixel-tests", action="store_false",
             dest="pixel_tests", help="Disable pixel-to-pixel PNG comparisons"),
-        optparse.make_option("--no-sample-on-timeout", action="store_false",
-            dest="sample_on_timeout", help="Don't run sample on timeout (Mac OS X only)"),
-        optparse.make_option("--no-ref-tests", action="store_true",
-            dest="no_ref_tests", help="Skip all ref tests"),
-        optparse.make_option("--tolerance",
-            help="Ignore image differences less than this percentage (some "
-                "ports may ignore this option)", type="float"),
         optparse.make_option("--results-directory", help="Location of test results"),
         optparse.make_option("--build-directory",
             help="Path to the directory under which build files are kept (should not include configuration)"),
@@ -151,14 +144,10 @@ def parse_args(args):
                  "Note: When using this option, you might miss new crashes "
                  "in these tests."),
         optparse.make_option("--additional-drt-flag", action="append",
-            default=[], help="Additional command line flag to pass to DumpRenderTree "
+            default=[], help="Additional command line flag to pass to the driver "
                  "Specify multiple times to add multiple flags."),
         optparse.make_option("--driver-name", type="string",
-            help="Alternative DumpRenderTree binary to use"),
-        optparse.make_option("--content-shell", action="store_true",
-            help="Use Content Shell instead of DumpRenderTree"),
-        optparse.make_option("--dump-render-tree", action="store_true",
-            help="Use DumpRenderTree instead of Content Shell"),
+            help="Alternative driver binary to use"),
         optparse.make_option("--additional-platform-directory", action="append",
             default=[], help="Additional directory where to look for test "
                  "baselines (will take precendence over platform baselines). "
@@ -177,36 +166,31 @@ def parse_args(args):
             help="Show all failures in results.html, rather than only regressions"),
         optparse.make_option("--clobber-old-results", action="store_true",
             default=False, help="Clobbers test results from previous runs."),
-        optparse.make_option("--http", action="store_true", dest="http",
-            default=True, help="Run HTTP and WebSocket tests (default)"),
-        optparse.make_option("--no-http", action="store_false", dest="http",
-            help="Don't run HTTP and WebSocket tests"),
-        optparse.make_option("--ignore-metrics", action="store_true", dest="ignore_metrics",
-            default=False, help="Ignore rendering metrics related information from test "
-            "output, only compare the structure of the rendertree."),
     ]))
 
     option_group_definitions.append(("Testing Options", [
         optparse.make_option("--build", dest="build",
             action="store_true", default=True,
-            help="Check to ensure the DumpRenderTree build is up-to-date "
-                 "(default)."),
+            help="Check to ensure the build is up-to-date (default)."),
         optparse.make_option("--no-build", dest="build",
-            action="store_false", help="Don't check to see if the "
-                                       "DumpRenderTree build is up-to-date."),
+            action="store_false", help="Don't check to see if the build is up-to-date."),
         optparse.make_option("-n", "--dry-run", action="store_true",
             default=False,
             help="Do everything but actually run the tests or upload results."),
         optparse.make_option("--wrapper",
             help="wrapper command to insert before invocations of "
-                 "DumpRenderTree; option is split on whitespace before "
+                 "the driver; option is split on whitespace before "
                  "running. (Example: --wrapper='valgrind --smc-check=all')"),
         optparse.make_option("-i", "--ignore-tests", action="append", default=[],
             help="directories or test to ignore (may specify multiple times)"),
         optparse.make_option("--ignore-flaky-tests", action="store",
             help=("Control whether tests that are flaky on the bots get ignored."
                 "'very-flaky' == Ignore any tests that flaked more than once on the bot."
-                "'maybe-flaky' == Ignore any tests that flaked once on the bot.")),
+                "'maybe-flaky' == Ignore any tests that flaked once on the bot."
+                "'unexpected' == Ignore any tests that had unexpected results on the bot.")),
+        optparse.make_option("--ignore-builder-category", action="store",
+            help=("The category of builders to use with the --ignore-flaky-tests "
+                "option ('layout' or 'deps').")),
         optparse.make_option("--test-list", action="append",
             help="read list of tests to run from file", metavar="FILE"),
         optparse.make_option("--skipped", action="store", default="default",
@@ -215,8 +199,6 @@ def parse_args(args):
                  "'ignore' == Run them anyway, "
                  "'only' == only run the SKIP tests, "
                  "'always' == always skip, even if listed on the command line.")),
-        optparse.make_option("--force", dest="skipped", action="store_const", const='ignore',
-            help="Run all tests, even those marked SKIP in the test list (same as --skipped=ignore)"),
         optparse.make_option("--time-out-ms",
             help="Set the timeout for each test"),
         optparse.make_option("--order", action="store", default="natural",
@@ -231,11 +213,11 @@ def parse_args(args):
                   "the nth of m parts, of the layout tests")),
         optparse.make_option("--batch-size",
             help=("Run a the tests in batches (n), after every n tests, "
-                  "DumpRenderTree is relaunched."), type="int", default=None),
+                  "the driver is relaunched."), type="int", default=None),
         optparse.make_option("--run-singly", action="store_true",
-            default=False, help="run a separate DumpRenderTree for each test (implies --verbose)"),
+            default=False, help="run a separate driver for each test (implies --verbose)"),
         optparse.make_option("--child-processes",
-            help="Number of DumpRenderTrees to run in parallel."),
+            help="Number of drivers to run in parallel."),
         # FIXME: Display default number of child processes that will run.
         optparse.make_option("-f", "--fully-parallel", action="store_true",
             help="run all tests in parallel"),
@@ -322,13 +304,6 @@ def _set_up_derived_options(port, options):
         for path in options.additional_platform_directory:
             additional_platform_directories.append(port.host.filesystem.abspath(path))
         options.additional_platform_directory = additional_platform_directories
-
-    if not options.http and options.skipped in ('ignore', 'only'):
-        _log.warning("--force/--skipped=%s overrides --no-http." % (options.skipped))
-        options.http = True
-
-    if options.ignore_metrics and (options.new_baseline or options.reset_results):
-        _log.warning("--ignore-metrics has no effect with --new-baselines or with --reset-results")
 
     if options.new_baseline:
         options.reset_results = True

@@ -48,12 +48,12 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/inspector/InjectedScriptHost.h"
 #include "core/inspector/InspectorController.h"
-#include "core/inspector/InspectorValues.h"
 #include "core/loader/cache/MemoryCache.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/PageGroup.h"
+#include "core/platform/JSONValues.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceRequest.h"
@@ -66,11 +66,11 @@
 #include "public/platform/WebURLError.h"
 #include "public/platform/WebURLRequest.h"
 #include "public/platform/WebURLResponse.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/MathExtras.h>
-#include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/CurrentTime.h"
+#include "wtf/MathExtras.h"
+#include "wtf/Noncopyable.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/text/WTFString.h"
 
 using namespace WebCore;
 using namespace std;

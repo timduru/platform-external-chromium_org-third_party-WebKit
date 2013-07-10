@@ -304,6 +304,11 @@ bool WebPopupMenuImpl::confirmComposition()
     return false;
 }
 
+bool WebPopupMenuImpl::confirmComposition(ConfirmCompositionBehavior)
+{
+    return false;
+}
+
 bool WebPopupMenuImpl::confirmComposition(const WebString&)
 {
     return false;
@@ -314,11 +319,6 @@ bool WebPopupMenuImpl::compositionRange(size_t* location, size_t* length)
     *location = 0;
     *length = 0;
     return false;
-}
-
-WebTextInputType WebPopupMenuImpl::textInputType()
-{
-    return WebTextInputTypeNone;
 }
 
 bool WebPopupMenuImpl::caretOrSelectionRange(size_t* location, size_t* length)

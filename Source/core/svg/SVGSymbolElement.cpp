@@ -62,7 +62,7 @@ bool SVGSymbolElement::isSupportedAttribute(const QualifiedName& attrName)
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         SVGFitToViewBox::addSupportedAttributes(supportedAttributes);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGSymbolElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -101,9 +101,9 @@ bool SVGSymbolElement::selfHasRelativeLengths() const
     return hasAttribute(SVGNames::viewBoxAttr);
 }
 
-RenderObject* SVGSymbolElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGSymbolElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGHiddenContainer(this);
+    return new (document()->renderArena()) RenderSVGHiddenContainer(this);
 }
 
 }

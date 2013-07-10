@@ -31,17 +31,13 @@
 #ifndef InspectorInstrumentation_h
 #define InspectorInstrumentation_h
 
-#include "bindings/v8/ScriptState.h"
 #include "bindings/v8/ScriptString.h"
-#include "core/css/CSSImportRule.h"
-#include "core/css/CSSRule.h"
 #include "core/css/CSSSelector.h"
 #include "core/css/CSSStyleSheet.h"
 #include "core/dom/Element.h"
 #include "core/dom/EventContext.h"
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/inspector/ConsoleAPITypes.h"
-#include "core/page/ConsoleTypes.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/network/FormData.h"
@@ -51,8 +47,6 @@
 #include "modules/websockets/WebSocketHandshakeRequest.h"
 #include "modules/websockets/WebSocketHandshakeResponse.h"
 #include "wtf/RefPtr.h"
-#include "wtf/UnusedParam.h"
-#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -95,8 +89,8 @@ class StyleResolver;
 class StyleRule;
 class StyleSheet;
 class ThreadableLoaderClient;
-class WorkerContext;
-class WorkerContextProxy;
+class WorkerGlobalScope;
+class WorkerGlobalScopeProxy;
 class XMLHttpRequest;
 
 #define FAST_RETURN_IF_NO_FRONTENDS(value) if (!hasFrontends()) return value;
@@ -144,7 +138,7 @@ InstrumentingAgents* instrumentingAgentsForDocument(Document*);
 InstrumentingAgents* instrumentingAgentsForRenderObject(RenderObject*);
 InstrumentingAgents* instrumentingAgentsForElement(Element*);
 
-InstrumentingAgents* instrumentingAgentsForWorkerContext(WorkerContext*);
+InstrumentingAgents* instrumentingAgentsForWorkerGlobalScope(WorkerGlobalScope*);
 InstrumentingAgents* instrumentingAgentsForNonDocumentContext(ScriptExecutionContext*);
 
 }  // namespace InspectorInstrumentation
@@ -205,7 +199,7 @@ bool cssErrorFilter(const CSSParserString& content, int propertyId, int errorTyp
 
 InstrumentingAgents* instrumentationForPage(Page*);
 
-InstrumentingAgents* instrumentationForWorkerContext(WorkerContext*);
+InstrumentingAgents* instrumentationForWorkerGlobalScope(WorkerGlobalScope*);
 
 } // namespace WebCore
 

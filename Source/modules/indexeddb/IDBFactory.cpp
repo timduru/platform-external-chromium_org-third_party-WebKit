@@ -33,16 +33,14 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
-#include "core/page/GroupSettings.h"
 #include "core/page/Page.h"
 #include "core/page/PageGroup.h"
 #include "core/platform/HistogramSupport.h"
-#include "core/workers/WorkerContext.h"
+#include "core/workers/WorkerGlobalScope.h"
 #include "core/workers/WorkerLoaderProxy.h"
 #include "core/workers/WorkerThread.h"
 #include "modules/indexeddb/IDBDatabase.h"
 #include "modules/indexeddb/IDBDatabaseCallbacksImpl.h"
-#include "modules/indexeddb/IDBDatabaseException.h"
 #include "modules/indexeddb/IDBFactoryBackendInterface.h"
 #include "modules/indexeddb/IDBHistograms.h"
 #include "modules/indexeddb/IDBKey.h"
@@ -66,30 +64,14 @@ IDBFactory::~IDBFactory()
 {
 }
 
-namespace {
 static bool isContextValid(ScriptExecutionContext* context)
 {
-    ASSERT(context->isDocument() || context->isWorkerContext());
+    ASSERT(context->isDocument() || context->isWorkerGlobalScope());
     if (context->isDocument()) {
         Document* document = toDocument(context);
         return document->frame() && document->page();
     }
     return true;
-}
-
-static String getIndexedDBDatabasePath(ScriptExecutionContext* context)
-{
-    ASSERT(isContextValid(context));
-    if (context->isDocument()) {
-        Document* document = toDocument(context);
-        return document->page()->group().groupSettings()->indexedDBDatabasePath();
-    }
-    WorkerContext* workerContext = static_cast<WorkerContext*>(context);
-    const GroupSettings* groupSettings = workerContext->groupSettings();
-    if (groupSettings)
-        return groupSettings->indexedDBDatabasePath();
-    return String();
-}
 }
 
 PassRefPtr<IDBRequest> IDBFactory::getDatabaseNames(ScriptExecutionContext* context, ExceptionCode& ec)
@@ -103,7 +85,7 @@ PassRefPtr<IDBRequest> IDBFactory::getDatabaseNames(ScriptExecutionContext* cont
     }
 
     RefPtr<IDBRequest> request = IDBRequest::create(context, IDBAny::create(this), 0);
-    m_backend->getDatabaseNames(request, createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context, getIndexedDBDatabasePath(context));
+    m_backend->getDatabaseNames(request, createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context);
     return request;
 }
 
@@ -135,7 +117,7 @@ PassRefPtr<IDBOpenDBRequest> IDBFactory::openInternal(ScriptExecutionContext* co
     RefPtr<IDBDatabaseCallbacksImpl> databaseCallbacks = IDBDatabaseCallbacksImpl::create();
     int64_t transactionId = IDBDatabase::nextTransactionId();
     RefPtr<IDBOpenDBRequest> request = IDBOpenDBRequest::create(context, databaseCallbacks, transactionId, version);
-    m_backend->open(name, version, transactionId, request, databaseCallbacks, createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context, getIndexedDBDatabasePath(context));
+    m_backend->open(name, version, transactionId, request, databaseCallbacks, createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context);
     return request;
 }
 
@@ -161,7 +143,7 @@ PassRefPtr<IDBOpenDBRequest> IDBFactory::deleteDatabase(ScriptExecutionContext* 
     }
 
     RefPtr<IDBOpenDBRequest> request = IDBOpenDBRequest::create(context, 0, 0, IDBDatabaseMetadata::DefaultIntVersion);
-    m_backend->deleteDatabase(name, request, createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context, getIndexedDBDatabasePath(context));
+    m_backend->deleteDatabase(name, request, createDatabaseIdentifierFromSecurityOrigin(context->securityOrigin()), context);
     return request;
 }
 
@@ -175,7 +157,7 @@ short IDBFactory::cmp(ScriptExecutionContext* context, const ScriptValue& firstV
     ASSERT(second);
 
     if (!first->isValid() || !second->isValid()) {
-        ec = IDBDatabaseException::DataError;
+        ec = DataError;
         return 0;
     }
 

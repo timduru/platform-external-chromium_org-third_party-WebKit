@@ -47,8 +47,8 @@ class EmptyChromeClient;
 class GraphicsContext;
 class InspectorClient;
 class InspectorOverlayHost;
-class InspectorValue;
 class IntRect;
+class JSONValue;
 class Node;
 class Page;
 class PlatformMouseEvent;
@@ -107,6 +107,15 @@ struct Highlight {
 class InspectorOverlay {
     WTF_MAKE_FAST_ALLOCATED;
 public:
+    // This must be kept in sync with the overrideEntries array in InspectorOverlayPage.html.
+    enum OverrideType {
+        UserAgentOverride = 1,
+        DeviceMetricsOverride = 1 << 1,
+        GeolocationOverride = 1 << 2,
+        DeviceOrientationOverride = 1 << 3,
+        TouchOverride = 1 << 4,
+        CSSMediaOverride = 1 << 5
+    };
     static PassOwnPtr<InspectorOverlay> create(Page* page, InspectorClient* client)
     {
         return adoptPtr(new InspectorOverlay(page, client));
@@ -124,6 +133,8 @@ public:
 
     void setPausedInDebuggerMessage(const String*);
     void setInspectModeEnabled(bool);
+    void setOverride(OverrideType, bool);
+    void setOverridesTopOffset(int);
 
     void hideHighlight();
     void highlightNode(Node*, Node* eventTarget, const HighlightConfig&);
@@ -150,11 +161,12 @@ private:
     void drawQuadHighlight();
     void drawPausedInDebuggerMessage();
     void drawViewSize();
+    void drawOverridesMessage();
 
     Page* overlayPage();
     void reset(const IntSize& viewportSize, const IntSize& frameViewFullSize, int scrollX, int scrollY);
     void evaluateInOverlay(const String& method, const String& argument);
-    void evaluateInOverlay(const String& method, PassRefPtr<InspectorValue> argument);
+    void evaluateInOverlay(const String& method, PassRefPtr<JSONValue> argument);
     void onTimer(Timer<InspectorOverlay>*);
 
     Page* m_page;
@@ -173,6 +185,8 @@ private:
     bool m_drawViewSize;
     bool m_drawViewSizeWithGrid;
     Timer<InspectorOverlay> m_timer;
+    unsigned m_overrides;
+    int m_overridesTopOffset;
 };
 
 } // namespace WebCore

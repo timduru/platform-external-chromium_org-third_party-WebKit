@@ -28,11 +28,10 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "MockColorChooser.h"
 
-#include "WebTestDelegate.h"
-#include "WebTestProxy.h"
+#include "public/testing/WebTestDelegate.h"
+#include "public/testing/WebTestProxy.h"
 
 using namespace WebKit;
 using namespace std;

@@ -41,10 +41,12 @@
 #include "WebFrame.h"
 #include "WebFrameClient.h"
 #include "WebFrameImpl.h"
+#include "WebHitTestResult.h"
 #include "WebInputEvent.h"
 #include "WebSettings.h"
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
+#include "WebWidget.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/html/HTMLDocument.h"
@@ -229,6 +231,30 @@ TEST_F(WebViewTest, ActiveState)
     webView->close();
 }
 
+TEST_F(WebViewTest, HitTestResultAtWithPageScale)
+{
+    std::string url = m_baseURL + "specify_size.html?" + "50px" + ":" + "50px";
+    URLTestHelpers::registerMockedURLLoad(toKURL(url), "specify_size.html");
+    WebView* webView = FrameTestHelpers::createWebViewAndLoad(url, true, 0);
+    webView->resize(WebSize(100, 100));
+    WebPoint hitPoint(75, 75);
+
+    // Image is at top left quandrant, so should not hit it.
+    WebHitTestResult negativeResult = webView->hitTestResultAt(hitPoint);
+    ASSERT_EQ(WebNode::ElementNode, negativeResult.node().nodeType());
+    EXPECT_FALSE(negativeResult.node().to<WebElement>().hasTagName("img"));
+    negativeResult.reset();
+
+    // Scale page up 2x so image should occupy the whole viewport.
+    webView->setPageScaleFactor(2.0f, WebPoint(0, 0));
+    WebHitTestResult positiveResult = webView->hitTestResultAt(hitPoint);
+    ASSERT_EQ(WebNode::ElementNode, positiveResult.node().nodeType());
+    EXPECT_TRUE(positiveResult.node().to<WebElement>().hasTagName("img"));
+    positiveResult.reset();
+
+    webView->close();
+}
+
 void WebViewTest::testAutoResize(const WebSize& minAutoResize, const WebSize& maxAutoResize,
                                  const std::string& pageWidth, const std::string& pageHeight,
                                  int expectedWidth, int expectedHeight,
@@ -386,6 +412,50 @@ TEST_F(WebViewTest, SetEditableSelectionOffsetsAndTextInputInfo)
     webView->close();
 }
 
+TEST_F(WebViewTest, ConfirmCompositionCursorPositionChange)
+{
+    URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("input_field_populated.html"));
+    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "input_field_populated.html");
+    webView->setInitialFocus(false);
+
+    // Set up a composition that needs to be committed.
+    std::string compositionText("hello");
+
+    WebVector<WebCompositionUnderline> emptyUnderlines;
+    webView->setComposition(WebString::fromUTF8(compositionText.c_str()), emptyUnderlines, 3, 3);
+
+    WebTextInputInfo info = webView->textInputInfo();
+    EXPECT_EQ("hello", std::string(info.value.utf8().data()));
+    EXPECT_EQ(3, info.selectionStart);
+    EXPECT_EQ(3, info.selectionEnd);
+    EXPECT_EQ(0, info.compositionStart);
+    EXPECT_EQ(5, info.compositionEnd);
+
+    webView->confirmComposition(WebWidget::KeepSelection);
+    info = webView->textInputInfo();
+    EXPECT_EQ(3, info.selectionStart);
+    EXPECT_EQ(3, info.selectionEnd);
+    EXPECT_EQ(-1, info.compositionStart);
+    EXPECT_EQ(-1, info.compositionEnd);
+
+    webView->setComposition(WebString::fromUTF8(compositionText.c_str()), emptyUnderlines, 3, 3);
+    info = webView->textInputInfo();
+    EXPECT_EQ("helhellolo", std::string(info.value.utf8().data()));
+    EXPECT_EQ(6, info.selectionStart);
+    EXPECT_EQ(6, info.selectionEnd);
+    EXPECT_EQ(3, info.compositionStart);
+    EXPECT_EQ(8, info.compositionEnd);
+
+    webView->confirmComposition(WebWidget::DoNotKeepSelection);
+    info = webView->textInputInfo();
+    EXPECT_EQ(8, info.selectionStart);
+    EXPECT_EQ(8, info.selectionEnd);
+    EXPECT_EQ(-1, info.compositionStart);
+    EXPECT_EQ(-1, info.compositionEnd);
+
+    webView->close();
+}
+
 TEST_F(WebViewTest, FormChange)
 {
     FormChangeWebViewClient client;
@@ -458,7 +528,7 @@ TEST_F(WebViewTest, IsSelectionAnchorFirst)
     webView->close();
 }
 
-TEST_F(WebViewTest, ResetScrollAndScaleState)
+TEST_F(WebViewTest, HistoryResetScrollAndScaleState)
 {
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("hello_world.html"));
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "hello_world.html"));
@@ -500,6 +570,54 @@ TEST_F(WebViewTest, ResetScrollAndScaleState)
     EXPECT_EQ(1.0f, webViewImpl->pageScaleFactor());
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().width);
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().height);
+    webViewImpl->close();
+}
+
+class EnterFullscreenWebViewClient : public WebViewClient {
+public:
+    // WebViewClient methods
+    virtual bool enterFullScreen() { return true; }
+    virtual void exitFullScreen() { }
+};
+
+
+TEST_F(WebViewTest, EnterFullscreenResetScrollAndScaleState)
+{
+    EnterFullscreenWebViewClient client;
+    URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("hello_world.html"));
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "hello_world.html", true, 0, &client));
+    webViewImpl->settings()->setFullScreenEnabled(true);
+    webViewImpl->resize(WebSize(640, 480));
+    webViewImpl->layout();
+    EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().width);
+    EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().height);
+
+    // Make the page scale and scroll with the given paremeters.
+    webViewImpl->setPageScaleFactor(2.0f, WebPoint(116, 84));
+    EXPECT_EQ(2.0f, webViewImpl->pageScaleFactor());
+    EXPECT_EQ(116, webViewImpl->mainFrame()->scrollOffset().width);
+    EXPECT_EQ(84, webViewImpl->mainFrame()->scrollOffset().height);
+
+    RefPtr<WebCore::Element> element = static_cast<PassRefPtr<WebCore::Element> >(webViewImpl->mainFrame()->document().body());
+    webViewImpl->enterFullScreenForElement(element.get());
+    webViewImpl->willEnterFullScreen();
+    webViewImpl->didEnterFullScreen();
+
+    // Page scale factor must be 1.0 during fullscreen for elements to be sized
+    // properly.
+    EXPECT_EQ(1.0f, webViewImpl->pageScaleFactor());
+
+    // Make sure fullscreen nesting doesn't disrupt scroll/scale saving.
+    RefPtr<WebCore::Element> otherElement = static_cast<PassRefPtr<WebCore::Element> >(webViewImpl->mainFrame()->document().head());
+    webViewImpl->enterFullScreenForElement(otherElement.get());
+
+    // Confirm that exiting fullscreen restores the parameters.
+    webViewImpl->willExitFullScreen();
+    webViewImpl->didExitFullScreen();
+    EXPECT_EQ(2.0f, webViewImpl->pageScaleFactor());
+    EXPECT_EQ(116, webViewImpl->mainFrame()->scrollOffset().width);
+    EXPECT_EQ(84, webViewImpl->mainFrame()->scrollOffset().height);
+
     webViewImpl->close();
 }
 

@@ -369,18 +369,18 @@ const StylePropertyShorthand& webkitColumnRuleShorthand()
     return webkitColumnRuleLonghands;
 }
 
-const StylePropertyShorthand& webkitFlexFlowShorthand()
+const StylePropertyShorthand& flexFlowShorthand()
 {
-    static const CSSPropertyID flexFlowProperties[] = { CSSPropertyWebkitFlexDirection, CSSPropertyWebkitFlexWrap };
-    DEFINE_STATIC_LOCAL(StylePropertyShorthand, webkitFlexFlowLonghands, (CSSPropertyWebkitFlexFlow, flexFlowProperties, WTF_ARRAY_LENGTH(flexFlowProperties)));
-    return webkitFlexFlowLonghands;
+    static const CSSPropertyID flexFlowProperties[] = { CSSPropertyFlexDirection, CSSPropertyFlexWrap };
+    DEFINE_STATIC_LOCAL(StylePropertyShorthand, flexFlowLonghands, (CSSPropertyFlexFlow, flexFlowProperties, WTF_ARRAY_LENGTH(flexFlowProperties)));
+    return flexFlowLonghands;
 }
 
-const StylePropertyShorthand& webkitFlexShorthand()
+const StylePropertyShorthand& flexShorthand()
 {
-    static const CSSPropertyID flexProperties[] = { CSSPropertyWebkitFlexGrow, CSSPropertyWebkitFlexShrink, CSSPropertyWebkitFlexBasis };
-    DEFINE_STATIC_LOCAL(StylePropertyShorthand, webkitFlexLonghands, (CSSPropertyWebkitFlex, flexProperties, WTF_ARRAY_LENGTH(flexProperties)));
-    return webkitFlexLonghands;
+    static const CSSPropertyID flexProperties[] = { CSSPropertyFlexGrow, CSSPropertyFlexShrink, CSSPropertyFlexBasis };
+    DEFINE_STATIC_LOCAL(StylePropertyShorthand, flexLonghands, (CSSPropertyFlex, flexProperties, WTF_ARRAY_LENGTH(flexProperties)));
+    return flexLonghands;
 }
 
 const StylePropertyShorthand& webkitMarginCollapseShorthand()
@@ -393,8 +393,8 @@ const StylePropertyShorthand& webkitMarginCollapseShorthand()
 const StylePropertyShorthand& gridColumnShorthand()
 {
     static const CSSPropertyID gridColumnProperties[] = {
-        CSSPropertyGridStart,
-        CSSPropertyGridEnd
+        CSSPropertyGridColumnStart,
+        CSSPropertyGridColumnEnd
     };
     DEFINE_STATIC_LOCAL(StylePropertyShorthand, gridColumnLonghands, (CSSPropertyGridColumn, gridColumnProperties, WTF_ARRAY_LENGTH(gridColumnProperties)));
     return gridColumnLonghands;
@@ -403,8 +403,8 @@ const StylePropertyShorthand& gridColumnShorthand()
 const StylePropertyShorthand& gridRowShorthand()
 {
     static const CSSPropertyID gridRowProperties[] = {
-        CSSPropertyGridBefore,
-        CSSPropertyGridAfter
+        CSSPropertyGridRowStart,
+        CSSPropertyGridRowEnd
     };
     DEFINE_STATIC_LOCAL(StylePropertyShorthand, gridRowLonghands, (CSSPropertyGridRow, gridRowProperties, WTF_ARRAY_LENGTH(gridRowProperties)));
     return gridRowLonghands;
@@ -413,10 +413,10 @@ const StylePropertyShorthand& gridRowShorthand()
 const StylePropertyShorthand& gridAreaShorthand()
 {
     static const CSSPropertyID gridAreaProperties[] = {
-        CSSPropertyGridStart,
-        CSSPropertyGridBefore,
-        CSSPropertyGridEnd,
-        CSSPropertyGridAfter
+        CSSPropertyGridColumnStart,
+        CSSPropertyGridRowStart,
+        CSSPropertyGridColumnEnd,
+        CSSPropertyGridRowEnd
     };
     DEFINE_STATIC_LOCAL(StylePropertyShorthand, gridAreaLonghands, (CSSPropertyGridArea, gridAreaProperties, WTF_ARRAY_LENGTH(gridAreaProperties)));
     return gridAreaLonghands;
@@ -587,10 +587,10 @@ const StylePropertyShorthand& shorthandForProperty(CSSPropertyID propertyID)
         return webkitColumnsShorthand();
     case CSSPropertyWebkitColumnRule:
         return webkitColumnRuleShorthand();
-    case CSSPropertyWebkitFlex:
-        return webkitFlexShorthand();
-    case CSSPropertyWebkitFlexFlow:
-        return webkitFlexFlowShorthand();
+    case CSSPropertyFlex:
+        return flexShorthand();
+    case CSSPropertyFlexFlow:
+        return flexFlowShorthand();
     case CSSPropertyGridColumn:
         return gridColumnShorthand();
     case CSSPropertyGridRow:
@@ -853,27 +853,27 @@ const Vector<StylePropertyShorthand> matchingShorthandsForLonghand(CSSPropertyID
         map.set(CSSPropertyWebkitColumnRuleColor, columnRule);
 
         Vector<StylePropertyShorthand, 1> flex;
-        flex.uncheckedAppend(webkitFlexShorthand());
-        map.set(CSSPropertyWebkitFlexGrow, flex);
-        map.set(CSSPropertyWebkitFlexShrink, flex);
-        map.set(CSSPropertyWebkitFlexBasis, flex);
+        flex.uncheckedAppend(flexShorthand());
+        map.set(CSSPropertyFlexGrow, flex);
+        map.set(CSSPropertyFlexShrink, flex);
+        map.set(CSSPropertyFlexBasis, flex);
 
         Vector<StylePropertyShorthand, 1> flexFlow;
-        flexFlow.uncheckedAppend(webkitFlexFlowShorthand());
-        map.set(CSSPropertyWebkitFlexDirection, flexFlow);
-        map.set(CSSPropertyWebkitFlexWrap, flexFlow);
+        flexFlow.uncheckedAppend(flexFlowShorthand());
+        map.set(CSSPropertyFlexDirection, flexFlow);
+        map.set(CSSPropertyFlexWrap, flexFlow);
 
         Vector<StylePropertyShorthand, 2> grid;
         grid.uncheckedAppend(gridAreaShorthand());
         grid.uncheckedAppend(gridColumnShorthand());
-        map.set(CSSPropertyGridStart, grid);
-        map.set(CSSPropertyGridEnd, grid);
+        map.set(CSSPropertyGridColumnStart, grid);
+        map.set(CSSPropertyGridColumnEnd, grid);
 
         Vector<StylePropertyShorthand, 2> gridAfter;
         gridAfter.uncheckedAppend(gridAreaShorthand());
         gridAfter.uncheckedAppend(gridRowShorthand());
-        map.set(CSSPropertyGridBefore, gridAfter);
-        map.set(CSSPropertyGridAfter, gridAfter);
+        map.set(CSSPropertyGridRowStart, gridAfter);
+        map.set(CSSPropertyGridRowEnd, gridAfter);
 
         Vector<StylePropertyShorthand, 1> marginCollapse;
         marginCollapse.uncheckedAppend(webkitMarginCollapseShorthand());

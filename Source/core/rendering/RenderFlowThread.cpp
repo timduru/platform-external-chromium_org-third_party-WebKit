@@ -48,13 +48,14 @@ namespace WebCore {
 
 RenderFlowThread::RenderFlowThread()
     : RenderBlock(0)
+    , m_previousRegionCount(0)
     , m_autoLogicalHeightRegionsCount(0)
     , m_regionsInvalidated(false)
     , m_regionsHaveUniformLogicalWidth(true)
     , m_regionsHaveUniformLogicalHeight(true)
-    , m_overset(true)
     , m_hasRegionsWithStyling(false)
     , m_dispatchRegionLayoutUpdateEvent(false)
+    , m_dispatchRegionOversetChangeEvent(false)
     , m_pageLogicalSizeChanged(false)
     , m_inConstrainedLayoutPhase(false)
     , m_needsTwoPhasesLayout(false)
@@ -217,6 +218,9 @@ void RenderFlowThread::layout()
 
     if (shouldDispatchRegionLayoutUpdateEvent())
         dispatchRegionLayoutUpdateEvent();
+
+    if (shouldDispatchRegionOversetChangeEvent())
+        dispatchRegionOversetChangeEvent();
 }
 
 void RenderFlowThread::updateLogicalWidth()
@@ -727,45 +731,6 @@ void RenderFlowThread::applyBreakAfterContent(LayoutUnit clientHeight)
     // Simulate a region break at height. If it points inside an auto logical height region,
     // then it may determine the region override logical content height.
     addForcedRegionBreak(clientHeight, this, false);
-}
-
-void RenderFlowThread::computeOverflowStateForRegions(LayoutUnit oldClientAfterEdge)
-{
-    LayoutUnit height = oldClientAfterEdge;
-
-    // FIXME: the visual overflow of middle region (if it is the last one to contain any content in a render flow thread)
-    // might not be taken into account because the render flow thread height is greater that that regions height + its visual overflow
-    // because of how computeLogicalHeight is implemented for RenderFlowThread (as a sum of all regions height).
-    // This means that the middle region will be marked as fit (even if it has visual overflow flowing into the next region)
-    if (hasRenderOverflow()
-        && ( (isHorizontalWritingMode() && visualOverflowRect().maxY() > clientBoxRect().maxY())
-            || (!isHorizontalWritingMode() && visualOverflowRect().maxX() > clientBoxRect().maxX())))
-        height = isHorizontalWritingMode() ? visualOverflowRect().maxY() : visualOverflowRect().maxX();
-
-    RenderRegion* lastReg = lastRegion();
-    for (RenderRegionList::iterator iter = m_regionList.begin(); iter != m_regionList.end(); ++iter) {
-        RenderRegion* region = *iter;
-        LayoutUnit flowMin = height - (isHorizontalWritingMode() ? region->flowThreadPortionRect().y() : region->flowThreadPortionRect().x());
-        LayoutUnit flowMax = height - (isHorizontalWritingMode() ? region->flowThreadPortionRect().maxY() : region->flowThreadPortionRect().maxX());
-        RenderRegion::RegionState previousState = region->regionState();
-        RenderRegion::RegionState state = RenderRegion::RegionFit;
-        if (flowMin <= 0)
-            state = RenderRegion::RegionEmpty;
-        if (flowMax > 0 && region == lastReg)
-            state = RenderRegion::RegionOverset;
-        region->setRegionState(state);
-        // determine whether the NamedFlow object should dispatch a regionLayoutUpdate event
-        // FIXME: currently it cannot determine whether a region whose regionOverset state remained either "fit" or "overset" has actually
-        // changed, so it just assumes that the NamedFlow should dispatch the event
-        if (previousState != state
-            || state == RenderRegion::RegionFit
-            || state == RenderRegion::RegionOverset)
-            setDispatchRegionLayoutUpdateEvent(true);
-    }
-
-    // With the regions overflow state computed we can also set the overset flag for the named flow.
-    // If there are no valid regions in the chain, overset is true.
-    m_overset = lastReg ? lastReg->regionState() == RenderRegion::RegionOverset : true;
 }
 
 bool RenderFlowThread::regionInRange(const RenderRegion* targetRegion, const RenderRegion* startRegion, const RenderRegion* endRegion) const

@@ -28,7 +28,6 @@
 #define WorkerThread_h
 
 #include "core/page/ContentSecurityPolicy.h"
-#include "core/page/GroupSettings.h"
 #include "core/workers/WorkerRunLoop.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/Forward.h"
@@ -40,12 +39,12 @@ namespace WebCore {
 
     class KURL;
     class NotificationClient;
-    class WorkerContext;
+    class WorkerGlobalScope;
     class WorkerLoaderProxy;
     class WorkerReportingProxy;
     struct WorkerThreadStartupData;
 
-    enum WorkerThreadStartMode { DontPauseWorkerContextOnStart, PauseWorkerContextOnStart };
+    enum WorkerThreadStartMode { DontPauseWorkerGlobalScopeOnStart, PauseWorkerGlobalScopeOnStart };
 
     class WorkerThread : public RefCounted<WorkerThread> {
     public:
@@ -69,15 +68,15 @@ namespace WebCore {
 #endif
 
     protected:
-        WorkerThread(const KURL&, const String& userAgent, const GroupSettings*,  const String& sourceCode, WorkerLoaderProxy&, WorkerReportingProxy&, WorkerThreadStartMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType, const SecurityOrigin* topOrigin);
+        WorkerThread(const KURL&, const String& userAgent, const String& sourceCode, WorkerLoaderProxy&, WorkerReportingProxy&, WorkerThreadStartMode, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType, const SecurityOrigin* topOrigin);
 
         // Factory method for creating a new worker context for the thread.
-        virtual PassRefPtr<WorkerContext> createWorkerContext(const KURL&, const String& userAgent, PassOwnPtr<GroupSettings>, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType, PassRefPtr<SecurityOrigin> topOrigin) = 0;
+        virtual PassRefPtr<WorkerGlobalScope> createWorkerGlobalScope(const KURL&, const String& userAgent, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType, PassRefPtr<SecurityOrigin> topOrigin) = 0;
 
         // Executes the event loop for the worker thread. Derived classes can override to perform actions before/after entering the event loop.
         virtual void runEventLoop();
 
-        WorkerContext* workerContext() { return m_workerContext.get(); }
+        WorkerGlobalScope* workerGlobalScope() { return m_workerGlobalScope.get(); }
 
     private:
         // Static function executed as the core routine on the new thread. Passed a pointer to a WorkerThread object.
@@ -90,7 +89,7 @@ namespace WebCore {
         WorkerLoaderProxy& m_workerLoaderProxy;
         WorkerReportingProxy& m_workerReportingProxy;
 
-        RefPtr<WorkerContext> m_workerContext;
+        RefPtr<WorkerGlobalScope> m_workerGlobalScope;
         Mutex m_threadCreationMutex;
 
         OwnPtr<WorkerThreadStartupData> m_startupData;

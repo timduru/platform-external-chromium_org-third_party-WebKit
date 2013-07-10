@@ -42,9 +42,8 @@
 #include "core/platform/network/ResourceRequest.h"
 #include "core/platform/network/ResourceResponse.h"
 #include "core/platform/text/StringWithDirection.h"
-#include <wtf/HashSet.h>
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
+#include "wtf/HashSet.h"
+#include "wtf/RefPtr.h"
 
 namespace WTF {
 class SchedulePair;
@@ -81,11 +80,14 @@ namespace WebCore {
         void detachFromFrame();
 
         FrameLoader* frameLoader() const;
-        PassRefPtr<SharedBuffer> mainResourceData() const;
 
         unsigned long mainResourceIdentifier() const;
-        
-        DocumentWriter* writer() const { return &m_writer; }
+
+        void replaceDocument(const String& source, Document*);
+        DocumentWriter* beginWriting(const String& mimeType, const String& encoding, const KURL& = KURL());
+        void endWriting(DocumentWriter*);
+
+        String mimeType() const;
 
         const ResourceRequest& originalRequest() const;
         const ResourceRequest& originalRequestCopy() const;
@@ -134,7 +136,6 @@ namespace WebCore {
         KURL urlForHistory() const;
         
         void setDefersLoading(bool);
-        void setMainResourceDataBufferingPolicy(DataBufferingPolicy);
 
         void startLoadingMainResource();
         void cancelMainResourceLoad(const ResourceError&);
@@ -152,10 +153,6 @@ namespace WebCore {
         DocumentLoadTiming* timing() { return &m_documentLoadTiming; }
         void resetTiming() { m_documentLoadTiming = DocumentLoadTiming(); }
 
-        // The WebKit layer calls this function when it's ready for the data to
-        // actually be added to the document.
-        void commitData(const char* bytes, size_t length);
-
         ApplicationCacheHost* applicationCacheHost() const { return m_applicationCacheHost.get(); }
 
         virtual void reportMemoryUsage(MemoryObjectInfo*) const;
@@ -167,6 +164,10 @@ namespace WebCore {
         bool m_deferMainResourceDataLoad;
 
     private:
+        static PassRefPtr<DocumentWriter> createWriterFor(Frame*, const Document* ownerDocument, const KURL&, const String& mimeType, const String& encoding, bool userChosen, bool dispatch);
+
+        void ensureWriter();
+        void ensureWriter(const String& mimeType, const KURL& overridingURL = KURL());
 
         // The URL of the document resulting from this DocumentLoader.
         KURL documentURL() const;
@@ -175,13 +176,14 @@ namespace WebCore {
         void setRequest(const ResourceRequest&);
 
         void commitIfReady();
+        void commitData(const char* bytes, size_t length);
         void setMainDocumentError(const ResourceError&);
-        void commitLoad(const char*, int);
         void clearMainResourceLoader();
         ResourceLoader* mainResourceLoader() const;
         void clearMainResourceHandle();
+        PassRefPtr<SharedBuffer> mainResourceData() const;
 
-        bool maybeCreateArchive();
+        void createArchive();
         void clearArchiveResources();
 
         void prepareSubframeArchiveLoadIfNeeded();
@@ -216,7 +218,7 @@ namespace WebCore {
         ResourceLoaderSet m_resourceLoaders;
         ResourceLoaderSet m_multipartResourceLoaders;
         
-        mutable DocumentWriter m_writer;
+        RefPtr<DocumentWriter> m_writer;
 
         // A reference to actual request used to create the data source.
         // This should only be used by the resourceLoadDelegate's
@@ -241,7 +243,6 @@ namespace WebCore {
 
         bool m_committed;
         bool m_isStopping;
-        bool m_gotFirstByte;
         bool m_isClientRedirect;
 
         // FIXME: Document::m_processingLoadEvent and DocumentLoader::m_wasOnloadHandled are roughly the same

@@ -24,17 +24,17 @@
 
 #include "IntegerToStringConversion.h"
 #include <stdarg.h>
-#include <wtf/ASCIICType.h>
-#include <wtf/DataLog.h>
-#include <wtf/HexNumber.h>
-#include <wtf/MathExtras.h>
-#include <wtf/text/CString.h>
-#include <wtf/StringExtras.h>
-#include <wtf/Vector.h>
-#include <wtf/dtoa.h>
-#include <wtf/unicode/CharacterNames.h>
-#include <wtf/unicode/UTF8.h>
-#include <wtf/unicode/Unicode.h>
+#include "wtf/ASCIICType.h"
+#include "wtf/DataLog.h"
+#include "wtf/HexNumber.h"
+#include "wtf/MathExtras.h"
+#include "wtf/text/CString.h"
+#include "wtf/StringExtras.h"
+#include "wtf/Vector.h"
+#include "wtf/dtoa.h"
+#include "wtf/unicode/CharacterNames.h"
+#include "wtf/unicode/UTF8.h"
+#include "wtf/unicode/Unicode.h"
 
 using namespace std;
 
@@ -107,15 +107,16 @@ void String::append(const String& str)
             UChar* data;
             RELEASE_ASSERT(str.length() <= numeric_limits<unsigned>::max() - m_impl->length());
             RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(m_impl->length() + str.length(), data);
-            memcpy(data, m_impl->characters(), m_impl->length() * sizeof(UChar));
-            memcpy(data + m_impl->length(), str.characters(), str.length() * sizeof(UChar));
+            memcpy(data, m_impl->bloatedCharacters(), m_impl->length() * sizeof(UChar));
+            memcpy(data + m_impl->length(), str.bloatedCharacters(), str.length() * sizeof(UChar));
             m_impl = newImpl.release();
         } else
             m_impl = str.m_impl;
     }
 }
 
-void String::append(LChar c)
+template <typename CharacterType>
+inline void String::appendInternal(CharacterType c)
 {
     // FIXME: This is extremely inefficient. So much so that we might want to take this
     // out of String's API. We can make it better by optimizing the case where exactly
@@ -125,28 +126,21 @@ void String::append(LChar c)
         UChar* data;
         RELEASE_ASSERT(m_impl->length() < numeric_limits<unsigned>::max());
         RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(m_impl->length() + 1, data);
-        memcpy(data, m_impl->characters(), m_impl->length() * sizeof(UChar));
+        memcpy(data, m_impl->bloatedCharacters(), m_impl->length() * sizeof(UChar));
         data[m_impl->length()] = c;
         m_impl = newImpl.release();
     } else
         m_impl = StringImpl::create(&c, 1);
 }
 
+void String::append(LChar c)
+{
+    appendInternal(c);
+}
+
 void String::append(UChar c)
 {
-    // FIXME: This is extremely inefficient. So much so that we might want to take this
-    // out of String's API. We can make it better by optimizing the case where exactly
-    // one String is pointing at this StringImpl, but even then it's going to require a
-    // call to fastMalloc every single time.
-    if (m_impl) {
-        UChar* data;
-        RELEASE_ASSERT(m_impl->length() < numeric_limits<unsigned>::max());
-        RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(m_impl->length() + 1, data);
-        memcpy(data, m_impl->characters(), m_impl->length() * sizeof(UChar));
-        data[m_impl->length()] = c;
-        m_impl = newImpl.release();
-    } else
-        m_impl = StringImpl::create(&c, 1);
+    appendInternal(c);
 }
 
 int codePointCompare(const String& a, const String& b)
@@ -163,7 +157,7 @@ void String::insert(const String& str, unsigned pos)
             m_impl = str.impl();
         return;
     }
-    insert(str.characters(), str.length(), pos);
+    insert(str.bloatedCharacters(), str.length(), pos);
 }
 
 void String::append(const LChar* charactersToAppend, unsigned lengthToAppend)
@@ -243,9 +237,9 @@ void String::insert(const UChar* charactersToInsert, unsigned lengthToInsert, un
     UChar* data;
     RELEASE_ASSERT(lengthToInsert <= numeric_limits<unsigned>::max() - length());
     RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(length() + lengthToInsert, data);
-    memcpy(data, characters(), position * sizeof(UChar));
+    memcpy(data, bloatedCharacters(), position * sizeof(UChar));
     memcpy(data + position, charactersToInsert, lengthToInsert * sizeof(UChar));
-    memcpy(data + position + lengthToInsert, characters() + position, (length() - position) * sizeof(UChar));
+    memcpy(data + position + lengthToInsert, bloatedCharacters() + position, (length() - position) * sizeof(UChar));
     m_impl = newImpl.release();
 }
 
@@ -262,7 +256,7 @@ void String::truncate(unsigned position)
         return;
     UChar* data;
     RefPtr<StringImpl> newImpl = StringImpl::createUninitialized(position, data);
-    memcpy(data, characters(), position * sizeof(UChar));
+    memcpy(data, bloatedCharacters(), position * sizeof(UChar));
     m_impl = newImpl.release();
 }
 
@@ -380,18 +374,42 @@ bool String::percentage(int& result) const
     if ((*m_impl)[m_impl->length() - 1] != '%')
        return false;
 
-    result = charactersToIntStrict(m_impl->characters(), m_impl->length() - 1);
+    result = charactersToIntStrict(m_impl->bloatedCharacters(), m_impl->length() - 1);
     return true;
 }
 
-const UChar* String::charactersWithNullTermination()
+Vector<UChar> String::charactersWithNullTermination() const
 {
-    if (!m_impl)
+    Vector<UChar> result;
+
+    if (m_impl) {
+        result.reserveInitialCapacity(length() + 1);
+
+        if (is8Bit()) {
+            const LChar* characters8 = m_impl->characters8();
+            for (size_t i = 0; i < length(); ++i)
+                result.uncheckedAppend(characters8[i]);
+        } else {
+            const UChar* characters16 = m_impl->characters16();
+            result.append(characters16, m_impl->length());
+        }
+
+        result.append(0);
+    }
+
+    return result;
+}
+
+unsigned String::copyTo(UChar* buffer, unsigned maxLength) const
+{
+    unsigned numCharacters = std::min(length(), maxLength);
+    if (!numCharacters)
         return 0;
-    if (m_impl->hasTerminatingNullCharacter())
-        return m_impl->characters();
-    m_impl = StringImpl::createWithTerminatingNullCharacter(*m_impl);
-    return m_impl->characters();
+    if (is8Bit())
+        StringImpl::copyChars(buffer, characters8(), numCharacters);
+    else
+        StringImpl::copyChars(buffer, characters16(), numCharacters);
+    return numCharacters;
 }
 
 String String::format(const char *format, ...)
@@ -792,7 +810,7 @@ CString String::utf8(ConversionMode mode) const
                 // was as an unpaired high surrogate would have been handled in
                 // the middle of a string with non-strict conversion - which is
                 // to say, simply encode it to UTF-8.
-                ASSERT((characters + 1) == (this->characters() + length));
+                ASSERT((characters + 1) == (this->bloatedCharacters() + length));
                 ASSERT((*characters >= 0xD800) && (*characters <= 0xDBFF));
                 // There should be room left, since one UChar hasn't been converted.
                 ASSERT((buffer + 3) <= (buffer + bufferVector.size()));

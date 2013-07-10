@@ -31,6 +31,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
+#include "core/platform/chromium/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
 namespace WebCore {
@@ -76,7 +77,9 @@ static void methodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void methodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     TestMediaQueryListListenerV8Internal::methodMethod(args);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 } // namespace TestMediaQueryListListenerV8Internal
@@ -111,6 +114,7 @@ v8::Handle<v8::FunctionTemplate> V8TestMediaQueryListListener::GetTemplate(v8::I
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
+    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestMediaQueryListListenerTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);

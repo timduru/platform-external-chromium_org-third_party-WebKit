@@ -72,26 +72,18 @@ class LayoutTestRunner(object):
 
         self._expectations = None
         self._test_inputs = []
-        self._needs_http = None
-        self._needs_websockets = None
         self._retrying = False
 
         self._current_run_results = None
-        self._remaining_locked_shards = []
-        self._has_http_lock = False
 
-    def run_tests(self, expectations, test_inputs, tests_to_skip, num_workers, needs_http, needs_websockets, retrying):
+    def run_tests(self, expectations, test_inputs, tests_to_skip, num_workers, retrying):
         self._expectations = expectations
         self._test_inputs = test_inputs
-        self._needs_http = needs_http
-        self._needs_websockets = needs_websockets
         self._retrying = retrying
 
         # FIXME: rename all variables to test_run_results or some such ...
         run_results = TestRunResults(self._expectations, len(test_inputs) + len(tests_to_skip))
         self._current_run_results = run_results
-        self._remaining_locked_shards = []
-        self._has_http_lock = False
         self._printer.num_tests = len(test_inputs)
         self._printer.num_completed = 0
 
@@ -106,19 +98,10 @@ class LayoutTestRunner(object):
         self._printer.write_update('Sharding tests ...')
         locked_shards, unlocked_shards = self._sharder.shard_tests(test_inputs, int(self._options.child_processes), self._options.fully_parallel)
 
-        # FIXME: We don't have a good way to coordinate the workers so that
-        # they don't try to run the shards that need a lock if we don't actually
-        # have the lock. The easiest solution at the moment is to grab the
-        # lock at the beginning of the run, and then run all of the locked
-        # shards first. This minimizes the time spent holding the lock, but
-        # means that we won't be running tests while we're waiting for the lock.
-        # If this becomes a problem in practice we'll need to change this.
-
+        # We don't have a good way to coordinate the workers so that they don't
+        # try to run the shards that need a lock. The easiest solution is to
+        # run all of the locked shards first.
         all_shards = locked_shards + unlocked_shards
-        self._remaining_locked_shards = locked_shards
-        if self._port.requires_http_server() or (locked_shards and self._options.http):
-            self.start_servers_with_lock(2 * min(num_workers, len(locked_shards)))
-
         num_workers = min(num_workers, len(all_shards))
         self._printer.print_workers_and_shards(num_workers, len(all_shards), len(locked_shards))
 
@@ -127,6 +110,7 @@ class LayoutTestRunner(object):
 
         self._printer.write_update('Starting %s ...' % grammar.pluralize('worker', num_workers))
 
+        start_time = time.time()
         try:
             with message_pool.get(self, self._worker_factory, num_workers, self._port.worker_startup_delay_secs(), self._port.host) as pool:
                 pool.run(('test_list', shard.name, shard.test_inputs) for shard in all_shards)
@@ -141,7 +125,7 @@ class LayoutTestRunner(object):
             _log.debug('%s("%s") raised, exiting' % (e.__class__.__name__, str(e)))
             raise
         finally:
-            self.stop_servers_with_lock()
+            run_results.run_time = time.time() - start_time
 
         return run_results
 
@@ -193,29 +177,6 @@ class LayoutTestRunner(object):
 
         self._interrupt_if_at_failure_limits(run_results)
 
-    def start_servers_with_lock(self, number_of_servers):
-        self._printer.write_update('Acquiring http lock ...')
-        self._port.acquire_http_lock()
-        if self._needs_http:
-            self._printer.write_update('Starting HTTP server ...')
-            self._port.start_http_server(number_of_servers=number_of_servers)
-        if self._needs_websockets:
-            self._printer.write_update('Starting WebSocket server ...')
-            self._port.start_websocket_server()
-        self._has_http_lock = True
-
-    def stop_servers_with_lock(self):
-        if self._has_http_lock:
-            if self._needs_http:
-                self._printer.write_update('Stopping HTTP server ...')
-                self._port.stop_http_server()
-            if self._needs_websockets:
-                self._printer.write_update('Stopping WebSocket server ...')
-                self._port.stop_websocket_server()
-            self._printer.write_update('Releasing server lock ...')
-            self._port.release_http_lock()
-            self._has_http_lock = False
-
     def handle(self, name, source, *args):
         method = getattr(self, '_handle_' + name)
         if method:
@@ -226,17 +187,7 @@ class LayoutTestRunner(object):
         self._printer.print_started_test(test_input.test_name)
 
     def _handle_finished_test_list(self, worker_name, list_name):
-        def find(name, test_lists):
-            for i in range(len(test_lists)):
-                if test_lists[i].name == name:
-                    return i
-            return -1
-
-        index = find(list_name, self._remaining_locked_shards)
-        if index >= 0:
-            self._remaining_locked_shards.pop(index)
-            if not self._remaining_locked_shards and not self._port.requires_http_server():
-                self.stop_servers_with_lock()
+        pass
 
     def _handle_finished_test(self, worker_name, result, log_messages=[]):
         self._update_summary_with_result(self._current_run_results, result)
@@ -318,7 +269,7 @@ class Worker(object):
 
     def _timeout(self, test_input):
         """Compute the appropriate timeout value for a test."""
-        # The DumpRenderTree watchdog uses 2.5x the timeout; we want to be
+        # The driver watchdog uses 2.5x the timeout; we want to be
         # larger than that. We also add a little more padding if we're
         # running tests in a separate thread.
         #
@@ -350,7 +301,7 @@ class Worker(object):
         test_name = test_input.test_name
 
         if result.failures:
-            # Check and kill DumpRenderTree if we need to.
+            # Check and kill the driver if we need to.
             if any([f.driver_needs_restart() for f in result.failures]):
                 self._kill_driver()
                 # Reset the batch count since the shell just bounced.
@@ -397,14 +348,14 @@ class Worker(object):
         failures = []
         if thread.isAlive():
             # If join() returned with the thread still running, the
-            # DumpRenderTree is completely hung and there's nothing
+            # driver is completely hung and there's nothing
             # more we can do with it.  We have to kill all the
-            # DumpRenderTrees to free it up. If we're running more than
-            # one DumpRenderTree thread, we'll end up killing the other
-            # DumpRenderTrees too, introducing spurious crashes. We accept
+            # drivers to free it up. If we're running more than
+            # one driver thread, we'll end up killing the other
+            # drivers too, introducing spurious crashes. We accept
             # that tradeoff in order to avoid losing the rest of this
             # thread's results.
-            _log.error('Test thread hung: killing all DumpRenderTrees')
+            _log.error('Test thread hung: killing all drivers')
             failures = [test_failures.FailureTimeout()]
 
         driver.stop()
@@ -414,7 +365,7 @@ class Worker(object):
         return result
 
     def _run_test_in_this_thread(self, test_input, stop_when_done):
-        """Run a single test file using a shared DumpRenderTree process.
+        """Run a single test file using a shared driver process.
 
         Args:
           test_input: Object containing the test filename, uri and timeout
@@ -516,6 +467,7 @@ class Sharder(object):
         minimizing flakiness caused by inter-test dependencies."""
         locked_shards = []
         unlocked_shards = []
+        unlocked_slow_shards = []
         tests_by_dir = {}
         # FIXME: Given that the tests are already sorted by directory,
         # we can probably rewrite this to be clearer and faster.
@@ -528,11 +480,16 @@ class Sharder(object):
             shard = TestShard(directory, test_inputs)
             if test_inputs[0].requires_lock:
                 locked_shards.append(shard)
+            # In practice, virtual test suites are slow to run. It's a bit hacky, but
+            # put them first since they're the long-tail of test runtime.
+            elif directory.startswith('virtual'):
+                unlocked_slow_shards.append(shard)
             else:
                 unlocked_shards.append(shard)
 
         # Sort the shards by directory name.
         locked_shards.sort(key=lambda shard: shard.name)
+        unlocked_slow_shards.sort(key=lambda shard: shard.name)
         unlocked_shards.sort(key=lambda shard: shard.name)
 
         # Put a ceiling on the number of locked shards, so that we
@@ -544,7 +501,7 @@ class Sharder(object):
         # limit this to no more than a quarter of all workers, e.g.:
         # return max(math.ceil(num_workers / 4.0), 1)
         return (self._resize_shards(locked_shards, self._max_locked_shards, 'locked_shard'),
-                unlocked_shards)
+                unlocked_slow_shards + unlocked_shards)
 
     def _resize_shards(self, old_shards, max_new_shards, shard_name_prefix):
         """Takes a list of shards and redistributes the tests into no more

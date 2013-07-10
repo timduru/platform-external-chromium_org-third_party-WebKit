@@ -75,7 +75,7 @@ bool SVGLinearGradientElement::isSupportedAttribute(const QualifiedName& attrNam
         supportedAttributes.add(SVGNames::y1Attr);
         supportedAttributes.add(SVGNames::y2Attr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGLinearGradientElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -113,9 +113,9 @@ void SVGLinearGradientElement::svgAttributeChanged(const QualifiedName& attrName
         object->setNeedsLayout(true);
 }
 
-RenderObject* SVGLinearGradientElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGLinearGradientElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGResourceLinearGradient(this);
+    return new (document()->renderArena()) RenderSVGResourceLinearGradient(this);
 }
 
 bool SVGLinearGradientElement::collectGradientAttributes(LinearGradientAttributes& attributes)

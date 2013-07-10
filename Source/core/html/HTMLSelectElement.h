@@ -49,6 +49,8 @@ public:
     virtual String validationMessage() const OVERRIDE;
     virtual bool valueMissing() const OVERRIDE;
 
+    virtual void reset() OVERRIDE;
+
     unsigned length() const;
 
     int size() const { return m_size; }
@@ -113,8 +115,7 @@ protected:
 private:
     virtual const AtomicString& formControlType() const;
     
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isMouseFocusable() const;
+    virtual bool shouldShowFocusRingOnMouseFocus() const OVERRIDE;
 
     virtual void dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode, FocusDirection) OVERRIDE;
     virtual void dispatchBlurEvent(PassRefPtr<Node> newFocusedNode);
@@ -131,10 +132,8 @@ private:
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
 
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle *);
+    virtual RenderObject* createRenderer(RenderStyle *);
     virtual bool appendFormData(FormDataList&, bool);
-
-    virtual void reset();
 
     virtual void defaultEventHandler(Event*);
 

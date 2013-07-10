@@ -26,6 +26,7 @@
 #ifndef RawDataDocumentParser_h
 #define RawDataDocumentParser_h
 
+#include "core/dom/Document.h"
 #include "core/dom/DocumentParser.h"
 
 namespace WebCore {
@@ -44,10 +45,11 @@ protected:
     }
 
 private:
-    virtual void flush(DocumentWriter* writer)
+    virtual size_t flush() OVERRIDE
     {
         // Make sure appendBytes is called at least once.
-        appendBytes(writer, 0, 0);
+        appendBytes(0, 0);
+        return 0;
     }
 
     virtual void insert(const SegmentedString&)

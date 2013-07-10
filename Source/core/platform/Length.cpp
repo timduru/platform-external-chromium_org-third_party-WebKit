@@ -28,7 +28,6 @@
 #include "core/platform/CalculationValue.h"
 #include <wtf/ASCIICType.h>
 #include <wtf/Assertions.h>
-#include <wtf/OwnArrayPtr.h>
 #include <wtf/text/StringBuffer.h>
 #include <wtf/text/WTFString.h>
 
@@ -36,10 +35,10 @@ using namespace WTF;
 
 namespace WebCore {
 
-static Length parseLength(const UChar* data, unsigned length)
+template<typename CharType>
+static unsigned splitLength(const CharType* data, unsigned length, unsigned& intLength, unsigned& doubleLength)
 {
-    if (length == 0)
-        return Length(1, Relative);
+    ASSERT(length);
 
     unsigned i = 0;
     while (i < length && isSpaceOrNewline(data[i]))
@@ -48,17 +47,44 @@ static Length parseLength(const UChar* data, unsigned length)
         ++i;
     while (i < length && isASCIIDigit(data[i]))
         ++i;
-    unsigned intLength = i;
+    intLength = i;
     while (i < length && (isASCIIDigit(data[i]) || data[i] == '.'))
         ++i;
-    unsigned doubleLength = i;
+    doubleLength = i;
 
     // IE quirk: Skip whitespace between the number and the % character (20 % => 20%).
     while (i < length && isSpaceOrNewline(data[i]))
         ++i;
 
+    return i;
+}
+
+template<typename CharType>
+static Length parseHTMLAreaCoordinate(const CharType* data, unsigned length)
+{
+    unsigned intLength;
+    unsigned doubleLength;
+    splitLength(data, length, intLength, doubleLength);
+
     bool ok;
-    UChar next = (i < length) ? data[i] : ' ';
+    int r = charactersToIntStrict(data, intLength, &ok);
+    if (ok)
+        return Length(r, Fixed);
+    return Length(0, Fixed);
+}
+
+template<typename CharType>
+static Length parseFrameSetDimension(const CharType* data, unsigned length)
+{
+    if (!length)
+        return Length(1, Relative);
+
+    unsigned intLength;
+    unsigned doubleLength;
+    unsigned i = splitLength(data, length, intLength, doubleLength);
+
+    bool ok;
+    CharType next = (i < length) ? data[i] : ' ';
     if (next == '%') {
         // IE quirk: accept decimal fractions for percentages.
         double r = charactersToDouble(data, doubleLength, &ok);
@@ -77,87 +103,88 @@ static Length parseLength(const UChar* data, unsigned length)
     return Length(0, Relative);
 }
 
-static int countCharacter(const UChar* data, unsigned length, UChar character)
-{
-    int count = 0;
-    for (int i = 0; i < static_cast<int>(length); ++i)
-        count += data[i] == character;
-    return count;
-}
-
-PassOwnArrayPtr<Length> newCoordsArray(const String& string, int& len)
+// FIXME: Per HTML5, this should follow the "rules for parsing a list of integers".
+Vector<Length> parseHTMLAreaElementCoords(const String& string)
 {
     unsigned length = string.length();
-    const UChar* data = string.characters();
-    StringBuffer<UChar> spacified(length);
+    StringBuffer<LChar> spacified(length);
     for (unsigned i = 0; i < length; i++) {
-        UChar cc = data[i];
-        if (cc > '9' || (cc < '0' && cc != '-' && cc != '*' && cc != '.'))
+        UChar cc = string[i];
+        if (cc > '9' || (cc < '0' && cc != '-' && cc != '.'))
             spacified[i] = ' ';
         else
             spacified[i] = cc;
     }
     RefPtr<StringImpl> str = StringImpl::adopt(spacified);
-
     str = str->simplifyWhiteSpace();
+    ASSERT(str->is8Bit());
 
-    len = countCharacter(str->characters(), str->length(), ' ') + 1;
-    OwnArrayPtr<Length> r = adoptArrayPtr(new Length[len]);
+    if (!str->length())
+        return Vector<Length>();
+
+    unsigned len = str->count(' ') + 1;
+    Vector<Length> r(len);
 
     int i = 0;
     unsigned pos = 0;
     size_t pos2;
 
     while ((pos2 = str->find(' ', pos)) != notFound) {
-        r[i++] = parseLength(str->characters() + pos, pos2 - pos);
-        pos = pos2+1;
+        r[i++] = parseHTMLAreaCoordinate(str->characters8() + pos, pos2 - pos);
+        pos = pos2 + 1;
     }
-    r[i] = parseLength(str->characters() + pos, str->length() - pos);
+    r[i] = parseHTMLAreaCoordinate(str->characters8() + pos, str->length() - pos);
 
     ASSERT(i == len - 1);
 
-    return r.release();
+    return r;
 }
 
-PassOwnArrayPtr<Length> newLengthArray(const String& string, int& len)
+template<typename CharType>
+static Vector<Length> parseFrameSetListOfDimensionsInternal(StringImpl* str)
 {
-    RefPtr<StringImpl> str = string.impl()->simplifyWhiteSpace();
-    if (!str->length()) {
-        len = 1;
-        return nullptr;
-    }
-
-    len = countCharacter(str->characters(), str->length(), ',') + 1;
-    OwnArrayPtr<Length> r = adoptArrayPtr(new Length[len]);
+    unsigned len = str->count(',') + 1;
+    Vector<Length> r(len);
 
     int i = 0;
     unsigned pos = 0;
     size_t pos2;
 
     while ((pos2 = str->find(',', pos)) != notFound) {
-        r[i++] = parseLength(str->characters() + pos, pos2 - pos);
-        pos = pos2+1;
+        r[i++] = parseFrameSetDimension(str->getCharacters<CharType>() + pos, pos2 - pos);
+        pos = pos2 + 1;
     }
 
     ASSERT(i == len - 1);
 
     // IE Quirk: If the last comma is the last char skip it and reduce len by one.
-    if (str->length()-pos > 0)
-        r[i] = parseLength(str->characters() + pos, str->length() - pos);
+    if (str->length() - pos > 0)
+        r[i] = parseFrameSetDimension(str->getCharacters<CharType>() + pos, str->length() - pos);
     else
-        len--;
+        r.shrink(r.size() - 1);
 
-    return r.release();
+    return r;
 }
-        
+
+// FIXME: Per HTML5, this should "use the rules for parsing a list of dimensions".
+Vector<Length> parseFrameSetListOfDimensions(const String& string)
+{
+    RefPtr<StringImpl> str = string.impl()->simplifyWhiteSpace();
+    if (!str->length())
+        return Vector<Length>();
+    if (str->is8Bit())
+        return parseFrameSetListOfDimensionsInternal<LChar>(str.get());
+    return parseFrameSetListOfDimensionsInternal<UChar>(str.get());
+}
+
 class CalculationValueHandleMap {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    CalculationValueHandleMap() 
-        : m_index(1) 
+    CalculationValueHandleMap()
+        : m_index(1)
     {
     }
-    
+
     int insert(PassRefPtr<CalculationValue> calcValue)
     {
         ASSERT(m_index);
@@ -166,9 +193,9 @@ public:
         // of the handle space. Consider reusing empty handles.
         while (m_map.contains(m_index))
             m_index++;
-        
-        m_map.set(m_index, calcValue);       
-        
+
+        m_map.set(m_index, calcValue);
+
         return m_index;
     }
 
@@ -177,18 +204,18 @@ public:
         ASSERT(m_map.contains(index));
         m_map.remove(index);
     }
-    
+
     PassRefPtr<CalculationValue> get(int index)
     {
         ASSERT(m_map.contains(index));
         return m_map.get(index);
     }
-    
-private:        
+
+private:
     int m_index;
     HashMap<int, RefPtr<CalculationValue> > m_map;
 };
-    
+
 static CalculationValueHandleMap& calcHandles()
 {
     DEFINE_STATIC_LOCAL(CalculationValueHandleMap, handleMap, ());
@@ -202,25 +229,25 @@ Length::Length(PassRefPtr<CalculationValue> calc)
 {
     m_intValue = calcHandles().insert(calc);
 }
-        
+
 Length Length::blendMixedTypes(const Length& from, double progress) const
 {
     if (progress <= 0.0)
         return from;
-        
+
     if (progress >= 1.0)
         return *this;
-        
+
     OwnPtr<CalcExpressionNode> blend = adoptPtr(new CalcExpressionBlendLength(from, *this, progress));
     return Length(CalculationValue::create(blend.release(), CalculationRangeAll));
 }
-          
+
 PassRefPtr<CalculationValue> Length::calculationValue() const
 {
     ASSERT(isCalculated());
     return calcHandles().get(calculationHandle());
 }
-    
+
 void Length::incrementCalculatedRef() const
 {
     ASSERT(isCalculated());
@@ -234,7 +261,7 @@ void Length::decrementCalculatedRef() const
     if (calcLength->hasOneRef())
         calcHandles().remove(calculationHandle());
     calcLength->deref();
-}    
+}
 
 float Length::nonNanCalculatedValue(int maxValue) const
 {

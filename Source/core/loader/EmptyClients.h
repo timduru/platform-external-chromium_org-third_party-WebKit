@@ -39,12 +39,14 @@
 #include "core/page/EditorClient.h"
 #include "core/page/FocusDirection.h"
 #include "core/page/Page.h"
+#include "core/platform/DragImage.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/text/TextCheckerClient.h"
 #include "modules/device_orientation/DeviceMotionClient.h"
-
 #include "public/platform/WebScreenInfo.h"
+#include "wtf/Forward.h"
+
 #include <v8.h>
 
 /*
@@ -83,8 +85,8 @@ public:
     virtual void takeFocus(FocusDirection) OVERRIDE { }
 
     virtual void focusedNodeChanged(Node*) OVERRIDE { }
-    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&) OVERRIDE { return 0; }
-    virtual void show() OVERRIDE { }
+    virtual Page* createWindow(Frame*, const FrameLoadRequest&, const WindowFeatures&, const NavigationAction&, NavigationPolicy) OVERRIDE { return 0; }
+    virtual void show(NavigationPolicy) OVERRIDE { }
 
     virtual bool canRunModal() OVERRIDE { return false; }
     virtual void runModal() OVERRIDE { }
@@ -211,10 +213,6 @@ public:
     virtual void dispatchDidFinishLoad() OVERRIDE { }
     virtual void dispatchDidLayout(LayoutMilestones) OVERRIDE { }
 
-    virtual Frame* dispatchCreatePage(const NavigationAction&) OVERRIDE { return 0; }
-    virtual void dispatchShow() OVERRIDE { }
-
-    virtual PolicyAction policyForNewWindowAction(const NavigationAction&, const String&) OVERRIDE;
     virtual PolicyAction decidePolicyForNavigationAction(const NavigationAction&, const ResourceRequest&) OVERRIDE;
 
     virtual void dispatchUnableToImplementPolicy(const ResourceError&) OVERRIDE { }
@@ -222,16 +220,13 @@ public:
     virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) OVERRIDE;
     virtual void dispatchWillSubmitForm(PassRefPtr<FormState>) OVERRIDE;
 
-    virtual void setMainDocumentError(DocumentLoader*, const ResourceError&) OVERRIDE { }
-
     virtual void postProgressStartedNotification() OVERRIDE { }
     virtual void postProgressEstimateChangedNotification() OVERRIDE { }
     virtual void postProgressFinishedNotification() OVERRIDE { }
 
     virtual void startDownload(const ResourceRequest&, const String& suggestedName = String()) OVERRIDE { UNUSED_PARAM(suggestedName); }
 
-    virtual void committedLoad(DocumentLoader*, const char*, int) OVERRIDE { }
-    virtual void finishedLoading(DocumentLoader*) OVERRIDE { }
+    virtual void didReceiveDocumentData(const char*, int) OVERRIDE { }
 
     virtual ResourceError cancelledError(const ResourceRequest&) OVERRIDE { ResourceError error("", 0, "", ""); error.setIsCancellation(true); return error; }
     virtual ResourceError cannotShowURLError(const ResourceRequest&) OVERRIDE { return ResourceError("", 0, "", ""); }
@@ -267,7 +262,6 @@ public:
 
     virtual ObjectContentType objectContentType(const KURL&, const String&, bool) OVERRIDE { return ObjectContentType(); }
 
-    virtual void redirectDataToPlugin(Widget*) OVERRIDE { }
     virtual void dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*) OVERRIDE { }
     virtual void documentElementAvailable() OVERRIDE { }
 
@@ -360,7 +354,7 @@ public:
     EmptyDragClient() { }
     virtual ~EmptyDragClient() {}
     virtual DragDestinationAction actionMaskForDrag(DragData*) OVERRIDE { return DragDestinationActionNone; }
-    virtual void startDrag(DragImageRef, const IntPoint&, const IntPoint&, Clipboard*, Frame*, bool) OVERRIDE { }
+    virtual void startDrag(DragImage*, const IntPoint&, const IntPoint&, Clipboard*, Frame*, bool) OVERRIDE { }
 };
 
 class EmptyInspectorClient : public InspectorClient {

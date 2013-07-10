@@ -25,10 +25,10 @@
 #include "AtomicString.h"
 
 #include "StringHash.h"
-#include <wtf/HashSet.h>
-#include <wtf/Threading.h>
-#include <wtf/WTFThreadData.h>
-#include <wtf/unicode/UTF8.h>
+#include "wtf/HashSet.h"
+#include "wtf/Threading.h"
+#include "wtf/WTFThreadData.h"
+#include "wtf/unicode/UTF8.h"
 
 namespace WTF {
 
@@ -76,7 +76,7 @@ static inline HashSet<StringImpl*>& stringTable()
 template<typename T, typename HashTranslator>
 static inline PassRefPtr<StringImpl> addToStringTable(const T& value)
 {
-    HashSet<StringImpl*>::AddResult addResult = stringTable().add<T, HashTranslator>(value);
+    HashSet<StringImpl*>::AddResult addResult = stringTable().add<HashTranslator>(value);
 
     // If the string is newly-translated, then we need to adopt it.
     // The boolean in the pair tells us if that is so.
@@ -186,7 +186,7 @@ struct HashAndUTF8CharactersTranslator {
 
         // If buffer contains only ASCII characters UTF-8 and UTF16 length are the same.
         if (buffer.utf16Length != buffer.length) {
-            const UChar* stringCharacters = string->characters();
+            const UChar* stringCharacters = string->bloatedCharacters();
 
             return equalUTF16WithUTF8(stringCharacters, stringCharacters + string->length(), buffer.characters, buffer.characters + buffer.length);
         }
@@ -282,12 +282,12 @@ struct SubstringLocation {
 struct SubstringTranslator {
     static unsigned hash(const SubstringLocation& buffer)
     {
-        return StringHasher::computeHashAndMaskTop8Bits(buffer.baseString->characters() + buffer.start, buffer.length);
+        return StringHasher::computeHashAndMaskTop8Bits(buffer.baseString->bloatedCharacters() + buffer.start, buffer.length);
     }
 
     static bool equal(StringImpl* const& string, const SubstringLocation& buffer)
     {
-        return WTF::equal(string, buffer.baseString->characters() + buffer.start, buffer.length);
+        return WTF::equal(string, buffer.baseString->bloatedCharacters() + buffer.start, buffer.length);
     }
 
     static void translate(StringImpl*& location, const SubstringLocation& buffer, unsigned hash)
@@ -394,7 +394,7 @@ template<typename CharacterType>
 static inline HashSet<StringImpl*>::iterator findString(const StringImpl* stringImpl)
 {
     HashAndCharacters<CharacterType> buffer = { stringImpl->existingHash(), stringImpl->getCharacters<CharacterType>(), stringImpl->length() };
-    return stringTable().find<HashAndCharacters<CharacterType>, HashAndCharactersTranslator<CharacterType> >(buffer);
+    return stringTable().find<HashAndCharactersTranslator<CharacterType> >(buffer);
 }
 
 AtomicStringImpl* AtomicString::find(const StringImpl* stringImpl)

@@ -28,7 +28,6 @@
 #include "core/html/HTMLOptionElement.h"
 
 #include "HTMLNames.h"
-#include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeTraversal.h"
@@ -38,9 +37,8 @@
 #include "core/html/HTMLSelectElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/rendering/RenderTheme.h"
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/Vector.h>
+#include "wtf/Vector.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -344,12 +342,9 @@ bool HTMLOptionElement::isDisabledFormControl() const
 {
     if (ownElementDisabled())
         return true;
-
-    if (!parentNode() || !parentNode()->isHTMLElement())
-        return false;
-
-    HTMLElement* parentElement = static_cast<HTMLElement*>(parentNode());
-    return parentElement->hasTagName(optgroupTag) && parentElement->isDisabledFormControl();
+    if (Element* parent = parentElement())
+        return parent->hasTagName(optgroupTag) && parent->isDisabledFormControl();
+    return false;
 }
 
 Node::InsertionNotificationRequest HTMLOptionElement::insertedInto(ContainerNode* insertionPoint)
@@ -383,20 +378,4 @@ String HTMLOptionElement::collectOptionInnerText() const
     return text.toString();
 }
 
-#ifndef NDEBUG
-
-HTMLOptionElement* toHTMLOptionElement(Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(optionTag));
-    return static_cast<HTMLOptionElement*>(node);
-}
-
-const HTMLOptionElement* toHTMLOptionElement(const Node* node)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(optionTag));
-    return static_cast<const HTMLOptionElement*>(node);
-}
-
-#endif
-
-} // namespace
+} // namespace WebCore

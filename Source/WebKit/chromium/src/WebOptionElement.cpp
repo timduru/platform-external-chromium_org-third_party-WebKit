@@ -35,7 +35,7 @@
 #include "core/html/HTMLOptionElement.h"
 #include "core/html/HTMLSelectElement.h"
 #include "public/platform/WebString.h"
-#include <wtf/PassRefPtr.h>
+#include "wtf/PassRefPtr.h"
 
 using namespace WebCore;
 using namespace HTMLNames;
@@ -95,7 +95,7 @@ WebOptionElement& WebOptionElement::operator=(const PassRefPtr<HTMLOptionElement
 
 WebOptionElement::operator PassRefPtr<HTMLOptionElement>() const
 {
-    return static_cast<HTMLOptionElement*>(m_private.get());
+    return toHTMLOptionElement(m_private.get());
 }
 
 } // namespace WebKit

@@ -25,13 +25,13 @@
 #ifndef XMLDocumentParser_h
 #define XMLDocumentParser_h
 
-#include <libxml/tree.h>
-#include "core/dom/FragmentScriptingPermission.h"
+#include "core/dom/ParserContentPolicy.h"
 #include "core/dom/ScriptableDocumentParser.h"
 #include "core/loader/cache/CachedResourceClient.h"
 #include "core/loader/cache/CachedResourceHandle.h"
 #include "core/platform/text/SegmentedString.h"
 #include "core/xml/XMLErrors.h"
+#include <libxml/tree.h>
 #include <wtf/HashMap.h>
 #include <wtf/OwnPtr.h>
 #include <wtf/text/CString.h>
@@ -82,6 +82,8 @@ class Text;
 
         void setIsXHTMLDocument(bool isXHTML) { m_isXHTMLDocument = isXHTML; }
         bool isXHTMLDocument() const { return m_isXHTMLDocument; }
+
+        bool isCurrentlyParsing8BitChunk() { return m_isCurrentlyParsing8BitChunk; }
 
         static bool parseDocumentFragment(const String&, DocumentFragment*, Element* parent = 0, ParserContentPolicy = AllowScriptingContent);
 
@@ -165,6 +167,7 @@ class Text;
 
         RefPtr<Text> m_leafTextNode;
 
+        bool m_isCurrentlyParsing8BitChunk;
         bool m_sawError;
         bool m_sawCSS;
         bool m_sawXSLTransform;

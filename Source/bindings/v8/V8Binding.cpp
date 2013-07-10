@@ -34,7 +34,7 @@
 #include "V8DOMStringList.h"
 #include "V8Element.h"
 #include "V8Window.h"
-#include "V8WorkerContext.h"
+#include "V8WorkerGlobalScope.h"
 #include "V8XPathNSResolver.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/V8NodeFilterCondition.h"
@@ -52,7 +52,7 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/Frame.h"
 #include "core/page/Settings.h"
-#include "core/workers/WorkerContext.h"
+#include "core/workers/WorkerGlobalScope.h"
 #include "core/xml/XPathNSResolver.h"
 #include "wtf/MainThread.h"
 #include "wtf/MathExtras.h"
@@ -97,7 +97,7 @@ v8::Handle<v8::Value> v8Array(PassRefPtr<DOMStringList> stringList, v8::Isolate*
         return v8::Array::New();
     v8::Local<v8::Array> result = v8::Array::New(stringList->length());
     for (unsigned i = 0; i < stringList->length(); ++i)
-        result->Set(v8Integer(i, isolate), v8String(stringList->item(i), isolate));
+        result->Set(v8::Integer::New(i, isolate), v8String(stringList->item(i), isolate));
     return result;
 }
 
@@ -358,7 +358,7 @@ PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value> value, v8::Isola
     RefPtr<DOMStringList> ret = DOMStringList::create();
     v8::Local<v8::Array> v8Array = v8::Local<v8::Array>::Cast(v8Value);
     for (size_t i = 0; i < v8Array->Length(); ++i) {
-        v8::Local<v8::Value> indexedValue = v8Array->Get(v8Integer(i, isolate));
+        v8::Local<v8::Value> indexedValue = v8Array->Get(v8::Integer::New(i, isolate));
         ret->append(toWebCoreString(indexedValue));
     }
     return ret.release();
@@ -400,9 +400,9 @@ ScriptExecutionContext* toScriptExecutionContext(v8::Handle<v8::Context> context
     windowWrapper = global->FindInstanceInPrototypeChain(V8Window::GetTemplate(context->GetIsolate(), IsolatedWorld));
     if (!windowWrapper.IsEmpty())
         return V8Window::toNative(windowWrapper)->scriptExecutionContext();
-    v8::Handle<v8::Object> workerWrapper = global->FindInstanceInPrototypeChain(V8WorkerContext::GetTemplate(context->GetIsolate(), WorkerWorld));
+    v8::Handle<v8::Object> workerWrapper = global->FindInstanceInPrototypeChain(V8WorkerGlobalScope::GetTemplate(context->GetIsolate(), WorkerWorld));
     if (!workerWrapper.IsEmpty())
-        return V8WorkerContext::toNative(workerWrapper)->scriptExecutionContext();
+        return V8WorkerGlobalScope::toNative(workerWrapper)->scriptExecutionContext();
     // FIXME: Is this line of code reachable?
     return 0;
 }
@@ -446,9 +446,9 @@ v8::Local<v8::Context> toV8Context(ScriptExecutionContext* context, DOMWrapperWo
         ASSERT(world);
         if (Frame* frame = toDocument(context)->frame())
             return frame->script()->windowShell(world)->context();
-    } else if (context->isWorkerContext()) {
+    } else if (context->isWorkerGlobalScope()) {
         ASSERT(!world);
-        if (WorkerScriptController* script = static_cast<WorkerContext*>(context)->script())
+        if (WorkerScriptController* script = toWorkerGlobalScope(context)->script())
             return script->context();
     }
     return v8::Local<v8::Context>();

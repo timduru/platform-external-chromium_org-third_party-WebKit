@@ -28,9 +28,9 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "WebTestInterfaces.h"
+#include "public/testing/WebTestInterfaces.h"
 
+#include "MockWebMIDIAccessor.h"
 #include "MockWebMediaStreamCenter.h"
 #include "MockWebRTCPeerConnectionHandler.h"
 #include "TestInterfaces.h"
@@ -102,6 +102,11 @@ WebMediaStreamCenter* WebTestInterfaces::createMediaStreamCenter(WebMediaStreamC
 WebRTCPeerConnectionHandler* WebTestInterfaces::createWebRTCPeerConnectionHandler(WebRTCPeerConnectionHandlerClient* client)
 {
     return new MockWebRTCPeerConnectionHandler(client, m_interfaces.get());
+}
+
+WebMIDIAccessor* WebTestInterfaces::createMIDIAccessor(WebMIDIAccessorClient* client)
+{
+    return new MockWebMIDIAccessor(client);
 }
 
 }

@@ -38,11 +38,10 @@
 #include "core/platform/LayoutUnit.h"
 #include "core/platform/graphics/Color.h"
 #include "core/rendering/style/RenderStyle.h"
-#include <wtf/ASCIICType.h>
-#include <wtf/DecimalNumber.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuffer.h>
-#include <wtf/text/StringBuilder.h>
+#include "wtf/DecimalNumber.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/text/StringBuffer.h"
+#include "wtf/text/StringBuilder.h"
 
 using namespace WTF;
 
@@ -154,6 +153,20 @@ CSSPrimitiveValue::UnitCategory CSSPrimitiveValue::unitCategory(CSSPrimitiveValu
         return CSSPrimitiveValue::UResolution;
     default:
         return CSSPrimitiveValue::UOther;
+    }
+}
+
+bool CSSPrimitiveValue::colorIsDerivedFromElement() const
+{
+    int valueID = getValueID();
+    switch (valueID) {
+    case CSSValueWebkitText:
+    case CSSValueWebkitLink:
+    case CSSValueWebkitActivelink:
+    case CSSValueCurrentcolor:
+        return true;
+    default:
+        return false;
     }
 }
 
@@ -284,11 +297,11 @@ CSSPrimitiveValue::CSSPrimitiveValue(const Length& length)
             break;
         case MinContent:
             m_primitiveUnitType = CSS_VALUE_ID;
-            m_value.valueID = CSSValueWebkitMinContent;
+            m_value.valueID = CSSValueMinContent;
             break;
         case MaxContent:
             m_primitiveUnitType = CSS_VALUE_ID;
-            m_value.valueID = CSSValueWebkitMaxContent;
+            m_value.valueID = CSSValueMaxContent;
             break;
         case FillAvailable:
             m_primitiveUnitType = CSS_VALUE_ID;
@@ -860,7 +873,7 @@ ALWAYS_INLINE static String formatNumber(double number, const char (&characters)
     return formatNumber(number, characters, characterCount - 1);
 }
 
-String CSSPrimitiveValue::customCssText() const
+String CSSPrimitiveValue::customCssText(CssTextFormattingFlags formattingFlag) const
 {
     // FIXME: return the original value instead of a generated one (e.g. color
     // name if it was specified) - check what spec says about this
@@ -949,7 +962,7 @@ String CSSPrimitiveValue::customCssText() const
             text = m_value.string;
             break;
         case CSS_STRING:
-            text = quoteCSSStringIfNeeded(m_value.string);
+            text = formattingFlag == AlwaysQuoteCSSString ? quoteCSSString(m_value.string) : quoteCSSStringIfNeeded(m_value.string);
             break;
         case CSS_URI:
             text = "url(" + quoteCSSURLIfNeeded(m_value.string) + ")";
@@ -1066,7 +1079,7 @@ String CSSPrimitiveValue::customCssText() const
             text = formatNumber(m_value.num, "vmax");
             break;
         case CSS_VARIABLE_NAME:
-            text = "-webkit-var(" + String(m_value.string) + ")";
+            text = "var(" + String(m_value.string) + ")";
             break;
     }
 

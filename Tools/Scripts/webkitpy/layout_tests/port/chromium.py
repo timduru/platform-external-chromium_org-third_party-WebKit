@@ -38,10 +38,8 @@ import sys
 import time
 
 from webkitpy.common.system import executive
-from webkitpy.common.system.path import cygpath
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
 from webkitpy.layout_tests.port.base import Port, VirtualTestSuite
-from webkitpy.layout_tests.port.http_lock import HttpLock
 
 
 _log = logging.getLogger(__name__)
@@ -67,8 +65,8 @@ class ChromiumPort(Port):
 
     ALL_BASELINE_VARIANTS = [
         'chromium-mac-mountainlion', 'chromium-mac-lion', 'chromium-mac-snowleopard',
-        'chromium-win-win7', 'chromium-win-xp',
-        'chromium-linux-x86_64', 'chromium-linux-x86',
+        'win-win7', 'win-xp',
+        'linux-x86_64', 'linux-x86',
     ]
 
     CONFIGURATION_SPECIFIER_MACROS = {
@@ -221,59 +219,6 @@ class ChromiumPort(Port):
             return False
         return result
 
-    def check_image_diff(self, override_step=None, logging=True):
-        image_diff_path = self._path_to_image_diff()
-        return self._check_file_exists(image_diff_path, 'image diff exe',
-                                       override_step, logging)
-
-    def diff_image(self, expected_contents, actual_contents, tolerance=None):
-        # tolerance is not used in chromium. Make sure caller doesn't pass tolerance other than zero or None.
-        assert (tolerance is None) or tolerance == 0
-
-        # If only one of them exists, return that one.
-        if not actual_contents and not expected_contents:
-            return (None, 0, None)
-        if not actual_contents:
-            return (expected_contents, 0, None)
-        if not expected_contents:
-            return (actual_contents, 0, None)
-
-        tempdir = self._filesystem.mkdtemp()
-
-        expected_filename = self._filesystem.join(str(tempdir), "expected.png")
-        self._filesystem.write_binary_file(expected_filename, expected_contents)
-
-        actual_filename = self._filesystem.join(str(tempdir), "actual.png")
-        self._filesystem.write_binary_file(actual_filename, actual_contents)
-
-        diff_filename = self._filesystem.join(str(tempdir), "diff.png")
-
-        native_expected_filename = self._convert_path(expected_filename)
-        native_actual_filename = self._convert_path(actual_filename)
-        native_diff_filename = self._convert_path(diff_filename)
-
-        executable = self._path_to_image_diff()
-        # Note that although we are handed 'old', 'new', image_diff wants 'new', 'old'.
-        comand = [executable, '--diff', native_actual_filename, native_expected_filename, native_diff_filename]
-
-        result = None
-        err_str = None
-        try:
-            exit_code = self._executive.run_command(comand, return_exit_code=True)
-            if exit_code == 0:
-                # The images are the same.
-                result = None
-            elif exit_code == 1:
-                result = self._filesystem.read_binary_file(native_diff_filename)
-            else:
-                err_str = "image diff returned an exit code of %s" % exit_code
-        except OSError, e:
-            err_str = 'error running image diff: %s' % str(e)
-        finally:
-            self._filesystem.rmtree(str(tempdir))
-
-        return (result, 0, err_str or None)  # FIXME: how to get % diff?
-
     def path_from_chromium_base(self, *comps):
         """Returns the full path to path made by joining the top of the
         Chromium source tree and the list of path components in |*comps|."""
@@ -378,17 +323,12 @@ class ChromiumPort(Port):
         if stderr and 'AddressSanitizer' in stderr:
             # Running the AddressSanitizer take a lot of memory, so we need to
             # serialize access to it across all the concurrently running drivers.
-            lock = HttpLock(lock_path=None, lock_file_prefix='WebKitASAN.lock.',
-                            filesystem=self._filesystem, executive=self._executive,
-                            name='ASAN')
-            try:
-                lock.wait_for_httpd_lock()
-                asan_filter_path = self.path_from_chromium_base('tools', 'valgrind', 'asan', 'asan_symbolize.py')
-                if self._filesystem.exists(asan_filter_path):
-                    output = self._executive.run_command([asan_filter_path], input=stderr, decode_output=False)
-                    stderr = self._executive.run_command(['c++filt'], input=output, decode_output=False)
-            finally:
-                lock.cleanup_http_lock()
+
+            # FIXME: investigate using LLVM_SYMBOLIZER_PATH here to reduce the overhead.
+            asan_filter_path = self.path_from_chromium_base('tools', 'valgrind', 'asan', 'asan_symbolize.py')
+            if self._filesystem.exists(asan_filter_path):
+                output = self._executive.run_command(['flock', sys.executable, asan_filter_path], input=stderr, decode_output=False)
+                stderr = self._executive.run_command(['c++filt'], input=output, decode_output=False)
 
         return super(ChromiumPort, self)._get_crash_log(name, pid, stdout, stderr, newer_than)
 
@@ -477,10 +417,3 @@ class ChromiumPort(Port):
         if platform is None:
             platform = self.name()
         return self.path_from_webkit_base('LayoutTests', 'platform', platform)
-
-    def _convert_path(self, path):
-        """Handles filename conversion for subprocess command line args."""
-        # See note above in diff_image() for why we need this.
-        if sys.platform == 'cygwin':
-            return cygpath(path)
-        return path

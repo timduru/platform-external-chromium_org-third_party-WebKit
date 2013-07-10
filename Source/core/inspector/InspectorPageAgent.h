@@ -36,10 +36,8 @@
 #include "core/dom/DeviceOrientationData.h"
 #include "core/inspector/InspectorBaseAgent.h"
 #include "modules/geolocation/GeolocationPosition.h"
-#include <wtf/HashMap.h>
-#include <wtf/RefCounted.h>
-#include <wtf/text/WTFString.h>
-#include <wtf/Vector.h>
+#include "wtf/HashMap.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -106,6 +104,7 @@ public:
     virtual void setShowDebugBorders(ErrorString*, bool show);
     virtual void setShowFPSCounter(ErrorString*, bool show);
     virtual void setContinuousPaintingEnabled(ErrorString*, bool enabled);
+    virtual void setShowScrollBottleneckRects(ErrorString*, bool show);
     virtual void getScriptExecutionStatus(ErrorString*, PageCommandHandler::Result::Enum*);
     virtual void setScriptExecutionDisabled(ErrorString*, bool);
     virtual void setGeolocationOverride(ErrorString*, const double*, const double*, const double*);
@@ -115,8 +114,6 @@ public:
     virtual void setTouchEmulationEnabled(ErrorString*, bool);
     virtual void setEmulatedMedia(ErrorString*, const String&);
     virtual void setForceCompositingMode(ErrorString*, bool force);
-    virtual void getCompositingBordersVisible(ErrorString*, bool* out_param);
-    virtual void setCompositingBordersVisible(ErrorString*, bool);
     virtual void captureScreenshot(ErrorString*, String* data);
     virtual void handleJavaScriptDialog(ErrorString*, bool accept, const String* promptText);
     virtual void setShowViewportSizeOnResize(ErrorString*, bool show, const bool* showGrid);
@@ -178,6 +175,7 @@ private:
     bool deviceMetricsChanged(int width, int height, double fontScaleFactor, bool fitWindow);
     void updateViewMetrics(int, int, double, bool);
     void updateTouchEventEmulationInPage(bool);
+    void updateOverridesTopOffset();
 
     static bool dataContent(const char* data, unsigned size, const String& textEncodingName, bool withBase64Encode, String* result);
 

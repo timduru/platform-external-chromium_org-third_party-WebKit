@@ -406,15 +406,7 @@ body.show-toolbar-icons.dock-to-bottom #toolbar-panels-menu {
     border: 0;
     padding: 0 2px;
     margin: 0;
-    width: 165px;
-}
-
-.filter {
-    -webkit-appearance: none;
-    border: 0;
-    padding: 0 2px;
-    margin: 0;
-    width: 251px;
+    -webkit-flex: 1;
 }
 
 .search-replace:focus {
@@ -430,10 +422,7 @@ body.show-toolbar-icons.dock-to-bottom #toolbar-panels-menu {
 }
 
 .toolbar-search-navigation-controls {
-    position: absolute;
-    top: 0;
-    right: 0;
-    height: 18px;
+    vertical-align: top;
     background-image: -webkit-linear-gradient(rgb(228, 228, 228), rgb(206, 206, 206));
 }
 
@@ -472,13 +461,13 @@ body.show-toolbar-icons.dock-to-bottom #toolbar-panels-menu {
 }
 
 .toolbar-search-control {
-    display: inline-block;
+    display: -webkit-flex;
+    width: 253px;
     position: relative;
     background-color: white;
     border: 1px solid rgb(163, 163, 163);
     height: 20px;
     border-radius: 2px;
-    padding-top: 1px;
 }
 
 .toolbar-replace-control {
@@ -512,12 +501,10 @@ body.show-toolbar-icons.dock-to-bottom #toolbar-panels-menu {
 
 .search-results-matches {
     display: inline-block;
-    min-width: 50px;
     min-height: 10px;
-    margin-right: 36px;
     text-align: right;
     font-size: 11px;
-    padding: 0 4px;
+    padding: 1px 4px;
     color: rgb(165, 165, 165);
 }
 
@@ -1076,12 +1063,29 @@ body.remote .dock-status-bar-item {
     -webkit-transition: height 100ms linear;
 }
 
-#drawer-contents {
+#drawer-body {
     position: absolute;
     top: 0;
     bottom: 24px;
     left: 0;
     right: 0;
+}
+
+#drawer-contents {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    left: 0;
+    right: 0;
+}
+
+#drawer-footer {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    font-size: 11px;
+    height: 23px;
 }
 
 body.drawer-visible #drawer {
@@ -1881,6 +1885,14 @@ iframe.panel.extension {
     text-shadow: none;
 }
 
+.properties-calculate-value-button:hover {
+    text-decoration: underline;
+}
+
+.properties-accessor-property-name {
+    font-style: italic;
+}
+
 @media (-webkit-min-device-pixel-ratio: 1.5) {
 .properties-tree li.parent::before {
     background-image: url(Images/statusbarButtonGlyphs2x.png);
@@ -2002,6 +2014,11 @@ li.editing-sub-part .delete-button {
     position: absolute;
     right: 8px;
     display: none;
+}
+
+.tabbed-pane-content .watch-expressions li:first-child .delete-button {
+    right: 55px;
+    top: 3px;
 }
 
 .section .properties li.hovered .delete-button {

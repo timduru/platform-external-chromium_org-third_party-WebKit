@@ -42,6 +42,7 @@
 #include "core/rendering/RenderLazyBlock.h"
 #include "core/rendering/RenderSelectionInfo.h"
 #include "core/rendering/RenderWidget.h"
+#include "wtf/MemoryInstrumentationHashSet.h"
 
 namespace WebCore {
 
@@ -268,7 +269,8 @@ void RenderView::layout()
                     || child->style()->logicalMaxHeight().isPercent()
                     || child->style()->logicalHeight().isViewportPercentage()
                     || child->style()->logicalMinHeight().isViewportPercentage()
-                    || child->style()->logicalMaxHeight().isViewportPercentage())
+                    || child->style()->logicalMaxHeight().isViewportPercentage()
+                    || child->isSVGRoot())
                 child->setChildNeedsLayout(true, MarkOnlyThis);
         }
     }

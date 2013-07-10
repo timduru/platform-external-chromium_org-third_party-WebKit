@@ -84,10 +84,12 @@ public:
     virtual bool isActivatedSubmit() const { return false; }
     virtual void setActivatedSubmit(bool) { }
 
+    enum CheckValidityDispatchEvents { CheckValidityDispatchEventsAllowed, CheckValidityDispatchEventsNone };
+
     virtual bool willValidate() const;
     void updateVisibleValidationMessage();
     void hideVisibleValidationMessage();
-    bool checkValidity(Vector<RefPtr<FormAssociatedElement> >* unhandledInvalidControls = 0);
+    bool checkValidity(Vector<RefPtr<FormAssociatedElement> >* unhandledInvalidControls = 0, CheckValidityDispatchEvents = CheckValidityDispatchEventsAllowed);
     // This must be called when a validation constraint or control value is changed.
     void setNeedsValidityCheck();
     virtual void setCustomValidity(const String&) OVERRIDE;
@@ -119,7 +121,10 @@ protected:
     virtual bool supportsFocus() const OVERRIDE;
     virtual bool rendererIsFocusable() const OVERRIDE;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isMouseFocusable() const;
+    virtual bool shouldShowFocusRingOnMouseFocus() const;
+    virtual bool shouldHaveFocusAppearance() const OVERRIDE;
+    virtual void dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode, FocusDirection) OVERRIDE;
+    virtual void willCallDefaultEventHandler(const Event&) OVERRIDE;
 
     virtual void didRecalcStyle(StyleChange) OVERRIDE;
 
@@ -165,9 +170,21 @@ private:
     bool m_isValid : 1;
 
     bool m_wasChangedSinceLastFormControlChangeEvent : 1;
-
+    bool m_wasFocusedByMouse : 1;
     bool m_hasAutofocused : 1;
 };
+
+inline HTMLFormControlElement* toHTMLFormControlElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || (node->isElementNode() && toElement(node)->isFormControlElement()));
+    return static_cast<HTMLFormControlElement*>(node);
+}
+
+inline HTMLFormControlElement* toHTMLFormControlElement(FormAssociatedElement* control)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!control || control->isFormControlElement());
+    return static_cast<HTMLFormControlElement*>(control);
+}
 
 } // namespace
 

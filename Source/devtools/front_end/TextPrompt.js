@@ -127,12 +127,12 @@ WebInspector.TextPrompt.prototype = {
     {
         this._removeFromElement();
         this.proxyElement.parentElement.insertBefore(this._element, this.proxyElement);
-        this.proxyElement.parentElement.removeChild(this.proxyElement);
+        this.proxyElement.remove();
+        delete this._proxyElement;
         this._element.removeStyleClass("text-prompt");
         this._element.removeEventListener("keydown", this._boundOnKeyDown, false);
         this._element.removeEventListener("mousewheel", this._boundOnMouseWheel, false);
         this._element.removeEventListener("selectstart", this._boundSelectStart, false);
-        delete this._proxyElement;
         WebInspector.restoreFocusFromElement(this._element);
     },
 
@@ -235,23 +235,8 @@ WebInspector.TextPrompt.prototype = {
         var invokeDefault = true;
 
         switch (event.keyIdentifier) {
-        case "Up":
-            handled = this.upKeyPressed(event);
-            break;
-        case "Down":
-            handled = this.downKeyPressed(event);
-            break;
-        case "PageUp":
-            handled = this.pageUpKeyPressed(event);
-            break;
-        case "PageDown":
-            handled = this.pageDownKeyPressed(event);
-            break;
         case "U+0009": // Tab
             handled = this.tabKeyPressed(event);
-            break;
-        case "Enter":
-            handled = this.enterKeyPressed(event);
             break;
         case "Left":
         case "Home":
@@ -285,6 +270,9 @@ WebInspector.TextPrompt.prototype = {
             invokeDefault = false;
             break;
         }
+
+        if (!handled && this.isSuggestBoxVisible())
+            handled = this._suggestBox.keyPressed(event);
 
         if (!handled && invokeDefault)
             handled = this.defaultKeyHandler(event);
@@ -320,8 +308,7 @@ WebInspector.TextPrompt.prototype = {
         if (!this.autoCompleteElement)
             return;
 
-        if (this.autoCompleteElement.parentNode)
-            this.autoCompleteElement.parentNode.removeChild(this.autoCompleteElement);
+        this.autoCompleteElement.remove();
         delete this.autoCompleteElement;
 
         if (!this._userEnteredRange || !this._userEnteredText)
@@ -402,7 +389,7 @@ WebInspector.TextPrompt.prototype = {
         anchorElement.textContent = "\u200B";
         textRange.insertNode(anchorElement);
         var box = anchorElement.boxInWindow(window);
-        anchorElement.parentElement.removeChild(anchorElement);
+        anchorElement.remove();
         selection.removeAllRanges();
         selection.addRange(rangeCopy);
         return box;
@@ -565,8 +552,8 @@ WebInspector.TextPrompt.prototype = {
         var finalSelectionRange = document.createRange();
         var completionTextNode = document.createTextNode(completionText);
         this._userEnteredRange.insertNode(completionTextNode);
-        if (this.autoCompleteElement && this.autoCompleteElement.parentNode) {
-            this.autoCompleteElement.parentNode.removeChild(this.autoCompleteElement);
+        if (this.autoCompleteElement) {
+            this.autoCompleteElement.remove();
             delete this.autoCompleteElement;
         }
 
@@ -724,46 +711,6 @@ WebInspector.TextPrompt.prototype = {
 
         // Consume the key.
         return true;
-    },
-
-    enterKeyPressed: function(event)
-    {
-        if (this.isSuggestBoxVisible())
-            return this._suggestBox.enterKeyPressed();
-
-        return false;
-    },
-
-    upKeyPressed: function(event)
-    {
-        if (this.isSuggestBoxVisible())
-            return this._suggestBox.upKeyPressed();
-
-        return false;
-    },
-
-    downKeyPressed: function(event)
-    {
-        if (this.isSuggestBoxVisible())
-            return this._suggestBox.downKeyPressed();
-
-        return false;
-    },
-
-    pageUpKeyPressed: function(event)
-    {
-        if (this.isSuggestBoxVisible())
-            return this._suggestBox.pageUpKeyPressed();
-
-        return false;
-    },
-
-    pageDownKeyPressed: function(event)
-    {
-        if (this.isSuggestBoxVisible())
-            return this._suggestBox.pageDownKeyPressed();
-
-        return false;
     },
 
     __proto__: WebInspector.Object.prototype

@@ -75,7 +75,6 @@ class PlatformWheelEvent;
 class QualifiedName;
 class RadioNodeList;
 class RegisteredEventListener;
-class RenderArena;
 class RenderBox;
 class RenderBoxModelObject;
 class RenderObject;
@@ -88,14 +87,13 @@ typedef int ExceptionCode;
 
 const int nodeStyleChangeShift = 15;
 
-// SyntheticStyleChange means that we need to go through the entire style change logic even though
-// no style property has actually changed. It is used to restructure the tree when, for instance,
-// RenderLayers are created or destroyed due to animation changes.
 enum StyleChangeType {
     NoStyleChange = 0,
     InlineStyleChange = 1 << nodeStyleChangeShift,
-    SyntheticStyleChange = 2 << nodeStyleChangeShift,
-    FullStyleChange = 3 << nodeStyleChangeShift,
+    FullStyleChange = 2 << nodeStyleChangeShift,
+
+    // FIXME: SyntheticStyleChange is deprecated, instead you should use setNeedsLayerUpdate().
+    SyntheticStyleChange = 3 << nodeStyleChangeShift,
 };
 
 class NodeRareDataBase {
@@ -156,8 +154,6 @@ public:
         DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20,
     };
 
-    static void init();
-    static void shutdown();
 #if ENABLE(PARTITION_ALLOC)
     // All Nodes are placed in their own heap partition for security.
     // See http://crbug.com/246860 for detail.
@@ -273,6 +269,8 @@ public:
     bool inNamedFlow() const { return getFlag(InNamedFlowFlag); }
     bool hasCustomStyleCallbacks() const { return getFlag(HasCustomStyleCallbacksFlag); }
 
+    bool isRegisteredWithNamedFlow() const;
+
     bool hasSyntheticAttrChildNodes() const { return getFlag(HasSyntheticAttrChildNodesFlag); }
     void setHasSyntheticAttrChildNodes(bool flag) { setFlag(flag, HasSyntheticAttrChildNodesFlag); }
 
@@ -376,7 +374,14 @@ public:
     void clearChildNeedsStyleRecalc() { clearFlag(ChildNeedsStyleRecalcFlag); }
 
     void setNeedsStyleRecalc(StyleChangeType changeType = FullStyleChange);
-    void clearNeedsStyleRecalc() { m_nodeFlags &= ~StyleChangeMask; }
+    void clearNeedsStyleRecalc()
+    {
+        m_nodeFlags &= ~StyleChangeMask;
+        clearFlag(NeedsLayerUpdate);
+    }
+
+    void setNeedsLayerUpdate();
+    bool needsLayerUpdate() const { return getFlag(NeedsLayerUpdate); }
 
     void setIsLink(bool f) { setFlag(f, IsLinkFlag); }
     void setIsLink() { setFlag(IsLinkFlag); }
@@ -417,6 +422,8 @@ public:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool isMouseFocusable() const;
     virtual Node* focusDelegate();
+    // This is called only when the node is focused.
+    virtual bool shouldHaveFocusAppearance() const;
 
     enum UserSelectAllTreatment {
         UserSelectAllDoesNotAffectEditability,
@@ -670,6 +677,7 @@ public:
 
     // Perform the default action for an event.
     virtual void defaultEventHandler(Event*);
+    virtual void willCallDefaultEventHandler(const Event&);
 
     using TreeShared<Node>::ref;
     using TreeShared<Node>::deref;
@@ -735,10 +743,12 @@ private:
         IsInShadowTreeFlag = 1 << 26,
         IsCustomElement = 1 << 27,
 
+        NeedsLayerUpdate = 1 << 28,
+
         DefaultNodeFlags = IsParsingChildrenFinishedFlag
     };
 
-    // 4 bits remaining
+    // 3 bits remaining
 
     bool getFlag(NodeFlags mask) const { return m_nodeFlags & mask; }
     void setFlag(bool f, NodeFlags mask) const { m_nodeFlags = (m_nodeFlags & ~mask) | (-(int32_t)f & mask); } 
@@ -914,8 +924,11 @@ inline void Node::lazyReattachIfAttached()
 
 inline void Node::lazyReattach(ShouldSetAttached shouldSetAttached)
 {
+    AttachContext context;
+    context.performingReattach = true;
+
     if (attached())
-        detach();
+        detach(context);
     lazyAttach(shouldSetAttached);
 }
 

@@ -31,58 +31,35 @@
 #ifndef CustomElementRegistry_h
 #define CustomElementRegistry_h
 
-#include "bindings/v8/ScriptValue.h"
-#include "core/dom/ContextDestructionObserver.h"
+#include "core/dom/ContextLifecycleObserver.h"
 #include "core/dom/CustomElementUpgradeCandidateMap.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/QualifiedName.h"
-#include "wtf/HashSet.h"
-#include "wtf/ListHashSet.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
-#include "wtf/Vector.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/AtomicStringHash.h"
 
 namespace WebCore {
 
+class CustomElementConstructorBuilder;
 class CustomElementDefinition;
-class Dictionary;
 class Document;
 class Element;
-class ScriptState;
-
-class CustomElementInvocation {
-public:
-    explicit CustomElementInvocation(PassRefPtr<Element>);
-    ~CustomElementInvocation();
-
-    Element* element() const { return m_element.get(); }
-
-private:
-    RefPtr<Element> m_element;
-};
 
 void setTypeExtension(Element*, const AtomicString& typeExtension);
 
-class CustomElementRegistry : public RefCounted<CustomElementRegistry>, public ContextDestructionObserver {
+class CustomElementRegistry : public RefCounted<CustomElementRegistry>, public ContextLifecycleObserver {
     WTF_MAKE_NONCOPYABLE(CustomElementRegistry); WTF_MAKE_FAST_ALLOCATED;
 public:
-    class CallbackDeliveryScope {
-    public:
-        CallbackDeliveryScope() { }
-        ~CallbackDeliveryScope() { CustomElementRegistry::deliverAllLifecycleCallbacksIfNeeded(); }
-    };
-
     explicit CustomElementRegistry(Document*);
-    ~CustomElementRegistry();
+    virtual ~CustomElementRegistry() { }
 
-    ScriptValue registerElement(ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionCode&);
+    void registerElement(CustomElementConstructorBuilder*, const AtomicString& name, ExceptionCode&);
 
     bool isUnresolved(Element*) const;
     PassRefPtr<CustomElementDefinition> findFor(Element*) const;
-    PassRefPtr<CustomElementDefinition> findAndCheckNamespace(const AtomicString& type, const AtomicString& namespaceURI) const;
 
     PassRefPtr<Element> createCustomTagElement(const QualifiedName& localName);
 
@@ -93,42 +70,18 @@ public:
 
     static bool isCustomTagName(const AtomicString& name) { return isValidName(name); }
 
-    static void deliverAllLifecycleCallbacks();
-    static void deliverAllLifecycleCallbacksIfNeeded();
-
 private:
     typedef HashMap<AtomicString, RefPtr<CustomElementDefinition> > DefinitionMap;
-    typedef ListHashSet<CustomElementRegistry*> InstanceSet;
-
     static bool isValidName(const AtomicString&);
 
-    static InstanceSet& activeCustomElementRegistries();
-    void activate(const CustomElementInvocation&);
-    void deactivate();
-    void deliverLifecycleCallbacks();
+    PassRefPtr<CustomElementDefinition> findAndCheckNamespace(const AtomicString& type, const AtomicString& namespaceURI) const;
 
-    void didCreateCustomTagElement(Element*);
+    void didCreateCustomTagElement(CustomElementDefinition*, Element*);
     void didCreateUnresolvedElement(CustomElementDefinition::CustomElementKind, const AtomicString& type, Element*);
 
     DefinitionMap m_definitions;
     CustomElementUpgradeCandidateMap m_candidates;
-
-    Vector<CustomElementInvocation> m_invocations;
 };
-
-inline void CustomElementRegistry::deliverAllLifecycleCallbacksIfNeeded()
-{
-    if (!activeCustomElementRegistries().isEmpty())
-        deliverAllLifecycleCallbacks();
-    ASSERT(activeCustomElementRegistries().isEmpty());
-}
-
-inline CustomElementRegistry::InstanceSet& CustomElementRegistry::activeCustomElementRegistries()
-{
-    DEFINE_STATIC_LOCAL(InstanceSet, activeInstances, ());
-    return activeInstances;
-}
-
 
 } // namespace WebCore
 

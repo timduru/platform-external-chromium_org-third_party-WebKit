@@ -25,16 +25,14 @@
 #include "core/page/LayoutMilestones.h"
 #include "core/page/PageVisibilityState.h"
 #include "core/page/UseCounter.h"
-#include "core/platform/PlatformScreen.h"
 #include "core/platform/Supplementable.h"
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/platform/graphics/Region.h"
 #include "core/rendering/Pagination.h"
-#include <wtf/Forward.h>
-#include <wtf/HashMap.h>
-#include <wtf/HashSet.h>
-#include <wtf/Noncopyable.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/Forward.h"
+#include "wtf/HashSet.h"
+#include "wtf/Noncopyable.h"
+#include "wtf/text/WTFString.h"
 
 #if OS(SOLARIS)
 #include <sys/time.h> // For time_t structure.
@@ -228,7 +226,6 @@ public:
     static void visitedStateChanged(PageGroup*, LinkHash visitedHash);
 
     StorageNamespace* sessionStorage(bool optionalCreate = true);
-    void setSessionStorage(PassRefPtr<StorageNamespace>);
 
     // Don't allow more than a certain number of frames in a page.
     // This seems like a reasonable upper bound, and otherwise mutually
@@ -326,7 +323,7 @@ private:
 
     RefPtr<PageGroup> m_group;
 
-    RefPtr<StorageNamespace> m_sessionStorage;
+    OwnPtr<StorageNamespace> m_sessionStorage;
 
     double m_timerAlignmentInterval;
 

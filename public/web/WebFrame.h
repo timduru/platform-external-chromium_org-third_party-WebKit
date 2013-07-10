@@ -42,6 +42,7 @@
 #include "WebURLLoaderOptions.h"
 
 struct NPObject;
+struct _NPP;
 
 namespace v8 {
 class Context;
@@ -217,8 +218,6 @@ public:
 
     // Binds a NPObject as a property of this frame's DOMWindow.
     virtual void bindToWindowObject(const WebString& name, NPObject*) = 0;
-    virtual void bindToWindowObject(
-        const WebString& name, NPObject*, void*) = 0;
 
     // Executes script in the context of the current page.
     virtual void executeScript(const WebScriptSource&) = 0;
@@ -383,11 +382,6 @@ public:
     // will, for example, be cancelled when WebFrame::stopLoading is called.
     // FIXME: stopLoading does not yet cancel an associated loader!!
     virtual WebURLLoader* createAssociatedURLLoader(const WebURLLoaderOptions& = WebURLLoaderOptions()) = 0;
-
-    // Called from within WebFrameClient::didReceiveDocumentData to commit
-    // data for the frame that will be used to construct the frame's
-    // document.
-    virtual void commitDocumentData(const char* data, size_t length) = 0;
 
     // Returns the number of registered unload listeners.
     virtual unsigned unloadListenerCount() const = 0;

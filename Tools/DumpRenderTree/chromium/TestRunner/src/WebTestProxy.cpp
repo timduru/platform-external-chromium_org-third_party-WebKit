@@ -28,8 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "WebTestProxy.h"
+#include "public/testing/WebTestProxy.h"
 
 #include "AccessibilityControllerChromium.h"
 #include "EventSender.h"
@@ -42,35 +41,36 @@
 #include "TestInterfaces.h"
 #include "TestPlugin.h"
 #include "TestRunner.h"
-#include "WebAccessibilityNotification.h"
-#include "WebAccessibilityObject.h"
-#include "WebCachedURLRequest.h"
-#include "WebConsoleMessage.h"
-#include "WebDataSource.h"
-#include "WebDeviceOrientationClientMock.h"
-#include "WebDocument.h"
-#include "WebElement.h"
-#include "WebFrame.h"
-#include "WebGeolocationClientMock.h"
-#include "WebHistoryItem.h"
-#include "WebNode.h"
-#include "WebPluginParams.h"
-#include "WebPrintParams.h"
-#include "WebRange.h"
-#include "WebScriptController.h"
-#include "WebTestDelegate.h"
-#include "WebTestInterfaces.h"
-#include "WebTestRunner.h"
-#include "WebUserGestureIndicator.h"
 #include "WebUserMediaClientMock.h"
-#include "WebView.h"
-// FIXME: Including platform_canvas.h here is a layering violation.
-#include <cctype>
-#include "skia/ext/platform_canvas.h"
 #include "public/platform/WebCString.h"
 #include "public/platform/WebURLError.h"
 #include "public/platform/WebURLRequest.h"
 #include "public/platform/WebURLResponse.h"
+#include "public/testing/WebTestDelegate.h"
+#include "public/testing/WebTestInterfaces.h"
+#include "public/testing/WebTestRunner.h"
+#include "public/web/WebAccessibilityNotification.h"
+#include "public/web/WebAccessibilityObject.h"
+#include "public/web/WebCachedURLRequest.h"
+#include "public/web/WebConsoleMessage.h"
+#include "public/web/WebDataSource.h"
+#include "public/web/WebDeviceOrientationClientMock.h"
+#include "public/web/WebDocument.h"
+#include "public/web/WebElement.h"
+#include "public/web/WebFrame.h"
+#include "public/web/WebGeolocationClientMock.h"
+#include "public/web/WebHistoryItem.h"
+#include "public/web/WebNode.h"
+#include "public/web/WebPluginParams.h"
+#include "public/web/WebPrintParams.h"
+#include "public/web/WebRange.h"
+#include "public/web/WebScriptController.h"
+#include "public/web/WebUserGestureIndicator.h"
+#include "public/web/WebView.h"
+
+// FIXME: Including platform_canvas.h here is a layering violation.
+#include <cctype>
+#include "skia/ext/platform_canvas.h"
 
 using namespace WebKit;
 using namespace std;
@@ -1059,11 +1059,6 @@ WebUserMediaClient* WebTestProxyBase::userMediaClient()
     return m_userMediaClient.get();
 }
 
-WebMediaPlayer* WebTestProxyBase::createMediaPlayer(WebFrame* frame, const WebURL& url, WebMediaPlayerClient* client)
-{
-    return m_delegate->createWebMediaPlayer(frame, url, client);
-}
-
 // Simulate a print by going into print mode and then exit straight away.
 void WebTestProxyBase::printPage(WebFrame* frame)
 {
@@ -1187,12 +1182,6 @@ void WebTestProxyBase::didStartProvisionalLoad(WebFrame* frame)
 
     if (m_testInterfaces->testRunner()->shouldDumpUserGestureInFrameLoadCallbacks())
         printFrameUserGestureStatus(m_delegate, frame, " - in didStartProvisionalLoadForFrame\n");
-
-    if (m_testInterfaces->testRunner()->stopProvisionalFrameLoads()) {
-        printFrameDescription(m_delegate, frame);
-        m_delegate->printMessage(" - stopping load in didStartProvisionalLoadForFrame callback\n");
-        frame->stopLoading();
-    }
 }
 
 void WebTestProxyBase::didReceiveServerRedirectForProvisionalLoad(WebFrame* frame)
@@ -1555,6 +1544,14 @@ bool WebTestProxyBase::willCheckAndDispatchMessageEvent(WebFrame*, WebFrame*, We
     }
 
     return false;
+}
+
+void WebTestProxyBase::resetInputMethod()
+{
+    // If a composition text exists, then we need to let the browser process
+    // to cancel the input method's ongoing composition session.
+    if (m_webWidget)
+        m_webWidget->confirmComposition();
 }
 
 }

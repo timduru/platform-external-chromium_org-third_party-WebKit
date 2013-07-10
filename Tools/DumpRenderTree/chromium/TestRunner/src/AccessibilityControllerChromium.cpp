@@ -28,16 +28,15 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "AccessibilityControllerChromium.h"
 
-#include "WebAccessibilityObject.h"
-#include "WebElement.h"
-#include "WebFrame.h"
-#include "WebNode.h"
-#include "WebTestDelegate.h"
-#include "WebView.h"
 #include "public/platform/WebCString.h"
+#include "public/testing/WebTestDelegate.h"
+#include "public/web/WebAccessibilityObject.h"
+#include "public/web/WebElement.h"
+#include "public/web/WebFrame.h"
+#include "public/web/WebNode.h"
+#include "public/web/WebView.h"
 
 using namespace WebKit;
 
@@ -144,7 +143,7 @@ void AccessibilityController::notificationReceived(const WebKit::WebAccessibilit
         arguments[0].set(*element->getAsCppVariant());
         arguments[1].set(notificationName);
         CppVariant invokeResult;
-        m_notificationCallbacks[i].invokeDefault(arguments, 2, invokeResult);
+        m_notificationCallbacks[i].invokeDefault(npp(), arguments, 2, invokeResult);
     }
 }
 

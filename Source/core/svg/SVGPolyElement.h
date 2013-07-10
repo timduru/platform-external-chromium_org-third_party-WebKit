@@ -24,16 +24,12 @@
 #include "SVGNames.h"
 #include "core/svg/SVGAnimatedBoolean.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
-#include "core/svg/SVGLangSpace.h"
+#include "core/svg/SVGGraphicsElement.h"
 #include "core/svg/SVGPointList.h"
-#include "core/svg/SVGStyledTransformableElement.h"
-#include "core/svg/SVGTests.h"
 
 namespace WebCore {
 
-class SVGPolyElement : public SVGStyledTransformableElement
-                     , public SVGTests
-                     , public SVGLangSpace
+class SVGPolyElement : public SVGGraphicsElement
                      , public SVGExternalResourcesRequired {
 public:
     SVGListPropertyTearOff<SVGPointList>* points();
@@ -63,11 +59,6 @@ private:
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGPolyElement)
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
-
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 
 protected:
     mutable SVGSynchronizableAnimatedProperty<SVGPointList> m_points;

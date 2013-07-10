@@ -30,7 +30,7 @@
 
 {
     'variables': {
-        'ahem_path': '../../DumpRenderTree/qt/fonts/AHEM____.TTF',
+        'ahem_path': '../../../Source/testing/data/fonts/AHEM____.TTF',
         'tools_dir': '../..',
         'source_dir': '../../../Source',
         'conditions': [
@@ -82,16 +82,14 @@
             ],
             'include_dirs': [
                 '<(DEPTH)',
-                '<(source_dir)/WebKit/chromium/public',
-                '../chromium/TestRunner/public',
-                '../chromium/TestRunner/src',
                 '../../../Source',
                 '../../..',
             ],
+            'export_dependent_settings': [
+                '../../../public/blink.gyp:blink',
+            ],
             'direct_dependent_settings': {
                 'include_dirs': [
-                    '../chromium/TestRunner/public',
-                    '../../../Source',
                     '../../..',
                 ],
             },
@@ -130,14 +128,11 @@
                     },
                 }],
                 ['toolkit_uses_gtk == 1', {
-                    'defines': [
-                        'WTF_USE_GTK=1',
-                    ],
                     'dependencies': [
                         '<(DEPTH)/build/linux/system.gyp:gtk',
                     ],
                     'include_dirs': [
-                        '<(source_dir)/WebKit/chromium/public/gtk',
+                        '../../../public/web/gtk',
                     ],
                 }],
                 ['OS!="win"', {
@@ -213,15 +208,15 @@
                     'all_dependent_settings': {
                         'mac_bundle_resources': [
                             '<(ahem_path)',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher100.ttf',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher200.ttf',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher300.ttf',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher400.ttf',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher500.ttf',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher600.ttf',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher700.ttf',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher800.ttf',
-                            '<(tools_dir)/DumpRenderTree/fonts/WebKitWeightWatcher900.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher100.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher200.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher300.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher400.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher500.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher600.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher700.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher800.ttf',
+                            '<(source_dir)/testing/data/fonts/WebKitWeightWatcher900.ttf',
                             '<(SHARED_INTERMEDIATE_DIR)/webkit/missingImage.png',
                             '<(SHARED_INTERMEDIATE_DIR)/webkit/textAreaResizeCorner.png',
                         ],
@@ -241,7 +236,7 @@
                         'destination': '<(PRODUCT_DIR)',
                         'files': [
                             '<(ahem_path)',
-                            '<(tools_dir)/DumpRenderTree/chromium/fonts.conf',
+                            '<(source_dir)/testing/data/fonts/fonts.conf',
                         ]
                     }],
                 }],
@@ -254,8 +249,8 @@
                         'destination': '<(PRODUCT_DIR)',
                         'files': [
                             '<(ahem_path)',
-                            '<(tools_dir)/DumpRenderTree/chromium/android_main_fonts.xml',
-                            '<(tools_dir)/DumpRenderTree/chromium/android_fallback_fonts.xml',
+                            '<(source_dir)/testing/data/fonts/android_main_fonts.xml',
+                            '<(source_dir)/testing/data/fonts/android_fallback_fonts.xml',
                         ]
                     }],
                 }],

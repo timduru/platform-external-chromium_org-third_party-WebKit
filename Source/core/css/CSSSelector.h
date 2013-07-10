@@ -24,9 +24,8 @@
 
 #include "core/dom/QualifiedName.h"
 #include "core/rendering/style/RenderStyleConstants.h"
-#include <wtf/Noncopyable.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include "wtf/OwnPtr.h"
+#include "wtf/PassOwnPtr.h"
 
 namespace WebCore {
     class CSSSelectorList;
@@ -153,7 +152,6 @@ namespace WebCore {
             PseudoFullScreen,
             PseudoFullScreenDocument,
             PseudoFullScreenAncestor,
-            PseudoAnimatingFullScreenTransition,
             PseudoInRange,
             PseudoOutOfRange,
             PseudoUserAgentCustomElement,

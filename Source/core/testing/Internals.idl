@@ -85,6 +85,8 @@
     [RaisesException] void setEnableMockPagePopup(boolean enabled);
     readonly attribute PagePopupController pagePopupController;
 
+    [RaisesException] ClientRect unscaledViewportRect();
+
     [RaisesException] ClientRect absoluteCaretBounds();
 
     [RaisesException] ClientRect boundingBox(Element element);
@@ -233,6 +235,8 @@
 
     [RaisesException] DOMString markerTextForListItem(Element element);
 
+    [RaisesException] DOMString baseURL(Document document);
+
     SerializedScriptValue deserializeBuffer(ArrayBuffer buffer);
     ArrayBuffer serializeObject(SerializedScriptValue obj);
 
@@ -245,4 +249,6 @@
     [RaisesException] DOMString getImageSourceURL(Element element);
 
     boolean isSelectPopupVisible(Node node);
+
+    [RaisesException] ClientRect selectionBounds();
 };

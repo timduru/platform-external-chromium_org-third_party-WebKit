@@ -212,6 +212,7 @@
       'hard_dependency': 1,
       'dependencies': [
         'webcore_prerequisites',
+        '../bindings/derived_sources.gyp:bindings_derived_sources',
         'core_derived_sources.gyp:make_derived_sources',
         'inspector_overlay_page',
         'inspector_protocol_sources',
@@ -276,8 +277,6 @@
         '<(SHARED_INTERMEDIATE_DIR)/webkit/EventInterfaces.h',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/EventTargetHeaders.h',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/EventTargetInterfaces.h',
-        '<(SHARED_INTERMEDIATE_DIR)/webkit/DOMException.cpp',
-        '<(SHARED_INTERMEDIATE_DIR)/webkit/DOMException.h',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/PickerCommon.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/UserAgentStyleSheetsData.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/V8HTMLElementWrapperFactory.cpp',
@@ -285,7 +284,6 @@
         '<(SHARED_INTERMEDIATE_DIR)/webkit/XMLNSNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/XMLNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/SVGNames.cpp',
-        '<(SHARED_INTERMEDIATE_DIR)/webkit/MathMLElementFactory.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/MathMLNames.cpp',
         '<(SHARED_INTERMEDIATE_DIR)/webkit/FontFamilyNames.cpp',
 
@@ -355,8 +353,8 @@
         'inspector_overlay_page',
         'inspector_protocol_sources',
         'inspector_instrumentation_sources',
-        'core_derived_sources.gyp:make_derived_sources',
         '../bindings/derived_sources.gyp:bindings_derived_sources',
+        'core_derived_sources.gyp:make_derived_sources',
         '../wtf/wtf.gyp:wtf',
         '../config.gyp:config',
         '../weborigin/weborigin.gyp:weborigin',
@@ -630,11 +628,6 @@
         ['exclude', 'platform/graphics/cpu/arm/filters/.*NEON\\.(cpp|h)'],
       ],
       'conditions': [
-        ['component=="shared_library"', {
-            'defines': [
-                'WEBKIT_DLL',
-            ],
-        }],
         ['use_default_render_theme==1', {
           'sources/': [
             ['exclude', 'platform/chromium/PlatformThemeChromiumWin.h'],
@@ -781,7 +774,7 @@
             ['exclude', 'platform/graphics/FontPlatformData\\.cpp$'],
           ],
         }],
-        ['OS != "linux" and OS != "mac" and (OS != "win" or (OS == "win" and "ENABLE_GDI_FONTS_ON_WINDOWS=1"))', {
+        ['OS != "linux" and OS != "mac" and (OS != "win" or (OS == "win" and "ENABLE_GDI_FONTS_ON_WINDOWS=1" in feature_defines))', {
           'sources/': [
             ['exclude', 'VDMX[^/]+\\.(cpp|h)$'],
           ],
@@ -794,10 +787,7 @@
             ['include', '/SkiaFontWin\\.cpp$'],
             ['include', '/TransparencyWin\\.cpp$'],
 
-            # The Chromium Win currently uses GlyphPageTreeNodeChromiumWin.cpp from
-            # platform/graphics/chromium, included by regex above, instead.
             ['exclude', 'platform/graphics/skia/FontCacheSkia\\.cpp$'],
-            ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
 
             # SystemInfo.cpp is useful and we don't want to copy it.
             ['include', 'platform/win/SystemInfo\\.cpp$'],
@@ -811,11 +801,14 @@
             ['"ENABLE_GDI_FONTS_ON_WINDOWS=1" in feature_defines', {
               'sources/': [
                 ['exclude', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
+                ['exclude', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
               ],
             },{ # ENABLE_GDI_FONTS_ON_WINDOWS!=1
               'sources/': [
                 ['exclude', 'platform/graphics/chromium/SimpleFontDataChromiumWin\\.cpp$'],
                 ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
+                ['include', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
+                ['exclude', 'platform/graphics/chromium/GlyphPageTreeNodeChromiumWin\\.cpp$'],
               ],
             }],
           ],

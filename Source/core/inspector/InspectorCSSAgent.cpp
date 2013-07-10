@@ -31,7 +31,6 @@
 #include "core/css/CSSImportRule.h"
 #include "core/css/CSSMediaRule.h"
 #include "core/css/CSSParser.h"
-#include "core/css/CSSPropertySourceData.h"
 #include "core/css/CSSRule.h"
 #include "core/css/CSSRuleList.h"
 #include "core/css/CSSStyleRule.h"
@@ -50,23 +49,20 @@
 #include "core/dom/Node.h"
 #include "core/dom/NodeList.h"
 #include "core/html/HTMLHeadElement.h"
-#include "core/inspector/ContentSearchUtils.h"
 #include "core/inspector/InspectorDOMAgent.h"
 #include "core/inspector/InspectorHistory.h"
 #include "core/inspector/InspectorPageAgent.h"
 #include "core/inspector/InspectorState.h"
-#include "core/inspector/InspectorValues.h"
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/loader/DocumentLoader.h"
-#include "core/loader/cache/CachedResource.h"
 #include "core/page/ContentSecurityPolicy.h"
+#include "core/platform/JSONValues.h"
 #include "core/rendering/RenderRegion.h"
-
-#include <wtf/CurrentTime.h>
-#include <wtf/HashSet.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/StringConcatenate.h>
-#include <wtf/Vector.h>
+#include "wtf/CurrentTime.h"
+#include "wtf/HashSet.h"
+#include "wtf/Vector.h"
+#include "wtf/text/CString.h"
+#include "wtf/text/StringConcatenate.h"
 
 namespace CSSAgentState {
 static const char cssAgentEnabled[] = "cssAgentEnabled";
@@ -167,7 +163,7 @@ private:
     Vector<CSSStyleSheet*>& m_result;
 };
 
-static unsigned computePseudoClassMask(InspectorArray* pseudoClassArray)
+static unsigned computePseudoClassMask(JSONArray* pseudoClassArray)
 {
     DEFINE_STATIC_LOCAL(String, active, (ASCIILiteral("active")));
     DEFINE_STATIC_LOCAL(String, hover, (ASCIILiteral("hover")));
@@ -178,7 +174,7 @@ static unsigned computePseudoClassMask(InspectorArray* pseudoClassArray)
 
     unsigned result = PseudoNone;
     for (size_t i = 0; i < pseudoClassArray->length(); ++i) {
-        RefPtr<InspectorValue> pseudoClassValue = pseudoClassArray->get(i);
+        RefPtr<JSONValue> pseudoClassValue = pseudoClassArray->get(i);
         String pseudoClass;
         bool success = pseudoClassValue->asString(&pseudoClass);
         if (!success)
@@ -321,6 +317,54 @@ void UpdateRegionLayoutTask::onTimer(Timer<UpdateRegionLayoutTask>*)
 
     if (!m_namedFlows.isEmpty() && !m_timer.isActive())
         m_timer.startOneShot(0);
+}
+
+class ChangeRegionOversetTask {
+public:
+    ChangeRegionOversetTask(InspectorCSSAgent*);
+    void scheduleFor(NamedFlow*, int documentNodeId);
+    void unschedule(NamedFlow*);
+    void reset();
+    void onTimer(Timer<ChangeRegionOversetTask>*);
+
+private:
+    InspectorCSSAgent* m_cssAgent;
+    Timer<ChangeRegionOversetTask> m_timer;
+    HashMap<NamedFlow*, int> m_namedFlows;
+};
+
+ChangeRegionOversetTask::ChangeRegionOversetTask(InspectorCSSAgent* cssAgent)
+    : m_cssAgent(cssAgent)
+    , m_timer(this, &ChangeRegionOversetTask::onTimer)
+{
+}
+
+void ChangeRegionOversetTask::scheduleFor(NamedFlow* namedFlow, int documentNodeId)
+{
+    m_namedFlows.add(namedFlow, documentNodeId);
+
+    if (!m_timer.isActive())
+        m_timer.startOneShot(0);
+}
+
+void ChangeRegionOversetTask::unschedule(NamedFlow* namedFlow)
+{
+    m_namedFlows.remove(namedFlow);
+}
+
+void ChangeRegionOversetTask::reset()
+{
+    m_timer.stop();
+    m_namedFlows.clear();
+}
+
+void ChangeRegionOversetTask::onTimer(Timer<ChangeRegionOversetTask>*)
+{
+    // The timer is stopped on m_cssAgent destruction, so this method will never be called after m_cssAgent has been destroyed.
+    for (HashMap<NamedFlow*, int>::iterator it = m_namedFlows.begin(), end = m_namedFlows.end(); it != end; ++it)
+        m_cssAgent->regionOversetChanged(it->key, it->value);
+
+    m_namedFlows.clear();
 }
 
 class InspectorCSSAgent::StyleSheetAction : public InspectorHistory::Action {
@@ -608,28 +652,103 @@ CSSStyleRule* InspectorCSSAgent::asCSSStyleRule(CSSRule* rule)
     return static_cast<CSSStyleRule*>(rule);
 }
 
-template <typename CharType>
-static bool hasVendorSpecificPrefix(const CharType* string, size_t stringLength)
+template <typename CharType, size_t bufferLength>
+static size_t vendorPrefixLowerCase(const CharType* string, size_t stringLength, char (&buffer)[bufferLength])
 {
-    for (size_t i = 1; i < stringLength; ++i) {
-        int c = string[i];
-        if ((c < 'a' || c > 'z') && (c < 'A' || c > 'Z'))
-            return i >= 2 && c == '-';
+    static const char lowerCaseOffset = 'a' - 'A';
+
+    if (string[0] != '-')
+        return 0;
+
+    for (size_t i = 0; i < stringLength - 1; i++) {
+        CharType c = string[i + 1];
+        if (c == '-')
+            return i;
+        if (i == bufferLength)
+            break;
+        if (c < 'A' || c > 'z')
+            break;
+        if (c >= 'a')
+            buffer[i] = c;
+        else if (c <= 'Z')
+            buffer[i] = c + lowerCaseOffset;
+        else
+            break;
     }
-    return false;
+    return 0;
+}
+
+template <size_t patternLength>
+static bool equals(const char* prefix, size_t prefixLength, const char (&pattern)[patternLength])
+{
+    if (prefixLength != patternLength - 1)
+        return false;
+    for (size_t i = 0; i < patternLength - 1; i++) {
+        if (prefix[i] != pattern[i])
+            return false;
+    }
+    return true;
 }
 
 static bool hasNonWebkitVendorSpecificPrefix(const CSSParserString& string)
 {
+    // Known prefixes: http://wiki.csswg.org/spec/vendor-prefixes
     const size_t stringLength = string.length();
-    if (stringLength < 4 || string[0] != '-')
+    if (stringLength < 4)
         return false;
 
-    static const char webkitPrefix[] = "-webkit-";
-    if (stringLength > 8 && string.startsWithIgnoringCase(webkitPrefix))
+    char buffer[6];
+    size_t prefixLength = string.is8Bit() ?
+        vendorPrefixLowerCase(string.characters8(), stringLength, buffer) :
+        vendorPrefixLowerCase(string.characters16(), stringLength, buffer);
+
+    if (!prefixLength || prefixLength == stringLength - 2)
         return false;
 
-    return string.is8Bit() ? hasVendorSpecificPrefix(string.characters8(), stringLength) : hasVendorSpecificPrefix(string.characters16(), stringLength);
+    switch (buffer[0]) {
+    case 'a':
+        return (prefixLength == 2 && buffer[1] == 'h') || equals(buffer + 1, prefixLength - 1, "tsc");
+    case 'e':
+        return equals(buffer + 1, prefixLength - 1, "pub");
+    case 'h':
+        return prefixLength == 2 && buffer[1] == 'p';
+    case 'i':
+        return equals(buffer + 1, prefixLength - 1, "books");
+    case 'k':
+        return equals(buffer + 1, prefixLength - 1, "html");
+    case 'm':
+        if (prefixLength == 2)
+            return buffer[1] == 's';
+        if (prefixLength == 3)
+            return (buffer[1] == 'o' && buffer[2] == 'z') || (buffer[1] == 's' || buffer[2] == 'o');
+        break;
+    case 'o':
+        return prefixLength == 1;
+    case 'p':
+        return equals(buffer + 1, prefixLength - 1, "rince");
+    case 'r':
+        return (prefixLength == 2 && buffer[1] == 'o') || equals(buffer + 1, prefixLength - 1, "im");
+    case 't':
+        return prefixLength == 2 && buffer[1] == 'c';
+    case 'w':
+        return (prefixLength == 3 && buffer[1] == 'a' && buffer[2] == 'p') || equals(buffer + 1, prefixLength - 1, "easy");
+    case 'x':
+        return prefixLength == 2 && buffer[1] == 'v';
+    }
+    return false;
+}
+
+static bool isValidPropertyName(const CSSParserString& content)
+{
+    if (content.equalIgnoringCase("animation")
+        || content.equalIgnoringCase("font-size-adjust")
+        || content.equalIgnoringCase("transform")
+        || content.equalIgnoringCase("user-select")
+        || content.equalIgnoringCase("-webkit-flex-pack")
+        || content.equalIgnoringCase("-webkit-text-size-adjust"))
+        return true;
+
+    return false;
 }
 
 // static
@@ -646,6 +765,7 @@ bool InspectorCSSAgent::cssErrorFilter(const CSSParserString& content, int prope
         // The "filter" property is commonly used instead of "opacity" for IE9.
         if (propertyId == CSSPropertyFilter)
             return false;
+
         break;
 
     case CSSParser::InvalidPropertyValueError:
@@ -661,9 +781,29 @@ bool InspectorCSSAgent::cssErrorFilter(const CSSParserString& content, int prope
         if (propertyId == CSSPropertyCursor && content.equalIgnoringCase("hand"))
             return false;
 
-        // Ignore properties like "property: value \9". This trick used in bootsrtap for IE-only properies.
-        if (contentLength > 2 && content[contentLength - 2] == '\\' && content[contentLength - 1] == '9')
+        // Ignore properties like "property: value \9" (common IE hack) or "property: value \0" (IE 8 hack).
+        if (contentLength > 2 && content[contentLength - 2] == '\\' && (content[contentLength - 1] == '9' || content[contentLength - 1] == '0'))
             return false;
+
+        if (contentLength > 3) {
+
+            // property: value\0/;
+            if (content[contentLength - 3] == '\\' && content[contentLength - 2] == '0' && content[contentLength - 1] == '/')
+                return false;
+
+            // property: value !ie;
+            if (content[contentLength - 3] == '!' && content[contentLength - 2] == 'i' && content[contentLength - 1] == 'e')
+                return false;
+        }
+
+        // Popular value prefixes valid in other browsers.
+        if (content.startsWithIgnoringCase("linear-gradient"))
+            return false;
+        if (content.startsWithIgnoringCase("-webkit-flexbox"))
+            return false;
+        if (propertyId == CSSPropertyUnicodeBidi && content.startsWithIgnoringCase("isolate"))
+            return false;
+
         break;
 
     case CSSParser::InvalidPropertyError:
@@ -678,10 +818,20 @@ bool InspectorCSSAgent::cssErrorFilter(const CSSParserString& content, int prope
         if (content.startsWithIgnoringCase("scrollbar-"))
             return false;
 
-        // Unsupported standard property.
-        if (content.equalIgnoringCase("font-size-adjust"))
+        if (isValidPropertyName(content))
             return false;
+
         break;
+
+    case CSSParser::InvalidRuleError:
+        // Block error reporting for @-rules for now to avoid noise.
+        if (contentLength > 4 && content[0] == '@')
+            return false;
+        return true;
+
+    case CSSParser::InvalidSelectorPseudoError:
+        if (hasNonWebkitVendorSpecificPrefix(content))
+            return false;
     }
     return true;
 }
@@ -749,6 +899,8 @@ void InspectorCSSAgent::resetNonPersistentData()
     m_namedFlowCollectionsRequested.clear();
     if (m_updateRegionLayoutTask)
         m_updateRegionLayoutTask->reset();
+    if (m_changeRegionOversetTask)
+        m_changeRegionOversetTask->reset();
     resetPseudoStates();
 }
 
@@ -828,6 +980,28 @@ void InspectorCSSAgent::regionLayoutUpdated(NamedFlow* namedFlow, int documentNo
     RefPtr<NamedFlow> protector(namedFlow);
 
     m_frontend->regionLayoutUpdated(buildObjectForNamedFlow(&errorString, namedFlow, documentNodeId));
+}
+
+void InspectorCSSAgent::didChangeRegionOverset(Document* document, NamedFlow* namedFlow)
+{
+    int documentNodeId = documentNodeWithRequestedFlowsId(document);
+    if (!documentNodeId)
+        return;
+
+    if (!m_changeRegionOversetTask)
+        m_changeRegionOversetTask = adoptPtr(new ChangeRegionOversetTask(this));
+    m_changeRegionOversetTask->scheduleFor(namedFlow, documentNodeId);
+}
+
+void InspectorCSSAgent::regionOversetChanged(NamedFlow* namedFlow, int documentNodeId)
+{
+    if (namedFlow->flowState() == NamedFlow::FlowStateNull)
+        return;
+
+    ErrorString errorString;
+    RefPtr<NamedFlow> protector(namedFlow);
+
+    m_frontend->regionOversetChanged(buildObjectForNamedFlow(&errorString, namedFlow, documentNodeId));
 }
 
 void InspectorCSSAgent::activeStyleSheetsUpdated(Document* document, const Vector<RefPtr<StyleSheet> >& newSheets)
@@ -1037,7 +1211,7 @@ void InspectorCSSAgent::setStyleSheetText(ErrorString* errorString, const String
     *errorString = InspectorDOMAgent::toErrorString(ec);
 }
 
-void InspectorCSSAgent::setStyleText(ErrorString* errorString, const RefPtr<InspectorObject>& fullStyleId, const String& text, RefPtr<TypeBuilder::CSS::CSSStyle>& result)
+void InspectorCSSAgent::setStyleText(ErrorString* errorString, const RefPtr<JSONObject>& fullStyleId, const String& text, RefPtr<TypeBuilder::CSS::CSSStyle>& result)
 {
     InspectorCSSId compoundId(fullStyleId);
     ASSERT(!compoundId.isEmpty());
@@ -1053,7 +1227,7 @@ void InspectorCSSAgent::setStyleText(ErrorString* errorString, const RefPtr<Insp
     *errorString = InspectorDOMAgent::toErrorString(ec);
 }
 
-void InspectorCSSAgent::setPropertyText(ErrorString* errorString, const RefPtr<InspectorObject>& fullStyleId, int propertyIndex, const String& text, bool overwrite, RefPtr<TypeBuilder::CSS::CSSStyle>& result)
+void InspectorCSSAgent::setPropertyText(ErrorString* errorString, const RefPtr<JSONObject>& fullStyleId, int propertyIndex, const String& text, bool overwrite, RefPtr<TypeBuilder::CSS::CSSStyle>& result)
 {
     InspectorCSSId compoundId(fullStyleId);
     ASSERT(!compoundId.isEmpty());
@@ -1069,7 +1243,7 @@ void InspectorCSSAgent::setPropertyText(ErrorString* errorString, const RefPtr<I
     *errorString = InspectorDOMAgent::toErrorString(ec);
 }
 
-void InspectorCSSAgent::toggleProperty(ErrorString* errorString, const RefPtr<InspectorObject>& fullStyleId, int propertyIndex, bool disable, RefPtr<TypeBuilder::CSS::CSSStyle>& result)
+void InspectorCSSAgent::toggleProperty(ErrorString* errorString, const RefPtr<JSONObject>& fullStyleId, int propertyIndex, bool disable, RefPtr<TypeBuilder::CSS::CSSStyle>& result)
 {
     InspectorCSSId compoundId(fullStyleId);
     ASSERT(!compoundId.isEmpty());
@@ -1085,7 +1259,7 @@ void InspectorCSSAgent::toggleProperty(ErrorString* errorString, const RefPtr<In
     *errorString = InspectorDOMAgent::toErrorString(ec);
 }
 
-void InspectorCSSAgent::setRuleSelector(ErrorString* errorString, const RefPtr<InspectorObject>& fullRuleId, const String& selector, RefPtr<TypeBuilder::CSS::CSSRule>& result)
+void InspectorCSSAgent::setRuleSelector(ErrorString* errorString, const RefPtr<JSONObject>& fullRuleId, const String& selector, RefPtr<TypeBuilder::CSS::CSSRule>& result)
 {
     InspectorCSSId compoundId(fullRuleId);
     ASSERT(!compoundId.isEmpty());
@@ -1154,7 +1328,7 @@ void InspectorCSSAgent::getSupportedCSSProperties(ErrorString*, RefPtr<TypeBuild
     cssProperties = properties.release();
 }
 
-void InspectorCSSAgent::forcePseudoState(ErrorString* errorString, int nodeId, const RefPtr<InspectorArray>& forcedPseudoClasses)
+void InspectorCSSAgent::forcePseudoState(ErrorString* errorString, int nodeId, const RefPtr<JSONArray>& forcedPseudoClasses)
 {
     Element* element = m_domAgent->assertElement(errorString, nodeId);
     if (!element)
@@ -1216,7 +1390,6 @@ PassRefPtr<TypeBuilder::CSS::CSSMedia> InspectorCSSAgent::buildMediaObject(const
 
     if (!sourceURL.isEmpty()) {
         mediaObject->setSourceURL(sourceURL);
-        mediaObject->setSourceLine(media->queries()->lastLine());
 
         CSSRule* parentRule = media->parentRule();
         if (!parentRule)
@@ -1573,7 +1746,7 @@ PassRefPtr<TypeBuilder::CSS::CSSStyle> InspectorCSSAgent::buildObjectForAttribut
         return 0;
 
     // FIXME: Ugliness below.
-    StylePropertySet* attributeStyle = const_cast<StylePropertySet*>(static_cast<StyledElement*>(element)->presentationAttributeStyle());
+    StylePropertySet* attributeStyle = const_cast<StylePropertySet*>(element->presentationAttributeStyle());
     if (!attributeStyle)
         return 0;
 
@@ -1591,17 +1764,17 @@ PassRefPtr<TypeBuilder::Array<TypeBuilder::CSS::Region> > InspectorCSSAgent::bui
     for (unsigned i = 0; i < regionList->length(); ++i) {
         TypeBuilder::CSS::Region::RegionOverset::Enum regionOverset;
 
-        switch (toElement(regionList->item(i))->renderRegion()->regionState()) {
-        case RenderRegion::RegionFit:
+        switch (toElement(regionList->item(i))->renderRegion()->regionOversetState()) {
+        case RegionFit:
             regionOverset = TypeBuilder::CSS::Region::RegionOverset::Fit;
             break;
-        case RenderRegion::RegionEmpty:
+        case RegionEmpty:
             regionOverset = TypeBuilder::CSS::Region::RegionOverset::Empty;
             break;
-        case RenderRegion::RegionOverset:
+        case RegionOverset:
             regionOverset = TypeBuilder::CSS::Region::RegionOverset::Overset;
             break;
-        case RenderRegion::RegionUndefined:
+        case RegionUndefined:
             continue;
         default:
             ASSERT_NOT_REACHED();

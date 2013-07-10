@@ -39,7 +39,6 @@
 #include "core/editing/RenderedPosition.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
-#include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLLabelElement.h"
 #include "core/html/HTMLOptionElement.h"
@@ -63,10 +62,7 @@
 #include "core/svg/SVGDocument.h"
 #include "core/svg/SVGSVGElement.h"
 #include "core/svg/graphics/SVGImage.h"
-#include "core/svg/graphics/SVGImageChromeClient.h"
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/unicode/CharacterNames.h>
+#include "wtf/StdLibExtras.h"
 
 using namespace std;
 
@@ -1405,7 +1401,7 @@ AccessibilityObject* AccessibilityRenderObject::accessibilityHitTest(const IntPo
         return accessibilityImageMapHitTest(static_cast<HTMLAreaElement*>(node), point);
 
     if (node->hasTagName(optionTag))
-        node = static_cast<HTMLOptionElement*>(node)->ownerSelectElement();
+        node = toHTMLOptionElement(node)->ownerSelectElement();
 
     RenderObject* obj = node->renderer();
     if (!obj)
@@ -1857,24 +1853,6 @@ void AccessibilityRenderObject::handleAriaExpandedChanged()
     // Post that the specific row either collapsed or expanded.
     if (roleValue() == RowRole || roleValue() == TreeItemRole)
         axObjectCache()->postNotification(this, document(), isExpanded() ? AXObjectCache::AXRowExpanded : AXObjectCache::AXRowCollapsed, true);
-}
-
-void AccessibilityRenderObject::textChanged()
-{
-    // If this element supports ARIA live regions, or is part of a region with an ARIA editable role,
-    // then notify the AT of changes.
-    AXObjectCache* cache = axObjectCache();
-    for (RenderObject* renderParent = m_renderer; renderParent; renderParent = renderParent->parent()) {
-        AccessibilityObject* parent = cache->get(renderParent);
-        if (!parent)
-            continue;
-
-        if (parent->supportsARIALiveRegion())
-            cache->postNotification(renderParent, AXObjectCache::AXLiveRegionChanged, true);
-
-        if (parent->isARIATextControl() && !parent->isNativeTextControl() && !parent->node()->rendererIsEditable())
-            cache->postNotification(renderParent, AXObjectCache::AXValueChanged, true);
-    }
 }
 
 //

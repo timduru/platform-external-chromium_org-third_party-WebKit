@@ -82,7 +82,7 @@ bool SVGRadialGradientElement::isSupportedAttribute(const QualifiedName& attrNam
         supportedAttributes.add(SVGNames::rAttr);
         supportedAttributes.add(SVGNames::frAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGRadialGradientElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -124,9 +124,9 @@ void SVGRadialGradientElement::svgAttributeChanged(const QualifiedName& attrName
         object->setNeedsLayout(true);
 }
 
-RenderObject* SVGRadialGradientElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGRadialGradientElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGResourceRadialGradient(this);
+    return new (document()->renderArena()) RenderSVGResourceRadialGradient(this);
 }
 
 bool SVGRadialGradientElement::collectGradientAttributes(RadialGradientAttributes& attributes)

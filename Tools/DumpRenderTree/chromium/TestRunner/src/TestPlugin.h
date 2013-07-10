@@ -26,11 +26,11 @@
 #ifndef TestPlugin_h
 #define TestPlugin_h
 
-#include "WebPlugin.h"
-#include "WebPluginContainer.h"
-#include <memory>
 #include "public/platform/WebExternalTextureLayer.h"
 #include "public/platform/WebExternalTextureLayerClient.h"
+#include "public/web/WebPlugin.h"
+#include "public/web/WebPluginContainer.h"
+#include <memory>
 #include <string>
 
 namespace WebTestRunner {
@@ -60,6 +60,7 @@ public:
     virtual bool initialize(WebKit::WebPluginContainer*);
     virtual void destroy();
     virtual NPObject* scriptableObject() { return 0; }
+    virtual struct _NPP* pluginNPP() { return 0; }
     virtual bool canProcessDrag() const { return m_canProcessDrag; }
     virtual void paint(WebKit::WebCanvas*, const WebKit::WebRect&) { }
     virtual void updateGeometry(const WebKit::WebRect& frameRect, const WebKit::WebRect& clipRect, const WebKit::WebVector<WebKit::WebRect>& cutOutsRects, bool isVisible);

@@ -154,7 +154,7 @@ static CSSPropertyInfo* cssPropertyInfo(v8::Handle<v8::String> v8PropertyName)
     return propInfo;
 }
 
-void V8CSSStyleDeclaration::namedPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>& info)
+void V8CSSStyleDeclaration::namedPropertyEnumeratorCustom(const v8::PropertyCallbackInfo<v8::Array>& info)
 {
     typedef Vector<String, numCSSProperties - 1> PreAllocatedPropertyVector;
     DEFINE_STATIC_LOCAL(PreAllocatedPropertyVector, propertyNames, ());
@@ -174,13 +174,13 @@ void V8CSSStyleDeclaration::namedPropertyEnumerator(const v8::PropertyCallbackIn
     for (unsigned i = 0; i < propertyNamesLength; ++i) {
         String key = propertyNames.at(i);
         ASSERT(!key.isNull());
-        properties->Set(v8Integer(i, info.GetIsolate()), v8String(key, info.GetIsolate()));
+        properties->Set(v8::Integer::New(i, info.GetIsolate()), v8String(key, info.GetIsolate()));
     }
 
     v8SetReturnValue(info, properties);
 }
 
-void V8CSSStyleDeclaration::namedPropertyQuery(v8::Local<v8::String> v8Name, const v8::PropertyCallbackInfo<v8::Integer>& info)
+void V8CSSStyleDeclaration::namedPropertyQueryCustom(v8::Local<v8::String> v8Name, const v8::PropertyCallbackInfo<v8::Integer>& info)
 {
     // NOTE: cssPropertyInfo lookups incur several mallocs.
     // Successful lookups have the same cost the first time, but are cached.
@@ -190,7 +190,7 @@ void V8CSSStyleDeclaration::namedPropertyQuery(v8::Local<v8::String> v8Name, con
     }
 }
 
-void V8CSSStyleDeclaration::namedPropertyGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+void V8CSSStyleDeclaration::namedPropertyGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     // First look for API defined attributes on the style declaration object.
     if (info.Holder()->HasRealNamedCallbackProperty(name))
@@ -223,7 +223,7 @@ void V8CSSStyleDeclaration::namedPropertyGetter(v8::Local<v8::String> name, cons
     v8SetReturnValue(info, v8String(result, info.GetIsolate()));
 }
 
-void V8CSSStyleDeclaration::namedPropertySetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info)
+void V8CSSStyleDeclaration::namedPropertySetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     CSSStyleDeclaration* imp = V8CSSStyleDeclaration::toNative(info.Holder());
     CSSPropertyInfo* propInfo = cssPropertyInfo(name);

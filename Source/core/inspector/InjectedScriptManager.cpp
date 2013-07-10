@@ -35,8 +35,9 @@
 #include "bindings/v8/ScriptObject.h"
 #include "core/inspector/InjectedScript.h"
 #include "core/inspector/InjectedScriptHost.h"
-#include "core/inspector/InspectorValues.h"
-#include <wtf/PassOwnPtr.h>
+#include "core/inspector/JSONParser.h"
+#include "core/platform/JSONValues.h"
+#include "wtf/PassOwnPtr.h"
 
 namespace WebCore {
 
@@ -47,7 +48,7 @@ PassOwnPtr<InjectedScriptManager> InjectedScriptManager::createForPage()
 
 PassOwnPtr<InjectedScriptManager> InjectedScriptManager::createForWorker()
 {
-    return adoptPtr(new InjectedScriptManager(&InjectedScriptManager::canAccessInspectedWorkerContext));
+    return adoptPtr(new InjectedScriptManager(&InjectedScriptManager::canAccessInspectedWorkerGlobalScope));
 }
 
 InjectedScriptManager::InjectedScriptManager(InspectedStateAccessCheck accessCheck)
@@ -96,8 +97,8 @@ int InjectedScriptManager::injectedScriptIdFor(ScriptState* scriptState)
 
 InjectedScript InjectedScriptManager::injectedScriptForObjectId(const String& objectId)
 {
-    RefPtr<InspectorValue> parsedObjectId = InspectorValue::parseJSON(objectId);
-    if (parsedObjectId && parsedObjectId->type() == InspectorValue::TypeObject) {
+    RefPtr<JSONValue> parsedObjectId = parseJSON(objectId);
+    if (parsedObjectId && parsedObjectId->type() == JSONValue::TypeObject) {
         long injectedScriptId = 0;
         bool success = parsedObjectId->asObject()->getNumber("injectedScriptId", &injectedScriptId);
         if (success)
@@ -141,7 +142,7 @@ void InjectedScriptManager::discardInjectedScriptsFor(DOMWindow* window)
         m_scriptStateToId.remove(scriptStatesToRemove[i]);
 }
 
-bool InjectedScriptManager::canAccessInspectedWorkerContext(ScriptState*)
+bool InjectedScriptManager::canAccessInspectedWorkerGlobalScope(ScriptState*)
 {
     return true;
 }

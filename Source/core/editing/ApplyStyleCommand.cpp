@@ -66,7 +66,7 @@ bool isLegacyAppleStyleSpan(const Node *node)
     return elem->hasLocalName(spanAttr) && elem->getAttribute(classAttr) == styleSpanClassString();
 }
 
-static bool hasNoAttributeOrOnlyStyleAttribute(const StyledElement* element, ShouldStyleAttributeBeEmpty shouldStyleAttributeBeEmpty)
+static bool hasNoAttributeOrOnlyStyleAttribute(const Element* element, ShouldStyleAttributeBeEmpty shouldStyleAttributeBeEmpty)
 {
     if (!element->hasAttributes())
         return true;
@@ -501,7 +501,7 @@ void ApplyStyleCommand::removeEmbeddingUpToEnclosingBlock(Node* node, Node* unsp
         if (!n->isStyledElement())
             continue;
 
-        StyledElement* element = static_cast<StyledElement*>(n);
+        Element* element = toElement(n);
         int unicodeBidi = getIdentifierValue(CSSComputedStyleDeclaration::create(element).get(), CSSPropertyUnicodeBidi);
         if (!unicodeBidi || unicodeBidi == CSSValueNormal)
             continue;
@@ -1026,9 +1026,9 @@ void ApplyStyleCommand::pushDownInlineStyleAroundNode(EditingStyle* style, Node*
     while (current && current != targetNode && current->contains(targetNode)) {
         NodeVector currentChildren;
         getChildNodes(current.get(), currentChildren);
-        RefPtr<StyledElement> styledElement;
+        RefPtr<Element> styledElement;
         if (current->isStyledElement() && isStyledInlineElementToRemove(toElement(current.get()))) {
-            styledElement = static_cast<StyledElement*>(current.get());
+            styledElement = toElement(current.get());
             elementsToPushDown.append(styledElement);
         }
 
@@ -1098,16 +1098,17 @@ void ApplyStyleCommand::removeInlineStyle(EditingStyle* style, const Position &s
     Position s = start.isNull() || start.isOrphan() ? pushDownStart : start;
     Position e = end.isNull() || end.isOrphan() ? pushDownEnd : end;
 
-    Node* node = start.deprecatedNode();
+    RefPtr<Node> node = start.deprecatedNode();
     while (node) {
         RefPtr<Node> next;
-        if (editingIgnoresContent(node)) {
+        if (editingIgnoresContent(node.get())) {
             ASSERT(node == end.deprecatedNode() || !node->contains(end.deprecatedNode()));
-            next = NodeTraversal::nextSkippingChildren(node);
-        } else
-            next = NodeTraversal::next(node);
-        if (node->isHTMLElement() && nodeFullySelected(node, start, end)) {
-            RefPtr<HTMLElement> elem = toHTMLElement(node);
+            next = NodeTraversal::nextSkippingChildren(node.get());
+        } else {
+            next = NodeTraversal::next(node.get());
+        }
+        if (node->isHTMLElement() && nodeFullySelected(node.get(), start, end)) {
+            RefPtr<HTMLElement> elem = toHTMLElement(node.get());
             RefPtr<Node> prev = NodeTraversal::previousPostOrder(elem.get());
             RefPtr<Node> next = NodeTraversal::next(elem.get());
             RefPtr<EditingStyle> styleToPushDown;
@@ -1141,7 +1142,7 @@ void ApplyStyleCommand::removeInlineStyle(EditingStyle* style, const Position &s
         }
         if (node == end.deprecatedNode())
             break;
-        node = next.get();
+        node = next;
     }
 
     updateStartEnd(s, e);
@@ -1309,8 +1310,8 @@ bool ApplyStyleCommand::mergeEndWithNextIfIdentical(const Position& start, const
 
     Node* nextSibling = endNode->nextSibling();
     if (nextSibling && areIdenticalElements(endNode, nextSibling)) {
-        Element* nextElement = static_cast<Element *>(nextSibling);
-        Element* element = static_cast<Element *>(endNode);
+        Element* nextElement = toElement(nextSibling);
+        Element* element = toElement(endNode);
         Node* nextChild = nextElement->firstChild();
 
         mergeIdenticalElements(element, nextElement);

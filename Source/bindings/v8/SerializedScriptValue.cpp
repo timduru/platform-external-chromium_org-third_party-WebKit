@@ -1670,7 +1670,7 @@ private:
         uint32_t rawValue;
         if (!doReadUint32(&rawValue))
             return false;
-        *value = v8Integer(static_cast<int32_t>(ZigZag::decode(rawValue)), m_isolate);
+        *value = v8::Integer::New(static_cast<int32_t>(ZigZag::decode(rawValue)), m_isolate);
         return true;
     }
 
@@ -1679,7 +1679,7 @@ private:
         uint32_t rawValue;
         if (!doReadUint32(&rawValue))
             return false;
-        *value = v8UnsignedInteger(rawValue, m_isolate);
+        *value = v8::Integer::NewFromUnsigned(rawValue, m_isolate);
         return true;
     }
 
@@ -2337,18 +2337,23 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::numberValue(double valu
     return adoptRef(new SerializedScriptValue(wireData));
 }
 
-Vector<uint8_t> SerializedScriptValue::toWireBytes() const
+// Convert serialized string to big endian wire data.
+void SerializedScriptValue::toWireBytes(Vector<char>& result) const
 {
-    // Convert serialized string to big endian wire data.
+    ASSERT(result.isEmpty());
     size_t length = m_data.length();
-    Vector<uint8_t> result(length * sizeof(UChar));
-
-    const UChar* src = m_data.characters();
+    result.resize(length * sizeof(UChar));
     UChar* dst = reinterpret_cast<UChar*>(result.data());
-    for (size_t i = 0; i < length; i++)
-        dst[i] = htons(src[i]);
 
-    return result;
+    if (m_data.is8Bit()) {
+        const LChar* src = m_data.characters8();
+        for (size_t i = 0; i < length; i++)
+            dst[i] = htons(static_cast<UChar>(src[i]));
+    } else {
+        const UChar* src = m_data.characters16();
+        for (size_t i = 0; i < length; i++)
+            dst[i] = htons(src[i]);
+    }
 }
 
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::release()
@@ -2473,7 +2478,7 @@ v8::Handle<v8::Value> SerializedScriptValue::deserialize(v8::Isolate* isolate, M
     if (!m_data.impl())
         return v8NullWithCheck(isolate);
     COMPILE_ASSERT(sizeof(BufferValueType) == 2, BufferValueTypeIsTwoBytes);
-    Reader reader(reinterpret_cast<const uint8_t*>(m_data.impl()->characters()), 2 * m_data.length(), isolate);
+    Reader reader(reinterpret_cast<const uint8_t*>(m_data.impl()->bloatedCharacters()), 2 * m_data.length(), isolate);
     Deserializer deserializer(reader, messagePorts, m_arrayBufferContentsArray.get());
     return deserializer.deserialize();
 }

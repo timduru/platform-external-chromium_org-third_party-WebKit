@@ -33,10 +33,10 @@
 
 #include "core/dom/CrossThreadTask.h"
 
-#include "core/workers/WorkerContext.h"
+#include "core/workers/WorkerGlobalScope.h"
 #include "core/workers/WorkerLoaderProxy.h"
 #include "core/workers/WorkerThread.h"
-#include <wtf/MainThread.h>
+#include "wtf/MainThread.h"
 
 using namespace WebCore;
 

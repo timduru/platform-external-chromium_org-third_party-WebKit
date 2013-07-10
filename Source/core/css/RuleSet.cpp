@@ -29,9 +29,6 @@
 #include "config.h"
 #include "core/css/RuleSet.h"
 
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/MemoryInstrumentationVector.h>
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "core/css/CSSFontSelector.h"
@@ -47,9 +44,10 @@
 #include "core/css/StyleSheetContents.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
-#include "weborigin/SecurityOrigin.h"
-
 #include "core/html/track/TextTrackCue.h"
+#include "weborigin/SecurityOrigin.h"
+#include "wtf/MemoryInstrumentationHashMap.h"
+#include "wtf/MemoryInstrumentationVector.h"
 
 namespace WebCore {
 
@@ -60,6 +58,11 @@ using namespace HTMLNames;
 static inline bool isDocumentScope(const ContainerNode* scope)
 {
     return !scope || scope->isDocumentNode();
+}
+
+static inline bool isScopingNodeInShadowTree(const ContainerNode* scopingNode)
+{
+    return scopingNode && scopingNode->isInShadowTree();
 }
 
 static inline bool isSelectorMatchingHTMLBasedOnRuleHash(const CSSSelector* selector)
@@ -132,9 +135,80 @@ static inline PropertyWhitelistType determinePropertyWhitelistType(const AddRule
     return PropertyWhitelistNone;
 }
 
+namespace {
+
+// FIXME: Should we move this class to WTF?
+template<typename T>
+class TerminatedArrayBuilder {
+public:
+    explicit TerminatedArrayBuilder(PassOwnPtr<T> array)
+        : m_array(array)
+        , m_count(0)
+        , m_capacity(0)
+    {
+        if (!m_array)
+            return;
+        for (T* item = m_array.get(); !item->isLastInArray(); ++item)
+            ++m_count;
+        ++m_count; // To count the last item itself.
+        m_capacity = m_count;
+    }
+
+    void grow(size_t count)
+    {
+        ASSERT(count);
+        if (!m_array) {
+            ASSERT(!m_count);
+            ASSERT(!m_capacity);
+            m_capacity = count;
+            m_array = adoptPtr(static_cast<T*>(fastMalloc(m_capacity * sizeof(T))));
+            return;
+        }
+        m_capacity += count;
+        m_array = adoptPtr(static_cast<T*>(fastRealloc(m_array.leakPtr(), m_capacity * sizeof(T))));
+        m_array.get()[m_count - 1].setLastInArray(false);
+    }
+
+    void append(const T& item)
+    {
+        RELEASE_ASSERT(m_count < m_capacity);
+        ASSERT(!item.isLastInArray());
+        m_array.get()[m_count++] = item;
+    }
+
+    PassOwnPtr<T> release()
+    {
+        RELEASE_ASSERT(m_count == m_capacity);
+        if (m_array)
+            m_array.get()[m_count - 1].setLastInArray(true);
+        assertValid();
+        return m_array.release();
+    }
+
+private:
+#ifndef NDEBUG
+    void assertValid()
+    {
+        for (size_t i = 0; i < m_count; ++i) {
+            bool isLastInArray = (i + 1 == m_count);
+            ASSERT(m_array.get()[i].isLastInArray() == isLastInArray);
+        }
+    }
+#else
+    void assertValid() { }
+#endif
+
+    OwnPtr<T> m_array;
+    size_t m_count;
+    size_t m_capacity;
+};
+
+}
+
 RuleData::RuleData(StyleRule* rule, unsigned selectorIndex, unsigned position, AddRuleFlags addRuleFlags)
     : m_rule(rule)
     , m_selectorIndex(selectorIndex)
+    , m_isLastInArray(false)
     , m_position(position)
     , m_hasFastCheckableSelector((addRuleFlags & RuleCanUseFastCheckSelector) && SelectorCheckerFastPath::canUse(selector()))
     , m_specificity(selector()->specificity())
@@ -147,7 +221,6 @@ RuleData::RuleData(StyleRule* rule, unsigned selectorIndex, unsigned position, A
 {
     ASSERT(m_position == position);
     ASSERT(m_selectorIndex == selectorIndex);
-    SelectorFilter::collectIdentifierHashes(selector(), m_descendantSelectorIdentifierHashes, maximumIdentifierCount);
 }
 
 void RuleData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
@@ -200,28 +273,28 @@ static void collectFeaturesFromRuleData(RuleFeatureSet& features, const RuleData
         features.uncommonAttributeRules.append(RuleFeature(ruleData.rule(), ruleData.selectorIndex(), ruleData.hasDocumentSecurityOrigin()));
 }
     
-void RuleSet::addToRuleSet(AtomicStringImpl* key, AtomRuleMap& map, const RuleData& ruleData)
+void RuleSet::addToRuleSet(AtomicStringImpl* key, PendingRuleMap& map, const RuleData& ruleData)
 {
     if (!key)
         return;
-    OwnPtr<Vector<RuleData> >& rules = map.add(key, nullptr).iterator->value;
+    OwnPtr<LinkedStack<RuleData> >& rules = map.add(key, nullptr).iterator->value;
     if (!rules)
-        rules = adoptPtr(new Vector<RuleData>);
-    rules->append(ruleData);
+        rules = adoptPtr(new LinkedStack<RuleData>);
+    rules->push(ruleData);
 }
 
 bool RuleSet::findBestRuleSetAndAdd(const CSSSelector* component, RuleData& ruleData)
 {
     if (component->m_match == CSSSelector::Id) {
-        addToRuleSet(component->value().impl(), m_idRules, ruleData);
+        addToRuleSet(component->value().impl(), ensurePendingRules()->idRules, ruleData);
         return true;
     }
     if (component->m_match == CSSSelector::Class) {
-        addToRuleSet(component->value().impl(), m_classRules, ruleData);
+        addToRuleSet(component->value().impl(), ensurePendingRules()->classRules, ruleData);
         return true;
     }
     if (component->isCustomPseudoElement()) {
-        addToRuleSet(component->value().impl(), m_shadowPseudoElementRules, ruleData);
+        addToRuleSet(component->value().impl(), ensurePendingRules()->shadowPseudoElementRules, ruleData);
         return true;
     }
     if (component->pseudoType() == CSSSelector::PseudoCue) {
@@ -252,7 +325,7 @@ bool RuleSet::findBestRuleSetAndAdd(const CSSSelector* component, RuleData& rule
                 && findBestRuleSetAndAdd(component->tagHistory(), ruleData))
                 return true;
 
-            addToRuleSet(component->tagQName().localName().impl(), m_tagRules, ruleData);
+            addToRuleSet(component->tagQName().localName().impl(), ensurePendingRules()->tagRules, ruleData);
             return true;
         }
     }
@@ -272,11 +345,13 @@ void RuleSet::addRule(StyleRule* rule, unsigned selectorIndex, AddRuleFlags addR
 
 void RuleSet::addPageRule(StyleRulePage* rule)
 {
+    ensurePendingRules(); // So that m_pageRules.shrinkToFit() gets called.
     m_pageRules.append(rule);
 }
 
 void RuleSet::addRegionRule(StyleRuleRegion* regionRule, bool hasDocumentSecurityOrigin)
 {
+    ensurePendingRules(); // So that m_regionSelectorsAndRuleSets.shrinkToFit() gets called.
     OwnPtr<RuleSet> regionRuleSet = RuleSet::create();
     // The region rule set should take into account the position inside the parent rule set.
     // Otherwise, the rules inside region block might be incorrectly positioned before other similar rules from
@@ -339,10 +414,14 @@ void RuleSet::addChildRules(const Vector<RefPtr<StyleRuleBase> >& rules, const M
         else if (rule->isRegionRule() && resolver) {
             // FIXME (BUG 72472): We don't add @-webkit-region rules of scoped style sheets for the moment.
             addRegionRule(static_cast<StyleRuleRegion*>(rule), hasDocumentSecurityOrigin);
-        }
-        else if (rule->isHostRule())
+        } else if (rule->isHostRule() && resolver) {
+            if (!isScopingNodeInShadowTree(scope))
+                continue;
+            bool enabled = resolver->buildScopedStyleTreeInDocumentOrder();
+            resolver->setBuildScopedStyleTreeInDocumentOrder(false);
             resolver->ensureScopedStyleResolver(scope->shadowHost())->addHostRule(static_cast<StyleRuleHost*>(rule), hasDocumentSecurityOrigin, scope);
-        else if (RuntimeEnabledFeatures::cssViewportEnabled() && rule->isViewportRule() && resolver) {
+            resolver->setBuildScopedStyleTreeInDocumentOrder(enabled);
+        } else if (RuntimeEnabledFeatures::cssViewportEnabled() && rule->isViewportRule() && resolver) {
             // @viewport should not be scoped.
             if (!isDocumentScope(scope))
                 continue;
@@ -368,9 +447,6 @@ void RuleSet::addRulesFromSheet(StyleSheetContents* sheet, const MediaQueryEvalu
     AddRuleFlags addRuleFlags = static_cast<AddRuleFlags>((hasDocumentSecurityOrigin ? RuleHasDocumentSecurityOrigin : 0) | (!scope ? RuleCanUseFastCheckSelector : 0));
 
     addChildRules(sheet->childRules(), medium, resolver, scope, hasDocumentSecurityOrigin, addRuleFlags);
-
-    if (m_autoShrinkToFitEnabled)
-        shrinkToFit();
 }
 
 void RuleSet::addStyleRule(StyleRule* rule, AddRuleFlags addRuleFlags)
@@ -379,19 +455,32 @@ void RuleSet::addStyleRule(StyleRule* rule, AddRuleFlags addRuleFlags)
         addRule(rule, selectorIndex, addRuleFlags);
 }
 
-static inline void shrinkMapVectorsToFit(RuleSet::AtomRuleMap& map)
+void RuleSet::compactPendingRules(PendingRuleMap& pendingMap, CompactRuleMap& compactMap)
 {
-    RuleSet::AtomRuleMap::iterator end = map.end();
-    for (RuleSet::AtomRuleMap::iterator it = map.begin(); it != end; ++it)
-        it->value->shrinkToFit();
+    PendingRuleMap::iterator end = pendingMap.end();
+    for (PendingRuleMap::iterator it = pendingMap.begin(); it != end; ++it) {
+        OwnPtr<LinkedStack<RuleData> > pendingRules = it->value.release();
+        CompactRuleMap::iterator compactRules = compactMap.add(it->key, nullptr).iterator;
+
+        TerminatedArrayBuilder<RuleData> builder(compactRules->value.release());
+        builder.grow(pendingRules->size());
+        while (!pendingRules->isEmpty()) {
+            builder.append(pendingRules->peek());
+            pendingRules->pop();
+        }
+
+        compactRules->value = builder.release();
+    }
 }
 
-void RuleSet::shrinkToFit()
+void RuleSet::compactRules()
 {
-    shrinkMapVectorsToFit(m_idRules);
-    shrinkMapVectorsToFit(m_classRules);
-    shrinkMapVectorsToFit(m_tagRules);
-    shrinkMapVectorsToFit(m_shadowPseudoElementRules);
+    ASSERT(m_pendingRules);
+    OwnPtr<PendingRuleMaps> pendingRules = m_pendingRules.release();
+    compactPendingRules(pendingRules->idRules, m_idRules);
+    compactPendingRules(pendingRules->classRules, m_classRules);
+    compactPendingRules(pendingRules->tagRules, m_tagRules);
+    compactPendingRules(pendingRules->shadowPseudoElementRules, m_shadowPseudoElementRules);
     m_linkPseudoClassRules.shrinkToFit();
     m_cuePseudoRules.shrinkToFit();
     m_focusPseudoClassRules.shrinkToFit();

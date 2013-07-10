@@ -153,6 +153,7 @@ void BaseMultipleFieldsDateAndTimeInputType::didBlurFromControl()
     // We don't need to call blur(). This function is called when control
     // lost focus.
 
+    RefPtr<HTMLInputElement> protector(element());
     // Remove focus ring by CSS "focus" pseudo class.
     element()->setFocus(false);
 }
@@ -163,6 +164,7 @@ void BaseMultipleFieldsDateAndTimeInputType::didFocusOnControl()
     // got focus.
 
     // Add focus ring by CSS "focus" pseudo class.
+    // FIXME: Setting the focus flag to non-focused element is too tricky.
     element()->setFocus(true);
 }
 
@@ -248,7 +250,7 @@ void BaseMultipleFieldsDateAndTimeInputType::pickerIndicatorChooseValue(const St
         return;
     DateComponents date;
     unsigned end;
-    if (date.parseDate(value.characters(), value.length(), 0, end) && end == value.length())
+    if (date.parseDate(value, 0, end) && end == value.length())
         edit->setOnlyYearMonthDay(date);
 }
 
@@ -368,7 +370,7 @@ void BaseMultipleFieldsDateAndTimeInputType::handleFocusEvent(Node* oldFocusedNo
     if (direction == FocusDirectionBackward) {
         if (element()->document()->page())
             element()->document()->page()->focusController()->advanceFocus(direction, 0);
-    } else if (direction == FocusDirectionNone) {
+    } else if (direction == FocusDirectionNone || direction == FocusDirectionMouse) {
         edit->focusByOwner(oldFocusedNode);
     } else
         edit->focusByOwner();
@@ -420,11 +422,6 @@ bool BaseMultipleFieldsDateAndTimeInputType::hasBadInput() const
 }
 
 bool BaseMultipleFieldsDateAndTimeInputType::isKeyboardFocusable(KeyboardEvent*) const
-{
-    return element()->isFocusable();
-}
-
-bool BaseMultipleFieldsDateAndTimeInputType::isMouseFocusable() const
 {
     return element()->isFocusable();
 }

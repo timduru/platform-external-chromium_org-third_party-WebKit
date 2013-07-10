@@ -94,7 +94,7 @@ class SingleTestRunner(object):
 
     def run(self):
         if self._reference_files:
-            if self._port.get_option('no_ref_tests') or self._options.reset_results:
+            if self._options.reset_results:
                 reftest_type = set([reference_file[0] for reference_file in self._reference_files])
                 result = TestResult(self._test_name, reftest_type=reftest_type)
                 result.type = test_expectations.SKIP
@@ -107,10 +107,6 @@ class SingleTestRunner(object):
     def _run_compare_test(self):
         driver_output = self._driver.run_test(self._driver_input(), self._stop_when_done)
         expected_driver_output = self._expected_driver_output()
-
-        if self._options.ignore_metrics:
-            expected_driver_output.strip_metrics()
-            driver_output.strip_metrics()
 
         test_result = self._compare_output(expected_driver_output, driver_output)
         if self._options.new_test_results:
@@ -266,16 +262,15 @@ class SingleTestRunner(object):
         elif not expected_driver_output.image_hash:
             failures.append(test_failures.FailureMissingImageHash())
         elif driver_output.image_hash != expected_driver_output.image_hash:
-            diff_result = self._port.diff_image(expected_driver_output.image, driver_output.image)
-            err_str = diff_result[2]
+            diff, err_str = self._port.diff_image(expected_driver_output.image, driver_output.image)
             if err_str:
                 _log.warning('  %s : %s' % (self._test_name, err_str))
                 failures.append(test_failures.FailureImageHashMismatch())
                 driver_output.error = (driver_output.error or '') + err_str
             else:
-                driver_output.image_diff = diff_result[0]
+                driver_output.image_diff = diff
                 if driver_output.image_diff:
-                    failures.append(test_failures.FailureImageHashMismatch(diff_result[1]))
+                    failures.append(test_failures.FailureImageHashMismatch())
                 else:
                     # See https://bugs.webkit.org/show_bug.cgi?id=69444 for why this isn't a full failure.
                     _log.warning('  %s -> pixel hash failed (but diff passed)' % self._test_name)
@@ -326,15 +321,15 @@ class SingleTestRunner(object):
             failures.append(test_failures.FailureReftestNoImagesGenerated(reference_filename))
         elif mismatch:
             if reference_driver_output.image_hash == actual_driver_output.image_hash:
-                diff_result = self._port.diff_image(reference_driver_output.image, actual_driver_output.image, tolerance=0)
-                if not diff_result[0]:
+                diff, err_str = self._port.diff_image(reference_driver_output.image, actual_driver_output.image)
+                if not diff:
                     failures.append(test_failures.FailureReftestMismatchDidNotOccur(reference_filename))
                 else:
                     _log.warning("  %s -> ref test hashes matched but diff failed" % self._test_name)
 
         elif reference_driver_output.image_hash != actual_driver_output.image_hash:
-            diff_result = self._port.diff_image(reference_driver_output.image, actual_driver_output.image, tolerance=0)
-            if diff_result[0]:
+            diff, err_str = self._port.diff_image(reference_driver_output.image, actual_driver_output.image)
+            if diff:
                 failures.append(test_failures.FailureReftestMismatch(reference_filename))
             else:
                 _log.warning("  %s -> ref test hashes didn't match but diff passed" % self._test_name)

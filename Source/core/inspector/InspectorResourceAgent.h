@@ -35,9 +35,6 @@
 #include "bindings/v8/ScriptString.h"
 #include "core/inspector/InspectorBaseAgent.h"
 #include "wtf/PassOwnPtr.h"
-#include "wtf/RefCounted.h"
-#include "wtf/Vector.h"
-#include "wtf/text/TextPosition.h"
 #include "wtf/text/WTFString.h"
 
 
@@ -54,13 +51,13 @@ class DocumentLoader;
 class FormData;
 class Frame;
 class HTTPHeaderMap;
-class InspectorArray;
 class InspectorClient;
 class InspectorFrontend;
-class InspectorObject;
+class InspectorOverlay;
 class InspectorPageAgent;
 class InspectorState;
 class InstrumentingAgents;
+class JSONObject;
 class KURL;
 class NetworkResourcesData;
 class Page;
@@ -81,9 +78,9 @@ typedef String ErrorString;
 
 class InspectorResourceAgent : public InspectorBaseAgent<InspectorResourceAgent>, public InspectorBackendDispatcher::NetworkCommandHandler {
 public:
-    static PassOwnPtr<InspectorResourceAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client, InspectorCompositeState* state)
+    static PassOwnPtr<InspectorResourceAgent> create(InstrumentingAgents* instrumentingAgents, InspectorPageAgent* pageAgent, InspectorClient* client, InspectorCompositeState* state, InspectorOverlay* overlay)
     {
-        return adoptPtr(new InspectorResourceAgent(instrumentingAgents, pageAgent, client, state));
+        return adoptPtr(new InspectorResourceAgent(instrumentingAgents, pageAgent, client, state, overlay));
     }
 
     virtual void setFrontend(InspectorFrontend*);
@@ -138,7 +135,7 @@ public:
     virtual void enable(ErrorString*);
     virtual void disable(ErrorString*);
     virtual void setUserAgentOverride(ErrorString*, const String& userAgent);
-    virtual void setExtraHTTPHeaders(ErrorString*, const RefPtr<InspectorObject>&);
+    virtual void setExtraHTTPHeaders(ErrorString*, const RefPtr<JSONObject>&);
     virtual void getResponseBody(ErrorString*, const String& requestId, String* content, bool* base64Encoded);
 
     virtual void replayXHR(ErrorString*, const String& requestId);
@@ -149,17 +146,18 @@ public:
     virtual void clearBrowserCookies(ErrorString*);
     virtual void setCacheDisabled(ErrorString*, bool cacheDisabled);
 
-    virtual void loadResourceForFrontend(ErrorString*, const String& frameId, const String& url, PassRefPtr<LoadResourceForFrontendCallback>);
+    virtual void loadResourceForFrontend(ErrorString*, const String& frameId, const String& url, const RefPtr<JSONObject>* requestHeaders, PassRefPtr<LoadResourceForFrontendCallback>);
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
 
 private:
-    InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*, InspectorCompositeState*);
+    InspectorResourceAgent(InstrumentingAgents*, InspectorPageAgent*, InspectorClient*, InspectorCompositeState*, InspectorOverlay*);
 
     void enable();
 
     InspectorPageAgent* m_pageAgent;
     InspectorClient* m_client;
+    InspectorOverlay* m_overlay;
     InspectorFrontend::Network* m_frontend;
     String m_userAgentOverride;
     OwnPtr<NetworkResourcesData> m_resourcesData;

@@ -407,7 +407,7 @@ LayoutSize RenderBoxModelObject::paintOffset() const
     LayoutSize offset = offsetForInFlowPosition();
 
     if (isBox() && isFloating())
-        if (ExclusionShapeOutsideInfo* shapeOutside = toRenderBox(this)->exclusionShapeOutsideInfo())
+        if (ShapeOutsideInfo* shapeOutside = toRenderBox(this)->shapeOutsideInfo())
             offset -= shapeOutside->shapeLogicalOffset();
 
     return offset;
@@ -527,7 +527,8 @@ static void applyBoxShadowForBackground(GraphicsContext* context, RenderStyle* s
         boxShadow = boxShadow->next();
 
     FloatSize shadowOffset(boxShadow->x(), boxShadow->y());
-    context->setShadow(shadowOffset, boxShadow->blur(), boxShadow->color(), DrawLooper::ShadowIgnoresAlpha);
+    context->setShadow(shadowOffset, boxShadow->blur(), boxShadow->color(),
+        DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
 }
 
 void RenderBoxModelObject::paintFillLayerExtended(const PaintInfo& paintInfo, const Color& color, const FillLayer* bgLayer, const LayoutRect& rect,
@@ -1993,21 +1994,6 @@ void RenderBoxModelObject::drawBoxSideFromPath(GraphicsContext* graphicsContext,
     graphicsContext->drawRect(pixelSnappedIntRect(borderRect));
 }
 
-static void findInnerVertex(const FloatPoint& outerCorner, const FloatPoint& innerCorner, const FloatPoint& centerPoint, FloatPoint& result)
-{
-    // If the line between outer and inner corner is towards the horizontal, intersect with a vertical line through the center,
-    // otherwise with a horizontal line through the center. The points that form this line are arbitrary (we use 0, 100).
-    // Note that if findIntersection fails, it will leave result untouched.
-    float diffInnerOuterX = fabs(innerCorner.x() - outerCorner.x());
-    float diffInnerOuterY = fabs(innerCorner.y() - outerCorner.y());
-    float diffCenterOuterX = fabs(centerPoint.x() - outerCorner.x());
-    float diffCenterOuterY = fabs(centerPoint.y() - outerCorner.y());
-    if (diffInnerOuterY * diffCenterOuterX < diffCenterOuterY * diffInnerOuterX)
-        findIntersection(outerCorner, innerCorner, FloatPoint(centerPoint.x(), 0), FloatPoint(centerPoint.x(), 100), result);
-    else
-        findIntersection(outerCorner, innerCorner, FloatPoint(0, centerPoint.y()), FloatPoint(100, centerPoint.y()), result);
-}
-
 void RenderBoxModelObject::clipBorderSidePolygon(GraphicsContext* graphicsContext, const RoundedRect& outerBorder, const RoundedRect& innerBorder,
                                                  BoxSide side, bool firstEdgeMatches, bool secondEdgeMatches)
 {
@@ -2039,11 +2025,27 @@ void RenderBoxModelObject::clipBorderSidePolygon(GraphicsContext* graphicsContex
         quad[2] = innerRect.maxXMinYCorner();
         quad[3] = outerRect.maxXMinYCorner();
 
-        if (!innerBorder.radii().topLeft().isZero())
-            findInnerVertex(outerRect.minXMinYCorner(), innerRect.minXMinYCorner(), centerPoint, quad[1]);
+        if (!innerBorder.radii().topLeft().isZero()) {
+            findIntersection(quad[0], quad[1],
+                FloatPoint(
+                    quad[1].x() + innerBorder.radii().topLeft().width(),
+                    quad[1].y()),
+                FloatPoint(
+                    quad[1].x(),
+                    quad[1].y() + innerBorder.radii().topLeft().height()),
+                quad[1]);
+        }
 
-        if (!innerBorder.radii().topRight().isZero())
-            findInnerVertex(outerRect.maxXMinYCorner(), innerRect.maxXMinYCorner(), centerPoint, quad[2]);
+        if (!innerBorder.radii().topRight().isZero()) {
+            findIntersection(quad[3], quad[2],
+                FloatPoint(
+                    quad[2].x() - innerBorder.radii().topRight().width(),
+                    quad[2].y()),
+                FloatPoint(
+                    quad[2].x(),
+                    quad[2].y() + innerBorder.radii().topRight().height()),
+                quad[2]);
+        }
         break;
 
     case BSLeft:
@@ -2052,11 +2054,27 @@ void RenderBoxModelObject::clipBorderSidePolygon(GraphicsContext* graphicsContex
         quad[2] = innerRect.minXMaxYCorner();
         quad[3] = outerRect.minXMaxYCorner();
 
-        if (!innerBorder.radii().topLeft().isZero())
-            findInnerVertex(outerRect.minXMinYCorner(), innerRect.minXMinYCorner(), centerPoint, quad[1]);
+        if (!innerBorder.radii().topLeft().isZero()) {
+            findIntersection(quad[0], quad[1],
+                FloatPoint(
+                    quad[1].x() + innerBorder.radii().topLeft().width(),
+                    quad[1].y()),
+                FloatPoint(
+                    quad[1].x(),
+                    quad[1].y() + innerBorder.radii().topLeft().height()),
+                quad[1]);
+        }
 
-        if (!innerBorder.radii().bottomLeft().isZero())
-            findInnerVertex(outerRect.minXMaxYCorner(), innerRect.minXMaxYCorner(), centerPoint, quad[2]);
+        if (!innerBorder.radii().bottomLeft().isZero()) {
+            findIntersection(quad[3], quad[2],
+                FloatPoint(
+                    quad[2].x() + innerBorder.radii().bottomLeft().width(),
+                    quad[2].y()),
+                FloatPoint(
+                    quad[2].x(),
+                    quad[2].y() - innerBorder.radii().bottomLeft().height()),
+                quad[2]);
+        }
         break;
 
     case BSBottom:
@@ -2065,11 +2083,27 @@ void RenderBoxModelObject::clipBorderSidePolygon(GraphicsContext* graphicsContex
         quad[2] = innerRect.maxXMaxYCorner();
         quad[3] = outerRect.maxXMaxYCorner();
 
-        if (!innerBorder.radii().bottomLeft().isZero())
-            findInnerVertex(outerRect.minXMaxYCorner(), innerRect.minXMaxYCorner(), centerPoint, quad[1]);
+        if (!innerBorder.radii().bottomLeft().isZero()) {
+            findIntersection(quad[0], quad[1],
+                FloatPoint(
+                    quad[1].x() + innerBorder.radii().bottomLeft().width(),
+                    quad[1].y()),
+                FloatPoint(
+                    quad[1].x(),
+                    quad[1].y() - innerBorder.radii().bottomLeft().height()),
+                quad[1]);
+        }
 
-        if (!innerBorder.radii().bottomRight().isZero())
-            findInnerVertex(outerRect.maxXMaxYCorner(), innerRect.maxXMaxYCorner(), centerPoint, quad[2]);
+        if (!innerBorder.radii().bottomRight().isZero()) {
+            findIntersection(quad[3], quad[2],
+                FloatPoint(
+                    quad[2].x() - innerBorder.radii().bottomRight().width(),
+                    quad[2].y()),
+                FloatPoint(
+                    quad[2].x(),
+                    quad[2].y() - innerBorder.radii().bottomRight().height()),
+                quad[2]);
+        }
         break;
 
     case BSRight:
@@ -2078,11 +2112,27 @@ void RenderBoxModelObject::clipBorderSidePolygon(GraphicsContext* graphicsContex
         quad[2] = innerRect.maxXMaxYCorner();
         quad[3] = outerRect.maxXMaxYCorner();
 
-        if (!innerBorder.radii().topRight().isZero())
-            findInnerVertex(outerRect.maxXMinYCorner(), innerRect.maxXMinYCorner(), centerPoint, quad[1]);
+        if (!innerBorder.radii().topRight().isZero()) {
+            findIntersection(quad[0], quad[1],
+                FloatPoint(
+                    quad[1].x() - innerBorder.radii().topRight().width(),
+                    quad[1].y()),
+                FloatPoint(
+                    quad[1].x(),
+                    quad[1].y() + innerBorder.radii().topRight().height()),
+                quad[1]);
+        }
 
-        if (!innerBorder.radii().bottomRight().isZero())
-            findInnerVertex(outerRect.maxXMaxYCorner(), innerRect.maxXMaxYCorner(), centerPoint, quad[2]);
+        if (!innerBorder.radii().bottomRight().isZero()) {
+            findIntersection(quad[3], quad[2],
+                FloatPoint(
+                    quad[2].x() - innerBorder.radii().bottomRight().width(),
+                    quad[2].y()),
+                FloatPoint(
+                    quad[2].x(),
+                    quad[2].y() - innerBorder.radii().bottomRight().height()),
+                quad[2]);
+        }
         break;
     }
 
@@ -2093,22 +2143,41 @@ void RenderBoxModelObject::clipBorderSidePolygon(GraphicsContext* graphicsContex
         return;
     }
 
-    // Square off the end which shouldn't be affected by antialiasing, and clip.
+    // If antialiasing settings for the first edge and second edge is different,
+    // they have to be addressed separately. We do this by breaking the quad into
+    // two parallelograms, made by moving quad[1] and quad[2].
+    float ax = quad[1].x() - quad[0].x();
+    float ay = quad[1].y() - quad[0].y();
+    float bx = quad[2].x() - quad[1].x();
+    float by = quad[2].y() - quad[1].y();
+    float cx = quad[3].x() - quad[2].x();
+    float cy = quad[3].y() - quad[2].y();
+
+    const static float kEpsilon = 1e-2f;
+    float r1, r2;
+    if (fabsf(bx) < kEpsilon && fabsf(by) < kEpsilon) {
+        // The quad was actually a triangle.
+        r1 = r2 = 1.0f;
+    } else {
+        // Extend parallelogram a bit to hide calculation error
+        const static float kExtendFill = 1e-2f;
+
+        r1 = (-ax * by + ay * bx) / (cx * by - cy * bx) + kExtendFill;
+        r2 = (-cx * by + cy * bx) / (ax * by - ay * bx) + kExtendFill;
+    }
+
     FloatPoint firstQuad[4];
     firstQuad[0] = quad[0];
     firstQuad[1] = quad[1];
-    firstQuad[2] = side == BSTop || side == BSBottom ? FloatPoint(quad[3].x(), quad[2].y())
-        : FloatPoint(quad[2].x(), quad[3].y());
+    firstQuad[2] = FloatPoint(quad[3].x() + r2 * ax, quad[3].y() + r2 * ay);
     firstQuad[3] = quad[3];
     graphicsContext->clipConvexPolygon(4, firstQuad, !firstEdgeMatches);
 
     FloatPoint secondQuad[4];
     secondQuad[0] = quad[0];
-    secondQuad[1] = side == BSTop || side == BSBottom ? FloatPoint(quad[0].x(), quad[1].y())
-        : FloatPoint(quad[1].x(), quad[0].y());
+    secondQuad[1] = FloatPoint(quad[0].x() - r1 * cx, quad[0].y() - r1 * cy);
     secondQuad[2] = quad[2];
     secondQuad[3] = quad[3];
-    // Antialiasing affects the second side.
     graphicsContext->clipConvexPolygon(4, secondQuad, !secondEdgeMatches);
 }
 
@@ -2367,7 +2436,6 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
     bool isHorizontal = s->isHorizontalWritingMode();
     
     bool hasOpaqueBackground = s->visitedDependentColor(CSSPropertyBackgroundColor).isValid() && s->visitedDependentColor(CSSPropertyBackgroundColor).alpha() == 255;
-    bool contextWasClipped = false;
     for (const ShadowData* shadow = s->boxShadow(); shadow; shadow = shadow->next()) {
         if (shadow->style() != shadowStyle)
             continue;
@@ -2397,21 +2465,18 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
                 DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
             context->setDrawLooper(drawLooper);
 
+            context->save();
             if (hasBorderRadius) {
-                if (!contextWasClipped) {
-                    RoundedRect rectToClipOut = border;
+                RoundedRect rectToClipOut = border;
 
-                    // If the box is opaque, it is unnecessary to clip it out. However, doing so saves time
-                    // when painting the shadow. On the other hand, it introduces subpixel gaps along the
-                    // corners. Those are avoided by insetting the clipping path by one pixel.
-                    if (hasOpaqueBackground)
-                        rectToClipOut.inflateWithRadii(-1);
+                // If the box is opaque, it is unnecessary to clip it out. However, doing so saves time
+                // when painting the shadow. On the other hand, it introduces subpixel gaps along the
+                // corners. Those are avoided by insetting the clipping path by one pixel.
+                if (hasOpaqueBackground)
+                    rectToClipOut.inflateWithRadii(-1);
 
-                    if (!rectToClipOut.isEmpty()) {
-                        context->save();
-                        context->clipOutRoundedRect(rectToClipOut);
-                        contextWasClipped = true;
-                    }
+                if (!rectToClipOut.isEmpty()) {
+                    context->clipOutRoundedRect(rectToClipOut);
                 }
 
                 RoundedRect influenceRect(shadowRect, border.radii());
@@ -2425,88 +2490,44 @@ void RenderBoxModelObject::paintBoxShadow(const PaintInfo& info, const LayoutRec
                     context->fillRoundedRect(fillRect, Color::black);
                 }
             } else {
-                if (!contextWasClipped) {
-                    IntRect rectToClipOut = border.rect();
+                IntRect rectToClipOut = border.rect();
 
-                    // If the box is opaque, it is unnecessary to clip it out. However, doing so saves time
-                    // when painting the shadow. On the other hand, it introduces subpixel gaps along the
-                    // edges if they are not pixel-aligned. Those are avoided by insetting the clipping path
-                    // by one pixel.
-                    if (hasOpaqueBackground) {
-                        // FIXME: The function to decide on the policy based on the transform should be a named function.
-                        // FIXME: It's not clear if this check is right. What about integral scale factors?
-                        AffineTransform transform = context->getCTM();
-                        if (transform.a() != 1 || (transform.d() != 1 && transform.d() != -1) || transform.b() || transform.c())
-                            rectToClipOut.inflate(-1);
-                    }
+                // If the box is opaque, it is unnecessary to clip it out. However, doing so saves time
+                // when painting the shadow. On the other hand, it introduces subpixel gaps along the
+                // edges if they are not pixel-aligned. Those are avoided by insetting the clipping path
+                // by one pixel.
+                if (hasOpaqueBackground) {
+                    // FIXME: The function to decide on the policy based on the transform should be a named function.
+                    // FIXME: It's not clear if this check is right. What about integral scale factors?
+                    AffineTransform transform = context->getCTM();
+                    if (transform.a() != 1 || (transform.d() != 1 && transform.d() != -1) || transform.b() || transform.c())
+                        rectToClipOut.inflate(-1);
+                }
 
-                    if (!rectToClipOut.isEmpty()) {
-                        context->save();
-                        context->clipOut(rectToClipOut);
-                        contextWasClipped = true;
-                    }
+                if (!rectToClipOut.isEmpty()) {
+                    context->clipOut(rectToClipOut);
                 }
                 context->fillRect(fillRect.rect(), Color::black);
             }
+            context->restore();
+            context->clearDrawLooper();
         } else {
-            // Inset shadow.
-            IntRect holeRect(border.rect());
-            holeRect.inflate(-shadowSpread);
-
-            if (holeRect.isEmpty()) {
-                if (hasBorderRadius)
-                    context->fillRoundedRect(border, shadowColor);
-                else
-                    context->fillRect(border.rect(), shadowColor);
-                continue;
-            }
-
+            GraphicsContext::Edges clippedEdges = GraphicsContext::NoEdge;
             if (!includeLogicalLeftEdge) {
-                if (isHorizontal) {
-                    holeRect.move(-max(shadowOffset.width(), 0) - shadowBlur, 0);
-                    holeRect.setWidth(holeRect.width() + max(shadowOffset.width(), 0) + shadowBlur);
-                } else {
-                    holeRect.move(0, -max(shadowOffset.height(), 0) - shadowBlur);
-                    holeRect.setHeight(holeRect.height() + max(shadowOffset.height(), 0) + shadowBlur);
-                }
+                if (isHorizontal)
+                    clippedEdges |= GraphicsContext::LeftEdge;
+                else
+                    clippedEdges |= GraphicsContext::TopEdge;
             }
             if (!includeLogicalRightEdge) {
                 if (isHorizontal)
-                    holeRect.setWidth(holeRect.width() - min(shadowOffset.width(), 0) + shadowBlur);
+                    clippedEdges |= GraphicsContext::RightEdge;
                 else
-                    holeRect.setHeight(holeRect.height() - min(shadowOffset.height(), 0) + shadowBlur);
+                    clippedEdges |= GraphicsContext::BottomEdge;
             }
-
-            Color fillColor(shadowColor.red(), shadowColor.green(), shadowColor.blue(), 255);
-
-            IntRect outerRect = areaCastingShadowInHole(border.rect(), shadowBlur, shadowSpread, shadowOffset);
-            RoundedRect roundedHole(holeRect, border.radii());
-            if (hasBorderRadius)
-                roundedHole.shrinkRadii(shadowSpread);
-
-            if (!contextWasClipped) {
-                context->save();
-                if (hasBorderRadius) {
-                    Path path;
-                    path.addRoundedRect(border);
-                    context->clipPath(path);
-                } else {
-                    context->clip(border.rect());
-                }
-                contextWasClipped = true;
-            }
-
-            DrawLooper drawLooper;
-            drawLooper.addShadow(shadowOffset, shadowBlur, shadowColor,
-                DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
-            context->setDrawLooper(drawLooper);
-            context->fillRectWithRoundedHole(outerRect, roundedHole, fillColor);
+            context->drawInnerShadow(border, shadowColor, shadowOffset, shadowBlur, shadowSpread, clippedEdges);
         }
     }
-
-    if (contextWasClipped)
-        context->restore();
-    context->clearDrawLooper();
 }
 
 LayoutUnit RenderBoxModelObject::containingBlockLogicalWidthForContent() const

@@ -1,3 +1,4 @@
+
 /*
  * Copyright (C) 2012 Google, Inc. All rights reserved.
  *
@@ -282,24 +283,24 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
 #if defined(ENABLE_CSS_FILTERS) && ENABLE_CSS_FILTERS
     case CSSPropertyWebkitFilter: return 229;
 #endif
-    case CSSPropertyWebkitAlignContent: return 230;
-    case CSSPropertyWebkitAlignItems: return 231;
-    case CSSPropertyWebkitAlignSelf: return 232;
-    case CSSPropertyWebkitFlex: return 233;
-    case CSSPropertyWebkitFlexBasis: return 234;
-    case CSSPropertyWebkitFlexDirection: return 235;
-    case CSSPropertyWebkitFlexFlow: return 236;
-    case CSSPropertyWebkitFlexGrow: return 237;
-    case CSSPropertyWebkitFlexShrink: return 238;
-    case CSSPropertyWebkitFlexWrap: return 239;
-    case CSSPropertyWebkitJustifyContent: return 240;
+    case CSSPropertyAlignContent: return 230;
+    case CSSPropertyAlignItems: return 231;
+    case CSSPropertyAlignSelf: return 232;
+    case CSSPropertyFlex: return 233;
+    case CSSPropertyFlexBasis: return 234;
+    case CSSPropertyFlexDirection: return 235;
+    case CSSPropertyFlexFlow: return 236;
+    case CSSPropertyFlexGrow: return 237;
+    case CSSPropertyFlexShrink: return 238;
+    case CSSPropertyFlexWrap: return 239;
+    case CSSPropertyJustifyContent: return 240;
     case CSSPropertyWebkitFontSizeDelta: return 241;
-    case CSSPropertyGridColumns: return 242;
-    case CSSPropertyGridRows: return 243;
-    case CSSPropertyGridStart: return 244;
-    case CSSPropertyGridEnd: return 245;
-    case CSSPropertyGridBefore: return 246;
-    case CSSPropertyGridAfter: return 247;
+    case CSSPropertyGridDefinitionColumns: return 242;
+    case CSSPropertyGridDefinitionRows: return 243;
+    case CSSPropertyGridColumnStart: return 244;
+    case CSSPropertyGridColumnEnd: return 245;
+    case CSSPropertyGridRowStart: return 246;
+    case CSSPropertyGridRowEnd: return 247;
     case CSSPropertyGridColumn: return 248;
     case CSSPropertyGridRow: return 249;
     case CSSPropertyGridAutoFlow: return 250;
@@ -355,7 +356,7 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     case CSSPropertyWebkitMinLogicalWidth: return 300;
     case CSSPropertyWebkitMinLogicalHeight: return 301;
     // WebkitNbspMode has been deleted, was return 302;
-    case CSSPropertyWebkitOrder: return 303;
+    case CSSPropertyOrder: return 303;
     case CSSPropertyWebkitPaddingAfter: return 304;
     case CSSPropertyWebkitPaddingBefore: return 305;
     case CSSPropertyWebkitPaddingEnd: return 306;

@@ -33,9 +33,6 @@
     ],
     'targets': [
         {
-            # These targets should be sufficient to cause everything
-            # else to build (incl. webkit); if they aren't, we have our
-            # dependencies wrong.
             'target_name': 'all_blink',
             'type': 'none',
             'dependencies': [
@@ -48,12 +45,22 @@
                 # Special target to wrap a gtest_target_type==shared_library
                 # webkit_unit_tests into an android apk for execution. See
                 # base.gyp for TODO(jrg)s about this strategy.
-                ['OS=="android" and gtest_target_type == "shared_library"', {
+                ['OS=="android" and android_webview_build==0 and gtest_target_type == "shared_library"', {
                     'dependencies': [
                         '../Source/WebKit/chromium/WebKitUnitTests.gyp:webkit_unit_tests_apk',
                     ],
                 }],
             ],
-        }
+        },
+        {
+            'target_name': 'blink_testing',
+            'type': 'none',
+            'dependencies': [
+                '../Tools/DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:TestRunner',
+            ],
+            'export_dependent_settings': [
+                '../Tools/DumpRenderTree/DumpRenderTree.gyp/DumpRenderTree.gyp:TestRunner',
+            ],
+        },
     ],
 }

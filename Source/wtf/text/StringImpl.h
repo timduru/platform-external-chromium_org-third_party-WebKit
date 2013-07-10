@@ -130,7 +130,7 @@ class WTF_EXPORT StringImpl {
     friend struct WTF::SubstringTranslator;
     friend struct WTF::UCharBufferTranslator;
     friend class AtomicStringImpl;
-    
+
 private:
     enum BufferOwnership {
         BufferInternal,
@@ -148,7 +148,7 @@ private:
         , m_buffer(0)
         , m_refCount(s_refCountFlagIsStaticString)
         , m_length(length)
-        , m_hashAndFlags(s_hashFlagIsIdentifier | BufferOwned)
+        , m_hashAndFlags(BufferOwned)
     {
         // Ensure that the hash is computed so that AtomicStringHash can call existingHash()
         // with impunity. The empty string is special because it is never entered into
@@ -166,7 +166,7 @@ private:
         , m_buffer(0)
         , m_refCount(s_refCountFlagIsStaticString)
         , m_length(length)
-        , m_hashAndFlags(s_hashFlag8BitBuffer | s_hashFlagIsIdentifier | BufferOwned)
+        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferOwned)
     {
         // Ensure that the hash is computed so that AtomicStringHash can call existingHash()
         // with impunity. The empty string is special because it is never entered into
@@ -226,7 +226,7 @@ private:
         , m_buffer(0)
         , m_refCount(s_refCountIncrement)
         , m_length(length)
-        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferInternal | s_hashFlagHasTerminatingNullCharacter)
+        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferInternal)
     {
         ASSERT(m_data8);
         ASSERT(m_length);
@@ -396,7 +396,6 @@ public:
     static unsigned flagsOffset() { return OBJECT_OFFSETOF(StringImpl, m_hashAndFlags); }
     static unsigned flagIs8Bit() { return s_hashFlag8BitBuffer; }
     static unsigned dataOffset() { return OBJECT_OFFSETOF(StringImpl, m_data8); }
-    static PassRefPtr<StringImpl> createWithTerminatingNullCharacter(const StringImpl&);
 
     template<typename CharType, size_t inlineCapacity>
     static PassRefPtr<StringImpl> adopt(Vector<CharType, inlineCapacity>& vector)
@@ -418,10 +417,10 @@ public:
     bool hasOwnedBuffer() const { return bufferOwnership() == BufferOwned; }
     StringImpl* baseString() const { return bufferOwnership() == BufferSubstring ? m_substringBuffer : 0; }
 
-    // FIXME: Remove all unnecessary usages of characters()
+    // FIXME: Remove all unnecessary usages of bloatedCharacters()
     ALWAYS_INLINE const LChar* characters8() const { ASSERT(is8Bit()); return m_data8; }
     ALWAYS_INLINE const UChar* characters16() const { ASSERT(!is8Bit()); return m_data16; }
-    ALWAYS_INLINE const UChar* characters() const
+    ALWAYS_INLINE const UChar* bloatedCharacters() const
     {
         if (!is8Bit())
             return m_data16;
@@ -449,22 +448,11 @@ public:
 
     bool has16BitShadow() const { return m_hashAndFlags & s_hashFlagHas16BitShadow; }
     void upconvertCharacters(unsigned, unsigned) const;
-    bool isIdentifier() const { return m_hashAndFlags & s_hashFlagIsIdentifier; }
-    void setIsIdentifier(bool isIdentifier)
-    {
-        ASSERT(!isStatic());
-        if (isIdentifier)
-            m_hashAndFlags |= s_hashFlagIsIdentifier;
-        else
-            m_hashAndFlags &= ~s_hashFlagIsIdentifier;
-    }
 
     bool isEmptyUnique() const
     {
         return !length() && !isStatic();
     }
-
-    bool hasTerminatingNullCharacter() const { return m_hashAndFlags & s_hashFlagHasTerminatingNullCharacter; }
 
     bool isAtomic() const { return m_hashAndFlags & s_hashFlagIsAtomic; }
     void setIsAtomic(bool isAtomic)
@@ -491,7 +479,7 @@ private:
         // Multiple clients assume that StringHasher is the canonical string hash function.
         ASSERT(hash == (is8Bit() ? StringHasher::computeHashAndMaskTop8Bits(m_data8, m_length) : StringHasher::computeHashAndMaskTop8Bits(m_data16, m_length)));
         ASSERT(!(hash & (s_flagMask << (8 * sizeof(hash) - s_flagCount)))); // Verify that enough high bits are empty.
-        
+
         hash <<= s_flagCount;
         ASSERT(!(hash & m_hashAndFlags)); // Verify that enough low bits are empty after shift.
         ASSERT(hash); // Verify that 0 is a valid sentinel hash value.
@@ -649,6 +637,8 @@ public:
     size_t reverseFind(StringImpl*, unsigned index = UINT_MAX);
     size_t reverseFindIgnoringCase(StringImpl*, unsigned index = UINT_MAX);
 
+    size_t count(LChar) const;
+
     bool startsWith(StringImpl* str, bool caseSensitive = true) { return (caseSensitive ? reverseFind(str, 0) : reverseFindIgnoringCase(str, 0)) == 0; }
     bool startsWith(UChar) const;
     bool startsWith(const char*, unsigned matchLength, bool caseSensitive) const;
@@ -709,10 +699,9 @@ private:
 
     static const unsigned s_hashFlagHas16BitShadow = 1u << 7;
     static const unsigned s_hashFlag8BitBuffer = 1u << 6;
-    static const unsigned s_hashFlagHasTerminatingNullCharacter = 1u << 5;
+    static const unsigned s_unusedHashFlag = 1u << 5;
     static const unsigned s_hashFlagIsAtomic = 1u << 4;
     static const unsigned s_hashFlagDidReportCost = 1u << 3;
-    static const unsigned s_hashFlagIsIdentifier = 1u << 2;
     static const unsigned s_hashMaskBufferOwnership = 1u | (1u << 1);
 
 #ifdef STRING_STATS
@@ -729,7 +718,7 @@ public:
         unsigned m_hashAndFlags;
 
         static const unsigned s_initialRefCount = s_refCountFlagIsStaticString;
-        static const unsigned s_initialFlags = s_hashFlag8BitBuffer | s_hashFlagHas16BitShadow | BufferInternal | s_hashFlagHasTerminatingNullCharacter;
+        static const unsigned s_initialFlags = s_hashFlag8BitBuffer | s_hashFlagHas16BitShadow | BufferInternal;
         static const unsigned s_hashShift = s_flagCount;
     };
 
@@ -763,7 +752,7 @@ template <>
 ALWAYS_INLINE const LChar* StringImpl::getCharacters<LChar>() const { return characters8(); }
 
 template <>
-ALWAYS_INLINE const UChar* StringImpl::getCharacters<UChar>() const { return characters(); }
+ALWAYS_INLINE const UChar* StringImpl::getCharacters<UChar>() const { return bloatedCharacters(); }
 
 WTF_EXPORT bool equal(const StringImpl*, const StringImpl*);
 WTF_EXPORT bool equal(const StringImpl*, const LChar*);
@@ -819,7 +808,7 @@ ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
 ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
 {
     unsigned dwordLength = length >> 2;
-    
+
     if (dwordLength) {
         const uint64_t* aDWordCharacters = reinterpret_cast<const uint64_t*>(a);
         const uint64_t* bDWordCharacters = reinterpret_cast<const uint64_t*>(b);
@@ -863,7 +852,7 @@ ALWAYS_INLINE bool equal(const LChar* a, const LChar* b, unsigned length)
     if (length) {
         const LChar* aRemainder = reinterpret_cast<const LChar*>(aCharacters);
         const LChar* bRemainder = reinterpret_cast<const LChar*>(bCharacters);
-        
+
         for (unsigned i = 0; i <  length; ++i) {
             if (aRemainder[i] != bRemainder[i])
                 return false;
@@ -877,16 +866,16 @@ ALWAYS_INLINE bool equal(const UChar* a, const UChar* b, unsigned length)
 {
     const uint32_t* aCharacters = reinterpret_cast<const uint32_t*>(a);
     const uint32_t* bCharacters = reinterpret_cast<const uint32_t*>(b);
-    
+
     unsigned wordLength = length >> 1;
     for (unsigned i = 0; i != wordLength; ++i) {
         if (*aCharacters++ != *bCharacters++)
             return false;
     }
-    
+
     if (length & 1 && *reinterpret_cast<const UChar*>(aCharacters) != *reinterpret_cast<const UChar*>(bCharacters))
         return false;
-    
+
     return true;
 }
 #else
@@ -1003,7 +992,7 @@ inline size_t findNextLineStart(const CharacterType* characters, unsigned length
         // There can only be a start of a new line if there are more characters
         // beyond the current character.
         if (index < length) {
-            // The 3 common types of line terminators are 1. \r\n (Windows), 
+            // The 3 common types of line terminators are 1. \r\n (Windows),
             // 2. \r (old MacOS) and 3. \n (Unix'es).
 
             if (c == '\n')
@@ -1017,7 +1006,7 @@ inline size_t findNextLineStart(const CharacterType* characters, unsigned length
             // But, there's only a start of a new line if there are more
             // characters beyond the \r\n.
             if (++index < length)
-                return index; 
+                return index;
         }
     }
     return notFound;
@@ -1100,7 +1089,7 @@ bool equalIgnoringNullity(const Vector<UChar, inlineCapacity>& a, StringImpl* b)
         return !a.size();
     if (a.size() != b->length())
         return false;
-    return !memcmp(a.data(), b->characters(), b->length() * sizeof(UChar));
+    return !memcmp(a.data(), b->bloatedCharacters(), b->length() * sizeof(UChar));
 }
 
 template<typename CharacterType1, typename CharacterType2>

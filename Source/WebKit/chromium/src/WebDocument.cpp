@@ -32,7 +32,7 @@
 #include "WebDocument.h"
 
 #include "public/platform/WebURL.h"
-#include <wtf/PassRefPtr.h>
+#include "wtf/PassRefPtr.h"
 #include "WebAccessibilityObject.h"
 #include "WebDOMEvent.h"
 #include "WebDocumentType.h"
@@ -170,7 +170,7 @@ void WebDocument::forms(WebVector<WebFormElement>& results) const
         Node* node = forms->item(i);
         // Strange but true, sometimes node can be 0.
         if (node && node->isHTMLElement())
-            temp.append(WebFormElement(static_cast<HTMLFormElement*>(node)));
+            temp.append(WebFormElement(toHTMLFormElement(node)));
     }
     results.assign(temp);
 }
@@ -288,7 +288,7 @@ WebDocument& WebDocument::operator=(const PassRefPtr<Document>& elem)
 
 WebDocument::operator PassRefPtr<Document>() const
 {
-    return static_cast<Document*>(m_private.get());
+    return toDocument(m_private.get());
 }
 
 } // namespace WebKit

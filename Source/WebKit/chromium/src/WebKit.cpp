@@ -38,17 +38,15 @@
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8RecursionScope.h"
 #include "core/Init.h"
-#include "core/dom/CustomElementRegistry.h"
-#include "core/dom/MutationObserver.h"
+#include "core/dom/Microtask.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/EventTracer.h"
 #include "core/platform/LayoutTestSupport.h"
 #include "core/platform/Logging.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/platform/graphics/chromium/ImageDecodingStore.h"
-#include "core/workers/WorkerContextProxy.h"
+#include "core/workers/WorkerGlobalScopeProxy.h"
 #include "wtf/Assertions.h"
 #include "wtf/CryptographicallyRandomNumber.h"
 #include "wtf/CurrentTime.h"
@@ -71,8 +69,7 @@ public:
     virtual void willProcessTask() { }
     virtual void didProcessTask()
     {
-        WebCore::CustomElementRegistry::deliverAllLifecycleCallbacks();
-        WebCore::MutationObserver::deliverAllMutations();
+        WebCore::Microtask::performCheckpoint();
     }
 };
 
@@ -162,13 +159,11 @@ void initializeWithoutV8(Platform* platform)
     // this, initializing this lazily probably doesn't buy us much.
     WTF::UTF8Encoding();
 
-    WebCore::EventTracer::initialize();
-
     WebCore::setIDBFactoryBackendInterfaceCreateFunction(WebKit::IDBFactoryBackendProxy::create);
 
     WebCore::MediaPlayer::setMediaEngineCreateFunction(WebKit::WebMediaPlayerClientImpl::create);
 
-    WebCore::WorkerContextProxy::setCreateDelegate(WebWorkerClientImpl::createWorkerContextProxy);
+    WebCore::WorkerGlobalScopeProxy::setCreateDelegate(WebWorkerClientImpl::createWorkerGlobalScopeProxy);
 }
 
 

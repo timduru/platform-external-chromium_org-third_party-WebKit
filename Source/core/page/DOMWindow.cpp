@@ -27,14 +27,12 @@
 #include "config.h"
 #include "core/page/DOMWindow.h"
 
-#include <wtf/CurrentTime.h>
-#include <wtf/MainThread.h>
-#include <wtf/MathExtras.h>
-#include <wtf/text/Base64.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/MainThread.h"
+#include "wtf/MathExtras.h"
+#include "wtf/text/Base64.h"
+#include "wtf/text/WTFString.h"
 #include <algorithm>
 #include "RuntimeEnabledFeatures.h"
-#include "bindings/v8/ScheduledAction.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/SerializedScriptValue.h"
@@ -227,77 +225,9 @@ static bool allowsBeforeUnloadListeners(DOMWindow* window)
     return frame == page->mainFrame();
 }
 
-bool DOMWindow::dispatchAllPendingBeforeUnloadEvents()
-{
-    DOMWindowSet& set = windowsWithBeforeUnloadEventListeners();
-    if (set.isEmpty())
-        return true;
-
-    static bool alreadyDispatched = false;
-    ASSERT(!alreadyDispatched);
-    if (alreadyDispatched)
-        return true;
-
-    Vector<RefPtr<DOMWindow> > windows;
-    DOMWindowSet::iterator end = set.end();
-    for (DOMWindowSet::iterator it = set.begin(); it != end; ++it)
-        windows.append(it->key);
-
-    size_t size = windows.size();
-    for (size_t i = 0; i < size; ++i) {
-        DOMWindow* window = windows[i].get();
-        if (!set.contains(window))
-            continue;
-
-        Frame* frame = window->frame();
-        if (!frame)
-            continue;
-
-        if (!frame->loader()->shouldClose())
-            return false;
-    }
-
-    enableSuddenTermination();
-
-    alreadyDispatched = true;
-
-    return true;
-}
-
 unsigned DOMWindow::pendingUnloadEventListeners() const
 {
     return windowsWithUnloadEventListeners().count(const_cast<DOMWindow*>(this));
-}
-
-void DOMWindow::dispatchAllPendingUnloadEvents()
-{
-    DOMWindowSet& set = windowsWithUnloadEventListeners();
-    if (set.isEmpty())
-        return;
-
-    static bool alreadyDispatched = false;
-    ASSERT(!alreadyDispatched);
-    if (alreadyDispatched)
-        return;
-
-    Vector<RefPtr<DOMWindow> > windows;
-    DOMWindowSet::iterator end = set.end();
-    for (DOMWindowSet::iterator it = set.begin(); it != end; ++it)
-        windows.append(it->key);
-
-    size_t size = windows.size();
-    for (size_t i = 0; i < size; ++i) {
-        DOMWindow* window = windows[i].get();
-        if (!set.contains(window))
-            continue;
-
-        window->dispatchEvent(PageTransitionEvent::create(eventNames().pagehideEvent, false), window->document());
-        window->dispatchEvent(Event::create(eventNames().unloadEvent, false, false), window->document());
-    }
-
-    enableSuddenTermination();
-
-    alreadyDispatched = true;
 }
 
 // This function:
@@ -404,18 +334,18 @@ void DOMWindow::setDocument(PassRefPtr<Document> document)
 
     m_document = document;
 
-    if (m_document) {
-        m_document->setDOMWindow(this);
-        if (!m_document->attached())
-            m_document->attach();
-        m_document->updateViewportArguments();
-    }
+    if (!m_document)
+        return;
+
+    m_document->setDOMWindow(this);
+    if (!m_document->attached())
+        m_document->attach();
 
     if (!m_frame)
         return;
 
-    if (m_document)
-        m_frame->script()->updateDocument();
+    m_frame->script()->updateDocument();
+    m_document->updateViewportArguments();
 
     if (m_frame->page() && m_frame->view()) {
         if (ScrollingCoordinator* scrollingCoordinator = m_frame->page()->scrollingCoordinator()) {
@@ -429,7 +359,7 @@ void DOMWindow::setDocument(PassRefPtr<Document> document)
 
     if (m_frame->page() && m_frame->page()->mainFrame() == m_frame) {
         m_frame->page()->mainFrame()->notifyChromeClientWheelEventHandlerCountChanged();
-        if (m_document && m_document->hasTouchEventHandlers())
+        if (m_document->hasTouchEventHandlers())
             m_frame->page()->chrome().client()->needTouchEvents(true);
     }
 }
@@ -726,7 +656,7 @@ Storage* DOMWindow::sessionStorage(ExceptionCode& ec) const
     if (!page)
         return 0;
 
-    RefPtr<StorageArea> storageArea = page->sessionStorage()->storageArea(document->securityOrigin());
+    OwnPtr<StorageArea> storageArea = page->sessionStorage()->storageArea(document->securityOrigin());
     if (!storageArea->canAccessStorage(m_frame)) {
         ec = SECURITY_ERR;
         return 0;
@@ -765,7 +695,7 @@ Storage* DOMWindow::localStorage(ExceptionCode& ec) const
     if (!page->settings()->localStorageEnabled())
         return 0;
 
-    RefPtr<StorageArea> storageArea = page->group().localStorage()->storageArea(document->securityOrigin());
+    OwnPtr<StorageArea> storageArea = StorageNamespace::localStorageArea(document->securityOrigin());
     if (!storageArea->canAccessStorage(m_frame)) {
         ec = SECURITY_ERR;
         return 0;

@@ -56,7 +56,7 @@ bool SVGStopElement::isSupportedAttribute(const QualifiedName& attrName)
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty())
         supportedAttributes.add(SVGNames::offsetAttr);
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGStopElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -97,9 +97,9 @@ void SVGStopElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderObject* SVGStopElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGStopElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGGradientStop(this);
+    return new (document()->renderArena()) RenderSVGGradientStop(this);
 }
 
 bool SVGStopElement::rendererIsNeeded(const NodeRenderingContext&)

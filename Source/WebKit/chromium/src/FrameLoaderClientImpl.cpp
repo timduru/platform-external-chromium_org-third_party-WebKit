@@ -87,9 +87,9 @@
 #include "public/platform/WebURL.h"
 #include "public/platform/WebURLError.h"
 #include "public/platform/WebVector.h"
-#include <wtf/StringExtras.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/StringExtras.h"
+#include "wtf/text/CString.h"
+#include "wtf/text/WTFString.h"
 
 using namespace WebCore;
 
@@ -106,8 +106,6 @@ enum {
 
 FrameLoaderClientImpl::FrameLoaderClientImpl(WebFrameImpl* frame)
     : m_webFrame(frame)
-    , m_sentInitialResponseToPlugin(false)
-    , m_nextNavigationPolicy(WebNavigationPolicyIgnore)
 {
 }
 
@@ -260,11 +258,6 @@ bool FrameLoaderClientImpl::hasFrameView() const
 
 void FrameLoaderClientImpl::detachedFromParent()
 {
-    // If we were reading data into a plugin, drop our reference to it. If we
-    // don't do this then it may end up out-living the rest of the page, which
-    // leads to problems if the plugin's destructor tries to script things.
-    m_pluginWidget = 0;
-
     // Close down the proxy.  The purpose of this change is to make the
     // call to ScriptController::clearWindowShell a no-op when called from
     // Frame::pageDestroyed.  Without this change, this call to clearWindowShell
@@ -740,68 +733,6 @@ void FrameLoaderClientImpl::dispatchDidLayout(LayoutMilestones milestones)
         m_webFrame->client()->didFirstVisuallyNonEmptyLayout(m_webFrame);
 }
 
-Frame* FrameLoaderClientImpl::dispatchCreatePage(const NavigationAction& action)
-{
-    // Make sure that we have a valid disposition.  This should have been set in
-    // the preceeding call to dispatchDecidePolicyForNewWindowAction.
-    ASSERT(m_nextNavigationPolicy != WebNavigationPolicyIgnore);
-    WebNavigationPolicy policy = m_nextNavigationPolicy;
-    m_nextNavigationPolicy = WebNavigationPolicyIgnore;
-
-    // Store the disposition on the opener ChromeClientImpl so that we can pass
-    // it to WebViewClient::createView.
-    ChromeClientImpl* chromeClient = static_cast<ChromeClientImpl*>(m_webFrame->frame()->page()->chrome().client());
-    chromeClient->setNewWindowNavigationPolicy(policy);
-
-    if (m_webFrame->frame()->settings() && !m_webFrame->frame()->settings()->supportsMultipleWindows())
-        return m_webFrame->frame();
-
-    struct WindowFeatures features;
-    Page* newPage = m_webFrame->frame()->page()->chrome().createWindow(
-        m_webFrame->frame(), FrameLoadRequest(m_webFrame->frame()->document()->securityOrigin()),
-        features, action);
-
-    // createWindow can return null (e.g., popup blocker denies the window).
-    if (!newPage)
-        return 0;
-
-    // Also give the disposition to the new window.
-    WebViewImpl::fromPage(newPage)->setInitialNavigationPolicy(policy);
-    return newPage->mainFrame();
-}
-
-void FrameLoaderClientImpl::dispatchShow()
-{
-    WebViewImpl* webView = m_webFrame->viewImpl();
-    if (webView && webView->client())
-        webView->client()->show(webView->initialNavigationPolicy());
-}
-
-PolicyAction FrameLoaderClientImpl::policyForNewWindowAction(
-    const NavigationAction& action,
-    const String& frameName)
-{
-    WebNavigationPolicy navigationPolicy;
-    if (!actionSpecifiesNavigationPolicy(action, &navigationPolicy))
-        navigationPolicy = WebNavigationPolicyNewForegroundTab;
-
-    if (navigationPolicy == WebNavigationPolicyDownload)
-        return PolicyDownload;
-
-    // Remember the disposition for when dispatchCreatePage is called.  It is
-    // unfortunate that WebCore does not provide us with any context when
-    // creating or showing the new window that would allow us to avoid having
-    // to keep this state.
-    m_nextNavigationPolicy = navigationPolicy;
-
-    // Store the disposition on the opener ChromeClientImpl so that we can pass
-    // it to WebViewClient::createView.
-    ChromeClientImpl* chromeClient = static_cast<ChromeClientImpl*>(m_webFrame->frame()->page()->chrome().client());
-    chromeClient->setNewWindowNavigationPolicy(navigationPolicy);
-
-    return PolicyUse;
-}
-
 PolicyAction FrameLoaderClientImpl::decidePolicyForNavigationAction(
     const NavigationAction& action,
     const ResourceRequest& request) {
@@ -811,8 +742,9 @@ PolicyAction FrameLoaderClientImpl::decidePolicyForNavigationAction(
     // The null check here is to fix a crash that seems strange
     // (see - https://bugs.webkit.org/show_bug.cgi?id=23554).
     if (m_webFrame->client() && !request.url().isNull()) {
-        WebNavigationPolicy navigationPolicy = WebNavigationPolicyCurrentTab;
-        actionSpecifiesNavigationPolicy(action, &navigationPolicy);
+        NavigationPolicy policy = NavigationPolicyCurrentTab;
+        action.specifiesNavigationPolicy(&policy);
+        WebNavigationPolicy navigationPolicy = static_cast<WebNavigationPolicy>(policy);
 
         // Give the delegate a chance to change the navigation policy.
         const WebDataSourceImpl* ds = m_webFrame->provisionalDataSourceImpl();
@@ -867,18 +799,6 @@ void FrameLoaderClientImpl::dispatchWillSubmitForm(PassRefPtr<FormState> formSta
         m_webFrame->client()->willSubmitForm(m_webFrame, WebFormElement(formState->form()));
 }
 
-void FrameLoaderClientImpl::setMainDocumentError(DocumentLoader*,
-                                                 const ResourceError& error)
-{
-    if (m_pluginWidget) {
-        if (m_sentInitialResponseToPlugin) {
-            m_pluginWidget->didFailLoading(error);
-            m_sentInitialResponseToPlugin = false;
-        }
-        m_pluginWidget = 0;
-    }
-}
-
 void FrameLoaderClientImpl::postProgressStartedNotification()
 {
     WebViewImpl* webview = m_webFrame->viewImpl();
@@ -915,45 +835,11 @@ void FrameLoaderClientImpl::startDownload(const ResourceRequest& request, const 
     }
 }
 
-// Called whenever data is received.
-void FrameLoaderClientImpl::committedLoad(DocumentLoader* loader, const char* data, int length)
+void FrameLoaderClientImpl::didReceiveDocumentData(const char* data, int length)
 {
-    if (!m_pluginWidget) {
-        if (m_webFrame->client()) {
-            bool preventDefault = false;
-            m_webFrame->client()->didReceiveDocumentData(m_webFrame, data, length, preventDefault);
-            if (!preventDefault)
-                m_webFrame->commitDocumentData(data, length);
-        }
-    }
-
-    // If we are sending data to MediaDocument, we should stop here
-    // and cancel the request.
-    if (m_webFrame->frame()->document()->isMediaDocument())
-        loader->cancelMainResourceLoad(pluginWillHandleLoadError(loader->response()));
-
-    // The plugin widget could have been created in the m_webFrame->DidReceiveData
-    // function.
-    if (m_pluginWidget) {
-        if (!m_sentInitialResponseToPlugin) {
-            m_sentInitialResponseToPlugin = true;
-            m_pluginWidget->didReceiveResponse(
-                m_webFrame->frame()->loader()->activeDocumentLoader()->response());
-        }
-
-        // It's possible that the above call removed the pointer to the plugin, so
-        // check before calling it.
-        if (m_pluginWidget)
-            m_pluginWidget->didReceiveData(data, length);
-    }
-}
-
-void FrameLoaderClientImpl::finishedLoading(DocumentLoader*)
-{
-    if (m_pluginWidget) {
-        m_pluginWidget->didFinishLoading();
-        m_pluginWidget = 0;
-        m_sentInitialResponseToPlugin = false;
+    if (m_webFrame->client()) {
+        bool preventDefault = false;
+        m_webFrame->client()->didReceiveDocumentData(m_webFrame, data, length, preventDefault);
     }
 }
 
@@ -1199,14 +1085,6 @@ PassRefPtr<Widget> FrameLoaderClientImpl::createPlugin(
     return container;
 }
 
-// This method gets called when a plugin is put in place of html content
-// (e.g., acrobat reader).
-void FrameLoaderClientImpl::redirectDataToPlugin(Widget* pluginWidget)
-{
-    ASSERT_WITH_SECURITY_IMPLICATION(!pluginWidget || pluginWidget->isPluginContainer());
-    m_pluginWidget = static_cast<WebPluginContainerImpl*>(pluginWidget);
-}
-
 PassRefPtr<Widget> FrameLoaderClientImpl::createJavaAppletWidget(
     const IntSize& size,
     HTMLAppletElement* element,
@@ -1259,28 +1137,6 @@ ObjectContentType FrameLoaderClientImpl::objectContentType(
         return ObjectContentFrame;
 
     return ObjectContentNone;
-}
-
-bool FrameLoaderClientImpl::actionSpecifiesNavigationPolicy(
-    const NavigationAction& action,
-    WebNavigationPolicy* policy)
-{
-    const MouseEvent* event = 0;
-    if (action.type() == NavigationTypeLinkClicked
-        && action.event()->isMouseEvent())
-        event = static_cast<const MouseEvent*>(action.event());
-    else if (action.type() == NavigationTypeFormSubmitted
-             && action.event()
-             && action.event()->underlyingEvent()
-             && action.event()->underlyingEvent()->isMouseEvent())
-        event = static_cast<const MouseEvent*>(action.event()->underlyingEvent());
-
-    if (!event)
-        return false;
-
-    return WebViewImpl::navigationPolicyFromMouseEvent(
-        event->button(), event->ctrlKey(), event->shiftKey(), event->altKey(),
-        event->metaKey(), policy);
 }
 
 PassOwnPtr<WebPluginLoadObserver> FrameLoaderClientImpl::pluginLoadObserver()

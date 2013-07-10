@@ -81,8 +81,8 @@
 #include "public/platform/WebSize.h"
 #include "public/platform/WebURLError.h"
 #include "public/platform/WebVector.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/HashMap.h>
+#include "wtf/CurrentTime.h"
+#include "wtf/HashMap.h"
 #include <algorithm>
 #include "AssociatedURLLoader.h"
 #include "AsyncFileSystemChromium.h"
@@ -771,11 +771,6 @@ NPObject* WebFrameImpl::windowObject() const
 
 void WebFrameImpl::bindToWindowObject(const WebString& name, NPObject* object)
 {
-    bindToWindowObject(name, object, 0);
-}
-
-void WebFrameImpl::bindToWindowObject(const WebString& name, NPObject* object, void*)
-{
     if (!frame() || !frame()->script()->canExecuteScripts(NotAboutToExecuteScript))
         return;
     frame()->script()->bindToWindowObject(frame(), String(name), object);
@@ -1098,11 +1093,6 @@ WebURLLoader* WebFrameImpl::createAssociatedURLLoader(const WebURLLoaderOptions&
     return new AssociatedURLLoader(this, options);
 }
 
-void WebFrameImpl::commitDocumentData(const char* data, size_t length)
-{
-    frame()->loader()->documentLoader()->commitData(data, length);
-}
-
 unsigned WebFrameImpl::unloadListenerCount() const
 {
     return frame()->document()->domWindow()->pendingUnloadEventListeners();
@@ -1169,7 +1159,7 @@ size_t WebFrameImpl::characterIndexForPoint(const WebPoint& webPoint) const
         return notFound;
 
     IntPoint point = frame()->view()->windowToContents(webPoint);
-    HitTestResult result = frame()->eventHandler()->hitTestResultAtPoint(point);
+    HitTestResult result = frame()->eventHandler()->hitTestResultAtPoint(point, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
     RefPtr<Range> range = frame()->rangeForPoint(result.roundedPointInInnerNodeFrame());
     if (!range)
         return notFound;
@@ -2491,7 +2481,7 @@ void WebFrameImpl::loadJavaScriptURL(const KURL& url)
         return;
 
     if (!frame()->navigationScheduler()->locationChangePending())
-        frame()->document()->loader()->writer()->replaceDocument(scriptResult, ownerDocument.get());
+        frame()->document()->loader()->replaceDocument(scriptResult, ownerDocument.get());
 }
 
 void WebFrameImpl::willDetachPage()

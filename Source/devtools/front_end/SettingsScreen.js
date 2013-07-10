@@ -156,8 +156,9 @@ WebInspector.SettingsTab.prototype = {
     /**
      * @param {boolean=} omitParagraphElement
      * @param {Element=} inputElement
+     * @param {string=} tooltip
      */
-    _createCheckboxSetting: function(name, setting, omitParagraphElement, inputElement)
+    _createCheckboxSetting: function(name, setting, omitParagraphElement, inputElement, tooltip)
     {
         var input = inputElement || document.createElement("input");
         input.type = "checkbox";
@@ -173,6 +174,9 @@ WebInspector.SettingsTab.prototype = {
         var label = document.createElement("label");
         label.appendChild(input);
         label.appendChild(document.createTextNode(name));
+        if (tooltip)
+            label.title = tooltip;
+
         if (omitParagraphElement)
             return label;
 
@@ -327,23 +331,27 @@ WebInspector.GenericSettingsTab = function()
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show rulers"), WebInspector.settings.showMetricsRulers));
 
     p = this._appendSection(WebInspector.UIString("Rendering"));
+    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show paint rectangles"), WebInspector.settings.showPaintRects));
     this._forceCompositingModeCheckbox = document.createElement("input");
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Force accelerated compositing"), WebInspector.settings.forceCompositingMode, false, this._forceCompositingModeCheckbox));
     WebInspector.settings.forceCompositingMode.addChangeListener(this._forceCompositingModeChanged, this);
-    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show paint rectangles"), WebInspector.settings.showPaintRects));
+    this._compositingModeSettings = p.createChild("fieldset");
     this._showCompositedLayersBordersCheckbox = document.createElement("input");
-    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show composited layer borders"), WebInspector.settings.showDebugBorders, false, this._showCompositedLayersBordersCheckbox));
+    this._compositingModeSettings.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show composited layer borders"), WebInspector.settings.showDebugBorders, false, this._showCompositedLayersBordersCheckbox));
     this._showFPSCheckbox = document.createElement("input");
-    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show FPS meter"), WebInspector.settings.showFPSCounter, false, this._showFPSCheckbox));
+    this._compositingModeSettings.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show FPS meter"), WebInspector.settings.showFPSCounter, false, this._showFPSCheckbox));
     this._continousPaintingCheckbox = document.createElement("input");
-    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Enable continuous page repainting"), WebInspector.settings.continuousPainting, false, this._continousPaintingCheckbox));
+    this._compositingModeSettings.appendChild(this._createCheckboxSetting(WebInspector.UIString("Enable continuous page repainting"), WebInspector.settings.continuousPainting, false, this._continousPaintingCheckbox));
+    this._showScrollBottleneckRectsCheckbox = document.createElement("input");
+    var tooltip = WebInspector.UIString("Shows areas of the page that slow down scrolling:\nTouch and mousewheel event listeners can delay scrolling.\nSome areas need to repaint their content when scrolled.");
+    this._compositingModeSettings.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show potential scroll bottlenecks"), WebInspector.settings.showScrollBottleneckRects, false, this._showScrollBottleneckRectsCheckbox, tooltip));
     this._forceCompositingModeChanged();
 
     p = this._appendSection(WebInspector.UIString("Sources"));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Search in content scripts"), WebInspector.settings.searchInContentScripts));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Enable source maps"), WebInspector.settings.sourceMapsEnabled));
     if (WebInspector.experimentsSettings.isEnabled("sass"))
-        p.appendChild(this._createCSSAutoReloadControls());
+        p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Auto-reload CSS upon Sass save"), WebInspector.settings.cssReloadEnabled));
     var indentationElement = this._createSelectSetting(WebInspector.UIString("Indentation"), [
             [ WebInspector.UIString("2 spaces"), WebInspector.TextUtils.Indent.TwoSpaces ],
             [ WebInspector.UIString("4 spaces"), WebInspector.TextUtils.Indent.FourSpaces ],
@@ -391,16 +399,16 @@ WebInspector.GenericSettingsTab.prototype = {
     _forceCompositingModeChanged: function(event)
     {
         var compositing = event ? !!event.data : WebInspector.settings.forceCompositingMode.get();
-        this._showFPSCheckbox.disabled = !compositing;
-        this._continousPaintingCheckbox.disabled = !compositing;
-        this._showCompositedLayersBordersCheckbox.disabled = !compositing;
+        this._compositingModeSettings.disabled = !compositing
         if (!compositing) {
             this._showFPSCheckbox.checked = false;
             this._continousPaintingCheckbox.checked = false;
             this._showCompositedLayersBordersCheckbox.checked = false;
+            this._showScrollBottleneckRectsCheckbox.checked = false;
             WebInspector.settings.showFPSCounter.set(false);
             WebInspector.settings.continuousPainting.set(false);
             WebInspector.settings.showDebugBorders.set(false);
+            WebInspector.settings.showScrollBottleneckRects.set(false);
         }
         this._forceCompositingModeCheckbox.checked = compositing;
     },
@@ -443,34 +451,6 @@ WebInspector.GenericSettingsTab.prototype = {
         PageAgent.setScriptExecutionDisabled(WebInspector.settings.javaScriptDisabled.get(), this._updateScriptDisabledCheckbox.bind(this));
     },
 
-    _createCSSAutoReloadControls: function()
-    {
-        var fragment = document.createDocumentFragment();
-        var labelElement = fragment.createChild("label");
-        var checkboxElement = labelElement.createChild("input");
-        checkboxElement.type = "checkbox";
-        checkboxElement.checked = WebInspector.settings.cssReloadEnabled.get();
-        checkboxElement.addEventListener("click", checkboxClicked, false);
-        labelElement.appendChild(document.createTextNode(WebInspector.UIString("Auto-reload CSS upon Sass save")));
-
-        var fieldsetElement = this._createInputSetting(WebInspector.UIString("Timeout (ms)"), WebInspector.settings.cssReloadTimeout, true, 8, "60px", validateReloadTimeout);
-        fieldsetElement.disabled = !checkboxElement.checked;
-        fragment.appendChild(fieldsetElement);
-        return fragment;
-
-        function checkboxClicked()
-        {
-            var reloadEnabled = checkboxElement.checked;
-            WebInspector.settings.cssReloadEnabled.set(reloadEnabled);
-            fieldsetElement.disabled = !reloadEnabled;
-        }
-
-        function validateReloadTimeout(value)
-        {
-            return isFinite(value) && value > 0;
-        }
-    },
-
     __proto__: WebInspector.SettingsTab.prototype
 }
 
@@ -483,7 +463,7 @@ WebInspector.OverridesSettingsTab = function()
     WebInspector.SettingsTab.call(this, WebInspector.UIString("Overrides"), "overrides-tab-content");
     this._view = new WebInspector.OverridesView();
     this.containerElement.parentElement.appendChild(this._view.containerElement);
-    this.containerElement.removeSelf();
+    this.containerElement.remove();
     this.containerElement = this._view.containerElement;
 }
 
@@ -673,8 +653,8 @@ WebInspector.WorkspaceSettingsTab.prototype = {
     _resetFileMappings: function()
     {
 
-        if (this._fileMappingsSection && this._fileMappingsSection.parentElement) {
-            this._fileMappingsSection.parentElement.removeChild(this._fileMappingsSection);
+        if (this._fileMappingsSection) {
+            this._fileMappingsSection.remove();
             delete this._fileMappingsSection;
             delete this._fileMappingsListContainer;
             delete this._fileMappingsList;
@@ -689,8 +669,8 @@ WebInspector.WorkspaceSettingsTab.prototype = {
 
         var entries = WebInspector.isolatedFileSystemManager.mapping().mappingEntries(this._selectedFileSystemPath());
 
-        if (this._fileMappingsList && this._fileMappingsList.element.parentElement)
-            this._fileMappingsList.element.parentElement.removeChild(this._fileMappingsList.element);
+        if (this._fileMappingsList)
+            this._fileMappingsList.element.remove();
 
         this._fileMappingsList = new WebInspector.EditableSettingsList(["url", "path"], this._fileMappingValuesProvider.bind(this), this._removeFileMapping.bind(this), this._fileMappingValidate.bind(this), this._fileMappingEdit.bind(this));
         this._fileMappingsList.element.addStyleClass("file-mappings-list");
@@ -905,7 +885,7 @@ WebInspector.TetheringSettingsTab.prototype = {
 
         function removeMappingClicked()
         {
-            mappingRow.removeSelf();
+            mappingRow.remove();
             if (!this._paragraphElement.querySelector(".workspace-settings-row"))
                 this._addMappingRow();
             this._save();
@@ -918,7 +898,7 @@ WebInspector.TetheringSettingsTab.prototype = {
     _save: function()
     {
         var portForwardings = [];
-        for (var rowElement = this._paragraphElement.firstChild.nextSibling; rowElement; rowElement = rowElement.nextSibling) {
+        for (var rowElement = this._paragraphElement.firstChild; rowElement; rowElement = rowElement.nextSibling) {
             var portElement = rowElement.firstChild;
             var locationElement = portElement.nextSibling;
             var port = this._validatePort(portElement);
@@ -1201,9 +1181,7 @@ WebInspector.SettingsList.prototype = {
      */
     removeItem: function(id)
     {
-        var listItem = this._listItems[id];
-        if (listItem.parentElement)
-            listItem.parentElement.removeChild(listItem);
+        this._listItems[id].remove();
         delete this._listItems[id];
         this._ids.remove(id);
         if (id === this._selectedId) {

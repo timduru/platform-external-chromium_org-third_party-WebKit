@@ -37,7 +37,6 @@ import sys
 
 from checkers.common import categories as CommonCategories
 from checkers.common import CarriageReturnChecker
-from checkers.changelog import ChangeLogChecker
 from checkers.cpp import CppChecker
 from checkers.cmake import CMakeChecker
 from checkers.jsonchecker import JSONChecker
@@ -45,7 +44,6 @@ from checkers.png import PNGChecker
 from checkers.python import PythonChecker
 from checkers.test_expectations import TestExpectationsChecker
 from checkers.text import TextChecker
-from checkers.watchlist import WatchListChecker
 from checkers.xcodeproj import XcodeProjectFileChecker
 from checkers.xml import XMLChecker
 from error_handlers import DefaultStyleErrorHandler
@@ -373,7 +371,6 @@ def _all_categories():
     categories = CommonCategories.union(CppChecker.categories)
     categories = categories.union(JSONChecker.categories)
     categories = categories.union(TestExpectationsChecker.categories)
-    categories = categories.union(ChangeLogChecker.categories)
     categories = categories.union(PNGChecker.categories)
 
     # FIXME: Consider adding all of the pep8 categories.  Since they
@@ -513,13 +510,13 @@ class FileType:
 
     NONE = 0  # FileType.NONE evaluates to False.
     # Alphabetize remaining types
-    CHANGELOG = 1
+    # CHANGELOG = 1
     CPP = 2
     JSON = 3
     PNG = 4
     PYTHON = 5
     TEXT = 6
-    WATCHLIST = 7
+    # WATCHLIST = 7
     XML = 8
     XCODEPROJ = 9
     CMAKE = 10
@@ -556,16 +553,12 @@ class CheckerDispatcher(object):
         if not self._file_type(file_path):  # FileType.NONE.
             return True
         # Since "LayoutTests" is in _SKIPPED_FILES_WITHOUT_WARNING, make
-        # an exception to prevent files like "LayoutTests/ChangeLog" and
-        # "LayoutTests/ChangeLog-2009-06-16" from being skipped.
-        # Files like 'TestExpectations' are also should not be skipped.
+        # an exception to prevent files like 'TestExpectations' from being skipped.
         #
         # FIXME: Figure out a good way to avoid having to add special logic
         #        for this special case.
         basename = os.path.basename(file_path)
-        if basename.startswith('ChangeLog'):
-            return False
-        elif basename == 'TestExpectations':
+        if basename == 'TestExpectations':
             return False
         for skipped_file in _SKIPPED_FILES_WITHOUT_WARNING:
             if self._should_skip_file_path(file_path, skipped_file):
@@ -593,10 +586,6 @@ class CheckerDispatcher(object):
             return FileType.PYTHON
         elif file_extension in _XML_FILE_EXTENSIONS:
             return FileType.XML
-        elif os.path.basename(file_path).startswith('ChangeLog'):
-            return FileType.CHANGELOG
-        elif os.path.basename(file_path) == 'watchlist':
-            return FileType.WATCHLIST
         elif file_extension == _XCODEPROJ_FILE_EXTENSION:
             return FileType.XCODEPROJ
         elif file_extension == _PNG_FILE_EXTENSION:
@@ -614,11 +603,6 @@ class CheckerDispatcher(object):
         """Instantiate and return a style checker based on file type."""
         if file_type == FileType.NONE:
             checker = None
-        elif file_type == FileType.CHANGELOG:
-            should_line_be_checked = None
-            if handle_style_error:
-                should_line_be_checked = handle_style_error.should_line_be_checked
-            checker = ChangeLogChecker(file_path, handle_style_error, should_line_be_checked)
         elif file_type == FileType.CPP:
             file_extension = self._file_extension(file_path)
             checker = CppChecker(file_path, file_extension,
@@ -641,8 +625,6 @@ class CheckerDispatcher(object):
                 checker = TestExpectationsChecker(file_path, handle_style_error)
             else:
                 checker = TextChecker(file_path, handle_style_error)
-        elif file_type == FileType.WATCHLIST:
-            checker = WatchListChecker(file_path, handle_style_error)
         else:
             raise ValueError('Invalid file type "%(file_type)s": the only valid file types '
                              "are %(NONE)s, %(CPP)s, and %(TEXT)s."

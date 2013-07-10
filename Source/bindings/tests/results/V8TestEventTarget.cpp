@@ -26,7 +26,6 @@
 #include "V8Node.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/V8Binding.h"
-#include "bindings/v8/V8Collection.h"
 #include "bindings/v8/V8DOMConfiguration.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8EventListenerList.h"
@@ -34,6 +33,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
+#include "core/platform/chromium/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
 namespace WebCore {
@@ -83,7 +83,9 @@ static void itemMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void itemMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     TestEventTargetV8Internal::itemMethod(args);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 static void namedItemMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -100,7 +102,9 @@ static void namedItemMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void namedItemMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     TestEventTargetV8Internal::namedItemMethod(args);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 static void addEventListenerMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -115,7 +119,9 @@ static void addEventListenerMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
 
 static void addEventListenerMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     TestEventTargetV8Internal::addEventListenerMethod(args);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 static void removeEventListenerMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -130,7 +136,9 @@ static void removeEventListenerMethod(const v8::FunctionCallbackInfo<v8::Value>&
 
 static void removeEventListenerMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     TestEventTargetV8Internal::removeEventListenerMethod(args);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 static void dispatchEventMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -153,31 +161,31 @@ static void dispatchEventMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void dispatchEventMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     TestEventTargetV8Internal::dispatchEventMethod(args);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
-} // namespace TestEventTargetV8Internal
-
-static const V8DOMConfiguration::BatchedMethod V8TestEventTargetMethods[] = {
-    {"item", TestEventTargetV8Internal::itemMethodCallback, 0, 1},
-    {"namedItem", TestEventTargetV8Internal::namedItemMethodCallback, 0, 1},
-    {"addEventListener", TestEventTargetV8Internal::addEventListenerMethodCallback, 0, 2},
-    {"removeEventListener", TestEventTargetV8Internal::removeEventListenerMethodCallback, 0, 2},
-};
-
-void V8TestEventTarget::indexedPropertyGetter(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void indexedPropertyGetter(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     ASSERT(V8DOMWrapper::maybeDOMWrapper(info.Holder()));
-    TestEventTarget* collection = toNative(info.Holder());
+    TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
     RefPtr<Node> element = collection->item(index);
     if (!element)
         return;
     v8SetReturnValue(info, toV8Fast(element.release(), info, collection));
 }
 
-void V8TestEventTarget::indexedPropertyDeleter(unsigned index, const v8::PropertyCallbackInfo<v8::Boolean>& info)
+static void indexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    TestEventTarget* collection = toNative(info.Holder());
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMIndexedProperty");
+    TestEventTargetV8Internal::indexedPropertyGetter(index, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+}
+
+static void indexedPropertyDeleter(unsigned index, const v8::PropertyCallbackInfo<v8::Boolean>& info)
+{
+    TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
     ExceptionCode ec = 0;
     bool result = collection->anonymousIndexedDeleter(index, ec);
     if (ec) {
@@ -187,7 +195,14 @@ void V8TestEventTarget::indexedPropertyDeleter(unsigned index, const v8::Propert
     return v8SetReturnValueBool(info, result);
 }
 
-void V8TestEventTarget::namedPropertyGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void indexedPropertyDeleterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Boolean>& info)
+{
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMIndexedProperty");
+    TestEventTargetV8Internal::indexedPropertyDeleter(index, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+}
+
+static void namedPropertyGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     if (!info.Holder()->GetRealNamedPropertyInPrototypeChain(name).IsEmpty())
         return;
@@ -197,7 +212,7 @@ void V8TestEventTarget::namedPropertyGetter(v8::Local<v8::String> name, const v8
         return;
 
     ASSERT(V8DOMWrapper::maybeDOMWrapper(info.Holder()));
-    TestEventTarget* collection = toNative(info.Holder());
+    TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
     AtomicString propertyName = toWebCoreAtomicString(name);
     RefPtr<Node> element = collection->namedItem(propertyName);
     if (!element)
@@ -205,7 +220,14 @@ void V8TestEventTarget::namedPropertyGetter(v8::Local<v8::String> name, const v8
     v8SetReturnValue(info, toV8Fast(element.release(), info, collection));
 }
 
-void V8TestEventTarget::namedPropertySetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void namedPropertyGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TestEventTargetV8Internal::namedPropertyGetter(name, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+}
+
+static void namedPropertySetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     if (!info.Holder()->GetRealNamedPropertyInPrototypeChain(name).IsEmpty())
         return;
@@ -213,7 +235,7 @@ void V8TestEventTarget::namedPropertySetter(v8::Local<v8::String> name, v8::Loca
         return;
     if (info.Holder()->HasRealNamedProperty(name))
         return;
-    TestEventTarget* collection = toNative(info.Holder());
+    TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, propertyName, name);
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, propertyValue, value);
     bool result;
@@ -226,18 +248,32 @@ void V8TestEventTarget::namedPropertySetter(v8::Local<v8::String> name, v8::Loca
     v8SetReturnValue(info, value);
 }
 
-void V8TestEventTarget::namedPropertyDeleter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Boolean>& info)
+static void namedPropertySetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    TestEventTarget* collection = toNative(info.Holder());
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TestEventTargetV8Internal::namedPropertySetter(name, value, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+}
+
+static void namedPropertyDeleter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Boolean>& info)
+{
+    TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
     AtomicString propertyName = toWebCoreAtomicString(name);
     bool result = collection->anonymousNamedDeleter(propertyName);
     return v8SetReturnValueBool(info, result);
 }
 
-void V8TestEventTarget::namedPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>& info)
+static void namedPropertyDeleterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Boolean>& info)
+{
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TestEventTargetV8Internal::namedPropertyDeleter(name, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+}
+
+static void namedPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>& info)
 {
     ExceptionCode ec = 0;
-    TestEventTarget* collection = toNative(info.Holder());
+    TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
     Vector<String> names;
     collection->namedPropertyEnumerator(names, ec);
     if (ec) {
@@ -246,13 +282,13 @@ void V8TestEventTarget::namedPropertyEnumerator(const v8::PropertyCallbackInfo<v
     }
     v8::Handle<v8::Array> v8names = v8::Array::New(names.size());
     for (size_t i = 0; i < names.size(); ++i)
-        v8names->Set(v8Integer(i, info.GetIsolate()), v8String(names[i], info.GetIsolate()));
+        v8names->Set(v8::Integer::New(i, info.GetIsolate()), v8String(names[i], info.GetIsolate()));
     v8SetReturnValue(info, v8names);
 }
 
-void V8TestEventTarget::namedPropertyQuery(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Integer>& info)
+static void namedPropertyQuery(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Integer>& info)
 {
-    TestEventTarget* collection = toNative(info.Holder());
+    TestEventTarget* collection = V8TestEventTarget::toNative(info.Holder());
     AtomicString propertyName = toWebCoreAtomicString(name);
     ExceptionCode ec = 0;
     bool result = collection->namedPropertyQuery(propertyName, ec);
@@ -264,6 +300,29 @@ void V8TestEventTarget::namedPropertyQuery(v8::Local<v8::String> name, const v8:
         return;
     v8SetReturnValueInt(info, v8::None);
 }
+
+static void namedPropertyEnumeratorCallback(const v8::PropertyCallbackInfo<v8::Array>& info)
+{
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TestEventTargetV8Internal::namedPropertyEnumerator(info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+}
+
+static void namedPropertyQueryCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Integer>& info)
+{
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TestEventTargetV8Internal::namedPropertyQuery(name, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+}
+
+} // namespace TestEventTargetV8Internal
+
+static const V8DOMConfiguration::BatchedMethod V8TestEventTargetMethods[] = {
+    {"item", TestEventTargetV8Internal::itemMethodCallback, 0, 1},
+    {"namedItem", TestEventTargetV8Internal::namedItemMethodCallback, 0, 1},
+    {"addEventListener", TestEventTargetV8Internal::addEventListenerMethodCallback, 0, 2},
+    {"removeEventListener", TestEventTargetV8Internal::removeEventListenerMethodCallback, 0, 2},
+};
 
 static v8::Handle<v8::FunctionTemplate> ConfigureV8TestEventTargetTemplate(v8::Handle<v8::FunctionTemplate> desc, v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
@@ -278,8 +337,8 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestEventTargetTemplate(v8::H
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
     UNUSED_PARAM(instance); // In some cases, it will not be used.
     UNUSED_PARAM(proto); // In some cases, it will not be used.
-    desc->InstanceTemplate()->SetIndexedPropertyHandler(V8TestEventTarget::indexedPropertyGetter, 0, 0, V8TestEventTarget::indexedPropertyDeleter, nodeCollectionIndexedPropertyEnumerator<TestEventTarget>);
-    desc->InstanceTemplate()->SetNamedPropertyHandler(V8TestEventTarget::namedPropertyGetter, V8TestEventTarget::namedPropertySetter, V8TestEventTarget::namedPropertyQuery, V8TestEventTarget::namedPropertyDeleter, V8TestEventTarget::namedPropertyEnumerator);
+    desc->InstanceTemplate()->SetIndexedPropertyHandler(TestEventTargetV8Internal::indexedPropertyGetterCallback, 0, 0, TestEventTargetV8Internal::indexedPropertyDeleterCallback, indexedPropertyEnumerator<TestEventTarget>);
+    desc->InstanceTemplate()->SetNamedPropertyHandler(TestEventTargetV8Internal::namedPropertyGetterCallback, TestEventTargetV8Internal::namedPropertySetterCallback, TestEventTargetV8Internal::namedPropertyQueryCallback, TestEventTargetV8Internal::namedPropertyDeleterCallback, TestEventTargetV8Internal::namedPropertyEnumeratorCallback);
     desc->InstanceTemplate()->MarkAsUndetectable();
 
     // Custom Signature 'dispatchEvent'
@@ -300,6 +359,7 @@ v8::Handle<v8::FunctionTemplate> V8TestEventTarget::GetTemplate(v8::Isolate* iso
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
+    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestEventTargetTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);

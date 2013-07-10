@@ -30,7 +30,6 @@
 #include "core/dom/NodeRenderingContext.h"
 #include "core/html/HTMLDocument.h"
 #include "core/rendering/RenderIFrame.h"
-#include <wtf/text/TextPosition.h>
 
 namespace WebCore {
 
@@ -103,9 +102,9 @@ bool HTMLIFrameElement::rendererIsNeeded(const NodeRenderingContext& context)
     return isURLAllowed() && context.style()->display() != NONE;
 }
 
-RenderObject* HTMLIFrameElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* HTMLIFrameElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderIFrame(this);
+    return new (document()->renderArena()) RenderIFrame(this);
 }
 
 Node::InsertionNotificationRequest HTMLIFrameElement::insertedInto(ContainerNode* insertionPoint)

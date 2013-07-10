@@ -31,11 +31,11 @@
 #ifndef MemoryInstrumentationString_h
 #define MemoryInstrumentationString_h
 
-#include <wtf/MemoryInstrumentation.h>
-#include <wtf/text/AtomicString.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/MemoryInstrumentation.h"
+#include "wtf/text/AtomicString.h"
+#include "wtf/text/CString.h"
+#include "wtf/text/StringBuilder.h"
+#include "wtf/text/WTFString.h"
 
 namespace WTF {
 
@@ -43,7 +43,7 @@ inline void reportMemoryUsage(const StringImpl* stringImpl, MemoryObjectInfo* me
 {
     size_t selfSize = sizeof(StringImpl);
 
-    size_t length = stringImpl->length() + (stringImpl->hasTerminatingNullCharacter() ? 1 : 0);
+    size_t length = stringImpl->length();
     size_t bufferSize = length * (stringImpl->is8Bit() ? sizeof(LChar) : sizeof(UChar));
     const void* buffer = stringImpl->is8Bit() ? static_cast<const void*>(stringImpl->characters8()) : static_cast<const void*>(stringImpl->characters16());
 
@@ -60,7 +60,7 @@ inline void reportMemoryUsage(const StringImpl* stringImpl, MemoryObjectInfo* me
             info.addRawBuffer(buffer, bufferSize, "char[]", "ownedBuffer");
 
         if (stringImpl->has16BitShadow())
-            info.addRawBuffer(stringImpl->characters(), length * sizeof(UChar), "UChar[]", "16bitShadow");
+            info.addRawBuffer(stringImpl->bloatedCharacters(), length * sizeof(UChar), "UChar[]", "16bitShadow");
     }
 }
 

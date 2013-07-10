@@ -80,7 +80,7 @@ PassRefPtr<UserMediaRequest> UserMediaRequest::create(ScriptExecutionContext* co
 }
 
 UserMediaRequest::UserMediaRequest(ScriptExecutionContext* context, UserMediaController* controller, PassRefPtr<MediaConstraintsImpl> audio, PassRefPtr<MediaConstraintsImpl> video, PassRefPtr<NavigatorUserMediaSuccessCallback> successCallback, PassRefPtr<NavigatorUserMediaErrorCallback> errorCallback)
-    : ContextDestructionObserver(context)
+    : ContextLifecycleObserver(context)
     , m_audio(audio)
     , m_video(video)
     , m_controller(controller)
@@ -124,13 +124,8 @@ Document* UserMediaRequest::ownerDocument()
 
 void UserMediaRequest::start()
 {
-    MediaStreamCenter::instance().queryMediaStreamSources(this);
-}
-
-void UserMediaRequest::didCompleteQuery(const MediaStreamSourceVector& audioSources, const MediaStreamSourceVector& videoSources)
-{
     if (m_controller)
-        m_controller->requestUserMedia(this, audioSources, videoSources);
+        m_controller->requestUserMedia(this);
 }
 
 void UserMediaRequest::succeed(PassRefPtr<MediaStreamDescriptor> streamDescriptor)
@@ -185,7 +180,7 @@ void UserMediaRequest::contextDestroyed()
         m_controller = 0;
     }
 
-    ContextDestructionObserver::contextDestroyed();
+    ContextLifecycleObserver::contextDestroyed();
 }
 
 } // namespace WebCore

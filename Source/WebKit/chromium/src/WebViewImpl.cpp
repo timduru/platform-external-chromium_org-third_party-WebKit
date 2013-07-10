@@ -42,11 +42,11 @@
 #include "public/platform/WebRect.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebVector.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/MainThread.h>
-#include <wtf/RefPtr.h>
-#include <wtf/TemporaryChange.h>
-#include <wtf/Uint8ClampedArray.h>
+#include "wtf/CurrentTime.h"
+#include "wtf/MainThread.h"
+#include "wtf/RefPtr.h"
+#include "wtf/TemporaryChange.h"
+#include "wtf/Uint8ClampedArray.h"
 #include "AutofillPopupMenuClient.h"
 #include "CSSValueKeywords.h"
 #include "CompositionUnderlineVectorBuilder.h"
@@ -57,6 +57,7 @@
 #include "HTMLNames.h"
 #include "LinkHighlight.h"
 #include "PageWidgetDelegate.h"
+#include "PinchViewports.h"
 #include "PopupContainer.h"
 #include "PrerendererClientImpl.h"
 #include "SpeechInputClientImpl.h"
@@ -149,7 +150,6 @@
 #include "core/platform/graphics/chromium/LayerPainterChromium.h"
 #include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
 #include "core/platform/network/ResourceHandle.h"
-#include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
@@ -386,6 +386,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_minimumZoomLevel(zoomFactorToZoomLevel(minTextSizeMultiplier))
     , m_maximumZoomLevel(zoomFactorToZoomLevel(maxTextSizeMultiplier))
     , m_savedPageScaleFactor(0)
+    , m_exitFullscreenPageScaleFactor(0)
     , m_doubleTapZoomPageScaleFactor(0)
     , m_doubleTapZoomPending(false)
     , m_enableFakeDoubleTapAnimationForTesting(false)
@@ -395,7 +396,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_doingDragAndDrop(false)
     , m_ignoreInputEvents(false)
     , m_suppressNextKeypressEvent(false)
-    , m_initialNavigationPolicy(WebNavigationPolicyIgnore)
     , m_imeAcceptEvents(true)
     , m_operationsAllowed(WebDragOperationNone)
     , m_dragOperation(WebDragOperationNone)
@@ -431,6 +431,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_showPaintRects(false)
     , m_showDebugBorders(false)
     , m_continuousPaintingEnabled(false)
+    , m_showScrollBottleneckRects(false)
 {
     Page::PageClients pageClients;
     pageClients.chromeClient = &m_chromeClientImpl;
@@ -882,6 +883,13 @@ void WebViewImpl::setContinuousPaintingEnabled(bool enabled)
     }
     m_continuousPaintingEnabled = enabled;
     m_client->scheduleAnimation();
+}
+
+void WebViewImpl::setShowScrollBottleneckRects(bool show)
+{
+    if (m_layerTreeView)
+        m_layerTreeView->setShowScrollBottleneckRects(show);
+    m_showScrollBottleneckRects = show;
 }
 
 bool WebViewImpl::handleKeyEvent(const WebKeyboardEvent& event)
@@ -1612,8 +1620,11 @@ void WebViewImpl::resize(const WebSize& newSize)
         agentPrivate->webViewResized(newSize);
     if (!agentPrivate || !agentPrivate->metricsOverridden()) {
         WebFrameImpl* webFrame = mainFrameImpl();
-        if (webFrame->frameView())
+        if (webFrame->frameView()) {
             webFrame->frameView()->resize(m_size);
+            if (m_pinchViewports)
+                m_pinchViewports->setViewportSize(m_size);
+        }
     }
 
     if (settings()->viewportEnabled()) {
@@ -1673,8 +1684,15 @@ void WebViewImpl::didEnterFullScreen()
         return;
 
     if (Document* doc = m_fullScreenFrame->document()) {
-        if (FullscreenController::isFullScreen(doc))
+        if (FullscreenController::isFullScreen(doc)) {
+            if (!m_exitFullscreenPageScaleFactor) {
+                m_exitFullscreenPageScaleFactor = pageScaleFactor();
+                m_exitFullscreenScrollOffset = mainFrame()->scrollOffset();
+                setPageScaleFactorPreservingScrollOffset(1.0f);
+            }
+
             FullscreenController::from(doc)->webkitDidEnterFullScreenForElement(0);
+        }
     }
 }
 
@@ -1705,8 +1723,16 @@ void WebViewImpl::didExitFullScreen()
 
     if (Document* doc = m_fullScreenFrame->document()) {
         if (FullscreenController* fullscreen = FullscreenController::fromIfExists(doc)) {
-            if (fullscreen->webkitIsFullScreen())
+            if (fullscreen->webkitIsFullScreen()) {
+                if (m_exitFullscreenPageScaleFactor) {
+                    setPageScaleFactor(m_exitFullscreenPageScaleFactor,
+                        WebPoint(m_exitFullscreenScrollOffset.width(), m_exitFullscreenScrollOffset.height()));
+                    m_exitFullscreenPageScaleFactor = 0;
+                    m_exitFullscreenScrollOffset = IntSize();
+                }
+
                 fullscreen->webkitDidExitFullScreenForElement(0);
+            }
         }
     }
 
@@ -2103,10 +2129,20 @@ bool WebViewImpl::setComposition(
 
 bool WebViewImpl::confirmComposition()
 {
-    return confirmComposition(WebString());
+    return confirmComposition(DoNotKeepSelection);
+}
+
+bool WebViewImpl::confirmComposition(ConfirmCompositionBehavior selectionBehavior)
+{
+    return confirmComposition(WebString(), selectionBehavior);
 }
 
 bool WebViewImpl::confirmComposition(const WebString& text)
+{
+    return confirmComposition(text, DoNotKeepSelection);
+}
+
+bool WebViewImpl::confirmComposition(const WebString& text, ConfirmCompositionBehavior selectionBehavior)
 {
     Frame* focused = focusedWebCoreFrame();
     if (!focused || !m_imeAcceptEvents)
@@ -2127,10 +2163,17 @@ bool WebViewImpl::confirmComposition(const WebString& text)
     }
 
     if (editor->hasComposition()) {
-        if (text.length())
+        if (text.length()) {
             editor->confirmComposition(String(text));
-        else
+        } else {
+            size_t location;
+            size_t length;
+            caretOrSelectionRange(&location, &length);
+
             editor->confirmComposition();
+            if (selectionBehavior == KeepSelection)
+                editor->setSelectionOffsets(location, location + length);
+        }
     } else
         editor->insertText(String(text), 0);
 
@@ -3166,7 +3209,9 @@ void WebViewImpl::performPluginAction(const WebPluginAction& action,
 
 WebHitTestResult WebViewImpl::hitTestResultAt(const WebPoint& point)
 {
-    return hitTestResultForWindowPos(point);
+    IntPoint scaledPoint = point;
+    scaledPoint.scale(1 / pageScaleFactor(), 1 / pageScaleFactor());
+    return hitTestResultForWindowPos(scaledPoint);
 }
 
 void WebViewImpl::copyImageAt(const WebPoint& point)
@@ -3668,34 +3713,6 @@ void WebViewImpl::setEmulatedTextZoomFactor(float textZoomFactor)
         frame->setPageAndTextZoomFactors(frame->pageZoomFactor(), m_emulatedTextZoomFactor);
 }
 
-bool WebViewImpl::navigationPolicyFromMouseEvent(unsigned short button,
-                                                 bool ctrl, bool shift,
-                                                 bool alt, bool meta,
-                                                 WebNavigationPolicy* policy)
-{
-#if OS(DARWIN)
-    const bool newTabModifier = (button == 1) || meta;
-#else
-    const bool newTabModifier = (button == 1) || ctrl;
-#endif
-    if (!newTabModifier && !shift && !alt)
-      return false;
-
-    ASSERT(policy);
-    if (newTabModifier) {
-        if (shift)
-          *policy = WebNavigationPolicyNewForegroundTab;
-        else
-          *policy = WebNavigationPolicyNewBackgroundTab;
-    } else {
-        if (shift)
-          *policy = WebNavigationPolicyNewWindow;
-        else
-          *policy = WebNavigationPolicyDownload;
-    }
-    return true;
-}
-
 void WebViewImpl::startDragging(Frame* frame,
                                 const WebDragData& dragData,
                                 WebDragOperationsMask mask,
@@ -3787,7 +3804,7 @@ Node* WebViewImpl::focusedWebCoreNode()
 HitTestResult WebViewImpl::hitTestResultForWindowPos(const IntPoint& pos)
 {
     IntPoint docPoint(m_page->mainFrame()->view()->windowToContents(pos));
-    return m_page->mainFrame()->eventHandler()->hitTestResultAtPoint(docPoint);
+    return m_page->mainFrame()->eventHandler()->hitTestResultAtPoint(docPoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
 }
 
 void WebViewImpl::setTabsToLinks(bool enable)
@@ -3815,8 +3832,25 @@ void WebViewImpl::setRootGraphicsLayer(GraphicsLayer* layer)
 {
     suppressInvalidations(true);
 
-    m_rootGraphicsLayer = layer;
-    m_rootLayer = layer ? layer->platformLayer() : 0;
+    if (page()->settings()->pinchVirtualViewportEnabled()) {
+        if (!m_pinchViewports)
+            m_pinchViewports = PinchViewports::create(this);
+
+        m_pinchViewports->setOverflowControlsHostLayer(layer);
+        m_pinchViewports->setViewportSize(mainFrameImpl()->frame()->view()->frameRect().size());
+        if (layer) {
+            m_rootGraphicsLayer = m_pinchViewports->rootGraphicsLayer();
+            m_rootLayer = m_pinchViewports->rootGraphicsLayer()->platformLayer();
+            m_pinchViewports->registerViewportLayersWithTreeView(m_layerTreeView);
+        } else {
+            m_rootGraphicsLayer = 0;
+            m_rootLayer = 0;
+            m_pinchViewports->clearViewportLayersForTreeView(m_layerTreeView);
+        }
+    } else {
+        m_rootGraphicsLayer = layer;
+        m_rootLayer = layer ? layer->platformLayer() : 0;
+    }
 
     setIsAcceleratedCompositingActive(layer);
 
@@ -3852,6 +3886,16 @@ void WebViewImpl::invalidateRect(const IntRect& rect)
 WebCore::GraphicsLayerFactory* WebViewImpl::graphicsLayerFactory() const
 {
     return m_graphicsLayerFactory.get();
+}
+
+WebCore::RenderLayerCompositor* WebViewImpl::compositor() const
+{
+    if (!page()
+        || !page()->mainFrame()
+        || !page()->mainFrame()->document()
+        || !page()->mainFrame()->document()->renderView())
+        return 0;
+    return page()->mainFrame()->document()->renderView()->compositor();
 }
 
 void WebViewImpl::registerForAnimations(WebLayer* layer)
@@ -3930,6 +3974,7 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
             m_layerTreeView->setShowPaintRects(m_showPaintRects);
             m_layerTreeView->setShowDebugBorders(m_showDebugBorders);
             m_layerTreeView->setContinuousPaintingEnabled(m_continuousPaintingEnabled);
+            m_layerTreeView->setShowScrollBottleneckRects(m_showScrollBottleneckRects);
         } else {
             m_isAcceleratedCompositingActive = false;
             m_client->didDeactivateCompositor();

@@ -429,7 +429,7 @@ void InputType::forwardEvent(Event*)
 
 bool InputType::shouldSubmitImplicitly(Event* event)
 {
-    return event->isKeyboardEvent() && event->type() == eventNames().keypressEvent && static_cast<KeyboardEvent*>(event)->charCode() == '\r';
+    return event->isKeyboardEvent() && event->type() == eventNames().keypressEvent && toKeyboardEvent(event)->charCode() == '\r';
 }
 
 PassRefPtr<HTMLFormElement> InputType::formForSubmission() const
@@ -437,7 +437,7 @@ PassRefPtr<HTMLFormElement> InputType::formForSubmission() const
     return element()->form();
 }
 
-RenderObject* InputType::createRenderer(RenderArena*, RenderStyle* style) const
+RenderObject* InputType::createRenderer(RenderStyle* style) const
 {
     return RenderObject::createObject(element(), style);
 }
@@ -531,9 +531,9 @@ bool InputType::isKeyboardFocusable(KeyboardEvent* event) const
     return element()->isTextFormControlKeyboardFocusable(event);
 }
 
-bool InputType::isMouseFocusable() const
+bool InputType::shouldShowFocusRingOnMouseFocus() const
 {
-    return element()->isTextFormControlMouseFocusable();
+    return false;
 }
 
 bool InputType::shouldUseInputMethod() const

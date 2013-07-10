@@ -24,9 +24,9 @@
 #define RenderBox_h
 
 #include "core/platform/ScrollTypes.h"
-#include "core/rendering/exclusions/ExclusionShapeOutsideInfo.h"
 #include "core/rendering/RenderBoxModelObject.h"
 #include "core/rendering/RenderOverflow.h"
+#include "core/rendering/shapes/ShapeOutsideInfo.h"
 
 namespace WebCore {
 
@@ -207,6 +207,9 @@ public:
 
     virtual int pixelSnappedOffsetWidth() const OVERRIDE FINAL;
     virtual int pixelSnappedOffsetHeight() const OVERRIDE FINAL;
+
+    bool requiresLayoutToDetermineWidth() const;
+    LayoutUnit fixedOffsetWidth() const;
 
     // More IE extensions.  clientWidth and clientHeight represent the interior of an object
     // excluding border and scrollbar.  clientLeft/Top are just the borderLeftWidth and borderTopWidth.
@@ -532,7 +535,7 @@ public:
     LayoutRect logicalLayoutOverflowRectForPropagation(RenderStyle*) const;
     LayoutRect layoutOverflowRectForPropagation(RenderStyle*) const;
 
-    RenderOverflow* hasRenderOverflow() const { return m_overflow.get(); }    
+    bool hasRenderOverflow() const { return m_overflow; }
     bool hasVisualOverflow() const { return m_overflow && !borderBoxRect().contains(m_overflow->visualOverflowRect()); }
 
     virtual bool needsPreferredWidthsRecalculation() const;
@@ -547,24 +550,22 @@ public:
 
     bool hasHorizontalLayoutOverflow() const
     {
-        if (RenderOverflow* overflow = hasRenderOverflow()) {
-            LayoutRect layoutOverflowRect = overflow->layoutOverflowRect();
-            flipForWritingMode(layoutOverflowRect);
-            return layoutOverflowRect.x() < x() || layoutOverflowRect.maxX() > x() + logicalWidth();
-        }
+        if (!m_overflow)
+            return false;
 
-        return false;
+        LayoutRect layoutOverflowRect = m_overflow->layoutOverflowRect();
+        flipForWritingMode(layoutOverflowRect);
+        return layoutOverflowRect.x() < x() || layoutOverflowRect.maxX() > x() + logicalWidth();
     }
 
     bool hasVerticalLayoutOverflow() const
     {
-        if (RenderOverflow* overflow = hasRenderOverflow()) {
-            LayoutRect layoutOverflowRect = overflow->layoutOverflowRect();
-            flipForWritingMode(layoutOverflowRect);
-            return layoutOverflowRect.y() < y() || layoutOverflowRect.maxY() > y() + logicalHeight();
-        }
+        if (!m_overflow)
+            return false;
 
-        return false;
+        LayoutRect layoutOverflowRect = m_overflow->layoutOverflowRect();
+        flipForWritingMode(layoutOverflowRect);
+        return layoutOverflowRect.y() < y() || layoutOverflowRect.maxY() > y() + logicalHeight();
     }
 
     virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject*) const
@@ -578,9 +579,9 @@ public:
     virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
     static void reportStaticMembersMemoryUsage(MemoryInstrumentation*);
 
-    ExclusionShapeOutsideInfo* exclusionShapeOutsideInfo() const
+    ShapeOutsideInfo* shapeOutsideInfo() const
     {
-        return isFloatingWithShapeOutside() && ExclusionShapeOutsideInfo::isEnabledFor(this) ? ExclusionShapeOutsideInfo::info(this) : 0;
+        return isFloatingWithShapeOutside() && ShapeOutsideInfo::isEnabledFor(this) ? ShapeOutsideInfo::info(this) : 0;
     }
 
 protected:
@@ -619,7 +620,7 @@ protected:
     RenderObject* splitAnonymousBoxesAroundChild(RenderObject* beforeChild);
  
 private:
-    void updateExclusionShapeOutsideInfoAfterStyleChange(const ExclusionShapeValue* shapeOutside, const ExclusionShapeValue* oldShapeOutside);
+    void updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOutside, const ShapeValue* oldShapeOutside);
 
     bool includeVerticalScrollbarSize() const;
     bool includeHorizontalScrollbarSize() const;

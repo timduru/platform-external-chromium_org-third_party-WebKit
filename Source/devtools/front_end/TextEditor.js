@@ -78,7 +78,7 @@ WebInspector.TextEditor.prototype = {
     /**
      * @param {string} mimeType
      */
-    set mimeType(mimeType) { },
+    setMimeType: function(mimeType) { },
 
     /**
      * @param {boolean} readOnly
@@ -151,9 +151,10 @@ WebInspector.TextEditor.prototype = {
     removeDecoration: function(lineNumber, element) { },
 
     /**
+     * @param {!RegExp} regex
      * @param {WebInspector.TextRange} range
      */
-    markAndRevealRange: function(range) { },
+    highlightSearchResults: function(regex, range) { },
 
     /**
      * @param {number} lineNumber
@@ -291,6 +292,8 @@ WebInspector.TextEditorDelegate.prototype = {
      * @param {number} lineNumber
      */
     scrollChanged: function(lineNumber) { },
+
+    editorFocused: function() { },
 
     /**
      * @param {WebInspector.ContextMenu} contextMenu

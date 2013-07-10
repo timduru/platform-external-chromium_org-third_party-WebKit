@@ -27,9 +27,7 @@
 #include "core/svg/SVGAnimatedRect.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
 #include "core/svg/SVGFitToViewBox.h"
-#include "core/svg/SVGLangSpace.h"
-#include "core/svg/SVGStyledTransformableElement.h"
-#include "core/svg/SVGTests.h"
+#include "core/svg/SVGGraphicsElement.h"
 #include "core/svg/SVGZoomAndPan.h"
 
 namespace WebCore {
@@ -41,17 +39,15 @@ class SVGViewSpec;
 class SVGViewElement;
 class SMILTimeContainer;
 
-class SVGSVGElement FINAL : public SVGStyledTransformableElement,
-                            public SVGTests,
-                            public SVGLangSpace,
+class SVGSVGElement FINAL : public SVGGraphicsElement,
                             public SVGExternalResourcesRequired,
                             public SVGFitToViewBox,
                             public SVGZoomAndPan {
 public:
     static PassRefPtr<SVGSVGElement> create(const QualifiedName&, Document*);
 
-    using SVGStyledTransformableElement::ref;
-    using SVGStyledTransformableElement::deref;
+    using SVGGraphicsElement::ref;
+    using SVGGraphicsElement::deref;
 
     virtual bool isValid() const { return SVGTests::isValid(); }
     virtual bool supportsFocus() const { return true; }
@@ -145,7 +141,7 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
     virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
@@ -172,11 +168,6 @@ private:
         DECLARE_ANIMATED_RECT(ViewBox, viewBox)
         DECLARE_ANIMATED_PRESERVEASPECTRATIO(PreserveAspectRatio, preserveAspectRatio)
     END_DECLARE_ANIMATED_PROPERTIES
-
-    // SVGTests
-    virtual void synchronizeRequiredFeatures() { SVGTests::synchronizeRequiredFeatures(this); }
-    virtual void synchronizeRequiredExtensions() { SVGTests::synchronizeRequiredExtensions(this); }
-    virtual void synchronizeSystemLanguage() { SVGTests::synchronizeSystemLanguage(this); }
 
     virtual AffineTransform localCoordinateSpaceTransform(SVGLocatable::CTMScope) const;
 

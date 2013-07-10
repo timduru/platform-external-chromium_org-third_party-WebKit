@@ -30,7 +30,6 @@
 
 #include "core/css/resolver/StyleResolver.h"
 
-#include <stdlib.h>
 #include "CSSPropertyNames.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/CSSValueList.h"
@@ -40,7 +39,7 @@
 #include "core/svg/SVGColor.h"
 #include "core/svg/SVGPaint.h"
 #include "core/svg/SVGURIReference.h"
-#include <wtf/MathExtras.h>
+#include "wtf/MathExtras.h"
 
 #define HANDLE_INHERIT(prop, Prop) \
 if (isInherit) \
@@ -566,7 +565,7 @@ void StyleResolver::applySVGProperty(CSSPropertyID id, CSSValue* value)
             int blur = item->blur ? item->blur->computeLength<int>(state.style(), state.rootElementStyle()) : 0;
             Color color;
             if (item->color)
-                color = colorFromPrimitiveValue(item->color.get());
+                color = resolveColorFromPrimitiveValue(item->color.get());
 
             // -webkit-svg-shadow does should not have a spread or style
             ASSERT(!item->spread);

@@ -276,8 +276,8 @@ private:
     
     bool fireBeforeUnloadEvent(Chrome&);
 
-    void checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState>);
-    void checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction&);
+    void checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState>, FrameLoadType);
+    void checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction&, bool isNewNavigation);
     void checkNewWindowPolicyAndContinue(PassRefPtr<FormState>, const String& frameName, const NavigationAction&);
 
     bool shouldPerformFragmentNavigation(bool isFormSubmission, const String& httpMethod, FrameLoadType, const KURL&);
@@ -312,8 +312,6 @@ private:
     void closeAndRemoveChild(Frame*);
 
     void loadInSameDocument(const KURL&, PassRefPtr<SerializedScriptValue> stateObject, bool isNewNavigation);
-
-    void prepareForLoadStart();
 
     bool didOpenURL();
 

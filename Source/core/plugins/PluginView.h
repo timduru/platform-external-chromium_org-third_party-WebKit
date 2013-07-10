@@ -28,14 +28,15 @@
 
 #include "core/platform/ScrollTypes.h"
 #include "core/platform/Widget.h"
+#include <bindings/npruntime.h>
 #include <wtf/text/WTFString.h>
-
-struct NPObject;
 
 namespace WebKit { class WebLayer; }
 
 namespace WebCore {
 
+class ResourceError;
+class ResourceResponse;
 class Scrollbar;
 
 class PluginView : public Widget {
@@ -44,10 +45,17 @@ public:
 
     virtual WebKit::WebLayer* platformLayer() const { return 0; }
     virtual NPObject* scriptableObject() { return 0; }
+    virtual NPP pluginNPP() = 0;
+
     virtual bool getFormValue(String&) { return false; }
     virtual bool wantsWheelEvents() { return false; }
     virtual bool supportsKeyboardFocus() const { return false; }
     virtual bool canProcessDrag() const { return false; }
+
+    virtual void didReceiveResponse(const ResourceResponse&) { }
+    virtual void didReceiveData(const char*, int) { }
+    virtual void didFinishLoading() { }
+    virtual void didFailLoading(const ResourceError&) { }
 
 protected:
     PluginView() : Widget() { }

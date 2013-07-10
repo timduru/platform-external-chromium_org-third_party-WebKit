@@ -27,27 +27,8 @@
 #ifndef ScopedStyleResolver_h
 #define ScopedStyleResolver_h
 
-#include "core/css/CSSKeyframeRule.h"
-#include "core/css/CSSKeyframesRule.h"
-#include "core/css/CSSRuleList.h"
-#include "core/css/CSSSVGDocumentValue.h"
-#include "core/css/CSSToStyleMap.h"
-#include "core/css/CSSValueList.h"
-#include "core/css/DocumentRuleSets.h"
-#include "core/css/InspectorCSSOMWrappers.h"
-#include "core/css/MediaQueryExp.h"
-#include "core/css/RuleFeature.h"
 #include "core/css/RuleSet.h"
-#include "core/css/SelectorChecker.h"
-#include "core/css/SelectorFilter.h"
 #include "core/css/SiblingTraversalStrategies.h"
-#include "core/css/resolver/ViewportStyleResolver.h"
-#include "core/platform/LinkHash.h"
-#include "core/platform/ScrollTypes.h"
-#include "core/platform/graphics/filters/custom/CustomFilterConstants.h"
-#include "core/rendering/style/RenderStyle.h"
-#include "core/rendering/style/StyleInheritedData.h"
-#include "wtf/Assertions.h"
 #include "wtf/Forward.h"
 #include "wtf/HashMap.h"
 #include "wtf/OwnPtr.h"
@@ -71,12 +52,13 @@ public:
 
     static const ContainerNode* scopingNodeFor(const CSSStyleSheet*);
 
-    // methods for building tree.
     const ContainerNode* scopingNode() const { return m_scopingNode; }
     const TreeScope* treeScope() const { return m_scopingNode->treeScope(); }
     void prepareEmptyRuleSet() { m_authorStyle = RuleSet::create(); }
     void setParent(ScopedStyleResolver* newParent) { m_parent = newParent; }
     ScopedStyleResolver* parent() { return m_parent; }
+
+    bool hasOnlyEmptyRuleSets() const { return !m_authorStyle->ruleCount() && m_atHostRules.isEmpty(); }
 
 public:
     bool checkRegionStyle(Element*);
@@ -85,10 +67,11 @@ public:
     void matchAuthorRules(ElementRuleCollector&, bool includeEmptyRules, bool applyAuthorStyles);
     void matchPageRules(PageRuleCollector&);
     void addRulesFromSheet(StyleSheetContents*, const MediaQueryEvaluator&, StyleResolver*);
-    void postAddRulesFromSheet() { m_authorStyle->shrinkToFit(); }
     void addHostRule(StyleRuleHost*, bool hasDocumentSecurityOrigin, const ContainerNode* scopingNode);
     void collectFeaturesTo(RuleFeatureSet&);
     void resetAuthorStyle();
+    void resetAtHostRules(const ShadowRoot*);
+
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
 private:
@@ -108,7 +91,7 @@ private:
 class ScopedStyleTree {
     WTF_MAKE_NONCOPYABLE(ScopedStyleTree); WTF_MAKE_FAST_ALLOCATED;
 public:
-    ScopedStyleTree() : m_scopedResolverForDocument(0) { }
+    ScopedStyleTree() : m_scopedResolverForDocument(0), m_buildInDocumentOrder(true) { }
 
     ScopedStyleResolver* ensureScopedStyleResolver(const ContainerNode* scopingNode);
     ScopedStyleResolver* scopedStyleResolverFor(const ContainerNode* scopingNode);
@@ -122,10 +105,14 @@ public:
     void resolveScopedStyles(const Element*, Vector<ScopedStyleResolver*, 8>&);
     ScopedStyleResolver* scopedResolverFor(const Element*);
 
+    void remove(const ContainerNode* scopingNode);
+
     void pushStyleCache(const ContainerNode* scopingNode, const ContainerNode* parent);
     void popStyleCache(const ContainerNode* scopingNode);
 
     void collectFeaturesTo(RuleFeatureSet& features);
+    void setBuildInDocumentOrder(bool enabled) { m_buildInDocumentOrder = enabled; }
+    bool buildInDocumentOrder() const { return m_buildInDocumentOrder; }
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 private:
@@ -135,9 +122,12 @@ private:
     void resolveStyleCache(const ContainerNode* scopingNode);
     ScopedStyleResolver* enclosingScopedStyleResolverFor(const ContainerNode* scopingNode);
 
+    void reparentNodes(const ScopedStyleResolver* oldParent, ScopedStyleResolver* newParent);
+
 private:
     HashMap<const ContainerNode*, OwnPtr<ScopedStyleResolver> > m_authorStyles;
     ScopedStyleResolver* m_scopedResolverForDocument;
+    bool m_buildInDocumentOrder;
 
     struct ScopedStyleCache {
         ScopedStyleResolver* scopedResolver;

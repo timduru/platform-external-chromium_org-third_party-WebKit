@@ -810,8 +810,7 @@ WebInspector.ElementsTreeElement.prototype = {
         {
             switch (entry.type) {
                 case "added":
-                    if (entry.node.parentElement)
-                        entry.node.parentElement.removeChild(entry.node);
+                    entry.node.remove();
                     break;
                 case "changed":
                     entry.node.textContent = entry.oldText;
@@ -1309,6 +1308,7 @@ WebInspector.ElementsTreeElement.prototype = {
         contextMenu.appendItem(WebInspector.UIString("Copy as HTML"), this._copyHTML.bind(this));
         contextMenu.appendItem(WebInspector.UIString("Copy XPath"), this._copyXPath.bind(this));
         contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Delete node" : "Delete Node"), this.remove.bind(this));
+        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Inspect DOM properties" : "Inspect DOM Properties"), this._inspectDOMProperties.bind(this));
     },
 
     _startEditing: function()
@@ -1619,7 +1619,7 @@ WebInspector.ElementsTreeElement.prototype = {
         }
 
         if (!attributeName.trim() && !newText.trim()) {
-            element.removeSelf();
+            element.remove();
             moveToNextAttributeIfNeeded.call(this);
             return;
         }
@@ -1791,8 +1791,8 @@ WebInspector.ElementsTreeElement.prototype = {
 
     _updateDecorations: function()
     {
-        if (this._decoratorElement && this._decoratorElement.parentElement)
-            this._decoratorElement.parentElement.removeChild(this._decoratorElement);
+        if (this._decoratorElement)
+            this._decoratorElement.remove();
         this._decoratorElement = this._createDecoratorElement();
         if (this._decoratorElement && this.listItemElement)
             this.listItemElement.insertBefore(this._decoratorElement, this.listItemElement.firstChild);
@@ -2063,6 +2063,24 @@ WebInspector.ElementsTreeElement.prototype = {
     _copyXPath: function()
     {
         this._node.copyXPath(true);
+    },
+
+    _inspectDOMProperties: function()
+    {
+        WebInspector.RemoteObject.resolveNode(this._node, "console", callback);
+
+        /**
+         * @param {WebInspector.RemoteObject} nodeObject
+         */
+        function callback(nodeObject)
+        {
+            if (!nodeObject)
+                return;
+
+            var message = WebInspector.ConsoleMessage.create(WebInspector.ConsoleMessage.MessageSource.ConsoleAPI, WebInspector.ConsoleMessage.MessageLevel.Log, "", WebInspector.ConsoleMessage.MessageType.Dir, undefined, undefined, undefined, undefined, [nodeObject]);
+            WebInspector.console.addMessage(message);
+            WebInspector.showConsole();
+        }
     },
 
     _highlightSearchResults: function()

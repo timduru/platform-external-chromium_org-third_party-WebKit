@@ -59,8 +59,8 @@
 #include "public/platform/WebRect.h"
 #include "public/platform/WebSize.h"
 #include "public/platform/WebString.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/RefCounted.h>
+#include "wtf/OwnPtr.h"
+#include "wtf/RefCounted.h"
 
 namespace WebCore {
 class ChromiumDataObject;
@@ -81,6 +81,7 @@ class PlatformKeyboardEvent;
 class PopupContainer;
 class PopupMenuClient;
 class Range;
+class RenderLayerCompositor;
 class RenderTheme;
 class TextFieldDecorator;
 class Widget;
@@ -94,6 +95,7 @@ class ContextMenuClientImpl;
 class DeviceOrientationClientProxy;
 class GeolocationClientProxy;
 class LinkHighlight;
+class PinchViewports;
 class PrerendererClientImpl;
 class SpeechInputClientImpl;
 class SpeechRecognitionClientProxy;
@@ -159,10 +161,10 @@ public:
         int selectionStart,
         int selectionEnd);
     virtual bool confirmComposition();
+    virtual bool confirmComposition(ConfirmCompositionBehavior selectionBehavior);
     virtual bool confirmComposition(const WebString& text);
     virtual bool compositionRange(size_t* location, size_t* length);
     virtual WebTextInputInfo textInputInfo();
-    virtual WebTextInputType textInputType();
     virtual bool setEditableSelectionOffsets(int start, int end);
     virtual bool setCompositionFromExistingText(int compositionStart, int compositionEnd, const WebVector<WebCompositionUnderline>& underlines);
     virtual void extendSelectionAndDelete(int before, int after);
@@ -312,6 +314,7 @@ public:
     virtual void setShowDebugBorders(bool);
     virtual void setShowFPSCounter(bool);
     virtual void setContinuousPaintingEnabled(bool);
+    virtual void setShowScrollBottleneckRects(bool);
 
     // WebViewImpl
 
@@ -436,16 +439,6 @@ public:
         return m_maxAutoSize;
     }
 
-    // Set the disposition for how this webview is to be initially shown.
-    void setInitialNavigationPolicy(WebNavigationPolicy policy)
-    {
-        m_initialNavigationPolicy = policy;
-    }
-    WebNavigationPolicy initialNavigationPolicy() const
-    {
-        return m_initialNavigationPolicy;
-    }
-
     // Sets the emulated text zoom factor
     // (may not be 1 in the device metrics emulation mode).
     void setEmulatedTextZoomFactor(float);
@@ -458,16 +451,6 @@ public:
     }
 
     void updatePageDefinedPageScaleConstraints(const WebCore::ViewportArguments&);
-
-    // Determines whether a page should e.g. be opened in a background tab.
-    // Returns false if it has no opinion, in which case it doesn't set *policy.
-    static bool navigationPolicyFromMouseEvent(
-        unsigned short button,
-        bool ctrl,
-        bool shift,
-        bool alt,
-        bool meta,
-        WebNavigationPolicy*);
 
     // Start a system drag and drop operation.
     void startDragging(
@@ -516,6 +499,7 @@ public:
     void scheduleCompositingLayerSync();
     void scrollRootLayerRect(const WebCore::IntSize& scrollDelta, const WebCore::IntRect& clipRect);
     WebCore::GraphicsLayerFactory* graphicsLayerFactory() const;
+    WebCore::RenderLayerCompositor* compositor() const;
     void registerForAnimations(WebLayer*);
     void scheduleAnimation();
 
@@ -597,6 +581,8 @@ private:
     WebViewImpl(WebViewClient*);
     virtual ~WebViewImpl();
 
+    WebTextInputType textInputType();
+
     // Returns true if the event was actually processed.
     bool keyEventDefault(const WebKeyboardEvent&);
 
@@ -607,6 +593,8 @@ private:
     // have changed. Note that this should only be called when the Autofill
     // popup is showing.
     void refreshAutofillPopup();
+
+    bool confirmComposition(const WebString& text, ConfirmCompositionBehavior);
 
     // Returns true if the view was scrolled.
     bool scrollViewWithKeyboard(int keyCode, int modifiers);
@@ -713,6 +701,8 @@ private:
     // Saved page scale state.
     float m_savedPageScaleFactor; // 0 means that no page scale factor is saved.
     WebCore::IntSize m_savedScrollOffset;
+    float m_exitFullscreenPageScaleFactor;
+    WebCore::IntSize m_exitFullscreenScrollOffset;
 
     // The scale moved to by the latest double tap zoom, if any.
     float m_doubleTapZoomPageScaleFactor;
@@ -736,9 +726,6 @@ private:
     // associated WM_CHAR event if the keydown was handled. We emulate
     // this behavior by setting this flag if the keyDown was handled.
     bool m_suppressNextKeypressEvent;
-
-    // The policy for how this webview is to be initially shown.
-    WebNavigationPolicy m_initialNavigationPolicy;
 
     // Represents whether or not this object should process incoming IME events.
     bool m_imeAcceptEvents;
@@ -812,6 +799,7 @@ private:
     // If true, the graphics context is being restored.
     bool m_recreatingGraphicsContext;
     static const WebInputEvent* m_currentInputEvent;
+    OwnPtr<PinchViewports> m_pinchViewports;
 
 #if ENABLE(INPUT_SPEECH)
     OwnPtr<SpeechInputClientImpl> m_speechInputClient;
@@ -839,6 +827,7 @@ private:
     bool m_showPaintRects;
     bool m_showDebugBorders;
     bool m_continuousPaintingEnabled;
+    bool m_showScrollBottleneckRects;
 };
 
 } // namespace WebKit

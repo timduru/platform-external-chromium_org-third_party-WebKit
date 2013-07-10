@@ -34,14 +34,12 @@
 
 #include "core/dom/EventListenerMap.h"
 #include "core/dom/EventNames.h"
-#include <wtf/Forward.h>
-#include <wtf/HashMap.h>
-#include <wtf/text/AtomicStringHash.h>
+#include "wtf/Forward.h"
 
 namespace WebCore {
 
     class AudioContext;
-    class DedicatedWorkerContext;
+    class DedicatedWorkerGlobalScope;
     class DOMApplicationCache;
     class DOMWindow;
     class Event;
@@ -65,7 +63,7 @@ namespace WebCore {
     class ScriptExecutionContext;
     class ScriptProcessorNode;
     class SharedWorker;
-    class SharedWorkerContext;
+    class SharedWorkerGlobalScope;
     class TextTrack;
     class TextTrackCue;
     class WebSocket;

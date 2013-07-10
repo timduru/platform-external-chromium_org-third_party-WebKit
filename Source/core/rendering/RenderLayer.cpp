@@ -95,7 +95,6 @@
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
-#include "core/rendering/RenderMarquee.h"
 #include "core/rendering/RenderReplica.h"
 #include "core/rendering/RenderScrollbar.h"
 #include "core/rendering/RenderScrollbarPart.h"
@@ -149,7 +148,6 @@ RenderLayer::RenderLayer(RenderLayerModelObject* renderer)
     , m_3DTransformedDescendantStatusDirty(true)
     , m_has3DTransformedDescendant(false)
     , m_containsDirtyOverlayScrollbars(false)
-    , m_updatingMarqueePosition(false)
 #if !ASSERT_DISABLED
     , m_layerListMutationAllowed(true)
 #endif
@@ -420,16 +418,6 @@ void RenderLayer::updateLayerPositions(RenderGeometryMap* geometryMap, UpdateLay
         backing()->updateAfterLayout(updateFlags);
     }
 
-    // With all our children positioned, now update our marquee if we need to.
-    if (renderer()->isMarquee()) {
-        RenderMarquee* marquee = toRenderMarquee(renderer());
-        // FIXME: would like to use TemporaryChange<> but it doesn't work with bitfields.
-        bool oldUpdatingMarqueePosition = m_updatingMarqueePosition;
-        m_updatingMarqueePosition = true;
-        marquee->updateMarqueePosition();
-        m_updatingMarqueePosition = oldUpdatingMarqueePosition;
-    }
-
     if (geometryMap)
         geometryMap->popMappingsToAncestor(parent());
 }
@@ -504,6 +492,14 @@ bool RenderLayer::acceleratedCompositingForOverflowScrollEnabled() const
 {
     const Settings* settings = renderer()->document()->settings();
     return settings && settings->acceleratedCompositingForOverflowScrollEnabled();
+}
+
+// FIXME: This is a temporary flag and should be removed once accelerated
+// overflow scroll is ready (crbug.com/254111).
+bool RenderLayer::compositorDrivenAcceleratedScrollingEnabled() const
+{
+    const Settings* settings = renderer()->document()->settings();
+    return settings && settings->isCompositorDrivenAcceleratedScrollingEnabled();
 }
 
 // Determine whether the current layer can be promoted to a stacking container.
@@ -764,14 +760,6 @@ void RenderLayer::updateLayerPositionsAfterScroll(RenderGeometryMap* geometryMap
     // We don't update our reflection as scrolling is a translation which does not change the size()
     // of an object, thus RenderReplica will still repaint itself properly as the layer position was
     // updated above.
-
-    if (renderer()->isMarquee()) {
-        RenderMarquee* marquee = toRenderMarquee(renderer());
-        bool oldUpdatingMarqueePosition = m_updatingMarqueePosition;
-        m_updatingMarqueePosition = true;
-        marquee->updateMarqueePosition();
-        m_updatingMarqueePosition = oldUpdatingMarqueePosition;
-    }
 
     if (geometryMap)
         geometryMap->popMappingsToAncestor(parent());
@@ -1874,8 +1862,10 @@ static inline const RenderLayer* accumulateOffsetTowardsAncestor(const RenderLay
             ancestorLayer->convertToLayerCoords(fixedPositionContainerLayer, ancestorCoords);
 
             location += (fixedContainerCoords - ancestorCoords);
-            return ancestorLayer;
+        } else {
+            location += toSize(layer->location());
         }
+        return ancestorLayer;
     }
     
     RenderLayer* parentLayer;
@@ -2159,13 +2149,7 @@ void RenderLayer::setScrollOffset(const IntPoint& newScrollOffset)
             view->markLazyBlocksForLayout();
         }
 
-        if (!m_updatingMarqueePosition) {
-            // Avoid updating compositing layers if, higher on the stack, we're already updating layer
-            // positions. Updating layer positions requires a full walk of up-to-date RenderLayers, and
-            // in this case we're still updating their positions; we'll update compositing layers later
-            // when that completes.
-            updateCompositingLayersAfterScroll();
-        }
+        updateCompositingLayersAfterScroll();
     }
 
     RenderLayerModelObject* repaintContainer = renderer()->containerForRepaint();
@@ -2455,31 +2439,29 @@ void RenderLayer::resize(const PlatformEvent& evt, const LayoutSize& oldOffset)
     
     LayoutSize difference = (currentSize + newOffset - adjustedOldOffset).expandedTo(minimumSize) - currentSize;
 
-    ASSERT_WITH_SECURITY_IMPLICATION(element->isStyledElement());
-    StyledElement* styledElement = static_cast<StyledElement*>(element);
     bool isBoxSizingBorder = renderer->style()->boxSizing() == BORDER_BOX;
 
     EResize resize = renderer->style()->resize();
     if (resize != RESIZE_VERTICAL && difference.width()) {
         if (element->isFormControlElement()) {
             // Make implicit margins from the theme explicit (see <http://bugs.webkit.org/show_bug.cgi?id=9547>).
-            styledElement->setInlineStyleProperty(CSSPropertyMarginLeft, String::number(renderer->marginLeft() / zoomFactor) + "px", false);
-            styledElement->setInlineStyleProperty(CSSPropertyMarginRight, String::number(renderer->marginRight() / zoomFactor) + "px", false);
+            element->setInlineStyleProperty(CSSPropertyMarginLeft, String::number(renderer->marginLeft() / zoomFactor) + "px", false);
+            element->setInlineStyleProperty(CSSPropertyMarginRight, String::number(renderer->marginRight() / zoomFactor) + "px", false);
         }
         LayoutUnit baseWidth = renderer->width() - (isBoxSizingBorder ? LayoutUnit() : renderer->borderAndPaddingWidth());
         baseWidth = baseWidth / zoomFactor;
-        styledElement->setInlineStyleProperty(CSSPropertyWidth, String::number(roundToInt(baseWidth + difference.width())) + "px", false);
+        element->setInlineStyleProperty(CSSPropertyWidth, String::number(roundToInt(baseWidth + difference.width())) + "px", false);
     }
 
     if (resize != RESIZE_HORIZONTAL && difference.height()) {
         if (element->isFormControlElement()) {
             // Make implicit margins from the theme explicit (see <http://bugs.webkit.org/show_bug.cgi?id=9547>).
-            styledElement->setInlineStyleProperty(CSSPropertyMarginTop, String::number(renderer->marginTop() / zoomFactor) + "px", false);
-            styledElement->setInlineStyleProperty(CSSPropertyMarginBottom, String::number(renderer->marginBottom() / zoomFactor) + "px", false);
+            element->setInlineStyleProperty(CSSPropertyMarginTop, String::number(renderer->marginTop() / zoomFactor) + "px", false);
+            element->setInlineStyleProperty(CSSPropertyMarginBottom, String::number(renderer->marginBottom() / zoomFactor) + "px", false);
         }
         LayoutUnit baseHeight = renderer->height() - (isBoxSizingBorder ? LayoutUnit() : renderer->borderAndPaddingHeight());
         baseHeight = baseHeight / zoomFactor;
-        styledElement->setInlineStyleProperty(CSSPropertyHeight, String::number(roundToInt(baseHeight + difference.height())) + "px", false);
+        element->setInlineStyleProperty(CSSPropertyHeight, String::number(roundToInt(baseHeight + difference.height())) + "px", false);
     }
 
     document->updateLayout();
@@ -5002,26 +4984,20 @@ void RenderLayer::calculateRects(const ClipRectsContext& clipRectsContext, const
     layerBounds = LayoutRect(offset, size());
 
     // Update the clip rects that will be passed to child layers.
-    if (renderer()->hasClipOrOverflowClip()) {
+    if (renderer()->hasOverflowClip()) {
         // This layer establishes a clip of some kind.
-        if (renderer()->hasOverflowClip() && (this != clipRectsContext.rootLayer || clipRectsContext.respectOverflowClip == RespectOverflowClip)) {
+        if (this != clipRectsContext.rootLayer || clipRectsContext.respectOverflowClip == RespectOverflowClip) {
             foregroundRect.intersect(toRenderBox(renderer())->overflowClipRect(offset, clipRectsContext.region, clipRectsContext.overlayScrollbarSizeRelevancy));
             if (renderer()->style()->hasBorderRadius())
                 foregroundRect.setHasRadius(true);
         }
 
-        if (renderer()->hasClip()) {
-            // Clip applies to *us* as well, so go ahead and update the damageRect.
-            LayoutRect newPosClip = toRenderBox(renderer())->clipRect(offset, clipRectsContext.region);
-            backgroundRect.intersect(newPosClip);
-            foregroundRect.intersect(newPosClip);
-            outlineRect.intersect(newPosClip);
-        }
-
-        // If we establish a clip at all, then go ahead and make sure our background
+        // If we establish an overflow clip at all, then go ahead and make sure our background
         // rect is intersected with our layer's bounds including our visual overflow,
         // since any visual overflow like box-shadow or border-outset is not clipped by overflow:auto/hidden.
         if (renderBox()->hasVisualOverflow()) {
+            // FIXME: Perhaps we should be propagating the borderbox as the clip rect for children, even though
+            //        we may need to inflate our clip specifically for shadows or outsets.
             // FIXME: Does not do the right thing with CSS regions yet, since we don't yet factor in the
             // individual region boxes as overflow.
             LayoutRect layerBoundsWithVisualOverflow = renderBox()->visualOverflowRect();
@@ -5036,6 +5012,15 @@ void RenderLayer::calculateRects(const ClipRectsContext& clipRectsContext, const
             if (this != clipRectsContext.rootLayer || clipRectsContext.respectOverflowClip == RespectOverflowClip)
                 backgroundRect.intersect(bounds);
         }
+    }
+
+    // CSS clip (different than clipping due to overflow) can clip to any box, even if it falls outside of the border box.
+    if (renderer()->hasClip()) {
+        // Clip applies to *us* as well, so go ahead and update the damageRect.
+        LayoutRect newPosClip = toRenderBox(renderer())->clipRect(offset, clipRectsContext.region);
+        backgroundRect.intersect(newPosClip);
+        foregroundRect.intersect(newPosClip);
+        outlineRect.intersect(newPosClip);
     }
 }
 

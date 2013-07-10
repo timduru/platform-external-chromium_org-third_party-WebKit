@@ -100,7 +100,7 @@ static void pluginDeallocate(NPObject*);
 NPNetscapeFuncs* browser;
 NPPluginFuncs* pluginFunctions;
 
-static NPClass pluginClass = {
+static NPClass pluginClass_ = {
     NP_CLASS_STRUCT_VERSION,
     pluginAllocate,
     pluginDeallocate,
@@ -116,9 +116,11 @@ static NPClass pluginClass = {
     0, // NPClass::construct
 };
 
-NPClass* getPluginClass(void)
+NPClass* createPluginClass(void)
 {
-    return &pluginClass;
+    NPClass* pluginClass = new NPClass;
+    *pluginClass = pluginClass_;
+    return pluginClass;
 }
 
 static bool identifiersInitialized = false;
@@ -136,6 +138,8 @@ enum {
     ID_PROPERTY_WINDOWED_PLUGIN,
     ID_PROPERTY_TEST_OBJECT_COUNT,
     ID_PROPERTY_DELETE_IN_GET_PROPERTY,
+    ID_PROPERTY_DELETE_IN_HAS_PROPERTY_RETURN_TRUE,
+    ID_PROPERTY_DELETE_IN_SET_PROPERTY,
     NUM_PROPERTY_IDENTIFIERS
 };
 
@@ -152,7 +156,9 @@ static const NPUTF8 *pluginPropertyIdentifierNames[NUM_PROPERTY_IDENTIFIERS] = {
     "lastSetWindowArguments",
     "windowedPlugin",
     "testObjectCount",
-    "deletePluginInGetProperty"
+    "deletePluginInGetProperty",
+    "deletePluginInHasPropertyReturnTrue",
+    "deletePluginInSetProperty"
 };
 
 enum {
@@ -274,11 +280,10 @@ static bool callDeletePlugin(NPObject* obj, NPIdentifier name, NPIdentifier iden
 
 static bool pluginHasProperty(NPObject *obj, NPIdentifier name)
 {
-    if (callDeletePlugin(obj, name, browser->getstringidentifier("deletePluginReturnTrue")))
-        return true;
-
-    if (callDeletePlugin(obj, name, browser->getstringidentifier("deletePluginReturnFalse")))
+    if (callDeletePlugin(obj, name, browser->getstringidentifier("deletePluginInHasPropertyReturnFalse")))
         return false;
+
+    callDeletePlugin(obj, name, pluginPropertyIdentifiers[ID_PROPERTY_DELETE_IN_HAS_PROPERTY_RETURN_TRUE]);
 
     for (int i = 0; i < NUM_PROPERTY_IDENTIFIERS; i++)
         if (name == pluginPropertyIdentifiers[i])
@@ -366,7 +371,7 @@ static bool pluginGetProperty(NPObject* obj, NPIdentifier name, NPVariant* resul
 static bool pluginSetProperty(NPObject* obj, NPIdentifier name, const NPVariant* variant)
 {
     PluginObject* plugin = reinterpret_cast<PluginObject*>(obj);
-    if (callDeletePlugin(obj, name, browser->getstringidentifier("deletePluginReturnTrue")))
+    if (callDeletePlugin(obj, name, pluginPropertyIdentifiers[ID_PROPERTY_DELETE_IN_SET_PROPERTY]))
         return true;
 
     if (name == pluginPropertyIdentifiers[ID_PROPERTY_EVENT_LOGGING]) {
@@ -849,7 +854,8 @@ static bool testScriptObjectInvoke(PluginObject* obj, const NPVariant* args, uin
     free(object_mehod_string);
 
     // Create a fresh NPObject to be passed as an argument
-    NPObject* object_arg = browser->createobject(obj->npp, &pluginClass);
+    NPObject* object_arg = browser->createobject(obj->npp, obj->header._class);
+
     NPVariant invoke_args[1];
     OBJECT_TO_NPVARIANT(object_arg, invoke_args[0]);
 
@@ -1091,7 +1097,7 @@ static bool pluginInvoke(NPObject* header, NPIdentifier name, const NPVariant* a
         return false;
     }
     if (name == pluginMethodIdentifiers[ID_TEST_CLONE_OBJECT]) {
-        NPObject* new_object = browser->createobject(plugin->npp, &pluginClass);
+        NPObject* new_object = browser->createobject(plugin->npp, plugin->header._class);
         assert(new_object->referenceCount == 1);
         OBJECT_TO_NPVARIANT(new_object, *result);
         return true;
@@ -1156,7 +1162,7 @@ static bool pluginInvoke(NPObject* header, NPIdentifier name, const NPVariant* a
     if (name == pluginMethodIdentifiers[ID_OBJECTS_ARE_SAME])
         return objectsAreSame(plugin, args, argCount, result);
     if (name == pluginMethodIdentifiers[ID_TEST_DELETE_WITHIN_INVOKE]) {
-        NPObject* newObject = browser->createobject(plugin->npp, &pluginClass);
+        NPObject* newObject = browser->createobject(plugin->npp, plugin->header._class);
         OBJECT_TO_NPVARIANT(newObject, *result);
         callDeletePlugin(header, name, pluginMethodIdentifiers[ID_TEST_DELETE_WITHIN_INVOKE]);
         return true;

@@ -42,12 +42,12 @@
 namespace WebCore {
 
     class ScriptExecutionContext;
-    class WorkerContextProxy;
+    class WorkerGlobalScopeProxy;
     class WorkerScriptLoader;
 
     typedef int ExceptionCode;
 
-    class Worker : public AbstractWorker, private WorkerScriptLoaderClient {
+    class Worker : public AbstractWorker, public ScriptWrappable, private WorkerScriptLoaderClient {
     public:
         static PassRefPtr<Worker> create(ScriptExecutionContext*, const String& url, ExceptionCode&);
         virtual ~Worker();
@@ -61,7 +61,7 @@ namespace WebCore {
         virtual bool canSuspend() const OVERRIDE;
         virtual void stop() OVERRIDE;
         virtual bool hasPendingActivity() const OVERRIDE;
-    
+
         DEFINE_ATTRIBUTE_EVENT_LISTENER(message);
 
     private:
@@ -75,7 +75,7 @@ namespace WebCore {
         virtual void derefEventTarget() OVERRIDE { deref(); }
 
         RefPtr<WorkerScriptLoader> m_scriptLoader;
-        WorkerContextProxy* m_contextProxy; // The proxy outlives the worker to perform thread shutdown.
+        WorkerGlobalScopeProxy* m_contextProxy; // The proxy outlives the worker to perform thread shutdown.
     };
 
 } // namespace WebCore

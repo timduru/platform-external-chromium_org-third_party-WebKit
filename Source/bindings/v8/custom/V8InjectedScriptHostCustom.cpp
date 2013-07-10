@@ -56,7 +56,7 @@
 #include "core/inspector/InjectedScript.h"
 #include "core/inspector/InjectedScriptHost.h"
 #include "core/inspector/InspectorDOMAgent.h"
-#include "core/inspector/InspectorValues.h"
+#include "core/platform/JSONValues.h"
 #include "modules/webdatabase/Database.h"
 
 namespace WebCore {
@@ -193,8 +193,8 @@ void V8InjectedScriptHost::functionDetailsMethodCustom(const v8::FunctionCallbac
     int columnNumber = function->GetScriptColumnNumber();
 
     v8::Local<v8::Object> location = v8::Object::New();
-    location->Set(v8::String::NewSymbol("lineNumber"), v8Integer(lineNumber, args.GetIsolate()));
-    location->Set(v8::String::NewSymbol("columnNumber"), v8Integer(columnNumber, args.GetIsolate()));
+    location->Set(v8::String::NewSymbol("lineNumber"), v8::Integer::New(lineNumber, args.GetIsolate()));
+    location->Set(v8::String::NewSymbol("columnNumber"), v8::Integer::New(columnNumber, args.GetIsolate()));
     location->Set(v8::String::NewSymbol("scriptId"), function->GetScriptId()->ToString());
 
     v8::Local<v8::Object> result = v8::Object::New();
@@ -301,7 +301,7 @@ void V8InjectedScriptHost::inspectMethodCustom(const v8::FunctionCallbackInfo<v8
     InjectedScriptHost* host = V8InjectedScriptHost::toNative(args.Holder());
     ScriptValue object(args[0]);
     ScriptValue hints(args[1]);
-    host->inspectImpl(object.toInspectorValue(ScriptState::current()), hints.toInspectorValue(ScriptState::current()));
+    host->inspectImpl(object.toJSONValue(ScriptState::current()), hints.toJSONValue(ScriptState::current()));
 }
 
 void V8InjectedScriptHost::databaseIdMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -438,4 +438,3 @@ void V8InjectedScriptHost::unmonitorFunctionMethodCustom(const v8::FunctionCallb
 }
 
 } // namespace WebCore
-

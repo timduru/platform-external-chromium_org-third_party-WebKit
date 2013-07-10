@@ -39,16 +39,15 @@
 #include "core/platform/graphics/ImageOrientation.h"
 #include "core/platform/graphics/skia/OpaqueRegionSkia.h"
 
-#include "third_party/skia/include/core/SkBitmap.h"
-#include "third_party/skia/include/core/SkDevice.h"
-#include "third_party/skia/include/core/SkPaint.h"
-#include "third_party/skia/include/core/SkPath.h"
-#include "third_party/skia/include/core/SkRect.h"
-#include "third_party/skia/include/core/SkRRect.h"
-#include "third_party/skia/include/effects/SkCornerPathEffect.h"
-
 #include <wtf/Noncopyable.h>
 #include <wtf/PassOwnPtr.h>
+
+class SkBitmap;
+class SkDevice;
+class SkPaint;
+class SkPath;
+class SkRRect;
+struct SkRect;
 
 namespace WebCore {
 
@@ -83,16 +82,8 @@ public:
     const SkCanvas* canvas() const { return m_canvas; }
     bool paintingDisabled() const { return !m_canvas; }
 
-    const SkBitmap* bitmap() const
-    {
-        TRACE_EVENT0("skia", "GraphicsContext::bitmap");
-        return &m_canvas->getDevice()->accessBitmap(false);
-    }
-
-    const SkBitmap& layerBitmap(AccessMode access = ReadOnly) const
-    {
-        return m_canvas->getTopDevice()->accessBitmap(access == ReadWrite);
-    }
+    const SkBitmap* bitmap() const;
+    const SkBitmap& layerBitmap(AccessMode = ReadOnly) const;
 
     SkDevice* createCompatibleDevice(const IntSize&, bool hasAlpha) const;
 
@@ -144,9 +135,6 @@ public:
     bool getClipBounds(SkRect* bounds) const;
     const SkMatrix& getTotalMatrix() const;
     bool isPrintingDevice() const;
-
-    void setShadowsIgnoreTransforms(bool ignoreTransforms) { m_state->m_shadowsIgnoreTransforms = ignoreTransforms; }
-    bool shadowsIgnoreTransforms() const { return m_state->m_shadowsIgnoreTransforms; }
 
     void setShouldAntialias(bool antialias) { m_state->m_shouldAntialias = antialias; }
     bool shouldAntialias() const { return m_state->m_shouldAntialias; }
@@ -239,7 +227,6 @@ public:
     void fillRect(const FloatRect&, const Color&, CompositeOperator);
     void fillRoundedRect(const IntRect&, const IntSize& topLeft, const IntSize& topRight, const IntSize& bottomLeft, const IntSize& bottomRight, const Color&);
     void fillRoundedRect(const RoundedRect&, const Color&);
-    void fillRectWithRoundedHole(const IntRect&, const RoundedRect& roundedHoleRect, const Color&);
 
     void clearRect(const FloatRect&);
 
@@ -289,7 +276,7 @@ public:
     void clipOutRoundedRect(const RoundedRect&);
     void clipPath(const Path&, WindRule = RULE_EVENODD);
     void clipConvexPolygon(size_t numPoints, const FloatPoint*, bool antialias = true);
-    void clipToImageBuffer(ImageBuffer*, const FloatRect&);
+    void clipToImageBuffer(const ImageBuffer*, const FloatRect&);
     bool clipRect(const SkRect&, AntiAliasingMode = NotAntiAliased, SkRegion::Op = SkRegion::kIntersect_Op);
 
     void drawText(const Font&, const TextRunPaintInfo&, const FloatPoint&);
@@ -306,13 +293,10 @@ public:
 
     void beginTransparencyLayer(float opacity);
     void endTransparencyLayer();
-    // Begins a layer that is clipped to the image |imageBuffer| at the location
-    // |rect|. This layer is implicitly restored when the next restore is invoked.
-    // NOTE: |imageBuffer| may be deleted before the |restore| is invoked.
-    void beginLayerClippedToImage(const FloatRect&, const ImageBuffer*);
 
     bool hasShadow() const;
     void setShadow(const FloatSize& offset, float blur, const Color&,
+        DrawLooper::ShadowTransformMode = DrawLooper::ShadowRespectsTransforms,
         DrawLooper::ShadowAlphaMode = DrawLooper::ShadowRespectsAlpha);
     void clearShadow() { clearDrawLooper(); }
 
@@ -323,6 +307,16 @@ public:
 
     void drawFocusRing(const Vector<IntRect>&, int width, int offset, const Color&);
     void drawFocusRing(const Path&, int width, int offset, const Color&);
+
+    enum Edge {
+        NoEdge = 0,
+        TopEdge = 1 << 1,
+        RightEdge = 1 << 2,
+        BottomEdge = 1 << 3,
+        LeftEdge = 1 << 4
+    };
+    typedef unsigned Edges;
+    void drawInnerShadow(const RoundedRect&, const Color& shadowColor, const IntSize shadowOffset, int shadowBlur, int shadowSpread, Edges clippedEdges = NoEdge);
 
     // This clip function is used only by <canvas> code. It allows
     // implementations to handle clipping on the canvas differently since
@@ -432,6 +426,8 @@ private:
     }
 
     void didDrawTextInRect(const SkRect& textRect);
+
+    void fillRectWithRoundedHole(const IntRect&, const RoundedRect& roundedHoleRect, const Color&);
 
     // null indicates painting is disabled. Never delete this object.
     SkCanvas* m_canvas;

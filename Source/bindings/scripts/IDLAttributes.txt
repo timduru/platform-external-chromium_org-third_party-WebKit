@@ -22,7 +22,7 @@ ActiveDOMObject
 ActivityLog=Access|Setter|Getter|AccessForIsolatedWorlds|SetterForIsolatedWorlds|GetterForIsolatedWorlds
 CachedAttribute
 KeepAttributeAliveForGC
-CallWith=ScriptExecutionContext|ScriptState|ScriptArguments|ActiveWindow|FirstWindow
+CallWith=ScriptExecutionContext|ScriptState|ScriptArguments|ActiveWindow|FirstWindow|ThisValue
 CheckSecurity
 CheckSecurityForNode
 Clamp
@@ -56,7 +56,7 @@ EnforceRange
 EventTarget
 GenerateIsReachable=*
 GetterRaisesException
-GlobalContext=WindowOnly|WorkerOnly|WindowAndWorker
+GlobalContext=Window|WorkerGlobalScope|SharedWorkerGlobalScope|DedicatedWorkerGlobalScope
 Immutable
 ImplementedAs=*
 InitializedByEventConstructor

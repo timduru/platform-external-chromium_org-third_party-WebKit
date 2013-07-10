@@ -31,7 +31,6 @@
 #include "core/page/Page.h"
 #include "core/rendering/RenderMeter.h"
 #include "core/rendering/RenderTheme.h"
-#include <wtf/StdLibExtras.h>
 
 namespace WebCore {
 
@@ -55,12 +54,12 @@ PassRefPtr<HTMLMeterElement> HTMLMeterElement::create(const QualifiedName& tagNa
     return meter;
 }
 
-RenderObject* HTMLMeterElement::createRenderer(RenderArena* arena, RenderStyle* style)
+RenderObject* HTMLMeterElement::createRenderer(RenderStyle* style)
 {
     if (hasAuthorShadowRoot() || !document()->page()->theme()->supportsMeter(style->appearance()))
         return RenderObject::createObject(this, style);
 
-    return new (arena) RenderMeter(this);
+    return new (document()->renderArena()) RenderMeter(this);
 }
 
 bool HTMLMeterElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const

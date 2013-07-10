@@ -251,14 +251,14 @@ public:
         if (!m_length)
             return 0;
         if (!m_string.isNull())
-            return m_string.characters();
+            return m_string.bloatedCharacters();
         ASSERT(m_buffer);
         if (m_buffer->has16BitShadow() && m_valid16BitShadowLength < m_length)
             m_buffer->upconvertCharacters(m_valid16BitShadowLength, m_length);
 
         m_valid16BitShadowLength = m_length;
 
-        return m_buffer->characters();
+        return m_buffer->bloatedCharacters();
     }
     
     bool is8Bit() const { return m_is8Bit; }

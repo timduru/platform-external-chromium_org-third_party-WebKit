@@ -46,13 +46,13 @@
 #include "core/rendering/style/BorderValue.h"
 #include "core/rendering/style/CounterDirectives.h"
 #include "core/rendering/style/DataRef.h"
-#include "core/rendering/style/ExclusionShapeValue.h"
 #include "core/rendering/style/LineClampValue.h"
 #include "core/rendering/style/NinePieceImage.h"
 #include "core/rendering/style/OutlineValue.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "core/rendering/style/SVGRenderStyle.h"
 #include "core/rendering/style/ShadowData.h"
+#include "core/rendering/style/ShapeValue.h"
 #include "core/rendering/style/StyleBackgroundData.h"
 #include "core/rendering/style/StyleBoxData.h"
 #include "core/rendering/style/StyleDeprecatedFlexibleBoxData.h"
@@ -739,18 +739,18 @@ public:
     EFlexWrap flexWrap() const { return static_cast<EFlexWrap>(rareNonInheritedData->m_flexibleBox->m_flexWrap); }
     EJustifyContent justifyContent() const { return static_cast<EJustifyContent>(rareNonInheritedData->m_justifyContent); }
 
-    const Vector<GridTrackSize>& gridColumns() const { return rareNonInheritedData->m_grid->m_gridColumns; }
-    const Vector<GridTrackSize>& gridRows() const { return rareNonInheritedData->m_grid->m_gridRows; }
+    const Vector<GridTrackSize>& gridDefinitionColumns() const { return rareNonInheritedData->m_grid->m_gridDefinitionColumns; }
+    const Vector<GridTrackSize>& gridDefinitionRows() const { return rareNonInheritedData->m_grid->m_gridDefinitionRows; }
     const NamedGridLinesMap& namedGridColumnLines() const { return rareNonInheritedData->m_grid->m_namedGridColumnLines; }
     const NamedGridLinesMap& namedGridRowLines() const { return rareNonInheritedData->m_grid->m_namedGridRowLines; }
     GridAutoFlow gridAutoFlow() const { return rareNonInheritedData->m_grid->m_gridAutoFlow; }
     const GridTrackSize& gridAutoColumns() const { return rareNonInheritedData->m_grid->m_gridAutoColumns; }
     const GridTrackSize& gridAutoRows() const { return rareNonInheritedData->m_grid->m_gridAutoRows; }
 
-    const GridPosition& gridStart() const { return rareNonInheritedData->m_gridItem->m_gridStart; }
-    const GridPosition& gridEnd() const { return rareNonInheritedData->m_gridItem->m_gridEnd; }
-    const GridPosition& gridBefore() const { return rareNonInheritedData->m_gridItem->m_gridBefore; }
-    const GridPosition& gridAfter() const { return rareNonInheritedData->m_gridItem->m_gridAfter; }
+    const GridPosition& gridColumnStart() const { return rareNonInheritedData->m_gridItem->m_gridColumnStart; }
+    const GridPosition& gridColumnEnd() const { return rareNonInheritedData->m_gridItem->m_gridColumnEnd; }
+    const GridPosition& gridRowStart() const { return rareNonInheritedData->m_gridItem->m_gridRowStart; }
+    const GridPosition& gridRowEnd() const { return rareNonInheritedData->m_gridItem->m_gridRowEnd; }
 
     const ShadowData* boxShadow() const { return rareNonInheritedData->m_boxShadow.get(); }
     void getBoxShadowExtent(LayoutUnit& top, LayoutUnit& right, LayoutUnit& bottom, LayoutUnit& left) const { getShadowExtent(boxShadow(), top, right, bottom, left); }
@@ -1190,16 +1190,16 @@ public:
     void setJustifyContent(EJustifyContent p) { SET_VAR(rareNonInheritedData, m_justifyContent, p); }
     void setGridAutoColumns(const GridTrackSize& length) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridAutoColumns, length); }
     void setGridAutoRows(const GridTrackSize& length) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridAutoRows, length); }
-    void setGridColumns(const Vector<GridTrackSize>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridColumns, lengths); }
-    void setGridRows(const Vector<GridTrackSize>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridRows, lengths); }
+    void setGridDefinitionColumns(const Vector<GridTrackSize>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridDefinitionColumns, lengths); }
+    void setGridDefinitionRows(const Vector<GridTrackSize>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridDefinitionRows, lengths); }
     void setNamedGridColumnLines(const NamedGridLinesMap& namedGridColumnLines) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridColumnLines, namedGridColumnLines); }
     void setNamedGridRowLines(const NamedGridLinesMap& namedGridRowLines) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridRowLines, namedGridRowLines); }
     void setGridAutoFlow(GridAutoFlow flow) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridAutoFlow, flow); }
 
-    void setGridStart(const GridPosition& startPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridStart, startPosition); }
-    void setGridEnd(const GridPosition& endPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridEnd, endPosition); }
-    void setGridBefore(const GridPosition& beforePosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridBefore, beforePosition); }
-    void setGridAfter(const GridPosition& afterPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridAfter, afterPosition); }
+    void setGridColumnStart(const GridPosition& columnStartPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridColumnStart, columnStartPosition); }
+    void setGridColumnEnd(const GridPosition& columnEndPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridColumnEnd, columnEndPosition); }
+    void setGridRowStart(const GridPosition& rowStartPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridRowStart, rowStartPosition); }
+    void setGridRowEnd(const GridPosition& rowEndPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridRowEnd, rowEndPosition); }
 
     void setMarqueeIncrement(Length f) { SET_VAR(rareNonInheritedData.access()->m_marquee, increment, f); }
     void setMarqueeSpeed(int f) { SET_VAR(rareNonInheritedData.access()->m_marquee, speed, f); }
@@ -1349,31 +1349,31 @@ public:
     SVGLength kerning() const { return svgStyle()->kerning(); }
     void setKerning(SVGLength k) { accessSVGStyle()->setKerning(k); }
 
-    void setShapeInside(PassRefPtr<ExclusionShapeValue> value)
+    void setShapeInside(PassRefPtr<ShapeValue> value)
     {
         if (rareNonInheritedData->m_shapeInside == value)
             return;
         rareNonInheritedData.access()->m_shapeInside = value;
     }
-    ExclusionShapeValue* shapeInside() const { return rareNonInheritedData->m_shapeInside.get(); }
-    ExclusionShapeValue* resolvedShapeInside() const
+    ShapeValue* shapeInside() const { return rareNonInheritedData->m_shapeInside.get(); }
+    ShapeValue* resolvedShapeInside() const
     {
-        ExclusionShapeValue* shapeInside = this->shapeInside();
-        if (shapeInside && shapeInside->type() == ExclusionShapeValue::Outside)
+        ShapeValue* shapeInside = this->shapeInside();
+        if (shapeInside && shapeInside->type() == ShapeValue::Outside)
             return shapeOutside();
         return shapeInside;
     }
 
-    void setShapeOutside(PassRefPtr<ExclusionShapeValue> value)
+    void setShapeOutside(PassRefPtr<ShapeValue> value)
     {
         if (rareNonInheritedData->m_shapeOutside == value)
             return;
         rareNonInheritedData.access()->m_shapeOutside = value;
     }
-    ExclusionShapeValue* shapeOutside() const { return rareNonInheritedData->m_shapeOutside.get(); }
+    ShapeValue* shapeOutside() const { return rareNonInheritedData->m_shapeOutside.get(); }
 
-    static ExclusionShapeValue* initialShapeInside();
-    static ExclusionShapeValue* initialShapeOutside() { return 0; }
+    static ShapeValue* initialShapeInside();
+    static ShapeValue* initialShapeOutside() { return 0; }
 
     void setClipPath(PassRefPtr<ClipPathOperation> operation)
     {
@@ -1595,8 +1595,8 @@ public:
     static TouchAction initialTouchAction() { return TouchActionAuto; }
 
     // The initial value is 'none' for grid tracks.
-    static Vector<GridTrackSize> initialGridColumns() { return Vector<GridTrackSize>(); }
-    static Vector<GridTrackSize> initialGridRows() { return Vector<GridTrackSize>(); }
+    static Vector<GridTrackSize> initialGridDefinitionColumns() { return Vector<GridTrackSize>(); }
+    static Vector<GridTrackSize> initialGridDefinitionRows() { return Vector<GridTrackSize>(); }
 
     static GridAutoFlow initialGridAutoFlow() { return AutoFlowNone; }
 
@@ -1607,10 +1607,10 @@ public:
     static NamedGridLinesMap initialNamedGridRowLines() { return NamedGridLinesMap(); }
 
     // 'auto' is the default.
-    static GridPosition initialGridStart() { return GridPosition(); }
-    static GridPosition initialGridEnd() { return GridPosition(); }
-    static GridPosition initialGridBefore() { return GridPosition(); }
-    static GridPosition initialGridAfter() { return GridPosition(); }
+    static GridPosition initialGridColumnStart() { return GridPosition(); }
+    static GridPosition initialGridColumnEnd() { return GridPosition(); }
+    static GridPosition initialGridRowStart() { return GridPosition(); }
+    static GridPosition initialGridRowEnd() { return GridPosition(); }
 
     static unsigned initialTabSize() { return 8; }
 

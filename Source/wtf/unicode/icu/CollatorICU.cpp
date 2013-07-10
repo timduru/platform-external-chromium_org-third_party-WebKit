@@ -27,18 +27,18 @@
  */
 
 #include "config.h"
-#include <wtf/unicode/Collator.h>
+#include "wtf/unicode/Collator.h"
 
 #if !UCONFIG_NO_COLLATION
 
-#include <wtf/Assertions.h>
-#include <wtf/StringExtras.h>
-#include <wtf/Threading.h>
+#include "wtf/Assertions.h"
+#include "wtf/StringExtras.h"
+#include "wtf/Threading.h"
 #include <unicode/ucol.h>
 #include <string.h>
 
 #if OS(DARWIN)
-#include <wtf/RetainPtr.h>
+#include "wtf/RetainPtr.h"
 #include <CoreFoundation/CoreFoundation.h>
 #endif
 
@@ -62,13 +62,8 @@ PassOwnPtr<Collator> Collator::userDefault()
 {
 #if OS(DARWIN) && USE(CF)
     // Mac OS X doesn't set UNIX locale to match user-selected one, so ICU default doesn't work.
-#if __MAC_OS_X_VERSION_MIN_REQUIRED >= 1060
     RetainPtr<CFLocaleRef> currentLocale(AdoptCF, CFLocaleCopyCurrent());
     CFStringRef collationOrder = (CFStringRef)CFLocaleGetValue(currentLocale.get(), kCFLocaleCollatorIdentifier);
-#else
-    RetainPtr<CFStringRef> collationOrderRetainer(AdoptCF, (CFStringRef)CFPreferencesCopyValue(CFSTR("AppleCollationOrder"), kCFPreferencesAnyApplication, kCFPreferencesCurrentUser, kCFPreferencesAnyHost));
-    CFStringRef collationOrder = collationOrderRetainer.get();
-#endif
     char buf[256];
     if (!collationOrder)
         return adoptPtr(new Collator(""));

@@ -44,7 +44,6 @@
 #include "core/rendering/RenderFlexibleBox.h"
 #include "core/rendering/RenderSlider.h"
 #include "core/rendering/RenderTheme.h"
-#include <wtf/MathExtras.h>
 
 using namespace std;
 
@@ -220,9 +219,9 @@ void SliderThumbElement::setPositionFromValue()
         renderer()->setNeedsLayout(true);
 }
 
-RenderObject* SliderThumbElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SliderThumbElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSliderThumb(this);
+    return new (document()->renderArena()) RenderSliderThumb(this);
 }
 
 bool SliderThumbElement::isDisabledFormControl() const
@@ -348,7 +347,7 @@ void SliderThumbElement::defaultEventHandler(Event* event)
         return;
     }
 
-    MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
+    MouseEvent* mouseEvent = toMouseEvent(event);
     bool isLeftButton = mouseEvent->button() == LeftButton;
     const AtomicString& eventType = event->type();
 
@@ -448,9 +447,9 @@ PassRefPtr<SliderContainerElement> SliderContainerElement::create(Document* docu
     return adoptRef(new SliderContainerElement(document));
 }
 
-RenderObject* SliderContainerElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SliderContainerElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSliderContainer(this);
+    return new (document()->renderArena()) RenderSliderContainer(this);
 }
 
 const AtomicString& SliderContainerElement::shadowPseudoId() const

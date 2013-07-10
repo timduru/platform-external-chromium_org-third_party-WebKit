@@ -29,7 +29,7 @@
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/ActiveDOMObject.h"
 #include "core/dom/EventTarget.h"
-#include "core/dom/ExceptionBase.h"
+#include "core/dom/ExceptionCode.h"
 #include "core/platform/mediastream/MediaStreamDescriptor.h"
 #include "core/platform/mediastream/MediaStreamSource.h"
 #include "modules/mediastream/SourceInfo.h"
@@ -41,6 +41,7 @@
 namespace WebCore {
 
 class MediaStreamComponent;
+class MediaStreamTrackSourcesCallback;
 
 class MediaStreamTrack : public RefCounted<MediaStreamTrack>, public ScriptWrappable, public ActiveDOMObject, public EventTarget, public MediaStreamSource::Observer {
 public:
@@ -58,7 +59,7 @@ public:
 
     String readyState() const;
 
-    static SourceInfoVector getSourceInfos(ScriptExecutionContext*, ExceptionCode&);
+    static void getSources(ScriptExecutionContext*, PassRefPtr<MediaStreamTrackSourcesCallback>, ExceptionCode&);
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mute);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(unmute);

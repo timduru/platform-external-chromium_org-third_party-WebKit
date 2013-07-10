@@ -118,11 +118,6 @@ void SimpleFontData::platformInit()
     }
 
     float lineGap = SkScalarToFloat(metrics.fLeading);
-#if OS(WINDOWS)
-    // FIXME: Windows code uses tmExternalLeading from TEXTMETRIC, SkPaint::FontMetrics does not seem to
-    // offer an equivalent. The formula below tries to proximate it based on fLeading.
-    lineGap = floorf(lineGap * 0.45);
-#endif
     m_fontMetrics.setLineGap(lineGap);
     m_fontMetrics.setLineSpacing(lroundf(ascent) + lroundf(descent) + lroundf(lineGap));
 
@@ -138,9 +133,14 @@ void SimpleFontData::platformInit()
     // In WebKit/WebCore/platform/graphics/SimpleFontData.cpp, m_spaceWidth is
     // calculated for us, but we need to calculate m_maxCharWidth and
     // m_avgCharWidth in order for text entry widgets to be sized correctly.
-
+#if OS(WINDOWS)
+    m_maxCharWidth = SkScalarRound(metrics.fMaxCharWidth);
+#else
+    // FIXME: This seems incorrect and should probably use fMaxCharWidth as
+    // the code path above.
     SkScalar xRange = metrics.fXMax - metrics.fXMin;
     m_maxCharWidth = SkScalarRound(xRange * SkScalarRound(m_platformData.size()));
+#endif
 
     if (metrics.fAvgCharWidth)
         m_avgCharWidth = SkScalarRound(metrics.fAvgCharWidth);

@@ -86,7 +86,11 @@ WebInspector.NetworkLogView = function(coulmnsVisibilitySetting)
 }
 
 WebInspector.NetworkLogView.HTTPSchemas = {"http": true, "https": true, "ws": true, "wss": true};
-WebInspector.NetworkLogView._defaultColumnsVisivility = {method: true, status: true, domain: false, type: true, initiator: true, cookies: false, setCookies: false, size: true, time: true};
+WebInspector.NetworkLogView._responseHeaderColumns = ["Cache-Control", "Connection", "Content-Encoding", "Content-Length", "ETag", "Keep-Alive", "Last-Modified", "Server", "Vary"];
+WebInspector.NetworkLogView._defaultColumnsVisibility = {
+    method: true, status: true, domain: false, type: true, initiator: true, cookies: false, setCookies: false, size: true, time: true,
+    "Cache-Control": false, "Connection": false, "Content-Encoding": false, "Content-Length": false, "ETag": false, "Keep-Alive": false, "Last-Modified": false, "Server": false, "Vary": false
+};
 WebInspector.NetworkLogView._defaultRefreshDelay = 500;
 WebInspector.NetworkLogView.ALL_TYPES = "all";
 
@@ -229,6 +233,19 @@ WebInspector.NetworkLogView.prototype = {
             weight: 6,
             align: WebInspector.DataGrid.Align.Right
         });
+
+        var responseHeaderColumns = WebInspector.NetworkLogView._responseHeaderColumns;
+        for (var i = 0; i < responseHeaderColumns.length; ++i) {
+            var headerName = responseHeaderColumns[i];
+            var descriptor = {
+                id: headerName,
+                title: WebInspector.UIString(headerName),
+                weight: 6
+            }
+            if (headerName === "Content-Length")
+                descriptor.align = WebInspector.DataGrid.Align.Right;
+            columns.push(descriptor);
+        }
 
         columns.push({
             id: "timeline",
@@ -1229,7 +1246,11 @@ WebInspector.NetworkLogView.prototype = {
         this.dispatchEventToListeners(WebInspector.NetworkLogView.EventTypes.SearchIndexUpdated, this._currentMatchedRequestIndex);
     },
 
-    performSearch: function(searchQuery)
+    /**
+     * @param {string} query
+     * @param {boolean} shouldJump
+     */
+    performSearch: function(query, shouldJump)
     {
         var newMatchedRequestIndex = 0;
         var currentMatchedRequestId;
@@ -1237,7 +1258,7 @@ WebInspector.NetworkLogView.prototype = {
             currentMatchedRequestId = this._matchedRequests[this._currentMatchedRequestIndex];
 
         this._clearSearchMatchedList();
-        this._searchRegExp = createPlainTextSearchRegex(searchQuery, "i");
+        this._searchRegExp = createPlainTextSearchRegex(query, "i");
 
         var childNodes = this._dataGrid.dataTableBody.childNodes;
         var requestNodes = Array.prototype.slice.call(childNodes, 0, childNodes.length - 1); // drop the filler row.
@@ -1251,7 +1272,8 @@ WebInspector.NetworkLogView.prototype = {
         }
 
         this.dispatchEventToListeners(WebInspector.NetworkLogView.EventTypes.SearchCountUpdated, this._matchedRequests.length);
-        this._highlightNthMatchedRequestForSearch(newMatchedRequestIndex, false);
+        if (shouldJump)
+            this._highlightNthMatchedRequestForSearch(newMatchedRequestIndex, false);
     },
 
     /**
@@ -1444,7 +1466,7 @@ WebInspector.NetworkPanel = function()
     this.createSidebarView();
     this.splitView.hideMainElement();
 
-    var defaultColumnsVisibility = WebInspector.NetworkLogView._defaultColumnsVisivility;
+    var defaultColumnsVisibility = WebInspector.NetworkLogView._defaultColumnsVisibility;
     var networkLogColumnsVisibilitySetting = WebInspector.settings.createSetting("networkLogColumnsVisibility", defaultColumnsVisibility);
     var savedColumnsVisibility = networkLogColumnsVisibilitySetting.get();
     var columnsVisibility = {};
@@ -1627,11 +1649,12 @@ WebInspector.NetworkPanel.prototype = {
     },
 
     /**
-     * @param {string} searchQuery
+     * @param {string} query
+     * @param {boolean} shouldJump
      */
-    performSearch: function(searchQuery)
+    performSearch: function(query, shouldJump)
     {
-        this._networkLogView.performSearch(searchQuery);
+        this._networkLogView.performSearch(query, shouldJump);
     },
 
     /**
@@ -1689,7 +1712,7 @@ WebInspector.NetworkPanel.prototype = {
         var style = document.createElement("style");
         var rules = [];
 
-        var columns = WebInspector.NetworkLogView._defaultColumnsVisivility;
+        var columns = WebInspector.NetworkLogView._defaultColumnsVisibility;
 
         var hideSelectors = [];
         var bgSelectors = [];
@@ -1998,6 +2021,12 @@ WebInspector.NetworkDataGridNode.prototype = {
         this._setCookiesCell = this._createDivInTD("setCookies");
         this._sizeCell = this._createDivInTD("size");
         this._timeCell = this._createDivInTD("time");
+
+        this._responseHeaderCells = {};
+        var responseHeaderColumns = WebInspector.NetworkLogView._responseHeaderColumns;
+        for (var i = 0; i < responseHeaderColumns.length; ++i)
+            this._responseHeaderCells[responseHeaderColumns[i]] = this._createDivInTD(responseHeaderColumns[i]);
+
         this._timelineCell = this._createDivInTD("timeline");
         this._createTimelineBar(this._timelineCell);
         this._nameCell.addEventListener("click", this._onClick.bind(this), false);
@@ -2106,6 +2135,10 @@ WebInspector.NetworkDataGridNode.prototype = {
         this._refreshSizeCell();
         this._refreshTimeCell();
 
+        var responseHeaderColumns = WebInspector.NetworkLogView._responseHeaderColumns;
+        for (var i = 0; i < responseHeaderColumns.length; ++i)
+            this._refreshResponseHeaderCell(responseHeaderColumns[i]);
+
         if (this._request.cached)
             this._timelineCell.addStyleClass("resource-cached");
 
@@ -2124,6 +2157,13 @@ WebInspector.NetworkDataGridNode.prototype = {
             element.removeMatchingStyleClasses("network-type-\\w+");
             element.addStyleClass(typeClassName);
         }
+    },
+
+    _refreshResponseHeaderCell: function(headerName)
+    {
+        var cell = this._responseHeaderCells[headerName];
+        var value = this._request.responseHeaderValue(headerName);
+        cell.setTextAndTitle(value ? value : "");
     },
 
     _refreshNameCell: function()

@@ -29,7 +29,7 @@
 #define WTF_Platform_h
 
 /* Include compiler specific macros */
-#include <wtf/Compiler.h>
+#include "wtf/Compiler.h"
 
 /* ==== Platform adaptation macros: these describe properties of the target environment. ==== */
 
@@ -57,8 +57,6 @@
 /* OS(DARWIN) - Any Darwin-based OS, including Mac OS X and iPhone OS */
 #ifdef __APPLE__
 #define WTF_OS_DARWIN 1
-
-#include <AvailabilityMacros.h>
 #endif
 
 /* OS(FREEBSD) - FreeBSD */

@@ -40,9 +40,9 @@ PassRefPtr<SVGTSpanElement> SVGTSpanElement::create(const QualifiedName& tagName
     return adoptRef(new SVGTSpanElement(tagName, document));
 }
 
-RenderObject* SVGTSpanElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGTSpanElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGTSpan(this);
+    return new (document()->renderArena()) RenderSVGTSpan(this);
 }
 
 bool SVGTSpanElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
@@ -69,7 +69,7 @@ bool SVGTSpanElement::rendererIsNeeded(const NodeRenderingContext& context)
             || parentNode()->hasTagName(SVGNames::textTag)
             || parentNode()->hasTagName(SVGNames::textPathTag)
             || parentNode()->hasTagName(SVGNames::tspanTag)))
-        return StyledElement::rendererIsNeeded(context);
+        return Element::rendererIsNeeded(context);
 
     return false;
 }

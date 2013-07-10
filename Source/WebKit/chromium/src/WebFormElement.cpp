@@ -40,7 +40,7 @@
 #include "core/loader/FormState.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebURL.h"
-#include <wtf/PassRefPtr.h>
+#include "wtf/PassRefPtr.h"
 
 using namespace WebCore;
 
@@ -94,12 +94,17 @@ void WebFormElement::getFormControlElements(WebVector<WebFormControlElement>& re
     for (size_t i = 0; i < form->associatedElements().size(); i++) {
         if (!form->associatedElements()[i]->isFormControlElement())
             continue;
-        HTMLFormControlElement* element = static_cast<HTMLFormControlElement*>(form->associatedElements()[i]);
+        HTMLFormControlElement* element = toHTMLFormControlElement(form->associatedElements()[i]);
         if (element->hasLocalName(HTMLNames::inputTag)
             || element->hasLocalName(HTMLNames::selectTag))
             tempVector.append(element);
     }
     result.assign(tempVector);
+}
+
+bool WebFormElement::checkValidityWithoutDispatchingEvents()
+{
+    return unwrap<HTMLFormElement>()->checkValidityWithoutDispatchingEvents();
 }
 
 void WebFormElement::finishRequestAutocomplete(WebFormElement::AutocompleteResult result)
@@ -120,7 +125,7 @@ WebFormElement& WebFormElement::operator=(const PassRefPtr<HTMLFormElement>& e)
 
 WebFormElement::operator PassRefPtr<HTMLFormElement>() const
 {
-    return static_cast<HTMLFormElement*>(m_private.get());
+    return toHTMLFormElement(m_private.get());
 }
 
 } // namespace WebKit

@@ -40,12 +40,12 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ScriptExecutionContext.h"
-#include "core/workers/WorkerContext.h"
+#include "core/workers/WorkerGlobalScope.h"
 #include "core/workers/WorkerThread.h"
 #include "modules/quota/StorageErrorCallback.h"
 #include "modules/quota/StorageQuotaCallback.h"
 #include "modules/quota/StorageUsageCallback.h"
-#include <wtf/Threading.h>
+#include "wtf/Threading.h"
 
 using namespace WebKit;
 
@@ -53,13 +53,13 @@ namespace WebCore {
 
 static void queryUsageAndQuotaFromWorker(WebCommonWorkerClient* commonClient, WebStorageQuotaType storageType, WebStorageQuotaCallbacksImpl* callbacks)
 {
-    WorkerContext* workerContext = WorkerScriptController::controllerForContext()->workerContext();
-    WebCore::WorkerThread* workerThread = workerContext->thread();
+    WorkerGlobalScope* workerGlobalScope = WorkerScriptController::controllerForContext()->workerGlobalScope();
+    WebCore::WorkerThread* workerThread = workerGlobalScope->thread();
     WebCore::WorkerLoaderProxy* workerLoaderProxy = &workerThread->workerLoaderProxy();
 
     String mode = "queryUsageAndQuotaMode" + String::number(workerThread->runLoop().createUniqueId());
 
-    RefPtr<WorkerStorageQuotaCallbacksBridge> bridge = WorkerStorageQuotaCallbacksBridge::create(workerLoaderProxy, workerContext, callbacks);
+    RefPtr<WorkerStorageQuotaCallbacksBridge> bridge = WorkerStorageQuotaCallbacksBridge::create(workerLoaderProxy, workerGlobalScope, callbacks);
 
     // The bridge is held by the task that is created in posted to the main thread by this method.
     bridge->postQueryUsageAndQuotaToMainThread(commonClient, storageType, mode);
@@ -75,12 +75,12 @@ void StorageQuota::queryUsageAndQuota(ScriptExecutionContext* scriptExecutionCon
         return;
     }
     if (scriptExecutionContext->isDocument()) {
-        Document* document = static_cast<Document*>(scriptExecutionContext);
+        Document* document = toDocument(scriptExecutionContext);
         WebFrameImpl* webFrame = WebFrameImpl::fromFrame(document->frame());
         webFrame->client()->queryStorageUsageAndQuota(webFrame, storageType, new WebStorageQuotaCallbacksImpl(successCallback, errorCallback));
     } else {
-        WorkerContext* workerContext = static_cast<WorkerContext*>(scriptExecutionContext);
-        WebWorkerBase* webWorker = static_cast<WebWorkerBase*>(workerContext->thread()->workerLoaderProxy().toWebWorkerBase());
+        WorkerGlobalScope* workerGlobalScope = toWorkerGlobalScope(scriptExecutionContext);
+        WebWorkerBase* webWorker = static_cast<WebWorkerBase*>(workerGlobalScope->thread()->workerLoaderProxy().toWebWorkerBase());
         queryUsageAndQuotaFromWorker(webWorker->commonClient(), storageType, new WebStorageQuotaCallbacksImpl(successCallback, errorCallback));
     }
 }
@@ -95,7 +95,7 @@ void StorageQuota::requestQuota(ScriptExecutionContext* scriptExecutionContext, 
         return;
     }
     if (scriptExecutionContext->isDocument()) {
-        Document* document = static_cast<Document*>(scriptExecutionContext);
+        Document* document = toDocument(scriptExecutionContext);
         WebFrameImpl* webFrame = WebFrameImpl::fromFrame(document->frame());
         webFrame->client()->requestStorageQuota(webFrame, storageType, newQuotaInBytes, new WebStorageQuotaCallbacksImpl(successCallback, errorCallback));
     } else {

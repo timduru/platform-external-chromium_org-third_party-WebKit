@@ -36,10 +36,9 @@
 #include "InspectorTypeBuilder.h"
 #include "bindings/v8/ScriptState.h"
 #include "core/inspector/InspectorBaseAgent.h"
-#include <wtf/HashMap.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/HashMap.h"
+#include "wtf/PassOwnPtr.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -86,6 +85,7 @@ public:
     virtual void replayTraceLog(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, int, RefPtr<TypeBuilder::Canvas::ResourceState>&);
     virtual void getResourceInfo(ErrorString*, const TypeBuilder::Canvas::ResourceId&, RefPtr<TypeBuilder::Canvas::ResourceInfo>&);
     virtual void getResourceState(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, const TypeBuilder::Canvas::ResourceId&, RefPtr<TypeBuilder::Canvas::ResourceState>&);
+    virtual void evaluateTraceLogCallArgument(ErrorString*, const TypeBuilder::Canvas::TraceLogId&, int, int, const String*, RefPtr<TypeBuilder::Runtime::RemoteObject>&, RefPtr<TypeBuilder::Canvas::ResourceState>&);
 
 private:
     InspectorCanvasAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorPageAgent*, InjectedScriptManager*);

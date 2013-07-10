@@ -24,12 +24,10 @@
 #include "config.h"
 #include "core/loader/cache/CachedResource.h"
 
-#include "core/dom/Document.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/CachedMetadata.h"
 #include "core/loader/CrossOriginAccessControl.h"
-#include "core/loader/DocumentLoader.h"
 #include "core/loader/ResourceLoader.h"
 #include "core/loader/cache/CachedResourceClient.h"
 #include "core/loader/cache/CachedResourceClientWalker.h"
@@ -169,10 +167,7 @@ CachedResource::~CachedResource()
 
 void CachedResource::failBeforeStarting()
 {
-    // FIXME: What if resources in other frames were waiting for this revalidation?
     LOG(ResourceLoading, "Cannot start loading '%s'", url().string().latin1().data());
-    if (m_resourceToRevalidate) 
-        revalidationFailed();
     error(CachedResource::LoadError);
 }
 
@@ -234,6 +229,9 @@ void CachedResource::error(CachedResource::Status status)
 {
     if (m_resourceToRevalidate)
         revalidationFailed();
+
+    if (!m_error.isNull() && (m_error.isCancellation() || !isPreloaded()))
+        memoryCache()->remove(this);
 
     setStatus(status);
     ASSERT(errorOccurred());
@@ -447,6 +445,8 @@ void CachedResource::removeClient(CachedResourceClient* client)
 
 void CachedResource::allClientsRemoved()
 {
+    if (!m_loader)
+        return;
     if (m_type == MainResource || m_type == RawResource)
         cancelTimerFired(&m_cancelTimer);
     else if (!m_cancelTimer.isActive())
@@ -459,6 +459,8 @@ void CachedResource::cancelTimerFired(Timer<CachedResource>* timer)
     if (hasClients() || !m_loader)
         return;
     m_loader->cancelIfNotFinishing();
+    if (m_status != Cached)
+        memoryCache()->remove(this);
 }
 
 void CachedResource::destroyDecodedDataIfNeeded()
@@ -696,8 +698,6 @@ void CachedResource::revalidationFailed()
     LOG(ResourceLoading, "Revalidation failed for %p", this);
     ASSERT(resourceToRevalidate());
     clearResourceToRevalidate();
-    if (!m_error.isNull() && (m_error.isCancellation() || !isPreloaded()))
-        memoryCache()->remove(this);
 }
 
 void CachedResource::updateForAccess()

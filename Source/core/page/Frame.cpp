@@ -31,69 +31,37 @@
 #include "core/page/Frame.h"
 
 #include "bindings/v8/ScriptController.h"
-#include "bindings/v8/ScriptSourceCode.h"
-#include "bindings/v8/ScriptValue.h"
-#include "bindings/v8/npruntime_impl.h"
-#include "core/css/CSSComputedStyleDeclaration.h"
-#include "core/css/StylePropertySet.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Event.h"
-#include "core/dom/EventNames.h"
-#include "core/dom/NodeList.h"
-#include "core/dom/NodeTraversal.h"
-#include "core/dom/UserTypingGestureIndicator.h"
-#include "core/editing/ApplyStyleCommand.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
-#include "core/editing/TextIterator.h"
-#include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
-#include "core/html/HTMLDocument.h"
-#include "core/html/HTMLFormControlElement.h"
-#include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLFrameElementBase.h"
-#include "core/html/HTMLTableCellElement.h"
-#include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/loader/TextResourceDecoder.h"
-#include "core/loader/cache/CachedCSSStyleSheet.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/DOMWindow.h"
-#include "core/page/EditorClient.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FocusController.h"
 #include "core/page/FrameDestructionObserver.h"
 #include "core/page/FrameView.h"
-#include "core/page/Navigator.h"
 #include "core/page/Page.h"
-#include "core/page/PageGroup.h"
-#include "RuntimeEnabledFeatures.h"
-#include "core/page/Settings.h"
-#include "core/page/UserContentURLPattern.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/DragImage.h"
-#include "core/platform/Logging.h"
-#include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/GraphicsContext.h"
-#include "core/platform/graphics/GraphicsLayer.h"
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderLayerCompositor.h"
 #include "core/rendering/RenderPart.h"
-#include "core/rendering/RenderTableCell.h"
-#include "core/rendering/RenderTextControl.h"
-#include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
 #include "core/svg/SVGDocument.h"
-#include "core/svg/SVGDocumentExtensions.h"
-#include <wtf/PassOwnPtr.h>
-#include <wtf/RefCountedLeakCounter.h>
-#include <wtf/StdLibExtras.h>
+#include "wtf/PassOwnPtr.h"
+#include "wtf/RefCountedLeakCounter.h"
+#include "wtf/StdLibExtras.h"
 
 using namespace std;
 
@@ -433,7 +401,7 @@ String Frame::displayStringModifiedByEncoding(const String& str) const
 
 VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
 {
-    HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint, HitTestRequest::ReadOnly | HitTestRequest::Active);
+    HitTestResult result = eventHandler()->hitTestResultAtPoint(framePoint);
     Node* node = result.innerNonSharedNode();
     if (!node)
         return VisiblePosition();
@@ -455,7 +423,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
     HitTestResult result = HitTestResult(pt);
 
     if (contentRenderer())
-        result = eventHandler()->hitTestResultAtPoint(pt);
+        result = eventHandler()->hitTestResultAtPoint(pt, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
     return result.innerNode() ? result.innerNode()->document() : 0;
 }
 
@@ -658,10 +626,10 @@ struct ScopedFramePaintingState {
     Color backgroundColor;
 };
 
-DragImageRef Frame::nodeImage(Node* node)
+PassOwnPtr<DragImage> Frame::nodeImage(Node* node)
 {
     if (!node->renderer())
-        return 0;
+        return nullptr;
 
     const ScopedFramePaintingState state(this, node);
 
@@ -675,7 +643,7 @@ DragImageRef Frame::nodeImage(Node* node)
     // Document::updateLayout may have blown away the original RenderObject.
     RenderObject* renderer = node->renderer();
     if (!renderer)
-      return 0;
+        return nullptr;
 
     LayoutRect topLevelRect;
     IntRect paintingRect = pixelSnappedIntRect(renderer->paintingRootRect(topLevelRect));
@@ -688,20 +656,20 @@ DragImageRef Frame::nodeImage(Node* node)
 
     OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor));
     if (!buffer)
-        return 0;
+        return nullptr;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
     buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
 
     m_view->paintContents(buffer->context(), paintingRect);
 
     RefPtr<Image> image = buffer->copyImage();
-    return createDragImageFromImage(image.get(), renderer->shouldRespectImageOrientation());
+    return DragImage::create(image.get(), renderer->shouldRespectImageOrientation());
 }
 
-DragImageRef Frame::dragImageForSelection()
+PassOwnPtr<DragImage> Frame::dragImageForSelection()
 {
     if (!selection()->isRange())
-        return 0;
+        return nullptr;
 
     const ScopedFramePaintingState state(this, 0);
     m_view->setPaintBehavior(PaintBehaviorSelectionOnly | PaintBehaviorFlattenCompositingLayers);
@@ -717,14 +685,14 @@ DragImageRef Frame::dragImageForSelection()
 
     OwnPtr<ImageBuffer> buffer(ImageBuffer::create(paintingRect.size(), deviceScaleFactor));
     if (!buffer)
-        return 0;
+        return nullptr;
     buffer->context()->translate(-paintingRect.x(), -paintingRect.y());
     buffer->context()->clip(FloatRect(0, 0, paintingRect.maxX(), paintingRect.maxY()));
 
     m_view->paintContents(buffer->context(), paintingRect);
 
     RefPtr<Image> image = buffer->copyImage();
-    return createDragImageFromImage(image.get());
+    return DragImage::create(image.get());
 }
 
 } // namespace WebCore

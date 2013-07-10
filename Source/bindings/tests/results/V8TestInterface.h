@@ -51,10 +51,7 @@ public:
 #if ENABLE(Condition22) || ENABLE(Condition23)
     static void implementsStr3AttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
-    static void namedPropertyGetter(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Value>&);
-    static void namedPropertySetter(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<v8::Value>&);
-    static void namedPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>&);
-    static void namedPropertyQuery(v8::Local<v8::String>, const v8::PropertyCallbackInfo<v8::Integer>&);
+    static void namedPropertySetterCustom(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<v8::Value>&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
     static void installPerContextProperties(v8::Handle<v8::Object>, TestInterface*, v8::Isolate*);
     static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
@@ -108,7 +105,7 @@ template<class HolderContainer, class Wrappable>
 inline v8::Handle<v8::Value> toV8Fast(TestInterface* impl, const HolderContainer& container, Wrappable* wrappable)
 {
     if (UNLIKELY(!impl))
-        return v8Null(container.GetIsolate());
+        return v8::Null(container.GetIsolate());
     v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperFast(impl, container, wrappable);
     if (!wrapper.IsEmpty())
         return wrapper;
@@ -120,7 +117,7 @@ inline v8::Handle<v8::Value> toV8FastForMainWorld(TestInterface* impl, const Hol
 {
     ASSERT(worldType(container.GetIsolate()) == MainWorld);
     if (UNLIKELY(!impl))
-        return v8Null(container.GetIsolate());
+        return v8::Null(container.GetIsolate());
     v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperForMainWorld(impl);
     if (!wrapper.IsEmpty())
         return wrapper;

@@ -36,7 +36,7 @@ import threading
 import time
 
 from webkitpy.layout_tests.port import chromium
-from webkitpy.layout_tests.port import chromium_linux
+from webkitpy.layout_tests.port import linux
 from webkitpy.layout_tests.port import driver
 from webkitpy.layout_tests.port import factory
 from webkitpy.layout_tests.port import server_process
@@ -139,6 +139,7 @@ WEBKIT_PLATFORM_RESOURCES_TO_PUSH = [
 ]
 
 MD5SUM_DEVICE_FILE_NAME = 'md5sum_bin'
+MD5SUM_HOST_FILE_NAME = 'md5sum_bin_host'
 MD5SUM_DEVICE_PATH = '/data/local/tmp/' + MD5SUM_DEVICE_FILE_NAME
 
 # Shared pieces of information for the two supported test runners.
@@ -151,25 +152,6 @@ class SharedDriverDetails(object):
         return self.device_directory() + 'forwarder'
     def device_fifo_directory(self):
         return '/data/data/' + self.package_name() + '/files/'
-
-# Information required when running layout tests using DumpRenderTree as the test runner.
-class DumpRenderTreeDriverDetails(SharedDriverDetails):
-    def apk_name(self):
-        return 'DumpRenderTree_apk/DumpRenderTree-debug.apk'
-    def package_name(self):
-        return 'org.chromium.native_test'
-    def activity_name(self):
-        return self.package_name() + '/.ChromeNativeTestActivity'
-    def library_name(self):
-        return 'libDumpRenderTree.so'
-    def additional_resources(self):
-        return ['DumpRenderTree.pak', 'DumpRenderTree_resources']
-    def command_line_file(self):
-        return '/data/local/tmp/chrome-native-tests-command-line'
-    def additional_command_line_flags(self):
-        return ['--create-stdin-fifo', '--separate-stderr-fifo', '--disable-impl-side-painting']
-    def device_directory(self):
-        return DEVICE_SOURCE_ROOT_DIR + 'drt/'
 
 # Information required when running layout tests using content_shell as the test runner.
 class ContentShellDriverDetails(SharedDriverDetails):
@@ -186,7 +168,7 @@ class ContentShellDriverDetails(SharedDriverDetails):
     def command_line_file(self):
         return '/data/local/tmp/content-shell-command-line'
     def additional_command_line_flags(self):
-        return ['--dump-render-tree']
+        return ['--dump-render-tree', '--encode-binary']
     def device_directory(self):
         return DEVICE_SOURCE_ROOT_DIR + 'content_shell/'
 
@@ -274,17 +256,6 @@ class AndroidCommands(object):
         AndroidCommands._adb_command_path = command_path
         return command_path
 
-    @staticmethod
-    def get_devices(executive):
-        re_device = re.compile('^([a-zA-Z0-9_:.-]+)\tdevice$', re.MULTILINE)
-        result = executive.run_command([AndroidCommands.adb_command_path(executive), 'devices'],
-                error_handler=executive.ignore_error)
-        devices = re_device.findall(result)
-        if not devices:
-            raise AssertionError('No devices attached. Result of "adb devices": %s' % result)
-
-        return devices
-
     # Local private methods.
 
     def _log_error(self, message):
@@ -307,6 +278,74 @@ class AndroidCommands(object):
 
         return [int(n) for n in result.group(1).split('.')]
 
+
+# A class to encapsulate device status and information, such as the AndroidCommands
+# instances and whether the device has been set up.
+class AndroidDevices(object):
+    # Percentage of battery a device needs to have in order for it to be considered
+    # to participate in running the layout tests.
+    MINIMUM_BATTERY_PERCENTAGE = 30
+
+    def __init__(self, executive, default_device=None):
+        self._usable_devices = []
+        self._default_device = default_device
+        self._prepared_devices = []
+
+    def usable_devices(self, executive):
+        if self._usable_devices:
+            return self._usable_devices
+
+        if self._default_device:
+            self._usable_devices = [AndroidCommands(executive, self._default_device)]
+            return self._usable_devices
+
+        # Example "adb devices" command output:
+        #   List of devices attached
+        #   0123456789ABCDEF        device
+        re_device = re.compile('^([a-zA-Z0-9_:.-]+)\tdevice$', re.MULTILINE)
+
+        result = executive.run_command([AndroidCommands.adb_command_path(executive), 'devices'],
+                error_handler=executive.ignore_error)
+        devices = re_device.findall(result)
+        if not devices:
+            raise AssertionError('Unable to find attached Android devices. ADB output: %s' % result)
+
+        for device_serial in devices:
+            commands = AndroidCommands(executive, device_serial)
+            if self._battery_level_for_device(commands) < AndroidDevices.MINIMUM_BATTERY_PERCENTAGE:
+                continue
+
+            self._usable_devices.append(commands)
+
+        if not self._usable_devices:
+            raise AssertionError('No devices attached with more than %d percent battery.' %
+                AndroidDevices.MINIMUM_BATTERY_PERCENTAGE)
+
+        return self._usable_devices
+
+    def get_device(self, executive, device_index):
+        devices = self.usable_devices(executive)
+        if device_index >= len(devices):
+            raise AssertionError('Device index exceeds number of usable devices.')
+
+        return devices[device_index]
+
+    def is_device_prepared(self, device_serial):
+        return device_serial in self._prepared_devices
+
+    def set_device_prepared(self, device_serial):
+        self._prepared_devices.append(device_serial)
+
+    # Private methods
+    def _battery_level_for_device(self, commands):
+        battery_status = commands.run(['shell', 'dumpsys', 'battery'])
+        if 'Error' in battery_status:
+            _log.warning('Unable to read the battery level from device with serial "%s".' % commands.get_serial())
+            return 100
+
+        return int(re.findall('level: (\d+)', battery_status)[0])
+
+
 class ChromiumAndroidPort(chromium.ChromiumPort):
     port_name = 'chromium-android'
 
@@ -315,7 +354,7 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
 
     SUPPORTED_VERSIONS = ('android')
 
-    FALLBACK_PATHS = { 'android': [ 'chromium-android' ] + chromium_linux.ChromiumLinuxPort.latest_platform_fallback_path() }
+    FALLBACK_PATHS = { 'android': [ 'chromium-android' ] + linux.LinuxPort.latest_platform_fallback_path() }
 
     def __init__(self, host, port_name, **kwargs):
         super(ChromiumAndroidPort, self).__init__(host, port_name, **kwargs)
@@ -326,44 +365,38 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
         self._host_port = factory.PortFactory(host).get('chromium', **kwargs)
         self._server_process_constructor = self._android_server_process_constructor
 
-        if self.driver_name() == 'content_shell':
-            self._driver_details = ContentShellDriverDetails()
-        else:
-            self._driver_details = DumpRenderTreeDriverDetails()
+        if self.driver_name() != self.CONTENT_SHELL_NAME:
+            raise AssertionError('Layout tests on Android only support content_shell as the driver.')
 
+        self._driver_details = ContentShellDriverDetails()
+
+        # Initialize the AndroidDevices class which tracks available devices.
+        default_device = None
         if hasattr(self._options, 'adb_device') and len(self._options.adb_device):
-            self._devices = [self._options.adb_device]
-        else:
-            self._devices = []
+            default_device = self._options.adb_device
 
+        self._devices = AndroidDevices(self._executive, default_device)
+
+        # Tell AndroidCommands where to search for the "adb" command.
         AndroidCommands.set_adb_command_path_options(['adb',
             self.path_from_chromium_base('third_party', 'android_tools', 'sdk', 'platform-tools', 'adb')])
 
     # Local public methods.
-    def get_device_serial(self, worker_number):
-        if not self._devices:
-            self._devices = AndroidCommands.get_devices(self._executive)
-        if worker_number >= len(self._devices):
-            raise AssertionError('Worker number exceeds available number of devices')
-        return self._devices[worker_number]
-
     def path_to_forwarder(self):
         return self._build_path('forwarder')
 
     def path_to_md5sum(self):
         return self._build_path(MD5SUM_DEVICE_FILE_NAME)
 
+    def path_to_md5sum_host(self):
+        return self._build_path(MD5SUM_HOST_FILE_NAME)
+
     # Overridden public methods.
     def buildbot_archives_baselines(self):
         return False
 
     def additional_drt_flag(self):
-        # Chromium for Android always uses the hardware GPU path.
-        flags = ['--encode-binary', '--enable-hardware-gpu',
-                 '--force-compositing-mode',
-                 '--enable-accelerated-fixed-position']
-        flags += self._driver_details.additional_command_line_flags()
-        return flags
+        return self._driver_details.additional_command_line_flags()
 
     def default_timeout_ms(self):
         # Android platform has less computing power than desktop platforms.
@@ -375,18 +408,12 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
         # The driver doesn't respond to closing stdin, so we might as well stop the driver immediately.
         return 0.0
 
-    def driver_name(self):
-        if self.get_option('driver_name'):
-            return self.get_option('driver_name')
-        if self.get_option('content_shell'):
-            return self.CONTENT_SHELL_NAME
-        return 'DumpRenderTree'
-
     def default_child_processes(self):
-        if self._devices:
-            return len(self._devices)
+        usable_device_count = len(self._devices.usable_devices(self._executive))
+        if not usable_device_count:
+            raise AssertionError('There are no devices available to run the layout tests on.')
 
-        return len(AndroidCommands.get_devices(self._executive))
+        return usable_device_count
 
     def default_baseline_search_path(self):
         return map(self._webkit_baseline_path, self.FALLBACK_PATHS['android'])
@@ -397,6 +424,7 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
     def check_build(self, needs_http):
         result = super(ChromiumAndroidPort, self).check_build(needs_http)
         result = self._check_file_exists(self.path_to_md5sum(), 'md5sum utility') and result
+        result = self._check_file_exists(self.path_to_md5sum_host(), 'md5sum host utility') and result
         result = self._check_file_exists(self.path_to_forwarder(), 'forwarder utility') and result
         if not result:
             _log.error('For complete Android build requirements, please see:')
@@ -431,7 +459,9 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
         super(ChromiumAndroidPort, self).start_http_server(additional_dirs, number_of_servers)
 
     def create_driver(self, worker_number, no_timeout=False):
-        return ChromiumAndroidDriver(self, worker_number, pixel_tests=self.get_option('pixel_tests'), driver_details=self._driver_details,
+        return ChromiumAndroidDriver(self, worker_number, pixel_tests=self.get_option('pixel_tests'),
+                                     driver_details=self._driver_details,
+                                     android_devices=self._devices,
                                      # Force no timeout to avoid test driver timeouts before NRWT.
                                      no_timeout=True)
 
@@ -440,14 +470,6 @@ class ChromiumAndroidPort(chromium.ChromiumPort):
         return self.create_driver(0)._android_driver_cmd_line(self.get_option('pixel_tests'), [])
 
     # Overridden protected methods.
-
-    def _port_specific_expectations_files(self):
-        # LayoutTests/platform/chromium-android/TestExpectations should contain only the rules to
-        # skip tests for the features not supported or not testable on Android.
-        # Other rules should be in LayoutTests/TestExpectations.
-        android_expectations_file = self.path_from_webkit_base('LayoutTests', 'platform', 'chromium-android', 'TestExpectations')
-        return super(ChromiumAndroidPort, self)._port_specific_expectations_files() + [android_expectations_file]
-
 
     def _build_path(self, *comps):
         return self._host_port._build_path(*comps)
@@ -616,7 +638,7 @@ http://crbug.com/165250 discusses making these pre-built binaries externally ava
 
 
 class ChromiumAndroidDriver(driver.Driver):
-    def __init__(self, port, worker_number, pixel_tests, driver_details, no_timeout=False):
+    def __init__(self, port, worker_number, pixel_tests, driver_details, android_devices, no_timeout=False):
         super(ChromiumAndroidDriver, self).__init__(port, worker_number, pixel_tests, no_timeout)
         self._in_fifo_path = driver_details.device_fifo_directory() + 'stdin.fifo'
         self._out_fifo_path = driver_details.device_fifo_directory() + 'test.fifo'
@@ -624,11 +646,11 @@ class ChromiumAndroidDriver(driver.Driver):
         self._read_stdout_process = None
         self._read_stderr_process = None
         self._forwarder_process = None
-        self._has_setup = False
         self._original_governors = {}
         self._original_kptr_restrict = None
 
-        self._android_commands = AndroidCommands(port._executive, port.get_device_serial(worker_number))
+        self._android_devices = android_devices
+        self._android_commands = android_devices.get_device(port._executive, worker_number)
         self._driver_details = driver_details
 
         # FIXME: If we taught ProfileFactory about "target" devices we could
@@ -705,12 +727,11 @@ class ChromiumAndroidDriver(driver.Driver):
         self._push_platform_resources()
 
     def _setup_test(self):
-        if self._has_setup:
+        if self._android_devices.is_device_prepared(self._android_commands.get_serial()):
             return
 
         self._android_commands.restart_as_root()
         self._setup_md5sum_and_push_data_if_needed()
-        self._has_setup = True
         self._setup_performance()
 
         # Required by webkit_support::GetWebKitRootDirFilePath().
@@ -724,6 +745,9 @@ class ChromiumAndroidDriver(driver.Driver):
 
         # Make sure that the disk cache on the device resets to a clean state.
         self._android_commands.run(['shell', 'rm', '-r', self._driver_details.device_cache_directory()])
+
+        # Mark this device as having been set up.
+        self._android_devices.set_device_prepared(self._android_commands.get_serial())
 
     def _log_error(self, message):
         _log.error('[%s] %s' % (self._android_commands.get_serial(), message))
@@ -878,8 +902,15 @@ class ChromiumAndroidDriver(driver.Driver):
         # We override the default start() so that we can call _android_driver_cmd_line()
         # instead of cmd_line().
         new_cmd_line = self._android_driver_cmd_line(pixel_tests, per_test_args)
-        if new_cmd_line != self._current_cmd_line:
+
+        # Since _android_driver_cmd_line() is different than cmd_line() we need to provide
+        # our own mechanism for detecting when the process should be stopped.
+        if self._current_cmd_line is None:
+            self._current_android_cmd_line = None
+        if new_cmd_line != self._current_android_cmd_line:
             self.stop()
+        self._current_android_cmd_line = new_cmd_line
+
         super(ChromiumAndroidDriver, self).start(pixel_tests, per_test_args)
 
     def _start(self, pixel_tests, per_test_args):
@@ -900,6 +931,10 @@ class ChromiumAndroidDriver(driver.Driver):
         self._forwarder_process = self._port._server_process_constructor(
             self._port, 'Forwarder', self._android_commands.adb_command() + ['shell', '%s -D %s' % (self._driver_details.device_forwarder_path(), FORWARD_PORTS)])
         self._forwarder_process.start()
+
+        deadline = time.time() + DRIVER_START_STOP_TIMEOUT_SECS
+        if not self._wait_for_server_process_output(self._forwarder_process, deadline, 'Forwarding device port'):
+            return False
 
         self._android_commands.run(['logcat', '-c'])
         self._android_commands.run(['shell', 'echo'] + self._android_driver_cmd_line(pixel_tests, per_test_args) + ['>', self._driver_details.command_line_file()])
@@ -950,16 +985,9 @@ class ChromiumAndroidDriver(driver.Driver):
         threading.Thread(name='DeadlockDetector', target=deadlock_detector,
                          args=([self._server_process, self._read_stdout_process, self._read_stderr_process], normal_startup_event)).start()
 
-        output = ''
-        line = self._server_process.read_stdout_line(deadline)
-        while not self._server_process.timed_out and not self.has_crashed() and line.rstrip() != '#READY':
-            output += line
-            line = self._server_process.read_stdout_line(deadline)
-
-        if self._server_process.timed_out and not self.has_crashed():
-            # The test driver crashed during startup, or when the deadlock detector hit
-            # a deadlock and killed the fifo reading/writing processes.
-            _log.error('Failed to start the test driver: \n%s' % output)
+        # The test driver might crash during startup or when the deadlock detector hits
+        # a deadlock and kills the fifo reading/writing processes.
+        if not self._wait_for_server_process_output(self._server_process, deadline, '#READY'):
             return False
 
         # Inform the deadlock detector that the startup is successful without deadlock.
@@ -996,7 +1024,7 @@ class ChromiumAndroidDriver(driver.Driver):
             self._forwarder_process.kill()
             self._forwarder_process = None
 
-        if self._has_setup:
+        if self._android_devices.is_device_prepared(self._android_commands.get_serial()):
             if not ChromiumAndroidDriver._loop_with_timeout(self._remove_all_pipes, DRIVER_START_STOP_TIMEOUT_SECS):
                 raise AssertionError('Failed to remove fifo files. May be locked.')
 
@@ -1017,3 +1045,16 @@ class ChromiumAndroidDriver(driver.Driver):
                 if last_char in ('#', '$'):
                     return
             last_char = current_char
+
+    def _wait_for_server_process_output(self, server_process, deadline, text):
+        output = ''
+        line = server_process.read_stdout_line(deadline)
+        while not server_process.timed_out and not server_process.has_crashed() and not text in line.rstrip():
+            output += line
+            line = server_process.read_stdout_line(deadline)
+
+        if server_process.timed_out or server_process.has_crashed():
+            _log.error('Failed to start the %s process: \n%s' % (server_process.name(), output))
+            return False
+
+        return True

@@ -66,6 +66,8 @@ class WebGestureCurve;
 class WebGraphicsContext3DProvider;
 class WebHyphenator;
 class WebIDBFactory;
+class WebMIDIAccessor;
+class WebMIDIAccessorClient;
 class WebMediaStreamCenter;
 class WebMediaStreamCenterClient;
 class WebMessagePortChannel;
@@ -152,6 +154,13 @@ public:
     virtual WebAudioDevice* createAudioDevice(size_t bufferSize, unsigned numberOfInputChannels, unsigned numberOfChannels, double sampleRate, WebAudioDevice::RenderCallback*) { return 0; }
 
 
+    // MIDI ----------------------------------------------------------------
+
+    // Creates a platform dependent WebMIDIAccessor. MIDIAccessor under platform
+    // creates and owns it.
+    virtual WebMIDIAccessor* createMIDIAccessor(WebMIDIAccessorClient*) { return 0; }
+
+
     // Blob ----------------------------------------------------------------
 
     // Must return non-null.
@@ -179,7 +188,9 @@ public:
 
     // DOM Storage --------------------------------------------------
 
-    // Return a LocalStorage namespace that corresponds to the following path.
+    // Return a LocalStorage namespace
+    virtual WebStorageNamespace* createLocalStorageNamespace() { return createLocalStorageNamespace(WebString(), 0); }
+    // FIXME: Remove the argument-taking version once its override is removed from Chromium; the arguments are unused.
     virtual WebStorageNamespace* createLocalStorageNamespace(const WebString& path, unsigned quota) { return 0; }
 
 

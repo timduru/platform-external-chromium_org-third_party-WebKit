@@ -39,9 +39,11 @@ namespace WebCore {
     V(adaptorFunctionPeer) \
     V(attributeListener) \
     V(callback) \
+    V(customElementReady) \
     V(detail) \
     V(document) \
     V(event) \
+    V(isCustomElementInterfacePrototypeObject) \
     V(listener) \
     V(name) \
     V(namespaceURI) \

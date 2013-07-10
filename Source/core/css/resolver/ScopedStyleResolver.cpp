@@ -41,7 +41,6 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLStyleElement.h"
 #include "wtf/MemoryInstrumentationHashMap.h"
-#include "wtf/MemoryInstrumentationHashSet.h"
 
 namespace WebCore {
 
@@ -84,22 +83,34 @@ void ScopedStyleTree::setupScopedStylesTree(ScopedStyleResolver* target)
     ASSERT(target);
     ASSERT(target->scopingNode());
 
+    const ContainerNode* scopingNode = target->scopingNode();
+
     // Since StyleResolver creates RuleSets according to styles' document
     // order, a parent of the given ScopedRuleData has been already
     // prepared.
-    const ContainerNode* e = target->scopingNode()->parentOrShadowHostNode();
-    for (; e; e = e->parentOrShadowHostNode()) {
-        if (ScopedStyleResolver* scopedResolver = scopedStyleResolverFor(e)) {
+    for (const ContainerNode* node = scopingNode->parentOrShadowHostNode(); node; node = node->parentOrShadowHostNode()) {
+        if (ScopedStyleResolver* scopedResolver = scopedStyleResolverFor(node)) {
             target->setParent(scopedResolver);
             break;
         }
-        if (e->isDocumentNode()) {
+        if (node->isDocumentNode()) {
             bool dummy;
-            ScopedStyleResolver* scopedResolver = addScopedStyleResolver(e, dummy);
+            ScopedStyleResolver* scopedResolver = addScopedStyleResolver(node, dummy);
             target->setParent(scopedResolver);
             setupScopedStylesTree(scopedResolver);
             break;
         }
+    }
+
+    if (m_buildInDocumentOrder)
+        return;
+
+    // Reparent all nodes whose scoping node is contained by target's one.
+    for (HashMap<const ContainerNode*, OwnPtr<ScopedStyleResolver> >::iterator it = m_authorStyles.begin(); it != m_authorStyles.end(); ++it) {
+        if (it->value == target)
+            continue;
+        if (it->value->parent() == target->parent() && scopingNode->containsIncludingShadowDOM(it->key))
+            it->value->setParent(target);
     }
 }
 
@@ -163,6 +174,31 @@ void ScopedStyleTree::collectFeaturesTo(RuleFeatureSet& features)
         it->value->collectFeaturesTo(features);
 }
 
+inline void ScopedStyleTree::reparentNodes(const ScopedStyleResolver* oldParent, ScopedStyleResolver* newParent)
+{
+    // FIXME: this takes O(N) (N = number of all scoping nodes).
+    for (HashMap<const ContainerNode*, OwnPtr<ScopedStyleResolver> >::iterator it = m_authorStyles.begin(); it != m_authorStyles.end(); ++it) {
+        if (it->value->parent() == oldParent)
+            it->value->setParent(newParent);
+    }
+}
+
+void ScopedStyleTree::remove(const ContainerNode* scopingNode)
+{
+    if (!scopingNode || scopingNode->isDocumentNode())
+        return;
+
+    ScopedStyleResolver* resolverRemoved = scopedStyleResolverFor(scopingNode);
+    if (!resolverRemoved)
+        return;
+
+    reparentNodes(resolverRemoved, resolverRemoved->parent());
+    if (m_cache.scopedResolver == resolverRemoved)
+        m_cache.clear();
+
+    m_authorStyles.remove(scopingNode);
+}
+
 void ScopedStyleTree::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
 {
     MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
@@ -177,10 +213,10 @@ const ContainerNode* ScopedStyleResolver::scopingNodeFor(const CSSStyleSheet* sh
     if (!document)
         return 0;
     Node* ownerNode = sheet->ownerNode();
-    if (!ownerNode || !ownerNode->isHTMLElement() || !ownerNode->hasTagName(HTMLNames::styleTag))
+    if (!ownerNode || !ownerNode->hasTagName(HTMLNames::styleTag))
         return 0;
 
-    HTMLStyleElement* styleElement = static_cast<HTMLStyleElement*>(ownerNode);
+    HTMLStyleElement* styleElement = toHTMLStyleElement(ownerNode);
     if (!styleElement->scoped())
         return styleElement->isInShadowTree() ? styleElement->containingShadowRoot() : 0;
 
@@ -242,8 +278,11 @@ void ScopedStyleResolver::collectFeaturesTo(RuleFeatureSet& features)
 void ScopedStyleResolver::resetAuthorStyle()
 {
     m_authorStyle = RuleSet::create();
-    m_authorStyle->disableAutoShrinkToFit();
-    m_atHostRules.clear();
+}
+
+void ScopedStyleResolver::resetAtHostRules(const ShadowRoot* shadowRoot)
+{
+    m_atHostRules.remove(shadowRoot);
 }
 
 bool ScopedStyleResolver::checkRegionStyle(Element* regionElement)

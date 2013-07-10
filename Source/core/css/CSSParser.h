@@ -36,7 +36,6 @@
 #include "core/css/MediaQuery.h"
 #include "core/page/UseCounter.h"
 #include "core/platform/graphics/Color.h"
-#include "wtf/HashMap.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnArrayPtr.h"
 #include "wtf/Vector.h"
@@ -66,9 +65,11 @@ class StyleRuleBase;
 class StyleRuleKeyframes;
 class StyleKeyframe;
 class StyleSheetContents;
-class StyledElement;
 
-struct CSSParserLocation;
+struct CSSParserLocation {
+    int lineNumber;
+    CSSParserString token;
+};
 
 class CSSParser {
     friend inline int cssyylex(void*, CSSParser*);
@@ -83,6 +84,10 @@ public:
         InvalidSelectorError,
         InvalidSupportsConditionError,
         InvalidRuleError,
+        InvalidMediaQueryError,
+        InvalidKeyframeSelectorError,
+        InvalidSelectorPseudoError,
+        UnterminatedCommentError,
         GeneralError
     };
 
@@ -166,7 +171,8 @@ public:
     bool parseIntegerOrStringFromGridPosition(RefPtr<CSSPrimitiveValue>& numericValue, RefPtr<CSSPrimitiveValue>& gridLineName);
     bool parseGridItemPositionShorthand(CSSPropertyID, bool important);
     bool parseGridTrackList(CSSPropertyID, bool important);
-    PassRefPtr<CSSPrimitiveValue> parseGridTrackSize();
+    bool parseGridTrackRepeatFunction(CSSValueList&);
+    PassRefPtr<CSSPrimitiveValue> parseGridTrackSize(CSSParserValueList& inputList);
     PassRefPtr<CSSPrimitiveValue> parseGridBreadth(CSSParserValue*);
 
     bool parseClipShape(CSSPropertyID, bool important);
@@ -343,7 +349,6 @@ public:
     Vector<OwnPtr<CSSParserSelector> >* reusableRegionSelectorVector() { return &m_reusableRegionSelectorVector; }
 
     void updateLastSelectorLineAndPosition();
-    void updateLastMediaLine(MediaQuerySet*);
 
     void clearProperties();
 
@@ -397,6 +402,8 @@ public:
     void endInvalidRuleHeader();
     void reportError(const CSSParserLocation&, ErrorType = GeneralError);
     void resumeErrorLogging() { m_ignoreErrors = false; }
+    void setLocationLabel(const CSSParserLocation& location) { m_locationLabel = location; }
+    const CSSParserLocation& lastLocationLabel() const { return m_locationLabel; }
 
     inline int lex(void* yylval) { return (this->*m_lexFunc)(yylval); }
 
@@ -508,7 +515,7 @@ private:
     template <typename CharacterType>
     inline void detectSupportsToken(int);
     template <typename CharacterType>
-    inline bool detectCSSVariablesToken(int);
+    inline void detectCSSVariableDefinitionToken(int);
 
     void setStyleSheet(StyleSheetContents* styleSheet) { m_styleSheet = styleSheet; }
 
@@ -589,6 +596,8 @@ private:
 
     bool inViewport() const { return m_inViewport; }
     bool m_inViewport;
+
+    CSSParserLocation m_locationLabel;
 
     int (CSSParser::*m_lexFunc)(void*);
 
@@ -683,11 +692,6 @@ public:
 
 private:
     CSSParser* m_parser;
-};
-
-struct CSSParserLocation {
-    int lineNumber;
-    CSSParserString token;
 };
 
 class CSSParser::SourceDataHandler {

@@ -136,9 +136,9 @@ WebInspector.IsolatedFileSystem.prototype = {
 
     /**
      * @param {string} path
-     * @param {function(?string)} callback
+     * @param {function(?Date, ?number)} callback
      */
-    requestFileContent: function(path, callback)
+    requestMetadata: function(path, callback)
     {
         this._requestFileSystem(fileSystemLoaded.bind(this));
 
@@ -155,7 +155,48 @@ WebInspector.IsolatedFileSystem.prototype = {
          */
         function fileEntryLoaded(entry)
         {
-            entry.file(fileLoaded, errorHandler);
+            entry.getMetadata(successHandler, errorHandler);
+        }
+
+        /**
+         * @param {Metadata} metadata
+         */
+        function successHandler(metadata)
+        {
+            callback(metadata.modificationTime, metadata.size);
+        }
+
+        /**
+         * @param {FileError} error
+         */
+        function errorHandler(error)
+        {
+            callback(null, null);
+        }
+    },
+
+    /**
+     * @param {string} path
+     * @param {function(?string)} callback
+     */
+    requestFileContent: function(path, callback)
+    {
+        this._requestFileSystem(fileSystemLoaded.bind(this));
+
+        /**
+         * @param {DOMFileSystem} domFileSystem
+         */
+        function fileSystemLoaded(domFileSystem)
+        {
+            domFileSystem.root.getFile(path, null, fileEntryLoaded, errorHandler.bind(this));
+        }
+
+        /**
+         * @param {FileEntry} entry
+         */
+        function fileEntryLoaded(entry)
+        {
+            entry.file(fileLoaded, errorHandler.bind(this));
         }
 
         /**

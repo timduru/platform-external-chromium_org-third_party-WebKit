@@ -23,10 +23,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-interface SVGMarkerElement : SVGStyledElement,
-                             SVGLangSpace,
-                             SVGExternalResourcesRequired,
-                             SVGFitToViewBox {
+interface SVGMarkerElement : SVGStyledElement {
     // Marker Unit Types
     const unsigned short SVG_MARKERUNITS_UNKNOWN        = 0;
     const unsigned short SVG_MARKERUNITS_USERSPACEONUSE = 1;
@@ -48,4 +45,7 @@ interface SVGMarkerElement : SVGStyledElement,
     void setOrientToAuto();
     void setOrientToAngle([Default=Undefined] optional SVGAngle angle);
 };
+
+SVGMarkerElement implements SVGExternalResourcesRequired;
+SVGMarkerElement implements SVGFitToViewBox;
 

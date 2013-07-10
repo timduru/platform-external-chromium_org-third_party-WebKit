@@ -45,8 +45,6 @@ using namespace HTMLNames;
 
 HTMLFrameSetElement::HTMLFrameSetElement(const QualifiedName& tagName, Document* document)
     : HTMLElement(tagName, document)
-    , m_totalRows(1)
-    , m_totalCols(1)
     , m_border(6)
     , m_borderSet(false)
     , m_borderColorSet(false)
@@ -83,12 +81,12 @@ void HTMLFrameSetElement::parseAttribute(const QualifiedName& name, const Atomic
 {
     if (name == rowsAttr) {
         if (!value.isNull()) {
-            m_rowLengths = newLengthArray(value.string(), m_totalRows);
+            m_rowLengths = parseFrameSetListOfDimensions(value.string());
             setNeedsStyleRecalc();
         }
     } else if (name == colsAttr) {
         if (!value.isNull()) {
-            m_colLengths = newLengthArray(value.string(), m_totalCols);
+            m_colLengths = parseFrameSetListOfDimensions(value.string());
             setNeedsStyleRecalc();
         }
     } else if (name == frameborderAttr) {
@@ -156,12 +154,12 @@ bool HTMLFrameSetElement::rendererIsNeeded(const NodeRenderingContext& context)
     return context.style()->isStyleAvailable();
 }
 
-RenderObject *HTMLFrameSetElement::createRenderer(RenderArena *arena, RenderStyle *style)
+RenderObject* HTMLFrameSetElement::createRenderer(RenderStyle *style)
 {
     if (style->hasContent())
         return RenderObject::createObject(this, style);
     
-    return new (arena) RenderFrameSet(this);
+    return new (document()->renderArena()) RenderFrameSet(this);
 }
 
 void HTMLFrameSetElement::attach(const AttachContext& context)
@@ -191,7 +189,7 @@ void HTMLFrameSetElement::attach(const AttachContext& context)
 void HTMLFrameSetElement::defaultEventHandler(Event* evt)
 {
     if (evt->isMouseEvent() && !m_noresize && renderer() && renderer()->isFrameSet()) {
-        if (toRenderFrameSet(renderer())->userResize(static_cast<MouseEvent*>(evt))) {
+        if (toRenderFrameSet(renderer())->userResize(toMouseEvent(evt))) {
             evt->setDefaultHandled();
             return;
         }

@@ -30,7 +30,6 @@
 #include "core/dom/DocumentMarker.h"
 #include "core/editing/EditAction.h"
 #include "core/editing/EditingBehavior.h"
-#include "core/editing/EditingStyle.h"
 #include "core/editing/EditorInsertAction.h"
 #include "core/editing/FindOptions.h"
 #include "core/editing/FrameSelection.h"
@@ -212,7 +211,7 @@ public:
     void markAndReplaceFor(PassRefPtr<SpellCheckRequest>, const Vector<TextCheckingResult>&);
 
     bool isOverwriteModeEnabled() const { return m_overwriteModeEnabled; }
-    void toggleOverwriteModeEnabled() { m_overwriteModeEnabled = !m_overwriteModeEnabled; }
+    void toggleOverwriteModeEnabled();
 
     void markAllMisspellingsAndBadGrammarInRanges(TextCheckingTypeMask, Range* spellingRange, Range* grammarRange);
 

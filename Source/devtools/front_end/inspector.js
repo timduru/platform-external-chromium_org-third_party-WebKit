@@ -153,7 +153,7 @@ var WebInspector = {
     _removeDrawerView: function()
     {
         if (this._drawerStatusBarHeader) {
-            this._drawerStatusBarHeader.removeSelf();
+            this._drawerStatusBarHeader.remove();
             if (this._drawerStatusBarHeader.onclose)
                 this._drawerStatusBarHeader.onclose();
             delete this._drawerStatusBarHeader;
@@ -561,6 +561,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     WebInspector.settings.showDebugBorders = WebInspector.settings.createBackendSetting("showDebugBorders", false, PageAgent.setShowDebugBorders.bind(PageAgent));
     WebInspector.settings.continuousPainting = WebInspector.settings.createBackendSetting("continuousPainting", false, PageAgent.setContinuousPaintingEnabled.bind(PageAgent));
     WebInspector.settings.showFPSCounter = WebInspector.settings.createBackendSetting("showFPSCounter", false, PageAgent.setShowFPSCounter.bind(PageAgent));
+    WebInspector.settings.showScrollBottleneckRects = WebInspector.settings.createBackendSetting("showScrollBottleneckRects", false, PageAgent.setShowScrollBottleneckRects.bind(PageAgent));
 
     WebInspector.settings.showMetricsRulers.addChangeListener(showRulersChanged);
     function showRulersChanged()
@@ -836,6 +837,10 @@ WebInspector.postDocumentKeyDown = function(event)
         return;
 
     if (event.keyCode === WebInspector.KeyboardShortcut.Keys.Esc.code) {
+        if (WebInspector.searchController.isSearchVisible()) {
+            WebInspector.searchController.closeSearch();
+            return;
+        }
         // If drawer is open with some view other than console then close it.
         if (!this._toggleConsoleButton.toggled && WebInspector.drawer.visible)
             this.closeViewInDrawer();
@@ -1037,7 +1042,7 @@ WebInspector._showAnchorLocationInPanel = function(anchor, panel)
         anchor.addStyleClass("webkit-html-resource-link");
     }
 
-    WebInspector.inspectorView.showPanelForAnchorNavigation(panel);
+    WebInspector.inspectorView.setCurrentPanel(panel);
     panel.showAnchorLocation(anchor);
     return true;
 }

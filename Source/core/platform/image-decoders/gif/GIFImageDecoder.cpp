@@ -134,6 +134,7 @@ bool GIFImageDecoder::setFailed()
     return ImageDecoder::setFailed();
 }
 
+// FIXME: Can the intermediate |rowBuffer| be avoided?
 bool GIFImageDecoder::haveDecodedRow(size_t frameIndex, const Vector<unsigned char>& rowBuffer, size_t width, size_t rowNumber, unsigned repeatCount, bool writeTransparentPixels)
 {
     const GIFFrameContext* frameContext = m_reader->frameContext(frameIndex);
@@ -242,6 +243,19 @@ bool GIFImageDecoder::frameComplete(size_t frameIndex)
     return true;
 }
 
+size_t GIFImageDecoder::clearCacheExceptFrame(size_t clearExceptFrame)
+{
+    // We need to preserve frames such that:
+    //  1. We don't clear |clearExceptFrame|;
+    //  2. We don't clear any frame from which a future initFrameBuffer() call
+    //     will copy bitmap data.
+    // All other frames can be cleared.
+    while ((clearExceptFrame < m_frameBufferCache.size()) && (m_frameBufferCache[clearExceptFrame].status() == ImageFrame::FrameEmpty))
+        clearExceptFrame = m_frameBufferCache[clearExceptFrame].requiredPreviousFrameIndex();
+
+    return ImageDecoder::clearCacheExceptFrame(clearExceptFrame);
+}
+
 void GIFImageDecoder::clearFrameBuffer(size_t frameIndex)
 {
     if (m_reader && m_frameBufferCache[frameIndex].status() == ImageFrame::FramePartial) {
@@ -305,13 +319,8 @@ void GIFImageDecoder::decode(size_t frameIndex)
         frameToDecode = m_frameBufferCache[frameToDecode].requiredPreviousFrameIndex();
     } while (frameToDecode != notFound && m_frameBufferCache[frameToDecode].status() != ImageFrame::FrameComplete);
 
-    // The |rend| variable is needed by some compilers that can't correctly
-    // select from const and non-const versions of overloaded functions.
-    // Can remove the variable if Android compiler can compile
-    // 'iter != framesToDecode.rend()'.
-    Vector<size_t>::const_reverse_iterator rend = framesToDecode.rend();
-    for (Vector<size_t>::const_reverse_iterator iter = framesToDecode.rbegin(); iter != rend; ++iter) {
-        size_t frameIndex = *iter;
+    for (size_t i = framesToDecode.size(); i > 0; --i) {
+        size_t frameIndex = framesToDecode[i - 1];
         if (!m_reader->decode(frameIndex)) {
             setFailed();
             return;
@@ -352,12 +361,7 @@ bool GIFImageDecoder::initFrameBuffer(size_t frameIndex)
             // affecting pixels in the image outside of the frame.
             const IntRect& prevRect = prevBuffer->originalFrameRect();
             ASSERT(!prevRect.contains(IntRect(IntPoint(), size())));
-            for (int y = prevRect.y(); y < prevRect.maxY(); ++y) {
-                for (int x = prevRect.x(); x < prevRect.maxX(); ++x)
-                    buffer->setRGBA(x, y, 0, 0, 0, 0);
-            }
-            if ((prevRect.width() > 0) && (prevRect.height() > 0))
-                buffer->setHasAlpha(true);
+            buffer->zeroFillFrameRect(prevRect);
         }
     }
 

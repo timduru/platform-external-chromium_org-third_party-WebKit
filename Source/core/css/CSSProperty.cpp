@@ -26,8 +26,6 @@
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 
-#include <wtf/text/StringBuilder.h>
-
 namespace WebCore {
 
 struct SameSizeAsCSSProperty {
@@ -503,9 +501,9 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyUnicodeRange:
     case CSSPropertyVectorEffect:
     case CSSPropertyVerticalAlign:
-    case CSSPropertyWebkitAlignContent:
-    case CSSPropertyWebkitAlignItems:
-    case CSSPropertyWebkitAlignSelf:
+    case CSSPropertyAlignContent:
+    case CSSPropertyAlignItems:
+    case CSSPropertyAlignSelf:
     case CSSPropertyWebkitAnimation:
     case CSSPropertyWebkitAnimationDelay:
     case CSSPropertyWebkitAnimationDirection:
@@ -566,27 +564,27 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitColumnWidth:
     case CSSPropertyWebkitColumns:
     case CSSPropertyWebkitFilter:
-    case CSSPropertyWebkitFlex:
-    case CSSPropertyWebkitFlexBasis:
-    case CSSPropertyWebkitFlexDirection:
-    case CSSPropertyWebkitFlexFlow:
-    case CSSPropertyWebkitFlexGrow:
-    case CSSPropertyWebkitFlexShrink:
-    case CSSPropertyWebkitFlexWrap:
+    case CSSPropertyFlex:
+    case CSSPropertyFlexBasis:
+    case CSSPropertyFlexDirection:
+    case CSSPropertyFlexFlow:
+    case CSSPropertyFlexGrow:
+    case CSSPropertyFlexShrink:
+    case CSSPropertyFlexWrap:
     case CSSPropertyWebkitFontSizeDelta:
-    case CSSPropertyGridAfter:
+    case CSSPropertyGridArea:
     case CSSPropertyGridAutoColumns:
     case CSSPropertyGridAutoFlow:
     case CSSPropertyGridAutoRows:
-    case CSSPropertyGridBefore:
     case CSSPropertyGridColumn:
-    case CSSPropertyGridColumns:
-    case CSSPropertyGridEnd:
+    case CSSPropertyGridColumnEnd:
+    case CSSPropertyGridColumnStart:
+    case CSSPropertyGridDefinitionColumns:
+    case CSSPropertyGridDefinitionRows:
     case CSSPropertyGridRow:
-    case CSSPropertyGridRows:
-    case CSSPropertyGridStart:
-    case CSSPropertyGridArea:
-    case CSSPropertyWebkitJustifyContent:
+    case CSSPropertyGridRowEnd:
+    case CSSPropertyGridRowStart:
+    case CSSPropertyJustifyContent:
     case CSSPropertyWebkitLineClamp:
     case CSSPropertyWebkitLogicalHeight:
     case CSSPropertyWebkitLogicalWidth:
@@ -604,7 +602,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitMarqueeIncrement:
     case CSSPropertyWebkitMarqueeRepetition:
     case CSSPropertyWebkitMarqueeSpeed:
-    case CSSPropertyWebkitOrder:
+    case CSSPropertyOrder:
     case CSSPropertyWebkitMarqueeStyle:
     case CSSPropertyWebkitMask:
     case CSSPropertyWebkitMaskBoxImage:

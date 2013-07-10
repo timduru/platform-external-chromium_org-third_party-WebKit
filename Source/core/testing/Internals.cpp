@@ -195,7 +195,7 @@ void Internals::resetToConsistentState(Page* page)
 }
 
 Internals::Internals(Document* document)
-    : ContextDestructionObserver(document)
+    : ContextLifecycleObserver(document)
     , m_runtimeFlags(InternalRuntimeFlags::create())
 {
 }
@@ -740,6 +740,17 @@ void Internals::setEnableMockPagePopup(bool enabled, ExceptionCode& ec)
 PassRefPtr<PagePopupController> Internals::pagePopupController()
 {
     return s_pagePopupDriver ? s_pagePopupDriver->pagePopupController() : 0;
+}
+
+PassRefPtr<ClientRect> Internals::unscaledViewportRect(ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->view()) {
+        ec = INVALID_ACCESS_ERR;
+        return ClientRect::create();
+    }
+
+    return ClientRect::create(document->view()->visibleContentRect());
 }
 
 PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionCode& ec)
@@ -1889,7 +1900,9 @@ String Internals::getCurrentCursorInfo(Document* document, ExceptionCode& ec)
 PassRefPtr<ArrayBuffer> Internals::serializeObject(PassRefPtr<SerializedScriptValue> value) const
 {
     String stringValue = value->toWireString();
-    return ArrayBuffer::create(static_cast<const void*>(stringValue.impl()->characters()), stringValue.sizeInBytes());
+    RefPtr<ArrayBuffer> buffer = ArrayBuffer::createUninitialized(stringValue.length(), sizeof(UChar));
+    stringValue.copyTo(static_cast<UChar*>(buffer->data()), stringValue.length());
+    return buffer.release();
 }
 
 PassRefPtr<SerializedScriptValue> Internals::deserializeBuffer(PassRefPtr<ArrayBuffer> buffer) const
@@ -1908,6 +1921,17 @@ void Internals::forceReload(bool endToEnd)
     frame()->loader()->reload(endToEnd);
 }
 
+PassRefPtr<ClientRect> Internals::selectionBounds(ExceptionCode& ec)
+{
+    Document* document = contextDocument();
+    if (!document || !document->frame() || !document->frame()->selection()) {
+        ec = INVALID_ACCESS_ERR;
+        return 0;
+    }
+
+    return ClientRect::create(document->frame()->selection()->bounds());
+}
+
 String Internals::markerTextForListItem(Element* element, ExceptionCode& ec)
 {
     if (!element) {
@@ -1924,6 +1948,16 @@ String Internals::getImageSourceURL(Element* element, ExceptionCode& ec)
         return String();
     }
     return element->imageSourceURL();
+}
+
+String Internals::baseURL(Document* document, ExceptionCode& ec)
+{
+    if (!document) {
+        ec = INVALID_ACCESS_ERR;
+        return String();
+    }
+
+    return document->baseURL().string();
 }
 
 bool Internals::isSelectPopupVisible(Node* node)

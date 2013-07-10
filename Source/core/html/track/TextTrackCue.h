@@ -35,10 +35,7 @@
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/EventTarget.h"
 #include "core/html/HTMLDivElement.h"
-#include "core/html/HTMLElement.h"
-#include "core/html/track/TextTrack.h"
-#include <wtf/PassOwnPtr.h>
-#include <wtf/RefCounted.h>
+#include "wtf/RefCounted.h"
 
 namespace WebCore {
 
@@ -64,7 +61,7 @@ public:
 protected:
     TextTrackCueBox(Document*, TextTrackCue*);
 
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) OVERRIDE;
+    virtual RenderObject* createRenderer(RenderStyle*) OVERRIDE;
 
     TextTrackCue* m_cue;
 };

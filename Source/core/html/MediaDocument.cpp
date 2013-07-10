@@ -60,7 +60,7 @@ private:
     {
     }
 
-    virtual void appendBytes(DocumentWriter*, const char*, size_t);
+    virtual size_t appendBytes(const char*, size_t) OVERRIDE;
 
     void createDocumentStructure();
 
@@ -97,21 +97,16 @@ void MediaDocumentParser::createDocumentStructure()
 
     m_mediaElement->appendChild(sourceElement, IGNORE_EXCEPTION);
     body->appendChild(mediaElement, IGNORE_EXCEPTION);
-
-    Frame* frame = document()->frame();
-    if (!frame)
-        return;
-
-    frame->loader()->activeDocumentLoader()->setMainResourceDataBufferingPolicy(DoNotBufferData);
 }
 
-void MediaDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
+size_t MediaDocumentParser::appendBytes(const char*, size_t)
 {
     if (m_mediaElement)
-        return;
+        return 0;
 
     createDocumentStructure();
     finish();
+    return 0;
 }
     
 MediaDocument::MediaDocument(Frame* frame, const KURL& url)
@@ -154,7 +149,7 @@ void MediaDocument::defaultEventHandler(Event* event)
         if (!video)
             return;
 
-        KeyboardEvent* keyboardEvent = static_cast<KeyboardEvent*>(event);
+        KeyboardEvent* keyboardEvent = toKeyboardEvent(event);
         if (keyboardEvent->keyIdentifier() == "U+0020" || keyboardEvent->keyCode() == VKEY_MEDIA_PLAY_PAUSE) {
             // space or media key (play/pause)
             if (video->paused()) {

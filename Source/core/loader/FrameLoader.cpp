@@ -35,20 +35,12 @@
 #include "config.h"
 #include "core/loader/FrameLoader.h"
 
-#include <wtf/CurrentTime.h>
-#include <wtf/MemoryInstrumentationHashSet.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/WTFString.h>
 #include "HTMLNames.h"
-#include "SVGNames.h"
 #include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ScriptController.h"
-#include "bindings/v8/ScriptSourceCode.h"
 #include "bindings/v8/SerializedScriptValue.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/BeforeUnloadEvent.h"
-#include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/dom/Event.h"
@@ -58,15 +50,12 @@
 #include "core/editing/Editor.h"
 #include "core/history/BackForwardController.h"
 #include "core/history/HistoryItem.h"
-#include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLObjectElement.h"
-#include "core/html/PluginDocument.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/inspector/InspectorController.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/inspector/ScriptCallStack.h"
 #include "core/loader/DocumentLoadTiming.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FormState.h"
@@ -75,17 +64,13 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/IconController.h"
 #include "core/loader/ProgressTracker.h"
-#include "core/loader/TextResourceDecoder.h"
 #include "core/loader/UniqueIdentifier.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
 #include "core/loader/cache/CachedResourceLoader.h"
-#include "core/loader/cache/MemoryCache.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
-#include "core/page/Console.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/DOMWindow.h"
-#include "core/page/EditorClient.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
@@ -94,32 +79,22 @@
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
 #include "core/platform/Logging.h"
-#include "core/platform/MIMETypeFromURL.h"
-#include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/ScrollAnimator.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/network/HTTPParsers.h"
 #include "core/platform/network/ResourceHandle.h"
 #include "core/platform/network/ResourceRequest.h"
-#include "core/platform/text/SegmentedString.h"
-#include "core/plugins/PluginData.h"
-#include "core/svg/SVGDocument.h"
-#include "core/svg/SVGLocatable.h"
-#include "core/svg/SVGPreserveAspectRatio.h"
-#include "core/svg/SVGSVGElement.h"
-#include "core/svg/SVGViewElement.h"
-#include "core/svg/SVGViewSpec.h"
 #include "core/xml/parser/XMLDocumentParser.h"
 #include "modules/webdatabase/DatabaseManager.h"
-#include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
-
+#include "wtf/MemoryInstrumentationHashSet.h"
+#include "wtf/text/CString.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
-using namespace SVGNames;
 
 static const char defaultAcceptHeader[] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
 
@@ -965,18 +940,6 @@ void FrameLoader::prepareForHistoryNavigation()
     }
 }
 
-void FrameLoader::prepareForLoadStart()
-{
-    m_progressTracker->progressStarted();
-    m_client->dispatchDidStartProvisionalLoad();
-
-    // Notify accessibility.
-    if (AXObjectCache* cache = m_frame->document()->existingAXObjectCache()) {
-        AXObjectCache::AXLoadingEvent loadingEvent = loadType() == FrameLoadTypeReload ? AXObjectCache::AXLoadingReloaded : AXObjectCache::AXLoadingStarted;
-        cache->frameLoadingEventNotification(m_frame, loadingEvent);
-    }
-}
-
 void FrameLoader::loadFrameRequest(const FrameLoadRequest& request, bool lockBackForwardList,
     PassRefPtr<Event> event, PassRefPtr<FormState> formState, ShouldSendReferrer shouldSendReferrer)
 {    
@@ -1010,7 +973,7 @@ void FrameLoader::loadFrameRequest(const FrameLoadRequest& request, bool lockBac
     FrameLoadType loadType;
     if (resourceRequest.cachePolicy() == ReloadIgnoringCacheData)
         loadType = FrameLoadTypeReload;
-    else if (lockBackForwardList || history()->currentItemShouldBeReplaced())
+    else if (lockBackForwardList)
         loadType = FrameLoadTypeRedirectWithLockedBackForwardList;
     else
         loadType = FrameLoadTypeStandard;
@@ -1029,8 +992,7 @@ void FrameLoader::loadFrameRequest(const FrameLoadRequest& request, bool lockBac
     }
 }
 
-void FrameLoader::loadURL(const ResourceRequest& request, const String& frameName, FrameLoadType newLoadType,
-    PassRefPtr<Event> event, PassRefPtr<FormState> formState)
+void FrameLoader::loadURL(const ResourceRequest& request, const String& frameName, FrameLoadType newLoadType, PassRefPtr<Event> event, PassRefPtr<FormState> formState)
 {
     if (m_inStopAllLoaders)
         return;
@@ -1125,14 +1087,13 @@ void FrameLoader::loadWithNavigationAction(const ResourceRequest& request, const
     if (type == FrameLoadTypeRedirectWithLockedBackForwardList)
         loader->setIsClientRedirect(true);
 
-    m_loadType = type;
     bool isFormSubmission = formState;
 
     if (shouldPerformFragmentNavigation(isFormSubmission, request.httpMethod(), type, request.url()))
-        checkNavigationPolicyAndContinueFragmentScroll(action);
+        checkNavigationPolicyAndContinueFragmentScroll(action, type != FrameLoadTypeRedirectWithLockedBackForwardList);
     else {
         setPolicyDocumentLoader(loader.get());
-        checkNavigationPolicyAndContinueLoad(formState);
+        checkNavigationPolicyAndContinueLoad(formState, type);
     }
 }
 
@@ -1170,6 +1131,9 @@ void FrameLoader::reload(bool endToEndReload, const KURL& overrideURL, const Str
     frame()->loader()->history()->saveDocumentAndScrollState();
 
     ResourceRequest request = documentLoader->request();
+    // FIXME: We need to reset cache policy to prevent it from being incorrectly propagted to the reload.
+    // Do we need to propagate anything other than the url?
+    request.setCachePolicy(UseProtocolCachePolicy);
     if (!overrideURL.isEmpty())
         request.setURL(overrideURL);
     else if (!documentLoader->unreachableURL().isEmpty())
@@ -1927,7 +1891,7 @@ void FrameLoader::receivedMainResourceError(const ResourceError& error)
         checkLoadComplete();
 }
 
-void FrameLoader::checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction& action)
+void FrameLoader::checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction& action, bool isNewNavigation)
 {
     m_documentLoader->setTriggeringAction(action);
 
@@ -1940,7 +1904,7 @@ void FrameLoader::checkNavigationPolicyAndContinueFragmentScroll(const Navigatio
         m_provisionalDocumentLoader->stopLoading();
         setProvisionalDocumentLoader(0);
     }
-    loadInSameDocument(request.url(), 0, m_loadType != FrameLoadTypeRedirectWithLockedBackForwardList);
+    loadInSameDocument(request.url(), 0, isNewNavigation);
 }
 
 bool FrameLoader::shouldPerformFragmentNavigation(bool isFormSubmission, const String& httpMethod, FrameLoadType loadType, const KURL& url)
@@ -2037,7 +2001,7 @@ bool FrameLoader::fireBeforeUnloadEvent(Chrome& chrome)
     return chrome.runBeforeUnloadConfirmPanel(text, m_frame);
 }
 
-void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> formState)
+void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> formState, FrameLoadType type)
 {
     // If we loaded an alternate page to replace an unreachableURL, we'll get in here with a
     // nil policyDataSource because loading the alternate page will have passed
@@ -2077,7 +2041,7 @@ void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> for
         // If the navigation request came from the back/forward menu, and we punt on it, we have the 
         // problem that we have optimistically moved the b/f cursor already, so move it back.  For sanity, 
         // we only do this when punting a navigation for the target frame or top-level frame.  
-        if ((isTargetItem || isLoadingMainFrame()) && isBackForwardLoadType(m_loadType)) {
+        if ((isTargetItem || isLoadingMainFrame()) && isBackForwardLoadType(type)) {
             if (Page* page = m_frame->page()) {
                 Frame* mainFrame = page->mainFrame();
                 if (HistoryItem* resetItem = mainFrame->loader()->history()->currentItem())
@@ -2101,6 +2065,7 @@ void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> for
     }
 
     setProvisionalDocumentLoader(m_policyDocumentLoader.get());
+    m_loadType = type;
     setState(FrameStateProvisional);
 
     setPolicyDocumentLoader(0);
@@ -2108,16 +2073,14 @@ void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> for
     if (formState)
         m_client->dispatchWillSubmitForm(formState);
 
-    prepareForLoadStart();
+    m_progressTracker->progressStarted();
+    m_client->dispatchDidStartProvisionalLoad();
+    ASSERT(m_provisionalDocumentLoader);
 
-    // The load might be cancelled inside of prepareForLoadStart(), nulling out the m_provisionalDocumentLoader,
-    // so we need to null check it again.
-    if (!m_provisionalDocumentLoader)
-        return;
-
-    DocumentLoader* activeDocLoader = activeDocumentLoader();
-    if (activeDocLoader && activeDocLoader->isLoadingMainResource())
-        return;
+    if (AXObjectCache* cache = m_frame->document()->existingAXObjectCache()) {
+        AXObjectCache::AXLoadingEvent loadingEvent = loadType() == FrameLoadTypeReload ? AXObjectCache::AXLoadingReloaded : AXObjectCache::AXLoadingStarted;
+        cache->frameLoadingEventNotification(m_frame, loadingEvent);
+    }
 
     m_provisionalDocumentLoader->startLoadingMainResource();
 }
@@ -2130,23 +2093,33 @@ void FrameLoader::checkNewWindowPolicyAndContinue(PassRefPtr<FormState> formStat
     if (!DOMWindow::allowPopUp(m_frame))
         return;
 
-    PolicyAction policy = m_client->policyForNewWindowAction(action, frameName);
-    ASSERT(policy != PolicyIgnore);
-    if (policy == PolicyDownload) {
+    NavigationPolicy navigationPolicy = NavigationPolicyNewForegroundTab;
+    action.specifiesNavigationPolicy(&navigationPolicy);
+
+    if (navigationPolicy == NavigationPolicyDownload) {
         m_client->startDownload(action.resourceRequest());
         return;
     }
 
     RefPtr<Frame> frame = m_frame;
-    RefPtr<Frame> mainFrame = m_client->dispatchCreatePage(action);
-    if (!mainFrame)
-        return;
+    RefPtr<Frame> mainFrame = m_frame;
+
+    if (!m_frame->settings() || m_frame->settings()->supportsMultipleWindows()) {
+        struct WindowFeatures features;
+        Page* newPage = m_frame->page()->chrome().client()->createWindow(m_frame, FrameLoadRequest(m_frame->document()->securityOrigin()),
+            features, action, navigationPolicy);
+
+        // createWindow can return null (e.g., popup blocker denies the window).
+        if (!newPage)
+            return;
+        mainFrame = newPage->mainFrame();
+    }
 
     if (frameName != "_blank")
         mainFrame->tree()->setName(frameName);
 
     mainFrame->page()->setOpenedByDOM();
-    mainFrame->loader()->m_client->dispatchShow();
+    mainFrame->page()->chrome().show(navigationPolicy);
     if (!m_suppressOpenerInNewFrame) {
         mainFrame->loader()->setOpener(frame.get());
         mainFrame->document()->setReferrerPolicy(frame->document()->referrerPolicy());
@@ -2502,7 +2475,7 @@ Frame* createWindow(Frame* openerFrame, Frame* lookupFrame, const FrameLoadReque
         return 0;
 
     NavigationAction action(requestWithReferrer.resourceRequest());
-    Page* page = oldPage->chrome().createWindow(openerFrame, requestWithReferrer, features, action);
+    Page* page = oldPage->chrome().client()->createWindow(openerFrame, requestWithReferrer, features, action);
     if (!page)
         return 0;
 

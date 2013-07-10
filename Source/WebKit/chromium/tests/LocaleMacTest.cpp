@@ -28,10 +28,10 @@
 
 #include <gtest/gtest.h>
 #include "core/platform/DateComponents.h"
-#include <wtf/DateMath.h>
-#include <wtf/MathExtras.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/text/CString.h>
+#include "wtf/DateMath.h"
+#include "wtf/MathExtras.h"
+#include "wtf/PassOwnPtr.h"
+#include "wtf/text/CString.h"
 
 using namespace WebCore;
 
@@ -74,7 +74,7 @@ protected:
         OwnPtr<LocaleMac> locale = LocaleMac::create(localeString);
         DateComponents date;
         unsigned end;
-        date.parseWeek(isoString.characters(), isoString.length(), 0, end);
+        date.parseWeek(isoString, 0, end);
         return locale->formatDateTime(date);
     }
 
@@ -83,7 +83,7 @@ protected:
         OwnPtr<LocaleMac> locale = LocaleMac::create(localeString);
         DateComponents date;
         unsigned end;
-        date.parseMonth(isoString.characters(), isoString.length(), 0, end);
+        date.parseMonth(isoString, 0, end);
         return locale->formatDateTime(date, (useShortFormat ? Locale::FormatTypeShort : Locale::FormatTypeMedium));
     }
 

@@ -41,6 +41,7 @@
 #include "core/svg/SVGDocument.h"
 #include "core/svg/SVGSVGElement.h"
 #include "core/svg/graphics/SVGImageChromeClient.h"
+#include "wtf/PassRefPtr.h"
 
 namespace WebCore {
 
@@ -142,9 +143,7 @@ void SVGImage::drawForContainer(GraphicsContext* context, const FloatSize contai
     setImageObserver(observer);
 }
 
-// Passes ownership of the native image to the caller so PassNativeImagePtr needs
-// to be a smart pointer type.
-PassNativeImagePtr SVGImage::nativeImageForCurrentFrame()
+PassRefPtr<NativeImageSkia> SVGImage::nativeImageForCurrentFrame()
 {
     if (!m_page)
         return 0;
@@ -190,7 +189,7 @@ void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize
     image->drawPattern(context, scaledSrcRect, scaleWithoutCTM, phase, compositeOp, dstRect);
 }
 
-void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator compositeOp, BlendMode)
+void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator compositeOp, BlendMode blendMode)
 {
     if (!m_page)
         return;
@@ -198,7 +197,7 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
     FrameView* view = frameView();
 
     GraphicsContextStateSaver stateSaver(*context);
-    context->setCompositeOperation(compositeOp);
+    context->setCompositeOperation(compositeOp, blendMode);
     context->clip(enclosingIntRect(dstRect));
     if (compositeOp != CompositeSourceOver)
         context->beginTransparencyLayer(1);
@@ -218,7 +217,7 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
     if (view->needsLayout())
         view->layout();
 
-    view->paint(context, IntRect(0, 0, view->width(), view->height()));
+    view->paint(context, enclosingIntRect(srcRect));
 
     if (compositeOp != CompositeSourceOver)
         context->endTransparencyLayer();
@@ -354,11 +353,9 @@ bool SVGImage::dataChanged(bool allDataReceived)
         frame->view()->setTransparent(true); // SVG Images are transparent.
 
         ASSERT(loader->activeDocumentLoader()); // DocumentLoader should have been created by frame->init().
-        loader->activeDocumentLoader()->writer()->setMIMEType("image/svg+xml");
-        loader->activeDocumentLoader()->writer()->begin(KURL()); // create the empty document
-        loader->activeDocumentLoader()->writer()->addData(data()->data(), data()->size());
-        loader->activeDocumentLoader()->writer()->end();
-
+        DocumentWriter* writer = loader->activeDocumentLoader()->beginWriting("image/svg+xml", "UTF-8");
+        writer->addData(data()->data(), data()->size());
+        loader->activeDocumentLoader()->endWriting(writer);
         // Set the intrinsic size before a container size is available.
         m_intrinsicSize = containerSize();
     }

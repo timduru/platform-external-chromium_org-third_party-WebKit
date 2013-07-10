@@ -40,7 +40,6 @@ namespace WebCore {
 class DOMWindow;
 class InjectedScript;
 class InjectedScriptHost;
-class InspectorObject;
 class ScriptObject;
 
 class InjectedScriptManager {
@@ -73,7 +72,7 @@ private:
     ScriptObject createInjectedScript(const String& source, ScriptState*, int id);
 
     static bool canAccessInspectedWindow(ScriptState*);
-    static bool canAccessInspectedWorkerContext(ScriptState*);
+    static bool canAccessInspectedWorkerGlobalScope(ScriptState*);
 
     int m_nextInjectedScriptId;
     typedef HashMap<int, InjectedScript> IdToInjectedScriptMap;

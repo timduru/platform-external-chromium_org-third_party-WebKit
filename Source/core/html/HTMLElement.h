@@ -23,7 +23,7 @@
 #ifndef HTMLElement_h
 #define HTMLElement_h
 
-#include "core/dom/StyledElement.h"
+#include "core/dom/Element.h"
 
 namespace WebCore {
 
@@ -37,7 +37,7 @@ enum TranslateAttributeMode {
     TranslateAttributeInherit
 };
 
-class HTMLElement : public StyledElement {
+class HTMLElement : public Element {
 public:
     static PassRefPtr<HTMLElement> create(const QualifiedName& tagName, Document*);
 
@@ -79,7 +79,7 @@ public:
     bool ieForbidsInsertHTML() const;
 
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
 
     HTMLFormElement* form() const { return virtualForm(); }
 
@@ -91,6 +91,8 @@ public:
     virtual bool isHTMLUnknownElement() const { return false; }
 
     virtual bool isLabelable() const { return false; }
+
+    virtual void defaultEventHandler(Event*) OVERRIDE;
 
 protected:
     HTMLElement(const QualifiedName& tagName, Document*, ConstructionType);
@@ -127,6 +129,9 @@ private:
     TranslateAttributeMode translateAttributeMode() const;
 
     AtomicString eventNameForAttributeName(const QualifiedName& attrName) const;
+
+    void handleKeypressEvent(KeyboardEvent*);
+    bool supportsSpatialNavigationFocus() const;
 };
 
 inline HTMLElement* toHTMLElement(Node* node)
@@ -145,7 +150,7 @@ inline const HTMLElement* toHTMLElement(const Node* node)
 void toHTMLElement(const HTMLElement*);
 
 inline HTMLElement::HTMLElement(const QualifiedName& tagName, Document* document, ConstructionType type = CreateHTMLElement)
-    : StyledElement(tagName, document, type)
+    : Element(tagName, document, type)
 {
     ASSERT(tagName.localName().impl());
     ScriptWrappable::init(this);

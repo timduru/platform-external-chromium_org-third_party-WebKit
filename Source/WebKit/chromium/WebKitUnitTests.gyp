@@ -50,6 +50,7 @@
                 '<(DEPTH)/base/base.gyp:test_support_base',
                 '<(DEPTH)/testing/gmock.gyp:gmock',
                 '<(DEPTH)/testing/gtest.gyp:gtest',
+                '<(DEPTH)/third_party/libwebp/libwebp.gyp:libwebp',
                 '<(DEPTH)/third_party/zlib/zlib.gyp:zlib',
                 '<(DEPTH)/url/url.gyp:url_lib',
                 '<(DEPTH)/v8/tools/gyp/v8.gyp:v8',
@@ -59,7 +60,7 @@
                 'tests/RunAllTests.cpp',
             ],
             'include_dirs': [
-                'public',
+                '../../../public/web',
                 'src',
             ],
             'conditions': [
@@ -83,7 +84,7 @@
                     'conditions': [
                         ['toolkit_uses_gtk == 1', {
                             'include_dirs': [
-                                'public/gtk',
+                                '../../../public/web/gtk',
                             ],
                             'variables': {
                             # FIXME: Enable warnings on other platforms.
@@ -112,7 +113,7 @@
                 }],
                 ['OS=="mac"', {
                     'include_dirs': [
-                        'public/mac',
+                        '../../../public/web/mac',
                     ],
                 }],
                 [ 'os_posix==1 and OS!="mac" and OS!="android" and OS!="ios" and linux_use_tcmalloc==1', {

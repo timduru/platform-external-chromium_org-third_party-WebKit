@@ -99,12 +99,6 @@ class InterpretTestFailuresTest(unittest.TestCase):
         self.port = host.port_factory.get(port_name='test')
 
     def test_interpret_test_failures(self):
-        test_dict = test_run_results._interpret_test_failures([test_failures.FailureImageHashMismatch(diff_percent=0.42)])
-        self.assertEqual(test_dict['image_diff_percent'], 0.42)
-
-        test_dict = test_run_results._interpret_test_failures([test_failures.FailureReftestMismatch(self.port.abspath_for_test('foo/reftest-expected.html'))])
-        self.assertIn('image_diff_percent', test_dict)
-
         test_dict = test_run_results._interpret_test_failures([test_failures.FailureReftestMismatchDidNotOccur(self.port.abspath_for_test('foo/reftest-expected-mismatch.html'))])
         self.assertEqual(len(test_dict), 0)
 
@@ -132,13 +126,13 @@ class SummarizedResultsTest(unittest.TestCase):
 
     def test_num_failures_by_type(self):
         summary = summarized_results(self.port, expected=False, passing=False, flaky=False)
-        self.assertEquals(summary['num_failures_by_type'], {'CRASH': 1, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'PASS': 0, 'SKIP': 0, 'TIMEOUT': 2, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 1})
+        self.assertEquals(summary['num_failures_by_type'], {'CRASH': 1, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'NEEDSREBASELINE': 0, 'PASS': 0, 'SKIP': 0, 'TIMEOUT': 2, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 1})
 
         summary = summarized_results(self.port, expected=True, passing=False, flaky=False)
-        self.assertEquals(summary['num_failures_by_type'], {'CRASH': 1, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'PASS': 1, 'SKIP': 0, 'TIMEOUT': 1, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 1})
+        self.assertEquals(summary['num_failures_by_type'], {'CRASH': 1, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'NEEDSREBASELINE': 0, 'PASS': 1, 'SKIP': 0, 'TIMEOUT': 1, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 1})
 
         summary = summarized_results(self.port, expected=False, passing=True, flaky=False)
-        self.assertEquals(summary['num_failures_by_type'], {'CRASH': 0, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'PASS': 4, 'SKIP': 1, 'TIMEOUT': 0, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 0})
+        self.assertEquals(summary['num_failures_by_type'], {'CRASH': 0, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'NEEDSREBASELINE': 0, 'PASS': 4, 'SKIP': 1, 'TIMEOUT': 0, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 0})
 
     def test_svn_revision(self):
         self.port._options.builder_name = 'dummy builder'

@@ -77,14 +77,15 @@
 #include "public/platform/WebThread.h"
 #include "public/platform/WebUnitTestSupport.h"
 #include "public/platform/WebURLResponse.h"
-#include <wtf/dtoa/utils.h>
-#include <wtf/Forward.h>
+#include "wtf/dtoa/utils.h"
+#include "wtf/Forward.h"
 
 using namespace WebKit;
 using WebCore::Document;
 using WebCore::DocumentMarker;
 using WebCore::Element;
 using WebCore::FloatRect;
+using WebCore::HitTestRequest;
 using WebCore::Range;
 using WebKit::URLTestHelpers::toKURL;
 using WebKit::FrameTestHelpers::runPendingTasks;
@@ -960,7 +961,7 @@ protected:
             webViewImpl->mainFrame()->setScrollOffset(scrollOffset);
 
             WebCore::IntPoint anchorPoint = WebCore::IntPoint(scrollOffset) + WebCore::IntPoint(viewportSize.width / 2, 0);
-            RefPtr<WebCore::Node> anchorNode = webViewImpl->mainFrameImpl()->frame()->eventHandler()->hitTestResultAtPoint(anchorPoint).innerNode();
+            RefPtr<WebCore::Node> anchorNode = webViewImpl->mainFrameImpl()->frame()->eventHandler()->hitTestResultAtPoint(anchorPoint, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent).innerNode();
             ASSERT(anchorNode);
 
             pageScaleFactor = webViewImpl->pageScaleFactor();
@@ -3377,6 +3378,32 @@ TEST_F(WebFrameTest, SimulateFragmentAnchorMiddleClick)
     RefPtr<WebCore::Event> event = WebCore::MouseEvent::create(WebCore::eventNames().clickEvent, false, false,
         document->defaultView(), 0, 0, 0, 0, 0, 0, 0, false, false, false, false, 1, 0, 0);
     webViewImpl->page()->mainFrame()->loader()->urlSelected(destination, "", event.release(), false, WebCore::MaybeSendReferrer);
+
+    m_webView->close();
+    m_webView = 0;
+}
+
+TEST_F(WebFrameTest, BackToReload)
+{
+    registerMockedHttpURLLoad("fragment_middle_click.html");
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fragment_middle_click.html", true);
+    WebFrame* frame = m_webView->mainFrame();
+    WebHistoryItem firstItem = frame->currentHistoryItem();
+    EXPECT_FALSE(firstItem.isNull());
+
+    registerMockedHttpURLLoad("white-1x1.png");
+    FrameTestHelpers::loadFrame(frame, m_baseURL + "white-1x1.png");
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    EXPECT_FALSE(frame->previousHistoryItem().isNull());
+    EXPECT_EQ(firstItem.urlString(), frame->previousHistoryItem().urlString());
+
+    frame->loadHistoryItem(frame->previousHistoryItem());
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    EXPECT_EQ(firstItem.urlString(), frame->currentHistoryItem().urlString());
+
+    frame->reload();
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+    EXPECT_EQ(WebURLRequest::ReloadIgnoringCacheData, frame->dataSource()->request().cachePolicy());
 
     m_webView->close();
     m_webView = 0;

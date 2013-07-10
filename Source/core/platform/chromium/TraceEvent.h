@@ -541,7 +541,7 @@
 // and thus cannot trace states of multiple threads.
 #define INTERNAL_TRACE_EVENT_SAMPLING_STATE(name, threadBucket) \
     do { \
-        *WebCore::traceSamplingState##threadBucket = reinterpret_cast<TraceEventAPIAtomicWord>("WebKit\0" name); \
+        *WebCore::traceSamplingState##threadBucket = reinterpret_cast<long>(name); \
     } while (0);
 
 // Notes regarding the following definitions:
@@ -791,6 +791,34 @@ private:
     };
     Data* m_pdata;
     Data m_data;
+};
+
+class SamplingState0Scope {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    SamplingState0Scope(const char* name)
+    {
+        m_previousState0 = *WebCore::traceSamplingState0;
+        *WebCore::traceSamplingState0 = reinterpret_cast<long>(const_cast<char*>(name));
+    }
+
+    ~SamplingState0Scope()
+    {
+        *WebCore::traceSamplingState0 = m_previousState0;
+    }
+
+    static inline const char* current()
+    {
+        return reinterpret_cast<const char*>(*WebCore::traceSamplingState0);
+    }
+
+    static inline void forceCurrent(const char* name)
+    {
+        *WebCore::traceSamplingState0 = reinterpret_cast<long>(const_cast<char*>(name));
+    }
+
+private:
+    long m_previousState0;
 };
 
 } // namespace TraceEvent

@@ -31,12 +31,12 @@
 #ifndef WebEntities_h
 #define WebEntities_h
 
-#include <wtf/HashMap.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/HashMap.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebKit {
 
-// FIXME: This class is wrong and needs to be removed.
+// FIXME: This class is wrong and needs to be removed!
 class WebEntities {
 public:
     // &apos;, &percnt;, &nsup;, &supl; are not defined by the HTML standards.

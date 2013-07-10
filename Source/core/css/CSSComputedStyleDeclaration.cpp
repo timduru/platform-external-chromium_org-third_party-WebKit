@@ -63,9 +63,9 @@
 #include "core/rendering/style/ContentData.h"
 #include "core/rendering/style/CounterContent.h"
 #include "core/rendering/style/CursorList.h"
-#include "core/rendering/style/ExclusionShapeValue.h"
 #include "core/rendering/style/RenderStyle.h"
-#include <wtf/text/StringBuilder.h>
+#include "core/rendering/style/ShapeValue.h"
+#include "wtf/text/StringBuilder.h"
 
 #include "core/platform/graphics/filters/custom/CustomFilterArrayParameter.h"
 #include "core/platform/graphics/filters/custom/CustomFilterNumberParameter.h"
@@ -244,27 +244,27 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitColumnSpan,
     CSSPropertyWebkitColumnWidth,
     CSSPropertyWebkitFilter,
-    CSSPropertyWebkitAlignContent,
-    CSSPropertyWebkitAlignItems,
-    CSSPropertyWebkitAlignSelf,
-    CSSPropertyWebkitFlexBasis,
-    CSSPropertyWebkitFlexGrow,
-    CSSPropertyWebkitFlexShrink,
-    CSSPropertyWebkitFlexDirection,
-    CSSPropertyWebkitFlexWrap,
-    CSSPropertyWebkitJustifyContent,
+    CSSPropertyAlignContent,
+    CSSPropertyAlignItems,
+    CSSPropertyAlignSelf,
+    CSSPropertyFlexBasis,
+    CSSPropertyFlexGrow,
+    CSSPropertyFlexShrink,
+    CSSPropertyFlexDirection,
+    CSSPropertyFlexWrap,
+    CSSPropertyJustifyContent,
     CSSPropertyWebkitFontKerning,
     CSSPropertyWebkitFontSmoothing,
     CSSPropertyWebkitFontVariantLigatures,
     CSSPropertyGridAutoColumns,
     CSSPropertyGridAutoFlow,
     CSSPropertyGridAutoRows,
-    CSSPropertyGridColumns,
-    CSSPropertyGridRows,
-    CSSPropertyGridStart,
-    CSSPropertyGridEnd,
-    CSSPropertyGridBefore,
-    CSSPropertyGridAfter,
+    CSSPropertyGridColumnEnd,
+    CSSPropertyGridColumnStart,
+    CSSPropertyGridDefinitionColumns,
+    CSSPropertyGridDefinitionRows,
+    CSSPropertyGridRowEnd,
+    CSSPropertyGridRowStart,
     CSSPropertyWebkitHighlight,
     CSSPropertyWebkitHyphenateCharacter,
     CSSPropertyWebkitHyphenateLimitAfter,
@@ -297,7 +297,7 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyWebkitMaskPosition,
     CSSPropertyWebkitMaskRepeat,
     CSSPropertyWebkitMaskSize,
-    CSSPropertyWebkitOrder,
+    CSSPropertyOrder,
     CSSPropertyWebkitPerspective,
     CSSPropertyWebkitPerspectiveOrigin,
     CSSPropertyWebkitPrintColorAdjust,
@@ -634,7 +634,8 @@ static PassRefPtr<CSSValue> getPositionOffsetValue(RenderStyle* style, CSSProper
             toRenderBox(renderer)->containingBlockLogicalWidthForContent() :
             toRenderBox(renderer)->containingBlockLogicalHeightForContent(ExcludeMarginBorderPadding);
         return zoomAdjustedPixelValue(valueForLength(l, containingBlockSize, 0), style);
-    } if (l.isViewportPercentage())
+    }
+    if (l.isViewportPercentage())
         return zoomAdjustedPixelValue(valueForLength(l, 0, renderView), style);
     if (l.isAuto()) {
         // FIXME: It's not enough to simply return "auto" values for one offset if the other side is defined.
@@ -1316,7 +1317,7 @@ static PassRefPtr<CSSValue> renderTextDecorationFlagsToCSSValue(int textDecorati
 
     if (!list->length())
         return cssValuePool().createIdentifierValue(CSSValueNone);
-    return list;
+    return list.release();
 }
 
 static PassRefPtr<CSSValue> renderTextDecorationStyleFlagsToCSSValue(TextDecorationStyle textDecorationStyle)
@@ -1484,22 +1485,17 @@ static PassRefPtr<CSSPrimitiveValue> fontWeightFromStyle(RenderStyle* style)
     return cssValuePool().createIdentifierValue(CSSValueNormal);
 }
 
-static bool isLayoutDependentProperty(CSSPropertyID propertyID)
+static bool isLayoutDependent(CSSPropertyID propertyID, PassRefPtr<RenderStyle> style, RenderObject* renderer)
 {
+    // Some properties only depend on layout in certain conditions which
+    // are specified in the main switch statement below. So we can avoid
+    // forcing layout in those conditions. The conditions in this switch
+    // statement must remain in sync with the conditions in the main switch.
+    // FIXME: Some of these cases could be narrowed down or optimized better.
     switch (propertyID) {
     case CSSPropertyBottom:
     case CSSPropertyHeight:
     case CSSPropertyLeft:
-    case CSSPropertyMargin:
-    case CSSPropertyMarginBottom:
-    case CSSPropertyMarginLeft:
-    case CSSPropertyMarginRight:
-    case CSSPropertyMarginTop:
-    case CSSPropertyPadding:
-    case CSSPropertyPaddingBottom:
-    case CSSPropertyPaddingLeft:
-    case CSSPropertyPaddingRight:
-    case CSSPropertyPaddingTop:
     case CSSPropertyRight:
     case CSSPropertyTop:
     case CSSPropertyWebkitPerspectiveOrigin:
@@ -1508,9 +1504,45 @@ static bool isLayoutDependentProperty(CSSPropertyID propertyID)
     case CSSPropertyWidth:
     case CSSPropertyWebkitFilter:
         return true;
+    case CSSPropertyMargin:
+        return renderer && renderer->isBox() && (!style || !style->marginBottom().isFixed() || !style->marginTop().isFixed() || !style->marginLeft().isFixed() || !style->marginRight().isFixed());
+    case CSSPropertyMarginLeft:
+        return renderer && renderer->isBox() && (!style || !style->marginLeft().isFixed());
+    case CSSPropertyMarginRight:
+        return renderer && renderer->isBox() && (!style || !style->marginRight().isFixed());
+    case CSSPropertyMarginTop:
+        return renderer && renderer->isBox() && (!style || !style->marginTop().isFixed());
+    case CSSPropertyMarginBottom:
+        return renderer && renderer->isBox() && (!style || !style->marginBottom().isFixed());
+    case CSSPropertyPadding:
+        return renderer && renderer->isBox() && (!style || !style->paddingBottom().isFixed() || !style->paddingTop().isFixed() || !style->paddingLeft().isFixed() || !style->paddingRight().isFixed());
+    case CSSPropertyPaddingBottom:
+        return renderer && renderer->isBox() && (!style || !style->paddingBottom().isFixed());
+    case CSSPropertyPaddingLeft:
+        return renderer && renderer->isBox() && (!style || !style->paddingLeft().isFixed());
+    case CSSPropertyPaddingRight:
+        return renderer && renderer->isBox() && (!style || !style->paddingRight().isFixed());
+    case CSSPropertyPaddingTop:
+        return renderer && renderer->isBox() && (!style || !style->paddingTop().isFixed());
     default:
         return false;
     }
+}
+
+PassRefPtr<RenderStyle> CSSComputedStyleDeclaration::computeRenderStyle(CSSPropertyID propertyID) const
+{
+    Node* styledNode = this->styledNode();
+    ASSERT(styledNode);
+    RenderObject* renderer = styledNode->renderer();
+    if (renderer && renderer->isComposited() && AnimationController::supportsAcceleratedAnimationOfProperty(propertyID)) {
+        AnimationUpdateBlock animationUpdateBlock(renderer->animation());
+        if (m_pseudoElementSpecifier && !styledNode->isPseudoElement()) {
+            // FIXME: This cached pseudo style will only exist if the animation has been run at least once.
+            return renderer->animation()->getAnimatedStyleForRenderer(renderer)->getCachedPseudoStyle(m_pseudoElementSpecifier);
+        }
+        return renderer->animation()->getAnimatedStyleForRenderer(renderer);
+    }
+    return styledNode->computedStyle(styledNode->isPseudoElement() ? NOPSEUDO : m_pseudoElementSpecifier);
 }
 
 Node* CSSComputedStyleDeclaration::styledNode() const
@@ -1529,42 +1561,35 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
     Node* styledNode = this->styledNode();
     if (!styledNode)
         return 0;
+    RenderObject* renderer = styledNode->renderer();
+    RefPtr<RenderStyle> style;
 
     if (updateLayout) {
         Document* document = styledNode->document();
-        // FIXME: Some of these cases could be narrowed down or optimized better.
-        bool forceFullLayout = isLayoutDependentProperty(propertyID)
-            || styledNode->isInShadowTree()
-            || (document->styleResolverIfExists() && document->styleResolverIfExists()->hasViewportDependentMediaQueries() && document->ownerElement())
-            || document->seamlessParentIFrame();
 
-        if (forceFullLayout)
-            document->updateLayoutIgnorePendingStylesheets();
-        else {
-            bool needsStyleRecalc = document->hasPendingForcedStyleRecalc();
-            for (Node* n = styledNode; n && !needsStyleRecalc; n = n->parentNode())
-                needsStyleRecalc = n->needsStyleRecalc();
-            if (needsStyleRecalc)
-                document->updateStyleIfNeeded();
-        }
+        document->updateStyleForNodeIfNeeded(styledNode);
 
         // The style recalc could have caused the styled node to be discarded or replaced
         // if it was a PseudoElement so we need to update it.
         styledNode = this->styledNode();
-    }
+        renderer = styledNode->renderer();
 
-    RenderObject* renderer = styledNode->renderer();
+        style = computeRenderStyle(propertyID);
 
-    RefPtr<RenderStyle> style;
-    if (renderer && renderer->isComposited() && AnimationController::supportsAcceleratedAnimationOfProperty(propertyID)) {
-        AnimationUpdateBlock animationUpdateBlock(renderer->animation());
-        style = renderer->animation()->getAnimatedStyleForRenderer(renderer);
-        if (m_pseudoElementSpecifier && !styledNode->isPseudoElement()) {
-            // FIXME: This cached pseudo style will only exist if the animation has been run at least once.
-            style = style->getCachedPseudoStyle(m_pseudoElementSpecifier);
+        bool forceFullLayout = isLayoutDependent(propertyID, style, renderer)
+            || styledNode->isInShadowTree()
+            || (document->styleResolverIfExists() && document->styleResolverIfExists()->hasViewportDependentMediaQueries() && document->ownerElement())
+            || document->seamlessParentIFrame();
+
+        if (forceFullLayout) {
+            document->updateLayoutIgnorePendingStylesheets();
+            styledNode = this->styledNode();
+            style = computeRenderStyle(propertyID);
+            renderer = styledNode->renderer();
         }
-    } else
-        style = styledNode->computedStyle(styledNode->isPseudoElement() ? NOPSEUDO : m_pseudoElementSpecifier);
+    } else {
+        style = computeRenderStyle(propertyID);
+    }
 
     if (!style)
         return 0;
@@ -1841,11 +1866,11 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->display());
         case CSSPropertyEmptyCells:
             return cssValuePool().createValue(style->emptyCells());
-        case CSSPropertyWebkitAlignContent:
+        case CSSPropertyAlignContent:
             return cssValuePool().createValue(style->alignContent());
-        case CSSPropertyWebkitAlignItems:
+        case CSSPropertyAlignItems:
             return cssValuePool().createValue(style->alignItems());
-        case CSSPropertyWebkitAlignSelf:
+        case CSSPropertyAlignSelf:
             if (style->alignSelf() == AlignAuto) {
                 Node* parent = styledNode->parentNode();
                 if (parent && parent->computedStyle())
@@ -1853,23 +1878,23 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
                 return cssValuePool().createValue(AlignStretch);
             }
             return cssValuePool().createValue(style->alignSelf());
-        case CSSPropertyWebkitFlex:
-            return getCSSPropertyValuesForShorthandProperties(webkitFlexShorthand());
-        case CSSPropertyWebkitFlexBasis:
+        case CSSPropertyFlex:
+            return getCSSPropertyValuesForShorthandProperties(flexShorthand());
+        case CSSPropertyFlexBasis:
             return cssValuePool().createValue(style->flexBasis());
-        case CSSPropertyWebkitFlexDirection:
+        case CSSPropertyFlexDirection:
             return cssValuePool().createValue(style->flexDirection());
-        case CSSPropertyWebkitFlexFlow:
-            return getCSSPropertyValuesForShorthandProperties(webkitFlexFlowShorthand());
-        case CSSPropertyWebkitFlexGrow:
+        case CSSPropertyFlexFlow:
+            return getCSSPropertyValuesForShorthandProperties(flexFlowShorthand());
+        case CSSPropertyFlexGrow:
             return cssValuePool().createValue(style->flexGrow());
-        case CSSPropertyWebkitFlexShrink:
+        case CSSPropertyFlexShrink:
             return cssValuePool().createValue(style->flexShrink());
-        case CSSPropertyWebkitFlexWrap:
+        case CSSPropertyFlexWrap:
             return cssValuePool().createValue(style->flexWrap());
-        case CSSPropertyWebkitJustifyContent:
+        case CSSPropertyJustifyContent:
             return cssValuePool().createValue(style->justifyContent());
-        case CSSPropertyWebkitOrder:
+        case CSSPropertyOrder:
             return cssValuePool().createValue(style->order(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyFloat:
             if (style->display() != NONE && style->hasOutOfFlowPosition())
@@ -1919,19 +1944,19 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->gridAutoFlow());
         case CSSPropertyGridAutoRows:
             return valueForGridTrackSize(style->gridAutoRows(), style.get(), m_node->document()->renderView());
-        case CSSPropertyGridColumns:
-            return valueForGridTrackList(style->gridColumns(), style->namedGridColumnLines(), style.get(), m_node->document()->renderView());
-        case CSSPropertyGridRows:
-            return valueForGridTrackList(style->gridRows(), style->namedGridRowLines(), style.get(), m_node->document()->renderView());
+        case CSSPropertyGridDefinitionColumns:
+            return valueForGridTrackList(style->gridDefinitionColumns(), style->namedGridColumnLines(), style.get(), m_node->document()->renderView());
+        case CSSPropertyGridDefinitionRows:
+            return valueForGridTrackList(style->gridDefinitionRows(), style->namedGridRowLines(), style.get(), m_node->document()->renderView());
 
-        case CSSPropertyGridStart:
-            return valueForGridPosition(style->gridStart());
-        case CSSPropertyGridEnd:
-            return valueForGridPosition(style->gridEnd());
-        case CSSPropertyGridBefore:
-            return valueForGridPosition(style->gridBefore());
-        case CSSPropertyGridAfter:
-            return valueForGridPosition(style->gridAfter());
+        case CSSPropertyGridColumnStart:
+            return valueForGridPosition(style->gridColumnStart());
+        case CSSPropertyGridColumnEnd:
+            return valueForGridPosition(style->gridColumnEnd());
+        case CSSPropertyGridRowStart:
+            return valueForGridPosition(style->gridRowStart());
+        case CSSPropertyGridRowEnd:
+            return valueForGridPosition(style->gridRowEnd());
         case CSSPropertyGridColumn:
             return getCSSPropertyValuesForGridShorthand(gridColumnShorthand());
         case CSSPropertyGridRow:
@@ -2090,22 +2115,30 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->overflowX());
         case CSSPropertyOverflowY:
             return cssValuePool().createValue(style->overflowY());
-        case CSSPropertyPaddingTop:
-            if (renderer && renderer->isBox())
-                return zoomAdjustedPixelValue(toRenderBox(renderer)->computedCSSPaddingTop(), style.get());
-            return zoomAdjustedPixelValueForLength(style->paddingTop(), style.get());
-        case CSSPropertyPaddingRight:
-            if (renderer && renderer->isBox())
-                return zoomAdjustedPixelValue(toRenderBox(renderer)->computedCSSPaddingRight(), style.get());
-            return zoomAdjustedPixelValueForLength(style->paddingRight(), style.get());
-        case CSSPropertyPaddingBottom:
-            if (renderer && renderer->isBox())
-                return zoomAdjustedPixelValue(toRenderBox(renderer)->computedCSSPaddingBottom(), style.get());
-            return zoomAdjustedPixelValueForLength(style->paddingBottom(), style.get());
-        case CSSPropertyPaddingLeft:
-            if (renderer && renderer->isBox())
-                return zoomAdjustedPixelValue(toRenderBox(renderer)->computedCSSPaddingLeft(), style.get());
-            return zoomAdjustedPixelValueForLength(style->paddingLeft(), style.get());
+        case CSSPropertyPaddingTop: {
+            Length paddingTop = style->paddingTop();
+            if (paddingTop.isFixed() || !renderer || !renderer->isBox())
+                return zoomAdjustedPixelValueForLength(paddingTop, style.get());
+            return zoomAdjustedPixelValue(toRenderBox(renderer)->computedCSSPaddingTop(), style.get());
+        }
+        case CSSPropertyPaddingRight: {
+            Length paddingRight = style->paddingRight();
+            if (paddingRight.isFixed() || !renderer || !renderer->isBox())
+                return zoomAdjustedPixelValueForLength(paddingRight, style.get());
+            return zoomAdjustedPixelValue(toRenderBox(renderer)->computedCSSPaddingRight(), style.get());
+        }
+        case CSSPropertyPaddingBottom: {
+            Length paddingBottom = style->paddingBottom();
+            if (paddingBottom.isFixed() || !renderer || !renderer->isBox())
+                return zoomAdjustedPixelValueForLength(paddingBottom, style.get());
+            return zoomAdjustedPixelValue(toRenderBox(renderer)->computedCSSPaddingBottom(), style.get());
+        }
+        case CSSPropertyPaddingLeft: {
+            Length paddingLeft = style->paddingLeft();
+            if (paddingLeft.isFixed() || !renderer || !renderer->isBox())
+                return zoomAdjustedPixelValueForLength(paddingLeft, style.get());
+            return zoomAdjustedPixelValue(toRenderBox(renderer)->computedCSSPaddingLeft(), style.get());
+        }
         case CSSPropertyPageBreakAfter:
             return cssValuePool().createValue(style->pageBreakAfter());
         case CSSPropertyPageBreakBefore:
@@ -2576,24 +2609,24 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyWebkitShapeInside:
             if (!style->shapeInside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
-            if (style->shapeInside()->type() == ExclusionShapeValue::Outside)
+            if (style->shapeInside()->type() == ShapeValue::Outside)
                 return cssValuePool().createIdentifierValue(CSSValueOutsideShape);
-            if (style->shapeInside()->type() == ExclusionShapeValue::Image) {
+            if (style->shapeInside()->type() == ShapeValue::Image) {
                 if (style->shapeInside()->image())
                     return style->shapeInside()->image()->cssValue();
                 return cssValuePool().createIdentifierValue(CSSValueNone);
             }
-            ASSERT(style->shapeInside()->type() == ExclusionShapeValue::Shape);
+            ASSERT(style->shapeInside()->type() == ShapeValue::Shape);
             return valueForBasicShape(style->shapeInside()->shape());
         case CSSPropertyWebkitShapeOutside:
             if (!style->shapeOutside())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
-            if (style->shapeOutside()->type() == ExclusionShapeValue::Image) {
+            if (style->shapeOutside()->type() == ShapeValue::Image) {
                 if (style->shapeOutside()->image())
                     return style->shapeOutside()->image()->cssValue();
                 return cssValuePool().createIdentifierValue(CSSValueNone);
             }
-            ASSERT(style->shapeOutside()->type() == ExclusionShapeValue::Shape);
+            ASSERT(style->shapeOutside()->type() == ShapeValue::Shape);
             return valueForBasicShape(style->shapeOutside()->shape());
         case CSSPropertyWebkitWrapThrough:
             return cssValuePool().createValue(style->wrapThrough());

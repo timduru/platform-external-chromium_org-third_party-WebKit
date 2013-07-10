@@ -218,6 +218,8 @@ ScriptString XMLHttpRequest::responseText(ExceptionCode& ec)
         ec = INVALID_STATE_ERR;
         return ScriptString();
     }
+    if (m_error || (m_state != LOADING && m_state != DONE))
+        return ScriptString();
     return m_responseText;
 }
 
@@ -238,7 +240,7 @@ Document* XMLHttpRequest::responseXML(ExceptionCode& ec)
         // If it is text/html, then the responseType of "document" must have been supplied explicitly.
         if ((m_response.isHTTP() && !responseIsXML() && !isHTML)
             || (isHTML && m_responseTypeCode == ResponseTypeDefault)
-            || scriptExecutionContext()->isWorkerContext()) {
+            || scriptExecutionContext()->isWorkerGlobalScope()) {
             m_responseDocument = 0;
         } else {
             if (isHTML)
@@ -265,7 +267,7 @@ Blob* XMLHttpRequest::responseBlob(ExceptionCode& ec)
         return 0;
     }
     // We always return null before DONE.
-    if (m_state != DONE)
+    if (m_error || m_state != DONE)
         return 0;
 
     if (!m_responseBlob) {
@@ -300,7 +302,7 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer(ExceptionCode& ec)
         return 0;
     }
 
-    if (m_state != DONE)
+    if (m_error || m_state != DONE)
         return 0;
 
     if (!m_responseArrayBuffer.get() && m_binaryResponseBuilder.get() && m_binaryResponseBuilder->size() > 0) {
@@ -330,7 +332,7 @@ void XMLHttpRequest::setResponseType(const String& responseType, ExceptionCode& 
         return;
     }
 
-    // Newer functionality is not available to synchronous requests in window contexts, as a spec-mandated 
+    // Newer functionality is not available to synchronous requests in window contexts, as a spec-mandated
     // attempt to discourage synchronous XHR use. responseType is one such piece of functionality.
     // We'll only disable this functionality for HTTP(S) requests since sync requests for local protocols
     // such as file: and data: still make sense to allow.
@@ -571,9 +573,12 @@ void XMLHttpRequest::send(Document* document, ExceptionCode& ec)
         // from the HTML5 specification to serialize the document.
         String body = createMarkup(document);
 
-        // FIXME: this should use value of document.inputEncoding to determine the encoding to use.
+        // FIXME: This should use value of document.inputEncoding to determine the encoding to use.
         WTF::TextEncoding encoding = UTF8Encoding();
-        m_requestEntityBody = FormData::create(encoding.encode(body.characters(), body.length(), WTF::EntitiesForUnencodables));
+        if (body.is8Bit())
+            m_requestEntityBody = FormData::create(body.characters8(), body.length());
+        else
+            m_requestEntityBody = FormData::create(encoding.encode(body, WTF::EntitiesForUnencodables));
         if (m_upload)
             m_requestEntityBody->setAlwaysStream(true);
     }
@@ -595,7 +600,10 @@ void XMLHttpRequest::send(const String& body, ExceptionCode& ec)
             m_requestHeaders.set("Content-Type", contentType);
         }
 
-        m_requestEntityBody = FormData::create(UTF8Encoding().encode(body.characters(), body.length(), WTF::EntitiesForUnencodables));
+        if (body.is8Bit())
+            m_requestEntityBody = FormData::create(body.characters8(), body.length());
+        else
+            m_requestEntityBody = FormData::create(UTF8Encoding().encode(body, WTF::EntitiesForUnencodables));
         if (m_upload)
             m_requestEntityBody->setAlwaysStream(true);
     }
@@ -678,12 +686,6 @@ void XMLHttpRequest::sendBytesData(const void* data, size_t length, ExceptionCod
     }
 
     createRequest(ec);
-}
-
-void XMLHttpRequest::sendForInspector(ExceptionCode& ec)
-{
-    m_allowCrossOriginRequests = true;
-    send(ec);
 }
 
 void XMLHttpRequest::sendForInspectorXHRReplay(PassRefPtr<FormData> formData, ExceptionCode& ec)
@@ -980,7 +982,7 @@ String XMLHttpRequest::getResponseHeader(const AtomicString& name, ExceptionCode
         logConsoleError(scriptExecutionContext(), "Refused to get unsafe header \"" + name + "\"");
         return String();
     }
-    
+
     HTTPHeaderSet accessControlExposeHeaderSet;
     parseAccessControlExposeHeadersAllowList(m_response.httpHeaderField("Access-Control-Expose-Headers"), accessControlExposeHeaderSet);
 

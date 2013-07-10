@@ -77,11 +77,10 @@
 #include "core/platform/graphics/gpu/DrawingBuffer.h"
 #include "core/rendering/RenderBox.h"
 
-#include <wtf/OwnArrayPtr.h>
-#include <wtf/PassOwnArrayPtr.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/Uint16Array.h>
-#include <wtf/Uint32Array.h>
+#include "wtf/OwnArrayPtr.h"
+#include "wtf/PassOwnArrayPtr.h"
+#include "wtf/Uint32Array.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -743,8 +742,11 @@ WebGLRenderingContext::~WebGLRenderingContext()
     for (size_t i = 0; i < m_extensions.size(); ++i)
         delete m_extensions[i];
 
-    destroyGraphicsContext3D();
+    // Context must be removed from the group prior to the destruction of the
+    // GraphicsContext3D, otherwise shared objects may not be properly deleted.
     m_contextGroup->removeContext(this);
+
+    destroyGraphicsContext3D();
 
     if (m_multisamplingObserverRegistered) {
         Page* page = canvas()->document()->page();
@@ -1658,8 +1660,11 @@ void WebGLRenderingContext::deleteTexture(WebGLTexture* texture)
     if (!deleteObject(texture))
         return;
     for (size_t i = 0; i < m_textureUnits.size(); ++i) {
-        if (texture == m_textureUnits[i].m_texture2DBinding)
+        if (texture == m_textureUnits[i].m_texture2DBinding) {
             m_textureUnits[i].m_texture2DBinding = 0;
+            if (!i)
+                m_drawingBuffer->setTexture2DBinding(0);
+        }
         if (texture == m_textureUnits[i].m_textureCubeMapBinding)
             m_textureUnits[i].m_textureCubeMapBinding = 0;
     }

@@ -38,8 +38,11 @@
 #include "third_party/skia/include/core/SkAnnotation.h"
 #include "third_party/skia/include/core/SkColorFilter.h"
 #include "third_party/skia/include/core/SkData.h"
+#include "third_party/skia/include/core/SkDevice.h"
+#include "third_party/skia/include/core/SkRRect.h"
 #include "third_party/skia/include/core/SkRefCnt.h"
 #include "third_party/skia/include/effects/SkBlurMaskFilter.h"
+#include "third_party/skia/include/effects/SkCornerPathEffect.h"
 #include "weborigin/KURL.h"
 #include "wtf/Assertions.h"
 #include "wtf/MathExtras.h"
@@ -84,6 +87,17 @@ GraphicsContext::~GraphicsContext()
     ASSERT(m_stateStack.size() == 1);
     ASSERT(!m_annotationCount);
     ASSERT(!m_transparencyCount);
+}
+
+const SkBitmap* GraphicsContext::bitmap() const
+{
+    TRACE_EVENT0("skia", "GraphicsContext::bitmap");
+    return &m_canvas->getDevice()->accessBitmap(false);
+}
+
+const SkBitmap& GraphicsContext::layerBitmap(AccessMode access) const
+{
+    return m_canvas->getTopDevice()->accessBitmap(access == ReadWrite);
 }
 
 SkDevice* GraphicsContext::createCompatibleDevice(const IntSize& size, bool hasAlpha) const
@@ -256,7 +270,9 @@ void GraphicsContext::setFillGradient(PassRefPtr<Gradient> gradient)
     m_state->m_fillPattern.clear();
 }
 
-void GraphicsContext::setShadow(const FloatSize& offset, float blur, const Color& color, DrawLooper::ShadowAlphaMode shadowAlphaMode)
+void GraphicsContext::setShadow(const FloatSize& offset, float blur, const Color& color,
+    DrawLooper::ShadowTransformMode shadowTransformMode,
+    DrawLooper::ShadowAlphaMode shadowAlphaMode)
 {
     if (paintingDisabled())
         return;
@@ -265,12 +281,6 @@ void GraphicsContext::setShadow(const FloatSize& offset, float blur, const Color
         clearShadow();
         return;
     }
-
-    DrawLooper::ShadowTransformMode shadowTransformMode;
-    if (m_state->m_shadowsIgnoreTransforms)
-        shadowTransformMode = DrawLooper::ShadowIgnoresTransforms;
-    else
-        shadowTransformMode = DrawLooper::ShadowRespectsTransforms;
 
     DrawLooper drawLooper;
     drawLooper.addShadow(offset, blur, color, shadowTransformMode, shadowAlphaMode);
@@ -347,7 +357,7 @@ bool GraphicsContext::couldUseLCDRenderedText()
     // rendered text cannot be composited correctly when the layer is
     // collapsed. Therefore, subpixel text is disabled when we are drawing
     // onto a layer.
-    if (paintingDisabled() || isDrawingToLayer())
+    if (paintingDisabled() || isDrawingToLayer() || !isCertainlyOpaque())
         return false;
 
     return shouldSmoothFonts();
@@ -423,7 +433,7 @@ void GraphicsContext::endTransparencyLayer()
 #endif
 }
 
-void GraphicsContext::beginLayerClippedToImage(const FloatRect& rect, const ImageBuffer* imageBuffer)
+void GraphicsContext::clipToImageBuffer(const ImageBuffer* imageBuffer, const FloatRect& rect)
 {
     if (paintingDisabled())
         return;
@@ -528,9 +538,21 @@ void GraphicsContext::drawEllipse(const IntRect& elipseRect)
     }
 }
 
-void GraphicsContext::drawFocusRing(const Path& path, int width, int offset, const Color& color)
+void GraphicsContext::drawFocusRing(const Path& focusRingPath, int width, int offset, const Color& color)
 {
-    // FIXME: implement
+    // FIXME: Implement support for offset.
+    UNUSED_PARAM(offset);
+
+    if (paintingDisabled())
+        return;
+
+    SkPaint paint;
+    paint.setAntiAlias(true);
+    paint.setStyle(SkPaint::kStroke_Style);
+    paint.setColor(color.rgb());
+
+    drawOuterPath(focusRingPath.skPath(), paint, width);
+    drawInnerPath(focusRingPath.skPath(), paint, width);
 }
 
 void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int width, int offset, const Color& color)
@@ -559,6 +581,70 @@ void GraphicsContext::drawFocusRing(const Vector<IntRect>& rects, int width, int
     focusRingRegion.getBoundaryPath(&path);
     drawOuterPath(path, paint, width);
     drawInnerPath(path, paint, width);
+}
+
+static inline IntRect areaCastingShadowInHole(const IntRect& holeRect, int shadowBlur, int shadowSpread, const IntSize& shadowOffset)
+{
+    IntRect bounds(holeRect);
+
+    bounds.inflate(shadowBlur);
+
+    if (shadowSpread < 0)
+        bounds.inflate(-shadowSpread);
+
+    IntRect offsetBounds = bounds;
+    offsetBounds.move(-shadowOffset);
+    return unionRect(bounds, offsetBounds);
+}
+
+void GraphicsContext::drawInnerShadow(const RoundedRect& rect, const Color& shadowColor, const IntSize shadowOffset, int shadowBlur, int shadowSpread, Edges clippedEdges)
+{
+    IntRect holeRect(rect.rect());
+    holeRect.inflate(-shadowSpread);
+
+    if (holeRect.isEmpty()) {
+        if (rect.isRounded())
+            fillRoundedRect(rect, shadowColor);
+        else
+            fillRect(rect.rect(), shadowColor);
+        return;
+    }
+
+    if (clippedEdges & LeftEdge) {
+        holeRect.move(-max(shadowOffset.width(), 0) - shadowBlur, 0);
+        holeRect.setWidth(holeRect.width() + max(shadowOffset.width(), 0) + shadowBlur);
+    }
+    if (clippedEdges & TopEdge) {
+        holeRect.move(0, -max(shadowOffset.height(), 0) - shadowBlur);
+        holeRect.setHeight(holeRect.height() + max(shadowOffset.height(), 0) + shadowBlur);
+    }
+    if (clippedEdges & RightEdge)
+        holeRect.setWidth(holeRect.width() - min(shadowOffset.width(), 0) + shadowBlur);
+    if (clippedEdges & BottomEdge)
+        holeRect.setHeight(holeRect.height() - min(shadowOffset.height(), 0) + shadowBlur);
+
+    Color fillColor(shadowColor.red(), shadowColor.green(), shadowColor.blue(), 255);
+
+    IntRect outerRect = areaCastingShadowInHole(rect.rect(), shadowBlur, shadowSpread, shadowOffset);
+    RoundedRect roundedHole(holeRect, rect.radii());
+
+    save();
+    if (rect.isRounded()) {
+        Path path;
+        path.addRoundedRect(rect);
+        clipPath(path);
+        roundedHole.shrinkRadii(shadowSpread);
+    } else {
+        clip(rect.rect());
+    }
+
+    DrawLooper drawLooper;
+    drawLooper.addShadow(shadowOffset, shadowBlur, shadowColor,
+        DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
+    setDrawLooper(drawLooper);
+    fillRectWithRoundedHole(outerRect, roundedHole, fillColor);
+    restore();
+    clearDrawLooper();
 }
 
 // This is only used to draw borders.
@@ -1326,11 +1412,6 @@ void GraphicsContext::clipConvexPolygon(size_t numPoints, const FloatPoint* poin
     SkPath path;
     setPathFromConvexPoints(&path, numPoints, points);
     clipPath(path, antialiased ? AntiAliased : NotAntiAliased);
-}
-
-void GraphicsContext::clipToImageBuffer(ImageBuffer* buffer, const FloatRect& rect)
-{
-    buffer->clip(this, rect);
 }
 
 void GraphicsContext::clipOutRoundedRect(const RoundedRect& rect)

@@ -835,10 +835,10 @@ static bool shouldEmitExtraNewlineForNode(Node* node)
 
 static int collapsedSpaceLength(RenderText* renderer, int textEnd)
 {
-    const UChar* characters = renderer->text()->characters();
-    int length = renderer->text()->length();
+    const String& text = renderer->text();
+    int length = text.length();
     for (int i = textEnd; i < length; ++i) {
-        if (!renderer->style()->isCollapsibleWhiteSpace(characters[i]))
+        if (!renderer->style()->isCollapsibleWhiteSpace(text[i]))
             return i - textEnd;
     }
 
@@ -1249,9 +1249,9 @@ bool SimplifiedBackwardsTextIterator::handleTextNode()
     ASSERT(m_positionStartOffset <= m_positionEndOffset);
 
     m_textLength = m_positionEndOffset - m_positionStartOffset;
-    m_textCharacters = text.characters() + (m_positionStartOffset - offsetInNode);
-    ASSERT(m_textCharacters >= text.characters());
-    RELEASE_ASSERT(m_textCharacters + m_textLength <= text.characters() + static_cast<int>(text.length()));
+    m_textCharacters = text.bloatedCharacters() + (m_positionStartOffset - offsetInNode);
+    ASSERT(m_textCharacters >= text.bloatedCharacters());
+    RELEASE_ASSERT(m_textCharacters + m_textLength <= text.bloatedCharacters() + static_cast<int>(text.length()));
 
     m_lastCharacter = text[m_positionEndOffset - 1];
 
@@ -1862,10 +1862,9 @@ static inline bool isCombiningVoicedSoundMark(UChar character)
 
 static inline bool containsKanaLetters(const String& pattern)
 {
-    const UChar* characters = pattern.characters();
     unsigned length = pattern.length();
     for (unsigned i = 0; i < length; ++i) {
-        if (isKanaLetter(characters[i]))
+        if (isKanaLetter(pattern[i]))
             return true;
     }
     return false;
@@ -1947,7 +1946,7 @@ inline SearchBuffer::SearchBuffer(const String& target, FindOptions options)
 
     if ((m_options & AtWordStarts) && targetLength) {
         UChar32 targetFirstCharacter;
-        U16_GET(m_target.characters(), 0, 0, targetLength, targetFirstCharacter);
+        U16_GET(m_target.bloatedCharacters(), 0, 0, targetLength, targetFirstCharacter);
         // Characters in the separator category never really occur at the beginning of a word,
         // so if the target begins with such a character, we just ignore the AtWordStart option.
         if (isSeparator(targetFirstCharacter)) {
@@ -1971,12 +1970,12 @@ inline SearchBuffer::SearchBuffer(const String& target, FindOptions options)
     }
 
     UErrorCode status = U_ZERO_ERROR;
-    usearch_setPattern(searcher, m_target.characters(), targetLength, &status);
+    usearch_setPattern(searcher, m_target.bloatedCharacters(), targetLength, &status);
     ASSERT(status == U_ZERO_ERROR);
 
     // The kana workaround requires a normalized copy of the target string.
     if (m_targetRequiresKanaWorkaround)
-        normalizeCharacters(m_target.characters(), m_target.length(), m_normalizedTarget);
+        normalizeCharacters(m_target.bloatedCharacters(), m_target.length(), m_normalizedTarget);
 }
 
 inline SearchBuffer::~SearchBuffer()
@@ -2313,9 +2312,9 @@ inline size_t SearchBuffer::search(size_t& start)
         return 0;
 
     size_t tailSpace = m_target.length() - m_cursor;
-    if (memcmp(&m_buffer[m_cursor], m_target.characters(), tailSpace * sizeof(UChar)) != 0)
+    if (memcmp(&m_buffer[m_cursor], m_target.bloatedCharacters(), tailSpace * sizeof(UChar)) != 0)
         return 0;
-    if (memcmp(&m_buffer[0], m_target.characters() + tailSpace, m_cursor * sizeof(UChar)) != 0)
+    if (memcmp(&m_buffer[0], m_target.bloatedCharacters() + tailSpace, m_cursor * sizeof(UChar)) != 0)
         return 0;
 
     start = length();
@@ -2485,19 +2484,16 @@ bool TextIterator::getLocationAndLengthFromRange(Node* scope, const Range* range
 String plainText(const Range* r, TextIteratorBehavior defaultBehavior, bool isDisplayString)
 {
     // The initial buffer size can be critical for performance: https://bugs.webkit.org/show_bug.cgi?id=81192
-    static const unsigned cMaxSegmentSize = 1 << 15;
+    static const unsigned initialCapacity = 1 << 15;
 
     unsigned bufferLength = 0;
     StringBuilder builder;
-    builder.reserveCapacity(cMaxSegmentSize);
+    builder.reserveCapacity(initialCapacity);
     TextIteratorBehavior behavior = defaultBehavior;
     if (!isDisplayString)
         behavior = static_cast<TextIteratorBehavior>(behavior | TextIteratorEmitsTextsWithoutTranscoding);
     
     for (TextIterator it(r, behavior); !it.atEnd(); it.advance()) {
-        if (builder.capacity() < builder.length() + it.length())
-            builder.reserveCapacity(builder.capacity() + cMaxSegmentSize);
-
         it.appendTextToStringBuilder(builder);
         bufferLength += it.length();
     }

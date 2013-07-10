@@ -23,13 +23,12 @@
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "MockWebSpeechInputController.h"
 
-#include "WebSpeechInputListener.h"
-#include "WebTestDelegate.h"
 #include "public/platform/WebCString.h"
 #include "public/platform/WebVector.h"
+#include "public/testing/WebTestDelegate.h"
+#include "public/web/WebSpeechInputListener.h"
 
 #if ENABLE_INPUT_SPEECH
 

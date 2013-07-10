@@ -29,7 +29,6 @@
 #include "HTMLNames.h"
 #include "SVGNames.h"
 #include "core/css/CSSHostRule.h"
-#include "core/css/CSSImportRule.h"
 #include "core/css/CSSKeyframesRule.h"
 #include "core/css/CSSMediaRule.h"
 #include "core/css/CSSParser.h"
@@ -49,15 +48,15 @@
 #include "core/inspector/ContentSearchUtils.h"
 #include "core/inspector/InspectorCSSAgent.h"
 #include "core/inspector/InspectorPageAgent.h"
-#include "core/inspector/InspectorValues.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
+#include "core/platform/JSONValues.h"
 #include "core/platform/text/RegularExpression.h"
-
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/Vector.h>
+#include "wtf/OwnPtr.h"
+#include "wtf/PassOwnPtr.h"
+#include "wtf/Vector.h"
+#include "wtf/text/StringBuilder.h"
+#include "wtf/text/TextPosition.h"
 
 using WebCore::TypeBuilder::Array;
 using WebCore::RuleSourceDataList;
@@ -443,12 +442,12 @@ enum MediaListSource {
     MediaListSourceImportRule
 };
 
-static PassRefPtr<TypeBuilder::CSS::SourceRange> buildSourceRangeObject(const SourceRange& range, Vector<size_t>* lineEndings)
+static PassRefPtr<TypeBuilder::CSS::SourceRange> buildSourceRangeObject(const SourceRange& range, Vector<unsigned>* lineEndings)
 {
     if (!lineEndings)
         return 0;
-    TextPosition start = ContentSearchUtils::textPositionFromOffset(range.start, *lineEndings);
-    TextPosition end = ContentSearchUtils::textPositionFromOffset(range.end, *lineEndings);
+    TextPosition start = TextPosition::fromOffsetAndLineEndings(range.start, *lineEndings);
+    TextPosition end = TextPosition::fromOffsetAndLineEndings(range.end, *lineEndings);
 
     RefPtr<TypeBuilder::CSS::SourceRange> result = TypeBuilder::CSS::SourceRange::create()
         .setStartLine(start.m_line.zeroBasedInt())
@@ -710,7 +709,7 @@ PassRefPtr<TypeBuilder::CSS::CSSStyle> InspectorStyle::styleWithProperties() con
     HashSet<String> foundShorthands;
     String previousPriority;
     String previousStatus;
-    OwnPtr<Vector<size_t> > lineEndings(m_parentStyleSheet ? m_parentStyleSheet->lineEndings() : PassOwnPtr<Vector<size_t> >());
+    OwnPtr<Vector<unsigned> > lineEndings(m_parentStyleSheet ? m_parentStyleSheet->lineEndings() : PassOwnPtr<Vector<unsigned> >());
     RefPtr<CSSRuleSourceData> sourceData = extractSourceData();
     unsigned ruleBodyRangeStart = sourceData ? sourceData->ruleBodyRange.start : 0;
 
@@ -903,14 +902,13 @@ NewLineAndWhitespace& InspectorStyle::newLineAndWhitespaceDelimiters() const
     int propertyIndex = 0;
     bool isFullPrefixScanned = false;
     bool lineFeedTerminated = false;
-    const UChar* characters = text.characters();
     while (propertyIndex < propertyCount) {
         const WebCore::CSSPropertySourceData& currentProperty = sourcePropertyData->at(propertyIndex++);
 
         bool processNextProperty = false;
         int scanEnd = currentProperty.range.start;
         for (int i = scanStart; i < scanEnd; ++i) {
-            UChar ch = characters[i];
+            UChar ch = text[i];
             bool isLineFeed = isHTMLLineBreak(ch);
             if (isLineFeed) {
                 if (!lineFeedTerminated)
@@ -1434,8 +1432,7 @@ String InspectorStyleSheet::sourceURL() const
         bool deprecated;
         String commentValue = ContentSearchUtils::findSourceURL(styleSheetText, ContentSearchUtils::CSSMagicComment, &deprecated);
         if (!commentValue.isEmpty()) {
-            if (deprecated)
-                m_pageAgent->page()->console()->addMessage(NetworkMessageSource, WarningMessageLevel, "\"/*@ sourceURL=\" source URL declaration is deprecated, \"/*# sourceURL=\" declaration should be used instead.", finalURL(), 0);
+            // FIXME: add deprecated console message here.
             m_sourceURL = commentValue;
             return commentValue;
         }
@@ -1488,8 +1485,7 @@ String InspectorStyleSheet::sourceMapURL() const
         bool deprecated;
         String commentValue = ContentSearchUtils::findSourceMapURL(styleSheetText, ContentSearchUtils::CSSMagicComment, &deprecated);
         if (!commentValue.isEmpty()) {
-            if (deprecated)
-                m_pageAgent->page()->console()->addMessage(NetworkMessageSource, WarningMessageLevel, "\"/*@ sourceMappingURL=\" source mapping URL declaration is deprecated, \"/*# sourceMappingURL=\" declaration should be used instead.", finalURL(), 0);
+            // FIXME: add deprecated console message here.
             return commentValue;
         }
     }
@@ -1514,11 +1510,11 @@ PassRefPtr<CSSRuleSourceData> InspectorStyleSheet::ruleSourceDataFor(CSSStyleDec
     return m_parsedStyleSheet->ruleSourceDataAt(ruleIndexByStyle(style));
 }
 
-PassOwnPtr<Vector<size_t> > InspectorStyleSheet::lineEndings() const
+PassOwnPtr<Vector<unsigned> > InspectorStyleSheet::lineEndings() const
 {
     if (!m_parsedStyleSheet->hasText())
-        return PassOwnPtr<Vector<size_t> >();
-    return ContentSearchUtils::lineEndings(m_parsedStyleSheet->text());
+        return PassOwnPtr<Vector<unsigned> >();
+    return WTF::lineEndings(m_parsedStyleSheet->text());
 }
 
 unsigned InspectorStyleSheet::ruleIndexByStyle(CSSStyleDeclaration* pageStyle) const
@@ -1748,9 +1744,9 @@ bool InspectorStyleSheetForInlineStyle::setStyleText(CSSStyleDeclaration* style,
     return !ec;
 }
 
-PassOwnPtr<Vector<size_t> > InspectorStyleSheetForInlineStyle::lineEndings() const
+PassOwnPtr<Vector<unsigned> > InspectorStyleSheetForInlineStyle::lineEndings() const
 {
-    return ContentSearchUtils::lineEndings(elementStyleText());
+    return WTF::lineEndings(elementStyleText());
 }
 
 Document* InspectorStyleSheetForInlineStyle::ownerDocument() const

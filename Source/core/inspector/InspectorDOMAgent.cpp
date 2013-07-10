@@ -37,6 +37,7 @@
 #include "core/dom/Attr.h"
 #include "core/dom/CharacterData.h"
 #include "core/dom/ContainerNode.h"
+#include "core/dom/DOMException.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentFragment.h"
 #include "core/dom/DocumentType.h"
@@ -93,7 +94,7 @@ static const char documentRequested[] = "documentRequested";
 static const size_t maxTextSize = 10000;
 static const UChar ellipsisUChar[] = { 0x2026, 0 };
 
-static Color parseColor(const RefPtr<InspectorObject>* colorObject)
+static Color parseColor(const RefPtr<JSONObject>* colorObject)
 {
     if (!colorObject || !(*colorObject))
         return Color::transparent;
@@ -121,13 +122,13 @@ static Color parseColor(const RefPtr<InspectorObject>* colorObject)
     return Color(r, g, b, static_cast<int>(a * 255));
 }
 
-static Color parseConfigColor(const String& fieldName, InspectorObject* configObject)
+static Color parseConfigColor(const String& fieldName, JSONObject* configObject)
 {
-    const RefPtr<InspectorObject> colorObject = configObject->getObject(fieldName);
+    const RefPtr<JSONObject> colorObject = configObject->getObject(fieldName);
     return parseColor(&colorObject);
 }
 
-static bool parseQuad(const RefPtr<InspectorArray>& quadArray, FloatQuad* quad)
+static bool parseQuad(const RefPtr<JSONArray>& quadArray, FloatQuad* quad)
 {
     if (!quadArray)
         return false;
@@ -214,10 +215,8 @@ void RevalidateStyleAttributeTask::onTimer(Timer<RevalidateStyleAttributeTask>*)
 
 String InspectorDOMAgent::toErrorString(const ExceptionCode& ec)
 {
-    if (ec) {
-        ExceptionCodeDescription description(ec);
-        return description.name;
-    }
+    if (ec)
+        return DOMException::getErrorName(ec);
     return "";
 }
 
@@ -994,7 +993,7 @@ void InspectorDOMAgent::performSearch(ErrorString*, const String& whitespaceTrim
                     break;
 
                 if (node->nodeType() == Node::ATTRIBUTE_NODE)
-                    node = static_cast<Attr*>(node)->ownerElement();
+                    node = toAttr(node)->ownerElement();
                 resultCollector.add(node);
             }
         }
@@ -1101,7 +1100,7 @@ void InspectorDOMAgent::handleMouseMove(Frame* frame, const PlatformMouseEvent& 
         m_overlay->highlightNode(node, eventTarget, *m_inspectModeHighlightConfig);
 }
 
-void InspectorDOMAgent::setSearchingForNode(ErrorString* errorString, bool enabled, InspectorObject* highlightInspectorObject)
+void InspectorDOMAgent::setSearchingForNode(ErrorString* errorString, bool enabled, JSONObject* highlightInspectorObject)
 {
     if (m_searchingForNode == enabled)
         return;
@@ -1115,7 +1114,7 @@ void InspectorDOMAgent::setSearchingForNode(ErrorString* errorString, bool enabl
         hideHighlight(errorString);
 }
 
-PassOwnPtr<HighlightConfig> InspectorDOMAgent::highlightConfigFromInspectorObject(ErrorString* errorString, InspectorObject* highlightInspectorObject)
+PassOwnPtr<HighlightConfig> InspectorDOMAgent::highlightConfigFromInspectorObject(ErrorString* errorString, JSONObject* highlightInspectorObject)
 {
     if (!highlightInspectorObject) {
         *errorString = "Internal error: highlight configuration parameter is missing";
@@ -1138,18 +1137,18 @@ PassOwnPtr<HighlightConfig> InspectorDOMAgent::highlightConfigFromInspectorObjec
     return highlightConfig.release();
 }
 
-void InspectorDOMAgent::setInspectModeEnabled(ErrorString* errorString, bool enabled, const RefPtr<InspectorObject>* highlightConfig)
+void InspectorDOMAgent::setInspectModeEnabled(ErrorString* errorString, bool enabled, const RefPtr<JSONObject>* highlightConfig)
 {
     setSearchingForNode(errorString, enabled, highlightConfig ? highlightConfig->get() : 0);
 }
 
-void InspectorDOMAgent::highlightRect(ErrorString*, int x, int y, int width, int height, const RefPtr<InspectorObject>* color, const RefPtr<InspectorObject>* outlineColor)
+void InspectorDOMAgent::highlightRect(ErrorString*, int x, int y, int width, int height, const RefPtr<JSONObject>* color, const RefPtr<JSONObject>* outlineColor)
 {
     OwnPtr<FloatQuad> quad = adoptPtr(new FloatQuad(FloatRect(x, y, width, height)));
     innerHighlightQuad(quad.release(), color, outlineColor);
 }
 
-void InspectorDOMAgent::highlightQuad(ErrorString* errorString, const RefPtr<InspectorArray>& quadArray, const RefPtr<InspectorObject>* color, const RefPtr<InspectorObject>* outlineColor)
+void InspectorDOMAgent::highlightQuad(ErrorString* errorString, const RefPtr<JSONArray>& quadArray, const RefPtr<JSONObject>* color, const RefPtr<JSONObject>* outlineColor)
 {
     OwnPtr<FloatQuad> quad = adoptPtr(new FloatQuad());
     if (!parseQuad(quadArray, quad.get())) {
@@ -1159,7 +1158,7 @@ void InspectorDOMAgent::highlightQuad(ErrorString* errorString, const RefPtr<Ins
     innerHighlightQuad(quad.release(), color, outlineColor);
 }
 
-void InspectorDOMAgent::innerHighlightQuad(PassOwnPtr<FloatQuad> quad, const RefPtr<InspectorObject>* color, const RefPtr<InspectorObject>* outlineColor)
+void InspectorDOMAgent::innerHighlightQuad(PassOwnPtr<FloatQuad> quad, const RefPtr<JSONObject>* color, const RefPtr<JSONObject>* outlineColor)
 {
     OwnPtr<HighlightConfig> highlightConfig = adoptPtr(new HighlightConfig());
     highlightConfig->content = parseColor(color);
@@ -1167,7 +1166,7 @@ void InspectorDOMAgent::innerHighlightQuad(PassOwnPtr<FloatQuad> quad, const Ref
     m_overlay->highlightQuad(quad, *highlightConfig);
 }
 
-void InspectorDOMAgent::highlightNode(ErrorString* errorString, const RefPtr<InspectorObject>& highlightInspectorObject, const int* nodeId, const String* objectId)
+void InspectorDOMAgent::highlightNode(ErrorString* errorString, const RefPtr<JSONObject>& highlightInspectorObject, const int* nodeId, const String* objectId)
 {
     Node* node = 0;
     if (nodeId) {
@@ -1193,8 +1192,8 @@ void InspectorDOMAgent::highlightNode(ErrorString* errorString, const RefPtr<Ins
 void InspectorDOMAgent::highlightFrame(
     ErrorString*,
     const String& frameId,
-    const RefPtr<InspectorObject>* color,
-    const RefPtr<InspectorObject>* outlineColor)
+    const RefPtr<JSONObject>* color,
+    const RefPtr<JSONObject>* outlineColor)
 {
     Frame* frame = m_pageAgent->frameForId(frameId);
     if (frame && frame->ownerElement()) {
@@ -1269,7 +1268,7 @@ void InspectorDOMAgent::focus(ErrorString* errorString, int nodeId)
     element->focus();
 }
 
-void InspectorDOMAgent::setFileInputFiles(ErrorString* errorString, int nodeId, const RefPtr<InspectorArray>& files)
+void InspectorDOMAgent::setFileInputFiles(ErrorString* errorString, int nodeId, const RefPtr<JSONArray>& files)
 {
     Node* node = assertNode(errorString, nodeId);
     if (!node)
@@ -1280,7 +1279,7 @@ void InspectorDOMAgent::setFileInputFiles(ErrorString* errorString, int nodeId, 
     }
 
     RefPtr<FileList> fileList = FileList::create();
-    for (InspectorArray::const_iterator iter = files->begin(); iter != files->end(); ++iter) {
+    for (JSONArray::const_iterator iter = files->begin(); iter != files->end(); ++iter) {
         String path;
         if (!(*iter)->asString(&path)) {
             *errorString = "Files must be strings";
@@ -1413,7 +1412,7 @@ PassRefPtr<TypeBuilder::DOM::Node> InspectorDOMAgent::buildObjectForNode(Node* n
         value->setSystemId(docType->systemId());
         value->setInternalSubset(docType->internalSubset());
     } else if (node->isAttributeNode()) {
-        Attr* attribute = static_cast<Attr*>(node);
+        Attr* attribute = toAttr(node);
         value->setName(attribute->name());
         value->setValue(attribute->value());
     }

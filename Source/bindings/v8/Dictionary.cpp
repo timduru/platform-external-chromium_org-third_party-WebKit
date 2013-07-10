@@ -294,7 +294,7 @@ bool Dictionary::get(const String& key, HashSet<AtomicString>& value) const
     ASSERT(m_isolate == v8::Isolate::GetCurrent());
     v8::Local<v8::Array> v8Array = v8::Local<v8::Array>::Cast(v8Value);
     for (size_t i = 0; i < v8Array->Length(); ++i) {
-        v8::Local<v8::Value> indexedValue = v8Array->Get(v8Integer(i, m_isolate));
+        v8::Local<v8::Value> indexedValue = v8Array->Get(v8::Integer::New(i, m_isolate));
         value.add(toWebCoreString(indexedValue));
     }
 
@@ -324,6 +324,18 @@ bool Dictionary::get(const String& key, RefPtr<Uint8Array>& value) const
     value = 0;
     if (V8Uint8Array::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
         value = V8Uint8Array::toNative(v8::Handle<v8::Object>::Cast(v8Value));
+    return true;
+}
+
+bool Dictionary::get(const String& key, RefPtr<ArrayBufferView>& value) const
+{
+    v8::Local<v8::Value> v8Value;
+    if (!getKey(key, v8Value))
+        return false;
+
+    value = 0;
+    if (V8ArrayBufferView::HasInstance(v8Value, m_isolate, worldType(m_isolate)))
+        value = V8ArrayBufferView::toNative(v8::Handle<v8::Object>::Cast(v8Value));
     return true;
 }
 

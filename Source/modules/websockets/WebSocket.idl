@@ -30,6 +30,7 @@
  */
 
 [
+    GlobalContext=Window&WorkerGlobalScope,
     ActiveDOMObject,
     Constructor(DOMString url),
     Constructor(DOMString url, sequence<DOMString> protocols),

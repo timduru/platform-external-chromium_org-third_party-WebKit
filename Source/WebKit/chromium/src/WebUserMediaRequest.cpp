@@ -37,7 +37,7 @@
 #include "public/platform/WebMediaStreamSource.h"
 #include "public/platform/WebString.h"
 #include "public/platform/WebVector.h"
-#include <wtf/Vector.h>
+#include "wtf/Vector.h"
 #include "WebDocument.h"
 #include "WebSecurityOrigin.h"
 #include "core/dom/Document.h"
@@ -52,6 +52,11 @@ using namespace WebCore;
 namespace WebKit {
 
 WebUserMediaRequest::WebUserMediaRequest(const PassRefPtr<UserMediaRequest>& request)
+    : m_private(request)
+{
+}
+
+WebUserMediaRequest::WebUserMediaRequest(UserMediaRequest* request)
     : m_private(request)
 {
 }

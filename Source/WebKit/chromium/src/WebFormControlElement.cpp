@@ -33,7 +33,7 @@
 
 #include "core/html/HTMLFormControlElement.h"
 #include "core/html/HTMLFormElement.h"
-#include <wtf/PassRefPtr.h>
+#include "wtf/PassRefPtr.h"
 
 using namespace WebCore;
 
@@ -95,7 +95,7 @@ WebFormControlElement& WebFormControlElement::operator=(const PassRefPtr<HTMLFor
 
 WebFormControlElement::operator PassRefPtr<HTMLFormControlElement>() const
 {
-    return static_cast<HTMLFormControlElement*>(m_private.get());
+    return toHTMLFormControlElement(m_private.get());
 }
 
 } // namespace WebKit

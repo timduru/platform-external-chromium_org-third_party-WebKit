@@ -24,7 +24,6 @@
 
 #include "core/platform/text/BidiResolver.h"
 #include "core/platform/text/Hyphenation.h"
-#include "core/rendering/exclusions/ExclusionShapeInsideInfo.h"
 #include "core/rendering/InlineIterator.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderCombineText.h"
@@ -39,6 +38,7 @@
 #include "core/rendering/TrailingFloatsRootInlineBox.h"
 #include "core/rendering/VerticalPositionCache.h"
 #include "core/rendering/break_lines.h"
+#include "core/rendering/shapes/ShapeInsideInfo.h"
 #include "core/rendering/svg/RenderSVGInlineText.h"
 #include "core/rendering/svg/SVGRootInlineBox.h"
 #include <wtf/RefCountedLeakCounter.h>
@@ -66,13 +66,13 @@ static LayoutUnit logicalHeightForLine(const RenderBlock* block, bool isFirstLin
     return max<LayoutUnit>(replacedHeight, block->lineHeight(isFirstLine, block->isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes));
 }
 
-ExclusionShapeInsideInfo* RenderBlock::layoutExclusionShapeInsideInfo() const
+ShapeInsideInfo* RenderBlock::layoutShapeInsideInfo() const
 {
-    ExclusionShapeInsideInfo* shapeInsideInfo = view()->layoutState()->exclusionShapeInsideInfo();
-    if (!shapeInsideInfo && flowThreadContainingBlock() && allowsExclusionShapeInsideInfoSharing()) {
+    ShapeInsideInfo* shapeInsideInfo = view()->layoutState()->shapeInsideInfo();
+    if (!shapeInsideInfo && flowThreadContainingBlock() && allowsShapeInsideInfoSharing()) {
         LayoutUnit offset = logicalHeight() + logicalHeightForLine(this, false);
         RenderRegion* region = regionAtBlockOffset(offset);
-        return region ? region->exclusionShapeInsideInfo() : 0;
+        return region ? region->shapeInsideInfo() : 0;
     }
     return shapeInsideInfo;
 }
@@ -94,9 +94,9 @@ public:
         , m_shouldIndentText(shouldIndentText)
     {
         ASSERT(block);
-        ExclusionShapeInsideInfo* exclusionShapeInsideInfo = m_block->layoutExclusionShapeInsideInfo();
-        if (exclusionShapeInsideInfo)
-            m_segment = exclusionShapeInsideInfo->currentSegment();
+        ShapeInsideInfo* shapeInsideInfo = m_block->layoutShapeInsideInfo();
+        if (shapeInsideInfo)
+            m_segment = shapeInsideInfo->currentSegment();
         updateAvailableWidth();
     }
     bool fitsOnLine() const { return currentWidth() <= m_availableWidth; }
@@ -161,7 +161,7 @@ inline void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(RenderBlock::Floa
     if (height < m_block->logicalTopForFloat(newFloat) || height >= m_block->logicalBottomForFloat(newFloat))
         return;
 
-    ExclusionShapeOutsideInfo* shapeOutsideInfo = newFloat->renderer()->exclusionShapeOutsideInfo();
+    ShapeOutsideInfo* shapeOutsideInfo = newFloat->renderer()->shapeOutsideInfo();
     if (shapeOutsideInfo)
         shapeOutsideInfo->computeSegmentsForLine(m_block->logicalHeight() - m_block->logicalTopForFloat(newFloat) + shapeOutsideInfo->shapeLogicalTop(), logicalHeightForLine(m_block, m_isFirstLine));
 
@@ -965,10 +965,10 @@ void RenderBlock::computeInlineDirectionPositionsForLine(RootInlineBox* lineBox,
     float availableLogicalWidth;
     updateLogicalInlinePositions(this, lineLogicalLeft, lineLogicalRight, availableLogicalWidth, isFirstLine, shouldIndentText, 0);
     bool needsWordSpacing;
-    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo();
-    if (exclusionShapeInsideInfo && exclusionShapeInsideInfo->hasSegments()) {
+    ShapeInsideInfo* shapeInsideInfo = layoutShapeInsideInfo();
+    if (shapeInsideInfo && shapeInsideInfo->hasSegments()) {
         BidiRun* segmentStart = firstRun;
-        const SegmentList& segments = exclusionShapeInsideInfo->segments();
+        const SegmentList& segments = shapeInsideInfo->segments();
         float logicalLeft = max<float>(roundToInt(segments[0].logicalLeft), lineLogicalLeft);
         float logicalRight = min<float>(floorToInt(segments[0].logicalRight), lineLogicalRight);
         float startLogicalLeft = logicalLeft;
@@ -1228,6 +1228,7 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
     // FIXME: We should pass a BidiRunList into createBidiRunsForLine instead
     // of the resolver owning the runs.
     ASSERT(&topResolver.runs() == &bidiRuns);
+    ASSERT(topResolver.position() != endOfRuns);
     RenderObject* currentRoot = topResolver.position().root();
     topResolver.createBidiRunsForLine(endOfRuns, override, previousLineBrokeCleanly);
 
@@ -1284,15 +1285,20 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
     }
 }
 
+static inline bool segmentIsEmpty(const InlineIterator& segmentStart, const InlineIterator& segmentEnd)
+{
+    return segmentStart == segmentEnd;
+}
+
 static inline void constructBidiRunsForLine(const RenderBlock* block, InlineBidiResolver& topResolver, BidiRunList<BidiRun>& bidiRuns, const InlineIterator& endOfLine, VisualDirectionOverride override, bool previousLineBrokeCleanly)
 {
-    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = block->layoutExclusionShapeInsideInfo();
-    if (!exclusionShapeInsideInfo || !exclusionShapeInsideInfo->hasSegments()) {
+    ShapeInsideInfo* shapeInsideInfo = block->layoutShapeInsideInfo();
+    if (!shapeInsideInfo || !shapeInsideInfo->hasSegments()) {
         constructBidiRunsForSegment(topResolver, bidiRuns, endOfLine, override, previousLineBrokeCleanly);
         return;
     }
 
-    const SegmentRangeList& segmentRanges = exclusionShapeInsideInfo->segmentRanges();
+    const SegmentRangeList& segmentRanges = shapeInsideInfo->segmentRanges();
     ASSERT(segmentRanges.size());
 
     for (size_t i = 0; i < segmentRanges.size(); i++) {
@@ -1308,8 +1314,10 @@ static inline void constructBidiRunsForLine(const RenderBlock* block, InlineBidi
             // Do not collapse midpoints between segments
             topResolver.midpointState().betweenMidpoints = false;
         }
-        topResolver.setPosition(segmentStart, numberOfIsolateAncestors(segmentStart));
-        constructBidiRunsForSegment(topResolver, bidiRuns, segmentEnd, override, previousLineBrokeCleanly);
+        if (!segmentIsEmpty(segmentStart, segmentEnd)) {
+            topResolver.setPosition(segmentStart, numberOfIsolateAncestors(segmentStart));
+            constructBidiRunsForSegment(topResolver, bidiRuns, segmentEnd, override, previousLineBrokeCleanly);
+        }
     }
 }
 
@@ -1534,6 +1542,28 @@ inline const InlineIterator& RenderBlock::restartLayoutRunsAndFloatsInRange(Layo
     return oldEnd;
 }
 
+static inline float firstPositiveWidth(const WordMeasurements& wordMeasurements)
+{
+    for (size_t i = 0; i < wordMeasurements.size(); ++i) {
+        if (wordMeasurements[i].width > 0)
+            return wordMeasurements[i].width;
+    }
+    return 0;
+}
+
+static inline LayoutUnit adjustLogicalLineTop(ShapeInsideInfo* shapeInsideInfo, const InlineIterator& start, const InlineIterator& end, const WordMeasurements& wordMeasurements)
+{
+    if (!shapeInsideInfo || !segmentIsEmpty(start, end))
+        return 0;
+
+    float minWidth = firstPositiveWidth(wordMeasurements);
+    ASSERT(minWidth || wordMeasurements.isEmpty());
+    if (minWidth > 0 && shapeInsideInfo->adjustLogicalLineTop(minWidth))
+        return shapeInsideInfo->logicalLineTop();
+
+    return shapeInsideInfo->shapeLogicalBottom();
+}
+
 void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, InlineBidiResolver& resolver, const InlineIterator& cleanLineStart, const BidiStatus& cleanLineBidiStatus, unsigned consecutiveHyphenatedLines)
 {
     RenderStyle* styleToUse = style();
@@ -1547,17 +1577,17 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
     LineBreaker lineBreaker(this);
 
     LayoutUnit absoluteLogicalTop;
-    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo();
-    if (exclusionShapeInsideInfo) {
-        ASSERT(exclusionShapeInsideInfo->owner() == this || allowsExclusionShapeInsideInfoSharing());
-        if (exclusionShapeInsideInfo != this->exclusionShapeInsideInfo()) {
+    ShapeInsideInfo* shapeInsideInfo = layoutShapeInsideInfo();
+    if (shapeInsideInfo) {
+        ASSERT(shapeInsideInfo->owner() == this || allowsShapeInsideInfoSharing());
+        if (shapeInsideInfo != this->shapeInsideInfo()) {
             // FIXME Bug 100284: If subsequent LayoutStates are pushed, we will have to add
             // their offsets from the original shape-inside container.
             absoluteLogicalTop = logicalTop();
         }
         // Begin layout at the logical top of our shape inside.
-        if (logicalHeight() + absoluteLogicalTop < exclusionShapeInsideInfo->shapeLogicalTop())
-            setLogicalHeight(exclusionShapeInsideInfo->shapeLogicalTop() - absoluteLogicalTop);
+        if (logicalHeight() + absoluteLogicalTop < shapeInsideInfo->shapeLogicalTop())
+            setLogicalHeight(shapeInsideInfo->shapeLogicalTop() - absoluteLogicalTop);
     }
 
     if (layoutState.flowThread()) {
@@ -1587,10 +1617,10 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
         // FIXME: Bug 95361: It is possible for a line to grow beyond lineHeight, in which
         // case these segments may be incorrect.
         if (layoutState.flowThread())
-            exclusionShapeInsideInfo = layoutExclusionShapeInsideInfo();
-        if (exclusionShapeInsideInfo) {
+            shapeInsideInfo = layoutShapeInsideInfo();
+        if (shapeInsideInfo) {
             LayoutUnit lineTop = logicalHeight() + absoluteLogicalTop;
-            exclusionShapeInsideInfo->computeSegmentsForLine(lineTop, lineHeight(layoutState.lineInfo().isFirstLine(), isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes));
+            shapeInsideInfo->computeSegmentsForLine(lineTop, lineHeight(layoutState.lineInfo().isFirstLine(), isHorizontalWritingMode() ? HorizontalLine : VerticalLine, PositionOfInteriorLineBoxes));
         }
         WordMeasurements wordMeasurements;
         end = lineBreaker.nextLineBreak(resolver, layoutState.lineInfo(), renderTextInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, wordMeasurements);
@@ -1604,12 +1634,13 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             resolver.setPosition(InlineIterator(resolver.position().root(), 0, 0), 0);
             break;
         }
-        ASSERT(end != resolver.position());
 
-        if (exclusionShapeInsideInfo && wordMeasurements.size() && exclusionShapeInsideInfo->adjustLogicalLineTop(wordMeasurements[0].width)) {
-            end = restartLayoutRunsAndFloatsInRange(logicalHeight(), exclusionShapeInsideInfo->logicalLineTop() - absoluteLogicalTop, lastFloatFromPreviousLine, resolver, oldEnd);
+        if (LayoutUnit adjustedLogicalLineTop = adjustLogicalLineTop(shapeInsideInfo, resolver.position(), end, wordMeasurements)) {
+            end = restartLayoutRunsAndFloatsInRange(logicalHeight(), adjustedLogicalLineTop - absoluteLogicalTop, lastFloatFromPreviousLine, resolver, oldEnd);
             continue;
         }
+
+        ASSERT(end != resolver.position());
 
         // This is a short-cut for empty lines.
         if (layoutState.lineInfo().isEmpty()) {
@@ -2534,15 +2565,21 @@ void RenderBlock::LineBreaker::reset()
 
 InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resolver, LineInfo& lineInfo, RenderTextInfo& renderTextInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements& wordMeasurements)
 {
-    ExclusionShapeInsideInfo* exclusionShapeInsideInfo = m_block->layoutExclusionShapeInsideInfo();
-    if (!exclusionShapeInsideInfo || !exclusionShapeInsideInfo->hasSegments())
+    ShapeInsideInfo* shapeInsideInfo = m_block->layoutShapeInsideInfo();
+    if (!shapeInsideInfo || !shapeInsideInfo->lineOverlapsShapeBounds())
         return nextSegmentBreak(resolver, lineInfo, renderTextInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, wordMeasurements);
 
     InlineIterator end = resolver.position();
     InlineIterator oldEnd = end;
 
-    const SegmentList& segments = exclusionShapeInsideInfo->segments();
-    SegmentRangeList& segmentRanges = exclusionShapeInsideInfo->segmentRanges();
+    if (!shapeInsideInfo->hasSegments()) {
+        end = nextSegmentBreak(resolver, lineInfo, renderTextInfo, lastFloatFromPreviousLine, consecutiveHyphenatedLines, wordMeasurements);
+        resolver.setPositionIgnoringNestedIsolates(oldEnd);
+        return oldEnd;
+    }
+
+    const SegmentList& segments = shapeInsideInfo->segments();
+    SegmentRangeList& segmentRanges = shapeInsideInfo->segmentRanges();
 
     for (unsigned i = 0; i < segments.size() && !end.atEnd(); i++) {
         InlineIterator segmentStart = resolver.position();
@@ -2555,6 +2592,7 @@ InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resol
         }
         if (resolver.position() == end) {
             // Nothing fit this segment
+            end = segmentStart;
             segmentRanges.append(LineSegmentRange(segmentStart, segmentStart));
             resolver.setPositionIgnoringNestedIsolates(segmentStart);
         } else {
@@ -2605,6 +2643,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
     // this to detect when we encounter a second space so we know we have to terminate
     // a run.
     bool currentCharacterIsSpace = false;
+    bool currentCharacterShouldCollapseIfPreWap = false;
     TrailingObjects trailingObjects;
 
     InlineIterator lBreak = resolver.position();
@@ -2736,7 +2775,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
                     && shouldSkipWhitespaceAfterStartObject(m_block, current.m_obj, lineMidpointState)) {
                     // Like with list markers, we start ignoring spaces to make sure that any
                     // additional spaces we see will be discarded.
-                    currentCharacterIsSpace = true;
+                    currentCharacterShouldCollapseIfPreWap = currentCharacterIsSpace = true;
                     ignoringSpaces = true;
                 }
             }
@@ -2759,7 +2798,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
 
             lineInfo.setEmpty(false, m_block, &width);
             ignoringSpaces = false;
-            currentCharacterIsSpace = false;
+            currentCharacterShouldCollapseIfPreWap = currentCharacterIsSpace = false;
             trailingObjects.clear();
 
             // Optimize for a common case. If we can't find whitespace after the list
@@ -2769,7 +2808,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
                 if (blockStyle->collapseWhiteSpace() && shouldSkipWhitespaceAfterStartObject(m_block, current.m_obj, lineMidpointState)) {
                     // Like with inline flows, we start ignoring spaces to make sure that any
                     // additional spaces we see will be discarded.
-                    currentCharacterIsSpace = true;
+                    currentCharacterShouldCollapseIfPreWap = currentCharacterIsSpace = true;
                     ignoringSpaces = true;
                 }
                 if (toRenderListMarker(current.m_obj)->isInside())
@@ -2850,8 +2889,9 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
             UChar secondToLastCharacter = renderTextInfo.m_lineBreakIterator.secondToLastCharacter();
             for (; current.m_pos < t->textLength(); current.fastIncrementInTextNode()) {
                 bool previousCharacterIsSpace = currentCharacterIsSpace;
+                bool previousCharacterShouldCollapseIfPreWap = currentCharacterShouldCollapseIfPreWap;
                 UChar c = current.current();
-                currentCharacterIsSpace = c == ' ' || c == '\t' || (!preserveNewline && (c == '\n'));
+                currentCharacterShouldCollapseIfPreWap = currentCharacterIsSpace = c == ' ' || c == '\t' || (!preserveNewline && (c == '\n'));
 
                 if (!collapseWhiteSpace || !currentCharacterIsSpace)
                     lineInfo.setEmpty(false, m_block, &width);
@@ -3035,7 +3075,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
                     ignoreStart.m_pos = current.m_pos;
                 }
 
-                if (!currentCharacterIsSpace && previousCharacterIsSpace) {
+                if (!currentCharacterIsSpace && previousCharacterShouldCollapseIfPreWap) {
                     if (autoWrap && currentStyle->breakOnlyAfterWhiteSpace())
                         lBreak.moveTo(current.m_obj, current.m_pos, current.m_nextBreakablePosition);
                 }
@@ -3149,7 +3189,10 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
         lBreak.clear();
 
  end:
-    if (lBreak == resolver.position() && (!lBreak.m_obj || !lBreak.m_obj->isBR())) {
+    ShapeInsideInfo* shapeInfo = m_block->layoutShapeInsideInfo();
+    bool segmentAllowsOverflow = !shapeInfo || !shapeInfo->hasSegments();
+
+    if (lBreak == resolver.position() && (!lBreak.m_obj || !lBreak.m_obj->isBR()) && segmentAllowsOverflow) {
         // we just add as much as possible
         if (blockStyle->whiteSpace() == PRE && !current.m_pos) {
             lBreak.moveTo(last, last->isText() ? last->length() : 0);
@@ -3164,7 +3207,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
     // FIXME Bug 100049: We do not need to consume input in a multi-segment line
     // unless no segment will.
     // make sure we consume at least one char/object.
-    if (lBreak == resolver.position())
+    if (lBreak == resolver.position() && segmentAllowsOverflow)
         lBreak.increment();
 
     // Sanity check our midpoints.

@@ -36,9 +36,7 @@
 #include "core/dom/Event.h"
 #include "core/dom/UserGestureIndicator.h"
 #include "core/history/BackForwardController.h"
-#include "core/history/HistoryItem.h"
 #include "core/html/HTMLFormElement.h"
-#include "core/html/HTMLFrameOwnerElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FormState.h"
@@ -46,10 +44,9 @@
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderStateMachine.h"
-#include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
-#include <wtf/CurrentTime.h>
+#include "wtf/CurrentTime.h"
 
 namespace WebCore {
 
@@ -78,6 +75,7 @@ public:
 
     double delay() const { return m_delay; }
     bool lockBackForwardList() const { return m_lockBackForwardList; }
+    void setLockBackForwardList(bool lockBackForwardList) { m_lockBackForwardList = lockBackForwardList; }
     bool wasDuringLoad() const { return m_wasDuringLoad; }
     bool isLocationChange() const { return m_isLocationChange; }
     PassOwnPtr<UserGestureIndicator> createUserGestureIndicator()
@@ -124,6 +122,8 @@ protected:
 
         OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
         frame->loader()->clientRedirected(KURL(ParsedURLString, m_url), delay(), currentTime() + timer->nextFireInterval());
+        if (frame->loader()->history()->currentItemShouldBeReplaced())
+            setLockBackForwardList(true);
     }
 
     virtual void didStopTimer(Frame* frame)
@@ -250,6 +250,8 @@ public:
 
         OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
         frame->loader()->clientRedirected(m_submission->requestURL(), delay(), currentTime() + timer->nextFireInterval());
+        if (frame->loader()->history()->currentItemShouldBeReplaced())
+            setLockBackForwardList(true);
     }
 
     virtual void didStopTimer(Frame* frame)

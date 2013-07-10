@@ -32,6 +32,7 @@
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
 #include "core/page/Frame.h"
+#include "core/platform/chromium/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
 namespace WebCore {
@@ -65,7 +66,7 @@ template <typename T> void V8_USE(T) { }
 static void valueAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
-    v8SetReturnValue(info, imp->value() ? imp->value()->deserialize() : v8::Handle<v8::Value>(v8Null(info.GetIsolate())));
+    v8SetReturnValue(info, imp->value() ? imp->value()->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate())));
     return;
 }
 
@@ -84,13 +85,15 @@ static void valueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> val
 
 static void valueAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     TestSerializedScriptValueInterfaceV8Internal::valueAttrSetter(name, value, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 static void readonlyValueAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
-    v8SetReturnValue(info, imp->readonlyValue() ? imp->readonlyValue()->deserialize() : v8::Handle<v8::Value>(v8Null(info.GetIsolate())));
+    v8SetReturnValue(info, imp->readonlyValue() ? imp->readonlyValue()->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate())));
     return;
 }
 
@@ -109,7 +112,7 @@ static void cachedValueAttrGetter(v8::Local<v8::String> name, const v8::Property
     }
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
     RefPtr<SerializedScriptValue> serialized = imp->cachedValue();
-    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8Null(info.GetIsolate()));
+    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
     info.Holder()->SetHiddenValue(propertyName, value);
     v8SetReturnValue(info, value);
     return;
@@ -131,7 +134,9 @@ static void cachedValueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Valu
 
 static void cachedValueAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetter(name, value, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 static void cachedReadonlyValueAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -144,7 +149,7 @@ static void cachedReadonlyValueAttrGetter(v8::Local<v8::String> name, const v8::
     }
     TestSerializedScriptValueInterface* imp = V8TestSerializedScriptValueInterface::toNative(info.Holder());
     RefPtr<SerializedScriptValue> serialized = imp->cachedReadonlyValue();
-    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8Null(info.GetIsolate()));
+    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
     info.Holder()->SetHiddenValue(propertyName, value);
     v8SetReturnValue(info, value);
     return;
@@ -190,6 +195,7 @@ v8::Handle<v8::FunctionTemplate> V8TestSerializedScriptValueInterface::GetTempla
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
+    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestSerializedScriptValueInterfaceTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);

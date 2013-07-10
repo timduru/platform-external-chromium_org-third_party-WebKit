@@ -60,11 +60,12 @@
 #include "core/rendering/RenderReplica.h"
 #include "core/rendering/RenderVideo.h"
 #include "core/rendering/RenderView.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
-#include <wtf/TemporaryChange.h>
+#include "wtf/MemoryInstrumentationHashMap.h"
+#include "wtf/MemoryInstrumentationHashSet.h"
+#include "wtf/TemporaryChange.h"
 
 #if !LOG_DISABLED
-#include <wtf/CurrentTime.h>
+#include "wtf/CurrentTime.h"
 #endif
 
 #ifndef NDEBUG
@@ -1573,16 +1574,14 @@ CompositingReasons RenderLayerCompositor::directReasonsForCompositing(const Rend
     if (requiresCompositingForTransform(renderer))
         directReasons |= CompositingReason3DTransform;
 
+    // Only zero or one of the following conditions will be true for a given RenderLayer.
     if (requiresCompositingForVideo(renderer))
         directReasons |= CompositingReasonVideo;
-
-    if (requiresCompositingForCanvas(renderer))
+    else if (requiresCompositingForCanvas(renderer))
         directReasons |= CompositingReasonCanvas;
-
-    if (requiresCompositingForPlugin(renderer))
+    else if (requiresCompositingForPlugin(renderer))
         directReasons |= CompositingReasonPlugin;
-
-    if (requiresCompositingForFrame(renderer))
+    else if (requiresCompositingForFrame(renderer))
         directReasons |= CompositingReasonIFrame;
     
     if (requiresCompositingForBackfaceVisibilityHidden(renderer))
@@ -2498,7 +2497,7 @@ void RenderLayerCompositor::attachRootLayer(RootLayerAttachment attachment)
         case RootLayerAttachedViaEnclosingFrame: {
             // The layer will get hooked up via RenderLayerBacking::updateGraphicsLayerConfiguration()
             // for the frame's renderer in the parent document.
-            m_renderView->document()->ownerElement()->scheduleSyntheticStyleChange();
+            m_renderView->document()->ownerElement()->scheduleLayerUpdate();
             break;
         }
     }
@@ -2521,7 +2520,7 @@ void RenderLayerCompositor::detachRootLayer()
             m_rootContentLayer->removeFromParent();
 
         if (HTMLFrameOwnerElement* ownerElement = m_renderView->document()->ownerElement())
-            ownerElement->scheduleSyntheticStyleChange();
+            ownerElement->scheduleLayerUpdate();
         break;
     }
     case RootLayerAttachedViaChromeClient: {
@@ -2561,13 +2560,13 @@ void RenderLayerCompositor::notifyIFramesOfCompositingChange()
 
     for (Frame* child = frame->tree()->firstChild(); child; child = child->tree()->traverseNext(frame)) {
         if (child->document() && child->document()->ownerElement())
-            child->document()->ownerElement()->scheduleSyntheticStyleChange();
+            child->document()->ownerElement()->scheduleLayerUpdate();
     }
     
     // Compositing also affects the answer to RenderIFrame::requiresAcceleratedCompositing(), so 
     // we need to schedule a style recalc in our parent document.
     if (HTMLFrameOwnerElement* ownerElement = m_renderView->document()->ownerElement())
-        ownerElement->scheduleSyntheticStyleChange();
+        ownerElement->scheduleLayerUpdate();
 }
 
 bool RenderLayerCompositor::layerHas3DContent(const RenderLayer* layer) const

@@ -22,11 +22,10 @@
 #ifndef ElementRuleCollector_h
 #define ElementRuleCollector_h
 
-#include "core/css/MediaQueryEvaluator.h"
 #include "core/css/SelectorChecker.h"
 #include "core/css/resolver/StyleResolver.h"
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
+#include "wtf/RefPtr.h"
+#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -78,7 +77,9 @@ public:
 private:
     Document* document() { return m_state.document(); }
 
+    void collectRuleIfMatches(const RuleData&, const MatchRequest&, StyleResolver::RuleRange&);
     void collectMatchingRulesForList(const Vector<RuleData>*, const MatchRequest&, StyleResolver::RuleRange&);
+    void collectMatchingRulesForList(const RuleData*, const MatchRequest&, StyleResolver::RuleRange&);
     bool ruleMatches(const RuleData&, const ContainerNode* scope, PseudoId&);
 
     void sortMatchedRules();

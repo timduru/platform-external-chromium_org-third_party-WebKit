@@ -101,8 +101,8 @@ class TestList(object):
 #
 # These numbers may need to be updated whenever we add or delete tests.
 #
-TOTAL_TESTS = 102
-TOTAL_SKIPS = 25
+TOTAL_TESTS = 104
+TOTAL_SKIPS = 26
 TOTAL_RETRIES = 14
 
 UNEXPECTED_PASSES = 6
@@ -115,6 +115,7 @@ def unit_test_list():
     tests.add('failures/expected/timeout.html', timeout=True)
     tests.add('failures/expected/hang.html', hang=True)
     tests.add('failures/expected/missing_text.html', expected_text=None)
+    tests.add('failures/expected/needsrebaseline.html', actual_text='needsrebaseline text')
     tests.add('failures/expected/image.html',
               actual_image='image_fail-pngtEXtchecksum\x00checksum_fail',
               expected_image='image-pngtEXtchecksum\x00checksum-png')
@@ -274,6 +275,7 @@ def add_unit_tests_to_mock_filesystem(filesystem):
         filesystem.write_text_file(LAYOUT_TEST_DIR + '/platform/test/TestExpectations', """
 Bug(test) failures/expected/crash.html [ Crash ]
 Bug(test) failures/expected/image.html [ ImageOnlyFailure ]
+Bug(test) failures/expected/needsrebaseline.html [ NeedsRebaseline ]
 Bug(test) failures/expected/audio.html [ Failure ]
 Bug(test) failures/expected/image_checksum.html [ ImageOnlyFailure ]
 Bug(test) failures/expected/mismatch.html [ ImageOnlyFailure ]
@@ -418,17 +420,15 @@ class TestPort(Port):
     def default_configuration(self):
         return 'Release'
 
-    def diff_image(self, expected_contents, actual_contents, tolerance=None):
+    def diff_image(self, expected_contents, actual_contents):
         diffed = actual_contents != expected_contents
         if not actual_contents and not expected_contents:
-            return (None, 0, None)
+            return (None, None)
         if not actual_contents or not expected_contents:
-            return (True, 0, None)
-        if 'ref' in expected_contents:
-            assert tolerance == 0
+            return (True, None)
         if diffed:
-            return ("< %s\n---\n> %s\n" % (expected_contents, actual_contents), 1, None)
-        return (None, 0, None)
+            return ("< %s\n---\n> %s\n" % (expected_contents, actual_contents), None)
+        return (None, None)
 
     def layout_tests_dir(self):
         return LAYOUT_TEST_DIR
@@ -537,7 +537,7 @@ class TestPort(Port):
 
 
 class TestDriver(Driver):
-    """Test/Dummy implementation of the DumpRenderTree interface."""
+    """Test/Dummy implementation of the driver interface."""
     next_pid = 1
 
     def __init__(self, *args, **kwargs):

@@ -26,6 +26,7 @@
 
 #include "core/dom/CheckedRadioButtons.h"
 #include "core/html/HTMLElement.h"
+#include "core/html/HTMLFormControlElement.h"
 #include "core/loader/FormState.h"
 #include "core/loader/FormSubmission.h"
 #include <wtf/OwnPtr.h>
@@ -100,6 +101,7 @@ public:
     HTMLFormControlElement* defaultButton() const;
 
     bool checkValidity();
+    bool checkValidityWithoutDispatchingEvents();
 
     enum AutocompleteResult {
         AutocompleteResultSuccess,
@@ -114,8 +116,8 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(autocomplete);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(autocompleteerror);
 
-    HTMLFormControlElement* elementForAlias(const AtomicString&);
-    void addElementAlias(HTMLFormControlElement*, const AtomicString& alias);
+    Node* elementForAlias(const AtomicString&);
+    void addElementAlias(Node*, const AtomicString& alias);
 
     CheckedRadioButtons& checkedRadioButtons() { return m_checkedRadioButtons; }
 
@@ -153,9 +155,9 @@ private:
     // Validates each of the controls, and stores controls of which 'invalid'
     // event was not canceled to the specified vector. Returns true if there
     // are any invalid controls in this form.
-    bool checkInvalidControlsAndCollectUnhandled(Vector<RefPtr<FormAssociatedElement> >&);
+    bool checkInvalidControlsAndCollectUnhandled(Vector<RefPtr<FormAssociatedElement> >*, HTMLFormControlElement::CheckValidityDispatchEvents = HTMLFormControlElement::CheckValidityDispatchEventsAllowed);
 
-    typedef HashMap<RefPtr<AtomicStringImpl>, RefPtr<HTMLFormControlElement> > AliasMap;
+    typedef HashMap<RefPtr<AtomicStringImpl>, RefPtr<Node> > AliasMap;
 
     FormSubmission::Attributes m_attributes;
     OwnPtr<AliasMap> m_elementAliases;
@@ -180,6 +182,12 @@ private:
     Vector<RefPtr<Event> > m_pendingAutocompleteEvents;
     Timer<HTMLFormElement> m_requestAutocompleteTimer;
 };
+
+inline HTMLFormElement* toHTMLFormElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::formTag));
+    return static_cast<HTMLFormElement*>(node);
+}
 
 } // namespace WebCore
 

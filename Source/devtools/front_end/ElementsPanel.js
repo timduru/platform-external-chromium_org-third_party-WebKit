@@ -302,8 +302,9 @@ WebInspector.ElementsPanel.prototype = {
 
     /**
      * @param {string} query
+     * @param {boolean} shouldJump
      */
-    performSearch: function(query)
+    performSearch: function(query, shouldJump)
     {
         // Call searchCanceled since it will reset everything we need before doing a new search.
         this.searchCanceled();
@@ -325,7 +326,8 @@ WebInspector.ElementsPanel.prototype = {
 
             this._searchResults = new Array(resultCount);
             this._currentSearchResultIndex = -1;
-            this.jumpToNextSearchResult();
+            if (shouldJump)
+                this.jumpToNextSearchResult();
         }
         WebInspector.domAgent.performSearch(whitespaceTrimmedQuery, resultCountCallback.bind(this));
     },
@@ -785,13 +787,19 @@ WebInspector.ElementsPanel.prototype = {
         crumbs.firstChild.addStyleClass("end");
         crumbs.lastChild.addStyleClass("start");
 
+        var rightPadding = 20;
+        var crumbsTotalOffsetLeft = crumbs.totalOffsetLeft();
+        var windowInnerWidth = window.innerWidth;
+        var errorWarningElement = document.getElementById("error-warning-count");
+        if (!WebInspector.drawer.visible) {
+            if (errorWarningElement)
+                rightPadding += errorWarningElement.offsetWidth;
+            rightPadding += WebInspector.settingsController.statusBarItem.offsetWidth;
+        }
+
         function crumbsAreSmallerThanContainer()
         {
-            var rightPadding = 20;
-            var errorWarningElement = document.getElementById("error-warning-count");
-            if (!WebInspector.drawer.visible && errorWarningElement)
-                rightPadding += errorWarningElement.offsetWidth;
-            return ((crumbs.totalOffsetLeft() + crumbs.offsetWidth + rightPadding) < window.innerWidth);
+            return (crumbsTotalOffsetLeft + crumbs.offsetWidth + rightPadding) < windowInnerWidth;
         }
 
         if (crumbsAreSmallerThanContainer())

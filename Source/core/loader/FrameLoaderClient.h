@@ -117,10 +117,6 @@ namespace WebCore {
 
         virtual void dispatchDidLayout(LayoutMilestones) { }
 
-        virtual Frame* dispatchCreatePage(const NavigationAction&) = 0;
-        virtual void dispatchShow() = 0;
-
-        virtual PolicyAction policyForNewWindowAction(const NavigationAction&, const String& frameName) = 0;
         virtual PolicyAction decidePolicyForNavigationAction(const NavigationAction&, const ResourceRequest&) = 0;
 
         virtual void dispatchUnableToImplementPolicy(const ResourceError&) = 0;
@@ -130,8 +126,6 @@ namespace WebCore {
         virtual void dispatchWillSendSubmitEvent(PassRefPtr<FormState>) = 0;
         virtual void dispatchWillSubmitForm(PassRefPtr<FormState>) = 0;
 
-        virtual void setMainDocumentError(DocumentLoader*, const ResourceError&) = 0;
-
         // Maybe these should go into a ProgressTrackerClient some day
         virtual void postProgressStartedNotification() = 0;
         virtual void postProgressEstimateChangedNotification() = 0;
@@ -139,8 +133,7 @@ namespace WebCore {
 
         virtual void startDownload(const ResourceRequest&, const String& suggestedName = String()) = 0;
 
-        virtual void committedLoad(DocumentLoader*, const char*, int) = 0;
-        virtual void finishedLoading(DocumentLoader*) = 0;
+        virtual void didReceiveDocumentData(const char*, int) = 0;
 
         virtual bool shouldGoToHistoryItem(HistoryItem*) const = 0;
         virtual bool shouldStopLoadingForHistoryItem(HistoryItem*) const = 0;
@@ -190,7 +183,6 @@ namespace WebCore {
 
         virtual PassRefPtr<Frame> createFrame(const KURL& url, const String& name, HTMLFrameOwnerElement* ownerElement, const String& referrer, bool allowsScrolling, int marginWidth, int marginHeight) = 0;
         virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool loadManually) = 0;
-        virtual void redirectDataToPlugin(Widget* pluginWidget) = 0;
 
         virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL& baseURL, const Vector<String>& paramNames, const Vector<String>& paramValues) = 0;
 

@@ -73,6 +73,8 @@ public:
 
     void setWidth(int);
     void setHeight(int);
+    void setAccelerationDisabled(bool accelerationDisabled) { m_accelerationDisabled = accelerationDisabled; }
+    bool accelerationDisabled() const { return m_accelerationDisabled; }
 
     void setSize(const IntSize& newSize)
     { 
@@ -137,7 +139,7 @@ private:
     HTMLCanvasElement(const QualifiedName&, Document*);
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual bool areAuthorShadowsAllowed() const OVERRIDE { return false; }
 
@@ -145,8 +147,8 @@ private:
 
     float targetDeviceScaleFactor() const;
 
-    void createImageBuffer() const;
-    void clearImageBuffer() const;
+    void createImageBuffer();
+    void clearImageBuffer();
 
     void setSurfaceSize(const IntSize&);
 
@@ -161,6 +163,7 @@ private:
     bool m_rendererIsCanvas;
 
     bool m_ignoreReset;
+    bool m_accelerationDisabled;
     FloatRect m_dirtyRect;
 
     float m_deviceScaleFactor;
@@ -169,9 +172,9 @@ private:
     // m_createdImageBuffer means we tried to malloc the buffer.  We didn't necessarily get it.
     mutable bool m_hasCreatedImageBuffer;
     mutable bool m_didClearImageBuffer;
-    mutable OwnPtr<ImageBuffer> m_imageBuffer;
+    OwnPtr<ImageBuffer> m_imageBuffer;
     mutable OwnPtr<GraphicsContextStateSaver> m_contextStateSaver;
-    
+
     mutable RefPtr<Image> m_presentedImage;
     mutable RefPtr<Image> m_copiedImage; // FIXME: This is temporary for platforms that have to copy the image buffer to render (and for CSSCanvasValue).
 };

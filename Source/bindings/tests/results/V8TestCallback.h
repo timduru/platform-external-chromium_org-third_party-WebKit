@@ -50,8 +50,9 @@ public:
     virtual bool callbackWithStringList(RefPtr<DOMStringList> listParam);
     virtual bool callbackWithBoolean(bool boolParam);
     virtual bool callbackWithSequence(Vector<RefPtr<TestObj> > sequenceParam);
+    virtual bool callbackWithThisArg(int param, ScriptValue thisValue);
 
-    virtual ScriptExecutionContext* scriptExecutionContext() const { return ContextDestructionObserver::scriptExecutionContext(); }
+    virtual ScriptExecutionContext* scriptExecutionContext() const { return ContextLifecycleObserver::scriptExecutionContext(); }
 
 private:
     V8TestCallback(v8::Handle<v8::Object>, ScriptExecutionContext*);

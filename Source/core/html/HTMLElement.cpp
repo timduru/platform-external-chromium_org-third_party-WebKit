@@ -38,6 +38,7 @@
 #include "core/dom/EventListener.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/dom/KeyboardEvent.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
 #include "core/editing/markup.h"
@@ -48,6 +49,7 @@
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/loader/FrameLoader.h"
 #include "core/page/Frame.h"
+#include "core/page/Settings.h"
 #include "core/rendering/RenderWordBreak.h"
 #include <wtf/StdLibExtras.h>
 #include <wtf/text/CString.h>
@@ -143,7 +145,7 @@ bool HTMLElement::isPresentationAttribute(const QualifiedName& name) const
 {
     if (name == alignAttr || name == contenteditableAttr || name == hiddenAttr || name == langAttr || name.matches(XMLNames::langAttr) || name == draggableAttr || name == dirAttr)
         return true;
-    return StyledElement::isPresentationAttribute(name);
+    return Element::isPresentationAttribute(name);
 }
 
 void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name, const AtomicString& value, MutableStylePropertySet* style)
@@ -187,7 +189,7 @@ void HTMLElement::collectStyleForPresentationAttribute(const QualifiedName& name
         if (!fastHasAttribute(XMLNames::langAttr))
             mapLanguageAttributeToLocale(value, style);
     } else
-        StyledElement::collectStyleForPresentationAttribute(name, value, style);
+        Element::collectStyleForPresentationAttribute(name, value, style);
 }
 
 AtomicString HTMLElement::eventNameForAttributeName(const QualifiedName& attrName) const
@@ -277,7 +279,7 @@ AtomicString HTMLElement::eventNameForAttributeName(const QualifiedName& attrNam
 void HTMLElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (isIdAttributeName(name) || name == classAttr || name == styleAttr)
-        return StyledElement::parseAttribute(name, value);
+        return Element::parseAttribute(name, value);
 
     if (name == dirAttr)
         dirAttributeChanged(value);
@@ -598,6 +600,23 @@ bool HTMLElement::hasCustomFocusLogic() const
     return false;
 }
 
+bool HTMLElement::supportsSpatialNavigationFocus() const
+{
+    // This function checks whether the element satisfies the extended criteria
+    // for the element to be focusable, introduced by spatial navigation feature,
+    // i.e. checks if click or keyboard event handler is specified.
+    // This is the way to make it possible to navigate to (focus) elements
+    // which web designer meant for being active (made them respond to click events).
+
+    if (!document()->settings() || !document()->settings()->spatialNavigationEnabled())
+        return false;
+    EventTarget* target = const_cast<HTMLElement*>(this);
+    return target->hasEventListeners(eventNames().clickEvent)
+        || target->hasEventListeners(eventNames().keydownEvent)
+        || target->hasEventListeners(eventNames().keypressEvent)
+        || target->hasEventListeners(eventNames().keyupEvent);
+}
+
 bool HTMLElement::supportsFocus() const
 {
     // FIXME: supportsFocus() can be called when layout is not up to date.
@@ -605,7 +624,8 @@ bool HTMLElement::supportsFocus() const
     // But supportsFocus must return true when the element is editable, or else
     // it won't be focusable. Furthermore, supportsFocus cannot just return true
     // always or else tabIndex() will change for all HTML elements.
-    return Element::supportsFocus() || (rendererIsEditable() && parentNode() && !parentNode()->rendererIsEditable());
+    return Element::supportsFocus() || (rendererIsEditable() && parentNode() && !parentNode()->rendererIsEditable())
+        || supportsSpatialNavigationFocus();
 }
 
 String HTMLElement::contentEditable() const
@@ -732,13 +752,13 @@ bool HTMLElement::rendererIsNeeded(const NodeRenderingContext& context)
         if (frame && frame->loader()->subframeLoader()->allowPlugins(NotAboutToInstantiatePlugin))
             return false;
     }
-    return StyledElement::rendererIsNeeded(context);
+    return Element::rendererIsNeeded(context);
 }
 
-RenderObject* HTMLElement::createRenderer(RenderArena* arena, RenderStyle* style)
+RenderObject* HTMLElement::createRenderer(RenderStyle* style)
 {
     if (hasLocalName(wbrTag))
-        return new (arena) RenderWordBreak(this);
+        return new (document()->renderArena()) RenderWordBreak(this);
     return RenderObject::createObject(this, style);
 }
 
@@ -746,7 +766,7 @@ HTMLFormElement* HTMLElement::findFormAncestor() const
 {
     for (ContainerNode* ancestor = parentNode(); ancestor; ancestor = ancestor->parentNode()) {
         if (ancestor->hasTagName(formTag))
-            return static_cast<HTMLFormElement*>(ancestor);
+            return toHTMLFormElement(ancestor);
     }
     return 0;
 }
@@ -786,7 +806,7 @@ static void setHasDirAutoFlagRecursively(Node* firstNode, bool flag, Node* lastN
 
 void HTMLElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
-    StyledElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
+    Element::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
     adjustDirectionalityIfNeededAfterChildrenChanged(beforeChange, childCountDelta);
 }
 
@@ -1027,6 +1047,28 @@ void HTMLElement::addHTMLColorToStyle(MutableStylePropertySet* style, CSSPropert
         parsedColor.setRGB(parseColorStringWithCrazyLegacyRules(colorString));
 
     style->setProperty(propertyID, cssValuePool().createColorValue(parsedColor.rgb()));
+}
+
+void HTMLElement::defaultEventHandler(Event* event)
+{
+    if (event->type() == eventNames().keypressEvent && event->isKeyboardEvent()) {
+        handleKeypressEvent(toKeyboardEvent(event));
+        if (event->defaultHandled())
+            return;
+    }
+
+    Element::defaultEventHandler(event);
+}
+
+void HTMLElement::handleKeypressEvent(KeyboardEvent* event)
+{
+    if (!document()->settings() || !document()->settings()->spatialNavigationEnabled() || !supportsFocus())
+        return;
+    int charCode = event->charCode();
+    if (charCode == '\r' || charCode == ' ') {
+        dispatchSimulatedClick(event);
+        event->setDefaultHandled();
+    }
 }
 
 } // namespace WebCore

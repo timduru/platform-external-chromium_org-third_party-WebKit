@@ -43,6 +43,7 @@ class TestRunResults(object):
         self.remaining = self.total
         self.expectations = expectations
         self.expected = 0
+        self.expected_failures = 0
         self.unexpected = 0
         self.unexpected_failures = 0
         self.unexpected_crashes = 0
@@ -61,6 +62,7 @@ class TestRunResults(object):
             self.tests_by_timeline[timeline] = expectations.get_tests_with_timeline(timeline)
         self.slow_tests = set()
         self.interrupted = False
+        self.run_time = 0  # The wall clock time spent running the tests (layout_test_runner.run()).
 
     def add(self, test_result, expected, test_is_slow):
         self.tests_by_expectation[test_result.type].add(test_result.test_name)
@@ -75,6 +77,8 @@ class TestRunResults(object):
             self.expected += 1
             if test_result.type == test_expectations.SKIP:
                 self.expected_skips += 1
+            elif test_result.type != test_expectations.PASS:
+                self.expected_failures += 1
         else:
             self.unexpected_results_by_name[test_result.test_name] = test_result
             self.unexpected += 1
@@ -111,11 +115,6 @@ def _interpret_test_failures(failures):
 
     if test_failures.FailureMissingImage in failure_types or test_failures.FailureMissingImageHash in failure_types:
         test_dict['is_missing_image'] = True
-
-    if 'image_diff_percent' not in test_dict:
-        for failure in failures:
-            if isinstance(failure, test_failures.FailureImageHashMismatch) or isinstance(failure, test_failures.FailureReftestMismatch):
-                test_dict['image_diff_percent'] = failure.diff_percent
 
     return test_dict
 

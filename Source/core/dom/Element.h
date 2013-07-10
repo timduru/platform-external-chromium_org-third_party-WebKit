@@ -25,19 +25,21 @@
 #ifndef Element_h
 #define Element_h
 
+#include "CSSPropertyNames.h"
 #include "HTMLNames.h"
+#include "core/css/CSSPrimitiveValue.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
-#include "core/dom/FragmentScriptingPermission.h"
 #include "core/dom/SpaceSplitString.h"
 #include "core/html/CollectionType.h"
 #include "core/platform/ScrollTypes.h"
+#include "core/rendering/RegionOversetState.h"
 
 namespace WebCore {
 
 class Animation;
-
 class Attr;
+class Attribute;
 class ClientRect;
 class ClientRectList;
 class DOMStringMap;
@@ -48,12 +50,16 @@ class ElementShadow;
 class InputMethodContext;
 class IntSize;
 class Locale;
+class MutableStylePropertySet;
+class PropertySetCSSStyleDeclaration;
 class PseudoElement;
 class RenderRegion;
 class ShadowRoot;
 class ShareableElementData;
 class StylePropertySet;
 class UniqueElementData;
+
+struct PresentationAttributeCacheKey;
 
 class ElementData : public RefCounted<ElementData> {
     WTF_MAKE_FAST_ALLOCATED;
@@ -108,7 +114,6 @@ protected:
 
 private:
     friend class Element;
-    friend class StyledElement;
     friend class ShareableElementData;
     friend class UniqueElementData;
     friend class SVGElement;
@@ -345,7 +350,7 @@ public:
 
     const Vector<RefPtr<Attr> >& attrNodeList();
 
-    virtual CSSStyleDeclaration* style();
+    CSSStyleDeclaration* style();
 
     const QualifiedName& tagQName() const { return m_tagName; }
     String tagName() const { return nodeName(); }
@@ -366,12 +371,29 @@ public:
     PassRefPtr<Element> cloneElementWithChildren();
     PassRefPtr<Element> cloneElementWithoutChildren();
 
-    void scheduleSyntheticStyleChange();
+    void scheduleLayerUpdate();
 
     void normalizeAttributes();
     String nodeNamePreservingCase() const;
 
     void setBooleanAttribute(const QualifiedName& name, bool);
+
+    virtual const StylePropertySet* additionalPresentationAttributeStyle() { return 0; }
+    void invalidateStyleAttribute();
+
+    const StylePropertySet* inlineStyle() const { return elementData() ? elementData()->m_inlineStyle.get() : 0; }
+
+    bool setInlineStyleProperty(CSSPropertyID, CSSValueID identifier, bool important = false);
+    bool setInlineStyleProperty(CSSPropertyID, CSSPropertyID identifier, bool important = false);
+    bool setInlineStyleProperty(CSSPropertyID, double value, CSSPrimitiveValue::UnitTypes, bool important = false);
+    bool setInlineStyleProperty(CSSPropertyID, const String& value, bool important = false);
+    bool removeInlineStyleProperty(CSSPropertyID);
+    void removeAllInlineStyleProperties();
+
+    void synchronizeStyleAttributeInternal() const;
+
+    const StylePropertySet* presentationAttributeStyle();
+    virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) { }
 
     // For exposing to DOM only.
     NamedNodeMap* attributes() const;
@@ -408,7 +430,7 @@ public:
 
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
     void recalcStyle(StyleChange = NoChange);
     void didAffectSelector(AffectedSelectorMask);
@@ -459,6 +481,12 @@ public:
 
     bool isUnresolvedCustomElement();
 
+    void setIsInsideRegion(bool);
+    bool isInsideRegion() const;
+
+    void setRegionOversetState(RegionOversetState);
+    RegionOversetState regionOversetState() const;
+
     AtomicString computeInheritedLanguage() const;
     Locale& locale() const;
 
@@ -480,6 +508,8 @@ public:
     String innerText();
     String outerText();
  
+    String textFromChildren();
+
     virtual String title() const;
 
     const AtomicString& pseudo() const;
@@ -578,6 +608,7 @@ public:
     PassRefPtr<RenderStyle> originalStyleForRenderer();
 
     RenderRegion* renderRegion() const;
+    virtual bool shouldMoveToFlowThread(RenderStyle*) const;
     const AtomicString& webkitRegionOverset() const;
     Vector<RefPtr<Range> > webkitGetRegionFlowRanges() const;
 
@@ -604,6 +635,14 @@ protected:
     {
         ScriptWrappable::init(this);
     }
+
+    virtual bool isPresentationAttribute(const QualifiedName&) const { return false; }
+
+    void addPropertyToPresentationAttributeStyle(MutableStylePropertySet*, CSSPropertyID, CSSValueID identifier);
+    void addPropertyToPresentationAttributeStyle(MutableStylePropertySet*, CSSPropertyID, double value, CSSPrimitiveValue::UnitTypes);
+    void addPropertyToPresentationAttributeStyle(MutableStylePropertySet*, CSSPropertyID, const String& value);
+
+    virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
@@ -632,6 +671,16 @@ protected:
     void classAttributeChanged(const AtomicString& newClassString);
 
 private:
+    void styleAttributeChanged(const AtomicString& newStyleString, AttributeModificationReason);
+
+    void inlineStyleChanged();
+    PropertySetCSSStyleDeclaration* inlineStyleCSSOMWrapper();
+    void setInlineStyleFromString(const AtomicString&);
+    MutableStylePropertySet* ensureMutableInlineStyle();
+
+    void makePresentationAttributeCacheKey(PresentationAttributeCacheKey&) const;
+    void rebuildPresentationAttributeStyle();
+
     void updatePseudoElement(PseudoId, StyleChange);
     void createPseudoElementIfNeeded(PseudoId);
 
@@ -771,7 +820,7 @@ inline Element* Node::previousElementSibling() const
     Node* n = previousSibling();
     while (n && !n->isElementNode())
         n = n->previousSibling();
-    return static_cast<Element*>(n);
+    return toElement(n);
 }
 
 inline Element* Node::nextElementSibling() const
@@ -779,7 +828,7 @@ inline Element* Node::nextElementSibling() const
     Node* n = nextSibling();
     while (n && !n->isElementNode())
         n = n->nextSibling();
-    return static_cast<Element*>(n);
+    return toElement(n);
 }
 
 inline bool Element::fastHasAttribute(const QualifiedName& name) const
@@ -912,6 +961,21 @@ inline void Node::removedFrom(ContainerNode* insertionPoint)
         clearFlag(InDocumentFlag);
     if (isInShadowTree() && !treeScope()->rootNode()->isShadowRoot())
         clearFlag(IsInShadowTreeFlag);
+}
+
+inline void Element::invalidateStyleAttribute()
+{
+    ASSERT(elementData());
+    elementData()->m_styleAttributeIsDirty = true;
+}
+
+inline const StylePropertySet* Element::presentationAttributeStyle()
+{
+    if (!elementData())
+        return 0;
+    if (elementData()->m_presentationAttributeStyleIsDirty)
+        rebuildPresentationAttributeStyle();
+    return elementData()->presentationAttributeStyle();
 }
 
 inline bool isShadowHost(const Node* node)

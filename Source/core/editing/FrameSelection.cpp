@@ -26,9 +26,9 @@
 #include "config.h"
 #include "core/editing/FrameSelection.h"
 
-#include <limits.h>
 #include <stdio.h>
 #include "HTMLNames.h"
+#include "core/accessibility/AXObjectCache.h"
 #include "core/css/StylePropertySet.h"
 #include "core/dom/CharacterData.h"
 #include "core/dom/Document.h"
@@ -63,7 +63,7 @@
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
-#include <wtf/text/CString.h>
+#include "wtf/text/CString.h"
 
 #define EDIT_DEBUG 0
 
@@ -111,6 +111,7 @@ FrameSelection::FrameSelection(Frame* frame)
     , m_caretPaint(true)
     , m_isCaretBlinkingSuspended(false)
     , m_focused(frame && frame->page() && frame->page()->focusController()->focusedFrame() == frame)
+    , m_shouldShowBlockCursor(false)
 {
     if (shouldAlwaysUseDirectionalSelection(m_frame))
         m_selection.setIsDirectional(true);
@@ -504,6 +505,11 @@ TextDirection FrameSelection::directionOfSelection()
         return startBox->direction();
 
     return directionOfEnclosingBlock();
+}
+
+void FrameSelection::didChangeFocus()
+{
+    updateAppearance();
 }
 
 void FrameSelection::willBeModified(EAlteration alter, SelectionDirection direction)
@@ -1474,7 +1480,7 @@ void CaretBase::paintCaret(Node* node, GraphicsContext* context, const LayoutPoi
 void FrameSelection::debugRenderer(RenderObject *r, bool selected) const
 {
     if (r->node()->isElementNode()) {
-        Element* element = static_cast<Element *>(r->node());
+        Element* element = toElement(r->node());
         fprintf(stderr, "%s%s\n", selected ? "==> " : "    ", element->localName().string().utf8().data());
     } else if (r->isText()) {
         RenderText* textRenderer = toRenderText(r);
@@ -1687,6 +1693,14 @@ bool FrameSelection::isInPasswordField() const
     return textControl && textControl->hasTagName(inputTag) && toHTMLInputElement(textControl)->isPasswordField();
 }
 
+void FrameSelection::notifyAccessibilityForSelectionChange()
+{
+    if (m_selection.start().isNotNull() && m_selection.end().isNotNull()) {
+        if (AXObjectCache* cache = m_frame->document()->existingAXObjectCache())
+            cache->selectionChanged(m_selection.start().containerNode());
+    }
+}
+
 void FrameSelection::focusedOrActiveStateChanged()
 {
     bool activeAndFocused = isFocusedAndActive();
@@ -1760,15 +1774,26 @@ inline static bool shouldStopBlinkingDueToTypingCommand(Frame* frame)
 
 void FrameSelection::updateAppearance()
 {
-    bool caretRectChangedOrCleared = recomputeCaretRect();
+    // Paint a block cursor instead of a caret in overtype mode unless the caret is at the end of a line (in this case
+    // the FrameSelection will paint a blinking caret as usual).
+    VisiblePosition forwardPosition;
+    if (m_shouldShowBlockCursor && m_selection.isCaret()) {
+        forwardPosition = modifyExtendingForward(CharacterGranularity);
+        m_caretPaint = forwardPosition.isNull();
+    }
 
-    bool caretBrowsing = m_frame->settings() && m_frame->settings()->caretBrowsingEnabled();
-    bool shouldBlink = caretIsVisible() && isCaret() && (isContentEditable() || caretBrowsing);
+    bool caretRectChangedOrCleared = recomputeCaretRect();
+    bool shouldBlink = shouldBlinkCaret() && forwardPosition.isNull();
 
     // If the caret moved, stop the blink timer so we can restart with a
     // black caret in the new location.
-    if (caretRectChangedOrCleared || !shouldBlink || shouldStopBlinkingDueToTypingCommand(m_frame))
+    if (caretRectChangedOrCleared || !shouldBlink || shouldStopBlinkingDueToTypingCommand(m_frame)) {
         m_caretBlinkTimer.stop();
+        if (!shouldBlink && m_caretPaint) {
+            m_caretPaint = false;
+            invalidateCaretRect();
+        }
+    }
 
     // Start blinking with a black caret. Be sure not to restart if we're
     // already blinking in the right location.
@@ -1788,7 +1813,7 @@ void FrameSelection::updateAppearance()
 
     // Construct a new VisibleSolution, since m_selection is not necessarily valid, and the following steps
     // assume a valid selection. See <https://bugs.webkit.org/show_bug.cgi?id=69563> and <rdar://problem/10232866>.
-    VisibleSelection selection(m_selection.visibleStart(), m_selection.visibleEnd());
+    VisibleSelection selection(m_selection.visibleStart(), forwardPosition.isNotNull() ? forwardPosition : m_selection.visibleEnd());
 
     if (!selection.isRange()) {
         view->clearSelection();
@@ -1830,6 +1855,25 @@ void FrameSelection::setCaretVisibility(CaretVisibility visibility)
     CaretBase::setCaretVisibility(visibility);
 
     updateAppearance();
+}
+
+bool FrameSelection::shouldBlinkCaret() const
+{
+    if (!caretIsVisible() || !isCaret())
+        return false;
+
+    if (m_frame->settings() && m_frame->settings()->caretBrowsingEnabled())
+        return false;
+
+    Node* root = rootEditableElement();
+    if (!root)
+        return false;
+
+    Node* focusedNode = root->document()->focusedNode();
+    if (!focusedNode)
+        return false;
+
+    return focusedNode->containsIncludingShadowDOM(m_selection.start().anchorNode());
 }
 
 void FrameSelection::caretBlinkTimerFired(Timer<FrameSelection>*)
@@ -1952,9 +1996,9 @@ static HTMLFormElement* scanForForm(Node* start)
     Element* element = start->isElementNode() ? toElement(start) : ElementTraversal::next(start);
     for (; element; element = ElementTraversal::next(element)) {
         if (element->hasTagName(formTag))
-            return static_cast<HTMLFormElement*>(element);
+            return toHTMLFormElement(element);
         if (element->isHTMLElement() && toHTMLElement(element)->isFormControlElement())
-            return static_cast<HTMLFormControlElement*>(element)->form();
+            return toHTMLFormControlElement(element)->form();
         if (element->hasTagName(frameTag) || element->hasTagName(iframeTag)) {
             Node* childDocument = static_cast<HTMLFrameElementBase*>(element)->contentDocument();
             if (HTMLFormElement* frameResult = scanForForm(childDocument))
@@ -1976,9 +2020,9 @@ HTMLFormElement* FrameSelection::currentForm() const
     Node* node;
     for (node = start; node; node = node->parentNode()) {
         if (node->hasTagName(formTag))
-            return static_cast<HTMLFormElement*>(node);
+            return toHTMLFormElement(node);
         if (node->isHTMLElement() && toHTMLElement(node)->isFormControlElement())
-            return static_cast<HTMLFormControlElement*>(node)->form();
+            return toHTMLFormControlElement(node)->form();
     }
 
     // Try walking forward in the node tree to find a form element.
@@ -2046,6 +2090,15 @@ inline bool FrameSelection::visualWordMovementEnabled() const
 {
     Settings* settings = m_frame ? m_frame->settings() : 0;
     return settings && settings->visualWordMovementEnabled();
+}
+
+void FrameSelection::setShouldShowBlockCursor(bool shouldShowBlockCursor)
+{
+    m_shouldShowBlockCursor = shouldShowBlockCursor;
+
+    m_frame->document()->updateLayoutIgnorePendingStylesheets();
+
+    updateAppearance();
 }
 
 #ifndef NDEBUG

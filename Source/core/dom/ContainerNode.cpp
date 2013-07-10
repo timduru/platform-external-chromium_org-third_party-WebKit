@@ -33,13 +33,11 @@
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/html/HTMLCollection.h"
-#include "core/page/Page.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderTheme.h"
 #include "core/rendering/RenderWidget.h"
-#include <wtf/CurrentTime.h>
-#include <wtf/Vector.h>
+#include "wtf/Vector.h"
 
 using namespace std;
 
@@ -558,15 +556,18 @@ void ContainerNode::removeChildren()
     // The container node can be removed from event handlers.
     RefPtr<ContainerNode> protect(this);
 
-    // exclude this node when looking for removed focusedNode since only children will be removed
-    document()->removeFocusedNodeOfSubtree(this, true);
-
     if (FullscreenController* fullscreen = FullscreenController::fromIfExists(document()))
         fullscreen->removeFullScreenElementOfSubtree(this, true);
 
     // Do any prep work needed before actually starting to detach
     // and remove... e.g. stop loading frames, fire unload events.
     willRemoveChildren(protect.get());
+
+    // Exclude this node when looking for removed focusedNode since only
+    // children will be removed.
+    // This must be later than willRemvoeChildren, which might change focus
+    // state of a child.
+    document()->removeFocusedNodeOfSubtree(this, true);
 
     NodeVector removedChildren;
     {
@@ -713,13 +714,13 @@ void ContainerNode::dispatchPostAttachCallbacks()
 
 void ContainerNode::attach(const AttachContext& context)
 {
-    attachChildren();
+    attachChildren(context);
     Node::attach(context);
 }
 
 void ContainerNode::detach(const AttachContext& context)
 {
-    detachChildren();
+    detachChildren(context);
     clearChildNeedsStyleRecalc();
     Node::detach(context);
 }

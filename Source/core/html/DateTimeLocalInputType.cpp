@@ -35,14 +35,13 @@
 #include "core/html/HTMLInputElement.h"
 #include "core/html/InputTypeNames.h"
 #include "core/platform/DateComponents.h"
-#include <wtf/PassOwnPtr.h>
+#include "wtf/PassOwnPtr.h"
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
 #include "core/html/DateTimeFieldsState.h"
 #include "core/platform/LocalizedStrings.h"
 #include "core/platform/text/PlatformLocale.h"
-#include <wtf/text/StringBuilder.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/text/WTFString.h"
 #endif
 
 namespace WebCore {
@@ -96,11 +95,11 @@ StepRange DateTimeLocalInputType::createStepRange(AnyStepHandling anyStepHandlin
     return StepRange(stepBase, minimum, maximum, step, stepDescription);
 }
 
-bool DateTimeLocalInputType::parseToDateComponentsInternal(const UChar* characters, unsigned length, DateComponents* out) const
+bool DateTimeLocalInputType::parseToDateComponentsInternal(const String& string, DateComponents* out) const
 {
     ASSERT(out);
     unsigned end;
-    return out->parseDateTimeLocal(characters, length, 0, end) && end == length;
+    return out->parseDateTimeLocal(string, 0, end) && end == string.length();
 }
 
 bool DateTimeLocalInputType::setMillisecondToDateComponents(double value, DateComponents* date) const

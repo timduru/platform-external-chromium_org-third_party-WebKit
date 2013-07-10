@@ -98,7 +98,7 @@ static WebURL urlFromFrame(Frame* frame)
 // Helper function to determine whether text is a single word.
 static bool isASingleWord(const String& text)
 {
-    TextBreakIterator* it = wordBreakIterator(text.characters(), text.length());
+    TextBreakIterator* it = wordBreakIterator(text.bloatedCharacters(), text.length());
     return it && textBreakNext(it) == static_cast<int>(text.length());
 }
 
@@ -121,7 +121,7 @@ static String selectMisspelledWord(Frame* selectedFrame)
 
     // Selection is empty, so change the selection to the word under the cursor.
     HitTestResult hitTestResult = selectedFrame->eventHandler()->
-        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().pointInInnerNodeFrame(), HitTestRequest::ReadOnly | HitTestRequest::Active);
+        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().pointInInnerNodeFrame());
     Node* innerNode = hitTestResult.innerNode();
     VisiblePosition pos(innerNode->renderer()->positionForPoint(
         hitTestResult.localPoint()));

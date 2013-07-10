@@ -159,13 +159,14 @@ public:
         return m_impl->length();
     }
 
-    const UChar* characters() const
+    // FIXME: Remove all the callers of bloatedCharacters().
+    const UChar* bloatedCharacters() const
     {
         if (!m_impl)
             return 0;
-        return m_impl->characters();
+        return m_impl->bloatedCharacters();
     }
-    
+
     const LChar* characters8() const
     {
         if (!m_impl)
@@ -185,10 +186,6 @@ public:
     // Return characters8() or characters16() depending on CharacterType.
     template <typename CharacterType>
     inline const CharacterType* getCharacters() const;
-
-    // Like getCharacters() and upconvert if CharacterType is UChar on a 8bit string.
-    template <typename CharacterType>
-    inline const CharacterType* getCharactersWithUpconvert() const;
 
     bool is8Bit() const { return m_impl->is8Bit(); }
 
@@ -269,8 +266,9 @@ public:
     size_t reverseFind(const String& str, unsigned start, bool caseSensitive) const
         { return caseSensitive ? reverseFind(str, start) : reverseFindIgnoringCase(str, start); }
 
-    const UChar* charactersWithNullTermination();
-    
+    Vector<UChar> charactersWithNullTermination() const;
+    unsigned copyTo(UChar* buffer, unsigned maxLength) const;
+
     UChar32 characterStartingAt(unsigned) const; // Ditto.
     
     bool contains(UChar c) const { return find(c) != notFound; }
@@ -460,6 +458,9 @@ private:
     template <typename CharacterType>
     void removeInternal(const CharacterType*, unsigned, int);
 
+    template <typename CharacterType>
+    void appendInternal(CharacterType);
+
     RefPtr<StringImpl> m_impl;
 };
 
@@ -526,19 +527,6 @@ inline const UChar* String::getCharacters<UChar>() const
     return characters16();
 }
 
-template<>
-inline const LChar* String::getCharactersWithUpconvert<LChar>() const
-{
-    ASSERT(is8Bit());
-    return characters8();
-}
-
-template<>
-inline const UChar* String::getCharactersWithUpconvert<UChar>() const
-{
-    return characters();
-}
-
 inline bool String::containsOnlyLatin1() const
 {
     if (isEmpty())
@@ -583,7 +571,17 @@ inline bool codePointCompareLessThan(const String& a, const String& b)
 template<size_t inlineCapacity>
 inline void append(Vector<UChar, inlineCapacity>& vector, const String& string)
 {
-    vector.append(string.characters(), string.length());
+    unsigned length = string.length();
+    if (!length)
+        return;
+    if (string.is8Bit()) {
+        const LChar* characters8 = string.characters8();
+        vector.reserveCapacity(vector.size() + length);
+        for (size_t i = 0; i < length; ++i)
+            vector.uncheckedAppend(characters8[i]);
+    } else {
+        vector.append(string.characters16(), length);
+    }
 }
 
 template<typename CharacterType>
@@ -627,7 +625,7 @@ inline bool String::isAllSpecialCharacters() const
 
     if (is8Bit())
         return WTF::isAllSpecialCharacters<isSpecialCharacter, LChar>(characters8(), len);
-    return WTF::isAllSpecialCharacters<isSpecialCharacter, UChar>(characters(), len);
+    return WTF::isAllSpecialCharacters<isSpecialCharacter, UChar>(bloatedCharacters(), len);
 }
 
 // StringHash is the default hash for String
@@ -679,5 +677,5 @@ using WTF::isSpaceOrNewline;
 using WTF::reverseFind;
 using WTF::ASCIILiteral;
 
-#include <wtf/text/AtomicString.h>
+#include "wtf/text/AtomicString.h"
 #endif

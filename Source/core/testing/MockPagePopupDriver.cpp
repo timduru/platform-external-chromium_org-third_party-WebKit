@@ -69,14 +69,11 @@ inline MockPagePopup::MockPagePopup(PagePopupClient* client, const IntRect& orig
     if (document->body())
         document->body()->appendChild(m_iframe.get());
     Frame* contentFrame = m_iframe->contentFrame();
-    DocumentWriter* writer = contentFrame->loader()->activeDocumentLoader()->writer();
-    writer->setMIMEType("text/html");
-    writer->setEncoding("UTF-8", false);
-    writer->begin();
+    DocumentWriter* writer = contentFrame->loader()->activeDocumentLoader()->beginWriting("text/html", "UTF-8");
     const char scriptToSetUpPagePopupController[] = "<script>window.pagePopupController = parent.internals.pagePopupController;</script>";
     writer->addData(scriptToSetUpPagePopupController, sizeof(scriptToSetUpPagePopupController));
     m_popupClient->writeDocument(*writer);
-    writer->end();
+    contentFrame->loader()->activeDocumentLoader()->endWriting(writer);
 }
 
 PassRefPtr<MockPagePopup> MockPagePopup::create(PagePopupClient* client, const IntRect& originBoundsInRootView, Frame* mainFrame)

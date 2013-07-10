@@ -36,11 +36,10 @@
 #include "core/html/HTMLTextFormControlElement.h"
 #include "core/html/StepRange.h"
 #include "core/page/UseCounter.h"
-#include <wtf/FastAllocBase.h>
-#include <wtf/Forward.h>
-#include <wtf/Noncopyable.h>
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
+#include "wtf/FastAllocBase.h"
+#include "wtf/Forward.h"
+#include "wtf/Noncopyable.h"
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
@@ -59,7 +58,6 @@ class Icon;
 class KeyboardEvent;
 class MouseEvent;
 class Node;
-class RenderArena;
 class RenderObject;
 class RenderStyle;
 class TouchEvent;
@@ -197,7 +195,7 @@ public:
     virtual PassRefPtr<HTMLFormElement> formForSubmission() const;
     virtual bool hasCustomFocusLogic() const;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isMouseFocusable() const;
+    virtual bool shouldShowFocusRingOnMouseFocus() const;
     virtual bool shouldUseInputMethod() const;
     virtual void handleFocusEvent(Node* oldFocusedNode, FocusDirection);
     virtual void handleBlurEvent();
@@ -230,7 +228,7 @@ public:
     // Miscellaneous functions
 
     virtual bool rendererIsNeeded();
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) const;
+    virtual RenderObject* createRenderer(RenderStyle*) const;
     virtual PassRefPtr<RenderStyle> customStyleForRenderer(PassRefPtr<RenderStyle>);
     virtual void attach();
     virtual void detach();

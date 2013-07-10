@@ -32,7 +32,6 @@
 
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/EventTarget.h"
-#include "wtf/ListHashSet.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
 #include "wtf/text/AtomicString.h"
@@ -79,6 +78,7 @@ public:
     FlowState flowState() const { return m_parentFlowThread ? FlowStateCreated : FlowStateNull; }
 
     void dispatchRegionLayoutUpdateEvent();
+    void dispatchRegionOversetChangeEvent();
 
 private:
     NamedFlow(PassRefPtr<NamedFlowCollection>, const AtomicString&);

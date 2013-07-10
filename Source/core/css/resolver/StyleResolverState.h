@@ -25,10 +25,9 @@
 #include "CSSPropertyNames.h"
 
 #include "core/css/CSSSVGDocumentValue.h"
-#include "core/css/CSSValueList.h"
+#include "core/css/resolver/ElementStyleResources.h"
 #include "core/dom/Element.h"
 #include "core/platform/graphics/Color.h"
-#include "core/platform/graphics/filters/FilterOperations.h"
 #include "core/rendering/style/BorderData.h"
 #include "core/rendering/style/FillLayer.h"
 #include "core/rendering/style/RenderStyle.h"
@@ -40,10 +39,6 @@ namespace WebCore {
 class FillLayer;
 class FontDescription;
 class RenderRegion;
-class StyledElement;
-
-typedef HashMap<CSSPropertyID, RefPtr<CSSValue> > PendingImagePropertyMap;
-typedef HashMap<FilterOperation*, RefPtr<CSSSVGDocumentValue> > PendingSVGDocumentMap;
 
 class StyleResolverState {
 WTF_MAKE_NONCOPYABLE(StyleResolverState);
@@ -60,22 +55,22 @@ public:
     , m_elementAffectedByClassRules(false)
     , m_applyPropertyToRegularStyle(true)
     , m_applyPropertyToVisitedLinkStyle(false)
-    , m_hasPendingShaders(false)
+    , m_isMatchedPropertiesCacheable(true)
     , m_lineHeightValue(0)
     , m_fontDirty(false)
     , m_hasUAAppearance(false)
     , m_backgroundData(BackgroundFillLayer) { }
 
-    public:
-    void initElement(Element*);
+public:
     void initForStyleResolve(Document*, Element*, RenderStyle* parentStyle = 0, RenderRegion* regionForStyling = 0);
     void clear();
 
-    Color colorFromPrimitiveValue(CSSPrimitiveValue*, bool forVisitedLink = false) const;
+    // This method might change an internal state, i.e. m_isMatchedPropertiesCachable.
+    Color resolveColorFromPrimitiveValue(CSSPrimitiveValue*, bool forVisitedLink = false);
 
     Document* document() const { return m_element->document(); }
     Element* element() const { return m_element; }
-    StyledElement* styledElement() const { return m_styledElement; }
+    Element* styledElement() const { return m_styledElement; }
     void setStyle(PassRefPtr<RenderStyle> style) { m_style = style; }
     RenderStyle* style() const { return m_style.get(); }
     PassRefPtr<RenderStyle> takeStyle() { return m_style.release(); }
@@ -95,10 +90,7 @@ public:
     void setApplyPropertyToVisitedLinkStyle(bool isApply) { m_applyPropertyToVisitedLinkStyle = isApply; }
     bool applyPropertyToRegularStyle() const { return m_applyPropertyToRegularStyle; }
     bool applyPropertyToVisitedLinkStyle() const { return m_applyPropertyToVisitedLinkStyle; }
-    PendingImagePropertyMap& pendingImageProperties() { return m_pendingImageProperties; }
-    PendingSVGDocumentMap& pendingSVGDocuments() { return m_pendingSVGDocuments; }
-    void setHasPendingShaders(bool hasPendingShaders) { m_hasPendingShaders = hasPendingShaders; }
-    bool hasPendingShaders() const { return m_hasPendingShaders; }
+    bool isMatchedPropertiesCacheable() const { return m_isMatchedPropertiesCacheable; }
 
     void setLineHeightValue(CSSValue* value) { m_lineHeightValue = value; }
     CSSValue* lineHeightValue() { return m_lineHeightValue; }
@@ -110,6 +102,7 @@ public:
     BorderData borderData() const { return m_borderData; }
     FillLayer backgroundData() const { return m_backgroundData; }
     Color backgroundColor() const { return m_backgroundColor; }
+    ElementStyleResources& elementStyleResources() { return m_elementStyleResources; }
 
     const FontDescription& fontDescription() { return m_style->fontDescription(); }
     const FontDescription& parentFontDescription() { return m_parentStyle->fontDescription(); }
@@ -119,12 +112,22 @@ public:
     void setWritingMode(WritingMode writingMode) { m_fontDirty |= m_style->setWritingMode(writingMode); }
     void setTextOrientation(TextOrientation textOrientation) { m_fontDirty |= m_style->setTextOrientation(textOrientation); }
 
+    // SVG handles zooming in a different way compared to CSS. The whole document is scaled instead
+    // of each individual length value in the render style / tree. CSSPrimitiveValue::computeLength*()
+    // multiplies each resolved length with the zoom multiplier - so for SVG we need to disable that.
+    // Though all CSS values that can be applied to outermost <svg> elements (width/height/border/padding...)
+    // need to respect the scaling. RenderBox (the parent class of RenderSVGRoot) grabs values like
+    // width/height/border/padding/... from the RenderStyle -> for SVG these values would never scale,
+    // if we'd pass a 1.0 zoom factor everyhwere. So we only pass a zoom factor of 1.0 for specific
+    // properties that are NOT allowed to scale within a zoomed SVG document (letter/word-spacing/font-size).
     bool useSVGZoomRules() const { return m_element && m_element->isSVGElement(); }
 
 private:
+    void initElement(Element*);
+
     Element* m_element;
     RefPtr<RenderStyle> m_style;
-    StyledElement* m_styledElement;
+    Element* m_styledElement;
     ContainerNode* m_parentNode;
     RefPtr<RenderStyle> m_parentStyle;
     RenderStyle* m_rootElementStyle;
@@ -140,10 +143,8 @@ private:
 
     bool m_applyPropertyToRegularStyle;
     bool m_applyPropertyToVisitedLinkStyle;
+    bool m_isMatchedPropertiesCacheable;
 
-    PendingImagePropertyMap m_pendingImageProperties;
-    bool m_hasPendingShaders;
-    PendingSVGDocumentMap m_pendingSVGDocuments;
     CSSValue* m_lineHeightValue;
     bool m_fontDirty;
 
@@ -151,6 +152,7 @@ private:
     BorderData m_borderData;
     FillLayer m_backgroundData;
     Color m_backgroundColor;
+    ElementStyleResources m_elementStyleResources;
 };
 
 } // namespace WebCore

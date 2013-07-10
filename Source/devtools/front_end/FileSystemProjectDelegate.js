@@ -41,8 +41,9 @@ WebInspector.FileSystemProjectDelegate = function(isolatedFileSystem, workspace)
     this._workspace = workspace;
 }
 
-WebInspector.FileSystemProjectDelegate._scriptExtensions = ["js", "java", "cc", "cpp", "h", "cs", "py", "php"].keySet();
-WebInspector.FileSystemProjectDelegate._styleSheetExtensions = ["css", "scss", "sass"].keySet();
+WebInspector.FileSystemProjectDelegate._scriptExtensions = ["js", "java", "coffee", "ts", "dart"].keySet();
+WebInspector.FileSystemProjectDelegate._styleSheetExtensions = ["css", "scss", "sass", "less"].keySet();
+WebInspector.FileSystemProjectDelegate._documentExtensions = ["htm", "html", "asp", "aspx", "phtml", "jsp"].keySet();
 
 WebInspector.FileSystemProjectDelegate.projectId = function(fileSystemPath)
 {
@@ -83,16 +84,16 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     },
 
     /**
-     * @param {Array.<string>} path
+     * @param {string} path
      * @return {string}
      */
     _filePathForPath: function(path)
     {
-        return "/" + path.join("/");
+        return "/" + path;
     },
 
     /**
-     * @param {Array.<string>} path
+     * @param {string} path
      * @param {function(?string,boolean,string)} callback
      */
     requestFileContent: function(path, callback)
@@ -105,9 +106,20 @@ WebInspector.FileSystemProjectDelegate.prototype = {
          */
         function innerCallback(content)
         {
-            var contentType = this._contentTypeForPath(path);
-            callback(content, false, contentType.canonicalMimeType());
+            var extension = this._extensionForPath(path);
+            var mimeType = WebInspector.ResourceType.mimeTypesForExtensions[extension];
+            callback(content, false, mimeType);
         }
+    },
+
+    /**
+     * @param {string} path
+     * @param {function(?Date, ?number)} callback
+     */
+    requestMetadata: function(path, callback)
+    {
+        var filePath = this._filePathForPath(path);
+        this._fileSystem.requestMetadata(filePath, callback);
     },
 
     /**
@@ -119,7 +131,7 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     },
 
     /**
-     * @param {Array.<string>} path
+     * @param {string} path
      * @param {string} newContent
      * @param {function(?string)} callback
      */
@@ -138,7 +150,7 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     },
 
     /**
-     * @param {Array.<string>} path
+     * @param {string} path
      * @param {string} newName
      * @param {function(boolean, string=)} callback
      */
@@ -149,7 +161,7 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     },
 
     /**
-     * @param {Array.<string>} path
+     * @param {string} path
      * @param {string} query
      * @param {boolean} caseSensitive
      * @param {boolean} isRegex
@@ -173,22 +185,28 @@ WebInspector.FileSystemProjectDelegate.prototype = {
     },
 
     /**
-     * @param {Array.<string>} path
+     * @param {string} path
+     * @return {string}
+     */
+    _extensionForPath: function(path)
+    {
+        var extensionIndex = path.lastIndexOf(".");
+        if (extensionIndex === -1)
+            return "";
+        return path.substring(extensionIndex + 1).toLowerCase();
+    },
+
+    /**
+     * @param {string} extension
      * @return {WebInspector.ResourceType}
      */
-    _contentTypeForPath: function(path)
+    _contentTypeForExtension: function(extension)
     {
-        var fileName = path[path.length - 1];
-        var extensionIndex = fileName.lastIndexOf(".");
-        var extension = "";
-        if (extensionIndex !== -1)
-            extension = fileName.substring(extensionIndex + 1).toLowerCase();
-        var contentType = WebInspector.resourceTypes.Other;
         if (WebInspector.FileSystemProjectDelegate._scriptExtensions[extension])
             return WebInspector.resourceTypes.Script;
         if (WebInspector.FileSystemProjectDelegate._styleSheetExtensions[extension])
             return WebInspector.resourceTypes.Stylesheet;
-        if (extension === "html" || extension === "htm")
+        if (WebInspector.FileSystemProjectDelegate._documentExtensions[extension])
             return WebInspector.resourceTypes.Document;
         return WebInspector.resourceTypes.Other;
     },
@@ -203,18 +221,24 @@ WebInspector.FileSystemProjectDelegate.prototype = {
      */
     _addFile: function(filePath)
     {
-        var path = filePath.split("/");
-        console.assert(path.length);
+        if (!filePath)
+            console.assert(false);
         var fullPath = this._fileSystem.path() + "/" + filePath;
 
+        var slash = filePath.lastIndexOf("/");
+        var parentPath = filePath.substring(0, slash);
+        var name = filePath.substring(slash + 1);
+
         var url = this._workspace.urlForPath(this._fileSystem.path(), filePath);
-        var contentType = this._contentTypeForPath(path);
-        var fileDescriptor = new WebInspector.FileDescriptor(path, "file://" + fullPath, url, contentType, true);
+        var extension = this._extensionForPath(filePath);
+        var contentType = this._contentTypeForExtension(extension);
+
+        var fileDescriptor = new WebInspector.FileDescriptor(parentPath, name, "file://" + fullPath, url, contentType, true);
         this.dispatchEventToListeners(WebInspector.ProjectDelegate.Events.FileAdded, fileDescriptor);
     },
 
     /**
-     * @param {Array.<string>} path
+     * @param {string} path
      */
     _removeFile: function(path)
     {

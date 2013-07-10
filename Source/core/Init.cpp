@@ -39,7 +39,8 @@
 #include "XMLNSNames.h"
 #include "XMLNames.h"
 #include "core/css/MediaFeatureNames.h"
-#include "core/dom/Node.h"
+#include "core/platform/EventTracer.h"
+#include "core/platform/Partitions.h"
 #include "wtf/text/StringStatics.h"
 
 namespace WebCore {
@@ -62,12 +63,15 @@ void init()
     MediaFeatureNames::init();
     WTF::StringStatics::init();
     QualifiedName::init();
-    Node::init();
+#if ENABLE(PARTITION_ALLOC)
+    Partitions::init();
+#endif
+    EventTracer::initialize();
 }
 
 void shutdown()
 {
-    Node::shutdown();
+    Partitions::shutdown();
 }
 
 } // namespace WebCore

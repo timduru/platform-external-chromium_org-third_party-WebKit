@@ -46,13 +46,13 @@ from webkitpy.common.memoized import memoized
 
 _exact_matches = {
     # These builders are on build.chromium.org.
-    "WebKit XP": {"port_name": "chromium-win-xp", "is_debug": False},
-    "WebKit Win7": {"port_name": "chromium-win-win7", "is_debug": False},
-    "WebKit Win7 (dbg)(1)": {"port_name": "chromium-win-win7", "is_debug": True},
-    "WebKit Win7 (dbg)(2)": {"port_name": "chromium-win-win7", "is_debug": True},
-    "WebKit Linux": {"port_name": "chromium-linux-x86_64", "is_debug": False},
-    "WebKit Linux 32": {"port_name": "chromium-linux-x86", "is_debug": False},
-    "WebKit Linux (dbg)": {"port_name": "chromium-linux-x86_64", "is_debug": True},
+    "WebKit XP": {"port_name": "win-xp", "is_debug": False},
+    "WebKit Win7": {"port_name": "win-win7", "is_debug": False},
+    "WebKit Win7 (dbg)(1)": {"port_name": "win-win7", "is_debug": True},
+    "WebKit Win7 (dbg)(2)": {"port_name": "win-win7", "is_debug": True},
+    "WebKit Linux": {"port_name": "linux-x86_64", "is_debug": False},
+    "WebKit Linux 32": {"port_name": "linux-x86", "is_debug": False},
+    "WebKit Linux (dbg)": {"port_name": "linux-x86_64", "is_debug": True},
     "WebKit Mac10.6": {"port_name": "chromium-mac-snowleopard", "is_debug": False},
     "WebKit Mac10.6 (dbg)": {"port_name": "chromium-mac-snowleopard", "is_debug": True},
     "WebKit Mac10.7": {"port_name": "chromium-mac-lion", "is_debug": False},
@@ -61,8 +61,20 @@ _exact_matches = {
 }
 
 
+# Mapping from port name to the deps builder of the same os:
+_deps_builders = {
+    "linux-x86": "WebKit Linux (deps)",
+    "linux-x86_64": "WebKit Linux (deps)",
+    "win-xp": "WebKit XP (deps)",
+    "win-win7": "WebKit XP (deps)",
+    "chromium-mac-snowleopard": "WebKit Mac10.6 (deps)",
+    "chromium-mac-lion": "WebKit Mac10.6 (deps)",
+    "chromium-mac-mountainlion": "WebKit Mac10.6 (deps)",
+}
+
+
 _ports_without_builders = [
-    # FIXME: Move to _extact_matches.
+    # FIXME: Move to _exact_matches.
     "chromium-android",
 ]
 
@@ -104,3 +116,7 @@ def builder_name_for_port_name(target_port_name):
 
 def builder_path_for_port_name(port_name):
     builder_path_from_name(builder_name_for_port_name(port_name))
+
+
+def deps_builder_name_for_port_name(target_port_name):
+    return _deps_builders.get(target_port_name, None)

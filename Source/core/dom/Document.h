@@ -41,23 +41,19 @@
 #include "core/dom/UserActionElementSet.h"
 #include "core/dom/ViewportArguments.h"
 #include "core/html/CollectionType.h"
-#include "core/inspector/InspectorCounters.h"
 #include "core/page/FocusDirection.h"
 #include "core/page/PageVisibilityState.h"
-#include "core/platform/PlatformScreen.h"
 #include "weborigin/ReferrerPolicy.h"
 #include "core/platform/Timer.h"
 #include "core/platform/graphics/Color.h"
-#include "core/platform/graphics/IntRect.h"
 #include "core/platform/text/StringWithDirection.h"
 #include "core/rendering/HitTestRequest.h"
-#include <wtf/Deque.h>
-#include <wtf/FixedArray.h>
-#include <wtf/HashSet.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/PassRefPtr.h>
-#include <wtf/WeakPtr.h>
+#include "wtf/Deque.h"
+#include "wtf/HashSet.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/PassOwnPtr.h"
+#include "wtf/PassRefPtr.h"
+#include "wtf/WeakPtr.h"
 
 namespace WebCore {
 
@@ -174,7 +170,16 @@ enum PageshowEventPersistence {
     PageshowEventPersisted = 1
 };
 
-enum StyleResolverUpdateFlag { RecalcStyleImmediately, DeferRecalcStyle, RecalcStyleIfNeeded };
+// FIXME: We should rename DeferRecalcStyle to RecalcStyleDeferred to be consitent.
+
+enum StyleResolverUpdateType { RecalcStyleImmediately, DeferRecalcStyle };
+
+enum StyleResolverUpdateMode {
+    // Discards the StyleResolver and rebuilds it.
+    FullStyleUpdate,
+    // Attempts to use StyleInvalidationAnalysis to avoid discarding the entire StyleResolver.
+    AnalyzedStyleUpdate
+};
 
 enum NodeListInvalidationType {
     DoNotInvalidateOnAttributeChanges = 0,
@@ -395,6 +400,7 @@ public:
     PassRefPtr<HTMLCollection> forms();
     PassRefPtr<HTMLCollection> anchors();
     PassRefPtr<HTMLCollection> scripts();
+    PassRefPtr<HTMLCollection> allForBinding();
     PassRefPtr<HTMLCollection> all();
 
     PassRefPtr<HTMLCollection> windowNamedItems(const AtomicString& name);
@@ -440,16 +446,8 @@ public:
     bool gotoAnchorNeededAfterStylesheetsLoad() { return m_gotoAnchorNeededAfterStylesheetsLoad; }
     void setGotoAnchorNeededAfterStylesheetsLoad(bool b) { m_gotoAnchorNeededAfterStylesheetsLoad = b; }
 
-    /**
-     * Called when one or more stylesheets in the document may have been added, removed or changed.
-     *
-     * Creates a new style resolver and assign it to this document. This is done by iterating through all nodes in
-     * document (or those before <BODY> in a HTML document), searching for stylesheets. Stylesheets can be contained in
-     * <LINK>, <STYLE> or <BODY> elements, as well as processing instructions (XML documents only). A list is
-     * constructed from these which is used to create the a new style selector which collates all of the stylesheets
-     * found and is used to calculate the derived styles for all rendering objects.
-     */
-    void styleResolverChanged(StyleResolverUpdateFlag);
+    // Called when one or more stylesheets in the document may have been added, removed, or changed.
+    void styleResolverChanged(StyleResolverUpdateType, StyleResolverUpdateMode = FullStyleUpdate);
 
     void didAccessStyleResolver();
 
@@ -484,6 +482,7 @@ public:
     void recalcStyle(StyleChange = NoChange);
     bool childNeedsAndNotInStyleRecalc();
     void updateStyleIfNeeded();
+    void updateStyleForNodeIfNeeded(Node*);
     void updateLayout();
     void updateLayoutIgnorePendingStylesheets();
     PassRefPtr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element*);
@@ -533,7 +532,7 @@ public:
     DocumentLoader* loader() const;
 
     void open(Document* ownerDocument = 0);
-    void implicitOpen();
+    PassRefPtr<DocumentParser> implicitOpen();
 
     // close() is the DOM API document.close()
     void close();
@@ -656,7 +655,6 @@ public:
     void setActiveElement(PassRefPtr<Element>);
     Element* activeElement() const { return m_activeElement.get(); }
 
-    void focusedNodeRemoved();
     void removeFocusedNodeOfSubtree(Node*, bool amongChildrenOnly = false);
     void hoveredNodeDetached(Node*);
     void activeChainNodeDetached(Node*);
@@ -928,10 +926,6 @@ public:
         displayBufferModifiedByEncodingInternal(buffer, len);
     }
 
-    // Quirk for the benefit of Apple's Dictionary application.
-    void setFrameElementsShouldIgnoreScrolling(bool ignore) { m_frameElementsShouldIgnoreScrolling = ignore; }
-    bool frameElementsShouldIgnoreScrolling() const { return m_frameElementsShouldIgnoreScrolling; }
-
     void setAnnotatedRegionsDirty(bool f) { m_annotatedRegionsDirty = f; }
     bool annotatedRegionsDirty() const { return m_annotatedRegionsDirty; }
     bool hasAnnotatedRegions () const { return m_hasAnnotatedRegions; }
@@ -1027,7 +1021,7 @@ public:
     CustomElementRegistry* registry() const { return m_registry.get(); }
     CustomElementRegistry* ensureCustomElementRegistry();
 
-    HTMLImportsController* ensureImports();
+    void setImports(PassRefPtr<HTMLImportsController>);
     HTMLImportsController* imports() const { return m_imports.get(); }
     bool haveImportsLoaded() const;
     void didLoadAllImports();
@@ -1076,8 +1070,7 @@ public:
     virtual const SecurityOrigin* topOrigin() const OVERRIDE;
 
     PassRefPtr<FontLoader> fontloader();
-
-    void addLifecycleObserver(DocumentLifecycleObserver*);
+    DocumentLifecycleNotifier* lifecycleNotifier();
 
 protected:
     Document(Frame*, const KURL&, DocumentClassFlags = DefaultDocumentClass);
@@ -1108,6 +1101,7 @@ private:
 
     virtual void refScriptExecutionContext() { ref(); }
     virtual void derefScriptExecutionContext() { deref(); }
+    virtual PassOwnPtr<ContextLifecycleNotifier> createLifecycleNotifier() OVERRIDE;
 
     virtual const KURL& virtualURL() const; // Same as url(), but needed for ScriptExecutionContext to implement it without a performance loss for direct calls.
     virtual KURL virtualCompleteURL(const String&) const; // Same as completeURL() for the same reason as above.
@@ -1252,7 +1246,6 @@ private:
     bool m_gotoAnchorNeededAfterStylesheetsLoad;
     bool m_isDNSPrefetchEnabled;
     bool m_haveExplicitlyDisabledDNSPrefetch;
-    bool m_frameElementsShouldIgnoreScrolling;
     bool m_containsValidityStyleRules;
     bool m_updateFocusAppearanceRestoresSelection;
 
@@ -1371,7 +1364,7 @@ private:
     OwnPtr<TextAutosizer> m_textAutosizer;
 
     RefPtr<CustomElementRegistry> m_registry;
-    OwnPtr<HTMLImportsController> m_imports;
+    RefPtr<HTMLImportsController> m_imports;
 
     bool m_scheduledTasksAreSuspended;
     
@@ -1400,8 +1393,6 @@ private:
 
     Timer<Document> m_didAssociateFormControlsTimer;
     HashSet<RefPtr<Element> > m_associatedFormControls;
-
-    OwnPtr<DocumentLifecycleNotifier> m_lifecycleNotifier;
 };
 
 inline void Document::notifyRemovePendingSheetIfNeeded()

@@ -39,7 +39,6 @@ namespace WebCore {
 
 class DOMDataStore;
 class GCEventData;
-class IntegerCache;
 class StringCache;
 class V8HiddenPropertyName;
 struct WrapperTypeInfo;
@@ -87,9 +86,6 @@ public:
     }
 
     StringCache* stringCache() { return m_stringCache.get(); }
-    IntegerCache* integerCache() { return m_integerCache.get(); }
-
-    v8::Handle<v8::Value> v8Null() { return m_v8Null.get(); }
 
     v8::Persistent<v8::Value>& ensureLiveRoot();
 
@@ -145,6 +141,9 @@ public:
 
     v8::Local<v8::Context> ensureRegexContext();
 
+    const char* previousSamplingState() const { return m_previousSamplingState; }
+    void setPreviousSamplingState(const char* name) { m_previousSamplingState = name; }
+
 private:
     explicit V8PerIsolateData(v8::Isolate*);
     ~V8PerIsolateData();
@@ -158,8 +157,6 @@ private:
     ScopedPersistent<v8::FunctionTemplate> m_toStringTemplate;
     v8::Persistent<v8::FunctionTemplate> m_lazyEventListenerToStringTemplate;
     OwnPtr<StringCache> m_stringCache;
-    OwnPtr<IntegerCache> m_integerCache;
-    ScopedPersistent<v8::Value> m_v8Null;
 
     Vector<DOMDataStore*> m_domDataList;
     DOMDataStore* m_workerDomDataStore;
@@ -167,6 +164,8 @@ private:
     OwnPtr<V8HiddenPropertyName> m_hiddenPropertyName;
     ScopedPersistent<v8::Value> m_liveRoot;
     ScopedPersistent<v8::Context> m_regexContext;
+
+    const char* m_previousSamplingState;
 
     bool m_constructorMode;
     friend class ConstructorMode;

@@ -31,10 +31,11 @@
 #include "core/platform/graphics/ImageBuffer.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebThread.h"
+#include "third_party/skia/include/core/SkDevice.h"
 
 #include <gmock/gmock.h>
 #include <gtest/gtest.h>
-#include <wtf/RefPtr.h>
+#include "wtf/RefPtr.h"
 
 using namespace WebCore;
 using namespace WebKit;

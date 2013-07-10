@@ -30,9 +30,11 @@
 #include "modules/indexeddb/IDBRequest.h"
 
 #include "bindings/v8/IDBBindingUtilities.h"
+#include "core/dom/DOMError.h"
 #include "core/dom/EventListener.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/EventQueue.h"
+#include "core/dom/ExceptionCode.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/ScriptExecutionContext.h"
 #include "modules/indexeddb/IDBCursorBackendInterface.h"
@@ -93,7 +95,7 @@ IDBRequest::~IDBRequest()
 PassRefPtr<IDBAny> IDBRequest::result(ExceptionCode& ec) const
 {
     if (m_readyState != DONE) {
-        ec = IDBDatabaseException::InvalidStateError;
+        ec = INVALID_STATE_ERR;
         return 0;
     }
     return m_result;
@@ -102,7 +104,7 @@ PassRefPtr<IDBAny> IDBRequest::result(ExceptionCode& ec) const
 PassRefPtr<DOMError> IDBRequest::error(ExceptionCode& ec) const
 {
     if (m_readyState != DONE) {
-        ec = IDBDatabaseException::InvalidStateError;
+        ec = INVALID_STATE_ERR;
         return 0;
     }
     return m_error;
@@ -161,7 +163,7 @@ void IDBRequest::abort()
 
     m_error.clear();
     m_result.clear();
-    onError(IDBDatabaseError::create(IDBDatabaseException::AbortError));
+    onError(DOMError::create(ABORT_ERR, "The transaction was aborted, so the request cannot be fulfilled."));
     m_requestAborted = true;
 }
 
@@ -233,13 +235,13 @@ bool IDBRequest::shouldEnqueueEvent() const
     return true;
 }
 
-void IDBRequest::onError(PassRefPtr<IDBDatabaseError> error)
+void IDBRequest::onError(PassRefPtr<DOMError> error)
 {
     IDB_TRACE("IDBRequest::onError()");
     if (!shouldEnqueueEvent())
         return;
 
-    m_error = DOMError::create(IDBDatabaseException::getErrorName(error->idbCode()), error->message());
+    m_error = error;
     m_pendingCursor.clear();
     enqueueEvent(Event::create(eventNames().errorEvent, true, true));
 }
@@ -506,7 +508,7 @@ bool IDBRequest::dispatchEvent(PassRefPtr<Event> event)
 void IDBRequest::uncaughtExceptionInEventHandler()
 {
     if (m_transaction && !m_requestAborted) {
-        m_transaction->setError(DOMError::create(IDBDatabaseException::getErrorName(IDBDatabaseException::AbortError), "Uncaught exception in event handler."));
+        m_transaction->setError(DOMError::create(ABORT_ERR, "Uncaught exception in event handler."));
         m_transaction->abort(IGNORE_EXCEPTION);
     }
 }

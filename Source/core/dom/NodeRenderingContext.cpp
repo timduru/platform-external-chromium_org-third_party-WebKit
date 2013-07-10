@@ -26,19 +26,12 @@
 #include "config.h"
 #include "core/dom/NodeRenderingContext.h"
 
-#include "HTMLNames.h"
 #include "SVGNames.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/ContainerNode.h"
 #include "core/dom/FullscreenController.h"
 #include "core/dom/Node.h"
-#include "core/dom/PseudoElement.h"
 #include "core/dom/Text.h"
-#include "core/dom/shadow/ContentDistributor.h"
-#include "core/dom/shadow/ElementShadow.h"
-#include "core/dom/shadow/ShadowRoot.h"
-#include "core/html/HTMLInputElement.h"
-#include "core/html/shadow/HTMLContentElement.h"
 #include "core/html/shadow/HTMLShadowElement.h"
 #include "core/rendering/FlowThreadController.h"
 #include "core/rendering/RenderFullScreen.h"
@@ -46,11 +39,8 @@
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderText.h"
 #include "core/rendering/RenderView.h"
-#include "core/rendering/style/StyleInheritedData.h"
 
 namespace WebCore {
-
-using namespace HTMLNames;
 
 NodeRenderingContext::NodeRenderingContext(Node* node)
     : m_node(node)
@@ -184,6 +174,7 @@ bool NodeRenderingContext::shouldCreateRenderer() const
 {
     if (!m_renderingParent)
         return false;
+
     RenderObject* parentRenderer = this->parentRenderer();
     if (!parentRenderer)
         return false;
@@ -194,37 +185,41 @@ bool NodeRenderingContext::shouldCreateRenderer() const
     return true;
 }
 
+// Check the specific case of elements that are children of regions but are flowed into a flow thread themselves.
+bool NodeRenderingContext::elementInsideRegionNeedsRenderer()
+{
+    Element* element = toElement(m_node);
+    bool elementInsideRegionNeedsRenderer = false;
+    RenderObject* parentRenderer = this->parentRenderer();
+    if ((parentRenderer && !parentRenderer->canHaveChildren() && parentRenderer->isRenderRegion())
+        || (!parentRenderer && element->parentElement() && element->parentElement()->isInsideRegion())) {
+
+        if (!m_style)
+            m_style = element->styleForRenderer();
+
+        elementInsideRegionNeedsRenderer = element->shouldMoveToFlowThread(m_style.get());
+
+        // Children of this element will only be allowed to be flowed into other flow-threads if display is NOT none.
+        if (element->rendererIsNeeded(*this))
+            element->setIsInsideRegion(true);
+    }
+
+    return elementInsideRegionNeedsRenderer;
+}
+
 void NodeRenderingContext::moveToFlowThreadIfNeeded()
 {
-    ASSERT(m_node->isElementNode());
-    ASSERT(m_style);
     if (!RuntimeEnabledFeatures::cssRegionsEnabled())
         return;
 
-    if (m_style->flowThread().isEmpty())
+    Element* element = toElement(m_node);
+
+    if (!element->shouldMoveToFlowThread(m_style.get()))
         return;
 
-    // As per http://dev.w3.org/csswg/css3-regions/#flow-into, pseudo-elements such as ::first-line, ::first-letter, ::before or ::after
-    // cannot be directly collected into a named flow.
-    if (m_node->isPseudoElement())
-        return;
-
-    // FIXME: Do not collect elements if they are in shadow tree.
-    if (m_node->isInShadowTree())
-        return;
-
-    if (m_node->isElementNode() && FullscreenController::isActiveFullScreenElement(toElement(m_node)))
-        return;
-
-    // Allow only svg root elements to be directly collected by a render flow thread.
-    if (m_node->isSVGElement()
-        && (!(m_node->hasTagName(SVGNames::svgTag) && m_node->parentNode() && !m_node->parentNode()->isSVGElement())))
-        return;
-
-    m_flowThread = m_style->flowThread();
     ASSERT(m_node->document()->renderView());
     FlowThreadController* flowThreadController = m_node->document()->renderView()->flowThreadController();
-    m_parentFlowRenderer = flowThreadController->ensureRenderFlowThreadWithName(m_flowThread);
+    m_parentFlowRenderer = flowThreadController->ensureRenderFlowThreadWithName(m_style->flowThread());
     flowThreadController->registerNamedFlowContentNode(m_node, m_parentFlowRenderer);
 }
 
@@ -244,9 +239,13 @@ void NodeRenderingContext::createRendererForElementIfNeeded()
 
     Element* element = toElement(m_node);
 
-    if (!shouldCreateRenderer())
+    element->setIsInsideRegion(false);
+
+    if (!shouldCreateRenderer() && !elementInsideRegionNeedsRenderer())
         return;
-    m_style = element->styleForRenderer();
+
+    if (!m_style)
+        m_style = element->styleForRenderer();
     ASSERT(m_style);
 
     moveToFlowThreadIfNeeded();
@@ -258,7 +257,7 @@ void NodeRenderingContext::createRendererForElementIfNeeded()
     RenderObject* nextRenderer = this->nextRenderer();
 
     Document* document = element->document();
-    RenderObject* newRenderer = element->createRenderer(document->renderArena(), m_style.get());
+    RenderObject* newRenderer = element->createRenderer(m_style.get());
     if (!newRenderer)
         return;
 
@@ -304,7 +303,7 @@ void NodeRenderingContext::createRendererForTextIfNeeded()
 
     if (!textNode->textRendererIsNeeded(*this))
         return;
-    RenderText* newRenderer = textNode->createTextRenderer(document->renderArena(), m_style.get());
+    RenderText* newRenderer = textNode->createTextRenderer(m_style.get());
     if (!newRenderer)
         return;
     if (!parentRenderer->isChildAllowed(newRenderer, m_style.get())) {

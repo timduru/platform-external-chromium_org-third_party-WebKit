@@ -80,7 +80,7 @@ bool SVGTextPathElement::isSupportedAttribute(const QualifiedName& attrName)
         supportedAttributes.add(SVGNames::methodAttr);
         supportedAttributes.add(SVGNames::spacingAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGTextPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -127,9 +127,9 @@ void SVGTextPathElement::svgAttributeChanged(const QualifiedName& attrName)
         RenderSVGResource::markForLayoutAndParentResourceInvalidation(object);
 }
 
-RenderObject* SVGTextPathElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGTextPathElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGTextPath(this);
+    return new (document()->renderArena()) RenderSVGTextPath(this);
 }
 
 bool SVGTextPathElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
@@ -148,7 +148,7 @@ bool SVGTextPathElement::rendererIsNeeded(const NodeRenderingContext& context)
     if (parentNode()
         && (parentNode()->hasTagName(SVGNames::aTag)
             || parentNode()->hasTagName(SVGNames::textTag)))
-        return StyledElement::rendererIsNeeded(context);
+        return Element::rendererIsNeeded(context);
 
     return false;
 }

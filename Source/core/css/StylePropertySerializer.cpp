@@ -86,6 +86,10 @@ String StylePropertySerializer::asText() const
         case CSSPropertyBackgroundRepeatY:
             repeatYPropertyIndex = n;
             continue;
+        case CSSPropertyContent:
+            if (property.value()->isValueList())
+                value = toCSSValueList(property.value())->customCssText(AlwaysQuoteCSSString);
+            break;
         case CSSPropertyBorderTopWidth:
         case CSSPropertyBorderRightWidth:
         case CSSPropertyBorderBottomWidth:
@@ -170,14 +174,14 @@ String StylePropertySerializer::asText() const
         case CSSPropertyWebkitAnimationFillMode:
             shorthandPropertyID = CSSPropertyWebkitAnimation;
             break;
-        case CSSPropertyWebkitFlexDirection:
-        case CSSPropertyWebkitFlexWrap:
-            shorthandPropertyID = CSSPropertyWebkitFlexFlow;
+        case CSSPropertyFlexDirection:
+        case CSSPropertyFlexWrap:
+            shorthandPropertyID = CSSPropertyFlexFlow;
             break;
-        case CSSPropertyWebkitFlexBasis:
-        case CSSPropertyWebkitFlexGrow:
-        case CSSPropertyWebkitFlexShrink:
-            shorthandPropertyID = CSSPropertyWebkitFlex;
+        case CSSPropertyFlexBasis:
+        case CSSPropertyFlexGrow:
+        case CSSPropertyFlexShrink:
+            shorthandPropertyID = CSSPropertyFlex;
             break;
         case CSSPropertyWebkitMaskPositionX:
         case CSSPropertyWebkitMaskPositionY:
@@ -215,8 +219,10 @@ String StylePropertySerializer::asText() const
         }
 
         if (!value.isNull()) {
-            propertyID = shorthandPropertyID;
-            shorthandPropertyUsed.set(shortPropertyIndex);
+            if (shorthandPropertyID) {
+                propertyID = shorthandPropertyID;
+                shorthandPropertyUsed.set(shortPropertyIndex);
+            }
         } else
             value = property.value()->cssText();
 
@@ -336,10 +342,10 @@ String StylePropertySerializer::getPropertyValue(CSSPropertyID propertyID) const
         return getShorthandValue(webkitColumnRuleShorthand());
     case CSSPropertyWebkitColumns:
         return getShorthandValue(webkitColumnsShorthand());
-    case CSSPropertyWebkitFlex:
-        return getShorthandValue(webkitFlexShorthand());
-    case CSSPropertyWebkitFlexFlow:
-        return getShorthandValue(webkitFlexFlowShorthand());
+    case CSSPropertyFlex:
+        return getShorthandValue(flexShorthand());
+    case CSSPropertyFlexFlow:
+        return getShorthandValue(flexFlowShorthand());
     case CSSPropertyGridColumn:
         return getShorthandValue(gridColumnShorthand());
     case CSSPropertyGridRow:

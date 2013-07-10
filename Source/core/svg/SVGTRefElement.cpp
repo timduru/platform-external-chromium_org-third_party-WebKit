@@ -190,7 +190,7 @@ bool SVGTRefElement::isSupportedAttribute(const QualifiedName& attrName)
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty())
         SVGURIReference::addSupportedAttributes(supportedAttributes);
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGTRefElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
@@ -225,9 +225,9 @@ void SVGTRefElement::svgAttributeChanged(const QualifiedName& attrName)
     ASSERT_NOT_REACHED();
 }
 
-RenderObject* SVGTRefElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGTRefElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderSVGInline(this);
+    return new (document()->renderArena()) RenderSVGInline(this);
 }
 
 bool SVGTRefElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
@@ -245,7 +245,7 @@ bool SVGTRefElement::rendererIsNeeded(const NodeRenderingContext& context)
             || parentNode()->hasTagName(SVGNames::textTag)
             || parentNode()->hasTagName(SVGNames::textPathTag)
             || parentNode()->hasTagName(SVGNames::tspanTag)))
-        return StyledElement::rendererIsNeeded(context);
+        return Element::rendererIsNeeded(context);
 
     return false;
 }

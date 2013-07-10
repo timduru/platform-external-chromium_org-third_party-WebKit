@@ -30,14 +30,12 @@
 #include "core/css/StylePropertyShorthand.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/page/RuntimeCSSEnabled.h"
-#include <wtf/BitArray.h>
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/text/StringBuilder.h>
+#include "wtf/MemoryInstrumentationVector.h"
+#include "wtf/text/StringBuilder.h"
 
 #ifndef NDEBUG
+#include "wtf/text/CString.h"
 #include <stdio.h>
-#include <wtf/ASCIICType.h>
-#include <wtf/text/CString.h>
 #endif
 
 using namespace std;
@@ -535,7 +533,7 @@ CSSStyleDeclaration* MutableStylePropertySet::ensureCSSStyleDeclaration()
     return cssomWrapper;
 }
 
-CSSStyleDeclaration* MutableStylePropertySet::ensureInlineCSSStyleDeclaration(StyledElement* parentElement)
+CSSStyleDeclaration* MutableStylePropertySet::ensureInlineCSSStyleDeclaration(Element* parentElement)
 {
     if (m_ownsCSSOMWrapper) {
         ASSERT(propertySetCSSOMWrapperMap().get(this)->parentElement() == parentElement);
@@ -594,7 +592,7 @@ String StylePropertySet::PropertyReference::cssName() const
         ASSERT(propertyValue()->isVariableValue());
         if (!propertyValue()->isVariableValue())
             return emptyString(); // Should not happen, but if it does, avoid a bad cast.
-        return "-webkit-var-" + static_cast<const CSSVariableValue*>(propertyValue())->name();
+        return "var-" + static_cast<const CSSVariableValue*>(propertyValue())->name();
     }
     return getPropertyNameString(id());
 }

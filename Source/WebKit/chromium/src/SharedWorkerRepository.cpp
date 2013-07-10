@@ -227,7 +227,7 @@ void SharedWorkerRepository::connect(PassRefPtr<SharedWorker> worker, PassOwnPtr
 
     // No nested workers (for now) - connect() should only be called from document context.
     ASSERT(worker->scriptExecutionContext()->isDocument());
-    Document* document = static_cast<Document*>(worker->scriptExecutionContext());
+    Document* document = toDocument(worker->scriptExecutionContext());
     WebFrameImpl* webFrame = WebFrameImpl::fromFrame(document->frame());
     OwnPtr<WebSharedWorker> webWorker;
     webWorker = adoptPtr(webFrame->client()->createSharedWorker(webFrame, url, name, getId(document)));
@@ -254,7 +254,7 @@ void SharedWorkerRepository::documentDetached(Document* document)
         repository->documentDetached(getId(document));
 
     // Stop the creation of any pending SharedWorkers for this context.
-    // FIXME: Need a way to invoke this for WorkerContexts as well when we support for nested workers.
+    // FIXME: Need a way to invoke this for WorkerGlobalScopes as well when we support for nested workers.
     SharedWorkerScriptLoader::stopAllLoadersForContext(document);
 }
 

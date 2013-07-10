@@ -36,6 +36,7 @@
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
+#include "core/platform/chromium/TraceEvent.h"
 #include "wtf/GetPtr.h"
 #include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
@@ -83,7 +84,9 @@ static void fooMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void fooMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     Float64ArrayV8Internal::fooMethod(args);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 static void setMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -93,12 +96,28 @@ static void setMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void setMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
     Float64ArrayV8Internal::setMethod(args);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     return constructWebGLArray<Float64Array, V8Float64Array, double>(args, &V8Float64Array::info, v8::kExternalDoubleArray);
+}
+
+static void indexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMIndexedProperty");
+    V8Float64Array::indexedPropertyGetterCustom(index, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+}
+
+static void indexedPropertySetterCallback(uint32_t index, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info)
+{
+    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMIndexedProperty");
+    V8Float64Array::indexedPropertySetterCustom(index, value, info);
+    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
 }
 
 } // namespace Float64ArrayV8Internal
@@ -118,6 +137,7 @@ static const V8DOMConfiguration::BatchedMethod V8Float64ArrayMethods[] = {
 
 void V8Float64Array::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
+    TraceEvent::SamplingState0Scope("Blink\0Blink-DOMConstructor");
     if (!args.IsConstructCall()) {
         throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
         return;
@@ -146,7 +166,7 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::Hand
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
     UNUSED_PARAM(instance); // In some cases, it will not be used.
     UNUSED_PARAM(proto); // In some cases, it will not be used.
-    desc->InstanceTemplate()->SetIndexedPropertyHandler(V8Float64Array::indexedPropertyGetter, V8Float64Array::indexedPropertySetter, 0, 0, nodeCollectionIndexedPropertyEnumerator<Float64Array>);
+    desc->InstanceTemplate()->SetIndexedPropertyHandler(Float64ArrayV8Internal::indexedPropertyGetterCallback, Float64ArrayV8Internal::indexedPropertySetterCallback, 0, 0, indexedPropertyEnumerator<Float64Array>);
 
     // Custom Signature 'foo'
     const int fooArgc = 1;
@@ -166,6 +186,7 @@ v8::Handle<v8::FunctionTemplate> V8Float64Array::GetTemplate(v8::Isolate* isolat
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
+    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8Float64ArrayTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);

@@ -109,7 +109,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSSelector.cpp \
 	third_party/WebKit/Source/core/css/CSSSelectorList.cpp \
 	third_party/WebKit/Source/core/css/CSSShaderValue.cpp \
-	third_party/WebKit/Source/core/css/CSSStyleDeclaration.cpp \
 	third_party/WebKit/Source/core/css/CSSStyleRule.cpp \
 	third_party/WebKit/Source/core/css/CSSStyleSheet.cpp \
 	third_party/WebKit/Source/core/css/CSSSupportsRule.cpp \
@@ -162,11 +161,13 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/StyleSheet.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetContents.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetList.cpp \
+	third_party/WebKit/Source/core/css/resolver/ElementStyleResources.cpp \
 	third_party/WebKit/Source/core/css/resolver/FilterOperationResolver.cpp \
 	third_party/WebKit/Source/core/css/resolver/ScopedStyleResolver.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleBuilderCustom.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleResolver.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleResolverState.cpp \
+	third_party/WebKit/Source/core/css/resolver/StyleResourceLoader.cpp \
 	third_party/WebKit/Source/core/css/resolver/TransformBuilder.cpp \
 	third_party/WebKit/Source/core/css/resolver/ViewportStyleResolver.cpp \
 	third_party/WebKit/Source/core/editing/AppendNodeCommand.cpp \
@@ -222,19 +223,19 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/VisibleUnits.cpp \
 	third_party/WebKit/Source/core/editing/WrapContentsInDummySpanCommand.cpp \
 	third_party/WebKit/Source/core/editing/chromium/EditorChromium.cpp \
-	third_party/WebKit/Source/core/editing/chromium/FrameSelectionChromium.cpp \
 	third_party/WebKit/Source/core/editing/htmlediting.cpp \
 	third_party/WebKit/Source/core/editing/markup.cpp \
 	third_party/WebKit/Source/core/fileapi/Blob.cpp \
 	third_party/WebKit/Source/core/fileapi/BlobBuilder.cpp \
+	third_party/WebKit/Source/core/fileapi/BlobRegistry.cpp \
 	third_party/WebKit/Source/core/fileapi/BlobURL.cpp \
 	third_party/WebKit/Source/core/fileapi/File.cpp \
-	third_party/WebKit/Source/core/fileapi/FileException.cpp \
+	third_party/WebKit/Source/core/fileapi/FileError.cpp \
 	third_party/WebKit/Source/core/fileapi/FileList.cpp \
 	third_party/WebKit/Source/core/fileapi/FileReader.cpp \
 	third_party/WebKit/Source/core/fileapi/FileReaderLoader.cpp \
 	third_party/WebKit/Source/core/fileapi/FileReaderSync.cpp \
-	third_party/WebKit/Source/core/fileapi/ThreadableBlobRegistry.cpp \
+	third_party/WebKit/Source/core/fileapi/Stream.cpp \
 	third_party/WebKit/Source/core/history/BackForwardController.cpp \
 	third_party/WebKit/Source/core/history/HistoryItem.cpp \
 	third_party/WebKit/Source/core/inspector/ConsoleMessage.cpp \
@@ -283,9 +284,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/inspector/InspectorStyleSheet.cpp \
 	third_party/WebKit/Source/core/inspector/InspectorStyleTextEditor.cpp \
 	third_party/WebKit/Source/core/inspector/InspectorTimelineAgent.cpp \
-	third_party/WebKit/Source/core/inspector/InspectorValues.cpp \
 	third_party/WebKit/Source/core/inspector/InspectorWorkerAgent.cpp \
 	third_party/WebKit/Source/core/inspector/JavaScriptCallFrame.cpp \
+	third_party/WebKit/Source/core/inspector/JSONParser.cpp \
 	third_party/WebKit/Source/core/inspector/MemoryInstrumentationImpl.cpp \
 	third_party/WebKit/Source/core/inspector/NetworkResourcesData.cpp \
 	third_party/WebKit/Source/core/inspector/PageConsoleAgent.cpp \
@@ -321,6 +322,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/LinkLoader.cpp \
 	third_party/WebKit/Source/core/loader/MixedContentChecker.cpp \
 	third_party/WebKit/Source/core/loader/NavigationAction.cpp \
+	third_party/WebKit/Source/core/loader/NavigationPolicy.cpp \
 	third_party/WebKit/Source/core/loader/NavigationScheduler.cpp \
 	third_party/WebKit/Source/core/loader/PingLoader.cpp \
 	third_party/WebKit/Source/core/loader/Prerenderer.cpp \
@@ -332,6 +334,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/SubframeLoader.cpp \
 	third_party/WebKit/Source/core/loader/SubstituteData.cpp \
 	third_party/WebKit/Source/core/loader/TextResourceDecoder.cpp \
+	third_party/WebKit/Source/core/loader/TextResourceDecoderBuilder.cpp \
 	third_party/WebKit/Source/core/loader/TextTrackLoader.cpp \
 	third_party/WebKit/Source/core/loader/ThreadableLoader.cpp \
 	third_party/WebKit/Source/core/loader/UniqueIdentifier.cpp \
@@ -379,7 +382,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/FrameDestructionObserver.cpp \
 	third_party/WebKit/Source/core/page/FrameTree.cpp \
 	third_party/WebKit/Source/core/page/FrameView.cpp \
-	third_party/WebKit/Source/core/page/GroupSettings.cpp \
 	third_party/WebKit/Source/core/page/History.cpp \
 	third_party/WebKit/Source/core/page/Location.cpp \
 	third_party/WebKit/Source/core/page/MemoryInfo.cpp \
@@ -439,15 +441,15 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/storage/Storage.cpp \
 	third_party/WebKit/Source/core/storage/StorageEvent.cpp \
 	third_party/WebKit/Source/core/workers/AbstractWorker.cpp \
-	third_party/WebKit/Source/core/workers/DedicatedWorkerContext.cpp \
+	third_party/WebKit/Source/core/workers/DedicatedWorkerGlobalScope.cpp \
 	third_party/WebKit/Source/core/workers/DedicatedWorkerThread.cpp \
 	third_party/WebKit/Source/core/workers/SharedWorker.cpp \
-	third_party/WebKit/Source/core/workers/SharedWorkerContext.cpp \
+	third_party/WebKit/Source/core/workers/SharedWorkerGlobalScope.cpp \
 	third_party/WebKit/Source/core/workers/SharedWorkerThread.cpp \
 	third_party/WebKit/Source/core/workers/Worker.cpp \
-	third_party/WebKit/Source/core/workers/WorkerContext.cpp \
-	third_party/WebKit/Source/core/workers/WorkerContextProxy.cpp \
+	third_party/WebKit/Source/core/workers/WorkerGlobalScopeProxy.cpp \
 	third_party/WebKit/Source/core/workers/WorkerEventQueue.cpp \
+	third_party/WebKit/Source/core/workers/WorkerGlobalScope.cpp \
 	third_party/WebKit/Source/core/workers/WorkerLocation.cpp \
 	third_party/WebKit/Source/core/workers/WorkerMessagingProxy.cpp \
 	third_party/WebKit/Source/core/workers/WorkerRunLoop.cpp \
@@ -464,7 +466,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/xml/XMLSerializer.cpp \
 	third_party/WebKit/Source/core/xml/XMLTreeViewer.cpp \
 	third_party/WebKit/Source/core/xml/XPathEvaluator.cpp \
-	third_party/WebKit/Source/core/xml/XPathException.cpp \
 	third_party/WebKit/Source/core/xml/XPathExpression.cpp \
 	third_party/WebKit/Source/core/xml/XPathExpressionNode.cpp \
 	third_party/WebKit/Source/core/xml/XPathFunctions.cpp \
@@ -487,7 +488,7 @@ LOCAL_SRC_FILES := \
 
 
 # Flags passed to both C and C++ files.
-MY_CFLAGS := \
+MY_CFLAGS_Debug := \
 	-fstack-protector \
 	--param=ssp-buffer-size=4 \
 	-fno-exceptions \
@@ -523,9 +524,7 @@ MY_CFLAGS := \
 	-fdata-sections \
 	-ffunction-sections
 
-MY_CFLAGS_C :=
-
-MY_DEFS := \
+MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DUSE_LINUX_BREAKPAD' \
@@ -547,11 +546,11 @@ MY_DEFS := \
 	'-DENABLE_CSS_REGIONS=1' \
 	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
-	'-DENABLE_GRAPHICS_CONTEXT_ANNOTATIONS=0' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
 	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -566,7 +565,6 @@ MY_DEFS := \
 	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_BUILD_NO_IMAGE_ENCODE' \
 	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \
@@ -589,10 +587,9 @@ MY_DEFS := \
 	'-DWTF_USE_DYNAMIC_ANNOTATIONS=1' \
 	'-D_DEBUG'
 
-LOCAL_CFLAGS := $(MY_CFLAGS_C) $(MY_CFLAGS) $(MY_DEFS)
 
 # Include paths placed before CFLAGS/CPPFLAGS
-LOCAL_C_INCLUDES := \
+LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
@@ -615,6 +612,7 @@ LOCAL_C_INCLUDES := \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
 	$(LOCAL_PATH)/third_party/skia/include/gpu \
 	$(LOCAL_PATH)/third_party/skia/include/gpu/gl \
+	$(LOCAL_PATH)/third_party/skia/include/lazy \
 	$(LOCAL_PATH)/third_party/skia/include/pathops \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
@@ -638,10 +636,9 @@ LOCAL_C_INCLUDES := \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
 
-LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES)
 
 # Flags passed to only C++ (and not C) files.
-LOCAL_CPPFLAGS := \
+LOCAL_CPPFLAGS_Debug := \
 	-fno-rtti \
 	-fno-threadsafe-statics \
 	-fvisibility-inlines-hidden \
@@ -653,9 +650,177 @@ LOCAL_CPPFLAGS := \
 	-Wno-sign-promo \
 	-Wno-non-virtual-dtor
 
+
+# Flags passed to both C and C++ files.
+MY_CFLAGS_Release := \
+	-fstack-protector \
+	--param=ssp-buffer-size=4 \
+	-fno-exceptions \
+	-fno-strict-aliasing \
+	-Wno-unused-parameter \
+	-Wno-missing-field-initializers \
+	-fvisibility=hidden \
+	-pipe \
+	-fPIC \
+	-fno-strict-aliasing \
+	-Wno-format \
+	-fno-tree-sra \
+	-fuse-ld=gold \
+	-Wno-psabi \
+	-ffunction-sections \
+	-funwind-tables \
+	-g \
+	-fstack-protector \
+	-fno-short-enums \
+	-finline-limit=64 \
+	-Wa,--noexecstack \
+	-U_FORTIFY_SOURCE \
+	-Wno-extra \
+	-Wno-ignored-qualifiers \
+	-Wno-type-limits \
+	-Wno-address \
+	-Wno-format-security \
+	-Wno-return-type \
+	-Wno-sequence-point \
+	-Os \
+	-fno-ident \
+	-fdata-sections \
+	-ffunction-sections \
+	-fomit-frame-pointer
+
+MY_DEFS_Release := \
+	'-DANGLE_DX11' \
+	'-D_FILE_OFFSET_BITS=64' \
+	'-DUSE_LINUX_BREAKPAD' \
+	'-DNO_TCMALLOC' \
+	'-DDISABLE_NACL' \
+	'-DCHROMIUM_BUILD' \
+	'-DUSE_LIBJPEG_TURBO=1' \
+	'-DUSE_PROPRIETARY_CODECS' \
+	'-DENABLE_GPU=1' \
+	'-DUSE_OPENSSL=1' \
+	'-DENABLE_EGLIMAGE=1' \
+	'-DENABLE_LANGUAGE_DETECTION=1' \
+	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
+	'-DWEBKIT_IMPLEMENTATION=1' \
+	'-DINSIDE_WEBKIT' \
+	'-DENABLE_CANVAS_USES_MAILBOX=1' \
+	'-DENABLE_CSS3_TEXT=0' \
+	'-DENABLE_CSS_EXCLUSIONS=1' \
+	'-DENABLE_CSS_REGIONS=1' \
+	'-DENABLE_CUSTOM_SCHEME_HANDLER=0' \
+	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
+	'-DENABLE_SVG_FONTS=1' \
+	'-DENABLE_TOUCH_ICON_LOADING=1' \
+	'-DENABLE_XHR_TIMEOUT=0' \
+	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
+	'-DENABLE_PARTITION_ALLOC=1' \
+	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
+	'-DENABLE_CALENDAR_PICKER=0' \
+	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
+	'-DENABLE_INPUT_SPEECH=0' \
+	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
+	'-DENABLE_MEDIA_CAPTURE=1' \
+	'-DENABLE_NOTIFICATIONS=0' \
+	'-DENABLE_ORIENTATION_EVENTS=1' \
+	'-DENABLE_PRINTING=0' \
+	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
+	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
+	'-DENABLE_8BIT_TEXTRUN=1' \
+	'-DENABLE_OPENTYPE_VERTICAL=1' \
+	'-DWTF_USE_HARFBUZZ=1' \
+	'-DU_USING_ICU_NAMESPACE=0' \
+	'-DSK_BUILD_NO_IMAGE_ENCODE' \
+	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \
+	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
+	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
+	'-DSK_ENABLE_INST_COUNT=0' \
+	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_BUILD_FOR_ANDROID' \
+	'-DCHROME_PNG_WRITE_SUPPORT' \
+	'-DPNG_USER_CONFIG' \
+	'-DLIBXML_STATIC' \
+	'-DLIBXSLT_STATIC' \
+	'-DUSE_SYSTEM_LIBJPEG' \
+	'-DANDROID' \
+	'-D__GNU_SOURCE=1' \
+	'-DUSE_STLPORT=1' \
+	'-D_STLP_USE_PTR_SPECIALIZATIONS=1' \
+	'-DCHROME_BUILD_ID=""' \
+	'-DNDEBUG' \
+	'-DNVALGRIND' \
+	'-DDYNAMIC_ANNOTATIONS_ENABLED=0'
+
+
+# Include paths placed before CFLAGS/CPPFLAGS
+LOCAL_C_INCLUDES_Release := \
+	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
+	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
+	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
+	$(LOCAL_PATH)/third_party/khronos \
+	$(LOCAL_PATH)/gpu \
+	$(LOCAL_PATH) \
+	$(LOCAL_PATH)/third_party \
+	$(LOCAL_PATH)/third_party/WebKit \
+	$(LOCAL_PATH)/third_party/WebKit/Source \
+	$(gyp_shared_intermediate_dir)/webkit \
+	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
+	$(PWD)/external/icu4c/common \
+	$(PWD)/external/icu4c/i18n \
+	$(LOCAL_PATH)/skia/config \
+	$(LOCAL_PATH)/third_party/skia/src/core \
+	$(LOCAL_PATH)/third_party/skia/include/config \
+	$(LOCAL_PATH)/third_party/skia/include/core \
+	$(LOCAL_PATH)/third_party/skia/include/effects \
+	$(LOCAL_PATH)/third_party/skia/include/pdf \
+	$(LOCAL_PATH)/third_party/skia/include/gpu \
+	$(LOCAL_PATH)/third_party/skia/include/gpu/gl \
+	$(LOCAL_PATH)/third_party/skia/include/lazy \
+	$(LOCAL_PATH)/third_party/skia/include/pathops \
+	$(LOCAL_PATH)/third_party/skia/include/pipe \
+	$(LOCAL_PATH)/third_party/skia/include/ports \
+	$(LOCAL_PATH)/third_party/skia/include/utils \
+	$(LOCAL_PATH)/skia/ext \
+	$(LOCAL_PATH)/third_party/iccjpeg \
+	$(LOCAL_PATH)/third_party/libpng \
+	$(LOCAL_PATH)/third_party/libwebp \
+	$(LOCAL_PATH)/third_party/libxml/linux/include \
+	$(LOCAL_PATH)/third_party/libxml/src/include \
+	$(LOCAL_PATH)/third_party/libxslt \
+	$(LOCAL_PATH)/third_party/npapi \
+	$(LOCAL_PATH)/third_party/npapi/bindings \
+	$(LOCAL_PATH)/third_party/ots/include \
+	$(LOCAL_PATH)/third_party/qcms/src \
+	$(LOCAL_PATH)/third_party/sqlite \
+	$(LOCAL_PATH)/third_party/zlib \
+	$(LOCAL_PATH)/v8/include \
+	$(PWD)/external/jpeg \
+	$(PWD)/frameworks/wilhelm/include \
+	$(PWD)/bionic \
+	$(PWD)/external/stlport/stlport
+
+
+# Flags passed to only C++ (and not C) files.
+LOCAL_CPPFLAGS_Release := \
+	-fno-rtti \
+	-fno-threadsafe-statics \
+	-fvisibility-inlines-hidden \
+	-Wno-c++0x-compat \
+	-Wno-deprecated \
+	-Wno-abi \
+	-Wno-error=c++0x-compat \
+	-Wno-non-virtual-dtor \
+	-Wno-sign-promo \
+	-Wno-non-virtual-dtor
+
+
+LOCAL_CFLAGS := $(MY_CFLAGS_$(GYP_CONFIGURATION)) $(MY_DEFS_$(GYP_CONFIGURATION))
+LOCAL_C_INCLUDES := $(GYP_COPIED_SOURCE_ORIGIN_DIRS) $(LOCAL_C_INCLUDES_$(GYP_CONFIGURATION))
+LOCAL_CPPFLAGS := $(LOCAL_CPPFLAGS_$(GYP_CONFIGURATION))
 ### Rules for final target.
 
-LOCAL_LDFLAGS := \
+LOCAL_LDFLAGS_Debug := \
 	-Wl,-z,now \
 	-Wl,-z,relro \
 	-Wl,-z,noexecstack \
@@ -671,6 +836,25 @@ LOCAL_LDFLAGS := \
 	-Wl,-O1 \
 	-Wl,--as-needed
 
+
+LOCAL_LDFLAGS_Release := \
+	-Wl,-z,now \
+	-Wl,-z,relro \
+	-Wl,-z,noexecstack \
+	-fPIC \
+	-Wl,-z,relro \
+	-Wl,-z,now \
+	-fuse-ld=gold \
+	-nostdlib \
+	-Wl,--no-undefined \
+	-Wl,--exclude-libs=ALL \
+	-Wl,--icf=safe \
+	-Wl,-O1 \
+	-Wl,--as-needed \
+	-Wl,--gc-sections
+
+
+LOCAL_LDFLAGS := $(LOCAL_LDFLAGS_$(GYP_CONFIGURATION))
 
 LOCAL_STATIC_LIBRARIES := \
 	skia_skia_gyp

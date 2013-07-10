@@ -82,9 +82,9 @@ public:
     void removeNodePreservingChildren(PassRefPtr<Node>);
 
 private:
-    PassRefPtr<StyledElement> insertFragmentForTestRendering(Node* rootEditableNode);
+    PassRefPtr<Element> insertFragmentForTestRendering(Node* rootEditableNode);
     void removeUnrenderedNodes(Node*);
-    void restoreAndRemoveTestRenderingNodesToFragment(StyledElement*);
+    void restoreAndRemoveTestRenderingNodesToFragment(Element*);
     void removeInterchangeNodes(Node*);
     
     void insertNodeBefore(PassRefPtr<Node> node, Node* refNode);
@@ -98,8 +98,7 @@ private:
 static bool isInterchangeNewlineNode(const Node *node)
 {
     DEFINE_STATIC_LOCAL(String, interchangeNewlineClassString, (AppleInterchangeNewline));
-    return node && node->hasTagName(brTag) && 
-           static_cast<const Element *>(node)->getAttribute(classAttr) == interchangeNewlineClassString;
+    return node && node->hasTagName(brTag) && toElement(node)->getAttribute(classAttr) == interchangeNewlineClassString;
 }
 
 static bool isInterchangeConvertedSpaceSpan(const Node *node)
@@ -163,7 +162,7 @@ ReplacementFragment::ReplacementFragment(Document* document, DocumentFragment* f
         return;
     }
 
-    RefPtr<StyledElement> holder = insertFragmentForTestRendering(editableRoot.get());
+    RefPtr<Element> holder = insertFragmentForTestRendering(editableRoot.get());
     if (!holder) {
         removeInterchangeNodes(m_fragment.get());
         return;
@@ -244,9 +243,9 @@ void ReplacementFragment::insertNodeBefore(PassRefPtr<Node> node, Node* refNode)
     parent->insertBefore(node, refNode, ASSERT_NO_EXCEPTION);
 }
 
-PassRefPtr<StyledElement> ReplacementFragment::insertFragmentForTestRendering(Node* rootEditableElement)
+PassRefPtr<Element> ReplacementFragment::insertFragmentForTestRendering(Node* rootEditableElement)
 {
-    RefPtr<StyledElement> holder = createDefaultParagraphElement(m_document.get());
+    RefPtr<Element> holder = createDefaultParagraphElement(m_document.get());
 
     holder->appendChild(m_fragment, ASSERT_NO_EXCEPTION);
     rootEditableElement->appendChild(holder.get(), ASSERT_NO_EXCEPTION);
@@ -255,7 +254,7 @@ PassRefPtr<StyledElement> ReplacementFragment::insertFragmentForTestRendering(No
     return holder.release();
 }
 
-void ReplacementFragment::restoreAndRemoveTestRenderingNodesToFragment(StyledElement* holder)
+void ReplacementFragment::restoreAndRemoveTestRenderingNodesToFragment(Element* holder)
 {
     if (!holder)
         return;
@@ -475,7 +474,7 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
         if (!node->isStyledElement())
             continue;
 
-        StyledElement* element = static_cast<StyledElement*>(node.get());
+        Element* element = toElement(node.get());
 
         const StylePropertySet* inlineStyle = element->inlineStyle();
         RefPtr<EditingStyle> newInlineStyle = EditingStyle::create(inlineStyle);
@@ -487,7 +486,7 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
                 if (newInlineStyle->conflictsWithImplicitStyleOfElement(htmlElement)) {
                     // e.g. <b style="font-weight: normal;"> is converted to <span style="font-weight: normal;">
                     node = replaceElementWithSpanPreservingChildrenAndAttributes(htmlElement);
-                    element = static_cast<StyledElement*>(node.get());
+                    element = toElement(node.get());
                     insertedNodes.didReplaceNode(htmlElement, node.get());
                 } else if (newInlineStyle->extractConflictingImplicitStyleOfAttributes(htmlElement, EditingStyle::PreserveWritingDirection, 0, attributes,
                     EditingStyle::DoNotExtractMatchingStyle)) {
@@ -627,7 +626,7 @@ void ReplaceSelectionCommand::makeInsertedContentRoundTrippableWithHTMLTreeBuild
         }
 
         if (isHeaderElement(node.get())) {
-            if (HTMLElement* headerElement = static_cast<HTMLElement*>(highestEnclosingNodeOfType(positionInParentBeforeNode(node.get()), isHeaderElement)))
+            if (HTMLElement* headerElement = toHTMLElement(highestEnclosingNodeOfType(positionInParentBeforeNode(node.get()), isHeaderElement)))
                 moveNodeOutOfAncestor(node, headerElement);
         }
     }
@@ -637,6 +636,9 @@ void ReplaceSelectionCommand::moveNodeOutOfAncestor(PassRefPtr<Node> prpNode, Pa
 {
     RefPtr<Node> node = prpNode;
     RefPtr<Node> ancestor = prpAncestor;
+
+    if (!ancestor->parentNode()->rendererIsEditable())
+        return;
 
     VisiblePosition positionAtEndOfNode = lastPositionInOrAfterNode(node.get());
     VisiblePosition lastPositionInParagraph = lastPositionInNode(ancestor.get());

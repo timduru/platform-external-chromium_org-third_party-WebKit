@@ -28,7 +28,6 @@
 #include "config.h"
 #include "core/dom/Document.h"
 
-#include "CSSValueKeywords.h"
 #include "HTMLElementFactory.h"
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
@@ -36,23 +35,20 @@
 #include "SVGNames.h"
 #include "XMLNSNames.h"
 #include "XMLNames.h"
+#include "bindings/v8/CustomElementConstructorBuilder.h"
 #include "bindings/v8/Dictionary.h"
 #include "bindings/v8/ScriptController.h"
-#include "bindings/v8/ScriptEventListener.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/animation/DocumentTimeline.h"
-#include "core/css/CSSParser.h"
 #include "core/css/CSSStyleDeclaration.h"
 #include "core/css/CSSStyleSheet.h"
 #include "core/css/FontLoader.h"
-#include "core/css/MediaQueryList.h"
 #include "core/css/MediaQueryMatcher.h"
 #include "core/css/StylePropertySet.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/css/StyleSheetList.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
-#include "core/dom/Attribute.h"
 #include "core/dom/CDATASection.h"
 #include "core/dom/Comment.h"
 #include "core/dom/ContextFeatures.h"
@@ -74,7 +70,6 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/HashChangeEvent.h"
-#include "core/dom/NameNodeList.h"
 #include "core/dom/NamedFlowCollection.h"
 #include "core/dom/NodeFilter.h"
 #include "core/dom/NodeIterator.h"
@@ -86,10 +81,8 @@
 #include "core/dom/PopStateEvent.h"
 #include "core/dom/ProcessingInstruction.h"
 #include "core/dom/QualifiedName.h"
-#include "core/dom/RegisteredEventListener.h"
 #include "core/dom/RequestAnimationFrameCallback.h"
 #include "core/dom/ScopedEventQueue.h"
-#include "core/dom/ScriptElement.h"
 #include "core/dom/ScriptRunner.h"
 #include "core/dom/ScriptedAnimationController.h"
 #include "core/dom/SelectorQuery.h"
@@ -103,11 +96,9 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
-#include "core/editing/htmlediting.h"
 #include "core/html/FormController.h"
 #include "core/html/HTMLAllCollection.h"
 #include "core/html/HTMLAnchorElement.h"
-#include "core/html/HTMLBodyElement.h"
 #include "core/html/HTMLCanvasElement.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLDocument.h"
@@ -116,7 +107,6 @@
 #include "core/html/HTMLIFrameElement.h"
 #include "core/html/HTMLImportsController.h"
 #include "core/html/HTMLLinkElement.h"
-#include "core/html/HTMLMapElement.h"
 #include "core/html/HTMLNameCollection.h"
 #include "core/html/HTMLScriptElement.h"
 #include "core/html/HTMLStyleElement.h"
@@ -131,21 +121,16 @@
 #include "core/loader/CookieJar.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/FrameLoaderClient.h"
 #include "core/loader/ImageLoader.h"
 #include "core/loader/Prerenderer.h"
-#include "core/loader/ResourceLoader.h"
 #include "core/loader/TextResourceDecoder.h"
-#include "core/loader/cache/CachedCSSStyleSheet.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/DOMSecurityPolicy.h"
-#include "core/page/DOMSelection.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/EventHandler.h"
-#include "core/page/FocusController.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/FrameView.h"
@@ -153,48 +138,36 @@
 #include "core/page/MouseEventWithHitTestResults.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
-#include "core/page/PageGroup.h"
 #include "core/page/PointerLockController.h"
 #include "core/page/Settings.h"
-#include "core/page/UserContentURLPattern.h"
 #include "core/page/ValidationMessageClient.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/DateComponents.h"
 #include "core/platform/HistogramSupport.h"
 #include "core/platform/Language.h"
-#include "core/platform/Logging.h"
-#include "core/platform/PlatformKeyboardEvent.h"
 #include "core/platform/Timer.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "core/platform/network/HTTPParsers.h"
 #include "core/platform/text/PlatformLocale.h"
 #include "core/platform/text/SegmentedString.h"
-#include "core/rendering/FlowThreadController.h"
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/RenderArena.h"
-#include "core/rendering/RenderLayerCompositor.h"
-#include "core/rendering/RenderNamedFlowThread.h"
-#include "core/rendering/RenderTextControl.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
 #include "core/svg/SVGDocumentExtensions.h"
-#include "core/svg/SVGSVGElement.h"
 #include "core/svg/SVGStyleElement.h"
 #include "core/workers/SharedWorkerRepository.h"
-#include "core/xml/XMLHttpRequest.h"
 #include "core/xml/XPathEvaluator.h"
 #include "core/xml/XPathExpression.h"
 #include "core/xml/XPathNSResolver.h"
 #include "core/xml/XPathResult.h"
 #include "core/xml/XSLTProcessor.h"
 #include "core/xml/parser/XMLDocumentParser.h"
-#include "modules/geolocation/GeolocationController.h"
 #include "weborigin/SchemeRegistry.h"
 #include "weborigin/SecurityOrigin.h"
-#include "weborigin/SecurityPolicy.h"
 #include "wtf/CurrentTime.h"
 #include "wtf/HashFunctions.h"
 #include "wtf/MainThread.h"
@@ -435,7 +408,6 @@ Document::Document(Frame* frame, const KURL& url, DocumentClassFlags documentCla
     , m_closeAfterStyleRecalc(false)
     , m_gotoAnchorNeededAfterStylesheetsLoad(false)
     , m_pendingStyleRecalcShouldForce(false)
-    , m_frameElementsShouldIgnoreScrolling(false)
     , m_containsValidityStyleRules(false)
     , m_updateFocusAppearanceRestoresSelection(false)
     , m_ignoreDestructiveWriteCount(0)
@@ -643,8 +615,7 @@ void Document::dispose()
         m_scriptedAnimationController->clearDocumentPointer();
     m_scriptedAnimationController.clear();
 
-    if (m_lifecycleNotifier)
-        m_lifecycleNotifier->notifyDocumentWasDisposed();
+    lifecycleNotifier()->notifyDocumentWasDisposed();
 }
 
 Element* Document::getElementById(const AtomicString& id) const
@@ -842,7 +813,9 @@ ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicS
         return ScriptValue();
     }
 
-    return ensureCustomElementRegistry()->registerElement(state, name, options, ec);
+    CustomElementConstructorBuilder constructorBuilder(state, &options);
+    ensureCustomElementRegistry()->registerElement(&constructorBuilder, name, ec);
+    return constructorBuilder.bindingsReturnValue();
 }
 
 CustomElementRegistry* Document::ensureCustomElementRegistry()
@@ -854,11 +827,10 @@ CustomElementRegistry* Document::ensureCustomElementRegistry()
     return m_registry.get();
 }
 
-HTMLImportsController* Document::ensureImports()
+void Document::setImports(PassRefPtr<HTMLImportsController> imports)
 {
-    if (!m_imports)
-        m_imports = HTMLImportsController::create(this);
-    return m_imports.get();
+    ASSERT(!m_imports);
+    m_imports = imports;
 }
 
 void Document::didLoadAllImports()
@@ -962,7 +934,7 @@ PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionCo
         return newElement.release();
     }
     case ATTRIBUTE_NODE:
-        return Attr::create(this, QualifiedName(nullAtom, static_cast<Attr*>(importedNode)->name(), nullAtom), static_cast<Attr*>(importedNode)->value());
+        return Attr::create(this, QualifiedName(nullAtom, toAttr(importedNode)->name(), nullAtom), toAttr(importedNode)->value());
     case DOCUMENT_FRAGMENT_NODE: {
         if (importedNode->isShadowRoot()) {
             // ShadowRoot nodes should not be explicitly importable.
@@ -1016,7 +988,7 @@ PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionCode& ec)
         ec = NOT_SUPPORTED_ERR;
         return 0;
     case ATTRIBUTE_NODE: {
-        Attr* attr = static_cast<Attr*>(source.get());
+        Attr* attr = toAttr(source.get());
         if (attr->ownerElement())
             attr->ownerElement()->removeAttributeNode(attr, ec);
         attr->setSpecified(true);
@@ -1680,6 +1652,7 @@ void Document::recalcStyle(StyleChange change)
         return; // Guard against re-entrancy. -dwh
 
     TRACE_EVENT0("webkit", "Document::recalcStyle");
+    TraceEvent::SamplingState0Scope("Blink\0Blink-RecalcStyle");
 
     // FIXME: We should update style on our ancestor chain before proceeding (especially for seamless),
     // however doing so currently causes several tests to crash, as Frame::setDocument calls Document::attach
@@ -1689,7 +1662,7 @@ void Document::recalcStyle(StyleChange change)
     // hits a null-dereference due to security code always assuming the document has a SecurityOrigin.
 
     if (m_styleSheetCollection->needsUpdateActiveStylesheetsOnStyleRecalc())
-        m_styleSheetCollection->updateActiveStyleSheets(DocumentStyleSheetCollection::FullUpdate);
+        m_styleSheetCollection->updateActiveStyleSheets(FullStyleUpdate);
 
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRecalculateStyle(this);
 
@@ -1760,6 +1733,12 @@ void Document::recalcStyle(StyleChange change)
     }
 
     InspectorInstrumentation::didRecalculateStyle(cookie);
+
+    // As a result of the style recalculation, the currently hovered element might have been
+    // detached (for example, by setting display:none in the :hover style), schedule another mouseMove event
+    // to check if any other elements ended up under the mouse pointer due to re-layout.
+    if (hoverNode() && !hoverNode()->renderer() && frame())
+        frame()->eventHandler()->dispatchFakeMouseMoveEventSoon();
 }
 
 void Document::updateStyleIfNeeded()
@@ -1772,6 +1751,18 @@ void Document::updateStyleIfNeeded()
 
     AnimationUpdateBlock animationUpdateBlock(m_frame ? m_frame->animation() : 0);
     recalcStyle(NoChange);
+}
+
+void Document::updateStyleForNodeIfNeeded(Node* node)
+{
+    if (!hasPendingForcedStyleRecalc() && !childNeedsStyleRecalc() && !needsStyleRecalc())
+        return;
+
+    bool needsStyleRecalc = hasPendingForcedStyleRecalc();
+    for (Node* n = node; n && !needsStyleRecalc; n = n->parentNode())
+        needsStyleRecalc = n->needsStyleRecalc();
+    if (needsStyleRecalc)
+        updateStyleIfNeeded();
 }
 
 void Document::updateLayout()
@@ -2002,8 +1993,7 @@ void Document::detach(const AttachContext& context)
     if (m_mediaQueryMatcher)
         m_mediaQueryMatcher->documentDestroyed();
 
-    if (m_lifecycleNotifier)
-        m_lifecycleNotifier->notifyDocumentWasDetached();
+    lifecycleNotifier()->notifyDocumentWasDetached();
 }
 
 void Document::prepareForDestruction()
@@ -2162,11 +2152,12 @@ void Document::cancelParsing()
     explicitClose();
 }
 
-void Document::implicitOpen()
+PassRefPtr<DocumentParser> Document::implicitOpen()
 {
     cancelParsing();
 
     removeChildren();
+    ASSERT(!m_focusedNode);
 
     setCompatibilityMode(NoQuirksMode);
 
@@ -2179,6 +2170,8 @@ void Document::implicitOpen()
     m_parser = createParser();
     setParsing(true);
     setReadyState(Loading);
+
+    return m_parser;
 }
 
 HTMLElement* Document::body() const
@@ -2295,12 +2288,14 @@ void Document::implicitClose()
     if (f)
         f->animation()->resumeAnimationsForDocument(this);
 
-    ImageLoader::dispatchPendingBeforeLoadEvents();
-    ImageLoader::dispatchPendingLoadEvents();
-    ImageLoader::dispatchPendingErrorEvents();
+    if (f && f->script()->canExecuteScripts(NotAboutToExecuteScript)) {
+        ImageLoader::dispatchPendingBeforeLoadEvents();
+        ImageLoader::dispatchPendingLoadEvents();
+        ImageLoader::dispatchPendingErrorEvents();
 
-    HTMLLinkElement::dispatchPendingLoadEvents();
-    HTMLStyleElement::dispatchPendingLoadEvents();
+        HTMLLinkElement::dispatchPendingLoadEvents();
+        HTMLStyleElement::dispatchPendingLoadEvents();
+    }
 
     // To align the HTML load event and the SVGLoad event for the outermost <svg> element, fire it from
     // here, instead of doing it from SVGElement::finishedParsingChildren (if externalResourcesRequired="false",
@@ -2688,7 +2683,7 @@ void Document::didRemoveAllPendingStylesheet()
 {
     m_needsNotifyRemoveAllPendingStylesheet = false;
 
-    styleResolverChanged(RecalcStyleIfNeeded);
+    styleResolverChanged(RecalcStyleImmediately, AnalyzedStyleUpdate);
     executeScriptsWaitingForResourcesIfNeeded();
 
     if (m_gotoAnchorNeededAfterStylesheetsLoad && view())
@@ -3052,7 +3047,7 @@ void Document::evaluateMediaQueryList()
         m_mediaQueryMatcher->styleResolverChanged();
 }
 
-void Document::styleResolverChanged(StyleResolverUpdateFlag updateFlag)
+void Document::styleResolverChanged(StyleResolverUpdateType updateType, StyleResolverUpdateMode updateMode)
 {
     // Don't bother updating, since we haven't loaded all our style info yet
     // and haven't calculated the style selector for the first time.
@@ -3067,12 +3062,9 @@ void Document::styleResolverChanged(StyleResolverUpdateFlag updateFlag)
         printf("Beginning update of style selector at time %d.\n", elapsedTime());
 #endif
 
-    DocumentStyleSheetCollection::UpdateFlag styleSheetUpdate = (updateFlag == RecalcStyleIfNeeded)
-        ? DocumentStyleSheetCollection::OptimizedUpdate
-        : DocumentStyleSheetCollection::FullUpdate;
-    bool stylesheetChangeRequiresStyleRecalc = m_styleSheetCollection->updateActiveStyleSheets(styleSheetUpdate);
+    bool needsRecalc = m_styleSheetCollection->updateActiveStyleSheets(updateMode);
 
-    if (updateFlag == DeferRecalcStyle) {
+    if (updateType >= DeferRecalcStyle) {
         scheduleForcedStyleRecalc();
         return;
     }
@@ -3083,7 +3075,7 @@ void Document::styleResolverChanged(StyleResolverUpdateFlag updateFlag)
             renderView()->repaintViewAndCompositedLayers();
     }
 
-    if (!stylesheetChangeRequiresStyleRecalc)
+    if (!needsRecalc)
         return;
 
     // This recalcStyle initiates a new recalc cycle. We need to bracket it to
@@ -3138,11 +3130,6 @@ void Document::setActiveElement(PassRefPtr<Element> newActiveElement)
     m_activeElement = newActiveElement;
 }
 
-void Document::focusedNodeRemoved()
-{
-    setFocusedNode(0);
-}
-
 void Document::removeFocusedNodeOfSubtree(Node* node, bool amongChildrenOnly)
 {
     if (!m_focusedNode)
@@ -3159,7 +3146,7 @@ void Document::removeFocusedNodeOfSubtree(Node* node, bool amongChildrenOnly)
         nodeInSubtree = (focusedNode == node) || focusedNode->isDescendantOf(node);
 
     if (nodeInSubtree)
-        document()->focusedNodeRemoved();
+        setFocusedNode(0);
 }
 
 void Document::hoveredNodeDetached(Node* node)
@@ -3344,6 +3331,8 @@ bool Document::setFocusedNode(PassRefPtr<Node> prpNewFocusedNode, FocusDirection
 
 SetFocusedNodeDone:
     updateStyleIfNeeded();
+    if (Frame* frame = this->frame())
+        frame->selection()->didChangeFocus();
     return !focusChangeBlocked;
 }
 
@@ -3826,7 +3815,7 @@ bool Document::parseQualifiedName(const String& qualifiedName, String& prefix, S
     bool sawColon = false;
     int colonPos = 0;
 
-    const UChar* s = qualifiedName.characters();
+    const UChar* s = qualifiedName.bloatedCharacters();
     for (unsigned i = 0; i < length;) {
         UChar32 c;
         U16_NEXT(s, i, length, c)
@@ -4132,6 +4121,12 @@ PassRefPtr<HTMLCollection> Document::forms()
 PassRefPtr<HTMLCollection> Document::anchors()
 {
     return ensureCachedCollection(DocAnchors);
+}
+
+PassRefPtr<HTMLCollection> Document::allForBinding()
+{
+    UseCounter::count(this, UseCounter::DocumentAll);
+    return all();
 }
 
 PassRefPtr<HTMLCollection> Document::all()
@@ -4479,8 +4474,10 @@ CanvasRenderingContext* Document::getCSSCanvasContext(const String& type, const 
 HTMLCanvasElement* Document::getCSSCanvasElement(const String& name)
 {
     RefPtr<HTMLCanvasElement>& element = m_cssCanvasElements.add(name, 0).iterator->value;
-    if (!element)
+    if (!element) {
         element = HTMLCanvasElement::create(this);
+        element->setAccelerationDisabled(true);
+    }
     return element.get();
 }
 
@@ -4528,7 +4525,7 @@ void Document::addMessage(MessageSource source, MessageLevel level, const String
     }
 
     if (Page* page = this->page())
-        page->console()->addMessage(source, level, message, sourceURL, lineNumber, callStack, state, requestIdentifier);
+        page->console()->addMessage(source, level, message, sourceURL, lineNumber, 0, callStack, state, requestIdentifier);
 }
 
 const SecurityOrigin* Document::topOrigin() const
@@ -5050,11 +5047,14 @@ void Document::updateHoverActiveState(const HitTestRequest& request, Element* in
 
     if (oldHoverObj != newHoverObj) {
         // If the old hovered node is not nil but it's renderer is, it was probably detached as part of the :hover style
-        // (for instance by setting display:none in the :hover pseudo-class). In this case, the old hovered element
+        // (for instance by setting display:none in the :hover pseudo-class). In this case, the old hovered element (and its ancestors)
         // must be updated, to ensure it's normal style is re-applied.
         if (oldHoverNode && !oldHoverObj) {
-            if (!mustBeInActiveChain || oldHoverNode->inActiveChain())
-                nodesToRemoveFromChain.append(oldHoverNode);
+            for (Node* node = oldHoverNode.get(); node; node = node->parentNode()) {
+                if (!mustBeInActiveChain || (node->isElementNode() && toElement(node)->inActiveChain()))
+                    nodesToRemoveFromChain.append(node);
+            }
+
         }
 
         // The old hover path only needs to be cleared up to (and not including) the common ancestor;
@@ -5226,11 +5226,14 @@ void Document::didAssociateFormControlsTimerFired(Timer<Document>* timer)
     m_associatedFormControls.clear();
 }
 
-void Document::addLifecycleObserver(DocumentLifecycleObserver* observer)
+PassOwnPtr<ContextLifecycleNotifier> Document::createLifecycleNotifier()
 {
-    if (!m_lifecycleNotifier)
-        m_lifecycleNotifier = DocumentLifecycleNotifier::create();
-    m_lifecycleNotifier->addObserver(observer);
+    return DocumentLifecycleNotifier::create(this);
+}
+
+DocumentLifecycleNotifier* Document::lifecycleNotifier()
+{
+    return static_cast<DocumentLifecycleNotifier*>(ScriptExecutionContext::lifecycleNotifier());
 }
 
 } // namespace WebCore

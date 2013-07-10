@@ -81,10 +81,8 @@ class Manager(object):
         self.PERF_SUBDIR = 'perf'
         self.WEBSOCKET_SUBDIR = 'websocket' + port.TEST_PATH_SEPARATOR
         self.LAYOUT_TESTS_DIRECTORY = 'LayoutTests'
-
-        # disable wss server. need to install pyOpenSSL on buildbots.
-        # self._websocket_secure_server = websocket_server.PyWebSocket(
-        #        options.results_directory, use_tls=True, port=9323)
+        self._http_server_started = False
+        self._websockets_server_started = False
 
         self._results_directory = self._port.results_directory()
         self._finder = LayoutTestFinder(self._port, self._options)
@@ -138,7 +136,7 @@ class Manager(object):
         return self._expectations.has_modifier(test_file, test_expectations.SLOW)
 
     def needs_servers(self, test_names):
-        return any(self._test_requires_lock(test_name) for test_name in test_names) and self._options.http
+        return any(self._test_requires_lock(test_name) for test_name in test_names)
 
     def _set_up_run(self, test_names):
         self._printer.write_update("Checking build ...")
@@ -170,6 +168,7 @@ class Manager(object):
 
     def run(self, args):
         """Run the tests and return a RunDetails object with the results."""
+        start_time = time.time()
         self._printer.write_update("Collecting tests ...")
         try:
             paths, test_names = self._collect_tests(args)
@@ -197,9 +196,10 @@ class Manager(object):
         else:
             should_retry_failures = self._options.retry_failures
 
-        start_time = time.time()
         enabled_pixel_tests_in_retry = False
         try:
+            self._start_servers(tests_to_run)
+
             initial_results = self._run_tests(tests_to_run, tests_to_skip, self._options.repeat_each, self._options.iterations,
                 int(self._options.child_processes), retrying=False)
 
@@ -218,9 +218,8 @@ class Manager(object):
             else:
                 retry_results = None
         finally:
+            self._stop_servers()
             self._clean_up_run()
-
-        end_time = time.time()
 
         # Some crash logs can take a long time to be written out so look
         # for new logs after the test run finishes.
@@ -232,7 +231,6 @@ class Manager(object):
         _log.debug("summarizing results")
         summarized_full_results = test_run_results.summarize_results(self._port, self._expectations, initial_results, retry_results, enabled_pixel_tests_in_retry)
         summarized_failing_results = test_run_results.summarize_results(self._port, self._expectations, initial_results, retry_results, enabled_pixel_tests_in_retry, only_include_failing=True)
-        self._printer.print_results(end_time - start_time, initial_results, summarized_failing_results)
 
         exit_code = self._port.exit_code_from_summarized_results(summarized_failing_results)
         if not self._options.dry_run:
@@ -244,18 +242,38 @@ class Manager(object):
             if self._options.show_results and (exit_code or (self._options.full_results_html and initial_results.total_failures)):
                 self._port.show_results_html_file(results_path)
 
+        self._printer.print_results(time.time() - start_time, initial_results, summarized_failing_results)
         return test_run_results.RunDetails(exit_code, summarized_full_results, summarized_failing_results, initial_results, retry_results, enabled_pixel_tests_in_retry)
 
     def _run_tests(self, tests_to_run, tests_to_skip, repeat_each, iterations, num_workers, retrying):
-        needs_http = self._port.requires_http_server() or any(self._is_http_test(test) for test in tests_to_run)
-        needs_websockets = any(self._is_websocket_test(test) for test in tests_to_run)
 
         test_inputs = []
         for _ in xrange(iterations):
             for test in tests_to_run:
                 for _ in xrange(repeat_each):
                     test_inputs.append(self._test_input_for_file(test))
-        return self._runner.run_tests(self._expectations, test_inputs, tests_to_skip, num_workers, needs_http, needs_websockets, retrying)
+        return self._runner.run_tests(self._expectations, test_inputs, tests_to_skip, num_workers, retrying)
+
+    def _start_servers(self, tests_to_run):
+        if self._port.requires_http_server() or any(self._is_http_test(test) for test in tests_to_run):
+            self._printer.write_update('Starting HTTP server ...')
+            self._port.start_http_server(number_of_servers=(2 * self._options.max_locked_shards))
+            self._http_server_started = True
+
+        if any(self._is_websocket_test(test) for test in tests_to_run):
+            self._printer.write_update('Starting WebSocket server ...')
+            self._port.start_websocket_server()
+            self._websockets_server_started = True
+
+    def _stop_servers(self):
+        if self._http_server_started:
+            self._printer.write_update('Stopping HTTP server ...')
+            self._http_server_started = False
+            self._port.stop_http_server()
+        if self._websockets_server_started:
+            self._printer.write_update('Stopping WebSocket server ...')
+            self._websockets_server_started = False
+            self._port.stop_websocket_server()
 
     def _clean_up_run(self):
         _log.debug("Flushing stdout")

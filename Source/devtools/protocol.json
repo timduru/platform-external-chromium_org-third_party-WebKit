@@ -354,6 +354,14 @@
                 "hidden": true
             },
             {
+                "name": "setShowScrollBottleneckRects",
+                "description": "Requests that backend shows scroll bottleneck rects",
+                "parameters": [
+                    { "name": "show", "type": "boolean", "description": "True for showing scroll bottleneck rects" }
+                ],
+                "hidden": true
+            },
+            {
                 "name": "getScriptExecutionStatus",
                 "description": "Determines if scripts can be executed in the page.",
                 "returns": [
@@ -411,22 +419,6 @@
                     { "name": "media", "type": "string", "description": "Media type to emulate. Empty string disables the override." }
                 ],
                 "description": "Emulates the given media for CSS media queries.",
-                "hidden": true
-            },
-            {
-                "name": "getCompositingBordersVisible",
-                "description": "Indicates the visibility of compositing borders.",
-                "returns": [
-                    { "name": "result", "type": "boolean", "description": "If true, compositing borders are visible." }
-                ],
-                "hidden": true
-            },
-            {
-                "name": "setCompositingBordersVisible",
-                "description": "Controls the visibility of compositing borders.",
-                "parameters": [
-                    { "name": "visible", "type": "boolean", "description": "True for showing compositing borders." }
-                ],
                 "hidden": true
             },
             {
@@ -568,7 +560,7 @@
                     { "name": "value", "type": "any", "optional": true, "description": "Remote object value (in case of primitive values or JSON values if it was requested)." },
                     { "name": "description", "type": "string", "optional": true, "description": "String representation of the object." },
                     { "name": "objectId", "$ref": "RemoteObjectId", "optional": true, "description": "Unique object identifier (for non-primitive values)." },
-                    { "name": "preview", "$ref": "ObjectPreview", "optional": true, "description": "Preview containsing abbreviated property values.", "hidden": true }
+                    { "name": "preview", "$ref": "ObjectPreview", "optional": true, "description": "Preview containing abbreviated property values.", "hidden": true }
                 ]
             },
             {
@@ -754,6 +746,7 @@
                     { "name": "type", "type": "string", "optional": true, "enum": ["log", "dir", "dirxml", "table", "trace", "clear", "startGroup", "startGroupCollapsed", "endGroup", "assert", "timing", "profile", "profileEnd"], "description": "Console message type." },
                     { "name": "url", "type": "string", "optional": true, "description": "URL of the message origin." },
                     { "name": "line", "type": "integer", "optional": true, "description": "Line number in the resource that generated this message." },
+                    { "name": "column", "type": "integer", "optional": true, "description": "Column number in the resource that generated this message." },
                     { "name": "repeatCount", "type": "integer", "optional": true, "description": "Repeat count for repeated messages." },
                     { "name": "parameters", "type": "array", "items": { "$ref": "Runtime.RemoteObject" }, "optional": true, "description": "Message parameters in case of the formatted message." },
                     { "name": "stackTrace", "$ref": "StackTrace", "optional": true, "description": "JavaScript stack trace for assertions and error messages." },
@@ -1047,9 +1040,12 @@
                 "async": true,
                 "parameters": [
                     { "name": "frameId", "$ref": "FrameId", "description": "Frame to load the resource from." },
-                    { "name": "url", "type": "string", "description": "URL of the resource to load." }
+                    { "name": "url", "type": "string", "description": "URL of the resource to load." },
+                    { "name": "requestHeaders", "$ref": "Network.Headers", "optional": true, "description": "Request headers." }
                 ],
                 "returns": [
+                    { "name": "statusCode", "type": "number", "description": "HTTP status code." },
+                    { "name": "responseHeaders", "$ref": "Network.Headers", "description": "Response headers." },
                     { "name": "content", "type": "string", "description": "Resource content." }
                 ],
                 "description": "Loads a resource in the context of a frame on the inspected page without cross origin checks.",
@@ -2391,7 +2387,6 @@
                     { "name": "text", "type": "string", "description": "Media query text." },
                     { "name": "source", "type": "string", "enum": ["mediaRule", "importRule", "linkedSheet", "inlineSheet"], "description": "Source of the media query: \"mediaRule\" if specified by a @media rule, \"importRule\" if specified by an @import rule, \"linkedSheet\" if specified by a \"media\" attribute in a linked stylesheet's LINK tag, \"inlineSheet\" if specified by a \"media\" attribute in an inline stylesheet's STYLE tag." },
                     { "name": "sourceURL", "type": "string", "optional": true, "description": "URL of the document containing the media query description." },
-                    { "name": "sourceLine", "type": "integer", "optional": true, "description": "Line in the document containing the media query (not defined for the \"linkedSheet\" source)." },
                     { "name": "range", "$ref": "SourceRange", "optional": true, "description": "The associated rule (@media or @import) header range in the enclosing stylesheet (if available)." }
                 ],
                 "description": "CSS media query descriptor."
@@ -2664,6 +2659,14 @@
                 ],
                 "description": "Fires when a Named Flow's layout may have changed.",
                 "hidden": true
+            },
+            {
+                "name": "regionOversetChanged",
+                "parameters": [
+                    { "name": "namedFlow", "$ref": "NamedFlow", "description": "The Named Flow containing the regions whose regionOverset values changed." }
+                ],
+                "description": "Fires if any of the regionOverset values changed in a Named Flow's region chain.",
+                "hidden": true
             }
         ]
     },
@@ -2785,6 +2788,20 @@
                     { "name": "object", "$ref": "Runtime.RemoteObject", "description": "Object representing the scope. For <code>global</code> and <code>with</code> scopes it represents the actual object; for the rest of the scopes, it is artificial transient object enumerating scope variables as its properties." }
                 ],
                 "description": "Scope description."
+            },
+            {
+                "id": "SetScriptSourceError",
+                "type": "object",
+                "properties": [
+                    { "name": "compileError", "optional": true, "type": "object", "properties":
+                        [
+                            { "name": "message", "type": "string", "description": "Compiler error message" },
+                            { "name": "lineNumber", "type": "integer", "description": "Compile error line number (1-based)" },
+                            { "name": "columnNumber", "type": "integer", "description": "Compile error column number (1-based)" }
+                        ]
+                    }
+                ],
+                "description": "Error data for setScriptSource command. compileError is a case type for uncompilable script source error."
             }
         ],
         "commands": [
@@ -2895,6 +2912,9 @@
                     { "name": "callFrames", "type": "array", "optional": true, "items": { "$ref": "CallFrame"}, "description": "New stack trace in case editing has happened while VM was stopped." },
                     { "name": "result", "type": "object", "optional": true, "description": "VM-specific description of the changes applied.", "hidden": true }
                 ],
+                "error": {
+                    "$ref": "SetScriptSourceError"
+                },
                 "description": "Edits JavaScript source live."
             },
             {
@@ -3152,6 +3172,7 @@
                 "description": "CPU Profile node. Holds callsite information, execution statistics and child nodes.",
                 "properties": [
                     { "name": "functionName", "type": "string", "description": "Function name." },
+                    { "name": "scriptId", "$ref": "Debugger.ScriptId", "description": "Script identifier." },
                     { "name": "url", "type": "string", "description": "URL." },
                     { "name": "lineNumber", "type": "integer", "description": "Line number." },
                     { "name": "totalTime", "type": "number", "description": "Total execution time." },
@@ -3464,7 +3485,10 @@
                 "id": "CallArgument",
                 "type": "object",
                 "properties": [
-                    { "name": "description", "type": "string" }
+                    { "name": "description", "type": "string", "description": "String representation of the object." },
+                    { "name": "resourceId", "$ref": "ResourceId", "optional": true, "description": "Resource identifier. Specified for <code>Resource</code> objects only." },
+                    { "name": "type", "type": "string", "optional": true, "enum": ["object", "function", "undefined", "string", "number", "boolean"], "description": "Object type. Specified for non <code>Resource</code> objects only." },
+                    { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date"], "description": "Object subtype hint. Specified for <code>object</code> type values only." }
                 ]
             },
             {
@@ -3588,6 +3612,20 @@
                 "returns": [
                     { "name": "resourceState", "$ref": "ResourceState" }
                 ]
+            },
+            {
+                "name": "evaluateTraceLogCallArgument",
+                "parameters": [
+                    { "name": "traceLogId", "$ref": "TraceLogId" },
+                    { "name": "callIndex", "type": "integer", "description": "Index of the call to evaluate on (zero based)." },
+                    { "name": "argumentIndex", "type": "integer", "description": "Index of the argument to evaluate (zero based). Provide <code>-1</code> to evaluate call result." },
+                    { "name": "objectGroup", "type": "string", "optional": true, "description": "String object group name to put result into (allows rapid releasing resulting object handles using <code>Runtime.releaseObjectGroup</code>)." }
+                ],
+                "returns": [
+                    { "name": "result", "$ref": "Runtime.RemoteObject", "optional": true, "description": "Object wrapper for the evaluation result." },
+                    { "name": "resourceState", "$ref": "ResourceState", "optional": true, "description": "State of the <code>Resource</code> object." }
+                ],
+                "description": "Evaluates a given trace call argument or its result."
             }
         ],
         "events": [

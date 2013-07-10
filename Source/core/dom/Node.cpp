@@ -28,19 +28,12 @@
 #include "HTMLNames.h"
 #include "XMLNames.h"
 #include "core/accessibility/AXObjectCache.h"
-#include "core/css/CSSParser.h"
-#include "core/css/CSSRule.h"
-#include "core/css/CSSSelector.h"
-#include "core/css/CSSSelectorList.h"
-#include "core/css/CSSStyleRule.h"
-#include "core/css/CSSStyleSheet.h"
 #include "core/dom/Attr.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/BeforeLoadEvent.h"
 #include "core/dom/ChildListMutationScope.h"
 #include "core/dom/ChildNodeList.h"
 #include "core/dom/ClassNodeList.h"
-#include "core/dom/ContainerNodeAlgorithms.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentFragment.h"
@@ -48,7 +41,6 @@
 #include "core/dom/Element.h"
 #include "core/dom/ElementRareData.h"
 #include "core/dom/Event.h"
-#include "core/dom/EventContext.h"
 #include "core/dom/EventDispatchMediator.h"
 #include "core/dom/EventDispatcher.h"
 #include "core/dom/EventListener.h"
@@ -62,16 +54,11 @@
 #include "core/dom/MouseEvent.h"
 #include "core/dom/MutationEvent.h"
 #include "core/dom/NameNodeList.h"
-#include "core/dom/NamedNodeMap.h"
 #include "core/dom/NodeRareData.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/ProcessingInstruction.h"
-#include "core/dom/ProgressEvent.h"
-#include "core/dom/RegisteredEventListener.h"
-#include "core/dom/ScopedEventQueue.h"
 #include "core/dom/SelectorQuery.h"
-#include "core/dom/StaticNodeList.h"
 #include "core/dom/TagNodeList.h"
 #include "core/dom/TemplateContentDocumentFragment.h"
 #include "core/dom/Text.h"
@@ -79,50 +66,31 @@
 #include "core/dom/TouchEvent.h"
 #include "core/dom/TreeScopeAdopter.h"
 #include "core/dom/UIEvent.h"
-#include "core/dom/UIEventWithKeyState.h"
 #include "core/dom/UserActionElementSet.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/dom/WheelEvent.h"
-#include "core/dom/WindowEventContext.h"
 #include "core/dom/shadow/ElementShadow.h"
-#include "core/dom/shadow/InsertionPoint.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/htmlediting.h"
-#include "core/html/DOMSettableTokenList.h"
-#include "core/html/HTMLElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLStyleElement.h"
-#include "core/html/LabelsNodeList.h"
 #include "core/html/RadioNodeList.h"
 #include "core/inspector/InspectorCounters.h"
-#include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
 #include "core/page/ContextMenuController.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
-#include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/Logging.h"
-#include "core/platform/PlatformMouseEvent.h"
-#include "core/platform/PlatformWheelEvent.h"
-#include "core/rendering/RenderBlock.h"
+#include "core/platform/Partitions.h"
+#include "core/rendering/FlowThreadController.h"
 #include "core/rendering/RenderBox.h"
-#include "core/rendering/RenderTextControl.h"
-#include "core/rendering/RenderView.h"
-#include "core/storage/StorageEvent.h"
 #include "wtf/HashSet.h"
-#include "wtf/PartitionAlloc.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCountedLeakCounter.h"
 #include "wtf/UnusedParam.h"
 #include "wtf/Vector.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/StringBuilder.h"
-
-#ifndef NDEBUG
-#include "core/rendering/RenderLayer.h"
-#endif
 
 using namespace std;
 
@@ -131,11 +99,9 @@ namespace WebCore {
 using namespace HTMLNames;
 
 #if ENABLE(PARTITION_ALLOC)
-static PartitionRoot root;
-
 void* Node::operator new(size_t size)
 {
-    return partitionAlloc(&root, size);
+    return partitionAlloc(Partitions::getObjectModelPartition(), size);
 }
 
 void Node::operator delete(void* ptr)
@@ -143,20 +109,6 @@ void Node::operator delete(void* ptr)
     partitionFree(ptr);
 }
 #endif // ENABLE(PARTITION_ALLOC)
-
-void Node::init()
-{
-#if ENABLE(PARTITION_ALLOC)
-    partitionAllocInit(&root);
-#endif
-}
-
-void Node::shutdown()
-{
-#if ENABLE(PARTITION_ALLOC)
-    partitionAllocShutdown(&root);
-#endif
-}
 
 bool Node::isSupported(const String& feature, const String& version)
 {
@@ -875,12 +827,24 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
     if (!attached()) // changed compared to what?
         return;
 
+    // FIXME: Switch all callers to use setNeedsLayerUpdate and get rid of SyntheticStyleChange.
+    if (changeType == SyntheticStyleChange) {
+        setNeedsLayerUpdate();
+        return;
+    }
+
     StyleChangeType existingChangeType = styleChangeType();
     if (changeType > existingChangeType)
         setStyleChange(changeType);
 
     if (existingChangeType == NoStyleChange)
         markAncestorsWithChildNeedsStyleRecalc();
+}
+
+void Node::setNeedsLayerUpdate()
+{
+    setFlag(NeedsLayerUpdate);
+    setNeedsStyleRecalc(InlineStyleChange);
 }
 
 void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
@@ -912,7 +876,8 @@ bool Node::isFocusable() const
 {
     if (!inDocument() || !supportsFocus())
         return false;
-
+    if (isElementNode() && toElement(this)->isInert())
+        return false;
     return rendererIsFocusable();
 }
 
@@ -929,6 +894,12 @@ bool Node::isMouseFocusable() const
 Node* Node::focusDelegate()
 {
     return this;
+}
+
+bool Node::shouldHaveFocusAppearance() const
+{
+    ASSERT(focused());
+    return true;
 }
 
 unsigned Node::nodeIndex() const
@@ -1035,8 +1006,10 @@ bool Node::isDescendantOf(const Node *other) const
     // Return true if other is an ancestor of this, otherwise false
     if (!other || !other->hasChildNodes() || inDocument() != other->inDocument())
         return false;
-    if (other->isDocumentNode())
-        return document() == other && !isDocumentNode() && inDocument() && !isInShadowTree();
+    if (other->treeScope() != treeScope())
+        return false;
+    if (other->isTreeScope())
+        return !isTreeScope();
     for (const ContainerNode* n = parentNode(); n; n = n->parentNode()) {
         if (n == other)
             return true;
@@ -1231,6 +1204,11 @@ bool Node::canStartSelection() const
             return false;
     }
     return parentOrShadowHostNode() ? parentOrShadowHostNode()->canStartSelection() : true;
+}
+
+bool Node::isRegisteredWithNamedFlow() const
+{
+    return document()->renderView()->flowThreadController()->isContentNodeRegisteredWithAnyNamedFlow(this);
 }
 
 Element* Node::shadowHost() const
@@ -1515,7 +1493,7 @@ bool Node::isDefaultNamespace(const AtomicString& namespaceURIMaybeEmpty) const
         case DOCUMENT_FRAGMENT_NODE:
             return false;
         case ATTRIBUTE_NODE: {
-            const Attr* attr = static_cast<const Attr*>(this);
+            const Attr* attr = toAttr(this);
             if (attr->ownerElement())
                 return attr->ownerElement()->isDefaultNamespace(namespaceURI);
             return false;
@@ -1537,7 +1515,7 @@ String Node::lookupPrefix(const AtomicString &namespaceURI) const
     
     switch (nodeType()) {
         case ELEMENT_NODE:
-            return lookupNamespacePrefix(namespaceURI, static_cast<const Element *>(this));
+            return lookupNamespacePrefix(namespaceURI, toElement(this));
         case DOCUMENT_NODE:
             if (Element* de = toDocument(this)->documentElement())
                 return de->lookupPrefix(namespaceURI);
@@ -1570,7 +1548,7 @@ String Node::lookupNamespaceURI(const String &prefix) const
     
     switch (nodeType()) {
         case ELEMENT_NODE: {
-            const Element *elem = static_cast<const Element *>(this);
+            const Element *elem = toElement(this);
             
             if (!elem->namespaceURI().isNull() && elem->prefix() == prefix)
                 return elem->namespaceURI();
@@ -1753,8 +1731,8 @@ unsigned short Node::compareDocumentPositionInternal(const Node* otherNode, Shad
     if (otherNode == this)
         return DOCUMENT_POSITION_EQUIVALENT;
     
-    const Attr* attr1 = nodeType() == ATTRIBUTE_NODE ? static_cast<const Attr*>(this) : 0;
-    const Attr* attr2 = otherNode->nodeType() == ATTRIBUTE_NODE ? static_cast<const Attr*>(otherNode) : 0;
+    const Attr* attr1 = nodeType() == ATTRIBUTE_NODE ? toAttr(this) : 0;
+    const Attr* attr2 = otherNode->nodeType() == ATTRIBUTE_NODE ? toAttr(otherNode) : 0;
     
     const Node* start1 = attr1 ? attr1->ownerElement() : this;
     const Node* start2 = attr2 ? attr2->ownerElement() : otherNode;
@@ -1910,11 +1888,10 @@ String Node::debugName() const
 
     if (hasClass()) {
         name.appendLiteral(" class=\'");
-        const StyledElement* styledElement = static_cast<const StyledElement*>(this);
-        for (size_t i = 0; i < styledElement->classNames().size(); ++i) {
+        for (size_t i = 0; i < toElement(this)->classNames().size(); ++i) {
             if (i > 0)
                 name.append(' ');
-            name.append(styledElement->classNames()[i]);
+            name.append(toElement(this)->classNames()[i]);
         }
         name.append('\'');
     }
@@ -2511,9 +2488,10 @@ void Node::defaultEventHandler(Event* event)
         return;
     const AtomicString& eventType = event->type();
     if (eventType == eventNames().keydownEvent || eventType == eventNames().keypressEvent) {
-        if (event->isKeyboardEvent())
+        if (event->isKeyboardEvent()) {
             if (Frame* frame = document()->frame())
-                frame->eventHandler()->defaultKeyboardEventHandler(static_cast<KeyboardEvent*>(event));
+                frame->eventHandler()->defaultKeyboardEventHandler(toKeyboardEvent(event));
+        }
     } else if (eventType == eventNames().clickEvent) {
         int detail = event->isUIEvent() ? static_cast<UIEvent*>(event)->detail() : 0;
         if (dispatchDOMActivateEvent(detail, event))
@@ -2528,7 +2506,7 @@ void Node::defaultEventHandler(Event* event)
                 frame->eventHandler()->defaultTextInputEventHandler(static_cast<TextEvent*>(event));
 #if ENABLE(PAN_SCROLLING)
     } else if (eventType == eventNames().mousedownEvent && event->isMouseEvent()) {
-        MouseEvent* mouseEvent = static_cast<MouseEvent*>(event);
+        MouseEvent* mouseEvent = toMouseEvent(event);
         if (mouseEvent->button() == MiddleButton) {
             if (enclosingLinkEventParentOrSelf())
                 return;
@@ -2558,6 +2536,10 @@ void Node::defaultEventHandler(Event* event)
     } else if (event->type() == eventNames().webkitEditableContentChangedEvent) {
         dispatchInputEvent();
     }
+}
+
+void Node::willCallDefaultEventHandler(const Event&)
+{
 }
 
 bool Node::willRespondToMouseMoveEvents()
@@ -2701,7 +2683,7 @@ size_t Node::numberOfScopedHTMLStyleChildren() const
 {
     size_t count = 0;
     for (Node* child = firstChild(); child; child = child->nextSibling()) {
-        if (child->hasTagName(HTMLNames::styleTag) && static_cast<HTMLStyleElement*>(child)->isRegisteredAsScoped())
+        if (child->hasTagName(HTMLNames::styleTag) && toHTMLStyleElement(child)->isRegisteredAsScoped())
             count++;
     }
 

@@ -34,7 +34,6 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/html/HTMLImageLoader.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/page/Frame.h"
 #include "core/page/Settings.h"
 #include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderVideo.h"
@@ -64,9 +63,9 @@ bool HTMLVideoElement::rendererIsNeeded(const NodeRenderingContext& context)
     return HTMLElement::rendererIsNeeded(context); 
 }
 
-RenderObject* HTMLVideoElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* HTMLVideoElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderVideo(this);
+    return new (document()->renderArena()) RenderVideo(this);
 }
 
 void HTMLVideoElement::attach(const AttachContext& context)

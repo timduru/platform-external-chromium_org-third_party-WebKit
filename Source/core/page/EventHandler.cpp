@@ -429,14 +429,15 @@ void EventHandler::selectClosestMisspellingFromHitTestResult(const HitTestResult
 
     if (innerNode && innerNode->renderer()) {
         VisiblePosition pos(innerNode->renderer()->positionForPoint(result.localPoint()));
+        Position start = pos.deepEquivalent();
+        Position end = pos.deepEquivalent();
         if (pos.isNotNull()) {
-            RefPtr<Range> range = makeRange(pos, pos);
             Vector<DocumentMarker*> markers = innerNode->document()->markers()->markersInRange(
-                range.get(), DocumentMarker::Spelling | DocumentMarker::Grammar);
+                makeRange(pos, pos).get(), DocumentMarker::Spelling | DocumentMarker::Grammar);
             if (markers.size() == 1) {
-                range->setStart(innerNode, markers[0]->startOffset());
-                range->setEnd(innerNode, markers[0]->endOffset());
-                newSelection = VisibleSelection(range.get());
+                start.moveToOffset(markers[0]->startOffset());
+                end.moveToOffset(markers[0]->endOffset());
+                newSelection = VisibleSelection(start, end);
             }
         }
 
@@ -2079,7 +2080,7 @@ bool EventHandler::dispatchMouseEvent(const AtomicString& eventType, Node* targe
         // if the page already set it (e.g., by canceling default behavior).
         if (Page* page = m_frame->page()) {
             if (node && node->isMouseFocusable()) {
-                if (!page->focusController()->setFocusedNode(node, m_frame))
+                if (!page->focusController()->setFocusedNode(node, m_frame, FocusDirectionMouse))
                     swallowEvent = true;
             } else if (!node || !node->focused()) {
                 if (!page->focusController()->setFocusedNode(0, m_frame))
@@ -2405,7 +2406,7 @@ bool EventHandler::handleGestureLongPress(const PlatformGestureEvent& gestureEve
 #endif
     if (shouldLongPressSelectWord) {
         IntPoint hitTestPoint = m_frame->view()->windowToContents(gestureEvent.position());
-        HitTestResult result = hitTestResultAtPoint(hitTestPoint, HitTestRequest::ReadOnly | HitTestRequest::Active);
+        HitTestResult result = hitTestResultAtPoint(hitTestPoint);
         Node* innerNode = result.targetNode();
         if (!result.isLiveLink() && innerNode && (innerNode->isContentEditable() || innerNode->isTextNode())) {
             selectClosestWordFromHitTestResult(result, DontAppendTrailingWhitespace);
@@ -3278,6 +3279,12 @@ bool EventHandler::handleDrag(const MouseEventWithHitTestResults& event, CheckDr
             }
         } 
         
+        Page* page = m_frame->page();
+        DragController* dragController = page ? page->dragController() : 0;
+        if (!dragController || !dragController->populateDragClipboard(m_frame, dragState(), m_mouseDownPos)) {
+            m_mouseDownMayStartDrag = false;
+            goto cleanupDrag;
+        }
         m_mouseDownMayStartDrag = dispatchDragSrcEvent(eventNames().dragstartEvent, m_mouseDown)
             && !m_frame->selection()->isInPasswordField();
         
@@ -3330,7 +3337,7 @@ bool EventHandler::handleTextInputEvent(const String& text, Event* underlyingEve
 {
     // Platforms should differentiate real commands like selectAll from text input in disguise (like insertNewline),
     // and avoid dispatching text input events from keydown default handlers.
-    ASSERT(!underlyingEvent || !underlyingEvent->isKeyboardEvent() || static_cast<KeyboardEvent*>(underlyingEvent)->type() == eventNames().keypressEvent);
+    ASSERT(!underlyingEvent || !underlyingEvent->isKeyboardEvent() || toKeyboardEvent(underlyingEvent)->type() == eventNames().keypressEvent);
 
     if (!m_frame)
         return false;

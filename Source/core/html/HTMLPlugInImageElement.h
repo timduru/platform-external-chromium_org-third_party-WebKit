@@ -25,8 +25,7 @@
 
 #include "core/platform/MIMETypeFromURL.h"
 #include "core/rendering/style/RenderStyle.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/RefPtr.h>
+#include "wtf/OwnPtr.h"
 
 namespace WebCore {
 
@@ -98,7 +97,7 @@ protected:
     virtual void didMoveToNewDocument(Document* oldDocument) OVERRIDE;
 
 private:
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
     virtual void willRecalcStyle(StyleChange) OVERRIDE FINAL;
 
     virtual void finishParsingChildren();

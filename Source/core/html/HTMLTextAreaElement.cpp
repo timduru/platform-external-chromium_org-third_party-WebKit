@@ -204,9 +204,9 @@ void HTMLTextAreaElement::parseAttribute(const QualifiedName& name, const Atomic
         HTMLTextFormControlElement::parseAttribute(name, value);
 }
 
-RenderObject* HTMLTextAreaElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* HTMLTextAreaElement::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderTextControlMultiLine(this);
+    return new (document()->renderArena()) RenderTextControlMultiLine(this);
 }
 
 bool HTMLTextAreaElement::appendFormData(FormDataList& encoding, bool)
@@ -241,9 +241,9 @@ bool HTMLTextAreaElement::isKeyboardFocusable(KeyboardEvent*) const
     return isFocusable();
 }
 
-bool HTMLTextAreaElement::isMouseFocusable() const
+bool HTMLTextAreaElement::shouldShowFocusRingOnMouseFocus() const
 {
-    return isFocusable();
+    return true;
 }
 
 void HTMLTextAreaElement::updateFocusAppearance(bool restorePreviousSelection)

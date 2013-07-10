@@ -34,10 +34,9 @@ import sys
 from webkitpy.common.checkout import Checkout
 from webkitpy.common.checkout.scm.detection import SCMDetector
 from webkitpy.common.memoized import memoized
-from webkitpy.common.net import bugzilla, buildbot, web
+from webkitpy.common.net import buildbot, web
 from webkitpy.common.net.buildbot.chromiumbuildbot import ChromiumBuildBot
 from webkitpy.common.system.systemhost import SystemHost
-from webkitpy.common.watchlist.watchlistloader import WatchListLoader
 from webkitpy.layout_tests.port.factory import PortFactory
 
 
@@ -54,7 +53,6 @@ class Host(SystemHost):
         self._checkout = None
 
         # Everything below this line is WebKit-specific and belongs on a higher-level object.
-        self.bugs = bugzilla.Bugzilla()
         self.buildbot = buildbot.BuildBot()
 
         # FIXME: Unfortunately Port objects are currently the central-dispatch objects of the NRWT world.
@@ -79,7 +77,7 @@ class Host(SystemHost):
         os.environ['LC_MESSAGES'] = 'en_US.UTF-8'
         os.environ['LC_ALL'] = ''
 
-    # FIXME: This is a horrible, horrible hack for ChromiumWin and should be removed.
+    # FIXME: This is a horrible, horrible hack for WinPort and should be removed.
     # Maybe this belongs in SVN in some more generic "find the svn binary" codepath?
     # Or possibly Executive should have a way to emulate shell path-lookups?
     # FIXME: Unclear how to test this, since it currently mutates global state on SVN.
@@ -89,7 +87,7 @@ class Host(SystemHost):
         except OSError, e:
             try:
                 self.executive.run_command(['svn.bat', 'help'])
-                # Chromium Win uses the depot_tools package, which contains a number
+                # The Win port uses the depot_tools package, which contains a number
                 # of development tools, including Python and svn. Instead of using a
                 # real svn executable, depot_tools indirects via a batch file, called
                 # svn.bat. This batch file allows depot_tools to auto-update the real
@@ -109,7 +107,7 @@ class Host(SystemHost):
         except OSError, e:
             try:
                 self.executive.run_command(['git.bat', 'help'])
-                # Chromium Win uses the depot_tools package, which contains a number
+                # The Win port uses the depot_tools package, which contains a number
                 # of development tools, including Python and git. Instead of using a
                 # real git executable, depot_tools indirects via a batch file, called
                 # git.bat. This batch file allows depot_tools to auto-update the real
@@ -146,7 +144,3 @@ class Host(SystemHost):
     @memoized
     def chromium_buildbot(self):
         return ChromiumBuildBot()
-
-    @memoized
-    def watch_list(self):
-        return WatchListLoader(self.filesystem).load()

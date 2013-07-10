@@ -27,11 +27,8 @@
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/DOMTimeStamp.h"
 #include "core/dom/EventContext.h"
-#include "core/dom/EventNames.h"
-#include <wtf/HashMap.h>
-#include <wtf/ListHashSet.h>
-#include <wtf/RefCounted.h>
-#include <wtf/text/AtomicString.h>
+#include "wtf/RefCounted.h"
+#include "wtf/text/AtomicString.h"
 
 namespace WebCore {
 
@@ -168,8 +165,6 @@ public:
     bool isBeingDispatched() const { return eventPhase(); }
 
     virtual void reportMemoryUsage(MemoryObjectInfo*) const;
-
-    virtual PassRefPtr<Event> cloneFor(HTMLIFrameElement*) const;
 
 protected:
     Event();

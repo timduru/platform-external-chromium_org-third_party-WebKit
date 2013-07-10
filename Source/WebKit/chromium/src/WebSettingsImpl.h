@@ -53,6 +53,7 @@ public:
     virtual void setAcceleratedCompositingFor3DTransformsEnabled(bool);
     virtual void setAcceleratedCompositingForAnimationEnabled(bool);
     virtual void setAcceleratedCompositingForCanvasEnabled(bool);
+    virtual void setAcceleratedCompositingForFiltersEnabled(bool);
     virtual void setAcceleratedCompositingForFixedPositionEnabled(bool);
     virtual void setAcceleratedCompositingForOverflowScrollEnabled(bool);
     virtual void setAcceleratedCompositingForTransitionEnabled(bool);
@@ -126,6 +127,7 @@ public:
     virtual void setPasswordEchoEnabled(bool);
     virtual void setPerTilePaintingEnabled(bool);
     virtual void setPictographFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON);
+    virtual void setPinchOverlayScrollbarThickness(int);
     virtual void setPinchVirtualViewportEnabled(bool);
     virtual void setPluginsEnabled(bool);
     virtual void setPrivilegedWebGLExtensionsEnabled(bool);
@@ -176,6 +178,7 @@ public:
     bool doubleTapToZoomEnabled() const { return m_doubleTapToZoomEnabled; }
     bool perTilePaintingEnabled() const { return m_perTilePaintingEnabled; }
     bool supportDeprecatedTargetDensityDPI() const { return m_supportDeprecatedTargetDensityDPI; }
+    int pinchOverlayScrollbarThickness() const { return m_pinchOverlayScrollbarThickness; }
 
 private:
     WebCore::Settings* m_settings;
@@ -189,6 +192,7 @@ private:
     bool m_doubleTapToZoomEnabled;
     bool m_perTilePaintingEnabled;
     bool m_supportDeprecatedTargetDensityDPI;
+    int m_pinchOverlayScrollbarThickness;
 };
 
 } // namespace WebKit

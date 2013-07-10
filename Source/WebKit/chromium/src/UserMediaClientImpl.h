@@ -33,7 +33,7 @@
 
 #include "core/platform/mediastream/MediaStreamSource.h"
 #include "modules/mediastream/UserMediaClient.h"
-#include <wtf/PassRefPtr.h>
+#include "wtf/PassRefPtr.h"
 
 namespace WebCore {
 class UserMediaRequest;
@@ -49,7 +49,7 @@ public:
     UserMediaClientImpl(WebViewImpl*);
 
     // WebCore::UserMediaClient ----------------------------------------------
-    virtual void requestUserMedia(PassRefPtr<WebCore::UserMediaRequest>, const WebCore::MediaStreamSourceVector& audioSources, const WebCore::MediaStreamSourceVector& videoSources);
+    virtual void requestUserMedia(PassRefPtr<WebCore::UserMediaRequest>);
     virtual void cancelUserMediaRequest(WebCore::UserMediaRequest*);
 
 private:

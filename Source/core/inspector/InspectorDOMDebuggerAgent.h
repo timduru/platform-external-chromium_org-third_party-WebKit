@@ -34,10 +34,9 @@
 
 #include "core/inspector/InspectorBaseAgent.h"
 #include "core/inspector/InspectorDebuggerAgent.h"
-#include <wtf/HashMap.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/HashMap.h"
+#include "wtf/PassOwnPtr.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -47,9 +46,9 @@ class Event;
 class InspectorDOMAgent;
 class InspectorDebuggerAgent;
 class InspectorFrontend;
-class InspectorObject;
 class InspectorState;
 class InstrumentingAgents;
+class JSONObject;
 class Node;
 
 typedef String ErrorString;
@@ -96,8 +95,8 @@ public:
 private:
     InspectorDOMDebuggerAgent(InstrumentingAgents*, InspectorCompositeState*, InspectorDOMAgent*, InspectorDebuggerAgent*);
 
-    void pauseOnNativeEventIfNeeded(PassRefPtr<InspectorObject> eventData, bool synchronous);
-    PassRefPtr<InspectorObject> preparePauseOnNativeEventData(bool isDOMEvent, const String& eventName);
+    void pauseOnNativeEventIfNeeded(PassRefPtr<JSONObject> eventData, bool synchronous);
+    PassRefPtr<JSONObject> preparePauseOnNativeEventData(bool isDOMEvent, const String& eventName);
 
     // InspectorDebuggerAgent::Listener implementation.
     virtual void debuggerWasEnabled();
@@ -106,7 +105,7 @@ private:
     virtual void didPause();
     void disable();
 
-    void descriptionForDOMEvent(Node* target, int breakpointType, bool insertion, InspectorObject* description);
+    void descriptionForDOMEvent(Node* target, int breakpointType, bool insertion, JSONObject* description);
     void updateSubtreeBreakpoints(Node*, uint32_t rootMask, bool set);
     bool hasBreakpoint(Node*, int type);
     void discardBindings();

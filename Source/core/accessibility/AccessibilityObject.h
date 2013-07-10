@@ -32,12 +32,11 @@
 
 #include "core/editing/TextIterator.h"
 #include "core/editing/VisiblePosition.h"
-#include "core/editing/VisibleSelection.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/LayoutRect.h"
-#include <wtf/Forward.h>
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
+#include "wtf/Forward.h"
+#include "wtf/RefPtr.h"
+#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -319,7 +318,8 @@ public:
     bool isMenuRelated() const;
     virtual bool isMockObject() const { return false; }
     virtual bool isNativeSpinButton() const { return false; }
-    virtual bool isNativeTextControl() const { return false; }
+    virtual bool isNativeTextControl() const { return false; } // input or textarea
+    virtual bool isNonNativeTextControl() const { return false; } // contenteditable or role=textbox
     virtual bool isPasswordField() const { return false; }
     virtual bool isProgressIndicator() const { return false; }
     bool isRadioButton() const { return roleValue() == RadioButtonRole; }
@@ -515,6 +515,7 @@ public:
     virtual void handleActiveDescendantChanged() { }
     virtual void handleAriaExpandedChanged() { }
     void notifyIfIgnoredValueChanged();
+    virtual void selectionChanged();
     virtual void textChanged() { }
     virtual void updateAccessibilityRole() { }
 

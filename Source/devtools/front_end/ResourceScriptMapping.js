@@ -36,7 +36,7 @@
 WebInspector.ResourceScriptMapping = function(workspace)
 {
     this._workspace = workspace;
-    this._workspace.addEventListener(WebInspector.UISourceCodeProvider.Events.UISourceCodeAdded, this._uiSourceCodeAddedToWorkspace, this);
+    this._workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeAdded, this._uiSourceCodeAddedToWorkspace, this);
 
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.GlobalObjectCleared, this._debuggerReset, this);
     this._initialize();
@@ -291,12 +291,13 @@ WebInspector.ResourceScriptFile.prototype = {
     {
         /**
          * @param {?string} error
+         * @param {DebuggerAgent.SetScriptSourceError=} errorData
          */
-        function innerCallback(error)
+        function innerCallback(error, errorData)
         {
             if (error) {
                 this._update();
-                WebInspector.showErrorMessage(error);
+                WebInspector.LiveEditSupport.logDetailedError(error, errorData, this._script);
                 return;
             }
 

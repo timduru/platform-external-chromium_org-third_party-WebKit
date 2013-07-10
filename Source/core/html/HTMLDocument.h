@@ -25,12 +25,12 @@
 
 #include "core/dom/Document.h"
 #include "core/loader/cache/CachedResourceClient.h"
-#include <wtf/HashCountedSet.h>
-#include <wtf/text/AtomicStringHash.h>
+#include "wtf/HashCountedSet.h"
 
 namespace WebCore {
 
 class FrameView;
+class HTMLBodyElement;
 class HTMLElement;
 
 class HTMLDocument : public Document, public CachedResourceClient {
@@ -40,9 +40,6 @@ public:
         return adoptRef(new HTMLDocument(frame, url));
     }
     virtual ~HTMLDocument();
-
-    int width();
-    int height();
 
     String dir();
     void setDir(const String&);
@@ -80,6 +77,7 @@ protected:
     HTMLDocument(Frame*, const KURL&, DocumentClassFlags extendedDocumentClasses = DefaultDocumentClass);
 
 private:
+    HTMLBodyElement* bodyAsHTMLBodyElement() const;
     void addItemToMap(HashCountedSet<AtomicStringImpl*>&, const AtomicString&);
     void removeItemFromMap(HashCountedSet<AtomicStringImpl*>&, const AtomicString&);
 

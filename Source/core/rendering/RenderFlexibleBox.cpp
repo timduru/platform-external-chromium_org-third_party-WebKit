@@ -39,63 +39,6 @@
 
 namespace WebCore {
 
-// Normally, -1 and 0 are not valid in a HashSet, but these are relatively likely order: values. Instead,
-// we make the two smallest int values invalid order: values (in the css parser code we clamp them to
-// int min + 2).
-struct RenderFlexibleBox::OrderHashTraits : WTF::GenericHashTraits<int> {
-    static const bool emptyValueIsZero = false;
-    static int emptyValue() { return std::numeric_limits<int>::min(); }
-    static void constructDeletedValue(int& slot) { slot = std::numeric_limits<int>::min() + 1; }
-    static bool isDeletedValue(int value) { return value == std::numeric_limits<int>::min() + 1; }
-};
-
-RenderFlexibleBox::OrderIterator::OrderIterator(const RenderFlexibleBox* flexibleBox)
-    : m_flexibleBox(flexibleBox)
-    , m_currentChild(0)
-    , m_orderValuesIterator(0)
-{
-}
-
-void RenderFlexibleBox::OrderIterator::setOrderValues(const OrderHashSet& orderValues)
-{
-    reset();
-    copyToVector(orderValues, m_orderValues);
-    std::sort(m_orderValues.begin(), m_orderValues.end());
-}
-
-RenderBox* RenderFlexibleBox::OrderIterator::first()
-{
-    reset();
-    return next();
-}
-
-RenderBox* RenderFlexibleBox::OrderIterator::next()
-{
-    do {
-        if (!m_currentChild) {
-            if (m_orderValuesIterator == m_orderValues.end())
-                return 0;
-            if (m_orderValuesIterator) {
-                ++m_orderValuesIterator;
-                if (m_orderValuesIterator == m_orderValues.end())
-                    return 0;
-            } else
-                m_orderValuesIterator = m_orderValues.begin();
-
-            m_currentChild = m_flexibleBox->firstChildBox();
-        } else
-            m_currentChild = m_currentChild->nextSiblingBox();
-    } while (!m_currentChild || m_currentChild->style()->order() != *m_orderValuesIterator);
-
-    return m_currentChild;
-}
-
-void RenderFlexibleBox::OrderIterator::reset()
-{
-    m_currentChild = 0;
-    m_orderValuesIterator = 0;
-}
-
 struct RenderFlexibleBox::LineContext {
     LineContext(LayoutUnit crossAxisOffset, LayoutUnit crossAxisExtent, size_t numberOfChildren, LayoutUnit maxAscent)
         : crossAxisOffset(crossAxisOffset)
@@ -343,7 +286,7 @@ void RenderFlexibleBox::layoutBlock(bool relayoutChildren, LayoutUnit)
     RenderFlowThread* flowThread = flowThreadContainingBlock();
     if (logicalWidthChangedInRegions(flowThread))
         relayoutChildren = true;
-    if (updateRegionsAndExclusionsLogicalSize(flowThread))
+    if (updateRegionsAndShapesLogicalSize(flowThread))
         relayoutChildren = true;
 
     m_numberOfInFlowChildrenOnFirstLine = -1;
@@ -351,7 +294,7 @@ void RenderFlexibleBox::layoutBlock(bool relayoutChildren, LayoutUnit)
     RenderBlock::startDelayUpdateScrollInfo();
 
     Vector<LineContext> lineContexts;
-    OrderHashSet orderValues;
+    Vector<int> orderValues;
     computeMainAxisPreferredSizes(orderValues);
     m_orderIterator.setOrderValues(orderValues);
 
@@ -762,17 +705,18 @@ LayoutUnit RenderFlexibleBox::preferredMainAxisContentExtentForChild(RenderBox* 
 void RenderFlexibleBox::layoutFlexItems(bool relayoutChildren, Vector<LineContext>& lineContexts)
 {
     OrderedFlexItemList orderedChildren;
-    LayoutUnit preferredMainAxisExtent;
+    LayoutUnit sumFlexBaseSize;
     double totalFlexGrow;
     double totalWeightedFlexShrink;
-    LayoutUnit minMaxAppliedMainAxisExtent;
+    LayoutUnit sumHypotheticalMainSize;
 
     m_orderIterator.first();
     LayoutUnit crossAxisOffset = flowAwareBorderBefore() + flowAwarePaddingBefore();
     bool hasInfiniteLineLength = false;
-    while (computeNextFlexLine(orderedChildren, preferredMainAxisExtent, totalFlexGrow, totalWeightedFlexShrink, minMaxAppliedMainAxisExtent, hasInfiniteLineLength)) {
-        LayoutUnit availableFreeSpace = mainAxisContentExtent(preferredMainAxisExtent) - preferredMainAxisExtent;
-        FlexSign flexSign = (minMaxAppliedMainAxisExtent < preferredMainAxisExtent + availableFreeSpace) ? PositiveFlexibility : NegativeFlexibility;
+    while (computeNextFlexLine(orderedChildren, sumFlexBaseSize, totalFlexGrow, totalWeightedFlexShrink, sumHypotheticalMainSize, hasInfiniteLineLength)) {
+        LayoutUnit containerMainInnerSize = mainAxisContentExtent(sumHypotheticalMainSize);
+        LayoutUnit availableFreeSpace = containerMainInnerSize - sumFlexBaseSize;
+        FlexSign flexSign = (sumHypotheticalMainSize < containerMainInnerSize) ? PositiveFlexibility : NegativeFlexibility;
         InflexibleFlexItemSize inflexibleItems;
         Vector<LayoutUnit> childSizes;
         while (!resolveFlexibleLengths(flexSign, orderedChildren, availableFreeSpace, totalFlexGrow, totalWeightedFlexShrink, inflexibleItems, childSizes, hasInfiniteLineLength)) {
@@ -927,11 +871,17 @@ LayoutUnit RenderFlexibleBox::computeChildMarginValue(Length margin, RenderView*
     return minimumValueForLength(margin, availableSize, view);
 }
 
-void RenderFlexibleBox::computeMainAxisPreferredSizes(OrderHashSet& orderValues)
+void RenderFlexibleBox::computeMainAxisPreferredSizes(Vector<int>& orderValues)
 {
     RenderView* renderView = view();
+    bool anyChildHasDefaultOrderValue = false;
+
     for (RenderBox* child = firstChildBox(); child; child = child->nextSiblingBox()) {
-        orderValues.add(child->style()->order());
+        // Avoid growing the vector for the common-case default value of 0.
+        if (int order = child->style()->order())
+            orderValues.append(child->style()->order());
+        else
+            anyChildHasDefaultOrderValue = true;
 
         if (child->isOutOfFlowPositioned())
             continue;
@@ -945,6 +895,13 @@ void RenderFlexibleBox::computeMainAxisPreferredSizes(OrderHashSet& orderValues)
             child->setMarginTop(computeChildMarginValue(child->style()->marginTop(), renderView));
             child->setMarginBottom(computeChildMarginValue(child->style()->marginBottom(), renderView));
         }
+    }
+
+    if (anyChildHasDefaultOrderValue) {
+        // Avoid growing the vector to the default capacity of 16 if we're only going to put one item in it.
+        if (orderValues.isEmpty())
+            orderValues.reserveInitialCapacity(1);
+        orderValues.append(0);
     }
 }
 
@@ -964,12 +921,12 @@ LayoutUnit RenderFlexibleBox::adjustChildSizeForMinAndMax(RenderBox* child, Layo
     return std::max(childSize, minExtent);
 }
 
-bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren, LayoutUnit& preferredMainAxisExtent, double& totalFlexGrow, double& totalWeightedFlexShrink, LayoutUnit& minMaxAppliedMainAxisExtent, bool& hasInfiniteLineLength)
+bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren, LayoutUnit& sumFlexBaseSize, double& totalFlexGrow, double& totalWeightedFlexShrink, LayoutUnit& sumHypotheticalMainSize, bool& hasInfiniteLineLength)
 {
     orderedChildren.clear();
-    preferredMainAxisExtent = 0;
+    sumFlexBaseSize = 0;
     totalFlexGrow = totalWeightedFlexShrink = 0;
-    minMaxAppliedMainAxisExtent = 0;
+    sumHypotheticalMainSize = 0;
 
     if (!m_orderIterator.currentChild())
         return false;
@@ -986,19 +943,20 @@ bool RenderFlexibleBox::computeNextFlexLine(OrderedFlexItemList& orderedChildren
         }
 
         LayoutUnit childMainAxisExtent = preferredMainAxisContentExtentForChild(child, hasInfiniteLineLength);
-        LayoutUnit childMainAxisMarginBoxExtent = mainAxisBorderAndPaddingExtentForChild(child) + childMainAxisExtent;
-        childMainAxisMarginBoxExtent += isHorizontalFlow() ? child->marginWidth() : child->marginHeight();
+        LayoutUnit childMainAxisMarginBorderPadding = mainAxisBorderAndPaddingExtentForChild(child)
+            + (isHorizontalFlow() ? child->marginWidth() : child->marginHeight());
+        LayoutUnit childMainAxisMarginBoxExtent = childMainAxisExtent + childMainAxisMarginBorderPadding;
 
-        if (isMultiline() && preferredMainAxisExtent + childMainAxisMarginBoxExtent > lineBreakLength && lineHasInFlowItem)
+        if (isMultiline() && sumFlexBaseSize + childMainAxisMarginBoxExtent > lineBreakLength && lineHasInFlowItem)
             break;
         orderedChildren.append(child);
         lineHasInFlowItem  = true;
-        preferredMainAxisExtent += childMainAxisMarginBoxExtent;
+        sumFlexBaseSize += childMainAxisMarginBoxExtent;
         totalFlexGrow += child->style()->flexGrow();
         totalWeightedFlexShrink += child->style()->flexShrink() * childMainAxisExtent;
 
         LayoutUnit childMinMaxAppliedMainAxisExtent = adjustChildSizeForMinAndMax(child, childMainAxisExtent);
-        minMaxAppliedMainAxisExtent += childMinMaxAppliedMainAxisExtent - childMainAxisExtent + childMainAxisMarginBoxExtent;
+        sumHypotheticalMainSize += childMinMaxAppliedMainAxisExtent + childMainAxisMarginBorderPadding;
     }
     return true;
 }

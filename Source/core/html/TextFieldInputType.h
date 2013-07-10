@@ -33,7 +33,6 @@
 
 #include "core/html/InputType.h"
 #include "core/html/shadow/SpinButtonElement.h"
-#include "core/html/shadow/TextControlInnerElements.h"
 
 namespace WebCore {
 
@@ -80,13 +79,13 @@ protected:
 
 private:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
-    virtual bool isMouseFocusable() const OVERRIDE;
+    virtual bool shouldShowFocusRingOnMouseFocus() const OVERRIDE;
     virtual bool isTextField() const OVERRIDE;
     virtual bool valueMissing(const String&) const OVERRIDE;
     virtual void handleBeforeTextInsertedEvent(BeforeTextInsertedEvent*) OVERRIDE;
     virtual void forwardEvent(Event*) OVERRIDE;
     virtual bool shouldSubmitImplicitly(Event*) OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*) const OVERRIDE;
+    virtual RenderObject* createRenderer(RenderStyle*) const OVERRIDE;
     virtual bool shouldUseInputMethod() const OVERRIDE;
     virtual String sanitizeValue(const String&) const OVERRIDE;
     virtual bool shouldRespectListAttribute() OVERRIDE;

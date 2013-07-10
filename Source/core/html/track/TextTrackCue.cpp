@@ -41,12 +41,11 @@
 #include "core/html/HTMLDivElement.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackCueList.h"
-#include "core/html/track/TextTrackRegionList.h"
 #include "core/html/track/WebVTTElement.h"
 #include "core/html/track/WebVTTParser.h"
 #include "core/rendering/RenderTextTrackCue.h"
-#include <wtf/MathExtras.h>
-#include <wtf/text/StringBuilder.h>
+#include "wtf/MathExtras.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -179,9 +178,9 @@ const AtomicString& TextTrackCueBox::textTrackCueBoxShadowPseudoId()
     return trackDisplayBoxShadowPseudoId;
 }
 
-RenderObject* TextTrackCueBox::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* TextTrackCueBox::createRenderer(RenderStyle*)
 {
-    return new (arena) RenderTextTrackCue(this);
+    return new (document()->renderArena()) RenderTextTrackCue(this);
 }
 
 // ----------------------------
@@ -480,8 +479,11 @@ void TextTrackCue::setText(const String& text)
 
 int TextTrackCue::cueIndex()
 {
-    if (m_cueIndex == invalidCueIndex)
-        m_cueIndex = track()->cues()->getCueIndex(this);
+    if (m_cueIndex == invalidCueIndex) {
+        TextTrackCueList* cues = track()->cues();
+        if (cues)
+            m_cueIndex = cues->getCueIndex(this);
+    }
 
     return m_cueIndex;
 }
@@ -760,7 +762,7 @@ void TextTrackCue::markFutureAndPastNodes(ContainerNode* root, double previousTi
             toWebVTTElement(child)->setIsPastNode(isPastNode);
             // Make an elemenet id match a cue id for style matching purposes.
             if (!m_id.isEmpty())
-                toElement(child)->setIdAttribute(AtomicString(m_id.characters(), m_id.length()));
+                toElement(child)->setIdAttribute(m_id);
         }
     }
 }

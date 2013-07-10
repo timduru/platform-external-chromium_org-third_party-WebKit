@@ -168,10 +168,16 @@ public:
         int selectionStart,
         int selectionEnd) { return false; }
 
+    enum ConfirmCompositionBehavior {
+        DoNotKeepSelection,
+        KeepSelection,
+    };
+
     // Called to inform the WebWidget to confirm an ongoing composition.
     // This method is same as confirmComposition(WebString());
     // Returns true if there is an ongoing composition.
-    virtual bool confirmComposition() { return false; }
+    virtual bool confirmComposition() { return false; } // Deprecated
+    virtual bool confirmComposition(ConfirmCompositionBehavior selectionBehavior) { return false; }
 
     // Called to inform the WebWidget to confirm an ongoing composition with a
     // new composition text. If the text is empty then the current composition
@@ -188,10 +194,6 @@ public:
 
     // Returns information about the current text input of this WebWidget.
     virtual WebTextInputInfo textInputInfo() { return WebTextInputInfo(); }
-
-    // Returns the current text input type of this WebWidget.
-    // FIXME: Remove this method. It's redundant with textInputInfo().
-    virtual WebTextInputType textInputType() { return WebTextInputTypeNone; }
 
     // Returns the anchor and focus bounds of the current selection.
     // If the selection range is empty, it returns the caret bounds.

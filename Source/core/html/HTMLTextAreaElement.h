@@ -100,11 +100,11 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
     virtual void collectStyleForPresentationAttribute(const QualifiedName&, const AtomicString&, MutableStylePropertySet*) OVERRIDE;
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
     virtual bool appendFormData(FormDataList&, bool);
     virtual void reset();
     virtual bool hasCustomFocusLogic() const OVERRIDE;
-    virtual bool isMouseFocusable() const;
+    virtual bool shouldShowFocusRingOnMouseFocus() const OVERRIDE;
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual void updateFocusAppearance(bool restorePreviousSelection);
 

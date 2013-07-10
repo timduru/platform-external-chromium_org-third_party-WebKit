@@ -24,11 +24,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
  */
 
-interface SVGRectElement : SVGStyledElement,
-                           SVGTests,
-                           SVGLangSpace,
-                           SVGExternalResourcesRequired,
-                           SVGTransformable {
+interface SVGRectElement : SVGGraphicsElement {
     readonly attribute SVGAnimatedLength x;
     readonly attribute SVGAnimatedLength y;
     readonly attribute SVGAnimatedLength width;
@@ -36,4 +32,6 @@ interface SVGRectElement : SVGStyledElement,
     readonly attribute SVGAnimatedLength rx;
     readonly attribute SVGAnimatedLength ry;
 };
+
+SVGRectElement implements SVGExternalResourcesRequired;
 

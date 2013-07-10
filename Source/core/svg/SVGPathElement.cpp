@@ -66,12 +66,11 @@ BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGPathElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(d)
     REGISTER_LOCAL_ANIMATED_PROPERTY(pathLength)
     REGISTER_LOCAL_ANIMATED_PROPERTY(externalResourcesRequired)
-    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGStyledTransformableElement)
-    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTests)
+    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGGraphicsElement)
 END_REGISTER_ANIMATED_PROPERTIES
 
 inline SVGPathElement::SVGPathElement(const QualifiedName& tagName, Document* document)
-    : SVGStyledTransformableElement(tagName, document)
+    : SVGGraphicsElement(tagName, document)
     , m_pathByteStream(SVGPathByteStream::create())
     , m_pathSegList(PathSegUnalteredRole)
     , m_isAnimValObserved(false)
@@ -206,19 +205,18 @@ bool SVGPathElement::isSupportedAttribute(const QualifiedName& attrName)
 {
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty()) {
-        SVGTests::addSupportedAttributes(supportedAttributes);
         SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         supportedAttributes.add(SVGNames::dAttr);
         supportedAttributes.add(SVGNames::pathLengthAttr);
     }
-    return supportedAttributes.contains<QualifiedName, SVGAttributeHashTranslator>(attrName);
+    return supportedAttributes.contains<SVGAttributeHashTranslator>(attrName);
 }
 
 void SVGPathElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (!isSupportedAttribute(name)) {
-        SVGStyledTransformableElement::parseAttribute(name, value);
+        SVGGraphicsElement::parseAttribute(name, value);
         return;
     }
 
@@ -235,8 +233,6 @@ void SVGPathElement::parseAttribute(const QualifiedName& name, const AtomicStrin
         return;
     }
 
-    if (SVGTests::parseAttribute(name, value))
-        return;
     if (SVGLangSpace::parseAttribute(name, value))
         return;
     if (SVGExternalResourcesRequired::parseAttribute(name, value))
@@ -248,14 +244,11 @@ void SVGPathElement::parseAttribute(const QualifiedName& name, const AtomicStrin
 void SVGPathElement::svgAttributeChanged(const QualifiedName& attrName)
 {
     if (!isSupportedAttribute(attrName)) {
-        SVGStyledTransformableElement::svgAttributeChanged(attrName);
+        SVGGraphicsElement::svgAttributeChanged(attrName);
         return;
     }
 
     SVGElementInstance::InvalidationGuard invalidationGuard(this);
-    
-    if (SVGTests::handleAttributeChange(this, attrName))
-        return;
 
     RenderSVGPath* renderer = toRenderSVGPath(this->renderer());
 
@@ -292,14 +285,14 @@ void SVGPathElement::invalidateMPathDependencies()
 
 Node::InsertionNotificationRequest SVGPathElement::insertedInto(ContainerNode* rootParent)
 {
-    SVGStyledTransformableElement::insertedInto(rootParent);
+    SVGGraphicsElement::insertedInto(rootParent);
     invalidateMPathDependencies();
     return InsertionDone;
 }
 
 void SVGPathElement::removedFrom(ContainerNode* rootParent)
 {
-    SVGStyledTransformableElement::removedFrom(rootParent);
+    SVGGraphicsElement::removedFrom(rootParent);
     invalidateMPathDependencies();
 }
 
@@ -401,10 +394,10 @@ FloatRect SVGPathElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
     return renderer->path().boundingRect();
 }
 
-RenderObject* SVGPathElement::createRenderer(RenderArena* arena, RenderStyle*)
+RenderObject* SVGPathElement::createRenderer(RenderStyle*)
 {
     // By default, any subclass is expected to do path-based drawing
-    return new (arena) RenderSVGPath(this);
+    return new (document()->renderArena()) RenderSVGPath(this);
 }
 
 }

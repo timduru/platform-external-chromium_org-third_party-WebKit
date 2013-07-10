@@ -35,6 +35,7 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
+#include "core/plugins/PluginView.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 
 namespace WebCore {
@@ -56,9 +57,13 @@ private:
     {
     }
 
-    virtual void appendBytes(DocumentWriter*, const char*, size_t);
+    virtual size_t appendBytes(const char*, size_t) OVERRIDE;
+
+    virtual void finish() OVERRIDE;
 
     void createDocumentStructure();
+
+    PluginView* pluginView() const;
 
     HTMLEmbedElement* m_embedElement;
 };
@@ -91,19 +96,11 @@ void PluginDocumentParser::createDocumentStructure()
     DocumentLoader* loader = document()->loader();
     ASSERT(loader);
     if (loader)
-        m_embedElement->setAttribute(typeAttr, loader->writer()->mimeType());
+        m_embedElement->setAttribute(typeAttr, loader->mimeType());
 
     toPluginDocument(document())->setPluginNode(m_embedElement);
 
     body->appendChild(embedElement, IGNORE_EXCEPTION);
-}
-
-void PluginDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
-{
-    if (m_embedElement)
-        return;
-
-    createDocumentStructure();
 
     Frame* frame = document()->frame();
     if (!frame)
@@ -121,15 +118,42 @@ void PluginDocumentParser::appendBytes(DocumentWriter*, const char*, size_t)
     // can synchronously redirect data to the plugin.
     frame->view()->flushAnyPendingPostLayoutTasks();
 
-    if (RenderPart* renderer = m_embedElement->renderPart()) {
-        if (Widget* widget = renderer->widget()) {
-            frame->loader()->client()->redirectDataToPlugin(widget);
-            // In a plugin document, the main resource is the plugin. If we have a null widget, that means
-            // the loading of the plugin was cancelled, which gives us a null mainResourceLoader(), so we
-            // need to have this call in a null check of the widget or of mainResourceLoader().
-            frame->loader()->activeDocumentLoader()->setMainResourceDataBufferingPolicy(DoNotBufferData);
-        }
+    if (PluginView* view = pluginView())
+        view->didReceiveResponse(document()->loader()->response());
+}
+
+size_t PluginDocumentParser::appendBytes(const char* data, size_t length)
+{
+    if (!m_embedElement)
+        createDocumentStructure();
+
+    if (!length)
+        return 0;
+    if (PluginView* view = pluginView())
+        view->didReceiveData(data, length);
+
+    return 0;
+}
+
+void PluginDocumentParser::finish()
+{
+    if (PluginView* view = pluginView()) {
+        const ResourceError& error = document()->loader()->mainDocumentError();
+        if (error.isNull())
+            view->didFinishLoading();
+        else
+            view->didFailLoading(error);
     }
+    RawDataDocumentParser::finish();
+}
+
+PluginView* PluginDocumentParser::pluginView() const
+{
+    if (Widget* widget = static_cast<PluginDocument*>(document())->pluginWidget()) {
+        ASSERT_WITH_SECURITY_IMPLICATION(widget->isPluginContainer());
+        return static_cast<PluginView*>(widget);
+    }
+    return 0;
 }
 
 PluginDocument::PluginDocument(Frame* frame, const KURL& url)
@@ -163,8 +187,6 @@ void PluginDocument::detach(const AttachContext& context)
 {
     // Release the plugin node so that we don't have a circular reference.
     m_pluginNode = 0;
-    if (FrameLoader* loader = frame()->loader())
-        loader->client()->redirectDataToPlugin(0);
     HTMLDocument::detach(context);
 }
 

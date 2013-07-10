@@ -26,13 +26,12 @@
 #ifndef AXObjectCache_h
 #define AXObjectCache_h
 
-#include <limits.h>
 #include "core/accessibility/AccessibilityObject.h"
 #include "core/platform/Timer.h"
-#include <wtf/Forward.h>
-#include <wtf/HashMap.h>
-#include <wtf/HashSet.h>
-#include <wtf/RefPtr.h>
+#include "wtf/Forward.h"
+#include "wtf/HashMap.h"
+#include "wtf/HashSet.h"
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
@@ -110,6 +109,7 @@ public:
     void checkedStateChanged(Node*);
     void selectedChildrenChanged(Node*);
     void selectedChildrenChanged(RenderObject*);
+    void selectionChanged(Node*);
     // Called by a node when text or a text equivalent (e.g. alt) attribute is changed.
     void textChanged(Node*);
     void textChanged(RenderObject*);

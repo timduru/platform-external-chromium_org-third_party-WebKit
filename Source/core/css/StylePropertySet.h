@@ -33,11 +33,11 @@ namespace WebCore {
 
 class CSSRule;
 class CSSStyleDeclaration;
+class Element;
 class ImmutableStylePropertySet;
 class KURL;
 class MutableStylePropertySet;
 class PropertySetCSSStyleDeclaration;
-class StyledElement;
 class StylePropertyShorthand;
 class StyleSheetContents;
 
@@ -211,7 +211,7 @@ public:
     void parseDeclaration(const String& styleDeclaration, StyleSheetContents* contextStyleSheet);
 
     CSSStyleDeclaration* ensureCSSStyleDeclaration();
-    CSSStyleDeclaration* ensureInlineCSSStyleDeclaration(StyledElement* parentElement);
+    CSSStyleDeclaration* ensureInlineCSSStyleDeclaration(Element* parentElement);
 
     Vector<CSSProperty, 4> m_propertyVector;
 

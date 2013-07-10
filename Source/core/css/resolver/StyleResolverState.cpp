@@ -22,12 +22,12 @@
 #include "config.h"
 #include "core/css/resolver/StyleResolverState.h"
 
-#include "core/css/CSSPrimitiveValueMappings.h"
+#include "core/dom/Element.h"
 #include "core/dom/Node.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeRenderingContext.h"
-#include "core/dom/StyledElement.h"
 #include "core/dom/VisitedLinkState.h"
+#include "core/page/Page.h"
 #include "core/rendering/RenderTheme.h"
 
 namespace WebCore {
@@ -49,20 +49,29 @@ void StyleResolverState::clear()
     m_parentStyle = 0;
     m_parentNode = 0;
     m_regionForStyling = 0;
-    m_pendingImageProperties.clear();
-    m_hasPendingShaders = false;
-    m_pendingSVGDocuments.clear();
+    m_elementStyleResources.clear();
 }
 
-void StyleResolverState::initElement(Element* e)
+void StyleResolverState::initElement(Element* element)
 {
-    m_element = e;
-    m_styledElement = e && e->isStyledElement() ? static_cast<StyledElement*>(e) : 0;
-    m_elementLinkState = e ? e->document()->visitedLinkState()->determineLinkState(e) : NotInsideLink;
+    if (m_element == element)
+        return;
+
+    m_element = element;
+    m_styledElement = element && element->isStyledElement() ? element : 0;
+    m_elementLinkState = element ? element->document()->visitedLinkState()->determineLinkState(element) : NotInsideLink;
+
+    if (!element || element != element->document()->documentElement())
+        return;
+
+    element->document()->setDirectionSetOnDocumentElement(false);
+    element->document()->setWritingModeSetOnDocumentElement(false);
 }
 
 void StyleResolverState::initForStyleResolve(Document* document, Element* e, RenderStyle* parentStyle, RenderRegion* regionForStyling)
 {
+    initElement(e);
+
     m_regionForStyling = regionForStyling;
 
     if (e) {
@@ -83,8 +92,11 @@ void StyleResolverState::initForStyleResolve(Document* document, Element* e, Ren
     m_rootElementStyle = docElement && e != docElement ? docElement->renderStyle() : docStyle;
 
     m_style = 0;
-    m_pendingImageProperties.clear();
+    m_elementStyleResources.clear();
     m_fontDirty = false;
+
+    if (Page* page = document->page())
+        m_elementStyleResources.setDeviceScaleFactor(page->deviceScaleFactor());
 }
 
 
@@ -125,7 +137,7 @@ static Color colorForCSSValue(CSSValueID cssValueId)
     return RenderTheme::defaultTheme()->systemColor(cssValueId);
 }
 
-Color StyleResolverState::colorFromPrimitiveValue(CSSPrimitiveValue* value, bool forVisitedLink) const
+Color StyleResolverState::resolveColorFromPrimitiveValue(CSSPrimitiveValue* value, bool forVisitedLink)
 {
     if (value->isRGBColor())
         return Color(value->getRGBA32Value());
@@ -143,11 +155,11 @@ Color StyleResolverState::colorFromPrimitiveValue(CSSPrimitiveValue* value, bool
     case CSSValueWebkitFocusRingColor:
         return RenderTheme::focusRingColor();
     case CSSValueCurrentcolor:
+        m_isMatchedPropertiesCacheable = false;
         return style()->color();
     default:
         return colorForCSSValue(valueID);
     }
 }
-
 
 } // namespace WebCore

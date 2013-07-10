@@ -28,8 +28,7 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "WebPreferences.h"
+#include "public/testing/WebPreferences.h"
 
 using namespace WebKit;
 

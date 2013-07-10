@@ -26,13 +26,11 @@
 #include "core/svg/SVGAnimatedRect.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
 #include "core/svg/SVGFitToViewBox.h"
-#include "core/svg/SVGLangSpace.h"
 #include "core/svg/SVGStyledElement.h"
 
 namespace WebCore {
 
 class SVGSymbolElement FINAL : public SVGStyledElement,
-                               public SVGLangSpace,
                                public SVGExternalResourcesRequired,
                                public SVGFitToViewBox {
 public:
@@ -46,7 +44,7 @@ private:
     bool isSupportedAttribute(const QualifiedName&);
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&);
-    virtual RenderObject* createRenderer(RenderArena*, RenderStyle*);
+    virtual RenderObject* createRenderer(RenderStyle*);
 
     virtual bool selfHasRelativeLengths() const;
 

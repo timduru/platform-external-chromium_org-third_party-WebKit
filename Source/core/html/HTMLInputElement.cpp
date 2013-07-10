@@ -30,7 +30,6 @@
 #include "core/html/HTMLInputElement.h"
 
 #include "CSSPropertyNames.h"
-#include "CSSValueKeywords.h"
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ScriptEventListener.h"
@@ -68,11 +67,9 @@
 #include "core/platform/Language.h"
 #include "core/platform/LocalizedStrings.h"
 #include "core/platform/PlatformMouseEvent.h"
-#include "core/platform/text/PlatformLocale.h"
 #include "core/rendering/RenderTextControlSingleLine.h"
 #include "core/rendering/RenderTheme.h"
-#include <wtf/MathExtras.h>
-#include <wtf/StdLibExtras.h>
+#include "wtf/MathExtras.h"
 
 using namespace std;
 
@@ -368,19 +365,14 @@ bool HTMLInputElement::isKeyboardFocusable(KeyboardEvent* event) const
     return m_inputType->isKeyboardFocusable(event);
 }
 
-bool HTMLInputElement::isMouseFocusable() const
+bool HTMLInputElement::shouldShowFocusRingOnMouseFocus() const
 {
-    return m_inputType->isMouseFocusable();
+    return m_inputType->shouldShowFocusRingOnMouseFocus();
 }
 
 bool HTMLInputElement::isTextFormControlKeyboardFocusable(KeyboardEvent* event) const
 {
     return HTMLTextFormControlElement::isKeyboardFocusable(event);
-}
-
-bool HTMLInputElement::isTextFormControlMouseFocusable() const
-{
-    return HTMLTextFormControlElement::isMouseFocusable();
 }
 
 void HTMLInputElement::updateFocusAppearance(bool restorePreviousSelection)
@@ -500,9 +492,9 @@ void HTMLInputElement::updateType()
     }
 
     if (wasAttached) {
-        attach();
+        lazyAttach();
         if (document()->focusedNode() == this)
-            updateFocusAppearance(true);
+            document()->updateFocusAppearanceSoon(true /* restore selection */);
     }
 
     if (ElementShadow* elementShadow = shadowOfParentForDistribution(this))
@@ -768,23 +760,15 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
     }
 #if ENABLE(INPUT_SPEECH)
     else if (name == webkitspeechAttr) {
-        if (m_inputType->shouldRespectSpeechAttribute() && RuntimeEnabledFeatures::speechInputEnabled()) {
+        if (RuntimeEnabledFeatures::speechInputEnabled() && m_inputType->shouldRespectSpeechAttribute()) {
             // This renderer and its children have quite different layouts and
             // styles depending on whether the speech button is visible or
             // not. So we reset the whole thing and recreate to get the right
             // styles and layout.
-            if (attached()) {
-                m_inputType->destroyShadowSubtree();
-                detach();
-                m_inputType->createShadowSubtree();
-                if (!attached())
-                    attach();
-            } else {
-                m_inputType->destroyShadowSubtree();
-                m_inputType->createShadowSubtree();
-            }
+            m_inputType->destroyShadowSubtree();
+            lazyReattachIfAttached();
+            m_inputType->createShadowSubtree();
             setFormControlValueMatchesRenderer(false);
-            setNeedsStyleRecalc();
         }
         UseCounter::count(document(), UseCounter::PrefixedSpeechAttribute);
     } else if (name == onwebkitspeechchangeAttr)
@@ -816,9 +800,9 @@ bool HTMLInputElement::rendererIsNeeded(const NodeRenderingContext& context)
     return m_inputType->rendererIsNeeded() && HTMLTextFormControlElement::rendererIsNeeded(context);
 }
 
-RenderObject* HTMLInputElement::createRenderer(RenderArena* arena, RenderStyle* style)
+RenderObject* HTMLInputElement::createRenderer(RenderStyle* style)
 {
-    return m_inputType->createRenderer(arena, style);
+    return m_inputType->createRenderer(style);
 }
 
 void HTMLInputElement::attach(const AttachContext& context)
@@ -1138,7 +1122,7 @@ void* HTMLInputElement::preDispatchEventHandler(Event* event)
     }
     if (event->type() != eventNames().clickEvent)
         return 0;
-    if (!event->isMouseEvent() || static_cast<MouseEvent*>(event)->button() != LeftButton)
+    if (!event->isMouseEvent() || toMouseEvent(event)->button() != LeftButton)
         return 0;
     // FIXME: Check whether there are any cases where this actually ends up leaking.
     return m_inputType->willDispatchClick().leakPtr();
@@ -1154,8 +1138,8 @@ void HTMLInputElement::postDispatchEventHandler(Event* event, void* dataFromPreD
 
 void HTMLInputElement::defaultEventHandler(Event* evt)
 {
-    if (evt->isMouseEvent() && evt->type() == eventNames().clickEvent && static_cast<MouseEvent*>(evt)->button() == LeftButton) {
-        m_inputType->handleClickEvent(static_cast<MouseEvent*>(evt));
+    if (evt->isMouseEvent() && evt->type() == eventNames().clickEvent && toMouseEvent(evt)->button() == LeftButton) {
+        m_inputType->handleClickEvent(toMouseEvent(evt));
         if (evt->defaultHandled())
             return;
     }
@@ -1167,7 +1151,7 @@ void HTMLInputElement::defaultEventHandler(Event* evt)
     }
 
     if (evt->isKeyboardEvent() && evt->type() == eventNames().keydownEvent) {
-        m_inputType->handleKeydownEvent(static_cast<KeyboardEvent*>(evt));
+        m_inputType->handleKeydownEvent(toKeyboardEvent(evt));
         if (evt->defaultHandled())
             return;
     }
@@ -1194,13 +1178,13 @@ void HTMLInputElement::defaultEventHandler(Event* evt)
     // Use key press event here since sending simulated mouse events
     // on key down blocks the proper sending of the key press event.
     if (evt->isKeyboardEvent() && evt->type() == eventNames().keypressEvent) {
-        m_inputType->handleKeypressEvent(static_cast<KeyboardEvent*>(evt));
+        m_inputType->handleKeypressEvent(toKeyboardEvent(evt));
         if (evt->defaultHandled())
             return;
     }
 
     if (evt->isKeyboardEvent() && evt->type() == eventNames().keyupEvent) {
-        m_inputType->handleKeyupEvent(static_cast<KeyboardEvent*>(evt));
+        m_inputType->handleKeyupEvent(toKeyboardEvent(evt));
         if (evt->defaultHandled())
             return;
     }
@@ -1226,7 +1210,7 @@ void HTMLInputElement::defaultEventHandler(Event* evt)
         m_inputType->handleBeforeTextInsertedEvent(static_cast<BeforeTextInsertedEvent*>(evt));
 
     if (evt->isMouseEvent() && evt->type() == eventNames().mousedownEvent) {
-        m_inputType->handleMouseDownEvent(static_cast<MouseEvent*>(evt));
+        m_inputType->handleMouseDownEvent(toMouseEvent(evt));
         if (evt->defaultHandled())
             return;
     }

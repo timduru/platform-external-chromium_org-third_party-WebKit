@@ -55,27 +55,6 @@ class DriverOutput(object):
     """Groups information about a output from driver for easy passing
     and post-processing of data."""
 
-    strip_patterns = []
-    strip_patterns.append((re.compile('at \(-?[0-9]+,-?[0-9]+\) *'), ''))
-    strip_patterns.append((re.compile('size -?[0-9]+x-?[0-9]+ *'), ''))
-    strip_patterns.append((re.compile('text run width -?[0-9]+: '), ''))
-    strip_patterns.append((re.compile('text run width -?[0-9]+ [a-zA-Z ]+: '), ''))
-    strip_patterns.append((re.compile('RenderButton {BUTTON} .*'), 'RenderButton {BUTTON}'))
-    strip_patterns.append((re.compile('RenderImage {INPUT} .*'), 'RenderImage {INPUT}'))
-    strip_patterns.append((re.compile('RenderBlock {INPUT} .*'), 'RenderBlock {INPUT}'))
-    strip_patterns.append((re.compile('RenderTextControl {INPUT} .*'), 'RenderTextControl {INPUT}'))
-    strip_patterns.append((re.compile('\([0-9]+px'), 'px'))
-    strip_patterns.append((re.compile(' *" *\n +" *'), ' '))
-    strip_patterns.append((re.compile('" +$'), '"'))
-    strip_patterns.append((re.compile('- '), '-'))
-    strip_patterns.append((re.compile('\n( *)"\s+'), '\n\g<1>"'))
-    strip_patterns.append((re.compile('\s+"\n'), '"\n'))
-    strip_patterns.append((re.compile('scrollWidth [0-9]+'), 'scrollWidth'))
-    strip_patterns.append((re.compile('scrollHeight [0-9]+'), 'scrollHeight'))
-    strip_patterns.append((re.compile('scrollX [0-9]+'), 'scrollX'))
-    strip_patterns.append((re.compile('scrollY [0-9]+'), 'scrollY'))
-    strip_patterns.append((re.compile('scrolled to [0-9]+,[0-9]+'), 'scrolled'))
-
     def __init__(self, text, image, image_hash, audio, crash=False,
             test_time=0, measurements=None, timeout=False, error='', crashed_process_name='??',
             crashed_pid=None, crash_log=None, pid=None):
@@ -98,20 +77,14 @@ class DriverOutput(object):
     def has_stderr(self):
         return bool(self.error)
 
-    def strip_metrics(self):
-        if not self.text:
-            return
-        for pattern in self.strip_patterns:
-            self.text = re.sub(pattern[0], pattern[1], self.text)
-
 
 class Driver(object):
-    """object for running test(s) using DumpRenderTree/WebKitTestRunner."""
+    """object for running test(s) using content_shell or other driver."""
 
     def __init__(self, port, worker_number, pixel_tests, no_timeout=False):
         """Initialize a Driver to subsequently run tests.
 
-        Typically this routine will spawn DumpRenderTree in a config
+        Typically this routine will spawn content_shell in a config
         ready for subsequent input.
 
         port - reference back to the port object.
@@ -285,8 +258,6 @@ class Driver(object):
     def _setup_environ_for_driver(self, environment):
         environment['DYLD_LIBRARY_PATH'] = self._port._build_path()
         environment['DYLD_FRAMEWORK_PATH'] = self._port._build_path()
-        # FIXME: We're assuming that WebKitTestRunner checks this DumpRenderTree-named environment variable.
-        environment['DUMPRENDERTREE_TEMP'] = str(self._driver_tempdir)
         environment['LOCAL_RESOURCE_ROOT'] = self._port.layout_tests_dir()
         if 'WEBKITOUTPUTDIR' in os.environ:
             environment['WEBKITOUTPUTDIR'] = os.environ['WEBKITOUTPUTDIR']
@@ -334,13 +305,9 @@ class Driver(object):
         cmd.append(self._port._path_to_driver())
         if self._no_timeout:
             cmd.append('--no-timeout')
-        # FIXME: We need to pass --timeout=SECONDS to WebKitTestRunner for WebKit2.
-
         cmd.extend(self._port.get_option('additional_drt_flag', []))
         cmd.extend(self._port.additional_drt_flag())
-
         cmd.extend(per_test_args)
-
         cmd.append('-')
         return cmd
 
@@ -469,7 +436,11 @@ class Driver(object):
                 # FIXME: Unlike HTTP, DRT dumps the content right after printing a Content-Length header.
                 # Don't wait until we're done with headers, just read the binary blob right now.
                 if content_length_before_header_check != block._content_length:
-                    block.content = self._server_process.read_stdout(deadline, block._content_length)
+                    if block._content_length > 0:
+                        block.content = self._server_process.read_stdout(deadline, block._content_length)
+                    else:
+                        _log.error("Received content of type %s with Content-Length of 0!  This indicates a bug in %s.",
+                                   block.content_type, self._server_process.name())
 
             if err_line:
                 if self._check_for_driver_crash(err_line):

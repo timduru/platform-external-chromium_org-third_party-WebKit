@@ -351,7 +351,8 @@
           'inputs': [
             '<@(scripts_for_in_files)',
             'scripts/make_event_factory.py',
-            'dom/EventNames.in',
+            '<(SHARED_INTERMEDIATE_DIR)/EventNames.in',
+            'dom/EventAliases.in',
           ],
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/Event.cpp',
@@ -361,7 +362,8 @@
           'action': [
             'python',
             'scripts/make_event_factory.py',
-            'dom/EventNames.in',
+            '<(SHARED_INTERMEDIATE_DIR)/EventNames.in',
+            'dom/EventAliases.in',
             '--output_dir',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/',
           ],
@@ -386,27 +388,6 @@
           ],
         },
         {
-          'action_name': 'ExceptionCodeDescription',
-          'inputs': [
-            '<@(scripts_for_in_files)',
-            'scripts/make_dom_exceptions.py',
-            'dom/DOMExceptions.in',
-          ],
-          'outputs': [
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/DOMException.cpp',
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/DOMException.h',
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/DOMExceptionHeaders.h',
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/DOMExceptionInterfaces.h',
-          ],
-          'action': [
-            'python',
-            'scripts/make_dom_exceptions.py',
-            'dom/DOMExceptions.in',
-            '--output_dir',
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/',
-          ],
-        },
-        {
           'action_name': 'MathMLNames',
           'inputs': [
             'scripts/Hasher.pm',
@@ -418,8 +399,6 @@
           'outputs': [
             '<(SHARED_INTERMEDIATE_DIR)/webkit/MathMLNames.cpp',
             '<(SHARED_INTERMEDIATE_DIR)/webkit/MathMLNames.h',
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/MathMLElementFactory.cpp',
-            '<(SHARED_INTERMEDIATE_DIR)/webkit/MathMLElementFactory.h',
           ],
           'action': [
             'python',
@@ -428,7 +407,6 @@
             '--',
             '<@(_inputs)',
             '--',
-            '--factory',
             '--extraDefines', '<(feature_defines)'
           ],
           'msvs_cygwin_shell': 1,

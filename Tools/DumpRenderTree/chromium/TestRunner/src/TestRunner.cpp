@@ -30,43 +30,42 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
 #include "TestRunner.h"
 
 #include "MockWebSpeechInputController.h"
 #include "MockWebSpeechRecognizer.h"
 #include "NotificationPresenter.h"
 #include "TestInterfaces.h"
-#include "WebBindings.h"
-#include "WebDataSource.h"
-#include "WebDeviceOrientation.h"
-#include "WebDeviceOrientationClientMock.h"
-#include "WebDocument.h"
-#include "WebElement.h"
-#include "WebFindOptions.h"
-#include "WebFrame.h"
-#include "WebGeolocationClientMock.h"
-#include "WebInputElement.h"
 #include "WebPermissions.h"
-#include "WebPreferences.h"
-#include "WebScriptSource.h"
-#include "WebSecurityPolicy.h"
-#include "WebSerializedScriptValue.h"
-#include "WebSettings.h"
-#include "WebSurroundingText.h"
-#include "WebTask.h"
-#include "WebTestDelegate.h"
-#include "WebTestProxy.h"
-#include "WebView.h"
-#include "v8/include/v8.h"
-#include <limits>
-#include <memory>
 #include "public/platform/WebData.h"
 #include "public/platform/WebPoint.h"
 #include "public/platform/WebURLResponse.h"
+#include "public/testing/WebPreferences.h"
+#include "public/testing/WebTask.h"
+#include "public/testing/WebTestDelegate.h"
+#include "public/testing/WebTestProxy.h"
+#include "public/web/WebBindings.h"
+#include "public/web/WebDataSource.h"
+#include "public/web/WebDeviceOrientation.h"
+#include "public/web/WebDeviceOrientationClientMock.h"
+#include "public/web/WebDocument.h"
+#include "public/web/WebElement.h"
+#include "public/web/WebFindOptions.h"
+#include "public/web/WebFrame.h"
+#include "public/web/WebGeolocationClientMock.h"
+#include "public/web/WebInputElement.h"
+#include "public/web/WebScriptSource.h"
+#include "public/web/WebSecurityPolicy.h"
+#include "public/web/WebSerializedScriptValue.h"
+#include "public/web/WebSettings.h"
+#include "public/web/WebSurroundingText.h"
+#include "public/web/WebView.h"
+#include "v8/include/v8.h"
+#include <limits>
+#include <memory>
 
 #if defined(__linux__) || defined(ANDROID)
-#include "linux/WebFontRendering.h"
+#include "public/web/linux/WebFontRendering.h"
 #endif
 
 using namespace WebKit;
@@ -78,8 +77,9 @@ namespace {
 
 class InvokeCallbackTask : public WebMethodTask<TestRunner> {
 public:
-    InvokeCallbackTask(TestRunner* object, auto_ptr<CppVariant> callbackArguments)
+    InvokeCallbackTask(TestRunner* object, NPP npp, auto_ptr<CppVariant> callbackArguments)
         : WebMethodTask<TestRunner>(object)
+        , m_npp(npp)
         , m_callbackArguments(callbackArguments)
     {
     }
@@ -87,10 +87,11 @@ public:
     virtual void runIfValid()
     {
         CppVariant invokeResult;
-        m_callbackArguments->invokeDefault(m_callbackArguments.get(), 1, invokeResult);
+        m_callbackArguments->invokeDefault(m_npp, m_callbackArguments.get(), 1, invokeResult);
     }
 
 private:
+    NPP m_npp;
     auto_ptr<CppVariant> m_callbackArguments;
 };
 
@@ -234,7 +235,6 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("setAudioData", &TestRunner::setAudioData);
     bindMethod("dumpFrameLoadCallbacks", &TestRunner::dumpFrameLoadCallbacks);
     bindMethod("dumpUserGestureInFrameLoadCallbacks", &TestRunner::dumpUserGestureInFrameLoadCallbacks);
-    bindMethod("setStopProvisionalFrameLoads", &TestRunner::setStopProvisionalFrameLoads);
     bindMethod("dumpTitleChanges", &TestRunner::dumpTitleChanges);
     bindMethod("dumpCreateView", &TestRunner::dumpCreateView);
     bindMethod("setCanOpenWindows", &TestRunner::setCanOpenWindows);
@@ -390,7 +390,6 @@ void TestRunner::reset()
     m_dumpAsAudio = false;
     m_dumpFrameLoadCallbacks = false;
     m_dumpUserGestureInFrameLoadCallbacks = false;
-    m_stopProvisionalFrameLoads = false;
     m_dumpTitleChanges = false;
     m_dumpCreateView = false;
     m_canOpenWindows = false;
@@ -517,11 +516,6 @@ void TestRunner::setShouldDumpFrameLoadCallbacks(bool value)
 bool TestRunner::shouldDumpUserGestureInFrameLoadCallbacks() const
 {
     return m_testIsRunning && m_dumpUserGestureInFrameLoadCallbacks;
-}
-
-bool TestRunner::stopProvisionalFrameLoads() const
-{
-    return m_stopProvisionalFrameLoads;
 }
 
 bool TestRunner::shouldDumpTitleChanges() const
@@ -1716,7 +1710,7 @@ void TestRunner::setBackingScaleFactor(const CppArgumentList& arguments, CppVari
     auto_ptr<CppVariant> callbackArguments(new CppVariant());
     callbackArguments->set(arguments[1]);
     result->setNull();
-    m_delegate->postTask(new InvokeCallbackTask(this, callbackArguments));
+    m_delegate->postTask(new InvokeCallbackTask(this, npp(), callbackArguments));
 }
 
 void TestRunner::setPOSIXLocale(const CppArgumentList& arguments, CppVariant* result)
@@ -1904,12 +1898,6 @@ void TestRunner::dumpUserGestureInFrameLoadCallbacks(const CppArgumentList&, Cpp
 {
     m_dumpUserGestureInFrameLoadCallbacks = true;
     result->setNull();
-}
-
-void TestRunner::setStopProvisionalFrameLoads(const CppArgumentList&, CppVariant* result)
-{
-    result->setNull();
-    m_stopProvisionalFrameLoads = true;
 }
 
 void TestRunner::dumpTitleChanges(const CppArgumentList&, CppVariant* result)

@@ -32,42 +32,17 @@
 #define CustomElementHelpers_h
 
 #include "bindings/v8/DOMDataStore.h"
-#include "bindings/v8/ScriptValue.h"
-#include "core/dom/CustomElementDefinition.h"
-#include "core/dom/CustomElementRegistry.h"
 #include "core/dom/Element.h"
-#include "wtf/Forward.h"
-#include "wtf/HashSet.h"
 #include "wtf/PassRefPtr.h"
-#include "wtf/text/AtomicString.h"
 
 namespace WebCore {
 
-class CustomElementInvocation;
-class Document;
 class HTMLElement;
-class QualifiedName;
 class SVGElement;
-class ScriptState;
 
 class CustomElementHelpers {
 public:
-    static void didRegisterDefinition(CustomElementDefinition*, ScriptExecutionContext*, const HashSet<Element*>& upgradeCandidates, const ScriptValue& prototypeValue);
-
-    static ScriptValue createConstructor(ScriptState*, const ScriptValue& prototype, Document*, const AtomicString& namespaceURI, const AtomicString& name, const AtomicString& type);
-
-    static bool isValidPrototypeParameter(const ScriptValue&, ScriptState*, AtomicString& namespaceURI);
-    static bool isValidPrototypeParameter(const ScriptValue&, ScriptState*);
-
-    static bool isFeatureAllowed(ScriptState*);
     static bool isFeatureAllowed(v8::Handle<v8::Context>);
-
-    static WrapperTypeInfo* findWrapperType(v8::Handle<v8::Value> chain);
-
-    static const QualifiedName* findLocalName(v8::Handle<v8::Object> chain);
-    static const QualifiedName* findLocalName(const ScriptValue& prototype);
-
-    static void invokeReadyCallbacksIfNeeded(ScriptExecutionContext*, const Vector<CustomElementInvocation>&);
 
     typedef v8::Handle<v8::Object> (*CreateSVGWrapperFunction)(SVGElement*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
     typedef v8::Handle<v8::Object> (*CreateHTMLWrapperFunction)(HTMLElement*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
@@ -95,12 +70,11 @@ public:
     // proper prototype instances accordingly.
     static v8::Handle<v8::Object> wrap(Element*, v8::Handle<v8::Object> creationContext, v8::Isolate*, const CreateWrapperFunction& createTypeExtensionUpgradeCandidateWrapper);
 
+    static WrapperTypeInfo* findWrapperType(v8::Handle<v8::Value> chain);
+
 private:
     static v8::Handle<v8::Object> createWrapper(PassRefPtr<Element>, v8::Handle<v8::Object>, v8::Isolate*, const CreateWrapperFunction& createTypeExtensionUpgradeCandidateWrapper);
     static v8::Handle<v8::Object> createUpgradeCandidateWrapper(PassRefPtr<Element>, v8::Handle<v8::Object> creationContext, v8::Isolate*, const CreateWrapperFunction& createTypeExtensionUpgradeCandidateWrapper);
-    static void upgradeWrappers(v8::Handle<v8::Context>, const HashSet<Element*>&, v8::Handle<v8::Object> prototype);
-
-    static void invokeReadyCallbackIfNeeded(Element*, v8::Handle<v8::Context>);
 };
 
 inline v8::Handle<v8::Object> CustomElementHelpers::wrap(Element* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate, const CreateWrapperFunction& createWrapper)
@@ -108,12 +82,6 @@ inline v8::Handle<v8::Object> CustomElementHelpers::wrap(Element* impl, v8::Hand
     ASSERT(impl);
     ASSERT(DOMDataStore::getWrapper(impl, isolate).IsEmpty());
     return CustomElementHelpers::createWrapper(impl, creationContext, isolate, createWrapper);
-}
-
-inline bool CustomElementHelpers::isValidPrototypeParameter(const ScriptValue& value, ScriptState* state)
-{
-    AtomicString namespaceURI;
-    return isValidPrototypeParameter(value, state, namespaceURI);
 }
 
 } // namespace WebCore

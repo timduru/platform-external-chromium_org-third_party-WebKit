@@ -39,15 +39,16 @@
  * @param {string=} type
  * @param {string=} url
  * @param {number=} line
+ * @param {number=} column
  * @param {number=} repeatCount
  * @param {Array.<RuntimeAgent.RemoteObject>=} parameters
  * @param {ConsoleAgent.StackTrace=} stackTrace
  * @param {NetworkAgent.RequestId=} requestId
  * @param {boolean=} isOutdated
  */
-WebInspector.ConsoleMessageImpl = function(source, level, message, linkifier, type, url, line, repeatCount, parameters, stackTrace, requestId, isOutdated)
+WebInspector.ConsoleMessageImpl = function(source, level, message, linkifier, type, url, line, column, repeatCount, parameters, stackTrace, requestId, isOutdated)
 {
-    WebInspector.ConsoleMessage.call(this, source, level, url, line, repeatCount);
+    WebInspector.ConsoleMessage.call(this, source, level, url, line, column, repeatCount);
 
     this._linkifier = linkifier;
     this.type = type || WebInspector.ConsoleMessage.MessageType.Log;
@@ -94,7 +95,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
         if (this.source === WebInspector.ConsoleMessage.MessageSource.ConsoleAPI) {
             switch (this.type) {
                 case WebInspector.ConsoleMessage.MessageType.Trace:
-                    this._messageElement = document.createTextNode("console.trace()");
+                    this._messageElement = this._format(this._parameters || ["console.trace()"]);
                     break;
                 case WebInspector.ConsoleMessage.MessageType.Clear:
                     this._messageElement = document.createTextNode(WebInspector.UIString("Console was cleared"));
@@ -163,7 +164,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             if (this._stackTrace && this._stackTrace.length && this._stackTrace[0].url) {
                 this._anchorElement = this._linkifyCallFrame(this._stackTrace[0]);
             } else if (this.url && this.url !== "undefined") {
-                this._anchorElement = this._linkifyLocation(this.url, this.line, 0);
+                this._anchorElement = this._linkifyLocation(this.url, this.line, this.column);
             }
         }
 
@@ -712,7 +713,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
 
     matchesRegex: function(regexObject)
     {
-        return regexObject.test(this._message) || (this._anchorElement && regexObject.test(this._anchorElement.textContent));
+        return regexObject.test(this.message) || (this._anchorElement && regexObject.test(this._anchorElement.textContent));
     },
 
     toMessageElement: function()
@@ -930,7 +931,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
      */
     clone: function()
     {
-        return WebInspector.ConsoleMessage.create(this.source, this.level, this._messageText, this.type, this.url, this.line, this.repeatCount, this._parameters, this._stackTrace, this._request ? this._request.requestId : undefined, this._isOutdated);
+        return WebInspector.ConsoleMessage.create(this.source, this.level, this._messageText, this.type, this.url, this.line, this.column, this.repeatCount, this._parameters, this._stackTrace, this._request ? this._request.requestId : undefined, this._isOutdated);
     },
 
     __proto__: WebInspector.ConsoleMessage.prototype

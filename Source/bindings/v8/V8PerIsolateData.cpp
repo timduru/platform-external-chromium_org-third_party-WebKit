@@ -51,7 +51,6 @@ namespace WebCore {
 V8PerIsolateData::V8PerIsolateData(v8::Isolate* isolate)
     : m_isolate(isolate)
     , m_stringCache(adoptPtr(new StringCache()))
-    , m_integerCache(adoptPtr(new IntegerCache()))
     , m_workerDomDataStore(0)
     , m_hiddenPropertyName(adoptPtr(new V8HiddenPropertyName()))
     , m_constructorMode(ConstructorMode::CreateNewObject)
@@ -62,7 +61,6 @@ V8PerIsolateData::V8PerIsolateData(v8::Isolate* isolate)
     , m_gcEventData(adoptPtr(new GCEventData()))
     , m_shouldCollectGarbageSoon(false)
 {
-    m_v8Null.set(isolate, v8::Null(isolate));
 }
 
 V8PerIsolateData::~V8PerIsolateData()
@@ -114,7 +112,6 @@ void V8PerIsolateData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) con
     info.addMember(m_templatesForMainWorld, "templatesForMainWorld");
     info.addMember(m_templatesForNonMainWorld, "templatesForNonMainWorld");
     info.addMember(m_stringCache, "stringCache");
-    info.addMember(m_integerCache, "integerCache");
     info.addMember(m_domDataList, "domDataList");
     info.addMember(m_workerDomDataStore, "workerDomDataStore");
     info.addMember(m_hiddenPropertyName, "hiddenPropertyName");
@@ -124,7 +121,6 @@ void V8PerIsolateData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) con
 
     info.ignoreMember(m_toStringTemplate);
     info.ignoreMember(m_lazyEventListenerToStringTemplate);
-    info.ignoreMember(m_v8Null);
     info.ignoreMember(m_liveRoot);
     info.ignoreMember(m_regexContext);
 }

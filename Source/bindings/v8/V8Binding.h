@@ -75,21 +75,13 @@ namespace WebCore {
         return index >= args.Length() ? v8::Local<v8::Value>() : args[index];
     }
 
-    // A fast accessor for v8::Null(isolate). isolate must not be 0.
-    // If isolate can be 0, use v8NullWithCheck().
-    inline v8::Handle<v8::Value> v8Null(v8::Isolate* isolate)
-    {
-        ASSERT(isolate);
-        return V8PerIsolateData::from(isolate)->v8Null();
-    }
-
     // Since v8::Null(isolate) crashes if we pass a null isolate,
     // we need to use v8NullWithCheck(isolate) if an isolate can be null.
     //
     // FIXME: Remove all null isolates from V8 bindings, and remove v8NullWithCheck(isolate).
     inline v8::Handle<v8::Value> v8NullWithCheck(v8::Isolate* isolate)
     {
-        return isolate ? v8Null(isolate) : v8::Handle<v8::Value>(v8::Null());
+        return v8::Handle<v8::Value>(isolate ? v8::Null(isolate) : v8::Null());
     }
 
     template<typename T, typename V>
@@ -193,7 +185,7 @@ namespace WebCore {
     {
         ASSERT(isolate);
         if (string.isNull())
-            return v8Null(isolate);
+            return v8::Null(isolate);
         return V8PerIsolateData::from(isolate)->stringCache()->v8ExternalString(string.impl(), handleType, isolate);
     }
 
@@ -203,17 +195,6 @@ namespace WebCore {
         if (string.isNull())
             return v8::Undefined(isolate);
         return V8PerIsolateData::from(isolate)->stringCache()->v8ExternalString(string.impl(), handleType, isolate);
-    }
-
-    inline v8::Handle<v8::Integer> v8Integer(int value, v8::Isolate* isolate)
-    {
-        return V8PerIsolateData::from(isolate)->integerCache()->v8Integer(value, isolate);
-    }
-
-    inline v8::Handle<v8::Integer> v8UnsignedInteger(unsigned value, v8::Isolate* isolate)
-    {
-        ASSERT(isolate);
-        return V8PerIsolateData::from(isolate)->integerCache()->v8UnsignedInteger(value, isolate);
     }
 
     inline v8::Handle<v8::Value> v8Undefined()
@@ -241,7 +222,7 @@ namespace WebCore {
     struct V8ValueTraits<unsigned long> {
         static inline v8::Handle<v8::Value> arrayV8Value(const unsigned long& value, v8::Isolate* isolate)
         {
-            return v8UnsignedInteger(value, isolate);
+            return v8::Integer::NewFromUnsigned(value, isolate);
         }
     };
 
@@ -269,7 +250,7 @@ namespace WebCore {
         typename Vector<T, inlineCapacity>::const_iterator end = iterator.end();
         typedef V8ValueTraits<T> TraitsType;
         for (typename Vector<T, inlineCapacity>::const_iterator iter = iterator.begin(); iter != end; ++iter)
-            result->Set(v8Integer(index++, isolate), TraitsType::arrayV8Value(*iter, isolate));
+            result->Set(v8::Integer::New(index++, isolate), TraitsType::arrayV8Value(*iter, isolate));
         return result;
     }
 
@@ -555,6 +536,20 @@ namespace WebCore {
         if (context.IsEmpty())
             return 0;
         return DOMWrapperWorld::isolatedWorld(context);
+    }
+
+    // FIXME: This will be soon embedded in the generated code.
+    template<class Collection> static void indexedPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>& info)
+    {
+        Collection* collection = reinterpret_cast<Collection*>(info.Holder()->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
+        int length = collection->length();
+        v8::Handle<v8::Array> properties = v8::Array::New(length);
+        for (int i = 0; i < length; ++i) {
+            // FIXME: Do we need to check that the item function returns a non-null value for this index?
+            v8::Handle<v8::Integer> integer = v8::Integer::New(i, info.GetIsolate());
+            properties->Set(integer, integer);
+        }
+        v8SetReturnValue(info, properties);
     }
 
     // If the current context causes out of memory, JavaScript setting
