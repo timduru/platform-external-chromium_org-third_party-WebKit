@@ -82,14 +82,14 @@ WebInspector.CPUProfileView = function(profileHeader)
     this._statusBarButtonsElement.appendChild(this.resetButton.element);
 
     this.profileHead = /** @type {?ProfilerAgent.CPUProfileNode} */ (null);
-    this.profileHeader = profileHeader;
+    this.profile = profileHeader;
 
     this._linkifier = new WebInspector.Linkifier(new WebInspector.Linkifier.DefaultFormatter(30));
 
-    if (this.profileHeader._profile) // If the profile has been loaded from file then use it.
-        this._processProfileData(this.profileHeader._profile);
+    if (this.profile._profile) // If the profile has been loaded from file then use it.
+        this._processProfileData(this.profile._profile);
     else
-        ProfilerAgent.getCPUProfile(this.profileHeader.uid, this._getCPUProfileCallback.bind(this));
+        ProfilerAgent.getCPUProfile(this.profile.uid, this._getCPUProfileCallback.bind(this));
 }
 
 WebInspector.CPUProfileView._TypeFlame = "Flame";
@@ -268,7 +268,7 @@ WebInspector.CPUProfileView.prototype = {
         if (!isNaN(queryNumber) && !(greaterThan || lessThan))
             equalTo = true;
 
-        var matcher = new RegExp(query.escapeForRegExp(), "i");
+        var matcher = createPlainTextSearchRegex(query, "i");
 
         function matchesQuery(/*ProfileDataGridNode*/ profileDataGridNode)
         {
@@ -447,7 +447,7 @@ WebInspector.CPUProfileView.prototype = {
 
     _changeView: function()
     {
-        if (!this.profileHeader)
+        if (!this.profile)
             return;
 
         switch (this.viewSelectComboBox.selectedOption().value) {

@@ -30,6 +30,7 @@
 #include "config.h"
 #include "core/loader/DocumentLoader.h"
 
+#include "CachedResourceInitiatorTypeNames.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentParser.h"
@@ -48,7 +49,6 @@
 #include "core/loader/archive/ArchiveResourceCollection.h"
 #include "core/loader/archive/MHTMLArchive.h"
 #include "core/loader/cache/CachedResourceLoader.h"
-#include "core/loader/cache/CachedResourceRequestInitiators.h"
 #include "core/loader/cache/MemoryCache.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/Frame.h"
@@ -399,7 +399,7 @@ void DocumentLoader::handleSubstituteDataLoadSoon()
         handleSubstituteDataLoadNow(0);
 }
 
-bool DocumentLoader::shouldContinueForNavigationPolicy(const ResourceRequest& request)
+bool DocumentLoader::shouldContinueForNavigationPolicy(const ResourceRequest& request, PolicyCheckLoadType policyCheckLoadType)
 {
     NavigationAction action = triggeringAction();
     if (action.isEmpty()) {
@@ -424,13 +424,22 @@ bool DocumentLoader::shouldContinueForNavigationPolicy(const ResourceRequest& re
     if (m_frame->ownerElement() && !m_frame->ownerElement()->document()->contentSecurityPolicy()->allowChildFrameFromSource(request.url()))
         return false;
 
-    PolicyAction policy = frameLoader()->client()->decidePolicyForNavigationAction(action, request);
-    if (policy == PolicyDownload) {
-        ResourceRequest mutableRequest(request);
+    if (request.isNull())
+        return false;
+
+    NavigationPolicy policy = NavigationPolicyCurrentTab;
+    action.specifiesNavigationPolicy(&policy);
+    policy = frameLoader()->client()->decidePolicyForNavigation(request, action.type(), policy, policyCheckLoadType == PolicyCheckRedirect);
+    if (policy == NavigationPolicyCurrentTab)
+        return true;
+    if (policy == NavigationPolicyIgnore)
+        return false;
+
+    ResourceRequest mutableRequest(request);
+    if (policy == NavigationPolicyDownload)
         frameLoader()->setOriginalURLForDownloadRequest(mutableRequest);
-        frameLoader()->client()->startDownload(mutableRequest);
-    }
-    return policy == PolicyUse;
+    frameLoader()->client()->loadURLExternally(mutableRequest, policy);
+    return false;
 }
 
 void DocumentLoader::redirectReceived(CachedResource* resource, ResourceRequest& request, const ResourceResponse& redirectResponse)
@@ -477,9 +486,9 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
     if (newRequest.cachePolicy() == UseProtocolCachePolicy && isPostOrRedirectAfterPost(newRequest, redirectResponse))
         newRequest.setCachePolicy(ReloadIgnoringCacheData);
 
-    Frame* parent = m_frame->tree()->parent();
-    if (parent) {
-        if (!parent->loader()->mixedContentChecker()->canRunInsecureContent(parent->document()->securityOrigin(), newRequest.url())) {
+    Frame* top = m_frame->tree()->top();
+    if (top) {
+        if (!top->loader()->mixedContentChecker()->canDisplayInsecureContent(top->document()->securityOrigin(), newRequest.url())) {
             cancelMainResourceLoad(frameLoader()->cancelledError(newRequest));
             return;
         }
@@ -490,8 +499,9 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
     if (redirectResponse.isNull())
         return;
 
+    appendRedirect(newRequest.url());
     frameLoader()->client()->dispatchDidReceiveServerRedirectForProvisionalLoad();
-    if (!shouldContinueForNavigationPolicy(newRequest))
+    if (!shouldContinueForNavigationPolicy(newRequest, PolicyCheckRedirect))
         stopLoadingForPolicyChange();
 }
 
@@ -704,6 +714,16 @@ void DocumentLoader::checkLoadComplete()
     m_frame->document()->domWindow()->finishedLoading();
 }
 
+void DocumentLoader::clearRedirectChain()
+{
+    m_redirectChain.clear();
+}
+
+void DocumentLoader::appendRedirect(const KURL& url)
+{
+    m_redirectChain.append(url);
+}
+
 void DocumentLoader::setFrame(Frame* frame)
 {
     if (m_frame == frame)
@@ -815,12 +835,16 @@ bool DocumentLoader::scheduleArchiveLoad(CachedResource* cachedResource, const R
 
     ASSERT(m_archiveResourceCollection);
     ArchiveResource* archiveResource = m_archiveResourceCollection->archiveResourceForURL(request.url());
-    ASSERT(archiveResource);
+    if (!archiveResource) {
+        cachedResource->error(CachedResource::LoadError);
+        return true;
+    }
 
     cachedResource->setLoading(true);
-    SharedBuffer* data = archiveResource->data();
     cachedResource->responseReceived(archiveResource->response());
-    cachedResource->appendData(data->data(), data->size());
+    SharedBuffer* data = archiveResource->data();
+    if (data)
+        cachedResource->appendData(data->data(), data->size());
     cachedResource->finish();
     return true;
 }
@@ -961,8 +985,8 @@ void DocumentLoader::startLoadingMainResource()
 
     ResourceRequest request(m_request);
     DEFINE_STATIC_LOCAL(ResourceLoaderOptions, mainResourceLoadOptions,
-        (SendCallbacks, SniffContent, DoNotBufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType));
-    CachedResourceRequest cachedResourceRequest(request, cachedResourceRequestInitiators().document, mainResourceLoadOptions);
+        (SendCallbacks, SniffContent, DoNotBufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType, DocumentContext));
+    CachedResourceRequest cachedResourceRequest(request, CachedResourceInitiatorTypeNames::document, mainResourceLoadOptions);
     m_mainResource = m_cachedResourceLoader->requestMainResource(cachedResourceRequest);
     if (!m_mainResource) {
         setRequest(ResourceRequest());
@@ -1032,7 +1056,7 @@ PassRefPtr<DocumentWriter> DocumentLoader::createWriterFor(Frame* frame, const D
     // inherit an aliased security context.
     RefPtr<Document> document = DOMImplementation::createDocument(mimeType, frame, url, frame->inViewSourceMode());
     if (document->isPluginDocument() && document->isSandboxed(SandboxPlugins))
-        document = SinkDocument::create(frame, url);
+        document = SinkDocument::create(DocumentInit(url, frame));
     bool shouldReuseDefaultView = frame->loader()->stateMachine()->isDisplayingInitialEmptyDocument() && frame->document()->isSecureTransitionTo(url);
 
     RefPtr<DOMWindow> originalDOMWindow;

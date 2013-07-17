@@ -43,7 +43,6 @@
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/text/TextCheckerClient.h"
-#include "modules/device_orientation/DeviceMotionClient.h"
 #include "public/platform/WebScreenInfo.h"
 #include "wtf/Forward.h"
 
@@ -199,8 +198,6 @@ public:
 
     virtual void dispatchDidHandleOnloadEvents() OVERRIDE { }
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad() OVERRIDE { }
-    virtual void dispatchDidCancelClientRedirect() OVERRIDE { }
-    virtual void dispatchWillPerformClientRedirect(const KURL&, double, double) OVERRIDE { }
     virtual void dispatchDidChangeLocationWithinPage() OVERRIDE { }
     virtual void dispatchWillClose() OVERRIDE { }
     virtual void dispatchDidStartProvisionalLoad() OVERRIDE { }
@@ -213,7 +210,7 @@ public:
     virtual void dispatchDidFinishLoad() OVERRIDE { }
     virtual void dispatchDidLayout(LayoutMilestones) OVERRIDE { }
 
-    virtual PolicyAction decidePolicyForNavigationAction(const NavigationAction&, const ResourceRequest&) OVERRIDE;
+    virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, NavigationType, NavigationPolicy, bool isRedirect) OVERRIDE;
 
     virtual void dispatchUnableToImplementPolicy(const ResourceError&) OVERRIDE { }
 
@@ -224,7 +221,7 @@ public:
     virtual void postProgressEstimateChangedNotification() OVERRIDE { }
     virtual void postProgressFinishedNotification() OVERRIDE { }
 
-    virtual void startDownload(const ResourceRequest&, const String& suggestedName = String()) OVERRIDE { UNUSED_PARAM(suggestedName); }
+    virtual void loadURLExternally(const ResourceRequest&, NavigationPolicy, const String& = String()) OVERRIDE { }
 
     virtual void didReceiveDocumentData(const char*, int) OVERRIDE { }
 
@@ -277,9 +274,9 @@ public:
 class EmptyTextCheckerClient : public TextCheckerClient {
 public:
     virtual bool shouldEraseMarkersAfterChangeSelection(TextCheckingType) const OVERRIDE { return true; }
-    virtual void checkSpellingOfString(const UChar*, int, int*, int*) OVERRIDE { }
+    virtual void checkSpellingOfString(const String&, int*, int*) OVERRIDE { }
     virtual String getAutoCorrectSuggestionForMisspelledWord(const String&) OVERRIDE { return String(); }
-    virtual void checkGrammarOfString(const UChar*, int, Vector<GrammarDetail>&, int*, int*) OVERRIDE { }
+    virtual void checkGrammarOfString(const String&, Vector<GrammarDetail>&, int*, int*) OVERRIDE { }
     virtual void requestCheckingOfString(PassRefPtr<TextCheckingRequest>) OVERRIDE;
 };
 
@@ -371,13 +368,6 @@ class EmptyDeviceClient : public DeviceClient {
 public:
     virtual void startUpdating() OVERRIDE { }
     virtual void stopUpdating() OVERRIDE { }
-};
-
-class EmptyDeviceMotionClient : public DeviceMotionClient {
-public:
-    virtual void setController(DeviceMotionController*) OVERRIDE { }
-    virtual DeviceMotionData* lastMotion() const OVERRIDE { return 0; }
-    virtual void deviceMotionControllerDestroyed() OVERRIDE { }
 };
 
 class EmptyDeviceOrientationClient : public DeviceOrientationClient {

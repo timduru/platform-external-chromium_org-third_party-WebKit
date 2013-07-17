@@ -44,6 +44,7 @@
 #include "core/editing/htmlediting.h" // For firstPositionInOrBeforeNode
 #include "core/html/HTMLAreaElement.h"
 #include "core/html/HTMLImageElement.h"
+#include "core/html/HTMLTextAreaElement.h"
 #include "core/page/Chrome.h"
 #include "core/page/EditorClient.h"
 #include "core/page/EventHandler.h"
@@ -295,7 +296,7 @@ bool FocusController::advanceFocusInDocumentOrder(FocusDirection direction, Keyb
     if (!node) {
         // We didn't find a node to focus, so we should try to pass focus to Chrome.
         if (!initialFocus && m_page->chrome().canTakeFocus(direction)) {
-            document->setFocusedNode(0);
+            document->setFocusedElement(0);
             setFocusedFrame(0);
             m_page->chrome().takeFocus(direction);
             return true;
@@ -326,20 +327,20 @@ bool FocusController::advanceFocusInDocumentOrder(FocusDirection direction, Keyb
         if (!owner->contentFrame())
             return false;
 
-        document->setFocusedNode(0);
+        document->setFocusedElement(0);
         setFocusedFrame(owner->contentFrame());
         return true;
     }
     
-    // FIXME: It would be nice to just be able to call setFocusedNode(node) here, but we can't do
-    // that because some elements (e.g. HTMLInputElement and HTMLTextAreaElement) do extra work in
-    // their focus() methods.
-
+    // FIXME: It would be nice to just be able to call setFocusedElement(node)
+    // here, but we can't do that because some elements (e.g. HTMLInputElement
+    // and HTMLTextAreaElement) do extra work in their focus() methods.
     Document* newDocument = node->document();
 
-    if (newDocument != document)
+    if (newDocument != document) {
         // Focus is going away from this document, so clear the focused node.
-        document->setFocusedNode(0);
+        document->setFocusedElement(0);
+    }
 
     if (newDocument)
         setFocusedFrame(newDocument->frame());
@@ -558,7 +559,7 @@ static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFram
     Node* selectionStartNode = s->selection().start().deprecatedNode();
     if (selectionStartNode == newFocusedNode || selectionStartNode->isDescendantOf(newFocusedNode) || selectionStartNode->deprecatedShadowAncestorNode() == newFocusedNode)
         return;
-        
+
     if (Node* mousePressNode = newFocusedFrame->eventHandler()->mousePressNode()) {
         if (mousePressNode->renderer() && !mousePressNode->canStartSelection()) {
             // Don't clear the selection for contentEditable elements, but do clear it for input and textarea. See bug 38696.
@@ -567,22 +568,22 @@ static void clearSelectionIfNeeded(Frame* oldFocusedFrame, Frame* newFocusedFram
                 return;
 
             if (Node* shadowAncestorNode = root->deprecatedShadowAncestorNode()) {
-                if (!shadowAncestorNode->hasTagName(inputTag) && !shadowAncestorNode->hasTagName(textareaTag))
+                if (!shadowAncestorNode->hasTagName(inputTag) && !isHTMLTextAreaElement(shadowAncestorNode))
                     return;
             }
         }
     }
-    
+
     s->clear();
 }
 
-bool FocusController::setFocusedNode(Node* node, PassRefPtr<Frame> newFocusedFrame, FocusDirection direction)
+bool FocusController::setFocusedElement(Element* element, PassRefPtr<Frame> newFocusedFrame, FocusDirection direction)
 {
     RefPtr<Frame> oldFocusedFrame = focusedFrame();
     RefPtr<Document> oldDocument = oldFocusedFrame ? oldFocusedFrame->document() : 0;
     
     Node* oldFocusedNode = oldDocument ? oldDocument->focusedNode() : 0;
-    if (oldFocusedNode == node)
+    if (oldFocusedNode == element)
         return true;
 
     // FIXME: Might want to disable this check for caretBrowsing
@@ -591,21 +592,21 @@ bool FocusController::setFocusedNode(Node* node, PassRefPtr<Frame> newFocusedFra
 
     m_page->editorClient()->willSetInputMethodState();
 
-    clearSelectionIfNeeded(oldFocusedFrame.get(), newFocusedFrame.get(), node);
+    clearSelectionIfNeeded(oldFocusedFrame.get(), newFocusedFrame.get(), element);
 
-    if (!node) {
+    if (!element) {
         if (oldDocument)
-            oldDocument->setFocusedNode(0);
+            oldDocument->setFocusedElement(0);
         return true;
     }
 
-    RefPtr<Document> newDocument = node->document();
+    RefPtr<Document> newDocument = element->document();
 
-    if (newDocument && newDocument->focusedNode() == node)
+    if (newDocument && newDocument->focusedNode() == element)
         return true;
     
     if (oldDocument && oldDocument != newDocument)
-        oldDocument->setFocusedNode(0);
+        oldDocument->setFocusedElement(0);
 
     if (newFocusedFrame && !newFocusedFrame->page()) {
         setFocusedFrame(0);
@@ -614,9 +615,9 @@ bool FocusController::setFocusedNode(Node* node, PassRefPtr<Frame> newFocusedFra
     setFocusedFrame(newFocusedFrame);
 
     // Setting the focused node can result in losing our last reft to node when JS event handlers fire.
-    RefPtr<Node> protect = node;
+    RefPtr<Element> protect = element;
     if (newDocument) {
-        bool successfullyFocused = newDocument->setFocusedNode(node, direction);
+        bool successfullyFocused = newDocument->setFocusedElement(element, direction);
         if (!successfullyFocused)
             return false;
     }
@@ -850,8 +851,8 @@ bool FocusController::advanceFocusDirectionally(FocusDirection direction, Keyboa
         if (!hasOffscreenRect(focusedNode)) {
             container = scrollableEnclosingBoxOrParentFrameForNodeInDirection(direction, focusedNode);
             startingRect = nodeRectInAbsoluteCoordinates(focusedNode, true /* ignore border */);
-        } else if (focusedNode->hasTagName(areaTag)) {
-            HTMLAreaElement* area = static_cast<HTMLAreaElement*>(focusedNode);
+        } else if (isHTMLAreaElement(focusedNode)) {
+            HTMLAreaElement* area = toHTMLAreaElement(focusedNode);
             container = scrollableEnclosingBoxOrParentFrameForNodeInDirection(direction, area->imageElement());
             startingRect = virtualRectForAreaElementAndDirection(area, direction);
         }

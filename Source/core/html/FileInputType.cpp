@@ -39,9 +39,9 @@
 #include "core/platform/LocalizedStrings.h"
 #include "core/platform/graphics/Icon.h"
 #include "core/rendering/RenderFileUploadControl.h"
-#include <wtf/PassOwnPtr.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/PassOwnPtr.h"
+#include "wtf/text/StringBuilder.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -151,7 +151,7 @@ void FileInputType::handleDOMActivateEvent(Event* event)
         settings.acceptFileExtensions = input->acceptFileExtensions();
         settings.selectedFiles = m_fileList->paths();
 #if ENABLE(MEDIA_CAPTURE)
-        settings.capture = input->capture();
+        settings.useMediaCapture = input->capture();
 #endif
         chrome->runOpenPanel(input->document()->frame(), newFileChooser(settings));
     }

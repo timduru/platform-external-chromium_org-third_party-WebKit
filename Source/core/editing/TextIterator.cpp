@@ -40,19 +40,16 @@
 #include "core/html/HTMLTextFormControlElement.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/text/TextBoundaries.h"
+#include "core/platform/text/TextBreakIteratorInternalICU.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderImage.h"
 #include "core/rendering/RenderTableCell.h"
 #include "core/rendering/RenderTableRow.h"
 #include "core/rendering/RenderTextControl.h"
 #include "core/rendering/RenderTextFragment.h"
-#include <wtf/text/CString.h>
-#include <wtf/unicode/CharacterNames.h>
-
-#if !UCONFIG_NO_COLLATION
+#include "wtf/text/CString.h"
+#include "wtf/unicode/CharacterNames.h"
 #include <unicode/usearch.h>
-#include "core/platform/text/TextBreakIteratorInternalICU.h"
-#endif
 
 using namespace WTF::Unicode;
 using namespace std;
@@ -84,13 +81,11 @@ public:
     size_t search(size_t& startOffset);
     bool atBreak() const;
 
-#if !UCONFIG_NO_COLLATION
-
 private:
     bool isBadMatch(const UChar*, size_t length) const;
     bool isWordStartMatch(size_t start, size_t length) const;
 
-    String m_target;
+    Vector<UChar> m_target;
     FindOptions m_options;
 
     Vector<UChar> m_buffer;
@@ -102,22 +97,6 @@ private:
     bool m_targetRequiresKanaWorkaround;
     Vector<UChar> m_normalizedTarget;
     mutable Vector<UChar> m_normalizedMatch;
-
-#else
-
-private:
-    void append(UChar, bool isCharacterStart);
-    size_t length() const;
-
-    String m_target;
-    FindOptions m_options;
-
-    Vector<UChar> m_buffer;
-    Vector<bool> m_isCharacterStartBuffer;
-    bool m_isBufferFull;
-    size_t m_cursor;
-
-#endif
 };
 
 // --------
@@ -1629,21 +1608,6 @@ static inline UChar foldQuoteMarkOrSoftHyphen(UChar c)
     }
 }
 
-static inline void foldQuoteMarksAndSoftHyphens(String& s)
-{
-    s.replace(hebrewPunctuationGeresh, '\'');
-    s.replace(hebrewPunctuationGershayim, '"');
-    s.replace(leftDoubleQuotationMark, '"');
-    s.replace(leftSingleQuotationMark, '\'');
-    s.replace(rightDoubleQuotationMark, '"');
-    s.replace(rightSingleQuotationMark, '\'');
-    // Replace soft hyphen with an ignorable character so that their presence or absence will
-    // not affect string comparison.
-    s.replace(softHyphen, 0);
-}
-
-#if !UCONFIG_NO_COLLATION
-
 static inline void foldQuoteMarksAndSoftHyphens(UChar* data, size_t length)
 {
     for (size_t i = 0; i < length; ++i)
@@ -1926,27 +1890,27 @@ static inline bool isSeparator(UChar32 character)
 }
 
 inline SearchBuffer::SearchBuffer(const String& target, FindOptions options)
-    : m_target(target)
-    , m_options(options)
+    : m_options(options)
     , m_prefixLength(0)
     , m_atBreak(true)
     , m_needsMoreContext(options & AtWordStarts)
-    , m_targetRequiresKanaWorkaround(containsKanaLetters(m_target))
+    , m_targetRequiresKanaWorkaround(containsKanaLetters(target))
 {
-    ASSERT(!m_target.isEmpty());
+    ASSERT(!target.isEmpty());
+    target.appendTo(m_target);
 
     // FIXME: We'd like to tailor the searcher to fold quote marks for us instead
     // of doing it in a separate replacement pass here, but ICU doesn't offer a way
     // to add tailoring on top of the locale-specific tailoring as of this writing.
-    foldQuoteMarksAndSoftHyphens(m_target);
+    foldQuoteMarksAndSoftHyphens(m_target.data(), m_target.size());
 
-    size_t targetLength = m_target.length();
+    size_t targetLength = m_target.size();
     m_buffer.reserveInitialCapacity(max(targetLength * 8, minimumSearchBufferSize));
     m_overlap = m_buffer.capacity() / 4;
 
     if ((m_options & AtWordStarts) && targetLength) {
         UChar32 targetFirstCharacter;
-        U16_GET(m_target.bloatedCharacters(), 0, 0, targetLength, targetFirstCharacter);
+        U16_GET(m_target.data(), 0, 0, targetLength, targetFirstCharacter);
         // Characters in the separator category never really occur at the beginning of a word,
         // so if the target begins with such a character, we just ignore the AtWordStart option.
         if (isSeparator(targetFirstCharacter)) {
@@ -1970,12 +1934,12 @@ inline SearchBuffer::SearchBuffer(const String& target, FindOptions options)
     }
 
     UErrorCode status = U_ZERO_ERROR;
-    usearch_setPattern(searcher, m_target.bloatedCharacters(), targetLength, &status);
+    usearch_setPattern(searcher, m_target.data(), targetLength, &status);
     ASSERT(status == U_ZERO_ERROR);
 
     // The kana workaround requires a normalized copy of the target string.
     if (m_targetRequiresKanaWorkaround)
-        normalizeCharacters(m_target.bloatedCharacters(), m_target.length(), m_normalizedTarget);
+        normalizeCharacters(m_target.data(), m_target.size(), m_normalizedTarget);
 }
 
 inline SearchBuffer::~SearchBuffer()
@@ -2230,118 +2194,6 @@ nextMatch:
     start = size - matchStart;
     return matchedLength;
 }
-
-#else // !UCONFIG_NO_COLLATION
-
-inline SearchBuffer::SearchBuffer(const String& target, FindOptions options)
-    : m_target(options & CaseInsensitive ? target.foldCase() : target)
-    , m_options(options)
-    , m_buffer(m_target.length())
-    , m_isCharacterStartBuffer(m_target.length())
-    , m_isBufferFull(false)
-    , m_cursor(0)
-{
-    ASSERT(!m_target.isEmpty());
-    m_target.replace(noBreakSpace, ' ');
-    foldQuoteMarksAndSoftHyphens(m_target);
-}
-
-inline SearchBuffer::~SearchBuffer()
-{
-}
-
-inline void SearchBuffer::reachedBreak()
-{
-    m_cursor = 0;
-    m_isBufferFull = false;
-}
-
-inline bool SearchBuffer::atBreak() const
-{
-    return !m_cursor && !m_isBufferFull;
-}
-
-inline void SearchBuffer::append(UChar c, bool isStart)
-{
-    m_buffer[m_cursor] = c == noBreakSpace ? ' ' : foldQuoteMarkOrSoftHyphen(c);
-    m_isCharacterStartBuffer[m_cursor] = isStart;
-    if (++m_cursor == m_target.length()) {
-        m_cursor = 0;
-        m_isBufferFull = true;
-    }
-}
-
-inline size_t SearchBuffer::append(const UChar* characters, size_t length)
-{
-    ASSERT(length);
-    if (!(m_options & CaseInsensitive)) {
-        append(characters[0], true);
-        return 1;
-    }
-    const int maxFoldedCharacters = 16; // sensible maximum is 3, this should be more than enough
-    UChar foldedCharacters[maxFoldedCharacters];
-    bool error;
-    int numFoldedCharacters = foldCase(foldedCharacters, maxFoldedCharacters, characters, 1, &error);
-    ASSERT(!error);
-    ASSERT(numFoldedCharacters);
-    ASSERT(numFoldedCharacters <= maxFoldedCharacters);
-    if (!error && numFoldedCharacters) {
-        numFoldedCharacters = min(numFoldedCharacters, maxFoldedCharacters);
-        append(foldedCharacters[0], true);
-        for (int i = 1; i < numFoldedCharacters; ++i)
-            append(foldedCharacters[i], false);
-    }
-    return 1;
-}
-
-inline bool SearchBuffer::needsMoreContext() const
-{
-    return false;
-}
-
-void SearchBuffer::prependContext(const UChar*, size_t)
-{
-    ASSERT_NOT_REACHED();
-}
-
-inline size_t SearchBuffer::search(size_t& start)
-{
-    if (!m_isBufferFull)
-        return 0;
-    if (!m_isCharacterStartBuffer[m_cursor])
-        return 0;
-
-    size_t tailSpace = m_target.length() - m_cursor;
-    if (memcmp(&m_buffer[m_cursor], m_target.bloatedCharacters(), tailSpace * sizeof(UChar)) != 0)
-        return 0;
-    if (memcmp(&m_buffer[0], m_target.bloatedCharacters() + tailSpace, m_cursor * sizeof(UChar)) != 0)
-        return 0;
-
-    start = length();
-
-    // Now that we've found a match once, we don't want to find it again, because those
-    // are the SearchBuffer semantics, allowing for a buffer where you append more than one
-    // character at a time. To do this we take advantage of m_isCharacterStartBuffer, but if
-    // we want to get rid of that in the future we could track this with a separate boolean
-    // or even move the characters to the start of the buffer and set m_isBufferFull to false.
-    m_isCharacterStartBuffer[m_cursor] = false;
-
-    return start;
-}
-
-// Returns the number of characters that were appended to the buffer (what we are searching in).
-// That's not necessarily the same length as the passed-in target string, because case folding
-// can make two strings match even though they're not the same length.
-size_t SearchBuffer::length() const
-{
-    size_t bufferSize = m_target.length();
-    size_t length = 0;
-    for (size_t i = 0; i < bufferSize; ++i)
-        length += m_isCharacterStartBuffer[i];
-    return length;
-}
-
-#endif // !UCONFIG_NO_COLLATION
 
 // --------
 

@@ -57,17 +57,17 @@ RenderSVGImage::~RenderSVGImage()
 
 bool RenderSVGImage::updateImageViewport()
 {
-    SVGImageElement* image = static_cast<SVGImageElement*>(node());
+    SVGImageElement* image = toSVGImageElement(node());
     FloatRect oldBoundaries = m_objectBoundingBox;
     bool updatedViewport = false;
 
     SVGLengthContext lengthContext(image);
-    m_objectBoundingBox = FloatRect(image->x().value(lengthContext), image->y().value(lengthContext), image->width().value(lengthContext), image->height().value(lengthContext));
+    m_objectBoundingBox = FloatRect(image->xCurrentValue().value(lengthContext), image->yCurrentValue().value(lengthContext), image->widthCurrentValue().value(lengthContext), image->heightCurrentValue().value(lengthContext));
 
     // Images with preserveAspectRatio=none should force non-uniform scaling. This can be achieved
     // by setting the image's container size to its intrinsic size.
     // See: http://www.w3.org/TR/SVG/single-page.html, 7.8 The ‘preserveAspectRatio’ attribute.
-    if (image->preserveAspectRatio().align() == SVGPreserveAspectRatio::SVG_PRESERVEASPECTRATIO_NONE) {
+    if (image->preserveAspectRatioCurrentValue().align() == SVGPreserveAspectRatio::SVG_PRESERVEASPECTRATIO_NONE) {
         if (CachedImage* cachedImage = m_imageResource->cachedImage()) {
             LayoutSize intrinsicSize = cachedImage->imageSizeForRenderer(0, style()->effectiveZoom());
             if (intrinsicSize != m_imageResource->imageSize(style()->effectiveZoom())) {
@@ -97,7 +97,7 @@ void RenderSVGImage::layout()
 
     bool transformOrBoundariesUpdate = m_needsTransformUpdate || m_needsBoundariesUpdate;
     if (m_needsTransformUpdate) {
-        m_localTransform = static_cast<SVGImageElement*>(node())->animatedLocalTransform();
+        m_localTransform = toSVGImageElement(node())->animatedLocalTransform();
         m_needsTransformUpdate = false;
     }
 
@@ -162,8 +162,8 @@ void RenderSVGImage::paintForeground(PaintInfo& paintInfo)
     FloatRect destRect = m_objectBoundingBox;
     FloatRect srcRect(0, 0, image->width(), image->height());
 
-    SVGImageElement* imageElement = static_cast<SVGImageElement*>(node());
-    imageElement->preserveAspectRatio().transformRect(destRect, srcRect);
+    SVGImageElement* imageElement = toSVGImageElement(node());
+    imageElement->preserveAspectRatioCurrentValue().transformRect(destRect, srcRect);
 
     bool useLowQualityScaling = false;
     if (style()->svgStyle()->bufferedRendering() != BR_STATIC)

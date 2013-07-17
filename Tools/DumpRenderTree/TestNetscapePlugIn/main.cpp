@@ -46,8 +46,9 @@ using namespace std;
     ((void(*)())0)(); /* More reliable, but doesn't say BBADBEEF */ \
 } while(false)
 
-static bool getEntryPointsWasCalled;
-static bool initializeWasCalled;
+static bool getEntryPointsWasCalled = false;
+static bool initializeWasCalled = false;
+static NPClass* pluginObjectClass = 0;
 
 #if defined(XP_WIN)
 #define STDCALL __stdcall
@@ -73,6 +74,9 @@ NPError STDCALL NP_Initialize(NPNetscapeFuncs *browserFuncs
 #endif
                               )
 {
+    // Create a copy of the PluginObject NPClass that we can trash on shutdown.
+    pluginObjectClass = createPluginClass();
+
     initializeWasCalled = true;
 
 #if defined(XP_WIN)
@@ -125,6 +129,13 @@ NPError STDCALL NP_GetEntryPoints(NPPluginFuncs *pluginFuncs)
 extern "C"
 void STDCALL NP_Shutdown(void)
 {
+    // Trash the PluginObject NPClass so that the process will deterministically
+    // crash if Blink tries to call into the plugin's NPObjects after unloading
+    // it, rather than relying on OS-specific DLL unload behaviour.
+    // Note that we leak the NPClass copy, to act as a guard for the lifetime of
+    // the process.
+    memset(pluginObjectClass, 0xf00dbeef, sizeof(NPClass));
+
     PluginTest::NP_Shutdown();
 }
 
@@ -176,7 +187,7 @@ NPError NPP_New(NPMIMEType pluginType, NPP instance, uint16_t mode, int16_t argc
      browser->setvalue(instance, NPPVpluginEventModel, (void *)eventModel);
 #endif // XP_MACOSX
 
-    PluginObject* obj = (PluginObject*)browser->createobject(instance, createPluginClass());
+    PluginObject* obj = (PluginObject*)browser->createobject(instance, pluginObjectClass);
     instance->pdata = obj;
 
 #ifdef XP_MACOSX
@@ -337,15 +348,7 @@ NPError NPP_Destroy(NPP instance, NPSavedData **save)
         if (obj->pluginTest)
             obj->pluginTest->NPP_Destroy(save);
 
-        // Save the object's class, release the object, then trash the class.
-        NPClass* scriptClass = obj->header._class;
         browser->releaseobject(&obj->header);
-
-        // FIXME: This breaks
-        // plugins/npruntime/delete-plugin-within-invoke.html on Mac, since the
-        // plugin object is released only after NPP_Destroy completes. Verify
-        // that that behaviour is sane, and move this to NPP_Shutdown if so.
-        // memset(scriptClass, 0xf00dbeef, sizeof(NPClass));
     }
     return NPERR_NO_ERROR;
 }

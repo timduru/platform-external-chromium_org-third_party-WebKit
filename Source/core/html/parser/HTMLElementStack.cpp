@@ -31,7 +31,10 @@
 #include "MathMLNames.h"
 #include "SVGNames.h"
 #include "core/dom/Element.h"
-#include <wtf/PassOwnPtr.h>
+#include "core/html/HTMLHtmlElement.h"
+#include "core/html/HTMLOptGroupElement.h"
+#include "core/html/HTMLTableElement.h"
+#include "wtf/PassOwnPtr.h"
 
 namespace WebCore {
 
@@ -43,7 +46,7 @@ namespace {
 inline bool isRootNode(HTMLStackItem* item)
 {
     return item->isDocumentFragmentNode()
-        || item->hasTagName(htmlTag);
+        || isHTMLHtmlElement(item->node());
 }
 
 inline bool isScopeMarker(HTMLStackItem* item)
@@ -52,7 +55,7 @@ inline bool isScopeMarker(HTMLStackItem* item)
         || item->hasTagName(captionTag)
         || item->hasTagName(marqueeTag)
         || item->hasTagName(objectTag)
-        || item->hasTagName(tableTag)
+        || isHTMLTableElement(item->node())
         || item->hasTagName(tdTag)
         || item->hasTagName(thTag)
         || item->hasTagName(MathMLNames::miTag)
@@ -77,7 +80,7 @@ inline bool isListItemScopeMarker(HTMLStackItem* item)
 
 inline bool isTableScopeMarker(HTMLStackItem* item)
 {
-    return item->hasTagName(tableTag)
+    return isHTMLTableElement(item->node())
         || item->hasTagName(templateTag)
         || isRootNode(item);
 }
@@ -113,7 +116,7 @@ inline bool isButtonScopeMarker(HTMLStackItem* item)
 
 inline bool isSelectScopeMarker(HTMLStackItem* item)
 {
-    return !item->hasTagName(optgroupTag)
+    return !isHTMLOptGroupElement(item->node())
         && !item->hasTagName(optionTag);
 }
 
@@ -307,7 +310,7 @@ void HTMLElementStack::pushRootNode(PassRefPtr<HTMLStackItem> rootItem)
 
 void HTMLElementStack::pushHTMLHtmlElement(PassRefPtr<HTMLStackItem> item)
 {
-    ASSERT(item->hasTagName(HTMLNames::htmlTag));
+    ASSERT(isHTMLHtmlElement(item->node()));
     pushRootNodeCommon(item);
 }
     
@@ -337,7 +340,7 @@ void HTMLElementStack::pushHTMLBodyElement(PassRefPtr<HTMLStackItem> item)
 
 void HTMLElementStack::push(PassRefPtr<HTMLStackItem> item)
 {
-    ASSERT(!item->hasTagName(HTMLNames::htmlTag));
+    ASSERT(!isHTMLHtmlElement(item->node()));
     ASSERT(!item->hasTagName(HTMLNames::headTag));
     ASSERT(!item->hasTagName(HTMLNames::bodyTag));
     ASSERT(m_rootNode);
@@ -349,7 +352,7 @@ void HTMLElementStack::insertAbove(PassRefPtr<HTMLStackItem> item, ElementRecord
     ASSERT(item);
     ASSERT(recordBelow);
     ASSERT(m_top);
-    ASSERT(!item->hasTagName(HTMLNames::htmlTag));
+    ASSERT(!isHTMLHtmlElement(item->node()));
     ASSERT(!item->hasTagName(HTMLNames::headTag));
     ASSERT(!item->hasTagName(HTMLNames::bodyTag));
     ASSERT(m_rootNode);
@@ -564,7 +567,7 @@ void HTMLElementStack::pushCommon(PassRefPtr<HTMLStackItem> item)
 
 void HTMLElementStack::popCommon()
 {
-    ASSERT(!topStackItem()->hasTagName(HTMLNames::htmlTag));
+    ASSERT(!isHTMLHtmlElement(topStackItem()->node()));
     ASSERT(!topStackItem()->hasTagName(HTMLNames::headTag) || !m_headElement);
     ASSERT(!topStackItem()->hasTagName(HTMLNames::bodyTag) || !m_bodyElement);
     top()->finishParsingChildren();
@@ -575,7 +578,7 @@ void HTMLElementStack::popCommon()
 
 void HTMLElementStack::removeNonTopCommon(Element* element)
 {
-    ASSERT(!element->hasTagName(HTMLNames::htmlTag));
+    ASSERT(!isHTMLHtmlElement(element));
     ASSERT(!element->hasTagName(HTMLNames::bodyTag));
     ASSERT(top() != element);
     for (ElementRecord* pos = m_top.get(); pos; pos = pos->next()) {

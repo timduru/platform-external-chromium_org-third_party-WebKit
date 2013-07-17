@@ -45,9 +45,9 @@ def platform_options(use_globs=False):
             const=('chromium*' if use_globs else 'chromium'),
             help=('Alias for --platform=chromium*' if use_globs else 'Alias for --platform=chromium')),
 
-        optparse.make_option('--chromium-android', action='store_const', dest='platform',
-            const=('chromium-android*' if use_globs else 'chromium-android'),
-            help=('Alias for --platform=chromium-android*' if use_globs else 'Alias for --platform=chromium')),
+        optparse.make_option('--android', action='store_const', dest='platform',
+            const=('android*' if use_globs else 'android'),
+            help=('Alias for --platform=android*' if use_globs else 'Alias for --platform=android')),
         ]
 
 
@@ -72,9 +72,9 @@ def _builder_options(builder_name):
 
 class PortFactory(object):
     PORT_CLASSES = (
-        'chromium_android.ChromiumAndroidPort',
+        'android.AndroidPort',
         'linux.LinuxPort',
-        'chromium_mac.ChromiumMacPort',
+        'mac.MacPort',
         'win.WinPort',
         'mock_drt.MockDRTPort',
         'test.TestPort',
@@ -88,7 +88,7 @@ class PortFactory(object):
         if platform.is_linux() or platform.is_freebsd():
             return 'linux'
         elif platform.is_mac():
-            return 'chromium-mac'
+            return 'mac'
         elif platform.is_win():
             return 'win'
         raise NotImplementedError('unknown platform: %s' % platform)
@@ -99,18 +99,10 @@ class PortFactory(object):
         appropriate port on this platform."""
         port_name = port_name or self._default_port(options)
 
-        # FIXME(dpranke): We special-case '--platform chromium' so that it can co-exist
-        # with '--platform chromium-mac' and '--platform linux' properly (we
-        # can't look at the port_name prefix in this case).
+        # FIXME(steveblock): There's no longer any need to pass '--platform
+        # chromium' on the command line so we can remove this logic.
         if port_name == 'chromium':
-            # FIXME(steveblock): This hack will go away once all ports have
-            # been renamed to remove the 'chromium-' part.
-            if self._host.platform.os_name == 'win':
-                port_name = 'win'
-            elif self._host.platform.os_name == 'linux':
-                port_name = 'linux'
-            else:
-                port_name = 'chromium-' + self._host.platform.os_name
+            port_name = self._host.platform.os_name
 
         for port_class in self.PORT_CLASSES:
             module_name, class_name = port_class.rsplit('.', 1)

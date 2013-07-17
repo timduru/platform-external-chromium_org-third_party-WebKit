@@ -34,6 +34,8 @@
 #include "core/editing/htmlediting.h"
 #include "core/html/HTMLElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
+#include "core/html/HTMLHtmlElement.h"
+#include "core/html/HTMLTextAreaElement.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
@@ -49,6 +51,7 @@
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerCompositor.h"
+#include "core/rendering/RenderListMarker.h"
 #include "core/rendering/RenderRegion.h"
 #include "core/rendering/RenderTableCell.h"
 #include "core/rendering/RenderTheme.h"
@@ -99,6 +102,7 @@ RenderBox::RenderBox(ContainerNode* node)
     : RenderBoxModelObject(node)
     , m_minPreferredLogicalWidth(-1)
     , m_maxPreferredLogicalWidth(-1)
+    , m_intrinsicContentLogicalHeight(-1)
     , m_inlineBoxWrapper(0)
 {
     setIsBox();
@@ -193,6 +197,7 @@ void RenderBox::removeFloatingOrPositionedChildFromBlockLists()
             parentBlock->markSiblingsWithFloatsForLayout(this);
             parentBlock->markAllDescendantsWithFloatsForLayout(this, false);
         }
+        RenderBlock::floatWillBeRemoved(this);
     }
 
     if (isOutOfFlowPositioned())
@@ -208,7 +213,7 @@ void RenderBox::styleWillChange(StyleDifference diff, const RenderStyle* newStyl
         // The background of the root element or the body element could propagate up to
         // the canvas.  Just dirty the entire canvas when our style changes substantially.
         if (diff >= StyleDifferenceRepaint && node() &&
-            (node()->hasTagName(htmlTag) || node()->hasTagName(bodyTag))) {
+            (isHTMLHtmlElement(node()) || node()->hasTagName(bodyTag))) {
             view()->repaint();
             
             if (oldStyle->hasEntirelyFixedBackground() != newStyle->hasEntirelyFixedBackground())
@@ -282,10 +287,6 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     bool isBodyRenderer = isBody();
     bool isRootRenderer = isRoot();
 
-    // Set the text color if we're the body.
-    if (isBodyRenderer)
-        document()->setTextColor(newStyle->visitedDependentColor(CSSPropertyColor));
-
     if (isRootRenderer || isBodyRenderer) {
         // Propagate the new writing mode and direction up to the RenderView.
         RenderView* viewRenderer = view();
@@ -350,12 +351,12 @@ void RenderBox::updateFromStyle()
             // (1) The root element is <html>.
             // (2) We are the primary <body> (can be checked by looking at document.body).
             // (3) The root element has visible overflow.
-            if (document()->documentElement()->hasTagName(htmlTag) &&
-                document()->body() == node() &&
-                document()->documentElement()->renderer()->style()->overflowX() == OVISIBLE)
+            if (isHTMLHtmlElement(document()->documentElement())
+                && document()->body() == node()
+                && document()->documentElement()->renderer()->style()->overflowX() == OVISIBLE)
                 boxHasOverflowClip = false;
         }
-        
+
         // Check for overflow clip.
         // It's sufficient to just check one direction, since it's illegal to have visible on only one overflow value.
         if (boxHasOverflowClip) {
@@ -564,13 +565,15 @@ LayoutRect RenderBox::outlineBoundsForRepaint(const RenderLayerModelObject* repa
     LayoutRect box = borderBoundingBox();
     adjustRectForOutlineAndShadow(box);
 
-    FloatQuad containerRelativeQuad;
-    if (geometryMap)
-        containerRelativeQuad = geometryMap->mapToContainer(box, repaintContainer);
-    else
-        containerRelativeQuad = localToContainerQuad(FloatRect(box), repaintContainer);
+    if (repaintContainer != this) {
+        FloatQuad containerRelativeQuad;
+        if (geometryMap)
+            containerRelativeQuad = geometryMap->mapToContainer(box, repaintContainer);
+        else
+            containerRelativeQuad = localToContainerQuad(FloatRect(box), repaintContainer);
 
-    box = containerRelativeQuad.enclosingBoundingBox();
+        box = containerRelativeQuad.enclosingBoundingBox();
+    }
 
     // FIXME: layoutDelta needs to be applied in parts before/after transforms and
     // repaint containers. https://bugs.webkit.org/show_bug.cgi?id=23308
@@ -1275,7 +1278,9 @@ bool RenderBox::computeBackgroundIsKnownToBeObscured()
     // Table and root background painting is special.
     if (isTable() || isRoot())
         return false;
-
+    // FIXME: box-shadow is painted while background painting.
+    if (style()->boxShadow())
+        return false;
     LayoutRect backgroundRect = backgroundPaintedExtent();
     return foregroundIsKnownToBeOpaqueInRect(backgroundRect, backgroundObscurationTestMaxDepth);
 }
@@ -1698,8 +1703,8 @@ void RenderBox::mapLocalToContainer(const RenderLayerModelObject* repaintContain
         if (v->layoutStateEnabled() && !repaintContainer) {
             LayoutState* layoutState = v->layoutState();
             LayoutSize offset = layoutState->m_paintOffset + locationOffset();
-            if (style()->hasPaintOffset() && layer())
-                offset += layer()->paintOffset();
+            if (style()->hasInFlowPosition() && layer())
+                offset += layer()->offsetForInFlowPosition();
             transformState.move(offset);
             return;
         }
@@ -1771,8 +1776,8 @@ LayoutSize RenderBox::offsetFromContainer(RenderObject* o, const LayoutPoint& po
     ASSERT(o == container() || o->isRenderRegion());
 
     LayoutSize offset;    
-    if (hasPaintOffset())
-        offset += paintOffset();
+    if (isInFlowPositioned())
+        offset += offsetForInFlowPosition();
 
     if (!isInline() || isReplaced()) {
         if (!style()->hasOutOfFlowPosition() && o->hasColumns()) {
@@ -1908,8 +1913,8 @@ void RenderBox::computeRectForRepaint(const RenderLayerModelObject* repaintConta
                 rect = layer()->transform()->mapRect(pixelSnappedIntRect(rect));
 
             // We can't trust the bits on RenderObject, because this might be called while re-resolving style.
-            if (styleToUse->hasPaintOffset() && layer())
-                rect.move(layer()->paintOffset());
+            if (styleToUse->hasInFlowPosition() && layer())
+                rect.move(layer()->offsetForInFlowPosition());
 
             rect.moveBy(location());
             rect.move(layoutState->m_paintOffset);
@@ -1951,14 +1956,14 @@ void RenderBox::computeRectForRepaint(const RenderLayerModelObject* repaintConta
     } else if (position == FixedPosition)
         fixed = true;
 
-    if (position == AbsolutePosition && o->isInFlowPositioned() && o->isRenderInline())
+    if (position == AbsolutePosition && o->isInFlowPositioned() && o->isRenderInline()) {
         topLeft += toRenderInline(o)->offsetForInFlowPositionedInline(this);
-    else if (styleToUse->hasPaintOffset() && layer()) {
+    } else if (styleToUse->hasInFlowPosition() && layer()) {
         // Apply the relative position offset when invalidating a rectangle.  The layer
         // is translated, but the render box isn't, so we need to do this to get the
         // right dirty rect.  Since this is called from RenderObject::setStyle, the relative position
         // flag on the RenderObject has been cleared, so use the one on the style().
-        topLeft += layer()->paintOffset();
+        topLeft += layer()->offsetForInFlowPosition();
     }
     
     if (position != AbsolutePosition && position != FixedPosition && o->hasColumns() && o->isBlockFlow()) {
@@ -2016,6 +2021,36 @@ void RenderBox::updateLogicalWidth()
     setLogicalLeft(computedValues.m_position);
     setMarginStart(computedValues.m_margins.m_start);
     setMarginEnd(computedValues.m_margins.m_end);
+}
+
+static float getMaxWidthListMarker(const RenderBox* renderer)
+{
+#ifndef NDEBUG
+    ASSERT(renderer);
+    Node* parentNode = renderer->generatingNode();
+    ASSERT(parentNode);
+    ASSERT(parentNode->hasTagName(olTag) || parentNode->hasTagName(ulTag));
+    ASSERT(renderer->style()->textAutosizingMultiplier() != 1);
+#endif
+    float maxWidth = 0;
+    for (RenderObject* child = renderer->firstChild(); child; child = child->nextSibling()) {
+        if (!child->isListItem())
+            continue;
+
+        RenderBox* listItem = toRenderBox(child);
+        for (RenderObject* itemChild = listItem->firstChild(); itemChild; itemChild = itemChild->nextSibling()) {
+            if (!itemChild->isListMarker())
+                continue;
+            RenderBox* itemMarker = toRenderBox(itemChild);
+            if (itemMarker->requiresLayoutToDetermineWidth()) {
+                // Make sure to compute the autosized width.
+                itemMarker->layout();
+            }
+            maxWidth = max<float>(maxWidth, toRenderListMarker(itemMarker)->logicalWidth().toFloat());
+            break;
+        }
+    }
+    return maxWidth;
 }
 
 void RenderBox::computeLogicalWidthInRegion(LogicalExtentComputedValues& computedValues, RenderRegion* region, LayoutUnit offsetFromLogicalTopOfFirstPage) const
@@ -2102,6 +2137,19 @@ void RenderBox::computeLogicalWidthInRegion(LogicalExtentComputedValues& compute
             computedValues.m_margins.m_start = newMargin;
         else
             computedValues.m_margins.m_end = newMargin;
+    }
+
+    if (styleToUse->textAutosizingMultiplier() != 1 && styleToUse->marginStart().type() == Fixed) {
+        Node* parentNode = generatingNode();
+        if (parentNode && (parentNode->hasTagName(olTag) || parentNode->hasTagName(ulTag))) {
+            // Make sure the markers in a list are properly positioned (i.e. not chopped off) when autosized.
+            const float adjustedMargin = (1 - 1.0 / styleToUse->textAutosizingMultiplier()) * getMaxWidthListMarker(this);
+            bool hasInvertedDirection = cb->style()->isLeftToRightDirection() != style()->isLeftToRightDirection();
+            if (hasInvertedDirection)
+                computedValues.m_margins.m_end += adjustedMargin;
+            else
+                computedValues.m_margins.m_start += adjustedMargin;
+        }
     }
 }
 
@@ -2237,7 +2285,8 @@ bool RenderBox::sizesLogicalWidthToFitContent(SizeType widthType) const
     // stretching column flexbox.
     // FIXME: Think about block-flow here.
     // https://bugs.webkit.org/show_bug.cgi?id=46473
-    if (logicalWidth.type() == Auto && !isStretchingColumnFlexItem(this) && node() && (node()->hasTagName(inputTag) || node()->hasTagName(selectTag) || node()->hasTagName(buttonTag) || node()->hasTagName(textareaTag) || node()->hasTagName(legendTag)))
+    if (logicalWidth.type() == Auto && !isStretchingColumnFlexItem(this) && node() && (node()->hasTagName(inputTag)
+        || node()->hasTagName(selectTag) || node()->hasTagName(buttonTag) || isHTMLTextAreaElement(node()) || node()->hasTagName(legendTag)))
         return true;
 
     if (isHorizontalWritingMode() != containingBlock()->isHorizontalWritingMode())
@@ -2398,6 +2447,8 @@ static bool shouldFlipBeforeAfterMargins(const RenderStyle* containingBlockStyle
 
 void RenderBox::updateLogicalHeight()
 {
+    m_intrinsicContentLogicalHeight = contentLogicalHeight();
+
     LogicalExtentComputedValues computedValues;
     computeLogicalHeight(logicalHeight(), logicalTop(), computedValues);
 
@@ -2540,8 +2591,13 @@ LayoutUnit RenderBox::computeIntrinsicLogicalContentHeightUsing(Length logicalHe
 {
     // FIXME(cbiesinger): The css-sizing spec is considering changing what min-content/max-content should resolve to.
     // If that happens, this code will have to change.
-    if (logicalHeightLength.isMinContent() || logicalHeightLength.isMaxContent() || logicalHeightLength.isFitContent())
+    if (logicalHeightLength.isMinContent() || logicalHeightLength.isMaxContent() || logicalHeightLength.isFitContent()) {
+        if (isReplaced())
+            return intrinsicSize().height();
+        if (m_intrinsicContentLogicalHeight != -1)
+            return m_intrinsicContentLogicalHeight;
         return intrinsicContentHeight;
+    }
     if (logicalHeightLength.isFillAvailable())
         return containingBlock()->availableLogicalHeight(ExcludeMarginBorderPadding) - borderAndPadding;
     ASSERT_NOT_REACHED();
@@ -4378,7 +4434,7 @@ LayoutRect RenderBox::layoutOverflowRectForPropagation(RenderStyle* parentStyle)
         rect.unite(layoutOverflowRect());
 
     bool hasTransform = hasLayer() && layer()->transform();
-    if (hasPaintOffset() || hasTransform) {
+    if (isInFlowPositioned() || hasTransform) {
         // If we are relatively positioned or if we have a transform, then we have to convert
         // this rectangle into physical coordinates, apply relative positioning and transforms
         // to it, and then convert it back.
@@ -4387,8 +4443,8 @@ LayoutRect RenderBox::layoutOverflowRectForPropagation(RenderStyle* parentStyle)
         if (hasTransform)
             rect = layer()->currentTransform().mapRect(rect);
 
-        if (hasPaintOffset())
-            rect.move(paintOffset());
+        if (isInFlowPositioned())
+            rect.move(offsetForInFlowPosition());
         
         // Now we need to flip back.
         flipForWritingMode(rect);

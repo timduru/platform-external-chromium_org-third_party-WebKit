@@ -21,8 +21,6 @@
 #include "config.h"
 #include "core/css/CSSStyleSheet.h"
 
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/text/StringBuilder.h>
 #include "HTMLNames.h"
 #include "SVGNames.h"
 #include "core/css/CSSCharsetRule.h"
@@ -37,6 +35,8 @@
 #include "core/dom/Node.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "weborigin/SecurityOrigin.h"
+#include "wtf/MemoryInstrumentationVector.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -164,7 +164,7 @@ void CSSStyleSheet::didMutate()
     Document* owner = ownerDocument();
     if (!owner)
         return;
-    owner->styleResolverChanged(DeferRecalcStyle);
+    owner->modifiedStyleSheet(this);
 }
 
 void CSSStyleSheet::reattachChildRuleCSSOMWrappers()
@@ -271,21 +271,21 @@ unsigned CSSStyleSheet::insertRule(const String& ruleString, unsigned index, Exc
 
     ec = 0;
     if (index > length()) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return 0;
     }
     CSSParser p(m_contents->parserContext(), UseCounter::getFrom(this));
     RefPtr<StyleRuleBase> rule = p.parseRule(m_contents.get(), ruleString);
 
     if (!rule) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
     RuleMutationScope mutationScope(this);
 
     bool success = m_contents->wrapperInsertRule(rule, index);
     if (!success) {
-        ec = HIERARCHY_REQUEST_ERR;
+        ec = HierarchyRequestError;
         return 0;
     }        
     if (!m_childRuleCSSOMWrappers.isEmpty())
@@ -300,7 +300,7 @@ void CSSStyleSheet::deleteRule(unsigned index, ExceptionCode& ec)
 
     ec = 0;
     if (index >= length()) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
     RuleMutationScope mutationScope(this);

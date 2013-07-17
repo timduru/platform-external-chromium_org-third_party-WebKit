@@ -29,6 +29,7 @@
 
 #include "HTMLNames.h"
 #include "InspectorFrontendClientLocal.h"
+#include "InternalProfilers.h"
 #include "InternalRuntimeFlags.h"
 #include "InternalSettings.h"
 #include "MallocStatistics.h"
@@ -228,6 +229,13 @@ InternalRuntimeFlags* Internals::runtimeFlags() const
     return m_runtimeFlags.get();
 }
 
+InternalProfilers* Internals::profilers()
+{
+    if (!m_profilers)
+        m_profilers = InternalProfilers::create();
+    return m_profilers.get();
+}
+
 unsigned Internals::workerThreadCount() const
 {
     return WorkerThread::workerThreadCount();
@@ -264,7 +272,7 @@ PassRefPtr<Element> Internals::createContentElement(ExceptionCode& ec)
 {
     Document* document = contextDocument();
     if (!document) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -274,7 +282,7 @@ PassRefPtr<Element> Internals::createContentElement(ExceptionCode& ec)
 bool Internals::isValidContentSelect(Element* insertionPoint, ExceptionCode& ec)
 {
     if (!insertionPoint || !insertionPoint->isInsertionPoint()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return false;
     }
 
@@ -284,7 +292,7 @@ bool Internals::isValidContentSelect(Element* insertionPoint, ExceptionCode& ec)
 Node* Internals::treeScopeRootNode(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -294,7 +302,7 @@ Node* Internals::treeScopeRootNode(Node* node, ExceptionCode& ec)
 Node* Internals::parentTreeScope(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     const TreeScope* parentTreeScope = node->treeScope()->parentTreeScope();
@@ -304,7 +312,7 @@ Node* Internals::parentTreeScope(Node* node, ExceptionCode& ec)
 bool Internals::hasSelectorForIdInShadow(Element* host, const String& idValue, ExceptionCode& ec)
 {
     if (!host || !host->shadow()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -314,7 +322,7 @@ bool Internals::hasSelectorForIdInShadow(Element* host, const String& idValue, E
 bool Internals::hasSelectorForClassInShadow(Element* host, const String& className, ExceptionCode& ec)
 {
     if (!host || !host->shadow()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -324,7 +332,7 @@ bool Internals::hasSelectorForClassInShadow(Element* host, const String& classNa
 bool Internals::hasSelectorForAttributeInShadow(Element* host, const String& attributeName, ExceptionCode& ec)
 {
     if (!host || !host->shadow()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -334,7 +342,7 @@ bool Internals::hasSelectorForAttributeInShadow(Element* host, const String& att
 bool Internals::hasSelectorForPseudoClassInShadow(Element* host, const String& pseudoClass, ExceptionCode& ec)
 {
     if (!host || !host->shadow()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -361,7 +369,7 @@ bool Internals::hasSelectorForPseudoClassInShadow(Element* host, const String& p
 unsigned short Internals::compareTreeScopePosition(const Node* node1, const Node* node2, ExceptionCode& ec) const
 {
     if (!node1 || !node2) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     const TreeScope* treeScope1 = node1->isDocumentNode() ? static_cast<const TreeScope*>(toDocument(node1)) :
@@ -369,7 +377,7 @@ unsigned short Internals::compareTreeScopePosition(const Node* node1, const Node
     const TreeScope* treeScope2 = node2->isDocumentNode() ? static_cast<const TreeScope*>(toDocument(node2)) :
         node2->isShadowRoot() ? static_cast<const TreeScope*>(toShadowRoot(node2)) : 0;
     if (!treeScope1 || !treeScope2) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     return treeScope1->comparePosition(treeScope2);
@@ -378,47 +386,54 @@ unsigned short Internals::compareTreeScopePosition(const Node* node1, const Node
 unsigned Internals::numberOfActiveAnimations() const
 {
     Frame* contextFrame = frame();
-    if (AnimationController* controller = contextFrame->animation())
-        return controller->numberOfActiveAnimations(contextFrame->document());
+    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
+        if (AnimationController* controller = contextFrame->animation())
+            return controller->numberOfActiveAnimations(contextFrame->document());
+    }
     return 0;
 }
 
 void Internals::suspendAnimations(Document* document, ExceptionCode& ec) const
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
-    AnimationController* controller = document->frame()->animation();
-    if (!controller)
-        return;
+    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
+        AnimationController* controller = document->frame()->animation();
+        if (!controller)
+            return;
 
-    controller->suspendAnimations();
+        controller->suspendAnimations();
+    }
 }
 
 void Internals::resumeAnimations(Document* document, ExceptionCode& ec) const
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
-    AnimationController* controller = document->frame()->animation();
-    if (!controller)
-        return;
+    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
+        AnimationController* controller = document->frame()->animation();
+        if (!controller)
+            return;
 
-    controller->resumeAnimations();
+        controller->resumeAnimations();
+    }
 }
 
 void Internals::pauseAnimations(double pauseTime, ExceptionCode& ec)
 {
     if (pauseTime < 0) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
-    frame()->animation()->pauseAnimationsForTesting(pauseTime);
+    if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
+        frame()->animation()->pauseAnimationsForTesting(pauseTime);
 }
 
 bool Internals::hasShadowInsertionPoint(const Node* root, ExceptionCode& ec) const
@@ -426,7 +441,7 @@ bool Internals::hasShadowInsertionPoint(const Node* root, ExceptionCode& ec) con
     if (root && root->isShadowRoot())
         return ScopeContentDistribution::hasShadowElement(toShadowRoot(root));
 
-    ec = INVALID_ACCESS_ERR;
+    ec = InvalidAccessError;
     return 0;
 }
 
@@ -435,14 +450,14 @@ bool Internals::hasContentElement(const Node* root, ExceptionCode& ec) const
     if (root && root->isShadowRoot())
         return ScopeContentDistribution::hasContentElement(toShadowRoot(root));
 
-    ec = INVALID_ACCESS_ERR;
+    ec = InvalidAccessError;
     return 0;
 }
 
 size_t Internals::countElementShadow(const Node* root, ExceptionCode& ec) const
 {
     if (!root || !root->isShadowRoot()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -452,7 +467,7 @@ size_t Internals::countElementShadow(const Node* root, ExceptionCode& ec) const
 bool Internals::attached(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return false;
     }
 
@@ -462,7 +477,7 @@ bool Internals::attached(Node* node, ExceptionCode& ec)
 Node* Internals::nextSiblingByWalker(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     ComposedShadowTreeWalker walker(node);
@@ -473,7 +488,7 @@ Node* Internals::nextSiblingByWalker(Node* node, ExceptionCode& ec)
 Node* Internals::firstChildByWalker(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     ComposedShadowTreeWalker walker(node);
@@ -484,7 +499,7 @@ Node* Internals::firstChildByWalker(Node* node, ExceptionCode& ec)
 Node* Internals::lastChildByWalker(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     ComposedShadowTreeWalker walker(node);
@@ -495,7 +510,7 @@ Node* Internals::lastChildByWalker(Node* node, ExceptionCode& ec)
 Node* Internals::nextNodeByWalker(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     ComposedShadowTreeWalker walker(node);
@@ -506,7 +521,7 @@ Node* Internals::nextNodeByWalker(Node* node, ExceptionCode& ec)
 Node* Internals::previousNodeByWalker(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     ComposedShadowTreeWalker walker(node);
@@ -517,13 +532,13 @@ Node* Internals::previousNodeByWalker(Node* node, ExceptionCode& ec)
 String Internals::elementRenderTreeAsText(Element* element, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
     String representation = externalRepresentation(element);
     if (representation.isEmpty()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -535,14 +550,14 @@ size_t Internals::numberOfScopedHTMLStyleChildren(const Node* scope, ExceptionCo
     if (scope && (scope->isElementNode() || scope->isShadowRoot()))
         return scope->numberOfScopedHTMLStyleChildren();
 
-    ec = INVALID_ACCESS_ERR;
+    ec = InvalidAccessError;
     return 0;
 }
 
 PassRefPtr<CSSComputedStyleDeclaration> Internals::computedStyleIncludingVisitedInfo(Node* node, ExceptionCode& ec) const
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -553,7 +568,7 @@ PassRefPtr<CSSComputedStyleDeclaration> Internals::computedStyleIncludingVisited
 ShadowRoot* Internals::ensureShadowRoot(Element* host, ExceptionCode& ec)
 {
     if (!host) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -573,7 +588,7 @@ ShadowRoot* Internals::shadowRoot(Element* host, ExceptionCode& ec)
 ShadowRoot* Internals::youngestShadowRoot(Element* host, ExceptionCode& ec)
 {
     if (!host) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -585,7 +600,7 @@ ShadowRoot* Internals::youngestShadowRoot(Element* host, ExceptionCode& ec)
 ShadowRoot* Internals::oldestShadowRoot(Element* host, ExceptionCode& ec)
 {
     if (!host) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -597,7 +612,7 @@ ShadowRoot* Internals::oldestShadowRoot(Element* host, ExceptionCode& ec)
 ShadowRoot* Internals::youngerShadowRoot(Node* shadow, ExceptionCode& ec)
 {
     if (!shadow || !shadow->isShadowRoot()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -607,7 +622,7 @@ ShadowRoot* Internals::youngerShadowRoot(Node* shadow, ExceptionCode& ec)
 ShadowRoot* Internals::olderShadowRoot(Node* shadow, ExceptionCode& ec)
 {
     if (!shadow || !shadow->isShadowRoot()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -617,7 +632,7 @@ ShadowRoot* Internals::olderShadowRoot(Node* shadow, ExceptionCode& ec)
 String Internals::shadowRootType(const Node* root, ExceptionCode& ec) const
 {
     if (!root || !root->isShadowRoot()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -635,7 +650,7 @@ String Internals::shadowRootType(const Node* root, ExceptionCode& ec) const
 Element* Internals::includerFor(Node* node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -645,7 +660,7 @@ Element* Internals::includerFor(Node* node, ExceptionCode& ec)
 String Internals::shadowPseudoId(Element* element, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -655,7 +670,7 @@ String Internals::shadowPseudoId(Element* element, ExceptionCode& ec)
 void Internals::setShadowPseudoId(Element* element, const String& id, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -683,12 +698,12 @@ Vector<String> Internals::formControlStateOfPreviousHistoryItem(ExceptionCode& e
 {
     HistoryItem* mainItem = frame()->loader()->history()->previousItem();
     if (!mainItem) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return Vector<String>();
     }
     String uniqueName = frame()->tree()->uniqueName();
     if (mainItem->target() != uniqueName && !mainItem->childItemWithTarget(uniqueName)) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return Vector<String>();
     }
     return mainItem->target() == uniqueName ? mainItem->documentState() : mainItem->childItemWithTarget(uniqueName)->documentState();
@@ -698,7 +713,7 @@ void Internals::setFormControlStateOfPreviousHistoryItem(const Vector<String>& s
 {
     HistoryItem* mainItem = frame()->loader()->history()->previousItem();
     if (!mainItem) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
     String uniqueName = frame()->tree()->uniqueName();
@@ -707,7 +722,7 @@ void Internals::setFormControlStateOfPreviousHistoryItem(const Vector<String>& s
     else if (HistoryItem* subItem = mainItem->childItemWithTarget(uniqueName))
         subItem->setDocumentState(state);
     else
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
 }
 
 void Internals::enableMockSpeechSynthesizer()
@@ -746,7 +761,7 @@ PassRefPtr<ClientRect> Internals::unscaledViewportRect(ExceptionCode& ec)
 {
     Document* document = contextDocument();
     if (!document || !document->view()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return ClientRect::create();
     }
 
@@ -757,7 +772,7 @@ PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionCode& ec)
 {
     Document* document = contextDocument();
     if (!document || !document->frame() || !document->frame()->selection()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return ClientRect::create();
     }
 
@@ -767,7 +782,7 @@ PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionCode& ec)
 PassRefPtr<ClientRect> Internals::boundingBox(Element* element, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return ClientRect::create();
     }
 
@@ -781,7 +796,7 @@ PassRefPtr<ClientRect> Internals::boundingBox(Element* element, ExceptionCode& e
 PassRefPtr<ClientRectList> Internals::inspectorHighlightRects(Document* document, ExceptionCode& ec)
 {
     if (!document || !document->page() || !document->page()->inspectorController()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return ClientRectList::create();
     }
 
@@ -793,13 +808,13 @@ PassRefPtr<ClientRectList> Internals::inspectorHighlightRects(Document* document
 unsigned Internals::markerCountForNode(Node* node, const String& markerType, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
     DocumentMarker::MarkerTypes markerTypes = 0;
     if (!markerTypesFrom(markerType, markerTypes)) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
 
@@ -809,13 +824,13 @@ unsigned Internals::markerCountForNode(Node* node, const String& markerType, Exc
 DocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsigned index, ExceptionCode& ec)
 {
     if (!node) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
     DocumentMarker::MarkerTypes markerTypes = 0;
     if (!markerTypesFrom(markerType, markerTypes)) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
 
@@ -850,7 +865,7 @@ void Internals::addTextMatchMarker(const Range* range, bool isActive)
 void Internals::setScrollViewPosition(Document* document, long x, long y, ExceptionCode& ec)
 {
     if (!document || !document->view()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -868,7 +883,7 @@ void Internals::setScrollViewPosition(Document* document, long x, long y, Except
 void Internals::setPagination(Document* document, const String& mode, int gap, int pageLength, ExceptionCode& ec)
 {
     if (!document || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
     Page* page = document->page();
@@ -885,7 +900,7 @@ void Internals::setPagination(Document* document, const String& mode, int gap, i
     else if (mode == "BottomToTopPaginated")
         pagination.mode = Pagination::BottomToTopPaginated;
     else {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
@@ -897,7 +912,7 @@ void Internals::setPagination(Document* document, const String& mode, int gap, i
 String Internals::configurationForViewport(Document* document, float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode& ec)
 {
     if (!document || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
     Page* page = document->page();
@@ -917,7 +932,7 @@ String Internals::configurationForViewport(Document* document, float devicePixel
 bool Internals::wasLastChangeUserEdit(Element* textField, ExceptionCode& ec)
 {
     if (!textField) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return false;
     }
 
@@ -926,35 +941,35 @@ bool Internals::wasLastChangeUserEdit(Element* textField, ExceptionCode& ec)
 
     // FIXME: We should be using hasTagName instead but Windows port doesn't link QualifiedNames properly.
     if (textField->tagName() == "TEXTAREA")
-        return static_cast<HTMLTextAreaElement*>(textField)->lastChangeWasUserEdit();
+        return toHTMLTextAreaElement(textField)->lastChangeWasUserEdit();
 
-    ec = INVALID_NODE_TYPE_ERR;
+    ec = InvalidNodeTypeError;
     return false;
 }
 
 bool Internals::elementShouldAutoComplete(Element* element, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return false;
     }
 
     if (element->hasTagName(inputTag))
         return toHTMLInputElement(element)->shouldAutocomplete();
 
-    ec = INVALID_NODE_TYPE_ERR;
+    ec = InvalidNodeTypeError;
     return false;
 }
 
 String Internals::suggestedValue(Element* element, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
     if (!element->hasTagName(inputTag)) {
-        ec = INVALID_NODE_TYPE_ERR;
+        ec = InvalidNodeTypeError;
         return String();
     }
 
@@ -964,12 +979,12 @@ String Internals::suggestedValue(Element* element, ExceptionCode& ec)
 void Internals::setSuggestedValue(Element* element, const String& value, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
     if (!element->hasTagName(inputTag)) {
-        ec = INVALID_NODE_TYPE_ERR;
+        ec = InvalidNodeTypeError;
         return;
     }
 
@@ -979,12 +994,12 @@ void Internals::setSuggestedValue(Element* element, const String& value, Excepti
 void Internals::setEditingValue(Element* element, const String& value, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
     if (!element->hasTagName(inputTag)) {
-        ec = INVALID_NODE_TYPE_ERR;
+        ec = InvalidNodeTypeError;
         return;
     }
 
@@ -994,7 +1009,7 @@ void Internals::setEditingValue(Element* element, const String& value, Exception
 void Internals::setAutofilled(Element* element, bool enabled, ExceptionCode& ec)
 {
     if (!element->hasTagName(inputTag)) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
     toHTMLInputElement(element)->setAutofilled(enabled);
@@ -1003,7 +1018,7 @@ void Internals::setAutofilled(Element* element, bool enabled, ExceptionCode& ec)
 void Internals::scrollElementToRect(Element* element, long x, long y, long w, long h, ExceptionCode& ec)
 {
     if (!element || !element->document() || !element->document()->view()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
     FrameView* frameView = element->document()->view();
@@ -1013,7 +1028,7 @@ void Internals::scrollElementToRect(Element* element, long x, long y, long w, lo
 void Internals::paintControlTints(Document* document, ExceptionCode& ec)
 {
     if (!document || !document->view()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -1024,7 +1039,7 @@ void Internals::paintControlTints(Document* document, ExceptionCode& ec)
 PassRefPtr<Range> Internals::rangeFromLocationAndLength(Element* scope, int rangeLocation, int rangeLength, ExceptionCode& ec)
 {
     if (!scope) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1034,7 +1049,7 @@ PassRefPtr<Range> Internals::rangeFromLocationAndLength(Element* scope, int rang
 unsigned Internals::locationFromRange(Element* scope, const Range* range, ExceptionCode& ec)
 {
     if (!scope || !range) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1047,7 +1062,7 @@ unsigned Internals::locationFromRange(Element* scope, const Range* range, Except
 unsigned Internals::lengthFromRange(Element* scope, const Range* range, ExceptionCode& ec)
 {
     if (!scope || !range) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1060,7 +1075,7 @@ unsigned Internals::lengthFromRange(Element* scope, const Range* range, Exceptio
 String Internals::rangeAsText(const Range* range, ExceptionCode& ec)
 {
     if (!range) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1070,7 +1085,7 @@ String Internals::rangeAsText(const Range* range, ExceptionCode& ec)
 PassRefPtr<DOMPoint> Internals::touchPositionAdjustedToBestClickableNode(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1092,7 +1107,7 @@ PassRefPtr<DOMPoint> Internals::touchPositionAdjustedToBestClickableNode(long x,
 Node* Internals::touchNodeAdjustedToBestClickableNode(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1110,7 +1125,7 @@ Node* Internals::touchNodeAdjustedToBestClickableNode(long x, long y, long width
 PassRefPtr<DOMPoint> Internals::touchPositionAdjustedToBestContextMenuNode(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1132,7 +1147,7 @@ PassRefPtr<DOMPoint> Internals::touchPositionAdjustedToBestContextMenuNode(long 
 Node* Internals::touchNodeAdjustedToBestContextMenuNode(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1150,7 +1165,7 @@ Node* Internals::touchNodeAdjustedToBestContextMenuNode(long x, long y, long wid
 PassRefPtr<ClientRect> Internals::bestZoomableAreaForTouchPoint(long x, long y, long width, long height, Document* document, ExceptionCode& ec)
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1174,7 +1189,7 @@ int Internals::lastSpellCheckRequestSequence(Document* document, ExceptionCode& 
     SpellChecker* checker = spellchecker(document);
 
     if (!checker) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return -1;
     }
 
@@ -1186,7 +1201,7 @@ int Internals::lastSpellCheckProcessedSequence(Document* document, ExceptionCode
     SpellChecker* checker = spellchecker(document);
 
     if (!checker) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return -1;
     }
 
@@ -1206,7 +1221,7 @@ void Internals::setUserPreferredLanguages(const Vector<String>& languages)
 unsigned Internals::wheelEventHandlerCount(Document* document, ExceptionCode& ec)
 {
     if (!document) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1216,7 +1231,7 @@ unsigned Internals::wheelEventHandlerCount(Document* document, ExceptionCode& ec
 unsigned Internals::touchEventHandlerCount(Document* document, ExceptionCode& ec)
 {
     if (!document) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1233,7 +1248,7 @@ unsigned Internals::touchEventHandlerCount(Document* document, ExceptionCode& ec
 PassRefPtr<ClientRectList> Internals::touchEventTargetClientRects(Document* document, ExceptionCode& ec)
 {
     if (!document || !document->view() || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
     if (!document->page()->scrollingCoordinator())
@@ -1255,7 +1270,7 @@ PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, i
     unsigned bottomPadding, unsigned leftPadding, bool ignoreClipping, bool allowShadowContent, bool allowChildFrameContent, ExceptionCode& ec) const
 {
     if (!document || !document->frame() || !document->frame()->view()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1410,11 +1425,21 @@ void Internals::closeDummyInspectorFrontend()
     m_frontendWindow.release();
 }
 
+Vector<unsigned long> Internals::setMemoryCacheCapacities(unsigned long minDeadBytes, unsigned long maxDeadBytes, unsigned long totalBytes)
+{
+    Vector<unsigned long> result;
+    result.append(memoryCache()->minDeadCapacity());
+    result.append(memoryCache()->maxDeadCapacity());
+    result.append(memoryCache()->capacity());
+    memoryCache()->setCapacities(minDeadBytes, maxDeadBytes, totalBytes);
+    return result;
+}
+
 void Internals::setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode& ec)
 {
     Page* page = contextDocument()->frame()->page();
     if (!page || !page->inspectorController()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
     page->inspectorController()->setResourcesDataSizeLimitsFromInternals(maximumResourcesContentSize, maximumSingleResourceContentSize);
@@ -1446,7 +1471,7 @@ unsigned Internals::numberOfScrollableAreas(Document* document, ExceptionCode&)
 bool Internals::isPageBoxVisible(Document* document, int pageNumber, ExceptionCode& ec)
 {
     if (!document) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return false;
     }
 
@@ -1466,7 +1491,7 @@ String Internals::elementLayerTreeAsText(Element* element, ExceptionCode& ec) co
 static PassRefPtr<NodeList> paintOrderList(Element* element, ExceptionCode& ec, RenderLayer::PaintOrderListType type)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1474,13 +1499,13 @@ static PassRefPtr<NodeList> paintOrderList(Element* element, ExceptionCode& ec, 
 
     RenderObject* renderer = element->renderer();
     if (!renderer || !renderer->isBox()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
     RenderLayer* layer = toRenderBox(renderer)->layer();
     if (!layer) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1502,7 +1527,7 @@ PassRefPtr<NodeList> Internals::paintOrderListAfterPromote(Element* element, Exc
 String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionCode& ec) const
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1512,7 +1537,7 @@ String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionC
 String Internals::elementLayerTreeAsText(Element* element, unsigned flags, ExceptionCode& ec) const
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1520,13 +1545,13 @@ String Internals::elementLayerTreeAsText(Element* element, unsigned flags, Excep
 
     RenderObject* renderer = element->renderer();
     if (!renderer || !renderer->isBox()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
     RenderLayer* layer = toRenderBox(renderer)->layer();
     if (!layer) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1541,7 +1566,7 @@ String Internals::elementLayerTreeAsText(Element* element, unsigned flags, Excep
 void Internals::setNeedsCompositedScrolling(Element* element, unsigned needsCompositedScrolling, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -1549,13 +1574,13 @@ void Internals::setNeedsCompositedScrolling(Element* element, unsigned needsComp
 
     RenderObject* renderer = element->renderer();
     if (!renderer || !renderer->isBox()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
     RenderLayer* layer = toRenderBox(renderer)->layer();
     if (!layer) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -1565,7 +1590,7 @@ void Internals::setNeedsCompositedScrolling(Element* element, unsigned needsComp
 String Internals::repaintRectsAsText(Document* document, ExceptionCode& ec) const
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1580,7 +1605,7 @@ String Internals::scrollingStateTreeAsText(Document* document, ExceptionCode& ec
 String Internals::mainThreadScrollingReasons(Document* document, ExceptionCode& ec) const
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1594,7 +1619,7 @@ String Internals::mainThreadScrollingReasons(Document* document, ExceptionCode& 
 PassRefPtr<ClientRectList> Internals::nonFastScrollableRects(Document* document, ExceptionCode& ec) const
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1608,7 +1633,7 @@ PassRefPtr<ClientRectList> Internals::nonFastScrollableRects(Document* document,
 void Internals::garbageCollectDocumentResources(Document* document, ExceptionCode& ec) const
 {
     if (!document) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -1688,7 +1713,7 @@ int Internals::numberOfPages(float pageWidth, float pageHeight)
 String Internals::pageProperty(String propertyName, int pageNumber, ExceptionCode& ec) const
 {
     if (!frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1698,7 +1723,7 @@ String Internals::pageProperty(String propertyName, int pageNumber, ExceptionCod
 String Internals::pageSizeAndMarginsInPixels(int pageNumber, int width, int height, int marginTop, int marginRight, int marginBottom, int marginLeft, ExceptionCode& ec) const
 {
     if (!frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1709,7 +1734,7 @@ void Internals::setDeviceScaleFactor(float scaleFactor, ExceptionCode& ec)
 {
     Document* document = contextDocument();
     if (!document || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
     Page* page = document->page();
@@ -1720,7 +1745,7 @@ void Internals::setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCod
 {
     Document* document = contextDocument();
     if (!document || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
     Page* page = document->page();
@@ -1730,7 +1755,7 @@ void Internals::setPageScaleFactor(float scaleFactor, int x, int y, ExceptionCod
 void Internals::setIsCursorVisible(Document* document, bool isVisible, ExceptionCode& ec)
 {
     if (!document || !document->page()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
     document->page()->setIsCursorVisible(isVisible);
@@ -1793,7 +1818,7 @@ Vector<String> Internals::getReferencedFilePaths() const
 void Internals::startTrackingRepaints(Document* document, ExceptionCode& ec)
 {
     if (!document || !document->view()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -1804,7 +1829,7 @@ void Internals::startTrackingRepaints(Document* document, ExceptionCode& ec)
 void Internals::stopTrackingRepaints(Document* document, ExceptionCode& ec)
 {
     if (!document || !document->view()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -1868,7 +1893,7 @@ static const char* cursorTypeToString(Cursor::Type cursorType)
 String Internals::getCurrentCursorInfo(Document* document, ExceptionCode& ec)
 {
     if (!document || !document->frame()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 
@@ -1901,7 +1926,7 @@ PassRefPtr<ArrayBuffer> Internals::serializeObject(PassRefPtr<SerializedScriptVa
 {
     String stringValue = value->toWireString();
     RefPtr<ArrayBuffer> buffer = ArrayBuffer::createUninitialized(stringValue.length(), sizeof(UChar));
-    stringValue.copyTo(static_cast<UChar*>(buffer->data()), stringValue.length());
+    stringValue.copyTo(static_cast<UChar*>(buffer->data()), 0, stringValue.length());
     return buffer.release();
 }
 
@@ -1925,7 +1950,7 @@ PassRefPtr<ClientRect> Internals::selectionBounds(ExceptionCode& ec)
 {
     Document* document = contextDocument();
     if (!document || !document->frame() || !document->frame()->selection()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -1935,7 +1960,7 @@ PassRefPtr<ClientRect> Internals::selectionBounds(ExceptionCode& ec)
 String Internals::markerTextForListItem(Element* element, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
     return WebCore::markerTextForListItem(element);
@@ -1944,7 +1969,7 @@ String Internals::markerTextForListItem(Element* element, ExceptionCode& ec)
 String Internals::getImageSourceURL(Element* element, ExceptionCode& ec)
 {
     if (!element) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
     return element->imageSourceURL();
@@ -1953,7 +1978,7 @@ String Internals::getImageSourceURL(Element* element, ExceptionCode& ec)
 String Internals::baseURL(Document* document, ExceptionCode& ec)
 {
     if (!document) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return String();
     }
 

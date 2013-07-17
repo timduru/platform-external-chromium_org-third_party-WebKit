@@ -34,7 +34,9 @@
 #include "core/dom/MouseEvent.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/html/HTMLAnchorElement.h"
+#include "core/html/HTMLFormElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
+#include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderTypes.h"
 #include "core/page/Chrome.h"
@@ -94,7 +96,6 @@ bool SVGAElement::isSupportedAttribute(const QualifiedName& attrName)
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty()) {
         SVGURIReference::addSupportedAttributes(supportedAttributes);
-        SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         supportedAttributes.add(SVGNames::targetAttr);
     }
@@ -115,8 +116,6 @@ void SVGAElement::parseAttribute(const QualifiedName& name, const AtomicString& 
 
     if (SVGURIReference::parseAttribute(name, value))
         return;
-    if (SVGLangSpace::parseAttribute(name, value))
-        return;
     if (SVGExternalResourcesRequired::parseAttribute(name, value))
         return;
 
@@ -136,7 +135,7 @@ void SVGAElement::svgAttributeChanged(const QualifiedName& attrName)
     // as none of the other properties changes the linking behaviour for our <a> element.
     if (SVGURIReference::isKnownAttribute(attrName)) {
         bool wasLink = isLink();
-        setIsLink(!href().isNull());
+        setIsLink(!hrefCurrentValue().isNull());
 
         if (wasLink != isLink())
             setNeedsStyleRecalc();
@@ -161,7 +160,7 @@ void SVGAElement::defaultEventHandler(Event* event)
         }
 
         if (isLinkClick(event)) {
-            String url = stripLeadingAndTrailingHTMLSpaces(href());
+            String url = stripLeadingAndTrailingHTMLSpaces(hrefCurrentValue());
 
             if (url[0] == '#') {
                 Element* targetElement = treeScope()->getElementById(url.substring(1));
@@ -183,7 +182,9 @@ void SVGAElement::defaultEventHandler(Event* event)
             Frame* frame = document()->frame();
             if (!frame)
                 return;
-            frame->loader()->urlSelected(document()->completeURL(url), target, event, false, MaybeSendReferrer);
+            FrameLoadRequest frameRequest(document()->securityOrigin(), ResourceRequest(document()->completeURL(url)), target);
+            frameRequest.setTriggeringEvent(event);
+            frame->loader()->load(frameRequest);
             return;
         }
     }

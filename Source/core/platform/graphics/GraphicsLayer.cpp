@@ -118,7 +118,6 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     , m_masksToBounds(false)
     , m_drawsContent(false)
     , m_contentsVisible(true)
-    , m_showDebugBorder(false)
     , m_showRepaintCounter(false)
     , m_paintingPhase(GraphicsLayerPaintAllWithOverflowClip)
     , m_contentsOrientation(CompositingCoordinatesTopDown)
@@ -141,7 +140,6 @@ GraphicsLayer::GraphicsLayer(GraphicsLayerClient* client)
     m_opaqueRectTrackingContentLayerDelegate = adoptPtr(new OpaqueRectTrackingContentLayerDelegate(this));
     m_layer = adoptPtr(Platform::current()->compositorSupport()->createContentLayer(m_opaqueRectTrackingContentLayerDelegate.get()));
     m_layer->layer()->setDrawsContent(m_drawsContent && m_contentsVisible);
-    m_layer->layer()->setScrollClient(this);
     m_layer->setAutomaticallyComputeRasterScale(true);
 }
 
@@ -381,35 +379,6 @@ String GraphicsLayer::animationNameForTransition(AnimatedPropertyID property)
     id.appendNumber(static_cast<int>(property));
     id.append('-');
     return id.toString();
-}
-
-void GraphicsLayer::getDebugBorderInfo(Color& color, float& width) const
-{
-    if (drawsContent()) {
-        color = Color(0, 128, 32, 128); // normal layer: green
-        width = 2;
-        return;
-    }
-    
-    if (masksToBounds()) {
-        color = Color(128, 255, 255, 48); // masking layer: pale blue
-        width = 20;
-        return;
-    }
-        
-    color = Color(255, 255, 0, 192); // container: yellow
-    width = 2;
-}
-
-void GraphicsLayer::updateDebugIndicators()
-{
-    if (!isShowingDebugBorder())
-        return;
-
-    Color borderColor;
-    float width = 0;
-    getDebugBorderInfo(borderColor, width);
-    setDebugBorder(borderColor, width);
 }
 
 void GraphicsLayer::setZPosition(float position)
@@ -953,12 +922,6 @@ void GraphicsLayer::setName(const String& name)
     updateNames();
 }
 
-int GraphicsLayer::debugID() const
-{
-    // FIXME: change this to assert m_layer always exists, and remove enum.
-    return m_layer ? m_layer->layer()->id() : DebugIDNoCompositedLayer;
-}
-
 void GraphicsLayer::setCompositingReasons(WebKit::WebCompositingReasons reasons)
 {
     m_layer->layer()->setCompositingReasons(reasons);
@@ -1334,6 +1297,21 @@ void GraphicsLayer::setLinkHighlight(LinkHighlightClient* linkHighlight)
 {
     m_linkHighlight = linkHighlight;
     updateChildList();
+}
+
+void GraphicsLayer::setScrollableArea(ScrollableArea* scrollableArea, bool isMainFrame)
+{
+    if (m_scrollableArea == scrollableArea)
+        return;
+
+    m_scrollableArea = scrollableArea;
+
+    // Main frame scrolling may involve pinch zoom and gets routed through
+    // WebViewImpl explicitly rather than via GraphicsLayer::didScroll.
+    if (isMainFrame)
+        m_layer->layer()->setScrollClient(0);
+    else
+        m_layer->layer()->setScrollClient(this);
 }
 
 void GraphicsLayer::paint(GraphicsContext& context, const IntRect& clip)

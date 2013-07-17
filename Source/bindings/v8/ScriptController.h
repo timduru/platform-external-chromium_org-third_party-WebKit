@@ -33,15 +33,15 @@
 
 #include "bindings/v8/ScriptInstance.h"
 #include "bindings/v8/ScriptValue.h"
-#include <bindings/npruntime.h>
 
 #include <v8.h>
 #include "wtf/Forward.h"
 #include "wtf/HashMap.h"
-#include "wtf/HashSet.h"
 #include "wtf/RefCounted.h"
 #include "wtf/Vector.h"
 #include "wtf/text/TextPosition.h"
+
+struct NPObject;
 
 namespace WebCore {
 
@@ -62,6 +62,10 @@ typedef WTF::Vector<v8::Extension*> V8Extensions;
 enum ReasonForCallingCanExecuteScripts {
     AboutToExecuteScript,
     NotAboutToExecuteScript
+};
+
+enum IsolatedWorldConstants {
+    EmbedderWorldIdLimit = (1 << 29)
 };
 
 class ScriptController {
@@ -141,7 +145,6 @@ public:
 
     void updateSecurityOrigin();
     void clearScriptObjects();
-    void allowScriptObjectsForPlugin(Widget*);
     void cleanupScriptObjectsForPlugin(Widget*);
 
     void clearForClose();
@@ -149,7 +152,6 @@ public:
 
     NPObject* createScriptObjectForPluginElement(HTMLPlugInElement*);
     NPObject* windowScriptNPObject();
-    NPP frameNPP();
 
     // Registers a v8 extension to be available on webpages. Will only
     // affect v8 contexts initialized after this call. Takes ownership of
@@ -162,8 +164,8 @@ public:
 
 private:
     typedef HashMap<int, OwnPtr<V8WindowShell> > IsolatedWorldMap;
+    typedef HashMap<Widget*, NPObject*> PluginObjectMap;
 
-    NPObject* createScriptObjectForFrame();
     void clearForClose(bool destroyGlobal);
 
     Frame* m_frame;
@@ -175,11 +177,13 @@ private:
 
     bool m_paused;
 
-    NPObject* m_windowScriptNPObject;
-    OwnPtr<NPP_t> m_frameNPP;
+    // A mapping between Widgets and their corresponding script object.
+    // This list is used so that when the plugin dies, we can immediately
+    // invalidate all sub-objects which are associated with that plugin.
+    // The frame keeps a NPObject reference for each item on the list.
+    PluginObjectMap m_pluginObjects;
 
-    typedef HashSet<NPP> PluginInstances;
-    PluginInstances m_pluginNPPs;
+    NPObject* m_windowScriptNPObject;
 };
 
 } // namespace WebCore

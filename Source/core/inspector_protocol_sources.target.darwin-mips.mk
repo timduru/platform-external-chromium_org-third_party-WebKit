@@ -15,27 +15,27 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_generate_inspector_protocol_version_gyp)/generate_inspector_protocol_version.stamp
 
 ### Rules for action "generateInspectorProtocolBackendSources":
-$(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInspector.py $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInspectorStrings.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/protocol.json $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInspector.py $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInspectorStrings.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/protocol.json $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Generating Inspector protocol backend sources from protocol.json ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit $(gyp_shared_intermediate_dir)/webcore; python inspector/CodeGeneratorInspector.py ../devtools/protocol.json --output_h_dir "$(gyp_shared_intermediate_dir)/webkit" --output_cpp_dir "$(gyp_shared_intermediate_dir)/webcore"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python inspector/CodeGeneratorInspector.py ../devtools/protocol.json --output_dir "$(gyp_shared_intermediate_dir)/webkit"
 
-$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.h: $(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp ;
-$(gyp_shared_intermediate_dir)/webcore/InspectorFrontend.cpp: $(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.h: $(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp ;
-$(gyp_shared_intermediate_dir)/webcore/InspectorTypeBuilder.cpp: $(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.h: $(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.h: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.h: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.h: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
 
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp \
+	$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.h \
-	$(gyp_shared_intermediate_dir)/webcore/InspectorFrontend.cpp \
+	$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.h \
-	$(gyp_shared_intermediate_dir)/webcore/InspectorTypeBuilder.cpp \
+	$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.h
 
 # Make sure our deps and generated files are built first.

@@ -188,6 +188,7 @@ void RenderStyle::copyNonInheritedFrom(const RenderStyle* other)
     noninherited_flags._page_break_after = other->noninherited_flags._page_break_after;
     noninherited_flags._page_break_inside = other->noninherited_flags._page_break_inside;
     noninherited_flags.explicitInheritance = other->noninherited_flags.explicitInheritance;
+    noninherited_flags.currentColor = other->noninherited_flags.currentColor;
     if (m_svgStyle != other->m_svgStyle)
         m_svgStyle.access()->copyNonInheritedFrom(other->m_svgStyle.get());
     ASSERT(zoom() == initialZoom());
@@ -434,7 +435,6 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
         if (rareInheritedData->highlight != other->rareInheritedData->highlight
             || rareInheritedData->indent != other->rareInheritedData->indent
 #if ENABLE(CSS3_TEXT)
-            || rareInheritedData->m_textAlignLast != other->rareInheritedData->m_textAlignLast
             || rareInheritedData->m_textIndentLine != other->rareInheritedData->m_textIndentLine
 #endif
             || rareInheritedData->m_effectiveZoom != other->rareInheritedData->m_effectiveZoom
@@ -451,6 +451,7 @@ StyleDifference RenderStyle::diff(const RenderStyle* other, unsigned& changedCon
             || rareInheritedData->textEmphasisMark != other->rareInheritedData->textEmphasisMark
             || rareInheritedData->textEmphasisPosition != other->rareInheritedData->textEmphasisPosition
             || rareInheritedData->textEmphasisCustomMark != other->rareInheritedData->textEmphasisCustomMark
+            || rareInheritedData->m_textAlignLast != other->rareInheritedData->m_textAlignLast
             || rareInheritedData->m_textOrientation != other->rareInheritedData->m_textOrientation
             || rareInheritedData->m_tabSize != other->rareInheritedData->m_tabSize
             || rareInheritedData->m_lineBoxContain != other->rareInheritedData->m_lineBoxContain
@@ -1153,8 +1154,8 @@ float RenderStyle::specifiedFontSize() const { return fontDescription().specifie
 float RenderStyle::computedFontSize() const { return fontDescription().computedSize(); }
 int RenderStyle::fontSize() const { return inherited->font.pixelSize(); }
 
-int RenderStyle::wordSpacing() const { return inherited->font.wordSpacing(); }
-int RenderStyle::letterSpacing() const { return inherited->font.letterSpacing(); }
+float RenderStyle::wordSpacing() const { return inherited->font.wordSpacing(); }
+float RenderStyle::letterSpacing() const { return inherited->font.letterSpacing(); }
 
 bool RenderStyle::setFontDescription(const FontDescription& v)
 {
@@ -1198,8 +1199,8 @@ int RenderStyle::computedLineHeight(RenderView* renderView) const
     return lh.value();
 }
 
-void RenderStyle::setWordSpacing(int v) { inherited.access()->font.setWordSpacing(v); }
-void RenderStyle::setLetterSpacing(int v) { inherited.access()->font.setLetterSpacing(v); }
+void RenderStyle::setWordSpacing(float v) { inherited.access()->font.setWordSpacing(v); }
+void RenderStyle::setLetterSpacing(float v) { inherited.access()->font.setLetterSpacing(v); }
 
 void RenderStyle::setFontSize(float size)
 {

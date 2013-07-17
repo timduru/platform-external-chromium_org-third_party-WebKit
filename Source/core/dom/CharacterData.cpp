@@ -82,8 +82,8 @@ unsigned CharacterData::parserAppendData(const String& string, unsigned offset, 
     ASSERT(!string.is8Bit() || string.containsOnlyLatin1()); // Latin-1 doesn't have unbreakable boundaries.
     if (characterLengthLimit < characterLength && !string.is8Bit()) {
         NonSharedCharacterBreakIterator it(string.characters16() + offset, (characterLengthLimit + 2 > characterLength) ? characterLength : characterLengthLimit + 2);
-        if (!isTextBreak(it, characterLengthLimit))
-            characterLengthLimit = textBreakPreceding(it, characterLengthLimit);
+        if (!it.isBreak(characterLengthLimit))
+            characterLengthLimit = it.preceding(characterLengthLimit);
     }
 
     if (!characterLengthLimit)
@@ -191,7 +191,7 @@ bool CharacterData::containsOnlyWhitespace() const
     return m_data.containsOnlyWhitespace();
 }
 
-void CharacterData::setNodeValue(const String& nodeValue, ExceptionCode&)
+void CharacterData::setNodeValue(const String& nodeValue)
 {
     setData(nodeValue);
 }
@@ -236,10 +236,10 @@ void CharacterData::checkCharDataOperation(unsigned offset, ExceptionCode& ec)
 {
     ec = 0;
 
-    // INDEX_SIZE_ERR: Raised if the specified offset is negative or greater than the number of 16-bit
+    // IndexSizeError: Raised if the specified offset is negative or greater than the number of 16-bit
     // units in data.
     if (offset > length()) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
 }

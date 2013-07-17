@@ -94,15 +94,10 @@ public:
 
     // FIXME: These are all functions which start loads. We have too many.
     void loadURLIntoChildFrame(const ResourceRequest&, Frame*);
-    void loadFrameRequest(const FrameLoadRequest&, bool lockBackForwardList,  // Called by submitForm, calls loadPostRequest and loadURL.
-        PassRefPtr<Event>, PassRefPtr<FormState>, ShouldSendReferrer);
-
     void load(const FrameLoadRequest&);
 
     unsigned long loadResourceSynchronously(const ResourceRequest&, StoredCredentials, ResourceError&, ResourceResponse&, Vector<char>& data);
 
-    void changeLocation(SecurityOrigin*, const KURL&, const String& referrer, bool lockBackForwardList = true, bool refresh = false);
-    void urlSelected(const KURL&, const String& target, PassRefPtr<Event>, bool lockBackForwardList, ShouldSendReferrer);
     void submitForm(PassRefPtr<FormSubmission>);
 
     void reload(bool endToEndReload = false, const KURL& overrideURL = KURL(), const String& overrideEncoding = String());
@@ -235,8 +230,6 @@ public:
 
     void completed();
     bool allAncestorsAreComplete() const; // including this
-    void clientRedirected(const KURL&, double delay, double fireDate);
-    void clientRedirectCancelledOrFinished();
 
     void setOriginalURLForDownloadRequest(ResourceRequest&);
 
@@ -295,14 +288,12 @@ private:
 
     void dispatchDidCommitLoad();
 
-    void urlSelected(const FrameLoadRequest&, PassRefPtr<Event>, bool lockBackForwardList, ShouldSendReferrer);
-
     // Calls continueLoadAfterNavigationPolicy
     void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,
         FrameLoadType, PassRefPtr<FormState>, const SubstituteData&, const String& overrideEncoding = String());
 
-    // Called by loadFrameRequest, calls loadWithNavigationAction or checkNewWindowPolicyAndContinue
-    void loadURL(const ResourceRequest&, const String& frameName, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>);
+    // Called by load, calls loadWithNavigationAction or checkNewWindowPolicyAndContinue
+    void loadURL(const ResourceRequest&, const String& frameName, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>, const SubstituteData&);
 
     bool shouldReload(const KURL& currentURL, const KURL& destinationURL);
 
@@ -373,20 +364,12 @@ private:
     bool m_didAccessInitialDocument;
     Timer<FrameLoader> m_didAccessInitialDocumentTimer;
     bool m_suppressOpenerInNewFrame;
+    bool m_startingClientRedirect;
 
     SandboxFlags m_forcedSandboxFlags;
 
     RefPtr<HistoryItem> m_requestedHistoryItem;
 };
-
-// This function is called by createWindow() in JSDOMWindowBase.cpp, for example, for
-// modal dialog creation.  The lookupFrame is for looking up the frame name in case
-// the frame name references a frame different from the openerFrame, e.g. when it is
-// "_self" or "_parent".
-//
-// FIXME: Consider making this function part of an appropriate class (not FrameLoader)
-// and moving it to a more appropriate location.
-Frame* createWindow(Frame* openerFrame, Frame* lookupFrame, const FrameLoadRequest&, const WindowFeatures&, bool& created);
 
 } // namespace WebCore
 

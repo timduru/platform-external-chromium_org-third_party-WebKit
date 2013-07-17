@@ -32,14 +32,51 @@
 #define AnimatableValue_h
 
 #include "core/css/CSSValue.h"
-#include "wtf/PassRefPtr.h"
+#include "wtf/RefCounted.h"
 
 namespace WebCore {
 
-// FIXME: This class is currently just a stub.
-class AnimatableValue {
+class CSSValue;
+
+class AnimatableValue : public RefCounted<AnimatableValue> {
 public:
-    PassRefPtr<CSSValue> toCSSValue() const;
+    virtual ~AnimatableValue() { }
+    static PassRefPtr<AnimatableValue> create(CSSValue*);
+    virtual PassRefPtr<CSSValue> toCSSValue() const = 0;
+
+    static const AnimatableValue* neutralValue();
+    virtual bool isNeutral() const { return false; }
+
+    static PassRefPtr<AnimatableValue> interpolate(const AnimatableValue*, const AnimatableValue*, double fraction);
+    // For noncommutative values read add(A, B) to mean the value A with B composed onto it.
+    static PassRefPtr<AnimatableValue> add(const AnimatableValue*, const AnimatableValue*);
+
+protected:
+    enum AnimatableType {
+        TypeNeutral,
+        TypeNumber,
+        TypeUnknown,
+    };
+
+    AnimatableValue(AnimatableType type) : m_type(type) { }
+
+    bool isSameType(const AnimatableValue* value) const
+    {
+        ASSERT(value);
+        return value->m_type == m_type;
+    }
+
+    virtual PassRefPtr<AnimatableValue> interpolateTo(const AnimatableValue*, double fraction) const = 0;
+    static PassRefPtr<AnimatableValue> defaultInterpolateTo(const AnimatableValue* left, const AnimatableValue* right, double fraction) { return takeConstRef((fraction < 0.5) ? left : right); }
+
+    // For noncommutative values read A->addWith(B) to mean the value A with B composed onto it.
+    virtual PassRefPtr<AnimatableValue> addWith(const AnimatableValue*) const = 0;
+    static PassRefPtr<AnimatableValue> defaultAddWith(const AnimatableValue* left, const AnimatableValue* right) { return takeConstRef(right); }
+
+    template <class T>
+    static PassRefPtr<T> takeConstRef(const T* value) { return PassRefPtr<T>(const_cast<T*>(value)); }
+
+    AnimatableType m_type;
 };
 
 } // namespace WebCore

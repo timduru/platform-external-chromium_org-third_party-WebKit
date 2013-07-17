@@ -204,6 +204,11 @@ HTMLElement* HTMLInputElement::speechButtonElement() const
 }
 #endif
 
+HTMLElement* HTMLInputElement::passwordGeneratorButtonElement() const
+{
+    return m_inputType->passwordGeneratorButtonElement();
+}
+
 HTMLElement* HTMLInputElement::sliderThumbElement() const
 {
     return m_inputType->sliderThumbElement();
@@ -553,7 +558,7 @@ bool HTMLInputElement::canHaveSelection() const
 int HTMLInputElement::selectionStartForBinding(ExceptionCode& ec) const
 {
     if (!canHaveSelection()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return 0;
     }
     return HTMLTextFormControlElement::selectionStart();
@@ -562,7 +567,7 @@ int HTMLInputElement::selectionStartForBinding(ExceptionCode& ec) const
 int HTMLInputElement::selectionEndForBinding(ExceptionCode& ec) const
 {
     if (!canHaveSelection()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return 0;
     }
     return HTMLTextFormControlElement::selectionEnd();
@@ -571,7 +576,7 @@ int HTMLInputElement::selectionEndForBinding(ExceptionCode& ec) const
 String HTMLInputElement::selectionDirectionForBinding(ExceptionCode& ec) const
 {
     if (!canHaveSelection()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return String();
     }
     return HTMLTextFormControlElement::selectionDirection();
@@ -580,7 +585,7 @@ String HTMLInputElement::selectionDirectionForBinding(ExceptionCode& ec) const
 void HTMLInputElement::setSelectionStartForBinding(int start, ExceptionCode& ec)
 {
     if (!canHaveSelection()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     HTMLTextFormControlElement::setSelectionStart(start);
@@ -589,7 +594,7 @@ void HTMLInputElement::setSelectionStartForBinding(int start, ExceptionCode& ec)
 void HTMLInputElement::setSelectionEndForBinding(int end, ExceptionCode& ec)
 {
     if (!canHaveSelection()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     HTMLTextFormControlElement::setSelectionEnd(end);
@@ -598,7 +603,7 @@ void HTMLInputElement::setSelectionEndForBinding(int end, ExceptionCode& ec)
 void HTMLInputElement::setSelectionDirectionForBinding(const String& direction, ExceptionCode& ec)
 {
     if (!canHaveSelection()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     HTMLTextFormControlElement::setSelectionDirection(direction);
@@ -607,7 +612,7 @@ void HTMLInputElement::setSelectionDirectionForBinding(const String& direction, 
 void HTMLInputElement::setSelectionRangeForBinding(int start, int end, ExceptionCode& ec)
 {
     if (!canHaveSelection()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     HTMLTextFormControlElement::setSelectionRange(start, end);
@@ -616,7 +621,7 @@ void HTMLInputElement::setSelectionRangeForBinding(int start, int end, Exception
 void HTMLInputElement::setSelectionRangeForBinding(int start, int end, const String& direction, ExceptionCode& ec)
 {
     if (!canHaveSelection()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     HTMLTextFormControlElement::setSelectionRange(start, end, direction);
@@ -1027,7 +1032,7 @@ void HTMLInputElement::setEditingValue(const String& value)
 void HTMLInputElement::setValue(const String& value, ExceptionCode& ec, TextFieldEventBehavior eventBehavior)
 {
     if (isFileUpload() && !value.isEmpty()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     setValue(value, eventBehavior);
@@ -1079,7 +1084,7 @@ double HTMLInputElement::valueAsNumber() const
 void HTMLInputElement::setValueAsNumber(double newValue, ExceptionCode& ec, TextFieldEventBehavior eventBehavior)
 {
     if (!std::isfinite(newValue)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return;
     }
     m_inputType->setValueAsDouble(newValue, eventBehavior, ec);
@@ -1317,7 +1322,7 @@ int HTMLInputElement::maxLength() const
 void HTMLInputElement::setMaxLength(int maxLength, ExceptionCode& ec)
 {
     if (maxLength < 0)
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
     else
         setAttribute(maxlengthAttr, String::number(maxLength));
 }
@@ -1335,7 +1340,7 @@ void HTMLInputElement::setSize(unsigned size)
 void HTMLInputElement::setSize(unsigned size, ExceptionCode& ec)
 {
     if (!size)
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
     else
         setSize(size);
 }
@@ -1739,26 +1744,22 @@ bool HTMLInputElement::shouldAppearIndeterminate() const
 }
 
 #if ENABLE(MEDIA_CAPTURE)
-String HTMLInputElement::capture() const
+bool HTMLInputElement::capture() const
 {
-    if (!isFileUpload())
-        return String();
+    if (!isFileUpload() || !fastHasAttribute(captureAttr))
+        return false;
 
-    String capture = fastGetAttribute(captureAttr).lower();
-    if (capture == "camera"
-        || capture == "camcorder"
-        || capture == "microphone"
-        || capture == "filesystem")
-        return capture;
+    // As per crbug.com/240252, emit a deprecation warning when the "capture"
+    // attribute is used as an enum. The spec has been updated and "capture" is
+    // supposed to be used as a boolean.
+    bool hasDeprecatedUsage = !fastGetAttribute(captureAttr).isNull();
+    if (hasDeprecatedUsage)
+        UseCounter::countDeprecation(document(), UseCounter::CaptureAttributeAsEnum);
+    else
+        UseCounter::count(document(), UseCounter::CaptureAttributeAsEnum);
 
-    return "filesystem";
+    return true;
 }
-
-void HTMLInputElement::setCapture(const String& value)
-{
-    setAttribute(captureAttr, value);
-}
-
 #endif
 
 bool HTMLInputElement::isInRequiredRadioButtonGroup()
@@ -1838,7 +1839,7 @@ void ListAttributeTargetObserver::idTargetChanged()
 void HTMLInputElement::setRangeText(const String& replacement, ExceptionCode& ec)
 {
     if (!m_inputType->supportsSelectionAPI()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -1848,7 +1849,7 @@ void HTMLInputElement::setRangeText(const String& replacement, ExceptionCode& ec
 void HTMLInputElement::setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionCode& ec)
 {
     if (!m_inputType->supportsSelectionAPI()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -1907,6 +1908,11 @@ void HTMLInputElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) con
     info.addMember(m_suggestedValue, "suggestedValue");
     info.addMember(m_inputType, "inputType");
     info.addMember(m_listAttributeTargetObserver, "listAttributeTargetObserver");
+}
+
+bool HTMLInputElement::supportsInputModeAttribute() const
+{
+    return m_inputType->supportsInputModeAttribute();
 }
 
 #if ENABLE(INPUT_MULTIPLE_FIELDS_UI)

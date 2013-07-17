@@ -42,9 +42,9 @@
 #include "core/workers/WorkerGlobalScope.h"
 #include "core/workers/WorkerLoaderProxy.h"
 #include "core/workers/WorkerThread.h"
-#include <wtf/MainThread.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/Vector.h>
+#include "wtf/MainThread.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/Vector.h"
 
 using namespace std;
 
@@ -109,6 +109,7 @@ void WorkerThreadableLoader::MainThreadBridge::mainThreadCreateLoader(ScriptExec
 
     OwnPtr<ResourceRequest> request(ResourceRequest::adopt(requestData));
     request->setHTTPReferrer(outgoingReferrer);
+    options.requestInitiatorContext = WorkerContext;
     // FIXME: If the a site requests a local resource, then this will return a non-zero value but the sync path
     // will return a 0 value.  Either this should return 0 or the other code path should do a callback with
     // a failure.

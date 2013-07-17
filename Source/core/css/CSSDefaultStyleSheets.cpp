@@ -34,6 +34,9 @@
 #include "core/css/RuleSet.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/dom/FullscreenController.h"
+#include "core/html/HTMLAnchorElement.h"
+#include "core/html/HTMLHtmlElement.h"
+#include "core/html/HTMLVideoElement.h"
 #include "core/rendering/RenderTheme.h"
 
 namespace WebCore {
@@ -58,7 +61,7 @@ static const char* simpleUserAgentStyleSheet = "html,body,div{display:block}head
 
 static inline bool elementCanUseSimpleDefaultStyle(Element* e)
 {
-    return e->hasTagName(htmlTag) || e->hasTagName(headTag) || e->hasTagName(bodyTag) || e->hasTagName(divTag) || e->hasTagName(spanTag) || e->hasTagName(brTag) || e->hasTagName(aTag);
+    return isHTMLHtmlElement(e) || e->hasTagName(headTag) || e->hasTagName(bodyTag) || e->hasTagName(divTag) || e->hasTagName(spanTag) || e->hasTagName(brTag) || isHTMLAnchorElement(e);
 }
 
 static const MediaQueryEvaluator& screenEval()
@@ -165,7 +168,7 @@ void CSSDefaultStyleSheets::ensureDefaultStyleSheetsForElement(Element* element,
         changedDefaultStyle = true;
     }
 
-    if (!mediaControlsStyleSheet && (element->hasTagName(videoTag) || element->hasTagName(audioTag))) {
+    if (!mediaControlsStyleSheet && (isHTMLVideoElement(element) || element->hasTagName(audioTag))) {
         String mediaRules = String(mediaControlsUserAgentStyleSheet, sizeof(mediaControlsUserAgentStyleSheet)) + RenderTheme::themeForPage(element->document()->page())->extraMediaControlsStyleSheet();
         mediaControlsStyleSheet = parseUASheet(mediaRules);
         defaultStyle->addRulesFromSheet(mediaControlsStyleSheet, screenEval());

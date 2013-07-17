@@ -64,7 +64,7 @@ class ChromiumPort(Port):
         )
 
     ALL_BASELINE_VARIANTS = [
-        'chromium-mac-mountainlion', 'chromium-mac-lion', 'chromium-mac-snowleopard',
+        'mac-mountainlion', 'mac-lion', 'mac-snowleopard',
         'win-win7', 'win-xp',
         'linux-x86_64', 'linux-x86',
     ]
@@ -73,7 +73,7 @@ class ChromiumPort(Port):
         'mac': ['snowleopard', 'lion', 'mountainlion'],
         'win': ['xp', 'win7'],
         'linux': ['lucid'],
-        'android': ['icecreamsandwich'],
+        # 'android': ['icecreamsandwich'],  # FIXME: see comment above next to 'icecreamsandwich'.
     }
 
     DEFAULT_BUILD_DIRECTORIES = ('out',)

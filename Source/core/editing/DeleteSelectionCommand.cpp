@@ -36,6 +36,7 @@
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
 #include "core/html/HTMLInputElement.h"
+#include "core/html/HTMLTableElement.h"
 #include "core/page/Frame.h"
 #include "core/rendering/RenderTableCell.h"
 
@@ -269,6 +270,12 @@ void DeleteSelectionCommand::initializePositionData()
     m_endBlock = enclosingNodeOfType(m_upstreamEnd.parentAnchoredEquivalent(), &isBlock, CanCrossEditingBoundary);
 }
 
+// We don't want to inherit style from an element which can't have contents.
+static bool shouldNotInheritStyleFrom(const Node& node)
+{
+    return !node.canContainRangeEndPoint();
+}
+
 void DeleteSelectionCommand::saveTypingStyleState()
 {
     // A common case is deleting characters that are all from the same text node. In 
@@ -279,6 +286,9 @@ void DeleteSelectionCommand::saveTypingStyleState()
     // compute the style at the start of the selection after deletion (see the 
     // early return in calculateTypingStyleAfterDelete).
     if (m_upstreamStart.deprecatedNode() == m_downstreamEnd.deprecatedNode() && m_upstreamStart.deprecatedNode()->isTextNode())
+        return;
+
+    if (shouldNotInheritStyleFrom(*m_selectionToDelete.start().anchorNode()))
         return;
 
     // Figure out the typing style in effect before the delete is done.
@@ -443,7 +453,7 @@ void DeleteSelectionCommand::handleGeneralDelete()
     makeStylingElementsDirectChildrenOfEditableRootToPreventStyleLoss();
 
     // Never remove the start block unless it's a table, in which case we won't merge content in.
-    if (startNode == m_startBlock && startOffset == 0 && canHaveChildrenForEditing(startNode) && !startNode->hasTagName(tableTag)) {
+    if (startNode->isSameNode(m_startBlock.get()) && !startOffset && canHaveChildrenForEditing(startNode) && !isHTMLTableElement(startNode)) {
         startOffset = 0;
         startNode = NodeTraversal::next(startNode);
         if (!startNode)

@@ -80,7 +80,7 @@ void WindowSetTimeoutImpl(const v8::FunctionCallbackInfo<v8::Value>& args, bool 
     ScriptExecutionContext* scriptContext = static_cast<ScriptExecutionContext*>(imp->document());
 
     if (!scriptContext) {
-        setDOMException(INVALID_ACCESS_ERR, args.GetIsolate());
+        setDOMException(InvalidAccessError, args.GetIsolate());
         return;
     }
 
@@ -230,60 +230,6 @@ void V8Window::openerAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::
 
     // Put property on the front (this) object.
     info.This()->Set(name, value);
-}
-
-void V8Window::addEventListenerMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-    String eventType = toWebCoreString(args[0]);
-    bool useCapture = args[2]->BooleanValue();
-
-    DOMWindow* imp = V8Window::toNative(args.Holder());
-
-    if (!BindingSecurity::shouldAllowAccessToFrame(imp->frame()))
-        return;
-
-    Document* doc = imp->document();
-
-    if (!doc)
-        return;
-
-    // FIXME: Check if there is not enough arguments
-    if (!imp->frame())
-        return;
-
-    RefPtr<EventListener> listener = V8EventListenerList::getEventListener(args[1], false, ListenerFindOrCreate);
-
-    if (listener) {
-        imp->addEventListener(eventType, listener, useCapture);
-        createHiddenDependency(args.Holder(), args[1], eventListenerCacheIndex, args.GetIsolate());
-    }
-}
-
-
-void V8Window::removeEventListenerMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-    String eventType = toWebCoreString(args[0]);
-    bool useCapture = args[2]->BooleanValue();
-
-    DOMWindow* imp = V8Window::toNative(args.Holder());
-
-    if (!BindingSecurity::shouldAllowAccessToFrame(imp->frame()))
-        return;
-
-    Document* doc = imp->document();
-
-    if (!doc)
-        return;
-
-    if (!imp->frame())
-        return;
-
-    RefPtr<EventListener> listener = V8EventListenerList::getEventListener(args[1], false, ListenerFindOnly);
-
-    if (listener) {
-        imp->removeEventListener(eventType, listener.get(), useCapture);
-        removeHiddenDependency(args.Holder(), args[1], eventListenerCacheIndex, args.GetIsolate());
-    }
 }
 
 static bool isLegacyTargetOriginDesignation(v8::Handle<v8::Value> value)
@@ -539,17 +485,21 @@ bool V8Window::indexedSecurityCheckCustom(v8::Local<v8::Object> host, uint32_t i
     Frame* target = targetWindow->frame();
     if (!target)
         return false;
-    Frame* childFrame =  target->tree()->scopedChild(index);
 
     // Notify the loader's client if the initial document has been accessed.
     if (target->loader()->stateMachine()->isDisplayingInitialEmptyDocument())
         target->loader()->didAccessInitialDocument();
 
+    Frame* childFrame =  target->tree()->scopedChild(index);
+
     // Notice that we can't call HasRealNamedProperty for ACCESS_HAS
     // because that would generate infinite recursion.
     if (type == v8::ACCESS_HAS && childFrame)
         return true;
-    if (type == v8::ACCESS_GET && childFrame && !host->HasRealIndexedProperty(index))
+    if (type == v8::ACCESS_GET
+        && childFrame
+        && !host->HasRealIndexedProperty(index)
+        && !window->HasRealIndexedProperty(index))
         return true;
 
     return BindingSecurity::shouldAllowAccessToFrame(target, DoNotReportSecurityError);

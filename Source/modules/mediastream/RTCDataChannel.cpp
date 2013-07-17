@@ -48,7 +48,7 @@ PassRefPtr<RTCDataChannel> RTCDataChannel::create(ScriptExecutionContext* contex
 {
     OwnPtr<RTCDataChannelHandler> handler = peerConnectionHandler->createDataChannel(label, init);
     if (!handler) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
     return adoptRef(new RTCDataChannel(context, handler.release()));
@@ -117,29 +117,29 @@ String RTCDataChannel::binaryType() const
 void RTCDataChannel::setBinaryType(const String& binaryType, ExceptionCode& ec)
 {
     if (binaryType == "blob")
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
     else if (binaryType == "arraybuffer")
         m_binaryType = BinaryTypeArrayBuffer;
     else
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
 }
 
 void RTCDataChannel::send(const String& data, ExceptionCode& ec)
 {
     if (m_readyState != ReadyStateOpen) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     if (!m_handler->sendStringData(data)) {
         // FIXME: Decide what the right exception here is.
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
     }
 }
 
 void RTCDataChannel::send(PassRefPtr<ArrayBuffer> prpData, ExceptionCode& ec)
 {
     if (m_readyState != ReadyStateOpen) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -153,7 +153,7 @@ void RTCDataChannel::send(PassRefPtr<ArrayBuffer> prpData, ExceptionCode& ec)
 
     if (!m_handler->sendRawData(dataPointer, dataLength)) {
         // FIXME: Decide what the right exception here is.
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
     }
 }
 
@@ -166,7 +166,7 @@ void RTCDataChannel::send(PassRefPtr<ArrayBufferView> data, ExceptionCode& ec)
 void RTCDataChannel::send(PassRefPtr<Blob> data, ExceptionCode& ec)
 {
     // FIXME: implement
-    ec = NOT_SUPPORTED_ERR;
+    ec = NotSupportedError;
 }
 
 void RTCDataChannel::close()

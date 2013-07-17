@@ -26,6 +26,7 @@
 
 #include "CSSPropertyNames.h"
 #include "FontFamilyNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "core/css/BasicShapeFunctions.h"
 #include "core/css/CSSArrayFunctionValue.h"
 #include "core/css/CSSAspectRatioValue.h"
@@ -170,12 +171,12 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyTableLayout,
     CSSPropertyTabSize,
     CSSPropertyTextAlign,
+    CSSPropertyTextAlignLast,
     CSSPropertyTextDecoration,
     CSSPropertyTextDecorationLine,
     CSSPropertyTextDecorationStyle,
     CSSPropertyTextDecorationColor,
 #if ENABLE(CSS3_TEXT)
-    CSSPropertyWebkitTextAlignLast,
     CSSPropertyWebkitTextUnderlinePosition,
 #endif // CSS3_TEXT
     CSSPropertyTextIndent,
@@ -910,8 +911,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::valueForFilter(const RenderObj
             DropShadowFilterOperation* dropShadowOperation = static_cast<DropShadowFilterOperation*>(filterOperation);
             filterValue = CSSFilterValue::create(CSSFilterValue::DropShadowFilterOperation);
             // We want our computed style to look like that of a text shadow (has neither spread nor inset style).
-            ShadowData shadowData = ShadowData(dropShadowOperation->location(), dropShadowOperation->stdDeviation(), 0, Normal, dropShadowOperation->color());
-            filterValue->append(valueForShadow(&shadowData, CSSPropertyTextShadow, style));
+            OwnPtr<ShadowData> shadow = ShadowData::create(dropShadowOperation->location(), dropShadowOperation->stdDeviation(), 0, Normal, dropShadowOperation->color());
+            filterValue->append(valueForShadow(shadow.get(), CSSPropertyTextShadow, style));
             break;
         }
         case FilterOperation::VALIDATED_CUSTOM:
@@ -1217,7 +1218,7 @@ String CSSComputedStyleDeclaration::cssText() const
 
 void CSSComputedStyleDeclaration::setCssText(const String&, ExceptionCode& ec)
 {
-    ec = NO_MODIFICATION_ALLOWED_ERR;
+    ec = NoModificationAllowedError;
 }
 
 static CSSValueID cssIdentifierForFontSizeKeyword(int keywordSize)
@@ -1534,7 +1535,7 @@ PassRefPtr<RenderStyle> CSSComputedStyleDeclaration::computeRenderStyle(CSSPrope
     Node* styledNode = this->styledNode();
     ASSERT(styledNode);
     RenderObject* renderer = styledNode->renderer();
-    if (renderer && renderer->isComposited() && AnimationController::supportsAcceleratedAnimationOfProperty(propertyID)) {
+    if (renderer && renderer->isComposited() && AnimationController::supportsAcceleratedAnimationOfProperty(propertyID) && !RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
         AnimationUpdateBlock animationUpdateBlock(renderer->animation());
         if (m_pseudoElementSpecifier && !styledNode->isPseudoElement()) {
             // FIXME: This cached pseudo style will only exist if the animation has been run at least once.
@@ -2160,6 +2161,8 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             return cssValuePool().createValue(style->tableLayout());
         case CSSPropertyTextAlign:
             return cssValuePool().createValue(style->textAlign());
+        case CSSPropertyTextAlignLast:
+            return cssValuePool().createValue(style->textAlignLast());
         case CSSPropertyTextDecoration:
         case CSSPropertyTextDecorationLine:
             return renderTextDecorationFlagsToCSSValue(style->textDecoration());
@@ -2168,8 +2171,6 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyTextDecorationColor:
             return currentColorOrValidColor(style.get(), style->textDecorationColor());
 #if ENABLE(CSS3_TEXT)
-        case CSSPropertyWebkitTextAlignLast:
-            return cssValuePool().createValue(style->textAlignLast());
         case CSSPropertyWebkitTextUnderlinePosition:
             return cssValuePool().createValue(style->textUnderlinePosition());
 #endif // CSS3_TEXT
@@ -2985,12 +2986,12 @@ bool CSSComputedStyleDeclaration::isPropertyImplicit(const String&)
 
 void CSSComputedStyleDeclaration::setProperty(const String&, const String&, const String&, ExceptionCode& ec)
 {
-    ec = NO_MODIFICATION_ALLOWED_ERR;
+    ec = NoModificationAllowedError;
 }
 
 String CSSComputedStyleDeclaration::removeProperty(const String&, ExceptionCode& ec)
 {
-    ec = NO_MODIFICATION_ALLOWED_ERR;
+    ec = NoModificationAllowedError;
     return String();
 }
     
@@ -3006,7 +3007,7 @@ String CSSComputedStyleDeclaration::getPropertyValueInternal(CSSPropertyID prope
 
 void CSSComputedStyleDeclaration::setPropertyInternal(CSSPropertyID, const String&, bool, ExceptionCode& ec)
 {
-    ec = NO_MODIFICATION_ALLOWED_ERR;
+    ec = NoModificationAllowedError;
 }
 
 PassRefPtr<CSSValueList> CSSComputedStyleDeclaration::getBackgroundShorthandValue() const

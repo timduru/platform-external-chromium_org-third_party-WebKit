@@ -66,8 +66,8 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLDocument::HTMLDocument(Frame* frame, const KURL& url, DocumentClassFlags extendedDocumentClasses)
-    : Document(frame, url, HTMLDocumentClass | extendedDocumentClasses)
+HTMLDocument::HTMLDocument(const DocumentInit& initializer, DocumentClassFlags extendedDocumentClasses)
+    : Document(initializer, HTMLDocumentClass | extendedDocumentClasses)
 {
     ScriptWrappable::init(this);
     clearXMLVersion();
@@ -111,8 +111,8 @@ void HTMLDocument::setDesignMode(const String& value)
 
 Element* HTMLDocument::activeElement()
 {
-    if (Node* node = treeScope()->focusedNode())
-        return node->isElementNode() ? toElement(node) : body();
+    if (Element* element = treeScope()->adjustedFocusedElement())
+        return element;
     return body();
 }
 

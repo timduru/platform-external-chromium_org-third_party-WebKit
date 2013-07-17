@@ -32,6 +32,7 @@
 #include "core/animation/DocumentTimeline.h"
 
 #include "core/animation/Animation.h"
+#include "core/animation/KeyframeAnimationEffect.h"
 #include "core/animation/TimedItem.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
@@ -43,38 +44,50 @@ using namespace WebCore;
 
 namespace {
 
-class EmptyAnimationEffect : public AnimationEffect {
-public:
-    static PassRefPtr<EmptyAnimationEffect> create()
+class DocumentTimelineTest : public ::testing::Test {
+protected:
+    virtual void SetUp()
     {
-        return adoptRef(new EmptyAnimationEffect);
+        document = Document::create();
+        element = Element::create(nullQName() , document.get());
+        timeline = DocumentTimeline::create(document.get());
     }
-    virtual PassOwnPtr<CompositableValueMap> sample(int iteration, double fraction) const
-    {
-        return adoptPtr(new CompositableValueMap);
-    }
-private:
-    EmptyAnimationEffect() { }
+
+    RefPtr<Document> document;
+    RefPtr<Element> element;
+    RefPtr<DocumentTimeline> timeline;
+    Timing timing;
 };
 
-TEST(DocumentTimeline, AddAnAnimation)
+TEST_F(DocumentTimelineTest, EmptyKeyframeAnimation)
 {
-    RefPtr<Document> d = Document::create(0, KURL());
-    RefPtr<Element> e = Element::create(nullQName() , d.get());
-    RefPtr<DocumentTimeline> timeline = DocumentTimeline::create(d.get());
-    Timing timing;
-    RefPtr<Animation> anim = Animation::create(e.get(), EmptyAnimationEffect::create(), timing);
-    ASSERT_TRUE(isNull(timeline->currentTime()));
+    RefPtr<KeyframeAnimationEffect> effect = KeyframeAnimationEffect::create(KeyframeAnimationEffect::KeyframeVector());
+    RefPtr<Animation> anim = Animation::create(element.get(), effect, timing);
+
+    EXPECT_TRUE(isNull(timeline->currentTime()));
 
     timeline->play(anim.get());
-    ASSERT_TRUE(isNull(timeline->currentTime()));
+    EXPECT_TRUE(isNull(timeline->currentTime()));
 
     timeline->serviceAnimations(0);
-    ASSERT_EQ(0, timeline->currentTime());
-    ASSERT_TRUE(anim->compositableValues()->isEmpty());
+    EXPECT_FLOAT_EQ(0, timeline->currentTime());
+    EXPECT_TRUE(anim->compositableValues()->isEmpty());
 
     timeline->serviceAnimations(100);
-    ASSERT_EQ(100, timeline->currentTime());
+    EXPECT_FLOAT_EQ(100, timeline->currentTime());
+}
+
+TEST_F(DocumentTimelineTest, PauseForTesting)
+{
+    float seekTime = 1;
+    RefPtr<Animation> anim1 = Animation::create(element.get(), KeyframeAnimationEffect::create(KeyframeAnimationEffect::KeyframeVector()), timing);
+    RefPtr<Animation> anim2  = Animation::create(element.get(), KeyframeAnimationEffect::create(KeyframeAnimationEffect::KeyframeVector()), timing);
+    RefPtr<Player> player1 = timeline->play(anim1.get());
+    RefPtr<Player> player2 = timeline->play(anim2.get());
+    timeline->pauseAnimationsForTesting(seekTime);
+
+    EXPECT_FLOAT_EQ(seekTime, player1->currentTime());
+    EXPECT_FLOAT_EQ(seekTime, player2->currentTime());
 }
 
 }

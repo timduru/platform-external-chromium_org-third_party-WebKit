@@ -27,6 +27,7 @@
 #include "V8NodeList.h"
 #include "V8TestObject.h"
 #include "bindings/bindings/tests/idls/TestPartialInterface.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMConfiguration.h"
@@ -34,11 +35,9 @@
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "wtf/GetPtr.h"
-#include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
 #include "wtf/UnusedParam.h"
 
@@ -84,7 +83,9 @@ static void implementsStaticReadOnlyAttrAttrGetter(v8::Local<v8::String> name, c
 
 static void implementsStaticReadOnlyAttrAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::implementsStaticReadOnlyAttrAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -93,7 +94,7 @@ static void implementsStaticReadOnlyAttrAttrGetterCallback(v8::Local<v8::String>
 
 static void implementsStaticAttrAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    v8SetReturnValue(info, v8String(TestInterface::implementsStaticAttr(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, TestInterface::implementsStaticAttr(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
@@ -103,7 +104,9 @@ static void implementsStaticAttrAttrGetter(v8::Local<v8::String> name, const v8:
 
 static void implementsStaticAttrAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::implementsStaticAttrAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -123,9 +126,9 @@ static void implementsStaticAttrAttrSetter(v8::Local<v8::String> name, v8::Local
 
 static void implementsStaticAttrAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::implementsStaticAttrAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -135,7 +138,7 @@ static void implementsStaticAttrAttrSetterCallback(v8::Local<v8::String> name, v
 static void implementsStr1AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestInterface* imp = V8TestInterface::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(imp->implementsStr1(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, imp->implementsStr1(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
@@ -145,7 +148,9 @@ static void implementsStr1AttrGetter(v8::Local<v8::String> name, const v8::Prope
 
 static void implementsStr1AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::implementsStr1AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -155,7 +160,7 @@ static void implementsStr1AttrGetterCallback(v8::Local<v8::String> name, const v
 static void implementsStr2AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestInterface* imp = V8TestInterface::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(imp->implementsStr2(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, imp->implementsStr2(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
@@ -165,7 +170,9 @@ static void implementsStr2AttrGetter(v8::Local<v8::String> name, const v8::Prope
 
 static void implementsStr2AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::implementsStr2AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -186,9 +193,9 @@ static void implementsStr2AttrSetter(v8::Local<v8::String> name, v8::Local<v8::V
 
 static void implementsStr2AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::implementsStr2AttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -197,7 +204,9 @@ static void implementsStr2AttrSetterCallback(v8::Local<v8::String> name, v8::Loc
 
 static void implementsStr3AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     V8TestInterface::implementsStr3AttrGetterCustom(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -206,9 +215,9 @@ static void implementsStr3AttrGetterCallback(v8::Local<v8::String> name, const v
 
 static void implementsStr3AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8TestInterface::implementsStr3AttrSetterCustom(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -228,7 +237,9 @@ static void implementsNodeAttrGetter(v8::Local<v8::String> name, const v8::Prope
 
 static void implementsNodeAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::implementsNodeAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -249,9 +260,9 @@ static void implementsNodeAttrSetter(v8::Local<v8::String> name, v8::Local<v8::V
 
 static void implementsNodeAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::implementsNodeAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -271,7 +282,9 @@ static void Node23AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallb
 
 static void Node23AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::Node23AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -292,9 +305,9 @@ static void Node23AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> va
 
 static void Node23AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::Node23AttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -314,7 +327,9 @@ static void Node24AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallb
 
 static void Node24AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::Node24AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -335,9 +350,9 @@ static void Node24AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> va
 
 static void Node24AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::Node24AttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -357,7 +372,9 @@ static void Node25AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallb
 
 static void Node25AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::Node25AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -378,9 +395,9 @@ static void Node25AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> va
 
 static void Node25AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::Node25AttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -399,7 +416,9 @@ static void supplementalStaticReadOnlyAttrAttrGetter(v8::Local<v8::String> name,
 
 static void supplementalStaticReadOnlyAttrAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::supplementalStaticReadOnlyAttrAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -408,7 +427,7 @@ static void supplementalStaticReadOnlyAttrAttrGetterCallback(v8::Local<v8::Strin
 
 static void supplementalStaticAttrAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    v8SetReturnValue(info, v8String(TestPartialInterface::supplementalStaticAttr(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, TestPartialInterface::supplementalStaticAttr(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
@@ -418,7 +437,9 @@ static void supplementalStaticAttrAttrGetter(v8::Local<v8::String> name, const v
 
 static void supplementalStaticAttrAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::supplementalStaticAttrAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -438,9 +459,9 @@ static void supplementalStaticAttrAttrSetter(v8::Local<v8::String> name, v8::Loc
 
 static void supplementalStaticAttrAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::supplementalStaticAttrAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -450,7 +471,7 @@ static void supplementalStaticAttrAttrSetterCallback(v8::Local<v8::String> name,
 static void supplementalStr1AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestInterface* imp = V8TestInterface::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(TestPartialInterface::supplementalStr1(imp), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, TestPartialInterface::supplementalStr1(imp), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
@@ -460,7 +481,9 @@ static void supplementalStr1AttrGetter(v8::Local<v8::String> name, const v8::Pro
 
 static void supplementalStr1AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::supplementalStr1AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -470,7 +493,7 @@ static void supplementalStr1AttrGetterCallback(v8::Local<v8::String> name, const
 static void supplementalStr2AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestInterface* imp = V8TestInterface::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(TestPartialInterface::supplementalStr2(imp), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, TestPartialInterface::supplementalStr2(imp), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
@@ -480,7 +503,9 @@ static void supplementalStr2AttrGetter(v8::Local<v8::String> name, const v8::Pro
 
 static void supplementalStr2AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::supplementalStr2AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -501,9 +526,9 @@ static void supplementalStr2AttrSetter(v8::Local<v8::String> name, v8::Local<v8:
 
 static void supplementalStr2AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::supplementalStr2AttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -512,7 +537,9 @@ static void supplementalStr2AttrSetterCallback(v8::Local<v8::String> name, v8::L
 
 static void supplementalStr3AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     V8TestInterface::supplementalStr3AttrGetterCustom(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -521,9 +548,9 @@ static void supplementalStr3AttrGetterCallback(v8::Local<v8::String> name, const
 
 static void supplementalStr3AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     V8TestInterface::supplementalStr3AttrSetterCustom(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -543,7 +570,9 @@ static void supplementalNodeAttrGetter(v8::Local<v8::String> name, const v8::Pro
 
 static void supplementalNodeAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::supplementalNodeAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -564,9 +593,9 @@ static void supplementalNodeAttrSetter(v8::Local<v8::String> name, v8::Local<v8:
 
 static void supplementalNodeAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::supplementalNodeAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -586,7 +615,9 @@ static void Node13AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallb
 
 static void Node13AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::Node13AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -607,9 +638,9 @@ static void Node13AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> va
 
 static void Node13AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::Node13AttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -629,7 +660,9 @@ static void Node14AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallb
 
 static void Node14AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::Node14AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -650,9 +683,9 @@ static void Node14AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> va
 
 static void Node14AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::Node14AttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -672,7 +705,9 @@ static void Node15AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallb
 
 static void Node15AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestInterfaceV8Internal::Node15AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -693,9 +728,9 @@ static void Node15AttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> va
 
 static void Node15AttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestInterfaceV8Internal::Node15AttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -716,9 +751,9 @@ static void implementsMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void implementsMethod1MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestInterfaceV8Internal::implementsMethod1Method(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -732,15 +767,13 @@ static void implementsMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& a
         return;
     }
     TestInterface* imp = V8TestInterface::toNative(args.Holder());
-    ExceptionCode ec = 0;
+    ExceptionState es(args.GetIsolate());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, strArg, args[0]);
     V8TRYCATCH_VOID(TestObj*, objArg, V8TestObject::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(args[1])) : 0);
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    RefPtr<TestObj> result = imp->implementsMethod2(scriptContext, strArg, objArg, ec);
-    if (UNLIKELY(ec)) {
-        setDOMException(ec, args.GetIsolate());
+    RefPtr<TestObj> result = imp->implementsMethod2(scriptContext, strArg, objArg, es);
+    if (es.throwIfNeeded())
         return;
-    }
     v8SetReturnValue(args, toV8(result.release(), args.Holder(), args.GetIsolate()));
     return;
 }
@@ -751,9 +784,9 @@ static void implementsMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void implementsMethod2MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestInterfaceV8Internal::implementsMethod2Method(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -762,9 +795,9 @@ static void implementsMethod2MethodCallback(const v8::FunctionCallbackInfo<v8::V
 
 static void implementsMethod3MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     V8TestInterface::implementsMethod3MethodCustom(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -784,9 +817,9 @@ static void implementsMethod4Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void implementsMethod4MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestInterfaceV8Internal::implementsMethod4Method(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
@@ -807,9 +840,9 @@ static void supplementalMethod1Method(const v8::FunctionCallbackInfo<v8::Value>&
 
 static void supplementalMethod1MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestInterfaceV8Internal::supplementalMethod1Method(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -823,15 +856,13 @@ static void supplementalMethod2Method(const v8::FunctionCallbackInfo<v8::Value>&
         return;
     }
     TestInterface* imp = V8TestInterface::toNative(args.Holder());
-    ExceptionCode ec = 0;
+    ExceptionState es(args.GetIsolate());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, strArg, args[0]);
     V8TRYCATCH_VOID(TestObj*, objArg, V8TestObject::HasInstance(args[1], args.GetIsolate(), worldType(args.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(args[1])) : 0);
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
-    RefPtr<TestObj> result = TestPartialInterface::supplementalMethod2(scriptContext, imp, strArg, objArg, ec);
-    if (UNLIKELY(ec)) {
-        setDOMException(ec, args.GetIsolate());
+    RefPtr<TestObj> result = TestPartialInterface::supplementalMethod2(scriptContext, imp, strArg, objArg, es);
+    if (es.throwIfNeeded())
         return;
-    }
     v8SetReturnValue(args, toV8(result.release(), args.Holder(), args.GetIsolate()));
     return;
 }
@@ -842,9 +873,9 @@ static void supplementalMethod2Method(const v8::FunctionCallbackInfo<v8::Value>&
 
 static void supplementalMethod2MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestInterfaceV8Internal::supplementalMethod2Method(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -853,9 +884,9 @@ static void supplementalMethod2MethodCallback(const v8::FunctionCallbackInfo<v8:
 
 static void supplementalMethod3MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     V8TestInterface::supplementalMethod3MethodCustom(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -875,9 +906,9 @@ static void supplementalMethod4Method(const v8::FunctionCallbackInfo<v8::Value>&
 
 static void supplementalMethod4MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestInterfaceV8Internal::supplementalMethod4Method(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
@@ -888,20 +919,18 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
-    ExceptionCode ec = 0;
+    ExceptionState es(args.GetIsolate());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, str1, args[0]);
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, str2, args[1]);
 
     ScriptExecutionContext* context = getScriptExecutionContext();
 
-    RefPtr<TestInterface> impl = TestInterface::create(context, str1, str2, ec);
+    RefPtr<TestInterface> impl = TestInterface::create(context, str1, str2, es);
     v8::Handle<v8::Object> wrapper = args.Holder();
-    if (ec) {
-        setDOMException(ec, args.GetIsolate());
+    if (es.throwIfNeeded())
         return;
-    }
 
-    V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestInterface::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestInterface>(impl.release(), &V8TestInterface::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     args.GetReturnValue().Set(wrapper);
 }
 
@@ -937,28 +966,26 @@ static void namedPropertyGetter(v8::Local<v8::String> name, const v8::PropertyCa
 
 static void namedPropertyGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMNamedProperty");
     TestInterfaceV8Internal::namedPropertyGetter(name, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void namedPropertySetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMNamedProperty");
     V8TestInterface::namedPropertySetterCustom(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void namedPropertyEnumerator(const v8::PropertyCallbackInfo<v8::Array>& info)
 {
-    ExceptionCode ec = 0;
+    ExceptionState es(info.GetIsolate());
     TestInterface* collection = V8TestInterface::toNative(info.Holder());
     Vector<String> names;
-    collection->namedPropertyEnumerator(names, ec);
-    if (ec) {
-        setDOMException(ec, info.GetIsolate());
+    collection->namedPropertyEnumerator(names, es);
+    if (es.throwIfNeeded())
         return;
-    }
     v8::Handle<v8::Array> v8names = v8::Array::New(names.size());
     for (size_t i = 0; i < names.size(); ++i)
         v8names->Set(v8::Integer::New(i, info.GetIsolate()), v8String(names[i], info.GetIsolate()));
@@ -969,12 +996,10 @@ static void namedPropertyQuery(v8::Local<v8::String> name, const v8::PropertyCal
 {
     TestInterface* collection = V8TestInterface::toNative(info.Holder());
     AtomicString propertyName = toWebCoreAtomicString(name);
-    ExceptionCode ec = 0;
-    bool result = collection->namedPropertyQuery(propertyName, ec);
-    if (ec) {
-        setDOMException(ec, info.GetIsolate());
+    ExceptionState es(info.GetIsolate());
+    bool result = collection->namedPropertyQuery(propertyName, es);
+    if (es.throwIfNeeded())
         return;
-    }
     if (!result)
         return;
     v8SetReturnValueInt(info, v8::None);
@@ -982,16 +1007,16 @@ static void namedPropertyQuery(v8::Local<v8::String> name, const v8::PropertyCal
 
 static void namedPropertyEnumeratorCallback(const v8::PropertyCallbackInfo<v8::Array>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMNamedProperty");
     TestInterfaceV8Internal::namedPropertyEnumerator(info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void namedPropertyQueryCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Integer>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMNamedProperty");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMNamedProperty");
     TestInterfaceV8Internal::namedPropertyQuery(name, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 } // namespace TestInterfaceV8Internal
@@ -1093,7 +1118,7 @@ COMPILE_ASSERT(2 == TestPartialInterface::CONST_IMPL, TestInterfaceEnumCONST_IMP
 
 void V8TestInterface::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TraceEvent::SamplingState0Scope("Blink\0Blink-DOMConstructor");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "DOMConstructor");
     if (!args.IsConstructCall()) {
         throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
         return;
@@ -1179,7 +1204,7 @@ v8::Handle<v8::FunctionTemplate> V8TestInterface::GetTemplate(v8::Isolate* isola
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
-    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestInterfaceTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
@@ -1249,18 +1274,18 @@ ActiveDOMObject* V8TestInterface::toActiveDOMObject(v8::Handle<v8::Object> objec
 v8::Handle<v8::Object> V8TestInterface::createWrapper(PassRefPtr<TestInterface> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
+    ASSERT(DOMDataStore::getWrapper<V8TestInterface>(impl.get(), isolate).IsEmpty());
 
-    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestInterface>(impl, &info, wrapper, isolate, WrapperConfiguration::Dependent);
     return wrapper;
 }
 void V8TestInterface::derefObject(void* object)
 {
-    static_cast<TestInterface*>(object)->deref();
+    fromInternalPointer(object)->deref();
 }
 
 } // namespace WebCore

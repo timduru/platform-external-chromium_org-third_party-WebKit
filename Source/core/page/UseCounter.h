@@ -81,7 +81,7 @@ public:
         UnprefixedTransitionEndEvent,
         PrefixedAndUnprefixedTransitionEndEvent,
         AutoFocusAttribute,
-        UnusedSlot01, // Prior to 4/2013, we used this slot for AutoSaveAttribute.
+        SVGAnimationElement, // Prior to 4/2013, we used this slot for AutoSaveAttribute.
         DataListElement,
         FormAttribute,
         IncrementalAttribute,
@@ -143,6 +143,9 @@ public:
         PrefixedDocumentRegister,
         HTMLShadowElementOlderShadowRoot,
         DocumentAll,
+        FormElement,
+        DemotedFormElement,
+        CaptureAttributeAsEnum,
         // Add new features immediately above this line. Don't change assigned numbers of each items.
         NumberOfFeatures, // This enum value must be last.
     };

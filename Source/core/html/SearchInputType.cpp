@@ -37,7 +37,7 @@
 #include "core/html/InputTypeNames.h"
 #include "core/html/shadow/TextControlInnerElements.h"
 #include "core/rendering/RenderSearchField.h"
-#include <wtf/PassOwnPtr.h>
+#include "wtf/PassOwnPtr.h"
 
 namespace WebCore {
 
@@ -183,6 +183,11 @@ void SearchInputType::didSetValueByUserEdit(ValueChangeState state)
         startSearchEventTimer();
 
     TextFieldInputType::didSetValueByUserEdit(state);
+}
+
+bool SearchInputType::supportsInputModeAttribute() const
+{
+    return true;
 }
 
 } // namespace WebCore

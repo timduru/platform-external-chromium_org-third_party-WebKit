@@ -29,8 +29,8 @@
 #include "core/dom/Attribute.h"
 #include "core/dom/Element.h"
 #include "core/dom/ExceptionCode.h"
-#include <wtf/ASCIICType.h>
-#include <wtf/text/StringBuilder.h>
+#include "wtf/ASCIICType.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -179,7 +179,7 @@ bool DatasetDOMStringMap::contains(const String& name)
 void DatasetDOMStringMap::setItem(const String& name, const String& value, ExceptionCode& ec)
 {
     if (!isValidPropertyName(name)) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
@@ -189,7 +189,7 @@ void DatasetDOMStringMap::setItem(const String& name, const String& value, Excep
 void DatasetDOMStringMap::deleteItem(const String& name, ExceptionCode& ec)
 {
     if (!isValidPropertyName(name)) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 

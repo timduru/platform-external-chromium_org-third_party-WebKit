@@ -70,6 +70,8 @@ namespace WebCore {
     // A helper for throwing JavaScript TypeError for not enough arguments.
     v8::Handle<v8::Value> throwNotEnoughArgumentsError(v8::Isolate*);
 
+    v8::ArrayBuffer::Allocator* v8ArrayBufferAllocator();
+
     inline v8::Handle<v8::Value> argumentOrNull(const v8::FunctionCallbackInfo<v8::Value>& args, int index)
     {
         return index >= args.Length() ? v8::Local<v8::Value>() : args[index];
@@ -84,26 +86,26 @@ namespace WebCore {
         return v8::Handle<v8::Value>(isolate ? v8::Null(isolate) : v8::Null());
     }
 
-    template<typename T, typename V>
-    inline void v8SetReturnValue(const T& args, V v)
+    template<typename CallbackInfo, typename V>
+    inline void v8SetReturnValue(const CallbackInfo& args, V v)
     {
         args.GetReturnValue().Set(v);
     }
 
-    template<typename T>
-    inline void v8SetReturnValueBool(const T& args, bool v)
+    template<typename CallbackInfo>
+    inline void v8SetReturnValueBool(const CallbackInfo& args, bool v)
     {
         args.GetReturnValue().Set(v);
     }
 
-    template<typename T>
-    inline void v8SetReturnValueInt(const T& args, int v)
+    template<typename CallbackInfo>
+    inline void v8SetReturnValueInt(const CallbackInfo& args, int v)
     {
         args.GetReturnValue().Set(v);
     }
 
-    template<typename T>
-    inline void v8SetReturnValueUnsigned(const T& args, unsigned v)
+    template<typename CallbackInfo>
+    inline void v8SetReturnValueUnsigned(const CallbackInfo& args, unsigned v)
     {
         // FIXME: this is temporary workaround to a v8 bug
         if (V8_LIKELY((v & (1 << 31)) == 0)) {
@@ -113,10 +115,36 @@ namespace WebCore {
         args.GetReturnValue().Set(v8::Integer::NewFromUnsigned(v, args.GetReturnValue().GetIsolate()));
     }
 
-    template<typename T>
-    inline void v8SetReturnValueNull(const T& args)
+    template<typename CallbackInfo>
+    inline void v8SetReturnValueNull(const CallbackInfo& args)
     {
         args.GetReturnValue().SetNull();
+    }
+
+    enum TreatNullStringAs {
+        NullStringAsEmpty,
+        NullStringAsNull,
+        NullStringAsUndefined,
+    };
+
+    template <class CallbackInfo>
+    inline void v8SetReturnValueString(const CallbackInfo& info, const String& string, v8::Isolate* isolate, TreatNullStringAs treatNullStringAs = NullStringAsEmpty)
+    {
+        if (string.isNull()) {
+            switch (treatNullStringAs) {
+            case NullStringAsEmpty:
+                v8SetReturnValue(info, v8::String::Empty(isolate));
+                break;
+            case NullStringAsNull:
+                v8SetReturnValueNull(info);
+                break;
+            case NullStringAsUndefined:
+                v8SetReturnValue(info, v8::Undefined(isolate));
+                break;
+            }
+            return;
+        }
+        V8PerIsolateData::from(isolate)->stringCache()->setReturnValueFromString(info, string.impl(), isolate);
     }
 
     // Convert v8 types to a WTF::String. If the V8 string is not already
@@ -174,27 +202,11 @@ namespace WebCore {
     // Return a V8 external string that shares the underlying buffer with the given
     // WebCore string. The reference counting mechanism is used to keep the
     // underlying buffer alive while the string is still live in the V8 engine.
-    inline v8::Handle<v8::String> v8String(const String& string, v8::Isolate* isolate, ReturnHandleType handleType = ReturnLocalHandle)
+    inline v8::Handle<v8::String> v8String(const String& string, v8::Isolate* isolate)
     {
         if (string.isNull())
             return v8::String::Empty(isolate);
-        return V8PerIsolateData::from(isolate)->stringCache()->v8ExternalString(string.impl(), handleType, isolate);
-    }
-
-    inline v8::Handle<v8::Value> v8StringOrNull(const String& string, v8::Isolate* isolate, ReturnHandleType handleType = ReturnLocalHandle)
-    {
-        ASSERT(isolate);
-        if (string.isNull())
-            return v8::Null(isolate);
-        return V8PerIsolateData::from(isolate)->stringCache()->v8ExternalString(string.impl(), handleType, isolate);
-    }
-
-    inline v8::Handle<v8::Value> v8StringOrUndefined(const String& string, v8::Isolate* isolate, ReturnHandleType handleType = ReturnLocalHandle)
-    {
-        ASSERT(isolate);
-        if (string.isNull())
-            return v8::Undefined(isolate);
-        return V8PerIsolateData::from(isolate)->stringCache()->v8ExternalString(string.impl(), handleType, isolate);
+        return V8PerIsolateData::from(isolate)->stringCache()->v8ExternalString(string.impl(), isolate);
     }
 
     inline v8::Handle<v8::Value> v8Undefined()
@@ -565,6 +577,12 @@ namespace WebCore {
     {
         const v8::Handle<T>* handle = reinterpret_cast<const v8::Handle<T>*>(&value);
         return *handle;
+    }
+
+    // Attaches |environment| to |function| and returns it.
+    inline v8::Local<v8::Function> createClosure(v8::FunctionCallback function, v8::Handle<v8::Value> environment)
+    {
+        return v8::FunctionTemplate::New(function, environment)->GetFunction();
     }
 
 } // namespace WebCore

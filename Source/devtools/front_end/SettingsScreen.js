@@ -213,43 +213,6 @@ WebInspector.SettingsTab.prototype = {
         return p;
     },
 
-    _createRadioSetting: function(name, options, setting)
-    {
-        var pp = document.createElement("p");
-        var fieldsetElement = document.createElement("fieldset");
-        var legendElement = document.createElement("legend");
-        legendElement.textContent = name;
-        fieldsetElement.appendChild(legendElement);
-
-        function clickListener(e)
-        {
-            setting.set(e.target.value);
-        }
-
-        var settingValue = setting.get();
-        for (var i = 0; i < options.length; ++i) {
-            var p = document.createElement("p");
-            var label = document.createElement("label");
-            p.appendChild(label);
-
-            var input = document.createElement("input");
-            input.type = "radio";
-            input.name = setting.name;
-            input.value = options[i][0];
-            input.addEventListener("click", clickListener, false);
-            if (settingValue == input.value)
-                input.checked = true;
-
-            label.appendChild(input);
-            label.appendChild(document.createTextNode(options[i][1]));
-
-            fieldsetElement.appendChild(p);
-        }
-
-        pp.appendChild(fieldsetElement);
-        return pp;
-    },
-
     /**
      * @param {string} label
      * @param {WebInspector.Setting} setting
@@ -320,11 +283,14 @@ WebInspector.GenericSettingsTab = function()
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Split panels vertically when docked to right"), WebInspector.settings.splitVerticallyWhenDockedToRight));
 
     p = this._appendSection(WebInspector.UIString("Elements"));
-    p.appendChild(this._createRadioSetting(WebInspector.UIString("Color format"), [
-        [ WebInspector.Color.Format.Original, WebInspector.UIString("As authored") ],
-        [ WebInspector.Color.Format.HEX, "HEX: #DAC0DE" ],
-        [ WebInspector.Color.Format.RGB, "RGB: rgb(128, 255, 255)" ],
-        [ WebInspector.Color.Format.HSL, "HSL: hsl(300, 80%, 90%)" ] ], WebInspector.settings.colorFormat));
+    var colorFormatElement = this._createSelectSetting(WebInspector.UIString("Color format"), [
+            [ WebInspector.UIString("As authored"), WebInspector.Color.Format.Original ],
+            [ "HEX: #DAC0DE", WebInspector.Color.Format.HEX ],
+            [ "RGB: rgb(128, 255, 255)", WebInspector.Color.Format.RGB ],
+            [ "HSL: hsl(300, 80%, 90%)", WebInspector.Color.Format.HSL ]
+        ], WebInspector.settings.colorFormat);
+    p.appendChild(colorFormatElement);
+    colorFormatElement.firstChild.className = "toplevel";
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show user agent styles"), WebInspector.settings.showUserAgentStyles));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Word wrap"), WebInspector.settings.domWordWrap));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show Shadow DOM"), WebInspector.settings.showShadowDOM));
@@ -349,10 +315,16 @@ WebInspector.GenericSettingsTab = function()
 
     p = this._appendSection(WebInspector.UIString("Sources"));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Search in content scripts"), WebInspector.settings.searchInContentScripts));
-    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Enable source maps"), WebInspector.settings.sourceMapsEnabled));
-    if (WebInspector.experimentsSettings.isEnabled("sass"))
-        p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Auto-reload CSS upon Sass save"), WebInspector.settings.cssReloadEnabled));
+    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Enable JS source maps"), WebInspector.settings.jsSourceMapsEnabled));
+    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Enable CSS source maps"), WebInspector.settings.cssSourceMapsEnabled));
+    WebInspector.settings.cssSourceMapsEnabled.addChangeListener(this._cssSourceMapsEnablementChanged, this);
+    this._cssSourceMapSettings = p.createChild("fieldset");
+    var autoReloadCSSCheckbox = this._cssSourceMapSettings.createChild("input");
+    this._cssSourceMapSettings.appendChild(this._createCheckboxSetting(WebInspector.UIString("Auto-reload generated CSS"), WebInspector.settings.cssReloadEnabled, false, autoReloadCSSCheckbox));
+    this._cssSourceMapsEnablementChanged();
+
     var indentationElement = this._createSelectSetting(WebInspector.UIString("Indentation"), [
+            [ WebInspector.UIString("Auto-detect"), WebInspector.TextUtils.Indent.AutoDetect ],
             [ WebInspector.UIString("2 spaces"), WebInspector.TextUtils.Indent.TwoSpaces ],
             [ WebInspector.UIString("4 spaces"), WebInspector.TextUtils.Indent.FourSpaces ],
             [ WebInspector.UIString("8 spaces"), WebInspector.TextUtils.Indent.EightSpaces ],
@@ -363,7 +335,7 @@ WebInspector.GenericSettingsTab = function()
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show whitespace characters"), WebInspector.settings.showWhitespacesInEditor));
 
     p = this._appendSection(WebInspector.UIString("Profiler"));
-    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show objects' hidden properties"), WebInspector.settings.showHeapSnapshotObjectsHiddenProperties));
+    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show advanced heap snapshot properties"), WebInspector.settings.showAdvancedHeapSnapshotProperties));
     if (WebInspector.experimentsSettings.nativeMemorySnapshots.isEnabled())
         p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show uninstrumented native memory"), WebInspector.settings.showNativeSnapshotUninstrumentedSize));
 
@@ -411,6 +383,15 @@ WebInspector.GenericSettingsTab.prototype = {
             WebInspector.settings.showScrollBottleneckRects.set(false);
         }
         this._forceCompositingModeCheckbox.checked = compositing;
+    },
+
+    /**
+     * @param {WebInspector.Event=} event
+     */
+    _cssSourceMapsEnablementChanged: function(event)
+    {
+        var cssSourceMapsEnabled = event ? /** @type {boolean} */ (event.data) : WebInspector.settings.cssSourceMapsEnabled.get();
+        this._cssSourceMapSettings.disabled = !cssSourceMapsEnabled;
     },
 
     /**
@@ -1303,9 +1284,9 @@ WebInspector.EditableSettingsList = function(columns, valuesProvider, itemRemove
     this._validateHandler = validateHandler;
     this._editHandler = editHandler;
     this._valuesProvider = valuesProvider;
-    /** @type {Object.<string, HTMLInputElement>} */
+    /** @type {!Object.<string, HTMLInputElement>} */
     this._addInputElements = {};
-    /** @type {Object.<string, Object.<string, HTMLInputElement>>} */
+    /** @type {!Object.<string, !Object.<string, HTMLInputElement>>} */
     this._editInputElements = {};
     /** @type {Object.<string, Object.<string, HTMLSpanElement>>} */
     this._textElements = {};

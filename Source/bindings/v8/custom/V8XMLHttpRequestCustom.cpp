@@ -31,7 +31,6 @@
 #include "config.h"
 #include "V8XMLHttpRequest.h"
 
-#include "V8ArrayBuffer.h"
 #include "V8ArrayBufferView.h"
 #include "V8Blob.h"
 #include "V8Document.h"
@@ -62,7 +61,7 @@ void V8XMLHttpRequest::constructorCustom(const v8::FunctionCallbackInfo<v8::Valu
     RefPtr<XMLHttpRequest> xmlHttpRequest = XMLHttpRequest::create(context, securityOrigin);
 
     v8::Handle<v8::Object> wrapper = args.Holder();
-    V8DOMWrapper::associateObjectWithWrapper(xmlHttpRequest.release(), &info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8XMLHttpRequest>(xmlHttpRequest.release(), &info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     args.GetReturnValue().Set(wrapper);
 }
 
@@ -76,7 +75,7 @@ void V8XMLHttpRequest::responseTextAttrGetterCustom(v8::Local<v8::String> name, 
         return;
     }
     if (text.hasNoValue()) {
-        v8SetReturnValue(info, v8String(emptyString(), info.GetIsolate()));
+        v8SetReturnValueString(info, emptyString(), info.GetIsolate());
         return;
     }
     v8SetReturnValue(info, text.v8Value());

@@ -51,8 +51,8 @@
 #include "core/page/Frame.h"
 #include "core/page/Settings.h"
 #include "core/rendering/RenderWordBreak.h"
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/CString.h>
+#include "wtf/StdLibExtras.h"
+#include "wtf/text/CString.h"
 
 namespace WebCore {
 
@@ -204,6 +204,8 @@ AtomicString HTMLElement::eventNameForAttributeName(const QualifiedName& attrNam
         attributeNameToEventNameMap.set(oncontextmenuAttr.localName(), eventNames().contextmenuEvent);
         attributeNameToEventNameMap.set(ondblclickAttr.localName(), eventNames().dblclickEvent);
         attributeNameToEventNameMap.set(onmousedownAttr.localName(), eventNames().mousedownEvent);
+        attributeNameToEventNameMap.set(onmouseenterAttr.localName(), eventNames().mouseenterEvent);
+        attributeNameToEventNameMap.set(onmouseleaveAttr.localName(), eventNames().mouseleaveEvent);
         attributeNameToEventNameMap.set(onmousemoveAttr.localName(), eventNames().mousemoveEvent);
         attributeNameToEventNameMap.set(onmouseoutAttr.localName(), eventNames().mouseoutEvent);
         attributeNameToEventNameMap.set(onmouseoverAttr.localName(), eventNames().mouseoverEvent);
@@ -336,7 +338,7 @@ void HTMLElement::setOuterHTML(const String& html, ExceptionCode& ec)
 {
     Node* p = parentNode();
     if (!p || !p->isHTMLElement()) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
+        ec = NoModificationAllowedError;
         return;
     }
     RefPtr<HTMLElement> parent = toHTMLElement(p);
@@ -392,14 +394,14 @@ PassRefPtr<DocumentFragment> HTMLElement::textToFragment(const String& text, Exc
 void HTMLElement::setInnerText(const String& text, ExceptionCode& ec)
 {
     if (ieForbidsInsertHTML()) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
+        ec = NoModificationAllowedError;
         return;
     }
     if (hasLocalName(colTag) || hasLocalName(colgroupTag) || hasLocalName(framesetTag) ||
         hasLocalName(headTag) || hasLocalName(htmlTag) || hasLocalName(tableTag) || 
         hasLocalName(tbodyTag) || hasLocalName(tfootTag) || hasLocalName(theadTag) ||
         hasLocalName(trTag)) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
+        ec = NoModificationAllowedError;
         return;
     }
 
@@ -440,20 +442,20 @@ void HTMLElement::setInnerText(const String& text, ExceptionCode& ec)
 void HTMLElement::setOuterText(const String &text, ExceptionCode& ec)
 {
     if (ieForbidsInsertHTML()) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
+        ec = NoModificationAllowedError;
         return;
     }
     if (hasLocalName(colTag) || hasLocalName(colgroupTag) || hasLocalName(framesetTag) ||
         hasLocalName(headTag) || hasLocalName(htmlTag) || hasLocalName(tableTag) || 
         hasLocalName(tbodyTag) || hasLocalName(tfootTag) || hasLocalName(theadTag) ||
         hasLocalName(trTag)) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
+        ec = NoModificationAllowedError;
         return;
     }
 
     ContainerNode* parent = parentNode();
     if (!parent) {
-        ec = NO_MODIFICATION_ALLOWED_ERR;
+        ec = NoModificationAllowedError;
         return;
     }
 
@@ -469,7 +471,7 @@ void HTMLElement::setOuterText(const String &text, ExceptionCode& ec)
         newChild = Text::create(document(), text);
 
     if (!this || !parentNode())
-        ec = HIERARCHY_REQUEST_ERR;
+        ec = HierarchyRequestError;
     if (ec)
         return;
     parent->replaceChild(newChild.release(), this, ec);
@@ -492,23 +494,35 @@ Node* HTMLElement::insertAdjacent(const String& where, Node* newChild, Exception
     // Opera also appears to disallow such usage.
 
     if (equalIgnoringCase(where, "beforeBegin")) {
-        ContainerNode* parent = this->parentNode();
-        return (parent && parent->insertBefore(newChild, this, ec)) ? newChild : 0;
+        if (ContainerNode* parent = this->parentNode()) {
+            parent->insertBefore(newChild, this, ec, AttachLazily);
+            if (!ec)
+                return newChild;
+        }
+        return 0;
     }
 
-    if (equalIgnoringCase(where, "afterBegin"))
-        return insertBefore(newChild, firstChild(), ec) ? newChild : 0;
+    if (equalIgnoringCase(where, "afterBegin")) {
+        insertBefore(newChild, firstChild(), ec, AttachLazily);
+        return ec ? 0 : newChild;
+    }
 
-    if (equalIgnoringCase(where, "beforeEnd"))
-        return appendChild(newChild, ec) ? newChild : 0;
+    if (equalIgnoringCase(where, "beforeEnd")) {
+        appendChild(newChild, ec, AttachLazily);
+        return ec ? 0 : newChild;
+    }
 
     if (equalIgnoringCase(where, "afterEnd")) {
-        ContainerNode* parent = this->parentNode();
-        return (parent && parent->insertBefore(newChild, nextSibling(), ec)) ? newChild : 0;
+        if (ContainerNode* parent = this->parentNode()) {
+            parent->insertBefore(newChild, nextSibling(), ec, AttachLazily);
+            if (!ec)
+                return newChild;
+        }
+        return 0;
     }
     
     // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-    ec = NOT_SUPPORTED_ERR;
+    ec = NotSupportedError;
     return 0;
 }
 
@@ -516,12 +530,11 @@ Element* HTMLElement::insertAdjacentElement(const String& where, Element* newChi
 {
     if (!newChild) {
         // IE throws COM Exception E_INVALIDARG; this is the best DOM exception alternative.
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return 0;
     }
 
     Node* returnValue = insertAdjacent(where, newChild, ec);
-    ASSERT_WITH_SECURITY_IMPLICATION(!returnValue || returnValue->isElementNode());
     return toElement(returnValue); 
 }
 
@@ -531,15 +544,14 @@ static Element* contextElementForInsertion(const String& where, Element* element
     if (equalIgnoringCase(where, "beforeBegin") || equalIgnoringCase(where, "afterEnd")) {
         ContainerNode* parent = element->parentNode();
         if (parent && !parent->isElementNode()) {
-            ec = NO_MODIFICATION_ALLOWED_ERR;
+            ec = NoModificationAllowedError;
             return 0;
         }
-        ASSERT_WITH_SECURITY_IMPLICATION(!parent || parent->isElementNode());
         return toElement(parent);
     }
     if (equalIgnoringCase(where, "afterBegin") || equalIgnoringCase(where, "beforeEnd"))
         return element;
-    ec =  SYNTAX_ERR;
+    ec =  SyntaxError;
     return 0;
 }
 
@@ -655,7 +667,7 @@ void HTMLElement::setContentEditable(const String& enabled, ExceptionCode& ec)
     else if (equalIgnoringCase(enabled, "inherit"))
         removeAttribute(contenteditableAttr);
     else
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
 }
 
 bool HTMLElement::draggable() const

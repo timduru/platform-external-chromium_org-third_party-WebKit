@@ -65,25 +65,29 @@ template <typename T> void V8_USE(T) { }
 static void attr1AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestEventConstructor* imp = V8TestEventConstructor::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(imp->attr1(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, imp->attr1(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
 static void attr1AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestEventConstructorV8Internal::attr1AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void attr2AttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestEventConstructor* imp = V8TestEventConstructor::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(imp->attr2(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, imp->attr2(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
 static void attr2AttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestEventConstructorV8Internal::attr2AttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -104,8 +108,8 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
     RefPtr<TestEventConstructor> event = TestEventConstructor::create(type, eventInit);
 
     v8::Handle<v8::Object> wrapper = args.Holder();
-    V8DOMWrapper::associateObjectWithWrapper(event.release(), &V8TestEventConstructor::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
-    args.GetReturnValue().Set(wrapper);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestEventConstructor>(event.release(), &V8TestEventConstructor::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    v8SetReturnValue(args, wrapper);
 }
 } // namespace TestEventConstructorV8Internal
 
@@ -124,7 +128,7 @@ bool fillTestEventConstructorInit(TestEventConstructorInit& eventInit, const Dic
 
 void V8TestEventConstructor::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TraceEvent::SamplingState0Scope("Blink\0Blink-DOMConstructor");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "DOMConstructor");
     if (!args.IsConstructCall()) {
         throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
         return;
@@ -162,7 +166,7 @@ v8::Handle<v8::FunctionTemplate> V8TestEventConstructor::GetTemplate(v8::Isolate
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
-    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestEventConstructorTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
@@ -186,18 +190,18 @@ bool V8TestEventConstructor::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, 
 v8::Handle<v8::Object> V8TestEventConstructor::createWrapper(PassRefPtr<TestEventConstructor> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
+    ASSERT(DOMDataStore::getWrapper<V8TestEventConstructor>(impl.get(), isolate).IsEmpty());
 
-    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestEventConstructor>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestEventConstructor::derefObject(void* object)
 {
-    static_cast<TestEventConstructor*>(object)->deref();
+    fromInternalPointer(object)->deref();
 }
 
 } // namespace WebCore

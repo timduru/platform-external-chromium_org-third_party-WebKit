@@ -23,6 +23,7 @@
 #include "core/svg/SVGForeignObjectElement.h"
 
 #include "SVGNames.h"
+#include "XLinkNames.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/rendering/svg/RenderSVGForeignObject.h"
 #include "core/rendering/svg/RenderSVGResource.h"
@@ -71,7 +72,6 @@ bool SVGForeignObjectElement::isSupportedAttribute(const QualifiedName& attrName
 {
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty()) {
-        SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         supportedAttributes.add(SVGNames::xAttr);
         supportedAttributes.add(SVGNames::yAttr);
@@ -95,8 +95,7 @@ void SVGForeignObjectElement::parseAttribute(const QualifiedName& name, const At
         setWidthBaseValue(SVGLength::construct(LengthModeWidth, value, parseError));
     else if (name == SVGNames::heightAttr)
         setHeightBaseValue(SVGLength::construct(LengthModeHeight, value, parseError));
-    else if (SVGLangSpace::parseAttribute(name, value)
-               || SVGExternalResourcesRequired::parseAttribute(name, value)) {
+    else if (SVGExternalResourcesRequired::parseAttribute(name, value)) {
     } else
         ASSERT_NOT_REACHED();
 
@@ -159,10 +158,10 @@ bool SVGForeignObjectElement::rendererIsNeeded(const NodeRenderingContext& conte
 
 bool SVGForeignObjectElement::selfHasRelativeLengths() const
 {
-    return x().isRelative()
-        || y().isRelative()
-        || width().isRelative()
-        || height().isRelative();
+    return xCurrentValue().isRelative()
+        || yCurrentValue().isRelative()
+        || widthCurrentValue().isRelative()
+        || heightCurrentValue().isRelative();
 }
 
 }

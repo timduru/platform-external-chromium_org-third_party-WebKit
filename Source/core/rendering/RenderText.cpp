@@ -85,7 +85,7 @@ private:
     virtual void fired()
     {
         ASSERT(gSecureTextTimers->contains(m_renderText));
-        m_renderText->setText(m_renderText->text(), true /* forcing setting text as it may be masked later */);
+        m_renderText->setText(m_renderText->text().impl(), true /* forcing setting text as it may be masked later */);
     }
 
     RenderText* m_renderText;
@@ -786,7 +786,7 @@ void RenderText::trimmedPrefWidths(float leadWidth,
 
     int len = textLength();
 
-    if (!len || (stripFrontSpaces && text()->containsOnlyWhitespace())) {
+    if (!len || (stripFrontSpaces && text().impl()->containsOnlyWhitespace())) {
         firstLineMinWidth = 0;
         lastLineMinWidth = 0;
         firstLineMaxWidth = 0;
@@ -913,7 +913,7 @@ static float maxWordFragmentWidth(RenderText* renderer, RenderStyle* style, cons
         fragmentWithHyphen.append(word + suffixStart, fragmentLength);
         fragmentWithHyphen.append(style->hyphenString());
 
-        TextRun run = RenderBlock::constructTextRun(renderer, font, fragmentWithHyphen.characters(), fragmentWithHyphen.length(), style);
+        TextRun run = RenderBlock::constructTextRun(renderer, font, fragmentWithHyphen.bloatedCharacters(), fragmentWithHyphen.length(), style);
         run.setCharactersLength(fragmentWithHyphen.length());
         run.setCharacterScanForCodePath(!renderer->canUseSimpleFontCodePath());
         float fragmentWidth = font.width(run);
@@ -1068,7 +1068,7 @@ void RenderText::computePreferredLogicalWidths(float leadWidth, HashSet<const Si
 
             if (w > maxWordWidth) {
                 int suffixStart;
-                float maxFragmentWidth = maxWordFragmentWidth(this, styleToUse, f, characters() + i, wordLen, minimumPrefixLength, minimumSuffixLength, suffixStart);
+                float maxFragmentWidth = maxWordFragmentWidth(this, styleToUse, f, bloatedCharacters() + i, wordLen, minimumPrefixLength, minimumSuffixLength, suffixStart);
 
                 if (suffixStart) {
                     float suffixWidth;
@@ -1351,10 +1351,7 @@ static inline bool isInlineFlowOrEmptyText(const RenderObject* o)
         return true;
     if (!o->isText())
         return false;
-    StringImpl* text = toRenderText(o)->text();
-    if (!text)
-        return true;
-    return !text->length();
+    return toRenderText(o)->text().isEmpty();
 }
 
 UChar RenderText::previousCharacter() const
@@ -1366,7 +1363,7 @@ UChar RenderText::previousCharacter() const
             break;
     UChar prev = ' ';
     if (previousText && previousText->isText())
-        if (StringImpl* previousString = toRenderText(previousText)->text())
+        if (StringImpl* previousString = toRenderText(previousText)->text().impl())
             prev = (*previousString)[previousString->length() - 1];
     return prev;
 }
@@ -1897,7 +1894,7 @@ bool RenderText::computeCanUseSimpleFontCodePath() const
 {
     if (isAllASCII() || m_text.is8Bit())
         return true;
-    return Font::characterRangeCodePath(characters(), length()) == Font::Simple;
+    return Font::characterRangeCodePath(bloatedCharacters(), length()) == Font::Simple;
 }
 
 #ifndef NDEBUG

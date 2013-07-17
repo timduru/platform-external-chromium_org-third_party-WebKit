@@ -45,23 +45,23 @@
 
 namespace WebCore {
 
-template<typename HolderContainer>
-static void getNamedItems(HTMLOptionsCollection* collection, const AtomicString& name, const HolderContainer& holder)
+template<typename CallbackInfo>
+static void getNamedItems(HTMLOptionsCollection* collection, const AtomicString& name, const CallbackInfo& callbackInfo)
 {
     Vector<RefPtr<Node> > namedItems;
     collection->namedItems(name, namedItems);
 
     if (!namedItems.size()) {
-        v8SetReturnValueNull(holder);
+        v8SetReturnValueNull(callbackInfo);
         return;
     }
 
     if (namedItems.size() == 1) {
-        v8SetReturnValue(holder, toV8Fast(namedItems.at(0).release(), holder, collection));
+        v8SetReturnValue(callbackInfo, toV8Fast(namedItems.at(0).release(), callbackInfo, collection));
         return;
     }
 
-    v8SetReturnValue(holder, toV8Fast(NamedNodesCollection::create(namedItems), holder, collection));
+    v8SetReturnValue(callbackInfo, toV8Fast(NamedNodesCollection::create(namedItems), callbackInfo, collection));
 }
 
 void V8HTMLOptionsCollection::namedItemMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -80,7 +80,7 @@ void V8HTMLOptionsCollection::removeMethodCustom(const v8::FunctionCallbackInfo<
 void V8HTMLOptionsCollection::addMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (!V8HTMLOptionElement::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate()))) {
-        setDOMException(TYPE_MISMATCH_ERR, args.GetIsolate());
+        setDOMException(TypeMismatchError, args.GetIsolate());
         return;
     }
     HTMLOptionsCollection* imp = V8HTMLOptionsCollection::toNative(args.Holder());
@@ -93,7 +93,7 @@ void V8HTMLOptionsCollection::addMethodCustom(const v8::FunctionCallbackInfo<v8:
         bool ok;
         V8TRYCATCH_VOID(int, index, toInt32(args[1], ok));
         if (!ok)
-            ec = TYPE_MISMATCH_ERR;
+            ec = TypeMismatchError;
         else
             imp->add(option, index, ec);
     }
@@ -111,7 +111,7 @@ void V8HTMLOptionsCollection::lengthAttrSetterCustom(v8::Local<v8::String> name,
     ExceptionCode ec = 0;
     if (!std::isnan(v) && !std::isinf(v)) {
         if (v < 0.0)
-            ec = INDEX_SIZE_ERR;
+            ec = IndexSizeError;
         else if (v > static_cast<double>(UINT_MAX))
             newLength = UINT_MAX;
         else

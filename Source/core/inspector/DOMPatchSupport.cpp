@@ -29,8 +29,6 @@
  */
 
 #include "config.h"
-
-
 #include "core/inspector/DOMPatchSupport.h"
 
 #include "HTMLNames.h"
@@ -44,13 +42,12 @@
 #include "core/inspector/DOMEditor.h"
 #include "core/inspector/InspectorHistory.h"
 #include "core/xml/parser/XMLDocumentParser.h"
-
-#include <wtf/Deque.h>
-#include <wtf/HashTraits.h>
-#include <wtf/RefPtr.h>
-#include <wtf/SHA1.h>
-#include <wtf/text/Base64.h>
-#include <wtf/text/CString.h>
+#include "wtf/Deque.h"
+#include "wtf/HashTraits.h"
+#include "wtf/RefPtr.h"
+#include "wtf/SHA1.h"
+#include "wtf/text/Base64.h"
+#include "wtf/text/CString.h"
 
 using namespace std;
 
@@ -89,11 +86,11 @@ void DOMPatchSupport::patchDocument(const String& markup)
 {
     RefPtr<Document> newDocument;
     if (m_document->isHTMLDocument())
-        newDocument = HTMLDocument::create(0, KURL());
+        newDocument = HTMLDocument::create();
     else if (m_document->isXHTMLDocument())
-        newDocument = HTMLDocument::createXHTML(0, KURL());
+        newDocument = HTMLDocument::createXHTML();
     else if (m_document->isSVGDocument())
-        newDocument = Document::create(0, KURL());
+        newDocument = Document::create();
 
     ASSERT(newDocument);
     newDocument->setContextFeatures(m_document->contextFeatures());

@@ -69,6 +69,7 @@ class WebIconLoadingCompletion;
 class WebImage;
 class WebInputElement;
 class WebKeyboardEvent;
+class WebMIDIClient;
 class WebNode;
 class WebNotificationPresenter;
 class WebRange;
@@ -120,9 +121,7 @@ public:
         const WebPopupMenuInfo&, WebExternalPopupMenuClient*) { return 0; }
 
     // Create a session storage namespace object associated with this WebView.
-    virtual WebStorageNamespace* createSessionStorageNamespace() { return createSessionStorageNamespace(0); }
-    // FIXME: Remove the argument-taking version once its override is removed from Chromium; the argument is unused.
-    virtual WebStorageNamespace* createSessionStorageNamespace(unsigned quota) { return 0; }
+    virtual WebStorageNamespace* createSessionStorageNamespace() { return 0; }
 
 
     // Misc ----------------------------------------------------------------
@@ -373,6 +372,10 @@ public:
     // Media Streams -------------------------------------------------------
 
     virtual WebUserMediaClient* userMediaClient() { return 0; }
+
+    // Web MIDI -------------------------------------------------------------
+
+    virtual WebMIDIClient* webMIDIClient() { return 0; }
 
 
     // Content detection ----------------------------------------------------

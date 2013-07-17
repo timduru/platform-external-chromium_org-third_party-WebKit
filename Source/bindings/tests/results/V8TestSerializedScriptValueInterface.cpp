@@ -72,7 +72,9 @@ static void valueAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallba
 
 static void valueAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestSerializedScriptValueInterfaceV8Internal::valueAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void valueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -85,9 +87,9 @@ static void valueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> val
 
 static void valueAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestSerializedScriptValueInterfaceV8Internal::valueAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void readonlyValueAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -99,7 +101,9 @@ static void readonlyValueAttrGetter(v8::Local<v8::String> name, const v8::Proper
 
 static void readonlyValueAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestSerializedScriptValueInterfaceV8Internal::readonlyValueAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void cachedValueAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -120,7 +124,9 @@ static void cachedValueAttrGetter(v8::Local<v8::String> name, const v8::Property
 
 static void cachedValueAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void cachedValueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -134,9 +140,9 @@ static void cachedValueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Valu
 
 static void cachedValueAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestSerializedScriptValueInterfaceV8Internal::cachedValueAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void cachedReadonlyValueAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -157,7 +163,9 @@ static void cachedReadonlyValueAttrGetter(v8::Local<v8::String> name, const v8::
 
 static void cachedReadonlyValueAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestSerializedScriptValueInterfaceV8Internal::cachedReadonlyValueAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 } // namespace TestSerializedScriptValueInterfaceV8Internal
@@ -195,7 +203,7 @@ v8::Handle<v8::FunctionTemplate> V8TestSerializedScriptValueInterface::GetTempla
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
-    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestSerializedScriptValueInterfaceTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
@@ -219,18 +227,18 @@ bool V8TestSerializedScriptValueInterface::HasInstanceInAnyWorld(v8::Handle<v8::
 v8::Handle<v8::Object> V8TestSerializedScriptValueInterface::createWrapper(PassRefPtr<TestSerializedScriptValueInterface> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
+    ASSERT(DOMDataStore::getWrapper<V8TestSerializedScriptValueInterface>(impl.get(), isolate).IsEmpty());
 
-    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestSerializedScriptValueInterface>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestSerializedScriptValueInterface::derefObject(void* object)
 {
-    static_cast<TestSerializedScriptValueInterface*>(object)->deref();
+    fromInternalPointer(object)->deref();
 }
 
 } // namespace WebCore

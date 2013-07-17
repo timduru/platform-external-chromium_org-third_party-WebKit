@@ -29,11 +29,17 @@
  */
 
 #include "config.h"
-#include "CustomElementCallbackDispatcher.h"
+#include "core/dom/CustomElementCallbackDispatcher.h"
 
-#include "CustomElementCallback.h"
+#include "core/dom/CustomElementCallbackInvocation.h"
+#include "wtf/MainThread.h"
 
 namespace WebCore {
+
+size_t CustomElementCallbackDispatcher::s_elementQueueStart = 0;
+
+// The base of the stack has a null sentinel value.
+size_t CustomElementCallbackDispatcher::s_elementQueueEnd = 1;
 
 CustomElementCallbackDispatcher& CustomElementCallbackDispatcher::instance()
 {
@@ -41,34 +47,137 @@ CustomElementCallbackDispatcher& CustomElementCallbackDispatcher::instance()
     return instance;
 }
 
-CustomElementCallbackDispatcher::ReadyInvocation::ReadyInvocation(PassRefPtr<CustomElementCallback> callback, PassRefPtr<Element> element)
-    : m_callback(callback)
-    , m_element(element)
+void CustomElementCallbackDispatcher::enqueueAttributeChangedCallback(PassRefPtr<CustomElementLifecycleCallbacks> callbacks, PassRefPtr<Element> element, const AtomicString& name, const AtomicString& oldValue, const AtomicString& newValue)
 {
-}
-
-bool CustomElementCallbackDispatcher::dispatch()
-{
-    if (m_invocations.isEmpty())
-        return false;
-
-    do  {
-        Vector<ReadyInvocation> invocations;
-        m_invocations.swap(invocations);
-
-        for (Vector<ReadyInvocation>::iterator it = invocations.begin(); it != invocations.end(); ++it)
-            it->invoke();
-    } while (!m_invocations.isEmpty());
-
-    return true;
-}
-
-void CustomElementCallbackDispatcher::enqueueReadyCallback(CustomElementCallback* callback, Element* element)
-{
-    if (!callback->hasReady())
+    if (!callbacks->hasAttributeChangedCallback())
         return;
 
-    m_invocations.append(ReadyInvocation(callback, element));
+    CustomElementCallbackQueue* queue = scheduleInCurrentElementQueue(element);
+    queue->append(CustomElementCallbackInvocation::createAttributeChangedInvocation(callbacks, name, oldValue, newValue));
+}
+
+void CustomElementCallbackDispatcher::enqueueCreatedCallback(PassRefPtr<CustomElementLifecycleCallbacks> callbacks, PassRefPtr<Element> element)
+{
+    if (!callbacks->hasCreatedCallback())
+        return;
+
+    CustomElementCallbackQueue* queue = createCallbackQueue(element);
+    queue->setOwner(currentElementQueue());
+
+    // The created callback is unique in being prepended to the front
+    // of the element queue
+    m_flattenedProcessingStack.insert(inCallbackDeliveryScope() ? s_elementQueueStart : /* skip null sentinel */ 1, queue);
+    ++s_elementQueueEnd;
+
+    queue->append(CustomElementCallbackInvocation::createInvocation(callbacks, CustomElementLifecycleCallbacks::Created));
+}
+
+void CustomElementCallbackDispatcher::enqueueEnteredDocumentCallback(PassRefPtr<CustomElementLifecycleCallbacks> callbacks, PassRefPtr<Element> element)
+{
+    if (!callbacks->hasEnteredDocumentCallback())
+        return;
+
+    CustomElementCallbackQueue* queue = scheduleInCurrentElementQueue(element);
+    queue->append(CustomElementCallbackInvocation::createInvocation(callbacks, CustomElementLifecycleCallbacks::EnteredDocument));
+}
+
+void CustomElementCallbackDispatcher::enqueueLeftDocumentCallback(PassRefPtr<CustomElementLifecycleCallbacks> callbacks, PassRefPtr<Element> element)
+{
+    if (!callbacks->hasLeftDocumentCallback())
+        return;
+
+    CustomElementCallbackQueue* queue = scheduleInCurrentElementQueue(element);
+    queue->append(CustomElementCallbackInvocation::createInvocation(callbacks, CustomElementLifecycleCallbacks::LeftDocument));
+}
+
+// Dispatches callbacks at microtask checkpoint.
+bool CustomElementCallbackDispatcher::dispatch()
+{
+    ASSERT(isMainThread());
+    if (inCallbackDeliveryScope())
+        return false;
+
+    size_t start = 1; // skip null sentinel
+    size_t end = s_elementQueueEnd;
+
+    for (size_t i = start; i < end; i++) {
+        m_flattenedProcessingStack[i]->processInElementQueue(currentElementQueue());
+
+        // new callbacks as a result of recursion must be scheduled in
+        // a CallbackDeliveryScope which restore this queue on completion
+        ASSERT(!s_elementQueueStart);
+        ASSERT(s_elementQueueEnd == end);
+    }
+
+    s_elementQueueEnd = 1;
+    m_flattenedProcessingStack.resize(s_elementQueueEnd);
+    m_elementCallbackQueueMap.clear();
+
+    bool didWork = start < end;
+    return didWork;
+}
+
+// Dispatches callbacks when popping the processing stack.
+void CustomElementCallbackDispatcher::processElementQueueAndPop()
+{
+    instance().processElementQueueAndPop(s_elementQueueStart, s_elementQueueEnd);
+}
+
+void CustomElementCallbackDispatcher::processElementQueueAndPop(size_t start, size_t end)
+{
+    ASSERT(isMainThread());
+
+    for (size_t i = start; i < end; i++) {
+        m_flattenedProcessingStack[i]->processInElementQueue(currentElementQueue());
+
+        // process() may run script which grows and shrinks the
+        // processing stack above this entry, but the processing stack
+        // should always drop back to having this entry at the
+        // top-of-stack on exit
+        ASSERT(start == s_elementQueueStart);
+        ASSERT(end == s_elementQueueEnd);
+    }
+
+    // Pop the element queue from the processing stack
+    m_flattenedProcessingStack.resize(start);
+    s_elementQueueEnd = start;
+
+    if (start == /* allow sentinel */ 1)
+        m_elementCallbackQueueMap.clear();
+}
+
+CustomElementCallbackQueue* CustomElementCallbackDispatcher::createCallbackQueue(PassRefPtr<Element> element)
+{
+    Element* key = element.get();
+    ElementCallbackQueueMap::AddResult result = m_elementCallbackQueueMap.add(key, CustomElementCallbackQueue::create(element));
+    ASSERT(result.isNewEntry);
+    return result.iterator->value.get();
+}
+
+CustomElementCallbackQueue* CustomElementCallbackDispatcher::ensureCallbackQueue(PassRefPtr<Element> element)
+{
+    Element* key = element.get();
+    ElementCallbackQueueMap::iterator it = m_elementCallbackQueueMap.find(key);
+    if (it == m_elementCallbackQueueMap.end())
+        it = m_elementCallbackQueueMap.add(key, CustomElementCallbackQueue::create(element)).iterator;
+    return it->value.get();
+}
+
+// Finds or creates the callback queue for element. If the element's
+// callback queue is scheduled in an earlier processing stack frame,
+// its owner is set to the element queue on the top of the processing
+// stack. Because callback queues are processed exhaustively, this
+// effectively moves the callback queue to the top of the stack.
+CustomElementCallbackQueue* CustomElementCallbackDispatcher::scheduleInCurrentElementQueue(PassRefPtr<Element> element)
+{
+    CustomElementCallbackQueue* queue = ensureCallbackQueue(element);
+    bool isInCurrentQueue = queue->owner() == currentElementQueue();
+    if (!isInCurrentQueue) {
+        queue->setOwner(currentElementQueue());
+        m_flattenedProcessingStack.append(queue);
+        ++s_elementQueueEnd;
+    }
+    return queue;
 }
 
 } // namespace WebCore

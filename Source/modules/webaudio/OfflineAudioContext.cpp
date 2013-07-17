@@ -38,14 +38,14 @@ PassRefPtr<OfflineAudioContext> OfflineAudioContext::create(ScriptExecutionConte
 {
     // FIXME: add support for workers.
     if (!context || !context->isDocument()) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
     Document* document = toDocument(context);
 
     if (numberOfChannels > 10 || !isSampleRateRangeGood(sampleRate)) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
 

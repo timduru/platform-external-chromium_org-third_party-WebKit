@@ -30,7 +30,7 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/NodeFilter.h"
 #include "core/dom/NodeTraversal.h"
-#include <wtf/PassRefPtr.h>
+#include "wtf/PassRefPtr.h"
 
 namespace WebCore {
 
@@ -44,7 +44,7 @@ TreeWalker::TreeWalker(PassRefPtr<Node> rootNode, unsigned whatToShow, PassRefPt
 void TreeWalker::setCurrentNode(PassRefPtr<Node> node, ExceptionCode& ec)
 {
     if (!node) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return;
     }
     m_current = node;

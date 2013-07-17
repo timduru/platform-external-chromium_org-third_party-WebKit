@@ -72,7 +72,7 @@ HTMLCanvasElement::HTMLCanvasElement(const QualifiedName& tagName, Document* doc
     , m_size(DefaultWidth, DefaultHeight)
     , m_rendererIsCanvas(false)
     , m_ignoreReset(false)
-    , m_deviceScaleFactor(targetDeviceScaleFactor())
+    , m_deviceScaleFactor(1)
     , m_originClean(true)
     , m_hasCreatedImageBuffer(false)
     , m_didClearImageBuffer(false)
@@ -162,7 +162,7 @@ CanvasRenderingContext* HTMLCanvasElement::getContext(const String& type, Canvas
         if (!m_context) {
             m_context = CanvasRenderingContext2D::create(this, RuntimeEnabledFeatures::experimentalCanvasFeaturesEnabled() ? static_cast<Canvas2DContextAttributes*>(attrs) : 0, document()->inQuirksMode());
             if (m_context)
-                setNeedsLayerUpdate();
+                scheduleLayerUpdate();
         }
         return m_context.get();
     }
@@ -184,7 +184,7 @@ CanvasRenderingContext* HTMLCanvasElement::getContext(const String& type, Canvas
             if (!m_context) {
                 m_context = WebGLRenderingContext::create(this, static_cast<WebGLContextAttributes*>(attrs));
                 if (m_context)
-                    setNeedsLayerUpdate();
+                    scheduleLayerUpdate();
             }
             return m_context.get();
         }
@@ -246,7 +246,7 @@ void HTMLCanvasElement::reset()
 
     IntSize oldSize = size();
     IntSize newSize(w, h);
-    float newDeviceScaleFactor = targetDeviceScaleFactor();
+    float newDeviceScaleFactor = 1;
 
     // If the size of an existing buffer matches, we can just clear it instead of reallocating.
     // This optimization is only done for 2D canvases for now.
@@ -278,15 +278,6 @@ void HTMLCanvasElement::reset()
     HashSet<CanvasObserver*>::iterator end = m_observers.end();
     for (HashSet<CanvasObserver*>::iterator it = m_observers.begin(); it != end; ++it)
         (*it)->canvasResized(this);
-}
-
-float HTMLCanvasElement::targetDeviceScaleFactor() const
-{
-#if ENABLE(HIGH_DPI_CANVAS)
-    return document()->frame() ? document()->frame()->page()->deviceScaleFactor() : 1;
-#else
-    return 1;
-#endif
 }
 
 bool HTMLCanvasElement::paintsIntoCanvasBuffer() const
@@ -379,7 +370,7 @@ String HTMLCanvasElement::toEncodingMimeType(const String& mimeType)
 String HTMLCanvasElement::toDataURL(const String& mimeType, const double* quality, ExceptionCode& ec)
 {
     if (!m_originClean) {
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return String();
     }
 
@@ -502,12 +493,15 @@ void HTMLCanvasElement::createImageBuffer()
     m_imageBuffer->context()->setImageInterpolationQuality(DefaultInterpolationQuality);
     if (document()->settings() && !document()->settings()->antialiased2dCanvasEnabled())
         m_imageBuffer->context()->setShouldAntialias(false);
+    // GraphicsContext's defaults don't always agree with the 2d canvas spec.
+    // See CanvasRenderingContext2D::State::State() for more information.
+    m_imageBuffer->context()->setMiterLimit(10);
     m_imageBuffer->context()->setStrokeThickness(1);
     m_contextStateSaver = adoptPtr(new GraphicsContextStateSaver(*m_imageBuffer->context()));
 
     // Recalculate compositing requirements if acceleration state changed.
     if (m_context && m_context->is2d())
-        setNeedsLayerUpdate();
+        scheduleLayerUpdate();
 }
 
 GraphicsContext* HTMLCanvasElement::drawingContext() const

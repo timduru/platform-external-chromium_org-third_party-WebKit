@@ -118,6 +118,7 @@
             'front_end/Object.js',
             'front_end/ObjectPopoverHelper.js',
             'front_end/ObjectPropertiesSection.js',
+            'front_end/OverridesSupport.js',
             'front_end/OverridesView.js',
             'front_end/OverviewGrid.js',
             'front_end/Panel.js',
@@ -183,7 +184,6 @@
             'front_end/UISourceCode.js',
             'front_end/UIString.js',
             'front_end/UIUtils.js',
-            'front_end/UserAgentSupport.js',
             'front_end/UserMetrics.js',
             'front_end/utilities.js',
             'front_end/View.js',
@@ -204,7 +204,6 @@
             'front_end/buildSystemOnly.js',
             'front_end/cm/cmdevtools.css',
             'front_end/cm/codemirror.css',
-            'front_end/cm/showhint.css',
             'front_end/cssNamedFlows.css',
             'front_end/dataGrid.css',
             'front_end/elementsPanel.css',
@@ -344,7 +343,6 @@
             'front_end/cm/php.js',
             'front_end/cm/python.js',
             'front_end/cm/shell.js',
-            'front_end/cm/showhint.js',
             'front_end/cm/xml.js',
         ],
 
@@ -499,7 +497,7 @@
                     'destination': '<(PRODUCT_DIR)/resources/inspector',
                     'files': [
                         '<@(devtools_files)',
-                        '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendCommands.js',
+                        '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendCommands.js',
                     ],
                     'conditions': [
                         ['debug_devtools==0', {
@@ -622,7 +620,7 @@
                         'script_name': 'scripts/generate_devtools_grd.py',
                         'input_pages': [
                             '<@(devtools_files)',
-                            '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendCommands.js',
+                            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendCommands.js',
                             '<(PRODUCT_DIR)/resources/inspector/devtools.html',
                         ],
                         'images': [
@@ -643,32 +641,32 @@
                 }],
             ],
         },
-	    {
-	      'target_name': 'frontend_protocol_sources',
-	      'type': 'none',
-	      'actions': [
-	        {
-	          'action_name': 'generateInspectorProtocolFrontendSources',
-	          'inputs': [
-	            # The python script in action below.
-	            'scripts/CodeGeneratorFrontend.py',
-	            # Input file for the script.
-	            'protocol.json',
-	          ],
-	          'outputs': [
-	            '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendCommands.js',
-	          ],
-	          'action': [
-	            'python',
-	            'scripts/CodeGeneratorFrontend.py',
-	            'protocol.json',
-	            '--output_js_dir', '<(SHARED_INTERMEDIATE_DIR)/webcore',
-	          ],
-	          'message': 'Generating Inspector protocol frontend sources from protocol.json',
-	          'msvs_cygwin_shell': 1,
-	        },
-	      ]
-	    },
+        {
+          'target_name': 'frontend_protocol_sources',
+          'type': 'none',
+          'actions': [
+            {
+              'action_name': 'generateInspectorProtocolFrontendSources',
+              'inputs': [
+                # The python script in action below.
+                'scripts/CodeGeneratorFrontend.py',
+                # Input file for the script.
+                'protocol.json',
+              ],
+              'outputs': [
+                '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendCommands.js',
+              ],
+              'action': [
+                'python',
+                'scripts/CodeGeneratorFrontend.py',
+                'protocol.json',
+                '--output_js_dir', '<(SHARED_INTERMEDIATE_DIR)/webkit',
+              ],
+              'message': 'Generating Inspector protocol frontend sources from protocol.json',
+              'msvs_cygwin_shell': 1,
+            },
+          ]
+        },
     ], # targets
     'conditions': [
         ['debug_devtools==0', {
@@ -688,11 +686,11 @@
                             '<@(_script_name)',
                             '<@(_input_page)',
                             '<@(devtools_files)',
-                            '<(SHARED_INTERMEDIATE_DIR)/webcore/InspectorBackendCommands.js'
+                            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendCommands.js'
                         ],
                         'search_path': [
                             'front_end',
-                            '<(SHARED_INTERMEDIATE_DIR)/webcore',
+                            '<(SHARED_INTERMEDIATE_DIR)/webkit',
                         ],
                         'outputs': ['<(PRODUCT_DIR)/resources/inspector/inspector.js'],
                         'action': ['python', '<@(_script_name)', '<@(_input_page)', '<@(_search_path)', '<@(_outputs)'],

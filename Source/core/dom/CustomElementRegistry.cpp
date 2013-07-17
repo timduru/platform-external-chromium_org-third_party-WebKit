@@ -34,221 +34,95 @@
 #include "HTMLNames.h"
 #include "SVGNames.h"
 #include "bindings/v8/CustomElementConstructorBuilder.h"
-#include "core/dom/CustomElementCallbackDispatcher.h"
 #include "core/dom/CustomElementDefinition.h"
-#include "core/dom/Document.h"
-#include "core/dom/Element.h"
-#include "core/html/HTMLElement.h"
-#include "core/svg/SVGElement.h"
+#include "core/dom/CustomElementRegistrationContext.h"
+#include "core/dom/DocumentLifecycleObserver.h"
 
 namespace WebCore {
 
-void setTypeExtension(Element* element, const AtomicString& typeExtension)
-{
-    ASSERT(element);
-    if (!typeExtension.isEmpty())
-        element->setAttribute(HTMLNames::isAttr, typeExtension);
-}
-
-CustomElementRegistry::CustomElementRegistry(Document* document)
-    : ContextLifecycleObserver(document)
-{
-}
-
-static inline bool nameIncludesHyphen(const AtomicString& name)
-{
-    size_t hyphenPosition = name.find('-');
-    return (hyphenPosition != notFound);
-}
-
-bool CustomElementRegistry::isValidName(const AtomicString& name)
-{
-    if (!nameIncludesHyphen(name))
-        return false;
-
-    DEFINE_STATIC_LOCAL(Vector<AtomicString>, reservedNames, ());
-    if (reservedNames.isEmpty()) {
-        reservedNames.append(SVGNames::color_profileTag.localName());
-        reservedNames.append(SVGNames::font_faceTag.localName());
-        reservedNames.append(SVGNames::font_face_srcTag.localName());
-        reservedNames.append(SVGNames::font_face_uriTag.localName());
-        reservedNames.append(SVGNames::font_face_formatTag.localName());
-        reservedNames.append(SVGNames::font_face_nameTag.localName());
-        reservedNames.append(SVGNames::missing_glyphTag.localName());
+class RegistrationContextObserver : public DocumentLifecycleObserver {
+public:
+    explicit RegistrationContextObserver(Document* document)
+        : DocumentLifecycleObserver(document)
+        , m_wentAway(!document)
+    {
     }
 
-    if (notFound != reservedNames.find(name))
-        return false;
+    bool registrationContextWentAway() { return m_wentAway; }
 
-    return Document::isValidName(name.string());
-}
+private:
+    virtual void documentWasDisposed() OVERRIDE { m_wentAway = true; }
 
-void CustomElementRegistry::registerElement(CustomElementConstructorBuilder* constructorBuilder, const AtomicString& userSuppliedName, ExceptionCode& ec)
+    bool m_wentAway;
+};
+
+CustomElementDefinition* CustomElementRegistry::registerElement(Document* document, CustomElementConstructorBuilder* constructorBuilder, const AtomicString& userSuppliedName, ExceptionCode& ec)
 {
-    RefPtr<CustomElementRegistry> protect(this);
+    // FIXME: In every instance except one it is the
+    // CustomElementConstructorBuilder that observes document
+    // destruction during registration. This responsibility should be
+    // consolidated in one place.
+    RegistrationContextObserver observer(document);
 
     if (!constructorBuilder->isFeatureAllowed())
-        return;
+        return 0;
 
     AtomicString type = userSuppliedName.lower();
-    if (!isValidName(type)) {
-        ec = INVALID_CHARACTER_ERR;
-        return;
+    if (!CustomElementRegistrationContext::isValidTypeName(type)) {
+        ec = InvalidCharacterError;
+        return 0;
     }
 
     if (!constructorBuilder->validateOptions()) {
-        ec = INVALID_STATE_ERR;
-        return;
+        ec = InvalidStateError;
+        return 0;
     }
 
     QualifiedName tagName = nullQName();
     if (!constructorBuilder->findTagName(type, tagName)) {
-        ec = NAMESPACE_ERR;
-        return;
+        ec = NamespaceError;
+        return 0;
     }
     ASSERT(tagName.namespaceURI() == HTMLNames::xhtmlNamespaceURI || tagName.namespaceURI() == SVGNames::svgNamespaceURI);
 
-    if (m_definitions.contains(type)) {
-        ec = INVALID_STATE_ERR;
-        return;
+    if (m_registeredTypeNames.contains(type)) {
+        ec = InvalidStateError;
+        return 0;
     }
 
-    RefPtr<CustomElementCallback> lifecycleCallbacks = constructorBuilder->createCallback(document());
+    ASSERT(!observer.registrationContextWentAway());
+
+    RefPtr<CustomElementLifecycleCallbacks> lifecycleCallbacks = constructorBuilder->createCallbacks(document);
 
     // Consulting the constructor builder could execute script and
     // kill the document.
-    if (!document()) {
-        ec = INVALID_STATE_ERR;
-        return;
-    }
-
-    RefPtr<CustomElementDefinition> definition = CustomElementDefinition::create(type, tagName.localName(), tagName.namespaceURI(), lifecycleCallbacks);
-
-    if (!constructorBuilder->createConstructor(document(), definition.get())) {
-        ec = NOT_SUPPORTED_ERR;
-        return;
-    }
-
-    m_definitions.add(definition->type(), definition);
-
-    // Upgrade elements that were waiting for this definition.
-    CustomElementUpgradeCandidateMap::ElementSet upgradeCandidates = m_candidates.takeUpgradeCandidatesFor(definition.get());
-    if (!constructorBuilder->didRegisterDefinition(definition.get(), upgradeCandidates)) {
-        ec = NOT_SUPPORTED_ERR;
-        return;
-    }
-
-    for (CustomElementUpgradeCandidateMap::ElementSet::iterator it = upgradeCandidates.begin(); it != upgradeCandidates.end(); ++it) {
-        (*it)->setNeedsStyleRecalc(); // :unresolved has changed
-
-        CustomElementCallbackDispatcher::instance().enqueueReadyCallback(lifecycleCallbacks.get(), *it);
-    }
-}
-
-bool CustomElementRegistry::isUnresolved(Element* element) const
-{
-    return m_candidates.contains(element);
-}
-
-PassRefPtr<CustomElementDefinition> CustomElementRegistry::findFor(Element* element) const
-{
-    ASSERT(element->document()->registry() == this);
-
-    if (!element->isCustomElement())
+    if (observer.registrationContextWentAway()) {
+        ec = InvalidStateError;
         return 0;
-
-    // When a custom tag and a type extension are provided as element
-    // names at the same time, the custom tag takes precedence.
-    if (isCustomTagName(element->localName())) {
-        if (RefPtr<CustomElementDefinition> definition = findAndCheckNamespace(element->localName(), element->namespaceURI()))
-            return definition->isTypeExtension() ? 0 : definition.release();
     }
 
-    // FIXME: Casually consulting the "is" attribute is dangerous if
-    // it could have changed since element creation.
-    const AtomicString& isValue = element->getAttribute(HTMLNames::isAttr);
-    if (RefPtr<CustomElementDefinition> definition = findAndCheckNamespace(isValue, element->namespaceURI()))
-        return definition->isTypeExtension() && definition->name() == element->localName() ? definition.release() : 0;
+    const CustomElementDescriptor descriptor(type, tagName.namespaceURI(), tagName.localName());
+    RefPtr<CustomElementDefinition> definition = CustomElementDefinition::create(descriptor, lifecycleCallbacks);
 
-    return 0;
-}
-
-PassRefPtr<CustomElementDefinition> CustomElementRegistry::findAndCheckNamespace(const AtomicString& type, const AtomicString& namespaceURI) const
-{
-    if (type.isNull())
+    if (!constructorBuilder->createConstructor(document, definition.get())) {
+        ec = NotSupportedError;
         return 0;
-    DefinitionMap::const_iterator it = m_definitions.find(type);
-    if (it == m_definitions.end())
-        return 0;
-    if (it->value->namespaceURI() != namespaceURI)
-        return 0;
-    return it->value;
-}
-
-PassRefPtr<Element> CustomElementRegistry::createCustomTagElement(const QualifiedName& tagName)
-{
-    if (!document())
-        return 0;
-
-    ASSERT(isCustomTagName(tagName.localName()));
-
-    RefPtr<Element> element;
-
-    if (HTMLNames::xhtmlNamespaceURI == tagName.namespaceURI())
-        element = HTMLElement::create(tagName, document());
-    else if (SVGNames::svgNamespaceURI == tagName.namespaceURI())
-        element = SVGElement::create(tagName, document());
-    else
-        return Element::create(tagName, document());
-
-    element->setIsCustomElement();
-
-    RefPtr<CustomElementDefinition> definition = findAndCheckNamespace(tagName.localName(), tagName.namespaceURI());
-    if (!definition || definition->isTypeExtension()) {
-        // If a definition for a type extension was available, this
-        // custom tag element will be unresolved in perpetuity.
-        didCreateUnresolvedElement(CustomElementDefinition::CustomTag, tagName.localName(), element.get());
-    } else {
-        didCreateCustomTagElement(definition.get(), element.get());
     }
 
-    return element.release();
-}
+    m_definitions.add(descriptor, definition);
+    m_registeredTypeNames.add(descriptor.type());
 
-void CustomElementRegistry::didGiveTypeExtension(Element* element, const AtomicString& type)
-{
-    if (!element->isHTMLElement() && !element->isSVGElement())
-        return;
-    element->setIsCustomElement();
-    RefPtr<CustomElementDefinition> definition = findFor(element);
-    if (!definition || !definition->isTypeExtension()) {
-        // If a definition for a custom tag was available, this type
-        // extension element will be unresolved in perpetuity.
-        didCreateUnresolvedElement(CustomElementDefinition::TypeExtension, type, element);
-    } else {
-        CustomElementCallbackDispatcher::instance().enqueueReadyCallback(definition->callback(), element);
+    if (!constructorBuilder->didRegisterDefinition(definition.get())) {
+        ec = NotSupportedError;
+        return 0;
     }
+
+    return definition.get();
 }
 
-void CustomElementRegistry::didCreateCustomTagElement(CustomElementDefinition* definition, Element* element)
+CustomElementDefinition* CustomElementRegistry::find(const CustomElementDescriptor& descriptor) const
 {
-    CustomElementCallbackDispatcher::instance().enqueueReadyCallback(definition->callback(), element);
+    return m_definitions.get(descriptor);
 }
 
-void CustomElementRegistry::didCreateUnresolvedElement(CustomElementDefinition::CustomElementKind kind, const AtomicString& type, Element* element)
-{
-    m_candidates.add(kind, type, element);
-}
-
-void CustomElementRegistry::customElementWasDestroyed(Element* element)
-{
-    ASSERT(element->isCustomElement());
-    m_candidates.remove(element);
-}
-
-inline Document* CustomElementRegistry::document() const
-{
-    return toDocument(m_scriptExecutionContext);
-}
-
-}
+} // namespace WebCore

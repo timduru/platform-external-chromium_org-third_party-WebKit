@@ -89,7 +89,7 @@ static inline void processRenderSVGInlineText(RenderSVGInlineText* text, unsigne
         return;
     }
 
-    const UChar* characters = text->characters();
+    const UChar* characters = text->bloatedCharacters();
     unsigned textLength = text->textLength();    
     for (unsigned textPosition = 0; textPosition < textLength; ++textPosition) {
         const UChar* currentCharacter = characters + textPosition;
@@ -179,11 +179,11 @@ static inline void updateCharacterData(unsigned i, float& lastRotation, SVGChara
 
 void SVGTextLayoutAttributesBuilder::fillCharacterDataMap(const TextPosition& position)
 {
-    const SVGLengthList& xList = position.element->x();
-    const SVGLengthList& yList = position.element->y();
-    const SVGLengthList& dxList = position.element->dx();
-    const SVGLengthList& dyList = position.element->dy();
-    const SVGNumberList& rotateList = position.element->rotate();
+    const SVGLengthList& xList = position.element->xCurrentValue();
+    const SVGLengthList& yList = position.element->yCurrentValue();
+    const SVGLengthList& dxList = position.element->dxCurrentValue();
+    const SVGLengthList& dyList = position.element->dyCurrentValue();
+    const SVGNumberList& rotateList = position.element->rotateCurrentValue();
 
     unsigned xListSize = xList.size();
     unsigned yListSize = yList.size();

@@ -98,7 +98,7 @@ void Attr::setPrefix(const AtomicString& prefix, ExceptionCode& ec)
 
     if ((prefix == xmlnsAtom && namespaceURI() != XMLNSNames::xmlnsNamespaceURI)
         || static_cast<Attr*>(this)->qualifiedName() == xmlnsAtom) {
-        ec = NAMESPACE_ERR;
+        ec = NamespaceError;
         return;
     }
 
@@ -135,9 +135,9 @@ void Attr::setValue(const AtomicString& value, ExceptionCode&)
         m_element->didModifyAttribute(qualifiedName(), value);
 }
 
-void Attr::setNodeValue(const String& v, ExceptionCode& ec)
+void Attr::setNodeValue(const String& v)
 {
-    setValue(v, ec);
+    setValue(v, IGNORE_EXCEPTION);
 }
 
 PassRefPtr<Node> Attr::cloneNode(bool /*deep*/)

@@ -54,15 +54,15 @@ class ScriptErrorTest(unittest.TestCase):
         error = ScriptError('My custom message!', '', -1)
         self.assertEqual(error.message_with_output(), 'My custom message!')
         error = ScriptError('My custom message!', '', -1, 'My output.')
-        self.assertEqual(error.message_with_output(), 'My custom message!\n\nMy output.')
+        self.assertEqual(error.message_with_output(), 'My custom message!\n\noutput: My output.')
         error = ScriptError('', 'my_command!', -1, 'My output.', '/Users/username/blah')
-        self.assertEqual(error.message_with_output(), 'Failed to run "\'my_command!\'" exit_code: -1 cwd: /Users/username/blah\n\nMy output.')
+        self.assertEqual(error.message_with_output(), 'Failed to run "\'my_command!\'" exit_code: -1 cwd: /Users/username/blah\n\noutput: My output.')
         error = ScriptError('', 'my_command!', -1, 'ab' + '1' * 499)
-        self.assertEqual(error.message_with_output(), 'Failed to run "\'my_command!\'" exit_code: -1\n\nLast 500 characters of output:\nb' + '1' * 499)
+        self.assertEqual(error.message_with_output(), 'Failed to run "\'my_command!\'" exit_code: -1\n\noutput: Last 500 characters of output:\nb' + '1' * 499)
 
     def test_message_with_tuple(self):
         error = ScriptError('', ('my', 'command'), -1, 'My output.', '/Users/username/blah')
-        self.assertEqual(error.message_with_output(), 'Failed to run "(\'my\', \'command\')" exit_code: -1 cwd: /Users/username/blah\n\nMy output.')
+        self.assertEqual(error.message_with_output(), 'Failed to run "(\'my\', \'command\')" exit_code: -1 cwd: /Users/username/blah\n\noutput: My output.')
 
 def never_ending_command():
     """Arguments for a command that will never end (useful for testing process
@@ -232,25 +232,6 @@ class ExecutiveTest(unittest.TestCase):
         executive = Executive()
         pids = executive.running_pids()
         self.assertIn(os.getpid(), pids)
-
-    def serial_test_run_in_parallel(self):
-        # We run this test serially to avoid overloading the machine and throwing off the timing.
-
-        if sys.platform in ("win32", "cygwin"):
-            return  # This function isn't implemented properly on windows yet.
-        import multiprocessing
-
-        NUM_PROCESSES = 2
-        DELAY_SECS = 0.50
-        cmd_line = [sys.executable, '-c', 'import time; time.sleep(%f); print "hello"' % DELAY_SECS]
-        cwd = os.getcwd()
-        commands = [tuple([cmd_line, cwd])] * NUM_PROCESSES
-        start = time.time()
-        command_outputs = Executive().run_in_parallel(commands, processes=NUM_PROCESSES)
-        done = time.time()
-        self.assertTrue(done - start < NUM_PROCESSES * DELAY_SECS)
-        self.assertEqual([output[1] for output in command_outputs], ["hello\n"] * NUM_PROCESSES)
-        self.assertEqual([],  multiprocessing.active_children())
 
     def test_run_in_parallel_assert_nonempty(self):
         self.assertRaises(AssertionError, Executive().run_in_parallel, [])

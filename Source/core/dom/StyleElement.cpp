@@ -29,8 +29,8 @@
 #include "core/dom/Element.h"
 #include "core/dom/ScriptableDocumentParser.h"
 #include "core/page/ContentSecurityPolicy.h"
-#include <wtf/text/StringBuilder.h>
-#include <wtf/text/TextPosition.h>
+#include "wtf/text/StringBuilder.h"
+#include "wtf/text/TextPosition.h"
 
 namespace WebCore {
 
@@ -71,12 +71,14 @@ void StyleElement::removedFromDocument(Document* document, Element* element)
     ASSERT(element);
     document->styleSheetCollection()->removeStyleSheetCandidateNode(element);
 
+    RefPtr<StyleSheet> removedSheet = m_sheet;
+
     if (m_sheet)
         clearSheet();
 
     // If we're in document teardown, then we don't need to do any notification of our sheet's removal.
     if (document->renderer())
-        document->styleResolverChanged(DeferRecalcStyle);
+        document->removedStyleSheet(removedSheet.get());
 }
 
 void StyleElement::clearDocumentData(Document* document, Element* element)
@@ -143,7 +145,7 @@ void StyleElement::createSheet(Element* e, const String& text)
             m_sheet = CSSStyleSheet::createInline(e, KURL(), startPosition, document->inputEncoding());
             m_sheet->setMediaQueries(mediaQueries.release());
             m_sheet->setTitle(e->title());
-            m_sheet->contents()->parseStringAtLine(text, startPosition.m_line.zeroBasedInt(), m_createdByParser);
+            m_sheet->contents()->parseStringAtPosition(text, startPosition, m_createdByParser);
 
             m_loading = false;
         }

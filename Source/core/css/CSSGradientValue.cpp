@@ -28,17 +28,17 @@
 
 #include "CSSValueKeywords.h"
 #include "core/css/CSSCalculationValue.h"
-#include "core/css/resolver/StyleResolverState.h"
 #include "core/dom/NodeRenderStyle.h"
+#include "core/dom/TextLinkColors.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/platform/graphics/GeneratorGeneratedImage.h"
 #include "core/platform/graphics/Gradient.h"
 #include "core/platform/graphics/Image.h"
 #include "core/platform/graphics/IntSize.h"
 #include "core/rendering/RenderObject.h"
-#include <wtf/MemoryInstrumentationVector.h>
-#include <wtf/text/StringBuilder.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/MemoryInstrumentationVector.h"
+#include "wtf/text/StringBuilder.h"
+#include "wtf/text/WTFString.h"
 
 using namespace std;
 
@@ -114,7 +114,7 @@ struct GradientStop {
     { }
 };
 
-PassRefPtr<CSSGradientValue> CSSGradientValue::gradientWithStylesResolved(StyleResolverState& styleResolverState)
+PassRefPtr<CSSGradientValue> CSSGradientValue::gradientWithStylesResolved(const TextLinkColors& textLinkColors, Color currentColor)
 {
     bool derived = false;
     for (unsigned i = 0; i < m_stops.size(); i++)
@@ -137,7 +137,7 @@ PassRefPtr<CSSGradientValue> CSSGradientValue::gradientWithStylesResolved(StyleR
     }
 
     for (unsigned i = 0; i < result->m_stops.size(); i++)
-        result->m_stops[i].m_resolvedColor = styleResolverState.resolveColorFromPrimitiveValue(result->m_stops[i].m_color.get());
+        result->m_stops[i].m_resolvedColor = textLinkColors.colorFromPrimitiveValue(result->m_stops[i].m_color.get(), currentColor);
 
     return result.release();
 }

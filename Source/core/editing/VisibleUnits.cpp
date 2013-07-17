@@ -292,10 +292,10 @@ static TextBreakIterator* wordBreakIteratorForMinOffsetBoundary(const VisiblePos
     string.clear();
     if (previousBox) {
         previousBoxLength = previousBox->len();
-        string.append(previousBox->textRenderer()->text()->bloatedCharacters() + previousBox->start(), previousBoxLength);
+        previousBox->textRenderer()->text().appendTo(string, previousBox->start(), previousBoxLength);
         len += previousBoxLength;
     }
-    string.append(textBox->textRenderer()->text()->bloatedCharacters() + textBox->start(), textBox->len());
+    textBox->textRenderer()->text().appendTo(string, textBox->start(), textBox->len());
     len += textBox->len();
 
     return wordBreakIterator(string.data(), len);
@@ -311,10 +311,10 @@ static TextBreakIterator* wordBreakIteratorForMaxOffsetBoundary(const VisiblePos
 
     int len = 0;
     string.clear();
-    string.append(textBox->textRenderer()->text()->bloatedCharacters() + textBox->start(), textBox->len());
+    textBox->textRenderer()->text().appendTo(string, textBox->start(), textBox->len());
     len += textBox->len();
     if (nextBox) {
-        string.append(nextBox->textRenderer()->text()->bloatedCharacters() + nextBox->start(), nextBox->len());
+        nextBox->textRenderer()->text().appendTo(string, nextBox->start(), nextBox->len());
         len += nextBox->len();
     }
 
@@ -381,7 +381,7 @@ static VisiblePosition visualWordPosition(const VisiblePosition& visiblePosition
         else if (offsetInBox == box->caretMaxOffset())
             iter = wordBreakIteratorForMaxOffsetBoundary(visiblePosition, textBox, nextBoxInDifferentBlock, string, leafBoxes);
         else if (movingIntoNewBox) {
-            iter = wordBreakIterator(textBox->textRenderer()->text()->bloatedCharacters() + textBox->start(), textBox->len());
+            iter = wordBreakIterator(textBox->textRenderer()->text(), textBox->start(), textBox->len());
             previouslyVisitedBox = box;
         }
 
@@ -492,9 +492,9 @@ static VisiblePosition previousBoundary(const VisiblePosition& c, BoundarySearch
             string.prepend(it.characters(), it.length());
         else {
             // Treat bullets used in the text security mode as regular characters when looking for boundaries
-            String iteratorString(it.characters(), it.length());
-            iteratorString.fill('x');
-            string.prepend(iteratorString.bloatedCharacters(), iteratorString.length());
+            Vector<UChar, 1024> iteratorString;
+            iteratorString.fill('x', it.length());
+            string.prepend(iteratorString.data(), iteratorString.size());
         }
         next = searchFunction(string.data(), string.size(), string.size() - suffixLength, MayHaveMoreContext, needMoreContext);
         if (next)
@@ -568,7 +568,7 @@ static VisiblePosition nextBoundary(const VisiblePosition& c, BoundarySearchFunc
             // Treat bullets used in the text security mode as regular characters when looking for boundaries
             String iteratorString(it.characters(), it.length());
             iteratorString.fill('x');
-            string.append(iteratorString.bloatedCharacters(), iteratorString.length());
+            iteratorString.appendTo(string);
         }
         next = searchFunction(string.data(), string.size(), prefixLength, MayHaveMoreContext, needMoreContext);
         if (next != string.size())
@@ -1106,11 +1106,7 @@ VisiblePosition startOfParagraph(const VisiblePosition& c, EditingBoundaryCrossi
 
     Node* n = startNode;
     while (n) {
-#if ENABLE(USERSELECT_ALL)
         if (boundaryCrossingRule == CannotCrossEditingBoundary && !Position::nodeIsUserSelectAll(n) && n->rendererIsEditable() != startNode->rendererIsEditable())
-#else
-        if (boundaryCrossingRule == CannotCrossEditingBoundary && n->rendererIsEditable() != startNode->rendererIsEditable())
-#endif
             break;
         if (boundaryCrossingRule == CanSkipOverEditingBoundary) {
             while (n && n->rendererIsEditable() != startNode->rendererIsEditable())
@@ -1136,13 +1132,13 @@ VisiblePosition startOfParagraph(const VisiblePosition& c, EditingBoundaryCrossi
             ASSERT_WITH_SECURITY_IMPLICATION(n->isTextNode());
             type = Position::PositionIsOffsetInAnchor;
             if (style->preserveNewline()) {
-                const UChar* chars = toRenderText(r)->characters();
-                int i = toRenderText(r)->textLength();
+                RenderText* text = toRenderText(r);
+                int i = text->textLength();
                 int o = offset;
                 if (n == startNode && o < i)
                     i = max(0, o);
                 while (--i >= 0) {
-                    if (chars[i] == '\n')
+                    if ((*text)[i] == '\n')
                         return VisiblePosition(Position(toText(n), i + 1), DOWNSTREAM);
                 }
             }
@@ -1186,11 +1182,7 @@ VisiblePosition endOfParagraph(const VisiblePosition &c, EditingBoundaryCrossing
 
     Node* n = startNode;
     while (n) {
-#if ENABLE(USERSELECT_ALL)
         if (boundaryCrossingRule == CannotCrossEditingBoundary && !Position::nodeIsUserSelectAll(n) && n->rendererIsEditable() != startNode->rendererIsEditable())
-#else
-        if (boundaryCrossingRule == CannotCrossEditingBoundary && n->rendererIsEditable() != startNode->rendererIsEditable())
-#endif
             break;
         if (boundaryCrossingRule == CanSkipOverEditingBoundary) {
             while (n && n->rendererIsEditable() != startNode->rendererIsEditable())
@@ -1219,10 +1211,10 @@ VisiblePosition endOfParagraph(const VisiblePosition &c, EditingBoundaryCrossing
             int length = toRenderText(r)->textLength();
             type = Position::PositionIsOffsetInAnchor;
             if (style->preserveNewline()) {
-                const UChar* chars = toRenderText(r)->characters();
+                RenderText* text = toRenderText(r);
                 int o = n == startNode ? offset : 0;
                 for (int i = o; i < length; ++i) {
-                    if (chars[i] == '\n')
+                    if ((*text)[i] == '\n')
                         return VisiblePosition(Position(toText(n), i), DOWNSTREAM);
                 }
             }

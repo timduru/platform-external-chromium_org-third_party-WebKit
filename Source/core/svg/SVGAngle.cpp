@@ -163,7 +163,7 @@ void SVGAngle::setValueAsString(const String& value, ExceptionCode& ec)
     bool success = value.is8Bit() ? parseValue<LChar>(value, valueInSpecifiedUnits, unitType)
                                   : parseValue<UChar>(value, valueInSpecifiedUnits, unitType);
     if (!success) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
@@ -174,7 +174,7 @@ void SVGAngle::setValueAsString(const String& value, ExceptionCode& ec)
 void SVGAngle::newValueSpecifiedUnits(unsigned short unitType, float valueInSpecifiedUnits, ExceptionCode& ec)
 {
     if (unitType == SVG_ANGLETYPE_UNKNOWN || unitType > SVG_ANGLETYPE_GRAD) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return;
     }
 
@@ -187,7 +187,7 @@ void SVGAngle::newValueSpecifiedUnits(unsigned short unitType, float valueInSpec
 void SVGAngle::convertToSpecifiedUnits(unsigned short unitType, ExceptionCode& ec)
 {
     if (unitType == SVG_ANGLETYPE_UNKNOWN || m_unitType == SVG_ANGLETYPE_UNKNOWN || unitType > SVG_ANGLETYPE_GRAD) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return;
     }
 

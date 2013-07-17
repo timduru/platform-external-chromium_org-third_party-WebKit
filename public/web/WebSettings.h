@@ -61,7 +61,8 @@ public:
     virtual void setAcceleratedCompositingForAnimationEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForCanvasEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForFiltersEnabled(bool) = 0;
-    virtual void setAcceleratedCompositingForFixedPositionEnabled(bool)  = 0;
+    virtual void setAcceleratedCompositingForFixedPositionEnabled(bool) = 0;
+    virtual void setAcceleratedCompositingForFixedRootBackgroundEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForOverflowScrollEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForTransitionEnabled(bool)  = 0;
     virtual void setAcceleratedCompositingForPluginsEnabled(bool) = 0;
@@ -107,7 +108,6 @@ public:
     virtual void setFantasyFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setFixedFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setFixedPositionCreatesStackingContext(bool) = 0;
-    virtual void setFontRenderingModeNormal() = 0;
     virtual void setForceCompositingMode(bool) = 0;
     virtual void setFullScreenEnabled(bool) = 0;
     virtual void setGestureTapHighlightEnabled(bool) = 0;
@@ -145,7 +145,6 @@ public:
     virtual void setSerifFontFamily(const WebString&, UScriptCode = USCRIPT_COMMON) = 0;
     virtual void setShouldPrintBackgrounds(bool) = 0;
     virtual void setShouldRespectImageOrientation(bool) = 0;
-    virtual void setShowDebugBorders(bool) = 0;
     virtual void setShowFPSCounter(bool) = 0;
     virtual void setShowPaintRects(bool) = 0;
     virtual void setShrinksStandaloneImagesToFit(bool) = 0;
@@ -165,7 +164,6 @@ public:
     virtual void setTextAreasAreResizable(bool) = 0;
     virtual void setTextAutosizingEnabled(bool) = 0;
     virtual void setTextAutosizingFontScaleFactor(float) = 0;
-    virtual void setTextDirectionSubmenuInclusionBehaviorNeverIncluded() { } // FIXME: Remove once its caller is gone from Chromium
     virtual void setThreadedHTMLParser(bool) = 0;
     virtual void setTouchDragDropEnabled(bool) = 0;
     virtual void setTouchEditingEnabled(bool) = 0;

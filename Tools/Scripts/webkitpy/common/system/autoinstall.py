@@ -39,7 +39,7 @@ import stat
 import sys
 import tarfile
 import tempfile
-import urllib
+import urllib2 as urllib
 import urlparse
 import zipfile
 

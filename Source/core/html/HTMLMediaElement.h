@@ -52,7 +52,7 @@ class KURL;
 class MediaController;
 class MediaControls;
 class MediaError;
-class MediaSourceBase;
+class HTMLMediaSource;
 class TextTrackList;
 class TimeRanges;
 #if ENABLE(ENCRYPTED_MEDIA_V2)
@@ -376,7 +376,7 @@ private:
 
     virtual CORSMode mediaPlayerCORSMode() const OVERRIDE;
 
-    virtual void scheduleLayerUpdate() OVERRIDE;
+    virtual void mediaPlayerScheduleLayerUpdate() OVERRIDE;
 
     void loadTimerFired(Timer<HTMLMediaElement>*);
     void progressEventTimerFired(Timer<HTMLMediaElement>*);
@@ -505,7 +505,7 @@ private:
 
     DisplayMode m_displayMode;
 
-    RefPtr<MediaSourceBase> m_mediaSource;
+    RefPtr<HTMLMediaSource> m_mediaSource;
 
     mutable double m_cachedTime;
     mutable double m_cachedTimeWallClockUpdateTime;

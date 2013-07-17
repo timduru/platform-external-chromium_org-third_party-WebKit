@@ -44,6 +44,7 @@ sub readAttrs($$);
 
 my $printFactory = 0; 
 my $fontNamesIn = "";
+my $resourceTypesIn = "";
 my $tagsFile = "";
 my $attrsFile = "";
 my $outputDir = ".";
@@ -78,59 +79,22 @@ GetOptions(
     'outputDir=s' => \$outputDir,
     'extraDefines=s' => \$extraDefines,
     'preprocessor=s' => \$preprocessor,
-    'fonts=s' => \$fontNamesIn
+    'fonts=s' => \$fontNamesIn,
+    'resourceTypes=s' => \$resourceTypesIn
 );
 
 mkpath($outputDir);
 
 if (length($fontNamesIn)) {
-    my $names = new IO::File;
     my $familyNamesFileBase = "FontFamily";
+    my $familyNamesPrefix = "CSS";
+    createGenericNamesFile($fontNamesIn, $familyNamesFileBase, $familyNamesPrefix);
+}
 
-    open($names, $fontNamesIn) or die "Failed to open file: $fontNamesIn";
-
-    $initDefaults = 0;
-    my $Parser = InFilesParser->new();
-    my $dummy;
-    $Parser->parse($names, \&parametersHandler, \&dummy);
-
-    my $F;
-    my $header = File::Spec->catfile($outputDir, "${familyNamesFileBase}Names.h");
-    open F, ">$header" or die "Unable to open $header for writing.";
-
-    printLicenseHeader($F);
-    printHeaderHead($F, "CSS", $familyNamesFileBase, "#include \"wtf/text/AtomicString.h\"");
-
-    printMacros($F, "extern const WTF::AtomicString", "", \%parameters);
-    print F "#endif\n\n";
-
-    printInit($F, 1);
-    close F;
-
-    my $source = File::Spec->catfile($outputDir, "${familyNamesFileBase}Names.cpp");
-    open F, ">$source" or die "Unable to open $source for writing.";
-
-    printLicenseHeader($F);
-    printCppHead($F, "CSS", $familyNamesFileBase, "WTF");
-
-    print F StaticString::GenerateStrings(\%parameters);
-
-    while ( my ($name, $identifier) = each %parameters ) {
-        print F "DEFINE_GLOBAL(AtomicString, $name)\n";
-    }
-
-    printInit($F, 0);
-
-    print F "\n";
-    print F StaticString::GenerateStringAsserts(\%parameters);
-
-    while ( my ($name, $identifier) = each %parameters ) {
-        print F "    new ((void*)&$name) AtomicString(${name}Impl);\n";
-    }
-
-    print F "}\n}\n}\n";
-    close F;
-    exit 0;
+if (length($resourceTypesIn)) {
+    my $baseName = "CachedResourceInitiatorType";
+    my $basePrefix = "Loader_Cache";
+    createGenericNamesFile($resourceTypesIn, $baseName, $basePrefix);
 }
 
 die "You must specify at least one of --tags <file> or --attrs <file>" unless (length($tagsFile) || length($attrsFile));
@@ -280,6 +244,11 @@ sub parametersHandler
 
     # Initialize default properties' values.
     %parameters = defaultParametersHash() if (!(keys %parameters) && $initDefaults);
+
+    # If the input is an array, we want the strings to have the same value as the key.
+    if ( $value eq 1) {
+        $value = $parameter;
+    }
 
     die "Unknown parameter $parameter for tags/attrs\n" if (!defined($parameters{$parameter}) && $initDefaults);
     $parameters{$parameter} = $value;
@@ -837,7 +806,7 @@ print F <<END
 #include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
 
-#include "CustomElementRegistry.h"
+#include "CustomElementRegistrationContext.h"
 
 namespace WebCore {
 
@@ -891,9 +860,9 @@ print F <<END
     if (!document)
         return 0;
 
-    if (RuntimeEnabledFeatures::customDOMElementsEnabled() && CustomElementRegistry::isCustomTagName(qName.localName())) {
-        RefPtr<Element> element = document->ensureCustomElementRegistry()->createCustomTagElement(qName);
-        ASSERT(element->is$parameters{namespace}Element());
+    if (CustomElementRegistrationContext::isCustomTagName(qName.localName())) {
+        RefPtr<Element> element = document->registrationContext()->createCustomTagElement(document, qName);
+        ASSERT_WITH_SECURITY_IMPLICATION(element->is$parameters{namespace}Element());
         return static_pointer_cast<$parameters{namespace}Element>(element.release());
     }
 
@@ -1101,7 +1070,7 @@ sub printWrapperFactoryCppFile
 
 #include "V8$parameters{namespace}Element.h"
 
-#include "bindings/v8/CustomElementHelpers.h"
+#include "bindings/v8/CustomElementWrapper.h"
 
 #include <v8.h>
 
@@ -1148,7 +1117,7 @@ END
 
     Create$parameters{namespace}ElementWrapperFunction createWrapperFunction = map.get(element->localName().impl());
     if (element->isCustomElement())
-        return CustomElementHelpers::wrap(element, creationContext, isolate, CustomElementHelpers::CreateWrapperFunction(createWrapperFunction));
+        return CustomElementWrapper<$parameters{namespace}Element, V8$parameters{namespace}Element>::wrap(element, creationContext, isolate, createWrapperFunction);
     if (createWrapperFunction)
     {
 END
@@ -1260,3 +1229,57 @@ END
 
     close F;
 }
+
+sub createGenericNamesFile
+{
+    my $inputName = shift;
+    my $baseName = shift;
+    my $basePrefix = shift;
+
+    my $names = new IO::File;
+    open($names, $inputName) or die "Failed to open file: $inputName";
+
+    $initDefaults = 0;
+    my $Parser = InFilesParser->new();
+    my $dummy;
+    $Parser->parse($names, \&parametersHandler, \&dummy);
+
+    my $F;
+    my $header = File::Spec->catfile($outputDir, "${baseName}Names.h");
+    open F, ">$header" or die "Unable to open $header for writing.";
+
+    printLicenseHeader($F);
+    printHeaderHead($F, $basePrefix, $baseName, "#include \"wtf/text/AtomicString.h\"");
+
+    printMacros($F, "extern const WTF::AtomicString", "", \%parameters);
+    print F "#endif\n\n";
+
+    printInit($F, 1);
+    close F;
+
+    my $source = File::Spec->catfile($outputDir, "${baseName}Names.cpp");
+    open F, ">$source" or die "Unable to open $source for writing.";
+
+    printLicenseHeader($F);
+    printCppHead($F, $basePrefix, $baseName, "WTF");
+
+    print F StaticString::GenerateStrings(\%parameters);
+
+    while ( my ($name, $identifier) = each %parameters ) {
+        print F "DEFINE_GLOBAL(AtomicString, $name)\n";
+    }
+
+    printInit($F, 0);
+
+    print F "\n";
+    print F StaticString::GenerateStringAsserts(\%parameters);
+
+    while ( my ($name, $identifier) = each %parameters ) {
+        print F "    new ((void*)&$name) AtomicString(${name}Impl);\n";
+    }
+
+    print F "}\n}\n}\n";
+    close F;
+    exit 0;
+}
+

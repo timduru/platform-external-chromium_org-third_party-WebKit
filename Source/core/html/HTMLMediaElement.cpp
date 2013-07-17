@@ -41,6 +41,7 @@
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/dom/shadow/ShadowRoot.h"
+#include "core/html/HTMLMediaSource.h"
 #include "core/html/HTMLSourceElement.h"
 #include "core/html/HTMLTrackElement.h"
 #include "core/html/MediaController.h"
@@ -67,8 +68,6 @@
 #include "core/platform/graphics/InbandTextTrackPrivate.h"
 #include "core/platform/graphics/MediaPlayer.h"
 #include "core/rendering/RenderVideo.h"
-#include "modules/mediasource/MediaSourceBase.h"
-#include "modules/mediasource/MediaSourceRegistry.h"
 #include "modules/mediastream/MediaStreamRegistry.h"
 #include "public/platform/Platform.h"
 #include "weborigin/SecurityOrigin.h"
@@ -160,13 +159,13 @@ static ExceptionCode exceptionCodeForMediaKeyException(MediaPlayer::MediaKeyExce
     case MediaPlayer::NoError:
         return 0;
     case MediaPlayer::InvalidPlayerState:
-        return INVALID_STATE_ERR;
+        return InvalidStateError;
     case MediaPlayer::KeySystemNotSupported:
-        return NOT_SUPPORTED_ERR;
+        return NotSupportedError;
     }
 
     ASSERT_NOT_REACHED();
-    return INVALID_STATE_ERR;
+    return InvalidStateError;
 }
 
 class TrackDisplayUpdateScope {
@@ -894,14 +893,22 @@ void HTMLMediaElement::loadResource(const KURL& initialURL, ContentType& content
     ASSERT(!m_mediaSource);
 
     if (url.protocolIs(mediaSourceBlobProtocol))
-        m_mediaSource = MediaSourceRegistry::registry().lookupMediaSource(url.string());
+        m_mediaSource = HTMLMediaSource::lookup(url.string());
 
-    if (m_mediaSource)
-        m_player->load(url, m_mediaSource);
-    else if (canLoadURL(url, contentType, keySystem))
+    if (m_mediaSource) {
+        if (m_mediaSource->attachToElement()) {
+            m_player->load(url, m_mediaSource);
+        } else {
+            // Forget our reference to the MediaSource, so we leave it alone
+            // while processing remainder of load failure.
+            m_mediaSource = 0;
+            mediaLoadingFailed(MediaPlayer::FormatError);
+        }
+    } else if (canLoadURL(url, contentType, keySystem)) {
         m_player->load(url);
-    else
+    } else {
         mediaLoadingFailed(MediaPlayer::FormatError);
+    }
 
     // If there is no poster to display, allow the media engine to render video frames as soon as
     // they are available.
@@ -1262,9 +1269,11 @@ void HTMLMediaElement::endIgnoringTrackDisplayUpdateRequests()
         updateActiveTextTrackCues(currentTime());
 }
 
-void HTMLMediaElement::textTrackAddCues(TextTrack*, const TextTrackCueList* cues)
+void HTMLMediaElement::textTrackAddCues(TextTrack* track, const TextTrackCueList* cues)
 {
     LOG(Media, "HTMLMediaElement::textTrackAddCues");
+    if (track->mode() == TextTrack::disabledKeyword())
+        return;
 
     TrackDisplayUpdateScope scope(this);
     for (size_t i = 0; i < cues->length(); ++i)
@@ -1280,8 +1289,11 @@ void HTMLMediaElement::textTrackRemoveCues(TextTrack*, const TextTrackCueList* c
         textTrackRemoveCue(cues->item(i)->track(), cues->item(i));
 }
 
-void HTMLMediaElement::textTrackAddCue(TextTrack*, PassRefPtr<TextTrackCue> cue)
+void HTMLMediaElement::textTrackAddCue(TextTrack* track, PassRefPtr<TextTrackCue> cue)
 {
+    if (track->mode() == TextTrack::disabledKeyword())
+        return;
+
     // Negative duration cues need be treated in the interval tree as
     // zero-length cues.
     double endTime = max(cue->startTime(), cue->endTime());
@@ -1826,9 +1838,9 @@ void HTMLMediaElement::seek(double time, ExceptionCode& ec)
 
     // 4.8.9.9 Seeking
 
-    // 1 - If the media element's readyState is HAVE_NOTHING, then raise an INVALID_STATE_ERR exception.
+    // 1 - If the media element's readyState is HAVE_NOTHING, then raise an InvalidStateError exception.
     if (m_readyState == HAVE_NOTHING || !m_player) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -1993,7 +2005,7 @@ double HTMLMediaElement::currentTime() const
 void HTMLMediaElement::setCurrentTime(double time, ExceptionCode& ec)
 {
     if (m_mediaController) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     seek(time, ec);
@@ -2217,12 +2229,12 @@ void HTMLMediaElement::closeMediaSource()
 void HTMLMediaElement::webkitGenerateKeyRequest(const String& keySystem, PassRefPtr<Uint8Array> initData, ExceptionCode& ec)
 {
     if (keySystem.isEmpty()) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
     if (!m_player) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -2245,22 +2257,22 @@ void HTMLMediaElement::webkitGenerateKeyRequest(const String& keySystem, Excepti
 void HTMLMediaElement::webkitAddKey(const String& keySystem, PassRefPtr<Uint8Array> key, PassRefPtr<Uint8Array> initData, const String& sessionId, ExceptionCode& ec)
 {
     if (keySystem.isEmpty()) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
     if (!key) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
     if (!key->length()) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
 
     if (!m_player) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -2283,12 +2295,12 @@ void HTMLMediaElement::webkitAddKey(const String& keySystem, PassRefPtr<Uint8Arr
 void HTMLMediaElement::webkitCancelKeyRequest(const String& keySystem, const String& sessionId, ExceptionCode& ec)
 {
     if (keySystem.isEmpty()) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
     if (!m_player) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -2338,7 +2350,7 @@ void HTMLMediaElement::setVolume(double vol, ExceptionCode& ec)
     LOG(Media, "HTMLMediaElement::setVolume(%f)", vol);
 
     if (vol < 0.0f || vol > 1.0f) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
 
@@ -2589,7 +2601,7 @@ PassRefPtr<TextTrack> HTMLMediaElement::addTextTrack(const String& kind, const S
 
     // 1. If kind is not one of the following strings, then throw a SyntaxError exception and abort these steps
     if (!TextTrack::isValidKindKeyword(kind)) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
 
@@ -3171,6 +3183,10 @@ PassRefPtr<TimeRanges> HTMLMediaElement::buffered() const
 {
     if (!m_player)
         return TimeRanges::create();
+
+    if (m_mediaSource)
+        return m_mediaSource->buffered();
+
     return m_player->buffered();
 }
 
@@ -3937,9 +3953,9 @@ void HTMLMediaElement::removeBehaviorsRestrictionsAfterFirstUserGesture()
     m_restrictions = NoRestrictions;
 }
 
-void HTMLMediaElement::scheduleLayerUpdate()
+void HTMLMediaElement::mediaPlayerScheduleLayerUpdate()
 {
-    setNeedsLayerUpdate();
+    scheduleLayerUpdate();
 }
 
 void HTMLMediaElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const

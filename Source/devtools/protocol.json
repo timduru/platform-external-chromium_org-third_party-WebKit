@@ -1954,6 +1954,7 @@
                 "hidden": true,
                 "parameters": [
                     { "name": "enabled", "type": "boolean", "description": "True to enable inspection mode, false to disable it." },
+                    { "name": "inspectShadowDOM", "type": "boolean", "optional": true, "description": "True to enable inspection mode for shadow DOM." },
                     { "name": "highlightConfig", "$ref": "HighlightConfig", "optional": true, "description": "A descriptor for the highlight appearance of hovered-over nodes. May be omitted if <code>enabled == false</code>." }
                 ],
                 "description": "Enters the 'inspect' mode. In this mode, elements that user is hovering over are highlighted. Backend then generates 'inspectNodeRequested' event upon element selection."
@@ -2750,8 +2751,8 @@
                 "type": "object",
                 "properties": [
                     { "name": "scriptId", "$ref": "ScriptId", "description": "Script identifier as reported in the <code>Debugger.scriptParsed</code>." },
-                    { "name": "lineNumber", "type": "integer", "description": "Line number in the script." },
-                    { "name": "columnNumber", "type": "integer", "optional": true, "description": "Column number in the script." }
+                    { "name": "lineNumber", "type": "integer", "description": "Line number in the script (0-based)." },
+                    { "name": "columnNumber", "type": "integer", "optional": true, "description": "Column number in the script (0-based)." }
                 ],
                 "description": "Location in the source code."
             },
@@ -2827,7 +2828,8 @@
                     { "name": "url", "type": "string", "optional": true, "description": "URL of the resources to set breakpoint on." },
                     { "name": "urlRegex", "type": "string", "optional": true, "description": "Regex pattern for the URLs of the resources to set breakpoints on. Either <code>url</code> or <code>urlRegex</code> must be specified." },
                     { "name": "columnNumber", "type": "integer", "optional": true, "description": "Offset in the line to set breakpoint at." },
-                    { "name": "condition", "type": "string", "optional": true, "description": "Expression to use as a breakpoint condition. When specified, debugger will only stop on the breakpoint if this expression evaluates to true." }
+                    { "name": "condition", "type": "string", "optional": true, "description": "Expression to use as a breakpoint condition. When specified, debugger will only stop on the breakpoint if this expression evaluates to true." },
+                    { "name": "isAntibreakpoint", "type": "boolean", "optional": true, "hidden": true, "description": "Creates pseudo-breakpoint that prevents debugger from pausing on exception at this location." }
                 ],
                 "returns": [
                     { "name": "breakpointId", "$ref": "BreakpointId", "description": "Id of the created breakpoint for further reference." },
@@ -2857,7 +2859,8 @@
             {
                 "name": "continueToLocation",
                 "parameters": [
-                    { "name": "location", "$ref": "Location", "description": "Location to continue to." }
+                    { "name": "location", "$ref": "Location", "description": "Location to continue to." },
+                    { "name": "interstatementLocation", "type": "boolean", "optional": true, "hidden": true, "description": "Allows breakpoints at the intemediate positions inside statements." }
                 ],
                 "description": "Continues execution until specific location is reached."
             },
@@ -3465,14 +3468,6 @@
                 "description": "Unique resource identifier."
             },
             {
-                "id": "ResourceInfo",
-                "type": "object",
-                "properties": [
-                    { "name": "id", "$ref": "ResourceId" },
-                    { "name": "description", "type": "string" }
-                ]
-            },
-            {
                 "id": "ResourceState",
                 "type": "object",
                 "properties": [
@@ -3519,6 +3514,7 @@
                 "properties": [
                     { "name": "id", "$ref": "TraceLogId" },
                     { "name": "calls", "type": "array", "items": { "$ref": "Call" } },
+                    { "name": "contexts", "type": "array", "items": { "$ref": "CallArgument" } },
                     { "name": "startOffset", "type": "integer" },
                     { "name": "alive", "type": "boolean" },
                     { "name": "totalAvailableCalls", "type": "number" }
@@ -3592,15 +3588,6 @@
                 ],
                 "returns": [
                     { "name": "resourceState", "$ref": "ResourceState" }
-                ]
-            },
-            {
-                "name": "getResourceInfo",
-                "parameters": [
-                    { "name": "resourceId", "$ref": "ResourceId" }
-                ],
-                "returns": [
-                    { "name": "resourceInfo", "$ref": "ResourceInfo" }
                 ]
             },
             {

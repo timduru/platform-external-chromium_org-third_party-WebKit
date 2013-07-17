@@ -32,10 +32,11 @@
 
 #include "core/dom/IconURL.h"
 #include "core/loader/FrameLoaderTypes.h"
+#include "core/loader/NavigationPolicy.h"
 #include "core/page/LayoutMilestones.h"
 #include "core/platform/network/ResourceLoadPriority.h"
-#include <wtf/Forward.h>
-#include <wtf/Vector.h>
+#include "wtf/Forward.h"
+#include "wtf/Vector.h"
 
 typedef class _jobject* jobject;
 
@@ -68,7 +69,6 @@ namespace WebCore {
     class IntSize;
     class KURL;
     class MessageEvent;
-    class NavigationAction;
     class Page;
     class PluginView;
     class ResourceError;
@@ -93,6 +93,7 @@ namespace WebCore {
 
         virtual void detachedFromParent() = 0;
 
+        virtual void dispatchWillRequestAfterPreconnect(ResourceRequest&) { }
         virtual void dispatchWillSendRequest(DocumentLoader*, unsigned long identifier, ResourceRequest&, const ResourceResponse& redirectResponse) = 0;
         virtual void dispatchDidReceiveResponse(DocumentLoader*, unsigned long identifier, const ResourceResponse&) = 0;
         virtual void dispatchDidFinishLoading(DocumentLoader*, unsigned long identifier) = 0;
@@ -101,8 +102,7 @@ namespace WebCore {
 
         virtual void dispatchDidHandleOnloadEvents() = 0;
         virtual void dispatchDidReceiveServerRedirectForProvisionalLoad() = 0;
-        virtual void dispatchDidCancelClientRedirect() = 0;
-        virtual void dispatchWillPerformClientRedirect(const KURL&, double interval, double fireDate) = 0;
+        virtual void dispatchDidCompleteClientRedirect(const KURL&) { }
         virtual void dispatchDidNavigateWithinPage() { }
         virtual void dispatchDidChangeLocationWithinPage() = 0;
         virtual void dispatchWillClose() = 0;
@@ -117,7 +117,7 @@ namespace WebCore {
 
         virtual void dispatchDidLayout(LayoutMilestones) { }
 
-        virtual PolicyAction decidePolicyForNavigationAction(const NavigationAction&, const ResourceRequest&) = 0;
+        virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, NavigationType, NavigationPolicy, bool isRedirect) = 0;
 
         virtual void dispatchUnableToImplementPolicy(const ResourceError&) = 0;
 
@@ -131,7 +131,7 @@ namespace WebCore {
         virtual void postProgressEstimateChangedNotification() = 0;
         virtual void postProgressFinishedNotification() = 0;
 
-        virtual void startDownload(const ResourceRequest&, const String& suggestedName = String()) = 0;
+        virtual void loadURLExternally(const ResourceRequest&, NavigationPolicy, const String& suggestedName = String()) = 0;
 
         virtual void didReceiveDocumentData(const char*, int) = 0;
 

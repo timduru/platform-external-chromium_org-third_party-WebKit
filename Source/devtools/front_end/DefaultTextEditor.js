@@ -110,6 +110,10 @@ WebInspector.DefaultTextEditor.EditInfo = function(range, text)
 }
 
 WebInspector.DefaultTextEditor.prototype = {
+    indent: function()
+    {
+        return WebInspector.settings.textEditorIndent.get();
+    },
 
     undo: function()
     {
@@ -533,6 +537,15 @@ WebInspector.DefaultTextEditor.prototype = {
     scrollToLine: function(lineNumber)
     {
         this._mainPanel.scrollToLine(lineNumber);
+    },
+
+    /**
+     * @return {number}
+     */
+    firstVisibleLine: function()
+    {
+        var visibleFrom = this._mainPanel.scrollTop();
+        return this._mainPanel.lineNumberAtOffset(visibleFrom);
     },
 
     /**
@@ -1429,7 +1442,7 @@ WebInspector.TextEditorMainPanel.prototype = {
                 return 0;
             return value - object.startColumn;
         }
-        var index = binarySearch(column, highlight.ranges, compare);
+        var index = highlight.ranges.binaryIndexOf(column, compare);
         if (index >= 0) {
             var range = highlight.ranges[index];
             return {

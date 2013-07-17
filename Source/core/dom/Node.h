@@ -37,9 +37,9 @@
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "weborigin/KURLHash.h"
-#include <wtf/Forward.h>
-#include <wtf/ListHashSet.h>
-#include <wtf/text/AtomicString.h>
+#include "wtf/Forward.h"
+#include "wtf/ListHashSet.h"
+#include "wtf/text/AtomicString.h"
 
 // This needs to be here because Document.h also depends on it.
 #define DUMP_NODE_STATISTICS 0
@@ -85,15 +85,19 @@ class TouchEvent;
 
 typedef int ExceptionCode;
 
-const int nodeStyleChangeShift = 15;
+const int nodeStyleChangeShift = 14;
 
 enum StyleChangeType {
     NoStyleChange = 0,
-    InlineStyleChange = 1 << nodeStyleChangeShift,
-    FullStyleChange = 2 << nodeStyleChangeShift,
+    LocalStyleChange = 1 << nodeStyleChangeShift,
+    SubtreeStyleChange = 2 << nodeStyleChangeShift,
+};
 
-    // FIXME: SyntheticStyleChange is deprecated, instead you should use setNeedsLayerUpdate().
-    SyntheticStyleChange = 3 << nodeStyleChangeShift,
+// If the style change is from the renderer then we'll call setStyle on the
+// renderer even if the style computed from CSS is identical.
+enum StyleChangeSource {
+    StyleChangeFromCSS,
+    StyleChangeFromRenderer
 };
 
 class NodeRareDataBase {
@@ -154,18 +158,12 @@ public:
         DOCUMENT_POSITION_IMPLEMENTATION_SPECIFIC = 0x20,
     };
 
-#if ENABLE(PARTITION_ALLOC)
     // All Nodes are placed in their own heap partition for security.
     // See http://crbug.com/246860 for detail.
     void* operator new(size_t);
     void operator delete(void*);
-#endif
 
     static bool isSupported(const String& feature, const String& version);
-
-    static void startIgnoringLeaks();
-    static void stopIgnoringLeaks();
-
     static void dumpStatistics();
 
     enum StyleChange { NoChange, NoInherit, Inherit, Detach, Force };    
@@ -180,7 +178,7 @@ public:
     bool hasLocalName(const AtomicString&) const;
     virtual String nodeName() const = 0;
     virtual String nodeValue() const;
-    virtual void setNodeValue(const String&, ExceptionCode&);
+    virtual void setNodeValue(const String&);
     virtual NodeType nodeType() const = 0;
     ContainerNode* parentNode() const;
     Element* parentElement() const;
@@ -203,19 +201,17 @@ public:
     Node* pseudoAwareLastChild() const;
 
     virtual KURL baseURI() const;
-    
-    void getSubresourceURLs(ListHashSet<KURL>&) const;
 
     // These should all actually return a node, but this is only important for language bindings,
     // which will already know and hold a ref on the right node to return. Returning bool allows
     // these methods to be more efficient since they don't need to return a ref
-    bool insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode&, AttachBehavior = AttachNow);
-    bool replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode&, AttachBehavior = AttachNow);
-    bool removeChild(Node* child, ExceptionCode&);
-    bool appendChild(PassRefPtr<Node> newChild, ExceptionCode&, AttachBehavior = AttachNow);
+    void insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode&, AttachBehavior = AttachNow);
+    void replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode&, AttachBehavior = AttachNow);
+    void removeChild(Node* child, ExceptionCode&);
+    void appendChild(PassRefPtr<Node> newChild, ExceptionCode&, AttachBehavior = AttachNow);
 
     bool hasChildNodes() const { return firstChild(); }
-    virtual PassRefPtr<Node> cloneNode(bool deep) = 0;
+    virtual PassRefPtr<Node> cloneNode(bool deep = true) = 0;
     virtual const AtomicString& localName() const;
     virtual const AtomicString& namespaceURI() const;
     virtual const AtomicString& prefix() const;
@@ -250,15 +246,26 @@ public:
 
     bool isCustomElement() const { return getFlag(IsCustomElement); }
     void setIsCustomElement();
+    bool isUpgradedCustomElement() const { return getFlag(IsUpgradedCustomElement); }
+    void setIsUpgradedCustomElement();
 
     virtual bool isMediaControlElement() const { return false; }
     virtual bool isMediaControls() const { return false; }
     virtual bool isWebVTTElement() const { return false; }
-    bool isStyledElement() const { return getFlag(IsStyledElementFlag); }
     virtual bool isAttributeNode() const { return false; }
     virtual bool isCharacterDataNode() const { return false; }
     virtual bool isFrameOwnerElement() const { return false; }
     virtual bool isPluginElement() const { return false; }
+
+    // StyledElements allow inline style (style="border: 1px"), presentational attributes (ex. color),
+    // class names (ex. class="foo bar") and other non-basic styling features. They and also control
+    // if this element can participate in style sharing.
+    //
+    // FIXME: The only things that ever go through StyleResolver that aren't StyledElements are
+    // PseudoElements and WebVTTElements. It's possible we can just eliminate all the checks
+    // since those elements will never have class names, inline style, or other things that
+    // this apparently guards against.
+    bool isStyledElement() const { return isHTMLElement() || isSVGElement(); }
 
     bool isDocumentNode() const;
     bool isTreeScope() const { return treeScope()->rootNode() == this; }
@@ -373,15 +380,14 @@ public:
     void setChildNeedsStyleRecalc() { setFlag(ChildNeedsStyleRecalcFlag); }
     void clearChildNeedsStyleRecalc() { clearFlag(ChildNeedsStyleRecalcFlag); }
 
-    void setNeedsStyleRecalc(StyleChangeType changeType = FullStyleChange);
+    void setNeedsStyleRecalc(StyleChangeType = SubtreeStyleChange, StyleChangeSource = StyleChangeFromCSS);
     void clearNeedsStyleRecalc()
     {
         m_nodeFlags &= ~StyleChangeMask;
-        clearFlag(NeedsLayerUpdate);
+        clearFlag(NotifyRendererWithIdenticalStyles);
     }
 
-    void setNeedsLayerUpdate();
-    bool needsLayerUpdate() const { return getFlag(NeedsLayerUpdate); }
+    bool shouldNotifyRendererWithIdenticalStyles() const { return getFlag(NotifyRendererWithIdenticalStyles); }
 
     void setIsLink(bool f) { setFlag(f, IsLinkFlag); }
     void setIsLink() { setFlag(IsLinkFlag); }
@@ -560,7 +566,7 @@ public:
     void reattach(const AttachContext& = AttachContext());
     void lazyReattachIfAttached();
     ContainerNode* parentNodeForRenderingAndStyle();
-    
+
     // Wrapper for nodes that don't have a renderer, but still cache the style (like HTMLOptionElement).
     RenderStyle* renderStyle() const;
 
@@ -711,39 +717,40 @@ private:
         IsTextFlag = 1,
         IsContainerFlag = 1 << 1,
         IsElementFlag = 1 << 2,
-        IsStyledElementFlag = 1 << 3,
-        IsHTMLFlag = 1 << 4,
-        IsSVGFlag = 1 << 5,
-        IsAttachedFlag = 1 << 6,
-        ChildNeedsStyleRecalcFlag = 1 << 7,
-        InDocumentFlag = 1 << 8,
-        IsLinkFlag = 1 << 9,
-        IsUserActionElement = 1 << 10,
-        HasRareDataFlag = 1 << 11,
-        IsDocumentFragmentFlag = 1 << 12,
+        IsHTMLFlag = 1 << 3,
+        IsSVGFlag = 1 << 4,
+        IsAttachedFlag = 1 << 5,
+        ChildNeedsStyleRecalcFlag = 1 << 6,
+        InDocumentFlag = 1 << 7,
+        IsLinkFlag = 1 << 8,
+        IsUserActionElement = 1 << 9,
+        HasRareDataFlag = 1 << 10,
+        IsDocumentFragmentFlag = 1 << 11,
 
         // These bits are used by derived classes, pulled up here so they can
         // be stored in the same memory word as the Node bits above.
-        IsParsingChildrenFinishedFlag = 1 << 13, // Element
-        HasSVGRareDataFlag = 1 << 14, // SVGElement
+        IsParsingChildrenFinishedFlag = 1 << 12, // Element
+        HasSVGRareDataFlag = 1 << 13, // SVGElement
 
         StyleChangeMask = 1 << nodeStyleChangeShift | 1 << (nodeStyleChangeShift + 1),
 
-        SelfOrAncestorHasDirAutoFlag = 1 << 17,
+        SelfOrAncestorHasDirAutoFlag = 1 << 16,
 
-        HasNameOrIsEditingTextFlag = 1 << 18,
+        HasNameOrIsEditingTextFlag = 1 << 17,
 
-        InNamedFlowFlag = 1 << 19,
-        HasSyntheticAttrChildNodesFlag = 1 << 20,
-        HasCustomStyleCallbacksFlag = 1 << 21,
-        HasScopedHTMLStyleChildFlag = 1 << 22,
-        HasEventTargetDataFlag = 1 << 23,
-        V8CollectableDuringMinorGCFlag = 1 << 24,
-        IsInsertionPointFlag = 1 << 25,
-        IsInShadowTreeFlag = 1 << 26,
-        IsCustomElement = 1 << 27,
+        InNamedFlowFlag = 1 << 18,
+        HasSyntheticAttrChildNodesFlag = 1 << 19,
+        HasCustomStyleCallbacksFlag = 1 << 20,
+        HasScopedHTMLStyleChildFlag = 1 << 21,
+        HasEventTargetDataFlag = 1 << 22,
+        V8CollectableDuringMinorGCFlag = 1 << 23,
+        IsInsertionPointFlag = 1 << 24,
+        IsInShadowTreeFlag = 1 << 25,
+        IsCustomElement = 1 << 26,
 
-        NeedsLayerUpdate = 1 << 28,
+        NotifyRendererWithIdenticalStyles = 1 << 27,
+
+        IsUpgradedCustomElement = 1 << 28,
 
         DefaultNodeFlags = IsParsingChildrenFinishedFlag
     };
@@ -764,9 +771,8 @@ protected:
         CreatePseudoElement =  CreateElement | InDocumentFlag,
         CreateShadowRoot = CreateContainer | IsDocumentFragmentFlag | IsInShadowTreeFlag,
         CreateDocumentFragment = CreateContainer | IsDocumentFragmentFlag,
-        CreateStyledElement = CreateElement | IsStyledElementFlag, 
-        CreateHTMLElement = CreateStyledElement | IsHTMLFlag,
-        CreateSVGElement = CreateStyledElement | IsSVGFlag,
+        CreateHTMLElement = CreateElement | IsHTMLFlag,
+        CreateSVGElement = CreateElement | IsSVGFlag,
         CreateDocument = CreateContainer | InDocumentFlag,
         CreateInsertionPoint = CreateHTMLElement | IsInsertionPointFlag,
         CreateEditingText = CreateText | HasNameOrIsEditingTextFlag,
@@ -904,16 +910,6 @@ inline ContainerNode* Node::parentNodeGuaranteedHostFree() const
 {
     ASSERT(!isShadowRoot());
     return parentOrShadowHostNode();
-}
-
-inline void Node::reattach(const AttachContext& context)
-{
-    AttachContext reattachContext(context);
-    reattachContext.performingReattach = true;
-
-    if (attached())
-        detach(reattachContext);
-    attach(reattachContext);
 }
 
 inline void Node::lazyReattachIfAttached()

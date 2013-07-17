@@ -53,10 +53,16 @@
 #include "core/dom/MessageEvent.h"
 #include "core/dom/PageTransitionEvent.h"
 #include "core/dom/RequestAnimationFrameCallback.h"
+#include "core/dom/ScriptExecutionContext.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/editing/Editor.h"
 #include "core/history/BackForwardController.h"
+#include "core/html/HTMLCanvasElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
+#include "core/html/HTMLImageElement.h"
+#include "core/html/HTMLVideoElement.h"
+#include "core/html/ImageData.h"
+#include "core/html/canvas/CanvasRenderingContext2D.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/ScriptCallStack.h"
 #include "core/loader/DocumentLoader.h"
@@ -68,6 +74,7 @@
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/Console.h"
+#include "core/page/CreateWindow.h"
 #include "core/page/DOMPoint.h"
 #include "core/page/DOMTimer.h"
 #include "core/page/EventHandler.h"
@@ -75,6 +82,8 @@
 #include "core/page/FrameTree.h"
 #include "core/page/FrameView.h"
 #include "core/page/History.h"
+#include "core/page/ImageBitmap.h"
+#include "core/page/ImageBitmapCallback.h"
 #include "core/page/Location.h"
 #include "core/page/Navigator.h"
 #include "core/page/Page.h"
@@ -89,6 +98,7 @@
 #include "core/platform/PlatformScreen.h"
 #include "core/platform/SuddenTermination.h"
 #include "core/platform/graphics/FloatRect.h"
+#include "core/platform/graphics/MediaPlayer.h"
 #include "core/storage/Storage.h"
 #include "core/storage/StorageArea.h"
 #include "core/storage/StorageNamespace.h"
@@ -640,13 +650,13 @@ Storage* DOMWindow::sessionStorage(ExceptionCode& ec) const
         return 0;
 
     if (!document->securityOrigin()->canAccessLocalStorage(document->topOrigin())) {
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return 0;
     }
 
     if (m_sessionStorage) {
         if (!m_sessionStorage->area()->canAccessStorage(m_frame)) {
-            ec = SECURITY_ERR;
+            ec = SecurityError;
             return 0;
         }
         return m_sessionStorage.get();
@@ -658,7 +668,7 @@ Storage* DOMWindow::sessionStorage(ExceptionCode& ec) const
 
     OwnPtr<StorageArea> storageArea = page->sessionStorage()->storageArea(document->securityOrigin());
     if (!storageArea->canAccessStorage(m_frame)) {
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return 0;
     }
 
@@ -676,13 +686,13 @@ Storage* DOMWindow::localStorage(ExceptionCode& ec) const
         return 0;
 
     if (!document->securityOrigin()->canAccessLocalStorage(document->topOrigin())) {
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return 0;
     }
 
     if (m_localStorage) {
         if (!m_localStorage->area()->canAccessStorage(m_frame)) {
-            ec = SECURITY_ERR;
+            ec = SecurityError;
             return 0;
         }
         return m_localStorage.get();
@@ -697,7 +707,7 @@ Storage* DOMWindow::localStorage(ExceptionCode& ec) const
 
     OwnPtr<StorageArea> storageArea = StorageNamespace::localStorageArea(document->securityOrigin());
     if (!storageArea->canAccessStorage(m_frame)) {
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return 0;
     }
 
@@ -713,7 +723,7 @@ void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const Mes
     Document* sourceDocument = source->document();
 
     // Compute the target origin.  We need to do this synchronously in order
-    // to generate the SYNTAX_ERR exception correctly.
+    // to generate the SyntaxError exception correctly.
     RefPtr<SecurityOrigin> target;
     if (targetOrigin == "/") {
         if (!sourceDocument)
@@ -724,7 +734,7 @@ void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const Mes
         // It doesn't make sense target a postMessage at a unique origin
         // because there's no way to represent a unique origin in a string.
         if (target->isUnique()) {
-            ec = SYNTAX_ERR;
+            ec = SyntaxError;
             return;
         }
     }
@@ -942,7 +952,7 @@ String DOMWindow::btoa(const String& stringToEncode, ExceptionCode& ec)
         return String();
 
     if (!stringToEncode.containsOnlyLatin1()) {
-        ec = INVALID_CHARACTER_ERR;
+        ec = InvalidCharacterError;
         return String();
     }
 
@@ -955,13 +965,13 @@ String DOMWindow::atob(const String& encodedString, ExceptionCode& ec)
         return String();
 
     if (!encodedString.containsOnlyLatin1()) {
-        ec = INVALID_CHARACTER_ERR;
+        ec = InvalidCharacterError;
         return String();
     }
 
     Vector<char> out;
     if (!base64Decode(encodedString, out, Base64FailOnInvalidCharacter)) {
-        ec = INVALID_CHARACTER_ERR;
+        ec = InvalidCharacterError;
         return String();
     }
 
@@ -1015,6 +1025,10 @@ int DOMWindow::innerHeight() const
     if (!view)
         return 0;
 
+    // FIXME: This is potentially too much work. We really only need to know the dimensions of the parent frame's renderer.
+    if (Frame* parent = m_frame->tree()->parent())
+        parent->document()->updateLayoutIgnorePendingStylesheets();
+
     // If the device height is overridden, do not include the horizontal scrollbar into the innerHeight (since it is absent on the real device).
     bool includeScrollbars = !InspectorInstrumentation::shouldApplyScreenHeightOverride(m_frame);
     return view->mapFromLayoutToCSSUnits(static_cast<int>(view->visibleContentRect(includeScrollbars ? ScrollableArea::IncludeScrollbars : ScrollableArea::ExcludeScrollbars).height()));
@@ -1028,6 +1042,10 @@ int DOMWindow::innerWidth() const
     FrameView* view = m_frame->view();
     if (!view)
         return 0;
+
+    // FIXME: This is potentially too much work. We really only need to know the dimensions of the parent frame's renderer.
+    if (Frame* parent = m_frame->tree()->parent())
+        parent->document()->updateLayoutIgnorePendingStylesheets();
 
     // If the device width is overridden, do not include the vertical scrollbar into the innerWidth (since it is absent on the real device).
     bool includeScrollbars = !InspectorInstrumentation::shouldApplyScreenWidthOverride(m_frame);
@@ -1395,6 +1413,192 @@ void DOMWindow::clearInterval(int timeoutId)
     DOMTimer::removeById(context, timeoutId);
 }
 
+static LayoutSize size(HTMLImageElement* image)
+{
+    if (CachedImage* cachedImage = image->cachedImage())
+        return cachedImage->imageSizeForRenderer(image->renderer(), 1.0f); // FIXME: Not sure about this.
+    return IntSize();
+}
+
+static IntSize size(HTMLVideoElement* video)
+{
+    if (MediaPlayer* player = video->player())
+        return player->naturalSize();
+    return IntSize();
+}
+
+void DOMWindow::createImageBitmap(HTMLImageElement* image, PassRefPtr<ImageBitmapCallback> callback, ExceptionCode& ec)
+{
+    LayoutSize s = size(image);
+    createImageBitmap(image, callback, 0, 0, s.width(), s.height(), ec);
+}
+
+void DOMWindow::createImageBitmap(HTMLImageElement* image, PassRefPtr<ImageBitmapCallback> callback, int sx, int sy, int sw, int sh, ExceptionCode& ec)
+{
+    if (!image) {
+        ec = TypeError;
+        return;
+    }
+    if (!image->cachedImage()) {
+        ec = InvalidStateError;
+        return;
+    }
+    if (image->cachedImage()->image()->isSVGImage()) {
+        ec = InvalidStateError;
+        return;
+    }
+    if (!sw || !sh) {
+        ec = IndexSizeError;
+        return;
+    }
+    if (!image->cachedImage()->image()->hasSingleSecurityOrigin()) {
+        ec = SecurityError;
+        return;
+    }
+    if (!image->cachedImage()->passesAccessControlCheck(document()->securityOrigin()) && document()->securityOrigin()->taintsCanvas(image->src())) {
+        ec = SecurityError;
+        return;
+    }
+
+    ec = 0;
+
+    // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
+    RefPtr<ImageBitmap> imageBitmap = ImageBitmap::create(image, IntRect(sx, sy, sw, sh));
+    RefPtr<ImageBitmapCallback> callbackLocal = callback;
+    scriptExecutionContext()->postTask(ImageBitmapCallback::CallbackTask::create(imageBitmap.release(), callbackLocal));
+}
+
+void DOMWindow::createImageBitmap(HTMLVideoElement* video, PassRefPtr<ImageBitmapCallback> callback, ExceptionCode& ec)
+{
+    IntSize s = size(video);
+    createImageBitmap(video, callback, 0, 0, s.width(), s.height(), ec);
+}
+
+void DOMWindow::createImageBitmap(HTMLVideoElement* video, PassRefPtr<ImageBitmapCallback> callback, int sx, int sy, int sw, int sh, ExceptionCode& ec)
+{
+    if (!video) {
+        ec = TypeError;
+        return;
+    }
+    if (!video->player()) {
+        ec = InvalidStateError;
+        return;
+    }
+    if (video->networkState() == HTMLMediaElement::NETWORK_EMPTY) {
+        ec = InvalidStateError;
+        return;
+    }
+    if (video->player()->readyState() <= MediaPlayer::HaveMetadata) {
+        ec = InvalidStateError;
+        return;
+    }
+    if (!sw || !sh) {
+        ec = IndexSizeError;
+        return;
+    }
+    if (!video->hasSingleSecurityOrigin()) {
+        ec = SecurityError;
+        return;
+    }
+    if (!video->player()->didPassCORSAccessCheck() && document()->securityOrigin()->taintsCanvas(video->currentSrc())) {
+        ec = SecurityError;
+        return;
+    }
+
+    ec = 0;
+
+    // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
+    RefPtr<ImageBitmap> imageBitmap = ImageBitmap::create(video, IntRect(sx, sy, sw, sh));
+    RefPtr<ImageBitmapCallback> callbackLocal = callback;
+    scriptExecutionContext()->postTask(ImageBitmapCallback::CallbackTask::create(imageBitmap.release(), callbackLocal));
+}
+
+void DOMWindow::createImageBitmap(CanvasRenderingContext2D* context, PassRefPtr<ImageBitmapCallback> callback, ExceptionCode& ec)
+{
+    createImageBitmap(context->canvas(), callback, ec);
+}
+
+void DOMWindow::createImageBitmap(CanvasRenderingContext2D* context, PassRefPtr<ImageBitmapCallback> callback, int sx, int sy, int sw, int sh, ExceptionCode& ec)
+{
+    createImageBitmap(context->canvas(), callback, sx, sy, sw, sh, ec);
+}
+
+void DOMWindow::createImageBitmap(HTMLCanvasElement* canvas, PassRefPtr<ImageBitmapCallback> callback, ExceptionCode& ec)
+{
+    createImageBitmap(canvas, callback, 0, 0, canvas->width(), canvas->height(), ec);
+}
+
+void DOMWindow::createImageBitmap(HTMLCanvasElement* canvas, PassRefPtr<ImageBitmapCallback> callback, int sx, int sy, int sw, int sh, ExceptionCode& ec)
+{
+    if (!canvas) {
+        ec = TypeError;
+        return;
+    }
+    if (!canvas->originClean()) {
+        ec = InvalidStateError;
+        return;
+    }
+    if (!sw || !sh) {
+        ec = IndexSizeError;
+        return;
+    }
+
+    ec = 0;
+
+    // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
+    RefPtr<ImageBitmap> imageBitmap = ImageBitmap::create(canvas, IntRect(sx, sy, sw, sh));
+    RefPtr<ImageBitmapCallback> callbackLocal = callback;
+    scriptExecutionContext()->postTask(ImageBitmapCallback::CallbackTask::create(imageBitmap.release(), callbackLocal));
+}
+
+void DOMWindow::createImageBitmap(ImageData* data, PassRefPtr<ImageBitmapCallback> callback, ExceptionCode& ec)
+{
+    createImageBitmap(data, callback, 0, 0, data->width(), data->height(), ec);
+}
+
+void DOMWindow::createImageBitmap(ImageData* data, PassRefPtr<ImageBitmapCallback> callback, int sx, int sy, int sw, int sh, ExceptionCode& ec)
+{
+    if (!data) {
+        ec = TypeError;
+        return;
+    }
+    if (!sw || !sh) {
+        ec = IndexSizeError;
+        return;
+    }
+
+    ec = 0;
+
+    // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
+    RefPtr<ImageBitmap> imageBitmap = ImageBitmap::create(data, IntRect(sx, sy, sw, sh));
+    RefPtr<ImageBitmapCallback> callbackLocal = callback;
+    scriptExecutionContext()->postTask(ImageBitmapCallback::CallbackTask::create(imageBitmap.release(), callbackLocal));
+}
+
+void DOMWindow::createImageBitmap(ImageBitmap* bitmap, PassRefPtr<ImageBitmapCallback> callback, ExceptionCode& ec)
+{
+    createImageBitmap(bitmap, callback, 0, 0, bitmap->width(), bitmap->height(), ec);
+}
+
+void DOMWindow::createImageBitmap(ImageBitmap* bitmap, PassRefPtr<ImageBitmapCallback> callback, int sx, int sy, int sw, int sh, ExceptionCode& ec)
+{
+    if (!bitmap) {
+        ec = TypeError;
+        return;
+    }
+    if (!sw || !sh) {
+        ec = IndexSizeError;
+        return;
+    }
+
+    ec = 0;
+
+    // FIXME: make ImageBitmap creation asynchronous crbug.com/258082
+    RefPtr<ImageBitmap> imageBitmap = ImageBitmap::create(bitmap, IntRect(sx, sy, sw, sh));
+    RefPtr<ImageBitmapCallback> callbackLocal = callback;
+    scriptExecutionContext()->postTask(ImageBitmapCallback::CallbackTask::create(imageBitmap.release(), callbackLocal));
+}
+
 int DOMWindow::requestAnimationFrame(PassRefPtr<RequestAnimationFrameCallback> callback)
 {
     callback->m_useLegacyTimeBase = false;
@@ -1667,49 +1871,6 @@ bool DOMWindow::isInsecureScriptAccess(DOMWindow* activeWindow, const String& ur
 
     printErrorMessage(crossDomainAccessErrorMessage(activeWindow));
     return true;
-}
-
-Frame* DOMWindow::createWindow(const String& urlString, const AtomicString& frameName, const WindowFeatures& windowFeatures,
-    DOMWindow* activeWindow, Frame* firstFrame, Frame* openerFrame, PrepareDialogFunction function, void* functionContext)
-{
-    Frame* activeFrame = activeWindow->frame();
-
-    KURL completedURL = urlString.isEmpty() ? KURL(ParsedURLString, emptyString()) : firstFrame->document()->completeURL(urlString);
-    if (!completedURL.isEmpty() && !completedURL.isValid()) {
-        // Don't expose client code to invalid URLs.
-        activeWindow->printErrorMessage("Unable to open a window with invalid URL '" + completedURL.string() + "'.\n");
-        return 0;
-    }
-
-    // For whatever reason, Firefox uses the first frame to determine the outgoingReferrer. We replicate that behavior here.
-    String referrer = SecurityPolicy::generateReferrerHeader(firstFrame->document()->referrerPolicy(), completedURL, firstFrame->loader()->outgoingReferrer());
-
-    ResourceRequest request(completedURL, referrer);
-    FrameLoader::addHTTPOriginIfNeeded(request, firstFrame->loader()->outgoingOrigin());
-    FrameLoadRequest frameRequest(activeWindow->document()->securityOrigin(), request, frameName);
-
-    // We pass the opener frame for the lookupFrame in case the active frame is different from
-    // the opener frame, and the name references a frame relative to the opener frame.
-    bool created;
-    Frame* newFrame = WebCore::createWindow(activeFrame, openerFrame, frameRequest, windowFeatures, created);
-    if (!newFrame)
-        return 0;
-
-    newFrame->loader()->setOpener(openerFrame);
-    newFrame->page()->setOpenedByDOM();
-
-    if (newFrame->document()->domWindow()->isInsecureScriptAccess(activeWindow, completedURL))
-        return newFrame;
-
-    if (function)
-        function(newFrame->document()->domWindow(), functionContext);
-
-    if (created)
-        newFrame->loader()->changeLocation(activeWindow->document()->securityOrigin(), completedURL, referrer, false);
-    else if (!urlString.isEmpty())
-        newFrame->navigationScheduler()->scheduleLocationChange(activeWindow->document()->securityOrigin(), completedURL.string(), referrer, false);
-
-    return newFrame;
 }
 
 PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicString& frameName, const String& windowFeaturesString,

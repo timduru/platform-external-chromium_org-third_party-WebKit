@@ -31,40 +31,39 @@ namespace WebCore {
     // Some of these are considered historical since they have been
     // changed or removed from the specifications.
     enum {
-        // FIXME: Rename these to use CamelCase matching the exception name.
-        INDEX_SIZE_ERR = 1,
-        HIERARCHY_REQUEST_ERR,
-        WRONG_DOCUMENT_ERR,
-        INVALID_CHARACTER_ERR,
-        NO_MODIFICATION_ALLOWED_ERR,
-        NOT_FOUND_ERR,
-        NOT_SUPPORTED_ERR,
-        INUSE_ATTRIBUTE_ERR, // Historical. Only used in setAttributeNode etc which have been removed from the DOM specs.
+        IndexSizeError = 1,
+        HierarchyRequestError,
+        WrongDocumentError,
+        InvalidCharacterError,
+        NoModificationAllowedError,
+        NotFoundError,
+        NotSupportedError,
+        InUseAttributeError, // Historical. Only used in setAttributeNode etc which have been removed from the DOM specs.
 
+        // FIXME: Rename these to use CamelCase matching the exception name.
         // Introduced in DOM Level 2:
-        INVALID_STATE_ERR,
-        SYNTAX_ERR,
-        INVALID_MODIFICATION_ERR,
-        NAMESPACE_ERR,
-        INVALID_ACCESS_ERR,
+        InvalidStateError,
+        SyntaxError,
+        InvalidModificationError,
+        NamespaceError,
+        InvalidAccessError,
 
         // Introduced in DOM Level 3:
-        TYPE_MISMATCH_ERR, // Historical; use TypeError instead
+        TypeMismatchError, // Historical; use TypeError instead
 
         // XMLHttpRequest extension:
-        SECURITY_ERR,
+        SecurityError,
 
         // Others introduced in HTML5:
-        NETWORK_ERR,
-        ABORT_ERR,
-        URL_MISMATCH_ERR,
-        QUOTA_EXCEEDED_ERR,
-        TIMEOUT_ERR,
-        INVALID_NODE_TYPE_ERR,
-        DATA_CLONE_ERR,
+        NetworkError,
+        AbortError,
+        URLMismatchError,
+        QuotaExceededError,
+        TimeoutError,
+        InvalidNodeTypeError,
+        DataCloneError,
 
         // These are IDB-specific.
-        IDBNotFoundError,
         UnknownError,
         ConstraintError,
         DataError,
@@ -78,25 +77,16 @@ namespace WebCore {
         FSSecurityError,
         FSAbortError,
         FSNotReadableError,
-        FSEncodingError,
+        EncodingError,
         FSNoModificationAllowedError,
         FSInvalidStateError,
         FSSyntaxError,
-        FSInvalidModificationError,
         FSQuotaExceededError,
         FSTypeMismatchError,
-        FSPathExistsError,
+        PathExistsError,
 
         // SQL
-        // FIXME: Consolidate these once https://crbug.com/252233 is fixed.
-        SQLUnknownError,
-        SQLDatabaseError,
-        SQLVersionError,
-        SQLTooLargeError,
-        SQLQuotaExceededError,
-        SQLSyntaxError,
-        SQLConstraintError,
-        SQLTimeoutError,
+        SQLDatabaseError, // Naming conflict with DatabaseError class.
 
         // WebIDL exception types, handled by the binding layer.
         // FIXME: Add GeneralError, EvalError, etc. when implemented in the bindings.

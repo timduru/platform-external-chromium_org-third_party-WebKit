@@ -108,7 +108,7 @@ ShadowRoot* ShadowRoot::bindingsOlderShadowRoot() const
 
 PassRefPtr<Node> ShadowRoot::cloneNode(bool, ExceptionCode& ec)
 {
-    ec = DATA_CLONE_ERR;
+    ec = DataCloneError;
     return 0;
 }
 
@@ -120,7 +120,7 @@ String ShadowRoot::innerHTML() const
 void ShadowRoot::setInnerHTML(const String& markup, ExceptionCode& ec)
 {
     if (isOrphan()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
@@ -158,17 +158,30 @@ void ShadowRoot::recalcStyle(StyleChange change)
         return;
     }
 
-    // When we're set to lazyAttach we'll have a FullStyleChange and we'll need
+    // When we're set to lazyAttach we'll have a SubtreeStyleChange and we'll need
     // to promote the change to a Force for all our descendants so they get a
     // recalc and will attach.
-    if (styleChangeType() == FullStyleChange)
+    if (styleChangeType() == SubtreeStyleChange)
         change = Force;
 
+    // FIXME: This doesn't handle :hover + div properly like Element::recalcStyle does.
+    bool forceReattachOfAnyWhitespaceSibling = false;
     for (Node* child = firstChild(); child; child = child->nextSibling()) {
-        if (child->isElementNode())
-            toElement(child)->recalcStyle(change);
-        else if (child->isTextNode())
-            toText(child)->recalcTextStyle(change);
+        bool didReattach = false;
+
+        if (child->renderer())
+            forceReattachOfAnyWhitespaceSibling = false;
+
+        if (child->isTextNode()) {
+            if (forceReattachOfAnyWhitespaceSibling && toText(child)->containsOnlyWhitespace())
+                child->reattach();
+            else
+                didReattach = toText(child)->recalcTextStyle(change);
+        } else if (child->isElementNode() && shouldRecalcStyle(change, child)) {
+            didReattach = toElement(child)->recalcStyle(change);
+        }
+
+        forceReattachOfAnyWhitespaceSibling = didReattach || forceReattachOfAnyWhitespaceSibling;
     }
 
     styleResolver->popParentShadowRoot(this);

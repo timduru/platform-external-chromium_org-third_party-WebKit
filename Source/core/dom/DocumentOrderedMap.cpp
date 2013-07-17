@@ -36,9 +36,10 @@
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/TreeScope.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
+#include "core/html/HTMLLabelElement.h"
 #include "core/html/HTMLMapElement.h"
-#include <wtf/MemoryInstrumentationHashCountedSet.h>
-#include <wtf/MemoryInstrumentationHashMap.h>
+#include "wtf/MemoryInstrumentationHashCountedSet.h"
+#include "wtf/MemoryInstrumentationHashMap.h"
 
 namespace WebCore {
 
@@ -51,17 +52,17 @@ inline bool keyMatchesId(AtomicStringImpl* key, Element* element)
 
 inline bool keyMatchesMapName(AtomicStringImpl* key, Element* element)
 {
-    return element->hasTagName(mapTag) && static_cast<HTMLMapElement*>(element)->getName().impl() == key;
+    return element->hasTagName(mapTag) && toHTMLMapElement(element)->getName().impl() == key;
 }
 
 inline bool keyMatchesLowercasedMapName(AtomicStringImpl* key, Element* element)
 {
-    return element->hasTagName(mapTag) && static_cast<HTMLMapElement*>(element)->getName().lower().impl() == key;
+    return element->hasTagName(mapTag) && toHTMLMapElement(element)->getName().lower().impl() == key;
 }
 
 inline bool keyMatchesLabelForAttribute(AtomicStringImpl* key, Element* element)
 {
-    return element->hasTagName(labelTag) && element->getAttribute(forAttr).impl() == key;
+    return isHTMLLabelElement(element) && element->getAttribute(forAttr).impl() == key;
 }
 
 void DocumentOrderedMap::clear()

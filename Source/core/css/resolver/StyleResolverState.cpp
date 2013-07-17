@@ -28,138 +28,73 @@
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/VisitedLinkState.h"
 #include "core/page/Page.h"
-#include "core/rendering/RenderTheme.h"
 
 namespace WebCore {
 
-void StyleResolverState::cacheBorderAndBackground()
+ElementResolveContext::ElementResolveContext(Element* element)
+    : m_element(element)
+    , m_elementLinkState(element ? element->document()->visitedLinkState()->determineLinkState(element) : NotInsideLink)
+    , m_distributedToInsertionPoint(false)
+    , m_resetStyleInheritance(false)
 {
-    m_hasUAAppearance = m_style->hasAppearance();
-    if (m_hasUAAppearance) {
-        m_borderData = m_style->border();
-        m_backgroundData = *m_style->backgroundLayers();
-        m_backgroundColor = m_style->backgroundColor();
-    }
+    NodeRenderingContext context(element);
+    m_parentNode = context.parentNodeForRenderingAndStyle();
+    m_distributedToInsertionPoint = context.insertionPoint();
+    m_resetStyleInheritance = context.resetStyleInheritance();
+
+    Node* documentElement = document()->documentElement();
+    RenderStyle* documentStyle = document()->renderStyle();
+    m_rootElementStyle = documentElement && element != documentElement ? documentElement->renderStyle() : documentStyle;
+}
+
+StyleResolveScope::StyleResolveScope(StyleResolverState* state, const Document* document, Element* e, RenderStyle* parentStyle, RenderRegion* regionForStyling)
+    : m_state(state)
+{
+    m_state->initForStyleResolve(document, e, parentStyle, regionForStyling);
+}
+
+StyleResolveScope::~StyleResolveScope()
+{
+    m_state->clear();
 }
 
 void StyleResolverState::clear()
 {
-    m_element = 0;
-    m_styledElement = 0;
+    m_elementContext = ElementResolveContext();
+    m_style = 0;
     m_parentStyle = 0;
-    m_parentNode = 0;
     m_regionForStyling = 0;
     m_elementStyleResources.clear();
 }
 
-void StyleResolverState::initElement(Element* element)
+void StyleResolverState::initForStyleResolve(const Document* newDocument, Element* newElement, RenderStyle* parentStyle, RenderRegion* regionForStyling)
 {
-    if (m_element == element)
-        return;
-
-    m_element = element;
-    m_styledElement = element && element->isStyledElement() ? element : 0;
-    m_elementLinkState = element ? element->document()->visitedLinkState()->determineLinkState(element) : NotInsideLink;
-
-    if (!element || element != element->document()->documentElement())
-        return;
-
-    element->document()->setDirectionSetOnDocumentElement(false);
-    element->document()->setWritingModeSetOnDocumentElement(false);
-}
-
-void StyleResolverState::initForStyleResolve(Document* document, Element* e, RenderStyle* parentStyle, RenderRegion* regionForStyling)
-{
-    initElement(e);
+    ASSERT(!element() || document() == newDocument);
+    if (newElement)
+        m_elementContext = ElementResolveContext(newElement);
+    else
+        m_elementContext = ElementResolveContext();
 
     m_regionForStyling = regionForStyling;
 
-    if (e) {
-        NodeRenderingContext context(e);
-        m_parentNode = context.parentNodeForRenderingAndStyle();
-        m_parentStyle = context.resetStyleInheritance() ? 0 :
-            parentStyle ? parentStyle :
-            m_parentNode ? m_parentNode->renderStyle() : 0;
-        m_distributedToInsertionPoint = context.insertionPoint();
-    } else {
-        m_parentNode = 0;
+    if (m_elementContext.resetStyleInheritance())
+        m_parentStyle = 0;
+    else if (parentStyle)
         m_parentStyle = parentStyle;
-        m_distributedToInsertionPoint = false;
-    }
-
-    Node* docElement = e ? e->document()->documentElement() : 0;
-    RenderStyle* docStyle = document->renderStyle();
-    m_rootElementStyle = docElement && e != docElement ? docElement->renderStyle() : docStyle;
+    else if (m_elementContext.parentNode())
+        m_parentStyle = m_elementContext.parentNode()->renderStyle();
+    else
+        m_parentStyle = 0;
 
     m_style = 0;
     m_elementStyleResources.clear();
     m_fontDirty = false;
 
-    if (Page* page = document->page())
+    // FIXME: StyleResolverState is never passed between documents
+    // so we should be able to do this initialization at StyleResolverState
+    // createion time instead of now, correct?
+    if (Page* page = newDocument->page())
         m_elementStyleResources.setDeviceScaleFactor(page->deviceScaleFactor());
-}
-
-
-static Color colorForCSSValue(CSSValueID cssValueId)
-{
-    struct ColorValue {
-        CSSValueID cssValueId;
-        RGBA32 color;
-    };
-
-    static const ColorValue colorValues[] = {
-        { CSSValueAqua, 0xFF00FFFF },
-        { CSSValueBlack, 0xFF000000 },
-        { CSSValueBlue, 0xFF0000FF },
-        { CSSValueFuchsia, 0xFFFF00FF },
-        { CSSValueGray, 0xFF808080 },
-        { CSSValueGreen, 0xFF008000  },
-        { CSSValueGrey, 0xFF808080 },
-        { CSSValueLime, 0xFF00FF00 },
-        { CSSValueMaroon, 0xFF800000 },
-        { CSSValueNavy, 0xFF000080 },
-        { CSSValueOlive, 0xFF808000  },
-        { CSSValueOrange, 0xFFFFA500 },
-        { CSSValuePurple, 0xFF800080 },
-        { CSSValueRed, 0xFFFF0000 },
-        { CSSValueSilver, 0xFFC0C0C0 },
-        { CSSValueTeal, 0xFF008080  },
-        { CSSValueTransparent, 0x00000000 },
-        { CSSValueWhite, 0xFFFFFFFF },
-        { CSSValueYellow, 0xFFFFFF00 },
-        { CSSValueInvalid, CSSValueInvalid }
-    };
-
-    for (const ColorValue* col = colorValues; col->cssValueId; ++col) {
-        if (col->cssValueId == cssValueId)
-            return col->color;
-    }
-    return RenderTheme::defaultTheme()->systemColor(cssValueId);
-}
-
-Color StyleResolverState::resolveColorFromPrimitiveValue(CSSPrimitiveValue* value, bool forVisitedLink)
-{
-    if (value->isRGBColor())
-        return Color(value->getRGBA32Value());
-
-    CSSValueID valueID = value->getValueID();
-    switch (valueID) {
-    case 0:
-        return Color();
-    case CSSValueWebkitText:
-        return document()->textColor();
-    case CSSValueWebkitLink:
-        return (element()->isLink() && forVisitedLink) ? document()->visitedLinkColor() : document()->linkColor();
-    case CSSValueWebkitActivelink:
-        return document()->activeLinkColor();
-    case CSSValueWebkitFocusRingColor:
-        return RenderTheme::focusRingColor();
-    case CSSValueCurrentcolor:
-        m_isMatchedPropertiesCacheable = false;
-        return style()->color();
-    default:
-        return colorForCSSValue(valueID);
-    }
 }
 
 } // namespace WebCore

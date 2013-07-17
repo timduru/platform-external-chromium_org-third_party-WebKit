@@ -51,6 +51,8 @@
 #include "core/editing/htmlediting.h"
 #include "core/html/HTMLBodyElement.h"
 #include "core/html/HTMLElement.h"
+#include "core/html/HTMLHtmlElement.h"
+#include "core/html/HTMLTableElement.h"
 #include "core/html/HTMLTextFormControlElement.h"
 #include "core/page/Frame.h"
 #include "core/rendering/RenderObject.h"
@@ -222,9 +224,7 @@ void StyledMarkupAccumulator::appendText(StringBuilder& out, Text* text)
         // FIXME: Should this be included in forceInline?
         wrappingStyle->style()->setProperty(CSSPropertyFloat, CSSValueNone);
 
-        StringBuilder openTag;
-        appendStyleNodeOpenTag(openTag, wrappingStyle->style(), text->document());
-        out.append(openTag.characters(), openTag.length());
+        appendStyleNodeOpenTag(out, wrappingStyle->style(), text->document());
     }
 
     if (!shouldAnnotate() || parentIsTextarea)
@@ -431,7 +431,7 @@ static Node* ancestorToRetainStructureAndAppearanceForBlock(Node* commonAncestor
 
     if (commonAncestorBlock->hasTagName(tbodyTag) || commonAncestorBlock->hasTagName(trTag)) {
         ContainerNode* table = commonAncestorBlock->parentNode();
-        while (table && !table->hasTagName(tableTag))
+        while (table && !isHTMLTableElement(table))
             table = table->parentNode();
 
         return table;
@@ -707,7 +707,7 @@ PassRefPtr<DocumentFragment> createFragmentFromMarkupWithContext(Document* docum
     taggedMarkup.append(markup.substring(fragmentEnd));
 
     RefPtr<DocumentFragment> taggedFragment = createFragmentFromMarkup(document, taggedMarkup.toString(), baseURL, parserContentPolicy);
-    RefPtr<Document> taggedDocument = Document::create(0, KURL());
+    RefPtr<Document> taggedDocument = Document::create();
     taggedDocument->setContextFeatures(document->contextFeatures());
     taggedDocument->takeAllChildrenFrom(taggedFragment.get());
 
@@ -842,7 +842,7 @@ PassRefPtr<DocumentFragment> createFragmentFromText(Range* context, const String
     bool useClonesOfEnclosingBlock = blockNode
         && blockNode->isElementNode()
         && !block->hasTagName(bodyTag)
-        && !block->hasTagName(htmlTag)
+        && !isHTMLHtmlElement(block)
         && block != editableRootForPosition(context->startPosition());
     bool useLineBreak = enclosingTextFormControl(context->startPosition());
 
@@ -955,7 +955,7 @@ PassRefPtr<DocumentFragment> createFragmentForInnerOuterHTML(const String& marku
 
     bool wasValid = fragment->parseXML(markup, contextElement, parserContentPolicy);
     if (!wasValid) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
     return fragment.release();
@@ -1000,13 +1000,13 @@ PassRefPtr<DocumentFragment> createContextualFragment(const String& markup, HTML
 {
     ASSERT(element);
     if (element->ieForbidsInsertHTML()) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
     if (element->hasLocalName(colTag) || element->hasLocalName(colgroupTag) || element->hasLocalName(framesetTag)
         || element->hasLocalName(headTag) || element->hasLocalName(styleTag) || element->hasLocalName(titleTag)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
@@ -1021,7 +1021,7 @@ PassRefPtr<DocumentFragment> createContextualFragment(const String& markup, HTML
     RefPtr<Node> nextNode;
     for (RefPtr<Node> node = fragment->firstChild(); node; node = nextNode) {
         nextNode = node->nextSibling();
-        if (node->hasTagName(htmlTag) || node->hasTagName(headTag) || node->hasTagName(bodyTag)) {
+        if (isHTMLHtmlElement(node.get()) || node->hasTagName(headTag) || node->hasTagName(bodyTag)) {
             HTMLElement* element = toHTMLElement(node.get());
             if (Node* firstChild = element->firstChild())
                 nextNode = firstChild;

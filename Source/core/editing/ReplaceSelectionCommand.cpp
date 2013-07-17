@@ -51,11 +51,12 @@
 #include "core/editing/markup.h"
 #include "core/html/HTMLElement.h"
 #include "core/html/HTMLInputElement.h"
+#include "core/html/HTMLTitleElement.h"
 #include "core/page/Frame.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderText.h"
-#include <wtf/StdLibExtras.h>
-#include <wtf/Vector.h>
+#include "wtf/StdLibExtras.h"
+#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -500,7 +501,7 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
 
             // If Mail wraps the fragment with a Paste as Quotation blockquote, or if you're pasting into a quoted region,
             // styles from blockquoteNode are allowed to override those from the source document, see <rdar://problem/4930986> and <rdar://problem/5089327>.
-            Node* blockquoteNode = isMailPasteAsQuotationNode(context) ? context : enclosingNodeOfType(firstPositionInNode(context), isMailBlockquote, CanCrossEditingBoundary);
+            Node* blockquoteNode = !context || isMailPasteAsQuotationNode(context) ? context : enclosingNodeOfType(firstPositionInNode(context), isMailBlockquote, CanCrossEditingBoundary);
             if (blockquoteNode)
                 newInlineStyle->removeStyleFromRulesAndContext(element, document()->documentElement());
 
@@ -526,7 +527,7 @@ void ReplaceSelectionCommand::removeRedundantStylesAndKeepStyleSpanInline(Insert
             continue;
         }
 
-        if (element->parentNode()->rendererIsRichlyEditable())
+        if (element->parentNode() && element->parentNode()->rendererIsRichlyEditable())
             removeNodeAttribute(element, contenteditableAttr);
 
         // WebKit used to not add display: inline and float: none on copy.
@@ -703,7 +704,7 @@ static void removeHeadContents(ReplacementFragment& fragment)
             || node->hasTagName(linkTag)
             || node->hasTagName(metaTag)
             || node->hasTagName(styleTag)
-            || node->hasTagName(titleTag)) {
+            || isHTMLTitleElement(node)) {
             next = NodeTraversal::nextSkippingChildren(node);
             fragment.removeNode(node);
         } else

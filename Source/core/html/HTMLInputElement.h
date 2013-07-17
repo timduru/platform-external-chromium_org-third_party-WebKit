@@ -128,6 +128,7 @@ public:
 #endif
     HTMLElement* sliderThumbElement() const;
     HTMLElement* sliderTrackElement() const;
+    HTMLElement* passwordGeneratorButtonElement() const;
     virtual HTMLElement* placeholderElement() const;
 
     bool checked() const { return m_isChecked; }
@@ -260,8 +261,7 @@ public:
     String defaultToolTip() const;
 
 #if ENABLE(MEDIA_CAPTURE)
-    String capture() const;
-    void setCapture(const String& value);
+    bool capture() const;
 #endif
 
     static const int maximumLength;
@@ -290,6 +290,8 @@ public:
 
     bool setupDateTimeChooserParameters(DateTimeChooserParameters&);
     virtual void reportMemoryUsage(MemoryObjectInfo*) const OVERRIDE;
+
+    bool supportsInputModeAttribute() const;
 
 protected:
     HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);

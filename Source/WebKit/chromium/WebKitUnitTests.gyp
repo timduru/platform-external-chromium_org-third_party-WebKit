@@ -30,11 +30,13 @@
 
 {
     'includes': [
-        '../../core/features.gypi',
-        'WebKit.gypi',
-        '../../wtf/wtf.gypi',
+        '../../bindings/bindings.gypi',
         '../../core/core.gypi',
+        '../../core/features.gypi',
         '../../modules/modules.gypi',
+        '../../wtf/wtf.gypi',
+        '../../web/web.gypi',
+        'WebKit.gypi',
     ],
     'targets': [
         {
@@ -61,6 +63,7 @@
             ],
             'include_dirs': [
                 '../../../public/web',
+                '../../web',
                 'src',
             ],
             'conditions': [
@@ -77,8 +80,10 @@
                         'INSIDE_WEBKIT',
                     ],
                     'sources': [
+                        '<@(bindings_unittest_files)',
                         '<@(core_unittest_files)',
                         '<@(modules_unittest_files)',
+                        '<@(web_unittest_files)',
                         '<@(webkit_unittest_files)',
                     ],
                     'conditions': [

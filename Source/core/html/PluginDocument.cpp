@@ -72,7 +72,7 @@ void PluginDocumentParser::createDocumentStructure()
 {
     RefPtr<Element> rootElement = document()->createElement(htmlTag, false);
     document()->appendChild(rootElement, IGNORE_EXCEPTION);
-    static_cast<HTMLHtmlElement*>(rootElement.get())->insertedByParser();
+    toHTMLHtmlElement(rootElement.get())->insertedByParser();
 
     if (document()->frame() && document()->frame()->loader())
         document()->frame()->loader()->dispatchDocumentElementAvailable();
@@ -156,8 +156,8 @@ PluginView* PluginDocumentParser::pluginView() const
     return 0;
 }
 
-PluginDocument::PluginDocument(Frame* frame, const KURL& url)
-    : HTMLDocument(frame, url, PluginDocumentClass)
+PluginDocument::PluginDocument(const DocumentInit& initializer)
+    : HTMLDocument(initializer, PluginDocumentClass)
     , m_shouldLoadPluginManually(true)
 {
     setCompatibilityMode(QuirksMode);

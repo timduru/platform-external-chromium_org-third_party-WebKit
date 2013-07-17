@@ -37,6 +37,7 @@
 #include "core/platform/graphics/filters/custom/CustomFilterProgram.h"
 #include "core/rendering/FilterEffectRenderer.h"
 #include "core/rendering/RenderLayer.h"
+#include "core/rendering/svg/RenderSVGResourceContainer.h"
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGFilterPrimitiveStandardAttributes.h"
 #include "core/svg/graphics/filters/SVGFilter.h"
@@ -106,7 +107,7 @@ void RenderLayerFilterInfo::setRenderer(PassRefPtr<FilterEffectRenderer> rendere
 void RenderLayerFilterInfo::notifyFinished(CachedResource*)
 {
     RenderObject* renderer = m_layer->renderer();
-    renderer->node()->setNeedsStyleRecalc(SyntheticStyleChange);
+    toElement(renderer->node())->scheduleLayerUpdate();
     renderer->repaint();
 }
 
@@ -154,7 +155,7 @@ void RenderLayerFilterInfo::removeReferenceFilterClients()
 void RenderLayerFilterInfo::notifyCustomFilterProgramLoaded(CustomFilterProgram*)
 {
     RenderObject* renderer = m_layer->renderer();
-    renderer->node()->setNeedsStyleRecalc(SyntheticStyleChange);
+    toElement(renderer->node())->scheduleLayerUpdate();
     renderer->repaint();
 }
 

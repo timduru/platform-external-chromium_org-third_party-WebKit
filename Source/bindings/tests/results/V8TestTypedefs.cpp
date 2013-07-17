@@ -27,6 +27,7 @@
 #include "V8SerializedScriptValue.h"
 #include "V8TestCallback.h"
 #include "V8TestSubObj.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/SerializedScriptValue.h"
 #include "bindings/v8/V8Binding.h"
@@ -35,7 +36,6 @@
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "core/svg/properties/SVGPropertyTearOff.h"
@@ -78,7 +78,9 @@ static void unsignedLongLongAttrAttrGetter(v8::Local<v8::String> name, const v8:
 
 static void unsignedLongLongAttrAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestTypedefsV8Internal::unsignedLongLongAttrAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void unsignedLongLongAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -91,9 +93,9 @@ static void unsignedLongLongAttrAttrSetter(v8::Local<v8::String> name, v8::Local
 
 static void unsignedLongLongAttrAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestTypedefsV8Internal::unsignedLongLongAttrAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void immutableSerializedScriptValueAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -105,7 +107,9 @@ static void immutableSerializedScriptValueAttrGetter(v8::Local<v8::String> name,
 
 static void immutableSerializedScriptValueAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestTypedefsV8Internal::immutableSerializedScriptValueAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void immutableSerializedScriptValueAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -118,27 +122,27 @@ static void immutableSerializedScriptValueAttrSetter(v8::Local<v8::String> name,
 
 static void immutableSerializedScriptValueAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestTypedefsV8Internal::immutableSerializedScriptValueAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void attrWithGetterExceptionAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
-    ExceptionCode ec = 0;
-    int v = imp->attrWithGetterException(ec);
-    if (UNLIKELY(ec)) {
-        setDOMException(ec, info.GetIsolate());
+    ExceptionState es(info.GetIsolate());
+    int v = imp->attrWithGetterException(es);
+    if (UNLIKELY(es.throwIfNeeded()))
         return;
-    };
     v8SetReturnValueInt(info, v);
     return;
 }
 
 static void attrWithGetterExceptionAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestTypedefsV8Internal::attrWithGetterExceptionAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void attrWithGetterExceptionAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -151,9 +155,9 @@ static void attrWithGetterExceptionAttrSetter(v8::Local<v8::String> name, v8::Lo
 
 static void attrWithGetterExceptionAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestTypedefsV8Internal::attrWithGetterExceptionAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void attrWithSetterExceptionAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -165,43 +169,44 @@ static void attrWithSetterExceptionAttrGetter(v8::Local<v8::String> name, const 
 
 static void attrWithSetterExceptionAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestTypedefsV8Internal::attrWithSetterExceptionAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void attrWithSetterExceptionAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     V8TRYCATCH_VOID(int, v, toInt32(value));
-    ExceptionCode ec = 0;
-    imp->setAttrWithSetterException(v, ec);
-    if (UNLIKELY(ec))
-        setDOMException(ec, info.GetIsolate());
+    ExceptionState es(info.GetIsolate());
+    imp->setAttrWithSetterException(v, es);
+    es.throwIfNeeded();
     return;
 }
 
 static void attrWithSetterExceptionAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestTypedefsV8Internal::attrWithSetterExceptionAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void stringAttrWithGetterExceptionAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
-    ExceptionCode ec = 0;
-    String v = imp->stringAttrWithGetterException(ec);
-    if (UNLIKELY(ec)) {
-        setDOMException(ec, info.GetIsolate());
+    ExceptionState es(info.GetIsolate());
+    String v = imp->stringAttrWithGetterException(es);
+    if (UNLIKELY(es.throwIfNeeded()))
         return;
-    };
-    v8SetReturnValue(info, v8String(v, info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, v, info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
 static void stringAttrWithGetterExceptionAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestTypedefsV8Internal::stringAttrWithGetterExceptionAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void stringAttrWithGetterExceptionAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -214,39 +219,40 @@ static void stringAttrWithGetterExceptionAttrSetter(v8::Local<v8::String> name, 
 
 static void stringAttrWithGetterExceptionAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestTypedefsV8Internal::stringAttrWithGetterExceptionAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void stringAttrWithSetterExceptionAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(imp->stringAttrWithSetterException(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, imp->stringAttrWithSetterException(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
 static void stringAttrWithSetterExceptionAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestTypedefsV8Internal::stringAttrWithSetterExceptionAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void stringAttrWithSetterExceptionAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(info.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, v, value);
-    ExceptionCode ec = 0;
-    imp->setStringAttrWithSetterException(v, ec);
-    if (UNLIKELY(ec))
-        setDOMException(ec, info.GetIsolate());
+    ExceptionState es(info.GetIsolate());
+    imp->setStringAttrWithSetterException(v, es);
+    es.throwIfNeeded();
     return;
 }
 
 static void stringAttrWithSetterExceptionAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     TestTypedefsV8Internal::stringAttrWithSetterExceptionAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void TestTypedefsConstructorGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -284,9 +290,9 @@ static void funcMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void funcMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::funcMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void setShadowMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -318,9 +324,9 @@ static void setShadowMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void setShadowMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::setShadowMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void methodWithSequenceArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -337,9 +343,9 @@ static void methodWithSequenceArgMethod(const v8::FunctionCallbackInfo<v8::Value
 
 static void methodWithSequenceArgMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::methodWithSequenceArgMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void nullableArrayArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -357,9 +363,9 @@ static void nullableArrayArgMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
 
 static void nullableArrayArgMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::nullableArrayArgMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void funcWithClampMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -389,23 +395,23 @@ static void funcWithClampMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 static void funcWithClampMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::funcWithClampMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void immutablePointFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
-    v8SetReturnValue(args, toV8(WTF::getPtr(SVGPropertyTearOff<FloatPoint>::create(imp->immutablePointFunction())), args.Holder(), args.GetIsolate()));
+    v8SetReturnValue(args, toV8(WTF::getPtr(SVGPropertyTearOff<SVGPoint>::create(imp->immutablePointFunction())), args.Holder(), args.GetIsolate()));
     return;
 }
 
 static void immutablePointFunctionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::immutablePointFunctionMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void stringArrayFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -415,22 +421,20 @@ static void stringArrayFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>&
         return;
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
-    ExceptionCode ec = 0;
+    ExceptionState es(args.GetIsolate());
     V8TRYCATCH_VOID(Vector<String>, values, toNativeArray<String>(args[0]));
-    Vector<String> result = imp->stringArrayFunction(values, ec);
-    if (UNLIKELY(ec)) {
-        setDOMException(ec, args.GetIsolate());
+    Vector<String> result = imp->stringArrayFunction(values, es);
+    if (es.throwIfNeeded())
         return;
-    }
     v8SetReturnValue(args, v8Array(result, args.GetIsolate()));
     return;
 }
 
 static void stringArrayFunctionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::stringArrayFunctionMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void stringArrayFunction2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -440,42 +444,38 @@ static void stringArrayFunction2Method(const v8::FunctionCallbackInfo<v8::Value>
         return;
     }
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
-    ExceptionCode ec = 0;
+    ExceptionState es(args.GetIsolate());
     V8TRYCATCH_VOID(Vector<String>, values, toNativeArray<String>(args[0]));
-    Vector<String> result = imp->stringArrayFunction2(values, ec);
-    if (UNLIKELY(ec)) {
-        setDOMException(ec, args.GetIsolate());
+    Vector<String> result = imp->stringArrayFunction2(values, es);
+    if (es.throwIfNeeded())
         return;
-    }
     v8SetReturnValue(args, v8Array(result, args.GetIsolate()));
     return;
 }
 
 static void stringArrayFunction2MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::stringArrayFunction2Method(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void methodWithExceptionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestTypedefs* imp = V8TestTypedefs::toNative(args.Holder());
-    ExceptionCode ec = 0;
-    imp->methodWithException(ec);
-    if (UNLIKELY(ec)) {
-        setDOMException(ec, args.GetIsolate());
+    ExceptionState es(args.GetIsolate());
+    imp->methodWithException(es);
+    if (es.throwIfNeeded())
         return;
-    }
 
     return;
 }
 
 static void methodWithExceptionMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     TestTypedefsV8Internal::methodWithExceptionMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -494,7 +494,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
     RefPtr<TestTypedefs> impl = TestTypedefs::create(hello, testCallback);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
-    V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestTypedefs::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestTypedefs>(impl.release(), &V8TestTypedefs::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     args.GetReturnValue().Set(wrapper);
 }
 
@@ -531,7 +531,7 @@ static const V8DOMConfiguration::BatchedMethod V8TestTypedefsMethods[] = {
 
 void V8TestTypedefs::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TraceEvent::SamplingState0Scope("Blink\0Blink-DOMConstructor");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "DOMConstructor");
     if (!args.IsConstructCall()) {
         throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
         return;
@@ -573,7 +573,7 @@ v8::Handle<v8::FunctionTemplate> V8TestTypedefs::GetTemplate(v8::Isolate* isolat
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
-    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestTypedefsTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
@@ -597,18 +597,18 @@ bool V8TestTypedefs::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Isol
 v8::Handle<v8::Object> V8TestTypedefs::createWrapper(PassRefPtr<TestTypedefs> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
+    ASSERT(DOMDataStore::getWrapper<V8TestTypedefs>(impl.get(), isolate).IsEmpty());
 
-    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestTypedefs>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestTypedefs::derefObject(void* object)
 {
-    static_cast<TestTypedefs*>(object)->deref();
+    fromInternalPointer(object)->deref();
 }
 
 } // namespace WebCore

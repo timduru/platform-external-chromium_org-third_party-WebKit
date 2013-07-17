@@ -67,6 +67,8 @@ typedef Vector<WordMeasurement, 64> WordMeasurements;
 enum CaretType { CursorCaret, DragCaret };
 enum ContainingBlockState { NewContainingBlock, SameContainingBlock };
 
+enum DeleteFloatMapValues { DeleteAllValues, DoNotDeleteValues };
+
 enum TextRunFlag {
     DefaultTextRunFlags = 0,
     RespectDirection = 1 << 0,
@@ -118,6 +120,7 @@ public:
     void removePositionedObjects(RenderBlock*, ContainingBlockState = SameContainingBlock);
 
     void removeFloatingObjects();
+    static void floatWillBeRemoved(RenderBox*);
 
     TrackedRendererListHashSet* positionedObjects() const;
     bool hasPositionedObjects() const
@@ -156,7 +159,8 @@ public:
     void markPositionedObjectsForLayout();
     virtual void markForPaginationRelayoutIfNeeded() OVERRIDE FINAL;
 
-    bool containsFloats() const { return m_floatingObjects && !m_floatingObjects->set().isEmpty(); }
+    bool containsFloats() const;
+
     bool containsFloat(RenderBox*) const;
 
     // Versions that can compute line offsets with the region and page offset passed in. Used for speed to avoid having to
@@ -293,10 +297,8 @@ public:
     static TextRun constructTextRun(RenderObject* context, const Font& font, const RenderText* text, unsigned offset, RenderStyle* style,
         TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion);
 
-#if ENABLE(8BIT_TEXTRUN)
     static TextRun constructTextRun(RenderObject* context, const Font& font, const LChar* characters, int length, RenderStyle* style,
         TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion);
-#endif
 
     static TextRun constructTextRun(RenderObject* context, const Font& font, const UChar* characters, int length, RenderStyle* style,
         TextRun::ExpansionBehavior = TextRun::AllowTrailingExpansion | TextRun::ForbidLeadingExpansion);
@@ -506,8 +508,22 @@ protected:
     virtual void paintChildren(PaintInfo&, const LayoutPoint&);
     void paintChild(RenderBox*, PaintInfo&, const LayoutPoint&);
 
-    LayoutUnit logicalRightOffsetForLine(LayoutUnit position, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* logicalHeightRemaining = 0, LayoutUnit logicalHeight = 0) const;
-    LayoutUnit logicalLeftOffsetForLine(LayoutUnit position, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* logicalHeightRemaining = 0, LayoutUnit logicalHeight = 0) const;
+    LayoutUnit logicalRightOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* heightRemaining = 0, LayoutUnit logicalHeight = 0) const
+    {
+        return adjustLogicalRightOffsetForLine(logicalRightFloatOffsetForLine(logicalTop, fixedOffset, heightRemaining, logicalHeight, ShapeOutsideFloatShapeOffset), applyTextIndent);
+    }
+    LayoutUnit logicalLeftOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* heightRemaining = 0, LayoutUnit logicalHeight = 0) const
+    {
+        return adjustLogicalLeftOffsetForLine(logicalLeftFloatOffsetForLine(logicalTop, fixedOffset, heightRemaining, logicalHeight, ShapeOutsideFloatShapeOffset), applyTextIndent);
+    }
+    LayoutUnit logicalRightOffsetForLineIgnoringShapeOutside(LayoutUnit logicalTop, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* heightRemaining = 0, LayoutUnit logicalHeight = 0) const
+    {
+        return adjustLogicalRightOffsetForLine(logicalRightFloatOffsetForLine(logicalTop, fixedOffset, heightRemaining, logicalHeight, ShapeOutsideFloatMarginBoxOffset), applyTextIndent);
+    }
+    LayoutUnit logicalLeftOffsetForLineIgnoringShapeOutside(LayoutUnit logicalTop, LayoutUnit fixedOffset, bool applyTextIndent, LayoutUnit* heightRemaining = 0, LayoutUnit logicalHeight = 0) const
+    {
+        return adjustLogicalLeftOffsetForLine(logicalLeftFloatOffsetForLine(logicalTop, fixedOffset, heightRemaining, logicalHeight, ShapeOutsideFloatMarginBoxOffset), applyTextIndent);
+    }
 
     virtual ETextAlign textAlignmentForLine(bool endsWithSoftBreak) const;
     virtual void adjustInlineDirectionLineBounds(int /* expansionOpportunityCount */, float& /* logicalLeft */, float& /* logicalWidth */) const { }
@@ -572,6 +588,13 @@ protected:
     virtual void checkForPaginationLogicalHeightChange(LayoutUnit& pageLogicalHeight, bool& pageLogicalHeightChanged, bool& hasSpecifiedPageLogicalHeight);
 
 private:
+    enum ShapeOutsideFloatOffsetMode { ShapeOutsideFloatShapeOffset, ShapeOutsideFloatMarginBoxOffset };
+
+    LayoutUnit logicalRightFloatOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, LayoutUnit* heightRemaining, LayoutUnit logicalHeight, ShapeOutsideFloatOffsetMode) const;
+    LayoutUnit logicalLeftFloatOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, LayoutUnit* heightRemaining, LayoutUnit logicalHeight, ShapeOutsideFloatOffsetMode) const;
+    LayoutUnit adjustLogicalRightOffsetForLine(LayoutUnit offsetFromFloats, bool applyTextIndent) const;
+    LayoutUnit adjustLogicalLeftOffsetForLine(LayoutUnit offsetFromFloats, bool applyTextIndent) const;
+
     void computeShapeSize();
     void updateRegionsAndShapesAfterChildLayout(RenderFlowThread*, bool);
     void updateShapeInsideInfoAfterStyleChange(const ShapeValue*, const ShapeValue* oldShape);
@@ -777,10 +800,6 @@ private:
 
     LayoutUnit xPositionForFloatIncludingMargin(const FloatingObject* child) const
     {
-        ShapeOutsideInfo *shapeOutside = child->renderer()->shapeOutsideInfo();
-        if (shapeOutside)
-            return child->x();
-
         if (isHorizontalWritingMode())
             return child->x() + child->renderer()->marginLeft();
         else
@@ -789,10 +808,6 @@ private:
         
     LayoutUnit yPositionForFloatIncludingMargin(const FloatingObject* child) const
     {
-        ShapeOutsideInfo *shapeOutside = child->renderer()->shapeOutsideInfo();
-        if (shapeOutside)
-            return child->y();
-
         if (isHorizontalWritingMode())
             return child->y() + marginBeforeForChild(child->renderer());
         else
@@ -1169,9 +1184,9 @@ protected:
         // When computing the offset caused by the floats on a given line, if
         // the outermost float on that line has a shape-outside, the inline
         // content that butts up against that float must be positioned using
-        // the contours of the shape, not the shape's bounding box. We save the
-        // last float encountered so that the offset can be computed correctly
-        // by the code using this adapter.
+        // the contours of the shape, not the margin box of the float.
+        // We save the last float encountered so that the offset can be
+        // computed correctly by the code using this adapter.
         const FloatingObject* lastFloat() const { return m_last; }
 
     private:
@@ -1280,8 +1295,13 @@ public:
 
 protected:
 
-    OwnPtr<FloatingObjects> m_floatingObjects;
     OwnPtr<RenderBlockRareData> m_rareData;
+
+    FloatingObjects* floatingObjects() const;
+
+    void removeBlockFromFloatMaps(DeleteFloatMapValues deleteValues = DeleteAllValues);
+    void insertIntoFloatingObjectMaps(FloatingObject*);
+    void removeFromFloatingObjectMaps(FloatingObject*);
 
     RenderObjectChildList m_children;
     RenderLineBoxList m_lineBoxes;   // All of the root line boxes created for this block flow.  For example, <div>Hello<br>world.</div> will have two total lines for the <div>.
@@ -1314,6 +1334,8 @@ inline const RenderBlock* toRenderBlock(const RenderObject* object)
     ASSERT_WITH_SECURITY_IMPLICATION(!object || object->isRenderBlock());
     return static_cast<const RenderBlock*>(object);
 }
+
+typedef WTF::HashMap<const RenderBlock*, OwnPtr<RenderBlock::FloatingObjects> > TrackedFloatMap;
 
 // This will catch anyone doing an unnecessary cast.
 void toRenderBlock(const RenderBlock*);

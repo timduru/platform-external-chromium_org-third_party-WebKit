@@ -52,6 +52,7 @@
 #include "core/html/canvas/CanvasStyle.h"
 #include "core/html/canvas/DOMPath.h"
 #include "core/loader/cache/CachedImage.h"
+#include "core/page/ImageBitmap.h"
 #include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/FontCache.h"
@@ -131,6 +132,10 @@ void CanvasRenderingContext2D::reset()
     m_unrealizedSaveCount = 0;
 }
 
+// Important: Several of these properties are also stored in GraphicsContext's
+// StrokeData. The default values that StrokeData uses may not the same values
+// that the canvas 2d spec specifies. Make sure to sync the initial state of the
+// GraphicsContext in HTMLCanvasElement::createImageBuffer()!
 CanvasRenderingContext2D::State::State()
     : m_strokeStyle(CanvasStyle::createFromRGBA(Color::black))
     , m_fillStyle(CanvasStyle::createFromRGBA(Color::black))
@@ -1186,10 +1191,99 @@ static inline FloatRect normalizeRect(const FloatRect& rect)
         max(rect.height(), -rect.height()));
 }
 
+void CanvasRenderingContext2D::drawImageInternal(Image* image, const FloatRect& srcRect, const FloatRect& dstRect, const CompositeOperator& op, const BlendMode& blendMode)
+{
+    if (!image)
+        return;
+
+    GraphicsContext* c = drawingContext();
+    if (!c)
+        return;
+    if (!state().m_invertibleCTM)
+        return;
+
+    if (rectContainsCanvas(dstRect)) {
+        c->drawImage(image, dstRect, srcRect, op, blendMode);
+        didDrawEntireCanvas();
+    } else if (isFullCanvasCompositeMode(op)) {
+        fullCanvasCompositedDrawImage(image, dstRect, srcRect, op);
+        didDrawEntireCanvas();
+    } else if (op == CompositeCopy) {
+        clearCanvas();
+        c->drawImage(image, dstRect, srcRect, op, blendMode);
+        didDrawEntireCanvas();
+    } else {
+        c->drawImage(image, dstRect, srcRect, op, blendMode);
+        didDraw(dstRect);
+    }
+}
+
+void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap, float x, float y, ExceptionCode& ec)
+{
+    if (!bitmap) {
+        ec = TypeMismatchError;
+        return;
+    }
+    drawImage(bitmap, x, y, bitmap->width(), bitmap->height(), ec);
+}
+
+void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap,
+    float x, float y, float width, float height, ExceptionCode& ec)
+{
+    if (!bitmap) {
+        ec = TypeMismatchError;
+        return;
+    }
+    if (!bitmap->bitmapWidth() || !bitmap->bitmapHeight())
+        return;
+
+    drawImage(bitmap, 0, 0, bitmap->bitmapWidth(), bitmap->bitmapHeight(), x, y, width, height, ec);
+}
+
+void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap,
+    float sx, float sy, float sw, float sh,
+    float dx, float dy, float dw, float dh, ExceptionCode& ec)
+{
+    if (!bitmap) {
+        ec = TypeMismatchError;
+        return;
+    }
+
+    FloatRect srcRect(sx, sy, sw, sh);
+    FloatRect dstRect(dx, dy, dw, dh);
+
+    if (!std::isfinite(dstRect.x()) || !std::isfinite(dstRect.y()) || !std::isfinite(dstRect.width()) || !std::isfinite(dstRect.height())
+        || !std::isfinite(srcRect.x()) || !std::isfinite(srcRect.y()) || !std::isfinite(srcRect.width()) || !std::isfinite(srcRect.height()))
+        return;
+
+    if (!dstRect.width() || !dstRect.height())
+        return;
+
+    ASSERT(bitmap->height() && bitmap->width());
+
+    FloatRect normalizedSrcRect = normalizeRect(srcRect);
+    FloatRect normalizedDstRect = normalizeRect(dstRect);
+    FloatRect actualDstRect(FloatPoint(bitmap->bitmapOffset()), bitmap->bitmapSize());
+    actualDstRect.scale(normalizedDstRect.width() / bitmap->width(), normalizedDstRect.height() / bitmap->height());
+    actualDstRect.moveBy(normalizedDstRect.location());
+
+    FloatRect imageRect = FloatRect(FloatPoint(), bitmap->bitmapSize());
+    if (!srcRect.width() || !srcRect.height()) {
+        ec = IndexSizeError;
+        return;
+    }
+    if (!imageRect.contains(normalizedSrcRect))
+        return;
+
+    Image* imageForRendering = bitmap->bitmapImage();
+
+    drawImageInternal(imageForRendering, normalizedSrcRect, actualDstRect, state().m_globalComposite, state().m_globalBlend);
+}
+
 void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, float x, float y, ExceptionCode& ec)
 {
     if (!image) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
     LayoutSize s = size(image);
@@ -1200,7 +1294,7 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image,
     float x, float y, float width, float height, ExceptionCode& ec)
 {
     if (!image) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
     LayoutSize s = size(image);
@@ -1222,7 +1316,7 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
 void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRect& srcRect, const FloatRect& dstRect, const CompositeOperator& op, const BlendMode& blendMode, ExceptionCode& ec)
 {
     if (!image) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
 
@@ -1243,16 +1337,10 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
 
     FloatRect imageRect = FloatRect(FloatPoint(), size(image));
     if (!srcRect.width() || !srcRect.height()) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
     if (!imageRect.contains(normalizedSrcRect))
-        return;
-
-    GraphicsContext* c = drawingContext();
-    if (!c)
-        return;
-    if (!state().m_invertibleCTM)
         return;
 
     CachedImage* cachedImage = image->cachedImage();
@@ -1269,20 +1357,7 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
     if (!image->renderer() && imageForRendering->usesContainerSize())
         imageForRendering->setContainerSize(imageForRendering->size());
 
-    if (rectContainsCanvas(normalizedDstRect)) {
-        c->drawImage(imageForRendering, normalizedDstRect, normalizedSrcRect, op, blendMode);
-        didDrawEntireCanvas();
-    } else if (isFullCanvasCompositeMode(op)) {
-        fullCanvasCompositedDrawImage(imageForRendering, normalizedDstRect, normalizedSrcRect, op);
-        didDrawEntireCanvas();
-    } else if (op == CompositeCopy) {
-        clearCanvas();
-        c->drawImage(imageForRendering, normalizedDstRect, normalizedSrcRect, op, blendMode);
-        didDrawEntireCanvas();
-    } else {
-        c->drawImage(imageForRendering, normalizedDstRect, normalizedSrcRect, op, blendMode);
-        didDraw(normalizedDstRect);
-    }
+    drawImageInternal(imageForRendering, normalizedSrcRect, normalizedDstRect, op, blendMode);
 }
 
 void CanvasRenderingContext2D::drawImage(HTMLCanvasElement* sourceCanvas, float x, float y, ExceptionCode& ec)
@@ -1307,19 +1382,19 @@ void CanvasRenderingContext2D::drawImage(HTMLCanvasElement* sourceCanvas, const 
     const FloatRect& dstRect, ExceptionCode& ec)
 {
     if (!sourceCanvas) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
 
     FloatRect srcCanvasRect = FloatRect(FloatPoint(), sourceCanvas->size());
 
     if (!srcCanvasRect.width() || !srcCanvasRect.height()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
     if (!srcRect.width() || !srcRect.height()) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
 
@@ -1367,7 +1442,7 @@ void CanvasRenderingContext2D::drawImage(HTMLCanvasElement* sourceCanvas, const 
 void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, float x, float y, ExceptionCode& ec)
 {
     if (!video) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
     IntSize s = size(video);
@@ -1378,7 +1453,7 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video,
                                          float x, float y, float width, float height, ExceptionCode& ec)
 {
     if (!video) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
     IntSize s = size(video);
@@ -1396,7 +1471,7 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, const FloatRec
                                          ExceptionCode& ec)
 {
     if (!video) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
 
@@ -1407,7 +1482,7 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, const FloatRec
 
     FloatRect videoRect = FloatRect(FloatPoint(), size(video));
     if (!srcRect.width() || !srcRect.height()) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
 
@@ -1599,7 +1674,7 @@ template<class T> void CanvasRenderingContext2D::fullCanvasCompositedFill(const 
 PassRefPtr<CanvasGradient> CanvasRenderingContext2D::createLinearGradient(float x0, float y0, float x1, float y1, ExceptionCode& ec)
 {
     if (!std::isfinite(x0) || !std::isfinite(y0) || !std::isfinite(x1) || !std::isfinite(y1)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
@@ -1610,12 +1685,12 @@ PassRefPtr<CanvasGradient> CanvasRenderingContext2D::createLinearGradient(float 
 PassRefPtr<CanvasGradient> CanvasRenderingContext2D::createRadialGradient(float x0, float y0, float r0, float x1, float y1, float r1, ExceptionCode& ec)
 {
     if (!std::isfinite(x0) || !std::isfinite(y0) || !std::isfinite(r0) || !std::isfinite(x1) || !std::isfinite(y1) || !std::isfinite(r1)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
     if (r0 < 0 || r1 < 0) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return 0;
     }
 
@@ -1627,7 +1702,7 @@ PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLImageEleme
     const String& repetitionType, ExceptionCode& ec)
 {
     if (!image) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return 0;
     }
     bool repeatX, repeatY;
@@ -1656,11 +1731,11 @@ PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLCanvasElem
     const String& repetitionType, ExceptionCode& ec)
 {
     if (!canvas) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return 0;
     }
     if (!canvas->width() || !canvas->height()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return 0;
     }
 
@@ -1740,7 +1815,7 @@ static PassRefPtr<ImageData> createEmptyImageData(const IntSize& size)
 PassRefPtr<ImageData> CanvasRenderingContext2D::createImageData(PassRefPtr<ImageData> imageData, ExceptionCode& ec) const
 {
     if (!imageData) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
@@ -1751,11 +1826,11 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::createImageData(float sw, float 
 {
     ec = 0;
     if (!sw || !sh) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return 0;
     }
     if (!std::isfinite(sw) || !std::isfinite(sh)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
@@ -1787,16 +1862,16 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::getImageData(ImageBuffer::Coordi
     if (!canvas()->originClean()) {
         DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Unable to get image data from canvas because the canvas has been tainted by cross-origin data.")));
         canvas()->document()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, consoleMessage);
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return 0;
     }
 
     if (!sw || !sh) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return 0;
     }
     if (!std::isfinite(sx) || !std::isfinite(sy) || !std::isfinite(sw) || !std::isfinite(sh)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
@@ -1832,7 +1907,7 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::getImageData(ImageBuffer::Coordi
 void CanvasRenderingContext2D::putImageData(ImageData* data, float dx, float dy, ExceptionCode& ec)
 {
     if (!data) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
     putImageData(data, dx, dy, 0, 0, data->width(), data->height(), ec);
@@ -1841,7 +1916,7 @@ void CanvasRenderingContext2D::putImageData(ImageData* data, float dx, float dy,
 void CanvasRenderingContext2D::webkitPutImageDataHD(ImageData* data, float dx, float dy, ExceptionCode& ec)
 {
     if (!data) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
     webkitPutImageDataHD(data, dx, dy, 0, 0, data->width(), data->height(), ec);
@@ -1862,11 +1937,11 @@ void CanvasRenderingContext2D::putImageData(ImageData* data, ImageBuffer::Coordi
                                             float dirtyWidth, float dirtyHeight, ExceptionCode& ec)
 {
     if (!data) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return;
     }
     if (!std::isfinite(dx) || !std::isfinite(dy) || !std::isfinite(dirtyX) || !std::isfinite(dirtyY) || !std::isfinite(dirtyWidth) || !std::isfinite(dirtyHeight)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return;
     }
 
@@ -1990,19 +2065,17 @@ void CanvasRenderingContext2D::setFont(const String& newFont)
     newStyle->font().update(newStyle->font().fontSelector());
 
     // Now map the font property longhands into the style.
-    StyleResolver* styleResolver = canvas()->styleResolver();
-    styleResolver->applyPropertyToStyle(CSSPropertyFontFamily, parsedStyle->getPropertyCSSValue(CSSPropertyFontFamily).get(), newStyle.get());
-    styleResolver->applyPropertyToCurrentStyle(CSSPropertyFontStyle, parsedStyle->getPropertyCSSValue(CSSPropertyFontStyle).get());
-    styleResolver->applyPropertyToCurrentStyle(CSSPropertyFontVariant, parsedStyle->getPropertyCSSValue(CSSPropertyFontVariant).get());
-    styleResolver->applyPropertyToCurrentStyle(CSSPropertyFontWeight, parsedStyle->getPropertyCSSValue(CSSPropertyFontWeight).get());
+    CSSPropertyValue properties[] = {
+        CSSPropertyValue(CSSPropertyFontFamily, *parsedStyle),
+        CSSPropertyValue(CSSPropertyFontStyle, *parsedStyle),
+        CSSPropertyValue(CSSPropertyFontVariant, *parsedStyle),
+        CSSPropertyValue(CSSPropertyFontWeight, *parsedStyle),
+        CSSPropertyValue(CSSPropertyFontSize, *parsedStyle),
+        CSSPropertyValue(CSSPropertyLineHeight, *parsedStyle),
+    };
 
-    // As described in BUG66291, setting font-size and line-height on a font may entail a CSSPrimitiveValue::computeLengthDouble call,
-    // which assumes the fontMetrics are available for the affected font, otherwise a crash occurs (see http://trac.webkit.org/changeset/96122).
-    // The updateFont() calls below update the fontMetrics and ensure the proper setting of font-size and line-height.
-    styleResolver->updateFont();
-    styleResolver->applyPropertyToCurrentStyle(CSSPropertyFontSize, parsedStyle->getPropertyCSSValue(CSSPropertyFontSize).get());
-    styleResolver->updateFont();
-    styleResolver->applyPropertyToCurrentStyle(CSSPropertyLineHeight, parsedStyle->getPropertyCSSValue(CSSPropertyLineHeight).get());
+    StyleResolver* styleResolver = canvas()->styleResolver();
+    styleResolver->applyPropertiesToStyle(properties, WTF_ARRAY_LENGTH(properties), newStyle.get());
 
     modifiableState().m_font = newStyle->font();
     modifiableState().m_font.update(styleResolver->fontSelector());

@@ -60,6 +60,7 @@ class Base(unittest.TestCase):
                 self.get_test('failures/expected/image_checksum.html'),
                 self.get_test('failures/expected/crash.html'),
                 self.get_test('failures/expected/needsrebaseline.html'),
+                self.get_test('failures/expected/needsmanualrebaseline.html'),
                 self.get_test('failures/expected/missing_text.html'),
                 self.get_test('failures/expected/image.html'),
                 self.get_test('passes/text.html')]
@@ -69,6 +70,7 @@ class Base(unittest.TestCase):
 Bug(test) failures/expected/text.html [ Failure ]
 Bug(test) failures/expected/crash.html [ WontFix ]
 Bug(test) failures/expected/needsrebaseline.html [ NeedsRebaseline ]
+Bug(test) failures/expected/needsmanualrebaseline.html [ NeedsManualRebaseline ]
 Bug(test) failures/expected/missing_image.html [ Rebaseline Missing ]
 Bug(test) failures/expected/image_checksum.html [ WontFix ]
 Bug(test) failures/expected/image.html [ WontFix Mac ]
@@ -245,6 +247,8 @@ class MiscTests(Base):
         self.assertTrue(match('failures/expected/crash.html', PASS, False))
         self.assertTrue(match('failures/expected/needsrebaseline.html', TEXT, True))
         self.assertFalse(match('failures/expected/needsrebaseline.html', CRASH, True))
+        self.assertTrue(match('failures/expected/needsmanualrebaseline.html', TEXT, True))
+        self.assertFalse(match('failures/expected/needsmanualrebaseline.html', CRASH, True))
         self.assertTrue(match('passes/text.html', PASS, False))
 
     def test_more_specific_override_resets_skip(self):
@@ -264,15 +268,42 @@ class MiscTests(Base):
 
         expectations = TestExpectations(self._port, self.get_basic_tests())
         self.assertEqual(expectations.get_expectations(self.get_test(test_name)), set([IMAGE]))
+        self.assertEqual(expectations.get_modifiers(self.get_test(test_name)), ['Bug(x)'])
 
         def bot_expectations():
             return {test_name: ['PASS', 'IMAGE']}
         self._port.bot_expectations = bot_expectations
-        self._port._options.ignore_flaky = 'very-flaky'
+        self._port._options.ignore_flaky_tests = 'very-flaky'
 
         expectations = TestExpectations(self._port, self.get_basic_tests())
         self.assertEqual(expectations.get_expectations(self.get_test(test_name)), set([PASS, IMAGE]))
 
+        # The following line tests the actual behavior, which is not necessarily a usefull behavior.
+        # Existing modifiers from a test expectation file are overridden by the bot expectations.
+        self.assertEqual(expectations.get_modifiers(self.get_test(test_name)), [])
+
+    def test_bot_test_expectations_merge(self):
+        """Test that expectations are merged rather than overridden when using flaky option 'unexpected'."""
+        test_name1 = 'failures/expected/text.html'
+        test_name2 = 'passes/text.html'
+
+        expectations_dict = OrderedDict()
+        expectations_dict['expectations'] = "Bug(x) %s [ ImageOnlyFailure ]\nBug(x) %s [ Slow ]\n" % (test_name1, test_name2)
+        self._port.expectations_dict = lambda: expectations_dict
+
+        expectations = TestExpectations(self._port, self.get_basic_tests())
+        self.assertEqual(expectations.get_expectations(self.get_test(test_name1)), set([IMAGE]))
+        self.assertEqual(set(expectations.get_modifiers(self.get_test(test_name2))), set(['Bug(x)', 'SLOW']))
+
+        def bot_expectations():
+            return {test_name1: ['PASS', 'TIMEOUT'], test_name2: ['CRASH']}
+        self._port.bot_expectations = bot_expectations
+        self._port._options.ignore_flaky_tests = 'unexpected'
+
+        expectations = TestExpectations(self._port, self.get_basic_tests())
+        self.assertEqual(expectations.get_expectations(self.get_test(test_name1)), set([PASS, IMAGE, TIMEOUT]))
+        self.assertEqual(expectations.get_expectations(self.get_test(test_name2)), set([PASS, CRASH]))
+        self.assertEqual(set(expectations.get_modifiers(self.get_test(test_name2))), set(['Bug(x)', 'SLOW']))
 
 class SkippedTests(Base):
     def check(self, expectations, overrides, skips, lint=False):
@@ -519,15 +550,17 @@ Bug(y) [ Win Mac Debug ] failures/expected/foo.html [ Crash ]
 Bug(y) [ Win Mac Debug ] failures/expected/foo.html [ Crash ]
 """, actual_expectations)
 
-    def test_remove_line(self):
+    def test_remove_line_with_comments(self):
         host = MockHost()
         test_port = host.port_factory.get('test-win-xp', None)
         test_port.test_exists = lambda test: True
         test_port.test_isfile = lambda test: True
 
         test_config = test_port.test_configuration()
-        test_port.expectations_dict = lambda: {'expectations': """Bug(x) [ Win Release ] failures/expected/foo.html [ Failure ]
-Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+        test_port.expectations_dict = lambda: {'expectations': """Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+
+ # This comment line should get stripped. As should the preceding line.
+Bug(x) [ Win Release ] failures/expected/foo.html [ Failure ]
 """}
         expectations = TestExpectations(test_port)
 
@@ -535,6 +568,110 @@ Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
         actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', host.port_factory.get('test-win-win7', None).test_configuration())
 
         self.assertEqual("""Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+""", actual_expectations)
+
+    def test_remove_line_with_comments_at_start(self):
+        host = MockHost()
+        test_port = host.port_factory.get('test-win-xp', None)
+        test_port.test_exists = lambda test: True
+        test_port.test_isfile = lambda test: True
+
+        test_config = test_port.test_configuration()
+        test_port.expectations_dict = lambda: {'expectations': """
+ # This comment line should get stripped. As should the preceding line.
+Bug(x) [ Win Release ] failures/expected/foo.html [ Failure ]
+
+Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+"""}
+        expectations = TestExpectations(test_port)
+
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', test_config)
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', host.port_factory.get('test-win-win7', None).test_configuration())
+
+        self.assertEqual("""
+Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+""", actual_expectations)
+
+    def test_remove_line_with_comments_at_end_with_no_trailing_newline(self):
+        host = MockHost()
+        test_port = host.port_factory.get('test-win-xp', None)
+        test_port.test_exists = lambda test: True
+        test_port.test_isfile = lambda test: True
+
+        test_config = test_port.test_configuration()
+        test_port.expectations_dict = lambda: {'expectations': """Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+
+ # This comment line should get stripped. As should the preceding line.
+Bug(x) [ Win Release ] failures/expected/foo.html [ Failure ]"""}
+        expectations = TestExpectations(test_port)
+
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', test_config)
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', host.port_factory.get('test-win-win7', None).test_configuration())
+
+        self.assertEqual("""Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]""", actual_expectations)
+
+    def test_remove_line_leaves_comments_for_next_line(self):
+        host = MockHost()
+        test_port = host.port_factory.get('test-win-xp', None)
+        test_port.test_exists = lambda test: True
+        test_port.test_isfile = lambda test: True
+
+        test_config = test_port.test_configuration()
+        test_port.expectations_dict = lambda: {'expectations': """
+ # This comment line should not get stripped.
+Bug(x) [ Win Release ] failures/expected/foo.html [ Failure ]
+Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+"""}
+        expectations = TestExpectations(test_port)
+
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', test_config)
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', host.port_factory.get('test-win-win7', None).test_configuration())
+
+        self.assertEqual("""
+ # This comment line should not get stripped.
+Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+""", actual_expectations)
+
+    def test_remove_line_no_whitespace_lines(self):
+        host = MockHost()
+        test_port = host.port_factory.get('test-win-xp', None)
+        test_port.test_exists = lambda test: True
+        test_port.test_isfile = lambda test: True
+
+        test_config = test_port.test_configuration()
+        test_port.expectations_dict = lambda: {'expectations': """
+ # This comment line should get stripped.
+Bug(x) [ Win Release ] failures/expected/foo.html [ Failure ]
+ # This comment line should not get stripped.
+Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+"""}
+        expectations = TestExpectations(test_port)
+
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', test_config)
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', host.port_factory.get('test-win-win7', None).test_configuration())
+
+        self.assertEqual(""" # This comment line should not get stripped.
+Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+""", actual_expectations)
+
+    def test_remove_first_line(self):
+        host = MockHost()
+        test_port = host.port_factory.get('test-win-xp', None)
+        test_port.test_exists = lambda test: True
+        test_port.test_isfile = lambda test: True
+
+        test_config = test_port.test_configuration()
+        test_port.expectations_dict = lambda: {'expectations': """Bug(x) [ Win Release ] failures/expected/foo.html [ Failure ]
+ # This comment line should not get stripped.
+Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
+"""}
+        expectations = TestExpectations(test_port)
+
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', test_config)
+        actual_expectations = expectations.remove_configuration_from_test('failures/expected/foo.html', host.port_factory.get('test-win-win7', None).test_configuration())
+
+        self.assertEqual(""" # This comment line should not get stripped.
+Bug(y) [ Win Debug ] failures/expected/foo.html [ Crash ]
 """, actual_expectations)
 
     def test_remove_flaky_line(self):

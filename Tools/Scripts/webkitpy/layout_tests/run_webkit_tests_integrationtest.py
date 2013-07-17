@@ -329,6 +329,11 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         tests_run = get_tests_run(['--order=random'] + tests_to_run)
         self.assertEqual(sorted(tests_to_run), sorted(tests_run))
 
+    def test_random_daily_seed_order(self):
+        tests_to_run = ['passes/audio.html', 'failures/expected/text.html', 'failures/expected/missing_text.html', 'passes/args.html']
+        tests_run = get_tests_run(['--order=random-seeded'] + tests_to_run)
+        self.assertEqual(sorted(tests_to_run), sorted(tests_run))
+
     def test_random_order_test_specified_multiple_times(self):
         tests_to_run = ['passes/args.html', 'passes/audio.html', 'passes/audio.html', 'passes/args.html']
         tests_run = get_tests_run(['--order=random'] + tests_to_run)
@@ -788,7 +793,7 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         if sys.platform == 'darwin':
             port_name = 'linux-x86'
         else:
-            port_name = 'chromium-mac-lion'
+            port_name = 'mac-lion'
         out = StringIO.StringIO()
         err = StringIO.StringIO()
         self.assertEqual(run_webkit_tests.main(['--platform', port_name, 'fast/harness/results.html'], out, err), -1)
@@ -896,11 +901,11 @@ class PortTest(unittest.TestCase):
     def assert_mock_port_works(self, port_name, args=[]):
         self.assertTrue(passing_run(args + ['--platform', 'mock-' + port_name, 'fast/harness/results.html'], tests_included=True, host=Host()))
 
-    def disabled_test_chromium_mac_lion(self):
-        self.assert_mock_port_works('chromium-mac-lion')
+    def disabled_test_mac_lion(self):
+        self.assert_mock_port_works('mac-lion')
 
-    def disabled_test_chromium_mac_lion_in_test_shell_mode(self):
-        self.assert_mock_port_works('chromium-mac-lion', args=['--additional-drt-flag=--test-shell'])
+    def disabled_test_mac_lion_in_test_shell_mode(self):
+        self.assert_mock_port_works('mac-lion', args=['--additional-drt-flag=--test-shell'])
 
     def disabled_test_qt_linux(self):
         self.assert_mock_port_works('qt-linux')

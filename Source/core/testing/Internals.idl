@@ -160,6 +160,7 @@
     [RaisesException] boolean isPageBoxVisible(Document document, long pageNumber);
 
     readonly attribute InternalSettings settings;
+    readonly attribute InternalProfilers profilers;
     readonly attribute InternalRuntimeFlags runtimeFlags;
     readonly attribute unsigned long workerThreadCount;
 
@@ -167,6 +168,7 @@
     // The values of these constants must be kept in sync with the values of LayerTreeAsTextBehaviorFlags in GraphicsLayerClient.h.
     const unsigned short LAYER_TREE_INCLUDES_REPAINT_RECTS = 2;
     const unsigned short LAYER_TREE_INCLUDES_PAINTING_PHASES = 4;
+    const unsigned short LAYER_TREE_INCLUDES_ROOT_LAYER = 8;
     [RaisesException] DOMString layerTreeAsText(Document document, optional unsigned short flags);
     [RaisesException] DOMString elementLayerTreeAsText(Element element, optional unsigned short flags);
 
@@ -197,6 +199,7 @@
     sequence<DOMString> consoleMessageArgumentCounts(Document document);
     Window openDummyInspectorFrontend(DOMString url);
     void closeDummyInspectorFrontend();
+    unsigned long[] setMemoryCacheCapacities(unsigned long minDeadBytes, unsigned long maxDeadBytes, unsigned long totalBytes);
     [RaisesException] void setInspectorResourcesDataSizeLimits(long maximumResourcesContentSize, long maximumSingleResourceContentSize);
 
     DOMString counterValue(Element element);

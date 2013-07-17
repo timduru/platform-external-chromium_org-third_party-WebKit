@@ -31,7 +31,7 @@
 #include "core/dom/MutationRecord.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include <wtf/MemoryInstrumentationHashMap.h>
+#include "wtf/MemoryInstrumentationHashMap.h"
 
 using namespace std;
 
@@ -230,7 +230,7 @@ void PropertySetCSSStyleDeclaration::setProperty(const String& propertyName, con
     didMutate(changed ? PropertyChanged : NoChanges);
 
     if (changed) {
-        // CSS DOM requires raising SYNTAX_ERR of parsing failed, but this is too dangerous for compatibility,
+        // CSS DOM requires raising SyntaxError of parsing failed, but this is too dangerous for compatibility,
         // see <http://bugs.webkit.org/show_bug.cgi?id=7296>.
         mutationScope.enqueueMutationRecord();
     }
@@ -390,7 +390,7 @@ void InlineCSSStyleDeclaration::didMutate(MutationType type)
     if (!m_parentElement)
         return;
 
-    m_parentElement->setNeedsStyleRecalc(InlineStyleChange);
+    m_parentElement->setNeedsStyleRecalc(LocalStyleChange);
     m_parentElement->invalidateStyleAttribute();
     StyleAttributeMutationScope(this).didInvalidateStyleAttr();
 }

@@ -37,9 +37,9 @@
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/fileapi/File.h"
 #include "core/platform/Logging.h"
-#include <wtf/ArrayBuffer.h>
-#include <wtf/CurrentTime.h>
-#include <wtf/text/CString.h>
+#include "wtf/ArrayBuffer.h"
+#include "wtf/CurrentTime.h"
+#include "wtf/text/CString.h"
 
 namespace WebCore {
 
@@ -145,9 +145,9 @@ void FileReader::readAsDataURL(Blob* blob, ExceptionCode& ec)
 
 void FileReader::readInternal(Blob* blob, FileReaderLoader::ReadType type, ExceptionCode& ec)
 {
-    // If multiple concurrent read methods are called on the same FileReader, INVALID_STATE_ERR should be thrown when the state is LOADING.
+    // If multiple concurrent read methods are called on the same FileReader, InvalidStateError should be thrown when the state is LOADING.
     if (m_state == LOADING) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -161,7 +161,7 @@ void FileReader::readInternal(Blob* blob, FileReaderLoader::ReadType type, Excep
     m_loader = adoptPtr(new FileReaderLoader(m_readType, this));
     m_loader->setEncoding(m_encoding);
     m_loader->setDataType(m_blob->type());
-    m_loader->start(scriptExecutionContext(), m_blob.get());
+    m_loader->start(scriptExecutionContext(), *m_blob);
 }
 
 static void delayedAbort(ScriptExecutionContext*, FileReader* reader)

@@ -46,8 +46,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/ContextLifecycleObserver.cpp \
 	third_party/WebKit/Source/core/dom/ContextFeatures.cpp \
 	third_party/WebKit/Source/core/dom/ContextLifecycleNotifier.cpp \
-	third_party/WebKit/Source/core/dom/CustomElementDefinition.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementCallbackDispatcher.cpp \
+	third_party/WebKit/Source/core/dom/CustomElementCallbackInvocation.cpp \
+	third_party/WebKit/Source/core/dom/CustomElementCallbackQueue.cpp \
+	third_party/WebKit/Source/core/dom/CustomElementDefinition.cpp \
+	third_party/WebKit/Source/core/dom/CustomElementRegistrationContext.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementRegistry.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementUpgradeCandidateMap.cpp \
 	third_party/WebKit/Source/core/dom/CustomEvent.cpp \
@@ -67,6 +70,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/DocumentEventQueue.cpp \
 	third_party/WebKit/Source/core/dom/DocumentFragment.cpp \
 	third_party/WebKit/Source/core/dom/DocumentFullscreen.cpp \
+	third_party/WebKit/Source/core/dom/DocumentInit.cpp \
 	third_party/WebKit/Source/core/dom/DocumentLifecycleObserver.cpp \
 	third_party/WebKit/Source/core/dom/DocumentMarkerController.cpp \
 	third_party/WebKit/Source/core/dom/DocumentMarker.cpp \
@@ -138,8 +142,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/Range.cpp \
 	third_party/WebKit/Source/core/dom/ResourceProgressEvent.cpp \
 	third_party/WebKit/Source/core/dom/ScopedEventQueue.cpp \
-	third_party/WebKit/Source/core/dom/ScriptElement.cpp \
 	third_party/WebKit/Source/core/dom/ScriptExecutionContext.cpp \
+	third_party/WebKit/Source/core/dom/ScriptLoader.cpp \
 	third_party/WebKit/Source/core/dom/ScriptRunner.cpp \
 	third_party/WebKit/Source/core/dom/ScriptableDocumentParser.cpp \
 	third_party/WebKit/Source/core/dom/ScriptedAnimationController.cpp \
@@ -149,9 +153,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/StaticNodeList.cpp \
 	third_party/WebKit/Source/core/dom/StringCallback.cpp \
 	third_party/WebKit/Source/core/dom/StyleElement.cpp \
+	third_party/WebKit/Source/core/dom/StyleSheetCollection.cpp \
 	third_party/WebKit/Source/core/dom/TagNodeList.cpp \
 	third_party/WebKit/Source/core/dom/Text.cpp \
 	third_party/WebKit/Source/core/dom/TextEvent.cpp \
+	third_party/WebKit/Source/core/dom/TextLinkColors.cpp \
 	third_party/WebKit/Source/core/dom/Touch.cpp \
 	third_party/WebKit/Source/core/dom/TouchEvent.cpp \
 	third_party/WebKit/Source/core/dom/TouchList.cpp \
@@ -221,6 +227,8 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -232,7 +240,6 @@ MY_DEFS_Debug := \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -240,9 +247,7 @@ MY_DEFS_Debug := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -254,7 +259,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -382,6 +386,8 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -393,7 +399,6 @@ MY_DEFS_Release := \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -401,9 +406,7 @@ MY_DEFS_Release := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -415,7 +418,6 @@ MY_DEFS_Release := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \

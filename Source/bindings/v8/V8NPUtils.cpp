@@ -42,7 +42,7 @@
 
 namespace WebCore {
 
-void convertV8ObjectToNPVariant(v8::Local<v8::Value> object, NPP owner, NPVariant* result)
+void convertV8ObjectToNPVariant(v8::Local<v8::Value> object, NPObject* owner, NPVariant* result)
 {
     VOID_TO_NPVARIANT(*result);
 
@@ -69,17 +69,14 @@ void convertV8ObjectToNPVariant(v8::Local<v8::Value> object, NPP owner, NPVarian
         STRINGN_TO_NPVARIANT(utf8Chars, length-1, *result);
     } else if (object->IsObject()) {
         DOMWindow* window = toDOMWindow(v8::Context::GetCurrent());
-        if (owner) {
-            NPObject* npobject = npCreateV8ScriptObject(
-                owner, v8::Handle<v8::Object>::Cast(object), window);
-            OBJECT_TO_NPVARIANT(npobject, *result);
-        } else {
-            NULL_TO_NPVARIANT(*result);
-        }
+        NPObject* npobject = npCreateV8ScriptObject(0, v8::Handle<v8::Object>::Cast(object), window);
+        if (npobject)
+            _NPN_RegisterObject(npobject, owner);
+        OBJECT_TO_NPVARIANT(npobject, *result);
     }
 }
 
-v8::Handle<v8::Value> convertNPVariantToV8Object(const NPVariant* variant, v8::Isolate* isolate)
+v8::Handle<v8::Value> convertNPVariantToV8Object(const NPVariant* variant, NPObject* owner, v8::Isolate* isolate)
 {
     NPVariantType type = variant->type;
 
@@ -102,7 +99,7 @@ v8::Handle<v8::Value> convertNPVariantToV8Object(const NPVariant* variant, v8::I
         NPObject* object = NPVARIANT_TO_OBJECT(*variant);
         if (V8NPObject* v8Object = npObjectToV8NPObject(object))
             return v8::Local<v8::Object>::New(isolate, v8Object->v8Object);
-        return createV8ObjectForNPObject(object);
+        return createV8ObjectForNPObject(object, owner);
     }
     default:
         return v8::Undefined();

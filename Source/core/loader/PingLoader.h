@@ -35,8 +35,8 @@
 #include "core/platform/Timer.h"
 #include "core/platform/network/ResourceHandleClient.h"
 #include "core/platform/network/ResourceHandleTypes.h"
-#include <wtf/Noncopyable.h>
-#include <wtf/RefPtr.h>
+#include "wtf/Noncopyable.h"
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
@@ -55,9 +55,14 @@ class ResourceResponse;
 class PingLoader : private ResourceHandleClient {
     WTF_MAKE_NONCOPYABLE(PingLoader); WTF_MAKE_FAST_ALLOCATED;
 public:
+    enum ViolationReportType {
+        ContentSecurityPolicyViolationReport,
+        XSSAuditorViolationReport
+    };
+
     static void loadImage(Frame*, const KURL& url);
     static void sendPing(Frame*, const KURL& pingURL, const KURL& destinationURL);
-    static void sendViolationReport(Frame*, const KURL& reportURL, PassRefPtr<FormData> report);
+    static void sendViolationReport(Frame*, const KURL& reportURL, PassRefPtr<FormData> report, ViolationReportType);
 
     virtual ~PingLoader();
 

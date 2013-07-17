@@ -56,6 +56,13 @@ Float32Array* WaveShaperNode::curve()
 
 void WaveShaperNode::setOversample(const String& type, ExceptionCode& ec)
 {
+    ASSERT(isMainThread());
+
+    // This is to synchronize with the changes made in
+    // AudioBasicProcessorNode::checkNumberOfChannelsForInput() where we can
+    // initialize() and uninitialize().
+    AudioContext::AutoLocker contextLocker(context());
+
     if (type == "none")
         waveShaperProcessor()->setOversample(WaveShaperProcessor::OverSampleNone);
     else if (type == "2x")
@@ -63,7 +70,7 @@ void WaveShaperNode::setOversample(const String& type, ExceptionCode& ec)
     else if (type == "4x")
         waveShaperProcessor()->setOversample(WaveShaperProcessor::OverSample4x);
     else
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
 }
 
 String WaveShaperNode::oversample() const

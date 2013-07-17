@@ -189,9 +189,7 @@ public:
     // DOM Storage --------------------------------------------------
 
     // Return a LocalStorage namespace
-    virtual WebStorageNamespace* createLocalStorageNamespace() { return createLocalStorageNamespace(WebString(), 0); }
-    // FIXME: Remove the argument-taking version once its override is removed from Chromium; the arguments are unused.
-    virtual WebStorageNamespace* createLocalStorageNamespace(const WebString& path, unsigned quota) { return 0; }
+    virtual WebStorageNamespace* createLocalStorageNamespace() { return 0; }
 
 
     // FileSystem ----------------------------------------------------------
@@ -285,6 +283,14 @@ public:
     // discardable.
     virtual WebDiscardableMemory* allocateAndLockDiscardableMemory(size_t bytes) { return 0; }
 
+    // A wrapper for tcmalloc's HeapProfilerStart();
+    virtual void startHeapProfiling(const WebString& /*prefix*/) { }
+    // A wrapper for tcmalloc's HeapProfilerStop();
+    virtual void stopHeapProfiling() { }
+    // A wrapper for tcmalloc's HeapProfilerDump()
+    virtual void dumpHeapProfiling(const WebString& /*reason*/) { }
+    // A wrapper for tcmalloc's GetHeapProfile()
+    virtual WebString getHeapProfile() { return WebString(); }
 
     // Message Ports -------------------------------------------------------
 

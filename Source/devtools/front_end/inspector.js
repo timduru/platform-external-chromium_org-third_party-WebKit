@@ -487,7 +487,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
 
     this.cssModel = new WebInspector.CSSStyleModel(this.workspace);
     this.timelineManager = new WebInspector.TimelineManager();
-    this.userAgentSupport = new WebInspector.UserAgentSupport();
+    this.overridesSupport = new WebInspector.OverridesSupport();
 
     this.searchController = new WebInspector.SearchController();
     this.advancedSearchController = new WebInspector.AdvancedSearchController();
@@ -833,10 +833,12 @@ WebInspector.documentKeyDown = function(event)
 
 WebInspector.postDocumentKeyDown = function(event)
 {
+    var Esc = "U+001B";
+
     if (event.handled)
         return;
 
-    if (event.keyCode === WebInspector.KeyboardShortcut.Keys.Esc.code) {
+    if (event.keyIdentifier === Esc) {
         if (WebInspector.searchController.isSearchVisible()) {
             WebInspector.searchController.closeSearch();
             return;

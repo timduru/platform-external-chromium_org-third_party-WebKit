@@ -31,6 +31,7 @@
 #include "config.h"
 #include "modules/mediasource/MediaSource.h"
 
+#include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/dom/GenericEventQueue.h"
 #include "core/html/TimeRanges.h"
 #include "core/platform/ContentType.h"
@@ -69,24 +70,24 @@ SourceBuffer* MediaSource::addSourceBuffer(const String& type, ExceptionCode& ec
     LOG(Media, "MediaSource::addSourceBuffer(%s) %p", type.ascii().data(), this);
 
     // 2.2 https://dvcs.w3.org/hg/html-media/raw-file/default/media-source/media-source.html#widl-MediaSource-addSourceBuffer-SourceBuffer-DOMString-type
-    // 1. If type is null or an empty then throw an INVALID_ACCESS_ERR exception and
+    // 1. If type is null or an empty then throw an InvalidAccessError exception and
     // abort these steps.
     if (type.isNull() || type.isEmpty()) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
     // 2. If type contains a MIME type that is not supported ..., then throw a
-    // NOT_SUPPORTED_ERR exception and abort these steps.
+    // NotSupportedError exception and abort these steps.
     if (!isTypeSupported(type)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
     // 4. If the readyState attribute is not in the "open" state then throw an
-    // INVALID_STATE_ERR exception and abort these steps.
+    // InvalidStateError exception and abort these steps.
     if (!isOpen()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return 0;
     }
 
@@ -96,9 +97,9 @@ SourceBuffer* MediaSource::addSourceBuffer(const String& type, ExceptionCode& ec
     OwnPtr<SourceBufferPrivate> sourceBufferPrivate = createSourceBufferPrivate(contentType.type(), codecs, ec);
 
     if (!sourceBufferPrivate) {
-        ASSERT(ec == NOT_SUPPORTED_ERR || ec == QUOTA_EXCEEDED_ERR);
-        // 2. If type contains a MIME type that is not supported ..., then throw a NOT_SUPPORTED_ERR exception and abort these steps.
-        // 3. If the user agent can't handle any more SourceBuffer objects then throw a QUOTA_EXCEEDED_ERR exception and abort these steps
+        ASSERT(ec == NotSupportedError || ec == QuotaExceededError);
+        // 2. If type contains a MIME type that is not supported ..., then throw a NotSupportedError exception and abort these steps.
+        // 3. If the user agent can't handle any more SourceBuffer objects then throw a QuotaExceededError exception and abort these steps
         return 0;
     }
 
@@ -116,17 +117,17 @@ void MediaSource::removeSourceBuffer(SourceBuffer* buffer, ExceptionCode& ec)
     RefPtr<SourceBuffer> protect(buffer);
 
     // 2.2 https://dvcs.w3.org/hg/html-media/raw-file/default/media-source/media-source.html#widl-MediaSource-removeSourceBuffer-void-SourceBuffer-sourceBuffer
-    // 1. If sourceBuffer is null then throw an INVALID_ACCESS_ERR exception and
+    // 1. If sourceBuffer is null then throw an InvalidAccessError exception and
     // abort these steps.
     if (!buffer) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return;
     }
 
     // 2. If sourceBuffer specifies an object that is not in sourceBuffers then
-    // throw a NOT_FOUND_ERR exception and abort these steps.
+    // throw a NotFoundError exception and abort these steps.
     if (!m_sourceBuffers->length() || !m_sourceBuffers->contains(buffer)) {
-        ec = NOT_FOUND_ERR;
+        ec = NotFoundError;
         return;
     }
 
@@ -147,23 +148,14 @@ void MediaSource::removeSourceBuffer(SourceBuffer* buffer, ExceptionCode& ec)
     buffer->removedFromMediaSource();
 }
 
-void MediaSource::setReadyState(const AtomicString& state)
+void MediaSource::onReadyStateChange(const AtomicString& oldState, const AtomicString& newState)
 {
-    ASSERT(state == openKeyword() || state == closedKeyword() || state == endedKeyword());
-    AtomicString oldState = readyState();
-    if (oldState == state)
-        return;
-
-    LOG(Media, "MediaSource::setReadyState() %p : %s -> %s", this, oldState.string().ascii().data(), state.string().ascii().data());
-
-    MediaSourceBase::setReadyState(state);
-
     if (isOpen()) {
         scheduleEvent(eventNames().sourceopenEvent);
         return;
     }
 
-    if (oldState == openKeyword() && state == endedKeyword()) {
+    if (oldState == openKeyword() && newState == endedKeyword()) {
         scheduleEvent(eventNames().sourceendedEvent);
         return;
     }
@@ -178,6 +170,15 @@ void MediaSource::setReadyState(const AtomicString& state)
     m_sourceBuffers->clear();
 
     scheduleEvent(eventNames().sourcecloseEvent);
+}
+
+Vector<RefPtr<TimeRanges> > MediaSource::activeRanges() const
+{
+    Vector<RefPtr<TimeRanges> > activeRanges(m_activeSourceBuffers->length());
+    for (size_t i = 0; i < m_activeSourceBuffers->length(); ++i)
+        activeRanges[i] = m_activeSourceBuffers->item(i)->buffered(ASSERT_NO_EXCEPTION);
+
+    return activeRanges;
 }
 
 bool MediaSource::isTypeSupported(const String& type)

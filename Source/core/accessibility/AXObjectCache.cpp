@@ -75,7 +75,7 @@
 #include "core/rendering/RenderTableCell.h"
 #include "core/rendering/RenderTableRow.h"
 #include "core/rendering/RenderView.h"
-#include <wtf/PassRefPtr.h>
+#include "wtf/PassRefPtr.h"
 
 namespace WebCore {
 
@@ -160,9 +160,9 @@ AccessibilityObject* AXObjectCache::focusedUIElementForPage(const Page* page)
     if (!focusedNode)
         focusedNode = focusedDocument;
 
-    if (focusedNode->hasTagName(areaTag))
-        return focusedImageMapUIElement(static_cast<HTMLAreaElement*>(focusedNode));
-    
+    if (isHTMLAreaElement(focusedNode))
+        return focusedImageMapUIElement(toHTMLAreaElement(focusedNode));
+
     AccessibilityObject* obj = focusedNode->document()->axObjectCache()->getOrCreate(focusedNode);
     if (!obj)
         return 0;
@@ -791,7 +791,7 @@ void AXObjectCache::handleAttributeChanged(const QualifiedName& attrName, Elemen
         handleAriaRoleChanged(element);
     else if (attrName == altAttr || attrName == titleAttr)
         textChanged(element);
-    else if (attrName == forAttr && element->hasTagName(labelTag))
+    else if (attrName == forAttr && isHTMLLabelElement(element))
         labelChanged(element);
 
     if (!attrName.localName().string().startsWith("aria-"))
@@ -819,9 +819,7 @@ void AXObjectCache::handleAttributeChanged(const QualifiedName& attrName, Elemen
 
 void AXObjectCache::labelChanged(Element* element)
 {
-    ASSERT(element->hasTagName(labelTag));
-    HTMLElement* correspondingControl = static_cast<HTMLLabelElement*>(element)->control();
-    textChanged(correspondingControl);
+    textChanged(toHTMLLabelElement(element)->control());
 }
 
 void AXObjectCache::recomputeIsIgnored(RenderObject* renderer)

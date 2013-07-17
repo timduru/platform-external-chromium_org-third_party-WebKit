@@ -22,17 +22,17 @@
 #include "V8TestOverloadedConstructors.h"
 
 #include "RuntimeEnabledFeatures.h"
-#include "V8ArrayBuffer.h"
 #include "V8ArrayBufferView.h"
 #include "V8Blob.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMConfiguration.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/V8ObjectConstructor.h"
+#include "bindings/v8/custom/V8ArrayBufferCustom.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "wtf/UnusedParam.h"
@@ -67,12 +67,12 @@ template <typename T> void V8_USE(T) { }
 
 static void constructor1(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    V8TRYCATCH_VOID(ArrayBuffer*, arrayBuffer, V8ArrayBuffer::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8ArrayBuffer::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
+    V8TRYCATCH_VOID(ArrayBuffer*, arrayBuffer, args[0]->IsArrayBuffer() ? V8ArrayBuffer::toNative(v8::Handle<v8::ArrayBuffer>::Cast(args[0])) : 0);
 
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(arrayBuffer);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
-    V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     args.GetReturnValue().Set(wrapper);
 }
 
@@ -83,7 +83,7 @@ static void constructor2(const v8::FunctionCallbackInfo<v8::Value>& args)
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(arrayBufferView);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
-    V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     args.GetReturnValue().Set(wrapper);
 }
 
@@ -94,7 +94,7 @@ static void constructor3(const v8::FunctionCallbackInfo<v8::Value>& args)
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(blob);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
-    V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     args.GetReturnValue().Set(wrapper);
 }
 
@@ -105,7 +105,7 @@ static void constructor4(const v8::FunctionCallbackInfo<v8::Value>& args)
     RefPtr<TestOverloadedConstructors> impl = TestOverloadedConstructors::create(string);
     v8::Handle<v8::Object> wrapper = args.Holder();
 
-    V8DOMWrapper::associateObjectWithWrapper(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl.release(), &V8TestOverloadedConstructors::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     args.GetReturnValue().Set(wrapper);
 }
 
@@ -139,7 +139,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 
 void V8TestOverloadedConstructors::constructorCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TraceEvent::SamplingState0Scope("Blink\0Blink-DOMConstructor");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "DOMConstructor");
     if (!args.IsConstructCall()) {
         throwTypeError("DOM object constructor cannot be called as a function.", args.GetIsolate());
         return;
@@ -177,7 +177,7 @@ v8::Handle<v8::FunctionTemplate> V8TestOverloadedConstructors::GetTemplate(v8::I
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
-    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestOverloadedConstructorsTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
@@ -201,18 +201,18 @@ bool V8TestOverloadedConstructors::HasInstanceInAnyWorld(v8::Handle<v8::Value> v
 v8::Handle<v8::Object> V8TestOverloadedConstructors::createWrapper(PassRefPtr<TestOverloadedConstructors> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
+    ASSERT(DOMDataStore::getWrapper<V8TestOverloadedConstructors>(impl.get(), isolate).IsEmpty());
 
-    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestOverloadedConstructors>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestOverloadedConstructors::derefObject(void* object)
 {
-    static_cast<TestOverloadedConstructors*>(object)->deref();
+    fromInternalPointer(object)->deref();
 }
 
 } // namespace WebCore

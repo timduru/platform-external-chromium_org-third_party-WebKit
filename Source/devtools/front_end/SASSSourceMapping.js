@@ -46,6 +46,7 @@ WebInspector.SASSSourceMapping = function(cssModel, workspace, networkWorkspaceP
     this._addingRevisionCounter = 0;
     this._reset();
     WebInspector.fileManager.addEventListener(WebInspector.FileManager.EventTypes.SavedURL, this._fileSaveFinished, this);
+    WebInspector.settings.cssSourceMapsEnabled.addChangeListener(this._toggleSourceMapSupport, this)
     this._cssModel.addEventListener(WebInspector.CSSStyleModel.Events.StyleSheetChanged, this._styleSheetChanged, this);
     this._workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeAdded, this._uiSourceCodeAdded, this);
     this._workspace.addEventListener(WebInspector.Workspace.Events.UISourceCodeContentCommitted, this._uiSourceCodeContentCommitted, this);
@@ -64,13 +65,25 @@ WebInspector.SASSSourceMapping.prototype = {
             return;
         }
         var header = this._cssModel.styleSheetHeaderForId(id);
-        if (!header || !WebInspector.experimentsSettings.sass.isEnabled())
+        if (!header)
             return;
 
-        var wasHeaderKnown = header.sourceURL && !!this._completeSourceMapURLForCSSURL[header.sourceURL];
         this.removeHeader(header);
-        if (wasHeaderKnown)
-            header.updateLocations();
+    },
+
+    /**
+     * @param {WebInspector.Event} event
+     */
+    _toggleSourceMapSupport: function(event)
+    {
+        var enabled = /** @type {boolean} */ (event.data);
+        var headers = this._cssModel.styleSheetHeaders();
+        for (var i = 0; i < headers.length; ++i) {
+            if (enabled)
+                this.addHeader(headers[i]);
+            else
+                this.removeHeader(headers[i]);
+        }
     },
 
     /**
@@ -83,24 +96,53 @@ WebInspector.SASSSourceMapping.prototype = {
     },
 
     /**
+     * @param {string} headerName
+     * @param {NetworkAgent.Headers} headers
+     * @return {?string}
+     */
+    _headerValue: function(headerName, headers)
+    {
+        headerName = headerName.toLowerCase();
+        var value = null;
+        for (var name in headers) {
+            if (name.toLowerCase() === headerName) {
+                value = headers[name];
+                break;
+            }
+        }
+        return value;
+    },
+
+    /**
      * @param {NetworkAgent.Headers} headers
      * @return {?Date}
      */
     _lastModified: function(headers)
     {
-        var lastModifiedHeader;
-        for (var name in headers) {
-            if (name.toLowerCase() === "last-modified") {
-                lastModifiedHeader = headers[name];
-                break;
-            }
-        }
+        var lastModifiedHeader = this._headerValue("last-modified", headers);
         if (!lastModifiedHeader)
             return null;
         var lastModified = new Date(lastModifiedHeader);
         if (isNaN(lastModified.getTime()))
             return null;
         return lastModified;
+    },
+
+    /**
+     * @param {NetworkAgent.Headers} headers
+     * @param {string} url
+     * @return {?Date}
+     */
+    _checkLastModified: function(headers, url)
+    {
+        var lastModified = this._lastModified(headers);
+        if (lastModified)
+            return lastModified;
+
+        var etagMessage = this._headerValue("etag", headers) ? ", \"ETag\" response header found instead" : "";
+        var message = String.sprintf("The \"Last-Modified\" response header is missing or invalid for %s%s. The CSS auto-reload functionality will not work correctly.", url, etagMessage);
+        WebInspector.log(message);
+        return null;
     },
 
     /**
@@ -134,7 +176,7 @@ WebInspector.SASSSourceMapping.prototype = {
                 console.error("Could not load content for " + sassURL + " : " + (error || ("HTTP status code: " + statusCode)));
                 return;
             }
-            var lastModified = this._lastModified(headers);
+            var lastModified = this._checkLastModified(headers, sassURL);
             if (!lastModified)
                 return;
             metadataReceived.call(this, lastModified);
@@ -246,8 +288,12 @@ WebInspector.SASSSourceMapping.prototype = {
                 callback(cssURL, sassURL, false);
                 return;
             }
-            var lastModified = this._lastModified(headers);
-            if (!lastModified || lastModified.getTime() < data.sassTimestamp.getTime()) {
+            var lastModified = this._checkLastModified(headers, cssURL);
+            if (!lastModified) {
+                callback(cssURL, sassURL, true);
+                return;
+            }
+            if (lastModified.getTime() < data.sassTimestamp.getTime()) {
                 callback(cssURL, sassURL, false);
                 return;
             }
@@ -336,7 +382,7 @@ WebInspector.SASSSourceMapping.prototype = {
      */
     addHeader: function(header)
     {
-        if (!header.sourceMapURL || !header.sourceURL || header.isInline || !WebInspector.experimentsSettings.sass.isEnabled())
+        if (!header.sourceMapURL || !header.sourceURL || header.isInline || !WebInspector.settings.cssSourceMapsEnabled.get())
             return;
         var completeSourceMapURL = WebInspector.ParsedURL.completeURL(header.sourceURL, header.sourceMapURL);
         if (!completeSourceMapURL)
@@ -364,6 +410,7 @@ WebInspector.SASSSourceMapping.prototype = {
         var completeSourceMapURL = WebInspector.ParsedURL.completeURL(sourceURL, header.sourceMapURL);
         if (completeSourceMapURL)
             delete this._sourceMapByURL[completeSourceMapURL];
+        header.updateLocations();
     },
 
     /**
@@ -466,12 +513,12 @@ WebInspector.SASSSourceMapping.prototype = {
         var sources = sourceMap.sources();
         for (var i = 0; i < sources.length; ++i) {
             var url = sources[i];
+            this._addCSSURLforSASSURL(rawURL, url);
             if (!this._workspace.hasMappingForURL(url) && !this._workspace.uiSourceCodeForURL(url)) {
                 var contentProvider = sourceMap.sourceContentProvider(url, WebInspector.resourceTypes.Stylesheet);
                 var uiSourceCode = this._networkWorkspaceProvider.addFileForURL(url, contentProvider, true);
                 uiSourceCode.setSourceMapping(this);
             }
-            this._addCSSURLforSASSURL(rawURL, url);
         }
     },
 

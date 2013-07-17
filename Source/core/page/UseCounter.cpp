@@ -465,8 +465,8 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
     case CSSPropertyTextDecorationLine: return 401;
     case CSSPropertyTextDecorationStyle: return 402;
     case CSSPropertyTextDecorationColor: return 403;
+    case CSSPropertyTextAlignLast: return 404;
 #if defined(ENABLE_CSS3_TEXT) && ENABLE_CSS3_TEXT
-    case CSSPropertyWebkitTextAlignLast: return 404;
     case CSSPropertyWebkitTextUnderlinePosition: return 405;
 #endif
     case CSSPropertyMaxZoom: return 406;
@@ -476,9 +476,7 @@ static int mapCSSPropertyIdToCSSSampleId(int id)
 #if defined(ENABLE_DASHBOARD_SUPPORT) && ENABLE_DASHBOARD_SUPPORT
     case CSSPropertyWebkitDashboardRegion: return 410;
 #endif
-#if defined(ENABLE_ACCELERATED_OVERFLOW_SCROLLING) && ENABLE_ACCELERATED_OVERFLOW_SCROLLING
-    case CSSPropertyWebkitOverflowScrolling: return 411;
-#endif
+    // CSSPropertyWebkitOverflowScrolling was 411.
     case CSSPropertyWebkitAppRegion: return 412;
     case CSSPropertyWebkitFilter: return 413;
     case CSSPropertyWebkitBoxDecorationBreak: return 414;
@@ -641,6 +639,10 @@ String UseCounter::deprecationMessage(Feature feature)
         return "HTMLShadowElement.olderShadowRoot is deprecated.";
     case PrefixedDocumentRegister:
         return "The document.webkitRegister method is deprecated. Use the document.register method instead.";
+
+    // HTML Media Capture
+    case CaptureAttributeAsEnum:
+        return "Using the 'capture' attribute as an enum is deprecated. Please use it as a boolean and specify the media types that should be accepted in the 'accept' attribute.";
 
     // Features that aren't deprecated don't have a deprecation message.
     default:

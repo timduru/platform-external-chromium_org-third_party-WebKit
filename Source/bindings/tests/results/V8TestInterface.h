@@ -36,7 +36,7 @@ public:
     static v8::Handle<v8::FunctionTemplate> GetTemplate(v8::Isolate*, WrapperWorldType);
     static TestInterface* toNative(v8::Handle<v8::Object> object)
     {
-        return reinterpret_cast<TestInterface*>(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
+        return fromInternalPointer(object->GetAlignedPointerFromInternalField(v8DOMWrapperObjectIndex));
     }
     static void derefObject(void*);
     static WrapperTypeInfo info;
@@ -44,6 +44,9 @@ public:
 #if ENABLE(Condition22) || ENABLE(Condition23)
     static void implementsMethod3MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
+#if ENABLE(Condition11) || ENABLE(Condition12)
+    static void supplementalMethod3MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
+#endif // ENABLE(Condition11) || ENABLE(Condition12)
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
 #if ENABLE(Condition22) || ENABLE(Condition23)
     static void implementsStr3AttrGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
@@ -53,6 +56,15 @@ public:
 #endif // ENABLE(Condition22) || ENABLE(Condition23)
     static void namedPropertySetterCustom(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<v8::Value>&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
+    static inline void* toInternalPointer(TestInterface* impl)
+    {
+        return impl;
+    }
+
+    static inline TestInterface* fromInternalPointer(void* object)
+    {
+        return static_cast<TestInterface*>(object);
+    }
     static void installPerContextProperties(v8::Handle<v8::Object>, TestInterface*, v8::Isolate*);
     static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
 private:
@@ -70,7 +82,7 @@ public:
 inline v8::Handle<v8::Object> wrap(TestInterface* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl);
-    ASSERT(DOMDataStore::getWrapper(impl, isolate).IsEmpty());
+    ASSERT(DOMDataStore::getWrapper<V8TestInterface>(impl, isolate).IsEmpty());
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl)) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl);
         // Might be a XXXConstructor::info instead of an XXX::info. These will both have
@@ -84,7 +96,7 @@ inline v8::Handle<v8::Value> toV8(TestInterface* impl, v8::Handle<v8::Object> cr
 {
     if (UNLIKELY(!impl))
         return v8NullWithCheck(isolate);
-    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapper(impl, isolate);
+    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapper<V8TestInterface>(impl, isolate);
     if (!wrapper.IsEmpty())
         return wrapper;
     return wrap(impl, creationContext, isolate);
@@ -95,46 +107,46 @@ inline v8::Handle<v8::Value> toV8ForMainWorld(TestInterface* impl, v8::Handle<v8
     ASSERT(worldType(isolate) == MainWorld);
     if (UNLIKELY(!impl))
         return v8NullWithCheck(isolate);
-    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapperForMainWorld(impl);
+    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapperForMainWorld<V8TestInterface>(impl);
     if (!wrapper.IsEmpty())
         return wrapper;
     return wrap(impl, creationContext, isolate);
 }
 
-template<class HolderContainer, class Wrappable>
-inline v8::Handle<v8::Value> toV8Fast(TestInterface* impl, const HolderContainer& container, Wrappable* wrappable)
+template<class CallbackInfo, class Wrappable>
+inline v8::Handle<v8::Value> toV8Fast(TestInterface* impl, const CallbackInfo& callbackInfo, Wrappable* wrappable)
 {
     if (UNLIKELY(!impl))
-        return v8::Null(container.GetIsolate());
-    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperFast(impl, container, wrappable);
+        return v8::Null(callbackInfo.GetIsolate());
+    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperFast<V8TestInterface>(impl, callbackInfo, wrappable);
     if (!wrapper.IsEmpty())
         return wrapper;
-    return wrap(impl, container.Holder(), container.GetIsolate());
+    return wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
 }
 
-template<class HolderContainer, class Wrappable>
-inline v8::Handle<v8::Value> toV8FastForMainWorld(TestInterface* impl, const HolderContainer& container, Wrappable* wrappable)
+template<class CallbackInfo, class Wrappable>
+inline v8::Handle<v8::Value> toV8FastForMainWorld(TestInterface* impl, const CallbackInfo& callbackInfo, Wrappable* wrappable)
 {
-    ASSERT(worldType(container.GetIsolate()) == MainWorld);
+    ASSERT(worldType(callbackInfo.GetIsolate()) == MainWorld);
     if (UNLIKELY(!impl))
-        return v8::Null(container.GetIsolate());
-    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperForMainWorld(impl);
+        return v8::Null(callbackInfo.GetIsolate());
+    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperForMainWorld<V8TestInterface>(impl);
     if (!wrapper.IsEmpty())
         return wrapper;
-    return wrap(impl, container.Holder(), container.GetIsolate());
+    return wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
 }
 
-template<class HolderContainer, class Wrappable>
-inline v8::Handle<v8::Value> toV8FastForMainWorld(PassRefPtr< TestInterface > impl, const HolderContainer& container, Wrappable* wrappable)
+template<class CallbackInfo, class Wrappable>
+inline v8::Handle<v8::Value> toV8FastForMainWorld(PassRefPtr< TestInterface > impl, const CallbackInfo& callbackInfo, Wrappable* wrappable)
 {
-    return toV8FastForMainWorld(impl.get(), container, wrappable);
+    return toV8FastForMainWorld(impl.get(), callbackInfo, wrappable);
 }
 
 
-template<class HolderContainer, class Wrappable>
-inline v8::Handle<v8::Value> toV8Fast(PassRefPtr< TestInterface > impl, const HolderContainer& container, Wrappable* wrappable)
+template<class CallbackInfo, class Wrappable>
+inline v8::Handle<v8::Value> toV8Fast(PassRefPtr< TestInterface > impl, const CallbackInfo& callbackInfo, Wrappable* wrappable)
 {
-    return toV8Fast(impl.get(), container, wrappable);
+    return toV8Fast(impl.get(), callbackInfo, wrappable);
 }
 
 inline v8::Handle<v8::Value> toV8(PassRefPtr< TestInterface > impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)

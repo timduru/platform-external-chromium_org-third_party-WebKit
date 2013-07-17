@@ -29,8 +29,8 @@
 #include "core/dom/Position.h"
 #include "core/editing/EditingBoundary.h"
 #include "core/platform/text/TextDirection.h"
-#include <wtf/Forward.h>
-#include <wtf/unicode/CharacterNames.h>
+#include "wtf/Forward.h"
+#include "wtf/unicode/CharacterNames.h"
 
 namespace WebCore {
 
@@ -58,13 +58,13 @@ Node* highestEditableRoot(const Position&, EditableType = ContentIsEditable);
 
 Node* highestEnclosingNodeOfType(const Position&, bool (*nodeIsOfType)(const Node*),
     EditingBoundaryCrossingRule = CannotCrossEditingBoundary, Node* stayWithin = 0);
-Node* highestNodeToRemoveInPruning(Node*);
+Node* highestNodeToRemoveInPruning(Node*, Node* excludeNode = 0);
 Node* lowestEditableAncestor(Node*);
 
 Element* enclosingBlock(Node*, EditingBoundaryCrossingRule = CannotCrossEditingBoundary);
 Node* enclosingTableCell(const Position&);
 Node* enclosingEmptyListItem(const VisiblePosition&);
-Node* enclosingAnchorElement(const Position&);
+Element* enclosingAnchorElement(const Position&);
 Node* enclosingNodeWithTag(const Position&, const QualifiedName&);
 Node* enclosingNodeOfType(const Position&, bool (*nodeIsOfType)(const Node*), EditingBoundaryCrossingRule = CannotCrossEditingBoundary);
 

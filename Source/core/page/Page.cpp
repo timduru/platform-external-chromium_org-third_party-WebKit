@@ -228,7 +228,7 @@ void Page::updateDragAndDrop(Node* dropTargetNode, const IntPoint& eventPosition
     m_autoscrollController->updateDragAndDrop(dropTargetNode, eventPosition, eventTime);
 }
 
-#if ENABLE(PAN_SCROLLING)
+#if OS(WINDOWS)
 void Page::handleMouseReleaseForPanScrolling(Frame* frame, const PlatformMouseEvent& point)
 {
     m_autoscrollController->handleMouseReleaseForPanScrolling(frame, point);
@@ -636,13 +636,13 @@ void Page::setVisibilityState(PageVisibilityState visibilityState, bool isInitia
         return;
     m_visibilityState = visibilityState;
 
-    if (!isInitialState && m_mainFrame)
-        m_mainFrame->dispatchVisibilityStateChangeEvent();
-
     if (visibilityState == WebCore::PageVisibilityStateHidden)
         setTimerAlignmentInterval(DOMTimer::hiddenPageAlignmentInterval());
     else
         setTimerAlignmentInterval(DOMTimer::visiblePageAlignmentInterval());
+
+    if (!isInitialState && m_mainFrame)
+        m_mainFrame->dispatchVisibilityStateChangeEvent();
 }
 
 PageVisibilityState Page::visibilityState() const

@@ -271,9 +271,8 @@ void V8WindowShell::createContext()
     // Used to avoid sleep calls in unload handlers.
     ScriptController::registerExtensionIfNeeded(DateExtension::get());
 
-    // Enables experimental i18n API in V8.
-    if (RuntimeEnabledFeatures::javaScriptI18NAPIEnabled())
-        ScriptController::registerExtensionIfNeeded(v8_i18n::Extension::get());
+    // Enable i18n API in V8.
+    ScriptController::registerExtensionIfNeeded(v8_i18n::Extension::get());
 
     // Dynamically tell v8 about our extensions now.
     const V8Extensions& extensions = ScriptController::registeredExtensions();
@@ -329,7 +328,7 @@ bool V8WindowShell::installDOMWindow()
     v8::Handle<v8::Object> innerGlobalObject = toInnerGlobalObject(m_context.newLocal(m_isolate));
     V8DOMWrapper::setNativeInfo(innerGlobalObject, &V8Window::info, window);
     innerGlobalObject->SetPrototype(windowWrapper);
-    V8DOMWrapper::associateObjectWithWrapper(PassRefPtr<DOMWindow>(window), &V8Window::info, windowWrapper, m_isolate, WrapperConfiguration::Dependent);
+    V8DOMWrapper::associateObjectWithWrapper<V8Window>(PassRefPtr<DOMWindow>(window), &V8Window::info, windowWrapper, m_isolate, WrapperConfiguration::Dependent);
     DOMWrapperWorld::setInitializingWindow(false);
     return true;
 }
@@ -440,7 +439,7 @@ static v8::Handle<v8::Value> getNamedProperty(HTMLDocument* htmlDocument, const 
     if (items->hasExactlyOneItem()) {
         Node* node = items->item(0);
         Frame* frame = 0;
-        if (node->hasTagName(HTMLNames::iframeTag) && (frame = static_cast<HTMLIFrameElement*>(node)->contentFrame()))
+        if (node->hasTagName(HTMLNames::iframeTag) && (frame = toHTMLIFrameElement(node)->contentFrame()))
             return toV8(frame->document()->domWindow(), creationContext, isolate);
         return toV8(node, creationContext, isolate);
     }

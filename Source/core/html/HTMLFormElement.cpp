@@ -41,10 +41,12 @@
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
+#include "core/html/HTMLTableElement.h"
 #include "core/loader/FormState.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/Frame.h"
+#include "core/page/UseCounter.h"
 #include "core/rendering/RenderTextControl.h"
 
 using namespace std;
@@ -70,11 +72,13 @@ HTMLFormElement::HTMLFormElement(const QualifiedName& tagName, Document* documen
 
 PassRefPtr<HTMLFormElement> HTMLFormElement::create(Document* document)
 {
+    UseCounter::count(document, UseCounter::FormElement);
     return adoptRef(new HTMLFormElement(formTag, document));
 }
 
 PassRefPtr<HTMLFormElement> HTMLFormElement::create(const QualifiedName& tagName, Document* document)
 {
+    UseCounter::count(document, UseCounter::FormElement);
     return adoptRef(new HTMLFormElement(tagName, document));
 }
 
@@ -101,7 +105,7 @@ bool HTMLFormElement::rendererIsNeeded(const NodeRenderingContext& context)
     ContainerNode* node = parentNode();
     RenderObject* parentRenderer = node->renderer();
     // FIXME: Shouldn't we also check for table caption (see |formIsTablePart| below).
-    bool parentIsTableElementPart = (parentRenderer->isTable() && node->hasTagName(tableTag))
+    bool parentIsTableElementPart = (parentRenderer->isTable() && isHTMLTableElement(node))
         || (parentRenderer->isTableRow() && node->hasTagName(trTag))
         || (parentRenderer->isTableSection() && node->hasTagName(tbodyTag))
         || (parentRenderer->isRenderTableCol() && node->hasTagName(colTag))
@@ -728,6 +732,13 @@ void HTMLFormElement::anonymousNamedGetter(const AtomicString& name, bool& retur
 
     returnValue0Enabled = true;
     returnValue0 = NamedNodesCollection::create(elements);
+}
+
+void HTMLFormElement::setDemoted(bool demoted)
+{
+    if (demoted)
+        UseCounter::count(document(), UseCounter::DemotedFormElement);
+    m_wasDemoted = demoted;
 }
 
 } // namespace

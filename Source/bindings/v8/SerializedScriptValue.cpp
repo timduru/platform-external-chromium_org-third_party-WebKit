@@ -31,7 +31,6 @@
 #include "config.h"
 #include "bindings/v8/SerializedScriptValue.h"
 
-#include "V8ArrayBuffer.h"
 #include "V8ArrayBufferView.h"
 #include "V8Blob.h"
 #include "V8DOMFileSystem.h"
@@ -682,13 +681,13 @@ static v8::Handle<v8::Object> toV8Object(MessagePort* impl, v8::Isolate* isolate
     return wrapper.As<v8::Object>();
 }
 
-static v8::Handle<v8::Object> toV8Object(ArrayBuffer* impl, v8::Isolate* isolate)
+static v8::Handle<v8::ArrayBuffer> toV8Object(ArrayBuffer* impl, v8::Isolate* isolate)
 {
     if (!impl)
-        return v8::Handle<v8::Object>();
+        return v8::Handle<v8::ArrayBuffer>();
     v8::Handle<v8::Value> wrapper = toV8(impl, v8::Handle<v8::Object>(), isolate);
-    ASSERT(wrapper->IsObject());
-    return wrapper.As<v8::Object>();
+    ASSERT(wrapper->IsArrayBuffer());
+    return wrapper.As<v8::ArrayBuffer>();
 }
 
 class Serializer {
@@ -846,7 +845,7 @@ private:
     protected:
         virtual StateBase* objectDone(unsigned numProperties, Serializer&) = 0;
 
-        StateBase* serializeProperties(bool ignoreIndexed, Serializer& serializer) 
+        StateBase* serializeProperties(bool ignoreIndexed, Serializer& serializer)
         {
             m_isSerializingAccessor = false;
             while (m_index < m_propertyNames->Length()) {
@@ -979,7 +978,7 @@ private:
             m_propertyNames = v8::Local<v8::Array>::New(propertyNames);
         }
 
-        virtual StateBase* advance(Serializer& serializer) 
+        virtual StateBase* advance(Serializer& serializer)
         {
             return serializeProperties(false, serializer);
         }
@@ -1178,7 +1177,7 @@ private:
         return 0;
     }
 
-    static bool shouldSerializeDensely(uint32_t length, uint32_t propertyCount) 
+    static bool shouldSerializeDensely(uint32_t length, uint32_t propertyCount)
     {
         // Let K be the cost of serializing all property values that are there
         // Cost of serializing sparsely: 5*propertyCount + K (5 bytes per uint32_t key)
@@ -1700,7 +1699,7 @@ private:
         *value = v8::Number::New(number);
         return true;
     }
-  
+
     bool readNumberObject(v8::Handle<v8::Value>* value)
     {
         double number;
@@ -1772,7 +1771,7 @@ private:
             return false;
         if (!creator.consumeTopOfStack(&arrayBufferV8Value))
             return false;
-        if (arrayBufferV8Value.IsEmpty()) 
+        if (arrayBufferV8Value.IsEmpty())
             return false;
         arrayBuffer = V8ArrayBuffer::toNative(arrayBufferV8Value.As<v8::Object>());
         if (!arrayBuffer)
@@ -2368,12 +2367,23 @@ SerializedScriptValue::SerializedScriptValue()
 {
 }
 
-template<typename T>
-inline void neuterBinding(T* object) 
+inline void neuterBinding(ArrayBuffer* object)
 {
     Vector<DOMDataStore*>& allStores = V8PerIsolateData::current()->allStores();
     for (size_t i = 0; i < allStores.size(); i++) {
-        v8::Handle<v8::Object> wrapper = allStores[i]->get(object);
+        v8::Handle<v8::Object> wrapper = allStores[i]->get<V8ArrayBuffer>(object);
+        if (!wrapper.IsEmpty()) {
+            ASSERT(wrapper->IsArrayBuffer());
+            v8::Handle<v8::ArrayBuffer>::Cast(wrapper)->Neuter();
+        }
+    }
+}
+
+inline void neuterBinding(ArrayBufferView* object)
+{
+    Vector<DOMDataStore*>& allStores = V8PerIsolateData::current()->allStores();
+    for (size_t i = 0; i < allStores.size(); i++) {
+        v8::Handle<v8::Object> wrapper = allStores[i]->get<V8ArrayBufferView>(object);
         if (!wrapper.IsEmpty())
             wrapper->SetIndexedPropertiesToExternalArrayData(0, v8::kExternalByteArray, 0);
     }
@@ -2385,7 +2395,7 @@ PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValu
 
     for (size_t i = 0; i < arrayBuffers.size(); i++) {
         if (arrayBuffers[i]->isNeutered()) {
-            setDOMException(INVALID_STATE_ERR, isolate);
+            setDOMException(InvalidStateError, isolate);
             didThrow = true;
             return nullptr;
         }
@@ -2403,7 +2413,7 @@ PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValu
 
         bool result = arrayBuffers[i]->transfer(contents->at(i), neuteredViews);
         if (!result) {
-            setDOMException(INVALID_STATE_ERR, isolate);
+            setDOMException(InvalidStateError, isolate);
             didThrow = true;
             return nullptr;
         }
@@ -2438,11 +2448,11 @@ SerializedScriptValue::SerializedScriptValue(v8::Handle<v8::Value> value, Messag
         // If there was an input error, throw a new exception outside
         // of the TryCatch scope.
         didThrow = true;
-        setDOMException(DATA_CLONE_ERR, isolate);
+        setDOMException(DataCloneError, isolate);
         return;
     case Serializer::InvalidStateError:
         didThrow = true;
-        setDOMException(INVALID_STATE_ERR, isolate);
+        setDOMException(InvalidStateError, isolate);
         return;
     case Serializer::JSFailure:
         // If there was a JS failure (but no exception), there's not
@@ -2480,6 +2490,10 @@ v8::Handle<v8::Value> SerializedScriptValue::deserialize(v8::Isolate* isolate, M
     COMPILE_ASSERT(sizeof(BufferValueType) == 2, BufferValueTypeIsTwoBytes);
     Reader reader(reinterpret_cast<const uint8_t*>(m_data.impl()->bloatedCharacters()), 2 * m_data.length(), isolate);
     Deserializer deserializer(reader, messagePorts, m_arrayBufferContentsArray.get());
+
+    // deserialize() can run arbitrary script (e.g., setters), which could result in |this| being destroyed.
+    // Holding a RefPtr ensures we are alive (along with our internal data) throughout the operation.
+    RefPtr<SerializedScriptValue> protect(this);
     return deserializer.deserialize();
 }
 

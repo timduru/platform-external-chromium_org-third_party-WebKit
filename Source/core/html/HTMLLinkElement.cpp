@@ -215,11 +215,13 @@ void HTMLLinkElement::removedFrom(ContainerNode* insertionPoint)
     }
     document()->styleSheetCollection()->removeStyleSheetCandidateNode(this);
 
+    RefPtr<StyleSheet> removedSheet = sheet();
+
     if (m_link)
         m_link->ownerRemoved();
 
     if (document()->renderer())
-        document()->styleResolverChanged(DeferRecalcStyle);
+        document()->removedStyleSheet(removedSheet.get());
 }
 
 void HTMLLinkElement::finishParsingChildren()
@@ -406,6 +408,8 @@ void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const 
         ASSERT(restoredSheet->isCacheable());
         ASSERT(!restoredSheet->isLoading());
 
+        if (m_sheet)
+            clearSheet();
         m_sheet = CSSStyleSheet::create(restoredSheet, m_owner);
         m_sheet->setMediaQueries(MediaQuerySet::create(m_owner->media()));
         m_sheet->setTitle(m_owner->title());
@@ -418,6 +422,8 @@ void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const 
 
     RefPtr<StyleSheetContents> styleSheet = StyleSheetContents::create(href, parserContext);
 
+    if (m_sheet)
+        clearSheet();
     m_sheet = CSSStyleSheet::create(styleSheet, m_owner);
     m_sheet->setMediaQueries(MediaQuerySet::create(m_owner->media()));
     m_sheet->setTitle(m_owner->title());
@@ -493,6 +499,8 @@ void LinkStyle::removePendingSheet(RemovePendingSheetNotificationType notificati
         return;
     if (type == NonBlocking) {
         // Document::removePendingSheet() triggers the style selector recalc for blocking sheets.
+        // FIXME: We don't have enough knowledge at this point to know if we're adding or removing a sheet
+        // so we can't call addedStyleSheet() or removedStyleSheet().
         m_owner->document()->styleResolverChanged(RecalcStyleImmediately);
         return;
     }
@@ -538,8 +546,10 @@ void LinkStyle::setDisabledState(bool disabled)
         if (!m_sheet && m_disabledState == EnabledViaScript) {
             if (m_owner->shouldProcessStyle())
                 process();
-        } else
-            m_owner->document()->styleResolverChanged(DeferRecalcStyle); // Update the style selector.
+        } else {
+            // FIXME: We don't have enough knowledge here to know if we should call addedStyleSheet() or removedStyleSheet().
+            m_owner->document()->styleResolverChanged(DeferRecalcStyle);
+        }
     }
 }
 
@@ -599,8 +609,9 @@ void LinkStyle::process()
         }
     } else if (m_sheet) {
         // we no longer contain a stylesheet, e.g. perhaps rel or type was changed
+        RefPtr<StyleSheet> removedSheet = m_sheet;
         clearSheet();
-        document()->styleResolverChanged(DeferRecalcStyle);
+        document()->removedStyleSheet(removedSheet.get());
     }
 }
 

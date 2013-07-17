@@ -251,7 +251,7 @@ CachedResourceHandle<CachedCSSStyleSheet> CachedResourceLoader::requestUserCSSSt
         memoryCache()->remove(existing);
     }
 
-    request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType));
+    request.setOptions(ResourceLoaderOptions(DoNotSendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType, DocumentContext));
     return static_cast<CachedCSSStyleSheet*>(requestResource(CachedResource::CSSStyleSheet, request).get());
 }
 
@@ -430,6 +430,7 @@ bool CachedResourceLoader::canAccess(CachedResource* resource)
     String error;
     switch (resource->type()) {
     case CachedResource::Script:
+    case CachedResource::RawResource:
         if (resource->options().requestOriginPolicy == PotentiallyCrossOriginEnabled
             && !m_document->securityOrigin()->canRequest(resource->response().url())
             && !resource->passesAccessControlCheck(m_document->securityOrigin(), error)) {
@@ -704,6 +705,9 @@ CachedResourceHandle<CachedResource> CachedResourceLoader::loadResource(CachedRe
 
 void CachedResourceLoader::storeResourceTimingInitiatorInformation(const CachedResourceHandle<CachedResource>& resource, const CachedResourceRequest& request)
 {
+    if (request.options().requestInitiatorContext != DocumentContext)
+        return;
+
     CachedResourceInitiatorInfo info = request.options().initiatorInfo;
     info.startTime = monotonicallyIncreasingTime();
 
@@ -1139,7 +1143,7 @@ void CachedResourceLoader::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo)
 
 const ResourceLoaderOptions& CachedResourceLoader::defaultCachedResourceOptions()
 {
-    DEFINE_STATIC_LOCAL(ResourceLoaderOptions, options, (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType));
+    DEFINE_STATIC_LOCAL(ResourceLoaderOptions, options, (SendCallbacks, SniffContent, BufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, DoSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType, DocumentContext));
     return options;
 }
 

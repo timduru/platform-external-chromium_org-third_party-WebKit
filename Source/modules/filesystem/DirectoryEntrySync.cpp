@@ -55,8 +55,8 @@ PassRefPtr<FileEntrySync> DirectoryEntrySync::getFile(const String& path, const 
     ec = 0;
     FileSystemFlags flags(options);
     EntrySyncCallbackHelper helper(m_fileSystem->asyncFileSystem());
-    if (!m_fileSystem->getFile(this, path, flags, helper.successCallback(), helper.errorCallback())) {
-        ec = FSInvalidModificationError;
+    if (!m_fileSystem->getFile(this, path, flags, helper.successCallback(), helper.errorCallback(), DOMFileSystemBase::Synchronous)) {
+        ec = InvalidModificationError;
         return 0;
     }
     return static_pointer_cast<FileEntrySync>(helper.getResult(ec));
@@ -67,8 +67,8 @@ PassRefPtr<DirectoryEntrySync> DirectoryEntrySync::getDirectory(const String& pa
     ec = 0;
     FileSystemFlags flags(options);
     EntrySyncCallbackHelper helper(m_fileSystem->asyncFileSystem());
-    if (!m_fileSystem->getDirectory(this, path, flags, helper.successCallback(), helper.errorCallback())) {
-        ec = FSInvalidModificationError;
+    if (!m_fileSystem->getDirectory(this, path, flags, helper.successCallback(), helper.errorCallback(), DOMFileSystemBase::Synchronous)) {
+        ec = InvalidModificationError;
         return 0;
     }
     return static_pointer_cast<DirectoryEntrySync>(helper.getResult(ec));
@@ -78,8 +78,8 @@ void DirectoryEntrySync::removeRecursively(ExceptionCode& ec)
 {
     ec = 0;
     VoidSyncCallbackHelper helper(m_fileSystem->asyncFileSystem());
-    if (!m_fileSystem->removeRecursively(this, helper.successCallback(), helper.errorCallback())) {
-        ec = FSInvalidModificationError;
+    if (!m_fileSystem->removeRecursively(this, helper.successCallback(), helper.errorCallback(), DOMFileSystemBase::Synchronous)) {
+        ec = InvalidModificationError;
         return;
     }
     helper.getResult(ec);

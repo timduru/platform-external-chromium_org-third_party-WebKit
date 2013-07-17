@@ -31,12 +31,12 @@
 #ifndef CustomElementRegistry_h
 #define CustomElementRegistry_h
 
-#include "core/dom/ContextLifecycleObserver.h"
-#include "core/dom/CustomElementUpgradeCandidateMap.h"
+#include "core/dom/CustomElementDefinition.h"
+#include "core/dom/CustomElementDescriptor.h"
+#include "core/dom/CustomElementDescriptorHash.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/QualifiedName.h"
-#include "wtf/PassRefPtr.h"
-#include "wtf/RefCounted.h"
+#include "wtf/HashMap.h"
+#include "wtf/HashSet.h"
 #include "wtf/RefPtr.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/AtomicStringHash.h"
@@ -44,43 +44,23 @@
 namespace WebCore {
 
 class CustomElementConstructorBuilder;
-class CustomElementDefinition;
 class Document;
-class Element;
 
-void setTypeExtension(Element*, const AtomicString& typeExtension);
+class CustomElementRegistry {
+    WTF_MAKE_NONCOPYABLE(CustomElementRegistry);
+protected:
+    friend class ActiveRegistrationContext;
 
-class CustomElementRegistry : public RefCounted<CustomElementRegistry>, public ContextLifecycleObserver {
-    WTF_MAKE_NONCOPYABLE(CustomElementRegistry); WTF_MAKE_FAST_ALLOCATED;
-public:
-    explicit CustomElementRegistry(Document*);
+    CustomElementRegistry() { }
     virtual ~CustomElementRegistry() { }
 
-    void registerElement(CustomElementConstructorBuilder*, const AtomicString& name, ExceptionCode&);
-
-    bool isUnresolved(Element*) const;
-    PassRefPtr<CustomElementDefinition> findFor(Element*) const;
-
-    PassRefPtr<Element> createCustomTagElement(const QualifiedName& localName);
-
-    Document* document() const;
-
-    void didGiveTypeExtension(Element*, const AtomicString&);
-    void customElementWasDestroyed(Element*);
-
-    static bool isCustomTagName(const AtomicString& name) { return isValidName(name); }
+    CustomElementDefinition* registerElement(Document*, CustomElementConstructorBuilder*, const AtomicString& name, ExceptionCode&);
+    CustomElementDefinition* find(const CustomElementDescriptor&) const;
 
 private:
-    typedef HashMap<AtomicString, RefPtr<CustomElementDefinition> > DefinitionMap;
-    static bool isValidName(const AtomicString&);
-
-    PassRefPtr<CustomElementDefinition> findAndCheckNamespace(const AtomicString& type, const AtomicString& namespaceURI) const;
-
-    void didCreateCustomTagElement(CustomElementDefinition*, Element*);
-    void didCreateUnresolvedElement(CustomElementDefinition::CustomElementKind, const AtomicString& type, Element*);
-
+    typedef HashMap<CustomElementDescriptor, RefPtr<CustomElementDefinition> > DefinitionMap;
     DefinitionMap m_definitions;
-    CustomElementUpgradeCandidateMap m_candidates;
+    HashSet<AtomicString> m_registeredTypeNames;
 };
 
 } // namespace WebCore

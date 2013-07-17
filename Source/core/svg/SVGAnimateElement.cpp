@@ -29,6 +29,8 @@
 #include "core/css/CSSParser.h"
 #include "core/css/StylePropertySet.h"
 #include "core/dom/QualifiedName.h"
+#include "core/svg/SVGAnimatedType.h"
+#include "core/svg/SVGAnimatedTypeAnimator.h"
 #include "core/svg/SVGAnimatorFactory.h"
 
 namespace WebCore {
@@ -241,14 +243,14 @@ static inline void applyCSSPropertyToTarget(SVGElement* targetElement, CSSProper
     if (!propertySet->setProperty(id, value, false, 0))
         return;
 
-    targetElement->setNeedsStyleRecalc(SyntheticStyleChange);
+    targetElement->setNeedsStyleRecalc(LocalStyleChange);
 }
 
 static inline void removeCSSPropertyFromTarget(SVGElement* targetElement, CSSPropertyID id)
 {
     ASSERT(!targetElement->m_deletionHasBegun);
     targetElement->ensureAnimatedSMILStyleProperties()->removeProperty(id);
-    targetElement->setNeedsStyleRecalc(SyntheticStyleChange);
+    targetElement->setNeedsStyleRecalc(LocalStyleChange);
 }
 
 static inline void applyCSSPropertyToTargetAndInstances(SVGElement* targetElement, const QualifiedName& attributeName, const String& valueAsString)

@@ -71,7 +71,6 @@ public:
 
     virtual bool shouldStartTimer(Frame*) { return true; }
     virtual void didStartTimer(Frame*, Timer<NavigationScheduler>*) { }
-    virtual void didStopTimer(Frame*) { }
 
     double delay() const { return m_delay; }
     bool lockBackForwardList() const { return m_lockBackForwardList; }
@@ -111,7 +110,10 @@ protected:
     virtual void fire(Frame* frame)
     {
         OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
-        frame->loader()->changeLocation(m_securityOrigin.get(), KURL(ParsedURLString, m_url), m_referrer, lockBackForwardList(), false);
+        FrameLoadRequest request(m_securityOrigin.get(), ResourceRequest(KURL(ParsedURLString, m_url), m_referrer), "_self");
+        request.setLockBackForwardList(lockBackForwardList());
+        request.setClientRedirect(true);
+        frame->loader()->load(request);
     }
 
     virtual void didStartTimer(Frame* frame, Timer<NavigationScheduler>* timer)
@@ -121,23 +123,8 @@ protected:
         m_haveToldClient = true;
 
         OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
-        frame->loader()->clientRedirected(KURL(ParsedURLString, m_url), delay(), currentTime() + timer->nextFireInterval());
         if (frame->loader()->history()->currentItemShouldBeReplaced())
             setLockBackForwardList(true);
-    }
-
-    virtual void didStopTimer(Frame* frame)
-    {
-        if (!m_haveToldClient)
-            return;
-
-        // Do not set a UserGestureIndicator because
-        // clientRedirectCancelledOrFinished() is also called from many places
-        // inside FrameLoader, where the gesture state is not set and is in
-        // fact unavailable. We need to be consistent with them, otherwise the
-        // gesture state will sometimes be set and sometimes not within
-        // dispatchDidCancelClientRedirect().
-        frame->loader()->clientRedirectCancelledOrFinished();
     }
 
     SecurityOrigin* securityOrigin() const { return m_securityOrigin.get(); }
@@ -164,8 +151,12 @@ public:
     virtual void fire(Frame* frame)
     {
         OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
-        bool refresh = equalIgnoringFragmentIdentifier(frame->document()->url(), KURL(ParsedURLString, url()));
-        frame->loader()->changeLocation(securityOrigin(), KURL(ParsedURLString, url()), referrer(), lockBackForwardList(), refresh);
+        FrameLoadRequest request(securityOrigin(), ResourceRequest(KURL(ParsedURLString, url()), referrer()), "_self");
+        request.setLockBackForwardList(lockBackForwardList());
+        if (equalIgnoringFragmentIdentifier(frame->document()->url(), request.resourceRequest().url()))
+            request.resourceRequest().setCachePolicy(ReloadIgnoringCacheData);
+        request.setClientRedirect(true);
+        frame->loader()->load(request);
     }
 };
 
@@ -185,7 +176,10 @@ public:
     virtual void fire(Frame* frame)
     {
         OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
-        frame->loader()->changeLocation(securityOrigin(), KURL(ParsedURLString, url()), referrer(), lockBackForwardList(), true);
+        FrameLoadRequest request(securityOrigin(), ResourceRequest(KURL(ParsedURLString, url()), referrer(), ReloadIgnoringCacheData), "_self");
+        request.setLockBackForwardList(lockBackForwardList());
+        request.setClientRedirect(true);
+        frame->loader()->load(request);
     }
 };
 
@@ -202,9 +196,11 @@ public:
         OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
 
         if (!m_historySteps) {
+            FrameLoadRequest frameRequest(frame->document()->securityOrigin(), ResourceRequest(frame->document()->url()));
+            frameRequest.setLockBackForwardList(lockBackForwardList());
             // Special case for go(0) from a frame -> reload only the frame
             // To follow Firefox and IE's behavior, history reload can only navigate the self frame.
-            frame->loader()->urlSelected(frame->document()->url(), "_self", 0, lockBackForwardList(), MaybeSendReferrer);
+            frame->loader()->load(frameRequest);
             return;
         }
         // go(i!=0) from a frame navigates into the history of the frame only,
@@ -239,7 +235,10 @@ public:
             return;
         FrameLoadRequest frameRequest(requestingDocument->document()->securityOrigin());
         m_submission->populateFrameLoadRequest(frameRequest);
-        frame->loader()->loadFrameRequest(frameRequest, lockBackForwardList(), m_submission->event(), m_submission->state(), MaybeSendReferrer);
+        frameRequest.setLockBackForwardList(lockBackForwardList());
+        frameRequest.setTriggeringEvent(m_submission->event());
+        frameRequest.setFormState(m_submission->state());
+        frame->loader()->load(frameRequest);
     }
     
     virtual void didStartTimer(Frame* frame, Timer<NavigationScheduler>* timer)
@@ -249,23 +248,8 @@ public:
         m_haveToldClient = true;
 
         OwnPtr<UserGestureIndicator> gestureIndicator = createUserGestureIndicator();
-        frame->loader()->clientRedirected(m_submission->requestURL(), delay(), currentTime() + timer->nextFireInterval());
         if (frame->loader()->history()->currentItemShouldBeReplaced())
             setLockBackForwardList(true);
-    }
-
-    virtual void didStopTimer(Frame* frame)
-    {
-        if (!m_haveToldClient)
-            return;
-
-        // Do not set a UserGestureIndicator because
-        // clientRedirectCancelledOrFinished() is also called from many places
-        // inside FrameLoader, where the gesture state is not set and is in
-        // fact unavailable. We need to be consistent with them, otherwise the
-        // gesture state will sometimes be set and sometimes not within
-        // dispatchDidCancelClientRedirect().
-        frame->loader()->clientRedirectCancelledOrFinished();
     }
 
 private:
@@ -355,11 +339,18 @@ void NavigationScheduler::scheduleLocationChange(SecurityOrigin* securityOrigin,
     FrameLoader* loader = m_frame->loader();
 
     // If the URL we're going to navigate to is the same as the current one, except for the
-    // fragment part, we don't need to schedule the location change.
-    KURL parsedURL(ParsedURLString, url);
-    if (parsedURL.hasFragmentIdentifier() && equalIgnoringFragmentIdentifier(m_frame->document()->url(), parsedURL)) {
-        loader->changeLocation(securityOrigin, m_frame->document()->completeURL(url), referrer, lockBackForwardList);
-        return;
+    // fragment part, we don't need to schedule the location change. We'll skip this
+    // optimization for cross-origin navigations to minimize the navigator's ability to
+    // execute timing attacks.
+    if (securityOrigin->canAccess(m_frame->document()->securityOrigin())) {
+        KURL parsedURL(ParsedURLString, url);
+        if (parsedURL.hasFragmentIdentifier() && equalIgnoringFragmentIdentifier(m_frame->document()->url(), parsedURL)) {
+            FrameLoadRequest request(securityOrigin, ResourceRequest(m_frame->document()->completeURL(url), referrer), "_self");
+            request.setLockBackForwardList(lockBackForwardList);
+            request.setClientRedirect(true);
+            loader->load(request);
+            return;
+        }
     }
 
     // Handle a location change of a page with no document as a special case.
@@ -482,10 +473,7 @@ void NavigationScheduler::cancel()
     if (m_timer.isActive())
         InspectorInstrumentation::frameClearedScheduledNavigation(m_frame);
     m_timer.stop();
-
-    OwnPtr<ScheduledNavigation> redirect(m_redirect.release());
-    if (redirect)
-        redirect->didStopTimer(m_frame);
+    m_redirect.clear();
 }
 
 } // namespace WebCore

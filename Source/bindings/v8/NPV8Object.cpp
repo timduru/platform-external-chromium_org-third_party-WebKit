@@ -87,12 +87,12 @@ static v8::Local<v8::Context> toV8Context(NPP npp, NPObject* npObject)
     return ScriptController::mainWorldContext(object->rootObject->frame());
 }
 
-static PassOwnArrayPtr<v8::Handle<v8::Value> > createValueListFromVariantArgs(const NPVariant* arguments, uint32_t argumentCount, NPP owner, v8::Isolate* isolate)
+static PassOwnArrayPtr<v8::Handle<v8::Value> > createValueListFromVariantArgs(const NPVariant* arguments, uint32_t argumentCount, NPObject* owner, v8::Isolate* isolate)
 {
     OwnArrayPtr<v8::Handle<v8::Value> > argv = adoptArrayPtr(new v8::Handle<v8::Value>[argumentCount]);
     for (uint32_t index = 0; index < argumentCount; index++) {
         const NPVariant* arg = &arguments[index];
-        argv[index] = convertNPVariantToV8Object(arg, isolate);
+        argv[index] = convertNPVariantToV8Object(arg, owner, isolate);
     }
     return argv.release();
 }
@@ -257,7 +257,7 @@ bool _NPN_Invoke(NPP npp, NPObject* npObject, NPIdentifier methodName, const NPV
 
     // Call the function object.
     v8::Handle<v8::Function> function = v8::Handle<v8::Function>::Cast(functionObject);
-    OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npp, isolate);
+    OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npObject, isolate);
     v8::Local<v8::Value> resultObject = frame->script()->callFunction(function, v8Object, argumentCount, argv.get());
 
     // If we had an error, return false.  The spec is a little unclear here, but says "Returns true if the method was
@@ -265,9 +265,7 @@ bool _NPN_Invoke(NPP npp, NPObject* npObject, NPIdentifier methodName, const NPV
     if (resultObject.IsEmpty())
         return false;
 
-    // If the returned object isn't yet owned then it must have the same owner
-    // as the frame.
-    convertV8ObjectToNPVariant(resultObject, frame->script()->frameNPP(), result);
+    convertV8ObjectToNPVariant(resultObject, npObject, result);
     return true;
 }
 
@@ -303,13 +301,13 @@ bool _NPN_InvokeDefault(NPP npp, NPObject* npObject, const NPVariant* arguments,
     if (!functionObject->IsFunction())
         return false;
 
-    Frame* frame = v8NpObject->rootObject->frame();
-    ASSERT(frame);
-
     v8::Local<v8::Value> resultObject;
     v8::Handle<v8::Function> function = v8::Local<v8::Function>::Cast(functionObject);
     if (!function->IsNull()) {
-        OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npp, isolate);
+        Frame* frame = v8NpObject->rootObject->frame();
+        ASSERT(frame);
+
+        OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npObject, isolate);
         resultObject = frame->script()->callFunction(function, functionObject, argumentCount, argv.get());
     }
     // If we had an error, return false.  The spec is a little unclear here, but says "Returns true if the method was
@@ -317,9 +315,7 @@ bool _NPN_InvokeDefault(NPP npp, NPObject* npObject, const NPVariant* arguments,
     if (resultObject.IsEmpty())
         return false;
 
-    // If the returned object isn't yet owned then it must have the same owner
-    // as the frame.
-    convertV8ObjectToNPVariant(resultObject, frame->script()->frameNPP(), result);
+    convertV8ObjectToNPVariant(resultObject, npObject, result);
     return true;
 }
 
@@ -365,7 +361,7 @@ bool _NPN_EvaluateHelper(NPP npp, bool popupsAllowed, NPObject* npObject, NPStri
         return false;
 
     if (_NPN_IsAlive(npObject))
-        convertV8ObjectToNPVariant(v8result, frame->script()->frameNPP(), result);
+        convertV8ObjectToNPVariant(v8result, npObject, result);
     return true;
 }
 
@@ -390,10 +386,7 @@ bool _NPN_GetProperty(NPP npp, NPObject* npObject, NPIdentifier propertyName, NP
         if (v8result.IsEmpty())
             return false;
 
-        Frame* frame = object->rootObject->frame();
-        ASSERT(frame);
-
-        convertV8ObjectToNPVariant(v8result, frame->script()->frameNPP(), result);
+        convertV8ObjectToNPVariant(v8result, npObject, result);
         return true;
     }
 
@@ -422,7 +415,7 @@ bool _NPN_SetProperty(NPP npp, NPObject* npObject, NPIdentifier propertyName, co
         ExceptionCatcher exceptionCatcher;
 
         v8::Handle<v8::Object> obj = v8::Local<v8::Object>::New(isolate, object->v8Object);
-        obj->Set(npIdentifierToV8Identifier(propertyName), convertNPVariantToV8Object(value, context->GetIsolate()));
+        obj->Set(npIdentifierToV8Identifier(propertyName), convertNPVariantToV8Object(value, object->rootObject->frame()->script()->windowScriptNPObject(), context->GetIsolate()));
         return true;
     }
 
@@ -597,21 +590,20 @@ bool _NPN_Construct(NPP npp, NPObject* npObject, const NPVariant* arguments, uin
         if (!ctorObj->IsFunction())
             return false;
 
-        Frame* frame = object->rootObject->frame();
-        ASSERT(frame);
-
         // Call the constructor.
         v8::Local<v8::Value> resultObject;
         v8::Handle<v8::Function> ctor = v8::Handle<v8::Function>::Cast(ctorObj);
         if (!ctor->IsNull()) {
-            OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npp, isolate);
+            Frame* frame = object->rootObject->frame();
+            ASSERT(frame);
+            OwnArrayPtr<v8::Handle<v8::Value> > argv = createValueListFromVariantArgs(arguments, argumentCount, npObject, isolate);
             resultObject = V8ObjectConstructor::newInstanceInDocument(ctor, argumentCount, argv.get(), frame ? frame->document() : 0);
         }
 
         if (resultObject.IsEmpty())
             return false;
 
-        convertV8ObjectToNPVariant(resultObject, frame->script()->frameNPP(), result);
+        convertV8ObjectToNPVariant(resultObject, npObject, result);
         return true;
     }
 

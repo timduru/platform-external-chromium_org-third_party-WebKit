@@ -28,9 +28,9 @@
 #define InspectorClient_h
 
 #include "core/inspector/InspectorStateClient.h"
-#include <wtf/Forward.h>
-#include <wtf/HashMap.h>
-#include <wtf/HashSet.h>
+#include "wtf/Forward.h"
+#include "wtf/HashMap.h"
+#include "wtf/HashSet.h"
 
 namespace WebCore {
 
@@ -39,6 +39,7 @@ class InspectorFrontendChannel;
 class Frame;
 class Page;
 class PlatformKeyboardEvent;
+class PlatformMouseEvent;
 
 class InspectorClient : public InspectorStateClient {
 public:
@@ -67,6 +68,7 @@ public:
     virtual void dumpUncountedAllocatedObjects(const HashMap<const void*, size_t>&) { }
 
     virtual void dispatchKeyEvent(const PlatformKeyboardEvent&) { }
+    virtual void dispatchMouseEvent(const PlatformMouseEvent&) { }
 
     static bool doDispatchMessageOnFrontendPage(Page* frontendPage, const String& message);
 

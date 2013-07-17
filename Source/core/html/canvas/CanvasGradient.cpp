@@ -48,13 +48,13 @@ CanvasGradient::CanvasGradient(const FloatPoint& p0, float r0, const FloatPoint&
 void CanvasGradient::addColorStop(float value, const String& color, ExceptionCode& ec)
 {
     if (!(value >= 0 && value <= 1.0f)) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
 
     RGBA32 rgba = 0;
     if (!parseColorOrCurrentColor(rgba, color, 0 /*canvas*/)) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 

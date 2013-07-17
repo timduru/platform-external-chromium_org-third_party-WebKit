@@ -56,6 +56,7 @@ WEBPImageDecoder::WEBPImageDecoder(ImageSource::AlphaOption alphaOption,
     , m_frameBackgroundHasAlpha(false)
 #if USE(QCMSLIB)
     , m_haveReadProfile(false)
+    , m_hasProfile(false)
     , m_transform(0)
 #endif
     , m_demux(0)
@@ -94,9 +95,9 @@ void WEBPImageDecoder::clearDecoder()
 
 bool WEBPImageDecoder::isSizeAvailable()
 {
-    if (!ImageDecoder::isSizeAvailable()) {
+    if (!ImageDecoder::isSizeAvailable())
         updateDemuxer();
-    }
+
     return ImageDecoder::isSizeAvailable();
 }
 
@@ -104,6 +105,7 @@ size_t WEBPImageDecoder::frameCount()
 {
     if (!updateDemuxer())
         return 0;
+
     return m_frameBufferCache.size();
 }
 
@@ -168,6 +170,10 @@ void WEBPImageDecoder::setData(SharedBuffer* data, bool allDataReceived)
 
     if (m_demuxState != WEBP_DEMUX_DONE)
         m_haveAlreadyParsedThisData = false;
+#if USE(QCMSLIB)
+    else if (m_hasProfile && !m_haveReadProfile)
+        m_haveAlreadyParsedThisData = false;
+#endif
 }
 
 int WEBPImageDecoder::repetitionCount() const
@@ -214,12 +220,16 @@ bool WEBPImageDecoder::updateDemuxer()
     bool hasAnimation = (m_formatFlags & ANIMATION_FLAG);
     if (!ImageDecoder::isSizeAvailable()) {
         m_formatFlags = WebPDemuxGetI(m_demux, WEBP_FF_FORMAT_FLAGS);
+#if USE(QCMSLIB)
+        m_hasProfile = (m_formatFlags & ICCP_FLAG) && !ignoresGammaAndColorProfile();
+#endif
         hasAnimation = (m_formatFlags & ANIMATION_FLAG);
         if (hasAnimation && !RuntimeEnabledFeatures::animatedWebPEnabled())
             return setFailed();
         if (!setSize(WebPDemuxGetI(m_demux, WEBP_FF_CANVAS_WIDTH), WebPDemuxGetI(m_demux, WEBP_FF_CANVAS_HEIGHT)))
             return setFailed();
     }
+
     ASSERT(ImageDecoder::isSizeAvailable());
     const size_t newFrameCount = WebPDemuxGetI(m_demux, WEBP_FF_FRAME_COUNT);
     if (hasAnimation && !m_haveReadAnimationParameters && newFrameCount) {
@@ -232,6 +242,7 @@ bool WEBPImageDecoder::updateDemuxer()
             m_repetitionCount = cAnimationLoopInfinite;
         m_haveReadAnimationParameters = true;
     }
+
     const size_t oldFrameCount = m_frameBufferCache.size();
     if (newFrameCount > oldFrameCount) {
         m_frameBufferCache.resize(newFrameCount);
@@ -251,6 +262,7 @@ bool WEBPImageDecoder::updateDemuxer()
             m_frameBufferCache[i].setRequiredPreviousFrameIndex(findRequiredPreviousFrame(i));
         }
     }
+
     return true;
 }
 
@@ -393,7 +405,7 @@ void WEBPImageDecoder::applyPostProcessing(size_t frameIndex)
     const int top = frameRect.y();
 
 #if USE(QCMSLIB)
-    if ((m_formatFlags & ICCP_FLAG) && !ignoresGammaAndColorProfile()) {
+    if (m_hasProfile) {
         if (!m_haveReadProfile) {
             readColorProfile();
             m_haveReadProfile = true;
@@ -505,7 +517,7 @@ bool WEBPImageDecoder::decode(const uint8_t* dataBytes, size_t dataSize, bool on
         if (!m_premultiplyAlpha)
             mode = outputMode(false);
 #if USE(QCMSLIB)
-        if ((m_formatFlags & ICCP_FLAG) && !ignoresGammaAndColorProfile())
+        if (m_hasProfile)
             mode = MODE_RGBA; // Decode to RGBA for input to libqcms.
 #endif
         WebPInitDecBuffer(&m_decoderBuffer);

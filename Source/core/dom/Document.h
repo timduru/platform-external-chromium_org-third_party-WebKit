@@ -32,11 +32,13 @@
 #include "core/dom/ContainerNode.h"
 #include "core/dom/DOMTimeStamp.h"
 #include "core/dom/DocumentEventQueue.h"
+#include "core/dom/DocumentInit.h"
 #include "core/dom/DocumentTiming.h"
 #include "core/dom/IconURL.h"
 #include "core/dom/MutationObserver.h"
 #include "core/dom/QualifiedName.h"
 #include "core/dom/ScriptExecutionContext.h"
+#include "core/dom/TextLinkColors.h"
 #include "core/dom/TreeScope.h"
 #include "core/dom/UserActionElementSet.h"
 #include "core/dom/ViewportArguments.h"
@@ -45,7 +47,6 @@
 #include "core/page/PageVisibilityState.h"
 #include "weborigin/ReferrerPolicy.h"
 #include "core/platform/Timer.h"
-#include "core/platform/graphics/Color.h"
 #include "core/platform/text/StringWithDirection.h"
 #include "core/rendering/HitTestRequest.h"
 #include "wtf/Deque.h"
@@ -69,7 +70,7 @@ class CanvasRenderingContext;
 class CharacterData;
 class Comment;
 class ContextFeatures;
-class CustomElementRegistry;
+class CustomElementRegistrationContext;
 class DOMImplementation;
 class DOMNamedFlowCollection;
 class DOMSecurityPolicy;
@@ -102,7 +103,7 @@ class HTMLDocument;
 class HTMLElement;
 class HTMLFrameOwnerElement;
 class HTMLHeadElement;
-class HTMLImportsController;
+class HTMLImport;
 class HTMLIFrameElement;
 class HTMLMapElement;
 class HTMLNameCollection;
@@ -154,10 +155,6 @@ class TransformSource;
 class TreeWalker;
 class VisitedLinkState;
 class XMLHttpRequest;
-class XPathEvaluator;
-class XPathExpression;
-class XPathNSResolver;
-class XPathResult;
 
 struct AnnotatedRegionValue;
 
@@ -210,13 +207,13 @@ typedef unsigned char DocumentClassFlags;
 
 class Document : public ContainerNode, public TreeScope, public ScriptExecutionContext {
 public:
-    static PassRefPtr<Document> create(Frame* frame, const KURL& url)
+    static PassRefPtr<Document> create(const DocumentInit& initializer = DocumentInit())
     {
-        return adoptRef(new Document(frame, url));
+        return adoptRef(new Document(initializer));
     }
-    static PassRefPtr<Document> createXHTML(Frame* frame, const KURL& url)
+    static PassRefPtr<Document> createXHTML(const DocumentInit& initializer = DocumentInit())
     {
-        return adoptRef(new Document(frame, url, XHTMLDocumentClass));
+        return adoptRef(new Document(initializer, XHTMLDocumentClass));
     }
     virtual ~Document();
 
@@ -228,9 +225,6 @@ public:
     Element* getElementById(const AtomicString& id) const;
 
     virtual bool canContainRangeEndPoint() const { return true; }
-
-    Element* getElementByAccessKey(const String& key);
-    void invalidateAccessKeyMap();
 
     SelectorQueryCache* selectorQueryCache();
 
@@ -254,6 +248,8 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keypress);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keyup);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mousedown);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseenter);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseleave);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mousemove);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseout);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseover);
@@ -449,6 +445,12 @@ public:
     // Called when one or more stylesheets in the document may have been added, removed, or changed.
     void styleResolverChanged(StyleResolverUpdateType, StyleResolverUpdateMode = FullStyleUpdate);
 
+    // FIXME: Switch all callers of styleResolverChanged to these or better ones and then make them
+    // do something smarter.
+    void removedStyleSheet(StyleSheet*, StyleResolverUpdateType type = DeferRecalcStyle) { styleResolverChanged(type); }
+    void addedStyleSheet(StyleSheet*, StyleResolverUpdateType type = DeferRecalcStyle) { styleResolverChanged(type); }
+    void modifiedStyleSheet(StyleSheet*, StyleResolverUpdateType type = DeferRecalcStyle) { styleResolverChanged(type); }
+
     void didAccessStyleResolver();
 
     void evaluateMediaQueryList();
@@ -612,19 +614,8 @@ public:
     bool shouldScheduleLayout();
     bool isLayoutTimerActive();
     int elapsedTime() const;
-    
-    void setTextColor(const Color& color) { m_textColor = color; }
-    Color textColor() const { return m_textColor; }
 
-    const Color& linkColor() const { return m_linkColor; }
-    const Color& visitedLinkColor() const { return m_visitedLinkColor; }
-    const Color& activeLinkColor() const { return m_activeLinkColor; }
-    void setLinkColor(const Color& c) { m_linkColor = c; }
-    void setVisitedLinkColor(const Color& c) { m_visitedLinkColor = c; }
-    void setActiveLinkColor(const Color& c) { m_activeLinkColor = c; }
-    void resetLinkColor();
-    void resetVisitedLinkColor();
-    void resetActiveLinkColor();
+    TextLinkColors& textLinkColors() { return m_textLinkColors; }
     VisitedLinkState* visitedLinkState() const { return m_visitedLinkState.get(); }
 
     MouseEventWithHitTestResults prepareMouseEvent(const HitTestRequest&, const LayoutPoint&, const PlatformMouseEvent&);
@@ -637,13 +628,12 @@ public:
     String selectedStylesheetSet() const;
     void setSelectedStylesheetSet(const String&);
 
-    bool setFocusedNode(PassRefPtr<Node>, FocusDirection = FocusDirectionNone);
+    bool setFocusedElement(PassRefPtr<Element>, FocusDirection = FocusDirectionNone);
     Node* focusedNode() const { return m_focusedNode.get(); }
     UserActionElementSet& userActionElements()  { return m_userActionElements; }
     const UserActionElementSet& userActionElements() const { return m_userActionElements; }
     void didRunCheckFocusedNodeTask() { m_didPostCheckFocusedNodeTask = false; }
-    void getFocusableNodes(Vector<RefPtr<Node> >&);
-    
+
     // The m_ignoreAutofocus flag specifies whether or not the document has been changed by the user enough 
     // for WebCore to ignore the autofocus attribute on any form controls
     bool ignoreAutofocus() const { return m_ignoreAutofocus; };
@@ -659,7 +649,7 @@ public:
     void hoveredNodeDetached(Node*);
     void activeChainNodeDetached(Node*);
 
-    void updateHoverActiveState(const HitTestRequest&, Element*);
+    void updateHoverActiveState(const HitTestRequest&, Element*, const PlatformMouseEvent* = 0);
 
     // Updates for :target (CSS3 selector).
     void setCSSTarget(Element*);
@@ -738,9 +728,6 @@ public:
     void addMutationObserverTypes(MutationObserverOptions types) { m_mutationObserverTypes |= types; }
 
     CSSStyleDeclaration* getOverrideStyle(Element*, const String& pseudoElt);
-
-    int nodeAbsIndex(Node*);
-    Node* nodeWithAbsIndex(int absIndex);
 
     /**
      * Handles a HTTP header equivalent set by a meta tag using <meta http-equiv="..." content="...">. This is called
@@ -868,18 +855,6 @@ public:
 
     void setDocType(PassRefPtr<DocumentType>);
 
-    // XPathEvaluator methods
-    PassRefPtr<XPathExpression> createExpression(const String& expression,
-                                                 XPathNSResolver* resolver,
-                                                 ExceptionCode& ec);
-    PassRefPtr<XPathNSResolver> createNSResolver(Node *nodeResolver);
-    PassRefPtr<XPathResult> evaluate(const String& expression,
-                                     Node* contextNode,
-                                     XPathNSResolver* resolver,
-                                     unsigned short type,
-                                     XPathResult* result,
-                                     ExceptionCode& ec);
-
     enum PendingSheetLayout { NoLayoutWithPendingSheets, DidLayoutWithPendingSheets, IgnoreLayoutWithPendingSheets };
 
     bool didLayoutWithPendingStylesheets() const { return m_pendingSheetLayout == DidLayoutWithPendingSheets; }
@@ -939,6 +914,7 @@ public:
     SVGDocumentExtensions* accessSVGExtensions();
 
     void initSecurityContext();
+    void initSecurityContext(const DocumentInit&);
     void initContentSecurityPolicy();
 
     void updateURLForPushOrReplaceState(const KURL&);
@@ -1018,11 +994,10 @@ public:
     PassRefPtr<Element> createElementNS(const AtomicString& namespaceURI, const String& qualifiedName, const AtomicString& typeExtension, ExceptionCode&);
     ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, ExceptionCode&);
     ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionCode&);
-    CustomElementRegistry* registry() const { return m_registry.get(); }
-    CustomElementRegistry* ensureCustomElementRegistry();
+    CustomElementRegistrationContext* registrationContext() { return m_registrationContext.get(); }
 
-    void setImports(PassRefPtr<HTMLImportsController>);
-    HTMLImportsController* imports() const { return m_imports.get(); }
+    void setImport(HTMLImport*);
+    HTMLImport* import() const { return m_import; }
     bool haveImportsLoaded() const;
     void didLoadAllImports();
 
@@ -1053,7 +1028,7 @@ public:
 
     DocumentTimeline* timeline() { return m_timeline.get(); }
 
-    void addToTopLayer(Element*);
+    void addToTopLayer(Element*, const Element* before = 0);
     void removeFromTopLayer(Element*);
     const Vector<RefPtr<Element> >& topLayerElements() const { return m_topLayerElements; }
     Element* activeModalDialog() const { return !m_topLayerElements.isEmpty() ? m_topLayerElements.last().get() : 0; }
@@ -1073,17 +1048,17 @@ public:
     DocumentLifecycleNotifier* lifecycleNotifier();
 
 protected:
-    Document(Frame*, const KURL&, DocumentClassFlags = DefaultDocumentClass);
+    Document(const DocumentInit&, DocumentClassFlags = DefaultDocumentClass);
 
     virtual void didUpdateSecurityOrigin() OVERRIDE;
 
     void clearXMLVersion() { m_xmlVersion = String(); }
 
+    virtual void dispose() OVERRIDE;
+
 private:
     friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
-
-    virtual void dispose() OVERRIDE;
 
     void detachParser();
 
@@ -1097,7 +1072,7 @@ private:
     virtual String nodeName() const;
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
-    virtual PassRefPtr<Node> cloneNode(bool deep);
+    virtual PassRefPtr<Node> cloneNode(bool deep = true);
 
     virtual void refScriptExecutionContext() { ref(); }
     virtual void derefScriptExecutionContext() { deref(); }
@@ -1114,8 +1089,6 @@ private:
     void updateFocusAppearanceTimerFired(Timer<Document>*);
     void updateBaseURL();
 
-    void buildAccessKeyMap(TreeScope* root);
-
     void createStyleResolver();
 
     void executeScriptsWaitingForResourcesIfNeeded();
@@ -1129,7 +1102,7 @@ private:
     void pendingTasksTimerFired(Timer<Document>*);
 
     static void didReceiveTask(void*);
-    
+
     template <typename CharacterType>
     void displayBufferModifiedByEncodingInternal(CharacterType*, unsigned) const;
 
@@ -1146,8 +1119,13 @@ private:
     void addMutationEventListenerTypeIfEnabled(ListenerType);
 
     void didAssociateFormControlsTimerFired(Timer<Document>*);
-
     void styleResolverThrowawayTimerFired(Timer<Document>*);
+
+    void processHttpEquivDefaultStyle(const String& content);
+    void processHttpEquivRefresh(const String& content);
+    void processHttpEquivSetCookie(const String& content);
+    void processHttpEquivXFrameOptions(const String& content);
+
     Timer<Document> m_styleResolverThrowawayTimer;
     double m_lastStyleResolverAccessTime;
 
@@ -1166,6 +1144,7 @@ private:
 
     Frame* m_frame;
     DOMWindow* m_domWindow;
+    HTMLImport* m_import;
 
     RefPtr<CachedResourceLoader> m_cachedResourceLoader;
     RefPtr<DocumentParser> m_parser;
@@ -1204,8 +1183,6 @@ private:
     CompatibilityMode m_compatibilityMode;
     bool m_compatibilityModeLocked; // This is cheaper than making setCompatibilityMode virtual.
 
-    Color m_textColor;
-
     bool m_didPostCheckFocusedNodeTask;
     RefPtr<Node> m_focusedNode;
     RefPtr<Node> m_hoverNode;
@@ -1228,9 +1205,7 @@ private:
 
     OwnPtr<FormController> m_formController;
 
-    Color m_linkColor;
-    Color m_visitedLinkColor;
-    Color m_activeLinkColor;
+    TextLinkColors m_textLinkColors;
     OwnPtr<VisitedLinkState> m_visitedLinkState;
 
     bool m_loadingSheet;
@@ -1298,8 +1273,6 @@ private:
     HashSet<LiveNodeListBase*> m_listsInvalidatedAtDocument;
     unsigned m_nodeListCounts[numNodeListInvalidationTypes];
 
-    RefPtr<XPathEvaluator> m_xpathEvaluator;
-
     OwnPtr<SVGDocumentExtensions> m_svgExtensions;
 
     Vector<AnnotatedRegionValue> m_annotatedRegions;
@@ -1309,9 +1282,6 @@ private:
     HashMap<String, RefPtr<HTMLCanvasElement> > m_cssCanvasElements;
 
     Vector<IconURL> m_iconURLs;
-
-    HashMap<StringImpl*, Element*, CaseFoldingHash> m_elementsByAccessKey;
-    bool m_accessKeyMapValid;
 
     OwnPtr<SelectorQueryCache> m_selectorQueryCache;
 
@@ -1363,8 +1333,7 @@ private:
 
     OwnPtr<TextAutosizer> m_textAutosizer;
 
-    RefPtr<CustomElementRegistry> m_registry;
-    RefPtr<HTMLImportsController> m_imports;
+    RefPtr<CustomElementRegistrationContext> m_registrationContext;
 
     bool m_scheduledTasksAreSuspended;
     

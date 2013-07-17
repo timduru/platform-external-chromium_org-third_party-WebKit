@@ -175,7 +175,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
             ASSERT(node());
             if (node()) {
                 m_needsToSetSizeForAltText = true;
-                node()->setNeedsStyleRecalc(SyntheticStyleChange);
+                node()->setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);
             }
             return;
         }
@@ -397,10 +397,10 @@ void RenderImage::paintAreaElementFocusRing(PaintInfo& paintInfo)
         return;
 
     Node* focusedNode = document->focusedNode();
-    if (!focusedNode || !focusedNode->hasTagName(areaTag))
+    if (!focusedNode || !isHTMLAreaElement(focusedNode))
         return;
 
-    HTMLAreaElement* areaElement = static_cast<HTMLAreaElement*>(focusedNode);
+    HTMLAreaElement* areaElement = toHTMLAreaElement(focusedNode);
     if (areaElement->imageElement() != node())
         return;
 

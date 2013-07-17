@@ -24,7 +24,7 @@
 #define CharacterData_h
 
 #include "core/dom/Node.h"
-#include <wtf/text/WTFString.h>
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -68,7 +68,7 @@ protected:
 
 private:
     virtual String nodeValue() const OVERRIDE FINAL;
-    virtual void setNodeValue(const String&, ExceptionCode&) OVERRIDE FINAL;
+    virtual void setNodeValue(const String&) OVERRIDE FINAL;
     virtual bool isCharacterDataNode() const OVERRIDE FINAL { return true; }
     virtual int maxCharacterOffset() const OVERRIDE FINAL;
     virtual bool offsetInCharacters() const OVERRIDE FINAL;

@@ -28,8 +28,8 @@
 #define TreeScope_h
 
 #include "core/dom/DocumentOrderedMap.h"
-#include <wtf/Forward.h>
-#include <wtf/text/AtomicString.h>
+#include "wtf/Forward.h"
+#include "wtf/text/AtomicString.h"
 
 namespace WebCore {
 
@@ -54,7 +54,7 @@ public:
     TreeScope* parentTreeScope() const { return m_parentTreeScope; }
     void setParentTreeScope(TreeScope*);
 
-    Node* focusedNode();
+    Element* adjustedFocusedElement();
     Element* getElementById(const AtomicString&) const;
     bool hasElementWithId(AtomicStringImpl* id) const;
     bool containsMultipleElementsWithId(const AtomicString& id) const;
@@ -129,6 +129,8 @@ public:
 
     bool isInclusiveAncestorOf(const TreeScope*) const;
     unsigned short comparePosition(const TreeScope*) const;
+
+    Element* getElementByAccessKey(const String& key) const;
 
 protected:
     TreeScope(ContainerNode*, Document*);

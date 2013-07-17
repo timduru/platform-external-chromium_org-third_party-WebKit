@@ -186,7 +186,7 @@ HTMLTableSectionElement* HTMLTableElement::lastBody() const
 PassRefPtr<HTMLElement> HTMLTableElement::insertRow(int index, ExceptionCode& ec)
 {
     if (index < -1) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return 0;
     }
 
@@ -201,7 +201,7 @@ PassRefPtr<HTMLElement> HTMLTableElement::insertRow(int index, ExceptionCode& ec
             row = HTMLTableRowsCollection::rowAfter(this, lastRow.get());
             if (!row) {
                 if (i != index) {
-                    ec = INDEX_SIZE_ERR;
+                    ec = IndexSizeError;
                     return 0;
                 }
                 break;
@@ -219,13 +219,13 @@ PassRefPtr<HTMLElement> HTMLTableElement::insertRow(int index, ExceptionCode& ec
             RefPtr<HTMLTableSectionElement> newBody = HTMLTableSectionElement::create(tbodyTag, document());
             RefPtr<HTMLTableRowElement> newRow = HTMLTableRowElement::create(document());
             newBody->appendChild(newRow, ec);
-            appendChild(newBody.release(), ec);
+            appendChild(newBody.release(), ec, AttachLazily);
             return newRow.release();
         }
     }
 
     RefPtr<HTMLTableRowElement> newRow = HTMLTableRowElement::create(document());
-    parent->insertBefore(newRow, row.get(), ec);
+    parent->insertBefore(newRow, row.get(), ec, AttachLazily);
     return newRow.release();
 }
 
@@ -242,7 +242,7 @@ void HTMLTableElement::deleteRow(int index, ExceptionCode& ec)
         }
     }
     if (!row) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
     row->remove(ec);

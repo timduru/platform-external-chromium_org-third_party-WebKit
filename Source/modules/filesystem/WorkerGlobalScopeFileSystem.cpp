@@ -74,12 +74,15 @@ PassRefPtr<DOMFileSystemSync> WorkerGlobalScopeFileSystem::webkitRequestFileSyst
 
     FileSystemType fileSystemType = static_cast<FileSystemType>(type);
     if (!DOMFileSystemBase::isValidType(fileSystemType)) {
-        ec = FSInvalidModificationError;
+        ec = InvalidModificationError;
         return 0;
     }
 
     FileSystemSyncCallbackHelper helper;
-    LocalFileSystem::localFileSystem().requestFileSystem(worker, fileSystemType, size, FileSystemCallbacks::create(helper.successCallback(), helper.errorCallback(), worker, fileSystemType), SynchronousFileSystem);
+    OwnPtr<FileSystemCallbacks> callbacks = FileSystemCallbacks::create(helper.successCallback(), helper.errorCallback(), worker, fileSystemType);
+    callbacks->setShouldBlockUntilCompletion(true);
+
+    LocalFileSystem::localFileSystem().requestFileSystem(worker, fileSystemType, size, callbacks.release(), SynchronousFileSystem);
     return helper.getResult(ec);
 }
 
@@ -115,7 +118,7 @@ PassRefPtr<EntrySync> WorkerGlobalScopeFileSystem::webkitResolveLocalFileSystemS
     FileSystemType type;
     String filePath;
     if (!completedURL.isValid() || !DOMFileSystemBase::crackFileSystemURL(completedURL, type, filePath)) {
-        ec = FSEncodingError;
+        ec = EncodingError;
         return 0;
     }
 

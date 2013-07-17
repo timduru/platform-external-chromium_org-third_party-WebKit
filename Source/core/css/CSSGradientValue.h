@@ -28,14 +28,14 @@
 
 #include "core/css/CSSImageGeneratorValue.h"
 #include "core/css/CSSPrimitiveValue.h"
-#include <wtf/RefPtr.h>
-#include <wtf/Vector.h>
+#include "wtf/RefPtr.h"
+#include "wtf/Vector.h"
 
 namespace WebCore {
 
 class FloatPoint;
 class Gradient;
-class StyleResolverState;
+class TextLinkColors;
 
 enum CSSGradientType {
     CSSDeprecatedLinearGradient,
@@ -90,7 +90,7 @@ public:
     bool knownToBeOpaque(const RenderObject*) const;
 
     void loadSubimages(CachedResourceLoader*) { }
-    PassRefPtr<CSSGradientValue> gradientWithStylesResolved(StyleResolverState&);
+    PassRefPtr<CSSGradientValue> gradientWithStylesResolved(const TextLinkColors&, Color currentColor);
 
 protected:
     CSSGradientValue(ClassType classType, CSSGradientRepeat repeat, CSSGradientType gradientType)

@@ -93,7 +93,7 @@ void RenderSVGRoot::computeIntrinsicRatioInformation(FloatSize& intrinsicSize, d
     //   aspect ratio is calculated from the width and height values of the ‘viewBox’ specified for the current SVG document
     //   fragment. If the ‘viewBox’ is not correctly specified, or set to 'none', the intrinsic aspect ratio cannot be
     //   calculated and is considered unspecified.
-    intrinsicSize = svg->viewBox().size();
+    intrinsicSize = svg->viewBoxCurrentValue().size();
     if (!intrinsicSize.isEmpty()) {
         // The viewBox can only yield an intrinsic ratio, not an intrinsic size.
         intrinsicRatio = intrinsicSize.width() / static_cast<double>(intrinsicSize.height());
@@ -358,10 +358,10 @@ void RenderSVGRoot::buildLocalToBorderBoxTransform()
     SVGSVGElement* svg = toSVGSVGElement(node());
     ASSERT(svg);
     float scale = style()->effectiveZoom();
-    FloatPoint translate = svg->currentTranslate();
+    SVGPoint translate = svg->currentTranslate();
     LayoutSize borderAndPadding(borderLeft() + paddingLeft(), borderTop() + paddingTop());
     m_localToBorderBoxTransform = svg->viewBoxToViewTransform(contentWidth() / scale, contentHeight() / scale);
-    if (borderAndPadding.isEmpty() && scale == 1 && translate == FloatPoint::zero())
+    if (borderAndPadding.isEmpty() && scale == 1 && translate == SVGPoint::zero())
         return;
     m_localToBorderBoxTransform = AffineTransform(scale, 0, 0, scale, borderAndPadding.width() + translate.x(), borderAndPadding.height() + translate.y()) * m_localToBorderBoxTransform;
 }

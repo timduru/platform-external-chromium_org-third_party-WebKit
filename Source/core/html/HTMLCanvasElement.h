@@ -31,7 +31,7 @@
 #include "core/html/HTMLElement.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/IntSize.h"
-#include <wtf/Forward.h>
+#include "wtf/Forward.h"
 
 #define DefaultInterpolationQuality InterpolationMedium
 
@@ -78,7 +78,7 @@ public:
 
     void setSize(const IntSize& newSize)
     { 
-        if (newSize == size() && targetDeviceScaleFactor() == m_deviceScaleFactor)
+        if (newSize == size() && m_deviceScaleFactor == 1)
             return;
         m_ignoreReset = true; 
         setWidth(newSize.width());
@@ -145,8 +145,6 @@ private:
 
     void reset();
 
-    float targetDeviceScaleFactor() const;
-
     void createImageBuffer();
     void clearImageBuffer();
 
@@ -166,7 +164,7 @@ private:
     bool m_accelerationDisabled;
     FloatRect m_dirtyRect;
 
-    float m_deviceScaleFactor;
+    float m_deviceScaleFactor; // FIXME: This is always 1 and should probable be deleted
     bool m_originClean;
 
     // m_createdImageBuffer means we tried to malloc the buffer.  We didn't necessarily get it.
@@ -178,6 +176,12 @@ private:
     mutable RefPtr<Image> m_presentedImage;
     mutable RefPtr<Image> m_copiedImage; // FIXME: This is temporary for platforms that have to copy the image buffer to render (and for CSSCanvasValue).
 };
+
+inline HTMLCanvasElement* toHTMLCanvasElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::canvasTag));
+    return static_cast<HTMLCanvasElement*>(node);
+}
 
 } //namespace
 

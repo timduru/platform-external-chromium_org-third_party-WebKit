@@ -22,17 +22,16 @@
 #include "V8TestInterfaceImplementedAs.h"
 
 #include "RuntimeEnabledFeatures.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMConfiguration.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "wtf/GetPtr.h"
-#include "wtf/RefCounted.h"
 #include "wtf/RefPtr.h"
 #include "wtf/UnusedParam.h"
 
@@ -67,13 +66,15 @@ template <typename T> void V8_USE(T) { }
 static void aAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(imp->a(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, imp->a(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
 static void aAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     RealClassV8Internal::aAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void aAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -86,9 +87,9 @@ static void aAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, 
 
 static void aAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     RealClassV8Internal::aAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void bAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -100,7 +101,9 @@ static void bAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackIn
 
 static void bAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     RealClassV8Internal::bAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void bAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
@@ -113,9 +116,9 @@ static void bAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, 
 
 static void bAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
     RealClassV8Internal::bAttrSetter(name, value, info);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void func1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -126,15 +129,15 @@ static void func1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
     }
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(args.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, a, args[0]);
-    v8SetReturnValue(args, v8String(imp->func1(a), args.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(args, imp->func1(a), args.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
 static void func1MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     RealClassV8Internal::func1Method(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 static void funcTestInterfaceImplementedAsParamMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -145,15 +148,15 @@ static void funcTestInterfaceImplementedAsParamMethod(const v8::FunctionCallback
     }
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(args.Holder());
     V8TRYCATCH_VOID(RealClass*, orange, V8TestInterfaceImplementedAs::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8TestInterfaceImplementedAs::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
-    v8SetReturnValue(args, v8String(imp->funcTestInterfaceImplementedAsParam(orange), args.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(args, imp->funcTestInterfaceImplementedAsParam(orange), args.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
 static void funcTestInterfaceImplementedAsParamMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    TRACE_EVENT_SAMPLING_STATE0("Blink\0Blink-DOMMethod");
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
     RealClassV8Internal::funcTestInterfaceImplementedAsParamMethod(args);
-    TRACE_EVENT_SAMPLING_STATE0("V8\0V8-Execution");
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 } // namespace RealClassV8Internal
@@ -201,7 +204,7 @@ v8::Handle<v8::FunctionTemplate> V8TestInterfaceImplementedAs::GetTemplate(v8::I
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
-    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestInterfaceImplementedAsTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
@@ -225,18 +228,18 @@ bool V8TestInterfaceImplementedAs::HasInstanceInAnyWorld(v8::Handle<v8::Value> v
 v8::Handle<v8::Object> V8TestInterfaceImplementedAs::createWrapper(PassRefPtr<RealClass> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
+    ASSERT(DOMDataStore::getWrapper<V8TestInterfaceImplementedAs>(impl.get(), isolate).IsEmpty());
 
-    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestInterfaceImplementedAs>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestInterfaceImplementedAs::derefObject(void* object)
 {
-    static_cast<RealClass*>(object)->deref();
+    fromInternalPointer(object)->deref();
 }
 
 } // namespace WebCore

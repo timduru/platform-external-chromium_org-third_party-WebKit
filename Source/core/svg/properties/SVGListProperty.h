@@ -21,7 +21,6 @@
 #define SVGListProperty_h
 
 #include "core/dom/ExceptionCode.h"
-#include "core/svg/properties/SVGAnimatedProperty.h"
 #include "core/svg/properties/SVGPropertyTearOff.h"
 #include "core/svg/properties/SVGPropertyTraits.h"
 
@@ -52,7 +51,7 @@ public:
     bool canAlterList(ExceptionCode& ec) const
     {
         if (m_role == AnimValRole) {
-            ec = NO_MODIFICATION_ALLOWED_ERR;
+            ec = NoModificationAllowedError;
             return false;
         }
 
@@ -172,7 +171,7 @@ public:
     bool canGetItem(unsigned index, ExceptionCode& ec)
     {
         if (index >= m_values->size()) {
-            ec = INDEX_SIZE_ERR;
+            ec = IndexSizeError;
             return false;
         }
 
@@ -274,7 +273,7 @@ public:
             return false;
 
         if (index >= m_values->size()) {
-            ec = INDEX_SIZE_ERR;
+            ec = IndexSizeError;
             return false;
         }
 
@@ -295,7 +294,7 @@ public:
 
         if (m_values->isEmpty()) {
             // 'newItem' already lived in our list, we removed it, and now we're empty, which means there's nothing to replace.
-            ec = INDEX_SIZE_ERR;
+            ec = IndexSizeError;
             return ListItemType();
         }
 
@@ -329,7 +328,7 @@ public:
         if (m_values->isEmpty()) {
             ASSERT(m_wrappers->isEmpty());
             // 'passNewItem' already lived in our list, we removed it, and now we're empty, which means there's nothing to replace.
-            ec = INDEX_SIZE_ERR;
+            ec = IndexSizeError;
             return 0;
         }
 
@@ -353,7 +352,7 @@ public:
             return false;
 
         if (index >= m_values->size()) {
-            ec = INDEX_SIZE_ERR;
+            ec = IndexSizeError;
             return false;
         }
 

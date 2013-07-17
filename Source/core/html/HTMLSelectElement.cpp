@@ -40,6 +40,7 @@
 #include "core/html/FormController.h"
 #include "core/html/FormDataList.h"
 #include "core/html/HTMLFormElement.h"
+#include "core/html/HTMLOptGroupElement.h"
 #include "core/html/HTMLOptionElement.h"
 #include "core/html/HTMLOptionsCollection.h"
 #include "core/page/EventHandler.h"
@@ -77,6 +78,11 @@ HTMLSelectElement::HTMLSelectElement(const QualifiedName& tagName, Document* doc
 {
     ASSERT(hasTagName(selectTag));
     ScriptWrappable::init(this);
+}
+
+PassRefPtr<HTMLSelectElement> HTMLSelectElement::create(Document* document)
+{
+    return adoptRef(new HTMLSelectElement(selectTag, document, 0, false));
 }
 
 PassRefPtr<HTMLSelectElement> HTMLSelectElement::create(const QualifiedName& tagName, Document* document, HTMLFormElement* form, bool createdByParser)
@@ -334,7 +340,7 @@ bool HTMLSelectElement::childShouldCreateRenderer(const NodeRenderingContext& ch
     if (!HTMLFormControlElementWithState::childShouldCreateRenderer(childContext))
         return false;
     if (!usesMenuList())
-        return childContext.node()->hasTagName(HTMLNames::optionTag) || childContext.node()->hasTagName(HTMLNames::optgroupTag);
+        return childContext.node()->hasTagName(HTMLNames::optionTag) || isHTMLOptGroupElement(childContext.node());
     return false;
 }
 
@@ -740,7 +746,7 @@ void HTMLSelectElement::recalcListItems(bool updateSelectedStates) const
         // optgroup tags may not nest. However, both FireFox and IE will
         // flatten the tree automatically, so we follow suit.
         // (http://www.w3.org/TR/html401/interact/forms.html#h-17.6)
-        if (current->hasTagName(optgroupTag)) {
+        if (isHTMLOptGroupElement(current)) {
             m_listItems.append(current);
             if (Element* nextElement = ElementTraversal::firstWithin(current)) {
                 currentElement = nextElement;
@@ -1566,7 +1572,7 @@ void HTMLSelectElement::finishParsingChildren()
 bool HTMLSelectElement::anonymousIndexedSetter(unsigned index, PassRefPtr<HTMLOptionElement> value, ExceptionCode& ec)
 {
     if (!value) {
-        ec = TYPE_MISMATCH_ERR;
+        ec = TypeMismatchError;
         return false;
     }
     setOption(index, value.get(), ec);

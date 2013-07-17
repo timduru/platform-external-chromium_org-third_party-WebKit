@@ -59,7 +59,7 @@ int HTMLTableRowElement::rowIndex() const
     if (!table)
         return -1;
     table = table->parentNode();
-    if (!table || !table->hasTagName(tableTag))
+    if (!table || !isHTMLTableElement(table))
         return -1;
 
     // To match Firefox, the row indices work like this:
@@ -69,7 +69,7 @@ int HTMLTableRowElement::rowIndex() const
 
     int rIndex = 0;
 
-    if (HTMLTableSectionElement* head = static_cast<HTMLTableElement*>(table)->tHead()) {
+    if (HTMLTableSectionElement* head = toHTMLTableElement(table)->tHead()) {
         for (Node *row = head->firstChild(); row; row = row->nextSibling()) {
             if (row == this)
                 return rIndex;
@@ -77,7 +77,7 @@ int HTMLTableRowElement::rowIndex() const
                 ++rIndex;
         }
     }
-    
+
     for (Node *node = table->firstChild(); node; node = node->nextSibling()) {
         if (node->hasTagName(tbodyTag)) {
             HTMLTableSectionElement* section = static_cast<HTMLTableSectionElement*>(node);
@@ -90,7 +90,7 @@ int HTMLTableRowElement::rowIndex() const
         }
     }
 
-    if (HTMLTableSectionElement* foot = static_cast<HTMLTableElement*>(table)->tFoot()) {
+    if (HTMLTableSectionElement* foot = toHTMLTableElement(table)->tFoot()) {
         for (Node *row = foot->firstChild(); row; row = row->nextSibling()) {
             if (row == this)
                 return rIndex;
@@ -122,20 +122,20 @@ PassRefPtr<HTMLElement> HTMLTableRowElement::insertCell(int index, ExceptionCode
     RefPtr<HTMLCollection> children = cells();
     int numCells = children ? children->length() : 0;
     if (index < -1 || index > numCells) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return 0;
     }
 
     RefPtr<HTMLTableCellElement> cell = HTMLTableCellElement::create(tdTag, document());
     if (index < 0 || index >= numCells)
-        appendChild(cell, ec);
+        appendChild(cell, ec, AttachLazily);
     else {
         Node* n;
         if (index < 1)
             n = firstChild();
         else
             n = children->item(index);
-        insertBefore(cell, n, ec);
+        insertBefore(cell, n, ec, AttachLazily);
     }
     return cell.release();
 }
@@ -149,8 +149,9 @@ void HTMLTableRowElement::deleteCell(int index, ExceptionCode& ec)
     if (index >= 0 && index < numCells) {
         RefPtr<Node> cell = children->item(index);
         HTMLElement::removeChild(cell.get(), ec);
-    } else
-        ec = INDEX_SIZE_ERR;
+    } else {
+        ec = IndexSizeError;
+    }
 }
 
 PassRefPtr<HTMLCollection> HTMLTableRowElement::cells()
@@ -160,7 +161,7 @@ PassRefPtr<HTMLCollection> HTMLTableRowElement::cells()
 
 void HTMLTableRowElement::setCells(HTMLCollection*, ExceptionCode& ec)
 {
-    ec = NO_MODIFICATION_ALLOWED_ERR;
+    ec = NoModificationAllowedError;
 }
 
 }

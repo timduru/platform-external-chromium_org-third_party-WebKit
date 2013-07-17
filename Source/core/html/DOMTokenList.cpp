@@ -27,21 +27,21 @@
 
 #include "core/dom/ExceptionCode.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include <wtf/text/StringBuilder.h>
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
 bool DOMTokenList::validateToken(const AtomicString& token, ExceptionCode& ec)
 {
     if (token.isEmpty()) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return false;
     }
 
     unsigned length = token.length();
     for (unsigned i = 0; i < length; ++i) {
         if (isHTMLSpace(token[i])) {
-            ec = INVALID_CHARACTER_ERR;
+            ec = InvalidCharacterError;
             return false;
         }
     }

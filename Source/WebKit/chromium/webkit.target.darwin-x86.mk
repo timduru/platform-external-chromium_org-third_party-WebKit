@@ -32,6 +32,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebActiveGestureAnimation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebAudioBus.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoAlgorithm.cpp \
+	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoKey.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebData.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebDeviceMotionData.cpp \
@@ -65,197 +66,197 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebURLError.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebURLRequest.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebURLResponse.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ApplicationCacheHost.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/AssertMatchingEnums.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/AssociatedURLLoader.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/AsyncFileSystemChromium.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/AsyncFileWriterChromium.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/AutofillPopupMenuClient.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/BackForwardClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/DateTimeChooserImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ChromeClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ColorChooserPopupUIController.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ColorChooserUIController.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/CompositionUnderlineVectorBuilder.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ContextFeaturesClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ContextMenuClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/DatabaseObserver.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/DeviceOrientationClientProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/DOMUtilitiesPrivate.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/DragClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/DragScrollTimer.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/EditorClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/EventListenerWrapper.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ExternalDateTimeChooser.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ExternalPopupMenu.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/FindInPageCoordinates.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/FrameLoaderClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/GeolocationClientProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/GraphicsLayerFactoryChromium.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebHelperPluginImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/IDBCursorBackendProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/IDBDatabaseBackendProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/IDBFactoryBackendProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/InbandTextTrackPrivateImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/InspectorClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/InspectorFrontendClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/LinkHighlight.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/PrerendererClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/android/WebInputEventFactory.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/linux/WebFontRendering.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/linux/WebFontRenderStyle.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/LocalFileSystemChromium.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/MediaSourcePrivateImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/NotificationPresenterImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/painting/ContinuousPainter.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/painting/PaintAggregator.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/PageOverlay.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/PageOverlayList.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/PageWidgetDelegate.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/PinchViewports.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/PopupContainer.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/PopupMenuChromium.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/PopupListBox.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ScrollbarGroup.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/SharedWorkerRepository.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/SourceBufferPrivateImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/SpeechInputClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/SpeechRecognitionClientProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/StorageAreaProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/StorageQuotaChromium.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/StorageNamespaceProxy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/TextFieldDecoratorImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/UserMediaClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ValidationMessageClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/ViewportAnchor.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebTextCheckingCompletionImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebTextCheckingResult.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebAccessibilityObject.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebArrayBuffer.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebArrayBufferView.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebBindings.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebBlob.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebBlobData.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebCache.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebCachedURLRequest.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebColorName.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebCrossOriginPreflightResultCache.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMActivityLogger.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMCustomEvent.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMEvent.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMEventListener.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMEventListenerPrivate.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMMessageEvent.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMMouseEvent.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMMutationEvent.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMProgressEvent.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDOMResourceProgressEvent.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDatabase.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDataSourceImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDevToolsAgentImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDevToolsFrontendImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDeviceOrientation.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDeviceOrientationClientMock.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDeviceOrientationController.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDocument.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDocumentType.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebDragData.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebElement.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebEntities.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebFileChooserCompletionImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebFileSystemCallbacksImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebFontCache.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebFontDescription.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebFontImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebFormControlElement.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebFormElement.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebFrameImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebGeolocationController.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebGeolocationClientMock.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebGeolocationError.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebGeolocationPermissionRequest.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebGeolocationPermissionRequestManager.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebGeolocationPosition.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebGlyphCache.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebHistoryItem.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebHitTestResult.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIconLoadingCompletionImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBCallbacksImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBDatabaseCallbacksImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBDatabaseError.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBKey.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBKeyPath.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBKeyRange.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebIDBMetadata.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebImageCache.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebImageDecoder.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebImageSkia.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebInputElement.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebInputEvent.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebInputEventConversion.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebKit.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebLabelElement.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebMediaPlayerClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebMediaSourceImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebMediaStreamRegistry.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebNetworkStateNotifier.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebNode.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebNodeCollection.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebNodeList.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebNotification.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebOptionElement.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPagePopupImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPageSerializer.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPageSerializerImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPasswordFormData.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPasswordFormUtils.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPerformance.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPluginContainerImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPluginDocument.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPluginLoadObserver.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPluginScrollbarImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebPopupMenuImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebRange.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebRuntimeFeatures.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebScopedMicrotaskSuppression.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebScopedUserGesture.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebScriptController.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebScrollbarThemePainter.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSearchableFormData.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSecurityOrigin.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSecurityPolicy.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSelectElement.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSerializedScriptValue.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSettingsImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSharedWorkerImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSocket.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSocketImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSpeechGrammar.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSpeechInputResult.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSpeechRecognitionHandle.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSpeechRecognitionResult.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebStorageEventDispatcherImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebStorageQuotaCallbacksImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebSurroundingText.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebTextInputInfo.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebTextRun.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebURLLoadTiming.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebTextFieldDecoratorClient.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebUserGestureIndicator.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebUserGestureToken.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebUserMediaRequest.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebViewBenchmarkSupportImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebViewImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebWorkerBase.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebWorkerClientImpl.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebWorkerInfo.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WebWorkerRunLoop.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WorkerAllowMainThreadBridgeBase.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WorkerAsyncFileSystemChromium.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WorkerAsyncFileWriterChromium.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WorkerFileSystemCallbacksBridge.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WorkerFileWriterCallbacksBridge.cpp \
-	third_party/WebKit/Source/WebKit/chromium/src/WorkerStorageQuotaCallbacksBridge.cpp
+	third_party/WebKit/Source/web/ApplicationCacheHost.cpp \
+	third_party/WebKit/Source/web/AssertMatchingEnums.cpp \
+	third_party/WebKit/Source/web/AssociatedURLLoader.cpp \
+	third_party/WebKit/Source/web/AsyncFileSystemChromium.cpp \
+	third_party/WebKit/Source/web/AsyncFileWriterChromium.cpp \
+	third_party/WebKit/Source/web/AutofillPopupMenuClient.cpp \
+	third_party/WebKit/Source/web/BackForwardClientImpl.cpp \
+	third_party/WebKit/Source/web/ChromeClientImpl.cpp \
+	third_party/WebKit/Source/web/ColorChooserPopupUIController.cpp \
+	third_party/WebKit/Source/web/ColorChooserUIController.cpp \
+	third_party/WebKit/Source/web/CompositionUnderlineVectorBuilder.cpp \
+	third_party/WebKit/Source/web/ContextFeaturesClientImpl.cpp \
+	third_party/WebKit/Source/web/ContextMenuClientImpl.cpp \
+	third_party/WebKit/Source/web/DOMUtilitiesPrivate.cpp \
+	third_party/WebKit/Source/web/DatabaseObserver.cpp \
+	third_party/WebKit/Source/web/DateTimeChooserImpl.cpp \
+	third_party/WebKit/Source/web/DeviceOrientationClientProxy.cpp \
+	third_party/WebKit/Source/web/DragClientImpl.cpp \
+	third_party/WebKit/Source/web/EditorClientImpl.cpp \
+	third_party/WebKit/Source/web/EventListenerWrapper.cpp \
+	third_party/WebKit/Source/web/ExternalDateTimeChooser.cpp \
+	third_party/WebKit/Source/web/ExternalPopupMenu.cpp \
+	third_party/WebKit/Source/web/FindInPageCoordinates.cpp \
+	third_party/WebKit/Source/web/FrameLoaderClientImpl.cpp \
+	third_party/WebKit/Source/web/GeolocationClientProxy.cpp \
+	third_party/WebKit/Source/web/GraphicsLayerFactoryChromium.cpp \
+	third_party/WebKit/Source/web/IDBCursorBackendProxy.cpp \
+	third_party/WebKit/Source/web/IDBDatabaseBackendProxy.cpp \
+	third_party/WebKit/Source/web/IDBFactoryBackendProxy.cpp \
+	third_party/WebKit/Source/web/InbandTextTrackPrivateImpl.cpp \
+	third_party/WebKit/Source/web/InspectorClientImpl.cpp \
+	third_party/WebKit/Source/web/InspectorFrontendClientImpl.cpp \
+	third_party/WebKit/Source/web/LinkHighlight.cpp \
+	third_party/WebKit/Source/web/LocalFileSystemChromium.cpp \
+	third_party/WebKit/Source/web/MIDIClientImpl.cpp \
+	third_party/WebKit/Source/web/MediaSourcePrivateImpl.cpp \
+	third_party/WebKit/Source/web/NotificationPresenterImpl.cpp \
+	third_party/WebKit/Source/web/PageOverlay.cpp \
+	third_party/WebKit/Source/web/PageOverlayList.cpp \
+	third_party/WebKit/Source/web/PageWidgetDelegate.cpp \
+	third_party/WebKit/Source/web/PinchViewports.cpp \
+	third_party/WebKit/Source/web/PopupContainer.cpp \
+	third_party/WebKit/Source/web/PopupListBox.cpp \
+	third_party/WebKit/Source/web/PopupMenuChromium.cpp \
+	third_party/WebKit/Source/web/PrerendererClientImpl.cpp \
+	third_party/WebKit/Source/web/ScrollbarGroup.cpp \
+	third_party/WebKit/Source/web/SharedWorkerRepository.cpp \
+	third_party/WebKit/Source/web/SourceBufferPrivateImpl.cpp \
+	third_party/WebKit/Source/web/SpeechInputClientImpl.cpp \
+	third_party/WebKit/Source/web/SpeechRecognitionClientProxy.cpp \
+	third_party/WebKit/Source/web/StorageAreaProxy.cpp \
+	third_party/WebKit/Source/web/StorageNamespaceProxy.cpp \
+	third_party/WebKit/Source/web/StorageQuotaChromium.cpp \
+	third_party/WebKit/Source/web/UserMediaClientImpl.cpp \
+	third_party/WebKit/Source/web/ValidationMessageClientImpl.cpp \
+	third_party/WebKit/Source/web/ViewportAnchor.cpp \
+	third_party/WebKit/Source/web/WebAccessibilityObject.cpp \
+	third_party/WebKit/Source/web/WebArrayBuffer.cpp \
+	third_party/WebKit/Source/web/WebArrayBufferView.cpp \
+	third_party/WebKit/Source/web/WebBindings.cpp \
+	third_party/WebKit/Source/web/WebBlob.cpp \
+	third_party/WebKit/Source/web/WebBlobData.cpp \
+	third_party/WebKit/Source/web/WebCache.cpp \
+	third_party/WebKit/Source/web/WebCachedURLRequest.cpp \
+	third_party/WebKit/Source/web/WebColorName.cpp \
+	third_party/WebKit/Source/web/WebCrossOriginPreflightResultCache.cpp \
+	third_party/WebKit/Source/web/WebDOMActivityLogger.cpp \
+	third_party/WebKit/Source/web/WebDOMCustomEvent.cpp \
+	third_party/WebKit/Source/web/WebDOMEvent.cpp \
+	third_party/WebKit/Source/web/WebDOMEventListener.cpp \
+	third_party/WebKit/Source/web/WebDOMEventListenerPrivate.cpp \
+	third_party/WebKit/Source/web/WebDOMMessageEvent.cpp \
+	third_party/WebKit/Source/web/WebDOMMouseEvent.cpp \
+	third_party/WebKit/Source/web/WebDOMMutationEvent.cpp \
+	third_party/WebKit/Source/web/WebDOMProgressEvent.cpp \
+	third_party/WebKit/Source/web/WebDOMResourceProgressEvent.cpp \
+	third_party/WebKit/Source/web/WebDataSourceImpl.cpp \
+	third_party/WebKit/Source/web/WebDatabase.cpp \
+	third_party/WebKit/Source/web/WebDevToolsAgentImpl.cpp \
+	third_party/WebKit/Source/web/WebDevToolsFrontendImpl.cpp \
+	third_party/WebKit/Source/web/WebDeviceOrientation.cpp \
+	third_party/WebKit/Source/web/WebDeviceOrientationClientMock.cpp \
+	third_party/WebKit/Source/web/WebDeviceOrientationController.cpp \
+	third_party/WebKit/Source/web/WebDocument.cpp \
+	third_party/WebKit/Source/web/WebDocumentType.cpp \
+	third_party/WebKit/Source/web/WebDragData.cpp \
+	third_party/WebKit/Source/web/WebElement.cpp \
+	third_party/WebKit/Source/web/WebEntities.cpp \
+	third_party/WebKit/Source/web/WebFileChooserCompletionImpl.cpp \
+	third_party/WebKit/Source/web/WebFileSystemCallbacksImpl.cpp \
+	third_party/WebKit/Source/web/WebFontCache.cpp \
+	third_party/WebKit/Source/web/WebFontDescription.cpp \
+	third_party/WebKit/Source/web/WebFontImpl.cpp \
+	third_party/WebKit/Source/web/WebFormControlElement.cpp \
+	third_party/WebKit/Source/web/WebFormElement.cpp \
+	third_party/WebKit/Source/web/WebFrameImpl.cpp \
+	third_party/WebKit/Source/web/WebGeolocationClientMock.cpp \
+	third_party/WebKit/Source/web/WebGeolocationController.cpp \
+	third_party/WebKit/Source/web/WebGeolocationError.cpp \
+	third_party/WebKit/Source/web/WebGeolocationPermissionRequest.cpp \
+	third_party/WebKit/Source/web/WebGeolocationPermissionRequestManager.cpp \
+	third_party/WebKit/Source/web/WebGeolocationPosition.cpp \
+	third_party/WebKit/Source/web/WebGlyphCache.cpp \
+	third_party/WebKit/Source/web/WebHelperPluginImpl.cpp \
+	third_party/WebKit/Source/web/WebHistoryItem.cpp \
+	third_party/WebKit/Source/web/WebHitTestResult.cpp \
+	third_party/WebKit/Source/web/WebIDBCallbacksImpl.cpp \
+	third_party/WebKit/Source/web/WebIDBDatabaseCallbacksImpl.cpp \
+	third_party/WebKit/Source/web/WebIDBDatabaseError.cpp \
+	third_party/WebKit/Source/web/WebIDBKey.cpp \
+	third_party/WebKit/Source/web/WebIDBKeyPath.cpp \
+	third_party/WebKit/Source/web/WebIDBKeyRange.cpp \
+	third_party/WebKit/Source/web/WebIDBMetadata.cpp \
+	third_party/WebKit/Source/web/WebIconLoadingCompletionImpl.cpp \
+	third_party/WebKit/Source/web/WebImageCache.cpp \
+	third_party/WebKit/Source/web/WebImageDecoder.cpp \
+	third_party/WebKit/Source/web/WebImageSkia.cpp \
+	third_party/WebKit/Source/web/WebInputElement.cpp \
+	third_party/WebKit/Source/web/WebInputEvent.cpp \
+	third_party/WebKit/Source/web/WebInputEventConversion.cpp \
+	third_party/WebKit/Source/web/WebKit.cpp \
+	third_party/WebKit/Source/web/WebLabelElement.cpp \
+	third_party/WebKit/Source/web/WebMIDIPermissionRequest.cpp \
+	third_party/WebKit/Source/web/WebMediaPlayerClientImpl.cpp \
+	third_party/WebKit/Source/web/WebMediaSourceImpl.cpp \
+	third_party/WebKit/Source/web/WebMediaStreamRegistry.cpp \
+	third_party/WebKit/Source/web/WebNetworkStateNotifier.cpp \
+	third_party/WebKit/Source/web/WebNode.cpp \
+	third_party/WebKit/Source/web/WebNodeCollection.cpp \
+	third_party/WebKit/Source/web/WebNodeList.cpp \
+	third_party/WebKit/Source/web/WebNotification.cpp \
+	third_party/WebKit/Source/web/WebOptionElement.cpp \
+	third_party/WebKit/Source/web/WebPagePopupImpl.cpp \
+	third_party/WebKit/Source/web/WebPageSerializer.cpp \
+	third_party/WebKit/Source/web/WebPageSerializerImpl.cpp \
+	third_party/WebKit/Source/web/WebPasswordFormData.cpp \
+	third_party/WebKit/Source/web/WebPasswordFormUtils.cpp \
+	third_party/WebKit/Source/web/WebPerformance.cpp \
+	third_party/WebKit/Source/web/WebPluginContainerImpl.cpp \
+	third_party/WebKit/Source/web/WebPluginDocument.cpp \
+	third_party/WebKit/Source/web/WebPluginLoadObserver.cpp \
+	third_party/WebKit/Source/web/WebPluginScrollbarImpl.cpp \
+	third_party/WebKit/Source/web/WebPopupMenuImpl.cpp \
+	third_party/WebKit/Source/web/WebRange.cpp \
+	third_party/WebKit/Source/web/WebRuntimeFeatures.cpp \
+	third_party/WebKit/Source/web/WebScopedMicrotaskSuppression.cpp \
+	third_party/WebKit/Source/web/WebScopedUserGesture.cpp \
+	third_party/WebKit/Source/web/WebScriptBindings.cpp \
+	third_party/WebKit/Source/web/WebScriptController.cpp \
+	third_party/WebKit/Source/web/WebScrollbarThemePainter.cpp \
+	third_party/WebKit/Source/web/WebSearchableFormData.cpp \
+	third_party/WebKit/Source/web/WebSecurityOrigin.cpp \
+	third_party/WebKit/Source/web/WebSecurityPolicy.cpp \
+	third_party/WebKit/Source/web/WebSelectElement.cpp \
+	third_party/WebKit/Source/web/WebSerializedScriptValue.cpp \
+	third_party/WebKit/Source/web/WebSettingsImpl.cpp \
+	third_party/WebKit/Source/web/WebSharedWorkerImpl.cpp \
+	third_party/WebKit/Source/web/WebSocket.cpp \
+	third_party/WebKit/Source/web/WebSocketImpl.cpp \
+	third_party/WebKit/Source/web/WebSpeechGrammar.cpp \
+	third_party/WebKit/Source/web/WebSpeechInputResult.cpp \
+	third_party/WebKit/Source/web/WebSpeechRecognitionHandle.cpp \
+	third_party/WebKit/Source/web/WebSpeechRecognitionResult.cpp \
+	third_party/WebKit/Source/web/WebStorageEventDispatcherImpl.cpp \
+	third_party/WebKit/Source/web/WebStorageQuotaCallbacksImpl.cpp \
+	third_party/WebKit/Source/web/WebSurroundingText.cpp \
+	third_party/WebKit/Source/web/WebTextCheckingCompletionImpl.cpp \
+	third_party/WebKit/Source/web/WebTextCheckingResult.cpp \
+	third_party/WebKit/Source/web/WebTextInputInfo.cpp \
+	third_party/WebKit/Source/web/WebTextRun.cpp \
+	third_party/WebKit/Source/web/WebURLLoadTiming.cpp \
+	third_party/WebKit/Source/web/WebUserGestureIndicator.cpp \
+	third_party/WebKit/Source/web/WebUserGestureToken.cpp \
+	third_party/WebKit/Source/web/WebUserMediaRequest.cpp \
+	third_party/WebKit/Source/web/WebViewBenchmarkSupportImpl.cpp \
+	third_party/WebKit/Source/web/WebViewImpl.cpp \
+	third_party/WebKit/Source/web/WebWorkerBase.cpp \
+	third_party/WebKit/Source/web/WebWorkerClientImpl.cpp \
+	third_party/WebKit/Source/web/WebWorkerInfo.cpp \
+	third_party/WebKit/Source/web/WebWorkerRunLoop.cpp \
+	third_party/WebKit/Source/web/WorkerAllowMainThreadBridgeBase.cpp \
+	third_party/WebKit/Source/web/WorkerAsyncFileSystemChromium.cpp \
+	third_party/WebKit/Source/web/WorkerAsyncFileWriterChromium.cpp \
+	third_party/WebKit/Source/web/WorkerFileSystemCallbacksBridge.cpp \
+	third_party/WebKit/Source/web/WorkerFileWriterCallbacksBridge.cpp \
+	third_party/WebKit/Source/web/WorkerStorageQuotaCallbacksBridge.cpp \
+	third_party/WebKit/Source/web/android/WebInputEventFactory.cpp \
+	third_party/WebKit/Source/web/linux/WebFontRenderStyle.cpp \
+	third_party/WebKit/Source/web/linux/WebFontRendering.cpp \
+	third_party/WebKit/Source/web/painting/ContinuousPainter.cpp \
+	third_party/WebKit/Source/web/painting/PaintAggregator.cpp
 
 
 # Flags passed to both C and C++ files.
@@ -300,8 +301,9 @@ MY_CFLAGS_Debug := \
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
-	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -312,7 +314,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -320,9 +321,7 @@ MY_DEFS_Debug := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -334,7 +333,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -360,7 +358,7 @@ MY_DEFS_Debug := \
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/WebKit/public/web \
-	$(LOCAL_PATH)/third_party/WebKit/Source/WebKit/chromium/src \
+	$(LOCAL_PATH)/third_party/WebKit/Source/web \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/android \
@@ -456,8 +454,9 @@ MY_CFLAGS_Release := \
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
-	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -468,7 +467,6 @@ MY_DEFS_Release := \
 	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -476,9 +474,7 @@ MY_DEFS_Release := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -490,7 +486,6 @@ MY_DEFS_Release := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -516,7 +511,7 @@ MY_DEFS_Release := \
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/WebKit/public/web \
-	$(LOCAL_PATH)/third_party/WebKit/Source/WebKit/chromium/src \
+	$(LOCAL_PATH)/third_party/WebKit/Source/web \
 	$(LOCAL_PATH)/third_party/angle_dx11/include \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/third_party/WebKit/public/web/android \

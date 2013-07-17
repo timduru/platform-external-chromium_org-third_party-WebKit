@@ -22,11 +22,8 @@
 #define SVGZoomAndPan_h
 
 #include "SVGNames.h"
-#include "core/dom/Attribute.h"
 #include "core/dom/QualifiedName.h"
 #include <wtf/HashSet.h>
-#include <wtf/RefCounted.h>
-#include <wtf/unicode/Unicode.h>
 
 namespace WebCore {
 
@@ -64,10 +61,16 @@ public:
         ASSERT(target);
         ASSERT(target->document());
         if (name == SVGNames::zoomAndPanAttr) {
-            const UChar* start = value.characters();
-            const UChar* end = start + value.length();
             SVGZoomAndPanType zoomAndPan = SVGZoomAndPanUnknown;
-            parseZoomAndPan(start, end, zoomAndPan);
+            if (!value.isEmpty()) {
+                if (value.is8Bit()) {
+                    const LChar* start = value.characters8();
+                    parseZoomAndPan(start, start + value.length(), zoomAndPan);
+                } else {
+                    const UChar* start = value.characters16();
+                    parseZoomAndPan(start, start + value.length(), zoomAndPan);
+                }
+            }
             target->setZoomAndPan(zoomAndPan);
             return true;
         }

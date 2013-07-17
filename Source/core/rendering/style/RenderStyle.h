@@ -69,11 +69,11 @@
 #include "core/rendering/style/StyleTransformData.h"
 #include "core/rendering/style/StyleVisualData.h"
 #include "core/svg/SVGPaint.h"
-#include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/Vector.h>
+#include "wtf/Forward.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/RefCounted.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/Vector.h"
 
 template<typename T, typename U> inline bool compareEqual(const T& t, const U& u) { return t == static_cast<T>(u); }
 
@@ -117,8 +117,10 @@ class RenderStyle: public RefCounted<RenderStyle> {
     friend class RenderSVGResource; // FIXME: Needs to alter the visited state by hand. Should clean the SVG code up and move it into RenderStyle perhaps.
     friend class RenderTreeAsText; // FIXME: Only needed so the render tree can keep lying and dump the wrong colors.  Rebaselining would allow this to be yanked.
     friend class StyleBuilderFunctions; // Sets color styles
+    friend class StyleBuilder; // FIXME: Revove this! StyleBuilder::oldApplyProperty reads color().
     friend class StyleResolver; // Sets members directly.
-    friend class StyleResolverState; // Sets members directly.
+    friend class StyleResolverState; // Needs to read color() to compute currentColor.
+    friend class CachedUAStyle; // Saves Border/Background information for later comparison.
 protected:
 
     // non-inherited attributes
@@ -215,6 +217,7 @@ protected:
                 && _pseudoBits == other._pseudoBits
                 && _unicodeBidi == other._unicodeBidi
                 && explicitInheritance == other.explicitInheritance
+                && currentColor == other.currentColor
                 && unique == other.unique
                 && emptyState == other.emptyState
                 && firstChildState == other.firstChildState
@@ -241,8 +244,9 @@ protected:
         unsigned _page_break_inside : 2; // EPageBreak
 
         unsigned _styleType : 6; // PseudoId
-        unsigned _pseudoBits : 7;
+        unsigned _pseudoBits : 8;
         unsigned explicitInheritance : 1; // Explicitly inherits a non-inherited property
+        unsigned currentColor : 1; // At least one color has the value 'currentColor'
         unsigned unique : 1; // Style can not be shared.
         unsigned emptyState : 1;
         unsigned firstChildState : 1;
@@ -262,7 +266,7 @@ protected:
         unsigned _affectedByDrag : 1;
         unsigned _isLink : 1;
         // If you add more style bits here, you will also need to update RenderStyle::copyNonInheritedFrom()
-        // 59 bits
+        // 61 bits
     } noninherited_flags;
 
 // !END SYNC!
@@ -304,6 +308,7 @@ protected:
         noninherited_flags._styleType = NOPSEUDO;
         noninherited_flags._pseudoBits = 0;
         noninherited_flags.explicitInheritance = false;
+        noninherited_flags.currentColor = false;
         noninherited_flags.unique = false;
         noninherited_flags.emptyState = false;
         noninherited_flags.firstChildState = false;
@@ -433,12 +438,6 @@ public:
     EPosition position() const { return static_cast<EPosition>(noninherited_flags._position); }
     bool hasOutOfFlowPosition() const { return position() == AbsolutePosition || position() == FixedPosition; }
     bool hasInFlowPosition() const { return position() == RelativePosition || position() == StickyPosition; }
-    bool hasPaintOffset() const
-    {
-        bool paintOffset = hasInFlowPosition();
-        paintOffset = paintOffset || (isFloating() && shapeOutside());
-        return paintOffset;
-    }
     bool hasViewportConstrainedPosition() const { return position() == FixedPosition || position() == StickyPosition; }
     EFloat floating() const { return static_cast<EFloat>(noninherited_flags._floating); }
 
@@ -541,16 +540,16 @@ public:
     TextIndentLine textIndentLine() const { return static_cast<TextIndentLine>(rareInheritedData->m_textIndentLine); }
 #endif
     ETextAlign textAlign() const { return static_cast<ETextAlign>(inherited_flags._text_align); }
+    TextAlignLast textAlignLast() const { return static_cast<TextAlignLast>(rareInheritedData->m_textAlignLast); }
     ETextTransform textTransform() const { return static_cast<ETextTransform>(inherited_flags._text_transform); }
     TextDecoration textDecorationsInEffect() const { return static_cast<TextDecoration>(inherited_flags._text_decorations); }
     TextDecoration textDecoration() const { return static_cast<TextDecoration>(visual->textDecoration); }
 #if ENABLE(CSS3_TEXT)
-    TextAlignLast textAlignLast() const { return static_cast<TextAlignLast>(rareInheritedData->m_textAlignLast); }
     TextUnderlinePosition textUnderlinePosition() const { return static_cast<TextUnderlinePosition>(rareInheritedData->m_textUnderlinePosition); }
 #endif // CSS3_TEXT
     TextDecorationStyle textDecorationStyle() const { return static_cast<TextDecorationStyle>(rareNonInheritedData->m_textDecorationStyle); }
-    int wordSpacing() const;
-    int letterSpacing() const;
+    float wordSpacing() const;
+    float letterSpacing() const;
 
     float zoom() const { return visual->m_zoom; }
     float effectiveZoom() const { return rareInheritedData->m_effectiveZoom; }
@@ -862,7 +861,6 @@ public:
     CSSAnimationDataList* accessTransitions();
 
     bool hasAnimations() const { return rareNonInheritedData->m_animations && rareNonInheritedData->m_animations->size() > 0; }
-    bool hasTransitions() const { return rareNonInheritedData->m_transitions && rareNonInheritedData->m_transitions->size() > 0; }
 
     // return the first found Animation (including 'all' transitions)
     const CSSAnimationData* transitionForProperty(CSSPropertyID) const;
@@ -1049,12 +1047,12 @@ public:
     void setTextIndentLine(TextIndentLine v) { SET_VAR(rareInheritedData, m_textIndentLine, v); }
 #endif
     void setTextAlign(ETextAlign v) { inherited_flags._text_align = v; }
+    void setTextAlignLast(TextAlignLast v) { SET_VAR(rareInheritedData, m_textAlignLast, v); }
     void setTextTransform(ETextTransform v) { inherited_flags._text_transform = v; }
     void addToTextDecorationsInEffect(TextDecoration v) { inherited_flags._text_decorations |= v; }
     void setTextDecorationsInEffect(TextDecoration v) { inherited_flags._text_decorations = v; }
     void setTextDecoration(TextDecoration v) { SET_VAR(visual, textDecoration, v); }
 #if ENABLE(CSS3_TEXT)
-    void setTextAlignLast(TextAlignLast v) { SET_VAR(rareInheritedData, m_textAlignLast, v); }
     void setTextUnderlinePosition(TextUnderlinePosition v) { SET_VAR(rareInheritedData, m_textUnderlinePosition, v); }
 #endif // CSS3_TEXT
     void setTextDecorationStyle(TextDecorationStyle v) { SET_VAR(rareNonInheritedData, m_textDecorationStyle, v); }
@@ -1068,8 +1066,8 @@ public:
 
     void setWhiteSpace(EWhiteSpace v) { inherited_flags._white_space = v; }
 
-    void setWordSpacing(int);
-    void setLetterSpacing(int);
+    void setWordSpacing(float);
+    void setLetterSpacing(float);
 
     void clearBackgroundLayers() { m_background.access()->m_background = FillLayer(BackgroundFillLayer); }
     void inheritBackgroundLayers(const FillLayer& parent) { m_background.access()->m_background = parent; }
@@ -1291,8 +1289,6 @@ public:
         rareNonInheritedData.access()->m_transitions.clear();
     }
 
-    void inheritAnimations(const CSSAnimationDataList* parent) { rareNonInheritedData.access()->m_animations = parent ? adoptPtr(new CSSAnimationDataList(*parent)) : nullptr; }
-    void inheritTransitions(const CSSAnimationDataList* parent) { rareNonInheritedData.access()->m_transitions = parent ? adoptPtr(new CSSAnimationDataList(*parent)) : nullptr; }
     void adjustAnimations();
     void adjustTransitions();
 
@@ -1450,6 +1446,9 @@ public:
     void setHasExplicitlyInheritedProperties() { noninherited_flags.explicitInheritance = true; }
     bool hasExplicitlyInheritedProperties() const { return noninherited_flags.explicitInheritance; }
 
+    void setHasCurrentColor() { noninherited_flags.currentColor = true; }
+    bool hasCurrentColor() const { return noninherited_flags.currentColor; }
+
     void reportMemoryUsage(MemoryObjectInfo*) const;
     
     // Initial values for all the properties
@@ -1488,7 +1487,7 @@ public:
     static unsigned initialBorderWidth() { return 3; }
     static unsigned short initialColumnRuleWidth() { return 3; }
     static unsigned short initialOutlineWidth() { return 3; }
-    static int initialLetterWordSpacing() { return 0; }
+    static float initialLetterWordSpacing() { return 0.0f; }
     static Length initialSize() { return Length(); }
     static Length initialMinSize() { return Length(Fixed); }
     static Length initialMaxSize() { return Length(Undefined); }
@@ -1504,9 +1503,9 @@ public:
     static short initialOrphans() { return 2; }
     static Length initialLineHeight() { return Length(-100.0, Percent); }
     static ETextAlign initialTextAlign() { return TASTART; }
+    static TextAlignLast initialTextAlignLast() { return TextAlignLastAuto; }
     static TextDecoration initialTextDecoration() { return TextDecorationNone; }
 #if ENABLE(CSS3_TEXT)
-    static TextAlignLast initialTextAlignLast() { return TextAlignLastAuto; }
     static TextUnderlinePosition initialTextUnderlinePosition() { return TextUnderlinePositionAuto; }
 #endif // CSS3_TEXT
     static TextDecorationStyle initialTextDecorationStyle() { return TextDecorationStyleSolid; }
@@ -1625,7 +1624,10 @@ public:
     static WrapFlow initialWrapFlow() { return WrapFlowAuto; }
     static WrapThrough initialWrapThrough() { return WrapThroughWrap; }
 
+    static QuotesData* initialQuotes() { return 0; }
+
     // Keep these at the end.
+    // FIXME: Why? Seems these should all be one big sorted list.
     static LineClampValue initialLineClamp() { return LineClampValue(); }
     static ETextSecurity initialTextSecurity() { return TSNONE; }
     static Color initialTapHighlightColor();

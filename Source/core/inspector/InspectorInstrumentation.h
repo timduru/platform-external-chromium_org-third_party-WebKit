@@ -151,12 +151,14 @@ extern const char ImageDecodeTask[];
 extern const char Paint[];
 extern const char Layer[];
 extern const char BeginFrame[];
+extern const char UpdateLayer[];
 };
 
 namespace InstrumentationEventArguments {
 extern const char LayerId[];
-extern const char PageId[];
+extern const char LayerTreeId[];
 extern const char NodeId[];
+extern const char PageId[];
 };
 
 namespace InspectorInstrumentation {
@@ -172,9 +174,7 @@ inline InstrumentingAgents* instrumentingAgentsForScriptExecutionContext(ScriptE
 
 inline InstrumentingAgents* instrumentingAgentsForFrame(Frame* frame)
 {
-    if (frame)
-        return instrumentingAgentsForPage(frame->page());
-    return 0;
+    return frame ? instrumentingAgentsForPage(frame->page()) : 0;
 }
 
 inline InstrumentingAgents* instrumentingAgentsForDocument(Document* document)
@@ -190,7 +190,7 @@ inline InstrumentingAgents* instrumentingAgentsForDocument(Document* document)
 
 inline InstrumentingAgents* instrumentingAgentsForElement(Element* element)
 {
-    return instrumentingAgentsForDocument(element->document());
+    return element ? instrumentingAgentsForDocument(element->document()) : 0;
 }
 
 bool cssErrorFilter(const CSSParserString& content, int propertyId, int errorType);

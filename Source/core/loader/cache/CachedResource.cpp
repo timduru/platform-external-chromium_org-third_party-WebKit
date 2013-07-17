@@ -108,7 +108,6 @@ DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("Cac
 CachedResource::CachedResource(const ResourceRequest& request, Type type)
     : m_resourceRequest(request)
     , m_responseTimestamp(currentTime())
-    , m_decodedDataDeletionTimer(this, &CachedResource::decodedDataDeletionTimerFired)
     , m_cancelTimer(this, &CachedResource::cancelTimerFired)
     , m_lastDecodedAccessTime(0)
     , m_loadFinishTime(0)
@@ -368,9 +367,6 @@ void CachedResource::addClient(CachedResourceClient* client)
 
 void CachedResource::didAddClient(CachedResourceClient* c)
 {
-    if (m_decodedDataDeletionTimer.isActive())
-        m_decodedDataDeletionTimer.stop();
-
     if (m_clientsAwaitingCallback.contains(c)) {
         m_clients.add(c);
         m_clientsAwaitingCallback.remove(c);
@@ -429,7 +425,6 @@ void CachedResource::removeClient(CachedResourceClient* client)
         }
         if (!m_switchingClientsToRevalidatedResource)
             allClientsRemoved();
-        destroyDecodedDataIfNeeded();
         if (response().cacheControlContainsNoStore()) {
             // RFC2616 14.9.2:
             // "no-store: ... MUST make a best-effort attempt to remove the information from volatile storage as promptly as possible"
@@ -458,23 +453,10 @@ void CachedResource::cancelTimerFired(Timer<CachedResource>* timer)
     ASSERT_UNUSED(timer, timer == &m_cancelTimer);
     if (hasClients() || !m_loader)
         return;
+    CachedResourceHandle<CachedResource> protect(this);
     m_loader->cancelIfNotFinishing();
     if (m_status != Cached)
         memoryCache()->remove(this);
-}
-
-void CachedResource::destroyDecodedDataIfNeeded()
-{
-    if (!m_decodedSize)
-        return;
-
-    if (double interval = memoryCache()->deadDecodedDataDeletionInterval())
-        m_decodedDataDeletionTimer.startOneShot(interval);
-}
-
-void CachedResource::decodedDataDeletionTimerFired(Timer<CachedResource>*)
-{
-    destroyDecodedData();
 }
 
 bool CachedResource::deleteIfPossible()
@@ -678,13 +660,7 @@ void CachedResource::revalidationSucceeded(const ResourceResponse& response)
     ASSERT(!canDelete());
 
     m_resourceToRevalidate->updateResponseAfterRevalidation(response);
-    memoryCache()->remove(this);
-    memoryCache()->add(m_resourceToRevalidate);
-    int delta = m_resourceToRevalidate->size();
-    if (m_resourceToRevalidate->decodedSize() && m_resourceToRevalidate->hasClients())
-        memoryCache()->insertInLiveDecodedResourcesList(m_resourceToRevalidate);
-    if (delta)
-        memoryCache()->adjustSize(m_resourceToRevalidate->hasClients(), delta);
+    memoryCache()->replace(m_resourceToRevalidate, this);
 
     switchClientsToRevalidatedResource();
     ASSERT(!m_deleted);
@@ -705,11 +681,8 @@ void CachedResource::updateForAccess()
     ASSERT(inCache());
 
     // Need to make sure to remove before we increase the access count, since
-    // the queue will possibly change. However, if this is a resource that is being
-    // added back in due to a successful revalidation, it is not present in the LRU list
-    // at this point, so we don't need to remove it.
-    if (!m_proxyResource && m_accessCount)
-        memoryCache()->removeFromLRUList(this);
+    // the queue will possibly change.
+    memoryCache()->removeFromLRUList(this);
 
     // If this is the first time the resource has been accessed, adjust the size of the cache to account for its initial size.
     if (!m_accessCount)
@@ -882,7 +855,6 @@ void CachedResource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
     info.addMember(m_proxyResource, "proxyResource");
     info.addMember(m_handlesToRevalidate, "handlesToRevalidate");
     info.addMember(m_options, "options");
-    info.addMember(m_decodedDataDeletionTimer, "decodedDataDeletionTimer");
     info.ignoreMember(m_clientsAwaitingCallback);
 
     if (m_purgeableData && !m_purgeableData->wasPurged())

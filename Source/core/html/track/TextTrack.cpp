@@ -266,13 +266,13 @@ void TextTrack::removeCue(TextTrackCue* cue, ExceptionCode& ec)
     // 1. If the given cue is not currently listed in the method's TextTrack 
     // object's text track's text track list of cues, then throw a NotFoundError exception.
     if (cue->track() != this) {
-        ec = NOT_FOUND_ERR;
+        ec = NotFoundError;
         return;
     }
 
     // 2. Remove cue from the method's TextTrack object's text track's text track list of cues.
     if (!m_cues || !m_cues->remove(cue)) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
@@ -347,12 +347,12 @@ void TextTrack::removeRegion(TextTrackRegion* region, ExceptionCode &ec)
     // 1. If the given region is not currently listed in the method's TextTrack
     // object's text track list of regions, then throw a NotFoundError exception.
     if (region->track() != this) {
-        ec = NOT_FOUND_ERR;
+        ec = NotFoundError;
         return;
     }
 
     if (!m_regions || !m_regions->remove(region)) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 

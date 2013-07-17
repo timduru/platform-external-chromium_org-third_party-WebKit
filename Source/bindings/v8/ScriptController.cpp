@@ -100,17 +100,17 @@ ScriptController::ScriptController(Frame* frame)
 ScriptController::~ScriptController()
 {
     clearForClose(true);
-
-    if (m_frameNPP) {
-        _NPN_UnregisterObjectOwner(m_frameNPP.get());
-        m_frameNPP.clear();
-    }
-
-    ASSERT(m_pluginNPPs.isEmpty());
 }
 
 void ScriptController::clearScriptObjects()
 {
+    PluginObjectMap::iterator it = m_pluginObjects.begin();
+    for (; it != m_pluginObjects.end(); ++it) {
+        _NPN_UnregisterObject(it->value);
+        _NPN_ReleaseObject(it->value);
+    }
+    m_pluginObjects.clear();
+
     if (m_windowScriptNPObject) {
         // Dispose of the underlying V8 object before releasing our reference
         // to it, so that if a plugin fails to release it properly we will
@@ -354,7 +354,7 @@ void ScriptController::bindToWindowObject(Frame* frame, const String& key, NPObj
 
     v8::Context::Scope scope(v8Context);
 
-    v8::Handle<v8::Object> value = createV8ObjectForNPObject(object);
+    v8::Handle<v8::Object> value = createV8ObjectForNPObject(object, 0);
 
     // Attach to the global object.
     v8::Handle<v8::Object> global = v8Context->Global();
@@ -414,33 +414,22 @@ PassScriptInstance ScriptController::createScriptInstanceForWidget(Widget* widge
     // NPObject as part of its wrapper. However, before accessing the object
     // it must consult the _NPN_Registry.
 
-    // Create the plugin script object, registered against the plugin.
-    v8::Local<v8::Object> wrapper = createV8ObjectForNPObject(npObject);
+    v8::Local<v8::Object> wrapper = createV8ObjectForNPObject(npObject, 0);
 
-    // We were passed a reference to the object, so release it.
-    _NPN_ReleaseObject(npObject);
+    // Track the plugin object. We've been given a reference to the object.
+    m_pluginObjects.set(widget, npObject);
 
     return V8ScriptInstance::create(wrapper);
 }
 
-void ScriptController::allowScriptObjectsForPlugin(Widget* widget)
+void ScriptController::cleanupScriptObjectsForPlugin(Widget* nativeHandle)
 {
-    ASSERT(widget->isPluginView());
-    ASSERT(toPluginView(widget)->pluginNPP());
-
-    // Register the plugin as an object owner.
-    _NPN_RegisterObjectOwner(toPluginView(widget)->pluginNPP());
-    m_pluginNPPs.add(toPluginView(widget)->pluginNPP());
-}
-
-void ScriptController::cleanupScriptObjectsForPlugin(Widget* widget)
-{
-    ASSERT(widget->isPluginView());
-    NPP instance = toPluginView(widget)->pluginNPP();
-    if (m_pluginNPPs.find(instance) == m_pluginNPPs.end())
+    PluginObjectMap::iterator it = m_pluginObjects.find(nativeHandle);
+    if (it == m_pluginObjects.end())
         return;
-    _NPN_UnregisterObjectOwner(instance);
-    m_pluginNPPs.remove(instance);
+    _NPN_UnregisterObject(it->value);
+    _NPN_ReleaseObject(it->value);
+    m_pluginObjects.remove(it);
 }
 
 V8Extensions& ScriptController::registeredExtensions()
@@ -466,19 +455,19 @@ static NPObject* createNoScriptObject()
     return 0;
 }
 
-NPObject* ScriptController::createScriptObjectForFrame()
+static NPObject* createScriptObject(Frame* frame)
 {
     v8::HandleScope handleScope;
-    v8::Handle<v8::Context> v8Context = ScriptController::mainWorldContext(m_frame);
+    v8::Handle<v8::Context> v8Context = ScriptController::mainWorldContext(frame);
     if (v8Context.IsEmpty())
         return createNoScriptObject();
 
     v8::Context::Scope scope(v8Context);
-    DOMWindow* window = m_frame->document()->domWindow();
+    DOMWindow* window = frame->document()->domWindow();
     v8::Handle<v8::Value> global = toV8(window, v8::Handle<v8::Object>(), v8Context->GetIsolate());
     ASSERT(global->IsObject());
 
-    return npCreateV8ScriptObject(frameNPP(), v8::Handle<v8::Object>::Cast(global), window);
+    return npCreateV8ScriptObject(0, v8::Handle<v8::Object>::Cast(global), window);
 }
 
 NPObject* ScriptController::windowScriptNPObject()
@@ -489,7 +478,8 @@ NPObject* ScriptController::windowScriptNPObject()
     if (canExecuteScripts(NotAboutToExecuteScript)) {
         // JavaScript is enabled, so there is a JavaScript window object.
         // Return an NPObject bound to the window object.
-        m_windowScriptNPObject = createScriptObjectForFrame();
+        m_windowScriptNPObject = createScriptObject(m_frame);
+        _NPN_RegisterObject(m_windowScriptNPObject, 0);
     } else {
         // JavaScript is not enabled, so we cannot bind the NPObject to the
         // JavaScript window object. Instead, we create an NPObject of a
@@ -497,15 +487,6 @@ NPObject* ScriptController::windowScriptNPObject()
         m_windowScriptNPObject = createNoScriptObject();
     }
     return m_windowScriptNPObject;
-}
-
-NPP ScriptController::frameNPP()
-{
-    if (!m_frameNPP) {
-        m_frameNPP = adoptPtr(new NPP_t);
-        _NPN_RegisterObjectOwner(m_frameNPP.get());
-    }
-    return m_frameNPP.get();
 }
 
 NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement* plugin)
@@ -525,7 +506,7 @@ NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement
     if (!v8plugin->IsObject())
         return createNoScriptObject();
 
-    return npCreateV8ScriptObject(frameNPP(), v8::Handle<v8::Object>::Cast(v8plugin), window);
+    return npCreateV8ScriptObject(0, v8::Handle<v8::Object>::Cast(v8plugin), window);
 }
 
 void ScriptController::clearWindowShell()

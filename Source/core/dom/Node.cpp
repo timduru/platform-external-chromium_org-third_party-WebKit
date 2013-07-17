@@ -98,7 +98,6 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-#if ENABLE(PARTITION_ALLOC)
 void* Node::operator new(size_t size)
 {
     return partitionAlloc(Partitions::getObjectModelPartition(), size);
@@ -108,7 +107,6 @@ void Node::operator delete(void* ptr)
 {
     partitionFree(ptr);
 }
-#endif // ENABLE(PARTITION_ALLOC)
 
 bool Node::isSupported(const String& feature, const String& version)
 {
@@ -261,25 +259,6 @@ void Node::dumpStatistics()
 }
 
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, nodeCounter, ("WebCoreNode"));
-DEFINE_DEBUG_ONLY_GLOBAL(HashSet<Node*>, ignoreSet, );
-
-#ifndef NDEBUG
-static bool shouldIgnoreLeaks = false;
-#endif
-
-void Node::startIgnoringLeaks()
-{
-#ifndef NDEBUG
-    shouldIgnoreLeaks = true;
-#endif
-}
-
-void Node::stopIgnoringLeaks()
-{
-#ifndef NDEBUG
-    shouldIgnoreLeaks = false;
-#endif
-}
 
 Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2, Document* doc)
 {
@@ -346,10 +325,7 @@ Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2, Docum
 void Node::trackForDebugging()
 {
 #ifndef NDEBUG
-    if (shouldIgnoreLeaks)
-        ignoreSet.add(this);
-    else
-        nodeCounter.increment();
+    nodeCounter.increment();
 #endif
 
 #if DUMP_NODE_STATISTICS
@@ -360,11 +336,7 @@ void Node::trackForDebugging()
 Node::~Node()
 {
 #ifndef NDEBUG
-    HashSet<Node*>::iterator it = ignoreSet.find(this);
-    if (it != ignoreSet.end())
-        ignoreSet.remove(it);
-    else
-        nodeCounter.decrement();
+    nodeCounter.decrement();
 #endif
 
 #if DUMP_NODE_STATISTICS
@@ -458,7 +430,7 @@ String Node::nodeValue() const
     return String();
 }
 
-void Node::setNodeValue(const String& /*nodeValue*/, ExceptionCode& ec)
+void Node::setNodeValue(const String&)
 {
     // By default, setting nodeValue has no effect.
 }
@@ -540,40 +512,36 @@ Node* Node::pseudoAwareLastChild() const
     return lastChild();
 }
 
-bool Node::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode& ec, AttachBehavior attachBehavior)
+void Node::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionCode& ec, AttachBehavior attachBehavior)
 {
-    if (!isContainerNode()) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return false;
-    }
-    return toContainerNode(this)->insertBefore(newChild, refChild, ec, attachBehavior);
+    if (isContainerNode())
+        toContainerNode(this)->insertBefore(newChild, refChild, ec, attachBehavior);
+    else
+        ec = HierarchyRequestError;
 }
 
-bool Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode& ec, AttachBehavior attachBehavior)
+void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionCode& ec, AttachBehavior attachBehavior)
 {
-    if (!isContainerNode()) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return false;
-    }
-    return toContainerNode(this)->replaceChild(newChild, oldChild, ec, attachBehavior);
+    if (isContainerNode())
+        toContainerNode(this)->replaceChild(newChild, oldChild, ec, attachBehavior);
+    else
+        ec = HierarchyRequestError;
 }
 
-bool Node::removeChild(Node* oldChild, ExceptionCode& ec)
+void Node::removeChild(Node* oldChild, ExceptionCode& ec)
 {
-    if (!isContainerNode()) {
-        ec = NOT_FOUND_ERR;
-        return false;
-    }
-    return toContainerNode(this)->removeChild(oldChild, ec);
+    if (isContainerNode())
+        toContainerNode(this)->removeChild(oldChild, ec);
+    else
+        ec = NotFoundError;
 }
 
-bool Node::appendChild(PassRefPtr<Node> newChild, ExceptionCode& ec, AttachBehavior attachBehavior)
+void Node::appendChild(PassRefPtr<Node> newChild, ExceptionCode& ec, AttachBehavior attachBehavior)
 {
-    if (!isContainerNode()) {
-        ec = HIERARCHY_REQUEST_ERR;
-        return false;
-    }
-    return toContainerNode(this)->appendChild(newChild, ec, attachBehavior);
+    if (isContainerNode())
+        toContainerNode(this)->appendChild(newChild, ec, attachBehavior);
+    else
+        ec = HierarchyRequestError;
 }
 
 void Node::remove(ExceptionCode& ec)
@@ -646,8 +614,8 @@ void Node::setPrefix(const AtomicString& /*prefix*/, ExceptionCode& ec)
 {
     // The spec says that for nodes other than elements and attributes, prefix is always null.
     // It does not say what to do when the user tries to set the prefix on another type of
-    // node, however Mozilla throws a NAMESPACE_ERR exception.
-    ec = NAMESPACE_ERR;
+    // node, however Mozilla throws a NamespaceError exception.
+    ec = NamespaceError;
 }
 
 const AtomicString& Node::localName() const
@@ -683,14 +651,10 @@ bool Node::rendererIsEditable(EditableLevel editableLevel, UserSelectAllTreatmen
 
     for (const Node* node = this; node; node = node->parentNode()) {
         if ((node->isHTMLElement() || node->isDocumentNode()) && node->renderer()) {
-#if ENABLE(USERSELECT_ALL)
             // Elements with user-select: all style are considered atomic
             // therefore non editable.
             if (node->renderer()->style()->userSelect() == SELECT_ALL && treatment == UserSelectAllIsAlwaysNonEditable)
                 return false;
-#else
-            UNUSED_PARAM(treatment);
-#endif
             switch (node->renderer()->style()->userModify()) {
             case READ_ONLY:
                 return false;
@@ -821,17 +785,14 @@ void Node::derefEventTarget()
     deref();
 }
 
-void Node::setNeedsStyleRecalc(StyleChangeType changeType)
+void Node::setNeedsStyleRecalc(StyleChangeType changeType, StyleChangeSource source)
 {
     ASSERT(changeType != NoStyleChange);
     if (!attached()) // changed compared to what?
         return;
 
-    // FIXME: Switch all callers to use setNeedsLayerUpdate and get rid of SyntheticStyleChange.
-    if (changeType == SyntheticStyleChange) {
-        setNeedsLayerUpdate();
-        return;
-    }
+    if (source == StyleChangeFromRenderer)
+        setFlag(NotifyRendererWithIdenticalStyles);
 
     StyleChangeType existingChangeType = styleChangeType();
     if (changeType > existingChangeType)
@@ -839,12 +800,6 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType)
 
     if (existingChangeType == NoStyleChange)
         markAncestorsWithChildNeedsStyleRecalc();
-}
-
-void Node::setNeedsLayerUpdate()
-{
-    setFlag(NeedsLayerUpdate);
-    setNeedsStyleRecalc(InlineStyleChange);
 }
 
 void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
@@ -859,7 +814,7 @@ void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
         attach();
         return;
     }
-    setStyleChange(FullStyleChange);
+    setStyleChange(SubtreeStyleChange);
     markAncestorsWithChildNeedsStyleRecalc();
     if (shouldSetAttached == DoNotSetAttached)
         return;
@@ -986,16 +941,16 @@ void Node::checkSetPrefix(const AtomicString& prefix, ExceptionCode& ec)
     // Element::setPrefix() and Attr::setPrefix()
 
     if (!prefix.isEmpty() && !Document::isValidName(prefix)) {
-        ec = INVALID_CHARACTER_ERR;
+        ec = InvalidCharacterError;
         return;
     }
 
-    // FIXME: Raise NAMESPACE_ERR if prefix is malformed per the Namespaces in XML specification.
+    // FIXME: Raise NamespaceError if prefix is malformed per the Namespaces in XML specification.
 
     const AtomicString& nodeNamespaceURI = namespaceURI();
     if ((nodeNamespaceURI.isEmpty() && !prefix.isEmpty())
         || (prefix == xmlAtom && nodeNamespaceURI != XMLNames::xmlNamespaceURI)) {
-        ec = NAMESPACE_ERR;
+        ec = NamespaceError;
         return;
     }
     // Attribute-specific checks are in Attr::setPrefix().
@@ -1046,6 +1001,18 @@ bool Node::containsIncludingHostElements(const Node* node) const
     return false;
 }
 
+void Node::reattach(const AttachContext& context)
+{
+    // FIXME: Text::updateTextRenderer calls reattach outside a style recalc.
+    ASSERT(document()->inStyleRecalc() || isTextNode());
+    AttachContext reattachContext(context);
+    reattachContext.performingReattach = true;
+
+    if (attached())
+        detach(reattachContext);
+    attach(reattachContext);
+}
+
 void Node::attach(const AttachContext&)
 {
     ASSERT(!attached());
@@ -1053,7 +1020,8 @@ void Node::attach(const AttachContext&)
 
     // If this node got a renderer it may be the previousRenderer() of sibling text nodes and thus affect the
     // result of Text::textRendererIsNeeded() for those nodes.
-    if (renderer()) {
+    // FIXME: This loop is no longer required once we lazy attach all the time.
+    if (renderer() && !document()->inStyleRecalc()) {
         for (Node* next = nextSibling(); next; next = next->nextSibling()) {
             if (next->renderer())
                 break;
@@ -1364,7 +1332,7 @@ PassRefPtr<RadioNodeList> Node::radioNodeList(const AtomicString& name)
 PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, ExceptionCode& ec)
 {
     if (selectors.isEmpty()) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
 
@@ -1377,7 +1345,7 @@ PassRefPtr<Element> Node::querySelector(const AtomicString& selectors, Exception
 PassRefPtr<NodeList> Node::querySelectorAll(const AtomicString& selectors, ExceptionCode& ec)
 {
     if (selectors.isEmpty()) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
 
@@ -1679,7 +1647,7 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
         case CDATA_SECTION_NODE:
         case COMMENT_NODE:
         case PROCESSING_INSTRUCTION_NODE:
-            setNodeValue(text, ec);
+            setNodeValue(text);
             return;
         case ELEMENT_NODE:
         case ATTRIBUTE_NODE:
@@ -2091,11 +2059,6 @@ void NodeListsNodeData::invalidateCaches(const QualifiedName* attrName)
         it->value->invalidateCache();
 }
 
-void Node::getSubresourceURLs(ListHashSet<KURL>& urls) const
-{
-    addSubresourceAttributeURLs(urls);
-}
-
 Node* Node::enclosingLinkEventParentOrSelf()
 {
     for (Node* node = this; node; node = node->parentOrShadowHostNode()) {
@@ -2311,6 +2274,10 @@ void Node::unregisterMutationObserver(MutationObserverRegistration* registration
     if (index == notFound)
         return;
 
+    // Deleting the registration may cause this node to be derefed, so we must make sure the Vector operation completes
+    // before that, in case |this| is destroyed (see MutationObserverRegistration::m_registrationNodeKeepAlive).
+    // FIXME: Simplify the registration/transient registration logic to make this understandable by humans.
+    RefPtr<Node> protect(this);
     registry->remove(index);
 }
 
@@ -2504,7 +2471,7 @@ void Node::defaultEventHandler(Event* event)
         if (event->hasInterface(eventNames().interfaceForTextEvent))
             if (Frame* frame = document()->frame())
                 frame->eventHandler()->defaultTextInputEventHandler(static_cast<TextEvent*>(event));
-#if ENABLE(PAN_SCROLLING)
+#if OS(WINDOWS)
     } else if (eventType == eventNames().mousedownEvent && event->isMouseEvent()) {
         MouseEvent* mouseEvent = toMouseEvent(event);
         if (mouseEvent->button() == MiddleButton) {
@@ -2736,6 +2703,13 @@ void Node::setIsCustomElement()
 {
     ASSERT(isHTMLElement() || isSVGElement());
     setFlag(IsCustomElement);
+}
+
+void Node::setIsUpgradedCustomElement()
+{
+    ASSERT(isCustomElement());
+    setFlag(IsUpgradedCustomElement);
+    setNeedsStyleRecalc(); // :unresolved has changed
 }
 
 } // namespace WebCore

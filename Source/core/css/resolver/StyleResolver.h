@@ -27,14 +27,15 @@
 #include "core/css/CSSToStyleMap.h"
 #include "core/css/DocumentRuleSets.h"
 #include "core/css/InspectorCSSOMWrappers.h"
-#include "core/css/MediaQueryExp.h"
 #include "core/css/PseudoStyleRequest.h"
 #include "core/css/RuleFeature.h"
 #include "core/css/RuleSet.h"
 #include "core/css/SelectorChecker.h"
 #include "core/css/SelectorFilter.h"
 #include "core/css/SiblingTraversalStrategies.h"
+#include "core/css/resolver/MatchedPropertiesCache.h"
 #include "core/css/resolver/ScopedStyleResolver.h"
+#include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/StyleResolverState.h"
 #include "core/css/resolver/StyleResourceLoader.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
@@ -59,7 +60,6 @@ class CSSSelector;
 class CSSStyleSheet;
 class CSSValue;
 class ContainerNode;
-class DeprecatedStyleBuilder;
 class Document;
 class Element;
 class ElementRuleCollector;
@@ -68,6 +68,8 @@ class FrameView;
 class KeyframeList;
 class KeyframeValue;
 class MediaQueryEvaluator;
+class MediaQueryExp;
+class MediaQueryResult;
 class Node;
 class RenderRegion;
 class RuleData;
@@ -86,19 +88,7 @@ class StyleShader;
 class StyleSheet;
 class StyleSheetList;
 
-class MediaQueryResult {
-    WTF_MAKE_NONCOPYABLE(MediaQueryResult); WTF_MAKE_FAST_ALLOCATED;
-public:
-    MediaQueryResult(const MediaQueryExp& expr, bool result)
-        : m_expression(expr)
-        , m_result(result)
-    {
-    }
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
-    MediaQueryExp m_expression;
-    bool m_result;
-};
+struct MatchResult;
 
 enum StyleSharingBehavior {
     AllowStyleSharing,
@@ -108,13 +98,13 @@ enum StyleSharingBehavior {
 // MatchOnlyUserAgentRules is used in media queries, where relative units
 // are interpreted according to the document root element style, and styled only
 // from the User Agent Stylesheet rules.
-
 enum RuleMatchingBehavior {
     MatchAllRules,
     MatchAllRulesExcludingSMIL,
     MatchOnlyUserAgentRules,
 };
 
+// FIXME: Move to separate file.
 class MatchRequest {
 public:
     MatchRequest(RuleSet* ruleSet, bool includeEmptyRules = false, const ContainerNode* scope = 0)
@@ -132,6 +122,14 @@ public:
     const ContainerNode* scope;
 };
 
+struct CSSPropertyValue {
+    CSSPropertyValue(CSSPropertyID property, CSSValue* value)
+        : property(property), value(value) { }
+    // Stores value=propertySet.getPropertyCSSValue(id).get().
+    CSSPropertyValue(CSSPropertyID, const StylePropertySet&);
+    CSSPropertyID property;
+    CSSValue* value;
+};
 
 // This class selects a RenderStyle for a given element based on a collection of stylesheets.
 class StyleResolver {
@@ -157,18 +155,9 @@ public:
     PassRefPtr<RenderStyle> defaultStyleForElement();
     PassRefPtr<RenderStyle> styleForText(Text*);
 
-    static PassRefPtr<RenderStyle> styleForDocument(Document*, CSSFontSelector* = 0);
+    static PassRefPtr<RenderStyle> styleForDocument(const Document*, CSSFontSelector* = 0);
 
-    Color resolveColorFromPrimitiveValue(CSSPrimitiveValue* value, bool forVisitedLink = false)
-    {
-        return m_state.resolveColorFromPrimitiveValue(value, forVisitedLink);
-    }
-    RenderStyle* style() const { return m_state.style(); }
-    RenderStyle* parentStyle() const { return m_state.parentStyle(); }
-    RenderStyle* rootElementStyle() const { return m_state.rootElementStyle(); }
-    Element* element() { return m_state.element(); }
     Document* document() { return m_document; }
-    bool hasParentNode() const { return m_state.parentNode(); }
 
     // FIXME: It could be better to call m_ruleSets.appendAuthorStyleSheets() directly after we factor StyleRsolver further.
     // https://bugs.webkit.org/show_bug.cgi?id=108890
@@ -190,14 +179,10 @@ public:
         return m_styleTree.ensureScopedStyleResolver(scope ? scope : document());
     }
 
-private:
-    RenderStyle* locateSharedStyle();
-    bool styleSharingCandidateMatchesRuleSet(RuleSet*);
-    Node* locateCousinList(Element* parent, unsigned& visitedNodeCount) const;
-    Element* findSiblingForStyleSharing(Node*, unsigned& count) const;
-    bool canShareStyleWithElement(Element*) const;
+    // FIXME: Used by SharingStyleFinder, but should be removed.
+    bool styleSharingCandidateMatchesRuleSet(const ElementResolveContext&, RuleSet*);
 
-    PassRefPtr<RenderStyle> styleForKeyframe(const RenderStyle*, const StyleKeyframe*, KeyframeValue&);
+    PassRefPtr<RenderStyle> styleForKeyframe(Element*, const RenderStyle*, const StyleKeyframe*, KeyframeValue&);
 
 public:
     // These methods will give back the set of rules that matched for a given element (or a pseudo-element).
@@ -213,17 +198,14 @@ public:
     PassRefPtr<CSSRuleList> pseudoStyleRulesForElement(Element*, PseudoId, unsigned rulesToInclude = AllButEmptyCSSRules);
 
 public:
-    void applyPropertyToStyle(CSSPropertyID, CSSValue*, RenderStyle*);
-
-    void applyPropertyToCurrentStyle(CSSPropertyID, CSSValue*);
+    // |properties| is an array with |count| elements.
+    void applyPropertiesToStyle(const CSSPropertyValue* properties, size_t count, RenderStyle*);
 
     void updateFont();
-    void initializeFontStyle(Settings*);
+    void initializeFontStyle(const Settings*);
     void setFontSize(FontDescription&, float size);
 
 public:
-    bool useSVGZoomRules();
-
     bool hasSelectorForId(const AtomicString&) const;
     bool hasSelectorForClass(const AtomicString&) const;
     bool hasSelectorForAttribute(const AtomicString&) const;
@@ -243,52 +225,8 @@ public:
     bool usesFirstLineRules() const { return m_features.usesFirstLineRules; }
     bool usesBeforeAfterRules() const { return m_features.usesBeforeAfterRules; }
 
+    // FIXME: Rename to reflect the purpose, like didChangeFontSize or something.
     void invalidateMatchedPropertiesCache();
-
-    struct RuleRange {
-        RuleRange(int& firstRuleIndex, int& lastRuleIndex): firstRuleIndex(firstRuleIndex), lastRuleIndex(lastRuleIndex) { }
-        int& firstRuleIndex;
-        int& lastRuleIndex;
-    };
-
-    struct MatchRanges {
-        MatchRanges() : firstUARule(-1), lastUARule(-1), firstAuthorRule(-1), lastAuthorRule(-1), firstUserRule(-1), lastUserRule(-1) { }
-        int firstUARule;
-        int lastUARule;
-        int firstAuthorRule;
-        int lastAuthorRule;
-        int firstUserRule;
-        int lastUserRule;
-        RuleRange UARuleRange() { return RuleRange(firstUARule, lastUARule); }
-        RuleRange authorRuleRange() { return RuleRange(firstAuthorRule, lastAuthorRule); }
-        RuleRange userRuleRange() { return RuleRange(firstUserRule, lastUserRule); }
-    };
-
-    struct MatchedProperties {
-        MatchedProperties();
-        ~MatchedProperties();
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-
-        RefPtr<StylePropertySet> properties;
-        union {
-            struct {
-                unsigned linkMatchType : 2;
-                unsigned whitelistType : 2;
-            };
-            // Used to make sure all memory is zero-initialized since we compute the hash over the bytes of this object.
-            void* possiblyPaddedMember;
-        };
-    };
-
-    struct MatchResult {
-        MatchResult() : isCacheable(true) { }
-        Vector<MatchedProperties, 64> matchedProperties;
-        Vector<StyleRule*, 64> matchedRules;
-        MatchRanges ranges;
-        bool isCacheable;
-
-        void addMatchedProperties(const StylePropertySet* properties, StyleRule* = 0, unsigned linkMatchType = SelectorChecker::MatchAll, PropertyWhitelistType = PropertyWhitelistNone);
-    };
 
 private:
     void matchUARules(ElementRuleCollector&, RuleSet*);
@@ -306,18 +244,18 @@ private:
     void checkForGenericFamilyChange(RenderStyle*, RenderStyle* parentStyle);
     void checkForZoomChange(RenderStyle*, RenderStyle* parentStyle);
 
-    void adjustRenderStyle(RenderStyle* styleToAdjust, RenderStyle* parentStyle, Element*);
-    void adjustGridItemPosition(RenderStyle* styleToAdjust) const;
-
     bool fastRejectSelector(const RuleData&) const;
 
     void applyMatchedProperties(const MatchResult&, const Element*);
 
     enum StyleApplicationPass {
         VariableDefinitions,
+        AnimationProperties,
         HighPriorityProperties,
         LowPriorityProperties
     };
+    template <StyleResolver::StyleApplicationPass pass>
+    static inline bool isPropertyForPass(CSSPropertyID);
     template <StyleApplicationPass pass>
     void applyMatchedProperties(const MatchResult&, bool important, int startIndex, int endIndex, bool inheritedOnly);
     template <StyleApplicationPass pass>
@@ -342,27 +280,7 @@ private:
 public:
     static RenderStyle* styleNotYetAvailable() { return s_styleNotYetAvailable; }
 
-    PassRefPtr<StyleImage> styleImage(CSSPropertyID, CSSValue*);
-    PassRefPtr<StyleImage> cachedOrPendingFromValue(CSSPropertyID, CSSImageValue*);
-    PassRefPtr<StyleImage> generatedOrPendingFromValue(CSSPropertyID, CSSImageGeneratorValue*);
-    PassRefPtr<StyleImage> setOrPendingFromValue(CSSPropertyID, CSSImageSetValue*);
-    PassRefPtr<StyleImage> cursorOrPendingFromValue(CSSPropertyID, CSSCursorImageValue*);
-
-    bool applyPropertyToRegularStyle() const { return m_state.applyPropertyToRegularStyle(); }
-    bool applyPropertyToVisitedLinkStyle() const { return m_state.applyPropertyToVisitedLinkStyle(); }
-
-    static Length convertToIntLength(CSSPrimitiveValue*, RenderStyle*, RenderStyle* rootStyle, double multiplier = 1);
-    static Length convertToFloatLength(CSSPrimitiveValue*, RenderStyle*, RenderStyle* rootStyle, double multiplier = 1);
-
-    CSSToStyleMap* styleMap() { return &m_styleMap; }
     InspectorCSSOMWrappers& inspectorCSSOMWrappers() { return m_inspectorCSSOMWrappers; }
-    const FontDescription& fontDescription() { return m_state.fontDescription(); }
-    const FontDescription& parentFontDescription() { return m_state.parentFontDescription(); }
-    void setFontDescription(const FontDescription& fontDescription) { m_state.setFontDescription(fontDescription); }
-    void setZoom(float f) { m_state.setZoom(f); }
-    void setEffectiveZoom(float f) { m_state.setEffectiveZoom(f); }
-    void setWritingMode(WritingMode writingMode) { m_state.setWritingMode(writingMode); }
-    void setTextOrientation(TextOrientation textOrientation) { m_state.setTextOrientation(textOrientation); }
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
 
@@ -372,35 +290,9 @@ private:
     void cacheBorderAndBackground();
 
 private:
-    bool canShareStyleWithControl(Element*) const;
-
     void applyProperty(CSSPropertyID, CSSValue*);
 
-    void applySVGProperty(CSSPropertyID, CSSValue*);
-
-    struct MatchedPropertiesCacheItem {
-        void reportMemoryUsage(MemoryObjectInfo*) const;
-        Vector<MatchedProperties> matchedProperties;
-        MatchRanges ranges;
-        RefPtr<RenderStyle> renderStyle;
-        RefPtr<RenderStyle> parentRenderStyle;
-    };
-    const MatchedPropertiesCacheItem* findFromMatchedPropertiesCache(unsigned hash, const MatchResult&);
-    void addToMatchedPropertiesCache(const RenderStyle*, const RenderStyle* parentStyle, unsigned hash, const MatchResult&);
-
-    // Every N additions to the matched declaration cache trigger a sweep where entries holding
-    // the last reference to a style declaration are garbage collected.
-    void sweepMatchedPropertiesCache(Timer<StyleResolver>*);
-
-    bool classNamesAffectedByRules(const SpaceSplitString&) const;
-    bool sharingCandidateHasIdenticalStyleAffectingAttributes(Element*) const;
-
-    unsigned m_matchedPropertiesCacheAdditionsSinceLastSweep;
-
-    typedef HashMap<unsigned, MatchedPropertiesCacheItem> MatchedPropertiesCache;
     MatchedPropertiesCache m_matchedPropertiesCache;
-
-    Timer<StyleResolver> m_matchedPropertiesCacheSweepTimer;
 
     OwnPtr<MediaQueryEvaluator> m_medium;
     RefPtr<RenderStyle> m_rootDefaultStyle;
@@ -415,24 +307,19 @@ private:
 
     RefPtr<ViewportStyleResolver> m_viewportStyleResolver;
 
-    const DeprecatedStyleBuilder& m_styleBuilder;
     ScopedStyleTree m_styleTree;
 
     RuleFeatureSet m_features;
     OwnPtr<RuleSet> m_siblingRuleSet;
     OwnPtr<RuleSet> m_uncommonAttributeRuleSet;
 
-    CSSToStyleMap m_styleMap;
     InspectorCSSOMWrappers m_inspectorCSSOMWrappers;
 
     StyleResolverState m_state;
     StyleResourceLoader m_styleResourceLoader;
 
-    friend class DeprecatedStyleBuilder;
-    friend bool operator==(const MatchedProperties&, const MatchedProperties&);
-    friend bool operator!=(const MatchedProperties&, const MatchedProperties&);
-    friend bool operator==(const MatchRanges&, const MatchRanges&);
-    friend bool operator!=(const MatchRanges&, const MatchRanges&);
+    friend void StyleBuilder::oldApplyProperty(CSSPropertyID, StyleResolver*, StyleResolverState&, CSSValue*, bool isInitial, bool isInherit);
+
 };
 
 inline bool StyleResolver::hasSelectorForAttribute(const AtomicString &attributeName) const

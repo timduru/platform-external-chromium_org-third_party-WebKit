@@ -98,7 +98,7 @@ public:
     Node* mousePressNode() const;
     void setMousePressNode(PassRefPtr<Node>);
 
-#if ENABLE(PAN_SCROLLING)
+#if OS(WINDOWS)
     void startPanScrolling(RenderObject*);
 #endif
 
@@ -139,12 +139,10 @@ public:
     bool logicalScrollRecursively(ScrollLogicalDirection, ScrollGranularity, Node* startingNode = 0);
 
     bool mouseMoved(const PlatformMouseEvent&);
-    bool passMouseMovedEventToScrollbars(const PlatformMouseEvent&);
 
     void lostMouseCapture();
 
     bool handleMousePressEvent(const PlatformMouseEvent&);
-    bool handleMouseMoveEvent(const PlatformMouseEvent&, HitTestResult* hoveredNode = 0, bool onlyUpdateScrollbars = false);
     bool handleMouseReleaseEvent(const PlatformMouseEvent&);
     bool handleWheelEvent(const PlatformWheelEvent&);
     void defaultWheelEventHandler(Node*, WheelEvent*);
@@ -209,6 +207,7 @@ private:
     void selectClosestMisspellingFromMouseEvent(const MouseEventWithHitTestResults&);
     void selectClosestWordOrLinkFromMouseEvent(const MouseEventWithHitTestResults&);
 
+    bool handleMouseMoveEvent(const PlatformMouseEvent&, HitTestResult* hoveredNode = 0, bool onlyUpdateScrollbars = false);
     bool handleMousePressEvent(const MouseEventWithHitTestResults&);
     bool handleMousePressEventSingleClick(const MouseEventWithHitTestResults&);
     bool handleMousePressEventDoubleClick(const MouseEventWithHitTestResults&);
@@ -250,6 +249,7 @@ private:
     void freeClipboard();
 
     bool handleDrag(const MouseEventWithHitTestResults&, CheckDragHysteresis);
+    bool tryStartDrag(const MouseEventWithHitTestResults&);
     bool handleMouseUp(const MouseEventWithHitTestResults&);
     void clearDragState();
 
@@ -299,7 +299,7 @@ private:
     bool panScrollInProgress() const;
     void setLastKnownMousePosition(const PlatformMouseEvent&);
 
-    Frame* m_frame;
+    Frame* const m_frame;
 
     bool m_mousePressed;
     bool m_capturesDragging;

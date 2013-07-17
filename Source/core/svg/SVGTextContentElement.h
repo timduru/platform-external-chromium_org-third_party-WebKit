@@ -77,11 +77,11 @@ public:
     unsigned getNumberOfChars();
     float getComputedTextLength();
     float getSubStringLength(unsigned charnum, unsigned nchars, ExceptionCode&);
-    FloatPoint getStartPositionOfChar(unsigned charnum, ExceptionCode&);
-    FloatPoint getEndPositionOfChar(unsigned charnum, ExceptionCode&);
-    FloatRect getExtentOfChar(unsigned charnum, ExceptionCode&);
+    SVGPoint getStartPositionOfChar(unsigned charnum, ExceptionCode&);
+    SVGPoint getEndPositionOfChar(unsigned charnum, ExceptionCode&);
+    SVGRect getExtentOfChar(unsigned charnum, ExceptionCode&);
     float getRotationOfChar(unsigned charnum, ExceptionCode&);
-    int getCharNumAtPosition(const FloatPoint&);
+    int getCharNumAtPosition(const SVGPoint&);
     void selectSubString(unsigned charnum, unsigned nchars, ExceptionCode&);
 
     static SVGTextContentElement* elementFromRenderer(RenderObject*);
@@ -89,7 +89,7 @@ public:
     // textLength is not declared using the standard DECLARE_ANIMATED_LENGTH macro
     // as its getter needs special handling (return getComputedTextLength(), instead of m_textLength).
     SVGLength& specifiedTextLength() { return m_specifiedTextLength; }
-    PassRefPtr<SVGAnimatedLength> textLengthAnimated();
+    PassRefPtr<SVGAnimatedLength> textLength();
     static const SVGPropertyInfo* textLengthPropertyInfo();
 
 protected:

@@ -240,6 +240,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/filters/FilterOperation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/FilterOperations.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/PointLightSource.cpp \
+	third_party/WebKit/Source/core/platform/graphics/filters/ReferenceFilter.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/SkiaImageFilterBuilder.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/SourceAlpha.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/SourceGraphic.cpp \
@@ -293,7 +294,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/mediastream/RTCDataChannelHandler.cpp \
 	third_party/WebKit/Source/core/platform/mediastream/RTCPeerConnectionHandler.cpp \
 	third_party/WebKit/Source/core/platform/midi/MIDIAccessor.cpp \
-	third_party/WebKit/Source/core/platform/mock/DeviceMotionClientMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/DeviceOrientationClientMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/GeolocationClientMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/PlatformSpeechSynthesizerMock.cpp \
@@ -383,6 +383,8 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -394,7 +396,6 @@ MY_DEFS_Debug := \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -402,9 +403,7 @@ MY_DEFS_Debug := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -416,7 +415,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -545,6 +543,8 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -556,7 +556,6 @@ MY_DEFS_Release := \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -564,9 +563,7 @@ MY_DEFS_Release := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -578,7 +575,6 @@ MY_DEFS_Release := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \

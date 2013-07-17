@@ -48,7 +48,7 @@ static struct CoreException {
     { "InUseAttributeError", "An attempt was made to add an attribute that is already in use elsewhere.", 10 },
     { "InvalidStateError", "An attempt was made to use an object that is not, or is no longer, usable.", 11 },
     { "SyntaxError", "An invalid or illegal string was specified.", 12 },
-    { "InvalidModificationError", "An attempt was made to modify the type of the underlying object.", 13 },
+    { "InvalidModificationError", "The object can not be modified in this way.", 13 },
     { "NamespaceError", "An attempt was made to create or change an object in a way which is incorrect with regard to namespaces.", 14 },
     { "InvalidAccessError", "A parameter or an operation was not supported by the underlying object.", 15 },
     { "TypeMismatchError", "The type of an object was incompatible with the expected type of the parameter associated to the object.", 17 },
@@ -61,12 +61,7 @@ static struct CoreException {
     { "InvalidNodeTypeError", "The supplied node is invalid or has an invalid ancestor for this operation.", 24 },
     { "DataCloneError", "An object could not be cloned.", 25 },
 
-    // These are IDB-specific errors.
-    // FIXME: NotFoundError is duplicated to have a more specific error message.
-    // https://code.google.com/p/chromium/issues/detail?id=252233
-    { "NotFoundError", "An operation failed because the requested database object could not be found.", 8 },
-
-    // More IDB-specific errors.
+    // Indexed DB
     { "UnknownError", "An unknown error occurred within Indexed Database.", 0 },
     { "ConstraintError", "A mutation operation in the transaction failed because a constraint was not satisfied.", 0 },
     { "DataError", "The data provided does not meet requirements.", 0 },
@@ -83,53 +78,36 @@ static struct CoreException {
     { "NoModificationAllowedError", "An attempt was made to write to a file or directory which could not be modified due to the state of the underlying filesystem.", 7 },
     { "InvalidStateError", "An operation that depends on state cached in an interface object was made but the state had changed since it was read from disk.", 11 },
     { "SyntaxError", "An invalid or unsupported argument was given, like an invalid line ending specifier.", 12 },
-    { "InvalidModificationError", "The modification request was illegal.", 13 },
     { "QuotaExceededError", "The operation failed because it would cause the application to exceed its storage quota.", 22 },
     { "TypeMismatchError", "The path supplied exists, but was not an entry of requested type.", 17 },
     { "PathExistsError", "An attempt was made to create a file or directory where an element already exists.", 0 },
 
     // SQL
-    { "UnknownError", "The operation failed for reasons unrelated to the database.", 0 },
     { "DatabaseError", "The operation failed for some reason related to the database.", 0 },
-    { "VersionError", "The actual database version did not match the expected version.", 0 },
-    { "TooLargeError", "Data returned from the database is too large.", 0 },
-    { "QuotaExceededError", "Quota was exceeded.", 22 },
-    { "SyntaxError", "Invalid or unauthorized statement; or the number of arguments did not match the number of ? placeholders.", 12 },
-    { "ConstraintError", "A constraint was violated.", 0 },
-    { "TimeoutError", "A transaction lock could not be acquired in a reasonable time.", 23 },
 };
 
 static const CoreException* getErrorEntry(ExceptionCode ec)
 {
     size_t tableSize = WTF_ARRAY_LENGTH(coreExceptions);
-    size_t tableIndex = ec - INDEX_SIZE_ERR;
+    size_t tableIndex = ec - IndexSizeError;
 
     return tableIndex < tableSize ? &coreExceptions[tableIndex] : 0;
 }
 
-DOMException::DOMException(ExceptionCode ec)
+DOMException::DOMException(unsigned short code, const char* name, const char * message)
 {
-    const CoreException* entry = getErrorEntry(ec);
-    ASSERT(entry);
-    if (!entry) {
-        m_code = 0;
-        m_name = "UnknownError";
-        m_message = "Unknown Error";
-    } else {
-        m_code = entry->code;
-        if (entry->name)
-            m_name = entry->name;
-        else
-            m_name = "Error";
-        m_message = entry->message;
-    }
-
+    ASSERT(name);
+    m_code = code;
+    m_name = name;
+    m_message = message;
     ScriptWrappable::init(this);
 }
 
-PassRefPtr<DOMException> DOMException::create(ExceptionCode ec)
+PassRefPtr<DOMException> DOMException::create(ExceptionCode ec, const char* message)
 {
-    return adoptRef(new DOMException(ec));
+    const CoreException* entry = getErrorEntry(ec);
+    ASSERT(entry);
+    return adoptRef(new DOMException(entry->code, entry->name ? entry->name : "Error", message ? message : entry->message));
 }
 
 String DOMException::toString() const

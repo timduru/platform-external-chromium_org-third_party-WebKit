@@ -23,6 +23,7 @@
 #include "core/svg/SVGCursorElement.h"
 
 #include "SVGNames.h"
+#include "XLinkNames.h"
 #include "core/dom/Document.h"
 #include "core/svg/SVGElementInstance.h"
 
@@ -137,7 +138,7 @@ void SVGCursorElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) cons
 {
     SVGElement::addSubresourceAttributeURLs(urls);
 
-    addSubresourceURL(urls, document()->completeURL(href()));
+    addSubresourceURL(urls, document()->completeURL(hrefCurrentValue()));
 }
 
 }

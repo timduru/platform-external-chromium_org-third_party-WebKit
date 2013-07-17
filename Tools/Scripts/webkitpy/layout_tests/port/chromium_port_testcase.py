@@ -33,9 +33,9 @@ from webkitpy.common.system.executive_mock import MockExecutive2
 from webkitpy.common.system.systemhost_mock import MockSystemHost
 from webkitpy.tool.mocktool import MockOptions
 
-import chromium_android
+import android
 import linux
-import chromium_mac
+import mac
 import win
 
 from webkitpy.layout_tests.models.test_configuration import TestConfiguration
@@ -66,7 +66,10 @@ class ChromiumPortTestCase(port_testcase.PortTestCase):
         # Test that we get the chromium skips and not the webkit default skips
         port = self.make_port()
         skip_dict = port._missing_symbol_to_skipped_tests()
-        self.assertTrue('ff_mp3_decoder' in skip_dict)
+        if port.PORT_HAS_AUDIO_CODECS_BUILT_IN:
+            self.assertEqual(skip_dict, {})
+        else:
+            self.assertTrue('ff_mp3_decoder' in skip_dict)
         self.assertFalse('WebGLShader' in skip_dict)
 
     def test_all_test_configurations(self):
@@ -89,19 +92,19 @@ class ChromiumPortTestCase(port_testcase.PortTestCase):
             TestConfiguration('lucid', 'x86_64', 'release'),
         ]))
 
-    class TestMacPort(chromium_mac.ChromiumMacPort):
+    class TestMacPort(mac.MacPort):
         def __init__(self, options=None):
             options = options or MockOptions()
-            chromium_mac.ChromiumMacPort.__init__(self, MockSystemHost(os_name='mac', os_version='leopard'), 'chromium-mac-leopard', options=options)
+            mac.MacPort.__init__(self, MockSystemHost(os_name='mac', os_version='leopard'), 'mac-leopard', options=options)
 
         def default_configuration(self):
             self.default_configuration_called = True
             return 'default'
 
-    class TestAndroidPort(chromium_android.ChromiumAndroidPort):
+    class TestAndroidPort(android.AndroidPort):
         def __init__(self, options=None):
             options = options or MockOptions()
-            chromium_android.ChromiumAndroidPort.__init__(self, MockSystemHost(os_name='android', os_version='icecreamsandwich'), 'chromium-android', options=options)
+            android.AndroidPort.__init__(self, MockSystemHost(os_name='android', os_version='icecreamsandwich'), 'android', options=options)
 
         def default_configuration(self):
             self.default_configuration_called = True

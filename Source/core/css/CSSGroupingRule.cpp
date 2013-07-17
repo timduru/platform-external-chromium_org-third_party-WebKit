@@ -64,8 +64,8 @@ unsigned CSSGroupingRule::insertRule(const String& ruleString, unsigned index, E
     ASSERT(m_childRuleCSSOMWrappers.size() == m_groupRule->childRules().size());
 
     if (index > m_groupRule->childRules().size()) {
-        // INDEX_SIZE_ERR: Raised if the specified index is not a valid insertion point.
-        ec = INDEX_SIZE_ERR;
+        // IndexSizeError: Raised if the specified index is not a valid insertion point.
+        ec = IndexSizeError;
         return 0;
     }
 
@@ -73,20 +73,20 @@ unsigned CSSGroupingRule::insertRule(const String& ruleString, unsigned index, E
     CSSParser parser(parserContext(), UseCounter::getFrom(styleSheet));
     RefPtr<StyleRuleBase> newRule = parser.parseRule(styleSheet ? styleSheet->contents() : 0, ruleString);
     if (!newRule) {
-        // SYNTAX_ERR: Raised if the specified rule has a syntax error and is unparsable.
-        ec = SYNTAX_ERR;
+        // SyntaxError: Raised if the specified rule has a syntax error and is unparsable.
+        ec = SyntaxError;
         return 0;
     }
 
     if (newRule->isImportRule()) {
-        // FIXME: an HIERARCHY_REQUEST_ERR should also be thrown for a @charset or a nested
-        // @media rule. They are currently not getting parsed, resulting in a SYNTAX_ERR
+        // FIXME: an HierarchyRequestError should also be thrown for a @charset or a nested
+        // @media rule. They are currently not getting parsed, resulting in a SyntaxError
         // to get raised above.
 
-        // HIERARCHY_REQUEST_ERR: Raised if the rule cannot be inserted at the specified
+        // HierarchyRequestError: Raised if the rule cannot be inserted at the specified
         // index, e.g., if an @import rule is inserted after a standard rule set or other
         // at-rule.
-        ec = HIERARCHY_REQUEST_ERR;
+        ec = HierarchyRequestError;
         return 0;
     }
     CSSStyleSheet::RuleMutationScope mutationScope(this);
@@ -102,9 +102,9 @@ void CSSGroupingRule::deleteRule(unsigned index, ExceptionCode& ec)
     ASSERT(m_childRuleCSSOMWrappers.size() == m_groupRule->childRules().size());
 
     if (index >= m_groupRule->childRules().size()) {
-        // INDEX_SIZE_ERR: Raised if the specified index does not correspond to a
+        // IndexSizeError: Raised if the specified index does not correspond to a
         // rule in the media rule list.
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
 

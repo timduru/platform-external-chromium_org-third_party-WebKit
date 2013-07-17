@@ -74,9 +74,9 @@
 #include "core/platform/text/TextBreakIterator.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderTheme.h"
-#include <wtf/Assertions.h>
-#include <wtf/HashMap.h>
-#include <wtf/text/StringHash.h>
+#include "wtf/Assertions.h"
+#include "wtf/HashMap.h"
+#include "wtf/text/StringHash.h"
 
 namespace WebCore {
 
@@ -194,7 +194,7 @@ double InputType::valueAsDate() const
 
 void InputType::setValueAsDate(double, ExceptionCode& ec) const
 {
-    ec = INVALID_STATE_ERR;
+    ec = InvalidStateError;
 }
 
 double InputType::valueAsDouble() const
@@ -209,7 +209,7 @@ void InputType::setValueAsDouble(double doubleValue, TextFieldEventBehavior even
 
 void InputType::setValueAsDecimal(const Decimal&, TextFieldEventBehavior, ExceptionCode& ec) const
 {
-    ec = INVALID_STATE_ERR;
+    ec = InvalidStateError;
 }
 
 bool InputType::supportsValidation() const
@@ -465,7 +465,7 @@ void InputType::destroyShadowSubtree()
     root->removeChildren();
 
     // It's ok to clear contents of all other ShadowRoots because they must have
-    // been created by TextFieldDecorationElement, and we don't allow adding
+    // been created by InputFieldPasswordGeneratorButtonElement, and we don't allow adding
     // AuthorShadowRoot to HTMLInputElement.
     while ((root = root->youngerShadowRoot())) {
         root->removeChildren();
@@ -919,6 +919,11 @@ bool InputType::supportsIndeterminateAppearance() const
     return false;
 }
 
+bool InputType::supportsInputModeAttribute() const
+{
+    return false;
+}
+
 bool InputType::supportsSelectionAPI() const
 {
     return false;
@@ -938,24 +943,24 @@ void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldE
 {
     StepRange stepRange(createStepRange(anyStepHandling));
     if (!stepRange.hasStep()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
     const Decimal current = parseToNumberOrNaN(element()->value());
     if (!current.isFinite()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     Decimal newValue = current + stepRange.step() * count;
     if (!newValue.isFinite()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
 
     const Decimal acceptableErrorValue = stepRange.acceptableError();
     if (newValue - stepRange.minimum() < -acceptableErrorValue) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     if (newValue < stepRange.minimum())
@@ -966,7 +971,7 @@ void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldE
         newValue = stepRange.alignValueForStep(current, newValue);
 
     if (newValue - stepRange.maximum() > acceptableErrorValue) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     if (newValue > stepRange.maximum())
@@ -994,7 +999,7 @@ StepRange InputType::createStepRange(AnyStepHandling) const
 void InputType::stepUp(int n, ExceptionCode& ec)
 {
     if (!isSteppable()) {
-        ec = INVALID_STATE_ERR;
+        ec = InvalidStateError;
         return;
     }
     applyStep(n, RejectAny, DispatchNoEvent, ec);

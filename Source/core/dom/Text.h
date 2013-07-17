@@ -46,7 +46,7 @@ public:
     String wholeText() const;
     PassRefPtr<Text> replaceWholeText(const String&);
     
-    void recalcTextStyle(StyleChange);
+    bool recalcTextStyle(StyleChange);
     void createTextRendererIfNeeded();
     bool textRendererIsNeeded(const NodeRenderingContext&);
     virtual RenderText* createTextRenderer(RenderStyle*);
@@ -66,8 +66,10 @@ protected:
 
 private:
     virtual String nodeName() const OVERRIDE;
-    virtual PassRefPtr<Node> cloneNode(bool deep) OVERRIDE FINAL;
+    virtual PassRefPtr<Node> cloneNode(bool deep = true) OVERRIDE FINAL;
     virtual bool childTypeAllowed(NodeType) const OVERRIDE;
+
+    bool needsWhitespaceRenderer();
 
     virtual PassRefPtr<Text> cloneWithData(const String&);
 

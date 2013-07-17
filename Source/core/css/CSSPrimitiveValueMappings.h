@@ -47,8 +47,7 @@
 #include "core/rendering/style/LineClampValue.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "core/rendering/style/SVGRenderStyleDefs.h"
-
-#include <wtf/MathExtras.h>
+#include "wtf/MathExtras.h"
 
 namespace WebCore {
 
@@ -2301,7 +2300,6 @@ template<> inline CSSPrimitiveValue::operator ETextAlign() const
     }
 }
 
-#if ENABLE(CSS3_TEXT)
 template<> inline CSSPrimitiveValue::CSSPrimitiveValue(TextAlignLast e)
     : CSSValue(PrimitiveClass)
 {
@@ -2355,7 +2353,6 @@ template<> inline CSSPrimitiveValue::operator TextAlignLast() const
     ASSERT_NOT_REACHED();
     return TextAlignLastAuto;
 }
-#endif // CSS3_TEXT
 
 template<> inline CSSPrimitiveValue::operator TextDecoration() const
 {

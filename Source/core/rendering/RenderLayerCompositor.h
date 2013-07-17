@@ -175,7 +175,7 @@ public:
     void frameViewDidLayout();
     void rootFixedBackgroundsChanged();
 
-    void scrollingLayerDidChange(RenderLayer*);
+    bool scrollingLayerDidChange(RenderLayer*);
 
     String layerTreeAsText(LayerTreeFlags);
 
@@ -202,8 +202,6 @@ public:
 
     void reportMemoryUsage(MemoryObjectInfo*) const;
     void setShouldReevaluateCompositingAfterLayout() { m_reevaluateCompositingAfterLayout = true; }
-
-    bool viewHasTransparentBackground(Color* backgroundColor = 0) const;
 
     // Returns all reasons (direct, indirectly due to subtree, and indirectly due to overlap) that a layer should be composited.
     CompositingReasons reasonsForCompositing(const RenderLayer*) const;
@@ -316,7 +314,6 @@ private:
     ChromeClient::CompositingTriggerFlags m_compositingTriggers;
 
     int m_compositedLayerCount;
-    bool m_showDebugBorders;
     bool m_showRepaintCounter;
 
     // When true, we have to wait until layout has happened before we can decide whether to enter compositing mode,
@@ -333,8 +330,8 @@ private:
     
     RootLayerAttachment m_rootLayerAttachment;
 
-    // Enclosing clipping layer for iframe content
-    OwnPtr<GraphicsLayer> m_clipLayer;
+    // Enclosing container layer, which clips for iframe content
+    OwnPtr<GraphicsLayer> m_containerLayer;
     OwnPtr<GraphicsLayer> m_scrollLayer;
 
     HashSet<RenderLayer*> m_viewportConstrainedLayers;

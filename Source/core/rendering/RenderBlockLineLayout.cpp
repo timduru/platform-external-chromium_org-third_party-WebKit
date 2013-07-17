@@ -161,22 +161,48 @@ inline void LineWidth::shrinkAvailableWidthForNewFloatIfNeeded(RenderBlock::Floa
     if (height < m_block->logicalTopForFloat(newFloat) || height >= m_block->logicalBottomForFloat(newFloat))
         return;
 
+    // When floats with shape outside are stacked, the floats are positioned based on the margin box of the float,
+    // not the shape's contour. Since we computed the width based on the shape contour when we added the float,
+    // when we add a subsequent float on the same line, we need to undo the shape delta in order to position
+    // based on the margin box. In order to do this, we need to walk back through the floating object list to find
+    // the first previous float that is on the same side as our newFloat.
+    ShapeOutsideInfo* previousShapeOutsideInfo = 0;
+    const RenderBlock::FloatingObjectSet& floatingObjectSet = m_block->floatingObjects()->set();
+    RenderBlock::FloatingObjectSetIterator it = floatingObjectSet.end();
+    RenderBlock::FloatingObjectSetIterator begin = floatingObjectSet.begin();
+    while (it != begin) {
+        --it;
+        RenderBlock::FloatingObject* previousFloat = *it;
+        if (previousFloat != newFloat && previousFloat->type() == newFloat->type()) {
+            previousShapeOutsideInfo = previousFloat->renderer()->shapeOutsideInfo();
+            if (previousShapeOutsideInfo) {
+                LayoutUnit lineTopInShapeCoordinates = m_block->logicalHeight() - m_block->logicalTopForFloat(previousFloat);
+                previousShapeOutsideInfo->computeSegmentsForLine(lineTopInShapeCoordinates, logicalHeightForLine(m_block, m_isFirstLine));
+            }
+            break;
+        }
+    }
+
     ShapeOutsideInfo* shapeOutsideInfo = newFloat->renderer()->shapeOutsideInfo();
     if (shapeOutsideInfo)
-        shapeOutsideInfo->computeSegmentsForLine(m_block->logicalHeight() - m_block->logicalTopForFloat(newFloat) + shapeOutsideInfo->shapeLogicalTop(), logicalHeightForLine(m_block, m_isFirstLine));
+        shapeOutsideInfo->computeSegmentsForLine(m_block->logicalHeight() - m_block->logicalTopForFloat(newFloat), logicalHeightForLine(m_block, m_isFirstLine));
 
     if (newFloat->type() == RenderBlock::FloatingObject::FloatLeft) {
         float newLeft = m_block->logicalRightForFloat(newFloat);
+        if (previousShapeOutsideInfo)
+            newLeft -= previousShapeOutsideInfo->rightSegmentMarginBoxDelta();
         if (shapeOutsideInfo)
-            newLeft += shapeOutsideInfo->rightSegmentShapeBoundingBoxDelta();
+            newLeft += shapeOutsideInfo->rightSegmentMarginBoxDelta();
 
         if (shouldIndentText() && m_block->style()->isLeftToRightDirection())
             newLeft += floorToInt(m_block->textIndentOffset());
         m_left = max<float>(m_left, newLeft);
     } else {
         float newRight = m_block->logicalLeftForFloat(newFloat);
+        if (previousShapeOutsideInfo)
+            newRight -= previousShapeOutsideInfo->leftSegmentMarginBoxDelta();
         if (shapeOutsideInfo)
-            newRight += shapeOutsideInfo->leftSegmentShapeBoundingBoxDelta();
+            newRight += shapeOutsideInfo->leftSegmentMarginBoxDelta();
 
         if (shouldIndentText() && !m_block->style()->isLeftToRightDirection())
             newRight -= floorToInt(m_block->textIndentOffset());
@@ -1487,7 +1513,7 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
     }
 
     if (containsFloats())
-        layoutState.setLastFloat(m_floatingObjects->set().last());
+        layoutState.setLastFloat(floatingObjects()->set().last());
 
     // We also find the first clean line and extract these lines.  We will add them back
     // if we determine that we're able to synchronize after handling all our dirty lines.
@@ -1613,7 +1639,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
         const InlineIterator oldEnd = end;
         bool isNewUBAParagraph = layoutState.lineInfo().previousLineBrokeCleanly();
-        FloatingObject* lastFloatFromPreviousLine = (containsFloats()) ? m_floatingObjects->set().last() : 0;
+        FloatingObject* lastFloatFromPreviousLine = (containsFloats()) ? floatingObjects()->set().last() : 0;
         // FIXME: Bug 95361: It is possible for a line to grow beyond lineHeight, in which
         // case these segments may be incorrect.
         if (layoutState.flowThread())
@@ -1715,8 +1741,9 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             newLine(lineBreaker.clear());
         }
 
-        if (m_floatingObjects && lastRootBox()) {
-            const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
+        FloatingObjects* floats = floatingObjects();
+        if (floats && lastRootBox()) {
+            const FloatingObjectSet& floatingObjectSet = floats->set();
             FloatingObjectSetIterator it = floatingObjectSet.begin();
             FloatingObjectSetIterator end = floatingObjectSet.end();
             if (layoutState.lastFloat()) {
@@ -1836,7 +1863,7 @@ void RenderBlock::linkToEndLineIfNeeded(LineLayoutState& layoutState)
         }
     }
     
-    if (m_floatingObjects && (layoutState.checkForFloatsFromLastLine() || positionNewFloats()) && lastRootBox()) {
+    if (floatingObjects() && (layoutState.checkForFloatsFromLastLine() || positionNewFloats()) && lastRootBox()) {
         // In case we have a float on the last line, it might not be positioned up to now.
         // This has to be done before adding in the bottom border/padding, or the float will
         // include the padding incorrectly. -dwh
@@ -1859,7 +1886,7 @@ void RenderBlock::linkToEndLineIfNeeded(LineLayoutState& layoutState)
                 trailingFloatsLineBox->setContainingRegion(regionAtBlockOffset(trailingFloatsLineBox->lineTopWithLeading()));
         }
 
-        const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
+        const FloatingObjectSet& floatingObjectSet = floatingObjects()->set();
         FloatingObjectSetIterator it = floatingObjectSet.begin();
         FloatingObjectSetIterator end = floatingObjectSet.end();
         if (layoutState.lastFloat()) {
@@ -2206,7 +2233,8 @@ bool RenderBlock::checkPaginationAndFloatsAtEndLine(LineLayoutState& layoutState
         }
     }
     
-    if (!lineDelta || !m_floatingObjects)
+    FloatingObjects* floats = floatingObjects();
+    if (!lineDelta || !floats)
         return true;
     
     // See if any floats end in the range along which we want to shift the lines vertically.
@@ -2218,7 +2246,7 @@ bool RenderBlock::checkPaginationAndFloatsAtEndLine(LineLayoutState& layoutState
 
     LayoutUnit logicalBottom = lastLine->lineBottomWithLeading() + absoluteValue(lineDelta);
 
-    const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
+    const FloatingObjectSet& floatingObjectSet = floats->set();
     FloatingObjectSetIterator end = floatingObjectSet.end();
     for (FloatingObjectSetIterator it = floatingObjectSet.begin(); it != end; ++it) {
         FloatingObject* f = *it;
@@ -2450,7 +2478,7 @@ static void tryHyphenating(RenderText* text, const Font& font, const AtomicStrin
     if (prefixLength < minimumPrefixLength)
         return;
 
-    prefixLength = lastHyphenLocation(text->characters() + lastSpace, pos - lastSpace, min(prefixLength, pos - lastSpace - minimumSuffixLength) + 1, localeIdentifier);
+    prefixLength = lastHyphenLocation(text->bloatedCharacters() + lastSpace, pos - lastSpace, min(prefixLength, pos - lastSpace - minimumSuffixLength) + 1, localeIdentifier);
     if (!prefixLength || prefixLength < minimumPrefixLength)
         return;
 
@@ -2505,7 +2533,10 @@ inline void TrailingObjects::setTrailingWhitespace(RenderText* whitespace)
 inline void TrailingObjects::clear()
 {
     m_whitespace = 0;
-    m_boxes.clear();
+    // Using resize(0) rather than clear() here saves 2% on
+    // PerformanceTests/Layout/line-layout.html because we avoid freeing and
+    // re-allocating the underlying buffer repeatedly.
+    m_boxes.resize(0);
 }
 
 inline void TrailingObjects::appendBoxIfNeeded(RenderBox* box)
@@ -2905,7 +2936,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
 
                 if ((breakAll || breakWords) && !midWordBreak) {
                     wrapW += charWidth;
-                    bool midWordBreakIsBeforeSurrogatePair = U16_IS_LEAD(c) && current.m_pos + 1 < t->textLength() && U16_IS_TRAIL(t->characters()[current.m_pos + 1]);
+                    bool midWordBreakIsBeforeSurrogatePair = U16_IS_LEAD(c) && current.m_pos + 1 < t->textLength() && U16_IS_TRAIL((*t)[current.m_pos + 1]);
                     charWidth = textWidth(t, current.m_pos, midWordBreakIsBeforeSurrogatePair ? 2 : 1, f, width.committedWidth() + wrapW, isFixedPitch, collapseWhiteSpace, 0, textLayout);
                     midWordBreak = width.committedWidth() + wrapW + charWidth > width.availableWidth();
                 }
@@ -3324,7 +3355,8 @@ bool RenderBlock::positionNewFloatOnLine(FloatingObject* newFloat, FloatingObjec
     if (!newFloat->m_paginationStrut || !lineInfo.previousLineBrokeCleanly() || !lineInfo.isEmpty())
         return true;
 
-    const FloatingObjectSet& floatingObjectSet = m_floatingObjects->set();
+    FloatingObjects* floats = floatingObjects();
+    const FloatingObjectSet& floatingObjectSet = floats->set();
     ASSERT(floatingObjectSet.last() == newFloat);
 
     LayoutUnit floatLogicalTop = logicalTopForFloat(newFloat);
@@ -3351,9 +3383,9 @@ bool RenderBlock::positionNewFloatOnLine(FloatingObject* newFloat, FloatingObjec
             // Save the old logical top before calling removePlacedObject which will set
             // isPlaced to false. Otherwise it will trigger an assert in logicalTopForFloat.
             LayoutUnit oldLogicalTop = logicalTopForFloat(f);
-            m_floatingObjects->removePlacedObject(f);
+            floats->removePlacedObject(f);
             setLogicalTopForFloat(f, oldLogicalTop + paginationStrut);
-            m_floatingObjects->addPlacedObject(f);
+            floats->addPlacedObject(f);
         }
     }
 

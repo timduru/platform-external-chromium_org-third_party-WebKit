@@ -71,7 +71,8 @@ WebInspector.Settings = function()
     this.eventListenerBreakpoints = this.createSetting("eventListenerBreakpoints", []);
     this.domBreakpoints = this.createSetting("domBreakpoints", []);
     this.xhrBreakpoints = this.createSetting("xhrBreakpoints", []);
-    this.sourceMapsEnabled = this.createSetting("sourceMapsEnabled", true);
+    this.jsSourceMapsEnabled = this.createSetting("sourceMapsEnabled", true);
+    this.cssSourceMapsEnabled = this.createSetting("cssSourceMapsEnabled", true);
     this.cacheDisabled = this.createSetting("cacheDisabled", false);
     this.overrideUserAgent = this.createSetting("overrideUserAgent", "");
     this.userAgent = this.createSetting("userAgent", "");
@@ -84,7 +85,7 @@ WebInspector.Settings = function()
     this.javaScriptDisabled = this.createSetting("javaScriptDisabled", false);
     this.geolocationOverride = this.createSetting("geolocationOverride", "");
     this.deviceOrientationOverride = this.createSetting("deviceOrientationOverride", "");
-    this.showHeapSnapshotObjectsHiddenProperties = this.createSetting("showHeaSnapshotObjectsHiddenProperties", false);
+    this.showAdvancedHeapSnapshotProperties = this.createSetting("showAdvancedHeapSnapshotProperties", false);
     this.showNativeSnapshotUninstrumentedSize = this.createSetting("showNativeSnapshotUninstrumentedSize", false);
     this.searchInContentScripts = this.createSetting("searchInContentScripts", false);
     this.textEditorIndent = this.createSetting("textEditorIndent", "    ");
@@ -248,7 +249,6 @@ WebInspector.ExperimentsSettings = function()
     this.nativeMemoryTimeline = this._createExperiment("nativeMemoryTimeline", "Native memory timeline");
     this.fileSystemInspection = this._createExperiment("fileSystemInspection", "FileSystem inspection");
     this.canvasInspection = this._createExperiment("canvasInspection ", "Canvas inspection");
-    this.sass = this._createExperiment("sass", "Sass stylesheet debugging");
     this.cssRegions = this._createExperiment("cssRegions", "CSS Regions Support");
     this.showOverridesInDrawer = this._createExperiment("showOverridesInDrawer", "Show Overrides in drawer");
     this.customizableToolbar = this._createExperiment("customizableToolbar", "Enable toolbar customization");
@@ -395,7 +395,7 @@ WebInspector.VersionController = function()
 {
 }
 
-WebInspector.VersionController.currentVersion = 3;
+WebInspector.VersionController.currentVersion = 4;
 
 WebInspector.VersionController.prototype = {
     updateVersion: function()
@@ -437,6 +437,12 @@ WebInspector.VersionController.prototype = {
         var fileSystemMappingSetting = WebInspector.settings.createSetting("fileSystemMapping", {});
         fileSystemMappingSetting.set({});
         delete window.localStorage["fileMappingEntries"];
+    },
+
+    _updateVersionFrom3To4: function()
+    {
+        var advancedMode = WebInspector.settings.createSetting("showHeaSnapshotObjectsHiddenProperties", false).get();
+        WebInspector.settings.showAdvancedHeapSnapshotProperties.set(advancedMode);
     },
 
     /**

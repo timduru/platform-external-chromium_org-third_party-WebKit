@@ -73,7 +73,7 @@ class Port(object):
     """Abstract class for Port-specific hooks for the layout_test package."""
 
     # Subclasses override this. This should indicate the basic implementation
-    # part of the port name, e.g., 'chromium-mac', 'win', 'gtk'; there is probably (?)
+    # part of the port name, e.g., 'mac', 'win', 'gtk'; there is probably (?)
     # one unique value per class.
 
     # FIXME: We should probably rename this to something like 'implementation_name'.
@@ -85,6 +85,9 @@ class Port(object):
     ALL_BUILD_TYPES = ('debug', 'release')
 
     CONTENT_SHELL_NAME = 'content_shell'
+
+    # True if the port as aac and mp3 codecs built in.
+    PORT_HAS_AUDIO_CODECS_BUILT_IN = False
 
     @classmethod
     def determine_full_port_name(cls, host, options, port_name):
@@ -211,6 +214,12 @@ class Port(object):
         """Return the absolute path to the platform-and-version-specific results."""
         baseline_search_paths = self.baseline_search_path()
         return baseline_search_paths[0]
+
+    def virtual_baseline_search_path(self, test_name):
+        suite = self.lookup_virtual_suite(test_name)
+        if not suite:
+            return None
+        return [self._filesystem.join(path, suite.name) for path in self.default_baseline_search_path()]
 
     def baseline_search_path(self):
         return self.get_option('additional_platform_directory', []) + self._compare_baseline() + self.default_baseline_search_path()
@@ -1353,11 +1362,20 @@ class Port(object):
                 virtual_tests.extend(suite.tests.keys())
         return virtual_tests
 
-    def lookup_virtual_test_base(self, test_name):
+    def is_virtual_test(self, test_name):
+        return bool(self.lookup_virtual_suite(test_name))
+
+    def lookup_virtual_suite(self, test_name):
         for suite in self.populated_virtual_test_suites():
             if test_name.startswith(suite.name):
-                return test_name.replace(suite.name, suite.base, 1)
+                return suite
         return None
+
+    def lookup_virtual_test_base(self, test_name):
+        suite = self.lookup_virtual_suite(test_name)
+        if not suite:
+            return None
+        return test_name.replace(suite.name, suite.base, 1)
 
     def lookup_virtual_test_args(self, test_name):
         for suite in self.populated_virtual_test_suites():
@@ -1393,10 +1411,13 @@ class Port(object):
     # If ports don't ever enable certain features, then those directories can just be
     # in the Skipped list instead of compile-time-checked here.
     def _missing_symbol_to_skipped_tests(self):
-        return {
-            "ff_mp3_decoder": ["webaudio/codec-tests/mp3"],
-            "ff_aac_decoder": ["webaudio/codec-tests/aac"],
-        }
+        if self.PORT_HAS_AUDIO_CODECS_BUILT_IN:
+            return {}
+        else:
+            return {
+                "ff_mp3_decoder": ["webaudio/codec-tests/mp3"],
+                "ff_aac_decoder": ["webaudio/codec-tests/aac"],
+            }
 
     def _has_test_in_directories(self, directory_lists, test_list):
         if not test_list:

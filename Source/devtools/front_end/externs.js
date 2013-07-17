@@ -46,6 +46,14 @@ Event.prototype.isMetaOrCtrlForTest = false;
 Event.prototype.initWebKitWheelEvent = function(vararg) {}
 Event.prototype.stopImmediatePropagation = function() {}
 
+/**
+ * @constructor
+ * @extends {KeyboardEvent}
+ * @param {string} eventType
+ * @param {Object=} properties
+ */
+window.KeyboardEvent = function(eventType, properties) {}
+
 /** @param {Element} element */
 window.getComputedStyle = function(element) {}
 /** @param {*} message */
@@ -87,8 +95,18 @@ function addEventListener(eventName, listener, capturing) {}
 /** @param {boolean=} onlyFirst */
 Array.prototype.remove = function(obj, onlyFirst) {}
 Array.prototype.keySet = function() {}
-/** @return {number} */
-Array.prototype.upperBound = function(anchor) {}
+/**
+ * @param {*} object
+ * @param {function(*,*):number=} comparator
+ * @return {number}
+ */
+Array.prototype.lowerBound = function(object, comparator) {}
+/**
+ * @param {*} object
+ * @param {function(*,*):number=} comparator
+ * @return {number}
+ */
+Array.prototype.upperBound = function(object, comparator) {}
 /** @return {number} */
 Array.prototype.binaryIndexOf = function(anchor) {}
 Array.prototype.sortRange = function(comparator, leftBound, rightBound, k) {}
@@ -360,6 +378,7 @@ CodeMirror.prototype = {
     firstLine: function() { },
     focus: function() { },
     getAllMarks: function() { },
+    /** @param {string=} start */
     getCursor: function(start) { },
     getDoc: function() { },
     getGutterElement: function() { },
@@ -392,7 +411,11 @@ CodeMirror.prototype = {
     lastLine: function() { },
     lineCount: function() { },
     lineInfo: function(line) { },
-    lineAtHeight: function(height) { },
+    /**
+     * @param {number} height
+     * @param {string=} mode
+     */
+    lineAtHeight: function(height, mode) { },
     linkedDoc: function(options) { },
     markClean: function() { },
     markText: function(from, to, options) { },

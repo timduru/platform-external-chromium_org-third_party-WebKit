@@ -43,7 +43,7 @@ _log = logging.getLogger(__name__)
 # FIXME: range() starts with 0 which makes if expectation checks harder
 # as PASS is 0.
 (PASS, FAIL, TEXT, IMAGE, IMAGE_PLUS_TEXT, AUDIO, TIMEOUT, CRASH, SKIP, WONTFIX,
- SLOW, REBASELINE, NEEDS_REBASELINE, MISSING, FLAKY, NOW, NONE) = range(17)
+ SLOW, REBASELINE, NEEDS_REBASELINE, NEEDS_MANUAL_REBASELINE, MISSING, FLAKY, NOW, NONE) = range(18)
 
 # FIXME: Perhas these two routines should be part of the Port instead?
 BASELINE_SUFFIX_LIST = ('png', 'wav', 'txt')
@@ -70,6 +70,7 @@ class TestExpectationParser(object):
 
     REBASELINE_MODIFIER = 'rebaseline'
     NEEDS_REBASELINE_MODIFIER = 'needsrebaseline'
+    NEEDS_MANUAL_REBASELINE_MODIFIER = 'needsmanualrebaseline'
     PASS_EXPECTATION = 'pass'
     SKIP_MODIFIER = 'skip'
     SLOW_MODIFIER = 'slow'
@@ -240,6 +241,7 @@ class TestExpectationParser(object):
         'Pass': 'PASS',
         'Rebaseline': 'REBASELINE',
         'NeedsRebaseline': 'NeedsRebaseline',
+        'NeedsManualRebaseline': 'NeedsManualRebaseline',
         'Skip': 'SKIP',
         'Slow': 'SLOW',
         'Timeout': 'TIMEOUT',
@@ -358,7 +360,7 @@ class TestExpectationParser(object):
             # FIXME: This is really a semantic warning and shouldn't be here. Remove when we drop the old syntax.
             warnings.append('A test marked Skip must not have other expectations.')
         elif not expectations:
-            if 'SKIP' not in modifiers and 'REBASELINE' not in modifiers and 'NeedsRebaseline' not in modifiers and 'SLOW' not in modifiers:
+            if 'SKIP' not in modifiers and 'REBASELINE' not in modifiers and 'NeedsRebaseline' not in modifiers  and 'NeedsManualRebaseline' not in modifiers and 'SLOW' not in modifiers:
                 modifiers.append('SKIP')
             expectations = ['PASS']
 
@@ -419,6 +421,9 @@ class TestExpectationLine(object):
     def is_flaky(self):
         return len(self.parsed_expectations) > 1
 
+    def is_whitespace_or_comment(self):
+        return bool(re.match("^\s*$", self.original_string.split('#')[0]))
+
     @staticmethod
     def create_passing_expectation(test):
         expectation_line = TestExpectationLine()
@@ -428,6 +433,29 @@ class TestExpectationLine(object):
         expectation_line.expectations = set(['PASS'])
         expectation_line.matching_tests = [test]
         return expectation_line
+
+    @staticmethod
+    def merge_expectation_lines(line1, line2):
+        """Merges the expectations of line2 into line1 and returns a fresh object."""
+        if line1 is None:
+            return line2
+        if line2 is None:
+            return line1
+
+        # Don't merge original_string, filename, line_number or comment.
+        result = TestExpectationLine()
+        result.name = line1.name
+        result.path = line1.path
+        result.parsed_expectations = set(line1.parsed_expectations) | set(line2.parsed_expectations)
+        result.expectations = list(set(line1.expectations) | set(line2.expectations))
+        result.modifiers = list(set(line1.modifiers) | set(line2.modifiers))
+        result.parsed_modifiers = list(set(line1.parsed_modifiers) | set(line2.parsed_modifiers))
+        result.parsed_bug_modifiers = list(set(line1.parsed_bug_modifiers) | set(line2.parsed_bug_modifiers))
+        result.matching_configurations = set(line1.matching_configurations) | set(line2.matching_configurations)
+        result.matching_tests = list(list(set(line1.matching_tests) | set(line2.matching_tests)))
+        result.warnings = list(set(line1.warnings) | set(line2.warnings))
+        result.is_skipped_outside_expectations_file = line1.is_skipped_outside_expectations_file or line2.is_skipped_outside_expectations_file
+        return result
 
     def to_string(self, test_configuration_converter, include_modifiers=True, include_expectations=True, include_comment=True):
         parsed_expectation_to_string = dict([[parsed_expectation, expectation_string] for expectation_string, parsed_expectation in TestExpectations.EXPECTATIONS.items()])
@@ -489,7 +517,7 @@ class TestExpectationLine(object):
             else:
                 # FIXME: Make this all work with the mixed-cased modifiers (e.g. WontFix, Slow, etc).
                 modifier = modifier.upper()
-                if modifier in ('SLOW', 'SKIP', 'REBASELINE', 'NeedsRebaseline', 'WONTFIX'):
+                if modifier in ('SLOW', 'SKIP', 'REBASELINE', 'NeedsRebaseline', 'NeedsManualRebaseline', 'WONTFIX'):
                     new_expectations.append(TestExpectationParser._inverted_expectation_tokens.get(modifier))
                 else:
                     new_modifiers.append(TestExpectationParser._inverted_configuration_tokens.get(modifier, modifier))
@@ -634,15 +662,22 @@ class TestExpectationsModel(object):
         self._clear_expectations_for_test(test)
         del self._test_to_expectation_line[test]
 
-    def add_expectation_line(self, expectation_line, override_existing_matches=False):
+    def add_expectation_line(self, expectation_line,
+                             override_existing_matches=False,
+                             merge_existing_matches=False):
         """Returns a list of warnings encountered while matching modifiers."""
 
         if expectation_line.is_invalid():
             return
 
         for test in expectation_line.matching_tests:
-            if not override_existing_matches and self._already_seen_better_match(test, expectation_line):
+            if (not (override_existing_matches or merge_existing_matches)
+                    and self._already_seen_better_match(test, expectation_line)):
                 continue
+
+            if merge_existing_matches:
+                merge = TestExpectationLine.merge_expectation_lines
+                expectation_line = merge(self.get_expectation_line(test), expectation_line)
 
             self._clear_expectations_for_test(test)
             self._test_to_expectation_line[test] = expectation_line
@@ -804,7 +839,8 @@ class TestExpectations(object):
                     'crash': CRASH,
                     'missing': MISSING,
                     'skip': SKIP,
-                    'needsrebaseline': NEEDS_REBASELINE}
+                    'needsrebaseline': NEEDS_REBASELINE,
+                    'needsmanualrebaseline': NEEDS_MANUAL_REBASELINE}
 
     EXPECTATIONS_TO_STRING = dict((k, v) for (v, k) in EXPECTATIONS.iteritems())
 
@@ -829,6 +865,7 @@ class TestExpectations(object):
                  TestExpectationParser.SLOW_MODIFIER: SLOW,
                  TestExpectationParser.REBASELINE_MODIFIER: REBASELINE,
                  TestExpectationParser.NEEDS_REBASELINE_MODIFIER: NEEDS_REBASELINE,
+                 TestExpectationParser.NEEDS_MANUAL_REBASELINE_MODIFIER: NEEDS_MANUAL_REBASELINE,
                  'none': NONE}
 
     MODIFIERS_TO_STRING = dict((k, v) for (v, k) in MODIFIERS.iteritems())
@@ -855,7 +892,7 @@ class TestExpectations(object):
             test_needs_rebaselining: whether test was marked as REBASELINE"""
         if result in expected_results:
             return True
-        if result in (TEXT, IMAGE, IMAGE_PLUS_TEXT, AUDIO, MISSING) and (NEEDS_REBASELINE in expected_results):
+        if result in (TEXT, IMAGE, IMAGE_PLUS_TEXT, AUDIO, MISSING) and (NEEDS_REBASELINE in expected_results or NEEDS_MANUAL_REBASELINE in expected_results):
             return True
         if result in (TEXT, IMAGE_PLUS_TEXT, AUDIO) and (FAIL in expected_results):
             return True
@@ -1025,7 +1062,13 @@ class TestExpectations(object):
                 expectations_to_remove.append(expectation)
 
         for expectation in expectations_to_remove:
+            index = self._expectations.index(expectation)
             self._expectations.remove(expectation)
+
+            if index == len(self._expectations) or self._expectations[index].is_whitespace_or_comment():
+                while index and self._expectations[index - 1].is_whitespace_or_comment():
+                    index = index - 1
+                    self._expectations.pop(index)
 
         return self.list_to_string(self._expectations, self._parser._test_configuration_converter, modified_expectations)
 
@@ -1064,7 +1107,10 @@ class TestExpectations(object):
         bot_expectations = self._port.bot_expectations()
         for test_name in bot_expectations:
             expectation_line = self._parser.expectation_line_for_test(test_name, bot_expectations[test_name])
-            self._model.add_expectation_line(expectation_line, override_existing_matches=True)
+
+            # Unexpected results are merged into existing expectations.
+            merge = self._port.get_option('ignore_flaky_tests') == 'unexpected'
+            self._model.add_expectation_line(expectation_line, override_existing_matches=True, merge_existing_matches=merge)
 
     def add_expectation_line(self, expectation_line):
         self._model.add_expectation_line(expectation_line)

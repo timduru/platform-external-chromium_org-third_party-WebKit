@@ -27,6 +27,7 @@
 
 #include "HTMLNames.h"
 #include "SVGNames.h"
+#include "XLinkNames.h"
 #include "XMLNames.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/css/CSSCursorImageValue.h"
@@ -89,7 +90,11 @@ SVGElement::~SVGElement()
 
 void SVGElement::willRecalcStyle(StyleChange change)
 {
-    if (!hasSVGRareData() || needsLayerUpdate())
+    // FIXME: This assumes that when shouldNotifyRendererWithIdenticalStyles() is true
+    // the change came from a SMIL animation, but what if there were non-SMIL changes
+    // since then? I think we should remove the shouldNotifyRendererWithIdenticalStyles
+    // check.
+    if (!hasSVGRareData() || shouldNotifyRendererWithIdenticalStyles())
         return;
     // If the style changes because of a regular property change (not induced by SMIL animations themselves)
     // reset the "computed style without SMIL style properties", so the base value change gets reflected.
@@ -315,6 +320,10 @@ void SVGElement::parseAttribute(const QualifiedName& name, const AtomicString& v
         setAttributeEventListener(eventNames().clickEvent, createAttributeEventListener(this, name, value));
     else if (name == onmousedownAttr)
         setAttributeEventListener(eventNames().mousedownEvent, createAttributeEventListener(this, name, value));
+    else if (name == onmouseenterAttr)
+        setAttributeEventListener(eventNames().mouseenterEvent, createAttributeEventListener(this, name, value));
+    else if (name == onmouseleaveAttr)
+        setAttributeEventListener(eventNames().mouseleaveEvent, createAttributeEventListener(this, name, value));
     else if (name == onmousemoveAttr)
         setAttributeEventListener(eventNames().mousemoveEvent, createAttributeEventListener(this, name, value));
     else if (name == onmouseoutAttr)

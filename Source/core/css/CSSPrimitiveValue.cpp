@@ -120,36 +120,36 @@ CSSPrimitiveValue::UnitCategory CSSPrimitiveValue::unitCategory(CSSPrimitiveValu
     // Here we violate the spec (http://www.w3.org/TR/DOM-Level-2-Style/css.html#CSS-CSSPrimitiveValue) and allow conversions
     // between CSS_PX and relative lengths (see cssPixelsPerInch comment in core/css/CSSHelper.h for the topic treatment).
     switch (type) {
-    case CSSPrimitiveValue::CSS_NUMBER:
+    case CSS_NUMBER:
         return CSSPrimitiveValue::UNumber;
-    case CSSPrimitiveValue::CSS_PERCENTAGE:
+    case CSS_PERCENTAGE:
         return CSSPrimitiveValue::UPercent;
-    case CSSPrimitiveValue::CSS_PX:
-    case CSSPrimitiveValue::CSS_CM:
-    case CSSPrimitiveValue::CSS_MM:
-    case CSSPrimitiveValue::CSS_IN:
-    case CSSPrimitiveValue::CSS_PT:
-    case CSSPrimitiveValue::CSS_PC:
+    case CSS_PX:
+    case CSS_CM:
+    case CSS_MM:
+    case CSS_IN:
+    case CSS_PT:
+    case CSS_PC:
         return CSSPrimitiveValue::ULength;
-    case CSSPrimitiveValue::CSS_MS:
-    case CSSPrimitiveValue::CSS_S:
+    case CSS_MS:
+    case CSS_S:
         return CSSPrimitiveValue::UTime;
-    case CSSPrimitiveValue::CSS_DEG:
-    case CSSPrimitiveValue::CSS_RAD:
-    case CSSPrimitiveValue::CSS_GRAD:
-    case CSSPrimitiveValue::CSS_TURN:
+    case CSS_DEG:
+    case CSS_RAD:
+    case CSS_GRAD:
+    case CSS_TURN:
         return CSSPrimitiveValue::UAngle;
-    case CSSPrimitiveValue::CSS_HZ:
-    case CSSPrimitiveValue::CSS_KHZ:
+    case CSS_HZ:
+    case CSS_KHZ:
         return CSSPrimitiveValue::UFrequency;
-    case CSSPrimitiveValue::CSS_VW:
-    case CSSPrimitiveValue::CSS_VH:
-    case CSSPrimitiveValue::CSS_VMIN:
-    case CSSPrimitiveValue::CSS_VMAX:
+    case CSS_VW:
+    case CSS_VH:
+    case CSS_VMIN:
+    case CSS_VMAX:
         return CSSPrimitiveValue::UViewportPercentageLength;
-    case CSSPrimitiveValue::CSS_DPPX:
-    case CSSPrimitiveValue::CSS_DPI:
-    case CSSPrimitiveValue::CSS_DPCM:
+    case CSS_DPPX:
+    case CSS_DPI:
+    case CSS_DPCM:
         return CSSPrimitiveValue::UResolution;
     default:
         return CSSPrimitiveValue::UOther;
@@ -182,26 +182,26 @@ unsigned short CSSPrimitiveValue::primitiveType() const
     if (m_primitiveUnitType == CSS_PROPERTY_ID || m_primitiveUnitType == CSS_VALUE_ID)
         return CSS_IDENT;
 
-    if (m_primitiveUnitType != CSSPrimitiveValue::CSS_CALC)
+    if (m_primitiveUnitType != CSS_CALC)
         return m_primitiveUnitType; 
     
     switch (m_value.calc->category()) {
     case CalcNumber:
-        return CSSPrimitiveValue::CSS_NUMBER;
+        return CSS_NUMBER;
     case CalcPercent:
-        return CSSPrimitiveValue::CSS_PERCENTAGE;
+        return CSS_PERCENTAGE;
     case CalcLength:
-        return CSSPrimitiveValue::CSS_PX;
+        return CSS_PX;
     case CalcPercentNumber:
-        return CSSPrimitiveValue::CSS_CALC_PERCENTAGE_WITH_NUMBER;
+        return CSS_CALC_PERCENTAGE_WITH_NUMBER;
     case CalcPercentLength:
-        return CSSPrimitiveValue::CSS_CALC_PERCENTAGE_WITH_LENGTH;
+        return CSS_CALC_PERCENTAGE_WITH_LENGTH;
     case CalcVariable:
-        return CSSPrimitiveValue::CSS_UNKNOWN; // The type of a calculation containing a variable cannot be known until the value of the variable is determined.
+        return CSS_UNKNOWN; // The type of a calculation containing a variable cannot be known until the value of the variable is determined.
     case CalcOther:
-        return CSSPrimitiveValue::CSS_UNKNOWN;
+        return CSS_UNKNOWN;
     }
-    return CSSPrimitiveValue::CSS_UNKNOWN;
+    return CSS_UNKNOWN;
 }
 
 static const AtomicString& propertyName(CSSPropertyID propertyID)
@@ -593,7 +593,7 @@ void CSSPrimitiveValue::setFloatValue(unsigned short, double, ExceptionCode& ec)
     // Keeping values immutable makes optimizations easier and allows sharing of the primitive value objects.
     // No other engine supports mutating style through this API. Computed style is always read-only anyway.
     // Supporting setter would require making primitive value copy-on-write and taking care of style invalidation.
-    ec = NO_MODIFICATION_ALLOWED_ERR;
+    ec = NoModificationAllowedError;
 }
 
 double CSSPrimitiveValue::conversionToCanonicalUnitsScaleFactor(unsigned short unitType)
@@ -601,48 +601,48 @@ double CSSPrimitiveValue::conversionToCanonicalUnitsScaleFactor(unsigned short u
     double factor = 1.0;
     // FIXME: the switch can be replaced by an array of scale factors.
     switch (unitType) {
-        // These are "canonical" units in their respective categories.
-        case CSSPrimitiveValue::CSS_PX:
-        case CSSPrimitiveValue::CSS_DEG:
-        case CSSPrimitiveValue::CSS_MS:
-        case CSSPrimitiveValue::CSS_HZ:
-            break;
-        case CSSPrimitiveValue::CSS_CM:
-            factor = cssPixelsPerInch / 2.54; // (2.54 cm/in)
-            break;
-        case CSSPrimitiveValue::CSS_DPCM:
-            factor = 2.54 / cssPixelsPerInch; // (2.54 cm/in)
-            break;
-        case CSSPrimitiveValue::CSS_MM:
-            factor = cssPixelsPerInch / 25.4;
-            break;
-        case CSSPrimitiveValue::CSS_IN:
-            factor = cssPixelsPerInch;
-            break;
-        case CSSPrimitiveValue::CSS_DPI:
-            factor = 1 / cssPixelsPerInch;
-            break;
-        case CSSPrimitiveValue::CSS_PT:
-            factor = cssPixelsPerInch / 72.0;
-            break;
-        case CSSPrimitiveValue::CSS_PC:
-            factor = cssPixelsPerInch * 12.0 / 72.0; // 1 pc == 12 pt
-            break;
-        case CSSPrimitiveValue::CSS_RAD:
-            factor = 180 / piDouble;
-            break;
-        case CSSPrimitiveValue::CSS_GRAD:
-            factor = 0.9;
-            break;
-        case CSSPrimitiveValue::CSS_TURN:
-            factor = 360;
-            break;
-        case CSSPrimitiveValue::CSS_S:
-        case CSSPrimitiveValue::CSS_KHZ:
-            factor = 1000;
-            break;
-        default:
-            break;
+    // These are "canonical" units in their respective categories.
+    case CSS_PX:
+    case CSS_DEG:
+    case CSS_MS:
+    case CSS_HZ:
+        break;
+    case CSS_CM:
+        factor = cssPixelsPerInch / 2.54; // (2.54 cm/in)
+        break;
+    case CSS_DPCM:
+        factor = 2.54 / cssPixelsPerInch; // (2.54 cm/in)
+        break;
+    case CSS_MM:
+        factor = cssPixelsPerInch / 25.4;
+        break;
+    case CSS_IN:
+        factor = cssPixelsPerInch;
+        break;
+    case CSS_DPI:
+        factor = 1 / cssPixelsPerInch;
+        break;
+    case CSS_PT:
+        factor = cssPixelsPerInch / 72.0;
+        break;
+    case CSS_PC:
+        factor = cssPixelsPerInch * 12.0 / 72.0; // 1 pc == 12 pt
+        break;
+    case CSS_RAD:
+        factor = 180 / piDouble;
+        break;
+    case CSS_GRAD:
+        factor = 0.9;
+        break;
+    case CSS_TURN:
+        factor = 360;
+        break;
+    case CSS_S:
+    case CSS_KHZ:
+        factor = 1000;
+        break;
+    default:
+        break;
     }
 
     return factor;
@@ -653,7 +653,7 @@ double CSSPrimitiveValue::getDoubleValue(unsigned short unitType, ExceptionCode&
     double result = 0;
     bool success = getDoubleValueInternal(static_cast<UnitTypes>(unitType), &result);
     if (!success) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0.0;
     }
 
@@ -754,7 +754,7 @@ void CSSPrimitiveValue::setStringValue(unsigned short, const String&, ExceptionC
     // Keeping values immutable makes optimizations easier and allows sharing of the primitive value objects.
     // No other engine supports mutating style through this API. Computed style is always read-only anyway.
     // Supporting setter would require making primitive value copy-on-write and taking care of style invalidation.
-    ec = NO_MODIFICATION_ALLOWED_ERR;
+    ec = NoModificationAllowedError;
 }
 
 String CSSPrimitiveValue::getStringValue(ExceptionCode& ec) const
@@ -771,7 +771,7 @@ String CSSPrimitiveValue::getStringValue(ExceptionCode& ec) const
         case CSS_PROPERTY_ID:
             return propertyName(m_value.propertyID);
         default:
-            ec = INVALID_ACCESS_ERR;
+            ec = InvalidAccessError;
             break;
     }
 
@@ -801,7 +801,7 @@ Counter* CSSPrimitiveValue::getCounterValue(ExceptionCode& ec) const
 {
     ec = 0;
     if (m_primitiveUnitType != CSS_COUNTER) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -812,7 +812,7 @@ Rect* CSSPrimitiveValue::getRectValue(ExceptionCode& ec) const
 {
     ec = 0;
     if (m_primitiveUnitType != CSS_RECT) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -823,7 +823,7 @@ Quad* CSSPrimitiveValue::getQuadValue(ExceptionCode& ec) const
 {
     ec = 0;
     if (m_primitiveUnitType != CSS_QUAD) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -834,7 +834,7 @@ PassRefPtr<RGBColor> CSSPrimitiveValue::getRGBColorValue(ExceptionCode& ec) cons
 {
     ec = 0;
     if (m_primitiveUnitType != CSS_RGBCOLOR) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 
@@ -846,7 +846,7 @@ Pair* CSSPrimitiveValue::getPairValue(ExceptionCode& ec) const
 {
     ec = 0;
     if (m_primitiveUnitType != CSS_PAIR) {
-        ec = INVALID_ACCESS_ERR;
+        ec = InvalidAccessError;
         return 0;
     }
 

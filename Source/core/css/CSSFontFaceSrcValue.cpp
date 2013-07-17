@@ -25,6 +25,8 @@
 
 #include "config.h"
 #include "core/css/CSSFontFaceSrcValue.h"
+
+#include "CachedResourceInitiatorTypeNames.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/dom/Document.h"
 #include "core/dom/Node.h"
@@ -32,10 +34,9 @@
 #include "core/loader/cache/CachedFont.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
-#include "core/loader/cache/CachedResourceRequestInitiators.h"
 #include "core/platform/graphics/FontCustomPlatformData.h"
 #include "core/svg/SVGFontFaceElement.h"
-#include <wtf/text/StringBuilder.h>
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -97,7 +98,7 @@ bool CSSFontFaceSrcValue::hasFailedOrCanceledSubresources() const
 CachedFont* CSSFontFaceSrcValue::cachedFont(Document* document)
 {
     if (!m_cachedFont) {
-        CachedResourceRequest request(ResourceRequest(document->completeURL(m_resource)), cachedResourceRequestInitiators().css);
+        CachedResourceRequest request(ResourceRequest(document->completeURL(m_resource)), CachedResourceInitiatorTypeNames::css);
         m_cachedFont = document->cachedResourceLoader()->requestFont(request);
     }
     return m_cachedFont.get();

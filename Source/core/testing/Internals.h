@@ -49,6 +49,7 @@ class Element;
 class Frame;
 class InspectorFrontendChannelDummy;
 class InternalRuntimeFlags;
+class InternalProfilers;
 class InternalSettings;
 class Node;
 class Page;
@@ -198,6 +199,7 @@ public:
 
     InternalSettings* settings() const;
     InternalRuntimeFlags* runtimeFlags() const;
+    InternalProfilers* profilers();
     unsigned workerThreadCount() const;
 
     void setDeviceProximity(Document*, const String& eventType, double value, double min, double max, ExceptionCode&);
@@ -229,6 +231,7 @@ public:
     Vector<String> consoleMessageArgumentCounts(Document*) const;
     PassRefPtr<DOMWindow> openDummyInspectorFrontend(const String& url);
     void closeDummyInspectorFrontend();
+    Vector<unsigned long> setMemoryCacheCapacities(unsigned long minDeadBytes, unsigned long maxDeadBytes, unsigned long totalBytes);
     void setInspectorResourcesDataSizeLimits(int maximumResourcesContentSize, int maximumSingleResourceContentSize, ExceptionCode&);
 
     String counterValue(Element*);
@@ -292,6 +295,7 @@ private:
     RefPtr<DOMWindow> m_frontendWindow;
     OwnPtr<InspectorFrontendChannelDummy> m_frontendChannel;
     RefPtr<InternalRuntimeFlags> m_runtimeFlags;
+    RefPtr<InternalProfilers> m_profilers;
 };
 
 } // namespace WebCore

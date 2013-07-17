@@ -60,6 +60,8 @@
 #include "core/dom/MouseEvent.h"
 #include "core/dom/Range.h"
 #include "core/editing/FrameSelection.h"
+#include "core/html/HTMLFormElement.h"
+#include "core/loader/FrameLoadRequest.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
@@ -2587,7 +2589,7 @@ TEST_F(WebFrameTest, DISABLED_PositionForPointTest)
     EXPECT_EQ(64, renderer->positionForPoint(WebCore::LayoutPoint(1000, 1000)).deepEquivalent().computeOffsetInContainerNode());
 }
 
-#if OS(ANDROID)
+#if !OS(DARWIN)
 TEST_F(WebFrameTest, SelectRangeStaysHorizontallyAlignedWhenMoved)
 {
     WebFrameImpl* frame;
@@ -3377,7 +3379,9 @@ TEST_F(WebFrameTest, SimulateFragmentAnchorMiddleClick)
 
     RefPtr<WebCore::Event> event = WebCore::MouseEvent::create(WebCore::eventNames().clickEvent, false, false,
         document->defaultView(), 0, 0, 0, 0, 0, 0, 0, false, false, false, false, 1, 0, 0);
-    webViewImpl->page()->mainFrame()->loader()->urlSelected(destination, "", event.release(), false, WebCore::MaybeSendReferrer);
+    WebCore::FrameLoadRequest frameRequest(document->securityOrigin(), WebCore::ResourceRequest(destination));
+    frameRequest.setTriggeringEvent(event);
+    webViewImpl->page()->mainFrame()->loader()->load(frameRequest);
 
     m_webView->close();
     m_webView = 0;

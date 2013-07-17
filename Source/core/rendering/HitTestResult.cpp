@@ -30,9 +30,12 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
 #include "core/html/HTMLAnchorElement.h"
+#include "core/html/HTMLAreaElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMediaElement.h"
+#include "core/html/HTMLTextAreaElement.h"
+#include "core/html/HTMLVideoElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/loader/cache/CachedImage.h"
 #include "core/page/Frame.h"
@@ -313,7 +316,7 @@ HTMLMediaElement* HitTestResult::mediaElement() const
     if (!(m_innerNonSharedNode->renderer() && m_innerNonSharedNode->renderer()->isMedia()))
         return 0;
 
-    if (m_innerNonSharedNode->hasTagName(HTMLNames::videoTag) || m_innerNonSharedNode->hasTagName(HTMLNames::audioTag))
+    if (isHTMLVideoElement(m_innerNonSharedNode.get()) || m_innerNonSharedNode->hasTagName(HTMLNames::audioTag))
         return static_cast<HTMLMediaElement*>(m_innerNonSharedNode.get());
     return 0;
 }
@@ -324,7 +327,7 @@ KURL HitTestResult::absoluteLinkURL() const
         return KURL();
 
     AtomicString urlString;
-    if (m_innerURLElement->hasTagName(aTag) || m_innerURLElement->hasTagName(areaTag) || m_innerURLElement->hasTagName(linkTag))
+    if (isHTMLAnchorElement(m_innerURLElement.get()) || isHTMLAreaElement(m_innerURLElement.get()) || m_innerURLElement->hasTagName(linkTag))
         urlString = m_innerURLElement->getAttribute(hrefAttr);
     else if (m_innerURLElement->hasTagName(SVGNames::aTag))
         urlString = m_innerURLElement->getAttribute(XLinkNames::hrefAttr);
@@ -339,8 +342,8 @@ bool HitTestResult::isLiveLink() const
     if (!(m_innerURLElement && m_innerURLElement->document()))
         return false;
 
-    if (m_innerURLElement->hasTagName(aTag))
-        return static_cast<HTMLAnchorElement*>(m_innerURLElement.get())->isLiveLink();
+    if (isHTMLAnchorElement(m_innerURLElement.get()))
+        return toHTMLAnchorElement(m_innerURLElement.get())->isLiveLink();
 
     if (m_innerURLElement->hasTagName(SVGNames::aTag))
         return m_innerURLElement->isLink();
@@ -383,7 +386,7 @@ bool HitTestResult::isContentEditable() const
     if (!m_innerNonSharedNode)
         return false;
 
-    if (m_innerNonSharedNode->hasTagName(textareaTag))
+    if (isHTMLTextAreaElement(m_innerNonSharedNode.get()))
         return true;
 
     if (m_innerNonSharedNode->hasTagName(inputTag))

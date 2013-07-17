@@ -42,7 +42,7 @@ class IntRect;
 class IntSize;
 class KURL;
 class MediaPlayer;
-class MediaSourceBase;
+class HTMLMediaSource;
 class TimeRanges;
 
 class MediaPlayerClient {
@@ -87,7 +87,7 @@ public:
     
     virtual CORSMode mediaPlayerCORSMode() const = 0;
 
-    virtual void scheduleLayerUpdate() = 0;
+    virtual void mediaPlayerScheduleLayerUpdate() = 0;
 
     virtual void mediaPlayerDidAddTrack(PassRefPtr<InbandTextTrackPrivate>) = 0;
     virtual void mediaPlayerDidRemoveTrack(PassRefPtr<InbandTextTrackPrivate>) = 0;
@@ -107,7 +107,7 @@ public:
     virtual ~MediaPlayer() { }
 
     virtual void load(const String& url) = 0;
-    virtual void load(const String& url, PassRefPtr<MediaSourceBase>) = 0;
+    virtual void load(const String& url, PassRefPtr<HTMLMediaSource>) = 0;
 
     virtual void prepareToPlay() = 0;
     virtual WebKit::WebLayer* platformLayer() const = 0;

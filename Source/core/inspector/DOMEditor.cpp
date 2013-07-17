@@ -29,8 +29,6 @@
  */
 
 #include "config.h"
-
-
 #include "core/inspector/DOMEditor.h"
 
 #include "core/dom/DOMException.h"
@@ -38,12 +36,10 @@
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/Node.h"
 #include "core/dom/Text.h"
+#include "core/editing/markup.h"
 #include "core/inspector/DOMPatchSupport.h"
 #include "core/inspector/InspectorHistory.h"
-
-#include "core/editing/markup.h"
-
-#include <wtf/RefPtr.h>
+#include "wtf/RefPtr.h"
 
 using namespace std;
 
@@ -67,12 +63,14 @@ public:
 
     virtual bool undo(ExceptionCode& ec)
     {
-        return m_parentNode->insertBefore(m_node.get(), m_anchorNode.get(), ec);
+        m_parentNode->insertBefore(m_node.get(), m_anchorNode.get(), ec);
+        return !ec;
     }
 
     virtual bool redo(ExceptionCode& ec)
     {
-        return m_parentNode->removeChild(m_node.get(), ec);
+        m_parentNode->removeChild(m_node.get(), ec);
+        return !ec;
     }
 
 private:
@@ -99,12 +97,14 @@ public:
             if (!m_removeChildAction->perform(ec))
                 return false;
         }
-        return m_parentNode->insertBefore(m_node.get(), m_anchorNode.get(), ec);
+        m_parentNode->insertBefore(m_node.get(), m_anchorNode.get(), ec);
+        return !ec;
     }
 
     virtual bool undo(ExceptionCode& ec)
     {
-        if (!m_parentNode->removeChild(m_node.get(), ec))
+        m_parentNode->removeChild(m_node.get(), ec);
+        if (ec)
             return false;
         if (m_removeChildAction)
             return m_removeChildAction->undo(ec);
@@ -115,7 +115,8 @@ public:
     {
         if (m_removeChildAction && !m_removeChildAction->redo(ec))
             return false;
-        return m_parentNode->insertBefore(m_node.get(), m_anchorNode.get(), ec);
+        m_parentNode->insertBefore(m_node.get(), m_anchorNode.get(), ec);
+        return !ec;
     }
 
 private:
@@ -301,12 +302,14 @@ public:
 
     virtual bool undo(ExceptionCode& ec)
     {
-        return m_parentNode->replaceChild(m_oldNode, m_newNode.get(), ec);
+        m_parentNode->replaceChild(m_oldNode, m_newNode.get(), ec);
+        return !ec;
     }
 
     virtual bool redo(ExceptionCode& ec)
     {
-        return m_parentNode->replaceChild(m_newNode, m_oldNode.get(), ec);
+        m_parentNode->replaceChild(m_newNode, m_oldNode.get(), ec);
+        return !ec;
     }
 
 private:
@@ -325,22 +328,22 @@ public:
     {
     }
 
-    virtual bool perform(ExceptionCode& ec)
+    virtual bool perform(ExceptionCode&)
     {
         m_oldValue = m_node->nodeValue();
-        return redo(ec);
+        return redo(IGNORE_EXCEPTION);
     }
 
-    virtual bool undo(ExceptionCode& ec)
+    virtual bool undo(ExceptionCode&)
     {
-        m_node->setNodeValue(m_oldValue, ec);
-        return !ec;
+        m_node->setNodeValue(m_oldValue);
+        return true;
     }
 
-    virtual bool redo(ExceptionCode& ec)
+    virtual bool redo(ExceptionCode&)
     {
-        m_node->setNodeValue(m_value, ec);
-        return !ec;
+        m_node->setNodeValue(m_value);
+        return true;
     }
 
 private:

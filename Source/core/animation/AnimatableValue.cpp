@@ -31,12 +31,56 @@
 #include "config.h"
 #include "core/animation/AnimatableValue.h"
 
+#include "core/animation/AnimatableNeutral.h"
+#include "core/animation/AnimatableNumber.h"
+#include "core/animation/AnimatableUnknown.h"
+
+#include <algorithm>
+
 namespace WebCore {
 
-PassRefPtr<CSSValue> AnimatableValue::toCSSValue() const
+PassRefPtr<AnimatableValue> AnimatableValue::create(CSSValue* value)
 {
-    ASSERT_NOT_REACHED();
-    return 0;
+    // FIXME: Move this logic to a separate factory class.
+    // FIXME: Handle all animatable CSSValue types.
+    if (AnimatableNumber::canCreateFrom(value))
+        return AnimatableNumber::create(value);
+    return AnimatableUnknown::create(value);
+}
+
+const AnimatableValue* AnimatableValue::neutralValue()
+{
+    static AnimatableNeutral* neutralSentinelValue = AnimatableNeutral::create().leakRef();
+    return neutralSentinelValue;
+}
+
+PassRefPtr<AnimatableValue> AnimatableValue::interpolate(const AnimatableValue* left, const AnimatableValue* right, double fraction)
+{
+    ASSERT(left);
+    ASSERT(right);
+    ASSERT(!left->isNeutral());
+    ASSERT(!right->isNeutral());
+
+    if (fraction && fraction != 1 && left->isSameType(right))
+        return left->interpolateTo(right, fraction);
+
+    return defaultInterpolateTo(left, right, fraction);
+}
+
+PassRefPtr<AnimatableValue> AnimatableValue::add(const AnimatableValue* left, const AnimatableValue* right)
+{
+    ASSERT(left);
+    ASSERT(right);
+
+    if (left->isNeutral())
+        return takeConstRef(right);
+    if (right->isNeutral())
+        return takeConstRef(left);
+
+    if (left->isSameType(right))
+        return left->addWith(right);
+
+    return defaultAddWith(left, right);
 }
 
 } // namespace WebCore

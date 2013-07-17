@@ -231,8 +231,10 @@ void InspectorTimelineAgent::stop(ErrorString*)
     if (!m_state->getBoolean(TimelineAgentState::timelineAgentEnabled))
         return;
 
-    m_traceEventProcessor->shutdown();
-    m_traceEventProcessor.clear();
+    if (m_traceEventProcessor) {
+        m_traceEventProcessor->shutdown();
+        m_traceEventProcessor.clear();
+    }
     m_weakFactory.revokeAll();
     m_instrumentingAgents->setInspectorTimelineAgent(0);
     ScriptGCEvent::removeEventListener(this);
@@ -724,7 +726,7 @@ void InspectorTimelineAgent::didCompleteCurrentRecord(const String& type)
         entry.record->setObject("data", entry.data);
         entry.record->setArray("children", entry.children);
         entry.record->setNumber("endTime", timestamp());
-        size_t usedHeapSizeDelta = getUsedHeapSize() - entry.usedHeapSizeAtStart;
+        ptrdiff_t usedHeapSizeDelta = getUsedHeapSize() - entry.usedHeapSizeAtStart;
         if (usedHeapSizeDelta)
             entry.record->setNumber("usedHeapSizeDelta", usedHeapSizeDelta);
         addRecordToTimeline(entry.record);
@@ -744,6 +746,7 @@ InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentin
     , m_client(client)
     , m_weakFactory(this)
     , m_styleRecalcElementCounter(0)
+    , m_layerTreeId(0)
 {
 }
 

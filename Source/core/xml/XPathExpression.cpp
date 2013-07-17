@@ -59,7 +59,7 @@ XPathExpression::~XPathExpression()
 PassRefPtr<XPathResult> XPathExpression::evaluate(Node* contextNode, unsigned short type, XPathResult*, ExceptionCode& ec)
 {
     if (!isValidContextNode(contextNode)) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
@@ -73,7 +73,7 @@ PassRefPtr<XPathResult> XPathExpression::evaluate(Node* contextNode, unsigned sh
 
     if (evaluationContext.hadTypeConversionError) {
         // It is not specified what to do if type conversion fails while evaluating an expression.
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return 0;
     }
 

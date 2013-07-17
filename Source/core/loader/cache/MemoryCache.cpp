@@ -54,7 +54,6 @@ static MemoryCache* gMemoryCache;
 static const int cDefaultCacheCapacity = 8192 * 1024;
 static const double cMinDelayBeforeLiveDecodedPrune = 1; // Seconds.
 static const float cTargetPrunePercentage = .95f; // Percentage of capacity toward which we prune, to avoid immediately pruning again.
-static const double cDefaultDecodedDataDeletionInterval = 0;
 
 MemoryCache* memoryCache()
 {
@@ -74,7 +73,6 @@ MemoryCache::MemoryCache()
     , m_capacity(cDefaultCacheCapacity)
     , m_minDeadCapacity(0)
     , m_maxDeadCapacity(cDefaultCacheCapacity)
-    , m_deadDecodedDataDeletionInterval(cDefaultDecodedDataDeletionInterval)
     , m_liveSize(0)
     , m_deadSize(0)
 #ifdef MEMORY_CACHE_STATS
@@ -109,6 +107,20 @@ void MemoryCache::add(CachedResource* resource)
     resource->updateForAccess();
     
     LOG(ResourceLoading, "MemoryCache::add Added '%s', resource %p\n", resource->url().string().latin1().data(), resource);
+}
+
+void MemoryCache::replace(CachedResource* newResource, CachedResource* oldResource)
+{
+    evict(oldResource);
+    ASSERT(!m_resources.get(newResource->url()));
+    m_resources.set(newResource->url(), newResource);
+    newResource->setInCache(true);
+    insertInLRUList(newResource);
+    int delta = newResource->size();
+    if (newResource->decodedSize() && newResource->hasClients())
+        insertInLiveDecodedResourcesList(newResource);
+    if (delta)
+        adjustSize(newResource->hasClients(), delta);
 }
 
 CachedResource* MemoryCache::resourceForURL(const KURL& resourceURL)
@@ -146,26 +158,6 @@ void MemoryCache::pruneLiveResources()
         return;
 
     unsigned targetSize = static_cast<unsigned>(capacity * cTargetPrunePercentage); // Cut by a percentage to avoid immediately pruning again.
-
-    pruneLiveResourcesToSize(targetSize);
-}
-
-void MemoryCache::pruneLiveResourcesToPercentage(float prunePercentage)
-{
-    if (prunePercentage < 0.0f  || prunePercentage > 0.95f)
-        return;
-
-    unsigned currentSize = m_liveSize + m_deadSize;
-    unsigned targetSize = static_cast<unsigned>(currentSize * prunePercentage);
-
-    pruneLiveResourcesToSize(targetSize);
-}
-
-void MemoryCache::pruneLiveResourcesToSize(unsigned targetSize)
-{
-    if (m_inPruneResources)
-        return;
-    TemporaryChange<bool> reentrancyProtector(m_inPruneResources, true);
 
     double currentTime = FrameView::currentPaintTimeStamp();
     if (!currentTime) // In case prune is called directly, outside of a Frame paint.
@@ -208,25 +200,6 @@ void MemoryCache::pruneDeadResources()
         return;
 
     unsigned targetSize = static_cast<unsigned>(capacity * cTargetPrunePercentage); // Cut by a percentage to avoid immediately pruning again.
-    pruneDeadResourcesToSize(targetSize);
-}
-
-void MemoryCache::pruneDeadResourcesToPercentage(float prunePercentage)
-{
-    if (prunePercentage < 0.0f  || prunePercentage > 0.95f)
-        return;
-
-    unsigned currentSize = m_liveSize + m_deadSize;
-    unsigned targetSize = static_cast<unsigned>(currentSize * prunePercentage);
-
-    pruneDeadResourcesToSize(targetSize);
-}
-
-void MemoryCache::pruneDeadResourcesToSize(unsigned targetSize)
-{
-    if (m_inPruneResources)
-        return;
-    TemporaryChange<bool> reentrancyProtector(m_inPruneResources, true);
 
     int size = m_allResources.size();
  
@@ -594,15 +567,12 @@ void MemoryCache::prune()
 {
     if (m_liveSize + m_deadSize <= m_capacity && m_maxDeadCapacity && m_deadSize <= m_maxDeadCapacity) // Fast path.
         return;
-        
+    if (m_inPruneResources)
+        return;
+    TemporaryChange<bool> reentrancyProtector(m_inPruneResources, true);
+
     pruneDeadResources(); // Prune dead first, in case it was "borrowing" capacity from live.
     pruneLiveResources();
-}
-
-void MemoryCache::pruneToPercentage(float targetPercentLive)
-{
-    pruneDeadResourcesToPercentage(targetPercentLive); // Prune dead first, in case it was "borrowing" capacity from live.
-    pruneLiveResourcesToPercentage(targetPercentLive);
 }
 
 

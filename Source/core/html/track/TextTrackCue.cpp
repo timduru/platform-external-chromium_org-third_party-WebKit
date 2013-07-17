@@ -345,7 +345,7 @@ void TextTrackCue::setVertical(const String& value, ExceptionCode& ec)
     else if (value == verticalGrowingRightKeyword())
         direction = VerticalGrowingRight;
     else
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
     
     if (direction == m_writingDirection)
         return;
@@ -371,7 +371,7 @@ void TextTrackCue::setLine(int position, ExceptionCode& ec)
     // On setting, if the text track cue snap-to-lines flag is not set, and the new
     // value is negative or greater than 100, then throw an IndexSizeError exception.
     if (!m_snapToLines && (position < 0 || position > 100)) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
 
@@ -391,7 +391,7 @@ void TextTrackCue::setPosition(int position, ExceptionCode& ec)
     // On setting, if the new value is negative or greater than 100, then throw an IndexSizeError exception.
     // Otherwise, set the text track cue text position to the new value.
     if (position < 0 || position > 100) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
     
@@ -410,7 +410,7 @@ void TextTrackCue::setSize(int size, ExceptionCode& ec)
     // On setting, if the new value is negative or greater than 100, then throw an IndexSizeError
     // exception. Otherwise, set the text track cue size to the new value.
     if (size < 0 || size > 100) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
     
@@ -454,7 +454,7 @@ void TextTrackCue::setAlign(const String& value, ExceptionCode& ec)
     else if (value == endKeyword())
         alignment = End;
     else
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
     
     if (alignment == m_cueAlignment)
         return;
@@ -479,11 +479,8 @@ void TextTrackCue::setText(const String& text)
 
 int TextTrackCue::cueIndex()
 {
-    if (m_cueIndex == invalidCueIndex) {
-        TextTrackCueList* cues = track()->cues();
-        if (cues)
-            m_cueIndex = cues->getCueIndex(this);
-    }
+    if (m_cueIndex == invalidCueIndex)
+        m_cueIndex = track()->cues()->getCueIndex(this);
 
     return m_cueIndex;
 }
@@ -1191,4 +1188,3 @@ bool TextTrackCue::operator==(const TextTrackCue& cue) const
 }
 
 } // namespace WebCore
-

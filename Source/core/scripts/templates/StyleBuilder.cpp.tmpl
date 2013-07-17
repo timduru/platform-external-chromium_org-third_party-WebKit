@@ -12,7 +12,7 @@
 //   test other variations for performance once we have more properties here.
 
 {%- macro set_value(property) -%}
-    styleResolver->style()->{{property.setter}}
+    state.style()->{{property.setter}}
 {%- endmacro %}
 
 namespace WebCore {
@@ -22,41 +22,49 @@ namespace WebCore {
         return;
 
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
-{% if property.use_none %}
-    if (primitiveValue->getValueID() == CSSValueNone)
-        {{ set_value(property) }}(Length(Undefined));
-{% endif %}
+    Length length;
+    switch(primitiveValue->getValueID()) {
 
-{%- if property.use_intrinsic %}
-    if (primitiveValue->getValueID() == CSSValueIntrinsic)
-        {{ set_value(property) }}(Length(Intrinsic));
-    else if (primitiveValue->getValueID() == CSSValueMinIntrinsic)
-        {{ set_value(property) }}(Length(MinIntrinsic));
-    else if (primitiveValue->getValueID() == CSSValueWebkitMinContent)
-        {{ set_value(property) }}(Length(MinContent));
-    else if (primitiveValue->getValueID() == CSSValueWebkitMaxContent)
-        {{ set_value(property) }}(Length(MaxContent));
-    else if (primitiveValue->getValueID() == CSSValueWebkitFillAvailable)
-        {{ set_value(property) }}(Length(FillAvailable));
-    else if (primitiveValue->getValueID() == CSSValueWebkitFitContent)
-        {{ set_value(property) }}(Length(FitContent));
-{% endif %}
-
-{%- if property.use_auto %}
-    if (primitiveValue->getValueID() == CSSValueAuto)
-        {{ set_value(property) }}(Length());
+{%- if property.use_none %}
+    case CSSValueNone:
+        length = Length(Undefined);
+        break;
 {%- endif %}
 
-    if (primitiveValue->isLength()) {
-        Length length = primitiveValue->computeLength<Length>(styleResolver->style(), styleResolver->rootElementStyle(), styleResolver->style()->effectiveZoom());
+{%- if property.use_intrinsic %}
+    case CSSValueIntrinsic:
+        length = Length(Intrinsic);
+        break;
+    case CSSValueMinIntrinsic:
+        length = Length(MinIntrinsic);
+        break;
+    case CSSValueWebkitMinContent:
+        length = Length(MinContent);
+        break;
+    case CSSValueWebkitMaxContent:
+        length = Length(MaxContent);
+        break;
+    case CSSValueWebkitFillAvailable:
+        length = Length(FillAvailable);
+        break;
+    case CSSValueWebkitFitContent:
+        length = Length(FitContent);
+        break;
+{%- endif %}
+
+{%- if property.use_auto %}
+    case CSSValueAuto:
+        break; // default ctor is auto
+{%- endif %}
+
+    case CSSValueInvalid:
+        length = primitiveValue->convertToLength<FixedIntegerConversion | CalculatedConversion | PercentConversion | ViewportPercentageConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
         length.setQuirk(primitiveValue->isQuirkValue());
-        {{ set_value(property) }}(length);
-    } else if (primitiveValue->isPercentage())
-        {{ set_value(property) }}(Length(primitiveValue->getDoubleValue(), Percent));
-    else if (primitiveValue->isCalculatedPercentageWithLength())
-        {{ set_value(property) }}(Length(primitiveValue->cssCalcValue()->toCalcValue(styleResolver->style(), styleResolver->rootElementStyle(), styleResolver->style()->effectiveZoom())));
-    else if (primitiveValue->isViewportPercentageLength())
-        {{ set_value(property) }}(primitiveValue->viewportPercentageLength());
+        break;
+    default:
+        ASSERT_NOT_REACHED();
+    }
+    {{ set_value(property) }}(length);
 {%- endmacro %}
 
 {%- for property_id, property in properties.items() if not property.use_handlers_for %}
@@ -64,21 +72,21 @@ namespace WebCore {
 {%- set apply_type = property.apply_type %}
 
 {%- if not property.custom_initial %}
-void StyleBuilderFunctions::applyInitial{{property_id}}(StyleResolver* styleResolver)
+void StyleBuilderFunctions::applyInitial{{property_id}}(StyleResolver* styleResolver, StyleResolverState& state)
 {
     {{ set_value(property) }}(RenderStyle::{{property.initial}}());
 }
 {% endif %}
 
 {%- if not property.custom_inherit %}
-void StyleBuilderFunctions::applyInherit{{property_id}}(StyleResolver* styleResolver)
+void StyleBuilderFunctions::applyInherit{{property_id}}(StyleResolver* styleResolver, StyleResolverState& state)
 {
-    {{ set_value(property) }}(styleResolver->parentStyle()->{{property.getter}}());
+    {{ set_value(property) }}(state.parentStyle()->{{property.getter}}());
 }
 {% endif %}
 
 {%- if not property.custom_value %}
-void StyleBuilderFunctions::applyValue{{property_id}}(StyleResolver* styleResolver, CSSValue* value)
+void StyleBuilderFunctions::applyValue{{property_id}}(StyleResolver* styleResolver, StyleResolverState& state, CSSValue* value)
 {
 {%- if apply_type == "length" %}
     {{ apply_value_length(property) }}
@@ -91,7 +99,7 @@ void StyleBuilderFunctions::applyValue{{property_id}}(StyleResolver* styleResolv
 {%- endcall %}
 {%- endfor %}
 
-bool StyleBuilder::applyProperty(CSSPropertyID property, StyleResolver* styleResolver, CSSValue* value, bool isInitial, bool isInherit) {
+bool StyleBuilder::applyProperty(CSSPropertyID property, StyleResolver* styleResolver, StyleResolverState& state, CSSValue* value, bool isInitial, bool isInherit) {
     switch(property) {
 {%- for property_id, property in properties.items() %}
 {%- set used_property = properties[property.use_handlers_for] or property %}
@@ -99,11 +107,11 @@ bool StyleBuilder::applyProperty(CSSPropertyID property, StyleResolver* styleRes
 {%- call wrap_with_condition(used_property.condition) %}
     case {{ property_id }}:
         if (isInitial)
-            StyleBuilderFunctions::applyInitial{{ used_property_id }}(styleResolver);
+            StyleBuilderFunctions::applyInitial{{ used_property_id }}(styleResolver, state);
         else if (isInherit)
-            StyleBuilderFunctions::applyInherit{{ used_property_id }}(styleResolver);
+            StyleBuilderFunctions::applyInherit{{ used_property_id }}(styleResolver, state);
         else
-            StyleBuilderFunctions::applyValue{{ used_property_id }}(styleResolver, value);
+            StyleBuilderFunctions::applyValue{{ used_property_id }}(styleResolver, state, value);
         return true;
 {%- endcall %}
 {% endfor %}

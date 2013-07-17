@@ -40,9 +40,9 @@
 #include "core/dom/MutationObserverRegistration.h"
 #include "core/dom/MutationRecord.h"
 #include "core/dom/Node.h"
-#include <wtf/HashSet.h>
-#include <wtf/MainThread.h>
-#include <wtf/Vector.h>
+#include "wtf/HashSet.h"
+#include "wtf/MainThread.h"
+#include "wtf/Vector.h"
 
 namespace WebCore {
 
@@ -84,7 +84,7 @@ bool MutationObserver::validateOptions(MutationObserverOptions options)
 void MutationObserver::observe(Node* node, const Dictionary& optionsDictionary, ExceptionCode& ec)
 {
     if (!node) {
-        ec = NOT_FOUND_ERR;
+        ec = NotFoundError;
         return;
     }
 
@@ -111,7 +111,7 @@ void MutationObserver::observe(Node* node, const Dictionary& optionsDictionary, 
         options |= AttributeFilter;
 
     if (!validateOptions(options)) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 

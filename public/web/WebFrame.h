@@ -42,7 +42,6 @@
 #include "WebURLLoaderOptions.h"
 
 struct NPObject;
-struct _NPP;
 
 namespace v8 {
 class Context;
@@ -218,6 +217,8 @@ public:
 
     // Binds a NPObject as a property of this frame's DOMWindow.
     virtual void bindToWindowObject(const WebString& name, NPObject*) = 0;
+    virtual void bindToWindowObject(
+        const WebString& name, NPObject*, void*) = 0;
 
     // Executes script in the context of the current page.
     virtual void executeScript(const WebScriptSource&) = 0;
@@ -231,6 +232,7 @@ public:
     // WebKit::registerExtension for the corresponding specifier.
     //
     // worldID must be > 0 (as 0 represents the main world).
+    // worldID must be < EmbedderWorldIdLimit, high number used internally.
     virtual void executeScriptInIsolatedWorld(
         int worldID, const WebScriptSource* sources, unsigned numSources,
         int extensionGroup) = 0;
@@ -267,6 +269,7 @@ public:
         const WebScriptSource&) = 0;
 
     // worldID must be > 0 (as 0 represents the main world).
+    // worldID must be < EmbedderWorldIdLimit, high number used internally.
     virtual void executeScriptInIsolatedWorld(
         int worldID, const WebScriptSource* sourcesIn, unsigned numSources,
         int extensionGroup, WebVector<v8::Local<v8::Value> >* results) = 0;

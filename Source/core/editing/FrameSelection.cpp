@@ -604,13 +604,11 @@ VisiblePosition FrameSelection::nextWordPositionForPlatform(const VisiblePositio
     return positionAfterCurrentWord;
 }
 
-#if ENABLE(USERSELECT_ALL)
 static void adjustPositionForUserSelectAll(VisiblePosition& pos, bool isForward)
 {
     if (Node* rootUserSelectAll = Position::rootUserSelectAllForNode(pos.deepEquivalent().anchorNode()))
         pos = isForward ? positionAfterNode(rootUserSelectAll).downstream(CanCrossEditingBoundary) : positionBeforeNode(rootUserSelectAll).upstream(CanCrossEditingBoundary);
 }
-#endif
 
 VisiblePosition FrameSelection::modifyExtendingRight(TextGranularity granularity)
 {
@@ -650,9 +648,7 @@ VisiblePosition FrameSelection::modifyExtendingRight(TextGranularity granularity
         pos = modifyExtendingForward(granularity);
         break;
     }
-#if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, directionOfEnclosingBlock() == LTR);
-#endif
     return pos;
 }
 
@@ -692,9 +688,7 @@ VisiblePosition FrameSelection::modifyExtendingForward(TextGranularity granulari
             pos = endOfDocument(pos);
         break;
     }
-#if ENABLE(USERSELECT_ALL)
      adjustPositionForUserSelectAll(pos, directionOfEnclosingBlock() == LTR);
-#endif
     return pos;
 }
 
@@ -817,9 +811,7 @@ VisiblePosition FrameSelection::modifyExtendingLeft(TextGranularity granularity)
         pos = modifyExtendingBackward(granularity);
         break;
     }
-#if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, !(directionOfEnclosingBlock() == LTR));
-#endif
     return pos;
 }
        
@@ -864,9 +856,7 @@ VisiblePosition FrameSelection::modifyExtendingBackward(TextGranularity granular
             pos = startOfDocument(pos);
         break;
     }
-#if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, !(directionOfEnclosingBlock() == LTR));
-#endif
     return pos;
 }
 
@@ -1204,6 +1194,7 @@ void FrameSelection::prepareForDestruction()
         view->clearSelection();
 
     setSelection(VisibleSelection(), CloseTyping | ClearTypingStyle | DoNotUpdateAppearance);
+    m_previousCaretNode.clear();
 }
 
 void FrameSelection::setStart(const VisiblePosition &pos, EUserTriggered trigger)
@@ -1915,29 +1906,29 @@ void FrameSelection::setFocusedNodeIfNeeded()
 
     bool caretBrowsing = m_frame->settings() && m_frame->settings()->caretBrowsingEnabled();
     if (caretBrowsing) {
-        if (Node* anchor = enclosingAnchorElement(base())) {
-            m_frame->page()->focusController()->setFocusedNode(anchor, m_frame);
+        if (Element* anchor = enclosingAnchorElement(base())) {
+            m_frame->page()->focusController()->setFocusedElement(anchor, m_frame);
             return;
         }
     }
 
-    if (Node* target = rootEditableElement()) {
+    if (Element* target = rootEditableElement()) {
         // Walk up the DOM tree to search for a node to focus. 
         while (target) {
             // We don't want to set focus on a subframe when selecting in a parent frame,
             // so add the !isFrameElement check here. There's probably a better way to make this
             // work in the long term, but this is the safest fix at this time.
             if (target->isMouseFocusable() && !isFrameElement(target)) {
-                m_frame->page()->focusController()->setFocusedNode(target, m_frame);
+                m_frame->page()->focusController()->setFocusedElement(target, m_frame);
                 return;
             }
-            target = target->parentOrShadowHostNode();
+            target = target->parentOrShadowHostElement();
         }
-        m_frame->document()->setFocusedNode(0);
+        m_frame->document()->setFocusedElement(0);
     }
 
     if (caretBrowsing)
-        m_frame->page()->focusController()->setFocusedNode(0, m_frame);
+        m_frame->page()->focusController()->setFocusedElement(0, m_frame);
 }
 
 void DragCaretController::paintDragCaret(Frame* frame, GraphicsContext* p, const LayoutPoint& paintOffset, const LayoutRect& clipRect) const

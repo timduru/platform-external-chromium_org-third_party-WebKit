@@ -21,6 +21,7 @@
 #include "config.h"
 #include "core/dom/ProcessingInstruction.h"
 
+#include "CachedResourceInitiatorTypeNames.h"
 #include "core/css/CSSStyleSheet.h"
 #include "core/css/MediaList.h"
 #include "core/css/StyleSheetContents.h"
@@ -29,7 +30,6 @@
 #include "core/loader/cache/CachedCSSStyleSheet.h"
 #include "core/loader/cache/CachedResourceLoader.h"
 #include "core/loader/cache/CachedResourceRequest.h"
-#include "core/loader/cache/CachedResourceRequestInitiators.h"
 #include "core/loader/cache/CachedXSLStyleSheet.h"
 #include "core/xml/XSLStyleSheet.h"
 #include "core/xml/parser/XMLDocumentParser.h" // for parseAttributes()
@@ -90,7 +90,7 @@ String ProcessingInstruction::nodeValue() const
     return m_data;
 }
 
-void ProcessingInstruction::setNodeValue(const String& nodeValue, ExceptionCode& ec)
+void ProcessingInstruction::setNodeValue(const String& nodeValue)
 {
     setData(nodeValue);
 }
@@ -154,7 +154,7 @@ void ProcessingInstruction::checkStyleSheet()
             m_loading = true;
             document()->styleSheetCollection()->addPendingSheet();
             
-            CachedResourceRequest request(ResourceRequest(document()->completeURL(href)), cachedResourceRequestInitiators().processinginstruction);
+            CachedResourceRequest request(ResourceRequest(document()->completeURL(href)), CachedResourceInitiatorTypeNames::processinginstruction);
             if (m_isXSL)
                 m_cachedSheet = document()->cachedResourceLoader()->requestXSLStyleSheet(request);
             else
@@ -291,6 +291,8 @@ void ProcessingInstruction::removedFrom(ContainerNode* insertionPoint)
     
     document()->styleSheetCollection()->removeStyleSheetCandidateNode(this);
 
+    RefPtr<StyleSheet> removedSheet = m_sheet;
+
     if (m_sheet) {
         ASSERT(m_sheet->ownerNode() == this);
         m_sheet->clearOwnerNode();
@@ -299,7 +301,7 @@ void ProcessingInstruction::removedFrom(ContainerNode* insertionPoint)
 
     // If we're in document teardown, then we don't need to do any notification of our sheet's removal.
     if (document()->renderer())
-        document()->styleResolverChanged(DeferRecalcStyle);
+        document()->removedStyleSheet(removedSheet.get());
 }
 
 void ProcessingInstruction::finishParsingChildren()

@@ -24,6 +24,7 @@
 #include "core/svg/SVGGradientElement.h"
 
 #include "SVGNames.h"
+#include "XLinkNames.h"
 #include "core/dom/Attribute.h"
 #include "core/rendering/svg/RenderSVGHiddenContainer.h"
 #include "core/rendering/svg/RenderSVGPath.h"
@@ -149,7 +150,7 @@ Vector<Gradient::ColorStop> SVGGradientElement::buildStops()
         Color color = stop->stopColorIncludingOpacity();
 
         // Figure out right monotonic offset
-        float offset = stop->offset();
+        float offset = stop->offsetCurrentValue();
         offset = std::min(std::max(previousOffset, offset), 1.0f);
         previousOffset = offset;
 

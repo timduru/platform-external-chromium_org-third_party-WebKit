@@ -79,6 +79,8 @@ $(gyp_intermediate_dir)/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/w
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/HTMLNames.cpp: $(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp
 	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/CachedResourceInitiatorTypeNames.cpp: $(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp
+	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/webkit/CalendarPicker.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/ColorSuggestionPicker.cpp: $(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.cpp
@@ -107,17 +109,19 @@ $(gyp_intermediate_dir)/HTMLEntityTable.cpp: $(gyp_shared_intermediate_dir)/webk
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp: $(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp
 	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/CSSParser.cpp: $(gyp_shared_intermediate_dir)/webkit/CSSParser.cpp
+	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CSSGrammar.cpp: $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/XPathGrammar.cpp: $(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/InspectorFrontend.cpp: $(gyp_shared_intermediate_dir)/webcore/InspectorFrontend.cpp
+$(gyp_intermediate_dir)/InspectorFrontend.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/InspectorBackendDispatcher.cpp: $(gyp_shared_intermediate_dir)/webcore/InspectorBackendDispatcher.cpp
+$(gyp_intermediate_dir)/InspectorBackendDispatcher.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/InspectorTypeBuilder.cpp: $(gyp_shared_intermediate_dir)/webcore/InspectorTypeBuilder.cpp
+$(gyp_intermediate_dir)/InspectorTypeBuilder.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/InspectorInstrumentationImpl.cpp: $(gyp_shared_intermediate_dir)/webcore/InspectorInstrumentationImpl.cpp
+$(gyp_intermediate_dir)/InspectorInstrumentationImpl.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationImpl.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/SVGElementFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/SVGElementFactory.cpp
 	mkdir -p $(@D); cp $< $@
@@ -152,6 +156,7 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/CSSValueKeywords.cpp \
 	$(gyp_intermediate_dir)/HTMLElementFactory.cpp \
 	$(gyp_intermediate_dir)/HTMLNames.cpp \
+	$(gyp_intermediate_dir)/CachedResourceInitiatorTypeNames.cpp \
 	$(gyp_intermediate_dir)/CalendarPicker.cpp \
 	$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp \
 	$(gyp_intermediate_dir)/Event.cpp \
@@ -166,6 +171,7 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/FontFamilyNames.cpp \
 	$(gyp_intermediate_dir)/HTMLEntityTable.cpp \
 	$(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp \
+	$(gyp_intermediate_dir)/CSSParser.cpp \
 	$(gyp_intermediate_dir)/CSSGrammar.cpp \
 	$(gyp_intermediate_dir)/XPathGrammar.cpp \
 	$(gyp_intermediate_dir)/InspectorFrontend.cpp \
@@ -179,19 +185,21 @@ LOCAL_GENERATED_SOURCES := \
 
 GYP_COPIED_SOURCE_ORIGIN_DIRS := \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webcore
+	$(gyp_shared_intermediate_dir)/webkit
 
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ActiveDOMCallback.cpp \
 	third_party/WebKit/Source/bindings/v8/ArrayValue.cpp \
 	third_party/WebKit/Source/bindings/v8/BindingSecurity.cpp \
+	third_party/WebKit/Source/bindings/v8/CustomElementBinding.cpp \
 	third_party/WebKit/Source/bindings/v8/CustomElementConstructorBuilder.cpp \
-	third_party/WebKit/Source/bindings/v8/CustomElementHelpers.cpp \
+	third_party/WebKit/Source/bindings/v8/CustomElementWrapper.cpp \
 	third_party/WebKit/Source/bindings/v8/DOMDataStore.cpp \
 	third_party/WebKit/Source/bindings/v8/DOMWrapperWorld.cpp \
 	third_party/WebKit/Source/bindings/v8/DateExtension.cpp \
 	third_party/WebKit/Source/bindings/v8/Dictionary.cpp \
+	third_party/WebKit/Source/bindings/v8/ExceptionState.cpp \
+	third_party/WebKit/Source/bindings/v8/ExceptionStatePlaceholder.cpp \
 	third_party/WebKit/Source/bindings/v8/IDBBindingUtilities.cpp \
 	third_party/WebKit/Source/bindings/v8/NPV8Object.cpp \
 	third_party/WebKit/Source/bindings/v8/PageScriptDebugServer.cpp \
@@ -207,6 +215,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ScriptInstance.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptObject.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptProfiler.cpp \
+	third_party/WebKit/Source/bindings/v8/ScriptPromiseResolver.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptScope.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptState.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptString.cpp \
@@ -215,7 +224,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/V8AbstractEventListener.cpp \
 	third_party/WebKit/Source/bindings/v8/V8Binding.cpp \
 	third_party/WebKit/Source/bindings/v8/V8Callback.cpp \
-	third_party/WebKit/Source/bindings/v8/V8CustomElementCallback.cpp \
+	third_party/WebKit/Source/bindings/v8/V8CustomElementLifecycleCallbacks.cpp \
 	third_party/WebKit/Source/bindings/v8/V8DOMConfiguration.cpp \
 	third_party/WebKit/Source/bindings/v8/V8ErrorHandler.cpp \
 	third_party/WebKit/Source/bindings/v8/V8DOMWrapper.cpp \
@@ -370,8 +379,9 @@ MY_CFLAGS_Debug := \
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
-	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -383,7 +393,6 @@ MY_DEFS_Debug := \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -391,9 +400,7 @@ MY_DEFS_Debug := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -405,7 +412,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -433,7 +439,6 @@ MY_DEFS_Debug := \
 
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES_Debug := \
-	$(gyp_shared_intermediate_dir)/webcore \
 	$(gyp_shared_intermediate_dir)/webkit \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
 	$(LOCAL_PATH)/third_party/WebKit \
@@ -546,8 +551,9 @@ MY_CFLAGS_Release := \
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
-	'-DUSE_LINUX_BREAKPAD' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -559,7 +565,6 @@ MY_DEFS_Release := \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -567,9 +572,7 @@ MY_DEFS_Release := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -581,7 +584,6 @@ MY_DEFS_Release := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -609,7 +611,6 @@ MY_DEFS_Release := \
 
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES_Release := \
-	$(gyp_shared_intermediate_dir)/webcore \
 	$(gyp_shared_intermediate_dir)/webkit \
 	$(gyp_shared_intermediate_dir)/webkit/bindings \
 	$(LOCAL_PATH)/third_party/WebKit \

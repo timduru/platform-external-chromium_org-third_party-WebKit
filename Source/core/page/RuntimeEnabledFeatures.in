@@ -18,7 +18,6 @@
 AnimatedWebP status=experimental
 ApplicationCache status=stable
 AuthorShadowDOMForAnyElement
-CanvasPath status=test
 Crypto status=test
 CSSCompositing status=experimental
 CSSExclusions status=experimental
@@ -26,6 +25,7 @@ CSSGridLayout status=experimental
 CSSRegions status=experimental
 CSSTouchAction status=test
 CSSVariables status=experimental
+CSS3Text status=experimental
 CSS3TextDecorations status=experimental
 CustomDOMElements status=experimental
 Database status=stable
@@ -52,7 +52,6 @@ IndexedDB status=stable
 InputModeAttribute status=test
 InputTypeColor status=stable
 InputTypeWeek status=stable
-JavaScriptI18NAPI status=stable
 LangAttributeAwareFormControlUI
 LazyLayout
 LegacyEncryptedMedia status=stable
@@ -65,9 +64,10 @@ PagePopup status=stable
 ParseSVGAsHTML
 PeerConnection depends_on=MediaStream, status=stable
 ProgrammaticScrollNotifications status=test
-Promise status=test
+Promise status=experimental
 Quota status=stable
 RequestAutocomplete status=test
+RowSpanLogicalHeightSpreading status=test
 ScriptedSpeech status=stable
 SeamlessIFrames status=experimental
 SessionStorage status=stable
@@ -80,6 +80,8 @@ Touch status=stable
 Vibration status=test
 VideoTrack status=stable
 WebAnimations
+WebAnimationsCSS depends_on=WebAnimations
+WebAnimationsSVG depends_on=WebAnimations
 WebAudio condition=WEB_AUDIO, status=stable
 WebGLDraftExtensions status=experimental
 WebMIDI status=test

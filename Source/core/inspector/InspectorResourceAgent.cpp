@@ -703,8 +703,9 @@ void InspectorResourceAgent::setCacheDisabled(ErrorString*, bool cacheDisabled)
         memoryCache()->evictResources();
 }
 
-void InspectorResourceAgent::loadResourceForFrontend(ErrorString* errorString, const String& frameId, const String& url, const RefPtr<JSONObject>* requestHeaders, PassRefPtr<LoadResourceForFrontendCallback> callback)
+void InspectorResourceAgent::loadResourceForFrontend(ErrorString* errorString, const String& frameId, const String& url, const RefPtr<JSONObject>* requestHeaders, PassRefPtr<LoadResourceForFrontendCallback> prpCallback)
 {
+    RefPtr<LoadResourceForFrontendCallback> callback = prpCallback;
     Frame* frame = m_pageAgent->assertFrame(errorString, frameId);
     if (!frame)
         return;
@@ -739,6 +740,7 @@ void InspectorResourceAgent::loadResourceForFrontend(ErrorString* errorString, c
     ThreadableLoaderOptions options;
     options.allowCredentials = DoNotAllowStoredCredentials;
     options.crossOriginRequestPolicy = AllowCrossOriginRequests;
+    options.sendLoadCallbacks = SendCallbacks;
 
     InspectorThreadableLoaderClient* inspectorThreadableLoaderClient = new InspectorThreadableLoaderClient(callback);
     RefPtr<DocumentThreadableLoader> loader = DocumentThreadableLoader::create(document, inspectorThreadableLoaderClient, request, options);
@@ -747,6 +749,8 @@ void InspectorResourceAgent::loadResourceForFrontend(ErrorString* errorString, c
         return;
     }
     loader->setDefersLoading(false);
+    if (!callback->isActive())
+        return;
     inspectorThreadableLoaderClient->setLoader(loader.release());
 }
 

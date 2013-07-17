@@ -44,8 +44,8 @@
 #include "core/page/Frame.h"
 #include "core/platform/LocalizedStrings.h"
 #include "core/rendering/RenderTextControlMultiLine.h"
-#include <wtf/StdLibExtras.h>
-#include <wtf/text/StringBuilder.h>
+#include "wtf/StdLibExtras.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -441,7 +441,7 @@ int HTMLTextAreaElement::maxLength() const
 void HTMLTextAreaElement::setMaxLength(int newValue, ExceptionCode& ec)
 {
     if (newValue < 0)
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
     else
         setAttribute(maxlengthAttr, String::number(newValue));
 }

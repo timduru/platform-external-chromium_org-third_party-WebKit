@@ -115,7 +115,10 @@ namespace WebCore {
         unsigned duration() const { return m_duration; }
         FrameDisposalMethod disposalMethod() const { return m_disposalMethod; }
         bool premultiplyAlpha() const { return m_premultiplyAlpha; }
+        SkBitmap::Allocator* allocator() const { return m_allocator; }
+        const SkBitmap& getSkBitmap() const { return m_bitmap->bitmap(); }
         void reportMemoryUsage(MemoryObjectInfo*) const;
+
         size_t requiredPreviousFrameIndex() const
         {
             ASSERT(m_requiredPreviousFrameIndexValid);
@@ -124,13 +127,15 @@ namespace WebCore {
 #if !ASSERT_DISABLED
         bool requiredPreviousFrameIndexValid() const { return m_requiredPreviousFrameIndexValid; }
 #endif
-
         void setHasAlpha(bool alpha);
         void setOriginalFrameRect(const IntRect& r) { m_originalFrameRect = r; }
         void setStatus(FrameStatus status);
         void setDuration(unsigned duration) { m_duration = duration; }
         void setDisposalMethod(FrameDisposalMethod method) { m_disposalMethod = method; }
         void setPremultiplyAlpha(bool premultiplyAlpha) { m_premultiplyAlpha = premultiplyAlpha; }
+        void setMemoryAllocator(SkBitmap::Allocator* allocator) { m_allocator = allocator; }
+        void setSkBitmap(const SkBitmap& bitmap) { m_bitmap = NativeImageSkia::create(bitmap); }
+
         void setRequiredPreviousFrameIndex(size_t previousFrameIndex)
         {
             m_requiredPreviousFrameIndex = previousFrameIndex;
@@ -139,42 +144,17 @@ namespace WebCore {
 #endif
         }
 
-        inline void setRGBA(int x, int y, unsigned r, unsigned g, unsigned b, unsigned a)
-        {
-            setRGBA(getAddr(x, y), r, g, b, a);
-        }
-
         inline PixelData* getAddr(int x, int y)
         {
             return m_bitmap->bitmap().getAddr32(x, y);
         }
 
-        void setSkBitmap(const SkBitmap& bitmap)
+        inline void setRGBA(int x, int y, unsigned r, unsigned g, unsigned b, unsigned a)
         {
-            m_bitmap = NativeImageSkia::create(bitmap);
+            setRGBA(getAddr(x, y), r, g, b, a);
         }
 
-        const SkBitmap& getSkBitmap() const
-        {
-            return m_bitmap->bitmap();
-        }
-
-        void setMemoryAllocator(SkBitmap::Allocator* allocator)
-        {
-            m_allocator = allocator;
-        }
-
-        SkBitmap::Allocator* allocator() const { return m_allocator; }
-
-        // Use fix point multiplier instead of integer division or floating point math.
-        // This multipler produces exactly the same result for all values in range 0 - 255.
-        static const unsigned fixPointShift = 24;
-        static const unsigned fixPointMult = static_cast<unsigned>(1.0 / 255.0 * (1 << fixPointShift)) + 1;
-        // Multiplies unsigned value by fixpoint value and converts back to unsigned.
-        static unsigned fixPointUnsignedMultiply(unsigned fixed, unsigned v)
-        {
-            return  (fixed * v) >> fixPointShift;
-        }
+        static const unsigned div255 = static_cast<unsigned>(1.0 / 255 * (1 << 24)) + 1;
 
         inline void setRGBA(PixelData* dest, unsigned r, unsigned g, unsigned b, unsigned a)
         {
@@ -184,13 +164,19 @@ namespace WebCore {
                     return;
                 }
 
-                unsigned alphaMult = a * fixPointMult;
-                r = fixPointUnsignedMultiply(r, alphaMult);
-                g = fixPointUnsignedMultiply(g, alphaMult);
-                b = fixPointUnsignedMultiply(b, alphaMult);
+                unsigned alpha = a * div255;
+                r = (r * alpha) >> 24;
+                g = (g * alpha) >> 24;
+                b = (b * alpha) >> 24;
             }
+
             // Call the "NoCheck" version since we may deliberately pass non-premultiplied
             // values, and we don't want an assert.
+            *dest = SkPackARGB32NoCheck(a, r, g, b);
+        }
+
+        inline void setRGBARaw(PixelData* dest, unsigned r, unsigned g, unsigned b, unsigned a)
+        {
             *dest = SkPackARGB32NoCheck(a, r, g, b);
         }
 
@@ -397,8 +383,11 @@ namespace WebCore {
         virtual void setMemoryAllocator(SkBitmap::Allocator* allocator)
         {
             // FIXME: this doesn't work for images with multiple frames.
-            if (m_frameBufferCache.isEmpty())
+            if (m_frameBufferCache.isEmpty()) {
                 m_frameBufferCache.resize(1);
+                m_frameBufferCache[0].setRequiredPreviousFrameIndex(
+                    findRequiredPreviousFrame(0));
+            }
             m_frameBufferCache[0].setMemoryAllocator(allocator);
         }
 

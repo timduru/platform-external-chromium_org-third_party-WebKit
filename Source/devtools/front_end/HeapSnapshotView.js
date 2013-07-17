@@ -114,8 +114,9 @@ WebInspector.HeapSnapshotView = function(parent, profile)
 
     this.views = [{title: "Summary", view: this.constructorsView, grid: this.constructorsDataGrid},
                   {title: "Comparison", view: this.diffView, grid: this.diffDataGrid},
-                  {title: "Containment", view: this.containmentView, grid: this.containmentDataGrid},
-                  {title: "Dominators", view: this.dominatorView, grid: this.dominatorDataGrid}];
+                  {title: "Containment", view: this.containmentView, grid: this.containmentDataGrid}];
+    if (WebInspector.settings.showAdvancedHeapSnapshotProperties.get())
+        this.views.push({title: "Dominators", view: this.dominatorView, grid: this.dominatorDataGrid});
     this.views.current = 0;
     for (var i = 0; i < this.views.length; ++i)
         this.viewSelect.createOption(WebInspector.UIString(this.views[i].title));
@@ -236,6 +237,10 @@ WebInspector.HeapSnapshotView.prototype = {
         this._searchResults = [];
     },
 
+    /**
+     * @param {string} query
+     * @param {function(!WebInspector.View, number)} finishedCallback
+     */
     performSearch: function(query, finishedCallback)
     {
         // Call searchCanceled since it will reset everything we need before doing a new search.
@@ -243,26 +248,28 @@ WebInspector.HeapSnapshotView.prototype = {
 
         query = query.trim();
 
-        if (!query.length)
+        if (!query)
             return;
         if (this.currentView !== this.constructorsView && this.currentView !== this.diffView)
             return;
 
         this._searchFinishedCallback = finishedCallback;
+        var nameRegExp = createPlainTextSearchRegex(query, "i");
+        var snapshotNodeId = null;
 
         function matchesByName(gridNode) {
-            return ("_name" in gridNode) && gridNode._name.hasSubstring(query, true);
+            return ("_name" in gridNode) && nameRegExp.test(gridNode._name);
         }
 
         function matchesById(gridNode) {
-            return ("snapshotNodeId" in gridNode) && gridNode.snapshotNodeId === query;
+            return ("snapshotNodeId" in gridNode) && gridNode.snapshotNodeId === snapshotNodeId;
         }
 
         var matchPredicate;
         if (query.charAt(0) !== "@")
             matchPredicate = matchesByName;
         else {
-            query = parseInt(query.substring(1), 10);
+            snapshotNodeId = parseInt(query.substring(1), 10);
             matchPredicate = matchesById;
         }
 
@@ -1365,6 +1372,11 @@ WebInspector.HeapProfileHeader.prototype = {
         var worker = /** @type {WebInspector.HeapSnapshotWorker} */ (this._snapshotProxy.worker);
         this.isTemporary = false;
         worker.startCheckingForLongRunningCalls();
+        this.notifySnapshotReceived();
+    },
+
+    notifySnapshotReceived: function()
+    {
         this._profileType._snapshotReceived(this);
     },
 

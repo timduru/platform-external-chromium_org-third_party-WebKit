@@ -26,6 +26,7 @@
 #include "core/svg/SVGFilterElement.h"
 
 #include "SVGNames.h"
+#include "XLinkNames.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/rendering/svg/RenderSVGResourceFilter.h"
 #include "core/svg/SVGElementInstance.h"
@@ -105,7 +106,6 @@ bool SVGFilterElement::isSupportedAttribute(const QualifiedName& attrName)
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, supportedAttributes, ());
     if (supportedAttributes.isEmpty()) {
         SVGURIReference::addSupportedAttributes(supportedAttributes);
-        SVGLangSpace::addSupportedAttributes(supportedAttributes);
         SVGExternalResourcesRequired::addSupportedAttributes(supportedAttributes);
         supportedAttributes.add(SVGNames::filterUnitsAttr);
         supportedAttributes.add(SVGNames::primitiveUnitsAttr);
@@ -147,7 +147,6 @@ void SVGFilterElement::parseAttribute(const QualifiedName& name, const AtomicStr
             setFilterResYBaseValue(y);
         }
     } else if (SVGURIReference::parseAttribute(name, value)
-             || SVGLangSpace::parseAttribute(name, value)
              || SVGExternalResourcesRequired::parseAttribute(name, value)) {
     } else
         ASSERT_NOT_REACHED();
@@ -231,10 +230,10 @@ bool SVGFilterElement::childShouldCreateRenderer(const NodeRenderingContext& chi
 
 bool SVGFilterElement::selfHasRelativeLengths() const
 {
-    return x().isRelative()
-        || y().isRelative()
-        || width().isRelative()
-        || height().isRelative();
+    return xCurrentValue().isRelative()
+        || yCurrentValue().isRelative()
+        || widthCurrentValue().isRelative()
+        || heightCurrentValue().isRelative();
 }
 
 }

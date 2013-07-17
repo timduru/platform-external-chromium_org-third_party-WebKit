@@ -43,7 +43,7 @@ template<> struct SequenceMemoryInstrumentationTraits<v8::String*> {
 
 namespace WebCore {
 
-static v8::Local<v8::String> makeExternalString(const String& string)
+v8::Local<v8::String> StringCache::makeExternalString(const String& string)
 {
     if (string.is8Bit()) {
         WebCoreStringResource8* stringResource = new WebCoreStringResource8(string);
@@ -60,7 +60,7 @@ static v8::Local<v8::String> makeExternalString(const String& string)
     return newString;
 }
 
-static void makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::String>* wrapper, StringImpl* stringImpl)
+void StringCache::makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::String>* wrapper, StringImpl* stringImpl)
 {
     V8PerIsolateData::current()->stringCache()->remove(stringImpl);
     wrapper->Dispose(isolate);
@@ -76,7 +76,7 @@ void StringCache::remove(StringImpl* stringImpl)
     clearOnGC();
 }
 
-v8::Handle<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl, ReturnHandleType handleType, v8::Isolate* isolate)
+v8::Handle<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl, v8::Isolate* isolate)
 {
     if (!stringImpl->length())
         return v8::String::Empty(isolate);
@@ -85,14 +85,18 @@ v8::Handle<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl,
     if (cachedV8String.isWeak()) {
         m_lastStringImpl = stringImpl;
         m_lastV8String = cachedV8String;
-        if (handleType == ReturnUnsafeHandle)
-            return cachedV8String.handle();
         return cachedV8String.newLocal(isolate);
     }
 
+    return createStringAndInsertIntoCache(stringImpl, isolate);
+}
+
+v8::Local<v8::String> StringCache::createStringAndInsertIntoCache(StringImpl* stringImpl, v8::Isolate* isolate)
+{
     v8::Local<v8::String> newString = makeExternalString(String(stringImpl));
-    if (newString.IsEmpty())
+    if (newString.IsEmpty()) {
         return newString;
+    }
 
     v8::Persistent<v8::String> wrapper(isolate, newString);
 
@@ -103,7 +107,6 @@ v8::Handle<v8::String> StringCache::v8ExternalStringSlow(StringImpl* stringImpl,
     m_stringCache.set(stringImpl, m_lastV8String);
 
     m_lastStringImpl = stringImpl;
-
     return newString;
 }
 

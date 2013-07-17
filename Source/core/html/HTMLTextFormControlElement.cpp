@@ -41,7 +41,7 @@
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderTextControl.h"
 #include "core/rendering/RenderTheme.h"
-#include <wtf/text/StringBuilder.h>
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -182,14 +182,6 @@ void HTMLTextFormControlElement::fixPlaceholderRenderer(HTMLElement* placeholder
     parentRenderer->addChild(placeholderRenderer, siblingRenderer);
 }
 
-RenderTextControl* HTMLTextFormControlElement::textRendererAfterUpdateLayout()
-{
-    if (!isTextFormControl())
-        return 0;
-    document()->updateLayoutIgnorePendingStylesheets();
-    return toRenderTextControl(renderer());
-}
-
 void HTMLTextFormControlElement::setSelectionStart(int start)
 {
     setSelectionRange(start, max(start, selectionEnd()), selectionDirection());
@@ -241,7 +233,7 @@ void HTMLTextFormControlElement::setRangeText(const String& replacement, Excepti
 void HTMLTextFormControlElement::setRangeText(const String& replacement, unsigned start, unsigned end, const String& selectionMode, ExceptionCode& ec)
 {
     if (start > end) {
-        ec = INDEX_SIZE_ERR;
+        ec = IndexSizeError;
         return;
     }
 

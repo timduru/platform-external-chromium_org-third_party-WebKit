@@ -46,12 +46,13 @@
 #include "core/html/HTMLLIElement.h"
 #include "core/html/HTMLOListElement.h"
 #include "core/html/HTMLParagraphElement.h"
+#include "core/html/HTMLTableElement.h"
 #include "core/html/HTMLUListElement.h"
 #include "core/page/Frame.h"
 #include "core/rendering/RenderObject.h"
-#include <wtf/Assertions.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/unicode/CharacterNames.h>
+#include "wtf/Assertions.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/unicode/CharacterNames.h"
 
 using namespace std;
 
@@ -652,13 +653,13 @@ static bool hasARenderedDescendant(Node* node, Node* excludedNode)
     return false;
 }
 
-Node* highestNodeToRemoveInPruning(Node* node)
+Node* highestNodeToRemoveInPruning(Node* node, Node* excludeNode)
 {
     Node* previousNode = 0;
     Node* rootEditableElement = node ? node->rootEditableElement() : 0;
     for (; node; node = node->parentNode()) {
         if (RenderObject* renderer = node->renderer()) {
-            if (!renderer->canHaveChildren() || hasARenderedDescendant(node, previousNode) || rootEditableElement == node)
+            if (!renderer->canHaveChildren() || hasARenderedDescendant(node, previousNode) || rootEditableElement == node || excludeNode == node)
                 return previousNode;
         }
         previousNode = node;
@@ -671,7 +672,7 @@ Node* enclosingTableCell(const Position& p)
     return toElement(enclosingNodeOfType(p, isTableCell));
 }
 
-Node* enclosingAnchorElement(const Position& p)
+Element* enclosingAnchorElement(const Position& p)
 {
     if (p.isNull())
         return 0;
@@ -679,7 +680,7 @@ Node* enclosingAnchorElement(const Position& p)
     Node* node = p.deprecatedNode();
     while (node && !(node->isElementNode() && node->isLink()))
         node = node->parentNode();
-    return node;
+    return toElement(node);
 }
 
 HTMLElement* enclosingList(Node* node)
@@ -1169,7 +1170,7 @@ bool isNonTableCellHTMLBlockElement(const Node* node)
     return node->hasTagName(listingTag)
         || node->hasTagName(olTag)
         || node->hasTagName(preTag)
-        || node->hasTagName(tableTag)
+        || isHTMLTableElement(node)
         || node->hasTagName(ulTag)
         || node->hasTagName(xmpTag)
         || node->hasTagName(h1Tag)

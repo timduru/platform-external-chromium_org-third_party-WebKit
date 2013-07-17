@@ -107,6 +107,7 @@ void WebGLRenderingContext::forciblyLoseOldestContext(const String& reason)
         activeContexts().remove(0);
 
         oldestActiveContext->printWarningToConsole(reason);
+        InspectorInstrumentation::didFireWebGLWarning(oldestActiveContext->canvas());
 
         // This will call deactivateContext once the context has actually been lost.
         oldestActiveContext->forceLostContext(WebGLRenderingContext::SyntheticLostContext);
@@ -483,6 +484,7 @@ public:
     {
         if (m_context->m_synthesizedErrorsToConsole)
             m_context->printGLErrorToConsole(message);
+        InspectorInstrumentation::didFireWebGLErrorOrWarning(m_context->canvas(), message);
     }
     virtual ~WebGLRenderingContextErrorMessageCallback() { }
 private:
@@ -1296,7 +1298,7 @@ GC3Denum WebGLRenderingContext::checkFramebufferStatus(GC3Denum target)
     const char* reason = "framebuffer incomplete";
     GC3Denum result = m_framebufferBinding->checkStatus(&reason);
     if (result != GraphicsContext3D::FRAMEBUFFER_COMPLETE) {
-        printGLWarningToConsole("checkFramebufferStatus", reason);
+        emitGLWarning("checkFramebufferStatus", reason);
         return result;
     }
     result = m_context->checkFramebufferStatus(target);
@@ -2174,7 +2176,7 @@ WebGLGetInfo WebGLRenderingContext::getFramebufferAttachmentParameter(GC3Denum t
         case GraphicsContext3D::FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE:
             return WebGLGetInfo(GraphicsContext3D::TEXTURE);
         case GraphicsContext3D::FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:
-            return WebGLGetInfo(PassRefPtr<WebGLTexture>(reinterpret_cast<WebGLTexture*>(object)));
+            return WebGLGetInfo(PassRefPtr<WebGLTexture>(static_cast<WebGLTexture*>(object)));
         case GraphicsContext3D::FRAMEBUFFER_ATTACHMENT_TEXTURE_LEVEL:
         case GraphicsContext3D::FRAMEBUFFER_ATTACHMENT_TEXTURE_CUBE_MAP_FACE:
             {
@@ -2191,7 +2193,7 @@ WebGLGetInfo WebGLRenderingContext::getFramebufferAttachmentParameter(GC3Denum t
         case GraphicsContext3D::FRAMEBUFFER_ATTACHMENT_OBJECT_TYPE:
             return WebGLGetInfo(GraphicsContext3D::RENDERBUFFER);
         case GraphicsContext3D::FRAMEBUFFER_ATTACHMENT_OBJECT_NAME:
-            return WebGLGetInfo(PassRefPtr<WebGLRenderbuffer>(reinterpret_cast<WebGLRenderbuffer*>(object)));
+            return WebGLGetInfo(PassRefPtr<WebGLRenderbuffer>(static_cast<WebGLRenderbuffer*>(object)));
         default:
             synthesizeGLError(GraphicsContext3D::INVALID_ENUM, "getFramebufferAttachmentParameter", "invalid parameter name for renderbuffer attachment");
             return WebGLGetInfo();
@@ -4357,7 +4359,7 @@ void WebGLRenderingContext::handleTextureCompleteness(const char* functionName, 
                 String msg(String("texture bound to texture unit ") + String::number(ii)
                     + " is not renderable. It maybe non-power-of-2 and have incompatible texture filtering or is not 'texture complete'."
                     + " Or the texture is Float or Half Float type with linear filtering while OES_float_linear or OES_half_float_linear extension is not enabled.");
-                printGLWarningToConsole(functionName, msg.utf8().data());
+                emitGLWarning(functionName, msg.utf8().data());
                 tex2D = m_blackTexture2D.get();
                 texCubeMap = m_blackTextureCubeMap.get();
             } else {
@@ -5136,7 +5138,7 @@ bool WebGLRenderingContext::validateHTMLImageElement(const char* functionName, H
         return false;
     }
     if (wouldTaintOrigin(image)) {
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return false;
     }
     return true;
@@ -5149,7 +5151,7 @@ bool WebGLRenderingContext::validateHTMLCanvasElement(const char* functionName, 
         return false;
     }
     if (wouldTaintOrigin(canvas)) {
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return false;
     }
     return true;
@@ -5162,7 +5164,7 @@ bool WebGLRenderingContext::validateHTMLVideoElement(const char* functionName, H
         return false;
     }
     if (wouldTaintOrigin(video)) {
-        ec = SECURITY_ERR;
+        ec = SecurityError;
         return false;
     }
     return true;
@@ -5499,16 +5501,16 @@ void WebGLRenderingContext::synthesizeGLError(GC3Denum error, const char* functi
         if (lost_context_errors_.find(error) == WTF::notFound)
             lost_context_errors_.append(error);
     }
-    InspectorInstrumentation::didFireWebGLError(canvas()->document(), errorType);
+    InspectorInstrumentation::didFireWebGLError(canvas(), errorType);
 }
 
-
-void WebGLRenderingContext::printGLWarningToConsole(const char* functionName, const char* description)
+void WebGLRenderingContext::emitGLWarning(const char* functionName, const char* description)
 {
     if (m_synthesizedErrorsToConsole) {
-        String str = String("WebGL: ") + String(functionName) + ": " + String(description);
-        printGLErrorToConsole(str);
+        String message = String("WebGL: ") + String(functionName) + ": " + String(description);
+        printGLErrorToConsole(message);
     }
+    InspectorInstrumentation::didFireWebGLWarning(canvas());
 }
 
 void WebGLRenderingContext::applyStencilTest()

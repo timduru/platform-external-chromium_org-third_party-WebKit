@@ -21,6 +21,7 @@
  */
 
 #include "config.h"
+#include "core/platform/graphics/PathTraversalState.h"
 
 #include "core/svg/SVGPathTraversalStateBuilder.h"
 
@@ -86,7 +87,7 @@ float SVGPathTraversalStateBuilder::totalLength()
     return m_traversalState->m_totalLength;
 }
 
-FloatPoint SVGPathTraversalStateBuilder::currentPoint()
+SVGPoint SVGPathTraversalStateBuilder::currentPoint()
 {
     ASSERT(m_traversalState);
     return m_traversalState->m_current;

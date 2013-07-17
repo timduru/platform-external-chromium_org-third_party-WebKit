@@ -32,9 +32,9 @@
 #include "XMLNames.h"
 #include "core/dom/QualifiedName.h"
 #include "core/dom/WebCoreMemoryInstrumentation.h"
-#include <wtf/Assertions.h>
-#include <wtf/HashSet.h>
-#include <wtf/StaticConstructors.h>
+#include "wtf/Assertions.h"
+#include "wtf/HashSet.h"
+#include "wtf/StaticConstructors.h"
 
 namespace WebCore {
 
@@ -156,12 +156,12 @@ unsigned QualifiedName::QualifiedNameImpl::computeHash() const
 
 void createQualifiedName(void* targetAddress, StringImpl* name, const AtomicString& nameNamespace)
 {
-    new (reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, AtomicString(name), nameNamespace);
+    new (targetAddress) QualifiedName(nullAtom, AtomicString(name), nameNamespace);
 }
 
 void createQualifiedName(void* targetAddress, StringImpl* name)
 {
-    new (reinterpret_cast<void*>(targetAddress)) QualifiedName(nullAtom, AtomicString(name), nullAtom);
+    new (targetAddress) QualifiedName(nullAtom, AtomicString(name), nullAtom);
 }
 
 }

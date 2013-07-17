@@ -76,6 +76,8 @@
 #include "core/platform/graphics/FloatPoint3D.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
+#include "core/platform/graphics/filters/ReferenceFilter.h"
+#include "core/platform/graphics/filters/SourceGraphic.h"
 #include "core/platform/graphics/filters/custom/CustomFilterGlobalContext.h"
 #include "core/platform/graphics/filters/custom/CustomFilterOperation.h"
 #include "core/platform/graphics/filters/custom/CustomFilterValidatedProgram.h"
@@ -100,6 +102,7 @@
 #include "core/rendering/RenderScrollbarPart.h"
 #include "core/rendering/RenderTreeAsText.h"
 #include "core/rendering/RenderView.h"
+#include "core/rendering/svg/ReferenceFilterBuilder.h"
 #include "core/rendering/svg/RenderSVGResourceClipper.h"
 #include <wtf/MemoryInstrumentationVector.h>
 #include <wtf/StdLibExtras.h>
@@ -1213,13 +1216,13 @@ bool RenderLayer::updateLayerPosition()
     }
     
     bool positionOrOffsetChanged = false;
-    if (renderer()->hasPaintOffset()) {
-        LayoutSize newOffset = toRenderBoxModelObject(renderer())->paintOffset();
-        positionOrOffsetChanged = newOffset != m_paintOffset;
-        m_paintOffset = newOffset;
-        localPoint.move(m_paintOffset);
+    if (renderer()->isInFlowPositioned()) {
+        LayoutSize newOffset = toRenderBoxModelObject(renderer())->offsetForInFlowPosition();
+        positionOrOffsetChanged = newOffset != m_offsetForInFlowPosition;
+        m_offsetForInFlowPosition = newOffset;
+        localPoint.move(m_offsetForInFlowPosition);
     } else {
-        m_paintOffset = LayoutSize();
+        m_offsetForInFlowPosition = LayoutSize();
     }
 
     // FIXME: We'd really like to just get rid of the concept of a layer rectangle and rely on the renderers.
@@ -3493,15 +3496,21 @@ static inline bool shouldSuppressPaintingLayer(RenderLayer* layer)
     return false;
 }
 
+static bool paintForFixedRootBackground(const RenderLayer* layer, RenderLayer::PaintLayerFlags paintFlags)
+{
+    return layer->renderer()->isRoot() && (paintFlags & RenderLayer::PaintLayerPaintingRootBackgroundOnly);
+}
+
 void RenderLayer::paintLayer(GraphicsContext* context, const LayerPaintingInfo& paintingInfo, PaintLayerFlags paintFlags)
 {
     if (isComposited()) {
         // The updatingControlTints() painting pass goes through compositing layers,
         // but we need to ensure that we don't cache clip rects computed with the wrong root in this case.
-        if (context->updatingControlTints() || (paintingInfo.paintBehavior & PaintBehaviorFlattenCompositingLayers))
+        if (context->updatingControlTints() || (paintingInfo.paintBehavior & PaintBehaviorFlattenCompositingLayers)) {
             paintFlags |= PaintLayerTemporaryClipRects;
-        else if (!backing()->paintsIntoCompositedAncestor()
-            && !shouldDoSoftwarePaint(this, paintFlags & PaintLayerPaintingReflection)) {
+        } else if (!backing()->paintsIntoCompositedAncestor()
+            && !shouldDoSoftwarePaint(this, paintFlags & PaintLayerPaintingReflection)
+            && !paintForFixedRootBackground(this, paintFlags)) {
             // If this RenderLayer should paint into its backing, that will be done via RenderLayerBacking::paintIntoLayer().
             return;
         }
@@ -4878,7 +4887,7 @@ void RenderLayer::calculateClipRects(const ClipRectsContext& clipRectsContext, C
         clipRects.setPosClipRect(clipRects.fixedClipRect());
         clipRects.setOverflowClipRect(clipRects.fixedClipRect());
         clipRects.setFixed(true);
-    } else if (renderer()->style()->hasPaintOffset())
+    } else if (renderer()->style()->hasInFlowPosition())
         clipRects.setPosClipRect(clipRects.overflowClipRect());
     else if (renderer()->style()->position() == AbsolutePosition)
         clipRects.setOverflowClipRect(clipRects.posClipRect());
@@ -5778,8 +5787,7 @@ bool RenderLayer::shouldBeNormalFlowOnlyIgnoringCompositedScrolling() const
         || renderer()->hasClipPath()
         || renderer()->hasFilter()
         || renderer()->hasBlendMode()
-        || isTransparent()
-        || renderer()->isFloatingWithShapeOutside();
+        || isTransparent();
 
     return couldBeNormalFlow && !preventsElementFromBeingNormalFlow;
 }
@@ -6046,13 +6054,6 @@ void RenderLayer::updateFilters(const RenderStyle* oldStyle, const RenderStyle* 
     if (shouldUpdateFilters)
         backing()->updateFilters(renderer()->style());
     updateOrRemoveFilterEffectRenderer();
-    // FIXME: Accelerated SVG reference filters still rely on FilterEffectRenderer to build the filter graph.
-    // Thus, we have to call updateFilters again, after we have a FilterEffectRenderer.
-    // FilterEffectRenderer is intended to render software filters and shouldn't be needed for accelerated filters.
-    // We should extract the SVG graph building functionality out of FilterEffectRenderer, and it should happen in RenderLayer::computeFilterOperations.
-    // https://bugs.webkit.org/show_bug.cgi?id=114051
-    if (shouldUpdateFilters && newStyle->filter().hasReferenceFilter())
-        backing()->updateFilters(renderer()->style());
 }
 
 void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
@@ -6245,6 +6246,22 @@ bool RenderLayer::isCSSCustomFilterEnabled() const
 FilterOperations RenderLayer::computeFilterOperations(const RenderStyle* style)
 {
     const FilterOperations& filters = style->filter();
+    if (filters.hasReferenceFilter()) {
+        for (size_t i = 0; i < filters.size(); ++i) {
+            FilterOperation* filterOperation = filters.operations().at(i).get();
+            if (filterOperation->getOperationType() != FilterOperation::REFERENCE)
+                continue;
+            ReferenceFilterOperation* referenceOperation = static_cast<ReferenceFilterOperation*>(filterOperation);
+            // FIXME: Cache the ReferenceFilter if it didn't change.
+            RefPtr<ReferenceFilter> referenceFilter = ReferenceFilter::create();
+            float zoom = style->effectiveZoom() * WebCore::deviceScaleFactor(renderer()->frame());
+            referenceFilter->setFilterResolution(FloatSize(zoom, zoom));
+            referenceFilter->setLastEffect(ReferenceFilterBuilder::build(referenceFilter.get(), renderer(), referenceFilter->sourceGraphic(),
+                referenceOperation));
+            referenceOperation->setFilter(referenceFilter.release());
+        }
+    }
+
     if (!filters.hasCustomFilter())
         return filters;
 
@@ -6310,14 +6327,7 @@ void RenderLayer::updateOrRemoveFilterEffectRenderer()
         if (RenderLayerFilterInfo* filterInfo = this->filterInfo())
             filterInfo->setRenderer(0);
 
-        // FIXME: Accelerated SVG reference filters shouldn't rely on FilterEffectRenderer to build the filter graph.
-        // https://bugs.webkit.org/show_bug.cgi?id=114051
-
-        // Early-return only if we *don't* have reference filters.
-        // For reference filters, we still want the FilterEffect graph built
-        // for us, even if we're composited.
-        if (!renderer()->style()->filter().hasReferenceFilter())
-            return;
+        return;
     }
     
     RenderLayerFilterInfo* filterInfo = ensureFilterInfo();
@@ -6339,7 +6349,7 @@ void RenderLayer::updateOrRemoveFilterEffectRenderer()
 
 void RenderLayer::filterNeedsRepaint()
 {
-    renderer()->node()->setNeedsStyleRecalc(SyntheticStyleChange);
+    toElement(renderer()->node())->scheduleLayerUpdate();
     if (renderer()->view())
         renderer()->repaint();
 }

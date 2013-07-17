@@ -17,19 +17,38 @@ background-repeat-x custom_all
 background-repeat-y custom_all
 background-size custom_all
 border-bottom-color custom_all
+border-bottom-left-radius initial=initialBorderRadius, custom_value
+border-bottom-right-radius initial=initialBorderRadius, custom_value
 border-bottom-style type_name=EBorderStyle, initial=initialBorderStyle
+border-bottom-width type_name=unsigned, initial=initialBorderWidth, custom_value
 border-collapse
+border-image-outset custom_all
+border-image-repeat custom_all
+border-image-slice custom_all
+border-image-source custom_value
+border-image-width custom_all
 border-left-color custom_all
 border-left-style type_name=EBorderStyle, initial=initialBorderStyle
+border-left-width type_name=unsigned, initial=initialBorderWidth, custom_value
 border-right-color custom_all
 border-right-style type_name=EBorderStyle, initial=initialBorderStyle
+border-right-width type_name=unsigned, initial=initialBorderWidth, custom_value
 border-top-color custom_all
+border-top-left-radius initial=initialBorderRadius, custom_value
+border-top-right-radius initial=initialBorderRadius, custom_value
 border-top-style type_name=EBorderStyle, initial=initialBorderStyle
+border-top-width type_name=unsigned, initial=initialBorderWidth, custom_value
 bottom apply_type=length, initial=initialOffset, use_auto
 box-sizing
 caption-side
 clear
+clip custom_all
 color custom_all
+counter-increment custom_all
+counter-reset custom_all
+cursor custom_all
+direction custom_value
+display custom_inherit, custom_value
 empty-cells type_name=EEmptyCell
 flex-basis apply_type=length, use_auto
 flex-direction
@@ -37,11 +56,19 @@ flex-grow type_name=float
 flex-shrink type_name=float
 flex-wrap
 float type_name=EFloat, name_for_methods=Floating
+font-family custom_all
+font-size custom_all
+font-style custom_all
+font-variant custom_all
+font-weight custom_all
 grid-auto-flow type_name=GridAutoFlow
 height apply_type=length, initial=initialSize, use_auto, use_intrinsic
 justify-content
 image-rendering
 left apply_type=length, initial=initialOffset, use_auto
+letter-spacing type_name=float, initial=initialLetterWordSpacing, custom_value
+line-height getter=specifiedLineHeight, custom_value
+list-style-image type_name=StyleImage*, custom_value
 list-style-position
 list-style-type
 margin-bottom apply_type=length, initial=initialMargin, use_auto
@@ -50,13 +77,16 @@ margin-right apply_type=length, initial=initialMargin, use_auto
 margin-top apply_type=length, initial=initialMargin, use_auto
 max-height apply_type=length, initial=initialMaxSize, use_auto, use_intrinsic, use_none
 max-width apply_type=length, initial=initialMaxSize, use_auto, use_intrinsic, use_none
-min-height apply_type=length, initial=initialMinSize, use_auto, use_intrinsic, use_none
+min-height apply_type=length, initial=initialMinSize, use_auto, use_intrinsic
 min-width apply_type=length, initial=initialMinSize, use_auto, use_intrinsic
 mix-blend-mode type_name=BlendMode, name_for_methods=BlendMode
 opacity type_name=float
 order type_name=int
 orphans type_name=short, custom_all
 outline-color custom_all
+outline-offset type_name=int, custom_value
+outline-style custom_all
+outline-width type_name=unsigned short, custom_value
 overflow-wrap
 overflow-x type_name=EOverflow
 overflow-y type_name=EOverflow
@@ -69,22 +99,32 @@ page-break-before type_name=EPageBreak, initial=initialPageBreak
 page-break-inside type_name=EPageBreak, initial=initialPageBreak
 pointer-events
 position
+resize custom_value
 right apply_type=length, initial=initialOffset, use_auto
+size custom_all
 speak
 table-layout
 tab-size type_name=unsigned
+text-align custom_value
+text-align-last type_name=TextAlignLast
+text-decoration custom_value
+text-decoration-line use_handlers_for=CSSPropertyTextDecoration
 text-decoration-color custom_all
 text-decoration-style type_name=TextDecorationStyle
+text-indent custom_all
 text-overflow type_name=TextOverflow
+text-rendering custom_all
 text-transform
 top apply_type=length, initial=initialOffset, use_auto
 touch-action type_name=TouchAction, initial=initialTouchAction
 unicode-bidi
+vertical-align custom_value
 visibility
 white-space
 widows type_name=short, custom_all
 width apply_type=length, initial=initialSize, use_auto, use_intrinsic
 word-break
+word-spacing type_name=float, initial=initialLetterWordSpacing, custom_value
 // UAs must treat 'word-wrap' as an alternate name for the 'overflow-wrap' property. So using the same handlers.
 word-wrap name_for_methods=OverflowWrap
 zoom custom_all
@@ -99,13 +139,16 @@ z-index type_name=int, custom_all
 -webkit-animation-play-state custom_all
 -webkit-animation-timing-function custom_all
 -webkit-appearance type_name=ControlPart
+-webkit-aspect-ratio custom_all
 -webkit-backface-visibility
 -webkit-background-clip use_handlers_for=CSSPropertyBackgroundClip
 -webkit-background-composite custom_all
 -webkit-background-origin use_handlers_for=CSSPropertyBackgroundOrigin
 -webkit-background-size use_handlers_for=CSSPropertyBackgroundSize
 -webkit-border-fit
+-webkit-border-horizontal-spacing type_name=short, name_for_methods=HorizontalBorderSpacing, custom_value
 -webkit-border-image initial=initialNinePieceImage, custom_value
+-webkit-border-vertical-spacing type_name=short, name_for_methods=VerticalBorderSpacing, custom_value
 -webkit-box-align type_name=EBoxAlignment
 -webkit-box-decoration-break
 -webkit-box-direction
@@ -115,6 +158,7 @@ z-index type_name=int, custom_all
 -webkit-box-ordinal-group type_name=unsigned int
 -webkit-box-orient
 -webkit-box-pack
+-webkit-clip-path custom_value
 -webkit-column-axis type_name=ColumnAxis
 -webkit-column-break-after type_name=EPageBreak, initial=initialPageBreak
 -webkit-column-break-before type_name=EPageBreak, initial=initialPageBreak
@@ -124,10 +168,14 @@ z-index type_name=int, custom_all
 -webkit-column-progression type_name=ColumnProgression
 -webkit-column-rule-color custom_all
 -webkit-column-rule-style type_name=EBorderStyle, initial=initialBorderStyle
+-webkit-column-rule-width type_name=unsigned short, custom_value
 -webkit-column-span type_name=ColumnSpan
 -webkit-column-width type_name=float, custom_all
 -webkit-flow-from type_name=const AtomicString&, name_for_methods=RegionThread, custom_value
 -webkit-flow-into type_name=const AtomicString&, name_for_methods=FlowThread, custom_value
+-webkit-font-kerning custom_all
+-webkit-font-smoothing custom_all
+-webkit-font-variant-ligatures custom_all
 -webkit-highlight type_name=const AtomicString&, custom_value
 -webkit-hyphenate-character type_name=const AtomicString&, name_for_methods=HyphenationString, custom_value
 -webkit-hyphenate-limit-after type_name=short, name_for_methods=HyphenationLimitAfter, custom_value
@@ -146,8 +194,14 @@ z-index type_name=int, custom_all
 -webkit-marquee-direction
 -webkit-marquee-increment custom_value
 -webkit-marquee-repetition type_name=int, name_for_methods=MarqueeLoopCount, custom_value
+-webkit-marquee-speed custom_value
 -webkit-marquee-style name_for_methods=MarqueeBehavior
 -webkit-mask-box-image initial=initialNinePieceImage, custom_value
+-webkit-mask-box-image-outset custom_all
+-webkit-mask-box-image-repeat custom_all
+-webkit-mask-box-image-slice custom_all
+-webkit-mask-box-image-source custom_value
+-webkit-mask-box-image-width custom_all
 -webkit-mask-clip custom_all
 -webkit-mask-composite custom_all
 -webkit-mask-image custom_all
@@ -157,6 +211,7 @@ z-index type_name=int, custom_all
 -webkit-mask-repeat-x custom_all
 -webkit-mask-repeat-y custom_all
 -webkit-mask-size custom_all
+-webkit-perspective-origin custom_all
 -webkit-perspective-origin-x apply_type=length
 -webkit-perspective-origin-y apply_type=length
 -webkit-print-color-adjust type_name=PrintColorAdjust
@@ -166,17 +221,21 @@ z-index type_name=int, custom_all
 -webkit-region-fragment type_name=RegionFragment
 -webkit-rtl-ordering type_name=Order, getter=rtlOrdering, setter=setRTLOrdering, initial=initialRTLOrdering
 -webkit-ruby-position type_name=RubyPosition
+-webkit-shape-inside type_name=ShapeValue*, custom_value
 -webkit-shape-margin apply_type=length
+-webkit-shape-outside type_name=ShapeValue*, custom_value
 -webkit-shape-padding apply_type=length
--webkit-text-align-last type_name=TextAlignLast, condition=CSS3_TEXT
 -webkit-text-combine type_name=TextCombine
 -webkit-text-emphasis-color custom_all
 -webkit-text-emphasis-position type_name=TextEmphasisPosition
+-webkit-text-emphasis-style custom_all
 -webkit-text-fill-color custom_all
 -webkit-text-security
 -webkit-text-stroke-color custom_all
+-webkit-text-underline-position custom_value, condition=CSS3_TEXT
 -webkit-transform-origin-x apply_type=length
 -webkit-transform-origin-y apply_type=length
+-webkit-transform-origin-z type_name=float, custom_value
 -webkit-transform-style name_for_methods=TransformStyle3D
 -webkit-transition-delay custom_all
 -webkit-transition-duration custom_all

@@ -77,9 +77,8 @@ namespace {
 
 class InvokeCallbackTask : public WebMethodTask<TestRunner> {
 public:
-    InvokeCallbackTask(TestRunner* object, NPP npp, auto_ptr<CppVariant> callbackArguments)
+    InvokeCallbackTask(TestRunner* object, auto_ptr<CppVariant> callbackArguments)
         : WebMethodTask<TestRunner>(object)
-        , m_npp(npp)
         , m_callbackArguments(callbackArguments)
     {
     }
@@ -87,11 +86,10 @@ public:
     virtual void runIfValid()
     {
         CppVariant invokeResult;
-        m_callbackArguments->invokeDefault(m_npp, m_callbackArguments.get(), 1, invokeResult);
+        m_callbackArguments->invokeDefault(m_callbackArguments.get(), 1, invokeResult);
     }
 
 private:
-    NPP m_npp;
     auto_ptr<CppVariant> m_callbackArguments;
 };
 
@@ -201,7 +199,6 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("setFixedLayoutSize", &TestRunner::setFixedLayoutSize);
     bindMethod("selectionAsMarkup", &TestRunner::selectionAsMarkup);
     bindMethod("setTextSubpixelPositioning", &TestRunner::setTextSubpixelPositioning);
-    bindMethod("resetPageVisibility", &TestRunner::resetPageVisibility);
     bindMethod("setPageVisibility", &TestRunner::setPageVisibility);
     bindMethod("setTextDirection", &TestRunner::setTextDirection);
     bindMethod("textSurroundingNode", &TestRunner::textSurroundingNode);
@@ -296,6 +293,7 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindProperty("titleTextDirection", &m_titleTextDirection);
     bindProperty("platformName", &m_platformName);
     bindProperty("tooltipText", &m_tooltipText);
+    bindProperty("disableNotifyDone", &m_disableNotifyDone);
 
     // webHistoryItemCount is used by tests in LayoutTests\http\tests\history
     bindProperty("webHistoryItemCount", &m_webHistoryItemCount);
@@ -360,7 +358,9 @@ void TestRunner::reset()
         m_webView->setSelectionColors(0xff1e90ff, 0xff000000, 0xffc8c8c8, 0xff323232);
 #endif
         m_webView->removeAllUserContent();
+        m_webView->setVisibilityState(WebPageVisibilityStateVisible, true);
     }
+
     m_topLoadingFrame = 0;
     m_waitUntilDone = false;
     m_policyDelegateEnabled = false;
@@ -417,6 +417,7 @@ void TestRunner::reset()
     m_interceptPostMessage.set(false);
     m_platformName.set("chromium");
     m_tooltipText.set("");
+    m_disableNotifyDone.set(false);
 
     m_userStyleSheetLocation = WebURL();
 
@@ -753,6 +754,9 @@ void TestRunner::waitUntilDone(const CppArgumentList&, CppVariant* result)
 
 void TestRunner::notifyDone(const CppArgumentList&, CppVariant* result)
 {
+    if (m_disableNotifyDone.toBoolean())
+        return;
+
     // Test didn't timeout. Kill the timeout timer.
     taskList()->revokeAll();
 
@@ -1373,11 +1377,6 @@ void TestRunner::setTextSubpixelPositioning(const CppArgumentList& arguments, Cp
     result->setNull();
 }
 
-void TestRunner::resetPageVisibility(const CppArgumentList& arguments, CppVariant* result)
-{
-    m_webView->setVisibilityState(WebPageVisibilityStateVisible, true);
-}
-
 void TestRunner::setPageVisibility(const CppArgumentList& arguments, CppVariant* result)
 {
     if (arguments.size() > 0 && arguments[0].isString()) {
@@ -1710,7 +1709,7 @@ void TestRunner::setBackingScaleFactor(const CppArgumentList& arguments, CppVari
     auto_ptr<CppVariant> callbackArguments(new CppVariant());
     callbackArguments->set(arguments[1]);
     result->setNull();
-    m_delegate->postTask(new InvokeCallbackTask(this, npp(), callbackArguments));
+    m_delegate->postTask(new InvokeCallbackTask(this, callbackArguments));
 }
 
 void TestRunner::setPOSIXLocale(const CppArgumentList& arguments, CppVariant* result)

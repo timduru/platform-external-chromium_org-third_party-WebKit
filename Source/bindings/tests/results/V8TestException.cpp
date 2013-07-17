@@ -63,13 +63,15 @@ template <typename T> void V8_USE(T) { }
 static void nameAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestException* imp = V8TestException::toNative(info.Holder());
-    v8SetReturnValue(info, v8String(imp->name(), info.GetIsolate(), ReturnUnsafeHandle));
+    v8SetReturnValueString(info, imp->name(), info.GetIsolate(), NullStringAsEmpty);
     return;
 }
 
 static void nameAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
     TestExceptionV8Internal::nameAttrGetter(name, info);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
 } // namespace TestExceptionV8Internal
@@ -101,7 +103,7 @@ v8::Handle<v8::FunctionTemplate> V8TestException::GetTemplate(v8::Isolate* isola
     if (result != data->templateMap(currentWorldType).end())
         return result->value.newLocal(isolate);
 
-    TraceEvent::SamplingState0Scope("Blink\0Blink-BuildDOMTemplate");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
     v8::HandleScope handleScope(isolate);
     v8::Handle<v8::FunctionTemplate> templ =
         ConfigureV8TestExceptionTemplate(data->rawTemplate(&info, currentWorldType), isolate, currentWorldType);
@@ -125,18 +127,18 @@ bool V8TestException::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Iso
 v8::Handle<v8::Object> V8TestException::createWrapper(PassRefPtr<TestException> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper(impl.get(), isolate).IsEmpty());
+    ASSERT(DOMDataStore::getWrapper<V8TestException>(impl.get(), isolate).IsEmpty());
 
-    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, impl.get(), isolate);
+    v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
     installPerContextProperties(wrapper, impl.get(), isolate);
-    V8DOMWrapper::associateObjectWithWrapper(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
+    V8DOMWrapper::associateObjectWithWrapper<V8TestException>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
 void V8TestException::derefObject(void* object)
 {
-    static_cast<TestException*>(object)->deref();
+    fromInternalPointer(object)->deref();
 }
 
 } // namespace WebCore

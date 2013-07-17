@@ -47,7 +47,7 @@ PassRefPtr<RTCDTMFSender> RTCDTMFSender::create(ScriptExecutionContext* context,
     RefPtr<MediaStreamTrack> track = prpTrack;
     OwnPtr<RTCDTMFSenderHandler> handler = peerConnectionHandler->createDTMFSender(track->component());
     if (!handler) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return 0;
     }
 
@@ -101,17 +101,17 @@ void RTCDTMFSender::insertDTMF(const String& tones, long duration, ExceptionCode
 void RTCDTMFSender::insertDTMF(const String& tones, long duration, long interToneGap, ExceptionCode& ec)
 {
     if (!canInsertDTMF()) {
-        ec = NOT_SUPPORTED_ERR;
+        ec = NotSupportedError;
         return;
     }
 
     if (duration > maxToneDurationMs || duration < minToneDurationMs) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
     if (interToneGap < minInterToneGapMs) {
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
         return;
     }
 
@@ -119,7 +119,7 @@ void RTCDTMFSender::insertDTMF(const String& tones, long duration, long interTon
     m_interToneGap = interToneGap;
 
     if (!m_handler->insertDTMF(tones, m_duration, m_interToneGap))
-        ec = SYNTAX_ERR;
+        ec = SyntaxError;
 }
 
 void RTCDTMFSender::didPlayTone(const String& tone)

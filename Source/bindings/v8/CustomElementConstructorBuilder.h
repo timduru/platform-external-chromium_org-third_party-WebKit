@@ -32,9 +32,8 @@
 #define CustomElementConstructorBuilder_h
 
 #include "bindings/v8/ScriptValue.h"
-#include "core/dom/CustomElementCallback.h"
+#include "core/dom/CustomElementLifecycleCallbacks.h"
 #include "core/dom/QualifiedName.h"
-#include "wtf/HashSet.h"
 #include "wtf/Noncopyable.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/text/AtomicString.h"
@@ -66,10 +65,10 @@ public:
 
     bool isFeatureAllowed() const;
     bool validateOptions();
-    bool findTagName(const AtomicString& customElementType, QualifiedName& tagName) const;
-    PassRefPtr<CustomElementCallback> createCallback(Document*);
+    bool findTagName(const AtomicString& customElementType, QualifiedName& tagName);
+    PassRefPtr<CustomElementLifecycleCallbacks> createCallbacks(Document*);
     bool createConstructor(Document*, CustomElementDefinition*);
-    bool didRegisterDefinition(CustomElementDefinition*, const HashSet<Element*>& upgradeCandidates) const;
+    bool didRegisterDefinition(CustomElementDefinition*) const;
 
     // This method collects a return value for the bindings. It is
     // safe to call this method even if the builder failed; it will
@@ -77,12 +76,15 @@ public:
     ScriptValue bindingsReturnValue() const;
 
 private:
+    static WrapperTypeInfo* findWrapperType(v8::Handle<v8::Value> chain);
     bool hasValidPrototypeChainFor(V8PerContextData*, WrapperTypeInfo*) const;
     bool prototypeIsValid() const;
+    v8::Handle<v8::Function> retrieveCallback(v8::Isolate*, const char* name);
 
     v8::Handle<v8::Context> m_context;
     const Dictionary* m_options;
     v8::Handle<v8::Object> m_prototype;
+    WrapperTypeInfo* m_wrapperType;
     AtomicString m_namespaceURI;
     v8::Handle<v8::Function> m_constructor;
 };

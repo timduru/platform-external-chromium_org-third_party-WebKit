@@ -180,6 +180,7 @@ protected:
                         HorizontalScrollbarState expectedHorizontalState, VerticalScrollbarState expectedVerticalState);
 
     void testTextInputType(WebTextInputType expectedType, const std::string& htmlFile);
+    void testInputMode(const WebString& expectedInputMode, const std::string& htmlFile);
 
     std::string m_baseURL;
 };
@@ -381,6 +382,26 @@ TEST_F(WebViewTest, TextInputType)
     testTextInputType(WebTextInputTypeURL, "input_field_url.html");
 }
 
+void WebViewTest::testInputMode(const WebString& expectedInputMode, const std::string& htmlFile)
+{
+    URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8(htmlFile.c_str()));
+    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + htmlFile);
+    webView->setInitialFocus(false);
+    EXPECT_EQ(expectedInputMode, webView->textInputInfo().inputMode);
+    webView->close();
+}
+
+TEST_F(WebViewTest, InputMode)
+{
+    testInputMode(WebString(), "input_mode_default.html");
+    testInputMode(WebString("unknown"), "input_mode_default_unknown.html");
+    testInputMode(WebString("verbatim"), "input_mode_default_verbatim.html");
+    testInputMode(WebString("verbatim"), "input_mode_type_text_verbatim.html");
+    testInputMode(WebString("verbatim"), "input_mode_type_search_verbatim.html");
+    testInputMode(WebString(), "input_mode_type_url_verbatim.html");
+    testInputMode(WebString("verbatim"), "input_mode_textarea_verbatim.html");
+}
+
 TEST_F(WebViewTest, SetEditableSelectionOffsetsAndTextInputInfo)
 {
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("input_field_populated.html"));
@@ -452,6 +473,43 @@ TEST_F(WebViewTest, ConfirmCompositionCursorPositionChange)
     EXPECT_EQ(8, info.selectionEnd);
     EXPECT_EQ(-1, info.compositionStart);
     EXPECT_EQ(-1, info.compositionEnd);
+
+    webView->close();
+}
+
+TEST_F(WebViewTest, InsertNewLinePlacementAfterConfirmComposition)
+{
+    URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("text_area_populated.html"));
+    WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "text_area_populated.html");
+    webView->setInitialFocus(false);
+
+    WebVector<WebCompositionUnderline> emptyUnderlines;
+
+    webView->setEditableSelectionOffsets(4, 4);
+    webView->setCompositionFromExistingText(8, 12, emptyUnderlines);
+
+    WebTextInputInfo info = webView->textInputInfo();
+    EXPECT_EQ("0123456789abcdefghijklmnopqrstuvwxyz", std::string(info.value.utf8().data()));
+    EXPECT_EQ(4, info.selectionStart);
+    EXPECT_EQ(4, info.selectionEnd);
+    EXPECT_EQ(8, info.compositionStart);
+    EXPECT_EQ(12, info.compositionEnd);
+
+    webView->confirmComposition(WebWidget::KeepSelection);
+    info = webView->textInputInfo();
+    EXPECT_EQ(4, info.selectionStart);
+    EXPECT_EQ(4, info.selectionEnd);
+    EXPECT_EQ(-1, info.compositionStart);
+    EXPECT_EQ(-1, info.compositionEnd);
+
+    std::string compositionText("\n");
+    webView->confirmComposition(WebString::fromUTF8(compositionText.c_str()));
+    info = webView->textInputInfo();
+    EXPECT_EQ(5, info.selectionStart);
+    EXPECT_EQ(5, info.selectionEnd);
+    EXPECT_EQ(-1, info.compositionStart);
+    EXPECT_EQ(-1, info.compositionEnd);
+    EXPECT_EQ("0123\n456789abcdefghijklmnopqrstuvwxyz", std::string(info.value.utf8().data()));
 
     webView->close();
 }

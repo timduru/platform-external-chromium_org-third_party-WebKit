@@ -54,6 +54,11 @@ WebInspector.TextEditor.prototype = {
 
     markClean: function() { },
 
+    /**
+     * @return {string}
+     */
+    indent: function() { },
+
     /*
      * @param {number} lineNumber
      * @param {number} column
@@ -191,6 +196,11 @@ WebInspector.TextEditor.prototype = {
      * @param {number} lineNumber
      */
     scrollToLine: function(lineNumber) { },
+
+    /**
+     * @return {number}
+     */
+    firstVisibleLine: function() { },
 
     /**
      * @return {WebInspector.TextRange}

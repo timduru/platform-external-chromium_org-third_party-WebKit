@@ -37,6 +37,7 @@
 #include "core/dom/OverflowEvent.h"
 #include "core/editing/FrameSelection.h"
 #include "core/html/HTMLFrameElement.h"
+#include "core/html/HTMLHtmlElement.h"
 #include "core/html/HTMLPlugInImageElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/FrameLoader.h"
@@ -615,7 +616,7 @@ void FrameView::applyPaginationToViewport()
     Node* body = document->body();
     if (body && body->renderer()) {
         if (body->hasTagName(bodyTag))
-            documentOrBodyRenderer = documentRenderer->style()->overflowX() == OVISIBLE && documentElement->hasTagName(htmlTag) ? body->renderer() : documentRenderer;
+            documentOrBodyRenderer = documentRenderer->style()->overflowX() == OVISIBLE && isHTMLHtmlElement(documentElement) ? body->renderer() : documentRenderer;
     }
 
     Pagination pagination;
@@ -669,7 +670,7 @@ void FrameView::calculateScrollbarModesForLayout(ScrollbarMode& hMode, Scrollbar
             } else if (body->hasTagName(bodyTag)) {
                 // It's sufficient to just check the X overflow,
                 // since it's illegal to have visible in only one direction.
-                RenderObject* o = rootRenderer->style()->overflowX() == OVISIBLE && document->documentElement()->hasTagName(htmlTag) ? body->renderer() : rootRenderer;
+                RenderObject* o = rootRenderer->style()->overflowX() == OVISIBLE && isHTMLHtmlElement(document->documentElement()) ? body->renderer() : rootRenderer;
                 applyOverflowToViewport(o, hMode, vMode);
             }
         } else if (rootRenderer)
@@ -868,7 +869,7 @@ void FrameView::layout(bool allowSubtree)
         return;
 
     TRACE_EVENT0("webkit", "FrameView::layout");
-    TraceEvent::SamplingState0Scope("Blink\0Blink-Layout");
+    TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "Layout");
 
     // Protect the view from being deleted during layout (in recalcStyle)
     RefPtr<FrameView> protector(this);
@@ -961,11 +962,6 @@ void FrameView::layout(bool allowSubtree)
                         body->renderer()->setChildNeedsLayout(true);
                 }
             }
-
-#ifdef INSTRUMENT_LAYOUT_SCHEDULING
-            if (m_firstLayout && !m_frame->ownerElement())
-                printf("Elapsed time before first layout: %d\n", document->elapsedTime());
-#endif
         }
 
         autoSizeIfEnabled();
@@ -1532,7 +1528,7 @@ bool FrameView::scrollToAnchor(const String& name)
 
     // If the anchor accepts keyboard focus, move focus there to aid users relying on keyboard navigation.
     if (anchorNode && anchorNode->isFocusable())
-        m_frame->document()->setFocusedNode(anchorNode);
+        m_frame->document()->setFocusedElement(anchorNode);
 
     return true;
 }
@@ -1891,17 +1887,11 @@ void FrameView::endDisableRepaints()
 
 void FrameView::layoutTimerFired(Timer<FrameView>*)
 {
-#ifdef INSTRUMENT_LAYOUT_SCHEDULING
-    if (!m_frame->document()->ownerElement())
-        printf("Layout timer fired at %d\n", m_frame->document()->elapsedTime());
-#endif
     layout();
 }
 
 void FrameView::scheduleRelayout()
 {
-    // FIXME: We should assert the page is not in the page cache, but that is causing
-    // too many false assertions.  See <rdar://problem/7218118>.
     ASSERT(m_frame->view() == this);
 
     if (m_layoutRoot) {
@@ -1928,12 +1918,6 @@ void FrameView::scheduleRelayout()
         return;
 
     m_delayedLayout = delay != 0;
-
-#ifdef INSTRUMENT_LAYOUT_SCHEDULING
-    if (!m_frame->document()->ownerElement())
-        printf("Scheduling layout for %d\n", delay);
-#endif
-
     m_layoutTimer.startOneShot(delay * 0.001);
 }
 
@@ -2024,20 +2008,16 @@ void FrameView::unscheduleRelayout()
     if (!m_layoutTimer.isActive())
         return;
 
-#ifdef INSTRUMENT_LAYOUT_SCHEDULING
-    if (!m_frame->document()->ownerElement())
-        printf("Layout timer unscheduled at %d\n", m_frame->document()->elapsedTime());
-#endif
-
     m_layoutTimer.stop();
     m_delayedLayout = false;
 }
 
 void FrameView::serviceScriptedAnimations(double monotonicAnimationStartTime)
 {
-    for (Frame* frame = m_frame.get(); frame; frame = frame->tree()->traverseNext()) {
+    for (RefPtr<Frame> frame = m_frame; frame; frame = frame->tree()->traverseNext()) {
         frame->view()->serviceScrollAnimations();
-        frame->animation()->serviceAnimations();
+        if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
+            frame->animation()->serviceAnimations();
         if (RuntimeEnabledFeatures::webAnimationsEnabled())
             frame->document()->timeline()->serviceAnimations(monotonicAnimationStartTime);
     }

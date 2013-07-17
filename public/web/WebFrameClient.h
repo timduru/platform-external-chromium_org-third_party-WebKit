@@ -162,15 +162,6 @@ public:
     // A form submission is about to occur.
     virtual void willSubmitForm(WebFrame*, const WebFormElement&) { }
 
-    // A client-side redirect will occur.  This may correspond to a <META
-    // refresh> or some script activity.
-    virtual void willPerformClientRedirect(
-        WebFrame*, const WebURL& from, const WebURL& to,
-        double interval, double fireTime) { }
-
-    // A client-side redirect was cancelled.
-    virtual void didCancelClientRedirect(WebFrame*) { }
-
     // A client-side redirect completed.
     virtual void didCompleteClientRedirect(WebFrame*, const WebURL& fromURL) { }
 
@@ -247,6 +238,9 @@ public:
 
     // An element will request a resource.
     virtual void willRequestResource(WebFrame*, const WebCachedURLRequest&) { }
+
+    // The request is after preconnect is triggered.
+    virtual void willRequestAfterPreconnect(WebFrame*, WebURLRequest&) { }
 
     // A request is about to be sent out, and the client may modify it.  Request
     // is writable, and changes to the URL, for example, will change the request

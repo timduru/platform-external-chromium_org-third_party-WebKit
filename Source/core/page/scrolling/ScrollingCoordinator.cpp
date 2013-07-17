@@ -158,7 +158,6 @@ void ScrollingCoordinator::updateLayerPositionConstraint(RenderLayer* layer)
 
     // Avoid unnecessary commits
     clearPositionConstraintExceptForLayer(backing->ancestorClippingLayer(), mainLayer);
-    clearPositionConstraintExceptForLayer(backing->contentsContainmentLayer(), mainLayer);
     clearPositionConstraintExceptForLayer(backing->graphicsLayer(), mainLayer);
 
     if (WebLayer* scrollableLayer = scrollingWebLayerForGraphicsLayer(mainLayer))
@@ -240,7 +239,7 @@ void ScrollingCoordinator::scrollableAreaScrollbarLayerDidChange(ScrollableArea*
     if (!platformSupportsCoordinatedScrollbar)
         return;
 
-    bool isMainFrame = (scrollableArea == static_cast<ScrollableArea*>(m_page->mainFrame()->view()));
+    bool isMainFrame = isForMainFrame(scrollableArea);
     if (!isMainFrame && platformSupportsMainFrameOnly)
         return;
 
@@ -268,11 +267,13 @@ void ScrollingCoordinator::scrollableAreaScrollbarLayerDidChange(ScrollableArea*
         removeWebScrollbarLayer(scrollableArea, orientation);
 }
 
-void ScrollingCoordinator::scrollableAreaScrollLayerDidChange(ScrollableArea* scrollableArea)
+bool ScrollingCoordinator::scrollableAreaScrollLayerDidChange(ScrollableArea* scrollableArea)
 {
     GraphicsLayer* scrollLayer = scrollLayerForScrollableArea(scrollableArea);
-    if (scrollLayer)
-        scrollLayer->setScrollableArea(scrollableArea);
+    if (scrollLayer) {
+        bool isMainFrame = isForMainFrame(scrollableArea);
+        scrollLayer->setScrollableArea(scrollableArea, isMainFrame);
+    }
 
     WebLayer* webLayer = scrollingWebLayerForScrollableArea(scrollableArea);
     if (webLayer) {
@@ -280,10 +281,18 @@ void ScrollingCoordinator::scrollableAreaScrollLayerDidChange(ScrollableArea* sc
         webLayer->setScrollPosition(IntPoint(scrollableArea->scrollPosition() - scrollableArea->minimumScrollPosition()));
         webLayer->setMaxScrollPosition(IntSize(scrollableArea->scrollSize(HorizontalScrollbar), scrollableArea->scrollSize(VerticalScrollbar)));
     }
-    if (WebScrollbarLayer* scrollbarLayer = getWebScrollbarLayer(scrollableArea, HorizontalScrollbar))
-        setupScrollbarLayer(horizontalScrollbarLayerForScrollableArea(scrollableArea), scrollbarLayer, webLayer);
-    if (WebScrollbarLayer* scrollbarLayer = getWebScrollbarLayer(scrollableArea, VerticalScrollbar))
-        setupScrollbarLayer(verticalScrollbarLayerForScrollableArea(scrollableArea), scrollbarLayer, webLayer);
+    if (WebScrollbarLayer* scrollbarLayer = getWebScrollbarLayer(scrollableArea, HorizontalScrollbar)) {
+        GraphicsLayer* horizontalScrollbarLayer = horizontalScrollbarLayerForScrollableArea(scrollableArea);
+        if (horizontalScrollbarLayer)
+            setupScrollbarLayer(horizontalScrollbarLayer, scrollbarLayer, webLayer);
+    }
+    if (WebScrollbarLayer* scrollbarLayer = getWebScrollbarLayer(scrollableArea, VerticalScrollbar)) {
+        GraphicsLayer* verticalScrollbarLayer = verticalScrollbarLayerForScrollableArea(scrollableArea);
+        if (verticalScrollbarLayer)
+            setupScrollbarLayer(verticalScrollbarLayer, scrollbarLayer, webLayer);
+    }
+
+    return !!webLayer;
 }
 
 void ScrollingCoordinator::setTouchEventTargetRects(const Vector<IntRect>& absoluteHitTestRects)
@@ -531,6 +540,11 @@ GraphicsLayer* ScrollingCoordinator::horizontalScrollbarLayerForScrollableArea(S
 GraphicsLayer* ScrollingCoordinator::verticalScrollbarLayerForScrollableArea(ScrollableArea* scrollableArea)
 {
     return scrollableArea->layerForVerticalScrollbar();
+}
+
+bool ScrollingCoordinator::isForMainFrame(ScrollableArea* scrollableArea) const
+{
+    return scrollableArea == m_page->mainFrame()->view();
 }
 
 GraphicsLayer* ScrollingCoordinator::scrollLayerForFrameView(FrameView* frameView)

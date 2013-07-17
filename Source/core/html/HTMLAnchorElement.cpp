@@ -24,18 +24,16 @@
 #include "config.h"
 #include "core/html/HTMLAnchorElement.h"
 
-#include "public/platform/Platform.h"
-#include "public/platform/WebPrescientNetworking.h"
-#include "public/platform/WebURL.h"
-#include <wtf/text/StringBuilder.h>
 #include "HTMLNames.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/KeyboardEvent.h"
 #include "core/dom/MouseEvent.h"
 #include "core/editing/FrameSelection.h"
+#include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
+#include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/FrameLoaderTypes.h"
@@ -50,9 +48,13 @@
 #include "core/platform/network/DNS.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/rendering/RenderImage.h"
+#include "public/platform/Platform.h"
+#include "public/platform/WebPrescientNetworking.h"
+#include "public/platform/WebURL.h"
 #include "weborigin/KnownPorts.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
+#include "wtf/text/StringBuilder.h"
 
 namespace WebCore {
 
@@ -76,13 +78,14 @@ public:
         return adoptPtr(new HTMLAnchorElement::PrefetchEventHandler(anchorElement));
     }
 
+    void reset();
+
     void handleEvent(Event* e);
     void didChangeHREF() { m_hadHREFChanged = true; }
+    bool hasIssuedPreconnect() const { return m_hasIssuedPreconnect; }
 
 private:
     explicit PrefetchEventHandler(HTMLAnchorElement*);
-
-    void reset();
 
     void handleMouseOver(Event* event);
     void handleMouseOut(Event* event);
@@ -220,6 +223,7 @@ void HTMLAnchorElement::defaultEventHandler(Event* event)
 
         if (isLinkClick(event) && treatLinkAsLiveForEventType(eventType(event))) {
             handleClick(event);
+            prefetchEventHandler()->reset();
             return;
         }
 
@@ -566,22 +570,28 @@ void HTMLAnchorElement::handleClick(Event* event)
     StringBuilder url;
     url.append(stripLeadingAndTrailingHTMLSpaces(fastGetAttribute(hrefAttr)));
     appendServerMapMousePosition(url, event);
-    KURL kurl = document()->completeURL(url.toString());
+    KURL completedURL = document()->completeURL(url.toString());
 
+    ResourceRequest request(completedURL);
+    if (prefetchEventHandler()->hasIssuedPreconnect())
+        frame->loader()->client()->dispatchWillRequestAfterPreconnect(request);
     if (hasAttribute(downloadAttr)) {
-        ResourceRequest request(kurl);
-
         if (!hasRel(RelationNoReferrer)) {
-            String referrer = SecurityPolicy::generateReferrerHeader(document()->referrerPolicy(), kurl, frame->loader()->outgoingReferrer());
+            String referrer = SecurityPolicy::generateReferrerHeader(document()->referrerPolicy(), completedURL, frame->loader()->outgoingReferrer());
             if (!referrer.isEmpty())
                 request.setHTTPReferrer(referrer);
         }
 
-        frame->loader()->client()->startDownload(request, fastGetAttribute(downloadAttr));
-    } else
-        frame->loader()->urlSelected(kurl, target(), event, false, hasRel(RelationNoReferrer) ? NeverSendReferrer : MaybeSendReferrer);
+        frame->loader()->client()->loadURLExternally(request, NavigationPolicyDownload, fastGetAttribute(downloadAttr));
+    } else {
+        FrameLoadRequest frameRequest(document()->securityOrigin(), request, target());
+        frameRequest.setTriggeringEvent(event);
+        if (hasRel(RelationNoReferrer))
+            frameRequest.setShouldSendReferrer(NeverSendReferrer);
+        frame->loader()->load(frameRequest);
+    }
 
-    sendPings(kurl);
+    sendPings(completedURL);
 }
 
 HTMLAnchorElement::EventType HTMLAnchorElement::eventType(Event* event)
@@ -790,8 +800,6 @@ void HTMLAnchorElement::PrefetchEventHandler::handleClick(Event* event)
 
     int flags = (m_hadTapUnconfirmed ? 2 : 0) | (capturedTapDown ? 1 : 0);
     HistogramSupport::histogramEnumeration("MouseEventPrefetch.PreTapEventsFollowedByClick", flags, 4);
-
-    reset();
 }
 
 bool HTMLAnchorElement::PrefetchEventHandler::shouldPrefetch(const KURL& url)
@@ -833,7 +841,12 @@ void HTMLAnchorElement::PrefetchEventHandler::prefetch(WebKit::WebPreconnectMoti
     if (!shouldPrefetch(url))
         return;
 
+    // The precision of current MouseOver trigger is too low to actually trigger preconnects.
+    if (motivation == WebKit::WebPreconnectMotivationLinkMouseOver)
+        return;
+
     preconnectToURL(url, motivation);
+    m_hasIssuedPreconnect = true;
 }
 
 }

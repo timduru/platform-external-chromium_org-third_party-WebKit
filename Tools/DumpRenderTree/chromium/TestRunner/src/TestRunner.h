@@ -257,7 +257,6 @@ private:
 
     // Switch the visibility of the page.
     void setPageVisibility(const CppArgumentList&, CppVariant*);
-    void resetPageVisibility(const CppArgumentList&, CppVariant*);
 
     // Changes the direction of the focused element.
     void setTextDirection(const CppArgumentList&, CppVariant*);
@@ -563,6 +562,12 @@ private:
 
     // Bound variable to store the last tooltip text
     CppVariant m_tooltipText;
+
+    // Bound variable to disable notifyDone calls. This is used in GC leak
+    // tests, where existing LayoutTests are loaded within an iframe. The GC
+    // test harness will set this flag to ignore the notifyDone calls from the
+    // target LayoutTest.
+    CppVariant m_disableNotifyDone;
 
     // If true, the test_shell will write a descriptive line for each editing
     // command.

@@ -51,22 +51,16 @@ public:
         NonOpaque
     };
 
-    enum ThreadMode {
-        SingleThread,
-        Threaded
-    };
-
-    static PassOwnPtr<Canvas2DLayerBridge> create(PassRefPtr<GraphicsContext3D> context, SkDeferredCanvas* canvas, OpacityMode opacityMode, ThreadMode threading)
+    static PassOwnPtr<Canvas2DLayerBridge> create(PassRefPtr<GraphicsContext3D> context, SkDeferredCanvas* canvas, OpacityMode opacityMode)
     {
-        return adoptPtr(new Canvas2DLayerBridge(context, canvas, opacityMode, threading));
+        return adoptPtr(new Canvas2DLayerBridge(context, canvas, opacityMode));
     }
 
     virtual ~Canvas2DLayerBridge();
 
     // WebKit::WebExternalTextureLayerClient implementation.
-    virtual unsigned prepareTexture(WebKit::WebTextureUpdater&) OVERRIDE;
     virtual WebKit::WebGraphicsContext3D* context() OVERRIDE;
-    virtual bool prepareMailbox(WebKit::WebExternalTextureMailbox*) OVERRIDE;
+    virtual bool prepareMailbox(WebKit::WebExternalTextureMailbox*, WebKit::WebExternalBitmap*) OVERRIDE;
     virtual void mailboxReleased(const WebKit::WebExternalTextureMailbox&) OVERRIDE;
 
     // SkDeferredCanvas::NotificationClient implementation
@@ -88,7 +82,8 @@ public:
     unsigned backBufferTexture();
 
 protected:
-    Canvas2DLayerBridge(PassRefPtr<GraphicsContext3D>, SkDeferredCanvas*, OpacityMode, ThreadMode);
+    Canvas2DLayerBridge(PassRefPtr<GraphicsContext3D>, SkDeferredCanvas*, OpacityMode);
+    void setRateLimitingEnabled(bool);
 
     SkDeferredCanvas* m_canvas;
     OwnPtr<WebKit::WebExternalTextureLayer> m_layer;
@@ -96,12 +91,12 @@ protected:
     size_t m_bytesAllocated;
     bool m_didRecordDrawCommand;
     int m_framesPending;
+    bool m_rateLimitingEnabled;
 
     friend class WTF::DoublyLinkedListNode<Canvas2DLayerBridge>;
     Canvas2DLayerBridge* m_next;
     Canvas2DLayerBridge* m_prev;
 
-#if ENABLE(CANVAS_USES_MAILBOX)
     enum MailboxStatus {
         MailboxInUse,
         MailboxReleased,
@@ -120,7 +115,6 @@ protected:
 
     uint32_t m_lastImageId;
     Vector<MailboxInfo> m_mailboxes;
-#endif
 };
 
 }

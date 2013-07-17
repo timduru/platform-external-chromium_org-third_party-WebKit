@@ -23,6 +23,7 @@
 #include "core/svg/SVGTextPathElement.h"
 
 #include "SVGNames.h"
+#include "XLinkNames.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/rendering/svg/RenderSVGTextPath.h"
@@ -160,7 +161,7 @@ void SVGTextPathElement::buildPendingResource()
         return;
 
     String id;
-    Element* target = SVGURIReference::targetElementFromIRIString(href(), document(), &id);
+    Element* target = SVGURIReference::targetElementFromIRIString(hrefCurrentValue(), document(), &id);
     if (!target) {
         // Do not register as pending if we are already pending this resource.
         if (document()->accessSVGExtensions()->isElementPendingResource(this, id))
@@ -193,7 +194,7 @@ void SVGTextPathElement::removedFrom(ContainerNode* rootParent)
 
 bool SVGTextPathElement::selfHasRelativeLengths() const
 {
-    return startOffset().isRelative()
+    return startOffsetCurrentValue().isRelative()
         || SVGTextContentElement::selfHasRelativeLengths();
 }
 

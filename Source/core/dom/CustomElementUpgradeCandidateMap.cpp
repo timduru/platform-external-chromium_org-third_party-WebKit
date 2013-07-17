@@ -29,63 +29,39 @@
  */
 
 #include "config.h"
-
 #include "core/dom/CustomElementUpgradeCandidateMap.h"
 
 namespace WebCore {
 
-void CustomElementUpgradeCandidateMap::add(CustomElementDefinition::CustomElementKind kind, const AtomicString& type, Element* element)
+void CustomElementUpgradeCandidateMap::add(const CustomElementDescriptor& descriptor, Element* element)
 {
-    m_unresolvedElements.add(element, RequiredDefinition(kind, type));
+    m_upgradeCandidates.add(element, descriptor);
 
-    UnresolvedDefinitionMap::iterator it = m_unresolvedDefinitions.find(type);
+    UnresolvedDefinitionMap::iterator it = m_unresolvedDefinitions.find(descriptor);
     if (it == m_unresolvedDefinitions.end())
-        it = m_unresolvedDefinitions.add(type, ElementSet()).iterator;
+        it = m_unresolvedDefinitions.add(descriptor, ElementSet()).iterator;
     it->value.add(element);
-}
-
-bool CustomElementUpgradeCandidateMap::contains(Element* element) const
-{
-    return m_unresolvedElements.contains(element);
 }
 
 void CustomElementUpgradeCandidateMap::remove(Element* element)
 {
-    UnresolvedElementMap::iterator it = m_unresolvedElements.find(element);
-    if (it == m_unresolvedElements.end())
+    UpgradeCandidateMap::iterator it = m_upgradeCandidates.find(element);
+    if (it == m_upgradeCandidates.end())
         return;
 
-    const AtomicString& type = it->value.second;
-    m_unresolvedDefinitions.get(type).remove(element);
-    m_unresolvedElements.remove(it);
+    const CustomElementDescriptor& descriptor = it->value;
+    m_unresolvedDefinitions.get(descriptor).remove(element);
+    m_upgradeCandidates.remove(it);
 }
 
-CustomElementUpgradeCandidateMap::ElementSet CustomElementUpgradeCandidateMap::takeUpgradeCandidatesFor(CustomElementDefinition* definition)
+ListHashSet<Element*> CustomElementUpgradeCandidateMap::takeUpgradeCandidatesFor(const CustomElementDescriptor& descriptor)
 {
-    UnresolvedDefinitionMap::iterator it = m_unresolvedDefinitions.find(definition->type());
-    if (it == m_unresolvedDefinitions.end())
-        return ElementSet();
+    const ListHashSet<Element*>& candidates = m_unresolvedDefinitions.take(descriptor);
 
-    const ElementSet& candidatesForThisType = it->value;
-    ElementSet matchingCandidates;
+    for (ElementSet::const_iterator candidate = candidates.begin(); candidate != candidates.end(); ++candidate)
+        m_upgradeCandidates.remove(*candidate);
 
-    // Filter the set based on whether the definition matches
-    for (ElementSet::const_iterator candidate = candidatesForThisType.begin(); candidate != candidatesForThisType.end(); ++candidate) {
-        if (matches(definition, *candidate)) {
-            matchingCandidates.add(*candidate);
-            m_unresolvedElements.remove(*candidate);
-        }
-    }
-
-    m_unresolvedDefinitions.remove(it);
-    return matchingCandidates;
-}
-
-bool CustomElementUpgradeCandidateMap::matches(CustomElementDefinition* definition, Element* element)
-{
-    ASSERT(m_unresolvedElements.contains(element));
-    const RequiredDefinition& requirement = m_unresolvedElements.get(element);
-    return definition->kind() == requirement.first && definition->type() == requirement.second && definition->namespaceURI() == element->namespaceURI() && definition->name() == element->localName();
+    return candidates;
 }
 
 }

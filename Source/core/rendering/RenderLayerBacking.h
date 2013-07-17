@@ -70,8 +70,6 @@ public:
     bool updateGraphicsLayerConfiguration();
     // Update graphics layer position and bounds.
     void updateGraphicsLayerGeometry(); // make private
-    // Update contents and clipping structure.
-    void updateDrawsContent();
     // Update whether layer needs blending.
     void updateContentsOpaque();
 
@@ -84,8 +82,6 @@ public:
     // Layer to get clipped by ancestor
     bool hasAncestorClippingLayer() const { return m_ancestorClippingLayer != 0; }
     GraphicsLayer* ancestorClippingLayer() const { return m_ancestorClippingLayer.get(); }
-
-    GraphicsLayer* contentsContainmentLayer() const { return m_contentsContainmentLayer.get(); }
 
     bool hasContentsLayer() const { return m_foregroundLayer != 0; }
     GraphicsLayer* foregroundLayer() const { return m_foregroundLayer.get(); }
@@ -134,8 +130,6 @@ public:
     void updateAfterWidgetResize();
     void positionOverflowControlsLayers(const IntSize& offsetFromRoot);
     bool hasUnpositionedOverflowControlsLayers() const;
-
-    void updateDebugIndicators(bool showBorder, bool showRepaintCounter);
 
     // GraphicsLayerClient interface
     virtual void notifyAnimationStarted(const GraphicsLayer*, double startTime) OVERRIDE;
@@ -192,8 +186,6 @@ private:
     void updateDrawsContent(bool isSimpleContainer);
     void registerScrollingLayers();
     
-    void updateRootLayerConfiguration();
-
     void setBackgroundLayerPaintsFixedRootBackground(bool);
 
     GraphicsLayerPaintingPhase paintingPhaseForPrimaryLayer() const;
@@ -218,7 +210,7 @@ private:
     // Returns true if this compositing layer has no visible content.
     bool isSimpleContainerCompositingLayer() const;
     // Returns true if this layer has content that needs to be rendered by painting into the backing store.
-    bool containsPaintedContent() const;
+    bool containsPaintedContent(bool isSimpleContainer) const;
     // Returns true if the RenderLayer just contains an image that we can composite directly.
     bool isDirectlyCompositedImage() const;
     void updateImageContents();
@@ -241,7 +233,6 @@ private:
     RenderLayer* m_owningLayer;
 
     OwnPtr<GraphicsLayer> m_ancestorClippingLayer; // Only used if we are clipped by an ancestor which is not a stacking context.
-    OwnPtr<GraphicsLayer> m_contentsContainmentLayer; // Only used if we have a background layer; takes the transform.
     OwnPtr<GraphicsLayer> m_graphicsLayer;
     OwnPtr<GraphicsLayer> m_foregroundLayer; // Only used in cases where we need to draw the foreground separately.
     OwnPtr<GraphicsLayer> m_backgroundLayer; // Only used in cases where we need to draw the background separately.

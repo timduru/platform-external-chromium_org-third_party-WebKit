@@ -52,9 +52,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableColumn.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableHeaderContainer.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableRow.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableNumber.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableValue.cpp \
 	third_party/WebKit/Source/core/animation/Animation.cpp \
 	third_party/WebKit/Source/core/animation/DocumentTimeline.cpp \
+	third_party/WebKit/Source/core/animation/KeyframeAnimationEffect.cpp \
 	third_party/WebKit/Source/core/animation/Player.cpp \
 	third_party/WebKit/Source/core/animation/TimedItem.cpp \
 	third_party/WebKit/Source/core/css/BasicShapeFunctions.cpp \
@@ -96,7 +98,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSMixFunctionValue.cpp \
 	third_party/WebKit/Source/core/css/CSSOMUtils.cpp \
 	third_party/WebKit/Source/core/css/CSSPageRule.cpp \
-	third_party/WebKit/Source/core/css/CSSParser.cpp \
 	third_party/WebKit/Source/core/css/CSSParserValues.cpp \
 	third_party/WebKit/Source/core/css/CSSPrimitiveValue.cpp \
 	third_party/WebKit/Source/core/css/CSSProperty.cpp \
@@ -121,7 +122,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSValueList.cpp \
 	third_party/WebKit/Source/core/css/CSSValuePool.cpp \
 	third_party/WebKit/Source/core/css/CSSViewportRule.cpp \
-	third_party/WebKit/Source/core/css/DeprecatedStyleBuilder.cpp \
 	third_party/WebKit/Source/core/css/DOMWindowCSS.cpp \
 	third_party/WebKit/Source/core/css/DocumentRuleSets.cpp \
 	third_party/WebKit/Source/core/css/ElementRuleCollector.cpp \
@@ -146,7 +146,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/RuleSet.cpp \
 	third_party/WebKit/Source/core/css/SVGCSSComputedStyleDeclaration.cpp \
 	third_party/WebKit/Source/core/css/SVGCSSParser.cpp \
-	third_party/WebKit/Source/core/css/SVGCSSStyleSelector.cpp \
 	third_party/WebKit/Source/core/css/SelectorChecker.cpp \
 	third_party/WebKit/Source/core/css/SelectorCheckerFastPath.cpp \
 	third_party/WebKit/Source/core/css/SelectorFilter.cpp \
@@ -163,7 +162,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/StyleSheetList.cpp \
 	third_party/WebKit/Source/core/css/resolver/ElementStyleResources.cpp \
 	third_party/WebKit/Source/core/css/resolver/FilterOperationResolver.cpp \
+	third_party/WebKit/Source/core/css/resolver/MatchedPropertiesCache.cpp \
+	third_party/WebKit/Source/core/css/resolver/MatchResult.cpp \
+	third_party/WebKit/Source/core/css/resolver/MediaQueryResult.cpp \
 	third_party/WebKit/Source/core/css/resolver/ScopedStyleResolver.cpp \
+	third_party/WebKit/Source/core/css/resolver/SharedStyleFinder.cpp \
+	third_party/WebKit/Source/core/css/resolver/StyleAdjuster.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleBuilderCustom.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleResolver.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleResolverState.cpp \
@@ -313,7 +317,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/EmptyClients.cpp \
 	third_party/WebKit/Source/core/loader/FormState.cpp \
 	third_party/WebKit/Source/core/loader/FormSubmission.cpp \
-	third_party/WebKit/Source/core/loader/FrameLoadRequest.cpp \
 	third_party/WebKit/Source/core/loader/FrameLoader.cpp \
 	third_party/WebKit/Source/core/loader/FrameLoaderStateMachine.cpp \
 	third_party/WebKit/Source/core/loader/HistoryController.cpp \
@@ -353,7 +356,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/cache/CachedResourceHandle.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedResourceLoader.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedResourceRequest.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedResourceRequestInitiators.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedScript.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedShader.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedTextTrack.cpp \
@@ -365,6 +367,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/Console.cpp \
 	third_party/WebKit/Source/core/page/ContentSecurityPolicy.cpp \
 	third_party/WebKit/Source/core/page/ContextMenuController.cpp \
+	third_party/WebKit/Source/core/page/CreateWindow.cpp \
 	third_party/WebKit/Source/core/page/DeviceController.cpp \
 	third_party/WebKit/Source/core/page/DiagnosticLoggingKeys.cpp \
 	third_party/WebKit/Source/core/page/DOMSecurityPolicy.cpp \
@@ -383,6 +386,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/FrameTree.cpp \
 	third_party/WebKit/Source/core/page/FrameView.cpp \
 	third_party/WebKit/Source/core/page/History.cpp \
+	third_party/WebKit/Source/core/page/ImageBitmap.cpp \
+	third_party/WebKit/Source/core/page/ImageBitmapCallback.cpp \
 	third_party/WebKit/Source/core/page/Location.cpp \
 	third_party/WebKit/Source/core/page/MemoryInfo.cpp \
 	third_party/WebKit/Source/core/page/MouseEventWithHitTestResults.cpp \
@@ -457,6 +462,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/workers/WorkerThread.cpp \
 	third_party/WebKit/Source/core/xml/parser/XMLDocumentParser.cpp \
 	third_party/WebKit/Source/core/xml/parser/XMLDocumentParserScope.cpp \
+	third_party/WebKit/Source/core/xml/DocumentXPathEvaluator.cpp \
 	third_party/WebKit/Source/core/xml/DOMParser.cpp \
 	third_party/WebKit/Source/core/xml/NativeXPathNSResolver.cpp \
 	third_party/WebKit/Source/core/xml/XMLErrors.cpp \
@@ -528,6 +534,8 @@ MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -539,7 +547,6 @@ MY_DEFS_Debug := \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -547,9 +554,7 @@ MY_DEFS_Debug := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -561,7 +566,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
@@ -691,6 +695,8 @@ MY_DEFS_Release := \
 	'-DANGLE_DX11' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
+	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
+	'-DSYSTEM_NATIVELY_SIGNALS_MEMORY_PRESSURE' \
 	'-DDISABLE_NACL' \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
@@ -702,7 +708,6 @@ MY_DEFS_Release := \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
-	'-DENABLE_CANVAS_USES_MAILBOX=1' \
 	'-DENABLE_CSS3_TEXT=0' \
 	'-DENABLE_CSS_EXCLUSIONS=1' \
 	'-DENABLE_CSS_REGIONS=1' \
@@ -710,9 +715,7 @@ MY_DEFS_Release := \
 	'-DENABLE_ENCRYPTED_MEDIA_V2=1' \
 	'-DENABLE_SVG_FONTS=1' \
 	'-DENABLE_TOUCH_ICON_LOADING=1' \
-	'-DENABLE_XHR_TIMEOUT=0' \
 	'-DENABLE_GDI_FONTS_ON_WINDOWS=1' \
-	'-DENABLE_PARTITION_ALLOC=1' \
 	'-DWTF_USE_CONCATENATED_IMPULSE_RESPONSES=1' \
 	'-DENABLE_CALENDAR_PICKER=0' \
 	'-DENABLE_FAST_MOBILE_SCROLLING=1' \
@@ -724,7 +727,6 @@ MY_DEFS_Release := \
 	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
-	'-DENABLE_8BIT_TEXTRUN=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \

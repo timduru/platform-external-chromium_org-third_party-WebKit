@@ -84,15 +84,15 @@ public:
         return *this;
     }
 
-    WEBKIT_EXPORT WebCryptoAlgorithmId algorithmId() const;
-    WEBKIT_EXPORT const char* algorithmName() const;
+    WEBKIT_EXPORT WebCryptoAlgorithmId id() const;
+    WEBKIT_EXPORT const char* name() const;
 
     WEBKIT_EXPORT WebCryptoAlgorithmParamsType paramsType() const;
 
     // Retrieves the type-specific parameters. The algorithm contains at most 1
     // type of parameters. Retrieving an invalid parameter will return 0.
-    WebCryptoAesCbcParams* aesCbcParams() const;
-    WebCryptoAesKeyGenParams* aesKeyGenParams() const;
+    WEBKIT_EXPORT WebCryptoAesCbcParams* aesCbcParams() const;
+    WEBKIT_EXPORT WebCryptoAesKeyGenParams* aesKeyGenParams() const;
 
 private:
     WEBKIT_EXPORT void assign(const WebCryptoAlgorithm& other);

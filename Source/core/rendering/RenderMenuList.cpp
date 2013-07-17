@@ -260,7 +260,7 @@ void RenderMenuList::setText(const String& s)
 
 String RenderMenuList::text() const
 {
-    return m_buttonText ? m_buttonText->text() : 0;
+    return m_buttonText ? m_buttonText->text() : String();
 }
 
 LayoutRect RenderMenuList::controlClipRect(const LayoutPoint& additionalOffset) const
@@ -399,8 +399,8 @@ String RenderMenuList::itemText(unsigned listIndex) const
 
     String itemString;
     Element* element = listItems[listIndex];
-    if (element->hasTagName(optgroupTag))
-        itemString = static_cast<const HTMLOptGroupElement*>(element)->groupLabelText();
+    if (isHTMLOptGroupElement(element))
+        itemString = toHTMLOptGroupElement(element)->groupLabelText();
     else if (element->hasTagName(optionTag))
         itemString = toHTMLOptionElement(element)->textIndentedToRespectGroupLabel();
 
@@ -446,7 +446,7 @@ bool RenderMenuList::itemIsEnabled(unsigned listIndex) const
 
     bool groupEnabled = true;
     if (Element* parentElement = element->parentElement()) {
-        if (parentElement->hasTagName(optgroupTag))
+        if (isHTMLOptGroupElement(parentElement))
             groupEnabled = !parentElement->isDisabledFormControl();
     }
     if (!groupEnabled)
@@ -590,7 +590,7 @@ bool RenderMenuList::itemIsSeparator(unsigned listIndex) const
 bool RenderMenuList::itemIsLabel(unsigned listIndex) const
 {
     const Vector<HTMLElement*>& listItems = selectElement()->listItems();
-    return listIndex < listItems.size() && listItems[listIndex]->hasTagName(optgroupTag);
+    return listIndex < listItems.size() && isHTMLOptGroupElement(listItems[listIndex]);
 }
 
 bool RenderMenuList::itemIsSelected(unsigned listIndex) const

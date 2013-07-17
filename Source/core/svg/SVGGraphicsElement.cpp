@@ -75,7 +75,7 @@ AffineTransform SVGGraphicsElement::animatedLocalTransform() const
         // Flatten any 3D transform.
         matrix = transform.toAffineTransform();
     } else {
-        transform().concatenate(matrix);
+        transformCurrentValue().concatenate(matrix);
     }
 
     if (m_supplementalTransform)
@@ -155,7 +155,7 @@ SVGElement* SVGGraphicsElement::farthestViewportElement() const
     return SVGTransformable::farthestViewportElement(this);
 }
 
-FloatRect SVGGraphicsElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
+SVGRect SVGGraphicsElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
 {
     return SVGTransformable::getBBox(this, styleUpdateStrategy);
 }

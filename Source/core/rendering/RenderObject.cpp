@@ -33,7 +33,10 @@
 #include "core/editing/EditingBoundary.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/htmlediting.h"
+#include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLElement.h"
+#include "core/html/HTMLHtmlElement.h"
+#include "core/html/HTMLTableElement.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
@@ -1721,7 +1724,7 @@ void RenderObject::handleDynamicFloatPositionChange()
 
 void RenderObject::setAnimatableStyle(PassRefPtr<RenderStyle> style)
 {
-    if (!isText() && style)
+    if (!isText() && style && !RuntimeEnabledFeatures::webAnimationsCSSEnabled())
         setStyle(animation()->updateAnimations(this, style.get()));
     else
         setStyle(style);
@@ -2285,7 +2288,7 @@ bool RenderObject::isRooted(RenderView** view) const
 RenderObject* RenderObject::rendererForRootBackground()
 {
     ASSERT(isRoot());
-    if (!hasBackground() && node() && node()->hasTagName(HTMLNames::htmlTag)) {
+    if (!hasBackground() && node() && isHTMLHtmlElement(node())) {
         // Locate the <body> element using the DOM. This is easier than trying
         // to crawl around a render tree with potential :before/:after content and
         // anonymous blocks created by inline <body> tags etc. We can locate the <body>
@@ -2860,8 +2863,7 @@ void RenderObject::getTextDecorationColors(int decorations, Color& underline, Co
         curr = curr->parent();
         if (curr && curr->isAnonymousBlock() && toRenderBlock(curr)->continuation())
             curr = toRenderBlock(curr)->continuation();
-    } while (curr && decorations && (!quirksMode || !curr->node() ||
-                                     (!curr->node()->hasTagName(aTag) && !curr->node()->hasTagName(fontTag))));
+    } while (curr && decorations && (!quirksMode || !curr->node() || (!isHTMLAnchorElement(curr->node()) && !curr->node()->hasTagName(fontTag))));
 
     // If we bailed out, use the element we bailed out at (typically a <font> or <a> element).
     if (decorations && curr) {
@@ -3048,7 +3050,7 @@ Element* RenderObject::offsetParent() const
         if (node->hasTagName(HTMLNames::bodyTag))
             break;
 
-        if (!isPositioned() && (node->hasTagName(tableTag) || node->hasTagName(tdTag) || node->hasTagName(thTag)))
+        if (!isPositioned() && (isHTMLTableElement(node) || node->hasTagName(tdTag) || node->hasTagName(thTag)))
             break;
 
         // Webkit specific extension where offsetParent stops at zoom level changes.

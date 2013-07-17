@@ -208,6 +208,8 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keypress);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(keyup);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mousedown);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseenter);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseleave);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mousemove);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseout);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(mouseover);
@@ -334,6 +336,8 @@ public:
     // Returns the absolute bounding box translated into screen coordinates:
     IntRect screenRect() const;
 
+    virtual void didMoveToNewDocument(Document*) OVERRIDE;
+
     void removeAttribute(const AtomicString& name);
     void removeAttributeNS(const AtomicString& namespaceURI, const AtomicString& localName);
 
@@ -432,7 +436,7 @@ public:
     virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual RenderObject* createRenderer(RenderStyle*);
     virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    void recalcStyle(StyleChange = NoChange);
+    bool recalcStyle(StyleChange = NoChange);
     void didAffectSelector(AffectedSelectorMask);
 
     ElementShadow* shadow() const;
@@ -479,7 +483,7 @@ public:
     void setIsInCanvasSubtree(bool);
     bool isInCanvasSubtree() const;
 
-    bool isUnresolvedCustomElement();
+    bool isUnresolvedCustomElement() { return isCustomElement() && !isUpgradedCustomElement(); }
 
     void setIsInsideRegion(bool);
     bool isInsideRegion() const;
@@ -560,7 +564,7 @@ public:
     virtual bool isInRange() const { return false; }
     virtual bool isOutOfRange() const { return false; }
     virtual bool isFrameElementBase() const { return false; }
-    virtual bool isTextFieldDecoration() const { return false; }
+    virtual bool isPasswordGeneratorButtonElement() const { return false; }
     virtual bool isClearButtonElement() const;
 
     virtual bool canContainRangeEndPoint() const { return true; }

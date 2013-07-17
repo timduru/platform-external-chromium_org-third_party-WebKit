@@ -88,21 +88,21 @@ bool CachedFont::ensureCustomFontData()
     return m_fontData;
 }
 
-FontPlatformData CachedFont::platformDataFromCustomData(float size, bool bold, bool italic, FontOrientation orientation, FontWidthVariant widthVariant, FontRenderingMode renderingMode)
+FontPlatformData CachedFont::platformDataFromCustomData(float size, bool bold, bool italic, FontOrientation orientation, FontWidthVariant widthVariant)
 {
 #if ENABLE(SVG_FONTS)
     if (m_externalSVGDocument)
         return FontPlatformData(size, bold, italic);
 #endif
     ASSERT(m_fontData);
-    return m_fontData->fontPlatformData(static_cast<int>(size), bold, italic, orientation, widthVariant, renderingMode);
+    return m_fontData->fontPlatformData(static_cast<int>(size), bold, italic, orientation, widthVariant);
 }
 
 #if ENABLE(SVG_FONTS)
 bool CachedFont::ensureSVGFontData()
 {
     if (!m_externalSVGDocument && !errorOccurred() && !isLoading() && m_data) {
-        m_externalSVGDocument = SVGDocument::create(0, KURL());
+        m_externalSVGDocument = SVGDocument::create();
 
         RefPtr<TextResourceDecoder> decoder = TextResourceDecoder::create("application/xml");
         String svgSource = decoder->decode(m_data->data(), m_data->size());
@@ -135,10 +135,10 @@ SVGFontElement* CachedFont::getSVGFontById(const String& fontName) const
 #endif
 
     if (fontName.isEmpty())
-        return static_cast<SVGFontElement*>(list->item(0));
+        return toSVGFontElement(list->item(0));
 
     for (unsigned i = 0; i < listLength; ++i) {
-        SVGFontElement* element = static_cast<SVGFontElement*>(list->item(i));
+        SVGFontElement* element = toSVGFontElement(list->item(i));
         if (element->getIdAttribute() == fontName)
             return element;
     }

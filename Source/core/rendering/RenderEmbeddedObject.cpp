@@ -188,7 +188,6 @@ bool RenderEmbeddedObject::getReplacementTextGeometry(const LayoutPoint& accumul
     ASSERT(settings);
     if (!settings)
         return false;
-    fontDescription.setRenderingMode(settings->fontRenderingMode());
     fontDescription.setComputedSize(fontDescription.specifiedSize());
     font = Font(fontDescription, 0, 0);
     font.update(0);
@@ -269,7 +268,7 @@ void RenderEmbeddedObject::viewCleared()
         int marginWidth = -1;
         int marginHeight = -1;
         if (node()->hasTagName(iframeTag)) {
-            HTMLIFrameElement* frame = static_cast<HTMLIFrameElement*>(node());
+            HTMLIFrameElement* frame = toHTMLIFrameElement(node());
             marginWidth = frame->marginWidth();
             marginHeight = frame->marginHeight();
         }
