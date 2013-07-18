@@ -88,7 +88,7 @@ public:
     virtual void contentsResized();
 
     bool hasOverlayScrollbars() const;
-    virtual void setScrollbarOverlayStyle(ScrollbarOverlayStyle);
+    void setScrollbarOverlayStyle(ScrollbarOverlayStyle);
     ScrollbarOverlayStyle scrollbarOverlayStyle() const { return static_cast<ScrollbarOverlayStyle>(m_scrollbarOverlayStyle); }
 
     // This getter will create a ScrollAnimator if it doesn't already exist.
@@ -172,8 +172,6 @@ public:
 
     virtual bool usesCompositedScrolling() const { return false; }
     virtual void updateNeedsCompositedScrolling() { }
-
-    virtual void reportMemoryUsage(MemoryObjectInfo*) const;
 
     // Convenience functions
     int scrollPosition(ScrollbarOrientation orientation) { return orientation == HorizontalScrollbar ? scrollPosition().x() : scrollPosition().y(); }

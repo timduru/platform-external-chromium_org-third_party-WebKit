@@ -21,6 +21,7 @@
 #ifndef AtomicString_h
 #define AtomicString_h
 
+#include "wtf/HashTableDeletedValueType.h"
 #include "wtf/WTFExport.h"
 #include "wtf/text/AtomicStringImpl.h"
 #include "wtf/text/WTFString.h"
@@ -36,7 +37,6 @@
 namespace WTF {
 
 struct AtomicStringHash;
-class MemoryObjectInfo;
 
 class WTF_EXPORT AtomicString {
 public:
@@ -98,7 +98,6 @@ public:
     AtomicStringImpl* impl() const { return static_cast<AtomicStringImpl *>(m_string.impl()); }
 
     bool is8Bit() const { return m_string.is8Bit(); }
-    const UChar* bloatedCharacters() const { return m_string.bloatedCharacters(); }
     const LChar* characters8() const { return m_string.characters8(); }
     const UChar* characters16() const { return m_string.characters16(); }
     unsigned length() const { return m_string.length(); }

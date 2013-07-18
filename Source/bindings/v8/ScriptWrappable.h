@@ -34,7 +34,6 @@
 #include "bindings/v8/UnsafePersistent.h"
 #include "bindings/v8/V8Utilities.h"
 #include "bindings/v8/WrapperTypeInfo.h"
-#include "core/dom/WebCoreMemoryInstrumentation.h"
 #include <v8.h>
 
 // Helper to call webCoreInitializeScriptWrappableForInterface in the global namespace.
@@ -46,7 +45,7 @@ template <class C> inline void initializeScriptWrappableHelper(C* object)
 
 namespace WebCore {
 
-class ScriptWrappable : public MemoryReporterTag {
+class ScriptWrappable {
 public:
     ScriptWrappable() : m_wrapperOrTypeInfo(0) { }
 
@@ -82,7 +81,7 @@ public:
             return reinterpret_cast<const WrapperTypeInfo*>(m_wrapperOrTypeInfo);
 
         if (containsWrapper()) {
-            return toWrapperTypeInfo(unsafePersistent().handle());
+            return toWrapperTypeInfo(unsafePersistent().deprecatedHandle());
         }
 
         return 0;
@@ -92,12 +91,6 @@ public:
     {
         m_wrapperOrTypeInfo = reinterpret_cast<uintptr_t>(info);
         ASSERT(containsTypeInfo());
-    }
-
-    void reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-    {
-        MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-        info.ignoreMember(m_wrapperOrTypeInfo);
     }
 
     static bool wrapperCanBeStoredInObject(const void*) { return false; }
@@ -181,7 +174,7 @@ private:
 
     static void makeWeakCallback(v8::Isolate* isolate, v8::Persistent<v8::Object>* wrapper, ScriptWrappable* key)
     {
-        ASSERT(key->unsafePersistent().handle() == *wrapper);
+        ASSERT(key->unsafePersistent().deprecatedHandle() == *wrapper);
 
         // Note: |object| might not be equal to |key|, e.g., if ScriptWrappable isn't a left-most base class.
         void* object = toNative(*wrapper);

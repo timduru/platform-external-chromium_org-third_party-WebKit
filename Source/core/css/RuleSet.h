@@ -72,8 +72,6 @@ public:
     bool hasDocumentSecurityOrigin() const { return m_hasDocumentSecurityOrigin; }
     PropertyWhitelistType propertyWhitelistType(bool isMatchingUARules = false) const { return isMatchingUARules ? PropertyWhitelistNone : static_cast<PropertyWhitelistType>(m_propertyWhitelistType); }
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
 private:
     StyleRule* m_rule;
     unsigned m_selectorIndex : 12;
@@ -119,6 +117,7 @@ public:
     const Vector<RuleData>* focusPseudoClassRules() const { ASSERT(!m_pendingRules); return &m_focusPseudoClassRules; }
     const Vector<RuleData>* universalRules() const { ASSERT(!m_pendingRules); return &m_universalRules; }
     const Vector<StyleRulePage*>& pageRules() const { ASSERT(!m_pendingRules); return m_pageRules; }
+    const Vector<StyleRuleViewport*>& viewportRules() const { ASSERT(!m_pendingRules); return m_viewportRules; }
 
     unsigned ruleCount() const { return m_ruleCount; }
 
@@ -129,12 +128,9 @@ public:
         compactRules();
     }
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
     struct RuleSetSelectorPair {
         RuleSetSelectorPair(const CSSSelector* selector, PassOwnPtr<RuleSet> ruleSet) : selector(selector), ruleSet(ruleSet) { }
         RuleSetSelectorPair(const RuleSetSelectorPair& rs) : selector(rs.selector), ruleSet(const_cast<RuleSetSelectorPair*>(&rs)->ruleSet.release()) { }
-        void reportMemoryUsage(MemoryObjectInfo*) const;
 
         const CSSSelector* selector;
         OwnPtr<RuleSet> ruleSet;
@@ -153,6 +149,7 @@ private:
 
     void addToRuleSet(AtomicStringImpl* key, PendingRuleMap&, const RuleData&);
     void addPageRule(StyleRulePage*);
+    void addViewportRule(StyleRuleViewport*);
     void addRegionRule(StyleRuleRegion*, bool hasDocumentSecurityOrigin);
 
     void addChildRules(const Vector<RefPtr<StyleRuleBase> >&, const MediaQueryEvaluator& medium, StyleResolver*, const ContainerNode* scope, bool hasDocumentSecurityOrigin, AddRuleFlags);
@@ -185,6 +182,7 @@ private:
     Vector<RuleData> m_universalRules;
     RuleFeatureSet m_features;
     Vector<StyleRulePage*> m_pageRules;
+    Vector<StyleRuleViewport*> m_viewportRules;
 
     unsigned m_ruleCount;
     OwnPtr<PendingRuleMaps> m_pendingRules;

@@ -43,11 +43,8 @@
 #include "core/css/StyleRuleImport.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/css/resolver/StyleResolver.h"
-#include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/html/track/TextTrackCue.h"
 #include "weborigin/SecurityOrigin.h"
-#include "wtf/MemoryInstrumentationHashMap.h"
-#include "wtf/MemoryInstrumentationVector.h"
 
 namespace WebCore {
 
@@ -223,35 +220,6 @@ RuleData::RuleData(StyleRule* rule, unsigned selectorIndex, unsigned position, A
     ASSERT(m_selectorIndex == selectorIndex);
 }
 
-void RuleData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_rule, "rule");
-}
-
-void RuleSet::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_idRules, "idRules");
-    info.addMember(m_classRules, "classRules");
-    info.addMember(m_tagRules, "tagRules");
-    info.addMember(m_shadowPseudoElementRules, "shadowPseudoElementRules");
-    info.addMember(m_linkPseudoClassRules, "linkPseudoClassRules");
-    info.addMember(m_cuePseudoRules, "cuePseudoRules");
-    info.addMember(m_focusPseudoClassRules, "focusPseudoClassRules");
-    info.addMember(m_universalRules, "universalRules");
-    info.addMember(m_pageRules, "pageRules");
-    info.addMember(m_regionSelectorsAndRuleSets, "regionSelectorsAndRuleSets");
-    info.addMember(m_features, "features");
-}
-
-void RuleSet::RuleSetSelectorPair::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(ruleSet, "ruleSet");
-    info.addMember(selector, "selector");
-}
-
 static void collectFeaturesFromRuleData(RuleFeatureSet& features, const RuleData& ruleData)
 {
     bool foundSiblingSelector = false;
@@ -349,6 +317,12 @@ void RuleSet::addPageRule(StyleRulePage* rule)
     m_pageRules.append(rule);
 }
 
+void RuleSet::addViewportRule(StyleRuleViewport* rule)
+{
+    ensurePendingRules(); // So that m_viewportRules.shrinkToFit() gets called.
+    m_viewportRules.append(rule);
+}
+
 void RuleSet::addRegionRule(StyleRuleRegion* regionRule, bool hasDocumentSecurityOrigin)
 {
     ensurePendingRules(); // So that m_regionSelectorsAndRuleSets.shrinkToFit() gets called.
@@ -406,12 +380,8 @@ void RuleSet::addChildRules(const Vector<RefPtr<StyleRuleBase> >& rules, const M
             resolver->fontSelector()->addFontFaceRule(fontFaceRule);
             resolver->invalidateMatchedPropertiesCache();
         } else if (rule->isKeyframesRule() && resolver) {
-            // FIXME (BUG 72462): We don't add @keyframe rules of scoped style sheets for the moment.
-            if (!isDocumentScope(scope))
-                continue;
-            resolver->addKeyframeStyle(static_cast<StyleRuleKeyframes*>(rule));
-        }
-        else if (rule->isRegionRule() && resolver) {
+            resolver->ensureScopedStyleResolver(scope)->addKeyframeStyle(static_cast<StyleRuleKeyframes*>(rule));
+        } else if (rule->isRegionRule() && resolver) {
             // FIXME (BUG 72472): We don't add @-webkit-region rules of scoped style sheets for the moment.
             addRegionRule(static_cast<StyleRuleRegion*>(rule), hasDocumentSecurityOrigin);
         } else if (rule->isHostRule() && resolver) {
@@ -421,11 +391,11 @@ void RuleSet::addChildRules(const Vector<RefPtr<StyleRuleBase> >& rules, const M
             resolver->setBuildScopedStyleTreeInDocumentOrder(false);
             resolver->ensureScopedStyleResolver(scope->shadowHost())->addHostRule(static_cast<StyleRuleHost*>(rule), hasDocumentSecurityOrigin, scope);
             resolver->setBuildScopedStyleTreeInDocumentOrder(enabled);
-        } else if (RuntimeEnabledFeatures::cssViewportEnabled() && rule->isViewportRule() && resolver) {
+        } else if (RuntimeEnabledFeatures::cssViewportEnabled() && rule->isViewportRule()) {
             // @viewport should not be scoped.
             if (!isDocumentScope(scope))
                 continue;
-            resolver->viewportStyleResolver()->addViewportRule(static_cast<StyleRuleViewport*>(rule));
+            addViewportRule(static_cast<StyleRuleViewport*>(rule));
         }
         else if (rule->isSupportsRule() && static_cast<StyleRuleSupports*>(rule)->conditionIsSupported())
             addChildRules(static_cast<StyleRuleSupports*>(rule)->childRules(), medium, resolver, scope, hasDocumentSecurityOrigin, addRuleFlags);
@@ -486,6 +456,7 @@ void RuleSet::compactRules()
     m_focusPseudoClassRules.shrinkToFit();
     m_universalRules.shrinkToFit();
     m_pageRules.shrinkToFit();
+    m_viewportRules.shrinkToFit();
 }
 
 } // namespace WebCore

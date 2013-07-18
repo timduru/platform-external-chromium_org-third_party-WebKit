@@ -67,7 +67,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/HashTable.cpp \
 	third_party/WebKit/Source/wtf/MD5.cpp \
 	third_party/WebKit/Source/wtf/MainThread.cpp \
-	third_party/WebKit/Source/wtf/MemoryInstrumentation.cpp \
 	third_party/WebKit/Source/wtf/NullPtr.cpp \
 	third_party/WebKit/Source/wtf/NumberOfCores.cpp \
 	third_party/WebKit/Source/wtf/PageAllocator.cpp \

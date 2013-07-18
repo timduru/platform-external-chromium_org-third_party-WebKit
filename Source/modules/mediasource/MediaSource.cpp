@@ -40,6 +40,7 @@
 #include "core/platform/graphics/SourceBufferPrivate.h"
 #include "modules/mediasource/MediaSourceRegistry.h"
 #include "wtf/Uint8Array.h"
+#include "wtf/text/CString.h"
 
 namespace WebCore {
 
@@ -208,15 +209,6 @@ bool MediaSource::isTypeSupported(const String& type)
 const AtomicString& MediaSource::interfaceName() const
 {
     return eventNames().interfaceForMediaSource;
-}
-
-void MediaSource::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    ScriptWrappable::reportMemoryUsage(memoryObjectInfo);
-    MediaSourceBase::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_sourceBuffers, "sourceBuffers");
-    info.addMember(m_activeSourceBuffers, "activeSourceBuffers");
 }
 
 } // namespace WebCore

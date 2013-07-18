@@ -122,8 +122,6 @@ public:
 
     GCEventData* gcEventData() { return m_gcEventData.get(); }
 
-    void reportMemoryUsage(MemoryObjectInfo*) const;
-
     // Gives the system a hint that we should request garbage collection
     // upon the next close or navigation event, because some expensive
     // objects have been allocated that we want to take every opportunity
@@ -132,8 +130,9 @@ public:
     void clearShouldCollectGarbageSoon() { m_shouldCollectGarbageSoon = false; }
     bool shouldCollectGarbageSoon() const { return m_shouldCollectGarbageSoon; }
 
-    bool hasPrivateTemplate(WrapperWorldType, void* privatePointer);
-    v8::Handle<v8::FunctionTemplate> privateTemplate(WrapperWorldType, void* privatePointer, v8::FunctionCallback, v8::Handle<v8::Value> data, v8::Handle<v8::Signature>, int length = 0);
+    v8::Handle<v8::FunctionTemplate> privateTemplate(WrapperWorldType, void* privatePointer, v8::FunctionCallback = 0, v8::Handle<v8::Value> data = v8::Handle<v8::Value>(), v8::Handle<v8::Signature> = v8::Handle<v8::Signature>(), int length = 0);
+    v8::Handle<v8::FunctionTemplate> privateTemplateIfExists(WrapperWorldType, void* privatePointer);
+    void setPrivateTemplate(WrapperWorldType, void* privatePointer, v8::Handle<v8::FunctionTemplate>);
 
     v8::Handle<v8::FunctionTemplate> rawTemplate(WrapperTypeInfo*, WrapperWorldType);
 

@@ -45,6 +45,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/LayoutTestSupport.cpp \
 	third_party/WebKit/Source/core/platform/Length.cpp \
 	third_party/WebKit/Source/core/platform/LengthBox.cpp \
+	third_party/WebKit/Source/core/platform/LifecycleContext.cpp \
+	third_party/WebKit/Source/core/platform/LifecycleNotifier.cpp \
+	third_party/WebKit/Source/core/platform/LifecycleObserver.cpp \
 	third_party/WebKit/Source/core/platform/LinkHash.cpp \
 	third_party/WebKit/Source/core/platform/Logging.cpp \
 	third_party/WebKit/Source/core/platform/MIMETypeFromURL.cpp \
@@ -52,7 +55,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/Partitions.cpp \
 	third_party/WebKit/Source/core/platform/PlatformEvent.cpp \
 	third_party/WebKit/Source/core/platform/PlatformInstrumentation.cpp \
-	third_party/WebKit/Source/core/platform/PlatformMemoryInstrumentation.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisUtterance.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisVoice.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesizer.cpp \
@@ -258,7 +260,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/skia/FontPlatformDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/GlyphPageTreeNodeSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/ImageSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/MemoryInstrumentationSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/NativeImageSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/OpaqueRegionSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SimpleFontDataSkia.cpp \

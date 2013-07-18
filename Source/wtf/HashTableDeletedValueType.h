@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,22 +28,13 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MemoryInstrumentationHashSet_h
-#define MemoryInstrumentationHashSet_h
-
-#include "wtf/HashSet.h"
-#include "wtf/MemoryInstrumentationSequence.h"
+#ifndef HashTableDeletedValueType_h
+#define HashTableDeletedValueType_h
 
 namespace WTF {
 
-template<typename ValueArg, typename HashArg, typename TraitsArg>
-void reportMemoryUsage(const HashSet<ValueArg, HashArg, TraitsArg>* hashSet, MemoryObjectInfo* memoryObjectInfo)
-{
-    MemoryClassInfo info(memoryObjectInfo, hashSet);
-    info.addPrivateBuffer(sizeof(typename HashTable<ValueArg, ValueArg, IdentityExtractor, HashArg, TraitsArg, TraitsArg>::ValueType) * hashSet->capacity(), 0, "ValueType[]", "data");
-    SequenceMemoryInstrumentationTraits<ValueArg>::reportMemoryUsage(hashSet->begin(), hashSet->end(), info);
-}
+enum HashTableDeletedValueType { HashTableDeletedValue };
 
-}
+} // namespace WTF
 
-#endif // !defined(MemoryInstrumentationHashSet_h)
+#endif // HashTableDeletedValueType_h

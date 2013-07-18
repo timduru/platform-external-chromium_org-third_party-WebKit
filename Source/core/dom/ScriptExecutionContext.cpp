@@ -32,8 +32,8 @@
 #include "core/dom/ErrorEvent.h"
 #include "core/dom/EventTarget.h"
 #include "core/dom/MessagePort.h"
-#include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/html/PublicURLManager.h"
+#include "core/inspector/InspectorInstrumentation.h"
 #include "core/inspector/ScriptCallStack.h"
 #include "core/loader/cache/CachedScript.h"
 #include "core/page/DOMTimer.h"
@@ -41,17 +41,7 @@
 #include "core/workers/WorkerThread.h"
 #include "modules/webdatabase/DatabaseContext.h"
 #include "wtf/MainThread.h"
-#include "wtf/MemoryInstrumentationHashMap.h"
-#include "wtf/MemoryInstrumentationHashSet.h"
-#include "wtf/MemoryInstrumentationVector.h"
 
-namespace WTF {
-
-template<> struct SequenceMemoryInstrumentationTraits<WebCore::ContextLifecycleObserver*> {
-    template <typename I> static void reportMemoryUsage(I, I, MemoryClassInfo&) { }
-};
-
-}
 namespace WebCore {
 
 class ProcessMessagesSoonTask : public ScriptExecutionContext::Task {
@@ -195,16 +185,6 @@ void ScriptExecutionContext::suspendActiveDOMObjectIfNeeded(ActiveDOMObject* obj
         object->suspend(m_reasonForSuspendingActiveDOMObjects);
 }
 
-void ScriptExecutionContext::wasObservedBy(ContextLifecycleObserver* observer, ContextLifecycleObserver::Type as)
-{
-    lifecycleNotifier()->addObserver(observer, as);
-}
-
-void ScriptExecutionContext::wasUnobservedBy(ContextLifecycleObserver* observer, ContextLifecycleObserver::Type as)
-{
-    lifecycleNotifier()->removeObserver(observer, as);
-}
-
 void ScriptExecutionContext::closeMessagePorts() {
     HashSet<MessagePort*>::iterator messagePortsEnd = m_messagePorts.end();
     for (HashSet<MessagePort*>::iterator iter = m_messagePorts.begin(); iter != messagePortsEnd; ++iter) {
@@ -279,6 +259,30 @@ int ScriptExecutionContext::circularSequentialID()
     return m_circularSequentialID;
 }
 
+int ScriptExecutionContext::installNewTimeout(PassOwnPtr<ScheduledAction> action, int timeout, bool singleShot)
+{
+    int timeoutID;
+    while (true) {
+        timeoutID = circularSequentialID();
+        if (!m_timeouts.contains(timeoutID))
+            break;
+    }
+    TimeoutMap::AddResult result = m_timeouts.add(timeoutID, DOMTimer::create(this, action, timeout, singleShot, timeoutID));
+    ASSERT(result.isNewEntry);
+    DOMTimer* timer = result.iterator->value.get();
+
+    timer->suspendIfNeeded();
+
+    return timer->timeoutID();
+}
+
+void ScriptExecutionContext::removeTimeoutByID(int timeoutID)
+{
+    if (timeoutID <= 0)
+        return;
+    m_timeouts.remove(timeoutID);
+}
+
 PublicURLManager& ScriptExecutionContext::publicURLManager()
 {
     if (!m_publicURLManager)
@@ -288,10 +292,8 @@ PublicURLManager& ScriptExecutionContext::publicURLManager()
 
 void ScriptExecutionContext::didChangeTimerAlignmentInterval()
 {
-    for (TimeoutMap::iterator iter = m_timeouts.begin(); iter != m_timeouts.end(); ++iter) {
-        DOMTimer* timer = iter->value;
-        timer->didChangeAlignmentInterval();
-    }
+    for (TimeoutMap::iterator iter = m_timeouts.begin(); iter != m_timeouts.end(); ++iter)
+        iter->value->didChangeAlignmentInterval();
 }
 
 double ScriptExecutionContext::timerAlignmentInterval() const
@@ -301,25 +303,12 @@ double ScriptExecutionContext::timerAlignmentInterval() const
 
 ContextLifecycleNotifier* ScriptExecutionContext::lifecycleNotifier()
 {
-    if (!m_lifecycleNotifier)
-        m_lifecycleNotifier = const_cast<ScriptExecutionContext*>(this)->createLifecycleNotifier();
-    return m_lifecycleNotifier.get();
+    return static_cast<ContextLifecycleNotifier*>(LifecycleContext::lifecycleNotifier());
 }
 
-PassOwnPtr<ContextLifecycleNotifier> ScriptExecutionContext::createLifecycleNotifier()
+PassOwnPtr<LifecycleNotifier> ScriptExecutionContext::createLifecycleNotifier()
 {
     return ContextLifecycleNotifier::create(this);
-}
-
-void ScriptExecutionContext::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    SecurityContext::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_messagePorts, "messagePorts");
-    info.addMember(m_lifecycleNotifier, "lifecycleObserver");
-    info.addMember(m_timeouts, "timeouts");
-    info.addMember(m_pendingExceptions, "pendingExceptions");
-    info.addMember(m_publicURLManager, "publicURLManager");
 }
 
 ScriptExecutionContext::Task::~Task()

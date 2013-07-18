@@ -162,9 +162,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/StyleSheetList.cpp \
 	third_party/WebKit/Source/core/css/resolver/ElementStyleResources.cpp \
 	third_party/WebKit/Source/core/css/resolver/FilterOperationResolver.cpp \
+	third_party/WebKit/Source/core/css/resolver/FontBuilder.cpp \
 	third_party/WebKit/Source/core/css/resolver/MatchedPropertiesCache.cpp \
 	third_party/WebKit/Source/core/css/resolver/MatchResult.cpp \
-	third_party/WebKit/Source/core/css/resolver/MediaQueryResult.cpp \
 	third_party/WebKit/Source/core/css/resolver/ScopedStyleResolver.cpp \
 	third_party/WebKit/Source/core/css/resolver/SharedStyleFinder.cpp \
 	third_party/WebKit/Source/core/css/resolver/StyleAdjuster.cpp \
@@ -246,7 +246,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/inspector/ContentSearchUtils.cpp \
 	third_party/WebKit/Source/core/inspector/DOMEditor.cpp \
 	third_party/WebKit/Source/core/inspector/DOMPatchSupport.cpp \
-	third_party/WebKit/Source/core/inspector/HeapGraphSerializer.cpp \
 	third_party/WebKit/Source/core/inspector/IdentifiersFactory.cpp \
 	third_party/WebKit/Source/core/inspector/InjectedScript.cpp \
 	third_party/WebKit/Source/core/inspector/InjectedScriptBase.cpp \
@@ -291,7 +290,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/inspector/InspectorWorkerAgent.cpp \
 	third_party/WebKit/Source/core/inspector/JavaScriptCallFrame.cpp \
 	third_party/WebKit/Source/core/inspector/JSONParser.cpp \
-	third_party/WebKit/Source/core/inspector/MemoryInstrumentationImpl.cpp \
 	third_party/WebKit/Source/core/inspector/NetworkResourcesData.cpp \
 	third_party/WebKit/Source/core/inspector/PageConsoleAgent.cpp \
 	third_party/WebKit/Source/core/inspector/PageDebuggerAgent.cpp \
@@ -397,6 +395,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/PageConsole.cpp \
 	third_party/WebKit/Source/core/page/PageGroup.cpp \
 	third_party/WebKit/Source/core/page/PageGroupLoadDeferrer.cpp \
+	third_party/WebKit/Source/core/page/PageLifecycleNotifier.cpp \
+	third_party/WebKit/Source/core/page/PageLifecycleObserver.cpp \
 	third_party/WebKit/Source/core/page/PagePopupController.cpp \
 	third_party/WebKit/Source/core/page/PagePopupClient.cpp \
 	third_party/WebKit/Source/core/page/PageScaleConstraints.cpp \
@@ -601,7 +601,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/third_party \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/webkit \
@@ -637,6 +636,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
 	$(PWD)/external/jpeg \
+	$(LOCAL_PATH)/third_party \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -765,7 +765,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
-	$(LOCAL_PATH)/third_party \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(gyp_shared_intermediate_dir)/webkit \
@@ -801,6 +800,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
 	$(PWD)/external/jpeg \
+	$(LOCAL_PATH)/third_party \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

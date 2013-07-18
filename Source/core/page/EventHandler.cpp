@@ -90,10 +90,10 @@
 #include "core/svg/SVGDocument.h"
 #include "core/svg/SVGElementInstance.h"
 #include "core/svg/SVGUseElement.h"
-#include <wtf/Assertions.h>
-#include <wtf/CurrentTime.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/TemporaryChange.h>
+#include "wtf/Assertions.h"
+#include "wtf/CurrentTime.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/TemporaryChange.h"
 
 namespace WebCore {
 
@@ -262,6 +262,19 @@ static inline bool shouldGesturesTriggerActive()
     // rely on them to set the active state. Unfortunately there's no generic way to
     // know in advance what event types are supported.
     return true;
+}
+
+// Refetch the event target node if it is removed or currently is the shadow node inside an <input> element.
+// If a mouse event handler changes the input element type to one that has a widget associated,
+// we'd like to EventHandler::handleMousePressEvent to pass the event to the widget and thus the
+// event target node can't still be the shadow node.
+static inline bool shouldRefetchEventTarget(const MouseEventWithHitTestResults& mev)
+{
+    Node* targetNode = mev.targetNode();
+    ASSERT(targetNode);
+    if (!targetNode->parentNode())
+        return true;
+    return targetNode->isShadowRoot() && toShadowRoot(targetNode)->host()->hasTagName(inputTag);
 }
 
 EventHandler::EventHandler(Frame* frame)
@@ -1355,11 +1368,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
         if (scrollbar)
             passMousePressEventToScrollbar(mev, scrollbar);
     } else {
-        // Refetch the event target node if it currently is the shadow node inside an <input> element.
-        // If a mouse event handler changes the input element type to one that has a widget associated,
-        // we'd like to EventHandler::handleMousePressEvent to pass the event to the widget and thus the
-        // event target node can't still be the shadow node.
-        if (mev.targetNode()->isShadowRoot() && toShadowRoot(mev.targetNode())->host()->hasTagName(inputTag)) {
+        if (shouldRefetchEventTarget(mev)) {
             HitTestRequest request(HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
             mev = m_frame->document()->prepareMouseEvent(request, documentPoint, mouseEvent);
         }

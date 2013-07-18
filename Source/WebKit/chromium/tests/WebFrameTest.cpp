@@ -59,7 +59,9 @@
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/MouseEvent.h"
 #include "core/dom/Range.h"
+#include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
+#include "core/editing/SpellChecker.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/page/EventHandler.h"
@@ -1442,7 +1444,7 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
     float scale;
     WebCore::IntPoint scroll;
     bool needAnimation;
-    webViewImpl->computeScaleAndScrollForFocusedNode(webViewImpl->focusedWebCoreNode(), scale, scroll, needAnimation);
+    webViewImpl->computeScaleAndScrollForFocusedNode(webViewImpl->focusedElement(), scale, scroll, needAnimation);
     EXPECT_TRUE(needAnimation);
     // The edit box should be left aligned with a margin for possible label.
     int hScroll = editBoxWithText.x - leftBoxRatio * viewportWidth / scale;
@@ -1457,7 +1459,7 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
     setScaleAndScrollAndLayout(m_webView, WebPoint(0, 0), 1);
     webViewImpl->selectionBounds(caret, rect);
-    webViewImpl->computeScaleAndScrollForFocusedNode(webViewImpl->focusedWebCoreNode(), scale, scroll, needAnimation);
+    webViewImpl->computeScaleAndScrollForFocusedNode(webViewImpl->focusedElement(), scale, scroll, needAnimation);
     EXPECT_TRUE(needAnimation);
     // The caret should be right aligned since the caret would be offscreen when the edit box is left aligned.
     hScroll = caret.x + caret.width + caretPadding - viewportWidth / scale;
@@ -1468,7 +1470,7 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
     // Move focus to edit box with text.
     m_webView->advanceFocus(false);
     webViewImpl->selectionBounds(caret, rect);
-    webViewImpl->computeScaleAndScrollForFocusedNode(webViewImpl->focusedWebCoreNode(), scale, scroll, needAnimation);
+    webViewImpl->computeScaleAndScrollForFocusedNode(webViewImpl->focusedElement(), scale, scroll, needAnimation);
     EXPECT_TRUE(needAnimation);
     // The edit box should be left aligned.
     hScroll = editBoxWithNoText.x;
@@ -1481,7 +1483,7 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
 
     // Move focus back to the first edit box.
     m_webView->advanceFocus(true);
-    webViewImpl->computeScaleAndScrollForFocusedNode(webViewImpl->focusedWebCoreNode(), scale, scroll, needAnimation);
+    webViewImpl->computeScaleAndScrollForFocusedNode(webViewImpl->focusedElement(), scale, scroll, needAnimation);
     // The position should have stayed the same since this box was already on screen with the right scale.
     EXPECT_FALSE(needAnimation);
 }
@@ -1626,7 +1628,7 @@ TEST_F(WebFrameTest, ClearFocusedNodeTest)
     m_webView->clearFocusedNode();
 
     // Now retrieve the FocusedNode and test it should be null.
-    EXPECT_EQ(0, static_cast<WebViewImpl*>(m_webView)->focusedWebCoreNode());
+    EXPECT_EQ(0, static_cast<WebViewImpl*>(m_webView)->focusedElement());
 }
 
 // Implementation of WebFrameClient that tracks the v8 contexts that are created
@@ -3162,6 +3164,30 @@ TEST_F(WebFrameTest, SlowSpellcheckMarkerPosition)
     m_webView = 0;
 }
 
+// This test verifies that cancelling spelling request does not cause a
+// write-after-free when there's no spellcheck client set.
+TEST_F(WebFrameTest, CancelSpellingRequestCrash)
+{
+    registerMockedHttpURLLoad("spell.html");
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "spell.html");
+    m_webView->setSpellCheckClient(0);
+
+    WebFrameImpl* frame = static_cast<WebFrameImpl*>(m_webView->mainFrame());
+    Document* document = frame->frame()->document();
+    Element* element = document->getElementById("data");
+
+    m_webView->settings()->setAsynchronousSpellCheckingEnabled(true);
+    m_webView->settings()->setUnifiedTextCheckerEnabled(true);
+    m_webView->settings()->setEditingBehavior(WebSettings::EditingBehaviorWin);
+
+    element->focus();
+    frame->frame()->editor()->replaceSelectionWithText("A", false, false);
+    frame->frame()->editor()->spellChecker()->cancelCheck();
+
+    m_webView->close();
+    m_webView = 0;
+}
+
 class TestAccessInitialDocumentWebFrameClient : public WebFrameClient {
 public:
     TestAccessInitialDocumentWebFrameClient() : m_didAccessInitialDocument(false)
@@ -3409,6 +3435,54 @@ TEST_F(WebFrameTest, BackToReload)
     Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
     EXPECT_EQ(WebURLRequest::ReloadIgnoringCacheData, frame->dataSource()->request().cachePolicy());
 
+    m_webView->close();
+    m_webView = 0;
+}
+
+class TestSameDocumentWebFrameClient : public WebFrameClient {
+public:
+    TestSameDocumentWebFrameClient()
+        : m_frameLoadTypeSameSeen(false)
+    {
+    }
+
+    virtual void willSendRequest(WebFrame* frame, unsigned, WebURLRequest&, const WebURLResponse&)
+    {
+        if (static_cast<WebFrameImpl*>(frame)->frame()->loader()->loadType() == WebCore::FrameLoadTypeSame)
+            m_frameLoadTypeSameSeen = true;
+    }
+
+    virtual WebURLError cancelledError(WebFrame*, const WebURLRequest& request)
+    {
+        // Return a dummy error so the DocumentLoader doesn't assert when
+        // the reload cancels it.
+        WebURLError webURLError;
+        webURLError.domain = "";
+        webURLError.reason = 1;
+        webURLError.isCancellation = true;
+        webURLError.unreachableURL = WebURL();
+        return webURLError;
+    }
+
+    bool frameLoadTypeSameSeen() const { return m_frameLoadTypeSameSeen; }
+
+private:
+    bool m_frameLoadTypeSameSeen;
+};
+
+TEST_F(WebFrameTest, NavigateToSame)
+{
+    registerMockedHttpURLLoad("navigate_to_same.html");
+    TestSameDocumentWebFrameClient client;
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "navigate_to_same.html", true, &client);
+    EXPECT_FALSE(client.frameLoadTypeSameSeen());
+
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+    WebCore::FrameLoadRequest frameRequest(0, WebCore::ResourceRequest(static_cast<WebViewImpl*>(m_webView)->page()->mainFrame()->document()->url()));
+    webViewImpl->page()->mainFrame()->loader()->load(frameRequest);
+    Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
+
+    EXPECT_TRUE(client.frameLoadTypeSameSeen());
     m_webView->close();
     m_webView = 0;
 }

@@ -36,12 +36,10 @@
 #include "core/css/StyleRule.h"
 #include "core/css/resolver/StyleResolver.h" // For MatchRequest.
 #include "core/dom/Document.h"
-#include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/dom/shadow/ContentDistributor.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLStyleElement.h"
-#include "wtf/MemoryInstrumentationHashMap.h"
 
 namespace WebCore {
 
@@ -128,6 +126,18 @@ void ScopedStyleTree::resolveScopedStyles(const Element* element, Vector<ScopedS
         resolvers.append(scopedResolver);
 }
 
+void ScopedStyleTree::resolveScopedKeyframesRules(const Element* element, Vector<ScopedStyleResolver*, 8>& resolvers)
+{
+    Document* document = element->document();
+    TreeScope* treeScope = element->treeScope();
+    bool applyAuthorStyles = treeScope->applyAuthorStyles();
+
+    for (ScopedStyleResolver* scopedResolver = scopedResolverFor(element); scopedResolver; scopedResolver = scopedResolver->parent()) {
+        if (scopedResolver->treeScope() == treeScope || (applyAuthorStyles && scopedResolver->treeScope() == document))
+            resolvers.append(scopedResolver);
+    }
+}
+
 inline ScopedStyleResolver* ScopedStyleTree::enclosingScopedStyleResolverFor(const ContainerNode* scopingNode)
 {
     for (; scopingNode; scopingNode = scopingNode->parentOrShadowHostNode()) {
@@ -198,12 +208,6 @@ void ScopedStyleTree::remove(const ContainerNode* scopingNode)
         m_cache.clear();
 
     m_authorStyles.remove(scopingNode);
-}
-
-void ScopedStyleTree::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_authorStyles, "authorStyles");
 }
 
 const ContainerNode* ScopedStyleResolver::scopingNodeFor(const CSSStyleSheet* sheet)
@@ -279,6 +283,7 @@ void ScopedStyleResolver::collectFeaturesTo(RuleFeatureSet& features)
 void ScopedStyleResolver::resetAuthorStyle()
 {
     m_authorStyle = RuleSet::create();
+    m_keyframesRuleMap.clear();
 }
 
 void ScopedStyleResolver::resetAtHostRules(const ShadowRoot* shadowRoot)
@@ -298,6 +303,26 @@ bool ScopedStyleResolver::checkRegionStyle(Element* regionElement)
             return true;
     }
     return false;
+}
+
+const StyleRuleKeyframes* ScopedStyleResolver::keyframeStylesForAnimation(const AtomicStringImpl* animationName)
+{
+    if (m_keyframesRuleMap.isEmpty())
+        return 0;
+
+    m_keyframesRuleMap.checkConsistency();
+
+    KeyframesRuleMap::iterator it = m_keyframesRuleMap.find(animationName);
+    if (it == m_keyframesRuleMap.end())
+        return 0;
+
+    return it->value.get();
+}
+
+void ScopedStyleResolver::addKeyframeStyle(PassRefPtr<StyleRuleKeyframes> rule)
+{
+    AtomicString s(rule->name());
+    m_keyframesRuleMap.set(s.impl(), rule);
 }
 
 inline RuleSet* ScopedStyleResolver::atHostRuleSetFor(const ShadowRoot* shadowRoot) const
@@ -363,11 +388,10 @@ void ScopedStyleResolver::matchPageRules(PageRuleCollector& collector)
     collector.matchPageRules(m_authorStyle.get());
 }
 
-void ScopedStyleResolver::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
+void ScopedStyleResolver::collectViewportRulesTo(StyleResolver* resolver) const
 {
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::CSS);
-    info.addMember(m_authorStyle, "authorStyle");
-    info.addMember(m_atHostRules, "atHostRules");
+    if (m_authorStyle)
+        resolver->collectViewportRules(m_authorStyle.get());
 }
 
 } // namespace WebCore

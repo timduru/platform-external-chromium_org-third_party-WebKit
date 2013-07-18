@@ -1100,10 +1100,7 @@ void HTMLInputElement::setValueFromRenderer(const String& value)
     // Renderer and our event handler are responsible for sanitizing values.
     ASSERT(value == sanitizeValue(value) || sanitizeValue(value).isEmpty());
 
-    // Workaround for bug where trailing \n is included in the result of textContent.
-    // The assert macro above may also be simplified to: value == constrainValue(value)
-    // http://bugs.webkit.org/show_bug.cgi?id=9661
-    m_valueIfDirty = value == "\n" ? emptyString() : value;
+    m_valueIfDirty = value;
 
     setFormControlValueMatchesRenderer(true);
     m_wasModifiedByUser = true;
@@ -1897,17 +1894,6 @@ bool HTMLInputElement::setupDateTimeChooserParameters(DateTimeChooserParameters&
         }
     }
     return true;
-}
-
-void HTMLInputElement::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    HTMLTextFormControlElement::reportMemoryUsage(memoryObjectInfo);
-    info.addMember(m_name, "name");
-    info.addMember(m_valueIfDirty, "valueIfDirty");
-    info.addMember(m_suggestedValue, "suggestedValue");
-    info.addMember(m_inputType, "inputType");
-    info.addMember(m_listAttributeTargetObserver, "listAttributeTargetObserver");
 }
 
 bool HTMLInputElement::supportsInputModeAttribute() const

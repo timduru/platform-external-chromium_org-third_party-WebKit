@@ -32,9 +32,9 @@
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/rendering/Pagination.h"
 #include "core/rendering/PaintPhase.h"
-#include <wtf/Forward.h>
-#include <wtf/OwnPtr.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/Forward.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -125,8 +125,6 @@ public:
     // Returns true when a paint with the PaintBehaviorFlattenCompositingLayers flag set gives
     // a faithful representation of the content.
     bool isSoftwareRenderable() const;
-
-    void setIsInWindow(bool);
 
     void resetScrollbars();
     void resetScrollbarsAndClearContentsSize();

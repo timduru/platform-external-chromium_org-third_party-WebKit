@@ -30,6 +30,7 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/Platform.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebActiveGestureAnimation.cpp \
+	third_party/WebKit/Source/core/platform/chromium/support/WebArrayBuffer.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebAudioBus.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoAlgorithm.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoKey.cpp \
@@ -123,7 +124,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/ValidationMessageClientImpl.cpp \
 	third_party/WebKit/Source/web/ViewportAnchor.cpp \
 	third_party/WebKit/Source/web/WebAccessibilityObject.cpp \
-	third_party/WebKit/Source/web/WebArrayBuffer.cpp \
 	third_party/WebKit/Source/web/WebArrayBufferView.cpp \
 	third_party/WebKit/Source/web/WebBindings.cpp \
 	third_party/WebKit/Source/web/WebBlob.cpp \

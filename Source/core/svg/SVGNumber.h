@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Samsung Electronics. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,26 +28,49 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef MemoryInstrumentationArrayBufferView_h
-#define MemoryInstrumentationArrayBufferView_h
+#ifndef SVGNumber_h
+#define SVGNumber_h
 
-#include "wtf/ArrayBufferView.h"
-#include "wtf/MemoryInstrumentation.h"
+#include "core/svg/properties/SVGPropertyTraits.h"
 
-namespace WTF {
+namespace WebCore {
 
-inline void reportMemoryUsage(const ArrayBufferView* arrayBufferView, MemoryObjectInfo* memoryObjectInfo)
-{
-    MemoryClassInfo info(memoryObjectInfo, arrayBufferView);
-    info.addMember(arrayBufferView->buffer().get(), "buffer", RetainingPointer);
-}
+class SVGNumber {
+    WTF_MAKE_FAST_ALLOCATED;
+public:
+    SVGNumber()
+        : m_value(0)
+    {
+    }
 
-inline void reportMemoryUsage(const ArrayBuffer* arrayBuffer, MemoryObjectInfo* memoryObjectInfo)
-{
-    MemoryClassInfo info(memoryObjectInfo, arrayBuffer);
-    info.addRawBuffer(arrayBuffer->data(), arrayBuffer->byteLength(), "byte[]", "data");
-}
+    SVGNumber(float value)
+        : m_value(value)
+    {
+    }
 
-}
+    SVGNumber& operator+=(const SVGNumber& rhs)
+    {
+        m_value += rhs.value();
+        return *this;
+    }
 
-#endif // !defined(MemoryInstrumentationArrayBufferView_h)
+    float value() const { return m_value; }
+    float& valueRef() { return m_value; }
+    String valueAsString() const { return String::number(m_value); }
+    void setValue(float value) { m_value = value; }
+
+private:
+    float m_value;
+};
+
+COMPILE_ASSERT(sizeof(SVGNumber) == sizeof(float), SVGNumber_same_size_as_float);
+
+template<>
+struct SVGPropertyTraits<SVGNumber> {
+    static SVGNumber initialValue() { return SVGNumber(); }
+    static String toString(const SVGNumber& type) { return type.valueAsString(); }
+};
+
+} // namespace WebCore
+
+#endif // SVGNumber_h

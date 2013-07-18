@@ -33,18 +33,6 @@
 #include "bindings/v8/V8HiddenPropertyName.h"
 #include "bindings/v8/V8ObjectConstructor.h"
 #include "bindings/v8/V8ScriptRunner.h"
-#include "core/dom/WebCoreMemoryInstrumentation.h"
-#include "wtf/MemoryInstrumentationHashMap.h"
-#include "wtf/MemoryInstrumentationVector.h"
-
-namespace WTF {
-
-// WrapperTypeInfo are statically allocated, don't count them.
-template<> struct SequenceMemoryInstrumentationTraits<WebCore::WrapperTypeInfo*> {
-    template <typename I> static void reportMemoryUsage(I, I, MemoryClassInfo&) { }
-};
-
-}
 
 namespace WebCore {
 
@@ -104,34 +92,6 @@ v8::Handle<v8::FunctionTemplate> V8PerIsolateData::toStringTemplate()
     return m_toStringTemplate.newLocal(m_isolate);
 }
 
-void V8PerIsolateData::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Binding);
-    info.addMember(m_rawTemplatesForMainWorld, "rawTemplatesForMainWorld");
-    info.addMember(m_rawTemplatesForNonMainWorld, "rawTemplatesForNonMainWorld");
-    info.addMember(m_templatesForMainWorld, "templatesForMainWorld");
-    info.addMember(m_templatesForNonMainWorld, "templatesForNonMainWorld");
-    info.addMember(m_stringCache, "stringCache");
-    info.addMember(m_domDataList, "domDataList");
-    info.addMember(m_workerDomDataStore, "workerDomDataStore");
-    info.addMember(m_hiddenPropertyName, "hiddenPropertyName");
-    info.addMember(m_gcEventData, "gcEventData");
-
-    info.addPrivateBuffer(ScriptProfiler::profilerSnapshotsSize(), WebCoreMemoryTypes::InspectorProfilerAgent, "HeapSnapshots", "snapshots");
-
-    info.ignoreMember(m_toStringTemplate);
-    info.ignoreMember(m_lazyEventListenerToStringTemplate);
-    info.ignoreMember(m_liveRoot);
-    info.ignoreMember(m_regexContext);
-}
-
-bool V8PerIsolateData::hasPrivateTemplate(WrapperWorldType currentWorldType, void* privatePointer)
-{
-    if (currentWorldType == MainWorld)
-        return m_templatesForMainWorld.find(privatePointer) != m_templatesForMainWorld.end();
-    return m_templatesForNonMainWorld.find(privatePointer) != m_templatesForNonMainWorld.end();
-}
-
 v8::Handle<v8::FunctionTemplate> V8PerIsolateData::privateTemplate(WrapperWorldType currentWorldType, void* privatePointer, v8::FunctionCallback callback, v8::Handle<v8::Value> data, v8::Handle<v8::Signature> signature, int length)
 {
     TemplateMap& templates = templateMap(currentWorldType);
@@ -141,6 +101,20 @@ v8::Handle<v8::FunctionTemplate> V8PerIsolateData::privateTemplate(WrapperWorldT
     v8::Local<v8::FunctionTemplate> templ = v8::FunctionTemplate::New(callback, data, signature, length);
     templates.add(privatePointer, UnsafePersistent<v8::FunctionTemplate>(m_isolate, templ));
     return templ;
+}
+
+v8::Handle<v8::FunctionTemplate> V8PerIsolateData::privateTemplateIfExists(WrapperWorldType currentWorldType, void* privatePointer)
+{
+    TemplateMap& templates = templateMap(currentWorldType);
+    TemplateMap::iterator result = templates.find(privatePointer);
+    if (result != templates.end())
+        return result->value.newLocal(m_isolate);
+    return v8::Local<v8::FunctionTemplate>();
+}
+
+void V8PerIsolateData::setPrivateTemplate(WrapperWorldType currentWorldType, void* privatePointer, v8::Handle<v8::FunctionTemplate> templ)
+{
+    templateMap(currentWorldType).add(privatePointer, UnsafePersistent<v8::FunctionTemplate>(m_isolate, templ));
 }
 
 v8::Handle<v8::FunctionTemplate> V8PerIsolateData::rawTemplate(WrapperTypeInfo* info, WrapperWorldType currentWorldType)

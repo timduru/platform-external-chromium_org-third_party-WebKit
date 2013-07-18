@@ -110,7 +110,6 @@
       'ViewportAnchor.cpp',
       'ViewportAnchor.h',
       'WebAccessibilityObject.cpp',
-      'WebArrayBuffer.cpp',
       'WebArrayBufferView.cpp',
       'WebBindings.cpp',
       'WebBlob.cpp',
@@ -294,6 +293,7 @@
     ],
     'web_unittest_files': [
       'tests/AssociatedURLLoaderTest.cpp',
+      'tests/ChromeClientImplTest.cpp',
     ],
   },
 }

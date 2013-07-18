@@ -26,7 +26,6 @@
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/VisitedLinkState.h"
-#include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/editing/Editor.h"
 #include "core/history/BackForwardController.h"
 #include "core/history/HistoryItem.h"
@@ -45,6 +44,7 @@
 #include "core/page/FrameView.h"
 #include "core/page/PageConsole.h"
 #include "core/page/PageGroup.h"
+#include "core/page/PageLifecycleNotifier.h"
 #include "core/page/PointerLockController.h"
 #include "core/page/Settings.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
@@ -55,7 +55,6 @@
 #include "core/rendering/RenderView.h"
 #include "core/storage/StorageNamespace.h"
 #include "wtf/HashMap.h"
-#include "wtf/MemoryInstrumentationHashSet.h"
 #include "wtf/RefCountedLeakCounter.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/Base64.h"
@@ -119,7 +118,6 @@ Page::Page(PageClients& pageClients)
     , m_userStyleSheetModificationTime(0)
     , m_group(0)
     , m_timerAlignmentInterval(DOMTimer::visiblePageAlignmentInterval())
-    , m_isInWindow(true)
     , m_visibilityState(PageVisibilityStateVisible)
     , m_isCursorVisible(true)
     , m_layoutMilestones(0)
@@ -511,19 +509,6 @@ void Page::setPagination(const Pagination& pagination)
     setNeedsRecalcStyleInAllFrames();
 }
 
-void Page::setIsInWindow(bool isInWindow)
-{
-    if (m_isInWindow == isInWindow)
-        return;
-
-    m_isInWindow = isInWindow;
-
-    for (Frame* frame = mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-        if (FrameView* frameView = frame->view())
-            frameView->setIsInWindow(isInWindow);
-    }
-}
-
 void Page::userStyleSheetLocationChanged()
 {
     // FIXME: Eventually we will move to a model of just being handed the sheet
@@ -640,6 +625,9 @@ void Page::setVisibilityState(PageVisibilityState visibilityState, bool isInitia
         setTimerAlignmentInterval(DOMTimer::hiddenPageAlignmentInterval());
     else
         setTimerAlignmentInterval(DOMTimer::visiblePageAlignmentInterval());
+
+    if (!isInitialState)
+        lifecycleNotifier()->notifyPageVisibilityChanged();
 
     if (!isInitialState && m_mainFrame)
         m_mainFrame->dispatchVisibilityStateChangeEvent();
@@ -782,38 +770,6 @@ void Page::addRelevantUnpaintedObject(RenderObject* object, const LayoutRect& ob
     m_relevantUnpaintedRegion.unite(pixelSnappedIntRect(objectPaintRect));
 }
 
-void Page::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::Page);
-    info.addMember(m_chrome, "chrome");
-    info.addMember(m_dragCaretController, "dragCaretController");
-
-    info.addMember(m_dragController, "dragController");
-    info.addMember(m_focusController, "focusController");
-    info.addMember(m_contextMenuController, "contextMenuController");
-    info.addMember(m_inspectorController, "inspectorController");
-    info.addMember(m_pointerLockController, "pointerLockController");
-    info.addMember(m_scrollingCoordinator, "scrollingCoordinator");
-    info.addMember(m_settings, "settings");
-    info.addMember(m_progress, "progress");
-    info.addMember(m_backForwardController, "backForwardController");
-    info.addMember(m_mainFrame, "mainFrame");
-    info.addMember(m_pluginData, "pluginData");
-    info.addMember(m_theme, "theme");
-    info.addMember(m_UseCounter, "UseCounter");
-    info.addMember(m_pagination, "pagination");
-    info.addMember(m_userStyleSheet, "userStyleSheet");
-    info.addMember(m_group, "group");
-    info.addMember(m_sessionStorage, "sessionStorage");
-    info.addMember(m_relevantUnpaintedRenderObjects, "relevantUnpaintedRenderObjects");
-    info.addMember(m_topRelevantPaintedRegion, "relevantPaintedRegion");
-    info.addMember(m_bottomRelevantPaintedRegion, "relevantPaintedRegion");
-    info.addMember(m_relevantUnpaintedRegion, "relevantUnpaintedRegion");
-
-    info.ignoreMember(m_editorClient);
-    info.ignoreMember(m_validationMessageClient);
-}
-
 void Page::addMultisamplingChangedObserver(MultisamplingChangedObserver* observer)
 {
     m_multisamplingChangedObservers.add(observer);
@@ -829,6 +785,16 @@ void Page::multisamplingChanged()
     HashSet<MultisamplingChangedObserver*>::iterator stop = m_multisamplingChangedObservers.end();
     for (HashSet<MultisamplingChangedObserver*>::iterator it = m_multisamplingChangedObservers.begin(); it != stop; ++it)
         (*it)->multisamplingChanged(m_settings->openGLMultisamplingEnabled());
+}
+
+PageLifecycleNotifier* Page::lifecycleNotifier()
+{
+    return static_cast<PageLifecycleNotifier*>(LifecycleContext::lifecycleNotifier());
+}
+
+PassOwnPtr<LifecycleNotifier> Page::createLifecycleNotifier()
+{
+    return PageLifecycleNotifier::create(this);
 }
 
 Page::PageClients::PageClients()

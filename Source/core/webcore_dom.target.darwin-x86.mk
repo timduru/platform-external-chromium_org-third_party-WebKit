@@ -174,7 +174,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/UserTypingGestureIndicator.cpp \
 	third_party/WebKit/Source/core/dom/ViewportArguments.cpp \
 	third_party/WebKit/Source/core/dom/VisitedLinkState.cpp \
-	third_party/WebKit/Source/core/dom/WebCoreMemoryInstrumentation.cpp \
 	third_party/WebKit/Source/core/dom/WheelEvent.cpp \
 	third_party/WebKit/Source/core/dom/WindowEventContext.cpp \
 	third_party/WebKit/Source/core/dom/default/chromium/PlatformMessagePortChannelChromium.cpp \

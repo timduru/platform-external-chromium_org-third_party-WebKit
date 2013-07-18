@@ -50,9 +50,10 @@ public:
     void SetUp()
     {
         m_isolate = v8::Isolate::GetCurrent();
-        m_context.set(m_isolate, v8::Context::New(m_isolate));
-        m_context.get()->Enter();
-        m_perContextData = V8PerContextData::create(m_context.get());
+        v8::Local<v8::Context> context = v8::Context::New(m_isolate);
+        m_context.set(m_isolate, context);
+        context->Enter();
+        m_perContextData = V8PerContextData::create(context);
         m_perContextData->init();
         m_resolver = ScriptPromiseResolver::create();
         m_promise = m_resolver->promise();
@@ -63,7 +64,7 @@ public:
         m_resolver = 0;
         m_promise.clear();
         m_perContextData.clear();
-        m_context.get()->Exit();
+        m_context.newLocal(m_isolate)->Exit();
     }
 
     V8PromiseCustom::PromiseState state()

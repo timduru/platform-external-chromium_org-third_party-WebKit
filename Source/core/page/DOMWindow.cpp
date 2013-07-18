@@ -54,7 +54,6 @@
 #include "core/dom/PageTransitionEvent.h"
 #include "core/dom/RequestAnimationFrameCallback.h"
 #include "core/dom/ScriptExecutionContext.h"
-#include "core/dom/WebCoreMemoryInstrumentation.h"
 #include "core/editing/Editor.h"
 #include "core/history/BackForwardController.h"
 #include "core/html/HTMLCanvasElement.h"
@@ -435,6 +434,10 @@ void DOMWindow::frameDestroyed()
 void DOMWindow::willDetachPage()
 {
     InspectorInstrumentation::frameWindowDiscarded(m_frame, this);
+    // FIXME: Once DeviceOrientationController is a ScriptExecutionContext
+    // Supplement, this will no longer be needed.
+    if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
+        controller->removeAllDeviceEventListeners(this);
 }
 
 void DOMWindow::willDestroyDocumentInFrame()
@@ -614,12 +617,6 @@ Navigator* DOMWindow::navigator() const
     if (!m_navigator)
         m_navigator = Navigator::create(m_frame);
     return m_navigator.get();
-}
-
-void DOMWindow::reportMemoryUsage(MemoryObjectInfo* memoryObjectInfo) const
-{
-    MemoryClassInfo info(memoryObjectInfo, this, WebCoreMemoryTypes::DOM);
-    info.addMember(m_document, "document");
 }
 
 Performance* DOMWindow::performance() const
@@ -1397,20 +1394,16 @@ void DOMWindow::resizeTo(float width, float height) const
     page->chrome().setWindowRect(adjustWindowRect(page, update));
 }
 
-void DOMWindow::clearTimeout(int timeoutId)
+void DOMWindow::clearTimeout(int timeoutID)
 {
-    ScriptExecutionContext* context = scriptExecutionContext();
-    if (!context)
-        return;
-    DOMTimer::removeById(context, timeoutId);
+    if (ScriptExecutionContext* context = scriptExecutionContext())
+        DOMTimer::removeByID(context, timeoutID);
 }
 
-void DOMWindow::clearInterval(int timeoutId)
+void DOMWindow::clearInterval(int timeoutID)
 {
-    ScriptExecutionContext* context = scriptExecutionContext();
-    if (!context)
-        return;
-    DOMTimer::removeById(context, timeoutId);
+    if (ScriptExecutionContext* context = scriptExecutionContext())
+        DOMTimer::removeByID(context, timeoutID);
 }
 
 static LayoutSize size(HTMLImageElement* image)
