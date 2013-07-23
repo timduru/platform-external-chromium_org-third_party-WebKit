@@ -464,12 +464,12 @@ static VisiblePosition previousBoundary(const VisiblePosition& c, BoundarySearch
         forwardsScanRange->setStart(end.deprecatedNode(), end.deprecatedEditingOffset(), ec);
         TextIterator forwardsIterator(forwardsScanRange.get());
         while (!forwardsIterator.atEnd()) {
-            const UChar* characters = forwardsIterator.characters();
-            int length = forwardsIterator.length();
-            int i = endOfFirstWordBoundaryContext(characters, length);
-            string.append(characters, i);
+            Vector<UChar, 1024> characters;
+            forwardsIterator.appendTextTo(characters);
+            int i = endOfFirstWordBoundaryContext(characters.data(), characters.size());
+            string.append(characters.data(), i);
             suffixLength += i;
-            if (i < length)
+            if (static_cast<unsigned>(i) < characters.size())
                 break;
             forwardsIterator.advance();
         }
@@ -489,7 +489,7 @@ static VisiblePosition previousBoundary(const VisiblePosition& c, BoundarySearch
     while (!it.atEnd()) {
         // iterate to get chunks until the searchFunction returns a non-zero value.
         if (!inTextSecurityMode)
-            string.prepend(it.characters(), it.length());
+            it.prependTextTo(string);
         else {
             // Treat bullets used in the text security mode as regular characters when looking for boundaries
             Vector<UChar, 1024> iteratorString;
@@ -542,10 +542,11 @@ static VisiblePosition nextBoundary(const VisiblePosition& c, BoundarySearchFunc
         backwardsScanRange->setEnd(start.deprecatedNode(), start.deprecatedEditingOffset(), IGNORE_EXCEPTION);
         SimplifiedBackwardsTextIterator backwardsIterator(backwardsScanRange.get());
         while (!backwardsIterator.atEnd()) {
-            const UChar* characters = backwardsIterator.characters();
-            int length = backwardsIterator.length();
-            int i = startOfLastWordBoundaryContext(characters, length);
-            string.prepend(characters + i, length - i);
+            Vector<UChar, 1024> characters;
+            backwardsIterator.prependTextTo(characters);
+            int length = characters.size();
+            int i = startOfLastWordBoundaryContext(characters.data(), length);
+            string.prepend(characters.data() + i, length - i);
             prefixLength += length - i;
             if (i > 0)
                 break;
@@ -563,12 +564,12 @@ static VisiblePosition nextBoundary(const VisiblePosition& c, BoundarySearchFunc
         // Keep asking the iterator for chunks until the search function
         // returns an end value not equal to the length of the string passed to it.
         if (!inTextSecurityMode)
-            string.append(it.characters(), it.length());
+            it.appendTextTo(string);
         else {
             // Treat bullets used in the text security mode as regular characters when looking for boundaries
-            String iteratorString(it.characters(), it.length());
-            iteratorString.fill('x');
-            iteratorString.appendTo(string);
+            Vector<UChar, 1024> iteratorString;
+            iteratorString.fill('x', it.length());
+            string.append(iteratorString.data(), iteratorString.size());
         }
         next = searchFunction(string.data(), string.size(), prefixLength, MayHaveMoreContext, needMoreContext);
         if (next != string.size())
@@ -591,7 +592,7 @@ static VisiblePosition nextBoundary(const VisiblePosition& c, BoundarySearchFunc
         RefPtr<Range> characterRange = charIt.range();
         pos = characterRange->endPosition();
 
-        if (*charIt.characters() == '\n') {
+        if (charIt.characterAt(0) == '\n') {
             // FIXME: workaround for collapsed range (where only start position is correct) emitted for some emitted newlines (see rdar://5192593)
             VisiblePosition visPos = VisiblePosition(pos);
             if (visPos == VisiblePosition(characterRange->startPosition())) {

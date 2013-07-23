@@ -42,7 +42,6 @@ public:
         : m_bufferCharacters8(0)
         , m_length(0)
         , m_is8Bit(true)
-        , m_valid16BitShadowLength(0)
     {
     }
 
@@ -102,6 +101,17 @@ public:
             append(string.characters8() + offset, length);
         else
             append(string.characters16() + offset, length);
+    }
+
+    void append(const StringView& string)
+    {
+        if (!string.length())
+            return;
+
+        if (string.is8Bit())
+            append(string.characters8(), string.length());
+        else
+            append(string.characters16(), string.length());
     }
 
     void append(const char* characters)
@@ -170,11 +180,11 @@ public:
         return m_string;
     }
 
-    const String& toStringPreserveCapacity() const
+    String substring(unsigned position, unsigned length) const
     {
-        if (m_string.isNull())
-            reifyString();
-        return m_string;
+        if (!m_string.isNull())
+            return m_string.substring(position, length);
+        return reifySubstring(position, length);
     }
 
     AtomicString toAtomicString() const
@@ -255,7 +265,6 @@ public:
         m_buffer = 0;
         m_bufferCharacters8 = 0;
         m_is8Bit = true;
-        m_valid16BitShadowLength = 0;
     }
 
     void swap(StringBuilder& stringBuilder)
@@ -264,7 +273,6 @@ public:
         m_string.swap(stringBuilder.m_string);
         m_buffer.swap(stringBuilder.m_buffer);
         std::swap(m_is8Bit, stringBuilder.m_is8Bit);
-        std::swap(m_valid16BitShadowLength, stringBuilder.m_valid16BitShadowLength);
         std::swap(m_bufferCharacters8, stringBuilder.m_bufferCharacters8);
     }
 
@@ -280,9 +288,10 @@ private:
     CharType* appendUninitializedSlow(unsigned length);
     template <typename CharType>
     ALWAYS_INLINE CharType * getBufferCharacters();
-    void reifyString() const;
+    void reifyString();
+    String reifySubstring(unsigned position, unsigned length) const;
 
-    mutable String m_string;  // Pointers first: crbug.com/232031
+    String m_string; // Pointers first: crbug.com/232031
     RefPtr<StringImpl> m_buffer;
     union {
         LChar* m_bufferCharacters8;
@@ -290,7 +299,6 @@ private:
     };
     unsigned m_length;
     bool m_is8Bit;
-    mutable unsigned m_valid16BitShadowLength;
 };
 
 template <>

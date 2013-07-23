@@ -2128,7 +2128,7 @@ void RenderLayer::setScrollOffset(const IntPoint& newScrollOffset)
     m_scrollOffset = toIntSize(newScrollOffset);
 
     Frame* frame = renderer()->frame();
-    InspectorInstrumentation::willScrollLayer(frame);
+    InspectorInstrumentation::willScrollLayer(renderer());
 
     RenderView* view = renderer()->view();
     
@@ -2177,13 +2177,13 @@ void RenderLayer::setScrollOffset(const IntPoint& newScrollOffset)
     if (renderer()->node())
         renderer()->node()->document()->eventQueue()->enqueueOrDispatchScrollEvent(renderer()->node(), DocumentEventQueue::ScrollEventElementTarget);
 
-    InspectorInstrumentation::didScrollLayer(frame);
+    InspectorInstrumentation::didScrollLayer(renderer());
 }
 
-static inline bool frameElementAndViewPermitScroll(HTMLFrameElement* frameElement, FrameView* frameView) 
+static inline bool frameElementAndViewPermitScroll(HTMLFrameElementBase* frameElementBase, FrameView* frameView)
 {
     // If scrollbars aren't explicitly forbidden, permit scrolling.
-    if (frameElement && frameElement->scrollingMode() != ScrollbarAlwaysOff)
+    if (frameElementBase && frameElementBase->scrollingMode() != ScrollbarAlwaysOff)
         return true;
 
     // If scrollbars are forbidden, user initiated scrolls should obviously be ignored.
@@ -2239,12 +2239,12 @@ void RenderLayer::scrollRectToVisible(const LayoutRect& rect, const ScrollAlignm
                 ownerElement = renderer()->document()->ownerElement();
 
             if (ownerElement && ownerElement->renderer()) {
-                HTMLFrameElement* frameElement = 0;
+                HTMLFrameElementBase* frameElementBase = 0;
 
                 if (ownerElement->hasTagName(frameTag) || ownerElement->hasTagName(iframeTag))
-                    frameElement = static_cast<HTMLFrameElement*>(ownerElement);
+                    frameElementBase = static_cast<HTMLFrameElementBase*>(ownerElement);
 
-                if (frameElementAndViewPermitScroll(frameElement, frameView)) {
+                if (frameElementAndViewPermitScroll(frameElementBase, frameView)) {
                     LayoutRect viewRect = frameView->visibleContentRect();
                     LayoutRect exposeRect = getRectToExpose(viewRect, rect, alignX, alignY);
 
@@ -2531,34 +2531,34 @@ bool RenderLayer::isActive() const
     return page && page->focusController()->isActive();
 }
 
-static int cornerStart(const RenderLayer* layer, int minX, int maxX, int thickness)
+static int cornerStart(const RenderStyle* style, int minX, int maxX, int thickness)
 {
-    if (layer->renderer()->style()->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
-        return minX + layer->renderer()->style()->borderLeftWidth();
-    return maxX - thickness - layer->renderer()->style()->borderRightWidth();
+    if (style->shouldPlaceBlockDirectionScrollbarOnLogicalLeft())
+        return minX + style->borderLeftWidth();
+    return maxX - thickness - style->borderRightWidth();
 }
 
-static IntRect cornerRect(const RenderLayer* layer, const IntRect& bounds)
+static IntRect cornerRect(const RenderStyle* style, const Scrollbar* horizontalScrollbar, const Scrollbar* verticalScrollbar, const IntRect& bounds)
 {
     int horizontalThickness;
     int verticalThickness;
-    if (!layer->verticalScrollbar() && !layer->horizontalScrollbar()) {
+    if (!verticalScrollbar && !horizontalScrollbar) {
         // FIXME: This isn't right.  We need to know the thickness of custom scrollbars
         // even when they don't exist in order to set the resizer square size properly.
         horizontalThickness = ScrollbarTheme::theme()->scrollbarThickness();
         verticalThickness = horizontalThickness;
-    } else if (layer->verticalScrollbar() && !layer->horizontalScrollbar()) {
-        horizontalThickness = layer->verticalScrollbar()->width();
+    } else if (verticalScrollbar && !horizontalScrollbar) {
+        horizontalThickness = verticalScrollbar->width();
         verticalThickness = horizontalThickness;
-    } else if (layer->horizontalScrollbar() && !layer->verticalScrollbar()) {
-        verticalThickness = layer->horizontalScrollbar()->height();
+    } else if (horizontalScrollbar && !verticalScrollbar) {
+        verticalThickness = horizontalScrollbar->height();
         horizontalThickness = verticalThickness;
     } else {
-        horizontalThickness = layer->verticalScrollbar()->width();
-        verticalThickness = layer->horizontalScrollbar()->height();
+        horizontalThickness = verticalScrollbar->width();
+        verticalThickness = horizontalScrollbar->height();
     }
-    return IntRect(cornerStart(layer, bounds.x(), bounds.maxX(), horizontalThickness),
-                   bounds.maxY() - verticalThickness - layer->renderer()->style()->borderBottomWidth(),
+    return IntRect(cornerStart(style, bounds.x(), bounds.maxX(), horizontalThickness),
+                   bounds.maxY() - verticalThickness - style->borderBottomWidth(),
                    horizontalThickness, verticalThickness);
 }
 
@@ -2572,7 +2572,7 @@ IntRect RenderLayer::scrollCornerRect() const
     bool hasVerticalBar = verticalScrollbar();
     bool hasResizer = renderer()->style()->resize() != RESIZE_NONE;
     if ((hasHorizontalBar && hasVerticalBar) || (hasResizer && (hasHorizontalBar || hasVerticalBar)))
-        return cornerRect(this, renderBox()->pixelSnappedBorderBoxRect());
+        return cornerRect(renderer()->style(), horizontalScrollbar(), verticalScrollbar(), renderBox()->pixelSnappedBorderBoxRect());
     return IntRect();
 }
 
@@ -2581,7 +2581,7 @@ IntRect RenderLayer::resizerCornerRect(const IntRect& bounds, ResizerHitTestType
     ASSERT(renderer()->isBox());
     if (renderer()->style()->resize() == RESIZE_NONE)
         return IntRect();
-    IntRect corner = cornerRect(this, bounds);
+    IntRect corner = cornerRect(renderer()->style(), horizontalScrollbar(), verticalScrollbar(), bounds);
 
     if (resizerHitTestType == ResizerForTouch) {
         // We make the resizer virtually larger for touch hit testing. With the
@@ -3617,6 +3617,9 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
         && ((isPaintingScrollingContent && isPaintingCompositedBackground)
         || (!isPaintingScrollingContent && isPaintingCompositedForeground));
     bool shouldPaintContent = m_hasVisibleContent && isSelfPaintingLayer && !isPaintingOverlayScrollbars;
+
+    float deviceScaleFactor = WebCore::deviceScaleFactor(renderer()->frame());
+    context->setUseHighResMarkers(deviceScaleFactor > 1.5f);
 
     GraphicsContext* transparencyLayerContext = context;
     

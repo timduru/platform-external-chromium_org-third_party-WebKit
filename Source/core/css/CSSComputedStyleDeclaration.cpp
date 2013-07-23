@@ -27,6 +27,7 @@
 #include "CSSPropertyNames.h"
 #include "FontFamilyNames.h"
 #include "RuntimeEnabledFeatures.h"
+#include "StylePropertyShorthand.h"
 #include "core/css/BasicShapeFunctions.h"
 #include "core/css/CSSArrayFunctionValue.h"
 #include "core/css/CSSAspectRatioValue.h"
@@ -50,7 +51,6 @@
 #include "core/css/Rect.h"
 #include "core/css/ShadowValue.h"
 #include "core/css/StylePropertySet.h"
-#include "core/css/StylePropertyShorthand.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
@@ -3000,6 +3000,57 @@ String CSSComputedStyleDeclaration::getPropertyValueInternal(CSSPropertyID prope
 
 void CSSComputedStyleDeclaration::setPropertyInternal(CSSPropertyID, const String&, bool, ExceptionCode& ec)
 {
+    ec = NoModificationAllowedError;
+}
+
+const HashMap<AtomicString, String>* CSSComputedStyleDeclaration::variableMap() const
+{
+    ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
+    Node* styledNode = this->styledNode();
+    if (!styledNode)
+        return 0;
+    RefPtr<RenderStyle> style = styledNode->computedStyle(styledNode->isPseudoElement() ? NOPSEUDO : m_pseudoElementSpecifier);
+    if (!style)
+        return 0;
+    return style->variables();
+}
+
+unsigned CSSComputedStyleDeclaration::variableCount() const
+{
+    ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
+    const HashMap<AtomicString, String>* variables = variableMap();
+    if (!variables)
+        return 0;
+    return variables->size();
+}
+
+String CSSComputedStyleDeclaration::variableValue(const AtomicString& name) const
+{
+    ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
+    const HashMap<AtomicString, String>* variables = variableMap();
+    if (!variables)
+        return emptyString();
+    HashMap<AtomicString, String>::const_iterator it = variables->find(name);
+    if (it == variables->end())
+        return emptyString();
+    return it->value;
+}
+
+void CSSComputedStyleDeclaration::setVariableValue(const AtomicString&, const String&, ExceptionCode& ec)
+{
+    ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
+    ec = NoModificationAllowedError;
+}
+
+bool CSSComputedStyleDeclaration::removeVariable(const AtomicString&)
+{
+    ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
+    return false;
+}
+
+void CSSComputedStyleDeclaration::clearVariables(ExceptionCode& ec)
+{
+    ASSERT(RuntimeEnabledFeatures::cssVariablesEnabled());
     ec = NoModificationAllowedError;
 }
 

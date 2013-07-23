@@ -253,7 +253,16 @@ void InspectorDebuggerAgent::setBreakpointByUrl(ErrorString* errorString, int li
     bool isAntiBreakpointValue = isAntiBreakpoint && *isAntiBreakpoint;
 
     String url = optionalURL ? *optionalURL : *optionalURLRegex;
-    int columnNumber = optionalColumnNumber ? *optionalColumnNumber : 0;
+    int columnNumber;
+    if (optionalColumnNumber) {
+        columnNumber = *optionalColumnNumber;
+        if (columnNumber < 0) {
+            *errorString = "Incorrect column number";
+            return;
+        }
+    } else {
+        columnNumber = isAntiBreakpointValue ? -1 : 0;
+    }
     String condition = optionalCondition ? *optionalCondition : "";
     bool isRegex = optionalURLRegex;
 
@@ -365,6 +374,25 @@ void InspectorDebuggerAgent::continueToLocation(ErrorString* errorString, const 
     resume(errorString);
 }
 
+void InspectorDebuggerAgent::getStepInPositions(ErrorString* errorString, const String& callFrameId, RefPtr<Array<TypeBuilder::Debugger::Location> >& positions)
+{
+    InjectedScript injectedScript = m_injectedScriptManager->injectedScriptForObjectId(callFrameId);
+    if (injectedScript.hasNoValue()) {
+        *errorString = "Inspected frame has gone";
+        return;
+    }
+
+    injectedScript.getStepInPositions(errorString, m_currentCallStack, callFrameId, positions);
+}
+
+void InspectorDebuggerAgent::getBacktrace(ErrorString* errorString, RefPtr<Array<TypeBuilder::Debugger::CallFrame> >& callFrames)
+{
+    if (!assertPaused(errorString))
+        return;
+    scriptDebugServer().updateCallStack(&m_currentCallStack);
+    callFrames = currentCallFrames();
+}
+
 bool InspectorDebuggerAgent::shouldSkipPause(RefPtr<JavaScriptCallFrame>& topFrame)
 {
     // Prepare top frame parameters;
@@ -395,7 +423,10 @@ bool InspectorDebuggerAgent::shouldSkipPause(RefPtr<JavaScriptCallFrame>& topFra
         int breakColumnNumber;
         breakpointObject->getNumber(DebuggerAgentState::columnNumber, &breakColumnNumber);
 
-        if (breakLineNumber != topFrameLineNumber || breakColumnNumber != topFrameColumnNumber)
+        if (breakLineNumber != topFrameLineNumber)
+            continue;
+
+        if (breakColumnNumber != -1 && breakColumnNumber != topFrameColumnNumber)
             continue;
 
         bool isRegex;

@@ -61,26 +61,18 @@ typedef bool (*IsWhiteSpaceFunctionPtr)(UChar);
 
 #ifdef STRING_STATS
 struct StringStats {
-    inline void add8BitString(unsigned length, bool isSubString = false)
+    inline void add8BitString(unsigned length)
     {
         ++m_totalNumberStrings;
         ++m_number8BitStrings;
-        if (!isSubString)
-            m_total8BitData += length;
+        m_total8BitData += length;
     }
 
-    inline void add16BitString(unsigned length, bool isSubString = false)
+    inline void add16BitString(unsigned length)
     {
         ++m_totalNumberStrings;
         ++m_number16BitStrings;
-        if (!isSubString)
-            m_total16BitData += length;
-    }
-
-    inline void addUpconvertedString(unsigned length)
-    {
-        ++m_numberUpconvertedStrings;
-        m_totalUpconvertedData += length;
+        m_total16BitData += length;
     }
 
     void removeString(StringImpl*);
@@ -92,27 +84,19 @@ struct StringStats {
     unsigned m_totalNumberStrings;
     unsigned m_number8BitStrings;
     unsigned m_number16BitStrings;
-    unsigned m_numberUpconvertedStrings;
     unsigned long long m_total8BitData;
     unsigned long long m_total16BitData;
-    unsigned long long m_totalUpconvertedData;
 };
 
 void addStringForStats(StringImpl*);
 void removeStringForStats(StringImpl*);
 
 #define STRING_STATS_ADD_8BIT_STRING(length) StringImpl::stringStats().add8BitString(length); addStringForStats(this)
-#define STRING_STATS_ADD_8BIT_STRING2(length, isSubString) StringImpl::stringStats().add8BitString(length, isSubString); addStringForStats(this)
 #define STRING_STATS_ADD_16BIT_STRING(length) StringImpl::stringStats().add16BitString(length); addStringForStats(this)
-#define STRING_STATS_ADD_16BIT_STRING2(length, isSubString) StringImpl::stringStats().add16BitString(length, isSubString); addStringForStats(this)
-#define STRING_STATS_ADD_UPCONVERTED_STRING(length) StringImpl::stringStats().addUpconvertedString(length)
 #define STRING_STATS_REMOVE_STRING(string) StringImpl::stringStats().removeString(string); removeStringForStats(this)
 #else
 #define STRING_STATS_ADD_8BIT_STRING(length) ((void)0)
-#define STRING_STATS_ADD_8BIT_STRING2(length, isSubString) ((void)0)
 #define STRING_STATS_ADD_16BIT_STRING(length) ((void)0)
-#define STRING_STATS_ADD_16BIT_STRING2(length, isSubString) ((void)0)
-#define STRING_STATS_ADD_UPCONVERTED_STRING(length) ((void)0)
 #define STRING_STATS_REMOVE_STRING(string) ((void)0)
 #endif
 
@@ -134,7 +118,6 @@ private:
     enum BufferOwnership {
         BufferInternal,
         BufferOwned,
-        BufferSubstring,
         // NOTE: Adding more ownership types needs to extend m_hashAndFlags as we're at capacity
     };
 
@@ -144,7 +127,6 @@ private:
     enum ConstructStaticStringTag { ConstructStaticString };
     StringImpl(const UChar* characters, unsigned length, ConstructStaticStringTag)
         : m_data16(characters)
-        , m_buffer(0)
         , m_refCount(s_refCountFlagIsStaticString)
         , m_length(length)
         , m_hashAndFlags(BufferOwned)
@@ -162,7 +144,6 @@ private:
     // static strings will be shared across threads & ref-counted in a non-threadsafe manner.
     StringImpl(const LChar* characters, unsigned length, ConstructStaticStringTag)
         : m_data8(characters)
-        , m_buffer(0)
         , m_refCount(s_refCountFlagIsStaticString)
         , m_length(length)
         , m_hashAndFlags(s_hashFlag8BitBuffer | BufferOwned)
@@ -180,7 +161,6 @@ private:
     // Create a normal 8-bit string with internal storage (BufferInternal)
     StringImpl(unsigned length, Force8Bit)
         : m_data8(reinterpret_cast<const LChar*>(this + 1))
-        , m_buffer(0)
         , m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_hashAndFlags(s_hashFlag8BitBuffer | BufferInternal)
@@ -194,7 +174,6 @@ private:
     // Create a normal 16-bit string with internal storage (BufferInternal)
     StringImpl(unsigned length)
         : m_data16(reinterpret_cast<const UChar*>(this + 1))
-        , m_buffer(0)
         , m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_hashAndFlags(BufferInternal)
@@ -208,7 +187,6 @@ private:
     // Create a StringImpl adopting ownership of the provided buffer (BufferOwned)
     StringImpl(const LChar* characters, unsigned length)
         : m_data8(characters)
-        , m_buffer(0)
         , m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_hashAndFlags(s_hashFlag8BitBuffer | BufferOwned)
@@ -222,7 +200,6 @@ private:
     enum ConstructFromLiteralTag { ConstructFromLiteral };
     StringImpl(const char* characters, unsigned length, ConstructFromLiteralTag)
         : m_data8(reinterpret_cast<const LChar*>(characters))
-        , m_buffer(0)
         , m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_hashAndFlags(s_hashFlag8BitBuffer | BufferInternal)
@@ -237,7 +214,6 @@ private:
     // Create a StringImpl adopting ownership of the provided buffer (BufferOwned)
     StringImpl(const UChar* characters, unsigned length)
         : m_data16(characters)
-        , m_buffer(0)
         , m_refCount(s_refCountIncrement)
         , m_length(length)
         , m_hashAndFlags(BufferOwned)
@@ -248,42 +224,9 @@ private:
         STRING_STATS_ADD_16BIT_STRING(m_length);
     }
 
-    // Used to create new strings that are a substring of an existing 8-bit StringImpl (BufferSubstring)
-    StringImpl(const LChar* characters, unsigned length, PassRefPtr<StringImpl> base)
-        : m_data8(characters)
-        , m_substringBuffer(base.leakRef())
-        , m_refCount(s_refCountIncrement)
-        , m_length(length)
-        , m_hashAndFlags(s_hashFlag8BitBuffer | BufferSubstring)
-    {
-        ASSERT(is8Bit());
-        ASSERT(m_data8);
-        ASSERT(m_length);
-        ASSERT(m_substringBuffer->bufferOwnership() != BufferSubstring);
-
-        STRING_STATS_ADD_8BIT_STRING2(m_length, true);
-    }
-
-    // Used to create new strings that are a substring of an existing 16-bit StringImpl (BufferSubstring)
-    StringImpl(const UChar* characters, unsigned length, PassRefPtr<StringImpl> base)
-        : m_data16(characters)
-        , m_substringBuffer(base.leakRef())
-        , m_refCount(s_refCountIncrement)
-        , m_length(length)
-        , m_hashAndFlags(BufferSubstring)
-    {
-        ASSERT(!is8Bit());
-        ASSERT(m_data16);
-        ASSERT(m_length);
-        ASSERT(m_substringBuffer->bufferOwnership() != BufferSubstring);
-
-        STRING_STATS_ADD_16BIT_STRING2(m_length, true);
-    }
-
     enum CreateEmptyUnique_T { CreateEmptyUnique };
     StringImpl(CreateEmptyUnique_T)
         : m_data16(reinterpret_cast<const UChar*>(1))
-        , m_buffer(0)
         , m_refCount(s_refCountIncrement)
         , m_length(0)
     {
@@ -316,33 +259,6 @@ public:
     ALWAYS_INLINE static PassRefPtr<StringImpl> create(const char* s, unsigned length) { return create(reinterpret_cast<const LChar*>(s), length); }
     static PassRefPtr<StringImpl> create(const LChar*);
     ALWAYS_INLINE static PassRefPtr<StringImpl> create(const char* s) { return create(reinterpret_cast<const LChar*>(s)); }
-
-    static ALWAYS_INLINE PassRefPtr<StringImpl> create8(PassRefPtr<StringImpl> rep, unsigned offset, unsigned length)
-    {
-        ASSERT(rep);
-        ASSERT(length <= rep->length());
-
-        if (!length)
-            return empty();
-
-        ASSERT(rep->is8Bit());
-        StringImpl* ownerRep = (rep->bufferOwnership() == BufferSubstring) ? rep->m_substringBuffer : rep.get();
-        return adoptRef(new StringImpl(rep->m_data8 + offset, length, ownerRep));
-    }
-
-    static ALWAYS_INLINE PassRefPtr<StringImpl> create(PassRefPtr<StringImpl> rep, unsigned offset, unsigned length)
-    {
-        ASSERT(rep);
-        ASSERT(length <= rep->length());
-
-        if (!length)
-            return empty();
-
-        StringImpl* ownerRep = (rep->bufferOwnership() == BufferSubstring) ? rep->m_substringBuffer : rep.get();
-        if (rep->is8Bit())
-            return adoptRef(new StringImpl(rep->m_data8 + offset, length, ownerRep));
-        return adoptRef(new StringImpl(rep->m_data16 + offset, length, ownerRep));
-    }
 
     static PassRefPtr<StringImpl> createFromLiteral(const char* characters, unsigned length);
     template<unsigned charactersCount>
@@ -392,6 +308,16 @@ public:
     static PassRefPtr<StringImpl> reallocate(PassRefPtr<StringImpl> originalString, unsigned length, LChar*& data);
     static PassRefPtr<StringImpl> reallocate(PassRefPtr<StringImpl> originalString, unsigned length, UChar*& data);
 
+    // If this StringImpl has only one reference, we can truncate the string by updating
+    // its m_length property without actually re-allocating its buffer.
+    void truncateAssumingIsolated(unsigned length)
+    {
+        ASSERT(hasOneRef());
+        ASSERT(length <= m_length);
+        ASSERT(bufferOwnership() == BufferInternal);
+        m_length = length;
+    }
+
     static unsigned flagsOffset() { return OBJECT_OFFSETOF(StringImpl, m_hashAndFlags); }
     static unsigned flagIs8Bit() { return s_hashFlag8BitBuffer; }
     static unsigned dataOffset() { return OBJECT_OFFSETOF(StringImpl, m_data8); }
@@ -414,28 +340,15 @@ public:
     bool is8Bit() const { return m_hashAndFlags & s_hashFlag8BitBuffer; }
     bool hasInternalBuffer() const { return bufferOwnership() == BufferInternal; }
     bool hasOwnedBuffer() const { return bufferOwnership() == BufferOwned; }
-    StringImpl* baseString() const { return bufferOwnership() == BufferSubstring ? m_substringBuffer : 0; }
 
-    // FIXME: Remove all unnecessary usages of bloatedCharacters()
     ALWAYS_INLINE const LChar* characters8() const { ASSERT(is8Bit()); return m_data8; }
     ALWAYS_INLINE const UChar* characters16() const { ASSERT(!is8Bit()); return m_data16; }
-    ALWAYS_INLINE const UChar* bloatedCharacters() const
-    {
-        if (!is8Bit())
-            return m_data16;
-
-        return getData16SlowCase();
-    }
 
     template <typename CharType>
     ALWAYS_INLINE const CharType * getCharacters() const;
 
     size_t cost()
     {
-        // For substrings, return the cost of the base string.
-        if (bufferOwnership() == BufferSubstring)
-            return m_substringBuffer->cost();
-
         if (m_hashAndFlags & s_hashFlagDidReportCost)
             return 0;
 
@@ -444,9 +357,6 @@ public:
     }
 
     size_t sizeInBytes() const;
-
-    bool has16BitShadow() const { return m_hashAndFlags & s_hashFlagHas16BitShadow; }
-    void upconvertCharacters(unsigned, unsigned) const;
 
     bool isEmptyUnique() const
     {
@@ -463,10 +373,6 @@ public:
     }
 
     bool isStatic() const { return m_refCount & s_refCountFlagIsStaticString; }
-
-#ifdef STRING_STATS
-    bool isSubString() const { return  bufferOwnership() == BufferSubstring; }
-#endif
 
 private:
     // The high bits of 'hash' are always empty, but we prefer to store our flags
@@ -540,6 +446,7 @@ public:
             return;
         }
 
+        // FIXME: Is this implementation really faster than memcpy?
         if (numCharacters <= s_copyCharsInlineCutOff) {
             unsigned i = 0;
 #if (CPU(X86) || CPU(X86_64))
@@ -684,7 +591,6 @@ private:
     BufferOwnership bufferOwnership() const { return static_cast<BufferOwnership>(m_hashAndFlags & s_hashMaskBufferOwnership); }
     template <class UCharPredicate> PassRefPtr<StringImpl> stripMatchedCharacters(UCharPredicate);
     template <typename CharType, class UCharPredicate> PassRefPtr<StringImpl> simplifyMatchedCharactersToSpace(UCharPredicate);
-    NEVER_INLINE const UChar* getData16SlowCase() const;
     NEVER_INLINE unsigned hashSlowCase() const;
 
     // The bottom bit in the ref count indicates a static (immortal) string.
@@ -696,7 +602,6 @@ private:
     static const unsigned s_flagMask = (1u << s_flagCount) - 1;
     COMPILE_ASSERT(s_flagCount == StringHasher::flagCount, StringHasher_reserves_enough_bits_for_StringImpl_flags);
 
-    static const unsigned s_hashFlagHas16BitShadow = 1u << 7;
     static const unsigned s_hashFlag8BitBuffer = 1u << 6;
     static const unsigned s_unusedHashFlag = 1u << 5;
     static const unsigned s_hashFlagIsAtomic = 1u << 4;
@@ -711,13 +616,12 @@ public:
     struct StaticASCIILiteral {
         // These member variables must match the layout of StringImpl.
         const LChar* m_data8;
-        const UChar* m_copyData16;
         unsigned m_refCount;
         unsigned m_length;
         unsigned m_hashAndFlags;
 
         static const unsigned s_initialRefCount = s_refCountFlagIsStaticString;
-        static const unsigned s_initialFlags = s_hashFlag8BitBuffer | s_hashFlagHas16BitShadow | BufferInternal;
+        static const unsigned s_initialFlags = s_hashFlag8BitBuffer | BufferInternal;
         static const unsigned s_hashShift = s_flagCount;
     };
 
@@ -735,11 +639,6 @@ private:
         const LChar* m_data8;
         const UChar* m_data16;
     };
-    union {
-        void* m_buffer;
-        StringImpl* m_substringBuffer;
-        mutable UChar* m_copyData16;
-    };
     unsigned m_refCount;
     unsigned m_length;
     mutable unsigned m_hashAndFlags;
@@ -751,7 +650,7 @@ template <>
 ALWAYS_INLINE const LChar* StringImpl::getCharacters<LChar>() const { return characters8(); }
 
 template <>
-ALWAYS_INLINE const UChar* StringImpl::getCharacters<UChar>() const { return bloatedCharacters(); }
+ALWAYS_INLINE const UChar* StringImpl::getCharacters<UChar>() const { return characters16(); }
 
 WTF_EXPORT bool equal(const StringImpl*, const StringImpl*);
 WTF_EXPORT bool equal(const StringImpl*, const LChar*);
@@ -946,7 +845,9 @@ bool equalIgnoringNullity(const Vector<UChar, inlineCapacity>& a, StringImpl* b)
         return !a.size();
     if (a.size() != b->length())
         return false;
-    return !memcmp(a.data(), b->bloatedCharacters(), b->length() * sizeof(UChar));
+    if (b->is8Bit())
+        return equal(a.data(), b->characters8(), b->length());
+    return equal(a.data(), b->characters16(), b->length());
 }
 
 template<typename CharacterType1, typename CharacterType2>

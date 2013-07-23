@@ -43,11 +43,12 @@ namespace WebCore {
     class DedicatedWorkerThread;
     class ScriptExecutionContext;
     class Worker;
+    class WorkerClients;
 
     class WorkerMessagingProxy : public WorkerGlobalScopeProxy, public WorkerObjectProxy, public WorkerLoaderProxy {
         WTF_MAKE_NONCOPYABLE(WorkerMessagingProxy); WTF_MAKE_FAST_ALLOCATED;
     public:
-        explicit WorkerMessagingProxy(Worker*);
+        WorkerMessagingProxy(Worker*, PassOwnPtr<WorkerClients>);
 
         // Implementations of WorkerGlobalScopeProxy.
         // (Only use these methods in the worker object thread.)
@@ -63,7 +64,7 @@ namespace WebCore {
         // Implementations of WorkerObjectProxy.
         // (Only use these methods in the worker context thread.)
         virtual void postMessageToWorkerObject(PassRefPtr<SerializedScriptValue>, PassOwnPtr<MessagePortChannelArray>) OVERRIDE;
-        virtual void postExceptionToWorkerObject(const String& errorMessage, int lineNumber, const String& sourceURL) OVERRIDE;
+        virtual void postExceptionToWorkerObject(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL) OVERRIDE;
         virtual void postConsoleMessageToWorkerObject(MessageSource, MessageLevel, const String& message, int lineNumber, const String& sourceURL) OVERRIDE;
         virtual void postMessageToPageInspector(const String&) OVERRIDE;
         virtual void updateInspectorStateCookie(const String&) OVERRIDE;
@@ -110,6 +111,8 @@ namespace WebCore {
 
         Vector<OwnPtr<ScriptExecutionContext::Task> > m_queuedEarlyTasks; // Tasks are queued here until there's a thread object created.
         WorkerGlobalScopeProxy::PageInspector* m_pageInspector;
+
+        OwnPtr<WorkerClients> m_workerClients;
     };
 
 } // namespace WebCore

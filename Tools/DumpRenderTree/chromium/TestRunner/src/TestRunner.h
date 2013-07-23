@@ -35,11 +35,14 @@
 
 #include "CppBoundClass.h"
 #include "TestCommon.h"
+#include "public/platform/WebCanvas.h"
 #include "public/platform/WebURL.h"
 #include "public/testing/WebTask.h"
 #include "public/testing/WebTestRunner.h"
 #include "public/web/WebArrayBufferView.h"
+#include "public/web/WebPageOverlay.h"
 #include "public/web/WebTextDirection.h"
+#include "third_party/skia/include/core/SkCanvas.h"
 #include <deque>
 #include <memory>
 #include <set>
@@ -48,6 +51,7 @@
 namespace WebKit {
 class WebArrayBufferView;
 class WebNotificationPresenter;
+class WebPageOverlay;
 class WebPermissionClient;
 class WebView;
 }
@@ -270,7 +274,8 @@ private:
     void enableAutoResizeMode(const CppArgumentList&, CppVariant*);
     void disableAutoResizeMode(const CppArgumentList&, CppVariant*);
 
-    // DeviceOrientation related functions
+    // Device Motion / Device Orientation related functions
+    void setMockDeviceMotion(const CppArgumentList&, CppVariant*);
     void setMockDeviceOrientation(const CppArgumentList&, CppVariant*);
 
     void didAcquirePointerLock(const CppArgumentList&, CppVariant*);
@@ -471,6 +476,11 @@ private:
     void setMockSpeechRecognitionError(const CppArgumentList&, CppVariant*);
     void wasMockSpeechRecognitionAborted(const CppArgumentList&, CppVariant*);
 
+    // WebPageOverlay related functions. Permits the adding and removing of only
+    // one opaque overlay.
+    void addWebPageOverlay(const CppArgumentList&, CppVariant*);
+    void removeWebPageOverlay(const CppArgumentList&, CppVariant*);
+
     void display(const CppArgumentList&, CppVariant*);
     void displayInvalidatedRegion(const CppArgumentList&, CppVariant*);
 
@@ -503,6 +513,14 @@ private:
 
     private:
         CallbackMethodType m_callback;
+    };
+    class TestPageOverlay : public WebKit::WebPageOverlay {
+    public:
+        explicit TestPageOverlay(WebKit::WebView*);
+        virtual void paintPageOverlay(WebKit::WebCanvas*) OVERRIDE;
+        virtual ~TestPageOverlay();
+    private:
+        WebKit::WebView* m_webView;
     };
     void didAcquirePointerLockInternal();
     void didNotAcquirePointerLockInternal();
@@ -674,6 +692,7 @@ private:
     TestInterfaces* m_testInterfaces;
     WebTestDelegate* m_delegate;
     WebKit::WebView* m_webView;
+    TestPageOverlay* m_pageOverlay;
     WebTestProxyBase* m_proxy;
 
     // This is non-0 IFF a load is in progress.

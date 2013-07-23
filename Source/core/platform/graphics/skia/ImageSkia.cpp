@@ -42,7 +42,7 @@
 #include "core/platform/graphics/skia/NativeImageSkia.h"
 #include "core/platform/graphics/skia/SkiaUtils.h"
 #include "core/platform/graphics/transforms/AffineTransform.h"
-#include <wtf/text/WTFString.h>
+#include "wtf/text/WTFString.h"
 
 #include <math.h>
 #include <limits>
@@ -326,7 +326,7 @@ void Image::paintSkBitmap(GraphicsContext* context, const NativeImageSkia& bitma
     bool useBicubicFilter = resampling == RESAMPLE_AWESOME
         && DeferredImageDecoder::isLazyDecoded(bitmap.bitmap());
     if (useBicubicFilter)
-        paint.setFlags(paint.getFlags() | SkPaint::kBicubicFilterBitmap_Flag | SkPaint::kFilterBitmap_Flag);
+        paint.setFilterLevel(SkPaint::kHigh_FilterLevel);
 
     if (resampling == RESAMPLE_AWESOME && !useBicubicFilter) {
         // Resample the image and then draw the result to canvas with bilinear
@@ -450,7 +450,7 @@ void Image::drawPattern(GraphicsContext* context,
 
     paint.setFilterBitmap(resampling == RESAMPLE_LINEAR);
     if (useBicubicFilter)
-        paint.setFlags(paint.getFlags() | SkPaint::kBicubicFilterBitmap_Flag);
+        paint.setFilterLevel(SkPaint::kHigh_FilterLevel);
 
     context->drawRect(destRect, paint);
 }

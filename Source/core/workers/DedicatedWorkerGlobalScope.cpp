@@ -29,24 +29,26 @@
  */
 
 #include "config.h"
-
 #include "core/workers/DedicatedWorkerGlobalScope.h"
 
+#include "bindings/v8/ExceptionState.h"
 #include "core/page/DOMWindow.h"
 #include "core/workers/DedicatedWorkerThread.h"
+#include "core/workers/WorkerClients.h"
 #include "core/workers/WorkerObjectProxy.h"
+#include "core/workers/WorkerThreadStartupData.h"
 
 namespace WebCore {
 
-PassRefPtr<DedicatedWorkerGlobalScope> DedicatedWorkerGlobalScope::create(const KURL& url, const String& userAgent, DedicatedWorkerThread* thread, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType, PassRefPtr<SecurityOrigin> topOrigin, double timeOrigin)
+PassRefPtr<DedicatedWorkerGlobalScope> DedicatedWorkerGlobalScope::create(DedicatedWorkerThread* thread, PassOwnPtr<WorkerThreadStartupData> startupData, double timeOrigin)
 {
-    RefPtr<DedicatedWorkerGlobalScope> context = adoptRef(new DedicatedWorkerGlobalScope(url, userAgent, thread, topOrigin, timeOrigin));
-    context->applyContentSecurityPolicyFromString(contentSecurityPolicy, contentSecurityPolicyType);
+    RefPtr<DedicatedWorkerGlobalScope> context = adoptRef(new DedicatedWorkerGlobalScope(startupData->m_scriptURL, startupData->m_userAgent, thread, startupData->m_topOrigin, timeOrigin, startupData->m_workerClients.release()));
+    context->applyContentSecurityPolicyFromString(startupData->m_contentSecurityPolicy, startupData->m_contentSecurityPolicyType);
     return context.release();
 }
 
-DedicatedWorkerGlobalScope::DedicatedWorkerGlobalScope(const KURL& url, const String& userAgent, DedicatedWorkerThread* thread, PassRefPtr<SecurityOrigin> topOrigin, double timeOrigin)
-    : WorkerGlobalScope(url, userAgent, thread, topOrigin, timeOrigin)
+DedicatedWorkerGlobalScope::DedicatedWorkerGlobalScope(const KURL& url, const String& userAgent, DedicatedWorkerThread* thread, PassRefPtr<SecurityOrigin> topOrigin, double timeOrigin, PassOwnPtr<WorkerClients> workerClients)
+    : WorkerGlobalScope(url, userAgent, thread, topOrigin, timeOrigin, workerClients)
 {
     ScriptWrappable::init(this);
 }
@@ -60,18 +62,18 @@ const AtomicString& DedicatedWorkerGlobalScope::interfaceName() const
     return eventNames().interfaceForDedicatedWorkerGlobalScope;
 }
 
-void DedicatedWorkerGlobalScope::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, ExceptionCode& ec)
+void DedicatedWorkerGlobalScope::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, ExceptionState& es)
 {
     // Disentangle the port in preparation for sending it to the remote context.
-    OwnPtr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, ec);
-    if (ec)
+    OwnPtr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, es);
+    if (es.hadException())
         return;
     thread()->workerObjectProxy().postMessageToWorkerObject(message, channels.release());
 }
 
-void DedicatedWorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionCode& ec)
+void DedicatedWorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionState& es)
 {
-    Base::importScripts(urls, ec);
+    Base::importScripts(urls, es);
     thread()->workerObjectProxy().reportPendingActivity(hasPendingActivity());
 }
 

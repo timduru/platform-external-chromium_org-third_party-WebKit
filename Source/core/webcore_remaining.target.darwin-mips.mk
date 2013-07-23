@@ -110,6 +110,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSSelector.cpp \
 	third_party/WebKit/Source/core/css/CSSSelectorList.cpp \
 	third_party/WebKit/Source/core/css/CSSShaderValue.cpp \
+	third_party/WebKit/Source/core/css/CSSStyleDeclaration.cpp \
 	third_party/WebKit/Source/core/css/CSSStyleRule.cpp \
 	third_party/WebKit/Source/core/css/CSSStyleSheet.cpp \
 	third_party/WebKit/Source/core/css/CSSSupportsRule.cpp \
@@ -121,6 +122,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSValue.cpp \
 	third_party/WebKit/Source/core/css/CSSValueList.cpp \
 	third_party/WebKit/Source/core/css/CSSValuePool.cpp \
+	third_party/WebKit/Source/core/css/CSSVariablesMap.cpp \
 	third_party/WebKit/Source/core/css/CSSViewportRule.cpp \
 	third_party/WebKit/Source/core/css/DOMWindowCSS.cpp \
 	third_party/WebKit/Source/core/css/DocumentRuleSets.cpp \
@@ -154,7 +156,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/StyleMedia.cpp \
 	third_party/WebKit/Source/core/css/StylePropertySerializer.cpp \
 	third_party/WebKit/Source/core/css/StylePropertySet.cpp \
-	third_party/WebKit/Source/core/css/StylePropertyShorthand.cpp \
+	third_party/WebKit/Source/core/css/StylePropertyShorthandCustom.cpp \
 	third_party/WebKit/Source/core/css/StyleRule.cpp \
 	third_party/WebKit/Source/core/css/StyleRuleImport.cpp \
 	third_party/WebKit/Source/core/css/StyleSheet.cpp \
@@ -372,6 +374,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/DOMSelection.cpp \
 	third_party/WebKit/Source/core/page/DOMTimer.cpp \
 	third_party/WebKit/Source/core/page/DOMWindow.cpp \
+	third_party/WebKit/Source/core/page/DOMWindowBase64.cpp \
+	third_party/WebKit/Source/core/page/DOMWindowTimers.cpp \
 	third_party/WebKit/Source/core/page/DOMWindowPagePopup.cpp \
 	third_party/WebKit/Source/core/page/DOMWindowProperty.cpp \
 	third_party/WebKit/Source/core/page/DragController.cpp \
@@ -452,14 +456,15 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/workers/SharedWorkerGlobalScope.cpp \
 	third_party/WebKit/Source/core/workers/SharedWorkerThread.cpp \
 	third_party/WebKit/Source/core/workers/Worker.cpp \
-	third_party/WebKit/Source/core/workers/WorkerGlobalScopeProxy.cpp \
 	third_party/WebKit/Source/core/workers/WorkerEventQueue.cpp \
+	third_party/WebKit/Source/core/workers/WorkerGlobalScopeProxy.cpp \
 	third_party/WebKit/Source/core/workers/WorkerGlobalScope.cpp \
 	third_party/WebKit/Source/core/workers/WorkerLocation.cpp \
 	third_party/WebKit/Source/core/workers/WorkerMessagingProxy.cpp \
 	third_party/WebKit/Source/core/workers/WorkerRunLoop.cpp \
 	third_party/WebKit/Source/core/workers/WorkerScriptLoader.cpp \
 	third_party/WebKit/Source/core/workers/WorkerThread.cpp \
+	third_party/WebKit/Source/core/workers/WorkerThreadStartupData.cpp \
 	third_party/WebKit/Source/core/xml/parser/XMLDocumentParser.cpp \
 	third_party/WebKit/Source/core/xml/parser/XMLDocumentParserScope.cpp \
 	third_party/WebKit/Source/core/xml/DocumentXPathEvaluator.cpp \

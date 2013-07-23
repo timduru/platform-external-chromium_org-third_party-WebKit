@@ -29,43 +29,29 @@
 #include "config.h"
 #include "core/css/resolver/StyleResolver.h"
 
-// FIXME: This include list is way more than we need!
 #include "CSSPropertyNames.h"
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
-#include "SVGNames.h"
-#include "XMLNames.h"
+#include "StylePropertyShorthand.h"
 #include "core/animation/AnimatableValue.h"
 #include "core/animation/Animation.h"
 #include "core/css/CSSCalculationValue.h"
-#include "core/css/CSSCursorImageValue.h"
 #include "core/css/CSSDefaultStyleSheets.h"
 #include "core/css/CSSFontSelector.h"
-#include "core/css/CSSImageSetValue.h"
 #include "core/css/CSSKeyframeRule.h"
 #include "core/css/CSSKeyframesRule.h"
-#include "core/css/CSSLineBoxContainValue.h"
 #include "core/css/CSSParser.h"
-#include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/CSSReflectValue.h"
-#include "core/css/CSSSVGDocumentValue.h"
+#include "core/css/CSSRuleList.h"
 #include "core/css/CSSSelector.h"
-#include "core/css/CSSSelectorList.h"
 #include "core/css/CSSStyleRule.h"
 #include "core/css/CSSValueList.h"
 #include "core/css/CSSVariableValue.h"
 #include "core/css/ElementRuleCollector.h"
-#include "core/css/FontFeatureValue.h"
-#include "core/css/FontSize.h"
 #include "core/css/MediaQueryEvaluator.h"
 #include "core/css/PageRuleCollector.h"
-#include "core/css/Pair.h"
 #include "core/css/RuleSet.h"
 #include "core/css/StylePropertySet.h"
-#include "core/css/StylePropertyShorthand.h"
-#include "core/css/StyleSheetContents.h"
-#include "core/css/resolver/ElementStyleResources.h"
-#include "core/css/resolver/FilterOperationResolver.h"
 #include "core/css/resolver/MatchResult.h"
 #include "core/css/resolver/MediaQueryResult.h"
 #include "core/css/resolver/SharedStyleFinder.h"
@@ -73,22 +59,14 @@
 #include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
 #include "core/dom/DocumentStyleSheetCollection.h"
-#include "core/dom/FullscreenController.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/Text.h"
 #include "core/dom/shadow/ShadowRoot.h"
-#include "core/html/HTMLHtmlElement.h"
 #include "core/html/HTMLIFrameElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/loader/cache/CachedDocument.h"
-#include "core/loader/cache/CachedSVGDocumentReference.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
-#include "core/page/Page.h"
-#include "core/page/Settings.h"
-#include "core/platform/graphics/filters/custom/CustomFilterConstants.h"
-#include "core/platform/text/LocaleToScriptMapping.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/style/KeyframeList.h"
 #include "core/rendering/style/StyleCustomFilterProgramCache.h"
@@ -127,6 +105,7 @@ StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
     , m_matchAuthorAndUserStyles(matchAuthorAndUserStyles)
     , m_fontSelector(CSSFontSelector::create(document))
     , m_viewportStyleResolver(ViewportStyleResolver::create(document))
+    , m_state(0)
     , m_styleResourceLoader(document->cachedResourceLoader())
 {
     Element* root = document->documentElement();
@@ -335,7 +314,7 @@ inline void StyleResolver::matchShadowDistributedRules(ElementRuleCollector& col
 
 void StyleResolver::matchHostRules(ScopedStyleResolver* resolver, ElementRuleCollector& collector, bool includeEmptyRules)
 {
-    if (m_state.element() != resolver->scopingNode())
+    if (m_state->element() != resolver->scopingNode())
         return;
     resolver->matchHostRules(collector, includeEmptyRules);
 }
@@ -349,11 +328,11 @@ void StyleResolver::matchScopedAuthorRules(ElementRuleCollector& collector, bool
     }
 
     Vector<ScopedStyleResolver*, 8> stack;
-    m_styleTree.resolveScopedStyles(m_state.element(), stack);
+    m_styleTree.resolveScopedStyles(m_state->element(), stack);
     if (stack.isEmpty())
         return;
 
-    bool applyAuthorStyles = m_state.element()->treeScope()->applyAuthorStyles();
+    bool applyAuthorStyles = m_state->element()->treeScope()->applyAuthorStyles();
     for (int i = stack.size() - 1; i >= 0; --i)
         stack.at(i)->matchAuthorRules(collector, includeEmptyRules, applyAuthorStyles);
 
@@ -425,17 +404,17 @@ void StyleResolver::matchAllRules(ElementRuleCollector& collector, bool matchAut
         matchUserRules(collector, false);
 
     // Now check author rules, beginning first with presentational attributes mapped from HTML.
-    if (m_state.element()->isStyledElement()) {
-        collector.addElementStyleProperties(m_state.element()->presentationAttributeStyle());
+    if (m_state->element()->isStyledElement()) {
+        collector.addElementStyleProperties(m_state->element()->presentationAttributeStyle());
 
         // Now we check additional mapped declarations.
         // Tables and table cells share an additional mapped rule that must be applied
         // after all attributes, since their mapped style depends on the values of multiple attributes.
-        collector.addElementStyleProperties(m_state.element()->additionalPresentationAttributeStyle());
+        collector.addElementStyleProperties(m_state->element()->additionalPresentationAttributeStyle());
 
-        if (m_state.element()->isHTMLElement()) {
+        if (m_state->element()->isHTMLElement()) {
             bool isAuto;
-            TextDirection textDirection = toHTMLElement(m_state.element())->directionalityIfhasDirAutoAttribute(isAuto);
+            TextDirection textDirection = toHTMLElement(m_state->element())->directionalityIfhasDirAutoAttribute(isAuto);
             if (isAuto)
                 collector.matchedResult().addMatchedProperties(textDirection == LTR ? leftToRightDeclaration() : rightToLeftDeclaration());
         }
@@ -445,21 +424,21 @@ void StyleResolver::matchAllRules(ElementRuleCollector& collector, bool matchAut
     if (matchAuthorAndUserStyles)
         matchAuthorRules(collector, false);
 
-    if (m_state.element()->isStyledElement()) {
+    if (m_state->element()->isStyledElement()) {
         // Now check our inline style attribute.
-        if (matchAuthorAndUserStyles && m_state.element()->inlineStyle()) {
+        if (matchAuthorAndUserStyles && m_state->element()->inlineStyle()) {
             // Inline style is immutable as long as there is no CSSOM wrapper.
             // FIXME: Media control shadow trees seem to have problems with caching.
-            bool isInlineStyleCacheable = !m_state.element()->inlineStyle()->isMutable() && !m_state.element()->isInShadowTree();
+            bool isInlineStyleCacheable = !m_state->element()->inlineStyle()->isMutable() && !m_state->element()->isInShadowTree();
             // FIXME: Constify.
-            collector.addElementStyleProperties(m_state.element()->inlineStyle(), isInlineStyleCacheable);
+            collector.addElementStyleProperties(m_state->element()->inlineStyle(), isInlineStyleCacheable);
         }
 
         // Now check SMIL animation override style.
-        if (includeSMILProperties && matchAuthorAndUserStyles && m_state.element()->isSVGElement())
-            collector.addElementStyleProperties(toSVGElement(m_state.element())->animatedSMILStyleProperties(), false /* isCacheable */);
+        if (includeSMILProperties && matchAuthorAndUserStyles && m_state->element()->isSVGElement())
+            collector.addElementStyleProperties(toSVGElement(m_state->element())->animatedSMILStyleProperties(), false /* isCacheable */);
 
-        if (m_state.element()->hasActiveAnimations())
+        if (m_state->element()->hasActiveAnimations())
             collector.matchedResult().isCacheable = false;
     }
 }
@@ -469,48 +448,8 @@ bool StyleResolver::styleSharingCandidateMatchesRuleSet(const ElementResolveCont
     if (!ruleSet)
         return false;
 
-    ElementRuleCollector collector(context, m_selectorFilter, m_state.style(), m_inspectorCSSOMWrappers);
+    ElementRuleCollector collector(context, m_selectorFilter, m_state->style(), m_inspectorCSSOMWrappers);
     return collector.hasAnyMatchingRules(ruleSet);
-}
-
-static void setStylesForPaginationMode(Pagination::Mode paginationMode, RenderStyle* style)
-{
-    if (paginationMode == Pagination::Unpaginated)
-        return;
-
-    switch (paginationMode) {
-    case Pagination::LeftToRightPaginated:
-        style->setColumnAxis(HorizontalColumnAxis);
-        if (style->isHorizontalWritingMode())
-            style->setColumnProgression(style->isLeftToRightDirection() ? NormalColumnProgression : ReverseColumnProgression);
-        else
-            style->setColumnProgression(style->isFlippedBlocksWritingMode() ? ReverseColumnProgression : NormalColumnProgression);
-        break;
-    case Pagination::RightToLeftPaginated:
-        style->setColumnAxis(HorizontalColumnAxis);
-        if (style->isHorizontalWritingMode())
-            style->setColumnProgression(style->isLeftToRightDirection() ? ReverseColumnProgression : NormalColumnProgression);
-        else
-            style->setColumnProgression(style->isFlippedBlocksWritingMode() ? NormalColumnProgression : ReverseColumnProgression);
-        break;
-    case Pagination::TopToBottomPaginated:
-        style->setColumnAxis(VerticalColumnAxis);
-        if (style->isHorizontalWritingMode())
-            style->setColumnProgression(style->isFlippedBlocksWritingMode() ? ReverseColumnProgression : NormalColumnProgression);
-        else
-            style->setColumnProgression(style->isLeftToRightDirection() ? NormalColumnProgression : ReverseColumnProgression);
-        break;
-    case Pagination::BottomToTopPaginated:
-        style->setColumnAxis(VerticalColumnAxis);
-        if (style->isHorizontalWritingMode())
-            style->setColumnProgression(style->isFlippedBlocksWritingMode() ? NormalColumnProgression : ReverseColumnProgression);
-        else
-            style->setColumnProgression(style->isLeftToRightDirection() ? ReverseColumnProgression : NormalColumnProgression);
-        break;
-    case Pagination::Unpaginated:
-        ASSERT_NOT_REACHED();
-        break;
-    }
 }
 
 PassRefPtr<RenderStyle> StyleResolver::styleForDocument(const Document* document, CSSFontSelector* fontSelector)
@@ -618,8 +557,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
 
     if (element == document()->documentElement())
         resetDirectionAndWritingModeOnDocument(document());
-    StyleResolverState& state = m_state;
-    StyleResolveScope resolveScope(&state, document(), element, defaultParent, regionForStyling);
+    StyleResolverState state(&m_state, document(), element, defaultParent, regionForStyling);
 
     if (sharingBehavior == AllowStyleSharing && !state.distributedToInsertionPoint() && state.parentStyle()) {
         SharedStyleFinder styleFinder(m_features, m_siblingRuleSet.get(), m_uncommonAttributeRuleSet.get(), this);
@@ -676,7 +614,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
         applyMatchedProperties(collector.matchedResult(), element);
     }
     {
-        StyleAdjuster adjuster(m_state.cachedUAStyle(), m_document->inQuirksMode());
+        StyleAdjuster adjuster(m_state->cachedUAStyle(), m_document->inQuirksMode());
         adjuster.adjustRenderStyle(state.style(), state.parentStyle(), element);
     }
     document()->didAccessStyleResolver();
@@ -696,13 +634,12 @@ PassRefPtr<RenderStyle> StyleResolver::styleForKeyframe(Element* e, const Render
 
     if (e == document()->documentElement())
         resetDirectionAndWritingModeOnDocument(document());
-    StyleResolveScope resolveScope(&m_state, document(), e);
+    StyleResolverState state(&m_state, document(), e);
 
     MatchResult result;
     if (keyframe->properties())
         result.addMatchedProperties(keyframe->properties());
 
-    StyleResolverState& state = m_state;
     ASSERT(!state.style());
 
     // Create the style
@@ -838,8 +775,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
 
     if (e == document()->documentElement())
         resetDirectionAndWritingModeOnDocument(document());
-    StyleResolverState& state = m_state;
-    StyleResolveScope resolveScope(&state, document(), e, parentStyle);
+    StyleResolverState state(&m_state, document(), e, parentStyle);
 
     if (pseudoStyleRequest.allowsInheritance(state.parentStyle())) {
         state.setStyle(RenderStyle::create());
@@ -873,7 +809,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
         applyMatchedProperties(collector.matchedResult(), e);
     }
     {
-        StyleAdjuster adjuster(m_state.cachedUAStyle(), m_document->inQuirksMode());
+        StyleAdjuster adjuster(m_state->cachedUAStyle(), m_document->inQuirksMode());
         // FIXME: Passing 0 as the Element* introduces a lot of complexity
         // in the adjustRenderStyle code.
         adjuster.adjustRenderStyle(state.style(), state.parentStyle(), 0);
@@ -891,8 +827,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
 PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
 {
     resetDirectionAndWritingModeOnDocument(document());
-    StyleResolverState& state = m_state;
-    StyleResolveScope resolveScope(&state, document(), document()->documentElement()); // m_rootElementStyle will be set to the document style.
+    StyleResolverState state(&m_state, document(), document()->documentElement()); // m_rootElementStyle will be set to the document style.
 
     state.setStyle(RenderStyle::create());
     state.style()->inheritFrom(state.rootElementStyle());
@@ -959,13 +894,14 @@ void StyleResolver::collectViewportRules(RuleSet* rules)
 
 PassRefPtr<RenderStyle> StyleResolver::defaultStyleForElement()
 {
-    m_state.setStyle(RenderStyle::create());
-    m_state.fontBuilder().initForStyleResolve(document(), m_state.style(), m_state.useSVGZoomRules());
-    m_state.style()->setLineHeight(RenderStyle::initialLineHeight());
-    m_state.setLineHeightValue(0);
-    m_state.fontBuilder().setInitial(m_state.style()->effectiveZoom());
-    m_state.style()->font().update(fontSelector());
-    return m_state.takeStyle();
+    StyleResolverState state(0, document(), 0);
+    state.setStyle(RenderStyle::create());
+    state.fontBuilder().initForStyleResolve(document(), state.style(), state.useSVGZoomRules());
+    state.style()->setLineHeight(RenderStyle::initialLineHeight());
+    state.setLineHeightValue(0);
+    state.fontBuilder().setInitial(state.style()->effectiveZoom());
+    state.style()->font().update(fontSelector());
+    return state.takeStyle();
 }
 
 PassRefPtr<RenderStyle> StyleResolver::styleForText(Text* textNode)
@@ -1001,7 +937,7 @@ bool StyleResolver::checkRegionStyle(Element* regionElement)
 
 void StyleResolver::updateFont()
 {
-    m_state.fontBuilder().createFont(m_fontSelector, m_state.parentStyle(), m_state.style());
+    m_state->fontBuilder().createFont(m_fontSelector, m_state->parentStyle(), m_state->style());
 }
 
 PassRefPtr<CSSRuleList> StyleResolver::styleRulesForElement(Element* e, unsigned rulesToInclude)
@@ -1016,9 +952,9 @@ PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, Ps
 
     if (e == document()->documentElement())
         resetDirectionAndWritingModeOnDocument(document());
-    StyleResolveScope resolveScope(&m_state, document(), e);
+    StyleResolverState state(&m_state, document(), e);
 
-    ElementRuleCollector collector(m_state.elementContext(), m_selectorFilter, m_state.style(), m_inspectorCSSOMWrappers);
+    ElementRuleCollector collector(m_state->elementContext(), m_selectorFilter, m_state->style(), m_inspectorCSSOMWrappers);
     collector.setMode(SelectorChecker::CollectingRules);
     collector.setPseudoStyleRequest(PseudoStyleRequest(pseudoId));
 
@@ -1063,7 +999,7 @@ void StyleResolver::applyAnimatedProperties(const Element* target)
                 continue;
             RefPtr<CSSValue> value = iter->value->compositeOnto(AnimatableValue::neutralValue())->toCSSValue();
             if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
-                m_state.setLineHeightValue(value.get());
+                m_state->setLineHeightValue(value.get());
             else
                 applyProperty(property, value.get());
         }
@@ -1142,10 +1078,16 @@ static inline bool isValidCueStyleProperty(CSSPropertyID id)
     case CSSPropertyOutlineWidth:
     case CSSPropertyVisibility:
     case CSSPropertyWhiteSpace:
+    // FIXME: 'text-decoration' shorthand to be handled when available.
+    // See https://chromiumcodereview.appspot.com/19516002 for details.
     case CSSPropertyTextDecoration:
     case CSSPropertyTextShadow:
     case CSSPropertyBorderStyle:
         return true;
+    case CSSPropertyTextDecorationLine:
+    case CSSPropertyTextDecorationStyle:
+    case CSSPropertyTextDecorationColor:
+        return RuntimeEnabledFeatures::css3TextDecorationsEnabled();
     default:
         break;
     }
@@ -1181,7 +1123,7 @@ bool StyleResolver::isPropertyForPass(CSSPropertyID property)
 template <StyleResolver::StyleApplicationPass pass>
 void StyleResolver::applyProperties(const StylePropertySet* properties, StyleRule* rule, bool isImportant, bool inheritedOnly, PropertyWhitelistType propertyWhitelistType)
 {
-    ASSERT((propertyWhitelistType != PropertyWhitelistRegion) || m_state.regionForStyling());
+    ASSERT((propertyWhitelistType != PropertyWhitelistRegion) || m_state->regionForStyling());
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willProcessRule(document(), rule, this);
 
     unsigned propertyCount = properties->propertyCount();
@@ -1205,7 +1147,7 @@ void StyleResolver::applyProperties(const StylePropertySet* properties, StyleRul
         if (!isPropertyForPass<pass>(property))
             continue;
         if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
-            m_state.setLineHeightValue(current.value());
+            m_state->setLineHeightValue(current.value());
         else
             applyProperty(current.id(), current.value());
     }
@@ -1218,7 +1160,7 @@ void StyleResolver::applyMatchedProperties(const MatchResult& matchResult, bool 
     if (startIndex == -1)
         return;
 
-    StyleResolverState& state = m_state;
+    StyleResolverState& state = *m_state;
     if (state.style()->insideLink() != NotInsideLink) {
         for (int i = startIndex; i <= endIndex; ++i) {
             const MatchedProperties& matchedProperties = matchResult.matchedProperties[i];
@@ -1252,11 +1194,11 @@ void StyleResolver::invalidateMatchedPropertiesCache()
 void StyleResolver::applyMatchedProperties(const MatchResult& matchResult, const Element* element)
 {
     ASSERT(element);
-    StyleResolverState& state = m_state;
+    StyleResolverState& state = *m_state;
     unsigned cacheHash = matchResult.isCacheable ? computeMatchedPropertiesHash(matchResult.matchedProperties.data(), matchResult.matchedProperties.size()) : 0;
     bool applyInheritedOnly = false;
     const CachedMatchedProperties* cachedMatchedProperties = 0;
-    if (cacheHash && (cachedMatchedProperties = m_matchedPropertiesCache.find(cacheHash, m_state, matchResult))) {
+    if (cacheHash && (cachedMatchedProperties = m_matchedPropertiesCache.find(cacheHash, *m_state, matchResult))) {
         // We can build up the style by copying non-inherited properties from an earlier style object built using the same exact
         // style declarations. We then only need to apply the inherited properties, if any, as their values can depend on the
         // element context. This is fast and saves memory by reusing the style data structures.
@@ -1348,10 +1290,10 @@ CSSPropertyValue::CSSPropertyValue(CSSPropertyID id, const StylePropertySet& pro
 
 void StyleResolver::applyPropertiesToStyle(const CSSPropertyValue* properties, size_t count, RenderStyle* style)
 {
-    StyleResolveScope resolveScope(&m_state, document(), 0, style);
-    m_state.setStyle(style);
+    StyleResolverState state(&m_state, document(), 0, style);
+    state.setStyle(style);
 
-    m_state.fontBuilder().initForStyleResolve(document(), style, m_state.useSVGZoomRules());
+    state.fontBuilder().initForStyleResolve(document(), style, state.useSVGZoomRules());
 
     for (size_t i = 0; i < count; ++i) {
         if (properties[i].value) {
@@ -1399,7 +1341,7 @@ static bool hasVariableReference(CSSValue* value)
 
 void StyleResolver::resolveVariables(CSSPropertyID id, CSSValue* value, Vector<std::pair<CSSPropertyID, String> >& knownExpressions)
 {
-    std::pair<CSSPropertyID, String> expression(id, value->serializeResolvingVariables(*m_state.style()->variables()));
+    std::pair<CSSPropertyID, String> expression(id, value->serializeResolvingVariables(*m_state->style()->variables()));
 
     if (knownExpressions.contains(expression))
         return; // cycle detected.
@@ -1413,10 +1355,13 @@ void StyleResolver::resolveVariables(CSSPropertyID id, CSSValue* value, Vector<s
 
     for (unsigned i = 0; i < resultSet->propertyCount(); i++) {
         StylePropertySet::PropertyReference property = resultSet->propertyAt(i);
-        if (property.id() != CSSPropertyVariable && hasVariableReference(property.value()))
+        if (property.id() != CSSPropertyVariable && hasVariableReference(property.value())) {
             resolveVariables(property.id(), property.value(), knownExpressions);
-        else
+        } else {
             applyProperty(property.id(), property.value());
+            // All properties become dependent on their parent style when they use variables.
+            m_state->style()->setHasExplicitlyInheritedProperties();
+        }
     }
 }
 
@@ -1431,7 +1376,7 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
     // CSS variables don't resolve shorthands at parsing time, so this should be *after* handling variables.
     ASSERT_WITH_MESSAGE(!isExpandedShorthand(id), "Shorthand property id = %d wasn't expanded at parsing time", id);
 
-    StyleResolverState& state = m_state;
+    StyleResolverState& state = *m_state;
     bool isInherit = state.parentNode() && value->isInheritedValue();
     bool isInitial = value->isInitialValue() || (!state.parentNode() && value->isInheritedValue());
 
@@ -1452,7 +1397,7 @@ void StyleResolver::applyProperty(CSSPropertyID id, CSSValue* value)
 
     if (id == CSSPropertyVariable) {
         ASSERT_WITH_SECURITY_IMPLICATION(value->isVariableValue());
-        CSSVariableValue* variable = static_cast<CSSVariableValue*>(value);
+        CSSVariableValue* variable = toCSSVariableValue(value);
         ASSERT(!variable->name().isEmpty());
         ASSERT(!variable->value().isEmpty());
         state.style()->setVariable(variable->name(), variable->value());
@@ -1480,5 +1425,32 @@ bool StyleResolver::affectedByViewportChange() const
     }
     return false;
 }
+
+#ifdef STYLE_STATS
+StyleSharingStats StyleResolver::m_styleSharingStats;
+
+static void printStyleStats(unsigned searches, unsigned elementsEligibleForSharing, unsigned stylesShared, unsigned searchFoundSiblingForSharing, unsigned searchesMissedSharing)
+{
+    double percentOfElementsSharingStyle = (stylesShared * 100.0) / searches;
+    double percentOfNodesEligibleForSharing = (elementsEligibleForSharing * 100.0) / searches;
+    double percentOfEligibleSharingRelativesFound = (searchFoundSiblingForSharing * 100.0) / searches;
+
+    fprintf(stderr, "%u elements checked, %u were eligible for style sharing (%.2f%%).\n", searches, elementsEligibleForSharing, percentOfNodesEligibleForSharing);
+    fprintf(stderr, "%u elements were found to share with, %u were possible (%.2f%%).\n", searchFoundSiblingForSharing, searchesMissedSharing + searchFoundSiblingForSharing, percentOfEligibleSharingRelativesFound);
+    fprintf(stderr, "%u styles were actually shared once sibling and attribute rules were considered (%.2f%%).\n", stylesShared, percentOfElementsSharingStyle);
+
+}
+
+void StyleSharingStats::printStats() const
+{
+    fprintf(stderr, "--------------------------------------------------------------------------------\n");
+    fprintf(stderr, "This recalc style:\n");
+    printStyleStats(m_searches, m_elementsEligibleForSharing, m_stylesShared, m_searchFoundSiblingForSharing, m_searchesMissedSharing);
+
+    fprintf(stderr, "Total:\n");
+    printStyleStats(m_totalSearches, m_totalElementsEligibleForSharing, m_totalStylesShared, m_totalSearchFoundSiblingForSharing, m_totalSearchesMissedSharing);
+    fprintf(stderr, "--------------------------------------------------------------------------------\n");
+}
+#endif
 
 } // namespace WebCore

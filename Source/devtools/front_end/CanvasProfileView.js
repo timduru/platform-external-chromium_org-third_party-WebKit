@@ -246,12 +246,12 @@ WebInspector.CanvasProfileView.prototype = {
             return;
         this._lastReplayCallIndex = index;
         this._pendingReplayTraceLogEvent = true;
-        var time = Date.now();
         /**
          * @param {?Protocol.Error} error
          * @param {CanvasAgent.ResourceState} resourceState
+         * @param {number} replayTime
          */
-        function didReplayTraceLog(error, resourceState)
+        function didReplayTraceLog(error, resourceState, replayTime)
         {
             delete this._pendingReplayTraceLogEvent;
 
@@ -262,7 +262,7 @@ WebInspector.CanvasProfileView.prototype = {
                 this._currentResourceStates["auto"] = resourceState;
                 this._currentResourceStates[resourceState.id] = resourceState;
 
-                this._debugInfoElement.textContent = "Replay time: " + (Date.now() - time) + "ms";
+                this._debugInfoElement.textContent = "Replay time: " + Number(replayTime).toFixed() + "ms";
                 this._onReplayContextChanged();
             }
 
@@ -331,7 +331,7 @@ WebInspector.CanvasProfileView.prototype = {
     {
         var lastChild;
         while ((lastChild = node.children.peekLast()))
-            node = /** @type {!WebInspector.DataGridNode} */ (lastChild);
+            node = lastChild;
         return node;
     },
 
@@ -341,7 +341,7 @@ WebInspector.CanvasProfileView.prototype = {
     _appendCallNodes: function(callNodes)
     {
         var rootNode = this._logGrid.rootNode();
-        var frameNode = /** @type {WebInspector.DataGridNode} */ (rootNode.children.peekLast());
+        var frameNode = rootNode.children.peekLast();
         if (frameNode && this._peekLastRecursively(frameNode).call.isFrameEndCall)
             frameNode = null;
         for (var i = 0, n = callNodes.length; i < n; ++i) {

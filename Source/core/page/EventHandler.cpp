@@ -49,6 +49,7 @@
 #include "core/editing/FrameSelection.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
+#include "core/history/BackForwardController.h"
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/html/HTMLFrameSetElement.h"
 #include "core/html/HTMLInputElement.h"
@@ -940,7 +941,7 @@ bool EventHandler::scrollOverflow(ScrollDirection direction, ScrollGranularity g
     Node* node = startingNode;
 
     if (!node)
-        node = m_frame->document()->focusedNode();
+        node = m_frame->document()->focusedElement();
 
     if (!node)
         node = m_mousePressNode.get();
@@ -961,7 +962,7 @@ bool EventHandler::logicalScrollOverflow(ScrollLogicalDirection direction, Scrol
     Node* node = startingNode;
 
     if (!node)
-        node = m_frame->document()->focusedNode();
+        node = m_frame->document()->focusedElement();
 
     if (!node)
         node = m_mousePressNode.get();
@@ -1886,7 +1887,7 @@ static inline SVGElementInstance* instanceAssociatedWithShadowTreeElement(Node* 
     if (!shadowTreeParentElement || !shadowTreeParentElement->hasTagName(useTag))
         return 0;
 
-    return static_cast<SVGUseElement*>(shadowTreeParentElement)->instanceForShadowTreeElement(referenceNode);
+    return toSVGUseElement(shadowTreeParentElement)->instanceForShadowTreeElement(referenceNode);
 }
 
 void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMouseEvent& mouseEvent, bool fireMouseOverOut)
@@ -2030,7 +2031,7 @@ bool EventHandler::dispatchMouseEvent(const AtomicString& eventType, Node* targe
                 Node* n = node->isShadowRoot() ? toShadowRoot(node)->host() : node;
                 if (m_frame->selection()->isRange()
                     && m_frame->selection()->toNormalizedRange()->compareNode(n, IGNORE_EXCEPTION) == Range::NODE_INSIDE
-                    && n->isDescendantOf(m_frame->document()->focusedNode()))
+                    && n->isDescendantOf(m_frame->document()->focusedElement()))
                     return true;
                     
                 break;
@@ -2713,7 +2714,7 @@ bool EventHandler::sendContextMenuEventForKey()
 #endif
     IntPoint location;
 
-    Node* focusedNode = doc->focusedNode();
+    Element* focusedElement = doc->focusedElement();
     FrameSelection* selection = m_frame->selection();
     Position start = selection->selection().start();
 
@@ -2725,8 +2726,8 @@ bool EventHandler::sendContextMenuEventForKey()
         // In a multiline edit, firstRect.maxY() would endup on the next line, so -1.
         int y = firstRect.maxY() ? firstRect.maxY() - 1 : 0;
         location = IntPoint(x, y);
-    } else if (focusedNode) {
-        RenderBoxModelObject* box = focusedNode->renderBoxModelObject();
+    } else if (focusedElement) {
+        RenderBoxModelObject* box = focusedElement->renderBoxModelObject();
         if (!box)
             return false;
         IntRect clippedRect = box->pixelSnappedAbsoluteClippedOverflowRect();
@@ -2742,7 +2743,7 @@ bool EventHandler::sendContextMenuEventForKey()
     IntPoint position = view->contentsToRootView(location);
     IntPoint globalPosition = view->hostWindow()->rootViewToScreen(IntRect(position, IntSize())).location();
 
-    Node* targetNode = doc->focusedNode();
+    Node* targetNode = doc->focusedElement();
     if (!targetNode)
         targetNode = doc;
 
@@ -3309,7 +3310,7 @@ bool EventHandler::handleTextInputEvent(const String& text, Event* underlyingEve
     if (FrameView* view = m_frame->view())
         view->resetDeferredRepaintDelay();
 
-    RefPtr<TextEvent> event = TextEvent::create(m_frame->document()->domWindow(), text, inputType);
+    RefPtr<TextEvent> event = TextEvent::create(m_frame->domWindow(), text, inputType);
     event->setUnderlyingEvent(underlyingEvent);
 
     target->dispatchEvent(event, IGNORE_EXCEPTION);
@@ -3360,7 +3361,7 @@ void EventHandler::defaultBackspaceEventHandler(KeyboardEvent* event)
 
     if (!m_frame->editor()->behavior().shouldNavigateBackOnBackspace())
         return;
-    
+
     Page* page = m_frame->page();
     if (!page)
         return;
@@ -3368,9 +3369,9 @@ void EventHandler::defaultBackspaceEventHandler(KeyboardEvent* event)
     bool handledEvent = false;
 
     if (event->shiftKey())
-        handledEvent = page->goForward();
+        handledEvent = page->backForward()->goForward();
     else
-        handledEvent = page->goBack();
+        handledEvent = page->backForward()->goBack();
 
     if (handledEvent)
         event->setDefaultHandled();
@@ -3426,9 +3427,8 @@ void EventHandler::defaultTabEventHandler(KeyboardEvent* event)
 
 void EventHandler::capsLockStateMayHaveChanged()
 {
-    Document* d = m_frame->document();
-    if (Node* node = d->focusedNode()) {
-        if (RenderObject* r = node->renderer()) {
+    if (Element* element = m_frame->document()->focusedElement()) {
+        if (RenderObject* r = element->renderer()) {
             if (r->isTextField())
                 toRenderTextControlSingleLine(r)->capsLockStateMayHaveChanged();
         }

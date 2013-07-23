@@ -39,88 +39,49 @@
 #include "config.h"
 #include "core/css/resolver/StyleBuilder.h"
 
-// FIXME: This is way more than we need to include!
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "StyleBuilderFunctions.h"
-#include "core/animation/AnimatableValue.h"
-#include "core/animation/Animation.h"
+#include "StylePropertyShorthand.h"
 #include "core/css/BasicShapeFunctions.h"
 #include "core/css/CSSAspectRatioValue.h"
-#include "core/css/CSSCalculationValue.h"
 #include "core/css/CSSCursorImageValue.h"
-#include "core/css/CSSDefaultStyleSheets.h"
-#include "core/css/CSSFontSelector.h"
+#include "core/css/CSSGradientValue.h"
 #include "core/css/CSSImageSetValue.h"
-#include "core/css/CSSKeyframeRule.h"
-#include "core/css/CSSKeyframesRule.h"
 #include "core/css/CSSLineBoxContainValue.h"
-#include "core/css/CSSParser.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
+#include "core/css/CSSProperty.h"
 #include "core/css/CSSReflectValue.h"
-#include "core/css/CSSSVGDocumentValue.h"
-#include "core/css/CSSSelector.h"
-#include "core/css/CSSSelectorList.h"
-#include "core/css/CSSStyleRule.h"
-#include "core/css/CSSValueList.h"
 #include "core/css/CSSVariableValue.h"
 #include "core/css/Counter.h"
-#include "core/css/ElementRuleCollector.h"
-#include "core/css/FontFeatureValue.h"
-#include "core/css/FontSize.h"
 #include "core/css/FontValue.h"
-#include "core/css/MediaQueryEvaluator.h"
-#include "core/css/PageRuleCollector.h"
 #include "core/css/Pair.h"
 #include "core/css/Rect.h"
-#include "core/css/RuleSet.h"
 #include "core/css/ShadowValue.h"
-#include "core/css/StylePropertySet.h"
-#include "core/css/StylePropertyShorthand.h"
-#include "core/css/StyleSheetContents.h"
 #include "core/css/resolver/ElementStyleResources.h"
 #include "core/css/resolver/FilterOperationResolver.h"
+#include "core/css/resolver/FontBuilder.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/css/resolver/StyleResolverState.h"
 #include "core/css/resolver/TransformBuilder.h"
-#include "core/css/resolver/ViewportStyleResolver.h"
-#include "core/dom/DocumentStyleSheetCollection.h"
-#include "core/dom/Text.h"
-#include "core/dom/shadow/ShadowRoot.h"
 #include "core/page/Frame.h"
-#include "core/page/FrameView.h"
-#include "core/page/Page.h"
 #include "core/page/Settings.h"
-#include "core/platform/LinkHash.h"
 #include "core/platform/graphics/FontDescription.h"
-#include "core/platform/graphics/filters/custom/CustomFilterConstants.h"
-#include "core/platform/text/LocaleToScriptMapping.h"
-#include "core/rendering/RenderTheme.h"
-#include "core/rendering/RenderView.h"
-#include "core/rendering/style/ContentData.h"
 #include "core/rendering/style/CounterContent.h"
 #include "core/rendering/style/CursorList.h"
-#include "core/rendering/style/KeyframeList.h"
 #include "core/rendering/style/QuotesData.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "core/rendering/style/SVGRenderStyle.h"
 #include "core/rendering/style/SVGRenderStyleDefs.h"
 #include "core/rendering/style/ShadowData.h"
-#include "core/rendering/style/StyleCachedImage.h"
-#include "core/rendering/style/StyleCachedImageSet.h"
-#include "core/rendering/style/StyleCustomFilterProgramCache.h"
 #include "core/rendering/style/StyleGeneratedImage.h"
-#include "core/rendering/style/StylePendingImage.h"
-#include "core/rendering/style/StylePendingShader.h"
-#include "core/rendering/style/StyleShader.h"
 #include "core/svg/SVGColor.h"
 #include "core/svg/SVGPaint.h"
 #include "core/svg/SVGURIReference.h"
 #include "wtf/MathExtras.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/Vector.h"
-
 
 namespace WebCore {
 
@@ -572,7 +533,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyTextIndent(StyleResolver*, Styl
 
     CSSValueList* valueList = toCSSValueList(value);
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(valueList->itemWithoutBoundsCheck(0));
-    Length lengthOrPercentageValue = primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | CalculatedConversion | ViewportPercentageConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    Length lengthOrPercentageValue = primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
     ASSERT(!lengthOrPercentageValue.isUndefined());
     state.style()->setTextIndent(lengthOrPercentageValue);
 
@@ -598,7 +559,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyVerticalAlign(StyleResolver*, S
     if (primitiveValue->getValueID())
         return state.style()->setVerticalAlign(*primitiveValue);
 
-    state.style()->setVerticalAlignLength(primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | CalculatedConversion | ViewportPercentageConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom()));
+    state.style()->setVerticalAlignLength(primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom()));
 }
 
 static void resetEffectiveZoom(StyleResolverState& state)
@@ -726,7 +687,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitMarqueeIncrement(StyleRes
             break;
         }
     } else {
-        Length marqueeLength = primitiveValue ? primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | CalculatedConversion | FractionConversion | ViewportPercentageConversion>(state.style(), state.rootElementStyle()) : Length(Undefined);
+        Length marqueeLength = primitiveValue ? primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | FractionConversion>(state.style(), state.rootElementStyle()) : Length(Undefined);
         if (!marqueeLength.isUndefined())
             state.style()->setMarqueeIncrement(marqueeLength);
     }
@@ -904,7 +865,7 @@ static bool createGridTrackBreadth(CSSPrimitiveValue* primitiveValue, const Styl
         return true;
     }
 
-    workingLength = primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | ViewportPercentageConversion | AutoConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
+    workingLength = primitiveValue->convertToLength<FixedIntegerConversion | PercentConversion | AutoConversion>(state.style(), state.rootElementStyle(), state.style()->effectiveZoom());
     if (workingLength.length().isUndefined())
         return false;
 
@@ -1215,36 +1176,17 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolver* styleResolv
         return;
     // Shorthand properties.
     case CSSPropertyFont:
-        // Short-hand properties are expanded by the parser and normally
-        // do not go through applyProperty() at all. CSSPropertyFont
-        // is special as system font names are sent through here.
-        // FIXME: Unclear why this special casing is handled this way.
-        // See isExpandedShorthand for more comments.
+        // Only System Font identifiers should come through this method
+        // all other values should have been handled when the shorthand
+        // was expanded by the parser.
+        // FIXME: System Font identifiers should not hijack this
+        // short-hand CSSProperty like this.
         ASSERT(!isInitial);
         ASSERT(!isInherit);
-        if (primitiveValue) {
-            state.style()->setLineHeight(RenderStyle::initialLineHeight());
-            state.setLineHeightValue(0);
-            state.fontBuilder().fromSystemFont(primitiveValue->getValueID(), state.style()->effectiveZoom());
-        } else if (value->isFontValue()) {
-            FontValue* font = static_cast<FontValue*>(value);
-            if (!font->style || !font->variant || !font->weight
-                || !font->size || !font->lineHeight || !font->family)
-                return;
-            styleResolver->applyProperty(CSSPropertyFontStyle, font->style.get());
-            styleResolver->applyProperty(CSSPropertyFontVariant, font->variant.get());
-            styleResolver->applyProperty(CSSPropertyFontWeight, font->weight.get());
-            // The previous properties can dirty our font but they don't try to read the font's
-            // properties back, which is safe. However if font-size is using the 'ex' unit, it will
-            // need query the dirtied font's x-height to get the computed size. To be safe in this
-            // case, let's just update the font now.
-            styleResolver->updateFont();
-            styleResolver->applyProperty(CSSPropertyFontSize, font->size.get());
-
-            state.setLineHeightValue(font->lineHeight.get());
-
-            styleResolver->applyProperty(CSSPropertyFontFamily, font->family.get());
-        }
+        ASSERT(primitiveValue);
+        state.style()->setLineHeight(RenderStyle::initialLineHeight());
+        state.setLineHeightValue(0);
+        state.fontBuilder().fromSystemFont(primitiveValue->getValueID(), state.style()->effectiveZoom());
         return;
     case CSSPropertyBackground:
     case CSSPropertyBackgroundPosition:
@@ -1347,7 +1289,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolver* styleResolv
         RefPtr<StyleReflection> reflection = StyleReflection::create();
         reflection->setDirection(*reflectValue->direction());
         if (reflectValue->offset())
-            reflection->setOffset(reflectValue->offset()->convertToLength<FixedIntegerConversion | PercentConversion | CalculatedConversion>(state.style(), state.rootElementStyle(), zoomFactor));
+            reflection->setOffset(reflectValue->offset()->convertToLength<FixedIntegerConversion | PercentConversion>(state.style(), state.rootElementStyle(), zoomFactor));
         NinePieceImage mask;
         mask.setMaskDefaults();
         state.styleMap().mapNinePieceImage(id, reflectValue->mask(), mask);

@@ -2223,25 +2223,21 @@ private:
 
 } // namespace
 
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(v8::Handle<v8::Value> value, MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers, bool& didThrow)
-{
-    return create(value, messagePorts, arrayBuffers, didThrow, v8::Isolate::GetCurrent());
-}
-
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(v8::Handle<v8::Value> value, MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers, bool& didThrow, v8::Isolate* isolate)
 {
     return adoptRef(new SerializedScriptValue(value, messagePorts, arrayBuffers, didThrow, isolate));
-}
-
-PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(v8::Handle<v8::Value> value)
-{
-    return create(value, v8::Isolate::GetCurrent());
 }
 
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::create(v8::Handle<v8::Value> value, v8::Isolate* isolate)
 {
     bool didThrow;
     return adoptRef(new SerializedScriptValue(value, 0, 0, didThrow, isolate));
+}
+
+PassRefPtr<SerializedScriptValue> SerializedScriptValue::createAndSwallowExceptions(v8::Handle<v8::Value> value, v8::Isolate* isolate)
+{
+    bool didThrow;
+    return adoptRef(new SerializedScriptValue(value, 0, 0, didThrow, isolate, DoNotThrowExceptions));
 }
 
 PassRefPtr<SerializedScriptValue> SerializedScriptValue::createFromWire(const String& data)
@@ -2425,7 +2421,7 @@ PassOwnPtr<SerializedScriptValue::ArrayBufferContentsArray> SerializedScriptValu
     return contents.release();
 }
 
-SerializedScriptValue::SerializedScriptValue(v8::Handle<v8::Value> value, MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers, bool& didThrow, v8::Isolate* isolate)
+SerializedScriptValue::SerializedScriptValue(v8::Handle<v8::Value> value, MessagePortArray* messagePorts, ArrayBufferArray* arrayBuffers, bool& didThrow, v8::Isolate* isolate, ExceptionPolicy policy)
     : m_externallyAllocatedMemory(0)
 {
     didThrow = false;
@@ -2436,9 +2432,10 @@ SerializedScriptValue::SerializedScriptValue(v8::Handle<v8::Value> value, Messag
         Serializer serializer(writer, messagePorts, arrayBuffers, m_blobURLs, tryCatch, isolate);
         status = serializer.serialize(value);
         if (status == Serializer::JSException) {
-            // If there was a JS exception thrown, re-throw it.
             didThrow = true;
-            tryCatch.ReThrow();
+            // If there was a JS exception thrown, re-throw it.
+            if (policy == ThrowExceptions)
+                tryCatch.ReThrow();
             return;
         }
     }
@@ -2448,11 +2445,13 @@ SerializedScriptValue::SerializedScriptValue(v8::Handle<v8::Value> value, Messag
         // If there was an input error, throw a new exception outside
         // of the TryCatch scope.
         didThrow = true;
-        setDOMException(DataCloneError, isolate);
+        if (policy == ThrowExceptions)
+            setDOMException(DataCloneError, isolate);
         return;
     case Serializer::InvalidStateError:
         didThrow = true;
-        setDOMException(InvalidStateError, isolate);
+        if (policy == ThrowExceptions)
+            setDOMException(InvalidStateError, isolate);
         return;
     case Serializer::JSFailure:
         // If there was a JS failure (but no exception), there's not
@@ -2488,7 +2487,12 @@ v8::Handle<v8::Value> SerializedScriptValue::deserialize(v8::Isolate* isolate, M
     if (!m_data.impl())
         return v8NullWithCheck(isolate);
     COMPILE_ASSERT(sizeof(BufferValueType) == 2, BufferValueTypeIsTwoBytes);
-    Reader reader(reinterpret_cast<const uint8_t*>(m_data.impl()->bloatedCharacters()), 2 * m_data.length(), isolate);
+    m_data.ensure16Bit();
+    // FIXME: SerializedScriptValue shouldn't use String for its underlying
+    // storage. Instead, it should use SharedBuffer or Vector<uint8_t>. The
+    // information stored in m_data isn't even encoded in UTF-16. Instead,
+    // unicode characters are encoded as UTF-8 with two code units per UChar.
+    Reader reader(reinterpret_cast<const uint8_t*>(m_data.impl()->characters16()), 2 * m_data.length(), isolate);
     Deserializer deserializer(reader, messagePorts, m_arrayBufferContentsArray.get());
 
     // deserialize() can run arbitrary script (e.g., setters), which could result in |this| being destroyed.

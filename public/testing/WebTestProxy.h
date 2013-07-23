@@ -200,18 +200,13 @@ protected:
     void didFailLoad(WebKit::WebFrame*, const WebKit::WebURLError&);
     void didFinishLoad(WebKit::WebFrame*);
     void didChangeLocationWithinPage(WebKit::WebFrame*);
-    void didDisplayInsecureContent(WebKit::WebFrame*);
-    void didRunInsecureContent(WebKit::WebFrame*, const WebKit::WebSecurityOrigin&, const WebKit::WebURL& insecureURL);
     void didDetectXSS(WebKit::WebFrame*, const WebKit::WebURL& insecureURL, bool didBlockEntirePage);
     void willRequestResource(WebKit::WebFrame*, const WebKit::WebCachedURLRequest&);
-    WebKit::WebURLError cannotHandleRequestError(WebKit::WebFrame*, const WebKit::WebURLRequest&);
     void didCreateDataSource(WebKit::WebFrame*, WebKit::WebDataSource*);
     void willSendRequest(WebKit::WebFrame*, unsigned identifier, WebKit::WebURLRequest&, const WebKit::WebURLResponse& redirectResponse);
     void didReceiveResponse(WebKit::WebFrame*, unsigned identifier, const WebKit::WebURLResponse&);
     void didChangeResourcePriority(WebKit::WebFrame*, unsigned identifier, const WebKit::WebURLRequest::Priority&);
     void didFinishResourceLoad(WebKit::WebFrame*, unsigned identifier);
-    void didFailResourceLoad(WebKit::WebFrame*, unsigned identifier, const WebKit::WebURLError&);
-    void unableToImplementPolicyWithError(WebKit::WebFrame*, const WebKit::WebURLError&);
     WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame*, const WebKit::WebURLRequest&, WebKit::WebNavigationType, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect);
     bool willCheckAndDispatchMessageEvent(WebKit::WebFrame* sourceFrame, WebKit::WebFrame* targetFrame, WebKit::WebSecurityOrigin target, WebKit::WebDOMMessageEvent);
     void resetInputMethod();
@@ -516,16 +511,6 @@ public:
         WebTestProxyBase::didChangeLocationWithinPage(frame);
         Base::didChangeLocationWithinPage(frame);
     }
-    virtual void didDisplayInsecureContent(WebKit::WebFrame* frame)
-    {
-        WebTestProxyBase::didDisplayInsecureContent(frame);
-        Base::didDisplayInsecureContent(frame);
-    }
-    virtual void didRunInsecureContent(WebKit::WebFrame* frame, const WebKit::WebSecurityOrigin& origin, const WebKit::WebURL& insecureURL)
-    {
-        WebTestProxyBase::didRunInsecureContent(frame, origin, insecureURL);
-        Base::didRunInsecureContent(frame, origin, insecureURL);
-    }
     virtual void didDetectXSS(WebKit::WebFrame* frame, const WebKit::WebURL& insecureURL, bool didBlockEntirePage)
     {
         WebTestProxyBase::didDetectXSS(frame, insecureURL, didBlockEntirePage);
@@ -535,10 +520,6 @@ public:
     {
         WebTestProxyBase::willRequestResource(frame, request);
         Base::willRequestResource(frame, request);
-    }
-    virtual WebKit::WebURLError cannotHandleRequestError(WebKit::WebFrame* frame, const WebKit::WebURLRequest& request)
-    {
-        return WebTestProxyBase::cannotHandleRequestError(frame, request);
     }
     virtual void didCreateDataSource(WebKit::WebFrame* frame, WebKit::WebDataSource* ds)
     {
@@ -564,16 +545,6 @@ public:
     {
         WebTestProxyBase::didFinishResourceLoad(frame, identifier);
         Base::didFinishResourceLoad(frame, identifier);
-    }
-    virtual void didFailResourceLoad(WebKit::WebFrame* frame, unsigned identifier, const WebKit::WebURLError& error)
-    {
-        WebTestProxyBase::didFailResourceLoad(frame, identifier, error);
-        Base::didFailResourceLoad(frame, identifier, error);
-    }
-    virtual void unableToImplementPolicyWithError(WebKit::WebFrame* frame, const WebKit::WebURLError& error)
-    {
-        WebTestProxyBase::unableToImplementPolicyWithError(frame, error);
-        Base::unableToImplementPolicyWithError(frame, error);
     }
     virtual void didAddMessageToConsole(const WebKit::WebConsoleMessage& message, const WebKit::WebString& sourceName, unsigned sourceLine)
     {

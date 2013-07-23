@@ -57,14 +57,6 @@ public:
         return v8::Local<T>::New(isolate, m_handle);
     }
 
-    // FIXME: This function does an unsafe handle access. Remove it. Do not add
-    // code which calls this function.
-    ALWAYS_INLINE v8::Handle<T> deprecatedGet() const
-    {
-        const v8::Handle<T>* handle = reinterpret_cast<const v8::Handle<T>*>(&m_handle);
-        return *handle;
-    }
-
     template<typename P>
     void makeWeak(P* parameters, void (*callback)(v8::Isolate*, v8::Persistent<T>*, P*))
     {
@@ -72,11 +64,6 @@ public:
     }
 
     bool isEmpty() const { return m_handle.IsEmpty(); }
-    bool isNull() { return deprecatedGet()->IsNull(); }
-    bool isUndefined() { return deprecatedGet()->IsUndefined(); }
-    bool isFunction() { return deprecatedGet()->IsFunction(); }
-    bool isObject() { return deprecatedGet()->IsObject(); }
-    bool isString() { return deprecatedGet()->IsString(); }
 
     void set(v8::Isolate* isolate, v8::Handle<T> handle)
     {

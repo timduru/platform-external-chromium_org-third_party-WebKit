@@ -72,7 +72,6 @@ public:
     bool is8Bit() const { return m_text.is8Bit(); }
     const LChar* characters8() const { return m_text.impl()->characters8(); }
     const UChar* characters16() const { return m_text.impl()->characters16(); }
-    const UChar* bloatedCharacters() const { return m_text.bloatedCharacters(); }
     bool hasEmptyText() const { return m_text.isEmpty(); }
     String substring(unsigned position, unsigned length) const { return m_text.substring(position, length); }
     UChar characterAt(unsigned) const;
@@ -152,6 +151,8 @@ protected:
 
     virtual void setTextInternal(PassRefPtr<StringImpl>);
     virtual UChar previousCharacter() const;
+
+    virtual void addLayerHitTestRects(LayerHitTestRects&, const RenderLayer* currentLayer, const LayoutPoint& layerOffset) const OVERRIDE;
     
     virtual InlineTextBox* createTextBox(); // Subclassed by SVG.
 

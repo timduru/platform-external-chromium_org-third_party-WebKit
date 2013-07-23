@@ -63,9 +63,9 @@ namespace WebCore {
 
 Node* InjectedScriptHost::scriptValueAsNode(ScriptValue value)
 {
+    v8::HandleScope scope(v8::Isolate::GetCurrent());
     if (!value.isObject() || value.isNull())
         return 0;
-    v8::HandleScope scope(v8::Isolate::GetCurrent());
     return V8Node::toNative(v8::Handle<v8::Object>::Cast(value.v8Value()));
 }
 
@@ -310,7 +310,7 @@ void V8InjectedScriptHost::databaseIdMethodCustom(const v8::FunctionCallbackInfo
         Database* database = V8Database::toNative(v8::Handle<v8::Object>::Cast(args[0]));
         if (database) {
             InjectedScriptHost* host = V8InjectedScriptHost::toNative(args.Holder()); {
-                v8SetReturnValueString(args, host->databaseIdImpl(database), args.GetIsolate(), NullStringAsUndefined);
+                v8SetReturnValueStringOrUndefined(args, host->databaseIdImpl(database), args.GetIsolate());
                 return;
             }
         }
@@ -323,7 +323,7 @@ void V8InjectedScriptHost::storageIdMethodCustom(const v8::FunctionCallbackInfo<
         Storage* storage = V8Storage::toNative(v8::Handle<v8::Object>::Cast(args[0]));
         if (storage) {
             InjectedScriptHost* host = V8InjectedScriptHost::toNative(args.Holder());
-            v8SetReturnValueString(args, host->storageIdImpl(storage), args.GetIsolate(), NullStringAsUndefined);
+            v8SetReturnValueStringOrUndefined(args, host->storageIdImpl(storage), args.GetIsolate());
             return;
         }
     }

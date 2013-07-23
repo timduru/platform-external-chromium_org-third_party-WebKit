@@ -60,15 +60,17 @@ public:
 class ScriptExecutionContext::PendingException {
     WTF_MAKE_NONCOPYABLE(PendingException);
 public:
-    PendingException(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack)
+    PendingException(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack)
         : m_errorMessage(errorMessage)
         , m_lineNumber(lineNumber)
+        , m_columnNumber(columnNumber)
         , m_sourceURL(sourceURL)
         , m_callStack(callStack)
     {
     }
     String m_errorMessage;
     int m_lineNumber;
+    int m_columnNumber;
     String m_sourceURL;
     RefPtr<ScriptCallStack> m_callStack;
 };
@@ -193,7 +195,7 @@ void ScriptExecutionContext::closeMessagePorts() {
     }
 }
 
-bool ScriptExecutionContext::sanitizeScriptError(String& errorMessage, int& lineNumber, String& sourceURL, CachedScript* cachedScript)
+bool ScriptExecutionContext::sanitizeScriptError(String& errorMessage, int& lineNumber, int& columnNumber, String& sourceURL, CachedScript* cachedScript)
 {
     KURL targetURL = completeURL(sourceURL);
     if (securityOrigin()->canRequest(targetURL) || (cachedScript && cachedScript->passesAccessControlCheck(securityOrigin())))
@@ -201,28 +203,29 @@ bool ScriptExecutionContext::sanitizeScriptError(String& errorMessage, int& line
     errorMessage = "Script error.";
     sourceURL = String();
     lineNumber = 0;
+    columnNumber = 0;
     return true;
 }
 
-void ScriptExecutionContext::reportException(const String& errorMessage, int lineNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack, CachedScript* cachedScript)
+void ScriptExecutionContext::reportException(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, PassRefPtr<ScriptCallStack> callStack, CachedScript* cachedScript)
 {
     if (m_inDispatchErrorEvent) {
         if (!m_pendingExceptions)
             m_pendingExceptions = adoptPtr(new Vector<OwnPtr<PendingException> >());
-        m_pendingExceptions->append(adoptPtr(new PendingException(errorMessage, lineNumber, sourceURL, callStack)));
+        m_pendingExceptions->append(adoptPtr(new PendingException(errorMessage, lineNumber, columnNumber, sourceURL, callStack)));
         return;
     }
 
     // First report the original exception and only then all the nested ones.
-    if (!dispatchErrorEvent(errorMessage, lineNumber, sourceURL, cachedScript))
-        logExceptionToConsole(errorMessage, sourceURL, lineNumber, callStack);
+    if (!dispatchErrorEvent(errorMessage, lineNumber, columnNumber, sourceURL, cachedScript))
+        logExceptionToConsole(errorMessage, sourceURL, lineNumber, columnNumber, callStack);
 
     if (!m_pendingExceptions)
         return;
 
     for (size_t i = 0; i < m_pendingExceptions->size(); i++) {
         PendingException* e = m_pendingExceptions->at(i).get();
-        logExceptionToConsole(e->m_errorMessage, e->m_sourceURL, e->m_lineNumber, e->m_callStack);
+        logExceptionToConsole(e->m_errorMessage, e->m_sourceURL, e->m_lineNumber, e->m_columnNumber, e->m_callStack);
     }
     m_pendingExceptions.clear();
 }
@@ -232,7 +235,7 @@ void ScriptExecutionContext::addConsoleMessage(MessageSource source, MessageLeve
     addMessage(source, level, message, sourceURL, lineNumber, 0, state, requestIdentifier);
 }
 
-bool ScriptExecutionContext::dispatchErrorEvent(const String& errorMessage, int lineNumber, const String& sourceURL, CachedScript* cachedScript)
+bool ScriptExecutionContext::dispatchErrorEvent(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, CachedScript* cachedScript)
 {
     EventTarget* target = errorEventTarget();
     if (!target)
@@ -240,12 +243,13 @@ bool ScriptExecutionContext::dispatchErrorEvent(const String& errorMessage, int 
 
     String message = errorMessage;
     int line = lineNumber;
+    int column = columnNumber;
     String sourceName = sourceURL;
-    sanitizeScriptError(message, line, sourceName, cachedScript);
+    sanitizeScriptError(message, line, column, sourceName, cachedScript);
 
     ASSERT(!m_inDispatchErrorEvent);
     m_inDispatchErrorEvent = true;
-    RefPtr<ErrorEvent> errorEvent = ErrorEvent::create(message, sourceName, line);
+    RefPtr<ErrorEvent> errorEvent = ErrorEvent::create(message, sourceName, line, column);
     target->dispatchEvent(errorEvent);
     m_inDispatchErrorEvent = false;
     return errorEvent->defaultPrevented();
@@ -259,7 +263,7 @@ int ScriptExecutionContext::circularSequentialID()
     return m_circularSequentialID;
 }
 
-int ScriptExecutionContext::installNewTimeout(PassOwnPtr<ScheduledAction> action, int timeout, bool singleShot)
+int ScriptExecutionContext::installNewTimeout(DOMTimer::Type timerType, PassOwnPtr<ScheduledAction> action, int timeout)
 {
     int timeoutID;
     while (true) {
@@ -267,20 +271,25 @@ int ScriptExecutionContext::installNewTimeout(PassOwnPtr<ScheduledAction> action
         if (!m_timeouts.contains(timeoutID))
             break;
     }
-    TimeoutMap::AddResult result = m_timeouts.add(timeoutID, DOMTimer::create(this, action, timeout, singleShot, timeoutID));
+    TimeoutMap::AddResult result = m_timeouts.add(timeoutID, DOMTimer::create(this, timerType, action, timeout, timeoutID));
     ASSERT(result.isNewEntry);
     DOMTimer* timer = result.iterator->value.get();
 
     timer->suspendIfNeeded();
 
-    return timer->timeoutID();
+    return timeoutID;
 }
 
-void ScriptExecutionContext::removeTimeoutByID(int timeoutID)
+bool ScriptExecutionContext::removeTimeoutByIDIfTypeMatches(DOMTimer::Type timerType, int timeoutID)
 {
     if (timeoutID <= 0)
-        return;
-    m_timeouts.remove(timeoutID);
+        return false;
+    TimeoutMap::iterator iter = m_timeouts.find(timeoutID);
+    if (iter != m_timeouts.end() && iter->value->type() == timerType) {
+        m_timeouts.remove(iter);
+        return true;
+    }
+    return false;
 }
 
 PublicURLManager& ScriptExecutionContext::publicURLManager()

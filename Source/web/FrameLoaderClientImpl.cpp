@@ -288,13 +288,6 @@ void FrameLoaderClientImpl::dispatchWillSendRequest(
     DocumentLoader* loader, unsigned long identifier, ResourceRequest& request,
     const ResourceResponse& redirectResponse)
 {
-    // FrameLoader::loadEmptyDocumentSynchronously() creates an empty document
-    // with no URL.  We don't like that, so we'll rename it to about:blank.
-    if (request.url().isEmpty())
-        request.setURL(KURL(ParsedURLString, "about:blank"));
-    if (request.firstPartyForCookies().isEmpty())
-        request.setFirstPartyForCookies(KURL(ParsedURLString, "about:blank"));
-
     // Give the WebFrameClient a crack at the request.
     if (m_webFrame->client()) {
         WrappedResourceRequest webreq(request);
@@ -326,14 +319,6 @@ void FrameLoaderClientImpl::dispatchDidFinishLoading(DocumentLoader* loader,
 {
     if (m_webFrame->client())
         m_webFrame->client()->didFinishResourceLoad(m_webFrame, identifier);
-}
-
-void FrameLoaderClientImpl::dispatchDidFailLoading(DocumentLoader* loader,
-                                                  unsigned long identifier,
-                                                  const ResourceError& error)
-{
-    if (m_webFrame->client())
-        m_webFrame->client()->didFailResourceLoad(m_webFrame, identifier, error);
 }
 
 void FrameLoaderClientImpl::dispatchDidFinishDocumentLoad()
@@ -432,7 +417,7 @@ void FrameLoaderClientImpl::dispatchDidFailProvisionalLoad(
     // a memory leak in the plugin!!
     if (error.domain() == internalErrorDomain
         && error.errorCode() == PolicyChangeError) {
-        m_webFrame->didFail(cancelledError(error.failingURL()), true);
+        m_webFrame->didFail(ResourceError::cancelledError(error.failingURL()), true);
         return;
     }
 
@@ -493,11 +478,6 @@ NavigationPolicy FrameLoaderClientImpl::decidePolicyForNavigation(const Resource
     WebNavigationPolicy webPolicy = m_webFrame->client()->decidePolicyForNavigation(
         m_webFrame, webRequest, WebDataSourceImpl::toWebNavigationType(type), static_cast<WebNavigationPolicy>(policy), isRedirect);
     return static_cast<NavigationPolicy>(webPolicy);
-}
-
-void FrameLoaderClientImpl::dispatchUnableToImplementPolicy(const ResourceError& error)
-{
-    m_webFrame->client()->unableToImplementPolicyWithError(m_webFrame, error);
 }
 
 void FrameLoaderClientImpl::dispatchWillRequestResource(CachedResourceRequest* request)
@@ -623,99 +603,11 @@ void FrameLoaderClientImpl::didDetectXSS(const KURL& insecureURL, bool didBlockE
         m_webFrame->client()->didDetectXSS(m_webFrame, insecureURL, didBlockEntirePage);
 }
 
-ResourceError FrameLoaderClientImpl::cancelledError(const ResourceRequest& request)
-{
-    if (!m_webFrame->client())
-        return ResourceError();
-
-    return m_webFrame->client()->cancelledError(
-        m_webFrame, WrappedResourceRequest(request));
-}
-
-ResourceError FrameLoaderClientImpl::cannotShowURLError(const ResourceRequest& request)
-{
-    if (!m_webFrame->client())
-        return ResourceError();
-
-    return m_webFrame->client()->cannotHandleRequestError(
-        m_webFrame, WrappedResourceRequest(request));
-}
-
 ResourceError FrameLoaderClientImpl::interruptedForPolicyChangeError(
     const ResourceRequest& request)
 {
     return ResourceError(internalErrorDomain, PolicyChangeError,
                          request.url().string(), String());
-}
-
-ResourceError FrameLoaderClientImpl::cannotShowMIMETypeError(const ResourceResponse&)
-{
-    // FIXME
-    return ResourceError();
-}
-
-ResourceError FrameLoaderClientImpl::fileDoesNotExistError(const ResourceResponse&)
-{
-    // FIXME
-    return ResourceError();
-}
-
-ResourceError FrameLoaderClientImpl::pluginWillHandleLoadError(const ResourceResponse&)
-{
-    // FIXME
-    return ResourceError();
-}
-
-bool FrameLoaderClientImpl::shouldFallBack(const ResourceError& error)
-{
-    // This method is called when we fail to load the URL for an <object> tag
-    // that has fallback content (child elements) and is being loaded as a frame.
-    // The error parameter indicates the reason for the load failure.
-    // We should let the fallback content load only if this wasn't a cancelled
-    // request.
-    // Note: The mac version also has a case for "WebKitErrorPluginWillHandleLoad"
-    ResourceError c = cancelledError(ResourceRequest());
-    return error.errorCode() != c.errorCode() || error.domain() != c.domain();
-}
-
-bool FrameLoaderClientImpl::canShowMIMEType(const String& mimeType) const
-{
-    // This method is called to determine if the media type can be shown
-    // "internally" (i.e. inside the browser) regardless of whether or not the
-    // browser or a plugin is doing the rendering.
-
-    // mimeType strings are supposed to be ASCII, but if they are not for some
-    // reason, then it just means that the mime type will fail all of these "is
-    // supported" checks and go down the path of an unhandled mime type.
-    if (WebKit::Platform::current()->mimeRegistry()->supportsMIMEType(mimeType) == WebMimeRegistry::IsSupported)
-        return true;
-
-    // If Chrome is started with the --disable-plugins switch, pluginData is null.
-    PluginData* pluginData = m_webFrame->frame()->page()->pluginData();
-
-    // See if the type is handled by an installed plugin, if so, we can show it.
-    // FIXME: (http://b/1085524) This is the place to stick a preference to
-    //        disable full page plugins (optionally for certain types!)
-    return !mimeType.isEmpty() && pluginData && pluginData->supportsMimeType(mimeType);
-}
-
-String FrameLoaderClientImpl::generatedMIMETypeForURLScheme(const String& scheme) const
-{
-    // This appears to generate MIME types for protocol handlers that are handled
-    // internally. The only place I can find in the WebKit code that uses this
-    // function is WebView::registerViewClass, where it is used as part of the
-    // process by which custom view classes for certain document representations
-    // are registered.
-    String mimeType("x-apple-web-kit/");
-    mimeType.append(scheme.lower());
-    return mimeType;
-}
-
-void FrameLoaderClientImpl::didFinishLoad()
-{
-    OwnPtr<WebPluginLoadObserver> observer = pluginLoadObserver();
-    if (observer)
-        observer->didFinishLoading();
 }
 
 PassRefPtr<DocumentLoader> FrameLoaderClientImpl::createDocumentLoader(

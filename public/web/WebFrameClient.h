@@ -140,18 +140,6 @@ public:
         WebFrame*, const WebURLRequest&, WebNavigationType,
         WebNavigationPolicy defaultPolicy, bool isRedirect) { return defaultPolicy; }
 
-    // Returns an error corresponding to canHandledRequest() returning false.
-    virtual WebURLError cannotHandleRequestError(
-        WebFrame*, const WebURLRequest& request) { return WebURLError(); }
-
-    // Returns an error corresponding to a user cancellation event.
-    virtual WebURLError cancelledError(
-        WebFrame*, const WebURLRequest& request) { return WebURLError(); }
-
-    // Notify that a URL cannot be handled.
-    virtual void unableToImplementPolicyWithError(
-        WebFrame*, const WebURLError&) { }
-
 
     // Navigational notifications ------------------------------------------
 
@@ -262,10 +250,6 @@ public:
     virtual void didFinishResourceLoad(
         WebFrame*, unsigned identifier) { }
 
-    // The resource request given by identifier failed.
-    virtual void didFailResourceLoad(
-        WebFrame*, unsigned identifier, const WebURLError&) { }
-
     // The specified request was satified from WebCore's memory cache.
     virtual void didLoadResourceFromMemoryCache(
         WebFrame*, const WebURLRequest&, const WebURLResponse&) { }
@@ -362,6 +346,7 @@ public:
     // error code.
     // The callbacks object is deleted when the callback method is called
     // and does not need to be (and should not be) deleted manually.
+    // FIXME: Deprecate this from WebFrameClient.
     virtual void queryStorageUsageAndQuota(
         WebFrame*, WebStorageQuotaType, WebStorageQuotaCallbacks*) { }
 

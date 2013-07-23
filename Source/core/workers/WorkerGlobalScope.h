@@ -47,7 +47,9 @@ namespace WebCore {
 
     class Blob;
     class DOMURL;
+    class ExceptionState;
     class ScheduledAction;
+    class WorkerClients;
     class WorkerInspectorController;
     class WorkerLocation;
     class WorkerNavigator;
@@ -87,14 +89,8 @@ namespace WebCore {
         DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
 
         // WorkerUtils
-        virtual void importScripts(const Vector<String>& urls, ExceptionCode&);
+        virtual void importScripts(const Vector<String>& urls, ExceptionState&);
         WorkerNavigator* navigator() const;
-
-        // Timers
-        int setTimeout(PassOwnPtr<ScheduledAction>, int timeout);
-        void clearTimeout(int timeoutId);
-        int setInterval(PassOwnPtr<ScheduledAction>, int timeout);
-        void clearInterval(int timeoutId);
 
         // ScriptExecutionContext
         virtual WorkerEventQueue* eventQueue() const OVERRIDE;
@@ -129,15 +125,19 @@ namespace WebCore {
         void unregisterObserver(Observer*);
         void notifyObserversOfStop();
 
+        bool idleNotification();
+
         virtual const SecurityOrigin* topOrigin() const OVERRIDE { return m_topOrigin.get(); }
 
         double timeOrigin() const { return m_timeOrigin; }
 
+        WorkerClients* clients() { return m_workerClients.get(); }
+
     protected:
-        WorkerGlobalScope(const KURL&, const String& userAgent, WorkerThread*, PassRefPtr<SecurityOrigin> topOrigin, double timeOrigin);
+        WorkerGlobalScope(const KURL&, const String& userAgent, WorkerThread*, PassRefPtr<SecurityOrigin> topOrigin, double timeOrigin, PassOwnPtr<WorkerClients>);
         void applyContentSecurityPolicyFromString(const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType);
 
-        virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack>) OVERRIDE;
+        virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack>) OVERRIDE;
         void addMessageToWorkerConsole(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>, ScriptState* = 0, unsigned long requestIdentifier = 0);
 
     private:
@@ -176,6 +176,8 @@ namespace WebCore {
         OwnPtr<WorkerEventQueue> m_eventQueue;
 
         RefPtr<SecurityOrigin> m_topOrigin;
+
+        OwnPtr<WorkerClients> m_workerClients;
 
         double m_timeOrigin;
     };

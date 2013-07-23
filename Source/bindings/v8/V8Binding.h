@@ -50,6 +50,7 @@ namespace WebCore {
     class Frame;
     class NodeFilter;
     class ScriptExecutionContext;
+    class ScriptWrappable;
     class XPathNSResolver;
 
     const int kMaxRecursionDepth = 22;
@@ -57,15 +58,17 @@ namespace WebCore {
     // Schedule a DOM exception to be thrown, if the exception code is different
     // from zero.
     v8::Handle<v8::Value> setDOMException(int, v8::Isolate*);
+    v8::Handle<v8::Value> setDOMException(int, const String&, v8::Isolate*);
 
     // Schedule a JavaScript error to be thrown.
-    v8::Handle<v8::Value> throwError(V8ErrorType, const char*, v8::Isolate*);
+    v8::Handle<v8::Value> throwError(V8ErrorType, const String&, v8::Isolate*);
 
     // Schedule a JavaScript error to be thrown.
-    v8::Handle<v8::Value> throwError(v8::Handle<v8::Value>, v8::Isolate*);
+    v8::Handle<v8::Value> throwError(v8::Handle<v8::Value>);
 
     // A helper for throwing JavaScript TypeError.
-    v8::Handle<v8::Value> throwTypeError(const char*, v8::Isolate*);
+    v8::Handle<v8::Value> throwTypeError(v8::Isolate*);
+    v8::Handle<v8::Value> throwTypeError(const String&, v8::Isolate*);
 
     // A helper for throwing JavaScript TypeError for not enough arguments.
     v8::Handle<v8::Value> throwNotEnoughArgumentsError(v8::Isolate*);
@@ -121,27 +124,31 @@ namespace WebCore {
         args.GetReturnValue().SetNull();
     }
 
-    enum TreatNullStringAs {
-        NullStringAsEmpty,
-        NullStringAsNull,
-        NullStringAsUndefined,
-    };
-
     template <class CallbackInfo>
-    inline void v8SetReturnValueString(const CallbackInfo& info, const String& string, v8::Isolate* isolate, TreatNullStringAs treatNullStringAs = NullStringAsEmpty)
+    inline void v8SetReturnValueString(const CallbackInfo& info, const String& string, v8::Isolate* isolate)
     {
         if (string.isNull()) {
-            switch (treatNullStringAs) {
-            case NullStringAsEmpty:
-                v8SetReturnValue(info, v8::String::Empty(isolate));
-                break;
-            case NullStringAsNull:
-                v8SetReturnValueNull(info);
-                break;
-            case NullStringAsUndefined:
-                v8SetReturnValue(info, v8::Undefined(isolate));
-                break;
-            }
+            v8SetReturnValue(info, v8::String::Empty(isolate));
+            return;
+        }
+        V8PerIsolateData::from(isolate)->stringCache()->setReturnValueFromString(info, string.impl(), isolate);
+    }
+
+    template <class CallbackInfo>
+    inline void v8SetReturnValueStringOrNull(const CallbackInfo& info, const String& string, v8::Isolate* isolate)
+    {
+        if (string.isNull()) {
+            v8SetReturnValueNull(info);
+            return;
+        }
+        V8PerIsolateData::from(isolate)->stringCache()->setReturnValueFromString(info, string.impl(), isolate);
+    }
+
+    template <class CallbackInfo>
+    inline void v8SetReturnValueStringOrUndefined(const CallbackInfo& info, const String& string, v8::Isolate* isolate)
+    {
+        if (string.isNull()) {
+            v8SetReturnValue(info, v8::Undefined(isolate));
             return;
         }
         V8PerIsolateData::from(isolate)->stringCache()->setReturnValueFromString(info, string.impl(), isolate);
@@ -454,7 +461,7 @@ namespace WebCore {
     inline v8::Handle<v8::Value> toV8Sequence(v8::Handle<v8::Value> value, uint32_t& length, v8::Isolate* isolate)
     {
         if (!value->IsObject()) {
-            throwTypeError(0, isolate);
+            throwTypeError(isolate);
             return v8Undefined();
         }
 
@@ -464,7 +471,7 @@ namespace WebCore {
         V8TRYCATCH(v8::Local<v8::Value>, lengthValue, object->Get(v8::String::NewSymbol("length")));
 
         if (lengthValue->IsUndefined() || lengthValue->IsNull()) {
-            throwTypeError(0, isolate);
+            throwTypeError(isolate);
             return v8Undefined();
         }
 
@@ -584,6 +591,8 @@ namespace WebCore {
     {
         return v8::FunctionTemplate::New(function, environment)->GetFunction();
     }
+
+    v8::Local<v8::Value> getHiddenValueFromMainWorldWrapper(v8::Isolate*, ScriptWrappable*, v8::Handle<v8::String> key);
 
 } // namespace WebCore
 

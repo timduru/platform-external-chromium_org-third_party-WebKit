@@ -29,74 +29,28 @@
 #include "config.h"
 #include "core/css/resolver/SharedStyleFinder.h"
 
-// FIXME: This include list is way more than we need!
-#include "CSSPropertyNames.h"
 #include "HTMLNames.h"
-#include "RuntimeEnabledFeatures.h"
-#include "SVGNames.h"
 #include "XMLNames.h"
-#include "core/animation/AnimatableValue.h"
-#include "core/animation/Animation.h"
-#include "core/css/CSSCalculationValue.h"
-#include "core/css/CSSCursorImageValue.h"
-#include "core/css/CSSDefaultStyleSheets.h"
-#include "core/css/CSSFontSelector.h"
-#include "core/css/CSSImageSetValue.h"
-#include "core/css/CSSKeyframeRule.h"
-#include "core/css/CSSKeyframesRule.h"
-#include "core/css/CSSLineBoxContainValue.h"
-#include "core/css/CSSParser.h"
-#include "core/css/CSSPrimitiveValueMappings.h"
-#include "core/css/CSSReflectValue.h"
-#include "core/css/CSSSVGDocumentValue.h"
-#include "core/css/CSSSelector.h"
-#include "core/css/CSSSelectorList.h"
-#include "core/css/CSSStyleRule.h"
-#include "core/css/CSSValueList.h"
-#include "core/css/CSSVariableValue.h"
-#include "core/css/MediaQueryEvaluator.h"
-#include "core/css/PageRuleCollector.h"
-#include "core/css/Pair.h"
-#include "core/css/RuleSet.h"
-#include "core/css/StylePropertySet.h"
-#include "core/css/StylePropertyShorthand.h"
-#include "core/css/StyleSheetContents.h"
+#include "core/css/RuleFeature.h"
 #include "core/css/resolver/StyleResolver.h"
-#include "core/dom/DocumentStyleSheetCollection.h"
+#include "core/css/resolver/StyleResolverState.h"
+#include "core/dom/ContainerNode.h"
+#include "core/dom/Document.h"
+#include "core/dom/Element.h"
 #include "core/dom/FullscreenController.h"
+#include "core/dom/Node.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/dom/NodeRenderingContext.h"
-#include "core/dom/Text.h"
-#include "core/dom/shadow/ShadowRoot.h"
-#include "core/html/HTMLIFrameElement.h"
+#include "core/dom/NodeTraversal.h"
+#include "core/dom/QualifiedName.h"
+#include "core/dom/SpaceSplitString.h"
+#include "core/html/HTMLElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLOptGroupElement.h"
-#include "core/html/HTMLTableElement.h"
 #include "core/html/track/WebVTTElement.h"
-#include "core/inspector/InspectorInstrumentation.h"
-#include "core/page/Frame.h"
-#include "core/page/FrameView.h"
-#include "core/page/Page.h"
-#include "core/page/Settings.h"
-#include "core/platform/LinkHash.h"
-#include "core/platform/graphics/filters/custom/CustomFilterConstants.h"
-#include "core/platform/text/LocaleToScriptMapping.h"
-#include "core/rendering/RenderTheme.h"
-#include "core/rendering/RenderView.h"
-#include "core/rendering/style/ContentData.h"
-#include "core/rendering/style/CursorList.h"
-#include "core/rendering/style/KeyframeList.h"
-#include "core/rendering/style/RenderStyleConstants.h"
-#include "core/rendering/style/StyleCachedImage.h"
-#include "core/rendering/style/StyleCachedImageSet.h"
-#include "core/rendering/style/StyleCustomFilterProgramCache.h"
-#include "core/rendering/style/StyleGeneratedImage.h"
-#include "core/svg/SVGDocumentExtensions.h"
+#include "core/rendering/style/RenderStyle.h"
 #include "core/svg/SVGElement.h"
-#include "core/svg/SVGFontFaceElement.h"
-#include "wtf/StdLibExtras.h"
-#include "wtf/Vector.h"
-
+#include "wtf/HashSet.h"
+#include "wtf/text/AtomicString.h"
 
 namespace WebCore {
 
@@ -354,8 +308,20 @@ inline Element* SharedStyleFinder::findSiblingForStyleSharing(const ElementResol
     return toElement(node);
 }
 
+#ifdef STYLE_STATS
+Element* SharedStyleFinder::searchDocumentForSharedStyle(const ElementResolveContext& context) const
+{
+    for (Element* element = context.element()->document()->documentElement(); element; element = ElementTraversal::next(element)) {
+        if (canShareStyleWithElement(context, element))
+            return element;
+    }
+    return 0;
+}
+#endif
+
 RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& context)
 {
+    STYLE_STATS_ADD_SEARCH();
     if (!context.element() || !context.element()->isStyledElement())
         return 0;
 
@@ -392,6 +358,8 @@ RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& c
     if (context.element()->hasTagName(dialogTag))
         return 0;
 
+    STYLE_STATS_ADD_ELEMENT_ELIGIBLE_FOR_SHARING();
+
     // Cache whether context.element() is affected by any known class selectors.
     // FIXME: This should be an explicit out parameter, instead of a member variable.
     m_elementAffectedByClassRules = context.element() && context.element()->hasClass() && classNamesAffectedByRules(context.element()->classNames());
@@ -408,6 +376,19 @@ RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& c
         cousinList = locateCousinList(cousinList->parentElement(), visitedNodeCount);
     }
 
+#ifdef STYLE_STATS
+    // FIXME: these stats don't to into account whether or not sibling/attribute
+    // rules prevent these nodes from actually sharing
+    if (shareElement) {
+        STYLE_STATS_ADD_SEARCH_FOUND_SIBLING_FOR_SHARING();
+    } else {
+        shareElement = searchDocumentForSharedStyle(context);
+        if (shareElement)
+            STYLE_STATS_ADD_SEARCH_MISSED_SHARING();
+        shareElement = 0;
+    }
+#endif
+
     // If we have exhausted all our budget or our cousins.
     if (!shareElement)
         return 0;
@@ -421,6 +402,7 @@ RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& c
     // Tracking child index requires unique style for each node. This may get set by the sibling rule match above.
     if (parentElementPreventsSharing(context.element()->parentElement()))
         return 0;
+    STYLE_STATS_ADD_STYLE_SHARED();
     return shareElement->renderStyle();
 }
 

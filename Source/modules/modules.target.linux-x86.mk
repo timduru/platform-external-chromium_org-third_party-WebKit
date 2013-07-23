@@ -42,6 +42,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionData.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionDispatcher.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceMotionEvent.cpp \
+	third_party/WebKit/Source/modules/device_orientation/DeviceOrientationData.cpp \
+	third_party/WebKit/Source/modules/device_orientation/DeviceOrientationEvent.cpp \
 	third_party/WebKit/Source/modules/device_orientation/DeviceRotationRate.cpp \
 	third_party/WebKit/Source/modules/donottrack/NavigatorDoNotTrack.cpp \
 	third_party/WebKit/Source/modules/encryptedmedia/MediaKeyMessageEvent.cpp \

@@ -580,6 +580,18 @@ void RenderBox::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& add
         rects.append(pixelSnappedIntRect(additionalOffset, size()));
 }
 
+void RenderBox::addLayerHitTestRects(LayerHitTestRects& layerRects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset) const
+{
+    LayoutPoint adjustedLayerOffset = layerOffset + locationOffset();
+    RenderBoxModelObject::addLayerHitTestRects(layerRects, currentLayer, adjustedLayerOffset);
+}
+
+void RenderBox::computeSelfHitTestRects(Vector<LayoutRect>& rects, const LayoutPoint& layerOffset) const
+{
+    if (!size().isEmpty())
+        rects.append(LayoutRect(layerOffset, size()));
+}
+
 LayoutRect RenderBox::reflectionBox() const
 {
     LayoutRect result;
@@ -1052,7 +1064,7 @@ void RenderBox::paintRootBoxFillLayers(const PaintInfo& paintInfo)
     RenderObject* rootBackgroundRenderer = rendererForRootBackground();
     
     const FillLayer* bgLayer = rootBackgroundRenderer->style()->backgroundLayers();
-    Color bgColor = rootBackgroundRenderer->style()->visitedDependentColor(CSSPropertyBackgroundColor);
+    Color bgColor = rootBackgroundRenderer->resolveColor(CSSPropertyBackgroundColor);
 
     paintFillLayers(paintInfo, bgColor, bgLayer, view()->backgroundRect(this), BackgroundBleedNone, CompositeSourceOver, rootBackgroundRenderer);
 }
@@ -1151,7 +1163,7 @@ void RenderBox::paintBackground(const PaintInfo& paintInfo, const LayoutRect& pa
         return;
     if (backgroundIsKnownToBeObscured())
         return;
-    paintFillLayers(paintInfo, style()->visitedDependentColor(CSSPropertyBackgroundColor), style()->backgroundLayers(), paintRect, bleedAvoidance);
+    paintFillLayers(paintInfo, resolveColor(CSSPropertyBackgroundColor), style()->backgroundLayers(), paintRect, bleedAvoidance);
 }
 
 LayoutRect RenderBox::backgroundPaintedExtent() const
@@ -1159,7 +1171,7 @@ LayoutRect RenderBox::backgroundPaintedExtent() const
     ASSERT(hasBackground());
     LayoutRect backgroundRect = pixelSnappedIntRect(borderBoxRect());
 
-    Color backgroundColor = style()->visitedDependentColor(CSSPropertyBackgroundColor);
+    Color backgroundColor = resolveColor(CSSPropertyBackgroundColor);
     if (backgroundColor.isValid() && backgroundColor.alpha())
         return backgroundRect;
     if (!style()->backgroundLayers()->image() || style()->backgroundLayers()->next())
@@ -1174,7 +1186,7 @@ bool RenderBox::backgroundIsKnownToBeOpaqueInRect(const LayoutRect& localRect) c
     if (isBody() && skipBodyBackground(this))
         return false;
 
-    Color backgroundColor = style()->visitedDependentColor(CSSPropertyBackgroundColor);
+    Color backgroundColor = resolveColor(CSSPropertyBackgroundColor);
     if (!backgroundColor.isValid() || backgroundColor.hasAlpha())
         return false;
 
@@ -1292,7 +1304,7 @@ bool RenderBox::backgroundHasOpaqueTopLayer() const
 
     // If there is only one layer and no image, check whether the background color is opaque
     if (!fillLayer->next() && !fillLayer->hasImage()) {
-        Color bgColor = style()->visitedDependentColor(CSSPropertyBackgroundColor);
+        Color bgColor = resolveColor(CSSPropertyBackgroundColor);
         if (bgColor.isValid() && bgColor.alpha() == 255)
             return true;
     }
@@ -2744,7 +2756,7 @@ LayoutUnit RenderBox::computeReplacedLogicalWidthUsing(Length logicalWidth) cons
             return adjustContentBoxLogicalWidthForBoxSizing(valueForLength(logicalWidth, 0, view()));
         case FitContent:
         case FillAvailable:
-        case Percent: 
+        case Percent:
         case Calculated: {
             // FIXME: containingBlockLogicalWidthForContent() is wrong if the replaced element's block-flow is perpendicular to the
             // containing block's block-flow.
@@ -2763,6 +2775,7 @@ LayoutUnit RenderBox::computeReplacedLogicalWidthUsing(Length logicalWidth) cons
         case MinIntrinsic:
         case Auto:
         case Relative:
+        case ExtendToZoom:
         case Undefined:
             return intrinsicLogicalWidth();
     }

@@ -49,6 +49,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/CustomElementCallbackDispatcher.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementCallbackInvocation.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementCallbackQueue.cpp \
+	third_party/WebKit/Source/core/dom/CustomElementCallbackScheduler.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementDefinition.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementRegistrationContext.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementRegistry.cpp \
@@ -64,8 +65,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/DatasetDOMStringMap.cpp \
 	third_party/WebKit/Source/core/dom/DecodedDataDocumentParser.cpp \
 	third_party/WebKit/Source/core/dom/DeviceOrientationController.cpp \
-	third_party/WebKit/Source/core/dom/DeviceOrientationData.cpp \
-	third_party/WebKit/Source/core/dom/DeviceOrientationEvent.cpp \
 	third_party/WebKit/Source/core/dom/Document.cpp \
 	third_party/WebKit/Source/core/dom/DocumentEventQueue.cpp \
 	third_party/WebKit/Source/core/dom/DocumentFragment.cpp \

@@ -76,6 +76,17 @@ $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp: $(LOCAL_PATH)/third_
 
 $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.h: $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp ;
 
+### Rules for action "StylePropertyShorthand":
+$(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_file.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/in_generator.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/license.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/name_macros.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/template_expander.py $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/macros.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_style_shorthands.py $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSShorthands.in $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/StylePropertyShorthand.h.tmpl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/templates/StylePropertyShorthand.cpp.tmpl $(GYP_TARGET_DEPENDENCIES)
+	@echo "Gyp action: third_party_WebKit_Source_core_core_derived_sources_gyp_make_derived_sources_target_StylePropertyShorthand ($@)"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/make_style_shorthands.py css/CSSShorthands.in --output_dir "$(gyp_shared_intermediate_dir)/webkit/"
+
+$(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.h: $(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp ;
+
 ### Rules for action "StyleBuilder":
 $(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp: gyp_local_path := $(LOCAL_PATH)
 $(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
@@ -331,6 +342,8 @@ GYP_GENERATED_OUTPUTS := \
 	$(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.h \
 	$(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.h \
+	$(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp \
+	$(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.h \
 	$(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/StyleBuilderFunctions.h \
 	$(gyp_shared_intermediate_dir)/webkit/StyleBuilderFunctions.cpp \

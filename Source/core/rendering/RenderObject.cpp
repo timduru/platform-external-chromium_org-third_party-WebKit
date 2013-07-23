@@ -28,6 +28,7 @@
 #include "core/rendering/RenderObject.h"
 
 #include "HTMLNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/editing/EditingBoundary.h"
@@ -1115,7 +1116,7 @@ void RenderObject::paintFocusRing(PaintInfo& paintInfo, const LayoutPoint& paint
     Vector<IntRect> focusRingRects;
     addFocusRingRects(focusRingRects, paintOffset, paintInfo.paintContainer);
     if (style->outlineStyleIsAuto())
-        paintInfo.context->drawFocusRing(focusRingRects, style->outlineWidth(), style->outlineOffset(), style->visitedDependentColor(CSSPropertyOutlineColor));
+        paintInfo.context->drawFocusRing(focusRingRects, style->outlineWidth(), style->outlineOffset(), resolveColor(style, CSSPropertyOutlineColor));
     else
         addPDFURLRect(paintInfo.context, unionRect(focusRingRects));
 }
@@ -1173,7 +1174,7 @@ void RenderObject::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRec
         return;
 
     EBorderStyle outlineStyle = styleToUse->outlineStyle();
-    Color outlineColor = styleToUse->visitedDependentColor(CSSPropertyOutlineColor);
+    Color outlineColor = resolveColor(styleToUse, CSSPropertyOutlineColor);
 
     GraphicsContext* graphicsContext = paintInfo.context;
     bool useTransparencyLayer = outlineColor.hasAlpha();
@@ -1656,8 +1657,8 @@ Color RenderObject::selectionBackgroundColor() const
     Color color;
     if (shouldUseSelectionColor(*style())) {
         RefPtr<RenderStyle> pseudoStyle = getUncachedPseudoStyle(PseudoStyleRequest(SELECTION));
-        if (pseudoStyle && pseudoStyle->visitedDependentColor(CSSPropertyBackgroundColor).isValid())
-            color = pseudoStyle->visitedDependentColor(CSSPropertyBackgroundColor).blendWithWhite();
+        if (pseudoStyle && resolveColor(pseudoStyle.get(), CSSPropertyBackgroundColor).isValid())
+            color = resolveColor(pseudoStyle.get(), CSSPropertyBackgroundColor).blendWithWhite();
         else
             color = frame()->selection()->isFocusedAndActive() ?
                     theme()->activeSelectionBackgroundColor() :
@@ -1677,9 +1678,8 @@ Color RenderObject::selectionColor(int colorProperty) const
         return color;
 
     if (RefPtr<RenderStyle> pseudoStyle = getUncachedPseudoStyle(PseudoStyleRequest(SELECTION))) {
-        color = pseudoStyle->visitedDependentColor(colorProperty);
-        if (!color.isValid())
-            color = pseudoStyle->visitedDependentColor(CSSPropertyColor);
+        Color selectionColor = resolveColor(pseudoStyle.get(), colorProperty);
+        color = selectionColor.isValid() ? selectionColor : resolveColor(pseudoStyle.get(), CSSPropertyColor);
     } else
         color = frame()->selection()->isFocusedAndActive() ?
                 theme()->activeSelectionForegroundColor() :
@@ -2270,6 +2270,60 @@ LayoutRect RenderObject::localCaretRect(InlineBox*, int, LayoutUnit* extraWidthT
     return LayoutRect();
 }
 
+void RenderObject::computeLayerHitTestRects(LayerHitTestRects& layerRects) const
+{
+    // Figure out what layer our container is in. Any offset (or new layer) for this
+    // renderer within it's container will be applied in addLayerHitTestRects.
+    LayoutPoint layerOffset;
+    const RenderLayer* currentLayer = 0;
+
+    if (!hasLayer()) {
+        RenderObject* container = this->container();
+        if (container) {
+            currentLayer = container->enclosingLayer();
+            if (currentLayer && currentLayer->renderer() != container)
+                layerOffset.move(container->offsetFromAncestorContainer(currentLayer->renderer()));
+        } else {
+            currentLayer = enclosingLayer();
+        }
+        if (!currentLayer)
+            return;
+    }
+
+    this->addLayerHitTestRects(layerRects, currentLayer, layerOffset);
+}
+
+void RenderObject::addLayerHitTestRects(LayerHitTestRects& layerRects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset) const
+{
+    ASSERT(currentLayer);
+    ASSERT(currentLayer == this->enclosingLayer());
+
+    // If it's possible for children to have rects outside our bounds, then we need to descend into
+    // the children and compute them.
+    // Ideally there would be other cases where we could detect that children couldn't have rects
+    // outside our bounds and prune the tree walk.
+    // Note that we don't use Region here because Union is O(N) - better to just keep a list of
+    // partially redundant rectangles. If we find examples where this is expensive, then we could
+    // rewrite Region to be more efficient. See https://bugs.webkit.org/show_bug.cgi?id=100814.
+    if (!isRenderView()) {
+        for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling()) {
+            curr->addLayerHitTestRects(layerRects, currentLayer,  layerOffset);
+        }
+    }
+
+    // Compute the rects for this renderer only and add them to the results.
+    // Note that we could avoid passing the offset and instead adjust each result, but this
+    // seems slightly simpler.
+    Vector<LayoutRect> ownRects;
+    computeSelfHitTestRects(ownRects, layerOffset);
+
+    LayerHitTestRects::iterator iter = layerRects.find(currentLayer);
+    if (iter == layerRects.end())
+        layerRects.add(currentLayer, ownRects);
+    else
+        iter->value.append(ownRects);
+}
+
 bool RenderObject::isRooted(RenderView** view) const
 {
     const RenderObject* o = this;
@@ -2814,21 +2868,21 @@ bool RenderObject::hasBlendMode() const
     return RuntimeEnabledFeatures::cssCompositingEnabled() && style() && style()->hasBlendMode();
 }
 
-static Color decorationColor(RenderStyle* style)
+static Color decorationColor(const RenderObject* object, RenderStyle* style)
 {
     Color result;
     // Check for text decoration color first.
-    result = style->visitedDependentColor(CSSPropertyTextDecorationColor);
+    result = object->resolveColor(style, CSSPropertyTextDecorationColor);
     if (result.isValid())
         return result;
     if (style->textStrokeWidth() > 0) {
         // Prefer stroke color if possible but not if it's fully transparent.
-        result = style->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
+        result = object->resolveColor(style, CSSPropertyWebkitTextStrokeColor);
         if (result.alpha())
             return result;
     }
     
-    result = style->visitedDependentColor(CSSPropertyWebkitTextFillColor);
+    result = object->resolveColor(style, CSSPropertyWebkitTextFillColor);
     return result;
 }
 
@@ -2842,7 +2896,7 @@ void RenderObject::getTextDecorationColors(int decorations, Color& underline, Co
     do {
         styleToUse = curr->style(firstlineStyle);
         currDecs = styleToUse->textDecoration();
-        resultColor = decorationColor(styleToUse);
+        resultColor = decorationColor(this, styleToUse);
         // Parameter 'decorations' is cast as an int to enable the bitwise operations below.
         if (currDecs) {
             if (currDecs & TextDecorationUnderline) {
@@ -2868,7 +2922,7 @@ void RenderObject::getTextDecorationColors(int decorations, Color& underline, Co
     // If we bailed out, use the element we bailed out at (typically a <font> or <a> element).
     if (decorations && curr) {
         styleToUse = curr->style(firstlineStyle);
-        resultColor = decorationColor(styleToUse);
+        resultColor = decorationColor(this, styleToUse);
         if (decorations & TextDecorationUnderline)
             underline = resultColor;
         if (decorations & TextDecorationOverline)
@@ -2998,10 +3052,9 @@ RenderObject* RenderObject::hoverAncestor() const
     // See https://code.google.com/p/chromium/issues/detail?id=243278
     RenderObject* hoverAncestor = parent();
 
-    // Skip anonymous blocks. There's no point in treating them as hover ancestors
-    // and it would also prevent us from continuing the search on the DOM tree
-    // when reaching the named flow thread.
-    if (hoverAncestor && hoverAncestor->isAnonymousBlock())
+    // Skip anonymous blocks directly flowed into flow threads as it would
+    // prevent us from continuing the search on the DOM tree when reaching the named flow thread.
+    if (hoverAncestor && hoverAncestor->isAnonymousBlock() && hoverAncestor->parent() && hoverAncestor->parent()->isRenderNamedFlowThread())
         hoverAncestor = hoverAncestor->parent();
 
     if (hoverAncestor && hoverAncestor->isRenderNamedFlowThread()) {

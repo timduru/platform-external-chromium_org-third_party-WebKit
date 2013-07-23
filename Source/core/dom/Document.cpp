@@ -275,23 +275,23 @@ static bool shouldInheritSecurityOriginFromOwner(const KURL& url)
     return url.isEmpty() || url.isBlankURL();
 }
 
-static Widget* widgetForNode(Node* focusedNode)
+static Widget* widgetForElement(Element* focusedElement)
 {
-    if (!focusedNode)
+    if (!focusedElement)
         return 0;
-    RenderObject* renderer = focusedNode->renderer();
+    RenderObject* renderer = focusedElement->renderer();
     if (!renderer || !renderer->isWidget())
         return 0;
     return toRenderWidget(renderer)->widget();
 }
 
-static bool acceptsEditingFocus(Node* node)
+static bool acceptsEditingFocus(Element* element)
 {
-    ASSERT(node);
-    ASSERT(node->rendererIsEditable());
+    ASSERT(element);
+    ASSERT(element->rendererIsEditable());
 
-    Node* root = node->rootEditableElement();
-    Frame* frame = node->document()->frame();
+    Element* root = element->rootEditableElement();
+    Frame* frame = element->document()->frame();
     if (!frame || !root)
         return false;
 
@@ -331,34 +331,35 @@ static void printNavigationErrorMessage(Frame* frame, const KURL& activeURL, con
     String message = "Unsafe JavaScript attempt to initiate navigation for frame with URL '" + frame->document()->url().string() + "' from frame with URL '" + activeURL.string() + "'. " + reason + "\n";
 
     // FIXME: should we print to the console of the document performing the navigation instead?
-    frame->document()->domWindow()->printErrorMessage(message);
+    frame->domWindow()->printErrorMessage(message);
 }
 
 uint64_t Document::s_globalTreeVersion = 0;
 
 // This class should be passed only to Document::postTask.
-class CheckFocusedNodeTask FINAL : public ScriptExecutionContext::Task {
+class CheckFocusedElementTask FINAL : public ScriptExecutionContext::Task {
 public:
-    static PassOwnPtr<CheckFocusedNodeTask> create()
+    static PassOwnPtr<CheckFocusedElementTask> create()
     {
-        return adoptPtr(new CheckFocusedNodeTask());
+        return adoptPtr(new CheckFocusedElementTask());
     }
-    virtual ~CheckFocusedNodeTask() { }
+    virtual ~CheckFocusedElementTask() { }
 
 private:
-    CheckFocusedNodeTask() { }
+    CheckFocusedElementTask() { }
     virtual void performTask(ScriptExecutionContext* context) OVERRIDE
     {
         ASSERT(context->isDocument());
         Document* document = toDocument(context);
-        document->didRunCheckFocusedNodeTask();
-        if (!document->focusedNode())
+        document->didRunCheckFocusedElementTask();
+        Element* element = document->focusedElement();
+        if (!element)
             return;
         if (document->childNeedsStyleRecalc())
             return;
-        if (document->focusedNode()->renderer() && document->focusedNode()->renderer()->needsLayout())
+        if (element->renderer() && element->renderer()->needsLayout())
             return;
-        if (!document->focusedNode()->isFocusable())
+        if (!element->isFocusable())
             document->setFocusedElement(0);
     }
 };
@@ -384,7 +385,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_ignoreAutofocus(false)
     , m_compatibilityMode(NoQuirksMode)
     , m_compatibilityModeLocked(false)
-    , m_didPostCheckFocusedNodeTask(false)
+    , m_didPostCheckFocusedElementTask(false)
     , m_domTreeVersion(++s_globalTreeVersion)
     , m_listenerTypes(0)
     , m_mutationObserverTypes(0)
@@ -583,7 +584,7 @@ void Document::dispose()
     // We must make sure not to be retaining any of our children through
     // these extra pointers or we will create a reference cycle.
     m_docType = 0;
-    m_focusedNode = 0;
+    m_focusedElement = 0;
     m_hoverNode = 0;
     m_activeElement = 0;
     m_titleElement = 0;
@@ -1103,8 +1104,11 @@ void Document::setReadyState(ReadyState readyState)
 
 String Document::encoding() const
 {
+    // TextEncoding::domName() returns a char*, no need to allocate a new
+    // String for it each time.
+    // FIXME: We should fix TextEncoding to speak AtomicString anyway.
     if (TextResourceDecoder* d = decoder())
-        return d->encoding().domName();
+        return AtomicString(d->encoding().domName());
     return String();
 }
 
@@ -1655,7 +1659,7 @@ void Document::recalcStyle(StyleChange change)
 
         // Pseudo element removal and similar may only work with these flags still set. Reset them after the style recalc.
         if (m_styleResolver)
-            m_styleSheetCollection->resetCSSFeatureFlags();
+            m_styleSheetCollection->resetCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
 
         if (frameView) {
             frameView->resumeScheduledEvents();
@@ -1668,6 +1672,9 @@ void Document::recalcStyle(StyleChange change)
         m_closeAfterStyleRecalc = false;
         implicitClose();
     }
+
+    STYLE_STATS_PRINT();
+    STYLE_STATS_CLEAR();
 
     InspectorInstrumentation::didRecalculateStyle(cookie);
 
@@ -1725,9 +1732,9 @@ void Document::updateLayout()
         frameView->layout();
 
     // FIXME: Using a Task doesn't look a good idea.
-    if (m_focusedNode && !m_didPostCheckFocusedNodeTask) {
-        postTask(CheckFocusedNodeTask::create());
-        m_didPostCheckFocusedNodeTask = true;
+    if (m_focusedElement && !m_didPostCheckFocusedElementTask) {
+        postTask(CheckFocusedElementTask::create());
+        m_didPostCheckFocusedElementTask = true;
     }
 }
 
@@ -1837,7 +1844,7 @@ void Document::createStyleResolver()
     if (Settings* docSettings = settings())
         matchAuthorAndUserStyles = docSettings->authorAndUserStylesEnabled();
     m_styleResolver = adoptPtr(new StyleResolver(this, matchAuthorAndUserStyles));
-    m_styleSheetCollection->combineCSSFeatureFlags();
+    m_styleSheetCollection->combineCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
 }
 
 void Document::clearStyleResolver()
@@ -1902,7 +1909,7 @@ void Document::detach(const AttachContext& context)
     setRenderer(0);
 
     m_hoverNode = 0;
-    m_focusedNode = 0;
+    m_focusedElement = 0;
     m_activeElement = 0;
 
     ContainerNode::detach(context);
@@ -2090,7 +2097,7 @@ PassRefPtr<DocumentParser> Document::implicitOpen()
     cancelParsing();
 
     removeChildren();
-    ASSERT(!m_focusedNode);
+    ASSERT(!m_focusedElement);
 
     setCompatibilityMode(NoQuirksMode);
 
@@ -2276,7 +2283,7 @@ void Document::implicitClose()
         // The AX cache may have been cleared at this point, but we need to make sure it contains an
         // AX object to send the notification to. getOrCreate will make sure that an valid AX object
         // exists in the cache (we ignore the return value because we don't need it here). This is
-        // only safe to call when a layout is not in progress, so it can not be used in postNotification.    
+        // only safe to call when a layout is not in progress, so it can not be used in postNotification.
         if (AXObjectCache* cache = axObjectCache()) {
             cache->getOrCreate(renderObject);
             if (this == topDocument()) {
@@ -2393,7 +2400,7 @@ EventTarget* Document::errorEventTarget()
     return domWindow();
 }
 
-void Document::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack> callStack)
+void Document::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack> callStack)
 {
     addMessage(JSMessageSource, ErrorMessageLevel, errorMessage, sourceURL, lineNumber, callStack);
 }
@@ -2666,12 +2673,20 @@ void Document::processHttpEquivRefresh(const String& content)
             refreshUrl = m_url.string();
         else
             refreshUrl = completeURL(refreshUrl).string();
-        if (!protocolIsJavaScript(refreshUrl)) {
-            frame->navigationScheduler()->scheduleRedirect(delay, refreshUrl);
-        } else {
+
+        if (protocolIsJavaScript(refreshUrl)) {
             String message = "Refused to refresh " + m_url.elidedString() + " to a javascript: URL";
             addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
+            return;
         }
+
+        if (isSandboxed(SandboxAutomaticFeatures)) {
+            String message = "Refused to execute the redirect specified via '<meta http-equiv='refresh' content='...'>'. The document is sandboxed, and the 'allow-scripts' keyword is not set.";
+            addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
+            return;
+        }
+
+        frame->navigationScheduler()->scheduleRedirect(delay, refreshUrl);
     }
 }
 
@@ -3040,9 +3055,9 @@ void Document::setActiveElement(PassRefPtr<Element> newActiveElement)
     m_activeElement = newActiveElement;
 }
 
-void Document::removeFocusedNodeOfSubtree(Node* node, bool amongChildrenOnly)
+void Document::removeFocusedElementOfSubtree(Node* node, bool amongChildrenOnly)
 {
-    if (!m_focusedNode)
+    if (!m_focusedElement)
         return;
 
     Element* focusedElement = node->treeScope()->adjustedFocusedElement();
@@ -3106,64 +3121,59 @@ void Document::setAnnotatedRegions(const Vector<AnnotatedRegionValue>& regions)
     setAnnotatedRegionsDirty(false);
 }
 
-bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedNode, FocusDirection direction)
+bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, FocusDirection direction)
 {
-    RefPtr<Node> newFocusedNode = prpNewFocusedNode;
+    RefPtr<Element> newFocusedElement = prpNewFocusedElement;
 
     // Make sure newFocusedNode is actually in this document
-    if (newFocusedNode && (newFocusedNode->document() != this))
+    if (newFocusedElement && (newFocusedElement->document() != this))
         return true;
 
-    if (m_focusedNode == newFocusedNode)
+    if (m_focusedElement == newFocusedElement)
         return true;
 
     bool focusChangeBlocked = false;
-    RefPtr<Node> oldFocusedNode = m_focusedNode;
-    m_focusedNode = 0;
+    RefPtr<Element> oldFocusedElement = m_focusedElement;
+    m_focusedElement = 0;
 
     // Remove focus from the existing focus node (if any)
-    if (oldFocusedNode) {
-        ASSERT(!oldFocusedNode->inDetach());
+    if (oldFocusedElement) {
+        ASSERT(!oldFocusedElement->inDetach());
 
-        if (oldFocusedNode->active())
-            oldFocusedNode->setActive(false);
+        if (oldFocusedElement->active())
+            oldFocusedElement->setActive(false);
 
-        oldFocusedNode->setFocus(false);
+        oldFocusedElement->setFocus(false);
 
         // Dispatch a change event for text fields or textareas that have been edited
-        if (oldFocusedNode->isElementNode()) {
-            Element* element = toElement(oldFocusedNode.get());
-            if (element->wasChangedSinceLastFormControlChangeEvent())
-                element->dispatchFormControlChangeEvent();
-        }
+        if (oldFocusedElement->wasChangedSinceLastFormControlChangeEvent())
+            oldFocusedElement->dispatchFormControlChangeEvent();
 
         // Dispatch the blur event and let the node do any other blur related activities (important for text fields)
-        oldFocusedNode->dispatchBlurEvent(newFocusedNode);
+        oldFocusedElement->dispatchBlurEvent(newFocusedElement);
 
-        if (m_focusedNode) {
+        if (m_focusedElement) {
             // handler shifted focus
             focusChangeBlocked = true;
-            newFocusedNode = 0;
+            newFocusedElement = 0;
         }
 
-        oldFocusedNode->dispatchFocusOutEvent(eventNames().focusoutEvent, newFocusedNode); // DOM level 3 name for the bubbling blur event.
+        oldFocusedElement->dispatchFocusOutEvent(eventNames().focusoutEvent, newFocusedElement); // DOM level 3 name for the bubbling blur event.
         // FIXME: We should remove firing DOMFocusOutEvent event when we are sure no content depends
         // on it, probably when <rdar://problem/8503958> is resolved.
-        oldFocusedNode->dispatchFocusOutEvent(eventNames().DOMFocusOutEvent, newFocusedNode); // DOM level 2 name for compatibility.
+        oldFocusedElement->dispatchFocusOutEvent(eventNames().DOMFocusOutEvent, newFocusedElement); // DOM level 2 name for compatibility.
 
-        if (m_focusedNode) {
+        if (m_focusedElement) {
             // handler shifted focus
             focusChangeBlocked = true;
-            newFocusedNode = 0;
+            newFocusedElement = 0;
         }
-        if (oldFocusedNode == this && oldFocusedNode->hasOneRef())
-            return true;
 
-        if (oldFocusedNode->isRootEditableElement())
+        if (oldFocusedElement->isRootEditableElement())
             frame()->editor()->didEndEditing();
 
         if (view()) {
-            Widget* oldWidget = widgetForNode(oldFocusedNode.get());
+            Widget* oldWidget = widgetForElement(oldFocusedElement.get());
             if (oldWidget)
                 oldWidget->setFocus(false);
             else
@@ -3171,57 +3181,57 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedNode, FocusDir
         }
     }
 
-    if (newFocusedNode && newFocusedNode->isFocusable()) {
-        if (newFocusedNode->isRootEditableElement() && !acceptsEditingFocus(newFocusedNode.get())) {
+    if (newFocusedElement && newFocusedElement->isFocusable()) {
+        if (newFocusedElement->isRootEditableElement() && !acceptsEditingFocus(newFocusedElement.get())) {
             // delegate blocks focus change
             focusChangeBlocked = true;
-            goto SetFocusedNodeDone;
+            goto SetFocusedElementDone;
         }
         // Set focus on the new node
-        m_focusedNode = newFocusedNode;
+        m_focusedElement = newFocusedElement;
 
         // Dispatch the focus event and let the node do any other focus related activities (important for text fields)
-        m_focusedNode->dispatchFocusEvent(oldFocusedNode, direction);
+        m_focusedElement->dispatchFocusEvent(oldFocusedElement, direction);
 
-        if (m_focusedNode != newFocusedNode) {
+        if (m_focusedElement != newFocusedElement) {
             // handler shifted focus
             focusChangeBlocked = true;
-            goto SetFocusedNodeDone;
+            goto SetFocusedElementDone;
         }
 
-        m_focusedNode->dispatchFocusInEvent(eventNames().focusinEvent, oldFocusedNode); // DOM level 3 bubbling focus event.
+        m_focusedElement->dispatchFocusInEvent(eventNames().focusinEvent, oldFocusedElement); // DOM level 3 bubbling focus event.
 
-        if (m_focusedNode != newFocusedNode) {
+        if (m_focusedElement != newFocusedElement) {
             // handler shifted focus
             focusChangeBlocked = true;
-            goto SetFocusedNodeDone;
+            goto SetFocusedElementDone;
         }
 
         // FIXME: We should remove firing DOMFocusInEvent event when we are sure no content depends
         // on it, probably when <rdar://problem/8503958> is m.
-        m_focusedNode->dispatchFocusInEvent(eventNames().DOMFocusInEvent, oldFocusedNode); // DOM level 2 for compatibility.
+        m_focusedElement->dispatchFocusInEvent(eventNames().DOMFocusInEvent, oldFocusedElement); // DOM level 2 for compatibility.
 
-        if (m_focusedNode != newFocusedNode) {
+        if (m_focusedElement != newFocusedElement) {
             // handler shifted focus
             focusChangeBlocked = true;
-            goto SetFocusedNodeDone;
+            goto SetFocusedElementDone;
         }
-        m_focusedNode->setFocus(true);
+        m_focusedElement->setFocus(true);
 
-        if (m_focusedNode->isRootEditableElement())
+        if (m_focusedElement->isRootEditableElement())
             frame()->editor()->didBeginEditing();
 
         // eww, I suck. set the qt focus correctly
         // ### find a better place in the code for this
         if (view()) {
-            Widget* focusWidget = widgetForNode(m_focusedNode.get());
+            Widget* focusWidget = widgetForElement(m_focusedElement.get());
             if (focusWidget) {
                 // Make sure a widget has the right size before giving it focus.
                 // Otherwise, we are testing edge cases of the Widget code.
                 // Specifically, in WebCore this does not work well for text fields.
                 updateLayout();
                 // Re-get the widget in case updating the layout changed things.
-                focusWidget = widgetForNode(m_focusedNode.get());
+                focusWidget = widgetForElement(m_focusedElement.get());
             }
             if (focusWidget)
                 focusWidget->setFocus(true);
@@ -3230,16 +3240,16 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedNode, FocusDir
         }
     }
 
-    if (!focusChangeBlocked && m_focusedNode) {
+    if (!focusChangeBlocked && m_focusedElement) {
         // Create the AXObject cache in a focus change because Chromium relies on it.
         if (AXObjectCache* cache = axObjectCache())
-            cache->handleFocusedUIElementChanged(oldFocusedNode.get(), newFocusedNode.get());
+            cache->handleFocusedUIElementChanged(oldFocusedElement.get(), newFocusedElement.get());
     }
 
     if (!focusChangeBlocked)
-        page()->chrome().focusedNodeChanged(m_focusedNode.get());
+        page()->chrome().focusedNodeChanged(m_focusedElement.get());
 
-SetFocusedNodeDone:
+SetFocusedElementDone:
     updateStyleIfNeeded();
     if (Frame* frame = this->frame())
         frame->selection()->didChangeFocus();
@@ -3630,6 +3640,11 @@ String Document::lastModified() const
     if (!foundDate)
         date.setMillisecondsSinceEpochForDateTime(currentTimeMS());
     return String::format("%02d/%02d/%04d %02d:%02d:%02d", date.month() + 1, date.monthDay(), date.fullYear(), date.hour(), date.minute(), date.second());
+}
+
+const KURL& Document::firstPartyForCookies() const
+{
+    return topDocument()->url();
 }
 
 static bool isValidNameNonASCII(const LChar* characters, unsigned length)
@@ -4317,15 +4332,10 @@ void Document::cancelFocusAppearanceUpdate()
 
 void Document::updateFocusAppearanceTimerFired(Timer<Document>*)
 {
-    Node* node = focusedNode();
-    if (!node)
+    Element* element = focusedElement();
+    if (!element)
         return;
-    if (!node->isElementNode())
-        return;
-
     updateLayout();
-
-    Element* element = toElement(node);
     if (element->isFocusable())
         element->updateFocusAppearance(m_updateFocusAppearanceRestoresSelection);
 }
@@ -4791,7 +4801,7 @@ Node* eventTargetNodeForDocument(Document* doc)
 {
     if (!doc)
         return 0;
-    Node* node = doc->focusedNode();
+    Node* node = doc->focusedElement();
     if (!node && doc->isPluginDocument()) {
         PluginDocument* pluginDocument = toPluginDocument(doc);
         node =  pluginDocument->pluginNode();

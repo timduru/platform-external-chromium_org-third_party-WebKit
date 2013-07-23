@@ -71,17 +71,27 @@ v8::Handle<v8::Value> setDOMException(int exceptionCode, v8::Isolate* isolate)
     return V8ThrowException::throwDOMException(exceptionCode, isolate);
 }
 
-v8::Handle<v8::Value> throwError(V8ErrorType errorType, const char* message, v8::Isolate* isolate)
+v8::Handle<v8::Value> setDOMException(int exceptionCode, const String& message, v8::Isolate* isolate)
+{
+    return V8ThrowException::throwDOMException(exceptionCode, message, isolate);
+}
+
+v8::Handle<v8::Value> throwError(V8ErrorType errorType, const String& message, v8::Isolate* isolate)
 {
     return V8ThrowException::throwError(errorType, message, isolate);
 }
 
-v8::Handle<v8::Value> throwError(v8::Handle<v8::Value> exception, v8::Isolate* isolate)
+v8::Handle<v8::Value> throwError(v8::Handle<v8::Value> exception)
 {
-    return V8ThrowException::throwError(exception, isolate);
+    return V8ThrowException::throwError(exception);
 }
 
-v8::Handle<v8::Value> throwTypeError(const char* message, v8::Isolate* isolate)
+v8::Handle<v8::Value> throwTypeError(v8::Isolate* isolate)
+{
+    return V8ThrowException::throwTypeError(String(), isolate);
+}
+
+v8::Handle<v8::Value> throwTypeError(const String& message, v8::Isolate* isolate)
 {
     return V8ThrowException::throwTypeError(message, isolate);
 }
@@ -538,8 +548,14 @@ DOMWrapperWorld* isolatedWorldForIsolate(v8::Isolate* isolate)
         return 0;
     if (!DOMWrapperWorld::isolatedWorldsExist())
         return 0;
-    ASSERT(!v8::Context::GetEntered().IsEmpty());
-    return DOMWrapperWorld::isolatedWorld(v8::Context::GetEntered());
+    ASSERT(v8::Context::InContext());
+    return DOMWrapperWorld::isolatedWorld(v8::Context::GetCurrent());
+}
+
+v8::Local<v8::Value> getHiddenValueFromMainWorldWrapper(v8::Isolate* isolate, ScriptWrappable* wrappable, v8::Handle<v8::String> key)
+{
+    v8::Local<v8::Object> wrapper = wrappable->newLocalWrapper(isolate);
+    return wrapper.IsEmpty() ? v8::Local<v8::Value>() : wrapper->GetHiddenValue(key);
 }
 
 } // namespace WebCore

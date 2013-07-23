@@ -127,6 +127,8 @@ $(gyp_intermediate_dir)/SVGElementFactory.cpp: $(gyp_shared_intermediate_dir)/we
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/V8SVGElementWrapperFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/V8SVGElementWrapperFactory.cpp
 	mkdir -p $(@D); cp $< $@
+$(gyp_intermediate_dir)/StylePropertyShorthand.cpp: $(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp
+	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/StyleBuilder.cpp: $(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/StyleBuilderFunctions.cpp: $(gyp_shared_intermediate_dir)/webkit/StyleBuilderFunctions.cpp
@@ -180,6 +182,7 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/InspectorInstrumentationImpl.cpp \
 	$(gyp_intermediate_dir)/SVGElementFactory.cpp \
 	$(gyp_intermediate_dir)/V8SVGElementWrapperFactory.cpp \
+	$(gyp_intermediate_dir)/StylePropertyShorthand.cpp \
 	$(gyp_intermediate_dir)/StyleBuilder.cpp \
 	$(gyp_intermediate_dir)/StyleBuilderFunctions.cpp
 
@@ -214,6 +217,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ScriptHeapSnapshot.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptInstance.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptObject.cpp \
+	third_party/WebKit/Source/bindings/v8/ScriptPreprocessor.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptProfiler.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptPromiseResolver.cpp \
 	third_party/WebKit/Source/bindings/v8/ScriptScope.cpp \

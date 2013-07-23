@@ -29,10 +29,10 @@
 
 #include "wtf/MainThread.h"
 #include "wtf/MathExtras.h"
-#include "wtf/text/Base64.h"
 #include "wtf/text/WTFString.h"
 #include <algorithm>
 #include "RuntimeEnabledFeatures.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptCallStackFactory.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/SerializedScriptValue.h"
@@ -75,7 +75,6 @@
 #include "core/page/Console.h"
 #include "core/page/CreateWindow.h"
 #include "core/page/DOMPoint.h"
-#include "core/page/DOMTimer.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
@@ -500,7 +499,7 @@ void DOMWindow::resetDOMWindowProperties()
 
 bool DOMWindow::isCurrentlyDisplayedInFrame() const
 {
-    return m_frame && m_frame->document()->domWindow() == this;
+    return m_frame && m_frame->domWindow() == this;
 }
 
 #if ENABLE(ORIENTATION_EVENTS)
@@ -646,7 +645,7 @@ Storage* DOMWindow::sessionStorage(ExceptionCode& ec) const
     if (!document)
         return 0;
 
-    if (!document->securityOrigin()->canAccessLocalStorage(document->topOrigin())) {
+    if (!document->securityOrigin()->canAccessLocalStorage()) {
         ec = SecurityError;
         return 0;
     }
@@ -682,7 +681,7 @@ Storage* DOMWindow::localStorage(ExceptionCode& ec) const
     if (!document)
         return 0;
 
-    if (!document->securityOrigin()->canAccessLocalStorage(document->topOrigin())) {
+    if (!document->securityOrigin()->canAccessLocalStorage()) {
         ec = SecurityError;
         return 0;
     }
@@ -712,7 +711,7 @@ Storage* DOMWindow::localStorage(ExceptionCode& ec) const
     return m_localStorage.get();
 }
 
-void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, const String& targetOrigin, DOMWindow* source, ExceptionCode& ec)
+void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray* ports, const String& targetOrigin, DOMWindow* source, ExceptionState& es)
 {
     if (!isCurrentlyDisplayedInFrame())
         return;
@@ -731,13 +730,13 @@ void DOMWindow::postMessage(PassRefPtr<SerializedScriptValue> message, const Mes
         // It doesn't make sense target a postMessage at a unique origin
         // because there's no way to represent a unique origin in a string.
         if (target->isUnique()) {
-            ec = SyntaxError;
+            es.throwDOMException(SyntaxError);
             return;
         }
     }
 
-    OwnPtr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, ec);
-    if (ec)
+    OwnPtr<MessagePortChannelArray> channels = MessagePort::disentanglePorts(ports, es);
+    if (es.hadException())
         return;
 
     // Capture the source of the message.  We need to do this synchronously
@@ -943,38 +942,6 @@ String DOMWindow::prompt(const String& message, const String& defaultValue)
     return String();
 }
 
-String DOMWindow::btoa(const String& stringToEncode, ExceptionCode& ec)
-{
-    if (stringToEncode.isNull())
-        return String();
-
-    if (!stringToEncode.containsOnlyLatin1()) {
-        ec = InvalidCharacterError;
-        return String();
-    }
-
-    return base64Encode(stringToEncode.latin1());
-}
-
-String DOMWindow::atob(const String& encodedString, ExceptionCode& ec)
-{
-    if (encodedString.isNull())
-        return String();
-
-    if (!encodedString.containsOnlyLatin1()) {
-        ec = InvalidCharacterError;
-        return String();
-    }
-
-    Vector<char> out;
-    if (!base64Decode(encodedString, out, Base64FailOnInvalidCharacter)) {
-        ec = InvalidCharacterError;
-        return String();
-    }
-
-    return String(out.data(), out.size());
-}
-
 bool DOMWindow::find(const String& string, bool caseSensitive, bool backwards, bool wrap, bool /*wholeWord*/, bool /*searchInFrames*/, bool /*showDialog*/) const
 {
     if (!isCurrentlyDisplayedInFrame())
@@ -1166,7 +1133,7 @@ DOMWindow* DOMWindow::self() const
     if (!m_frame)
         return 0;
 
-    return m_frame->document()->domWindow();
+    return m_frame->domWindow();
 }
 
 DOMWindow* DOMWindow::opener() const
@@ -1178,7 +1145,7 @@ DOMWindow* DOMWindow::opener() const
     if (!opener)
         return 0;
 
-    return opener->document()->domWindow();
+    return opener->domWindow();
 }
 
 DOMWindow* DOMWindow::parent() const
@@ -1188,9 +1155,9 @@ DOMWindow* DOMWindow::parent() const
 
     Frame* parent = m_frame->tree()->parent();
     if (parent)
-        return parent->document()->domWindow();
+        return parent->domWindow();
 
-    return m_frame->document()->domWindow();
+    return m_frame->domWindow();
 }
 
 DOMWindow* DOMWindow::top() const
@@ -1202,7 +1169,7 @@ DOMWindow* DOMWindow::top() const
     if (!page)
         return 0;
 
-    return m_frame->tree()->top()->document()->domWindow();
+    return m_frame->tree()->top()->domWindow();
 }
 
 Document* DOMWindow::document() const
@@ -1392,18 +1359,6 @@ void DOMWindow::resizeTo(float width, float height) const
     FloatSize dest = FloatSize(width, height);
     FloatRect update(fr.location(), dest);
     page->chrome().setWindowRect(adjustWindowRect(page, update));
-}
-
-void DOMWindow::clearTimeout(int timeoutID)
-{
-    if (ScriptExecutionContext* context = scriptExecutionContext())
-        DOMTimer::removeByID(context, timeoutID);
-}
-
-void DOMWindow::clearInterval(int timeoutID)
-{
-    if (ScriptExecutionContext* context = scriptExecutionContext())
-        DOMTimer::removeByID(context, timeoutID);
 }
 
 static LayoutSize size(HTMLImageElement* image)
@@ -1902,11 +1857,11 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
 
         KURL completedURL = firstFrame->document()->completeURL(urlString);
 
-        if (targetFrame->document()->domWindow()->isInsecureScriptAccess(activeWindow, completedURL))
-            return targetFrame->document()->domWindow();
+        if (targetFrame->domWindow()->isInsecureScriptAccess(activeWindow, completedURL))
+            return targetFrame->domWindow();
 
         if (urlString.isEmpty())
-            return targetFrame->document()->domWindow();
+            return targetFrame->domWindow();
 
         // For whatever reason, Firefox uses the first window rather than the active window to
         // determine the outgoing referrer. We replicate that behavior here.
@@ -1915,12 +1870,12 @@ PassRefPtr<DOMWindow> DOMWindow::open(const String& urlString, const AtomicStrin
             completedURL,
             firstFrame->loader()->outgoingReferrer(),
             false);
-        return targetFrame->document()->domWindow();
+        return targetFrame->domWindow();
     }
 
     WindowFeatures windowFeatures(windowFeaturesString);
     Frame* result = createWindow(urlString, frameName, windowFeatures, activeWindow, firstFrame, m_frame);
-    return result ? result->document()->domWindow() : 0;
+    return result ? result->domWindow() : 0;
 }
 
 void DOMWindow::showModalDialog(const String& urlString, const String& dialogFeaturesString,
@@ -1955,7 +1910,7 @@ DOMWindow* DOMWindow::anonymousIndexedGetter(uint32_t index)
 
     Frame* child = frame->tree()->scopedChild(index);
     if (child)
-        return child->document()->domWindow();
+        return child->domWindow();
 
     return 0;
 }

@@ -102,7 +102,7 @@ def get_latest_build(build_data):
 
 
 def dump_json(data):
-    return json.dumps(data, separators=(', ', ': '), indent=4, sort_keys=True)
+    return json.dumps(data, separators=(',', ':'), sort_keys=True)
 
 
 def fetch_buildbot_data(masters):
@@ -143,7 +143,7 @@ def fetch_buildbot_data(masters):
 
     logging.info('Fetched buildbot data in %s seconds.', delta.seconds)
 
-    return json.dumps(output_data, separators=(', ', ': '), indent=4, sort_keys=True)
+    return dump_json(output_data)
 
 
 class UpdateBuilders(webapp2.RequestHandler):
@@ -163,7 +163,10 @@ class GetBuilders(webapp2.RequestHandler):
         if not buildbot_data:
             logging.warning('No buildbot data in memcache. If this message repeats, something is probably wrong with memcache.')
             buildbot_data = fetch_buildbot_data(MASTERS)
-            memcache.set('buildbot_data', buildbot_data)
+            try:
+                memcache.set('buildbot_data', buildbot_data)
+            except ValueError, err:
+                logging.error(str(err))
 
         if callback:
             buildbot_data = callback + '(' + buildbot_data + ');'

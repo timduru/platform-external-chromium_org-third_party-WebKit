@@ -31,11 +31,12 @@
 {
     'includes': [
         'WinPrecompile.gypi',
-        '../../wtf/wtf.gypi',
+        '../../bindings/bindings.gypi',
         '../../core/core.gypi',
-        '../../web/web.gypi',
-        'WebKit.gypi',
         '../../core/features.gypi',
+        '../../modules/modules.gypi',
+        '../../web/web.gypi',
+        '../../wtf/wtf.gypi',
     ],
     'targets': [
         {
@@ -103,11 +104,12 @@
                         '../../core/testing/v8', # for WebCoreTestSupport.h, needed to link in window.internals code.
                     ],
                     'sources': [
+                        '<@(bindings_unittest_files)',
                         '<@(core_unittest_files)',
+                        '<@(modules_unittest_files)',
                         '<@(web_unittest_files)',
-                        '<@(webkit_unittest_files)',
                         '../../web/WebTestingSupport.cpp',
-                        'tests/WebUnitTests.cpp',   # Components test runner support.
+                        '../../web/tests/WebUnitTests.cpp',   # Components test runner support.
                     ],
                     'conditions': [
                         ['OS=="win" or OS=="mac"', {

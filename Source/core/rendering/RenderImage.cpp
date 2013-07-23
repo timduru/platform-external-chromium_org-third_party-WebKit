@@ -346,7 +346,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
                 LayoutUnit textWidth = font.width(textRun);
                 TextRunPaintInfo textRunPaintInfo(textRun);
                 textRunPaintInfo.bounds = FloatRect(textRectOrigin, FloatSize(textWidth, fontMetrics.height()));
-                context->setFillColor(style()->visitedDependentColor(CSSPropertyColor));
+                context->setFillColor(resolveColor(CSSPropertyColor));
                 if (errorPictureDrawn) {
                     if (usableWidth >= textWidth && fontMetrics.height() <= imageOffset.height())
                         context->drawText(font, textRunPaintInfo, textOrigin);
@@ -396,11 +396,11 @@ void RenderImage::paintAreaElementFocusRing(PaintInfo& paintInfo)
     if (paintInfo.context->paintingDisabled() && !paintInfo.context->updatingControlTints())
         return;
 
-    Node* focusedNode = document->focusedNode();
-    if (!focusedNode || !isHTMLAreaElement(focusedNode))
+    Element* focusedElement = document->focusedElement();
+    if (!focusedElement || !isHTMLAreaElement(focusedElement))
         return;
 
-    HTMLAreaElement* areaElement = toHTMLAreaElement(focusedNode);
+    HTMLAreaElement* areaElement = toHTMLAreaElement(focusedElement);
     if (areaElement->imageElement() != node())
         return;
 
@@ -421,7 +421,7 @@ void RenderImage::paintAreaElementFocusRing(PaintInfo& paintInfo)
     paintInfo.context->clip(absoluteContentBox());
     paintInfo.context->drawFocusRing(path, outlineWidth,
         areaElementStyle->outlineOffset(),
-        areaElementStyle->visitedDependentColor(CSSPropertyOutlineColor));
+        resolveColor(areaElementStyle, CSSPropertyOutlineColor));
 }
 
 void RenderImage::areaElementFocusChanged(HTMLAreaElement* areaElement)

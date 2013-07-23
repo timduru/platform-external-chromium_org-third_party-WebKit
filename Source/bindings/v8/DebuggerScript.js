@@ -302,6 +302,49 @@ DebuggerScript.getBreakpointNumbers = function(eventData)
     return numbers;
 }
 
+// Matched enum in V8 objects.h
+DebuggerScript.ScriptCompilationType = {
+    Host: 0,
+    Eval: 1,
+    JSON: 2
+};
+
+DebuggerScript._getScriptCompilationTypeInfo = function(script)
+{
+    var result = "";
+    var fromScript = script.evalFromScript();
+    if (script.compilationType() == DebuggerScript.ScriptCompilationType.Eval && fromScript) {
+        result += 'eval from ';
+        if (fromScript.compilationType() == DebuggerScript.ScriptCompilationType.Eval) {
+            result += DebuggerScript._getScriptCompilationTypeInfo(fromScript);
+        } else {
+            var name = fromScript.name();
+            if (name) {
+                var location = script.evalFromLocation();
+                result += name + (location ? ':' + (location.line + 1) + ':' + (location.column + 1) : '');
+            } else {
+                result += '(unknown source)';
+            }
+        }
+        return result;
+    } else if (script.compilationType() ==  Debug.ScriptCompilationType.JSON) {
+        result += 'JSON ';
+    } else {  // script.compilation == Debug.ScriptCompilationType.Host
+        result += '[unnamed] ';
+    }
+    return result || 'Failed to extract info';
+}
+
+DebuggerScript.getScriptCompilationTypeInfo = function(eventData)
+{
+    try {
+        var script = eventData.script();
+        return DebuggerScript._getScriptCompilationTypeInfo(script);
+    } catch (exc) {
+        return exc + '';
+    }
+}
+
 DebuggerScript._frameMirrorToJSCallFrame = function(frameMirror, callerFrame)
 {
     // Get function name.
@@ -324,7 +367,6 @@ DebuggerScript._frameMirrorToJSCallFrame = function(frameMirror, callerFrame)
     // Get this object.
     var thisObject = frameMirror.details_.receiver();
 
-    // Get scope chain array in format: [<scope type>, <scope object>, <scope type>, <scope object>,...]
     var scopeChain = [];
     var scopeType = [];
     for (var i = 0; i < frameMirror.scopeCount(); i++) {
@@ -348,6 +390,28 @@ DebuggerScript._frameMirrorToJSCallFrame = function(frameMirror, callerFrame)
         return DebuggerScript._setScopeVariableValue(frameMirror, scopeNumber, variableName, newValue);
     }
 
+    function stepInPositions()
+    {
+        var stepInPositionsV8 = frameMirror.stepInPositions();
+        var stepInPositionsProtocol;
+        if (stepInPositionsV8) {
+            stepInPositionsProtocol = [];
+            var script = frameMirror.func().script();
+            if (script) {
+                var scriptId = String(script.id());
+                for (var i = 0; i < stepInPositionsV8.length; i++) {
+                    var item = {
+                        scriptId: scriptId,
+                        lineNumber: stepInPositionsV8[i].position.line,
+                        columnNumber: stepInPositionsV8[i].position.column
+                    };
+                    stepInPositionsProtocol.push(item);
+                }
+            }
+        }
+        return JSON.stringify(stepInPositionsProtocol);
+    }
+
     return {
         "sourceID": sourceID,
         "line": location ? location.line : 0,
@@ -359,7 +423,8 @@ DebuggerScript._frameMirrorToJSCallFrame = function(frameMirror, callerFrame)
         "evaluate": evaluate,
         "caller": callerFrame,
         "restart": restart,
-        "setVariableValue": setVariableValue
+        "setVariableValue": setVariableValue,
+        "stepInPositions": stepInPositions
     };
 }
 

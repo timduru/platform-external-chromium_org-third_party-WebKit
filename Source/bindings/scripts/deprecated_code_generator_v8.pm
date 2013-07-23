@@ -1110,6 +1110,7 @@ sub GetImplNameFromImplementedBy
     my $implementedBy = shift;
 
     my $interface = ParseInterface($implementedBy);
+
     return $interface->extendedAttributes->{"ImplementedAs"} || $implementedBy;
 }
 
@@ -1478,7 +1479,7 @@ END
 
             if (ExtendedAttributeContains($attribute->extendedAttributes->{"CallWith"}, "ScriptState")) {
                 $code .= "    if (state.hadException()) {\n";
-                $code .= "        throwError(state.exception(), info.GetIsolate());\n";
+                $code .= "        throwError(state.exception());\n";
                 $code .= "        return;\n";
                 $code .= "    }\n";
             }
@@ -1759,7 +1760,7 @@ sub GenerateNormalAttrSetter
         my $argType = $attribute->type;
         if (IsWrapperType($argType)) {
             $code .= "    if (!isUndefinedOrNull(value) && !V8${argType}::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate()))) {\n";
-            $code .= "        throwTypeError(0, info.GetIsolate());\n";
+            $code .= "        throwTypeError(info.GetIsolate());\n";
             $code .= "        return;\n";
             $code .= "    }\n";
         }
@@ -1891,7 +1892,7 @@ END
 
     if (ExtendedAttributeContains($attribute->extendedAttributes->{"CallWith"}, "ScriptState")) {
         $code .= "    if (state.hadException())\n";
-        $code .= "        throwError(state.exception(), info.GetIsolate());\n";
+        $code .= "        throwError(state.exception());\n";
     }
 
     if ($svgNativeType) {
@@ -2043,7 +2044,7 @@ END
         $code .= "    }\n";
     }
     $code .= <<END;
-    throwTypeError(0, args.GetIsolate());
+    throwTypeError(args.GetIsolate());
 END
     $code .= "}\n\n";
     $code .= "#endif // ${conditionalString}\n\n" if $conditionalString;
@@ -2329,14 +2330,14 @@ sub GenerateParametersCheck
                 $parameterCheckString .= "    RefPtr<" . $parameter->type . "> $parameterName;\n";
                 $parameterCheckString .= "    if (args.Length() > $paramIndex && !args[$paramIndex]->IsNull() && !args[$paramIndex]->IsUndefined()) {\n";
                 $parameterCheckString .= "        if (!args[$paramIndex]->IsFunction()) {\n";
-                $parameterCheckString .= "            throwTypeError(0, args.GetIsolate());\n";
+                $parameterCheckString .= "            throwTypeError(args.GetIsolate());\n";
                 $parameterCheckString .= "            return;\n";
                 $parameterCheckString .= "        }\n";
                 $parameterCheckString .= "        $parameterName = ${v8ClassName}::create(args[$paramIndex], getScriptExecutionContext());\n";
                 $parameterCheckString .= "    }\n";
             } else {
                 $parameterCheckString .= "    if (args.Length() <= $paramIndex || !args[$paramIndex]->IsFunction()) {\n";
-                $parameterCheckString .= "        throwTypeError(0, args.GetIsolate());\n";
+                $parameterCheckString .= "        throwTypeError(args.GetIsolate());\n";
                 $parameterCheckString .= "        return;\n";
                 $parameterCheckString .= "    }\n";
                 $parameterCheckString .= "    RefPtr<" . $parameter->type . "> $parameterName = ${v8ClassName}::create(args[$paramIndex], getScriptExecutionContext());\n";
@@ -2365,7 +2366,7 @@ sub GenerateParametersCheck
                 $parameterCheckString .= "    Vector<$nativeElementType> $parameterName;\n";
                 $parameterCheckString .= "    for (int i = $paramIndex; i < args.Length(); ++i) {\n";
                 $parameterCheckString .= "        if (!V8${argType}::HasInstance(args[i], args.GetIsolate(), worldType(args.GetIsolate()))) {\n";
-                $parameterCheckString .= "            throwTypeError(0, args.GetIsolate());\n";
+                $parameterCheckString .= "            throwTypeError(args.GetIsolate());\n";
                 $parameterCheckString .= "            return;\n";
                 $parameterCheckString .= "        }\n";
                 $parameterCheckString .= "        $parameterName.append(V8${argType}::toNative(v8::Handle<v8::Object>::Cast(args[i])));\n";
@@ -2386,7 +2387,7 @@ sub GenerateParametersCheck
                 my $enumValidationExpression = join(" || ", @validEqualities);
                 $parameterCheckString .=  "    String string = $parameterName;\n";
                 $parameterCheckString .= "    if (!($enumValidationExpression)) {\n";
-                $parameterCheckString .= "        throwTypeError(0, args.GetIsolate());\n";
+                $parameterCheckString .= "        throwTypeError(args.GetIsolate());\n";
                 $parameterCheckString .= "        return;\n";
                 $parameterCheckString .= "    }\n";
             }
@@ -2402,7 +2403,7 @@ sub GenerateParametersCheck
                 my $argType = $parameter->type;
                 if (IsWrapperType($argType)) {
                     $parameterCheckString .= "    if (args.Length() > $paramIndex && !isUndefinedOrNull($argValue) && !V8${argType}::HasInstance($argValue, args.GetIsolate(), worldType(args.GetIsolate()))) {\n";
-                    $parameterCheckString .= "        throwTypeError(0, args.GetIsolate());\n";
+                    $parameterCheckString .= "        throwTypeError(args.GetIsolate());\n";
                     $parameterCheckString .= "        return;\n";
                     $parameterCheckString .= "    }\n";
                 }
@@ -2458,7 +2459,7 @@ END
         $code .= "    }\n";
     }
     $code .= <<END;
-    throwTypeError(0, args.GetIsolate());
+    throwTypeError(args.GetIsolate());
     return;
 END
     $code .= "}\n\n";
@@ -2620,6 +2621,13 @@ sub GenerateEventConstructor
     my $implClassName = GetImplName($interface);
     my $v8ClassName = GetV8ClassName($interface);
 
+    my @anyAttributeNames;
+    foreach my $attribute (@{$interface->attributes}) {
+        if ($attribute->type eq "any") {
+            push(@anyAttributeNames, $attribute->name);
+        }
+    }
+
     AddToImplIncludes("bindings/v8/Dictionary.h");
     $implementation{nameSpaceInternal}->add(<<END);
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -2630,29 +2638,51 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
     }
 
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, type, args[0]);
+END
+
+    foreach my $attrName (@anyAttributeNames) {
+        $implementation{nameSpaceInternal}->add("    v8::Local<v8::Value> ${attrName};\n");
+    }
+
+    $implementation{nameSpaceInternal}->add(<<END);
     ${implClassName}Init eventInit;
     if (args.Length() >= 2) {
         V8TRYCATCH_VOID(Dictionary, options, Dictionary(args[1], args.GetIsolate()));
         if (!fill${implClassName}Init(eventInit, options))
             return;
 END
-        for (my $index = 0; $index < @{$interface->attributes}; $index++) {
-            my $attribute = @{$interface->attributes}[$index];
-            if ($attribute->type eq "any") {
-                my $attributeName = $attribute->name;
-                $implementation{nameSpaceInternal}->add(<<END);
-        v8::Local<v8::Value> ${attributeName};
-        options.get("${attributeName}", ${attributeName});
-        if (!${attributeName}.IsEmpty())
-            args.Holder()->SetHiddenValue(V8HiddenPropertyName::${attributeName}(), ${attributeName});
-END
-            }
-        }
+
+    # Store 'any'-typed properties on the wrapper to avoid leaking them between isolated worlds.
+    foreach my $attrName (@anyAttributeNames) {
         $implementation{nameSpaceInternal}->add(<<END);
+        options.get("${attrName}", ${attrName});
+        if (!${attrName}.IsEmpty())
+            args.Holder()->SetHiddenValue(V8HiddenPropertyName::${attrName}(), ${attrName});
+END
+    }
+
+    $implementation{nameSpaceInternal}->add(<<END);
     }
 
     RefPtr<${implClassName}> event = ${implClassName}::create(type, eventInit);
+END
 
+    if (@anyAttributeNames) {
+        # If we're in an isolated world, create a SerializedScriptValue and store it in the event for
+        # later cloning if the property is accessed from another world.
+        # The main world case is handled lazily (in Custom code).
+        $implementation{nameSpaceInternal}->add("    if (isolatedWorldForIsolate(args.GetIsolate())) {\n");
+        foreach my $attrName (@anyAttributeNames) {
+            my $setter = "setSerialized" . FirstLetterToUpperCase($attrName);
+            $implementation{nameSpaceInternal}->add(<<END);
+        if (!${attrName}.IsEmpty())
+            event->${setter}(SerializedScriptValue::createAndSwallowExceptions(${attrName}, args.GetIsolate()));
+END
+        }
+        $implementation{nameSpaceInternal}->add("    }\n\n");
+    }
+
+    $implementation{nameSpaceInternal}->add(<<END);
     v8::Handle<v8::Object> wrapper = args.Holder();
     V8DOMWrapper::associateObjectWithWrapper<${v8ClassName}>(event.release(), &${v8ClassName}::info, wrapper, args.GetIsolate(), WrapperConfiguration::Dependent);
     v8SetReturnValue(args, wrapper);
@@ -2674,12 +2704,10 @@ END
 END
     }
 
-    for (my $index = 0; $index < @{$interface->attributes}; $index++) {
-        my $attribute = @{$interface->attributes}[$index];
+    foreach my $attribute (@{$interface->attributes}) {
         if ($attribute->extendedAttributes->{"InitializedByEventConstructor"}) {
-            my $attributeName = $attribute->name;
-            my $attributeType = $attribute->type;
-            if (not ($attribute->type eq "any")) {
+            if ($attribute->type ne "any") {
+                my $attributeName = $attribute->name;
                 $code .= "    options.get(\"$attributeName\", eventInit.$attributeName);\n";
             }
         }
@@ -4430,7 +4458,7 @@ END
 v8::Handle<v8::ObjectTemplate> V8Window::GetShadowObjectTemplate(v8::Isolate* isolate, WrapperWorldType currentWorldType)
 {
     if (currentWorldType == MainWorld) {
-        static v8::Persistent<v8::ObjectTemplate> V8WindowShadowObjectCacheForMainWorld;
+        DEFINE_STATIC_LOCAL(v8::Persistent<v8::ObjectTemplate>, V8WindowShadowObjectCacheForMainWorld, ());
         if (V8WindowShadowObjectCacheForMainWorld.IsEmpty()) {
             TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
             v8::Handle<v8::ObjectTemplate> templ = v8::ObjectTemplate::New();
@@ -4440,7 +4468,7 @@ v8::Handle<v8::ObjectTemplate> V8Window::GetShadowObjectTemplate(v8::Isolate* is
         }
         return v8::Local<v8::ObjectTemplate>::New(isolate, V8WindowShadowObjectCacheForMainWorld);
     } else {
-        static v8::Persistent<v8::ObjectTemplate> V8WindowShadowObjectCacheForNonMainWorld;
+        DEFINE_STATIC_LOCAL(v8::Persistent<v8::ObjectTemplate>, V8WindowShadowObjectCacheForNonMainWorld, ());
         if (V8WindowShadowObjectCacheForNonMainWorld.IsEmpty()) {
             TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "BuildDOMTemplate");
             v8::Handle<v8::ObjectTemplate> templ = v8::ObjectTemplate::New();
@@ -4897,7 +4925,7 @@ sub GenerateFunctionCallString
         $code .= $indent . "if (state.hadException()) {\n";
         $code .= $indent . "    v8::Local<v8::Value> exception = state.exception();\n";
         $code .= $indent . "    state.clearException();\n";
-        $code .= $indent . "    throwError(exception, args.GetIsolate());\n";
+        $code .= $indent . "    throwError(exception);\n";
         $code .= $indent . "    return;\n";
         $code .= $indent . "}\n";
     }
@@ -5398,17 +5426,17 @@ sub NativeToJSValue
 
     my $conv = $extendedAttributes->{"TreatReturnedNullStringAs"};
     if (($type eq "DOMString" || IsEnumType($type)) && $isReturnValue) {
-        my $nullAs = "NullStringAsEmpty";
+        my $functionSuffix = "";
         if (defined $conv) {
             if ($conv eq "Null") {
-                $nullAs = "NullStringAsNull";
+                $functionSuffix = "OrNull";
             } elsif ($conv eq "Undefined") {
-                $nullAs = "NullStringAsUndefined";
+                $functionSuffix = "OrUndefined";
             } else {
                 die "Unknown value for TreatReturnedNullStringAs extended attribute";
             }
         }
-        return "${indent}v8SetReturnValueString(${getCallbackInfo}, $nativeValue, $getIsolate, $nullAs);";
+        return "${indent}v8SetReturnValueString${functionSuffix}(${getCallbackInfo}, $nativeValue, $getIsolate);";
     }
 
     if ($type eq "DOMString" or IsEnumType($type)) {

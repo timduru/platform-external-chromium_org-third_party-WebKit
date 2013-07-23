@@ -29,6 +29,7 @@
 #include "CSSPropertyNames.h"
 #include "CSSValueKeywords.h"
 #include "HTMLNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SVGNames.h"
 #include "XMLNames.h"
 #include "core/accessibility/AXObjectCache.h"
@@ -883,12 +884,12 @@ static inline AtomicString makeIdForStyleResolution(const AtomicString& value, b
     return value;
 }
 
-static bool checkNeedsStyleInvalidationForIdChange(const AtomicString& oldId, const AtomicString& newId, StyleResolver* styleResolver)
+static bool checkNeedsStyleInvalidationForIdChange(const AtomicString& oldId, const AtomicString& newId, const RuleFeatureSet& features)
 {
     ASSERT(newId != oldId);
-    if (!oldId.isEmpty() && styleResolver->hasSelectorForId(oldId))
+    if (!oldId.isEmpty() && features.hasSelectorForId(oldId))
         return true;
-    if (!newId.isEmpty() && styleResolver->hasSelectorForId(newId))
+    if (!newId.isEmpty() && features.hasSelectorForId(newId))
         return true;
     return false;
 }
@@ -920,7 +921,7 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ne
         AtomicString newId = makeIdForStyleResolution(newValue, document()->inQuirksMode());
         if (newId != oldId) {
             elementData()->setIdForStyleResolution(newId);
-            shouldInvalidateStyle = testShouldInvalidateStyle && checkNeedsStyleInvalidationForIdChange(oldId, newId, styleResolver);
+            shouldInvalidateStyle = testShouldInvalidateStyle && checkNeedsStyleInvalidationForIdChange(oldId, newId, styleResolver->ruleFeatureSet());
         }
     } else if (name == classAttr) {
         classAttributeChanged(newValue);
@@ -1028,10 +1029,10 @@ void Element::classAttributeChanged(const AtomicString& newClassString)
         const SpaceSplitString oldClasses = elementData()->classNames();
         elementData()->setClass(newClassString, shouldFoldCase);
         const SpaceSplitString& newClasses = elementData()->classNames();
-        shouldInvalidateStyle = testShouldInvalidateStyle && checkSelectorForClassChange(oldClasses, newClasses, *styleResolver);
+        shouldInvalidateStyle = testShouldInvalidateStyle && checkSelectorForClassChange(oldClasses, newClasses, styleResolver->ruleFeatureSet());
     } else {
         const SpaceSplitString& oldClasses = elementData()->classNames();
-        shouldInvalidateStyle = testShouldInvalidateStyle && checkSelectorForClassChange(oldClasses, *styleResolver);
+        shouldInvalidateStyle = testShouldInvalidateStyle && checkSelectorForClassChange(oldClasses, styleResolver->ruleFeatureSet());
         elementData()->clearClass();
     }
 
@@ -1363,7 +1364,7 @@ void Element::attach(const AttachContext& context)
     if (hasRareData()) {
         ElementRareData* data = elementRareData();
         if (data->needsFocusAppearanceUpdateSoonAfterAttach()) {
-            if (isFocusable() && document()->focusedNode() == this)
+            if (isFocusable() && document()->focusedElement() == this)
                 document()->updateFocusAppearanceSoon(false /* don't restore selection */);
             data->setNeedsFocusAppearanceUpdateSoonAfterAttach(false);
         }
@@ -2024,7 +2025,7 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
         return;
 
     Document* doc = document();
-    if (doc->focusedNode() == this)
+    if (doc->focusedElement() == this)
         return;
 
     // If the stylesheets have already been loaded we can reliably check isFocusable.
@@ -2407,7 +2408,7 @@ void Element::cancelFocusAppearanceUpdate()
 {
     if (hasRareData())
         elementRareData()->setNeedsFocusAppearanceUpdateSoonAfterAttach(false);
-    if (document()->focusedNode() == this)
+    if (document()->focusedElement() == this)
         document()->cancelFocusAppearanceUpdate();
 }
 
@@ -2799,6 +2800,11 @@ void Element::updateLabel(TreeScope* scope, const AtomicString& oldForAttributeV
         scope->addLabel(newForAttributeValue, toHTMLLabelElement(this));
 }
 
+static bool hasSelectorForAttribute(Document* document, const AtomicString& localName)
+{
+    return document->styleResolver() && document->styleResolver()->ruleFeatureSet().hasSelectorForAttribute(localName);
+}
+
 void Element::willModifyAttribute(const QualifiedName& name, const AtomicString& oldValue, const AtomicString& newValue)
 {
     if (isIdAttributeName(name))
@@ -2812,7 +2818,7 @@ void Element::willModifyAttribute(const QualifiedName& name, const AtomicString&
     }
 
     if (oldValue != newValue) {
-        if (attached() && document()->styleResolver() && document()->styleResolver()->hasSelectorForAttribute(name.localName()))
+        if (attached() && hasSelectorForAttribute(document(), name.localName()))
            setNeedsStyleRecalc();
 
         if (isUpgradedCustomElement())

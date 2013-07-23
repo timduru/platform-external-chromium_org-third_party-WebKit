@@ -35,10 +35,6 @@
 #include "wtf/Noncopyable.h"
 #include "wtf/text/WTFString.h"
 
-#if OS(SOLARIS)
-#include <sys/time.h> // For time_t structure.
-#endif
-
 namespace WebCore {
 
 class AutoscrollController;
@@ -137,12 +133,7 @@ public:
     bool openedByDOM() const;
     void setOpenedByDOM();
 
-    // DEPRECATED. Use backForward() instead of the following 5 functions.
-    bool goBack();
-    bool goForward();
-    void goBackOrForward(int distance);
-    int getHistoryLength();
-
+    // DEPRECATED. Use backForward() instead of the following function.
     void goToItem(HistoryItem*);
 
     // FIXME: InspectorPageGroup is only needed to support single process debugger layout tests, it should be removed when DumpRenderTree is gone.
@@ -311,7 +302,6 @@ private:
 
     bool m_tabKeyCyclesThroughElements;
     bool m_defersLoading;
-    unsigned m_defersLoadingCallCount;
 
     float m_pageScaleFactor;
     float m_deviceScaleFactor;
@@ -320,7 +310,6 @@ private:
 
     mutable String m_userStyleSheet;
     mutable bool m_didLoadUserStyleSheet;
-    mutable time_t m_userStyleSheetModificationTime;
 
     RefPtr<PageGroup> m_group;
 

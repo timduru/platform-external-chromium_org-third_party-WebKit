@@ -39,14 +39,14 @@ Object.isEmpty = function(obj)
 }
 
 /**
- * @param {!Object} obj
- * @return {!Array}
+ * @param {!Object.<string,T>} obj
+ * @return {!Array.<T>}
+ * @template T
  */
 Object.values = function(obj)
 {
     var result = Object.keys(obj);
     var length = result.length;
-
     for (var i = 0; i < length; ++i)
         result[i] = obj[result[i]];
     return result;
@@ -232,6 +232,50 @@ String.prototype.endsWith = function(substring)
 }
 
 /**
+ * @param {string} a
+ * @param {string} b
+ * @return {number}
+ */
+String.naturalOrderComparator = function(a, b)
+{
+    var chunk = /^\d+|^\D+/;
+    var chunka, chunkb, anum, bnum;
+    while (1) {
+        if (a) {
+            if (!b)
+                return 1;
+        } else {
+            if (b)
+                return -1;
+            else
+                return 0;
+        }
+        chunka = a.match(chunk)[0];
+        chunkb = b.match(chunk)[0];
+        anum = !isNaN(chunka);
+        bnum = !isNaN(chunkb);
+        if (anum && !bnum)
+            return -1;
+        if (bnum && !anum)
+            return 1;
+        if (anum && bnum) {
+            var diff = chunka - chunkb;
+            if (diff)
+                return diff;
+            if (chunka.length !== chunkb.length) {
+                if (!+chunka && !+chunkb) // chunks are strings of all 0s (special case)
+                    return chunka.length - chunkb.length;
+                else
+                    return chunkb.length - chunka.length;
+            }
+        } else if (chunka !== chunkb)
+            return (chunka < chunkb) ? -1 : 1;
+        a = a.substring(chunka.length);
+        b = b.substring(chunkb.length);
+    }
+}
+
+/**
  * @param {number} num
  * @param {number} min
  * @param {number} max
@@ -295,9 +339,10 @@ Date.prototype.toISO8601Compact = function()
 Object.defineProperty(Array.prototype, "remove",
 {
     /**
-     * @param {*} value
+     * @param {T} value
      * @param {boolean=} onlyFirst
-     * @this {Array.<*>}
+     * @this {Array.<T>}
+     * @template T
      */
     value: function(value, onlyFirst)
     {
@@ -335,8 +380,9 @@ Object.defineProperty(Array.prototype, "rotate",
 {
     /**
      * @param {number} index
-     * @return {Array.<*>}
-     * @this {Array.<*>}
+     * @return {!Array.<T>}
+     * @this {Array.<T>}
+     * @template T
      */
     value: function(index)
     {
@@ -455,16 +501,17 @@ Object.defineProperty(Array.prototype, "lowerBound",
      * elements are smaller than the specimen) returns array.length.
      * The function works for sorted array.
      *
-     * @this {Array.<*>}
-     * @param {*} object
-     * @param {function(*,*):number=} comparator
+     * @param {T} object
+     * @param {function(T,S):number=} comparator
      * @return {number}
+     * @this {Array.<S>}
+     * @template T,S
      */
     value: function(object, comparator)
     {
         function defaultComparator(a, b)
         {
-            return a - b;
+            return a < b ? -1 : (a > b ? 1 : 0);
         }
         comparator = comparator || defaultComparator;
         var l = 0;
@@ -488,16 +535,17 @@ Object.defineProperty(Array.prototype, "upperBound",
      * elements are smaller than the specimen) returns array.length.
      * The function works for sorted array.
      *
-     * @this {Array.<*>}
-     * @param {*} object
-     * @param {function(*,*):number=} comparator
+     * @param {T} object
+     * @param {function(T,S):number=} comparator
      * @return {number}
+     * @this {Array.<S>}
+     * @template T,S
      */
     value: function(object, comparator)
     {
         function defaultComparator(a, b)
         {
-            return a - b;
+            return a < b ? -1 : (a > b ? 1 : 0);
         }
         comparator = comparator || defaultComparator;
         var l = 0;
@@ -516,10 +564,11 @@ Object.defineProperty(Array.prototype, "upperBound",
 Object.defineProperty(Array.prototype, "binaryIndexOf",
 {
     /**
-     * @this {Array.<*>}
-     * @param {*} value
-     * @param {function(*,*):number} comparator
+     * @param {T} value
+     * @param {function(T,S):number} comparator
      * @return {number}
+     * @this {Array.<S>}
+     * @template T,S
      */
     value: function(value, comparator)
     {
@@ -532,8 +581,9 @@ Object.defineProperty(Array.prototype, "select",
 {
     /**
      * @param {string} field
-     * @return {!Array.<*>}
-     * @this {Array.<*>}
+     * @return {!Array.<T>}
+     * @this {Array.<Object.<string,T>>}
+     * @template T
      */
     value: function(field)
     {
@@ -547,8 +597,9 @@ Object.defineProperty(Array.prototype, "select",
 Object.defineProperty(Array.prototype, "peekLast",
 {
     /**
-     * @return {*}
-     * @this {Array.<*>}
+     * @return {T|undefined}
+     * @this {Array.<T>}
+     * @template T
      */
     value: function()
     {
@@ -557,11 +608,12 @@ Object.defineProperty(Array.prototype, "peekLast",
 });
 
 /**
- * @param {*} object
- * @param {Array.<*>} list
- * @param {function(*,*):number=} comparator
+ * @param {T} object
+ * @param {Array.<S>} list
+ * @param {function(T,S):number=} comparator
  * @param {boolean=} insertionIndexAfter
  * @return {number}
+ * @template T,S
  */
 function insertionIndexForObjectInListSortedByFunction(object, list, comparator, insertionIndexAfter)
 {
@@ -834,17 +886,18 @@ createObjectIdentifier._last = 0;
 
 /**
  * @constructor
+ * @template T
  */
 var Set = function()
 {
-    /** @type !Object.<string, Object> */
+    /** @type {!Object.<string, !T>} */
     this._set = {};
     this._size = 0;
 }
 
 Set.prototype = {
     /**
-     * @param {!Object} item
+     * @param {!T} item
      */
     add: function(item)
     {
@@ -859,7 +912,7 @@ Set.prototype = {
     },
 
     /**
-     * @param {!Object} item
+     * @param {!T} item
      * @return {boolean}
      */
     remove: function(item)
@@ -873,7 +926,7 @@ Set.prototype = {
     },
 
     /**
-     * @return {!Array.<Object>}
+     * @return {!Array.<!T>}
      */
     items: function()
     {
@@ -885,7 +938,7 @@ Set.prototype = {
     },
 
     /**
-     * @param {!Object} item
+     * @param {!T} item
      * @return {boolean}
      */
     hasItem: function(item)
@@ -910,17 +963,19 @@ Set.prototype = {
 
 /**
  * @constructor
+ * @template K,V
  */
 var Map = function()
 {
+    /** @type {!Object.<string, !Array.<K|V>>} */
     this._map = {};
     this._size = 0;
 }
 
 Map.prototype = {
     /**
-     * @param {Object} key
-     * @param {*=} value
+     * @param {!K} key
+     * @param {V=} value
      */
     put: function(key, value)
     {
@@ -935,7 +990,7 @@ Map.prototype = {
     },
 
     /**
-     * @param {Object} key
+     * @param {!K} key
      */
     remove: function(key)
     {
@@ -948,7 +1003,7 @@ Map.prototype = {
     },
 
     /**
-     * @return {Array.<Object>}
+     * @return {!Array.<!K>}
      */
     keys: function()
     {
@@ -956,7 +1011,7 @@ Map.prototype = {
     },
 
     /**
-     * @return {Array.<*>}
+     * @return {!Array.<V>}
      */
     values: function()
     {
@@ -965,7 +1020,7 @@ Map.prototype = {
 
     /**
      * @param {number} index
-     * @return {Array.<Array>}
+     * @return {!Array.<K|V>}
      */
     _list: function(index)
     {
@@ -977,7 +1032,8 @@ Map.prototype = {
     },
 
     /**
-     * @param {Object} key
+     * @param {!K} key
+     * @return {V|undefined}
      */
     get: function(key)
     {
@@ -986,7 +1042,7 @@ Map.prototype = {
     },
 
     /**
-     * @param {Object} key
+     * @param {!K} key
      * @return {boolean}
      */
     contains: function(key)
@@ -1012,9 +1068,11 @@ Map.prototype = {
 
 /**
  * @constructor
+ * @template T
  */
 var StringMap = function()
 {
+    /** @type {!Object.<string, T>} */
     this._map = {};
     this._size = 0;
 }
@@ -1022,7 +1080,7 @@ var StringMap = function()
 StringMap.prototype = {
     /**
      * @param {string} key
-     * @param {*=} value
+     * @param {T} value
      */
     put: function(key, value)
     {
@@ -1031,6 +1089,7 @@ StringMap.prototype = {
                 ++this._size;
                 this._hasProtoKey = true;
             }
+            /** @type {T} */
             this._protoValue = value;
             return;
         }
@@ -1063,18 +1122,18 @@ StringMap.prototype = {
     },
 
     /**
-     * @return {Array.<string>}
+     * @return {!Array.<string>}
      */
     keys: function()
     {
-        var result = Object.keys(this._map);
+        var result = Object.keys(this._map) || [];
         if (this._hasProtoKey)
             result.push("__proto__");
         return result;
     },
 
     /**
-     * @return {Array.<*>}
+     * @return {!Array.<T>}
      */
     values: function()
     {

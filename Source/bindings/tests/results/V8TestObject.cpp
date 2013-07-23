@@ -1027,7 +1027,7 @@ static void withScriptStateAttributeAttrSetter(v8::Local<v8::String> name, v8::L
     ScriptState& state = *currentState;
     imp->setWithScriptStateAttribute(&state, v);
     if (state.hadException())
-        throwError(state.exception(), info.GetIsolate());
+        throwError(state.exception());
     return;
 }
 
@@ -1110,7 +1110,7 @@ static void withScriptStateAttributeRaisesAttrGetter(v8::Local<v8::String> name,
     if (UNLIKELY(es.throwIfNeeded()))
         return;
     if (state.hadException()) {
-        throwError(state.exception(), info.GetIsolate());
+        throwError(state.exception());
         return;
     }
     v8SetReturnValue(info, toV8Fast(v.release(), info, imp));
@@ -1134,7 +1134,7 @@ static void withScriptStateAttributeRaisesAttrSetter(v8::Local<v8::String> name,
     ScriptState& state = *currentState;
     imp->setWithScriptStateAttributeRaises(&state, WTF::getPtr(v));
     if (state.hadException())
-        throwError(state.exception(), info.GetIsolate());
+        throwError(state.exception());
     return;
 }
 
@@ -1210,7 +1210,7 @@ static void withScriptExecutionContextAndScriptStateAttributeAttrSetter(v8::Loca
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
     imp->setWithScriptExecutionContextAndScriptStateAttribute(&state, scriptContext, WTF::getPtr(v));
     if (state.hadException())
-        throwError(state.exception(), info.GetIsolate());
+        throwError(state.exception());
     return;
 }
 
@@ -1234,7 +1234,7 @@ static void withScriptExecutionContextAndScriptStateAttributeRaisesAttrGetter(v8
     if (UNLIKELY(es.throwIfNeeded()))
         return;
     if (state.hadException()) {
-        throwError(state.exception(), info.GetIsolate());
+        throwError(state.exception());
         return;
     }
     v8SetReturnValue(info, toV8Fast(v.release(), info, imp));
@@ -1259,7 +1259,7 @@ static void withScriptExecutionContextAndScriptStateAttributeRaisesAttrSetter(v8
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
     imp->setWithScriptExecutionContextAndScriptStateAttributeRaises(&state, scriptContext, WTF::getPtr(v));
     if (state.hadException())
-        throwError(state.exception(), info.GetIsolate());
+        throwError(state.exception());
     return;
 }
 
@@ -1300,7 +1300,7 @@ static void withScriptExecutionContextAndScriptStateWithSpacesAttributeAttrSette
     ScriptExecutionContext* scriptContext = getScriptExecutionContext();
     imp->setWithScriptExecutionContextAndScriptStateWithSpacesAttribute(&state, scriptContext, WTF::getPtr(v));
     if (state.hadException())
-        throwError(state.exception(), info.GetIsolate());
+        throwError(state.exception());
     return;
 }
 
@@ -3131,7 +3131,7 @@ static void methodWithEnumArgMethod(const v8::FunctionCallbackInfo<v8::Value>& a
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, enumArg, args[0]);
     String string = enumArg;
     if (!(string == "" || string == "EnumValue1" || string == "EnumValue2" || string == "EnumValue3")) {
-        throwTypeError(0, args.GetIsolate());
+        throwTypeError(args.GetIsolate());
         return;
     }
     imp->methodWithEnumArg(enumArg);
@@ -3320,7 +3320,7 @@ static void withScriptStateVoidMethod(const v8::FunctionCallbackInfo<v8::Value>&
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
-        throwError(exception, args.GetIsolate());
+        throwError(exception);
         return;
     }
 
@@ -3345,7 +3345,7 @@ static void withScriptStateObjMethod(const v8::FunctionCallbackInfo<v8::Value>& 
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
-        throwError(exception, args.GetIsolate());
+        throwError(exception);
         return;
     }
     v8SetReturnValue(args, toV8(result.release(), args.Holder(), args.GetIsolate()));
@@ -3373,7 +3373,7 @@ static void withScriptStateVoidExceptionMethod(const v8::FunctionCallbackInfo<v8
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
-        throwError(exception, args.GetIsolate());
+        throwError(exception);
         return;
     }
 
@@ -3401,7 +3401,7 @@ static void withScriptStateObjExceptionMethod(const v8::FunctionCallbackInfo<v8:
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
-        throwError(exception, args.GetIsolate());
+        throwError(exception);
         return;
     }
     v8SetReturnValue(args, toV8(result.release(), args.Holder(), args.GetIsolate()));
@@ -3443,7 +3443,7 @@ static void withScriptExecutionContextAndScriptStateMethod(const v8::FunctionCal
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
-        throwError(exception, args.GetIsolate());
+        throwError(exception);
         return;
     }
 
@@ -3472,7 +3472,7 @@ static void withScriptExecutionContextAndScriptStateObjExceptionMethod(const v8:
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
-        throwError(exception, args.GetIsolate());
+        throwError(exception);
         return;
     }
     v8SetReturnValue(args, toV8(result.release(), args.Holder(), args.GetIsolate()));
@@ -3498,7 +3498,7 @@ static void withScriptExecutionContextAndScriptStateWithSpacesMethod(const v8::F
     if (state.hadException()) {
         v8::Local<v8::Value> exception = state.exception();
         state.clearException();
-        throwError(exception, args.GetIsolate());
+        throwError(exception);
         return;
     }
     v8SetReturnValue(args, toV8(result.release(), args.Holder(), args.GetIsolate()));
@@ -3667,7 +3667,7 @@ static void methodWithCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
     if (args.Length() <= 0 || !args[0]->IsFunction()) {
-        throwTypeError(0, args.GetIsolate());
+        throwTypeError(args.GetIsolate());
         return;
     }
     RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getScriptExecutionContext());
@@ -3692,7 +3692,7 @@ static void methodWithNonCallbackArgAndCallbackArgMethod(const v8::FunctionCallb
     TestObj* imp = V8TestObject::toNative(args.Holder());
     V8TRYCATCH_VOID(int, nonCallback, toInt32(args[0]));
     if (args.Length() <= 1 || !args[1]->IsFunction()) {
-        throwTypeError(0, args.GetIsolate());
+        throwTypeError(args.GetIsolate());
         return;
     }
     RefPtr<TestCallback> callback = V8TestCallback::create(args[1], getScriptExecutionContext());
@@ -3714,7 +3714,7 @@ static void methodWithCallbackAndOptionalArgMethod(const v8::FunctionCallbackInf
     RefPtr<TestCallback> callback;
     if (args.Length() > 0 && !args[0]->IsNull() && !args[0]->IsUndefined()) {
         if (!args[0]->IsFunction()) {
-            throwTypeError(0, args.GetIsolate());
+            throwTypeError(args.GetIsolate());
             return;
         }
         callback = V8TestCallback::create(args[0], getScriptExecutionContext());
@@ -3736,7 +3736,7 @@ static void staticMethodWithCallbackAndOptionalArgMethod(const v8::FunctionCallb
     RefPtr<TestCallback> callback;
     if (args.Length() > 0 && !args[0]->IsNull() && !args[0]->IsUndefined()) {
         if (!args[0]->IsFunction()) {
-            throwTypeError(0, args.GetIsolate());
+            throwTypeError(args.GetIsolate());
             return;
         }
         callback = V8TestCallback::create(args[0], getScriptExecutionContext());
@@ -3760,7 +3760,7 @@ static void staticMethodWithCallbackArgMethod(const v8::FunctionCallbackInfo<v8:
         return;
     }
     if (args.Length() <= 0 || !args[0]->IsFunction()) {
-        throwTypeError(0, args.GetIsolate());
+        throwTypeError(args.GetIsolate());
         return;
     }
     RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getScriptExecutionContext());
@@ -4065,7 +4065,7 @@ static void overloadedMethod5Method(const v8::FunctionCallbackInfo<v8::Value>& a
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
     if (args.Length() <= 0 || !args[0]->IsFunction()) {
-        throwTypeError(0, args.GetIsolate());
+        throwTypeError(args.GetIsolate());
         return;
     }
     RefPtr<TestCallback> callback = V8TestCallback::create(args[0], getScriptExecutionContext());
@@ -4202,7 +4202,7 @@ static void overloadedMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
-    throwTypeError(0, args.GetIsolate());
+    throwTypeError(args.GetIsolate());
 }
 
 static void overloadedMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -4299,7 +4299,7 @@ static void overloadedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& a
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
-    throwTypeError(0, args.GetIsolate());
+    throwTypeError(args.GetIsolate());
 }
 
 #endif // ENABLE(Condition1)
@@ -4711,7 +4711,7 @@ static void variadicNodeMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& 
     Vector<RefPtr<Node> > tail;
     for (int i = 1; i < args.Length(); ++i) {
         if (!V8Node::HasInstance(args[i], args.GetIsolate(), worldType(args.GetIsolate()))) {
-            throwTypeError(0, args.GetIsolate());
+            throwTypeError(args.GetIsolate());
             return;
         }
         tail.append(V8Node::toNative(v8::Handle<v8::Object>::Cast(args[i])));
@@ -4826,7 +4826,7 @@ static void overloadedPerWorldMethodMethod(const v8::FunctionCallbackInfo<v8::Va
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
-    throwTypeError(0, args.GetIsolate());
+    throwTypeError(args.GetIsolate());
 }
 
 static void overloadedPerWorldMethodMethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -4843,7 +4843,7 @@ static void overloadedPerWorldMethodMethodForMainWorld(const v8::FunctionCallbac
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
-    throwTypeError(0, args.GetIsolate());
+    throwTypeError(args.GetIsolate());
 }
 
 static void overloadedPerWorldMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -5048,7 +5048,7 @@ static void overloadedActivityLoggedMethodMethod(const v8::FunctionCallbackInfo<
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
-    throwTypeError(0, args.GetIsolate());
+    throwTypeError(args.GetIsolate());
 }
 
 static void overloadedActivityLoggedMethodMethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -5065,7 +5065,7 @@ static void overloadedActivityLoggedMethodMethodForMainWorld(const v8::FunctionC
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
-    throwTypeError(0, args.GetIsolate());
+    throwTypeError(args.GetIsolate());
 }
 
 static void overloadedActivityLoggedMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -5130,7 +5130,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
         return;
     }
     if (args.Length() <= 0 || !args[0]->IsFunction()) {
-        throwTypeError(0, args.GetIsolate());
+        throwTypeError(args.GetIsolate());
         return;
     }
     RefPtr<TestCallback> testCallback = V8TestCallback::create(args[0], getScriptExecutionContext());
@@ -5470,7 +5470,7 @@ static const V8DOMConfiguration::BatchedMethod V8TestObjectMethods[] = {
 #endif // ENABLE(Condition1) && ENABLE(Condition2)
 #if ENABLE(Condition1) || ENABLE(Condition2)
     {"conditionalMethod3", TestObjV8Internal::conditionalMethod3MethodCallback, 0, 0},
-#endif // ENABLE(Condition1) && ENABLE(Condition2)
+#endif // ENABLE(Condition1) || ENABLE(Condition2)
     {"callbackFunctionReturnValue", TestObjV8Internal::callbackFunctionReturnValueMethodCallback, 0, 0},
     {"callbackFunctionArgument", TestObjV8Internal::callbackFunctionArgumentMethodCallback, 0, 1},
     {"overloadedMethod", TestObjV8Internal::overloadedMethodMethodCallback, 0, 2},
@@ -5717,6 +5717,13 @@ v8::Handle<v8::Object> V8TestObject::createWrapper(PassRefPtr<TestObj> impl, v8:
 {
     ASSERT(impl.get());
     ASSERT(DOMDataStore::getWrapper<V8TestObject>(impl.get(), isolate).IsEmpty());
+    if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
+        const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());
+        // Might be a XXXConstructor::info instead of an XXX::info. These will both have
+        // the same object de-ref functions, though, so use that as the basis of the check.
+        RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == info.derefObjectFunction);
+    }
+
 
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))

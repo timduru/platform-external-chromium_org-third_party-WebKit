@@ -40,30 +40,25 @@
 namespace WebCore {
 
 class CachedResource;
-class CachedResourceLoader;
 class DocumentLoader;
 class Frame;
 class FrameLoader;
 class KURL;
 class ResourceBuffer;
 class ResourceHandle;
+class ResourceLoaderHost;
 
 class ResourceLoader : public RefCounted<ResourceLoader>, protected ResourceHandleClient {
 public:
-    static PassRefPtr<ResourceLoader> create(DocumentLoader*, CachedResource*, const ResourceRequest&, const ResourceLoaderOptions&);
+    static PassRefPtr<ResourceLoader> create(ResourceLoaderHost*, CachedResource*, const ResourceRequest&, const ResourceLoaderOptions&);
     virtual ~ResourceLoader();
 
     void cancel();
     void cancel(const ResourceError&);
     void cancelIfNotFinishing();
 
-    FrameLoader* frameLoader() const;
-    DocumentLoader* documentLoader() const { return m_documentLoader.get(); }
     CachedResource* cachedResource() { return m_resource; }
     const ResourceRequest& originalRequest() const { return m_originalRequest; }
-
-    ResourceError cancelledError();
-    ResourceError cannotShowURLError();
     
     void setDefersLoading(bool);
     bool defersLoading() const { return m_defersLoading; }
@@ -86,13 +81,13 @@ public:
     ResourceHandle* handle() const { return m_handle.get(); }
     bool shouldSendResourceLoadCallbacks() const { return m_options.sendLoadCallbacks == SendCallbacks; }
     bool shouldSniffContent() const { return m_options.sniffContent == SniffContent; }
+    bool isLoadedBy(ResourceLoaderHost*) const;
 
     bool reachedTerminalState() const { return m_state == Terminated; }
-
     const ResourceRequest& request() const { return m_request; }
 
 private:
-    ResourceLoader(DocumentLoader*, CachedResource*, ResourceLoaderOptions);
+    ResourceLoader(ResourceLoaderHost*, CachedResource*, const ResourceLoaderOptions&);
 
     bool init(const ResourceRequest&);
     void start();
@@ -100,8 +95,7 @@ private:
     void didFinishLoadingOnePart(double finishTime);
 
     RefPtr<ResourceHandle> m_handle;
-    RefPtr<Frame> m_frame;
-    RefPtr<DocumentLoader> m_documentLoader;
+    RefPtr<ResourceLoaderHost> m_host;
 
     ResourceRequest m_request;
     ResourceRequest m_originalRequest; // Before redirects.
@@ -122,10 +116,10 @@ private:
 
     class RequestCountTracker {
     public:
-        RequestCountTracker(CachedResourceLoader*, CachedResource*);
+        RequestCountTracker(ResourceLoaderHost*, CachedResource*);
         ~RequestCountTracker();
     private:
-        CachedResourceLoader* m_cachedResourceLoader;
+        ResourceLoaderHost* m_host;
         CachedResource* m_resource;
     };
 

@@ -92,17 +92,15 @@ public:
 
     void prepareForHistoryNavigation();
 
-    // FIXME: These are all functions which start loads. We have too many.
-    void loadURLIntoChildFrame(const ResourceRequest&, Frame*);
-    void load(const FrameLoadRequest&);
+    // These functions start a load. All eventually call into loadWithNavigationAction() or loadInSameDocument().
+    void load(const FrameLoadRequest&); // The entry point for non-reload, non-history loads.
+    void reload(ReloadPolicy = NormalReload, const KURL& overrideURL = KURL(), const String& overrideEncoding = String());
+    void loadHistoryItem(HistoryItem*); // The entry point for all back/forward loads
+    void submitForm(PassRefPtr<FormSubmission>); // Schedules a form submission, which will eventually call load() in the target frame.
 
+    // FIXME: This doesn't really belong here, since we don't load Frames synchronously.
     unsigned long loadResourceSynchronously(const ResourceRequest&, StoredCredentials, ResourceError&, ResourceResponse&, Vector<char>& data);
 
-    void submitForm(PassRefPtr<FormSubmission>);
-
-    void reload(bool endToEndReload = false, const KURL& overrideURL = KURL(), const String& overrideEncoding = String());
-
-    void loadItem(HistoryItem*);
     HistoryItem* requestedHistoryItem() const { return m_requestedHistoryItem.get(); }
 
     static void reportLocalLoadFailed(Frame*, const String& url);
@@ -142,8 +140,6 @@ public:
     bool willLoadMediaElementURL(KURL&);
 
     void handleFallbackContent();
-
-    ResourceError cancelledError(const ResourceRequest&) const;
 
     bool isHostedByObjectElement() const;
     bool isLoadingMainFrame() const;
@@ -231,8 +227,6 @@ public:
     void completed();
     bool allAncestorsAreComplete() const; // including this
 
-    void setOriginalURLForDownloadRequest(ResourceRequest&);
-
     bool suppressOpenerInNewFrame() const { return m_suppressOpenerInNewFrame; }
 
     bool shouldClose();
@@ -255,9 +249,10 @@ private:
     void loadSameDocumentItem(HistoryItem*);
     void loadDifferentDocumentItem(HistoryItem*);
     void insertDummyHistoryItem();
-    
-    void updateFirstPartyForCookies();
-    void setFirstPartyForCookies(const KURL&);
+
+    bool prepareRequestForThisFrame(FrameLoadRequest&);
+    void setReferrerForFrameRequest(ResourceRequest&, ShouldSendReferrer);
+    FrameLoadType determineFrameLoadType(const FrameLoadRequest&);
 
     void clearProvisionalLoad();
     void transitionToCommitted();
@@ -290,8 +285,6 @@ private:
     void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,
         FrameLoadType, PassRefPtr<FormState>, const SubstituteData&, const String& overrideEncoding = String());
 
-    // Called by load, calls loadWithNavigationAction or checkNewWindowPolicyAndContinue
-    void loadURL(const ResourceRequest&, const String& frameName, FrameLoadType, PassRefPtr<Event>, PassRefPtr<FormState>, const SubstituteData&);
 
     bool shouldReload(const KURL& currentURL, const KURL& destinationURL);
 

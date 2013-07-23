@@ -205,14 +205,7 @@ static int frameCount = 0;
 // Key for a StatsCounter tracking how many WebFrames are active.
 static const char* const webFrameActiveCount = "WebFrameActiveCount";
 
-// Backend for contentAsPlainText, this is a recursive function that gets
-// the text for the current frame and all of its subframes. It will append
-// the text of each frame in turn to the |output| up to |maxChars| length.
-//
-// The |frame| must be non-null.
-//
-// FIXME: We should use StringBuilder rather than Vector<UChar>.
-static void frameContentAsPlainText(size_t maxChars, Frame* frame, Vector<UChar>* output)
+static void frameContentAsPlainText(size_t maxChars, Frame* frame, StringBuilder& output)
 {
     Document* document = frame->document();
     if (!document)
@@ -237,38 +230,15 @@ static void frameContentAsPlainText(size_t maxChars, Frame* frame, Vector<UChar>
         // size and also copy the results directly into a wstring, avoiding the
         // string conversion.
         for (TextIterator it(range.get()); !it.atEnd(); it.advance()) {
-            const UChar* chars = it.characters();
-            if (!chars) {
-                if (it.length()) {
-                    // It appears from crash reports that an iterator can get into a state
-                    // where the character count is nonempty but the character pointer is
-                    // null. advance()ing it will then just add that many to the null
-                    // pointer which won't be caught in a null check but will crash.
-                    //
-                    // A null pointer and 0 length is common for some nodes.
-                    //
-                    // IF YOU CATCH THIS IN A DEBUGGER please let brettw know. We don't
-                    // currently understand the conditions for this to occur. Ideally, the
-                    // iterators would never get into the condition so we should fix them
-                    // if we can.
-                    ASSERT_NOT_REACHED();
-                    break;
-                }
-
-                // Just got a null node, we can forge ahead!
-                continue;
-            }
-            size_t toAppend =
-                std::min(static_cast<size_t>(it.length()), maxChars - output->size());
-            output->append(chars, toAppend);
-            if (output->size() >= maxChars)
+            it.appendTextToStringBuilder(output, 0, maxChars - output.length());
+            if (output.length() >= maxChars)
                 return; // Filled up the buffer.
         }
     }
 
     // The separator between frames when the frames are converted to plain text.
-    const UChar frameSeparator[] = { '\n', '\n' };
-    const size_t frameSeparatorLen = 2;
+    const LChar frameSeparator[] = { '\n', '\n' };
+    const size_t frameSeparatorLength = WTF_ARRAY_LENGTH(frameSeparator);
 
     // Recursively walk the children.
     FrameTree* frameTree = frame->tree();
@@ -287,12 +257,12 @@ static void frameContentAsPlainText(size_t maxChars, Frame* frame, Vector<UChar>
         // maxChars. This will cause the computation above:
         //   maxChars - output->size()
         // to be a negative number which will crash when the subframe is added.
-        if (output->size() >= maxChars - frameSeparatorLen)
+        if (output.length() >= maxChars - frameSeparatorLength)
             return;
 
-        output->append(frameSeparator, frameSeparatorLen);
+        output.append(frameSeparator, frameSeparatorLength);
         frameContentAsPlainText(maxChars, curChild, output);
-        if (output->size() >= maxChars)
+        if (output.length() >= maxChars)
             return; // Filled up the buffer.
     }
 }
@@ -761,7 +731,7 @@ WebPerformance WebFrameImpl::performance() const
 {
     if (!frame())
         return WebPerformance();
-    return WebPerformance(frame()->document()->domWindow()->performance());
+    return WebPerformance(frame()->domWindow()->performance());
 }
 
 NPObject* WebFrameImpl::windowObject() const
@@ -936,13 +906,13 @@ v8::Handle<v8::Value> WebFrameImpl::createFileEntry(WebFileSystemType type, cons
 void WebFrameImpl::reload(bool ignoreCache)
 {
     ASSERT(frame());
-    frame()->loader()->reload(ignoreCache);
+    frame()->loader()->reload(ignoreCache ? EndToEndReload : NormalReload);
 }
 
 void WebFrameImpl::reloadWithOverrideURL(const WebURL& overrideUrl, bool ignoreCache)
 {
     ASSERT(frame());
-    frame()->loader()->reload(ignoreCache, overrideUrl);
+    frame()->loader()->reload(ignoreCache ? EndToEndReload : NormalReload, overrideUrl);
 }
 
 void WebFrameImpl::loadRequest(const WebURLRequest& request)
@@ -1104,7 +1074,7 @@ WebURLLoader* WebFrameImpl::createAssociatedURLLoader(const WebURLLoaderOptions&
 
 unsigned WebFrameImpl::unloadListenerCount() const
 {
-    return frame()->document()->domWindow()->pendingUnloadEventListeners();
+    return frame()->domWindow()->pendingUnloadEventListeners();
 }
 
 bool WebFrameImpl::willSuppressOpenerInNewFrame() const
@@ -1859,7 +1829,7 @@ void WebFrameImpl::sendOrientationChangeEvent(int orientation)
 void WebFrameImpl::dispatchMessageEventWithOriginCheck(const WebSecurityOrigin& intendedTargetOrigin, const WebDOMEvent& event)
 {
     ASSERT(!event.isNull());
-    frame()->document()->domWindow()->dispatchMessageEventWithOriginCheck(intendedTargetOrigin.get(), event, 0);
+    frame()->domWindow()->dispatchMessageEventWithOriginCheck(intendedTargetOrigin.get(), event, 0);
 }
 
 int WebFrameImpl::findMatchMarkersVersion() const
@@ -2051,9 +2021,9 @@ WebString WebFrameImpl::contentAsText(size_t maxChars) const
 {
     if (!frame())
         return WebString();
-    Vector<UChar> text;
-    frameContentAsPlainText(maxChars, frame(), &text);
-    return String::adopt(text);
+    StringBuilder text;
+    frameContentAsPlainText(maxChars, frame(), text);
+    return text.toString();
 }
 
 WebString WebFrameImpl::contentAsMarkup() const
@@ -2199,7 +2169,17 @@ PassRefPtr<Frame> WebFrameImpl::createChildFrame(const FrameLoadRequest& request
     if (!childFrame->tree()->parent())
         return 0;
 
-    frame()->loader()->loadURLIntoChildFrame(request.resourceRequest(), childFrame.get());
+    HistoryItem* parentItem = frame()->loader()->history()->currentItem();
+    HistoryItem* childItem = 0;
+    // If we're moving in the back/forward list, we might want to replace the content
+    // of this child frame with whatever was there at that point.
+    if (parentItem && parentItem->children().size() && isBackForwardLoadType(frame()->loader()->loadType()) && !frame()->document()->loadEventFinished())
+        childItem = parentItem->childItemWithTarget(childFrame->tree()->uniqueName());
+
+    if (childItem)
+        childFrame->loader()->loadHistoryItem(childItem);
+    else
+        childFrame->loader()->load(FrameLoadRequest(0, request.resourceRequest(), "_self"));
 
     // A synchronous navigation (about:blank) would have already processed
     // onload, so it is possible for the frame to have already been destroyed by

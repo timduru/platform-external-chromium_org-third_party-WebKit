@@ -37,6 +37,8 @@
 #include "core/inspector/ScriptCallStack.h"
 #include "core/page/DOMWindow.h"
 #include "core/workers/SharedWorkerThread.h"
+#include "core/workers/WorkerClients.h"
+#include "core/workers/WorkerThreadStartupData.h"
 #include "wtf/CurrentTime.h"
 
 namespace WebCore {
@@ -49,15 +51,15 @@ PassRefPtr<MessageEvent> createConnectEvent(PassRefPtr<MessagePort> port)
 }
 
 // static
-PassRefPtr<SharedWorkerGlobalScope> SharedWorkerGlobalScope::create(const String& name, const KURL& url, const String& userAgent, SharedWorkerThread* thread, const String& contentSecurityPolicy, ContentSecurityPolicy::HeaderType contentSecurityPolicyType)
+PassRefPtr<SharedWorkerGlobalScope> SharedWorkerGlobalScope::create(const String& name, SharedWorkerThread* thread, PassOwnPtr<WorkerThreadStartupData> startupData)
 {
-    RefPtr<SharedWorkerGlobalScope> context = adoptRef(new SharedWorkerGlobalScope(name, url, userAgent, thread));
-    context->applyContentSecurityPolicyFromString(contentSecurityPolicy, contentSecurityPolicyType);
+    RefPtr<SharedWorkerGlobalScope> context = adoptRef(new SharedWorkerGlobalScope(name, startupData->m_scriptURL, startupData->m_userAgent, thread, startupData->m_workerClients.release()));
+    context->applyContentSecurityPolicyFromString(startupData->m_contentSecurityPolicy, startupData->m_contentSecurityPolicyType);
     return context.release();
 }
 
-SharedWorkerGlobalScope::SharedWorkerGlobalScope(const String& name, const KURL& url, const String& userAgent, SharedWorkerThread* thread)
-    : WorkerGlobalScope(url, userAgent, thread, 0, monotonicallyIncreasingTime())
+SharedWorkerGlobalScope::SharedWorkerGlobalScope(const String& name, const KURL& url, const String& userAgent, SharedWorkerThread* thread, PassOwnPtr<WorkerClients> workerClients)
+    : WorkerGlobalScope(url, userAgent, thread, 0, monotonicallyIncreasingTime(), workerClients)
     , m_name(name)
 {
     ScriptWrappable::init(this);
@@ -77,9 +79,9 @@ SharedWorkerThread* SharedWorkerGlobalScope::thread()
     return static_cast<SharedWorkerThread*>(Base::thread());
 }
 
-void SharedWorkerGlobalScope::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack> callStack)
+void SharedWorkerGlobalScope::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack> callStack)
 {
-    WorkerGlobalScope::logExceptionToConsole(errorMessage, sourceURL, lineNumber, callStack);
+    WorkerGlobalScope::logExceptionToConsole(errorMessage, sourceURL, lineNumber, columnNumber, callStack);
     addMessageToWorkerConsole(JSMessageSource, ErrorMessageLevel, errorMessage, sourceURL, lineNumber, callStack);
 }
 

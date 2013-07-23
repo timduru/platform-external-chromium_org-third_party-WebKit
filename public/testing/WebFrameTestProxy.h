@@ -113,18 +113,6 @@ public:
         m_baseProxy->didChangeLocationWithinPage(frame);
         Base::didChangeLocationWithinPage(frame);
     }
-    virtual void didDisplayInsecureContent(WebKit::WebFrame* frame)
-    {
-        if (m_version > 1)
-            m_baseProxy->didDisplayInsecureContent(frame);
-        Base::didDisplayInsecureContent(frame);
-    }
-    virtual void didRunInsecureContent(WebKit::WebFrame* frame, const WebKit::WebSecurityOrigin& origin, const WebKit::WebURL& insecureURL)
-    {
-        if (m_version > 1)
-            m_baseProxy->didRunInsecureContent(frame, origin, insecureURL);
-        Base::didRunInsecureContent(frame, origin, insecureURL);
-    }
     virtual void didDetectXSS(WebKit::WebFrame* frame, const WebKit::WebURL& insecureURL, bool didBlockEntirePage)
     {
         // This is not implemented in RenderFrameImpl, so need to explicitly call
@@ -138,12 +126,6 @@ public:
         // into the base proxy.
         m_baseProxy->willRequestResource(frame, request);
         Base::willRequestResource(frame, request);
-    }
-    virtual WebKit::WebURLError cannotHandleRequestError(WebKit::WebFrame* frame, const WebKit::WebURLRequest& request)
-    {
-        // RenderFrameImpl handles all requests, so this method is not expected
-        // to be called. As such, just call the proxy object without calling Base.
-        return m_baseProxy->cannotHandleRequestError(frame, request);
     }
     virtual void didCreateDataSource(WebKit::WebFrame* frame, WebKit::WebDataSource* ds)
     {
@@ -171,18 +153,6 @@ public:
     virtual void didFinishResourceLoad(WebKit::WebFrame* frame, unsigned identifier)
     {
         Base::didFinishResourceLoad(frame, identifier);
-    }
-    virtual void didFailResourceLoad(WebKit::WebFrame* frame, unsigned identifier, const WebKit::WebURLError& error)
-    {
-        if (m_version > 1)
-            m_baseProxy->didFailResourceLoad(frame, identifier, error);
-        Base::didFailResourceLoad(frame, identifier, error);
-    }
-    virtual void unableToImplementPolicyWithError(WebKit::WebFrame* frame, const WebKit::WebURLError& error)
-    {
-        if (m_version > 1)
-            m_baseProxy->unableToImplementPolicyWithError(frame, error);
-        Base::unableToImplementPolicyWithError(frame, error);
     }
     virtual WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame* frame, const WebKit::WebURLRequest& request, WebKit::WebNavigationType type, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect)
     {

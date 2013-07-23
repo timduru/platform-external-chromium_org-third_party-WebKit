@@ -16,6 +16,7 @@
 ../core/css/CSSValue.idl
 ../core/css/CSSValueList.idl
 ../core/css/CSSViewportRule.idl
+../core/css/CSSVariablesMap.idl
 ../core/css/Counter.idl
 ../core/css/FontLoader.idl
 ../core/css/MediaList.idl
@@ -51,7 +52,6 @@
 ../core/dom/DOMStringMap.idl
 ../core/dom/DataTransferItem.idl
 ../core/dom/DataTransferItemList.idl
-../core/dom/DeviceOrientationEvent.idl
 ../core/dom/Document.idl
 ../core/dom/DocumentFragment.idl
 ../core/dom/DocumentType.idl
@@ -285,6 +285,8 @@
 ../core/page/SpeechInputResultList.idl
 ../core/page/WebKitPoint.idl
 ../core/page/Window.idl
+../core/page/WindowBase64.idl
+../core/page/WindowTimers.idl
 ../core/page/WorkerNavigator.idl
 ../core/plugins/MimeType.idl
 ../core/plugins/MimeTypeArray.idl
@@ -319,6 +321,7 @@
 ../modules/crypto/WorkerCrypto.idl
 ../modules/device_orientation/DeviceAcceleration.idl
 ../modules/device_orientation/DeviceMotionEvent.idl
+../modules/device_orientation/DeviceOrientationEvent.idl
 ../modules/device_orientation/DeviceRotationRate.idl
 ../modules/encryptedmedia/MediaKeyMessageEvent.idl
 ../modules/encryptedmedia/MediaKeyNeededEvent.idl
@@ -616,7 +619,6 @@
 ../core/dom/DocumentFullscreen.idl
 ../core/dom/ParentNode.idl
 ../core/page/WindowPagePopup.idl
-../core/page/WindowTimers.idl
 ../core/workers/AbstractWorker.idl
 ../modules/crypto/WindowCrypto.idl
 ../modules/crypto/WorkerGlobalScopeCrypto.idl

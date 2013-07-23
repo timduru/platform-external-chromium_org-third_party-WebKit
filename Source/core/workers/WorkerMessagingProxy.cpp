@@ -32,7 +32,6 @@
 #include "core/dom/CrossThreadTask.h"
 #include "core/dom/Document.h"
 #include "core/dom/ErrorEvent.h"
-#include "core/dom/ExceptionCode.h"
 #include "core/dom/MessageEvent.h"
 #include "core/dom/ScriptExecutionContext.h"
 #include "core/inspector/InspectorInstrumentation.h"
@@ -48,6 +47,8 @@
 #include "core/workers/DedicatedWorkerGlobalScope.h"
 #include "core/workers/DedicatedWorkerThread.h"
 #include "core/workers/Worker.h"
+#include "core/workers/WorkerClients.h"
+#include "core/workers/WorkerThreadStartupData.h"
 #include <wtf/MainThread.h>
 
 namespace WebCore {
@@ -113,15 +114,16 @@ private:
 
 class WorkerExceptionTask : public ScriptExecutionContext::Task {
 public:
-    static PassOwnPtr<WorkerExceptionTask> create(const String& errorMessage, int lineNumber, const String& sourceURL, WorkerMessagingProxy* messagingProxy)
+    static PassOwnPtr<WorkerExceptionTask> create(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, WorkerMessagingProxy* messagingProxy)
     {
-        return adoptPtr(new WorkerExceptionTask(errorMessage, lineNumber, sourceURL, messagingProxy));
+        return adoptPtr(new WorkerExceptionTask(errorMessage, lineNumber, columnNumber, sourceURL, messagingProxy));
     }
 
 private:
-    WorkerExceptionTask(const String& errorMessage, int lineNumber, const String& sourceURL, WorkerMessagingProxy* messagingProxy)
+    WorkerExceptionTask(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL, WorkerMessagingProxy* messagingProxy)
         : m_errorMessage(errorMessage.isolatedCopy())
         , m_lineNumber(lineNumber)
+        , m_columnNumber(columnNumber)
         , m_sourceURL(sourceURL.isolatedCopy())
         , m_messagingProxy(messagingProxy)
     {
@@ -136,13 +138,14 @@ private:
         // We don't bother checking the askedToTerminate() flag here, because exceptions should *always* be reported even if the thread is terminated.
         // This is intentionally different than the behavior in MessageWorkerTask, because terminated workers no longer deliver messages (section 4.6 of the WebWorker spec), but they do report exceptions.
 
-        bool errorHandled = !workerObject->dispatchEvent(ErrorEvent::create(m_errorMessage, m_sourceURL, m_lineNumber));
+        bool errorHandled = !workerObject->dispatchEvent(ErrorEvent::create(m_errorMessage, m_sourceURL, m_lineNumber, m_columnNumber));
         if (!errorHandled)
-            context->reportException(m_errorMessage, m_lineNumber, m_sourceURL, 0);
+            context->reportException(m_errorMessage, m_lineNumber, m_columnNumber, m_sourceURL, 0);
     }
 
     String m_errorMessage;
     int m_lineNumber;
+    int m_columnNumber;
     String m_sourceURL;
     WorkerMessagingProxy* m_messagingProxy;
 };
@@ -238,7 +241,7 @@ private:
     String m_message;
 };
 
-WorkerMessagingProxy::WorkerMessagingProxy(Worker* workerObject)
+WorkerMessagingProxy::WorkerMessagingProxy(Worker* workerObject, PassOwnPtr<WorkerClients> workerClients)
     : m_scriptExecutionContext(workerObject->scriptExecutionContext())
     , m_workerObject(workerObject)
     , m_mayBeDestroyed(false)
@@ -246,6 +249,7 @@ WorkerMessagingProxy::WorkerMessagingProxy(Worker* workerObject)
     , m_workerThreadHadPendingActivity(false)
     , m_askedToTerminate(false)
     , m_pageInspector(0)
+    , m_workerClients(workerClients)
 {
     ASSERT(m_workerObject);
     ASSERT((m_scriptExecutionContext->isDocument() && isMainThread())
@@ -264,7 +268,11 @@ void WorkerMessagingProxy::startWorkerGlobalScope(const KURL& scriptURL, const S
     // FIXME: This need to be revisited when we support nested worker one day
     ASSERT(m_scriptExecutionContext->isDocument());
     Document* document = toDocument(m_scriptExecutionContext.get());
-    RefPtr<DedicatedWorkerThread> thread = DedicatedWorkerThread::create(scriptURL, userAgent, sourceCode, *this, *this, startMode, document->contentSecurityPolicy()->deprecatedHeader(), document->contentSecurityPolicy()->deprecatedHeaderType(), document->topOrigin(), document->loader() ? document->loader()->timing()->referenceMonotonicTime() : monotonicallyIncreasingTime());
+
+    OwnPtr<WorkerThreadStartupData> startupData = WorkerThreadStartupData::create(scriptURL, userAgent, sourceCode, startMode, document->contentSecurityPolicy()->deprecatedHeader(), document->contentSecurityPolicy()->deprecatedHeaderType(), document->topOrigin(), m_workerClients.release());
+    double originTime = document->loader() ? document->loader()->timing()->referenceMonotonicTime() : monotonicallyIncreasingTime();
+
+    RefPtr<DedicatedWorkerThread> thread = DedicatedWorkerThread::create(*this, *this, originTime, startupData.release());
     workerThreadCreated(thread);
     thread->start();
     InspectorInstrumentation::didStartWorkerGlobalScope(m_scriptExecutionContext.get(), this, scriptURL);
@@ -304,9 +312,9 @@ void WorkerMessagingProxy::postTaskToLoader(PassOwnPtr<ScriptExecutionContext::T
     m_scriptExecutionContext->postTask(task);
 }
 
-void WorkerMessagingProxy::postExceptionToWorkerObject(const String& errorMessage, int lineNumber, const String& sourceURL)
+void WorkerMessagingProxy::postExceptionToWorkerObject(const String& errorMessage, int lineNumber, int columnNumber, const String& sourceURL)
 {
-    m_scriptExecutionContext->postTask(WorkerExceptionTask::create(errorMessage, lineNumber, sourceURL, this));
+    m_scriptExecutionContext->postTask(WorkerExceptionTask::create(errorMessage, lineNumber, columnNumber, sourceURL, this));
 }
 
 static void postConsoleMessageTask(ScriptExecutionContext* context, WorkerMessagingProxy* messagingProxy, MessageSource source, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceURL)

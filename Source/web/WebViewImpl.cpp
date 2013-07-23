@@ -521,7 +521,7 @@ void WebViewImpl::handleMouseDown(Frame& mainFrame, const WebMouseEvent& event)
         // Take capture on a mouse down on a plugin so we can send it mouse events.
         if (hitNode && hitNode->renderer() && hitNode->renderer()->isEmbeddedObject()) {
             m_mouseCaptureNode = hitNode;
-            TRACE_EVENT_ASYNC_BEGIN0("webkit", "capturing mouse", this);
+            TRACE_EVENT_ASYNC_BEGIN0("input", "capturing mouse", this);
         }
     }
 
@@ -1936,7 +1936,7 @@ const WebInputEvent* WebViewImpl::m_currentInputEvent = 0;
 
 bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
 {
-    TRACE_EVENT0("webkit", "WebViewImpl::handleInputEvent");
+    TRACE_EVENT0("input", "WebViewImpl::handleInputEvent");
     // If we've started a drag and drop operation, ignore input events until
     // we're done.
     if (m_doingDragAndDrop)
@@ -1957,7 +1957,7 @@ bool WebViewImpl::handleInputEvent(const WebInputEvent& inputEvent)
     }
 
     if (m_mouseCaptureNode && WebInputEvent::isMouseEventType(inputEvent.type)) {
-        TRACE_EVENT1("webkit", "captured mouse event", "type", inputEvent.type);
+        TRACE_EVENT1("input", "captured mouse event", "type", inputEvent.type);
         // Save m_mouseCaptureNode since mouseCaptureLost() will clear it.
         RefPtr<Node> node = m_mouseCaptureNode;
 
@@ -2000,7 +2000,7 @@ void WebViewImpl::setCursorVisibilityState(bool isVisible)
 
 void WebViewImpl::mouseCaptureLost()
 {
-    TRACE_EVENT_ASYNC_END0("webkit", "capturing mouse", this);
+    TRACE_EVENT_ASYNC_END0("input", "capturing mouse", this);
     m_mouseCaptureNode = 0;
 }
 
@@ -2011,7 +2011,7 @@ void WebViewImpl::setFocus(bool enable)
         m_page->focusController()->setActive(true);
         RefPtr<Frame> focusedFrame = m_page->focusController()->focusedFrame();
         if (focusedFrame) {
-            Element* element = toElement(focusedFrame->document()->focusedNode());
+            Element* element = focusedFrame->document()->focusedElement();
             if (element && focusedFrame->selection()->selection().isNone()) {
                 // If the selection was cleared while the WebView was not
                 // focused, then the focus element shows with a focus ring but
@@ -2591,7 +2591,7 @@ void WebViewImpl::setPageEncoding(const WebString& encodingName)
     String newEncodingName;
     if (!encodingName.isEmpty())
         newEncodingName = encodingName;
-    m_page->mainFrame()->loader()->reload(false, KURL(), newEncodingName);
+    m_page->mainFrame()->loader()->reload(NormalReload, KURL(), newEncodingName);
 }
 
 bool WebViewImpl::dispatchBeforeUnloadEvent()
@@ -2680,7 +2680,7 @@ void WebViewImpl::clearFocusedNode()
     if (!document)
         return;
 
-    RefPtr<Element> oldFocusedElement = toElement(document->focusedNode());
+    RefPtr<Element> oldFocusedElement = document->focusedElement();
 
     // Clear the focused node.
     document->setFocusedElement(0);
@@ -3797,7 +3797,7 @@ Element* WebViewImpl::focusedElement()
     if (!document)
         return 0;
 
-    return toElement(document->focusedNode());
+    return document->focusedElement();
 }
 
 HitTestResult WebViewImpl::hitTestResultForWindowPos(const IntPoint& pos)
@@ -3947,6 +3947,8 @@ void WebViewImpl::setIsAcceleratedCompositingActive(bool active)
     } else if (m_layerTreeView) {
         m_isAcceleratedCompositingActive = true;
         updateLayerTreeViewport();
+        if (m_pageOverlays)
+            m_pageOverlays->update();
 
         m_client->didActivateCompositor(0);
     } else {

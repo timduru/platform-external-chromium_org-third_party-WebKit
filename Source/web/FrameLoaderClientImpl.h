@@ -78,7 +78,6 @@ public:
     virtual void dispatchDidReceiveResponse(WebCore::DocumentLoader*, unsigned long identifier, const WebCore::ResourceResponse&);
     virtual void dispatchDidChangeResourcePriority(unsigned long identifier, WebCore::ResourceLoadPriority);
     virtual void dispatchDidFinishLoading(WebCore::DocumentLoader*, unsigned long identifier);
-    virtual void dispatchDidFailLoading(WebCore::DocumentLoader*, unsigned long identifier, const WebCore::ResourceError&);
     virtual void dispatchDidLoadResourceFromMemoryCache(WebCore::DocumentLoader*, const WebCore::ResourceRequest&, const WebCore::ResourceResponse&, int length);
     virtual void dispatchDidHandleOnloadEvents();
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad();
@@ -96,7 +95,6 @@ public:
     virtual void dispatchDidFinishLoad();
     virtual void dispatchDidLayout(WebCore::LayoutMilestones);
     virtual WebCore::NavigationPolicy decidePolicyForNavigation(const WebCore::ResourceRequest&, WebCore::NavigationType, WebCore::NavigationPolicy, bool isRedirect);
-    virtual void dispatchUnableToImplementPolicy(const WebCore::ResourceError&);
     virtual void dispatchWillRequestResource(WebCore::CachedResourceRequest*);
     virtual void dispatchWillSendSubmitEvent(PassRefPtr<WebCore::FormState>);
     virtual void dispatchWillSubmitForm(PassRefPtr<WebCore::FormState>);
@@ -112,16 +110,7 @@ public:
     virtual void didDisplayInsecureContent();
     virtual void didRunInsecureContent(WebCore::SecurityOrigin*, const WebCore::KURL& insecureURL);
     virtual void didDetectXSS(const WebCore::KURL&, bool didBlockEntirePage);
-    virtual WebCore::ResourceError cancelledError(const WebCore::ResourceRequest&);
-    virtual WebCore::ResourceError cannotShowURLError(const WebCore::ResourceRequest&);
     virtual WebCore::ResourceError interruptedForPolicyChangeError(const WebCore::ResourceRequest&);
-    virtual WebCore::ResourceError cannotShowMIMETypeError(const WebCore::ResourceResponse&);
-    virtual WebCore::ResourceError fileDoesNotExistError(const WebCore::ResourceResponse&);
-    virtual WebCore::ResourceError pluginWillHandleLoadError(const WebCore::ResourceResponse&);
-    virtual bool shouldFallBack(const WebCore::ResourceError&);
-    virtual bool canShowMIMEType(const WTF::String& MIMEType) const;
-    virtual WTF::String generatedMIMETypeForURLScheme(const WTF::String& URLScheme) const;
-    virtual void didFinishLoad();
     virtual PassRefPtr<WebCore::DocumentLoader> createDocumentLoader(
         const WebCore::ResourceRequest&, const WebCore::SubstituteData&);
     virtual WTF::String userAgent(const WebCore::KURL&);

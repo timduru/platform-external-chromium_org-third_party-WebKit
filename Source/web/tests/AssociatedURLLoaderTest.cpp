@@ -30,9 +30,9 @@
 
 #include "config.h"
 
+#include "URLTestHelpers.h"
 #include "WebFrame.h"
 #include "WebFrameClient.h"
-#include "WebKit/chromium/tests/URLTestHelpers.h"
 #include "WebURLLoaderOptions.h"
 #include "WebView.h"
 #include "public/platform/Platform.h"
@@ -54,15 +54,6 @@ using WebKit::URLTestHelpers::toKURL;
 namespace {
 
 class TestWebFrameClient : public WebFrameClient {
-    // Return a non-null cancellation error so the WebFrame loaders can shut down without asserting.
-    // Make 'reason' non-zero so WebURLError isn't considered null.
-    WebURLError cancelledError(WebFrame*, const WebURLRequest& request)
-    {
-        WebURLError error;
-        error.reason = 1;
-        error.unreachableURL = request.url();
-        return error;
-    }
 };
 
 class AssociatedURLLoaderTest : public testing::Test,
@@ -80,7 +71,7 @@ public:
     {
         // Reuse one of the test files from WebFrameTest.
         m_baseFilePath = Platform::current()->unitTestSupport()->webKitRootDir();
-        m_baseFilePath.append("/Source/WebKit/chromium/tests/data/");
+        m_baseFilePath.append("/Source/web/tests/data/");
         m_frameFilePath = m_baseFilePath;
         m_frameFilePath.append("iframes_test.html");
     }

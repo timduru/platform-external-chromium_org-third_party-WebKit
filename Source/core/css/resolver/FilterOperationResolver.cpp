@@ -29,7 +29,6 @@
 #include "config.h"
 #include "core/css/resolver/FilterOperationResolver.h"
 
-
 #include "core/css/CSSFilterValue.h"
 #include "core/css/CSSMixFunctionValue.h"
 #include "core/css/CSSParser.h"
@@ -53,7 +52,7 @@ namespace WebCore {
 
 static Length convertToFloatLength(CSSPrimitiveValue* primitiveValue, RenderStyle* style, RenderStyle* rootStyle, double multiplier)
 {
-    return primitiveValue ? primitiveValue->convertToLength<FixedFloatConversion | PercentConversion | CalculatedConversion | FractionConversion | ViewportPercentageConversion>(style, rootStyle, multiplier) : Length(Undefined);
+    return primitiveValue ? primitiveValue->convertToLength<FixedFloatConversion | PercentConversion | FractionConversion>(style, rootStyle, multiplier) : Length(Undefined);
 }
 
 

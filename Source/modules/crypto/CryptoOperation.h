@@ -43,13 +43,12 @@
 namespace WebCore {
 
 class ScriptPromiseResolver;
+class ExceptionState;
 
-typedef int ExceptionCode;
-
-class CryptoOperation : public ScriptWrappable, public RefCounted<CryptoOperation> {
+class CryptoOperation : public ScriptWrappable, public WebKit::WebCryptoOperationResult, public RefCounted<CryptoOperation> {
 public:
     ~CryptoOperation();
-    static PassRefPtr<CryptoOperation> create(const WebKit::WebCryptoAlgorithm&, WebKit::WebCryptoOperation*);
+    static PassRefPtr<CryptoOperation> create(const WebKit::WebCryptoAlgorithm&, ExceptionState*);
 
     CryptoOperation* process(ArrayBuffer* data);
     CryptoOperation* process(ArrayBufferView* data);
@@ -59,11 +58,17 @@ public:
 
     Algorithm* algorithm();
 
-private:
-    class Result;
-    friend class Result;
+    // Implementation of WebKit::WebCryptoOperationResult.
+    virtual void initializationFailed() OVERRIDE;
+    virtual void initializationSucceded(WebKit::WebCryptoOperation*) OVERRIDE;
+    virtual void completeWithError() OVERRIDE;
+    virtual void completeWithArrayBuffer(const WebKit::WebArrayBuffer&) OVERRIDE;
 
+private:
     enum State {
+        // Constructing the WebCryptoOperation.
+        Initializing,
+
         // Accepting calls to process().
         Processing,
 
@@ -77,7 +82,7 @@ private:
         Done,
     };
 
-    CryptoOperation(const WebKit::WebCryptoAlgorithm&, WebKit::WebCryptoOperation*);
+    CryptoOperation(const WebKit::WebCryptoAlgorithm&, ExceptionState*);
 
     void process(const unsigned char*, size_t);
 
@@ -94,7 +99,7 @@ private:
 
     RefPtr<ScriptPromiseResolver> m_promiseResolver;
 
-    OwnPtr<Result> m_result;
+    ExceptionState* m_exceptionState;
 };
 
 } // namespace WebCore

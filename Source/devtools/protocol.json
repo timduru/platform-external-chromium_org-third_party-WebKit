@@ -2390,7 +2390,7 @@
                     { "name": "selector", "type": "string", "description": "CSS selector of the corresponding rule." },
                     { "name": "url", "type": "string", "description": "URL of the resource containing the corresponding rule." },
                     { "name": "lineNumber", "type": "integer", "description": "Selector line number in the resource for the corresponding rule." },
-                    { "name": "time", "type": "number", "description": "Total time this rule handling contributed to the browser running time during profiling (in milliseconds.)" },
+                    { "name": "time", "type": "number", "description": "Total time this rule handling contributed to the browser running time during profiling (in milliseconds)." },
                     { "name": "hitCount", "type": "integer", "description": "Number of times this rule was considered a candidate for matching against DOM elements." },
                     { "name": "matchCount", "type": "integer", "description": "Number of times this rule actually matched a DOM element." }
                 ],
@@ -2400,7 +2400,7 @@
                 "id": "SelectorProfile",
                 "type": "object",
                 "properties": [
-                    { "name": "totalTime", "type": "number", "description": "Total processing time for all selectors in the profile (in milliseconds.)" },
+                    { "name": "totalTime", "type": "number", "description": "Total processing time for all selectors in the profile (in milliseconds)." },
                     { "name": "data", "type": "array", "items": { "$ref": "SelectorProfileEntry" }, "description": "CSS selector profile entries." }
                 ]
             },
@@ -3015,6 +3015,25 @@
                 ],
                 "hidden": true,
                 "description": "Changes value of variable in a callframe or a closure. Either callframe or function must be specified. Object-based scopes are not supported and must be mutated manually."
+            },
+            {
+                "name": "getStepInPositions",
+                "parameters": [
+                    { "name": "callFrameId", "$ref": "CallFrameId", "description": "Id of a call frame where the current statement should be analized" }
+                ],
+                "returns": [
+                    { "name": "stepInPositions", "type": "array", "items": { "$ref": "Location" }, "optional": true, "description": "experimental" }
+                ],
+                "hidden": true,
+                "description": "Lists all positions where step-in is possible for a current statement in a specified call frame"
+            },
+            {
+                "name": "getBacktrace",
+                "returns": [
+                    { "name": "callFrames", "type": "array", "items": { "$ref": "CallFrame"}, "description": "Call stack the virtual machine stopped on." }
+                ],
+                "hidden": true,
+                "description": "Returns call stack including variables changed since VM was paused. VM must be paused."
             }
         ],
         "events": [
@@ -3459,11 +3478,23 @@
                 "description": "Unique resource identifier."
             },
             {
+                "id": "ResourceStateDescriptor",
+                "type": "object",
+                "description": "Resource state descriptor.",
+                "properties": [
+                    { "name": "name", "type": "string", "description": "State name." },
+                    { "name": "value", "$ref": "CallArgument", "optional": true, "description": "The value associated with the particular state." },
+                    { "name": "values", "type": "array", "items": { "$ref": "ResourceStateDescriptor" }, "optional": true, "description": "Array of values associated with the particular state. Either <code>value</code> or <code>values</code> will be specified." }
+                ]
+            },
+            {
                 "id": "ResourceState",
                 "type": "object",
+                "description": "Resource state.",
                 "properties": [
                     { "name": "id", "$ref": "ResourceId" },
                     { "name": "traceLogId", "$ref": "TraceLogId" },
+                    { "name": "descriptors", "type": "array", "items": { "$ref": "ResourceStateDescriptor" }, "optional": true, "description": "Describes current <code>Resource</code> state." },
                     { "name": "imageURL", "type": "string", "optional": true, "description": "Screenshot image data URL." }
                 ]
             },
@@ -3575,10 +3606,11 @@
                 "name": "replayTraceLog",
                 "parameters": [
                     { "name": "traceLogId", "$ref": "TraceLogId" },
-                    { "name": "stepNo", "type": "integer" }
+                    { "name": "stepNo", "type": "integer", "description": "Last call index in the trace log to replay (zero based)." }
                 ],
                 "returns": [
-                    { "name": "resourceState", "$ref": "ResourceState" }
+                    { "name": "resourceState", "$ref": "ResourceState" },
+                    { "name": "replayTime", "type": "number", "description": "Replay time (in milliseconds)." }
                 ]
             },
             {

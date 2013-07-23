@@ -41,8 +41,10 @@
 #include "core/platform/graphics/opentype/OpenTypeVerticalData.h"
 #include "wtf/Forward.h"
 #include "wtf/HashTableDeletedValueType.h"
+#include "wtf/OwnPtr.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
+#include "wtf/RefPtr.h"
 #include "wtf/text/StringImpl.h"
 
 #include <usp10.h>
@@ -52,9 +54,8 @@ typedef struct HFONT__ *HFONT;
 namespace WebCore {
 
 // Return a typeface associated with the hfont, and return its size and
-// lfQuality from the hfont's LOGFONT. The caller is now an owner of the
-// typeface.
-SkTypeface* CreateTypefaceFromHFont(HFONT, int* size, int* paintTextFlags);
+// lfQuality from the hfont's LOGFONT.
+PassRefPtr<SkTypeface> CreateTypefaceFromHFont(HFONT, int* size, int* paintTextFlags);
 
 class FontDescription;
 
@@ -86,7 +87,7 @@ public:
     bool isFixedPitch() const;
     HFONT hfont() const { return m_font ? m_font->hfont() : 0; }
     float size() const { return m_size; }
-    SkTypeface* typeface() const { return m_typeface; }
+    SkTypeface* typeface() const { return m_typeface.get(); }
     int paintTextFlags() const { return m_paintTextFlags; }
 
     FontOrientation orientation() const { return m_orientation; }
@@ -156,11 +157,11 @@ private:
     float m_size;  // Point size of the font in pixels.
     FontOrientation m_orientation;
 
-    SkTypeface* m_typeface; // cached from m_font
+    RefPtr<SkTypeface> m_typeface; // cached from m_font
     int m_paintTextFlags; // cached from m_font
 
     mutable SCRIPT_CACHE m_scriptCache;
-    mutable SCRIPT_FONTPROPERTIES* m_scriptFontProperties;
+    mutable OwnPtr<SCRIPT_FONTPROPERTIES> m_scriptFontProperties;
 };
 
 } // WebCore

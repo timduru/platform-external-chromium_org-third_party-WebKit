@@ -48,12 +48,6 @@ public:
     static void supplementalMethod3MethodCustom(const v8::FunctionCallbackInfo<v8::Value>&);
 #endif // ENABLE(Condition11) || ENABLE(Condition12)
     static void constructorCallback(const v8::FunctionCallbackInfo<v8::Value>&);
-#if ENABLE(Condition22) || ENABLE(Condition23)
-    static void implementsStr3AttrGetterCustom(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>&);
-#endif // ENABLE(Condition22) || ENABLE(Condition23)
-#if ENABLE(Condition22) || ENABLE(Condition23)
-    static void implementsStr3AttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<void>&);
-#endif // ENABLE(Condition22) || ENABLE(Condition23)
     static void namedPropertySetterCustom(v8::Local<v8::String>, v8::Local<v8::Value>, const v8::PropertyCallbackInfo<v8::Value>&);
     static const int internalFieldCount = v8DefaultWrapperInternalFieldCount + 0;
     static inline void* toInternalPointer(TestInterface* impl)
@@ -83,12 +77,6 @@ inline v8::Handle<v8::Object> wrap(TestInterface* impl, v8::Handle<v8::Object> c
 {
     ASSERT(impl);
     ASSERT(DOMDataStore::getWrapper<V8TestInterface>(impl, isolate).IsEmpty());
-    if (ScriptWrappable::wrapperCanBeStoredInObject(impl)) {
-        const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl);
-        // Might be a XXXConstructor::info instead of an XXX::info. These will both have
-        // the same object de-ref functions, though, so use that as the basis of the check.
-        RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == V8TestInterface::info.derefObjectFunction);
-    }
     return V8TestInterface::createWrapper(impl, creationContext, isolate);
 }
 

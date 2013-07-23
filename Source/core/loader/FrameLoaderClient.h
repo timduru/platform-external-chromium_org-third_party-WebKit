@@ -97,7 +97,6 @@ namespace WebCore {
         virtual void dispatchWillSendRequest(DocumentLoader*, unsigned long identifier, ResourceRequest&, const ResourceResponse& redirectResponse) = 0;
         virtual void dispatchDidReceiveResponse(DocumentLoader*, unsigned long identifier, const ResourceResponse&) = 0;
         virtual void dispatchDidFinishLoading(DocumentLoader*, unsigned long identifier) = 0;
-        virtual void dispatchDidFailLoading(DocumentLoader*, unsigned long identifier, const ResourceError&) = 0;
         virtual void dispatchDidLoadResourceFromMemoryCache(DocumentLoader*, const ResourceRequest&, const ResourceResponse&, int length) = 0;
 
         virtual void dispatchDidHandleOnloadEvents() = 0;
@@ -118,8 +117,6 @@ namespace WebCore {
         virtual void dispatchDidLayout(LayoutMilestones) { }
 
         virtual NavigationPolicy decidePolicyForNavigation(const ResourceRequest&, NavigationType, NavigationPolicy, bool isRedirect) = 0;
-
-        virtual void dispatchUnableToImplementPolicy(const ResourceError&) = 0;
 
         virtual void dispatchWillRequestResource(CachedResourceRequest*) { }
 
@@ -158,20 +155,7 @@ namespace WebCore {
         virtual void didRunInsecureContent(SecurityOrigin*, const KURL&) = 0;
         virtual void didDetectXSS(const KURL&, bool didBlockEntirePage) = 0;
 
-        virtual ResourceError cancelledError(const ResourceRequest&) = 0;
-        virtual ResourceError cannotShowURLError(const ResourceRequest&) = 0;
         virtual ResourceError interruptedForPolicyChangeError(const ResourceRequest&) = 0;
-
-        virtual ResourceError cannotShowMIMETypeError(const ResourceResponse&) = 0;
-        virtual ResourceError fileDoesNotExistError(const ResourceResponse&) = 0;
-        virtual ResourceError pluginWillHandleLoadError(const ResourceResponse&) = 0;
-
-        virtual bool shouldFallBack(const ResourceError&) = 0;
-
-        virtual bool canShowMIMEType(const String& MIMEType) const = 0;
-        virtual String generatedMIMETypeForURLScheme(const String& URLScheme) const = 0;
-
-        virtual void didFinishLoad() = 0;
 
         virtual PassRefPtr<DocumentLoader> createDocumentLoader(const ResourceRequest&, const SubstituteData&) = 0;
 

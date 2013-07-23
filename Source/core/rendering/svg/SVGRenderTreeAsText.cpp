@@ -357,7 +357,7 @@ static TextStream& operator<<(TextStream& ts, const RenderSVGShape& shape)
         SVGPolyElement* element = static_cast<SVGPolyElement*>(svgElement);
         writeNameAndQuotedValue(ts, "points", element->pointList().valueAsString());
     } else if (svgElement->hasTagName(SVGNames::pathTag)) {
-        SVGPathElement* element = static_cast<SVGPathElement*>(svgElement);
+        SVGPathElement* element = toSVGPathElement(svgElement);
         String pathString;
         // FIXME: We should switch to UnalteredParsing here - this will affect the path dumping output of dozens of tests.
         buildStringFromByteStream(element->pathByteStream(), pathString, NormalizedParsing);
@@ -384,7 +384,7 @@ static void writeRenderSVGTextBox(TextStream& ts, const RenderSVGText& text)
     ts << " contains 1 chunk(s)";
 
     if (text.parent() && (text.parent()->style()->visitedDependentColor(CSSPropertyColor) != text.style()->visitedDependentColor(CSSPropertyColor)))
-        writeNameValuePair(ts, "color", text.style()->visitedDependentColor(CSSPropertyColor).nameForRenderTreeAsText());
+        writeNameValuePair(ts, "color", text.resolveColor(CSSPropertyColor).nameForRenderTreeAsText());
 }
 
 static inline void writeSVGInlineTextBox(TextStream& ts, SVGInlineTextBox* textBox, int indent)

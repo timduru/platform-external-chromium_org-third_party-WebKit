@@ -94,7 +94,7 @@ static void messageHandlerInMainThread(v8::Handle<v8::Message> message, v8::Hand
     v8::Handle<v8::Value> resourceName = message->GetScriptResourceName();
     bool shouldUseDocumentURL = resourceName.IsEmpty() || !resourceName->IsString();
     String resource = shouldUseDocumentURL ? firstWindow->document()->url() : toWebCoreString(resourceName);
-    firstWindow->document()->reportException(errorMessage, message->GetLineNumber(), resource, callStack);
+    firstWindow->document()->reportException(errorMessage, message->GetLineNumber(), message->GetStartColumn(), resource, callStack);
 }
 
 static void failedAccessCheckCallbackInMainThread(v8::Local<v8::Object> host, v8::AccessType type, v8::Local<v8::Value> data)
@@ -102,13 +102,14 @@ static void failedAccessCheckCallbackInMainThread(v8::Local<v8::Object> host, v8
     Frame* target = findFrame(host, data, v8::Isolate::GetCurrent());
     if (!target)
         return;
-    DOMWindow* targetWindow = target->document()->domWindow();
-    targetWindow->printErrorMessage(targetWindow->crossDomainAccessErrorMessage(activeDOMWindow()));
+    DOMWindow* targetWindow = target->domWindow();
 
     // Throw an exception for failed-access checks against Location objects, otherwise write to the console.
     WrapperTypeInfo* typeInfo = WrapperTypeInfo::unwrap(data);
     if (V8Location::info.equals(typeInfo))
-        setDOMException(SecurityError, v8::Isolate::GetCurrent());
+        setDOMException(SecurityError, targetWindow->crossDomainAccessErrorMessage(activeDOMWindow()), v8::Isolate::GetCurrent());
+    else
+        targetWindow->printErrorMessage(targetWindow->crossDomainAccessErrorMessage(activeDOMWindow()));
 }
 
 static bool codeGenerationCheckCallbackInMainThread(v8::Local<v8::Context> context)
@@ -167,8 +168,9 @@ static void messageHandlerInWorker(v8::Handle<v8::Message> message, v8::Handle<v
     if (ScriptExecutionContext* context = getScriptExecutionContext()) {
         String errorMessage = toWebCoreString(message->Get());
         int lineNumber = message->GetLineNumber();
+        int columnNumber = message->GetStartColumn();
         String sourceURL = toWebCoreString(message->GetScriptResourceName());
-        context->reportException(errorMessage, lineNumber, sourceURL, 0);
+        context->reportException(errorMessage, lineNumber, columnNumber, sourceURL, 0);
     }
 
     isReportingException = false;

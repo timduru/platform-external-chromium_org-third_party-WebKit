@@ -242,21 +242,13 @@ void Location::replace(DOMWindow* activeWindow, DOMWindow* firstWindow, const St
     if (!m_frame)
         return;
     // Note: We call DOMWindow::setLocation directly here because replace() always operates on the current frame.
-    m_frame->document()->domWindow()->setLocation(url, activeWindow, firstWindow, LockHistoryAndBackForwardList);
+    m_frame->domWindow()->setLocation(url, activeWindow, firstWindow, LockHistoryAndBackForwardList);
 }
 
 void Location::reload(DOMWindow* activeWindow)
 {
     if (!m_frame)
         return;
-    // FIXME: It's not clear this cross-origin security check is valuable.
-    // We allow one page to change the location of another. Why block attempts to reload?
-    // Other location operations simply block use of JavaScript URLs cross origin.
-    DOMWindow* targetWindow = m_frame->document()->domWindow();
-    if (!activeWindow->document()->securityOrigin()->canAccess(m_frame->document()->securityOrigin())) {
-        targetWindow->printErrorMessage(targetWindow->crossDomainAccessErrorMessage(activeWindow));
-        return;
-    }
     if (protocolIsJavaScript(m_frame->document()->url()))
         return;
     m_frame->navigationScheduler()->scheduleRefresh();
@@ -269,7 +261,7 @@ void Location::setLocation(const String& url, DOMWindow* activeWindow, DOMWindow
     Frame* frame = m_frame->loader()->findFrameForNavigation(String(), activeWindow->document());
     if (!frame)
         return;
-    frame->document()->domWindow()->setLocation(url, activeWindow, firstWindow);
+    frame->domWindow()->setLocation(url, activeWindow, firstWindow);
 }
 
 } // namespace WebCore

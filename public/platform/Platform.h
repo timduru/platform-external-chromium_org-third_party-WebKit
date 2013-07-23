@@ -42,7 +42,9 @@
 #include "WebGraphicsContext3D.h"
 #include "WebLocalizedString.h"
 #include "WebSpeechSynthesizer.h"
+#include "WebStorageQuotaType.h"
 #include "WebString.h"
+#include "WebURLError.h"
 #include "WebVector.h"
 
 class GrContext;
@@ -82,6 +84,7 @@ class WebSocketStreamHandle;
 class WebSpeechSynthesizer;
 class WebSpeechSynthesizerClient;
 class WebStorageNamespace;
+class WebStorageQuotaCallbacks;
 class WebUnitTestSupport;
 class WebThemeEngine;
 class WebThread;
@@ -91,7 +94,6 @@ class WebWorkerRunLoop;
 struct WebFloatPoint;
 struct WebLocalizedString;
 struct WebSize;
-struct WebURLError;
 
 class Platform {
 public:
@@ -314,6 +316,8 @@ public:
 
     // Returns the decoded data url if url had a supported mimetype and parsing was successful.
     virtual WebData parseDataURL(const WebURL&, WebString& mimetype, WebString& charset) { return WebData(); }
+
+    virtual WebURLError cancelledError(const WebURL&) const { return WebURLError(); }
 
 
     // Plugins -------------------------------------------------------------
@@ -552,6 +556,21 @@ public:
     // Sets a Listener to listen for device motion data updates.
     // If null, the platform stops providing device motion data to the current listener.
     virtual void setDeviceMotionListener(WebKit::WebDeviceMotionListener*) { }
+
+
+    // Quota -----------------------------------------------------------
+
+    // Queries the storage partition's storage usage and quota information.
+    // WebStorageQuotaCallbacks::didQueryStorageUsageAndQuota will be called
+    // with the current usage and quota information for the partition. When
+    // an error occurs WebStorageQuotaCallbacks::didFail is called with an
+    // error code.
+    // The callbacks object is deleted when the callback method is called
+    // and does not need to be (and should not be) deleted manually.
+    virtual void queryStorageUsageAndQuota(
+        const WebURL& storagePartition,
+        WebStorageQuotaType,
+        WebStorageQuotaCallbacks*) { }
 
 protected:
     virtual ~Platform() { }

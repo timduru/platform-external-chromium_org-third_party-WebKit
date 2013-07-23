@@ -32,12 +32,16 @@
 #include "InternalProfilers.h"
 #include "InternalRuntimeFlags.h"
 #include "InternalSettings.h"
+#include "LayerRect.h"
+#include "LayerRectList.h"
 #include "MallocStatistics.h"
 #include "MockPagePopupDriver.h"
 #include "RuntimeEnabledFeatures.h"
 #include "TypeConversions.h"
 #include "bindings/v8/SerializedScriptValue.h"
 #include "core/css/StyleSheetContents.h"
+#include "core/css/resolver/StyleResolver.h"
+#include "core/css/resolver/ViewportStyleResolver.h"
 #include "core/dom/ClientRect.h"
 #include "core/dom/ClientRectList.h"
 #include "core/dom/DOMStringList.h"
@@ -174,6 +178,9 @@ PassRefPtr<Internals> Internals::create(Document* document)
 
 Internals::~Internals()
 {
+    if (m_scrollingCoordinator) {
+        m_scrollingCoordinator->removeTouchEventTargetRectsObserver(this);
+    }
 }
 
 void Internals::resetToConsistentState(Page* page)
@@ -198,7 +205,12 @@ void Internals::resetToConsistentState(Page* page)
 Internals::Internals(Document* document)
     : ContextLifecycleObserver(document)
     , m_runtimeFlags(InternalRuntimeFlags::create())
+    , m_scrollingCoordinator(document->page()->scrollingCoordinator())
+    , m_touchEventTargetRectUpdateCount(0)
 {
+    if (m_scrollingCoordinator) {
+        m_scrollingCoordinator->addTouchEventTargetRectsObserver(this);
+    }
 }
 
 Document* Internals::contextDocument() const
@@ -909,7 +921,7 @@ void Internals::setPagination(Document* document, const String& mode, int gap, i
     page->setPagination(pagination);
 }
 
-String Internals::configurationForViewport(Document* document, float devicePixelRatio, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode& ec)
+String Internals::configurationForViewport(Document* document, float, int deviceWidth, int deviceHeight, int availableWidth, int availableHeight, ExceptionCode& ec)
 {
     if (!document || !document->page()) {
         ec = InvalidAccessError;
@@ -917,16 +929,34 @@ String Internals::configurationForViewport(Document* document, float devicePixel
     }
     Page* page = document->page();
 
-    const int defaultLayoutWidthForNonMobilePages = 980;
-
-    // FIXME(aelias): Remove this argument from all the fast/viewport tests.
-    ASSERT(devicePixelRatio == 1);
+    // Update initial viewport size.
+    IntSize initialViewportSize(availableWidth, availableHeight);
+    document->page()->mainFrame()->view()->setFrameRect(IntRect(IntPoint::zero(), initialViewportSize));
+    document->styleResolver()->viewportStyleResolver()->resolve();
 
     ViewportArguments arguments = page->viewportArguments();
-    PageScaleConstraints constraints = arguments.resolve(IntSize(availableWidth, availableHeight), FloatSize(deviceWidth, deviceHeight), defaultLayoutWidthForNonMobilePages);
+    PageScaleConstraints constraints = arguments.resolve(initialViewportSize, FloatSize(deviceWidth, deviceHeight), 980 /* defaultLayoutWidthForNonMobilePages */);
+
     constraints.fitToContentsWidth(constraints.layoutSize.width(), availableWidth);
 
-    return "viewport size " + String::number(constraints.layoutSize.width()) + "x" + String::number(constraints.layoutSize.height()) + " scale " + String::number(constraints.initialScale) + " with limits [" + String::number(constraints.minimumScale) + ", " + String::number(constraints.maximumScale) + "] and userScalable " + (arguments.userZoom ? "true" : "false");
+    StringBuilder builder;
+
+    builder.appendLiteral("viewport size ");
+    builder.append(String::number(constraints.layoutSize.width()));
+    builder.append('x');
+    builder.append(String::number(constraints.layoutSize.height()));
+
+    builder.appendLiteral(" scale ");
+    builder.append(String::number(constraints.initialScale));
+    builder.appendLiteral(" with limits [");
+    builder.append(String::number(constraints.minimumScale));
+    builder.appendLiteral(", ");
+    builder.append(String::number(constraints.maximumScale));
+
+    builder.appendLiteral("] and userScalable ");
+    builder.append(arguments.userZoom ? "true" : "false");
+
+    return builder.toString();
 }
 
 bool Internals::wasLastChangeUserEdit(Element* textField, ExceptionCode& ec)
@@ -1245,25 +1275,44 @@ unsigned Internals::touchEventHandlerCount(Document* document, ExceptionCode& ec
     return count;
 }
 
-PassRefPtr<ClientRectList> Internals::touchEventTargetClientRects(Document* document, ExceptionCode& ec)
+LayerRectList* Internals::touchEventTargetLayerRects(Document* document, ExceptionCode& ec)
 {
-    if (!document || !document->view() || !document->page()) {
+    if (!document || !document->view() || !document->page() || document != contextDocument()) {
         ec = InvalidAccessError;
         return 0;
     }
-    if (!document->page()->scrollingCoordinator())
-        return ClientRectList::create();
 
-    document->updateLayoutIgnorePendingStylesheets();
+    // Do any pending layouts (which may call touchEventTargetRectsChange) to ensure this
+    // really takes any previous changes into account.
+    document->updateLayout();
+    return m_currentTouchEventRects.get();
+}
 
-    Vector<IntRect> absoluteRects;
-    document->page()->scrollingCoordinator()->computeAbsoluteTouchEventTargetRects(document, absoluteRects);
-    Vector<FloatQuad> absoluteQuads(absoluteRects.size());
+unsigned Internals::touchEventTargetLayerRectsUpdateCount(Document* document, ExceptionCode& ec)
+{
+    if (!document || !document->view() || !document->page() || document != contextDocument()) {
+        ec = InvalidAccessError;
+        return 0;
+    }
 
-    for (size_t i = 0; i < absoluteRects.size(); ++i)
-        absoluteQuads[i] = FloatQuad(absoluteRects[i]);
+    // Do any pending layouts to ensure this really takes any previous changes into account.
+    document->updateLayout();
 
-    return ClientRectList::create(absoluteQuads);
+    return m_touchEventTargetRectUpdateCount;
+}
+
+void Internals::touchEventTargetRectsChanged(const LayerHitTestRects& rects)
+{
+    m_touchEventTargetRectUpdateCount++;
+
+    // Since it's not safe to hang onto the pointers in a LayerHitTestRects, we immediately
+    // copy into a LayerRectList.
+    m_currentTouchEventRects = LayerRectList::create();
+    for (LayerHitTestRects::const_iterator iter = rects.begin(); iter != rects.end(); ++iter) {
+        for (size_t i = 0; i < iter->value.size(); ++i) {
+            m_currentTouchEventRects->append(iter->key->renderer()->node(), ClientRect::create(enclosingIntRect(iter->value[i])));
+        }
+    }
 }
 
 PassRefPtr<NodeList> Internals::nodesFromRect(Document* document, int centerX, int centerY, unsigned topPadding, unsigned rightPadding,
@@ -1391,7 +1440,7 @@ PassRefPtr<DOMWindow> Internals::openDummyInspectorFrontend(const String& url)
     Page* page = contextDocument()->frame()->page();
     ASSERT(page);
 
-    DOMWindow* window = page->mainFrame()->document()->domWindow();
+    DOMWindow* window = page->mainFrame()->domWindow();
     ASSERT(window);
 
     m_frontendWindow = window->open(url, "", "", window, window);
@@ -1948,7 +1997,7 @@ void Internals::setUsesOverlayScrollbars(bool enabled)
 
 void Internals::forceReload(bool endToEnd)
 {
-    frame()->loader()->reload(endToEnd);
+    frame()->loader()->reload(endToEnd ? EndToEndReload : NormalReload);
 }
 
 PassRefPtr<ClientRect> Internals::selectionBounds(ExceptionCode& ec)

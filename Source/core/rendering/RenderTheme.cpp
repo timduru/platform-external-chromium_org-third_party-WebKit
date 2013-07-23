@@ -814,7 +814,7 @@ bool RenderTheme::isFocused(const RenderObject* o) const
     node = node->focusDelegate();
     Document* document = node->document();
     Frame* frame = document->frame();
-    return node == document->focusedNode() && node->shouldHaveFocusAppearance() && frame && frame->selection()->isFocusedAndActive();
+    return node == document->focusedElement() && node->shouldHaveFocusAppearance() && frame && frame->selection()->isFocusedAndActive();
 }
 
 bool RenderTheme::isPressed(const RenderObject* o) const
@@ -1015,7 +1015,7 @@ void RenderTheme::paintSliderTicks(RenderObject* o, const PaintInfo& paintInfo, 
     }
     RefPtr<HTMLCollection> options = dataList->options();
     GraphicsContextStateSaver stateSaver(*paintInfo.context);
-    paintInfo.context->setFillColor(o->style()->visitedDependentColor(CSSPropertyColor));
+    paintInfo.context->setFillColor(o->resolveColor(CSSPropertyColor));
     for (unsigned i = 0; Node* node = options->item(i); i++) {
         ASSERT(node->hasTagName(optionTag));
         HTMLOptionElement* optionElement = toHTMLOptionElement(node);

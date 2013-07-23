@@ -486,7 +486,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
     }
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, hello, args[0]);
     if (args.Length() <= 1 || !args[1]->IsFunction()) {
-        throwTypeError(0, args.GetIsolate());
+        throwTypeError(args.GetIsolate());
         return;
     }
     RefPtr<TestCallback> testCallback = V8TestCallback::create(args[1], getScriptExecutionContext());
@@ -598,6 +598,13 @@ v8::Handle<v8::Object> V8TestTypedefs::createWrapper(PassRefPtr<TestTypedefs> im
 {
     ASSERT(impl.get());
     ASSERT(DOMDataStore::getWrapper<V8TestTypedefs>(impl.get(), isolate).IsEmpty());
+    if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
+        const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());
+        // Might be a XXXConstructor::info instead of an XXX::info. These will both have
+        // the same object de-ref functions, though, so use that as the basis of the check.
+        RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == info.derefObjectFunction);
+    }
+
 
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))

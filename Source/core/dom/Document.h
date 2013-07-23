@@ -629,10 +629,10 @@ public:
     void setSelectedStylesheetSet(const String&);
 
     bool setFocusedElement(PassRefPtr<Element>, FocusDirection = FocusDirectionNone);
-    Node* focusedNode() const { return m_focusedNode.get(); }
+    Element* focusedElement() const { return m_focusedElement.get(); }
     UserActionElementSet& userActionElements()  { return m_userActionElements; }
     const UserActionElementSet& userActionElements() const { return m_userActionElements; }
-    void didRunCheckFocusedNodeTask() { m_didPostCheckFocusedNodeTask = false; }
+    void didRunCheckFocusedElementTask() { m_didPostCheckFocusedElementTask = false; }
 
     // The m_ignoreAutofocus flag specifies whether or not the document has been changed by the user enough 
     // for WebCore to ignore the autofocus attribute on any form controls
@@ -645,7 +645,7 @@ public:
     void setActiveElement(PassRefPtr<Element>);
     Element* activeElement() const { return m_activeElement.get(); }
 
-    void removeFocusedNodeOfSubtree(Node*, bool amongChildrenOnly = false);
+    void removeFocusedElementOfSubtree(Node*, bool amongChildrenOnly = false);
     void hoveredNodeDetached(Node*);
     void activeChainNodeDetached(Node*);
 
@@ -780,18 +780,7 @@ public:
     const KURL& cookieURL() const { return m_cookieURL; }
     void setCookieURL(const KURL& url) { m_cookieURL = url; }
 
-    // The firstPartyForCookies is used to compute whether this document
-    // appears in a "third-party" context for the purpose of third-party
-    // cookie blocking.  The document is in a third-party context if the
-    // cookieURL and the firstPartyForCookies are from different hosts.
-    //
-    // Note: Some ports (including possibly Apple's) only consider the
-    //       document in a third-party context if the cookieURL and the
-    //       firstPartyForCookies have a different registry-controlled
-    //       domain.
-    //
-    const KURL& firstPartyForCookies() const { return m_firstPartyForCookies; }
-    void setFirstPartyForCookies(const KURL& url) { m_firstPartyForCookies = url; }
+    const KURL& firstPartyForCookies() const;
     
     // The following implements the rule from HTML 4 for what valid names are.
     // To get this right for all the XML cases, we probably have to improve this or move it
@@ -958,7 +947,7 @@ public:
     void serviceScriptedAnimations(double monotonicAnimationStartTime);
 
     virtual EventTarget* errorEventTarget();
-    virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack>);
+    virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack>);
 
     void initDNSPrefetch();
 
@@ -1157,7 +1146,6 @@ private:
     KURL m_baseURLOverride; // An alternative base URL that takes precedence over m_baseURL (but not m_baseElementURL).
     KURL m_baseElementURL; // The URL set by the <base> element.
     KURL m_cookieURL; // The URL to use for cookie access.
-    KURL m_firstPartyForCookies; // The policy URL for third-party cookie blocking.
 
     // Document.documentURI:
     // Although URL-like, Document.documentURI can actually be set to any
@@ -1181,8 +1169,8 @@ private:
     CompatibilityMode m_compatibilityMode;
     bool m_compatibilityModeLocked; // This is cheaper than making setCompatibilityMode virtual.
 
-    bool m_didPostCheckFocusedNodeTask;
-    RefPtr<Node> m_focusedNode;
+    bool m_didPostCheckFocusedElementTask;
+    RefPtr<Element> m_focusedElement;
     RefPtr<Node> m_hoverNode;
     RefPtr<Element> m_activeElement;
     RefPtr<Element> m_documentElement;

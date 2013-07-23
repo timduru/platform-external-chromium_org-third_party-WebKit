@@ -186,13 +186,13 @@ RenderObject::SelectionState InlineTextBox::selectionState()
     return state;
 }
 
-static void adjustCharactersAndLengthForHyphen(BufferForAppendingHyphen& charactersWithHyphen, RenderStyle* style, String& string, int& length)
+static void adjustCharactersAndLengthForHyphen(BufferForAppendingHyphen& charactersWithHyphen, RenderStyle* style, StringView& string, int& length)
 {
     const AtomicString& hyphenString = style->hyphenString();
     charactersWithHyphen.reserveCapacity(length + hyphenString.length());
     charactersWithHyphen.append(string);
     charactersWithHyphen.append(hyphenString);
-    string = charactersWithHyphen.toString();
+    string = charactersWithHyphen.toString().createView();
     length += hyphenString.length();
 }
 
@@ -392,13 +392,15 @@ bool InlineTextBox::nodeAtPoint(const HitTestRequest& request, HitTestResult& re
     return false;
 }
 
-static void paintTextWithShadows(GraphicsContext* context, const Font& font, const TextRun& textRun,
-                                 const AtomicString& emphasisMark, int emphasisMarkOffset,
-                                 int startOffset, int endOffset, int truncationPoint,
-                                 const FloatPoint& textOrigin, const FloatRect& boxRect,
-                                 const ShadowData* shadow, bool stroked, bool horizontal)
+static void paintTextWithShadows(GraphicsContext* context,
+    const RenderObject* renderer, const Font& font, const TextRun& textRun,
+    const AtomicString& emphasisMark, int emphasisMarkOffset,
+    int startOffset, int endOffset, int truncationPoint,
+    const FloatPoint& textOrigin, const FloatRect& boxRect,
+    const ShadowData* shadow, bool stroked, bool horizontal)
 {
-    bool hasShadow = shadow;
+    // Text shadows are disabled when printing. http://crbug.com/258321
+    bool hasShadow = shadow && !context->printing();
     Color fillColor = context->fillColor();
 
     if (hasShadow) {
@@ -407,7 +409,7 @@ static void paintTextWithShadows(GraphicsContext* context, const Font& font, con
             int shadowX = horizontal ? shadow->x() : shadow->y();
             int shadowY = horizontal ? shadow->y() : -shadow->x();
             FloatSize offset(shadowX, shadowY);
-            drawLooper.addShadow(offset, shadow->blur(), shadow->color(),
+            drawLooper.addShadow(offset, shadow->blur(), renderer->resolveColor(shadow->color()),
                 DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowIgnoresAlpha);
         } while ((shadow = shadow->next()));
         drawLooper.addUnmodifiedContent();
@@ -526,7 +528,8 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
 
     GraphicsContext* context = paintInfo.context;
 
-    RenderStyle* styleToUse = renderer()->style(isFirstLineStyle());
+    RenderObject* rendererToUse = renderer();
+    RenderStyle* styleToUse = rendererToUse->style(isFirstLineStyle());
     
     adjustedPaintOffset.move(0, styleToUse->isHorizontalWritingMode() ? 0 : -logicalHeight());
 
@@ -549,14 +552,16 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     Color textStrokeColor;
     Color emphasisMarkColor;
     float textStrokeWidth = styleToUse->textStrokeWidth();
-    const ShadowData* textShadow = paintInfo.forceBlackText() ? 0 : styleToUse->textShadow();
+
+    // Text shadows are disabled when printing. http://crbug.com/258321
+    const ShadowData* textShadow = (context->printing() || paintInfo.forceBlackText()) ? 0 : styleToUse->textShadow();
 
     if (paintInfo.forceBlackText()) {
         textFillColor = Color::black;
         textStrokeColor = Color::black;
         emphasisMarkColor = Color::black;
     } else {
-        textFillColor = styleToUse->visitedDependentColor(CSSPropertyWebkitTextFillColor);
+        textFillColor = rendererToUse->resolveColor(styleToUse, CSSPropertyWebkitTextFillColor);
         
         bool forceBackgroundToWhite = false;
         if (isPrinting) {
@@ -570,13 +575,13 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         if (forceBackgroundToWhite)
             textFillColor = correctedTextColor(textFillColor, Color::white);
 
-        textStrokeColor = styleToUse->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
+        textStrokeColor = rendererToUse->resolveColor(styleToUse, CSSPropertyWebkitTextStrokeColor);
         
         // Make the text stroke color legible against a white background
         if (forceBackgroundToWhite)
             textStrokeColor = correctedTextColor(textStrokeColor, Color::white);
 
-        emphasisMarkColor = styleToUse->visitedDependentColor(CSSPropertyWebkitTextEmphasisColor);
+        emphasisMarkColor = rendererToUse->resolveColor(styleToUse, CSSPropertyWebkitTextEmphasisColor);
         
         // Make the text stroke color legible against a white background
         if (forceBackgroundToWhite)
@@ -608,7 +613,8 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         }
 
         if (RenderStyle* pseudoStyle = renderer()->getCachedPseudoStyle(SELECTION)) {
-            const ShadowData* shadow = paintInfo.forceBlackText() ? 0 : pseudoStyle->textShadow();
+            // Text shadows are disabled when printing. http://crbug.com/258321
+            const ShadowData* shadow = (context->printing() || paintInfo.forceBlackText()) ? 0 : pseudoStyle->textShadow();
             if (shadow != selectionShadow) {
                 if (!paintSelectedTextOnly)
                     paintSelectedTextSeparately = true;
@@ -622,7 +628,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
                 selectionStrokeWidth = strokeWidth;
             }
 
-            Color stroke = paintInfo.forceBlackText() ? Color::black : pseudoStyle->visitedDependentColor(CSSPropertyWebkitTextStrokeColor);
+            Color stroke = paintInfo.forceBlackText() ? Color::black : rendererToUse->resolveColor(pseudoStyle, CSSPropertyWebkitTextStrokeColor);
             if (stroke != selectionStrokeColor) {
                 if (!paintSelectedTextOnly)
                     paintSelectedTextSeparately = true;
@@ -668,13 +674,11 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     // 2. Now paint the foreground, including text and decorations like underline/overline (in quirks mode only).
     int length = m_len;
     int maximumLength;
-    String string;
+    StringView string;
     if (!combinedText) {
-        string = textRenderer()->text();
-        if (static_cast<unsigned>(length) != string.length() || m_start) {
-            ASSERT_WITH_SECURITY_IMPLICATION(static_cast<unsigned>(m_start + length) <= string.length());
-            string = string.substringSharingImpl(m_start, length);
-        }
+        string = textRenderer()->text().createView();
+        if (static_cast<unsigned>(length) != string.length() || m_start)
+            string.narrow(m_start, length);
         maximumLength = textRenderer()->textLength() - m_start;
     } else {
         combinedText->getStringToRender(m_start, string, length);
@@ -712,9 +716,10 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         updateGraphicsContext(context, textFillColor, textStrokeColor, textStrokeWidth);
         if (!paintSelectedTextSeparately || ePos <= sPos) {
             // FIXME: Truncate right-to-left text correctly.
-            paintTextWithShadows(context, font, textRun, nullAtom, 0, 0, length, length, textOrigin, boxRect, textShadow, textStrokeWidth > 0, isHorizontal());
-        } else
-            paintTextWithShadows(context, font, textRun, nullAtom, 0, ePos, sPos, length, textOrigin, boxRect, textShadow, textStrokeWidth > 0, isHorizontal());
+            paintTextWithShadows(context, rendererToUse, font, textRun, nullAtom, 0, 0, length, length, textOrigin, boxRect, textShadow, textStrokeWidth > 0, isHorizontal());
+        } else {
+            paintTextWithShadows(context, rendererToUse, font, textRun, nullAtom, 0, ePos, sPos, length, textOrigin, boxRect, textShadow, textStrokeWidth > 0, isHorizontal());
+        }
 
         if (!emphasisMark.isEmpty()) {
             updateGraphicsContext(context, emphasisMarkColor, textStrokeColor, textStrokeWidth);
@@ -727,9 +732,10 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
 
             if (!paintSelectedTextSeparately || ePos <= sPos) {
                 // FIXME: Truncate right-to-left text correctly.
-                paintTextWithShadows(context, combinedText ? combinedText->originalFont() : font, emphasisMarkTextRun, emphasisMark, emphasisMarkOffset, 0, length, length, emphasisMarkTextOrigin, boxRect, textShadow, textStrokeWidth > 0, isHorizontal());
-            } else
-                paintTextWithShadows(context, combinedText ? combinedText->originalFont() : font, emphasisMarkTextRun, emphasisMark, emphasisMarkOffset, ePos, sPos, length, emphasisMarkTextOrigin, boxRect, textShadow, textStrokeWidth > 0, isHorizontal());
+                paintTextWithShadows(context, rendererToUse, combinedText ? combinedText->originalFont() : font, emphasisMarkTextRun, emphasisMark, emphasisMarkOffset, 0, length, length, emphasisMarkTextOrigin, boxRect, textShadow, textStrokeWidth > 0, isHorizontal());
+            } else {
+                paintTextWithShadows(context, rendererToUse, combinedText ? combinedText->originalFont() : font, emphasisMarkTextRun, emphasisMark, emphasisMarkOffset, ePos, sPos, length, emphasisMarkTextOrigin, boxRect, textShadow, textStrokeWidth > 0, isHorizontal());
+            }
 
             if (combinedText)
                 context->concatCTM(rotation(boxRect, Counterclockwise));
@@ -741,7 +747,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         GraphicsContextStateSaver stateSaver(*context, selectionStrokeWidth > 0);
 
         updateGraphicsContext(context, selectionFillColor, selectionStrokeColor, selectionStrokeWidth);
-        paintTextWithShadows(context, font, textRun, nullAtom, 0, sPos, ePos, length, textOrigin, boxRect, selectionShadow, selectionStrokeWidth > 0, isHorizontal());
+        paintTextWithShadows(context, rendererToUse, font, textRun, nullAtom, 0, sPos, ePos, length, textOrigin, boxRect, selectionShadow, selectionStrokeWidth > 0, isHorizontal());
         if (!emphasisMark.isEmpty()) {
             updateGraphicsContext(context, selectionEmphasisMarkColor, textStrokeColor, textStrokeWidth);
 
@@ -751,7 +757,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
             if (combinedText)
                 context->concatCTM(rotation(boxRect, Clockwise));
 
-            paintTextWithShadows(context, combinedText ? combinedText->originalFont() : font, emphasisMarkTextRun, emphasisMark, emphasisMarkOffset, sPos, ePos, length, emphasisMarkTextOrigin, boxRect, selectionShadow, selectionStrokeWidth > 0, isHorizontal());
+            paintTextWithShadows(context, rendererToUse, combinedText ? combinedText->originalFont() : font, emphasisMarkTextRun, emphasisMark, emphasisMarkOffset, sPos, ePos, length, emphasisMarkTextOrigin, boxRect, selectionShadow, selectionStrokeWidth > 0, isHorizontal());
 
             if (combinedText)
                 context->concatCTM(rotation(boxRect, Counterclockwise));
@@ -853,12 +859,10 @@ void InlineTextBox::paintSelection(GraphicsContext* context, const FloatPoint& b
     // If the text is truncated, let the thing being painted in the truncation
     // draw its own highlight.
     int length = m_truncation != cNoTruncation ? m_truncation : m_len;
-    String string = textRenderer()->text();
+    StringView string = textRenderer()->text().createView();
 
-    if (string.length() != static_cast<unsigned>(length) || m_start) {
-        ASSERT_WITH_SECURITY_IMPLICATION(static_cast<unsigned>(m_start + length) <= string.length());
-        string = string.substringSharingImpl(m_start, length);
-    }
+    if (string.length() != static_cast<unsigned>(length) || m_start)
+        string.narrow(m_start, length);
 
     BufferForAppendingHyphen charactersWithHyphen;
     bool respectHyphen = ePos == length && hasHyphen();
@@ -1496,17 +1500,17 @@ TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, Bu
     ASSERT(textRenderer);
     ASSERT(textRenderer->text());
 
-    String string = textRenderer->text();
+    StringView string = textRenderer->text().createView();
     unsigned startPos = start();
     unsigned length = len();
 
     if (string.length() != length || startPos)
-        string = string.substringSharingImpl(startPos, length);
+        string.narrow(startPos, length);
 
     return constructTextRun(style, font, string, textRenderer->textLength() - startPos, charactersWithHyphen);
 }
 
-TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, String string, int maximumLength, BufferForAppendingHyphen* charactersWithHyphen) const
+TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, StringView string, int maximumLength, BufferForAppendingHyphen* charactersWithHyphen) const
 {
     ASSERT(style);
 

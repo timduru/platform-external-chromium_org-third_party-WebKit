@@ -26,9 +26,9 @@
  */
 
 #include "config.h"
-
 #include "core/workers/WorkerGlobalScope.h"
 
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScheduledAction.h"
 #include "bindings/v8/ScriptSourceCode.h"
 #include "bindings/v8/ScriptValue.h"
@@ -36,6 +36,7 @@
 #include "core/dom/ContextLifecycleNotifier.h"
 #include "core/dom/ErrorEvent.h"
 #include "core/dom/Event.h"
+#include "core/dom/ExceptionCode.h"
 #include "core/dom/MessagePort.h"
 #include "core/html/DOMURL.h"
 #include "core/inspector/InspectorConsoleInstrumentation.h"
@@ -43,10 +44,10 @@
 #include "core/inspector/WorkerInspectorController.h"
 #include "core/loader/WorkerThreadableLoader.h"
 #include "core/page/ContentSecurityPolicy.h"
-#include "core/page/DOMTimer.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/WorkerNavigator.h"
 #include "core/platform/NotImplemented.h"
+#include "core/workers/WorkerClients.h"
 #include "core/workers/WorkerLocation.h"
 #include "core/workers/WorkerObjectProxy.h"
 #include "core/workers/WorkerScriptLoader.h"
@@ -60,7 +61,7 @@
 #include "modules/notifications/NotificationCenter.h"
 #endif
 
-#include "core/dom/ExceptionCode.h"
+
 
 namespace WebCore {
 
@@ -81,7 +82,7 @@ public:
     virtual bool isCleanupTask() const { return true; }
 };
 
-WorkerGlobalScope::WorkerGlobalScope(const KURL& url, const String& userAgent, WorkerThread* thread, PassRefPtr<SecurityOrigin> topOrigin, double timeOrigin)
+WorkerGlobalScope::WorkerGlobalScope(const KURL& url, const String& userAgent, WorkerThread* thread, PassRefPtr<SecurityOrigin> topOrigin, double timeOrigin, PassOwnPtr<WorkerClients> workerClients)
     : m_url(url)
     , m_userAgent(userAgent)
     , m_script(adoptPtr(new WorkerScriptController(this)))
@@ -91,9 +92,11 @@ WorkerGlobalScope::WorkerGlobalScope(const KURL& url, const String& userAgent, W
     , m_eventQueue(WorkerEventQueue::create(this))
     , m_topOrigin(topOrigin)
     , m_timeOrigin(timeOrigin)
+    , m_workerClients(workerClients)
 {
     ScriptWrappable::init(this);
     setSecurityOrigin(SecurityOrigin::create(url));
+    m_workerClients->reattachThread();
 }
 
 WorkerGlobalScope::~WorkerGlobalScope()
@@ -179,41 +182,20 @@ void WorkerGlobalScope::postTask(PassOwnPtr<Task> task)
     thread()->runLoop().postTask(task);
 }
 
-int WorkerGlobalScope::setTimeout(PassOwnPtr<ScheduledAction> action, int timeout)
-{
-    return DOMTimer::install(scriptExecutionContext(), action, timeout, true);
-}
-
-void WorkerGlobalScope::clearTimeout(int timeoutID)
-{
-    DOMTimer::removeByID(scriptExecutionContext(), timeoutID);
-}
-
 void WorkerGlobalScope::clearInspector()
 {
     m_workerInspectorController.clear();
 }
 
-int WorkerGlobalScope::setInterval(PassOwnPtr<ScheduledAction> action, int timeout)
-{
-    return DOMTimer::install(scriptExecutionContext(), action, timeout, false);
-}
-
-void WorkerGlobalScope::clearInterval(int timeoutID)
-{
-    DOMTimer::removeByID(scriptExecutionContext(), timeoutID);
-}
-
-void WorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionCode& ec)
+void WorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionState& es)
 {
     ASSERT(contentSecurityPolicy());
-    ec = 0;
     Vector<String>::const_iterator urlsEnd = urls.end();
     Vector<KURL> completedURLs;
     for (Vector<String>::const_iterator it = urls.begin(); it != urlsEnd; ++it) {
         const KURL& url = scriptExecutionContext()->completeURL(*it);
         if (!url.isValid()) {
-            ec = SyntaxError;
+            es.throwDOMException(SyntaxError);
             return;
         }
         completedURLs.append(url);
@@ -227,7 +209,7 @@ void WorkerGlobalScope::importScripts(const Vector<String>& urls, ExceptionCode&
 
         // If the fetching attempt failed, throw a NetworkError exception and abort all these steps.
         if (scriptLoader->failed()) {
-            ec = NetworkError;
+            es.throwDOMException(NetworkError);
             return;
         }
 
@@ -247,9 +229,9 @@ EventTarget* WorkerGlobalScope::errorEventTarget()
     return this;
 }
 
-void WorkerGlobalScope::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, PassRefPtr<ScriptCallStack>)
+void WorkerGlobalScope::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack>)
 {
-    thread()->workerReportingProxy().postExceptionToWorkerObject(errorMessage, lineNumber, sourceURL);
+    thread()->workerReportingProxy().postExceptionToWorkerObject(errorMessage, lineNumber, columnNumber, sourceURL);
 }
 
 void WorkerGlobalScope::addConsoleMessage(MessageSource source, MessageLevel level, const String& message, unsigned long requestIdentifier)
@@ -347,6 +329,11 @@ void WorkerGlobalScope::notifyObserversOfStop()
         observer->notifyStop();
         iter = m_workerObservers.begin();
     }
+}
+
+bool WorkerGlobalScope::idleNotification()
+{
+    return script()->idleNotification();
 }
 
 WorkerEventQueue* WorkerGlobalScope::eventQueue() const

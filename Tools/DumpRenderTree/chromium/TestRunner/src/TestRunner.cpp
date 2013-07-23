@@ -38,6 +38,7 @@
 #include "TestInterfaces.h"
 #include "WebPermissions.h"
 #include "public/platform/WebData.h"
+#include "public/platform/WebDeviceMotionData.h"
 #include "public/platform/WebPoint.h"
 #include "public/platform/WebURLResponse.h"
 #include "public/testing/WebPreferences.h"
@@ -153,6 +154,7 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     , m_testInterfaces(interfaces)
     , m_delegate(0)
     , m_webView(0)
+    , m_pageOverlay(0)
     , m_webPermissions(new WebPermissions)
 #if ENABLE_NOTIFICATIONS
     , m_notificationPresenter(new NotificationPresenter)
@@ -204,6 +206,7 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("textSurroundingNode", &TestRunner::textSurroundingNode);
     bindMethod("disableAutoResizeMode", &TestRunner::disableAutoResizeMode);
     bindMethod("enableAutoResizeMode", &TestRunner::enableAutoResizeMode);
+    bindMethod("setMockDeviceMotion", &TestRunner::setMockDeviceMotion);
     bindMethod("setMockDeviceOrientation", &TestRunner::setMockDeviceOrientation);
     bindMethod("didAcquirePointerLock", &TestRunner::didAcquirePointerLock);
     bindMethod("didLosePointerLock", &TestRunner::didLosePointerLock);
@@ -288,6 +291,10 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("displayInvalidatedRegion", &TestRunner::displayInvalidatedRegion);
     bindMethod("isChooserShown", &TestRunner::isChooserShown);
 
+    // The following modify WebPageOverlays.
+    bindMethod("addWebPageOverlay", &TestRunner::addWebPageOverlay);
+    bindMethod("removeWebPageOverlay", &TestRunner::removeWebPageOverlay);
+
     // Properties.
     bindProperty("globalFlag", &m_globalFlag);
     bindProperty("titleTextDirection", &m_titleTextDirection);
@@ -359,6 +366,12 @@ void TestRunner::reset()
 #endif
         m_webView->removeAllUserContent();
         m_webView->setVisibilityState(WebPageVisibilityStateVisible, true);
+
+        if (m_pageOverlay) {
+            m_webView->removePageOverlay(m_pageOverlay);
+            delete m_pageOverlay;
+            m_pageOverlay = 0;
+        }
     }
 
     m_topLoadingFrame = 0;
@@ -713,6 +726,23 @@ bool TestRunner::isPointerLocked()
 void TestRunner::setToolTipText(const WebKit::WebString& text)
 {
     m_tooltipText.set(text.utf8());
+}
+
+TestRunner::TestPageOverlay::TestPageOverlay(WebKit::WebView* webView) : m_webView(webView)
+{
+}
+
+TestRunner::TestPageOverlay::~TestPageOverlay()
+{
+}
+
+void TestRunner::TestPageOverlay::paintPageOverlay(WebKit::WebCanvas* canvas)
+{
+    SkRect rect = SkRect::MakeWH(m_webView->size().width, m_webView->size().height);
+    SkPaint paint;
+    paint.setColor(SK_ColorCYAN);
+    paint.setStyle(SkPaint::kFill_Style);
+    canvas->drawRect(rect, paint);
 }
 
 void TestRunner::didAcquirePointerLockInternal()
@@ -1476,6 +1506,54 @@ void TestRunner::disableAutoResizeMode(const CppArgumentList& arguments, CppVari
     result->set(true);
 }
 
+void TestRunner::setMockDeviceMotion(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+    if (arguments.size() < 19
+        || !arguments[0].isBool() || !arguments[1].isNumber() // acceleration.x
+        || !arguments[2].isBool() || !arguments[3].isNumber() // acceleration.y
+        || !arguments[4].isBool() || !arguments[5].isNumber() // acceleration.z
+        || !arguments[6].isBool() || !arguments[7].isNumber() // accelerationIncludingGravity.x
+        || !arguments[8].isBool() || !arguments[9].isNumber() // accelerationIncludingGravity.y
+        || !arguments[10].isBool() || !arguments[11].isNumber() // accelerationIncludingGravity.z
+        || !arguments[12].isBool() || !arguments[13].isNumber() // rotationRate.alpha
+        || !arguments[14].isBool() || !arguments[15].isNumber() // rotationRate.beta
+        || !arguments[16].isBool() || !arguments[17].isNumber() // rotationRate.gamma
+        || !arguments[18].isNumber()) // interval
+        return;
+
+    WebDeviceMotionData motion;
+
+    // acceleration
+    motion.hasAccelerationX = arguments[0].toBoolean();
+    motion.accelerationX = arguments[1].toDouble();
+    motion.hasAccelerationY = arguments[2].toBoolean();
+    motion.accelerationY = arguments[3].toDouble();
+    motion.hasAccelerationZ = arguments[4].toBoolean();
+    motion.accelerationZ = arguments[5].toDouble();
+
+    // accelerationIncludingGravity
+    motion.hasAccelerationIncludingGravityX = arguments[6].toBoolean();
+    motion.accelerationIncludingGravityX = arguments[7].toDouble();
+    motion.hasAccelerationIncludingGravityY = arguments[8].toBoolean();
+    motion.accelerationIncludingGravityY = arguments[9].toDouble();
+    motion.hasAccelerationIncludingGravityZ = arguments[10].toBoolean();
+    motion.accelerationIncludingGravityZ = arguments[11].toDouble();
+
+    // rotationRate
+    motion.hasRotationRateAlpha = arguments[12].toBoolean();
+    motion.rotationRateAlpha = arguments[13].toDouble();
+    motion.hasRotationRateBeta = arguments[14].toBoolean();
+    motion.rotationRateBeta = arguments[15].toDouble();
+    motion.hasRotationRateGamma = arguments[16].toBoolean();
+    motion.rotationRateGamma = arguments[17].toDouble();
+
+    // interval
+    motion.interval = arguments[18].toDouble();
+
+    m_delegate->setDeviceMotionData(motion);
+}
+
 void TestRunner::setMockDeviceOrientation(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
@@ -1821,6 +1899,26 @@ void TestRunner::setMockSpeechRecognitionError(const CppArgumentList& arguments,
 void TestRunner::wasMockSpeechRecognitionAborted(const CppArgumentList&, CppVariant* result)
 {
     result->set(m_proxy->speechRecognizerMock()->wasAborted());
+}
+
+void TestRunner::addWebPageOverlay(const CppArgumentList&, CppVariant* result)
+{
+    if (m_webView && !m_pageOverlay) {
+        m_pageOverlay = new TestPageOverlay(m_webView);
+        m_webView->addPageOverlay(m_pageOverlay, 0);
+    }
+    result->setNull();
+}
+
+void TestRunner::removeWebPageOverlay(const CppArgumentList&, CppVariant* result)
+{
+    if (m_webView && m_pageOverlay) {
+        m_webView->removePageOverlay(m_pageOverlay);
+        delete m_pageOverlay;
+        m_pageOverlay = 0;
+    }
+
+    result->setNull();
 }
 
 void TestRunner::display(const CppArgumentList& arguments, CppVariant* result)

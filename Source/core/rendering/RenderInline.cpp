@@ -1383,6 +1383,33 @@ void RenderInline::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& 
     }
 }
 
+namespace {
+
+class AbsoluteLayoutRectsGeneratorContext {
+public:
+    AbsoluteLayoutRectsGeneratorContext(Vector<LayoutRect>& rects, const LayoutPoint& accumulatedOffset)
+        : m_rects(rects)
+        , m_accumulatedOffset(accumulatedOffset) { }
+
+    void operator()(const FloatRect& rect)
+    {
+        LayoutRect layoutRect(rect);
+        layoutRect.move(m_accumulatedOffset.x(), m_accumulatedOffset.y());
+        m_rects.append(layoutRect);
+    }
+private:
+    Vector<LayoutRect>& m_rects;
+    const LayoutPoint& m_accumulatedOffset;
+};
+
+}
+
+void RenderInline::computeSelfHitTestRects(Vector<LayoutRect>& rects, const LayoutPoint& layerOffset) const
+{
+    AbsoluteLayoutRectsGeneratorContext context(rects, layerOffset);
+    generateLineBoxRects(context);
+}
+
 void RenderInline::paintOutline(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 {
     if (!hasOutline())
@@ -1414,7 +1441,7 @@ void RenderInline::paintOutline(PaintInfo& paintInfo, const LayoutPoint& paintOf
     }
     rects.append(LayoutRect());
 
-    Color outlineColor = styleToUse->visitedDependentColor(CSSPropertyOutlineColor);
+    Color outlineColor = resolveColor(styleToUse, CSSPropertyOutlineColor);
     bool useTransparencyLayer = outlineColor.hasAlpha();
     if (useTransparencyLayer) {
         graphicsContext->beginTransparencyLayer(static_cast<float>(outlineColor.alpha()) / 255);

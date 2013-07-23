@@ -29,6 +29,7 @@
 
 #include "CSSValueKeywords.h"
 #include "RuntimeEnabledFeatures.h"
+#include "StylePropertyShorthand.h"
 #include "core/css/CSSArrayFunctionValue.h"
 #include "core/css/CSSAspectRatioValue.h"
 #include "core/css/CSSBasicShapes.h"
@@ -67,7 +68,6 @@
 #include "core/css/Rect.h"
 #include "core/css/ShadowValue.h"
 #include "core/css/StylePropertySet.h"
-#include "core/css/StylePropertyShorthand.h"
 #include "core/css/StyleRule.h"
 #include "core/css/StyleRuleImport.h"
 #include "core/css/StyleSheetContents.h"
@@ -601,8 +601,8 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         // inline | block | list-item | run-in | inline-block | table |
         // inline-table | table-row-group | table-header-group | table-footer-group | table-row |
         // table-column-group | table-column | table-cell | table-caption | -webkit-box | -webkit-inline-box | none | inherit
-        // -webkit-flex | -webkit-inline-flex | -webkit-grid | -webkit-inline-grid | lazy-block
-        if ((valueID >= CSSValueInline && valueID <= CSSValueWebkitInlineFlex) || valueID == CSSValueNone)
+        // flex | inline-flex | -webkit-flex | -webkit-inline-flex | grid | inline-grid | lazy-block
+        if ((valueID >= CSSValueInline && valueID <= CSSValueInlineFlex) || valueID == CSSValueWebkitFlex || valueID == CSSValueWebkitInlineFlex || valueID == CSSValueNone)
             return true;
         if (valueID == CSSValueGrid || valueID == CSSValueInlineGrid)
             return RuntimeEnabledFeatures::cssGridLayoutEnabled();
@@ -1356,7 +1356,7 @@ static inline void filterProperties(bool important, const CSSParser::ParsedPrope
         if (property.isImportant() != important)
             continue;
         if (property.id() == CSSPropertyVariable) {
-            const AtomicString& name = static_cast<CSSVariableValue*>(property.value())->name();
+            const AtomicString& name = toCSSVariableValue(property.value())->name();
             if (!seenVariables.add(name).isNewEntry)
                 continue;
             output[--unusedEntries] = property;
@@ -2601,7 +2601,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyBorder:
         // [ 'border-width' || 'border-style' || <color> ] | inherit
     {
-        if (parseShorthand(propId, borderAbridgedShorthand(), important)) {
+        if (parseShorthand(propId, borderShorthandForParsing(), important)) {
             // The CSS3 Borders and Backgrounds specification says that border also resets border-image. It's as
             // though a value of none was specified for the image.
             addExpandedPropertyForValue(CSSPropertyBorderImage, cssValuePool().createImplicitInitialValue(), important);
@@ -9121,7 +9121,7 @@ enum CharacterType {
     CharacterOther,
     CharacterNull,
     CharacterWhiteSpace,
-    CharacterEndMediaQuery,
+    CharacterEndMediaQueryOrSupports,
     CharacterEndNthChild,
     CharacterQuote,
     CharacterExclamationMark,
@@ -9200,7 +9200,7 @@ static const CharacterType typesOfASCIICharacters[128] = {
 /*  56 - 8                  */ CharacterNumber,
 /*  57 - 9                  */ CharacterNumber,
 /*  58 - :                  */ CharacterOther,
-/*  59 - ;                  */ CharacterEndMediaQuery,
+/*  59 - ;                  */ CharacterEndMediaQueryOrSupports,
 /*  60 - <                  */ CharacterLess,
 /*  61 - =                  */ CharacterOther,
 /*  62 - >                  */ CharacterOther,
@@ -9264,7 +9264,7 @@ static const CharacterType typesOfASCIICharacters[128] = {
 /* 120 - x                  */ CharacterIdentifierStart,
 /* 121 - y                  */ CharacterIdentifierStart,
 /* 122 - z                  */ CharacterIdentifierStart,
-/* 123 - {                  */ CharacterEndMediaQuery,
+/* 123 - {                  */ CharacterEndMediaQueryOrSupports,
 /* 124 - |                  */ CharacterVerticalBar,
 /* 125 - }                  */ CharacterOther,
 /* 126 - ~                  */ CharacterTilde,
@@ -9973,9 +9973,6 @@ inline void CSSParser::detectDashToken(int length)
         CASE("webkit-max") {
             m_token = MAXFUNCTION;
         }
-        CASE("webkit-var") {
-            m_token = VARFUNCTION;
-        }
         CASE("webkit-calc") {
             m_token = CALCFUNCTION;
         }
@@ -10475,8 +10472,8 @@ restartAfterComment:
         } while (*currentCharacter<SrcCharacterType>() <= ' ' && (typesOfASCIICharacters[*currentCharacter<SrcCharacterType>()] == CharacterWhiteSpace));
         break;
 
-    case CharacterEndMediaQuery:
-        if (m_parsingMode == MediaQueryMode)
+    case CharacterEndMediaQueryOrSupports:
+        if (m_parsingMode == MediaQueryMode || m_parsingMode == SupportsMode)
             m_parsingMode = NormalMode;
         break;
 
@@ -11435,11 +11432,11 @@ bool CSSParser::parseViewportProperty(CSSPropertyID propId, bool important)
     bool validPrimitive = false;
 
     switch (propId) {
-    case CSSPropertyMinWidth: // auto | <length> | <percentage>
+    case CSSPropertyMinWidth: // auto | extend-to-zoom | <length> | <percentage>
     case CSSPropertyMaxWidth:
     case CSSPropertyMinHeight:
     case CSSPropertyMaxHeight:
-        if (id == CSSValueAuto)
+        if (id == CSSValueAuto || id == CSSValueInternalExtendToZoom)
             validPrimitive = true;
         else
             validPrimitive = (!id && validUnit(value, FLength | FPercent | FNonNeg));

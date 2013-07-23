@@ -50,6 +50,7 @@ namespace WebCore {
     class Document;
     class Element;
     class EventListener;
+    class ExceptionState;
     class FloatRect;
     class Frame;
     class HTMLCanvasElement;
@@ -159,8 +160,6 @@ namespace WebCore {
         void alert(const String& message);
         bool confirm(const String& message);
         String prompt(const String& message, const String& defaultValue);
-        String btoa(const String& stringToEncode, ExceptionCode&);
-        String atob(const String& encodedString, ExceptionCode&);
 
         bool find(const String&, bool caseSensitive, bool backwards, bool wrap, bool wholeWord, bool searchInFrames, bool showDialog) const;
 
@@ -231,7 +230,7 @@ namespace WebCore {
         void printErrorMessage(const String&);
         String crossDomainAccessErrorMessage(DOMWindow* activeWindow);
 
-        void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, const String& targetOrigin, DOMWindow* source, ExceptionCode&);
+        void postMessage(PassRefPtr<SerializedScriptValue> message, const MessagePortArray*, const String& targetOrigin, DOMWindow* source, ExceptionState&);
         void postMessageTimerFired(PassOwnPtr<PostMessageTimer>);
         void dispatchMessageEventWithOriginCheck(SecurityOrigin* intendedTargetOrigin, PassRefPtr<Event>, PassRefPtr<ScriptCallStack>);
 
@@ -244,10 +243,6 @@ namespace WebCore {
 
         void resizeBy(float x, float y) const;
         void resizeTo(float width, float height) const;
-
-        // Timers
-        void clearTimeout(int timeoutId);
-        void clearInterval(int timeoutId);
 
         // Images
         void createImageBitmap(HTMLImageElement*, PassRefPtr<ImageBitmapCallback>, ExceptionCode&);

@@ -29,6 +29,7 @@
 #include "wtf/WTFExport.h"
 #include "wtf/text/ASCIIFastPath.h"
 #include "wtf/text/StringImpl.h"
+#include "wtf/text/StringView.h"
 
 #ifdef __OBJC__
 #include <objc/objc.h>
@@ -159,14 +160,6 @@ public:
         return m_impl->length();
     }
 
-    // FIXME: Remove all the callers of bloatedCharacters().
-    const UChar* bloatedCharacters() const
-    {
-        if (!m_impl)
-            return 0;
-        return m_impl->bloatedCharacters();
-    }
-
     const LChar* characters8() const
     {
         if (!m_impl)
@@ -272,6 +265,12 @@ public:
     template<size_t inlineCapacity>
     void appendTo(Vector<UChar, inlineCapacity>&, unsigned pos = 0, unsigned len = UINT_MAX) const;
 
+    template<typename BufferType>
+    void appendTo(BufferType&, unsigned pos = 0, unsigned len = UINT_MAX) const;
+
+    template<size_t inlineCapacity>
+    void prependTo(Vector<UChar, inlineCapacity>&, unsigned pos = 0, unsigned len = UINT_MAX) const;
+
     UChar32 characterStartingAt(unsigned) const;
     
     bool contains(UChar c) const { return find(c) != notFound; }
@@ -301,6 +300,7 @@ public:
     void append(const LChar*, unsigned length);
     void append(const UChar*, unsigned length);
     void insert(const String&, unsigned pos);
+    void insert(const LChar*, unsigned length, unsigned pos);
     void insert(const UChar*, unsigned length, unsigned pos);
 
     String& replace(UChar a, UChar b) { if (m_impl) m_impl = m_impl->replace(a, b); return *this; }
@@ -321,13 +321,17 @@ public:
     void makeUpper() { if (m_impl) m_impl = m_impl->upper(); }
     void fill(UChar c) { if (m_impl) m_impl = m_impl->fill(c); }
 
+    void ensure16Bit();
+
     void truncate(unsigned len);
     void remove(unsigned pos, int len = 1);
 
     String substring(unsigned pos, unsigned len = UINT_MAX) const;
-    String substringSharingImpl(unsigned pos, unsigned len = UINT_MAX) const;
     String left(unsigned len) const { return substring(0, len); }
     String right(unsigned len) const { return substring(length() - len, len); }
+
+    StringView createView() const { return StringView(impl()); }
+    StringView createView(unsigned offset, unsigned length) const { return StringView(impl(), offset, length); }
 
     // Returns a lowercase/uppercase version of the string
     String lower() const;
@@ -628,7 +632,7 @@ inline bool String::isAllSpecialCharacters() const
 
     if (is8Bit())
         return WTF::isAllSpecialCharacters<isSpecialCharacter, LChar>(characters8(), len);
-    return WTF::isAllSpecialCharacters<isSpecialCharacter, UChar>(bloatedCharacters(), len);
+    return WTF::isAllSpecialCharacters<isSpecialCharacter, UChar>(characters16(), len);
 }
 
 template<size_t inlineCapacity>
@@ -645,6 +649,34 @@ inline void String::appendTo(Vector<UChar, inlineCapacity>& result, unsigned pos
     } else {
         const UChar* characters16 = m_impl->characters16();
         result.append(characters16 + pos, numberOfCharactersToCopy);
+    }
+}
+
+template<typename BufferType>
+inline void String::appendTo(BufferType& result, unsigned pos, unsigned len) const
+{
+    unsigned numberOfCharactersToCopy = std::min(len, length() - pos);
+    if (numberOfCharactersToCopy <= 0)
+        return;
+    if (is8Bit())
+        result.append(m_impl->characters8() + pos, numberOfCharactersToCopy);
+    else
+        result.append(m_impl->characters16() + pos, numberOfCharactersToCopy);
+}
+
+template<size_t inlineCapacity>
+inline void String::prependTo(Vector<UChar, inlineCapacity>& result, unsigned pos, unsigned len) const
+{
+    unsigned numberOfCharactersToCopy = std::min(len, length() - pos);
+    if (numberOfCharactersToCopy <= 0)
+        return;
+    if (is8Bit()) {
+        size_t oldSize = result.size();
+        result.resize(oldSize + numberOfCharactersToCopy);
+        memmove(result.data() + numberOfCharactersToCopy, result.data(), oldSize * sizeof(UChar));
+        StringImpl::copyChars(result.data(), m_impl->characters8() + pos, numberOfCharactersToCopy);
+    } else {
+        result.prepend(m_impl->characters16() + pos, numberOfCharactersToCopy);
     }
 }
 
