@@ -61,15 +61,6 @@ HTMLTextFormControlElement::~HTMLTextFormControlElement()
 {
 }
 
-bool HTMLTextFormControlElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
-{
-    // FIXME: We shouldn't force the pseudo elements down into the shadow, but
-    // this perserves the current behavior of WebKit.
-    if (childContext.node()->isPseudoElement())
-        return HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
-    return childContext.isOnEncapsulationBoundary() && HTMLFormControlElementWithState::childShouldCreateRenderer(childContext);
-}
-
 Node::InsertionNotificationRequest HTMLTextFormControlElement::insertedInto(ContainerNode* insertionPoint)
 {
     HTMLFormControlElementWithState::insertedInto(insertionPoint);
@@ -161,7 +152,7 @@ void HTMLTextFormControlElement::updatePlaceholderVisibility(bool placeholderVal
     HTMLElement* placeholder = placeholderElement();
     if (!placeholder)
         return;
-    placeholder->setInlineStyleProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? ASCIILiteral("visible") : ASCIILiteral("hidden"));
+    placeholder->setInlineStyleProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? CSSValueVisible : CSSValueHidden);
 }
 
 void HTMLTextFormControlElement::fixPlaceholderRenderer(HTMLElement* placeholder, HTMLElement* siblingElement)
@@ -535,7 +526,7 @@ void HTMLTextFormControlElement::setInnerTextValue(const String& value)
         innerTextElement()->setInnerText(value, ASSERT_NO_EXCEPTION);
 
         if (value.endsWith('\n') || value.endsWith('\r'))
-            innerTextElement()->appendChild(HTMLBRElement::create(document()), ASSERT_NO_EXCEPTION);
+            innerTextElement()->appendChild(HTMLBRElement::create(document()), ASSERT_NO_EXCEPTION, AttachLazily);
     }
 
     setFormControlValueMatchesRenderer(true);

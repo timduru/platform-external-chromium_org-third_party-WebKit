@@ -33,7 +33,7 @@
 
 namespace WebCore {
 
-static const int infinity = intMaxForLayoutUnit;
+static const int infinity = -1;
 
 class GridTrack {
 public:
@@ -252,13 +252,6 @@ void RenderGrid::computePreferredLogicalWidths()
     setPreferredLogicalWidthsDirty(false);
 }
 
-void RenderGrid::removeChild(RenderObject* child)
-{
-    m_orderIterator.invalidate();
-
-    RenderBlock::removeChild(child);
-}
-
 LayoutUnit RenderGrid::computePreferredTrackWidth(const GridLength& gridLength, size_t trackIndex) const
 {
     if (gridLength.isFlex())
@@ -361,8 +354,7 @@ LayoutUnit RenderGrid::computeUsedBreadthOfMaxLength(TrackSizingDirection direct
     ASSERT(!trackLength.isAuto());
     if (trackLength.isFixed() || trackLength.isPercent() || trackLength.isViewportPercentage()) {
         LayoutUnit computedBreadth = computeUsedBreadthOfSpecifiedLength(direction, trackLength);
-        // FIXME: We should ASSERT that computedBreadth cannot return infinity but it's currently
-        // possible. See https://bugs.webkit.org/show_bug.cgi?id=107053
+        ASSERT(computedBreadth != infinity);
         return computedBreadth;
     }
 

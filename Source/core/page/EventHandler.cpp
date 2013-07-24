@@ -381,6 +381,7 @@ static inline bool dispatchSelectStart(Node* node)
 
 static VisibleSelection expandSelectionToRespectUserSelectAll(Node* targetNode, const VisibleSelection& selection)
 {
+#if ENABLE(USERSELECT_ALL)
     Node* rootUserSelectAll = Position::rootUserSelectAllForNode(targetNode);
     if (!rootUserSelectAll)
         return selection;
@@ -390,6 +391,10 @@ static VisibleSelection expandSelectionToRespectUserSelectAll(Node* targetNode, 
     newSelection.setExtent(positionAfterNode(rootUserSelectAll).downstream(CanCrossEditingBoundary));
 
     return newSelection;
+#else
+    UNUSED_PARAM(targetNode);
+    return selection;
+#endif
 }
 
 bool EventHandler::updateSelectionForMouseDownDispatchingSelectStart(Node* targetNode, const VisibleSelection& selection, TextGranularity granularity)
@@ -765,6 +770,7 @@ void EventHandler::updateSelectionForMouseDrag(const HitTestResult& hitTestResul
         newSelection = VisibleSelection(targetPosition);
     }
 
+#if ENABLE(USERSELECT_ALL)
     Node* rootUserSelectAllForMousePressNode = Position::rootUserSelectAllForNode(m_mousePressNode.get());
     if (rootUserSelectAllForMousePressNode && rootUserSelectAllForMousePressNode == Position::rootUserSelectAllForNode(target)) {
         newSelection.setBase(positionBeforeNode(rootUserSelectAllForMousePressNode).upstream(CanCrossEditingBoundary));
@@ -782,6 +788,9 @@ void EventHandler::updateSelectionForMouseDrag(const HitTestResult& hitTestResul
         else
             newSelection.setExtent(targetPosition);
     }
+#else
+    newSelection.setExtent(targetPosition);
+#endif
 
     if (m_frame->selection()->granularity() != CharacterGranularity)
         newSelection.expandUsingGranularity(m_frame->selection()->granularity());
@@ -1172,7 +1181,7 @@ OptionalCursor EventHandler::selectCursor(const MouseEventWithHitTestResults& ev
         if (renderer) {
             if (RenderLayer* layer = renderer->enclosingLayer()) {
                 if (FrameView* view = m_frame->view())
-                    inResizer = layer->isPointInResizeControl(view->windowToContents(event.event().position()), RenderLayer::ResizerForPointer);
+                    inResizer = layer->isPointInResizeControl(view->windowToContents(event.event().position()), ResizerForPointer);
             }
         }
         if ((editable || (renderer && renderer->isText() && node->canStartSelection())) && !inResizer && !scrollbar)
@@ -1276,6 +1285,8 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
     m_frame->loader()->resetMultipleFormSubmissionProtection();
     
     cancelFakeMouseMoveEvent();
+    if (m_eventHandlerWillResetCapturingMouseEventsNode)
+        m_capturingMouseEventsNode = 0;
     m_mousePressed = true;
     m_capturesDragging = true;
     setLastKnownMousePosition(mouseEvent);
@@ -1336,7 +1347,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
     if (FrameView* view = m_frame->view()) {
         RenderLayer* layer = m_clickNode->renderer() ? m_clickNode->renderer()->enclosingLayer() : 0;
         IntPoint p = view->windowToContents(mouseEvent.position());
-        if (layer && layer->isPointInResizeControl(p, RenderLayer::ResizerForPointer)) {
+        if (layer && layer->isPointInResizeControl(p, ResizerForPointer)) {
             layer->setInResizeMode(true);
             m_resizeLayer = layer;
             m_offsetFromResizeCorner = layer->offsetFromResizeCorner(p);
@@ -1406,6 +1417,20 @@ static RenderLayer* layerForNode(Node* node)
     return layer;
 }
 
+ScrollableArea* EventHandler::associatedScrollableArea(const RenderLayer* layer) const
+{
+    ScrollableArea* layerScrollableArea = layer->scrollableArea();
+    if (!layerScrollableArea)
+        return 0;
+
+    if (FrameView* frameView = m_frame->view()) {
+        if (frameView->containsScrollableArea(layerScrollableArea))
+            return layerScrollableArea;
+    }
+
+    return 0;
+}
+
 bool EventHandler::mouseMoved(const PlatformMouseEvent& event)
 {
     RefPtr<FrameView> protector(m_frame->view());
@@ -1419,10 +1444,8 @@ bool EventHandler::mouseMoved(const PlatformMouseEvent& event)
         return result;
 
     if (RenderLayer* layer = layerForNode(hoveredNode.innerNode())) {
-        if (FrameView* frameView = m_frame->view()) {
-            if (frameView->containsScrollableArea(layer))
-                layer->mouseMovedInContentArea();
-        }
+        if (ScrollableArea* layerScrollableArea = associatedScrollableArea(layer))
+            layerScrollableArea->mouseMovedInContentArea();
     }
 
     if (FrameView* frameView = m_frame->view())
@@ -1870,7 +1893,7 @@ MouseEventWithHitTestResults EventHandler::prepareMouseEvent(const HitTestReques
 {
     ASSERT(m_frame);
     ASSERT(m_frame->document());
-    
+
     return m_frame->document()->prepareMouseEvent(request, documentPointForWindowPoint(m_frame, mev.position()), mev);
 }
 
@@ -1950,12 +1973,8 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
             }
         } else if (page && (layerForLastNode && (!layerForNodeUnderMouse || layerForNodeUnderMouse != layerForLastNode))) {
             // The mouse has moved between layers.
-            if (Frame* frame = m_lastNodeUnderMouse->document()->frame()) {
-                if (FrameView* frameView = frame->view()) {
-                    if (frameView->containsScrollableArea(layerForLastNode))
-                        layerForLastNode->mouseExitedContentArea();
-                }
-            }
+            if (ScrollableArea* scrollableAreaForLastNode = associatedScrollableArea(layerForLastNode))
+                scrollableAreaForLastNode->mouseExitedContentArea();
         }
 
         if (m_nodeUnderMouse && (!m_lastNodeUnderMouse || m_lastNodeUnderMouse->document() != m_frame->document())) {
@@ -1966,12 +1985,8 @@ void EventHandler::updateMouseEventTargetNode(Node* targetNode, const PlatformMo
             }
         } else if (page && (layerForNodeUnderMouse && (!layerForLastNode || layerForNodeUnderMouse != layerForLastNode))) {
             // The mouse has moved between layers.
-            if (Frame* frame = m_nodeUnderMouse->document()->frame()) {
-                if (FrameView* frameView = frame->view()) {
-                    if (frameView->containsScrollableArea(layerForNodeUnderMouse))
-                        layerForNodeUnderMouse->mouseEnteredContentArea();
-                }
-            }
+            if (ScrollableArea* scrollableAreaForNodeUnderMouse = associatedScrollableArea(layerForNodeUnderMouse))
+                scrollableAreaForNodeUnderMouse->mouseEnteredContentArea();
         }
 
         if (m_lastNodeUnderMouse && m_lastNodeUnderMouse->document() != m_frame->document()) {
@@ -2407,7 +2422,7 @@ bool EventHandler::handleScrollGestureOnResizer(Node* eventTarget, const Platfor
     if (gestureEvent.type() == PlatformEvent::GestureScrollBegin) {
         RenderLayer* layer = eventTarget->renderer() ? eventTarget->renderer()->enclosingLayer() : 0;
         IntPoint p = m_frame->view()->windowToContents(gestureEvent.position());
-        if (layer && layer->isPointInResizeControl(p, RenderLayer::ResizerForTouch)) {
+        if (layer && layer->isPointInResizeControl(p, ResizerForTouch)) {
             layer->setInResizeMode(true);
             m_resizeLayer = layer;
             m_offsetFromResizeCorner = layer->offsetFromResizeCorner(p);

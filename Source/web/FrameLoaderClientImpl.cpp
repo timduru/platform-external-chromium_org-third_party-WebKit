@@ -52,7 +52,6 @@
 #include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/mediastream/RTCPeerConnectionHandler.h"
 #include "core/platform/network/HTTPParsers.h"
-#include "core/platform/network/ResourceHandleInternal.h"
 #include "core/plugins/PluginData.h"
 #include "core/rendering/HitTestResult.h"
 #include <v8.h>
@@ -530,14 +529,6 @@ void FrameLoaderClientImpl::loadURLExternally(const ResourceRequest& request, Na
         WrappedResourceRequest webreq(request);
         m_webFrame->client()->loadURLExternally(
             m_webFrame, webreq, static_cast<WebNavigationPolicy>(policy), suggestedName);
-    }
-}
-
-void FrameLoaderClientImpl::didReceiveDocumentData(const char* data, int length)
-{
-    if (m_webFrame->client()) {
-        bool preventDefault = false;
-        m_webFrame->client()->didReceiveDocumentData(m_webFrame, data, length, preventDefault);
     }
 }
 

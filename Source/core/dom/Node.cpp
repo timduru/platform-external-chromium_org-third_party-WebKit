@@ -55,7 +55,7 @@
 #include "core/dom/MutationEvent.h"
 #include "core/dom/NameNodeList.h"
 #include "core/dom/NodeRareData.h"
-#include "core/dom/NodeRenderingContext.h"
+#include "core/dom/NodeRenderingTraversal.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/ProcessingInstruction.h"
 #include "core/dom/SelectorQuery.h"
@@ -650,10 +650,14 @@ bool Node::rendererIsEditable(EditableLevel editableLevel, UserSelectAllTreatmen
 
     for (const Node* node = this; node; node = node->parentNode()) {
         if ((node->isHTMLElement() || node->isDocumentNode()) && node->renderer()) {
+#if ENABLE(USERSELECT_ALL)
             // Elements with user-select: all style are considered atomic
             // therefore non editable.
             if (node->renderer()->style()->userSelect() == SELECT_ALL && treatment == UserSelectAllIsAlwaysNonEditable)
                 return false;
+#else
+            UNUSED_PARAM(treatment);
+#endif
             switch (node->renderer()->style()->userModify()) {
             case READ_ONLY:
                 return false;
@@ -770,7 +774,7 @@ inline void Node::markAncestorsWithChildNeedsStyleRecalc()
     for (ContainerNode* p = parentOrShadowHostNode(); p && !p->childNeedsStyleRecalc(); p = p->parentOrShadowHostNode())
         p->setChildNeedsStyleRecalc();
 
-    if (document()->childNeedsStyleRecalc())
+    if (document()->needsStyleRecalc() || document()->childNeedsStyleRecalc())
         document()->scheduleStyleRecalc();
 }
 
@@ -1138,11 +1142,6 @@ Node *Node::nextLeafNode() const
         node = node->nextNodeConsideringAtomicNodes();
     }
     return 0;
-}
-
-ContainerNode* Node::parentNodeForRenderingAndStyle()
-{
-    return NodeRenderingContext(this).parentNodeForRenderingAndStyle();
 }
 
 RenderStyle* Node::virtualComputedStyle(PseudoId pseudoElementSpecifier)
@@ -1656,7 +1655,7 @@ void Node::setTextContent(const String& text, ExceptionCode& ec)
             ChildListMutationScope mutation(this);
             container->removeChildren();
             if (!text.isEmpty())
-                container->appendChild(document()->createTextNode(text), ec);
+                container->appendChild(document()->createTextNode(text), ec, AttachLazily);
             return;
         }
         case DOCUMENT_NODE:

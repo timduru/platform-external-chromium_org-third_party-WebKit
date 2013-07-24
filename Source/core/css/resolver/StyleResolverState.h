@@ -75,7 +75,7 @@ private:
 class StyleResolverState {
 WTF_MAKE_NONCOPYABLE(StyleResolverState);
 public:
-    StyleResolverState(StyleResolverState**, const Document*, Element*, RenderStyle* parentStyle = 0, RenderRegion* regionForStyling = 0);
+    StyleResolverState(const Document*, Element*, RenderStyle* parentStyle = 0, RenderRegion* regionForStyling = 0);
     ~StyleResolverState();
 
     // These are all just pass-through methods to ElementResolveContext.
@@ -122,7 +122,7 @@ public:
     // sites are extremely verbose.
     PassRefPtr<StyleImage> styleImage(CSSPropertyID propertyId, CSSValue* value)
     {
-        return m_elementStyleResources.styleImage(document()->textLinkColors(), style()->visitedDependentColor(CSSPropertyColor), propertyId, value);
+        return m_elementStyleResources.styleImage(document()->textLinkColors(), propertyId, value);
     }
 
     FontBuilder& fontBuilder() { return m_fontBuilder; }
@@ -179,8 +179,6 @@ private:
     // CSSToStyleMap is a pure-logic class and only contains
     // a back-pointer to this object.
     CSSToStyleMap m_styleMap;
-
-    StyleResolverState** m_thisPointer;
 };
 
 } // namespace WebCore

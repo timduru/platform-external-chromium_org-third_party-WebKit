@@ -570,10 +570,10 @@ public:
 
     void reattach(const AttachContext& = AttachContext());
     void lazyReattachIfAttached();
-    ContainerNode* parentNodeForRenderingAndStyle();
 
     // Wrapper for nodes that don't have a renderer, but still cache the style (like HTMLOptionElement).
     RenderStyle* renderStyle() const;
+    RenderStyle* parentRenderStyle() const;
 
     RenderStyle* computedStyle(PseudoId pseudoElementSpecifier = NOPSEUDO) { return virtualComputedStyle(pseudoElementSpecifier); }
 
@@ -931,9 +931,7 @@ inline void Node::lazyReattach(ShouldSetAttached shouldSetAttached)
     lazyAttach(shouldSetAttached);
 }
 
-// Need a template since ElementShadow is not a Node, but has the style recalc methods.
-template<class T>
-inline bool shouldRecalcStyle(Node::StyleChange change, const T* node)
+inline bool shouldRecalcStyle(Node::StyleChange change, const Node* node)
 {
     return change >= Node::Inherit || node->childNeedsStyleRecalc() || node->needsStyleRecalc();
 }

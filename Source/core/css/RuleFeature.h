@@ -24,7 +24,7 @@
 
 #include "wtf/Forward.h"
 #include "wtf/HashSet.h"
-#include "wtf/text/AtomicString.h"
+#include "wtf/text/AtomicStringHash.h"
 
 namespace WebCore {
 
@@ -59,27 +59,27 @@ public:
     bool usesFirstLineRules() const { return m_usesFirstLineRules; }
     bool usesBeforeAfterRules() const { return m_usesBeforeAfterRules; }
 
-    inline bool hasSelectorForAttribute(const AtomicString &attributeName) const
+    inline bool hasSelectorForAttribute(const AtomicString& attributeName) const
     {
         ASSERT(!attributeName.isEmpty());
-        return attrsInRules.contains(attributeName.impl());
+        return attrsInRules.contains(attributeName);
     }
 
     inline bool hasSelectorForClass(const AtomicString& classValue) const
     {
         ASSERT(!classValue.isEmpty());
-        return classesInRules.contains(classValue.impl());
+        return classesInRules.contains(classValue);
     }
 
     inline bool hasSelectorForId(const AtomicString& idValue) const
     {
         ASSERT(!idValue.isEmpty());
-        return idsInRules.contains(idValue.impl());
+        return idsInRules.contains(idValue);
     }
 
-    HashSet<AtomicStringImpl*> idsInRules;
-    HashSet<AtomicStringImpl*> classesInRules;
-    HashSet<AtomicStringImpl*> attrsInRules;
+    HashSet<AtomicString> idsInRules;
+    HashSet<AtomicString> classesInRules;
+    HashSet<AtomicString> attrsInRules;
     Vector<RuleFeature> siblingRules;
     Vector<RuleFeature> uncommonAttributeRules;
 private:

@@ -31,7 +31,6 @@
 
 #include "HTMLNames.h"
 #include "XMLNames.h"
-#include "core/css/RuleFeature.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/css/resolver/StyleResolverState.h"
 #include "core/dom/ContainerNode.h"
@@ -319,7 +318,7 @@ Element* SharedStyleFinder::searchDocumentForSharedStyle(const ElementResolveCon
 }
 #endif
 
-RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& context)
+RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& context, RenderStyle* newStyle)
 {
     STYLE_STATS_ADD_SEARCH();
     if (!context.element() || !context.element()->isStyledElement())
@@ -394,10 +393,10 @@ RenderStyle* SharedStyleFinder::locateSharedStyle(const ElementResolveContext& c
         return 0;
 
     // Can't share if sibling rules apply. This is checked at the end as it should rarely fail.
-    if (m_styleResolver->styleSharingCandidateMatchesRuleSet(context, m_siblingRuleSet))
+    if (m_styleResolver->styleSharingCandidateMatchesRuleSet(context, newStyle, m_siblingRuleSet))
         return 0;
     // Can't share if attribute rules apply.
-    if (m_styleResolver->styleSharingCandidateMatchesRuleSet(context, m_uncommonAttributeRuleSet))
+    if (m_styleResolver->styleSharingCandidateMatchesRuleSet(context, newStyle, m_uncommonAttributeRuleSet))
         return 0;
     // Tracking child index requires unique style for each node. This may get set by the sibling rule match above.
     if (parentElementPreventsSharing(context.element()->parentElement()))

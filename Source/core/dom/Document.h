@@ -482,7 +482,6 @@ public:
     PassRefPtr<Text> createEditingTextNode(const String&);
 
     void recalcStyle(StyleChange = NoChange);
-    bool childNeedsAndNotInStyleRecalc();
     void updateStyleIfNeeded();
     void updateStyleForNodeIfNeeded(Node*);
     void updateLayout();
@@ -654,8 +653,7 @@ public:
     // Updates for :target (CSS3 selector).
     void setCSSTarget(Element*);
     Element* cssTarget() const { return m_cssTarget; }
-    
-    void scheduleForcedStyleRecalc();
+
     void scheduleStyleRecalc();
     void unscheduleStyleRecalc();
     bool hasPendingStyleRecalc() const;
@@ -754,6 +752,7 @@ public:
     String title() const { return m_title.string(); }
     void setTitle(const String&);
 
+    Element* titleElement() const { return m_titleElement.get(); }
     void setTitleElement(const StringWithDirection&, Element* titleElement);
     void removeTitle(Element* titleElement);
 
@@ -1112,6 +1111,7 @@ private:
     void processHttpEquivRefresh(const String& content);
     void processHttpEquivSetCookie(const String& content);
     void processHttpEquivXFrameOptions(const String& content);
+    void processHttpEquivContentSecurityPolicy(const String& equiv, const String& content);
 
     Timer<Document> m_styleResolverThrowawayTimer;
     double m_lastStyleResolverAccessTime;
@@ -1198,9 +1198,8 @@ private:
     bool m_visuallyOrdered;
     ReadyState m_readyState;
     bool m_bParsing;
-    
+
     Timer<Document> m_styleRecalcTimer;
-    bool m_pendingStyleRecalcShouldForce;
     bool m_inStyleRecalc;
     bool m_closeAfterStyleRecalc;
 

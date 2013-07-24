@@ -33,6 +33,7 @@
 #include "SVGNames.h"
 #include "XMLNames.h"
 #include "core/accessibility/AXObjectCache.h"
+#include "core/animation/DocumentTimeline.h"
 #include "core/css/CSSParser.h"
 #include "core/css/CSSStyleSheet.h"
 #include "core/css/CSSValuePool.h"
@@ -43,6 +44,7 @@
 #include "core/dom/Attribute.h"
 #include "core/dom/ClientRect.h"
 #include "core/dom/ClientRectList.h"
+#include "core/dom/CustomElement.h"
 #include "core/dom/CustomElementRegistrationContext.h"
 #include "core/dom/DatasetDOMStringMap.h"
 #include "core/dom/Document.h"
@@ -208,8 +210,8 @@ Element::~Element()
         data->clearShadow();
     }
 
-    if (isCustomElement() && document() && document()->registrationContext())
-        document()->registrationContext()->customElementIsBeingDestroyed(this);
+    if (isCustomElement())
+        CustomElement::wasDestroyed(this);
 
     if (hasSyntheticAttrChildNodes())
         detachAllAttrNodesFromElement();
@@ -373,34 +375,31 @@ NamedNodeMap* Element::attributes() const
     return rareData->attributeMap();
 }
 
-void Element::addActiveAnimation(Animation* animation)
+ActiveAnimations* Element::activeAnimations() const
 {
-    ElementRareData* rareData = ensureElementRareData();
-    if (!rareData->activeAnimations())
-        rareData->setActiveAnimations(adoptPtr(new Vector<Animation*>));
-    rareData->activeAnimations()->append(animation);
+    if (hasActiveAnimations())
+        return elementRareData()->activeAnimations();
+    return 0;
 }
 
-void Element::removeActiveAnimation(Animation* animation)
+ActiveAnimations* Element::ensureActiveAnimations()
 {
-    ElementRareData* rareData = elementRareData();
-    ASSERT(rareData);
-    size_t position = rareData->activeAnimations()->find(animation);
-    ASSERT(position != notFound);
-    rareData->activeAnimations()->remove(position);
+    ElementRareData* rareData = ensureElementRareData();
+    if (!elementRareData()->activeAnimations())
+        rareData->setActiveAnimations(adoptPtr(new ActiveAnimations()));
+    return rareData->activeAnimations();
 }
 
 bool Element::hasActiveAnimations() const
 {
-    return hasRareData() && elementRareData()->activeAnimations()
-        && elementRareData()->activeAnimations()->size();
-}
+    if (!RuntimeEnabledFeatures::webAnimationsEnabled())
+        return false;
 
-Vector<Animation*>* Element::activeAnimations() const
-{
-    if (!elementRareData())
-        return 0;
-    return elementRareData()->activeAnimations();
+    if (!hasRareData())
+        return false;
+
+    ActiveAnimations* activeAnimations = elementRareData()->activeAnimations();
+    return activeAnimations && !activeAnimations->isEmpty();
 }
 
 Node::NodeType Element::nodeType() const
@@ -1200,37 +1199,6 @@ RenderObject* Element::createRenderer(RenderStyle* style)
     return RenderObject::createObject(this, style);
 }
 
-#if ENABLE(INPUT_MULTIPLE_FIELDS_UI)
-bool Element::isDateTimeEditElement() const
-{
-    return false;
-}
-
-bool Element::isDateTimeFieldElement() const
-{
-    return false;
-}
-
-bool Element::isPickerIndicatorElement() const
-{
-    return false;
-}
-#endif
-
-bool Element::isClearButtonElement() const
-{
-    return false;
-}
-
-bool Element::wasChangedSinceLastFormControlChangeEvent() const
-{
-    return false;
-}
-
-void Element::setChangedSinceLastFormControlChangeEvent(bool)
-{
-}
-
 bool Element::isInert() const
 {
     const Element* dialog = document()->activeModalDialog();
@@ -1265,7 +1233,7 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
         return InsertionDone;
 
     if (isUpgradedCustomElement())
-        document()->registrationContext()->customElementDidEnterDocument(this);
+        CustomElement::didEnterDocument(this);
 
     const AtomicString& idValue = getIdAttribute();
     if (!idValue.isNull())
@@ -1326,14 +1294,14 @@ void Element::removedFrom(ContainerNode* insertionPoint)
         if (hasPendingResources())
             document()->accessSVGExtensions()->removeElementFromPendingResources(this);
 
-        if (isUpgradedCustomElement() && document()->registrationContext())
-            document()->registrationContext()->customElementDidLeaveDocument(this);
+        if (isUpgradedCustomElement())
+            CustomElement::didLeaveDocument(this);
     }
 }
 
 void Element::createRendererIfNeeded(const AttachContext& context)
 {
-    NodeRenderingContext(this, context).createRendererForElementIfNeeded();
+    NodeRenderingContext(this, context.resolvedStyle).createRendererForElementIfNeeded();
 }
 
 void Element::attach(const AttachContext& context)
@@ -1464,12 +1432,12 @@ bool Element::recalcStyle(StyleChange change)
         willRecalcStyle(change);
 
     // Ref currentStyle in case it would otherwise be deleted when setting the new style in the renderer.
-    RefPtr<RenderStyle> currentStyle(renderStyle());
-    bool hasParentStyle = parentNodeForRenderingAndStyle() ? static_cast<bool>(parentNodeForRenderingAndStyle()->renderStyle()) : false;
+    RefPtr<RenderStyle> currentStyle = renderStyle();
+    bool hasParentStyle = static_cast<bool>(parentRenderStyle());
     bool hasDirectAdjacentRules = childrenAffectedByDirectAdjacentRules();
     bool hasIndirectAdjacentRules = childrenAffectedByForwardPositionalRules();
 
-    if ((change > NoChange || needsStyleRecalc())) {
+    if (change > NoChange || needsStyleRecalc()) {
         if (hasRareData())
             elementRareData()->resetComputedStyle();
     }
@@ -1528,11 +1496,12 @@ bool Element::recalcStyle(StyleChange change)
     }
     StyleResolverParentPusher parentPusher(this);
 
-    // FIXME: This does not care about sibling combinators. Will be necessary in XBL2 world.
     if (ElementShadow* shadow = this->shadow()) {
-        if (shouldRecalcStyle(change, shadow)) {
-            parentPusher.push();
-            shadow->recalcStyle(change);
+        for (ShadowRoot* root = shadow->youngestShadowRoot(); root; root = root->olderShadowRoot()) {
+            if (shouldRecalcStyle(change, root)) {
+                parentPusher.push();
+                root->recalcStyle(change);
+            }
         }
     }
 
@@ -1673,7 +1642,7 @@ bool Element::childTypeAllowed(NodeType type) const
     return false;
 }
 
-static void checkForEmptyStyleChange(Element* element, RenderStyle* style)
+static void inline checkForEmptyStyleChange(Element* element, RenderStyle* style)
 {
     if (!style && !element->styleAffectedByEmpty())
         return;
@@ -1685,69 +1654,14 @@ static void checkForEmptyStyleChange(Element* element, RenderStyle* style)
 static void checkForSiblingStyleChanges(Element* e, RenderStyle* style, bool finishedParsingCallback,
                                         Node* beforeChange, Node* afterChange, int childCountDelta)
 {
+    if (!e->attached() || e->document()->hasPendingForcedStyleRecalc() || e->styleChangeType() == SubtreeStyleChange)
+        return;
+
     // :empty selector.
     checkForEmptyStyleChange(e, style);
 
     if (!style || (e->needsStyleRecalc() && e->childrenAffectedByPositionalRules()))
         return;
-
-    // :first-child.  In the parser callback case, we don't have to check anything, since we were right the first time.
-    // In the DOM case, we only need to do something if |afterChange| is not 0.
-    // |afterChange| is 0 in the parser case, so it works out that we'll skip this block.
-    if (e->childrenAffectedByFirstChildRules() && afterChange) {
-        // Find our new first child.
-        Node* newFirstChild = 0;
-        for (newFirstChild = e->firstChild(); newFirstChild && !newFirstChild->isElementNode(); newFirstChild = newFirstChild->nextSibling()) {};
-
-        // Find the first element node following |afterChange|
-        Node* firstElementAfterInsertion = 0;
-        for (firstElementAfterInsertion = afterChange;
-             firstElementAfterInsertion && !firstElementAfterInsertion->isElementNode();
-             firstElementAfterInsertion = firstElementAfterInsertion->nextSibling()) {};
-
-        // This is the insert/append case.
-        if (newFirstChild != firstElementAfterInsertion && firstElementAfterInsertion && firstElementAfterInsertion->attached() &&
-            firstElementAfterInsertion->renderStyle() && firstElementAfterInsertion->renderStyle()->firstChildState())
-            firstElementAfterInsertion->setNeedsStyleRecalc();
-
-        // We also have to handle node removal.
-        if (childCountDelta < 0 && newFirstChild == firstElementAfterInsertion && newFirstChild && (!newFirstChild->renderStyle() || !newFirstChild->renderStyle()->firstChildState()))
-            newFirstChild->setNeedsStyleRecalc();
-    }
-
-    // :last-child.  In the parser callback case, we don't have to check anything, since we were right the first time.
-    // In the DOM case, we only need to do something if |afterChange| is not 0.
-    if (e->childrenAffectedByLastChildRules() && beforeChange) {
-        // Find our new last child.
-        Node* newLastChild = 0;
-        for (newLastChild = e->lastChild(); newLastChild && !newLastChild->isElementNode(); newLastChild = newLastChild->previousSibling()) {};
-
-        // Find the last element node going backwards from |beforeChange|
-        Node* lastElementBeforeInsertion = 0;
-        for (lastElementBeforeInsertion = beforeChange;
-             lastElementBeforeInsertion && !lastElementBeforeInsertion->isElementNode();
-             lastElementBeforeInsertion = lastElementBeforeInsertion->previousSibling()) {};
-
-        if (newLastChild != lastElementBeforeInsertion && lastElementBeforeInsertion && lastElementBeforeInsertion->attached() &&
-            lastElementBeforeInsertion->renderStyle() && lastElementBeforeInsertion->renderStyle()->lastChildState())
-            lastElementBeforeInsertion->setNeedsStyleRecalc();
-
-        // We also have to handle node removal.  The parser callback case is similar to node removal as well in that we need to change the last child
-        // to match now.
-        if ((childCountDelta < 0 || finishedParsingCallback) && newLastChild == lastElementBeforeInsertion && newLastChild && (!newLastChild->renderStyle() || !newLastChild->renderStyle()->lastChildState()))
-            newLastChild->setNeedsStyleRecalc();
-    }
-
-    // The + selector.  We need to invalidate the first element following the insertion point.  It is the only possible element
-    // that could be affected by this DOM change.
-    if (e->childrenAffectedByDirectAdjacentRules() && afterChange) {
-        Node* firstElementAfterInsertion = 0;
-        for (firstElementAfterInsertion = afterChange;
-             firstElementAfterInsertion && !firstElementAfterInsertion->isElementNode();
-             firstElementAfterInsertion = firstElementAfterInsertion->nextSibling()) {};
-        if (firstElementAfterInsertion && firstElementAfterInsertion->attached())
-            firstElementAfterInsertion->setNeedsStyleRecalc();
-    }
 
     // Forward positional selectors include the ~ selector, nth-child, nth-of-type, first-of-type and only-of-type.
     // Backward positional selectors include nth-last-child, nth-last-of-type, last-of-type and only-of-type.
@@ -1755,10 +1669,59 @@ static void checkForSiblingStyleChanges(Element* e, RenderStyle* style, bool fin
     // backward case.
     // |afterChange| is 0 in the parser callback case, so we won't do any work for the forward case if we don't have to.
     // For performance reasons we just mark the parent node as changed, since we don't want to make childrenChanged O(n^2) by crawling all our kids
-    // here.  recalcStyle will then force a walk of the children when it sees that this has happened.
-    if ((e->childrenAffectedByForwardPositionalRules() && afterChange)
-        || (e->childrenAffectedByBackwardPositionalRules() && beforeChange))
+    // here. recalcStyle will then force a walk of the children when it sees that this has happened.
+    if ((e->childrenAffectedByForwardPositionalRules() && afterChange) || (e->childrenAffectedByBackwardPositionalRules() && beforeChange)) {
         e->setNeedsStyleRecalc();
+        return;
+    }
+
+    // :first-child.  In the parser callback case, we don't have to check anything, since we were right the first time.
+    // In the DOM case, we only need to do something if |afterChange| is not 0.
+    // |afterChange| is 0 in the parser case, so it works out that we'll skip this block.
+    if (e->childrenAffectedByFirstChildRules() && afterChange) {
+        // Find our new first child.
+        Node* newFirstChild = e->firstElementChild();
+        RenderStyle* newFirstChildStyle = newFirstChild ? newFirstChild->renderStyle() : 0;
+
+        // Find the first element node following |afterChange|
+        Node* firstElementAfterInsertion = afterChange->isElementNode() ? afterChange : afterChange->nextElementSibling();
+        RenderStyle* firstElementAfterInsertionStyle = firstElementAfterInsertion ? firstElementAfterInsertion->renderStyle() : 0;
+
+        // This is the insert/append case.
+        if (newFirstChild != firstElementAfterInsertion && firstElementAfterInsertionStyle && firstElementAfterInsertionStyle->firstChildState())
+            firstElementAfterInsertion->setNeedsStyleRecalc();
+
+        // We also have to handle node removal.
+        if (childCountDelta < 0 && newFirstChild == firstElementAfterInsertion && newFirstChild && (!newFirstChildStyle || !newFirstChildStyle->firstChildState()))
+            newFirstChild->setNeedsStyleRecalc();
+    }
+
+    // :last-child.  In the parser callback case, we don't have to check anything, since we were right the first time.
+    // In the DOM case, we only need to do something if |afterChange| is not 0.
+    if (e->childrenAffectedByLastChildRules() && beforeChange) {
+        // Find our new last child.
+        Node* newLastChild = e->lastElementChild();
+        RenderStyle* newLastChildStyle = newLastChild ? newLastChild->renderStyle() : 0;
+
+        // Find the last element node going backwards from |beforeChange|
+        Node* lastElementBeforeInsertion = beforeChange->isElementNode() ? beforeChange : beforeChange->previousElementSibling();
+        RenderStyle* lastElementBeforeInsertionStyle = lastElementBeforeInsertion ? lastElementBeforeInsertion->renderStyle() : 0;
+
+        if (newLastChild != lastElementBeforeInsertion && lastElementBeforeInsertionStyle && lastElementBeforeInsertionStyle->lastChildState())
+            lastElementBeforeInsertion->setNeedsStyleRecalc();
+
+        // We also have to handle node removal.  The parser callback case is similar to node removal as well in that we need to change the last child
+        // to match now.
+        if ((childCountDelta < 0 || finishedParsingCallback) && newLastChild == lastElementBeforeInsertion && newLastChild && (!newLastChildStyle || !newLastChildStyle->lastChildState()))
+            newLastChild->setNeedsStyleRecalc();
+    }
+
+    // The + selector.  We need to invalidate the first element following the insertion point.  It is the only possible element
+    // that could be affected by this DOM change.
+    if (e->childrenAffectedByDirectAdjacentRules() && afterChange) {
+        if (Node* firstElementAfterInsertion = afterChange->nextElementSibling())
+            firstElementAfterInsertion->setNeedsStyleRecalc();
+    }
 }
 
 void Element::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
@@ -1769,7 +1732,7 @@ void Element::childrenChanged(bool changedByParser, Node* beforeChange, Node* af
     else
         checkForSiblingStyleChanges(this, renderStyle(), false, beforeChange, afterChange, childCountDelta);
 
-    if (ElementShadow * shadow = this->shadow())
+    if (ElementShadow* shadow = this->shadow())
         shadow->invalidateDistribution();
 }
 
@@ -2157,11 +2120,6 @@ String Element::textFromChildren()
     return content.toString();
 }
 
-String Element::title() const
-{
-    return String();
-}
-
 const AtomicString& Element::pseudo() const
 {
     return getAttribute(pseudoAttr);
@@ -2475,16 +2433,6 @@ RenderObject* Element::pseudoElementRenderer(PseudoId pseudoId) const
     return 0;
 }
 
-bool Element::matchesReadOnlyPseudoClass() const
-{
-    return false;
-}
-
-bool Element::matchesReadWritePseudoClass() const
-{
-    return false;
-}
-
 bool Element::webkitMatchesSelector(const String& selector, ExceptionCode& ec)
 {
     if (selector.isEmpty()) {
@@ -2496,11 +2444,6 @@ bool Element::webkitMatchesSelector(const String& selector, ExceptionCode& ec)
     if (!selectorQuery)
         return false;
     return selectorQuery->matches(this);
-}
-
-bool Element::shouldAppearIndeterminate() const
-{
-    return false;
 }
 
 DOMTokenList* Element::classList()
@@ -2822,7 +2765,7 @@ void Element::willModifyAttribute(const QualifiedName& name, const AtomicString&
            setNeedsStyleRecalc();
 
         if (isUpgradedCustomElement())
-            document()->registrationContext()->customElementAttributeDidChange(this, name.localName(), oldValue, newValue);
+            CustomElement::attributeDidChange(this, name.localName(), oldValue, newValue);
     }
 
     if (OwnPtr<MutationObserverInterestGroup> recipients = MutationObserverInterestGroup::createForAttributesMutation(this, name))
@@ -3096,9 +3039,9 @@ void Element::clearHasPendingResources()
 
 struct PresentationAttributeCacheKey {
     PresentationAttributeCacheKey() : tagName(0) { }
-    AtomicStringImpl* tagName;
+    StringImpl* tagName;
     // Only the values need refcounting.
-    Vector<pair<AtomicStringImpl*, AtomicString>, 3> attributesAndValues;
+    Vector<pair<StringImpl*, AtomicString>, 3> attributesAndValues;
 };
 
 struct PresentationAttributeCacheEntry {
@@ -3318,7 +3261,7 @@ void Element::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) const
         inlineStyle->addSubresourceStyleURLs(urls, document()->elementSheet()->contents());
 }
 
-static inline bool attributeNameSort(const pair<AtomicStringImpl*, AtomicString>& p1, const pair<AtomicStringImpl*, AtomicString>& p2)
+static inline bool attributeNameSort(const pair<StringImpl*, AtomicString>& p1, const pair<StringImpl*, AtomicString>& p2)
 {
     // Sort based on the attribute name pointers. It doesn't matter what the order is as long as it is always the same.
     return p1.first < p2.first;

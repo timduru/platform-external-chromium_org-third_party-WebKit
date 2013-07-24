@@ -189,9 +189,9 @@ $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: gyp_local_path := 
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/css/make-css-file-arrays.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/preprocessor.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/css/html.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/quirks.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/view-source.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromium.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumAndroid.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumLinux.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumSkia.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeWin.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeWinQuirks.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/svg.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mathml.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mediaControls.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mediaControlsAndroid.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/fullscreen.css $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/css/make-css-file-arrays.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/preprocessor.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/css/html.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/quirks.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/view-source.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromium.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumAndroid.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumLinux.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeChromiumSkia.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeWin.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/themeWinQuirks.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/svg.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mediaControls.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/mediaControlsAndroid.css $(LOCAL_PATH)/third_party/WebKit/Source/core/css/fullscreen.css $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_derived_sources_gyp_make_derived_sources_target_UserAgentStyleSheets ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_useragentstylesheets.py "$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h" "$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp" css/html.css css/quirks.css css/view-source.css css/themeChromium.css css/themeChromiumAndroid.css css/themeChromiumLinux.css css/themeChromiumSkia.css css/themeWin.css css/themeWinQuirks.css css/svg.css css/mathml.css css/mediaControls.css css/mediaControlsAndroid.css css/fullscreen.css -- css/make-css-file-arrays.pl scripts/preprocessor.pm -- --defines "\"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_GDI_FONTS_ON_WINDOWS=1\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_useragentstylesheets.py "$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h" "$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp" css/html.css css/quirks.css css/view-source.css css/themeChromium.css css/themeChromiumAndroid.css css/themeChromiumLinux.css css/themeChromiumSkia.css css/themeWin.css css/themeWinQuirks.css css/svg.css css/mediaControls.css css/mediaControlsAndroid.css css/fullscreen.css -- css/make-css-file-arrays.pl scripts/preprocessor.pm -- --defines "\"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_GDI_FONTS_ON_WINDOWS=1\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\""
 
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp: $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h ;
 
@@ -279,7 +279,7 @@ $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: gyp_shared_intermediate_dir 
 $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
 $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.y: $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSGrammar.y.in $(LOCAL_PATH)/third_party/WebKit/Source/core/css/CSSGrammar.y.includes $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: third_party_WebKit_Source_core_core_derived_sources_gyp_make_derived_sources_target_preprocess_grammar ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; perl -Iscripts css/makegrammar.pl --outputDir "$(gyp_shared_intermediate_dir)/webkit/" --extraDefines "\"ENABLE_CSS3_TEXT=0\" \"ENABLE_CSS_EXCLUSIONS=1\" \"ENABLE_CSS_REGIONS=1\" \"ENABLE_CUSTOM_SCHEME_HANDLER=0\" \"ENABLE_ENCRYPTED_MEDIA_V2=1\" \"ENABLE_SVG_FONTS=1\" \"ENABLE_TOUCH_ICON_LOADING=1\" \"ENABLE_GDI_FONTS_ON_WINDOWS=1\" \"WTF_USE_CONCATENATED_IMPULSE_RESPONSES=1\" \"ENABLE_CALENDAR_PICKER=0\" \"ENABLE_FAST_MOBILE_SCROLLING=1\" \"ENABLE_INPUT_SPEECH=0\" \"ENABLE_LEGACY_NOTIFICATIONS=0\" \"ENABLE_MEDIA_CAPTURE=1\" \"ENABLE_NOTIFICATIONS=0\" \"ENABLE_ORIENTATION_EVENTS=1\" \"ENABLE_PRINTING=0\" \"ENABLE_NAVIGATOR_CONTENT_UTILS=0\" \"WTF_USE_NATIVE_FULLSCREEN_VIDEO=1\" \"ENABLE_OPENTYPE_VERTICAL=1\" \"WTF_USE_HARFBUZZ=1\"" --preprocessOnly --preprocessor "/usr/bin/gcc -E -P -x c++" css/CSSGrammar.y.in css/CSSGrammar.y.includes
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; perl -Iscripts css/makegrammar.pl --outputDir "$(gyp_shared_intermediate_dir)/webkit/" css/CSSGrammar.y.in css/CSSGrammar.y.includes
 
 
 ### Rules for action "MakeTokenMatcher":
@@ -452,10 +452,10 @@ MY_DEFS_Debug := \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
+	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
-	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
 	'-DUSE_STLPORT=1' \
@@ -535,10 +535,10 @@ MY_DEFS_Release := \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
+	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
-	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
 	'-DUSE_STLPORT=1' \

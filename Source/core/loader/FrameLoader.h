@@ -39,11 +39,11 @@
 #include "core/loader/HistoryController.h"
 #include "core/loader/MixedContentChecker.h"
 #include "core/loader/ResourceLoadNotifier.h"
+#include "core/loader/ResourceLoaderOptions.h"
 #include "core/loader/SubframeLoader.h"
 #include "core/loader/cache/CachePolicy.h"
 #include "core/page/LayoutMilestones.h"
 #include "core/platform/Timer.h"
-#include "core/platform/network/ResourceHandle.h"
 #include "wtf/Forward.h"
 #include "wtf/HashSet.h"
 #include "wtf/OwnPtr.h"
@@ -260,7 +260,10 @@ private:
 
     SubstituteData defaultSubstituteDataForURL(const KURL&);
     
-    bool fireBeforeUnloadEvent(Chrome&);
+    bool fireBeforeUnloadEvent(Chrome&, FrameLoader*);
+    bool hasAllowedNavigationViaBeforeUnloadConfirmationPanel() const { return m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel; }
+    void didAllowNavigationViaBeforeUnloadConfirmationPanel() { m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel = true; }
+    void clearAllowNavigationViaBeforeUnloadConfirmationPanel() { m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel = false; }
 
     void checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState>, FrameLoadType);
     void checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction&, bool isNewNavigation);
@@ -284,9 +287,6 @@ private:
     // Calls continueLoadAfterNavigationPolicy
     void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,
         FrameLoadType, PassRefPtr<FormState>, const SubstituteData&, const String& overrideEncoding = String());
-
-
-    bool shouldReload(const KURL& currentURL, const KURL& destinationURL);
 
     void requestFromDelegate(ResourceRequest&, unsigned long& identifier, ResourceError&);
 
@@ -358,6 +358,8 @@ private:
     bool m_startingClientRedirect;
 
     SandboxFlags m_forcedSandboxFlags;
+
+    bool m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel;
 
     RefPtr<HistoryItem> m_requestedHistoryItem;
 };

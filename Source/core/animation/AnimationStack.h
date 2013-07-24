@@ -1,5 +1,5 @@
 /*
- * Copyright (c) 2011, Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,26 +28,36 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#include "config.h"
-#include "core/platform/graphics/Icon.h"
+#ifndef AnimationStack_h
+#define AnimationStack_h
 
-#include "core/platform/graphics/GraphicsContext.h"
-#include "wtf/text/WTFString.h"
+#include "wtf/HashMap.h"
+#include "wtf/RefPtr.h"
+#include "wtf/Vector.h"
 
 namespace WebCore {
 
-Icon::Icon(PassRefPtr<PlatformIcon> icon)
-    : m_icon(icon)
-{
-}
+class Element;
+class Animation;
 
-Icon::~Icon()
-{
-}
+class AnimationStack {
 
-void Icon::paint(GraphicsContext* context, const IntRect& rect)
-{
-    context->drawImage(m_icon.get(), rect);
-}
+public:
+    void add(Animation* animation) { m_activeAnimations.append(animation); }
+    void remove(Animation* animation)
+    {
+        size_t position = m_activeAnimations.find(animation);
+        ASSERT(position != notFound);
+        m_activeAnimations.remove(position);
+    }
+    bool hasActiveAnimations() const { return !m_activeAnimations.isEmpty(); }
+    // FIXME: This should be PassRefPtr<CompositableValue> composite(Element*, CSSPropertyId)
+    const Vector<Animation*>& activeAnimations(const Element* element) const { return m_activeAnimations; }
+
+private:
+    Vector<Animation*> m_activeAnimations;
+};
 
 } // namespace WebCore
+
+#endif

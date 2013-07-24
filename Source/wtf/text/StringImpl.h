@@ -112,7 +112,6 @@ class WTF_EXPORT StringImpl {
     friend struct WTF::LCharBufferTranslator;
     friend struct WTF::SubstringTranslator;
     friend struct WTF::UCharBufferTranslator;
-    friend class AtomicStringImpl;
 
 private:
     enum BufferOwnership {
@@ -332,9 +331,6 @@ public:
         }
         return empty();
     }
-
-    static PassRefPtr<StringImpl> adopt(StringBuffer<UChar>&);
-    static PassRefPtr<StringImpl> adopt(StringBuffer<LChar>&);
 
     unsigned length() const { return m_length; }
     bool is8Bit() const { return m_hashAndFlags & s_hashFlag8BitBuffer; }
@@ -597,16 +593,15 @@ private:
     static const unsigned s_refCountFlagIsStaticString = 0x1;
     static const unsigned s_refCountIncrement = 0x2; // This allows us to ref / deref without disturbing the static string flag.
 
-    // The bottom 8 bits in the hash are flags.
+    // The bottom 8 bits in the hash are flags, of which only 4 are currently in use.
     static const unsigned s_flagCount = 8;
     static const unsigned s_flagMask = (1u << s_flagCount) - 1;
     COMPILE_ASSERT(s_flagCount == StringHasher::flagCount, StringHasher_reserves_enough_bits_for_StringImpl_flags);
 
-    static const unsigned s_hashFlag8BitBuffer = 1u << 6;
-    static const unsigned s_unusedHashFlag = 1u << 5;
-    static const unsigned s_hashFlagIsAtomic = 1u << 4;
     static const unsigned s_hashFlagDidReportCost = 1u << 3;
-    static const unsigned s_hashMaskBufferOwnership = 1u | (1u << 1);
+    static const unsigned s_hashFlagIsAtomic = 1u << 2;
+    static const unsigned s_hashFlag8BitBuffer = 1u << 1;
+    static const unsigned s_hashMaskBufferOwnership = 1u;
 
 #ifdef STRING_STATS
     static StringStats m_stringStats;

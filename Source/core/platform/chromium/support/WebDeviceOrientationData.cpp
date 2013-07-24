@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,34 +29,19 @@
  */
 
 #include "config.h"
-#include "WebIconLoadingCompletionImpl.h"
+#include "public/platform/WebDeviceOrientationData.h"
 
-#include "core/platform/SharedBuffer.h"
-#include "core/platform/graphics/BitmapImage.h"
-#include "core/platform/graphics/Icon.h"
-
-using namespace WebCore;
+#include <string.h>
 
 namespace WebKit {
 
-WebIconLoadingCompletionImpl::WebIconLoadingCompletionImpl(FileIconLoader* fileIconLoader)
-    : m_fileIconLoader(fileIconLoader)
+WebDeviceOrientationData::WebDeviceOrientationData()
 {
-}
-
-WebIconLoadingCompletionImpl::~WebIconLoadingCompletionImpl()
-{
-}
-
-void WebIconLoadingCompletionImpl::didLoadIcon(const WebData& iconData)
-{
-    if (!iconData.isEmpty()) {
-        RefPtr<Image> image = BitmapImage::create();
-        image->setData(iconData, true);
-        m_fileIconLoader->notifyFinished(Icon::create(image));
-    }
-    // This object is no longer needed.
-    delete this;
+    // Make sure to zero out the memory so that there are no uninitialized bits.
+    // This object is used in the shared memory buffer and is memory copied by
+    // two processes. Valgrind will complain if we copy around memory that is
+    // only partially initialized.
+    memset(this, 0, sizeof(*this));
 }
 
 } // namespace WebKit

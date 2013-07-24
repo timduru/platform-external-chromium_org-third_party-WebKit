@@ -135,6 +135,9 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
     this._codeMirror.setOption("maxHighlightLength", 1000);
     this._codeMirror.setOption("mode", null);
 
+    this._shouldClearHistory = true;
+    this._lineSeparator = "\n";
+
     this._tokenHighlighter = new WebInspector.CodeMirrorTextEditor.TokenHighlighter(this._codeMirror);
     this._blockIndentController = new WebInspector.CodeMirrorTextEditor.BlockIndentController(this._codeMirror);
     this._fixWordMovement = new WebInspector.CodeMirrorTextEditor.FixWordMovement(this._codeMirror);
@@ -262,7 +265,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
     {
         var extraKeys = {};
         var indent = WebInspector.settings.textEditorIndent.get();
-        if (indent === WebInspector.TextUtils.Indent.AutoDetect)
+        if (WebInspector.settings.textEditorAutoDetectIndent.get())
             indent = this._guessIndentationLevel();
         if (indent === WebInspector.TextUtils.Indent.TabCharacter) {
             this._codeMirror.setOption("indentWithTabs", true);
@@ -860,7 +863,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
         this._codeMirror.replaceRange(text, pos.start, pos.end);
         var newRange = this._toRange(pos.start, this._codeMirror.posFromIndex(this._codeMirror.indexFromPos(pos.start) + text.length));
         this._delegate.onTextChanged(range, newRange);
-        if (WebInspector.settings.textEditorIndent.get() === WebInspector.TextUtils.Indent.AutoDetect)
+        if (WebInspector.settings.textEditorAutoDetectIndent.get())
             this._updateEditorIndentation();
         return newRange;
     },
@@ -1028,12 +1031,24 @@ WebInspector.CodeMirrorTextEditor.prototype = {
     /**
      * @param {string} text
      */
+    _detectLineSeparator: function(text)
+    {
+        this._lineSeparator = text.indexOf("\r\n") >= 0 ? "\r\n" : "\n";
+    },
+
+    /**
+     * @param {string} text
+     */
     setText: function(text)
     {
         this._muteTextChangedEvent = true;
         this._codeMirror.setValue(text);
         this._updateEditorIndentation();
-        this._codeMirror.clearHistory();
+        if (this._shouldClearHistory) {
+            this._codeMirror.clearHistory();
+            this._shouldClearHistory = false;
+        }
+        this._detectLineSeparator(text);
         delete this._muteTextChangedEvent;
     },
 
@@ -1042,7 +1057,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
      */
     text: function()
     {
-        return this._codeMirror.getValue();
+        return this._codeMirror.getValue().replace(/\n/g, this._lineSeparator);
     },
 
     /**

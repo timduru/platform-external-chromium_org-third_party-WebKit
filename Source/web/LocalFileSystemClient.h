@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,26 +28,28 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebIconLoadingCompletion_h
-#define WebIconLoadingCompletion_h
+#ifndef LocalFileSystemClient_h
+#define LocalFileSystemClient_h
+
+#include "modules/filesystem/FileSystemClient.h"
+#include "wtf/Forward.h"
 
 namespace WebKit {
 
-class WebData;
-class WebString;
-
-// Gets called back when WebViewClient finished loading an icon.
-class WebIconLoadingCompletion {
+class LocalFileSystemClient : public WebCore::FileSystemClient {
 public:
-    // Called with the loaded icon data, which is an image data stream
-    // WebCore can decode, such as PNG. A null WebData means a failure of
-    // loading. The callback instance is destroyed when this method is called.
-    virtual void didLoadIcon(const WebData&) = 0;
+    static PassOwnPtr<FileSystemClient> create();
 
-protected:
-    virtual ~WebIconLoadingCompletion() { }
+    virtual ~LocalFileSystemClient();
+
+    virtual bool allowFileSystem(WebCore::ScriptExecutionContext*) OVERRIDE;
+    virtual void openFileSystem(WebCore::ScriptExecutionContext*, WebCore::FileSystemType, PassOwnPtr<WebCore::AsyncFileSystemCallbacks>, WebCore::FileSystemSynchronousType, long long size, WebCore::OpenFileSystemMode) OVERRIDE;
+    virtual void deleteFileSystem(WebCore::ScriptExecutionContext*, WebCore::FileSystemType, PassOwnPtr<WebCore::AsyncFileSystemCallbacks>) OVERRIDE;
+
+private:
+    LocalFileSystemClient();
 };
 
 } // namespace WebKit
 
-#endif
+#endif // LocalFileSystemClient_h

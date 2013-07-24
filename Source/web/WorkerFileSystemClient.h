@@ -1,6 +1,5 @@
 /*
- * Copyright (C) 2008, 2009 Google Inc. All rights reserved.
- * Copyright (C) 2009 Apple Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,36 +27,28 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-#ifndef ScriptPreprocessor_h
-#define ScriptPreprocessor_h
 
-#include "bindings/v8/V8Binding.h"
-#include "wtf/RefCounted.h"
-#include "wtf/text/WTFString.h"
-#include <v8.h>
+#ifndef WorkerFileSystemClient_h
+#define WorkerFileSystemClient_h
 
-namespace WebCore {
+#include "modules/filesystem/FileSystemClient.h"
+#include "wtf/Forward.h"
 
-class ScriptController;
-class ScriptDebugServer;
-class PageConsole;
+namespace WebKit {
 
-class ScriptPreprocessor {
-    WTF_MAKE_NONCOPYABLE(ScriptPreprocessor);
+class WorkerFileSystemClient : public WebCore::FileSystemClient {
 public:
-    ScriptPreprocessor(const String& preprocessorScript, ScriptController*, PageConsole*);
-    String preprocessSourceCode(const String& sourceCode, const String& sourceName);
-    void preprocessEval(ScriptDebugServer* , v8::Handle<v8::Object> eventData);
+    static PassOwnPtr<FileSystemClient> create();
+    virtual ~WorkerFileSystemClient();
+
+    virtual bool allowFileSystem(WebCore::ScriptExecutionContext*) OVERRIDE;
+    virtual void openFileSystem(WebCore::ScriptExecutionContext*, WebCore::FileSystemType, PassOwnPtr<WebCore::AsyncFileSystemCallbacks>, WebCore::FileSystemSynchronousType, long long size, WebCore::OpenFileSystemMode) OVERRIDE;
+    virtual void deleteFileSystem(WebCore::ScriptExecutionContext*, WebCore::FileSystemType, PassOwnPtr<WebCore::AsyncFileSystemCallbacks>) OVERRIDE;
 
 private:
-    String m_preprocessorBody;
-    ScriptController* m_controller;
-    ScopedPersistent<v8::Context> m_context;
-    v8::Isolate* m_isolate;
-    ScopedPersistent<v8::Function> m_preprocessorFunction;
-    bool m_isPreprocessing;
+    WorkerFileSystemClient();
 };
 
-} // namespace WebCore
+} // namespace WebKit
 
-#endif // ScriptPreprocessor_h
+#endif // WorkerFileSystemClient_h

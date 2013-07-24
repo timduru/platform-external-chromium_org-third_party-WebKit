@@ -1,19 +1,15 @@
 /*
- * Copyright (C) 2006, 2007, 2008 Apple Inc. All rights reserved.
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
  *
  * 1.  Redistributions of source code must retain the above copyright
- *     notice, this list of conditions and the following disclaimer. 
+ *     notice, this list of conditions and the following disclaimer.
  * 2.  Redistributions in binary form must reproduce the above copyright
  *     notice, this list of conditions and the following disclaimer in the
- *     documentation and/or other materials provided with the distribution. 
- * 3.  Neither the name of Apple Computer, Inc. ("Apple") nor the names of
- *     its contributors may be used to endorse or promote products derived
- *     from this software without specific prior written permission. 
+ *     documentation and/or other materials provided with the distribution.
  *
  * THIS SOFTWARE IS PROVIDED BY APPLE AND ITS CONTRIBUTORS "AS IS" AND ANY
  * EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
@@ -25,47 +21,43 @@
  * ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF
  * THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
  */
 
-#ifndef FileIconLoader_h
-#define FileIconLoader_h
+#ifndef DeviceSensorEventController_h
+#define DeviceSensorEventController_h
 
-#include "wtf/RefPtr.h"
-#include "wtf/RefCounted.h"
+#include "core/dom/Event.h"
+#include "core/platform/Timer.h"
 
 namespace WebCore {
 
-class FileIconLoader;
-class Icon;
+class Document;
 
-class FileIconLoaderClient {
+class DeviceSensorEventController {
+
 public:
-    virtual void updateRendering(PassRefPtr<Icon>) = 0;
-    virtual ~FileIconLoaderClient();
+    void startUpdating();
+    void stopUpdating();
 
 protected:
-    FileIconLoader* newFileIconLoader();
+    explicit DeviceSensorEventController(Document*);
+    virtual ~DeviceSensorEventController();
+
+    void dispatchDeviceEvent(const PassRefPtr<Event>);
+
+    virtual bool hasLastData() = 0;
+    virtual PassRefPtr<Event> getLastEvent() = 0;
+    virtual void registerWithDispatcher() = 0;
+    virtual void unregisterWithDispatcher() = 0;
 
 private:
-    void discardLoader();
+    void fireDeviceEvent(Timer<DeviceSensorEventController>*);
 
-    RefPtr<FileIconLoader> m_loader;
-};
-
-class FileIconLoader : public RefCounted<FileIconLoader> {
-public:
-    static PassRefPtr<FileIconLoader> create(FileIconLoaderClient*);
-
-    void disconnectClient();
-    void notifyFinished(PassRefPtr<Icon>);
-
-private:
-    explicit FileIconLoader(FileIconLoaderClient*);
-
-    FileIconLoaderClient* m_client;
+    Document* m_document;
+    bool m_isActive;
+    Timer<DeviceSensorEventController> m_timer;
 };
 
 } // namespace WebCore
 
-#endif
+#endif // DeviceSensorEventController_h

@@ -207,13 +207,11 @@ bool Text::textRendererIsNeeded(const NodeRenderingContext& context)
     if (context.style()->display() == NONE)
         return false;
 
-    bool onlyWS = containsOnlyWhitespace();
-    if (!onlyWS)
+    if (!containsOnlyWhitespace())
         return true;
 
     RenderObject* parent = context.parentRenderer();
-    if (parent->isTable() || parent->isTableRow() || parent->isTableSection() || parent->isRenderTableCol() || parent->isFrameSet()
-        || parent->isFlexibleBox() || parent->isRenderGrid())
+    if (!parent->canHaveWhitespaceChildren())
         return false;
     
     if (context.style()->preserveNewline()) // pre/pre-wrap/pre-line always make renderers.
@@ -230,17 +228,19 @@ bool Text::textRendererIsNeeded(const NodeRenderingContext& context)
     } else {
         if (parent->isRenderBlock() && !parent->childrenInline() && (!prev || !prev->isInline()))
             return false;
-        
+
+        // Avoiding creation of a Renderer for the text node is a non-essential memory optimization.
+        // So to avoid blowing up on very wide DOMs, we limit the number of siblings to visit.
+        unsigned maxSiblingsToVisit = 50;
+
         RenderObject* first = parent->firstChild();
-        while (first && first->isFloatingOrOutOfFlowPositioned())
+        while (first && first->isFloatingOrOutOfFlowPositioned() && maxSiblingsToVisit--)
             first = first->nextSibling();
-        RenderObject* next = context.nextRenderer();
-        if (!first || next == first)
+        if (!first || context.nextRenderer() == first)
             // Whitespace at the start of a block just goes away.  Don't even
             // make a render object for this text.
             return false;
     }
-    
     return true;
 }
 
@@ -298,10 +298,7 @@ bool Text::recalcTextStyle(StyleChange change)
 bool Text::needsWhitespaceRenderer()
 {
     ASSERT(!renderer());
-    ContainerNode* parent = parentNodeForRenderingAndStyle();
-    if (!parent)
-        return false;
-    if (RenderStyle* style = parent->renderStyle())
+    if (RenderStyle* style = parentRenderStyle())
         return style->preserveNewline();
     return false;
 }

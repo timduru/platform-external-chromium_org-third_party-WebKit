@@ -59,6 +59,7 @@ class WebCompositorSupport;
 class WebCookieJar;
 class WebCrypto;
 class WebDeviceMotionListener;
+class WebDeviceOrientationListener;
 class WebDiscardableMemory;
 class WebFallbackThemeEngine;
 class WebFileSystem;
@@ -499,6 +500,8 @@ public:
     virtual void histogramCustomCounts(const char* name, int sample, int min, int max, int bucketCount) { }
     // Enumeration histogram buckets are linear, boundaryValue should be larger than any possible sample value.
     virtual void histogramEnumeration(const char* name, int sample, int boundaryValue) { }
+    // Unlike enumeration histograms, sparse histograms only allocate memory for non-empty buckets.
+    virtual void histogramSparse(const char* name, int sample) { }
 
 
     // GPU ----------------------------------------------------------------
@@ -556,6 +559,10 @@ public:
     // Sets a Listener to listen for device motion data updates.
     // If null, the platform stops providing device motion data to the current listener.
     virtual void setDeviceMotionListener(WebKit::WebDeviceMotionListener*) { }
+
+    // Sets a Listener to listen for device orientation data updates.
+    // If null, the platform stops proving device orientation data to the current listener.
+    virtual void setDeviceOrientationListener(WebKit::WebDeviceOrientationListener*) { }
 
 
     // Quota -----------------------------------------------------------

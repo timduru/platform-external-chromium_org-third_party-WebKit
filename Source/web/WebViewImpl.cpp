@@ -56,6 +56,7 @@
 #include "GraphicsLayerFactoryChromium.h"
 #include "HTMLNames.h"
 #include "LinkHighlight.h"
+#include "LocalFileSystemClient.h"
 #include "PageWidgetDelegate.h"
 #include "PinchViewports.h"
 #include "PopupContainer.h"
@@ -149,7 +150,6 @@
 #include "core/platform/graphics/ImageBuffer.h"
 #include "core/platform/graphics/chromium/LayerPainterChromium.h"
 #include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
-#include "core/platform/network/ResourceHandle.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
@@ -454,6 +454,8 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     provideDeviceOrientationTo(m_page.get(), m_deviceOrientationClientProxy.get());
     provideGeolocationTo(m_page.get(), m_geolocationClientProxy.get());
     m_geolocationClientProxy->setController(GeolocationController::from(m_page.get()));
+
+    provideLocalFileSystemTo(m_page.get(), LocalFileSystemClient::create());
 
     m_page->setGroupType(Page::SharedPageGroup);
 
@@ -1257,7 +1259,7 @@ void WebViewImpl::enableTapHighlight(const PlatformGestureEvent& tapEvent)
     if (!touchNode || !touchNode->renderer() || !touchNode->renderer()->enclosingLayer())
         return;
 
-    Color highlightColor = touchNode->renderer()->style()->tapHighlightColor();
+    Color highlightColor = touchNode->renderer()->resolveColor(CSSPropertyWebkitTapHighlightColor);
     // Safari documentation for -webkit-tap-highlight-color says if the specified color has 0 alpha,
     // then tap highlighting is disabled.
     // http://developer.apple.com/library/safari/#documentation/appleapplications/reference/safaricssref/articles/standardcssproperties.html
@@ -2461,7 +2463,7 @@ WebColor WebViewImpl::backgroundColor() const
     if (!m_page)
         return Color::white;
     FrameView* view = m_page->mainFrame()->view();
-    Color backgroundColor = view->documentBackgroundColor();
+    StyleColor backgroundColor = view->documentBackgroundColor();
     if (!backgroundColor.isValid())
         return Color::white;
     return backgroundColor.rgb();
@@ -4032,7 +4034,7 @@ void WebViewImpl::didExitCompositingMode()
     m_client->didInvalidateRect(IntRect(0, 0, m_size.width, m_size.height));
 
     // Force a style recalc to remove all the composited layers.
-    m_page->mainFrame()->document()->scheduleForcedStyleRecalc();
+    m_page->mainFrame()->document()->setNeedsStyleRecalc();
 
     if (m_pageOverlays)
         m_pageOverlays->update();

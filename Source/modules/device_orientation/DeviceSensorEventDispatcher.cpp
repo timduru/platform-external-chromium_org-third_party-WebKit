@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,31 +28,53 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebIconLoadingCompletionImpl_h
-#define WebIconLoadingCompletionImpl_h
+#include "config.h"
+#include "modules/device_orientation/DeviceSensorEventDispatcher.h"
 
-#include "WebIconLoadingCompletion.h"
-#include "core/platform/FileIconLoader.h"
-#include "public/platform/WebData.h"
-#include "wtf/PassRefPtr.h"
-#include "wtf/RefPtr.h"
+namespace WebCore {
 
-using WebKit::WebIconLoadingCompletion;
-using WebKit::WebData;
+DeviceSensorEventDispatcher::DeviceSensorEventDispatcher()
+{
+}
 
-namespace WebKit {
+DeviceSensorEventDispatcher::~DeviceSensorEventDispatcher()
+{
+}
 
-class WebIconLoadingCompletionImpl : public WebIconLoadingCompletion {
-public:
-    WebIconLoadingCompletionImpl(WebCore::FileIconLoader*);
-    virtual void didLoadIcon(const WebData&);
+void DeviceSensorEventDispatcher::addController(DeviceSensorEventController* controller)
+{
+    bool wasEmpty = m_controllers.isEmpty();
+    if (!m_controllers.contains(controller))
+        m_controllers.append(controller);
+    if (wasEmpty)
+        startListening();
+}
 
-private:
-    ~WebIconLoadingCompletionImpl();
+void DeviceSensorEventDispatcher::removeController(DeviceSensorEventController* controller)
+{
+    // Do not actually remove controller from the vector, instead zero them out.
+    // The zeros are removed after didChangeDeviceMotion has dispatched all events.
+    // This is to prevent re-entrancy case when a controller is destroyed while in the
+    // didChangeDeviceMotion method.
+    size_t index = m_controllers.find(controller);
+    if (index != notFound)
+        m_controllers[index] = 0;
+}
 
-    RefPtr<WebCore::FileIconLoader> m_fileIconLoader;
-};
+void DeviceSensorEventDispatcher::purgeControllers()
+{
+    size_t i = 0;
+    while (i < m_controllers.size()) {
+        if (!m_controllers[i]) {
+            m_controllers[i] = m_controllers.last();
+            m_controllers.removeLast();
+        } else {
+            ++i;
+        }
+    }
 
-} // namespace WebKit
+    if (m_controllers.isEmpty())
+        stopListening();
+}
 
-#endif
+} // namespace WebCore

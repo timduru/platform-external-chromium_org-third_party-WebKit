@@ -12,7 +12,7 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_webcore_prerequisites_gyp)/webcore_prerequisites.stamp \
-	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_gyp)/skia_skia_gyp.a
+	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_library_gyp)/skia_skia_library_gyp.a
 
 GYP_GENERATED_OUTPUTS :=
 
@@ -83,10 +83,10 @@ MY_DEFS_Debug := \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
+	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
-	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -112,13 +112,12 @@ MY_DEFS_Debug := \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
-	'-DSK_BUILD_NO_IMAGE_ENCODE' \
-	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \
-	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
-	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
 	'-DSK_ENABLE_INST_COUNT=0' \
-	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_SUPPORT_GPU=1' \
+	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
 	'-DSK_BUILD_FOR_ANDROID' \
+	'-DUSE_CHROMIUM_SKIA' \
+	'-DSK_USE_POSIX_THREADS' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
@@ -149,8 +148,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/src/core \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
@@ -242,10 +241,10 @@ MY_DEFS_Release := \
 	'-DCHROMIUM_BUILD' \
 	'-DUSE_LIBJPEG_TURBO=1' \
 	'-DUSE_PROPRIETARY_CODECS' \
+	'-DENABLE_CONFIGURATION_POLICY' \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
-	'-DENABLE_LANGUAGE_DETECTION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -271,13 +270,12 @@ MY_DEFS_Release := \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
 	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
-	'-DSK_BUILD_NO_IMAGE_ENCODE' \
-	'-DSK_DEFERRED_CANVAS_USES_GPIPE=1' \
-	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
-	'-DGR_AGGRESSIVE_SHADER_OPTS=1' \
 	'-DSK_ENABLE_INST_COUNT=0' \
-	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_SUPPORT_GPU=1' \
+	'-DGR_GL_CUSTOM_SETUP_HEADER="GrGLConfig_chrome.h"' \
 	'-DSK_BUILD_FOR_ANDROID' \
+	'-DUSE_CHROMIUM_SKIA' \
+	'-DSK_USE_POSIX_THREADS' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
@@ -308,8 +306,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
-	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/src/core \
+	$(LOCAL_PATH)/skia/config \
 	$(LOCAL_PATH)/third_party/skia/include/config \
 	$(LOCAL_PATH)/third_party/skia/include/core \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
@@ -397,7 +395,7 @@ LOCAL_LDFLAGS_Release := \
 LOCAL_LDFLAGS := $(LOCAL_LDFLAGS_$(GYP_CONFIGURATION))
 
 LOCAL_STATIC_LIBRARIES := \
-	skia_skia_gyp
+	skia_skia_library_gyp
 
 # Enable grouping to fix circular references
 LOCAL_GROUP_STATIC_LIBRARIES := true

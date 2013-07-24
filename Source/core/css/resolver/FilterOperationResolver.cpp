@@ -50,11 +50,10 @@
 
 namespace WebCore {
 
-static Length convertToFloatLength(CSSPrimitiveValue* primitiveValue, RenderStyle* style, RenderStyle* rootStyle, double multiplier)
+static Length convertToFloatLength(CSSPrimitiveValue* primitiveValue, const RenderStyle* style, const RenderStyle* rootStyle, double multiplier)
 {
     return primitiveValue ? primitiveValue->convertToLength<FixedFloatConversion | PercentConversion | FractionConversion>(style, rootStyle, multiplier) : Length(Undefined);
 }
-
 
 static FilterOperation::OperationType filterOperationForType(CSSFilterValue::FilterOperationType type)
 {
@@ -361,7 +360,7 @@ static PassRefPtr<CustomFilterOperation> createCustomFilterOperation(CSSFilterVa
 }
 
 
-bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderStyle* style, RenderStyle* rootStyle, FilterOperations& outOperations, StyleCustomFilterProgramCache* customFilterProgramCache, StyleResolverState& state)
+bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, const RenderStyle* style, const RenderStyle* rootStyle, FilterOperations& outOperations, StyleCustomFilterProgramCache* customFilterProgramCache, StyleResolverState& state)
 {
     ASSERT(outOperations.isEmpty());
 
@@ -494,11 +493,11 @@ bool FilterOperationResolver::createFilterOperations(CSSValue* inValue, RenderSt
             ShadowValue* item = static_cast<ShadowValue*>(cssValue);
             IntPoint location(item->x->computeLength<int>(style, rootStyle, zoomFactor), item->y->computeLength<int>(style, rootStyle, zoomFactor));
             int blur = item->blur ? item->blur->computeLength<int>(style, rootStyle, zoomFactor) : 0;
-            Color color;
+            StyleColor shadowColor;
             if (item->color)
-                color = state.document()->textLinkColors().colorFromPrimitiveValue(item->color.get(), state.style()->visitedDependentColor(CSSPropertyColor));
+                shadowColor = state.document()->textLinkColors().colorFromPrimitiveValue(item->color.get());
 
-            operations.operations().append(DropShadowFilterOperation::create(location, blur, color.isValid() ? color : Color::transparent, operationType));
+            operations.operations().append(DropShadowFilterOperation::create(location, blur, shadowColor.isValid() ? shadowColor.color() : Color::transparent, operationType));
             break;
         }
         case CSSFilterValue::UnknownFilterOperation:

@@ -333,7 +333,7 @@ void Page::scheduleForcedStyleRecalcForAllPages()
     HashSet<Page*>::iterator end = allPages->end();
     for (HashSet<Page*>::iterator it = allPages->begin(); it != end; ++it)
         for (Frame* frame = (*it)->mainFrame(); frame; frame = frame->tree()->traverseNext())
-            frame->document()->scheduleForcedStyleRecalc();
+            frame->document()->setNeedsStyleRecalc();
 }
 
 void Page::setNeedsRecalcStyleInAllFrames()
@@ -732,6 +732,11 @@ void Page::multisamplingChanged()
     HashSet<MultisamplingChangedObserver*>::iterator stop = m_multisamplingChangedObservers.end();
     for (HashSet<MultisamplingChangedObserver*>::iterator it = m_multisamplingChangedObservers.begin(); it != stop; ++it)
         (*it)->multisamplingChanged(m_settings->openGLMultisamplingEnabled());
+}
+
+void Page::didCommitLoad(Frame* frame)
+{
+    lifecycleNotifier()->notifyDidCommitLoad(frame);
 }
 
 PageLifecycleNotifier* Page::lifecycleNotifier()

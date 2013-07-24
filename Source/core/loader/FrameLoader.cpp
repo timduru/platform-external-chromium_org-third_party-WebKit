@@ -63,6 +63,7 @@
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/IconController.h"
 #include "core/loader/ProgressTracker.h"
+#include "core/loader/ResourceLoader.h"
 #include "core/loader/UniqueIdentifier.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
 #include "core/loader/cache/CachedResourceLoader.h"
@@ -81,7 +82,6 @@
 #include "core/platform/ScrollAnimator.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/network/HTTPParsers.h"
-#include "core/platform/network/ResourceHandle.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/xml/parser/XMLDocumentParser.h"
 #include "modules/webdatabase/DatabaseManager.h"
@@ -176,6 +176,7 @@ FrameLoader::FrameLoader(Frame* frame, FrameLoaderClient* client)
     , m_suppressOpenerInNewFrame(false)
     , m_startingClientRedirect(false)
     , m_forcedSandboxFlags(SandboxNone)
+    , m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel(false)
 {
 }
 
@@ -942,7 +943,7 @@ bool FrameLoader::prepareRequestForThisFrame(FrameLoadRequest& request)
         return false;
     }
 
-    if (request.requester() && request.frameName().isEmpty())
+    if (request.requester() && !request.formState() && request.frameName().isEmpty())
         request.setFrameName(m_frame->document()->baseTarget());
 
     // If the requesting SecurityOrigin is not this Frame's SecurityOrigin, the request was initiated by a different frame that should
@@ -950,6 +951,18 @@ bool FrameLoader::prepareRequestForThisFrame(FrameLoadRequest& request)
     if (request.requester() == m_frame->document()->securityOrigin())
         setReferrerForFrameRequest(request.resourceRequest(), request.shouldSendReferrer());
     return true;
+}
+
+static bool shouldOpenInNewWindow(Frame* targetFrame, const FrameLoadRequest& request, const NavigationAction& action)
+{
+    if (!targetFrame && !request.frameName().isEmpty())
+        return true;
+    if (!request.formState())
+        return false;
+    NavigationPolicy navigationPolicy = NavigationPolicyCurrentTab;
+    if (!action.specifiesNavigationPolicy(&navigationPolicy))
+        return false;
+    return navigationPolicy != NavigationPolicyCurrentTab;
 }
 
 void FrameLoader::load(const FrameLoadRequest& passedRequest)
@@ -977,13 +990,17 @@ void FrameLoader::load(const FrameLoadRequest& passedRequest)
 
     FrameLoadType newLoadType = determineFrameLoadType(request);
     NavigationAction action(request.resourceRequest(), newLoadType, request.formState(), request.triggeringEvent());
-    if (!targetFrame && !request.frameName().isEmpty()) {
+    if (shouldOpenInNewWindow(targetFrame, request, action)) {
         TemporaryChange<bool> changeOpener(m_suppressOpenerInNewFrame, request.shouldSendReferrer() == NeverSendReferrer);
         checkNewWindowPolicyAndContinue(request.formState(), request.frameName(), action);
         return;
     }
 
     TemporaryChange<bool> changeClientRedirect(m_startingClientRedirect, request.clientRedirect());
+    if (shouldPerformFragmentNavigation(request.formState(), request.resourceRequest().httpMethod(), newLoadType, request.resourceRequest().url())) {
+        checkNavigationPolicyAndContinueFragmentScroll(action, newLoadType != FrameLoadTypeRedirectWithLockedBackForwardList);
+        return;
+    }
     bool sameURL = shouldTreatURLAsSameAsCurrent(request.resourceRequest().url());
     loadWithNavigationAction(request.resourceRequest(), action, newLoadType, request.formState(), request.substituteData());
     // Example of this case are sites that reload the same URL with a different cookie
@@ -1024,15 +1041,8 @@ void FrameLoader::loadWithNavigationAction(const ResourceRequest& request, const
 
     loader->setReplacesCurrentHistoryItem(type == FrameLoadTypeRedirectWithLockedBackForwardList);
     loader->setIsClientRedirect(m_startingClientRedirect);
-
-    bool isFormSubmission = formState;
-
-    if (shouldPerformFragmentNavigation(isFormSubmission, request.httpMethod(), type, request.url()))
-        checkNavigationPolicyAndContinueFragmentScroll(action, type != FrameLoadTypeRedirectWithLockedBackForwardList);
-    else {
-        setPolicyDocumentLoader(loader.get());
-        checkNavigationPolicyAndContinueLoad(formState, type);
-    }
+    setPolicyDocumentLoader(loader.get());
+    checkNavigationPolicyAndContinueLoad(formState, type);
 }
 
 void FrameLoader::reportLocalLoadFailed(Frame* frame, const String& url)
@@ -1266,6 +1276,8 @@ void FrameLoader::transitionToCommitted()
     if (m_state != FrameStateProvisional)
         return;
 
+    clearAllowNavigationViaBeforeUnloadConfirmationPanel();
+
     if (FrameView* view = m_frame->view()) {
         if (ScrollAnimator* scrollAnimator = view->existingScrollAnimator())
             scrollAnimator->cancelAnimations();
@@ -1302,16 +1314,6 @@ void FrameLoader::transitionToCommitted()
 
     if (!m_stateMachine.creatingInitialEmptyDocument() && !m_stateMachine.committedFirstRealDocumentLoad())
         m_stateMachine.advanceTo(FrameLoaderStateMachine::DisplayingInitialEmptyDocumentPostCommit);
-}
-
-bool FrameLoader::shouldReload(const KURL& currentURL, const KURL& destinationURL)
-{
-    // This function implements the rule: "Don't reload if navigating by fragment within
-    // the same URL, but do reload if going to a new URL or to the same URL with no
-    // fragment identifier at all."
-    if (!destinationURL.hasFragmentIdentifier())
-        return true;
-    return !equalIgnoringFragmentIdentifier(currentURL, destinationURL);
 }
 
 void FrameLoader::closeOldDataSources()
@@ -1713,7 +1715,7 @@ unsigned long FrameLoader::loadResourceSynchronously(const ResourceRequest& requ
     if (error.isNull()) {
         ASSERT(!newRequest.isNull());
         documentLoader()->applicationCacheHost()->willStartLoadingSynchronously(newRequest);
-        ResourceHandle::loadResourceSynchronously(newRequest, storedCredentials, error, response, data);
+        ResourceLoader::loadResourceSynchronously(newRequest, storedCredentials, error, response, data);
     }
     int encodedDataLength = response.resourceLoadInfo() ? static_cast<int>(response.resourceLoadInfo()->encodedDataLength) : -1;
     notifier()->sendRemainingDelegateMessages(m_documentLoader.get(), identifier, response, data.data(), data.size(), encodedDataLength, error);
@@ -1769,17 +1771,16 @@ void FrameLoader::checkNavigationPolicyAndContinueFragmentScroll(const Navigatio
 
 bool FrameLoader::shouldPerformFragmentNavigation(bool isFormSubmission, const String& httpMethod, FrameLoadType loadType, const KURL& url)
 {
+    ASSERT(loadType != FrameLoadTypeBackForward);
+    ASSERT(loadType != FrameLoadTypeReloadFromOrigin);
+    ASSERT(loadType != FrameLoadTypeReplace);
     // We don't do this if we are submitting a form with method other than "GET", explicitly reloading,
     // currently displaying a frameset, or if the URL does not have a fragment.
-    // These rules were originally based on what KHTML was doing in KHTMLPart::openURL.
-
-    // FIXME: What about load types other than Standard and Reload?
-
     return (!isFormSubmission || equalIgnoringCase(httpMethod, "GET"))
         && loadType != FrameLoadTypeReload
-        && loadType != FrameLoadTypeReloadFromOrigin
         && loadType != FrameLoadTypeSame
-        && !shouldReload(m_frame->document()->url(), url)
+        && url.hasFragmentIdentifier()
+        && equalIgnoringFragmentIdentifier(m_frame->document()->url(), url)
         // We don't want to just scroll if a link from within a
         // frameset is trying to reload the frameset into _top.
         && !m_frame->document()->isFrameSet();
@@ -1823,7 +1824,7 @@ bool FrameLoader::shouldClose()
         for (i = 0; i < targetFrames.size(); i++) {
             if (!targetFrames[i]->tree()->isDescendantOf(m_frame))
                 continue;
-            if (!targetFrames[i]->loader()->fireBeforeUnloadEvent(page->chrome()))
+            if (!targetFrames[i]->loader()->fireBeforeUnloadEvent(page->chrome(), this))
                 break;
         }
 
@@ -1837,7 +1838,7 @@ bool FrameLoader::shouldClose()
     return shouldClose;
 }
 
-bool FrameLoader::fireBeforeUnloadEvent(Chrome& chrome)
+bool FrameLoader::fireBeforeUnloadEvent(Chrome& chrome, FrameLoader* navigatingFrameLoader)
 {
     DOMWindow* domWindow = m_frame->domWindow();
     if (!domWindow)
@@ -1857,8 +1858,17 @@ bool FrameLoader::fireBeforeUnloadEvent(Chrome& chrome)
     if (beforeUnloadEvent->result().isNull())
         return true;
 
+    if (navigatingFrameLoader->hasAllowedNavigationViaBeforeUnloadConfirmationPanel()) {
+        m_frame->document()->addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Blocked attempt to show multiple 'beforeunload' confirmation panels for a single navigation.");
+        return true;
+    }
+
     String text = document->displayStringModifiedByEncoding(beforeUnloadEvent->result());
-    return chrome.runBeforeUnloadConfirmPanel(text, m_frame);
+    if (chrome.runBeforeUnloadConfirmPanel(text, m_frame)) {
+        navigatingFrameLoader->didAllowNavigationViaBeforeUnloadConfirmationPanel();
+        return true;
+    }
+    return false;
 }
 
 void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> formState, FrameLoadType type)
@@ -2268,6 +2278,8 @@ void FrameLoader::dispatchDidCommitLoad()
     m_client->dispatchDidCommitLoad();
 
     InspectorInstrumentation::didCommitLoad(m_frame, m_documentLoader.get());
+
+    m_frame->page()->didCommitLoad(m_frame);
 
     if (m_frame->page()->mainFrame() == m_frame)
         m_frame->page()->useCounter()->didCommitLoad();
