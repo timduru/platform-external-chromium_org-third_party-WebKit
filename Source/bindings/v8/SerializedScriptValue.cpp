@@ -76,7 +76,6 @@
 #include "wtf/Uint8Array.h"
 #include "wtf/Uint8ClampedArray.h"
 #include "wtf/Vector.h"
-#include "wtf/text/StringBuffer.h"
 #include "wtf/text/StringUTF8Adaptor.h"
 
 // FIXME: consider crashing in debug mode on deserialization errors
@@ -730,7 +729,7 @@ public:
 
     Status serialize(v8::Handle<v8::Value> value)
     {
-        v8::HandleScope scope;
+        v8::HandleScope scope(m_isolate);
         m_writer.writeVersion();
         StateBase* state = doSerialize(value, 0);
         while (state)
@@ -2251,9 +2250,9 @@ PassRefPtr<SerializedScriptValue> SerializedScriptValue::createFromWireBytes(con
     // Decode wire data from big endian to host byte order.
     ASSERT(!(data.size() % sizeof(UChar)));
     size_t length = data.size() / sizeof(UChar);
-    StringBuffer<UChar> buffer(length);
+    Vector<UChar> buffer(length);
     const UChar* src = reinterpret_cast<const UChar*>(data.data());
-    UChar* dst = buffer.characters();
+    UChar* dst = buffer.data();
     for (size_t i = 0; i < length; i++)
         dst[i] = ntohs(src[i]);
 

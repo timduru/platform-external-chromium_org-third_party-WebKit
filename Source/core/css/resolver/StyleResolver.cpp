@@ -106,7 +106,7 @@ StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
     , m_matchAuthorAndUserStyles(matchAuthorAndUserStyles)
     , m_fontSelector(CSSFontSelector::create(document))
     , m_viewportStyleResolver(ViewportStyleResolver::create(document))
-    , m_styleResourceLoader(document->cachedResourceLoader())
+    , m_styleResourceLoader(document->fetcher())
 {
     Element* root = document->documentElement();
 
@@ -908,10 +908,11 @@ PassRefPtr<RenderStyle> StyleResolver::styleForText(Text* textNode)
 {
     ASSERT(textNode);
 
-    NodeRenderingContext context(textNode);
-    Node* parentNode = context.parentNodeForRenderingAndStyle();
-    return context.resetStyleInheritance() || !parentNode || !parentNode->renderStyle() ?
-        defaultStyleForElement() : parentNode->renderStyle();
+    NodeRenderingTraversal::ParentDetails parentDetails;
+    Node* parentNode = NodeRenderingTraversal::parent(textNode, &parentDetails);
+    if (!parentNode || !parentNode->renderStyle() || parentDetails.resetStyleInheritance())
+        return defaultStyleForElement();
+    return parentNode->renderStyle();
 }
 
 bool StyleResolver::checkRegionStyle(Element* regionElement)

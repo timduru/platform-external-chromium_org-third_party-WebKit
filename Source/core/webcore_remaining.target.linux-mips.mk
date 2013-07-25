@@ -355,8 +355,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/cache/CachedRawResource.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedResource.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedResourceHandle.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedResourceLoader.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedResourceRequest.cpp \
+	third_party/WebKit/Source/core/loader/cache/ResourceFetcher.cpp \
+	third_party/WebKit/Source/core/loader/cache/FetchRequest.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedScript.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedShader.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedTextTrack.cpp \
@@ -598,9 +598,9 @@ MY_DEFS_Debug := \
 
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES_Debug := \
-	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
-	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
+	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
+	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \
@@ -758,9 +758,9 @@ MY_DEFS_Release := \
 
 # Include paths placed before CFLAGS/CPPFLAGS
 LOCAL_C_INCLUDES_Release := \
-	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
-	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
+	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
+	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
 	$(LOCAL_PATH)/third_party/khronos \
 	$(LOCAL_PATH)/gpu \
 	$(LOCAL_PATH) \

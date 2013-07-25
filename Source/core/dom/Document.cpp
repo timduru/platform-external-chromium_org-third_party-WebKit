@@ -124,7 +124,7 @@
 #include "core/loader/ImageLoader.h"
 #include "core/loader/Prerenderer.h"
 #include "core/loader/TextResourceDecoder.h"
-#include "core/loader/cache/CachedResourceLoader.h"
+#include "core/loader/cache/ResourceFetcher.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/ContentSecurityPolicy.h"
@@ -453,12 +453,12 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     if (m_frame) {
         provideContextFeaturesToDocumentFrom(this, m_frame->page());
 
-        m_cachedResourceLoader = m_frame->loader()->activeDocumentLoader()->cachedResourceLoader();
+        m_fetcher = m_frame->loader()->activeDocumentLoader()->fetcher();
     }
 
-    if (!m_cachedResourceLoader)
-        m_cachedResourceLoader = CachedResourceLoader::create(0);
-    m_cachedResourceLoader->setDocument(this);
+    if (!m_fetcher)
+        m_fetcher = ResourceFetcher::create(0);
+    m_fetcher->setDocument(this);
 
     // We depend on the url getting immediately set in subframes, but we
     // also depend on the url NOT getting immediately set in opened windows.
@@ -554,13 +554,13 @@ Document::~Document()
     if (m_elemSheet)
         m_elemSheet->clearOwnerNode();
 
-    clearStyleResolver(); // We need to destory CSSFontSelector before destroying m_cachedResourceLoader.
+    clearStyleResolver(); // We need to destory CSSFontSelector before destroying m_fetcher.
 
-    // It's possible for multiple Documents to end up referencing the same CachedResourceLoader (e.g., SVGImages
+    // It's possible for multiple Documents to end up referencing the same ResourceFetcher (e.g., SVGImages
     // load the initial empty document and the SVGDocument with the same DocumentLoader).
-    if (m_cachedResourceLoader->document() == this)
-        m_cachedResourceLoader->setDocument(0);
-    m_cachedResourceLoader.clear();
+    if (m_fetcher->document() == this)
+        m_fetcher->setDocument(0);
+    m_fetcher.clear();
 
     // We must call clearRareData() here since a Document class inherits TreeScope
     // as well as Node. See a comment on TreeScope.h for the reason.
@@ -3082,11 +3082,12 @@ void Document::hoveredNodeDetached(Node* node)
     if (!m_hoverNode)
         return;
 
-    NodeRenderingTraversal::ParentDetails details;
-    if (node != m_hoverNode && (!m_hoverNode->isTextNode() || node != NodeRenderingTraversal::parent(m_hoverNode.get(), &details)))
+    if (node != m_hoverNode && (!m_hoverNode->isTextNode() || node != NodeRenderingTraversal::parent(m_hoverNode.get())))
         return;
 
-    for (m_hoverNode = NodeRenderingTraversal::parent(node, &details); m_hoverNode && !m_hoverNode->renderer(); m_hoverNode = NodeRenderingTraversal::parent(m_hoverNode.get(), &details)) { }
+    m_hoverNode = NodeRenderingTraversal::parent(node);
+    while (m_hoverNode && !m_hoverNode->renderer())
+        m_hoverNode = NodeRenderingTraversal::parent(m_hoverNode.get());
 
     // If the mouse cursor is not visible, do not clear existing
     // hover effects on the ancestors of |node| and do not invoke
@@ -3103,12 +3104,12 @@ void Document::activeChainNodeDetached(Node* node)
     if (!m_activeElement)
         return;
 
-    NodeRenderingTraversal::ParentDetails details;
-    if (node != m_activeElement && (!m_activeElement->isTextNode() || node != NodeRenderingTraversal::parent(m_activeElement.get(), &details)))
+    if (node != m_activeElement && (!m_activeElement->isTextNode() || node != NodeRenderingTraversal::parent(m_activeElement.get())))
         return;
 
-    Node* activeNode = NodeRenderingTraversal::parent(node, &details);
-    for (; activeNode && activeNode->isElementNode() && !activeNode->renderer(); activeNode = NodeRenderingTraversal::parent(activeNode, &details)) { }
+    Node* activeNode = NodeRenderingTraversal::parent(node);
+    while (activeNode && activeNode->isElementNode() && !activeNode->renderer())
+        activeNode = NodeRenderingTraversal::parent(activeNode);
 
     m_activeElement = activeNode && activeNode->isElementNode() ? toElement(activeNode) : 0;
 }
@@ -4108,7 +4109,7 @@ void Document::finishedParsing()
     m_sharedObjectPoolClearTimer.startOneShot(timeToKeepSharedObjectPoolAliveAfterParsingFinishedInSeconds);
 
     // Parser should have picked up all preloads by now
-    m_cachedResourceLoader->clearPreloads();
+    m_fetcher->clearPreloads();
 }
 
 void Document::sharedObjectPoolClearTimerFired(Timer<Document>*)
@@ -4425,11 +4426,6 @@ void Document::addMessage(MessageSource source, MessageLevel level, const String
 
     if (Page* page = this->page())
         page->console()->addMessage(source, level, message, sourceURL, lineNumber, 0, callStack, state, requestIdentifier);
-}
-
-const SecurityOrigin* Document::topOrigin() const
-{
-    return topDocument()->securityOrigin();
 }
 
 struct PerformTaskContext {
