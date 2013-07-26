@@ -48,7 +48,7 @@
 #include "public/platform/WebColor.h"
 #include "public/platform/WebRect.h"
 #include "public/platform/win/WebThemeEngine.h"
-#include <wtf/CurrentTime.h>
+#include "wtf/CurrentTime.h"
 
 
 // FIXME: This dependency should eventually be removed.
@@ -339,7 +339,7 @@ bool RenderThemeChromiumWin::paintSliderThumb(RenderObject* o, const PaintInfo& 
 
 static int menuListButtonWidth()
 {
-    static int width = isRunningLayoutTest() ? kStandardMenuListButtonWidth : 
+    static int width = isRunningLayoutTest() ? kStandardMenuListButtonWidth :
         IntSize(WebKit::Platform::current()->themeEngine()->getSize(SBP_ARROWBTN)).width();
     return width;
 }

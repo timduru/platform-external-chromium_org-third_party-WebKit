@@ -2,6 +2,7 @@
  * (C) 1999-2003 Lars Knoll (knoll@kde.org)
  * Copyright (C) 2004, 2005, 2006, 2007, 2008, 2009, 2010, 2012, 2013 Apple Inc. All rights reserved.
  * Copyright (C) 2011 Research In Motion Limited. All rights reserved.
+ * Copyright (C) 2013 Intel Corporation. All rights reserved.
  *
  * This library is free software; you can redistribute it and/or
  * modify it under the terms of the GNU Library General Public
@@ -367,7 +368,6 @@ bool StylePropertySet::hasCSSOMWrapper() const
 
 void MutableStylePropertySet::mergeAndOverrideOnConflict(const StylePropertySet* other)
 {
-    ASSERT(isMutable());
     unsigned size = other->propertyCount();
     for (unsigned n = 0; n < size; ++n) {
         PropertyReference toMerge = other->propertyAt(n);
@@ -477,8 +477,11 @@ bool MutableStylePropertySet::removePropertiesInSet(const CSSPropertyID* set, un
 
 int StylePropertySet::findPropertyIndex(CSSPropertyID propertyID) const
 {
+    // Convert here propertyID into an uint16_t to compare it with the metadata's m_propertyID to avoid
+    // the compiler converting it to an int multiple times in the loop.
+    uint16_t id = static_cast<uint16_t>(propertyID);
     for (int n = propertyCount() - 1 ; n >= 0; --n) {
-        if (propertyID == propertyAt(n).id()) {
+        if (id == propertyAt(n).propertyMetadata().m_propertyID) {
             // Only enabled properties should be part of the style.
             ASSERT(RuntimeCSSEnabled::isCSSPropertyEnabled(propertyID));
             return n;
@@ -513,7 +516,7 @@ bool StylePropertySet::propertyMatches(CSSPropertyID propertyID, const CSSValue*
         return false;
     return propertyAt(foundPropertyIndex).value()->equals(*propertyValue);
 }
-    
+
 void MutableStylePropertySet::removeEquivalentProperties(const StylePropertySet* style)
 {
     Vector<CSSPropertyID> propertiesToRemove;
@@ -522,7 +525,7 @@ void MutableStylePropertySet::removeEquivalentProperties(const StylePropertySet*
         PropertyReference property = propertyAt(i);
         if (style->propertyMatches(property.id(), property.value()))
             propertiesToRemove.append(property.id());
-    }    
+    }
     // FIXME: This should use mass removal.
     for (unsigned i = 0; i < propertiesToRemove.size(); ++i)
         removeProperty(propertiesToRemove[i]);
@@ -536,7 +539,7 @@ void MutableStylePropertySet::removeEquivalentProperties(const CSSStyleDeclarati
         PropertyReference property = propertyAt(i);
         if (style->cssPropertyMatches(property.id(), property.value()))
             propertiesToRemove.append(property.id());
-    }    
+    }
     // FIXME: This should use mass removal.
     for (unsigned i = 0; i < propertiesToRemove.size(); ++i)
         removeProperty(propertiesToRemove[i]);

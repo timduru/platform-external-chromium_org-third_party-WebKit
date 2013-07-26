@@ -22,7 +22,7 @@
  * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY
  * OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. 
+ * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
 #include "config.h"
@@ -72,16 +72,29 @@ CString TextEncoding::encode(const String& string, UnencodableHandling handling)
     if (string.isEmpty())
         return "";
 
+    OwnPtr<TextCodec> textCodec = newTextCodec(*this);
+    CString encodedString;
+    if (string.is8Bit())
+        encodedString = textCodec->encode(string.characters8(), string.length(), handling);
+    else
+        encodedString = textCodec->encode(string.characters16(), string.length(), handling);
+    return encodedString;
+}
+
+CString TextEncoding::normalizeAndEncode(const String& string, UnencodableHandling handling) const
+{
+    if (!m_name)
+        return CString();
+
+    if (string.isEmpty())
+        return "";
+
     // Text exclusively containing Latin-1 characters (U+0000..U+00FF) is left
     // unaffected by NFC. This is effectively the same as saying that all
     // Latin-1 text is already normalized to NFC.
     // Source: http://unicode.org/reports/tr15/
     if (string.is8Bit())
         return newTextCodec(*this)->encode(string.characters8(), string.length(), handling);
-
-    // FIXME: What's the right place to do normalization?
-    // It's a little strange to do it inside the encode function.
-    // Perhaps normalization should be an explicit step done before calling encode.
 
     const UChar* source = string.characters16();
     size_t length = string.length();
@@ -112,10 +125,10 @@ const char* TextEncoding::domName() const
     if (noExtendedTextEncodingNameUsed())
         return m_name;
 
-    // We treat EUC-KR as windows-949 (its superset), but need to expose 
+    // We treat EUC-KR as windows-949 (its superset), but need to expose
     // the name 'EUC-KR' because the name 'windows-949' is not recognized by
     // most Korean web servers even though they do use the encoding
-    // 'windows-949' with the name 'EUC-KR'. 
+    // 'windows-949' with the name 'EUC-KR'.
     // FIXME: This is not thread-safe. At the moment, this function is
     // only accessed in a single thread, but eventually has to be made
     // thread-safe along with usesVisualOrdering().
@@ -169,11 +182,11 @@ const TextEncoding& TextEncoding::closestByteBasedEquivalent() const
 {
     if (isNonByteBasedEncoding())
         return UTF8Encoding();
-    return *this; 
+    return *this;
 }
 
-// HTML5 specifies that UTF-8 be used in form submission when a form is 
-// is a part of a document in UTF-16 probably because UTF-16 is not a 
+// HTML5 specifies that UTF-8 be used in form submission when a form is
+// is a part of a document in UTF-16 probably because UTF-16 is not a
 // byte-based encoding and can contain 0x00. By extension, the same
 // should be done for UTF-32. In case of UTF-7, it is a byte-based encoding,
 // but it's fraught with problems and we'd rather steer clear of it.

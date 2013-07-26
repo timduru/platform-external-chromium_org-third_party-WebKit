@@ -33,6 +33,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/support/WebActiveGestureAnimation.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebArrayBuffer.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebAudioBus.cpp \
+	third_party/WebKit/Source/core/platform/chromium/support/WebCrypto.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoAlgorithm.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCryptoKey.cpp \
 	third_party/WebKit/Source/core/platform/chromium/support/WebCursorInfo.cpp \

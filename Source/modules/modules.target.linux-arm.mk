@@ -32,7 +32,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/crypto/Crypto.cpp \
 	third_party/WebKit/Source/modules/crypto/CryptoOperation.cpp \
 	third_party/WebKit/Source/modules/crypto/DOMWindowCrypto.cpp \
+	third_party/WebKit/Source/modules/crypto/HmacParams.cpp \
 	third_party/WebKit/Source/modules/crypto/Key.cpp \
+	third_party/WebKit/Source/modules/crypto/KeyOperation.cpp \
 	third_party/WebKit/Source/modules/crypto/NormalizeAlgorithm.cpp \
 	third_party/WebKit/Source/modules/crypto/SubtleCrypto.cpp \
 	third_party/WebKit/Source/modules/crypto/WorkerCrypto.cpp \

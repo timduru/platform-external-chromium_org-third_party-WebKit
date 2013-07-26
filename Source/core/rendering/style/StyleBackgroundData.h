@@ -28,8 +28,8 @@
 #include "core/css/StyleColor.h"
 #include "core/rendering/style/FillLayer.h"
 #include "core/rendering/style/OutlineValue.h"
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
+#include "wtf/PassRefPtr.h"
+#include "wtf/RefCounted.h"
 
 namespace WebCore {
 
@@ -53,7 +53,7 @@ private:
     friend class RenderStyle;
 
     StyleBackgroundData();
-    StyleBackgroundData(const StyleBackgroundData&); 
+    StyleBackgroundData(const StyleBackgroundData&);
 
     FillLayer m_background;
     StyleColor m_color;

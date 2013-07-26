@@ -316,6 +316,7 @@
 ../modules/crypto/Algorithm.idl
 ../modules/crypto/Crypto.idl
 ../modules/crypto/CryptoOperation.idl
+../modules/crypto/HmacParams.idl
 ../modules/crypto/Key.idl
 ../modules/crypto/SubtleCrypto.idl
 ../modules/crypto/WorkerCrypto.idl

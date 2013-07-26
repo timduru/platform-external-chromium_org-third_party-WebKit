@@ -32,58 +32,60 @@
 #define CustomElementRegistrationContext_h
 
 #include "core/dom/CustomElementDescriptor.h"
+#include "core/dom/CustomElementRegistry.h"
+#include "core/dom/CustomElementUpgradeCandidateMap.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/QualifiedName.h"
 #include "wtf/HashMap.h"
 #include "wtf/PassRefPtr.h"
-#include "wtf/RefPtr.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/AtomicStringHash.h"
 
 namespace WebCore {
 
 class CustomElementConstructorBuilder;
+class CustomElementDefinition;
 class Document;
 class Element;
 
 class CustomElementRegistrationContext : public RefCounted<CustomElementRegistrationContext> {
 public:
-    static PassRefPtr<CustomElementRegistrationContext> nullRegistrationContext();
     static PassRefPtr<CustomElementRegistrationContext> create();
 
-    virtual ~CustomElementRegistrationContext() { }
+    ~CustomElementRegistrationContext() { }
 
     // Model
     // FIXME: Move this to CustomElementRegistry
     static bool isValidTypeName(const AtomicString& type);
     // FIXME: Move this to CustomElement
     static bool isCustomTagName(const AtomicString& localName);
-    // FIXME: Privatize this when CustomElementWrapper uses the definition map.
-    static CustomElementDescriptor describe(Element*);
 
     // Definitions
-    virtual void registerElement(Document*, CustomElementConstructorBuilder*, const AtomicString& type, ExceptionCode&) = 0;
+    void registerElement(Document*, CustomElementConstructorBuilder*, const AtomicString& type, ExceptionCode&);
 
     // Instance creation
-    virtual PassRefPtr<Element> createCustomTagElement(Document*, const QualifiedName&) = 0;
+    PassRefPtr<Element> createCustomTagElement(Document*, const QualifiedName&);
     static void setIsAttributeAndTypeExtension(Element*, const AtomicString& type);
     static void setTypeExtension(Element*, const AtomicString& type);
 
     // Instance lifecycle
-    virtual void customElementWasDestroyed(Element*);
+    void customElementWasDestroyed(Element*);
 
 protected:
     CustomElementRegistrationContext() { }
 
-    // Model
-    static const AtomicString& typeExtension(Element*);
-
     // Instance creation
-    virtual void didGiveTypeExtension(Element*) = 0;
+    void didGiveTypeExtension(Element*, const AtomicString& type);
 
 private:
-    typedef HashMap<Element*, AtomicString> TypeExtensionMap;
-    static TypeExtensionMap* typeExtensionMap();
+    void resolve(Element*, const AtomicString& typeExtension);
+    void didResolveElement(CustomElementDefinition*, Element*);
+    void didCreateUnresolvedElement(const CustomElementDescriptor&, Element*);
+
+    CustomElementRegistry m_registry;
+
+    // Element creation
+    CustomElementUpgradeCandidateMap m_candidates;
 };
 
 }

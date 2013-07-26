@@ -30,7 +30,7 @@
 #include "core/svg/SVGPolygonElement.h"
 #include "core/svg/SVGPolylineElement.h"
 #include "core/svg/SVGRectElement.h"
-#include <wtf/HashMap.h>
+#include "wtf/HashMap.h"
 
 namespace WebCore {
 
@@ -111,8 +111,7 @@ static void updatePathFromPolylineElement(SVGElement* element, Path& path)
 
 static void updatePathFromRectElement(SVGElement* element, Path& path)
 {
-    ASSERT(element->hasTagName(SVGNames::rectTag));
-    SVGRectElement* rect = static_cast<SVGRectElement*>(element);
+    SVGRectElement* rect = toSVGRectElement(element);
 
     SVGLengthContext lengthContext(element);
     float width = rect->widthCurrentValue().value(lengthContext);

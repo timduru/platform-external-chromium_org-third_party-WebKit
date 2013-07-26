@@ -31,6 +31,7 @@
 #include "core/css/MediaList.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/dom/ContextFeatures.h"
+#include "core/dom/DocumentInit.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
 #include "core/dom/ExceptionCode.h"
@@ -146,7 +147,7 @@ static bool isSVG11Feature(const String &feature, const String &version)
         addString(svgFeatures, "ExternalResourcesRequired");
         addString(svgFeatures, "View");
         addString(svgFeatures, "Script");
-        addString(svgFeatures, "Animation"); 
+        addString(svgFeatures, "Animation");
 #if ENABLE(SVG_FONTS)
         addString(svgFeatures, "Font");
         addString(svgFeatures, "BasicFont");
@@ -257,7 +258,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& namespaceUR
     if (namespaceURI == SVGNames::svgNamespaceURI)
         doc = SVGDocument::create();
     else if (namespaceURI == HTMLNames::xhtmlNamespaceURI)
-        doc = Document::createXHTML();
+        doc = Document::createXHTML(DocumentInit().withRegistrationContext(m_document->registrationContext()));
     else
         doc = Document::create();
 
@@ -372,7 +373,7 @@ bool DOMImplementation::isTextMIMEType(const String& mimeType)
 
 PassRefPtr<HTMLDocument> DOMImplementation::createHTMLDocument(const String& title)
 {
-    RefPtr<HTMLDocument> d = HTMLDocument::create();
+    RefPtr<HTMLDocument> d = HTMLDocument::create(DocumentInit().withRegistrationContext(m_document->registrationContext()));
     d->open();
     d->write("<!doctype html><html><body></body></html>");
     if (!title.isNull())
@@ -411,7 +412,7 @@ PassRefPtr<Document> DOMImplementation::createDocument(const String& type, Frame
     // Everything else except text/plain can be overridden by plugins. In particular, Adobe SVG Viewer should be used for SVG, if installed.
     // Disallowing plug-ins to use text/plain prevents plug-ins from hijacking a fundamental type that the browser is expected to handle,
     // and also serves as an optimization to prevent loading the plug-in database in the common case.
-    if (type != "text/plain" && pluginData && pluginData->supportsMimeType(type)) 
+    if (type != "text/plain" && pluginData && pluginData->supportsMimeType(type))
         return PluginDocument::create(DocumentInit(url, frame));
     if (isTextMIMEType(type))
         return TextDocument::create(DocumentInit(url, frame));

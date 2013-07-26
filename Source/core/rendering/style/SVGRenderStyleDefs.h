@@ -31,10 +31,10 @@
 #include "core/rendering/style/ShadowData.h"
 #include "core/svg/SVGLength.h"
 #include "core/svg/SVGPaint.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
+#include "wtf/OwnPtr.h"
+#include "wtf/PassOwnPtr.h"
+#include "wtf/RefCounted.h"
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
@@ -76,7 +76,7 @@ namespace WebCore {
         DB_IDEOGRAPHIC, DB_ALPHABETIC, DB_HANGING, DB_MATHEMATICAL,
         DB_CENTRAL, DB_MIDDLE, DB_TEXT_AFTER_EDGE, DB_TEXT_BEFORE_EDGE
     };
-    
+
     enum EVectorEffect {
         VE_NONE,
         VE_NON_SCALING_STROKE
@@ -147,7 +147,7 @@ namespace WebCore {
         Color visitedLinkPaintColor;
         String visitedLinkPaintUri;
 
-    private:        
+    private:
         StyleStrokeData();
         StyleStrokeData(const StyleStrokeData&);
     };
@@ -166,7 +166,7 @@ namespace WebCore {
         float opacity;
         Color color;
 
-    private:        
+    private:
         StyleStopData();
         StyleStopData(const StyleStopData&);
     };
@@ -175,7 +175,7 @@ namespace WebCore {
     public:
         static PassRefPtr<StyleTextData> create() { return adoptRef(new StyleTextData); }
         PassRefPtr<StyleTextData> copy() const { return adoptRef(new StyleTextData(*this)); }
-        
+
         bool operator==(const StyleTextData& other) const;
         bool operator!=(const StyleTextData& other) const
         {

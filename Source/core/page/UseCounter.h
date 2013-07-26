@@ -146,6 +146,9 @@ public:
         FormElement,
         DemotedFormElement,
         CaptureAttributeAsEnum,
+        ShadowDOMPrefixedPseudo,
+        ShadowDOMPrefixedCreateShadowRoot,
+        ShadowDOMPrefixedShadowRoot,
         // Add new features immediately above this line. Don't change assigned numbers of each items.
         NumberOfFeatures, // This enum value must be last.
     };
@@ -170,6 +173,8 @@ public:
     static UseCounter* getFrom(const Document*);
     static UseCounter* getFrom(const CSSStyleSheet*);
     static UseCounter* getFrom(const StyleSheetContents*);
+
+    static int mapCSSPropertyIdToCSSSampleIdForHistogram(int id);
 
 private:
     bool recordMeasurement(Feature feature)

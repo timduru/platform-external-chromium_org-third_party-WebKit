@@ -12,7 +12,8 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 # Make sure our deps are built first.
 GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,skia_skia_gyp)/skia.stamp \
-	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_library_gyp)/skia_skia_library_gyp.a
+	$(call intermediates-dir-for,STATIC_LIBRARIES,skia_skia_library_gyp)/skia_skia_library_gyp.a \
+	$(call intermediates-dir-for,GYP,v8_tools_gyp_v8_gyp)/v8.stamp
 
 GYP_GENERATED_OUTPUTS :=
 
@@ -142,6 +143,7 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/skia/ext \
+	$(LOCAL_PATH)/v8/include \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -274,6 +276,7 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/ports \
 	$(LOCAL_PATH)/third_party/skia/include/utils \
 	$(LOCAL_PATH)/skia/ext \
+	$(LOCAL_PATH)/v8/include \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

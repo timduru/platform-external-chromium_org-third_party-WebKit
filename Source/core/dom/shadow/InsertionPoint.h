@@ -41,11 +41,6 @@ namespace WebCore {
 
 class InsertionPoint : public HTMLElement {
 public:
-    enum Type {
-        ShadowInsertionPoint,
-        ContentInsertionPoint
-    };
-
     enum MatchType {
         AlwaysMatches,
         NeverMatches,
@@ -63,7 +58,6 @@ public:
 
     virtual MatchType matchTypeFor(Node*) { return AlwaysMatches; }
     virtual const CSSSelectorList& selectorList() { return emptySelectorList(); }
-    virtual Type insertionPointType() const = 0;
     virtual bool canAffectSelector() const { return false; }
 
     bool resetStyleInheritance() const;
@@ -74,8 +68,6 @@ public:
 
     bool shouldUseFallbackElements() const;
 
-    size_t indexOf(Node* node) const { return m_distribution.find(node); }
-    bool contains(const Node*) const;
     size_t size() const { return m_distribution.size(); }
     Node* at(size_t index)  const { return m_distribution.at(index).get(); }
     Node* first() const { return m_distribution.isEmpty() ? 0 : m_distribution.first().get(); }

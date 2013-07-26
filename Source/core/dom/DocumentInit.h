@@ -28,11 +28,15 @@
 #ifndef DocumentInit_h
 #define DocumentInit_h
 
+#include "core/dom/CustomElementRegistrationContext.h"
 #include "core/dom/SecurityContext.h"
 #include "weborigin/KURL.h"
+#include "wtf/PassRefPtr.h"
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
+class Document;
 class Frame;
 class HTMLImport;
 class Settings;
@@ -49,6 +53,7 @@ public:
     Frame* frame() const { return m_frame; }
     HTMLImport* import() const { return m_import; }
 
+    bool hasSecurityContext() const { return frameForSecurityContext(); }
     bool shouldTreatURLAsSrcdocDocument() const;
     bool shouldSetURL() const;
     SandboxFlags sandboxFlags() const;
@@ -56,10 +61,16 @@ public:
     Frame* ownerFrame() const;
     Settings* settings() const;
 
+    DocumentInit& withRegistrationContext(CustomElementRegistrationContext*);
+    PassRefPtr<CustomElementRegistrationContext> registrationContext(Document*) const;
+
 private:
+    Frame* frameForSecurityContext() const;
+
     KURL m_url;
     Frame* m_frame;
     HTMLImport* m_import;
+    RefPtr<CustomElementRegistrationContext> m_registrationContext;
 };
 
 } // namespace WebCore

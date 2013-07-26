@@ -331,7 +331,7 @@ static TextStream& operator<<(TextStream& ts, const RenderSVGShape& shape)
     SVGLengthContext lengthContext(svgElement);
 
     if (svgElement->hasTagName(SVGNames::rectTag)) {
-        SVGRectElement* element = static_cast<SVGRectElement*>(svgElement);
+        SVGRectElement* element = toSVGRectElement(svgElement);
         writeNameValuePair(ts, "x", element->xCurrentValue().value(lengthContext));
         writeNameValuePair(ts, "y", element->yCurrentValue().value(lengthContext));
         writeNameValuePair(ts, "width", element->widthCurrentValue().value(lengthContext));
@@ -379,7 +379,7 @@ static void writeRenderSVGTextBox(TextStream& ts, const RenderSVGText& text)
         return;
 
     ts << " " << enclosingIntRect(FloatRect(text.location(), FloatSize(box->logicalWidth(), box->logicalHeight())));
-    
+
     // FIXME: Remove this hack, once the new text layout engine is completly landed. We want to preserve the old layout test results for now.
     ts << " contains 1 chunk(s)";
 
@@ -486,7 +486,7 @@ void writeSVGResourceContainer(TextStream& ts, const RenderObject& object, int i
 
     Element* element = toElement(object.node());
     const AtomicString& id = element->getIdAttribute();
-    writeNameAndQuotedValue(ts, "id", id);    
+    writeNameAndQuotedValue(ts, "id", id);
 
     RenderSVGResourceContainer* resource = const_cast<RenderObject&>(object).toRenderSVGResourceContainer();
     ASSERT(resource);

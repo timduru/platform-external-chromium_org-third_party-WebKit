@@ -437,6 +437,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_lastHandledUserGestureTimestamp(0)
     , m_prerenderer(Prerenderer::create(this))
     , m_textAutosizer(TextAutosizer::create(this))
+    , m_registrationContext(initializer.registrationContext(this))
     , m_pendingTasksTimer(this, &Document::pendingTasksTimerFired)
     , m_scheduledTasksAreSuspended(false)
     , m_sharedObjectPoolClearTimer(this, &Document::sharedObjectPoolClearTimerFired)
@@ -475,13 +476,6 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
         m_nodeListCounts[i] = 0;
 
     InspectorCounters::incrementCounter(InspectorCounters::DocumentCounter);
-
-    bool shouldProcessCustomElements =
-        (isHTMLDocument() || isXHTMLDocument())
-        && RuntimeEnabledFeatures::customDOMElementsEnabled();
-    m_registrationContext = shouldProcessCustomElements
-        ? CustomElementRegistrationContext::create()
-        : CustomElementRegistrationContext::nullRegistrationContext();
 }
 
 static void histogramMutationEventUsage(const unsigned short& listenerTypes)
@@ -720,7 +714,7 @@ PassRefPtr<Element> Document::createElement(const AtomicString& localName, const
 
     RefPtr<Element> element;
 
-    if (CustomElementRegistrationContext::isCustomTagName(localName))
+    if (CustomElementRegistrationContext::isCustomTagName(localName) && registrationContext())
         element = registrationContext()->createCustomTagElement(this, QualifiedName(nullAtom, localName, xhtmlNamespaceURI));
     else
         element = createElement(localName, ec);
@@ -744,7 +738,7 @@ PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, 
     }
 
     RefPtr<Element> element;
-    if (CustomElementRegistrationContext::isCustomTagName(qName.localName()))
+    if (CustomElementRegistrationContext::isCustomTagName(qName.localName()) && registrationContext())
         element = registrationContext()->createCustomTagElement(this, qName);
     else
         element = createElementNS(namespaceURI, qualifiedName, ec);
@@ -762,6 +756,11 @@ ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicS
 
 ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, const Dictionary& options, ExceptionCode& ec)
 {
+    if (!registrationContext()) {
+        ec = NotSupportedError;
+        return ScriptValue();
+    }
+
     CustomElementConstructorBuilder constructorBuilder(state, &options);
     registrationContext()->registerElement(this, &constructorBuilder, name, ec);
     return constructorBuilder.bindingsReturnValue();
@@ -2315,7 +2314,7 @@ bool Document::shouldScheduleLayout()
         || (documentElement() && !isHTMLHtmlElement(documentElement()));
 }
 
-bool Document::isLayoutTimerActive()
+bool Document::shouldParserYieldAgressivelyBeforeScriptExecution()
 {
     return view() && view()->layoutPending() && !minimumLayoutDelay();
 }
@@ -3154,7 +3153,7 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
             oldFocusedElement->dispatchFormControlChangeEvent();
 
         // Dispatch the blur event and let the node do any other blur related activities (important for text fields)
-        oldFocusedElement->dispatchBlurEvent(newFocusedElement);
+        oldFocusedElement->dispatchBlurEvent(newFocusedElement.get());
 
         if (m_focusedElement) {
             // handler shifted focus
@@ -3162,10 +3161,10 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
             newFocusedElement = 0;
         }
 
-        oldFocusedElement->dispatchFocusOutEvent(eventNames().focusoutEvent, newFocusedElement); // DOM level 3 name for the bubbling blur event.
+        oldFocusedElement->dispatchFocusOutEvent(eventNames().focusoutEvent, newFocusedElement.get()); // DOM level 3 name for the bubbling blur event.
         // FIXME: We should remove firing DOMFocusOutEvent event when we are sure no content depends
         // on it, probably when <rdar://problem/8503958> is resolved.
-        oldFocusedElement->dispatchFocusOutEvent(eventNames().DOMFocusOutEvent, newFocusedElement); // DOM level 2 name for compatibility.
+        oldFocusedElement->dispatchFocusOutEvent(eventNames().DOMFocusOutEvent, newFocusedElement.get()); // DOM level 2 name for compatibility.
 
         if (m_focusedElement) {
             // handler shifted focus
@@ -3195,7 +3194,7 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
         m_focusedElement = newFocusedElement;
 
         // Dispatch the focus event and let the node do any other focus related activities (important for text fields)
-        m_focusedElement->dispatchFocusEvent(oldFocusedElement, direction);
+        m_focusedElement->dispatchFocusEvent(oldFocusedElement.get(), direction);
 
         if (m_focusedElement != newFocusedElement) {
             // handler shifted focus
@@ -3203,7 +3202,7 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
             goto SetFocusedElementDone;
         }
 
-        m_focusedElement->dispatchFocusInEvent(eventNames().focusinEvent, oldFocusedElement); // DOM level 3 bubbling focus event.
+        m_focusedElement->dispatchFocusInEvent(eventNames().focusinEvent, oldFocusedElement.get()); // DOM level 3 bubbling focus event.
 
         if (m_focusedElement != newFocusedElement) {
             // handler shifted focus
@@ -3213,7 +3212,7 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
 
         // FIXME: We should remove firing DOMFocusInEvent event when we are sure no content depends
         // on it, probably when <rdar://problem/8503958> is m.
-        m_focusedElement->dispatchFocusInEvent(eventNames().DOMFocusInEvent, oldFocusedElement); // DOM level 2 for compatibility.
+        m_focusedElement->dispatchFocusInEvent(eventNames().DOMFocusInEvent, oldFocusedElement.get()); // DOM level 2 for compatibility.
 
         if (m_focusedElement != newFocusedElement) {
             // handler shifted focus
@@ -4110,6 +4109,9 @@ void Document::finishedParsing()
 
     // Parser should have picked up all preloads by now
     m_fetcher->clearPreloads();
+
+    if (m_import)
+        m_import->didFinishParsing();
 }
 
 void Document::sharedObjectPoolClearTimerFired(Timer<Document>*)
@@ -4209,7 +4211,7 @@ void Document::initSecurityContext(const DocumentInit& initializer)
         return;
     }
 
-    if (!initializer.frame()) {
+    if (!initializer.hasSecurityContext()) {
         // No source for a security context.
         // This can occur via document.implementation.createDocument().
         m_cookieURL = KURL(ParsedURLString, emptyString());
@@ -4281,12 +4283,11 @@ void Document::initSecurityContext(const DocumentInit& initializer)
     setSecurityOrigin(ownerFrame->document()->securityOrigin());
 }
 
-void Document::initContentSecurityPolicy()
+void Document::initContentSecurityPolicy(const ContentSecurityPolicyResponseHeaders& headers)
 {
-    if (!m_frame->tree()->parent() || (!shouldInheritSecurityOriginFromOwner(m_url) && !isPluginDocument()))
-        return;
-
-    contentSecurityPolicy()->copyStateFrom(m_frame->tree()->parent()->document()->contentSecurityPolicy());
+    if (m_frame && m_frame->tree()->parent() && (shouldInheritSecurityOriginFromOwner(m_url) || isPluginDocument()))
+        contentSecurityPolicy()->copyStateFrom(m_frame->tree()->parent()->document()->contentSecurityPolicy());
+    contentSecurityPolicy()->didReceiveHeaders(headers);
 }
 
 void Document::didUpdateSecurityOrigin()
@@ -5043,7 +5044,7 @@ Document* Document::ensureTemplateDocument()
         return const_cast<Document*>(document);
 
     if (isHTMLDocument())
-        m_templateDocument = HTMLDocument::create(DocumentInit(blankURL()));
+        m_templateDocument = HTMLDocument::create(DocumentInit(blankURL()).withRegistrationContext(registrationContext()));
     else
         m_templateDocument = Document::create(DocumentInit(blankURL()));
 

@@ -65,7 +65,7 @@ typedef int ExceptionCode;
 
 struct ClickHandlingState {
     WTF_MAKE_FAST_ALLOCATED;
-  
+
 public:
     bool checked;
     bool indeterminate;
@@ -196,7 +196,7 @@ public:
     virtual bool isKeyboardFocusable(KeyboardEvent*) const;
     virtual bool shouldShowFocusRingOnMouseFocus() const;
     virtual bool shouldUseInputMethod() const;
-    virtual void handleFocusEvent(Node* oldFocusedNode, FocusDirection);
+    virtual void handleFocusEvent(Element* oldFocusedElement, FocusDirection);
     virtual void handleBlurEvent();
     virtual void accessKeyAction(bool sendMouseEvents);
     virtual bool canBeSuccessfulSubmitButton();

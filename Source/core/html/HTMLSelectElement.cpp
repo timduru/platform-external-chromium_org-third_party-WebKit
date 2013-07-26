@@ -129,7 +129,7 @@ void HTMLSelectElement::optionSelectedByUser(int optionIndex, bool fireOnChangeN
 bool HTMLSelectElement::hasPlaceholderLabelOption() const
 {
     // The select element has no placeholder label option if it has an attribute "multiple" specified or a display size of non-1.
-    // 
+    //
     // The condition "size() > 1" is not compliant with the HTML5 spec as of Dec 3, 2010. "size() != 1" is correct.
     // Using "size() > 1" here because size() may be 0 in WebKit.
     // See the discussion at https://bugs.webkit.org/show_bug.cgi?id=43887
@@ -721,7 +721,7 @@ void HTMLSelectElement::setRecalcListItems()
     }
     if (!inDocument())
         invalidateSelectedItems();
-    
+
     if (renderer()) {
         if (AXObjectCache* cache = renderer()->document()->existingAXObjectCache())
             cache->childrenChanged(this);
@@ -901,23 +901,23 @@ int HTMLSelectElement::listToOptionIndex(int listIndex) const
     return optionIndex;
 }
 
-void HTMLSelectElement::dispatchFocusEvent(PassRefPtr<Node> oldFocusedNode, FocusDirection direction)
+void HTMLSelectElement::dispatchFocusEvent(Element* oldFocusedElement, FocusDirection direction)
 {
     // Save the selection so it can be compared to the new selection when
     // dispatching change events during blur event dispatch.
     if (usesMenuList())
         saveLastSelection();
-    HTMLFormControlElementWithState::dispatchFocusEvent(oldFocusedNode, direction);
+    HTMLFormControlElementWithState::dispatchFocusEvent(oldFocusedElement, direction);
 }
 
-void HTMLSelectElement::dispatchBlurEvent(PassRefPtr<Node> newFocusedNode)
+void HTMLSelectElement::dispatchBlurEvent(Element* newFocusedElement)
 {
     // We only need to fire change events here for menu lists, because we fire
     // change events for list boxes whenever the selection change is actually made.
     // This matches other browsers' behavior.
     if (usesMenuList())
         dispatchChangeEventForMenuList();
-    HTMLFormControlElementWithState::dispatchBlurEvent(newFocusedNode);
+    HTMLFormControlElementWithState::dispatchBlurEvent(newFocusedElement);
 }
 
 void HTMLSelectElement::deselectItemsWithoutValidation(HTMLElement* excludeElement)
@@ -1028,7 +1028,7 @@ bool HTMLSelectElement::appendFormData(FormDataList& list, bool)
     // will be submitted (!successful). We won't send a unselected non-disabled
     // option as fallback. This behavior matches to other browsers.
     return successful;
-} 
+}
 
 void HTMLSelectElement::reset()
 {
@@ -1455,7 +1455,7 @@ void HTMLSelectElement::defaultEventHandler(Event* event)
 
     if (usesMenuList())
         menuListDefaultEventHandler(event);
-    else 
+    else
         listBoxDefaultEventHandler(event);
     if (event->defaultHandled())
         return;
@@ -1495,7 +1495,7 @@ int HTMLSelectElement::optionCount() const
 String HTMLSelectElement::optionAtIndex(int index) const
 {
     const Vector<HTMLElement*>& items = listItems();
-    
+
     HTMLElement* element = items[index];
     if (!element->hasTagName(optionTag) || toHTMLOptionElement(element)->isDisabledFormControl())
         return String();
@@ -1523,11 +1523,11 @@ Node::InsertionNotificationRequest HTMLSelectElement::insertedInto(ContainerNode
 }
 
 void HTMLSelectElement::accessKeySetSelectedIndex(int index)
-{    
+{
     // First bring into focus the list box.
     if (!focused())
         accessKeyAction(false);
-    
+
     // If this index is already selected, unselect. otherwise update the selected index.
     const Vector<HTMLElement*>& items = listItems();
     int listIndex = optionToListIndex(index);

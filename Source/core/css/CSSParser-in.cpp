@@ -2310,10 +2310,14 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         break;
     case CSSPropertyOrder:
         if (validUnit(value, FInteger, CSSStrictMode)) {
-            // We restrict the smallest value to int min + 2 because we use int min and int min + 1 as special values in a hash set.
-            parsedValue = cssValuePool().createValue(max(static_cast<double>(std::numeric_limits<int>::min() + 2), value->fValue),
-                                                             static_cast<CSSPrimitiveValue::UnitTypes>(value->unit));
-            m_valueList->next();
+            if (value->unit != CSSPrimitiveValue::CSS_VARIABLE_NAME) {
+                // We restrict the smallest value to int min + 2 because we use int min and int min + 1 as special values in a hash set.
+                parsedValue = cssValuePool().createValue(max(static_cast<double>(std::numeric_limits<int>::min() + 2), value->fValue),
+                    static_cast<CSSPrimitiveValue::UnitTypes>(value->unit));
+                m_valueList->next();
+            } else {
+                validPrimitive = true;
+            }
         }
         break;
     case CSSPropertyWebkitMarquee:
@@ -8769,7 +8773,7 @@ bool CSSParser::parsePerspectiveOrigin(CSSPropertyID propId, CSSPropertyID& prop
 void CSSParser::addTextDecorationProperty(CSSPropertyID propId, PassRefPtr<CSSValue> value, bool important)
 {
     // The text-decoration-line property takes priority over text-decoration, unless the latter has important priority set.
-    if (propId == CSSPropertyTextDecoration && !important && m_currentShorthand == CSSPropertyInvalid) {
+    if (propId == CSSPropertyTextDecoration && !important && !inShorthand()) {
         for (unsigned i = 0; i < m_parsedProperties.size(); ++i) {
             if (m_parsedProperties[i].id() == CSSPropertyTextDecorationLine)
                 return;
@@ -8785,7 +8789,7 @@ bool CSSParser::parseTextDecoration(CSSPropertyID propId, bool important)
         return false;
 
     CSSParserValue* value = m_valueList->current();
-    if (value->id == CSSValueNone) {
+    if (value && value->id == CSSValueNone) {
         addTextDecorationProperty(propId, cssValuePool().createIdentifierValue(CSSValueNone), important);
         m_valueList->next();
         return true;

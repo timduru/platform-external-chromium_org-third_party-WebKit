@@ -100,10 +100,15 @@
     // WebKit extension, pending specification.
     [RaisesException] boolean webkitMatchesSelector([Default=Undefined] optional DOMString selectors);
 
-    // ShadowAware API
-    [Reflect=pseudo, ImplementedAs=pseudo, PerWorldBindings] attribute DOMString webkitPseudo;
-    [ImplementedAs=createShadowRoot, RaisesException] ShadowRoot webkitCreateShadowRoot();
-    [ImplementedAs=shadowRoot, PerWorldBindings] readonly attribute ShadowRoot webkitShadowRoot;
+    // Shadow DOM API
+    [EnabledAtRuntime=ShadowDOM, Reflect, PerWorldBindings] attribute DOMString pseudo;
+    [EnabledAtRuntime=ShadowDOM, RaisesException] ShadowRoot createShadowRoot();
+    [EnabledAtRuntime=ShadowDOM, PerWorldBindings] readonly attribute ShadowRoot shadowRoot;
+
+    // To-be-deprecated prefixed Shadow DOM API
+    [Reflect=pseudo, ImplementedAs=pseudo, PerWorldBindings, MeasureAs=ShadowDOMPrefixedPseudo] attribute DOMString webkitPseudo;
+    [ImplementedAs=createShadowRoot, RaisesException, MeasureAs=ShadowDOMPrefixedCreateShadowRoot] ShadowRoot webkitCreateShadowRoot();
+    [ImplementedAs=shadowRoot, PerWorldBindings, MeasureAs=ShadowDOMPrefixedShadowRoot] readonly attribute ShadowRoot webkitShadowRoot;
 
     // CSSOM View Module API
     ClientRectList getClientRects();

@@ -26,7 +26,7 @@
 #include "core/rendering/BidiRun.h"
 #include "core/rendering/RenderBlock.h"
 #include "core/rendering/RenderText.h"
-#include <wtf/StdLibExtras.h>
+#include "wtf/StdLibExtras.h"
 
 namespace WebCore {
 
@@ -78,7 +78,7 @@ public:
         return m_obj && m_obj->preservesNewline() && m_obj->isText() && toRenderText(m_obj)->textLength()
             && !toRenderText(m_obj)->isWordBreak() && toRenderText(m_obj)->characterAt(m_pos) == '\n';
     }
-    
+
     inline bool atParagraphSeparator()
     {
         return (m_obj && m_obj->isBR()) || atTextParagraphSeparator();
@@ -287,7 +287,7 @@ static inline RenderObject* bidiFirstSkippingEmptyInlines(RenderObject* root, In
             // Never skip empty inlines.
             if (resolver)
                 resolver->commitExplicitEmbedding();
-            return o; 
+            return o;
         }
     }
 

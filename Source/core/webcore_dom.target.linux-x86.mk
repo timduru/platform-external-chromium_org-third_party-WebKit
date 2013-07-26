@@ -154,6 +154,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/StringCallback.cpp \
 	third_party/WebKit/Source/core/dom/StyleElement.cpp \
 	third_party/WebKit/Source/core/dom/StyleSheetCollection.cpp \
+	third_party/WebKit/Source/core/dom/StyleSheetScopingNodeList.cpp \
 	third_party/WebKit/Source/core/dom/TagNodeList.cpp \
 	third_party/WebKit/Source/core/dom/Text.cpp \
 	third_party/WebKit/Source/core/dom/TextEvent.cpp \

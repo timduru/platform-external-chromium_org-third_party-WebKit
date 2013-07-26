@@ -28,8 +28,8 @@
 #include "core/css/StyleColor.h"
 #include "core/platform/graphics/FloatRect.h"
 #include "core/platform/graphics/LayoutRect.h"
-#include <wtf/OwnPtr.h>
-#include <wtf/PassOwnPtr.h>
+#include "wtf/OwnPtr.h"
+#include "wtf/PassOwnPtr.h"
 
 namespace WebCore {
 
@@ -52,7 +52,7 @@ public:
 
     bool operator==(const ShadowData&) const;
     bool operator!=(const ShadowData& o) const { return !(*this == o); }
-    
+
     int x() const { return m_location.x(); }
     int y() const { return m_location.y(); }
     IntPoint location() const { return m_location; }

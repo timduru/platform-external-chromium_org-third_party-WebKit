@@ -87,6 +87,7 @@
 #include "WebSettingsImpl.h"
 #include "WebTextInputInfo.h"
 #include "WebViewClient.h"
+#include "WebWindowFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Document.h"
@@ -427,6 +428,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_showDebugBorders(false)
     , m_continuousPaintingEnabled(false)
     , m_showScrollBottleneckRects(false)
+    , m_baseBackgroundColor(Color::white)
 {
     Page::PageClients pageClients;
     pageClients.chromeClient = &m_chromeClientImpl;
@@ -1833,7 +1835,7 @@ void WebViewImpl::paint(WebCanvas* canvas, const WebRect& rect, PaintOptions opt
         FrameView* view = page()->mainFrame()->view();
         PaintBehavior oldPaintBehavior = view->paintBehavior();
         if (isAcceleratedCompositingActive()) {
-            ASSERT(option == ForceSoftwareRenderingAndIgnoreGPUResidentContent);            
+            ASSERT(option == ForceSoftwareRenderingAndIgnoreGPUResidentContent);
             view->setPaintBehavior(oldPaintBehavior | PaintBehaviorFlattenCompositingLayers);
         }
 
@@ -1845,7 +1847,7 @@ void WebViewImpl::paint(WebCanvas* canvas, const WebRect& rect, PaintOptions opt
         WebKit::Platform::current()->histogramCustomCounts("Renderer4.SoftwarePaintMegapixPerSecond", pixelsPerSec / 1000000, 10, 210, 30);
 
         if (isAcceleratedCompositingActive()) {
-            ASSERT(option == ForceSoftwareRenderingAndIgnoreGPUResidentContent);            
+            ASSERT(option == ForceSoftwareRenderingAndIgnoreGPUResidentContent);
             view->setPaintBehavior(oldPaintBehavior);
         }
     }
@@ -2461,11 +2463,11 @@ WebColor WebViewImpl::backgroundColor() const
     if (isTransparent())
         return Color::transparent;
     if (!m_page)
-        return Color::white;
+        return m_baseBackgroundColor;
     FrameView* view = m_page->mainFrame()->view();
     StyleColor backgroundColor = view->documentBackgroundColor();
     if (!backgroundColor.isValid())
-        return Color::white;
+        return m_baseBackgroundColor;
     return backgroundColor.rgb();
 }
 
@@ -3383,6 +3385,9 @@ WebDragOperation WebViewImpl::dragTargetDragEnterOrOver(const WebPoint& clientPo
 
 void WebViewImpl::sendResizeEventAndRepaint()
 {
+    // FIXME: This is wrong. The FrameView is responsible sending a resizeEvent
+    // as part of layout. Layout is also responsible for sending invalidations
+    // to the embedder. This method and all callers may be wrong. -- eseidel.
     if (mainFrameImpl()->frameView()) {
         // Enqueues the resize event.
         mainFrameImpl()->frame()->eventHandler()->sendResizeEvent();
@@ -3578,6 +3583,19 @@ bool WebViewImpl::isTransparent() const
     return m_isTransparent;
 }
 
+void WebViewImpl::setBaseBackgroundColor(WebColor color)
+{
+    if (m_baseBackgroundColor == color)
+        return;
+
+    m_baseBackgroundColor = color;
+
+    m_page->mainFrame()->view()->setBaseBackgroundColor(color);
+
+    if (m_layerTreeView)
+        m_layerTreeView->setBackgroundColor(backgroundColor());
+}
+
 void WebViewImpl::setIsActive(bool active)
 {
     if (page() && page()->focusController())
@@ -3592,6 +3610,11 @@ bool WebViewImpl::isActive() const
 void WebViewImpl::setDomainRelaxationForbidden(bool forbidden, const WebString& scheme)
 {
     SchemeRegistry::setDomainRelaxationForbiddenForURLScheme(forbidden, String(scheme));
+}
+
+void WebViewImpl::setWindowFeatures(const WebWindowFeatures& features)
+{
+    m_page->chrome().setWindowFeatures(features);
 }
 
 void WebViewImpl::setScrollbarColors(unsigned inactiveColor,

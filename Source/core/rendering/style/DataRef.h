@@ -24,7 +24,7 @@
 #ifndef DataRef_h
 #define DataRef_h
 
-#include <wtf/RefPtr.h>
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
@@ -54,7 +54,7 @@ public:
         ASSERT(o.m_data);
         return m_data == o.m_data || *m_data == *o.m_data;
     }
-    
+
     bool operator!=(const DataRef<T>& o) const
     {
         ASSERT(m_data);

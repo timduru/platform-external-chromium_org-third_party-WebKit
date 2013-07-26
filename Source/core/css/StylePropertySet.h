@@ -73,8 +73,9 @@ public:
         // FIXME: Remove this.
         CSSProperty toCSSProperty() const { return CSSProperty(propertyMetadata(), const_cast<CSSValue*>(propertyValue())); }
 
+        const StylePropertyMetadata& propertyMetadata() const;
+
     private:
-        StylePropertyMetadata propertyMetadata() const;
         const CSSValue* propertyValue() const;
 
         const StylePropertySet& m_propertySet;
@@ -106,7 +107,7 @@ public:
     PassRefPtr<ImmutableStylePropertySet> immutableCopyIfNeeded() const;
 
     PassRefPtr<MutableStylePropertySet> copyPropertiesInSet(const Vector<CSSPropertyID>&) const;
-    
+
     String asText() const;
 
     bool isMutable() const { return m_isMutable; }
@@ -164,12 +165,12 @@ private:
 
 inline const CSSValue** ImmutableStylePropertySet::valueArray() const
 {
-    return reinterpret_cast<const CSSValue**>(const_cast<const void**>((&static_cast<const ImmutableStylePropertySet*>(this)->m_storage)));
+    return reinterpret_cast<const CSSValue**>(const_cast<const void**>(&(this->m_storage)));
 }
 
 inline const StylePropertyMetadata* ImmutableStylePropertySet::metadataArray() const
 {
-    return reinterpret_cast<const StylePropertyMetadata*>(&reinterpret_cast<const char*>((&static_cast<const ImmutableStylePropertySet*>(this)->m_storage))[m_arraySize * sizeof(CSSValue*)]);
+    return reinterpret_cast<const StylePropertyMetadata*>(&reinterpret_cast<const char*>(&(this->m_storage))[m_arraySize * sizeof(CSSValue*)]);
 }
 
 class MutableStylePropertySet : public StylePropertySet {
@@ -226,7 +227,7 @@ private:
     friend class StylePropertySet;
 };
 
-inline StylePropertyMetadata StylePropertySet::PropertyReference::propertyMetadata() const
+inline const StylePropertyMetadata& StylePropertySet::PropertyReference::propertyMetadata() const
 {
     if (m_propertySet.isMutable())
         return static_cast<const MutableStylePropertySet&>(m_propertySet).m_propertyVector.at(m_index).metadata();

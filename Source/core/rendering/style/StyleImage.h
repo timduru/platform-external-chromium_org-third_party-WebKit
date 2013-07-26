@@ -28,9 +28,9 @@
 #include "core/platform/graphics/Image.h"
 #include "core/platform/graphics/IntSize.h"
 #include "core/platform/graphics/LayoutSize.h"
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefCounted.h>
-#include <wtf/RefPtr.h>
+#include "wtf/PassRefPtr.h"
+#include "wtf/RefCounted.h"
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
@@ -72,7 +72,7 @@ public:
     ALWAYS_INLINE bool isPendingImage() const { return m_isPendingImage; }
     ALWAYS_INLINE bool isGeneratedImage() const { return m_isGeneratedImage; }
     ALWAYS_INLINE bool isCachedImageSet() const { return m_isCachedImageSet; }
-    
+
     static bool imagesEquivalent(const StyleImage* image1, const StyleImage* image2)
     {
         if (image1 != image2) {

@@ -30,8 +30,8 @@
 #include "core/rendering/LayoutRepainter.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderView.h"
-#include <wtf/StdLibExtras.h>
-#include <wtf/unicode/CharacterNames.h>
+#include "wtf/StdLibExtras.h"
+#include "wtf/unicode/CharacterNames.h"
 
 using namespace std;
 
@@ -454,7 +454,7 @@ void RenderDeprecatedFlexibleBox::layoutHorizontalBox(bool relayoutChildren)
                 }
                 continue;
             }
-            
+
             if (child->style()->visibility() == COLLAPSE) {
                 // visibility: collapsed children do not participate in our positioning.
                 // But we need to lay them down.
@@ -695,7 +695,7 @@ void RenderDeprecatedFlexibleBox::layoutVerticalBox(bool relayoutChildren)
                 }
                 continue;
             }
-            
+
             if (child->style()->visibility() == COLLAPSE) {
                 // visibility: collapsed children do not participate in our positioning.
                 // But we need to lay them down.

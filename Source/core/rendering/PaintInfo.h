@@ -32,8 +32,8 @@
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/platform/graphics/transforms/AffineTransform.h"
 #include "core/rendering/PaintPhase.h"
-#include <wtf/HashMap.h>
-#include <wtf/ListHashSet.h>
+#include "wtf/HashMap.h"
+#include "wtf/ListHashSet.h"
 
 namespace WebCore {
 
@@ -72,7 +72,7 @@ struct PaintInfo {
 
         // If we're the painting root, kids draw normally, and see root of 0.
         if (paintingRoot == renderer) {
-            paintingRoot = 0; 
+            paintingRoot = 0;
             return;
         }
     }

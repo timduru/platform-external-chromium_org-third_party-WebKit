@@ -176,14 +176,14 @@ static CSSTextCache& cssTextCache()
     return cache;
 }
 
-unsigned short CSSPrimitiveValue::primitiveType() const 
+unsigned short CSSPrimitiveValue::primitiveType() const
 {
     if (m_primitiveUnitType == CSS_PROPERTY_ID || m_primitiveUnitType == CSS_VALUE_ID)
         return CSS_IDENT;
 
     if (m_primitiveUnitType != CSS_CALC)
-        return m_primitiveUnitType; 
-    
+        return m_primitiveUnitType;
+
     switch (m_value.calc->category()) {
     case CalcNumber:
         return CSS_NUMBER;
@@ -528,7 +528,7 @@ double CSSPrimitiveValue::computeLengthDouble(const RenderStyle* style, const Re
     if (m_primitiveUnitType == CSS_CALC)
         // The multiplier and factor is applied to each value in the calc expression individually
         return m_value.calc->computeLengthPx(style, rootStyle, multiplier, computingFontSize);
-        
+
     double factor;
 
     switch (primitiveType()) {
@@ -672,7 +672,7 @@ double CSSPrimitiveValue::getDoubleValue(unsigned short unitType) const
 }
 
 double CSSPrimitiveValue::getDoubleValue() const
-{ 
+{
     return m_primitiveUnitType != CSS_CALC ? m_value.num : m_value.calc->doubleValue();
 }
 
@@ -1025,21 +1025,21 @@ String CSSPrimitiveValue::customCssText(CssTextFormattingFlags formattingFlag) c
                 Color::parseHexColor(m_value.string, rgbColor);
             Color color(rgbColor);
 
-            Vector<LChar> result;
-            result.reserveInitialCapacity(32);
+            StringBuilder result;
+            result.reserveCapacity(32);
             bool colorHasAlpha = color.hasAlpha();
             if (colorHasAlpha)
                 result.append("rgba(", 5);
             else
                 result.append("rgb(", 4);
 
-            appendNumber(result, static_cast<unsigned char>(color.red()));
+            result.appendNumber(static_cast<unsigned char>(color.red()));
             result.append(", ", 2);
 
-            appendNumber(result, static_cast<unsigned char>(color.green()));
+            result.appendNumber(static_cast<unsigned char>(color.green()));
             result.append(", ", 2);
 
-            appendNumber(result, static_cast<unsigned char>(color.blue()));
+            result.appendNumber(static_cast<unsigned char>(color.blue()));
             if (colorHasAlpha) {
                 result.append(", ", 2);
 
@@ -1049,7 +1049,7 @@ String CSSPrimitiveValue::customCssText(CssTextFormattingFlags formattingFlag) c
             }
 
             result.append(')');
-            text = String::adopt(result);
+            text = result.toString();
             break;
         }
         case CSS_PAIR:
