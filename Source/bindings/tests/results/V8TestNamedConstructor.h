@@ -91,7 +91,7 @@ inline v8::Handle<v8::Value> toV8ForMainWorld(TestNamedConstructor* impl, v8::Ha
 {
     ASSERT(worldType(isolate) == MainWorld);
     if (UNLIKELY(!impl))
-        return v8NullWithCheck(isolate);
+        return v8::Null(isolate);
     v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapperForMainWorld<V8TestNamedConstructor>(impl);
     if (!wrapper.IsEmpty())
         return wrapper;

@@ -447,10 +447,11 @@ class RebaselineExpectations(AbstractParallelRebaselineCommand):
 
     def _tests_to_rebaseline(self, port):
         tests_to_rebaseline = {}
-        expectations = TestExpectations(port, include_overrides=True)
-        for test in expectations.get_rebaselining_failures():
-            suffixes = TestExpectations.suffixes_for_expectations(expectations.get_expectations(test))
-            tests_to_rebaseline[test] = suffixes or BASELINE_SUFFIX_LIST
+        for path, value in port.expectations_dict().items():
+            expectations = TestExpectations(port, include_overrides=False, expectations_dict={path: value})
+            for test in expectations.get_rebaselining_failures():
+                suffixes = TestExpectations.suffixes_for_expectations(expectations.get_expectations(test))
+                tests_to_rebaseline[test] = suffixes or BASELINE_SUFFIX_LIST
         return tests_to_rebaseline
 
     def _add_tests_to_rebaseline_for_port(self, port_name):
@@ -545,12 +546,18 @@ class AutoRebaseline(AbstractParallelRebaselineCommand):
             # FIXME: Remove this option.
             self.results_directory_option,
             ])
+        self._builder_data = {}
+
+    def builder_data(self):
+        if not self._builder_data:
+            for builder_name in self._release_builders():
+                builder = self._tool.buildbot_for_builder_name(builder_name).builder_with_name(builder_name)
+                self._builder_data[builder_name] = builder.latest_layout_test_results()
+        return self._builder_data
 
     def latest_revision_processed_on_all_bots(self):
         revisions = []
-        for builder_name in self._release_builders():
-            builder = self._tool.buildbot_for_builder_name(builder_name).builder_with_name(builder_name)
-            result = builder.latest_layout_test_results()
+        for result in self.builder_data().values():
             if result.run_was_interrupted():
                 _log.error("Can't rebaseline. The latest run on %s did not complete." % builder_name)
                 return 0
@@ -614,6 +621,8 @@ class AutoRebaseline(AbstractParallelRebaselineCommand):
 
     def get_test_prefix_list(self, tests):
         test_prefix_list = {}
+        lines_to_remove = {}
+        builder_data = self.builder_data()
 
         for builder_name in self._release_builders():
             port_name = builders.port_name_for_builder_name(builder_name)
@@ -622,11 +631,24 @@ class AutoRebaseline(AbstractParallelRebaselineCommand):
             for test in expectations.get_needs_rebaseline_failures():
                 if test not in tests:
                     continue
+
+                if test not in lines_to_remove:
+                    lines_to_remove[test] = []
+                lines_to_remove[test].append(builder_name)
+
+                actual_results = builder_data[builder_name].actual_results(test)
+                if not actual_results:
+                    continue
+
+                suffixes = TestExpectations.suffixes_for_actual_expectations_string(actual_results)
+                if not suffixes:
+                    continue
+
                 if test not in test_prefix_list:
                     test_prefix_list[test] = {}
-                test_prefix_list[test][builder_name] = BASELINE_SUFFIX_LIST
+                test_prefix_list[test][builder_name] = suffixes
 
-        return test_prefix_list
+        return test_prefix_list, lines_to_remove
 
     def _run_git_cl_command(self, options, command):
         subprocess_command = ['git', 'cl'] + command
@@ -662,7 +684,7 @@ class AutoRebaseline(AbstractParallelRebaselineCommand):
             _log.info("Bot min revision is %s." % min_revision)
 
         tests, revision, author, bugs = self.tests_to_rebaseline(tool, min_revision, print_revisions=options.verbose)
-        test_prefix_list = self.get_test_prefix_list(tests)
+        test_prefix_list, lines_to_remove = self.get_test_prefix_list(tests)
 
         if not tests:
             _log.debug('No tests to rebaseline.')
@@ -678,7 +700,13 @@ class AutoRebaseline(AbstractParallelRebaselineCommand):
             tool.scm().delete_branch(self.AUTO_REBASELINE_BRANCH_NAME)
             tool.scm().create_clean_branch(self.AUTO_REBASELINE_BRANCH_NAME)
 
-            self._rebaseline(options, test_prefix_list)
+            # If the tests are passing everywhere, then this list will be empty. We don't need
+            # to rebaseline, but we'll still need to update TestExpectations.
+            if test_prefix_list:
+                self._rebaseline(options, test_prefix_list)
+            # If a test is not failing on the bot, we don't try to rebaseline it, but we still
+            # want to remove the NeedsRebaseline line.
+            self._update_expectations_files(lines_to_remove)
 
             tool.scm().commit_locally_with_message(self.commit_message(author, revision, bugs))
 

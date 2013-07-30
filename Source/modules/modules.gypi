@@ -497,6 +497,8 @@
       'quota/StorageQuota.h',
       'quota/StorageQuotaCallback.h',
       'quota/StorageUsageCallback.h',
+      'quota/WebStorageQuotaCallbacksImpl.cpp',
+      'quota/WebStorageQuotaCallbacksImpl.h',
       'quota/WorkerNavigatorStorageQuota.cpp',
       'quota/WorkerNavigatorStorageQuota.h',
       'speech/DOMWindowSpeechSynthesis.cpp',
@@ -741,6 +743,7 @@
       'websockets/WorkerThreadableWebSocketChannel.h',
     ],
     'modules_unittest_files': [
+      'indexeddb/IDBDatabaseTest.cpp',
       'indexeddb/IDBKeyPathTest.cpp',
       'websockets/WebSocketDeflaterTest.cpp',
       'websockets/WebSocketExtensionDispatcherTest.cpp',

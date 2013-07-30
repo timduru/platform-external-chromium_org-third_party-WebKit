@@ -22,10 +22,10 @@
     pages from the web. It has a memory cache for these objects.
 */
 
-#ifndef CachedResourceClientWalker_h
-#define CachedResourceClientWalker_h
+#ifndef ResourceClientWalker_h
+#define ResourceClientWalker_h
 
-#include "core/loader/cache/CachedResourceClient.h"
+#include "core/loader/cache/ResourceClient.h"
 #include "wtf/HashCountedSet.h"
 #include "wtf/Vector.h"
 
@@ -33,12 +33,12 @@ namespace WebCore {
 
 // Call this "walker" instead of iterator so people won't expect Qt or STL-style iterator interface.
 // Just keep calling next() on this. It's safe from deletions of items.
-template<typename T> class CachedResourceClientWalker {
+template<typename T> class ResourceClientWalker {
 public:
-    CachedResourceClientWalker(const HashCountedSet<CachedResourceClient*>& set)
+    ResourceClientWalker(const HashCountedSet<ResourceClient*>& set)
         : m_clientSet(set), m_clientVector(set.size()), m_index(0)
     {
-        typedef HashCountedSet<CachedResourceClient*>::const_iterator Iterator;
+        typedef HashCountedSet<ResourceClient*>::const_iterator Iterator;
         Iterator end = set.end();
         size_t clientIndex = 0;
         for (Iterator current = set.begin(); current != end; ++current)
@@ -49,9 +49,9 @@ public:
     {
         size_t size = m_clientVector.size();
         while (m_index < size) {
-            CachedResourceClient* next = m_clientVector[m_index++];
+            ResourceClient* next = m_clientVector[m_index++];
             if (m_clientSet.contains(next)) {
-                ASSERT(T::expectedType() == CachedResourceClient::expectedType() || next->resourceClientType() == T::expectedType());
+                ASSERT(T::expectedType() == ResourceClient::expectedType() || next->resourceClientType() == T::expectedType());
                 return static_cast<T*>(next);
             }
         }
@@ -59,8 +59,8 @@ public:
         return 0;
     }
 private:
-    const HashCountedSet<CachedResourceClient*>& m_clientSet;
-    Vector<CachedResourceClient*> m_clientVector;
+    const HashCountedSet<ResourceClient*>& m_clientSet;
+    Vector<ResourceClient*> m_clientVector;
     size_t m_index;
 };
 

@@ -176,12 +176,23 @@ RenderLayer::RenderLayer(RenderLayerModelObject* renderer)
     // there is no need to dirty / recompute these lists.
     m_zOrderListsDirty = isStackingContainer();
 
+    ScrollableArea::setConstrainsScrollingToContentEdge(false);
+
     if (!renderer->firstChild() && renderer->style()) {
         m_visibleContentStatusDirty = false;
         m_hasVisibleContent = renderer->style()->visibility() == VISIBLE;
     }
 
-    updateScrollableArea();
+    Node* node = renderer->node();
+    if (node && node->isElementNode()) {
+        // We save and restore only the scrollOffset as the other scroll values are recalculated.
+        Element* element = toElement(node);
+        m_scrollOffset = element->savedLayerScrollOffset();
+        if (!m_scrollOffset.isZero())
+            scrollAnimator()->setCurrentPosition(FloatPoint(m_scrollOffset.width(), m_scrollOffset.height()));
+        element->setSavedLayerScrollOffset(IntSize());
+    }
+
     updateResizerAreaSet();
 }
 
@@ -193,8 +204,10 @@ RenderLayer::~RenderLayer()
     }
 
     if (Frame* frame = renderer()->frame()) {
-        if (FrameView* frameView = frame->view())
+        if (FrameView* frameView = frame->view()) {
+            frameView->removeScrollableArea(this);
             frameView->removeResizerArea(this);
+        }
     }
 
     if (!m_renderer->documentBeingDestroyed()) {
@@ -208,6 +221,11 @@ RenderLayer::~RenderLayer()
 
     destroyScrollbar(HorizontalScrollbar);
     destroyScrollbar(VerticalScrollbar);
+
+    if (renderer()->frame() && renderer()->frame()->page()) {
+        if (ScrollingCoordinator* scrollingCoordinator = renderer()->frame()->page()->scrollingCoordinator())
+            scrollingCoordinator->willDestroyScrollableArea(this);
+    }
 
     if (m_reflection)
         removeReflection();
@@ -497,7 +515,7 @@ void RenderLayer::updateCanBeStackingContainer()
         return;
 
     FrameView* frameView = renderer()->view()->frameView();
-    if (!frameView || !frameView->containsScrollableArea(scrollableArea()))
+    if (!frameView || !frameView->containsScrollableArea(this))
         return;
 
     RenderLayer* ancestorStackingContext = this->ancestorStackingContext();
@@ -1942,7 +1960,7 @@ void RenderLayer::updateNeedsCompositedScrolling()
     updateCanBeStackingContainer();
     updateDescendantDependentFlags();
 
-    ASSERT(renderer()->view()->frameView() && renderer()->view()->frameView()->containsScrollableArea(scrollableArea()));
+    ASSERT(renderer()->view()->frameView() && renderer()->view()->frameView()->containsScrollableArea(this));
     bool needsCompositedScrolling = acceleratedCompositingForOverflowScrollEnabled()
         && canBeStackingContainer()
         && !hasUnclippedDescendant();
@@ -2090,7 +2108,7 @@ void RenderLayer::scrollToOffset(const IntSize& scrollOffset, ScrollOffsetClampi
 {
     IntSize newScrollOffset = clamp == ScrollOffsetClamped ? clampScrollOffset(scrollOffset) : scrollOffset;
     if (newScrollOffset != adjustedScrollOffset())
-        m_scrollableArea->scrollToOffsetWithoutAnimation(-scrollOrigin() + newScrollOffset);
+        scrollToOffsetWithoutAnimation(-scrollOrigin() + newScrollOffset);
 }
 
 void RenderLayer::setScrollOffset(const IntPoint& newScrollOffset)
@@ -2488,11 +2506,11 @@ IntPoint RenderLayer::maximumScrollPosition() const
     return -scrollOrigin() + enclosingIntRect(overflowRect).size() - enclosingIntRect(box->clientBoxRect()).size();
 }
 
-IntRect RenderLayer::visibleContentRect(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion) const
+IntRect RenderLayer::visibleContentRect(VisibleContentRectIncludesScrollbars scrollbarInclusion) const
 {
     int verticalScrollbarWidth = 0;
     int horizontalScrollbarHeight = 0;
-    if (scrollbarInclusion == ScrollableArea::IncludeScrollbars) {
+    if (scrollbarInclusion == IncludeScrollbars) {
         verticalScrollbarWidth = (verticalScrollbar() && !verticalScrollbar()->isOverlayScrollbar()) ? verticalScrollbar()->width() : 0;
         horizontalScrollbarHeight = (horizontalScrollbar() && !horizontalScrollbar()->isOverlayScrollbar()) ? horizontalScrollbar()->height() : 0;
     }
@@ -2795,13 +2813,13 @@ PassRefPtr<Scrollbar> RenderLayer::createScrollbar(ScrollbarOrientation orientat
     RenderObject* actualRenderer = rendererForScrollbar(renderer());
     bool hasCustomScrollbarStyle = actualRenderer->isBox() && actualRenderer->style()->hasPseudoStyle(SCROLLBAR);
     if (hasCustomScrollbarStyle)
-        widget = RenderScrollbar::createCustomScrollbar(scrollableArea(), orientation, actualRenderer->node());
+        widget = RenderScrollbar::createCustomScrollbar(this, orientation, actualRenderer->node());
     else {
-        widget = Scrollbar::createNativeScrollbar(scrollableArea(), orientation, RegularScrollbar);
+        widget = Scrollbar::createNativeScrollbar(this, orientation, RegularScrollbar);
         if (orientation == HorizontalScrollbar)
-            scrollableArea()->didAddHorizontalScrollbar(widget.get());
+            didAddHorizontalScrollbar(widget.get());
         else
-            scrollableArea()->didAddVerticalScrollbar(widget.get());
+            didAddVerticalScrollbar(widget.get());
     }
     renderer()->document()->view()->addChild(widget.get());
     return widget.release();
@@ -2815,9 +2833,9 @@ void RenderLayer::destroyScrollbar(ScrollbarOrientation orientation)
 
     if (!scrollbar->isCustomScrollbar()) {
         if (orientation == HorizontalScrollbar)
-            scrollableArea()->willRemoveHorizontalScrollbar(scrollbar.get());
+            willRemoveHorizontalScrollbar(scrollbar.get());
         else
-            scrollableArea()->willRemoveVerticalScrollbar(scrollbar.get());
+            willRemoveVerticalScrollbar(scrollbar.get());
     }
 
     scrollbar->removeFromParent();
@@ -2878,7 +2896,7 @@ void RenderLayer::setHasVerticalScrollbar(bool hasScrollbar)
 ScrollableArea* RenderLayer::enclosingScrollableArea() const
 {
     if (RenderLayer* scrollableLayer = enclosingScrollableLayer())
-        return scrollableLayer->scrollableArea();
+        return scrollableLayer;
 
     // FIXME: We should return the frame view here (or possibly an ancestor frame view,
     // if the frame view isn't scrollable.
@@ -3009,7 +3027,7 @@ void RenderLayer::computeScrollDimensions()
 
     int scrollableLeftOverflow = overflowLeft() - box->borderLeft();
     int scrollableTopOverflow = overflowTop() - box->borderTop();
-    m_scrollableArea->setScrollOrigin(IntPoint(-scrollableLeftOverflow, -scrollableTopOverflow));
+    setScrollOrigin(IntPoint(-scrollableLeftOverflow, -scrollableTopOverflow));
 }
 
 bool RenderLayer::hasScrollableHorizontalOverflow() const
@@ -3127,7 +3145,7 @@ void RenderLayer::updateScrollInfoAfterLayout()
     updateScrollbarsAfterLayout();
 
     if (originalScrollOffset != adjustedScrollOffset())
-        scrollableArea()->scrollToOffsetWithoutAnimation(-scrollOrigin() + adjustedScrollOffset());
+        scrollToOffsetWithoutAnimation(-scrollOrigin() + adjustedScrollOffset());
 
     // Composited scrolling may need to be enabled or disabled if the amount of overflow changed.
     if (renderer()->view() && compositor()->updateLayerCompositingState(this))
@@ -3371,10 +3389,7 @@ bool RenderLayer::hitTestOverflowControls(HitTestResult& result, const IntPoint&
 
 bool RenderLayer::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
 {
-    if (ScrollableArea* scrollableArea = this->scrollableArea())
-        return scrollableArea->scroll(direction, granularity, multiplier);
-
-    return false;
+    return ScrollableArea::scroll(direction, granularity, multiplier);
 }
 
 void RenderLayer::paint(GraphicsContext* context, const LayoutRect& damageRect, PaintBehavior paintBehavior, RenderObject* paintingRoot, RenderRegion* region, PaintLayerFlags paintFlags)
@@ -3706,6 +3721,13 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
     bool forceBlackText = localPaintingInfo.paintBehavior & PaintBehaviorForceBlackText;
     bool selectionOnly  = localPaintingInfo.paintBehavior & PaintBehaviorSelectionOnly;
 
+    bool shouldPaintBackground = isPaintingCompositedBackground && shouldPaintContent && !selectionOnly;
+    bool shouldPaintNegZOrderList = (isPaintingScrollingContent && isPaintingOverflowContents) || (!isPaintingScrollingContent && isPaintingCompositedBackground);
+    bool shouldPaintOwnContents = isPaintingCompositedForeground && shouldPaintContent;
+    bool shouldPaintNormalFlowAndPosZOrderLists = isPaintingCompositedForeground;
+    bool shouldPaintOverlayScrollbars = isPaintingOverlayScrollbars;
+    bool shouldPaintMask = (localPaintFlags & PaintLayerPaintingCompositingMaskPhase) && shouldPaintContent && renderer()->hasMask() && !selectionOnly;
+
     PaintBehavior paintBehavior = PaintBehaviorNormal;
     if (localPaintFlags & PaintLayerPaintingSkipRootBackground)
         paintBehavior |= PaintBehaviorSkipRootBackground;
@@ -3722,35 +3744,27 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
         updatePaintingInfoForFragments(layerFragments, localPaintingInfo, localPaintFlags, shouldPaintContent, &offsetFromRoot);
     }
 
-    if (isPaintingCompositedBackground) {
-        // Paint only the backgrounds for all of the fragments of the layer.
-        if (shouldPaintContent && !selectionOnly)
-            paintBackgroundForFragments(layerFragments, context, transparencyLayerContext, paintingInfo.paintDirtyRect, haveTransparency,
+    if (shouldPaintBackground)
+        paintBackgroundForFragments(layerFragments, context, transparencyLayerContext, paintingInfo.paintDirtyRect, haveTransparency,
                 localPaintingInfo, paintBehavior, paintingRootForRenderer);
-    }
 
-    // Now walk the sorted list of children with negative z-indices.
-    if ((isPaintingScrollingContent && isPaintingOverflowContents) || (!isPaintingScrollingContent && isPaintingCompositedBackground))
+    if (shouldPaintNegZOrderList)
         paintList(negZOrderList(), context, localPaintingInfo, localPaintFlags);
 
-    if (isPaintingCompositedForeground) {
-        if (shouldPaintContent)
-            paintForegroundForFragments(layerFragments, context, transparencyLayerContext, paintingInfo.paintDirtyRect, haveTransparency,
+    if (shouldPaintOwnContents)
+        paintForegroundForFragments(layerFragments, context, transparencyLayerContext, paintingInfo.paintDirtyRect, haveTransparency,
                 localPaintingInfo, paintBehavior, paintingRootForRenderer, selectionOnly, forceBlackText);
-    }
 
     if (shouldPaintOutline)
         paintOutlineForFragments(layerFragments, context, localPaintingInfo, paintBehavior, paintingRootForRenderer);
 
-    if (isPaintingCompositedForeground) {
-        // Paint any child layers that have overflow.
+    if (shouldPaintNormalFlowAndPosZOrderLists)
         paintList(m_normalFlowList.get(), context, localPaintingInfo, localPaintFlags);
 
-        // Now walk the sorted list of children with positive z-indices.
+    if (shouldPaintNormalFlowAndPosZOrderLists)
         paintList(posZOrderList(), context, localPaintingInfo, localPaintFlags);
-    }
 
-    if (isPaintingOverlayScrollbars)
+    if (shouldPaintOverlayScrollbars)
         paintOverflowControlsForFragments(layerFragments, context, localPaintingInfo);
 
     if (filterPainter.hasStartedFilterEffect()) {
@@ -3765,10 +3779,8 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
     // Make sure that we now use the original transparency context.
     ASSERT(transparencyLayerContext == context);
 
-    if ((localPaintFlags & PaintLayerPaintingCompositingMaskPhase) && shouldPaintContent && renderer()->hasMask() && !selectionOnly) {
-        // Paint the mask for the fragments.
+    if (shouldPaintMask)
         paintMaskForFragments(layerFragments, context, localPaintingInfo, paintingRootForRenderer);
-    }
 
     // End our transparency layer
     if (haveTransparency && m_usedTransparency && !m_paintingInsideReflection) {
@@ -6046,7 +6058,6 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
 {
     updateIsNormalFlowOnly();
 
-    updateScrollableArea();
     updateResizerAreaSet();
     updateScrollbarsAfterStyleChange(oldStyle);
     updateStackingContextsAfterStyleChange(oldStyle);
@@ -6096,16 +6107,6 @@ void RenderLayer::styleChanged(StyleDifference, const RenderStyle* oldStyle)
         backing()->updateGraphicsLayerGeometry();
 }
 
-void RenderLayer::updateScrollableArea()
-{
-    // FIXME: We could lazily allocate our ScrollableArea (e.g. for overflow: auto) but for now we go with this safer approach.
-    bool requiresScrollableArea = this->requiresScrollableArea();
-    if (requiresScrollableArea && !m_scrollableArea)
-        m_scrollableArea = adoptPtr(new RenderLayerScrollableArea(this));
-    else if (!requiresScrollableArea && m_scrollableArea)
-        m_scrollableArea = nullptr;
-}
-
 void RenderLayer::updateResizerAreaSet() {
     Frame* frame = renderer()->frame();
     if (!frame)
@@ -6134,10 +6135,10 @@ void RenderLayer::updateScrollableAreaSet(bool hasOverflow)
         isVisibleToHitTest &= owner->renderer() && owner->renderer()->visibleToHitTesting();
 
     if (hasOverflow && isVisibleToHitTest) {
-        if (frameView->addScrollableArea(scrollableArea()))
+        if (frameView->addScrollableArea(this))
             compositor()->setNeedsUpdateCompositingRequirementsState();
     } else {
-        if (frameView->removeScrollableArea(scrollableArea()))
+        if (frameView->removeScrollableArea(this))
             setNeedsCompositedScrolling(false);
     }
 }
@@ -6349,21 +6350,6 @@ void RenderLayer::filterNeedsRepaint()
     toElement(renderer()->node())->scheduleLayerUpdate();
     if (renderer()->view())
         renderer()->repaint();
-}
-
-const IntPoint& RenderLayer::scrollOrigin() const
-{
-    if (!m_scrollableArea) {
-        static IntPoint emptyPoint = IntPoint::zero();
-        return emptyPoint;
-    }
-
-    return m_scrollableArea->scrollOrigin();
-}
-
-bool RenderLayer::hasOverlayScrollbars() const
-{
-    return m_scrollableArea && m_scrollableArea->hasOverlayScrollbars();
 }
 
 } // namespace WebCore

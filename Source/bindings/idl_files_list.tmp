@@ -195,7 +195,6 @@
 ../core/html/TimeRanges.idl
 ../core/html/URL.idl
 ../core/html/ValidityState.idl
-../core/html/VoidCallback.idl
 ../core/html/canvas/ANGLEInstancedArrays.idl
 ../core/html/canvas/ArrayBufferView.idl
 ../core/html/canvas/CanvasGradient.idl
@@ -619,6 +618,7 @@
 ../core/dom/ChildNode.idl
 ../core/dom/DocumentFullscreen.idl
 ../core/dom/ParentNode.idl
+../core/html/VoidCallback.idl
 ../core/page/WindowPagePopup.idl
 ../core/workers/AbstractWorker.idl
 ../modules/crypto/WindowCrypto.idl

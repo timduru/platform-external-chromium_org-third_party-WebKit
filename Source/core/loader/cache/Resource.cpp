@@ -22,17 +22,17 @@
 */
 
 #include "config.h"
-#include "core/loader/cache/CachedResource.h"
+#include "core/loader/cache/Resource.h"
 
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/CachedMetadata.h"
 #include "core/loader/CrossOriginAccessControl.h"
 #include "core/loader/ResourceLoader.h"
-#include "core/loader/cache/CachedResourceClient.h"
-#include "core/loader/cache/CachedResourceClientWalker.h"
-#include "core/loader/cache/CachedResourceHandle.h"
 #include "core/loader/cache/MemoryCache.h"
+#include "core/loader/cache/ResourceClient.h"
+#include "core/loader/cache/ResourceClientWalker.h"
 #include "core/loader/cache/ResourceFetcher.h"
+#include "core/loader/cache/ResourcePtr.h"
 #include "core/platform/Logging.h"
 #include "core/platform/PurgeableBuffer.h"
 #include "core/platform/SharedBuffer.h"
@@ -91,12 +91,12 @@ static inline bool shouldUpdateHeaderAfterRevalidation(const AtomicString& heade
     return true;
 }
 
-DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("CachedResource"));
+DEFINE_DEBUG_ONLY_GLOBAL(RefCountedLeakCounter, cachedResourceLeakCounter, ("Resource"));
 
-CachedResource::CachedResource(const ResourceRequest& request, Type type)
+Resource::Resource(const ResourceRequest& request, Type type)
     : m_resourceRequest(request)
     , m_responseTimestamp(currentTime())
-    , m_cancelTimer(this, &CachedResource::cancelTimerFired)
+    , m_cancelTimer(this, &Resource::cancelTimerFired)
     , m_lastDecodedAccessTime(0)
     , m_loadFinishTime(0)
     , m_identifier(0)
@@ -138,7 +138,7 @@ CachedResource::CachedResource(const ResourceRequest& request, Type type)
     m_resourceRequest.setURL(urlForCache);
 }
 
-CachedResource::~CachedResource()
+Resource::~Resource()
 {
     ASSERT(!m_resourceToRevalidate); // Should be true because canDelete() checks this.
     ASSERT(canDelete());
@@ -152,13 +152,13 @@ CachedResource::~CachedResource()
 #endif
 }
 
-void CachedResource::failBeforeStarting()
+void Resource::failBeforeStarting()
 {
     LOG(ResourceLoading, "Cannot start loading '%s'", url().string().latin1().data());
-    error(CachedResource::LoadError);
+    error(Resource::LoadError);
 }
 
-void CachedResource::load(ResourceFetcher* fetcher, const ResourceLoaderOptions& options)
+void Resource::load(ResourceFetcher* fetcher, const ResourceLoaderOptions& options)
 {
     if (!fetcher->frame()) {
         failBeforeStarting();
@@ -189,17 +189,17 @@ void CachedResource::load(ResourceFetcher* fetcher, const ResourceLoaderOptions&
     m_status = Pending;
 }
 
-void CachedResource::checkNotify()
+void Resource::checkNotify()
 {
     if (isLoading())
         return;
 
-    CachedResourceClientWalker<CachedResourceClient> w(m_clients);
-    while (CachedResourceClient* c = w.next())
+    ResourceClientWalker<ResourceClient> w(m_clients);
+    while (ResourceClient* c = w.next())
         c->notifyFinished(this);
 }
 
-void CachedResource::appendData(const char* data, int length)
+void Resource::appendData(const char* data, int length)
 {
     ASSERT(!m_resourceToRevalidate);
     ASSERT(!errorOccurred());
@@ -212,7 +212,7 @@ void CachedResource::appendData(const char* data, int length)
     setEncodedSize(m_data->size());
 }
 
-void CachedResource::error(CachedResource::Status status)
+void Resource::error(Resource::Status status)
 {
     if (m_resourceToRevalidate)
         revalidationFailed();
@@ -228,13 +228,13 @@ void CachedResource::error(CachedResource::Status status)
     checkNotify();
 }
 
-void CachedResource::finishOnePart()
+void Resource::finishOnePart()
 {
     setLoading(false);
     checkNotify();
 }
 
-void CachedResource::finish(double finishTime)
+void Resource::finish(double finishTime)
 {
     ASSERT(!m_resourceToRevalidate);
     ASSERT(!errorOccurred());
@@ -244,18 +244,18 @@ void CachedResource::finish(double finishTime)
         m_status = Cached;
 }
 
-bool CachedResource::passesAccessControlCheck(SecurityOrigin* securityOrigin)
+bool Resource::passesAccessControlCheck(SecurityOrigin* securityOrigin)
 {
     String ignoredErrorDescription;
     return passesAccessControlCheck(securityOrigin, ignoredErrorDescription);
 }
 
-bool CachedResource::passesAccessControlCheck(SecurityOrigin* securityOrigin, String& errorDescription)
+bool Resource::passesAccessControlCheck(SecurityOrigin* securityOrigin, String& errorDescription)
 {
     return WebCore::passesAccessControlCheck(m_response, resourceRequest().allowCookies() ? AllowStoredCredentials : DoNotAllowStoredCredentials, securityOrigin, errorDescription);
 }
 
-bool CachedResource::isExpired() const
+bool Resource::isExpired() const
 {
     if (m_response.isNull())
         return false;
@@ -263,7 +263,7 @@ bool CachedResource::isExpired() const
     return currentAge() > freshnessLifetime();
 }
 
-double CachedResource::currentAge() const
+double Resource::currentAge() const
 {
     // RFC2616 13.2.3
     // No compensation for latency as that is not terribly important in practice
@@ -275,7 +275,7 @@ double CachedResource::currentAge() const
     return correctedReceivedAge + residentTime;
 }
 
-double CachedResource::freshnessLifetime() const
+double Resource::freshnessLifetime() const
 {
     // Cache non-http resources liberally
     if (!m_response.url().protocolIsInHTTPFamily())
@@ -297,7 +297,7 @@ double CachedResource::freshnessLifetime() const
     return 0;
 }
 
-void CachedResource::responseReceived(const ResourceResponse& response)
+void Resource::responseReceived(const ResourceResponse& response)
 {
     setResponse(response);
     m_responseTimestamp = currentTime();
@@ -313,7 +313,7 @@ void CachedResource::responseReceived(const ResourceResponse& response)
         revalidationFailed();
 }
 
-void CachedResource::setSerializedCachedMetadata(const char* data, size_t size)
+void Resource::setSerializedCachedMetadata(const char* data, size_t size)
 {
     // We only expect to receive cached metadata from the platform once.
     // If this triggers, it indicates an efficiency problem which is most
@@ -324,7 +324,7 @@ void CachedResource::setSerializedCachedMetadata(const char* data, size_t size)
     m_cachedMetadata = CachedMetadata::deserialize(data, size);
 }
 
-void CachedResource::setCachedMetadata(unsigned dataTypeID, const char* data, size_t size)
+void Resource::setCachedMetadata(unsigned dataTypeID, const char* data, size_t size)
 {
     // Currently, only one type of cached metadata per resource is supported.
     // If the need arises for multiple types of metadata per resource this could
@@ -336,25 +336,25 @@ void CachedResource::setCachedMetadata(unsigned dataTypeID, const char* data, si
     WebKit::Platform::current()->cacheMetadata(m_response.url(), m_response.responseTime(), serializedData.data(), serializedData.size());
 }
 
-CachedMetadata* CachedResource::cachedMetadata(unsigned dataTypeID) const
+CachedMetadata* Resource::cachedMetadata(unsigned dataTypeID) const
 {
     if (!m_cachedMetadata || m_cachedMetadata->dataTypeID() != dataTypeID)
         return 0;
     return m_cachedMetadata.get();
 }
 
-void CachedResource::clearLoader()
+void Resource::clearLoader()
 {
     m_loader = 0;
 }
 
-void CachedResource::addClient(CachedResourceClient* client)
+void Resource::addClient(ResourceClient* client)
 {
     if (addClientToSet(client))
         didAddClient(client);
 }
 
-void CachedResource::didAddClient(CachedResourceClient* c)
+void Resource::didAddClient(ResourceClient* c)
 {
     if (m_clientsAwaitingCallback.contains(c)) {
         m_clients.add(c);
@@ -364,7 +364,7 @@ void CachedResource::didAddClient(CachedResourceClient* c)
         c->notifyFinished(this);
 }
 
-bool CachedResource::addClientToSet(CachedResourceClient* client)
+bool Resource::addClientToSet(ResourceClient* client)
 {
     ASSERT(!isPurgeable());
 
@@ -382,10 +382,10 @@ bool CachedResource::addClientToSet(CachedResourceClient* client)
     if ((m_type == RawResource || m_type == MainResource) && !m_response.isNull() && !m_proxyResource) {
         // Certain resources (especially XHRs and main resources) do crazy things if an asynchronous load returns
         // synchronously (e.g., scripts may not have set all the state they need to handle the load).
-        // Therefore, rather than immediately sending callbacks on a cache hit like other CachedResources,
+        // Therefore, rather than immediately sending callbacks on a cache hit like other Resources,
         // we schedule the callbacks and ensure we never finish synchronously.
         ASSERT(!m_clientsAwaitingCallback.contains(client));
-        m_clientsAwaitingCallback.add(client, CachedResourceCallback::schedule(this, client));
+        m_clientsAwaitingCallback.add(client, ResourceCallback::schedule(this, client));
         return false;
     }
 
@@ -393,9 +393,9 @@ bool CachedResource::addClientToSet(CachedResourceClient* client)
     return true;
 }
 
-void CachedResource::removeClient(CachedResourceClient* client)
+void Resource::removeClient(ResourceClient* client)
 {
-    OwnPtr<CachedResourceCallback> callback = m_clientsAwaitingCallback.take(client);
+    OwnPtr<ResourceCallback> callback = m_clientsAwaitingCallback.take(client);
     if (callback) {
         ASSERT(!m_clients.contains(client));
         callback->cancel();
@@ -421,13 +421,14 @@ void CachedResource::removeClient(CachedResourceClient* client)
             // We allow non-secure content to be reused in history, but we do not allow secure content to be reused.
             if (url().protocolIs("https"))
                 memoryCache()->remove(this);
-        } else
+        } else {
             memoryCache()->prune();
+        }
     }
     // This object may be dead here.
 }
 
-void CachedResource::allClientsRemoved()
+void Resource::allClientsRemoved()
 {
     if (!m_loader)
         return;
@@ -437,28 +438,28 @@ void CachedResource::allClientsRemoved()
         m_cancelTimer.startOneShot(0);
 }
 
-void CachedResource::cancelTimerFired(Timer<CachedResource>* timer)
+void Resource::cancelTimerFired(Timer<Resource>* timer)
 {
     ASSERT_UNUSED(timer, timer == &m_cancelTimer);
     if (hasClients() || !m_loader)
         return;
-    CachedResourceHandle<CachedResource> protect(this);
+    ResourcePtr<Resource> protect(this);
     m_loader->cancelIfNotFinishing();
     if (m_status != Cached)
         memoryCache()->remove(this);
 }
 
-bool CachedResource::deleteIfPossible()
+bool Resource::deleteIfPossible()
 {
     if (canDelete() && !inCache()) {
-        InspectorInstrumentation::willDestroyCachedResource(this);
+        InspectorInstrumentation::willDestroyResource(this);
         delete this;
         return true;
     }
     return false;
 }
 
-void CachedResource::setDecodedSize(unsigned size)
+void Resource::setDecodedSize(unsigned size)
 {
     if (size == m_decodedSize)
         return;
@@ -494,7 +495,7 @@ void CachedResource::setDecodedSize(unsigned size)
     }
 }
 
-void CachedResource::setEncodedSize(unsigned size)
+void Resource::setEncodedSize(unsigned size)
 {
     if (size == m_encodedSize)
         return;
@@ -518,7 +519,7 @@ void CachedResource::setEncodedSize(unsigned size)
     }
 }
 
-void CachedResource::didAccessDecodedData(double timeStamp)
+void Resource::didAccessDecodedData(double timeStamp)
 {
     m_lastDecodedAccessTime = timeStamp;
 
@@ -531,7 +532,7 @@ void CachedResource::didAccessDecodedData(double timeStamp)
     }
 }
 
-void CachedResource::setResourceToRevalidate(CachedResource* resource)
+void Resource::setResourceToRevalidate(Resource* resource)
 {
     ASSERT(resource);
     ASSERT(!m_resourceToRevalidate);
@@ -539,18 +540,18 @@ void CachedResource::setResourceToRevalidate(CachedResource* resource)
     ASSERT(m_handlesToRevalidate.isEmpty());
     ASSERT(resource->type() == type());
 
-    LOG(ResourceLoading, "CachedResource %p setResourceToRevalidate %p", this, resource);
+    LOG(ResourceLoading, "Resource %p setResourceToRevalidate %p", this, resource);
 
     // The following assert should be investigated whenever it occurs. Although it should never fire, it currently does in rare circumstances.
     // https://bugs.webkit.org/show_bug.cgi?id=28604.
-    // So the code needs to be robust to this assert failing thus the "if (m_resourceToRevalidate->m_proxyResource == this)" in CachedResource::clearResourceToRevalidate.
+    // So the code needs to be robust to this assert failing thus the "if (m_resourceToRevalidate->m_proxyResource == this)" in Resource::clearResourceToRevalidate.
     ASSERT(!resource->m_proxyResource);
 
     resource->m_proxyResource = this;
     m_resourceToRevalidate = resource;
 }
 
-void CachedResource::clearResourceToRevalidate()
+void Resource::clearResourceToRevalidate()
 {
     ASSERT(m_resourceToRevalidate);
     if (m_switchingClientsToRevalidatedResource)
@@ -566,20 +567,20 @@ void CachedResource::clearResourceToRevalidate()
     deleteIfPossible();
 }
 
-void CachedResource::switchClientsToRevalidatedResource()
+void Resource::switchClientsToRevalidatedResource()
 {
     ASSERT(m_resourceToRevalidate);
     ASSERT(m_resourceToRevalidate->inCache());
     ASSERT(!inCache());
 
-    LOG(ResourceLoading, "CachedResource %p switchClientsToRevalidatedResource %p", this, m_resourceToRevalidate);
+    LOG(ResourceLoading, "Resource %p switchClientsToRevalidatedResource %p", this, m_resourceToRevalidate);
 
     m_resourceToRevalidate->m_identifier = m_identifier;
 
     m_switchingClientsToRevalidatedResource = true;
-    HashSet<CachedResourceHandleBase*>::iterator end = m_handlesToRevalidate.end();
-    for (HashSet<CachedResourceHandleBase*>::iterator it = m_handlesToRevalidate.begin(); it != end; ++it) {
-        CachedResourceHandleBase* handle = *it;
+    HashSet<ResourcePtrBase*>::iterator end = m_handlesToRevalidate.end();
+    for (HashSet<ResourcePtrBase*>::iterator it = m_handlesToRevalidate.begin(); it != end; ++it) {
+        ResourcePtrBase* handle = *it;
         handle->m_resource = m_resourceToRevalidate;
         m_resourceToRevalidate->registerHandle(handle);
         --m_handleCount;
@@ -587,10 +588,10 @@ void CachedResource::switchClientsToRevalidatedResource()
     ASSERT(!m_handleCount);
     m_handlesToRevalidate.clear();
 
-    Vector<CachedResourceClient*> clientsToMove;
-    HashCountedSet<CachedResourceClient*>::iterator end2 = m_clients.end();
-    for (HashCountedSet<CachedResourceClient*>::iterator it = m_clients.begin(); it != end2; ++it) {
-        CachedResourceClient* client = it->key;
+    Vector<ResourceClient*> clientsToMove;
+    HashCountedSet<ResourceClient*>::iterator end2 = m_clients.end();
+    for (HashCountedSet<ResourceClient*>::iterator it = m_clients.begin(); it != end2; ++it) {
+        ResourceClient* client = it->key;
         unsigned count = it->value;
         while (count) {
             clientsToMove.append(client);
@@ -616,7 +617,7 @@ void CachedResource::switchClientsToRevalidatedResource()
     m_switchingClientsToRevalidatedResource = false;
 }
 
-void CachedResource::updateResponseAfterRevalidation(const ResourceResponse& validatingResponse)
+void Resource::updateResponseAfterRevalidation(const ResourceResponse& validatingResponse)
 {
     m_responseTimestamp = currentTime();
 
@@ -636,7 +637,7 @@ void CachedResource::updateResponseAfterRevalidation(const ResourceResponse& val
     }
 }
 
-void CachedResource::revalidationSucceeded(const ResourceResponse& response)
+void Resource::revalidationSucceeded(const ResourceResponse& response)
 {
     ASSERT(m_resourceToRevalidate);
     ASSERT(!m_resourceToRevalidate->inCache());
@@ -657,7 +658,7 @@ void CachedResource::revalidationSucceeded(const ResourceResponse& response)
     clearResourceToRevalidate();
 }
 
-void CachedResource::revalidationFailed()
+void Resource::revalidationFailed()
 {
     ASSERT(WTF::isMainThread());
     LOG(ResourceLoading, "Revalidation failed for %p", this);
@@ -665,7 +666,7 @@ void CachedResource::revalidationFailed()
     clearResourceToRevalidate();
 }
 
-void CachedResource::updateForAccess()
+void Resource::updateForAccess()
 {
     ASSERT(inCache());
 
@@ -681,26 +682,26 @@ void CachedResource::updateForAccess()
     memoryCache()->insertInLRUList(this);
 }
 
-void CachedResource::registerHandle(CachedResourceHandleBase* h)
+void Resource::registerHandle(ResourcePtrBase* h)
 {
     ++m_handleCount;
     if (m_resourceToRevalidate)
         m_handlesToRevalidate.add(h);
 }
 
-void CachedResource::unregisterHandle(CachedResourceHandleBase* h)
+void Resource::unregisterHandle(ResourcePtrBase* h)
 {
     ASSERT(m_handleCount > 0);
     --m_handleCount;
 
     if (m_resourceToRevalidate)
-         m_handlesToRevalidate.remove(h);
+        m_handlesToRevalidate.remove(h);
 
     if (!m_handleCount)
         deleteIfPossible();
 }
 
-bool CachedResource::canUseCacheValidator() const
+bool Resource::canUseCacheValidator() const
 {
     if (m_loading || errorOccurred())
         return false;
@@ -710,7 +711,7 @@ bool CachedResource::canUseCacheValidator() const
     return m_response.hasCacheValidatorFields();
 }
 
-bool CachedResource::mustRevalidateDueToCacheHeaders(CachePolicy cachePolicy) const
+bool Resource::mustRevalidateDueToCacheHeaders(CachePolicy cachePolicy) const
 {
     ASSERT(cachePolicy == CachePolicyRevalidate || cachePolicy == CachePolicyCache || cachePolicy == CachePolicyVerify);
 
@@ -718,13 +719,13 @@ bool CachedResource::mustRevalidateDueToCacheHeaders(CachePolicy cachePolicy) co
         return true;
 
     if (m_response.cacheControlContainsNoCache() || m_response.cacheControlContainsNoStore()) {
-        LOG(ResourceLoading, "CachedResource %p mustRevalidate because of m_response.cacheControlContainsNoCache() || m_response.cacheControlContainsNoStore()\n", this);
+        LOG(ResourceLoading, "Resource %p mustRevalidate because of m_response.cacheControlContainsNoCache() || m_response.cacheControlContainsNoStore()\n", this);
         return true;
     }
 
     if (cachePolicy == CachePolicyCache) {
         if (m_response.cacheControlContainsMustRevalidate() && isExpired()) {
-            LOG(ResourceLoading, "CachedResource %p mustRevalidate because of cachePolicy == CachePolicyCache and m_response.cacheControlContainsMustRevalidate() && isExpired()\n", this);
+            LOG(ResourceLoading, "Resource %p mustRevalidate because of cachePolicy == CachePolicyCache and m_response.cacheControlContainsMustRevalidate() && isExpired()\n", this);
             return true;
         }
         return false;
@@ -732,19 +733,19 @@ bool CachedResource::mustRevalidateDueToCacheHeaders(CachePolicy cachePolicy) co
 
     // CachePolicyVerify
     if (isExpired()) {
-        LOG(ResourceLoading, "CachedResource %p mustRevalidate because of isExpired()\n", this);
+        LOG(ResourceLoading, "Resource %p mustRevalidate because of isExpired()\n", this);
         return true;
     }
 
     return false;
 }
 
-bool CachedResource::isSafeToMakePurgeable() const
+bool Resource::isSafeToMakePurgeable() const
 {
     return !hasClients() && !m_proxyResource && !m_resourceToRevalidate;
 }
 
-bool CachedResource::makePurgeable(bool purgeable)
+bool Resource::makePurgeable(bool purgeable)
 {
     if (purgeable) {
         ASSERT(isSafeToMakePurgeable());
@@ -783,43 +784,43 @@ bool CachedResource::makePurgeable(bool purgeable)
     return true;
 }
 
-bool CachedResource::isPurgeable() const
+bool Resource::isPurgeable() const
 {
     return m_purgeableData && m_purgeableData->isPurgeable();
 }
 
-bool CachedResource::wasPurged() const
+bool Resource::wasPurged() const
 {
     return m_purgeableData && m_purgeableData->wasPurged();
 }
 
-unsigned CachedResource::overheadSize() const
+unsigned Resource::overheadSize() const
 {
     static const int kAverageClientsHashMapSize = 384;
-    return sizeof(CachedResource) + m_response.memoryUsage() + kAverageClientsHashMapSize + m_resourceRequest.url().string().length() * 2;
+    return sizeof(Resource) + m_response.memoryUsage() + kAverageClientsHashMapSize + m_resourceRequest.url().string().length() * 2;
 }
 
-void CachedResource::didChangePriority(ResourceLoadPriority loadPriority)
+void Resource::didChangePriority(ResourceLoadPriority loadPriority)
 {
     if (m_loader)
         m_loader->didChangePriority(loadPriority);
 }
 
-CachedResource::CachedResourceCallback::CachedResourceCallback(CachedResource* resource, CachedResourceClient* client)
+Resource::ResourceCallback::ResourceCallback(Resource* resource, ResourceClient* client)
     : m_resource(resource)
     , m_client(client)
-    , m_callbackTimer(this, &CachedResourceCallback::timerFired)
+    , m_callbackTimer(this, &ResourceCallback::timerFired)
 {
     m_callbackTimer.startOneShot(0);
 }
 
-void CachedResource::CachedResourceCallback::cancel()
+void Resource::ResourceCallback::cancel()
 {
     if (m_callbackTimer.isActive())
         m_callbackTimer.stop();
 }
 
-void CachedResource::CachedResourceCallback::timerFired(Timer<CachedResourceCallback>*)
+void Resource::ResourceCallback::timerFired(Timer<ResourceCallback>*)
 {
     m_resource->didAddClient(m_client);
 }

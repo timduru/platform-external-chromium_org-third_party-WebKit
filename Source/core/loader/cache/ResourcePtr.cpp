@@ -24,11 +24,11 @@
  */
 
 #include "config.h"
-#include "core/loader/cache/CachedResourceHandle.h"
+#include "core/loader/cache/ResourcePtr.h"
 
 namespace WebCore {
 
-void CachedResourceHandleBase::setResource(CachedResource* resource)
+void ResourcePtrBase::setResource(Resource* resource)
 {
     if (resource == m_resource)
         return;

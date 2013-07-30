@@ -226,7 +226,7 @@ public:
     PassRefPtr<ClientRectList> nonFastScrollableRects(Document*, ExceptionCode&) const;
 
     void garbageCollectDocumentResources(Document*, ExceptionCode&) const;
-    void evictAllCachedResources() const;
+    void evictAllResources() const;
 
     void allowRoundingHacks() const;
 
@@ -291,6 +291,8 @@ public:
 
     PassRefPtr<ClientRect> selectionBounds(ExceptionCode&);
     String baseURL(Document*, ExceptionCode&);
+
+    bool loseSharedGraphicsContext3D();
 
 private:
     explicit Internals(Document*);

@@ -50,7 +50,7 @@
 
 namespace WebCore {
 
-class CachedResource;
+class Resource;
 class Chrome;
 class DOMWrapperWorld;
 class DocumentLoader;
@@ -151,8 +151,6 @@ public:
     bool isHostedByObjectElement() const;
     bool isLoadingMainFrame() const;
 
-    bool isReplacing() const;
-    void setReplacing();
     bool subframeIsLoading() const;
     void didChangeTitle(DocumentLoader*);
     void didChangeIcons(IconType);
@@ -167,7 +165,7 @@ public:
     void didLayout(LayoutMilestones);
     void didFirstLayout();
 
-    void loadedResourceFromMemoryCache(CachedResource*);
+    void loadedResourceFromMemoryCache(Resource*);
 
     void checkLoadComplete();
     void detachFromParent();
@@ -240,6 +238,10 @@ public:
 
     void started();
 
+    void setContainsPlugins() { m_containsPlugins = true; }
+    bool containsPlugins() const { return m_containsPlugins; }
+    bool allowPlugins(ReasonForCallingAllowPlugins);
+
     enum PageDismissalType {
         NoDismissal = 0,
         BeforeUnloadDismissal = 1,
@@ -262,7 +264,6 @@ private:
     FrameLoadType determineFrameLoadType(const FrameLoadRequest&);
 
     void clearProvisionalLoad();
-    void transitionToCommitted();
     void frameLoadCompleted();
 
     SubstituteData defaultSubstituteDataForURL(const KURL&);
@@ -301,8 +302,6 @@ private:
     void closeAndRemoveChild(Frame*);
 
     void loadInSameDocument(const KURL&, PassRefPtr<SerializedScriptValue> stateObject, bool isNewNavigation);
-
-    bool didOpenURL();
 
     void scheduleCheckCompleted();
     void scheduleCheckLoadComplete();
@@ -349,6 +348,7 @@ private:
     bool m_isComplete;
 
     bool m_needsClear;
+    bool m_containsPlugins;
 
     KURL m_submittedFormURL;
 

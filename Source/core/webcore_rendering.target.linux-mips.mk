@@ -77,7 +77,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderLayerBacking.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerCompositor.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerFilterInfo.cpp \
-	third_party/WebKit/Source/core/rendering/RenderLayerScrollableArea.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerModelObject.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLazyBlock.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLineBoxList.cpp \

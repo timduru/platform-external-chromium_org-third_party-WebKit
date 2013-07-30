@@ -23,8 +23,8 @@
 #define ProcessingInstruction_h
 
 #include "core/dom/Node.h"
-#include "core/loader/cache/CachedResourceHandle.h"
 #include "core/loader/cache/CachedStyleSheetClient.h"
+#include "core/loader/cache/ResourcePtr.h"
 
 namespace WebCore {
 
@@ -51,6 +51,8 @@ public:
     bool isCSS() const { return m_isCSS; }
     bool isXSL() const { return m_isXSL; }
 
+    bool isLoading() const;
+
 private:
     ProcessingInstruction(Document*, const String& target, const String& data);
 
@@ -69,7 +71,6 @@ private:
     virtual void setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CachedCSSStyleSheet*);
     virtual void setXSLStyleSheet(const String& href, const KURL& baseURL, const String& sheet);
 
-    bool isLoading() const;
     virtual bool sheetLoaded();
 
     virtual void addSubresourceAttributeURLs(ListHashSet<KURL>&) const;
@@ -81,7 +82,7 @@ private:
     String m_localHref;
     String m_title;
     String m_media;
-    CachedResourceHandle<CachedResource> m_cachedSheet;
+    ResourcePtr<Resource> m_cachedSheet;
     RefPtr<StyleSheet> m_sheet;
     bool m_loading;
     bool m_alternate;

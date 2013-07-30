@@ -158,6 +158,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/quota/StorageInfo.cpp \
 	third_party/WebKit/Source/modules/quota/StorageErrorCallback.cpp \
 	third_party/WebKit/Source/modules/quota/StorageQuota.cpp \
+	third_party/WebKit/Source/modules/quota/WebStorageQuotaCallbacksImpl.cpp \
 	third_party/WebKit/Source/modules/quota/WorkerNavigatorStorageQuota.cpp \
 	third_party/WebKit/Source/modules/speech/DOMWindowSpeechSynthesis.cpp \
 	third_party/WebKit/Source/modules/speech/SpeechGrammar.cpp \

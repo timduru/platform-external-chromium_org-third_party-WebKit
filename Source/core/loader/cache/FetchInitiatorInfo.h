@@ -23,16 +23,16 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef CachedResourceInitiatorInfo_h
-#define CachedResourceInitiatorInfo_h
+#ifndef FetchInitiatorInfo_h
+#define FetchInitiatorInfo_h
 
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/TextPosition.h"
 
 namespace WebCore {
 
-struct CachedResourceInitiatorInfo {
-    CachedResourceInitiatorInfo()
+struct FetchInitiatorInfo {
+    FetchInitiatorInfo()
         : name()
         , position(TextPosition::belowRangePosition())
         , startTime(0.0)

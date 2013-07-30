@@ -147,9 +147,6 @@ def summarize_results(port_obj, expectations, initial_results, retry_results, en
     for expecation_string, expectation_enum in test_expectations.TestExpectations.EXPECTATIONS.iteritems():
         keywords[expectation_enum] = expecation_string.upper()
 
-    for modifier_string, modifier_enum in test_expectations.TestExpectations.MODIFIERS.iteritems():
-        keywords[modifier_enum] = modifier_string.upper()
-
     num_failures_by_type = {}
     for expectation in initial_results.tests_by_expectation:
         num_failures_by_type[keywords[expectation]] = len(initial_results.tests_by_expectation[expectation] & tbt[test_expectations.NOW])
@@ -205,7 +202,7 @@ def summarize_results(port_obj, expectations, initial_results, retry_results, en
         if result.has_stderr:
             test_dict['has_stderr'] = True
 
-        bugs = expectations.model().get_expectation_line(test_name).parsed_bug_modifiers
+        bugs = expectations.model().get_expectation_line(test_name).bugs
         if bugs:
             test_dict['bugs'] = bugs
 

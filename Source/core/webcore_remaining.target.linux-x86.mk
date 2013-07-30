@@ -163,6 +163,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/StyleSheet.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetContents.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetList.cpp \
+	third_party/WebKit/Source/core/css/resolver/ElementResolveContext.cpp \
 	third_party/WebKit/Source/core/css/resolver/ElementStyleResources.cpp \
 	third_party/WebKit/Source/core/css/resolver/FilterOperationResolver.cpp \
 	third_party/WebKit/Source/core/css/resolver/FontBuilder.cpp \
@@ -353,8 +354,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/cache/CachedFont.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedImage.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedRawResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedResourceHandle.cpp \
+	third_party/WebKit/Source/core/loader/cache/Resource.cpp \
+	third_party/WebKit/Source/core/loader/cache/ResourcePtr.cpp \
 	third_party/WebKit/Source/core/loader/cache/ResourceFetcher.cpp \
 	third_party/WebKit/Source/core/loader/cache/FetchRequest.cpp \
 	third_party/WebKit/Source/core/loader/cache/CachedScript.cpp \
@@ -641,7 +642,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
 	$(PWD)/external/jpeg \
-	$(LOCAL_PATH)/third_party \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -804,7 +804,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/v8/include \
 	$(PWD)/external/jpeg \
-	$(LOCAL_PATH)/third_party \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

@@ -80,7 +80,7 @@ $(gyp_intermediate_dir)/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/w
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/HTMLNames.cpp: $(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/CachedResourceInitiatorTypeNames.cpp: $(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp
+$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp: $(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp
 	mkdir -p $(@D); cp $< $@
 $(gyp_intermediate_dir)/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/webkit/CalendarPicker.cpp
 	mkdir -p $(@D); cp $< $@
@@ -159,7 +159,7 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/CSSValueKeywords.cpp \
 	$(gyp_intermediate_dir)/HTMLElementFactory.cpp \
 	$(gyp_intermediate_dir)/HTMLNames.cpp \
-	$(gyp_intermediate_dir)/CachedResourceInitiatorTypeNames.cpp \
+	$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp \
 	$(gyp_intermediate_dir)/CalendarPicker.cpp \
 	$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp \
 	$(gyp_intermediate_dir)/Event.cpp \
@@ -394,7 +394,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
-	'-DUSE_I18N_EXTENSION' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -493,7 +492,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/v8/include \
 	$(PWD)/external/jpeg \
-	$(LOCAL_PATH)/third_party \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport
@@ -566,7 +564,6 @@ MY_DEFS_Release := \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
-	'-DUSE_I18N_EXTENSION' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -665,7 +662,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/sqlite \
 	$(LOCAL_PATH)/v8/include \
 	$(PWD)/external/jpeg \
-	$(LOCAL_PATH)/third_party \
 	$(PWD)/frameworks/wilhelm/include \
 	$(PWD)/bionic \
 	$(PWD)/external/stlport/stlport

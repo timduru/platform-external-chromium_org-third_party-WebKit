@@ -57,37 +57,8 @@ namespace WebCore {
 using namespace HTMLNames;
 
 SubframeLoader::SubframeLoader(Frame* frame)
-    : m_containsPlugins(false)
-    , m_frame(frame)
+    :  m_frame(frame)
 {
-}
-
-void SubframeLoader::clear()
-{
-    m_containsPlugins = false;
-}
-
-bool SubframeLoader::requestFrame(HTMLFrameOwnerElement* ownerElement, const String& urlString, const AtomicString& frameName, bool lockBackForwardList)
-{
-    // Support for <frame src="javascript:string">
-    KURL scriptURL;
-    KURL url;
-    if (protocolIsJavaScript(urlString)) {
-        scriptURL = completeURL(urlString); // completeURL() encodes the URL.
-        url = blankURL();
-    } else
-        url = completeURL(urlString);
-
-    if (!loadOrRedirectSubframe(ownerElement, url, frameName, lockBackForwardList))
-        return false;
-
-    if (!ownerElement->contentFrame())
-        return false;
-
-    if (!scriptURL.isEmpty())
-        ownerElement->contentFrame()->script()->executeScriptIfJavaScriptURL(scriptURL);
-
-    return true;
 }
 
 bool SubframeLoader::resourceWillUsePlugin(const String& url, const String& mimeType, bool shouldPreferPlugInsForImages)
@@ -143,7 +114,7 @@ bool SubframeLoader::requestPlugin(HTMLPlugInImageElement* ownerElement, const K
     // Application plug-ins are plug-ins implemented by the user agent, for example Qt plug-ins,
     // as opposed to third-party code such as Flash. The user agent decides whether or not they are
     // permitted, rather than WebKit.
-    if ((!allowPlugins(AboutToInstantiatePlugin) && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType)))
+    if ((!m_frame->loader()->allowPlugins(AboutToInstantiatePlugin) && !MIMETypeRegistry::isApplicationPluginMIMEType(mimeType)))
         return false;
 
     if (!pluginIsLoadable(ownerElement, url, mimeType))
@@ -178,51 +149,6 @@ bool SubframeLoader::requestObject(HTMLPlugInImageElement* ownerElement, const S
     // it will create a new frame and set it as the RenderPart's widget, causing what was previously
     // in the widget to be torn down.
     return loadOrRedirectSubframe(ownerElement, completedURL, frameName, true);
-}
-
-PassRefPtr<Widget> SubframeLoader::createJavaAppletWidget(const IntSize& size, HTMLAppletElement* element, const Vector<String>& paramNames, const Vector<String>& paramValues)
-{
-    String baseURLString;
-    String codeBaseURLString;
-
-    for (size_t i = 0; i < paramNames.size(); ++i) {
-        if (equalIgnoringCase(paramNames[i], "baseurl"))
-            baseURLString = paramValues[i];
-        else if (equalIgnoringCase(paramNames[i], "codebase"))
-            codeBaseURLString = paramValues[i];
-    }
-
-    if (!codeBaseURLString.isEmpty()) {
-        KURL codeBaseURL = completeURL(codeBaseURLString);
-        if (!element->document()->securityOrigin()->canDisplay(codeBaseURL)) {
-            FrameLoader::reportLocalLoadFailed(m_frame, codeBaseURL.string());
-            return 0;
-        }
-
-        const char javaAppletMimeType[] = "application/x-java-applet";
-        if (!element->document()->contentSecurityPolicy()->allowObjectFromSource(codeBaseURL)
-            || !element->document()->contentSecurityPolicy()->allowPluginType(javaAppletMimeType, javaAppletMimeType, codeBaseURL))
-            return 0;
-    }
-
-    if (baseURLString.isEmpty())
-        baseURLString = m_frame->document()->baseURL().string();
-    KURL baseURL = completeURL(baseURLString);
-
-    RefPtr<Widget> widget;
-    if (allowPlugins(AboutToInstantiatePlugin))
-        widget = m_frame->loader()->client()->createJavaAppletWidget(size, element, baseURL, paramNames, paramValues);
-
-    if (!widget) {
-        RenderEmbeddedObject* renderer = element->renderEmbeddedObject();
-
-        if (!renderer->showsUnavailablePluginIndicator())
-            renderer->setPluginUnavailabilityReason(RenderEmbeddedObject::PluginMissing);
-        return 0;
-    }
-
-    m_containsPlugins = true;
-    return widget;
 }
 
 bool SubframeLoader::loadOrRedirectSubframe(HTMLFrameOwnerElement* ownerElement, const KURL& url, const AtomicString& frameName, bool lockBackForwardList)
@@ -291,15 +217,6 @@ bool SubframeLoader::loadSubframe(HTMLFrameOwnerElement* ownerElement, const KUR
     return true;
 }
 
-bool SubframeLoader::allowPlugins(ReasonForCallingAllowPlugins reason)
-{
-    Settings* settings = m_frame->settings();
-    bool allowed = m_frame->loader()->client()->allowPlugins(settings && settings->arePluginsEnabled());
-    if (!allowed && reason == AboutToInstantiatePlugin)
-        m_frame->loader()->client()->didNotAllowPlugins();
-    return allowed;
-}
-
 bool SubframeLoader::shouldUsePlugin(const KURL& url, const String& mimeType, bool shouldPreferPlugInsForImages, bool hasFallback, bool& useFallback)
 {
     // Allow other plug-ins to win over QuickTime because if the user has installed a plug-in that
@@ -335,7 +252,7 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement* pluginElement, const KUR
     pluginElement->subframeLoaderWillCreatePlugIn(url);
 
     IntSize contentSize = roundedIntSize(LayoutSize(renderer->contentWidth(), renderer->contentHeight()));
-    bool loadManually = document()->isPluginDocument() && !m_containsPlugins && toPluginDocument(document())->shouldLoadPluginManually();
+    bool loadManually = document()->isPluginDocument() && !m_frame->loader()->containsPlugins() && toPluginDocument(document())->shouldLoadPluginManually();
     RefPtr<Widget> widget = m_frame->loader()->client()->createPlugin(contentSize,
         pluginElement, url, paramNames, paramValues, mimeType, loadManually);
 
@@ -346,7 +263,7 @@ bool SubframeLoader::loadPlugin(HTMLPlugInImageElement* pluginElement, const KUR
     }
 
     renderer->setWidget(widget);
-    m_containsPlugins = true;
+    m_frame->loader()->setContainsPlugins();
     pluginElement->setNeedsStyleRecalc(LocalStyleChange, StyleChangeFromRenderer);
     return true;
 }

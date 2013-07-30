@@ -20,8 +20,8 @@
     Boston, MA 02110-1301, USA.
 */
 
-#ifndef CachedResource_h
-#define CachedResource_h
+#ifndef Resource_h
+#define Resource_h
 
 #include "core/loader/ResourceLoaderOptions.h"
 #include "core/loader/cache/CachePolicy.h"
@@ -39,8 +39,8 @@ namespace WebCore {
 
 class MemoryCache;
 class CachedMetadata;
-class CachedResourceClient;
-class CachedResourceHandleBase;
+class ResourceClient;
+class ResourcePtrBase;
 class ResourceFetcher;
 class InspectorResource;
 class PurgeableBuffer;
@@ -49,10 +49,10 @@ class SecurityOrigin;
 class SharedBuffer;
 
 // A resource that is held in the cache. Classes who want to use this object should derive
-// from CachedResourceClient, to get the function calls in case the requested data has arrived.
+// from ResourceClient, to get the function calls in case the requested data has arrived.
 // This class also does the actual communication with the loader to obtain the resource from the network.
-class CachedResource {
-    WTF_MAKE_NONCOPYABLE(CachedResource); WTF_MAKE_FAST_ALLOCATED;
+class Resource {
+    WTF_MAKE_NONCOPYABLE(Resource); WTF_MAKE_FAST_ALLOCATED;
     friend class MemoryCache;
     friend class InspectorResource;
 
@@ -74,22 +74,22 @@ public:
     };
 
     enum Status {
-        Unknown,      // let cache decide what to do with it
-        Pending,      // only partially loaded
-        Cached,       // regular case
+        Unknown, // let cache decide what to do with it
+        Pending, // only partially loaded
+        Cached, // regular case
         LoadError,
         DecodeError
     };
 
-    CachedResource(const ResourceRequest&, Type);
-    virtual ~CachedResource();
+    Resource(const ResourceRequest&, Type);
+    virtual ~Resource();
 
     virtual void load(ResourceFetcher*, const ResourceLoaderOptions&);
 
     virtual void setEncoding(const String&) { }
     virtual String encoding() const { return String(); }
     virtual void appendData(const char*, int);
-    virtual void error(CachedResource::Status);
+    virtual void error(Resource::Status);
 
     void setResourceError(const ResourceError& error) { m_error = error; }
     const ResourceError& resourceError() const { return m_error; }
@@ -106,8 +106,8 @@ public:
 
     void didChangePriority(ResourceLoadPriority);
 
-    void addClient(CachedResourceClient*);
-    void removeClient(CachedResourceClient*);
+    void addClient(ResourceClient*);
+    void removeClient(ResourceClient*);
     bool hasClients() const { return !m_clients.isEmpty() || !m_clientsAwaitingCallback.isEmpty(); }
     bool deleteIfPossible();
 
@@ -119,8 +119,8 @@ public:
     };
     PreloadResult preloadResult() const { return static_cast<PreloadResult>(m_preloadResult); }
 
-    virtual void didAddClient(CachedResourceClient*);
-    virtual void didRemoveClient(CachedResourceClient*) { }
+    virtual void didAddClient(ResourceClient*);
+    virtual void didRemoveClient(ResourceClient*) { }
     virtual void allClientsRemoved();
 
     unsigned count() const { return m_clients.size(); }
@@ -213,14 +213,14 @@ public:
     void increasePreloadCount() { ++m_preloadCount; }
     void decreasePreloadCount() { ASSERT(m_preloadCount); --m_preloadCount; }
 
-    void registerHandle(CachedResourceHandleBase* h);
-    void unregisterHandle(CachedResourceHandleBase* h);
+    void registerHandle(ResourcePtrBase* h);
+    void unregisterHandle(ResourcePtrBase* h);
 
     bool canUseCacheValidator() const;
     bool mustRevalidateDueToCacheHeaders(CachePolicy) const;
     bool isCacheValidator() const { return m_resourceToRevalidate; }
-    CachedResource* resourceToRevalidate() const { return m_resourceToRevalidate; }
-    void setResourceToRevalidate(CachedResource*);
+    Resource* resourceToRevalidate() const { return m_resourceToRevalidate; }
+    void setResourceToRevalidate(Resource*);
 
     bool isPurgeable() const;
     bool wasPurged() const;
@@ -251,23 +251,23 @@ protected:
     void clearResourceToRevalidate();
     void updateResponseAfterRevalidation(const ResourceResponse& validatingResponse);
 
-    HashCountedSet<CachedResourceClient*> m_clients;
+    HashCountedSet<ResourceClient*> m_clients;
 
-    class CachedResourceCallback {
+    class ResourceCallback {
     public:
-        static PassOwnPtr<CachedResourceCallback> schedule(CachedResource* resource, CachedResourceClient* client) { return adoptPtr(new CachedResourceCallback(resource, client)); }
+        static PassOwnPtr<ResourceCallback> schedule(Resource* resource, ResourceClient* client) { return adoptPtr(new ResourceCallback(resource, client)); }
         void cancel();
     private:
-        CachedResourceCallback(CachedResource*, CachedResourceClient*);
-        void timerFired(Timer<CachedResourceCallback>*);
+        ResourceCallback(Resource*, ResourceClient*);
+        void timerFired(Timer<ResourceCallback>*);
 
-        CachedResource* m_resource;
-        CachedResourceClient* m_client;
-        Timer<CachedResourceCallback> m_callbackTimer;
+        Resource* m_resource;
+        ResourceClient* m_client;
+        Timer<ResourceCallback> m_callbackTimer;
     };
-    HashMap<CachedResourceClient*, OwnPtr<CachedResourceCallback> > m_clientsAwaitingCallback;
+    HashMap<ResourceClient*, OwnPtr<ResourceCallback> > m_clientsAwaitingCallback;
 
-    bool hasClient(CachedResourceClient* client) { return m_clients.contains(client) || m_clientsAwaitingCallback.contains(client); }
+    bool hasClient(ResourceClient* client) { return m_clients.contains(client) || m_clientsAwaitingCallback.contains(client); }
 
     ResourceRequest m_resourceRequest;
     AtomicString m_accept;
@@ -279,11 +279,11 @@ protected:
 
     RefPtr<SharedBuffer> m_data;
     OwnPtr<PurgeableBuffer> m_purgeableData;
-    Timer<CachedResource> m_cancelTimer;
+    Timer<Resource> m_cancelTimer;
 
 private:
-    bool addClientToSet(CachedResourceClient*);
-    void cancelTimerFired(Timer<CachedResource>*);
+    bool addClientToSet(ResourceClient*);
+    void cancelTimerFired(Timer<Resource>*);
 
     void revalidationSucceeded(const ResourceResponse&);
     void revalidationFailed();
@@ -312,13 +312,13 @@ private:
 
     unsigned m_preloadResult : 2; // PreloadResult
 
-    bool m_inLiveDecodedResourcesList : 1;
-    bool m_requestedFromNetworkingLayer : 1;
+    unsigned m_inLiveDecodedResourcesList : 1;
+    unsigned m_requestedFromNetworkingLayer : 1;
 
-    bool m_inCache : 1;
-    bool m_loading : 1;
+    unsigned m_inCache : 1;
+    unsigned m_loading : 1;
 
-    bool m_switchingClientsToRevalidatedResource : 1;
+    unsigned m_switchingClientsToRevalidatedResource : 1;
 
     unsigned m_type : 4; // Type
     unsigned m_status : 3; // Status
@@ -328,23 +328,23 @@ private:
     unsigned m_lruIndex;
 #endif
 
-    CachedResource* m_nextInAllResourcesList;
-    CachedResource* m_prevInAllResourcesList;
+    Resource* m_nextInAllResourcesList;
+    Resource* m_prevInAllResourcesList;
 
-    CachedResource* m_nextInLiveResourcesList;
-    CachedResource* m_prevInLiveResourcesList;
+    Resource* m_nextInLiveResourcesList;
+    Resource* m_prevInLiveResourcesList;
 
     // If this field is non-null we are using the resource as a proxy for checking whether an existing resource is still up to date
     // using HTTP If-Modified-Since/If-None-Match headers. If the response is 304 all clients of this resource are moved
     // to to be clients of m_resourceToRevalidate and the resource is deleted. If not, the field is zeroed and this
     // resources becomes normal resource load.
-    CachedResource* m_resourceToRevalidate;
+    Resource* m_resourceToRevalidate;
 
     // If this field is non-null, the resource has a proxy for checking whether it is still up to date (see m_resourceToRevalidate).
-    CachedResource* m_proxyResource;
+    Resource* m_proxyResource;
 
     // These handles will need to be updated to point to the m_resourceToRevalidate in case we get 304 response.
-    HashSet<CachedResourceHandleBase*> m_handlesToRevalidate;
+    HashSet<ResourcePtrBase*> m_handlesToRevalidate;
 };
 
 }

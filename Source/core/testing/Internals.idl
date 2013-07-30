@@ -189,7 +189,7 @@
     [RaisesException] DOMString repaintRectsAsText(Document document);
 
     [RaisesException] void garbageCollectDocumentResources(Document document);
-    void evictAllCachedResources();
+    void evictAllResources();
 
     void allowRoundingHacks();
 
@@ -256,4 +256,6 @@
     boolean isSelectPopupVisible(Node node);
 
     [RaisesException] ClientRect selectionBounds();
+
+    boolean loseSharedGraphicsContext3D();
 };

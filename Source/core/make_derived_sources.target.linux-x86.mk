@@ -195,16 +195,16 @@ $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h: $(LOCAL_PATH)/thir
 
 $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp: $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h ;
 
-### Rules for action "CachedResourceInitiatorTypeNames":
-$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/loader/cache/CachedResourceInitiatorTypeNames.in $(GYP_TARGET_DEPENDENCIES)
-	@echo "Gyp action: third_party_WebKit_Source_core_core_derived_sources_gyp_make_derived_sources_target_CachedResourceInitiatorTypeNames ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.h" -- scripts/Hasher.pm scripts/StaticString.pm scripts/make_names.pl loader/cache/CachedResourceInitiatorTypeNames.in -- --resourceTypes
+### Rules for action "FetchInitiatorTypeNames":
+$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/Hasher.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/StaticString.pm $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/make_names.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/loader/cache/FetchInitiatorTypeNames.in $(GYP_TARGET_DEPENDENCIES)
+	@echo "Gyp action: third_party_WebKit_Source_core_core_derived_sources_gyp_make_derived_sources_target_FetchInitiatorTypeNames ($@)"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python scripts/action_makenames.py "$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp" "$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.h" -- scripts/Hasher.pm scripts/StaticString.pm scripts/make_names.pl loader/cache/FetchInitiatorTypeNames.in -- --resourceTypes
 
-$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.h: $(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp ;
+$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.h: $(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp ;
 
 ### Rules for action "PickerCommon":
 $(gyp_shared_intermediate_dir)/webkit/PickerCommon.h: gyp_local_path := $(LOCAL_PATH)
@@ -371,8 +371,8 @@ GYP_GENERATED_OUTPUTS := \
 	$(gyp_shared_intermediate_dir)/webkit/MathMLNames.h \
 	$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheets.h \
 	$(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/CachedResourceInitiatorTypeNames.h \
+	$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp \
+	$(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.h \
 	$(gyp_shared_intermediate_dir)/webkit/PickerCommon.h \
 	$(gyp_shared_intermediate_dir)/webkit/PickerCommon.cpp \
 	$(gyp_shared_intermediate_dir)/webkit/CalendarPicker.h \

@@ -23,7 +23,7 @@
 #include "config.h"
 #include "core/xml/XMLHttpRequest.h"
 
-#include "CachedResourceInitiatorTypeNames.h"
+#include "FetchInitiatorTypeNames.h"
 #include <wtf/ArrayBuffer.h>
 #include <wtf/ArrayBufferView.h>
 #include <wtf/RefCountedLeakCounter.h>
@@ -736,7 +736,7 @@ void XMLHttpRequest::createRequest(ExceptionCode& ec)
     options.credentialsRequested = m_includeCredentials ? ClientRequestedCredentials : ClientDidNotRequestCredentials;
     options.crossOriginRequestPolicy = m_allowCrossOriginRequests ? AllowCrossOriginRequests : UseAccessControl;
     options.securityOrigin = securityOrigin();
-    options.initiator = CachedResourceInitiatorTypeNames::xmlhttprequest;
+    options.initiator = FetchInitiatorTypeNames::xmlhttprequest;
     options.contentSecurityPolicyEnforcement = ContentSecurityPolicy::shouldBypassMainWorld(scriptExecutionContext()) ? DoNotEnforceContentSecurityPolicy : EnforceConnectSrcDirective;
     options.timeoutMilliseconds = m_timeoutMilliseconds;
 
@@ -831,6 +831,7 @@ void XMLHttpRequest::clearResponse()
 void XMLHttpRequest::clearResponseBuffers()
 {
     m_responseText.clear();
+    m_responseEncoding = String();
     m_createdDocument = false;
     m_responseDocument = 0;
     m_responseBlob = 0;
@@ -1082,6 +1083,7 @@ void XMLHttpRequest::didFinishLoading(unsigned long identifier, double)
     m_loader = 0;
 
     changeState(DONE);
+    m_responseEncoding = String();
     m_decoder = 0;
 
     if (hadLoader)

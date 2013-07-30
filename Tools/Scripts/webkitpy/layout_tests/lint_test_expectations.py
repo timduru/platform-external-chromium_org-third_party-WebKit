@@ -64,14 +64,14 @@ def lint(host, options, logging_stream):
         for port_to_lint in ports_to_lint:
             expectations_dict = port_to_lint.expectations_dict()
 
-            # FIXME: This won't work if multiple ports share a TestExpectations file but support different modifiers in the file.
             for expectations_file in expectations_dict.keys():
                 if expectations_file in files_linted:
                     continue
 
                 try:
                     test_expectations.TestExpectations(port_to_lint,
-                        expectations_to_lint={expectations_file: expectations_dict[expectations_file]})
+                        expectations_dict={expectations_file: expectations_dict[expectations_file]},
+                        is_lint_mode=True)
                 except test_expectations.ParseError as e:
                     lint_failed = True
                     _log.error('')

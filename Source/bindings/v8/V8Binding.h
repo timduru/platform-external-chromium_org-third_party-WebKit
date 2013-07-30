@@ -88,7 +88,7 @@ namespace WebCore {
     // FIXME: Remove all null isolates from V8 bindings, and remove v8NullWithCheck(isolate).
     inline v8::Handle<v8::Value> v8NullWithCheck(v8::Isolate* isolate)
     {
-        return v8::Handle<v8::Value>(isolate ? v8::Null(isolate) : v8::Null());
+        return isolate ? v8::Null(isolate) : v8::Null();
     }
 
     template<typename CallbackInfo, typename V>
@@ -236,6 +236,14 @@ namespace WebCore {
         static inline v8::Handle<v8::Value> arrayV8Value(const String& value, v8::Isolate* isolate)
         {
             return v8String(value, isolate);
+        }
+    };
+
+    template<>
+    struct V8ValueTraits<unsigned> {
+        static inline v8::Handle<v8::Value> arrayV8Value(const unsigned& value, v8::Isolate* isolate)
+        {
+            return v8::Integer::NewFromUnsigned(value, isolate);
         }
     };
 

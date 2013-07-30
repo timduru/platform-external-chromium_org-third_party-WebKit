@@ -22,18 +22,18 @@
     pages from the web. It has a memory cache for these objects.
 */
 
-#ifndef CachedResourceClient_h
-#define CachedResourceClient_h
+#ifndef ResourceClient_h
+#define ResourceClient_h
 
 #include "wtf/FastAllocBase.h"
 #include "wtf/Forward.h"
 
 namespace WebCore {
-class CachedResource;
+class Resource;
 
-class CachedResourceClient {
+class ResourceClient {
 public:
-    enum CachedResourceClientType {
+    enum ResourceClientType {
         BaseResourceType,
         ImageType,
         FontType,
@@ -42,15 +42,15 @@ public:
         RawResourceType
     };
 
-    virtual ~CachedResourceClient() { }
-    virtual void notifyFinished(CachedResource*) { }
-    virtual void deprecatedDidReceiveCachedResource(CachedResource*) { }
+    virtual ~ResourceClient() { }
+    virtual void notifyFinished(Resource*) { }
+    virtual void deprecatedDidReceiveResource(Resource*) { }
 
-    static CachedResourceClientType expectedType() { return BaseResourceType; }
-    virtual CachedResourceClientType resourceClientType() const { return expectedType(); }
+    static ResourceClientType expectedType() { return BaseResourceType; }
+    virtual ResourceClientType resourceClientType() const { return expectedType(); }
 
 protected:
-    CachedResourceClient() { }
+    ResourceClient() { }
 };
 }
 

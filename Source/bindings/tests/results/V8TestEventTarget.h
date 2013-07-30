@@ -87,7 +87,7 @@ inline v8::Handle<v8::Value> toV8ForMainWorld(TestEventTarget* impl, v8::Handle<
 {
     ASSERT(worldType(isolate) == MainWorld);
     if (UNLIKELY(!impl))
-        return v8NullWithCheck(isolate);
+        return v8::Null(isolate);
     v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapperForMainWorld<V8TestEventTarget>(impl);
     if (!wrapper.IsEmpty())
         return wrapper;

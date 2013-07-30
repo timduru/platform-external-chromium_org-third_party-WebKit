@@ -232,7 +232,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebSpeechRecognitionHandle.cpp \
 	third_party/WebKit/Source/web/WebSpeechRecognitionResult.cpp \
 	third_party/WebKit/Source/web/WebStorageEventDispatcherImpl.cpp \
-	third_party/WebKit/Source/web/WebStorageQuotaCallbacksImpl.cpp \
 	third_party/WebKit/Source/web/WebSurroundingText.cpp \
 	third_party/WebKit/Source/web/WebTextCheckingCompletionImpl.cpp \
 	third_party/WebKit/Source/web/WebTextCheckingResult.cpp \
@@ -254,7 +253,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WorkerFileSystemCallbacksBridge.cpp \
 	third_party/WebKit/Source/web/WorkerFileSystemClient.cpp \
 	third_party/WebKit/Source/web/WorkerFileWriterCallbacksBridge.cpp \
-	third_party/WebKit/Source/web/WorkerStorageQuotaCallbacksBridge.cpp \
 	third_party/WebKit/Source/web/android/WebInputEventFactory.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRenderStyle.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRendering.cpp \

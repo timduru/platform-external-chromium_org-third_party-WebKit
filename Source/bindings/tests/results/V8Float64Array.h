@@ -83,7 +83,7 @@ inline v8::Handle<v8::Value> toV8ForMainWorld(Float64Array* impl, v8::Handle<v8:
 {
     ASSERT(worldType(isolate) == MainWorld);
     if (UNLIKELY(!impl))
-        return v8NullWithCheck(isolate);
+        return v8::Null(isolate);
     v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapperForMainWorld<V8Float64Array>(impl);
     if (!wrapper.IsEmpty())
         return wrapper;
