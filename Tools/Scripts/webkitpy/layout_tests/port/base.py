@@ -165,7 +165,12 @@ class Port(object):
         return False
 
     def default_timeout_ms(self):
-        return 35 * 1000
+        timeout_ms = 6 * 1000
+        if self.get_option('configuration') == 'Debug':
+            # Debug is 6x slower than Release
+            # FIXME: It should be closer to 2x. See crbug.com/254188
+            return 6 * timeout_ms
+        return timeout_ms
 
     def driver_stop_timeout(self):
         """ Returns the amount of time in seconds to wait before killing the process in driver.stop()."""
@@ -280,7 +285,7 @@ class Port(object):
         """This routine is used to check whether image_diff binary exists."""
         image_diff_path = self._path_to_image_diff()
         if not self._filesystem.exists(image_diff_path):
-            _log.error("ImageDiff was not found at %s" % image_diff_path)
+            _log.error("image_diff was not found at %s" % image_diff_path)
             return False
         return True
 
@@ -350,7 +355,7 @@ class Port(object):
     def diff_image(self, expected_contents, actual_contents):
         """Compare two images and return a tuple of an image diff, and an error string.
 
-        If an error occurs (like ImageDiff isn't found, or crashes, we log an error and return True (for a diff).
+        If an error occurs (like image_diff isn't found, or crashes, we log an error and return True (for a diff).
         """
         # If only one of them exists, return that one.
         if not actual_contents and not expected_contents:
@@ -370,7 +375,7 @@ class Port(object):
 
         diff_filename = self._filesystem.join(str(tempdir), "diff.png")
 
-        # ImageDiff needs native win paths as arguments, so we need to convert them if running under cygwin.
+        # image_diff needs native win paths as arguments, so we need to convert them if running under cygwin.
         native_expected_filename = self._convert_path(expected_filename)
         native_actual_filename = self._convert_path(actual_filename)
         native_diff_filename = self._convert_path(diff_filename)
@@ -1275,7 +1280,7 @@ class Port(object):
         """Returns the full path to the image_diff binary, or None if it is not available.
 
         This is likely used only by diff_image()"""
-        return self._build_path('ImageDiff')
+        return self._build_path('image_diff')
 
     def _path_to_lighttpd(self):
         """Returns the path to the LigHTTPd binary.

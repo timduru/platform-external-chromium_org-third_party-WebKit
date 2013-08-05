@@ -219,7 +219,7 @@ WebInspector.SettingsTab.prototype = {
      * @param {boolean} numeric
      * @param {number=} maxLength
      * @param {string=} width
-     * @param {function(string):boolean=} validatorCallback
+     * @param {function(string):?string=} validatorCallback
      */
     _createInputSetting: function(label, setting, numeric, maxLength, width, validatorCallback)
     {
@@ -236,13 +236,21 @@ WebInspector.SettingsTab.prototype = {
             inputElement.maxLength = maxLength;
         if (width)
             inputElement.style.width = width;
+        if (validatorCallback) {
+            var errorMessageLabel = labelElement.createChild("div");
+            errorMessageLabel.addStyleClass("field-error-message");
+            errorMessageLabel.style.color = "DarkRed";
+            inputElement.oninput = function()
+            {
+                var error = validatorCallback(inputElement.value);
+                if (!error)
+                    error = "";
+                errorMessageLabel.textContent = error;
+            };
+        }
 
         function onBlur()
         {
-            if (validatorCallback && !validatorCallback(inputElement.value)) {
-                inputElement.value = setting.get();
-                return;
-            }
             setting.set(numeric ? Number(inputElement.value) : inputElement.value);
         }
         inputElement.addEventListener("blur", onBlur, false);
@@ -279,7 +287,6 @@ WebInspector.GenericSettingsTab = function()
     this._updateScriptDisabledCheckbox();
 
     p = this._appendSection(WebInspector.UIString("Appearance"));
-    p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show toolbar icons"), WebInspector.settings.showToolbarIcons));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Split panels vertically when docked to right"), WebInspector.settings.splitVerticallyWhenDockedToRight));
 
     p = this._appendSection(WebInspector.UIString("Elements"));
@@ -333,6 +340,10 @@ WebInspector.GenericSettingsTab = function()
     p.appendChild(indentationElement);
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Detect indentation"), WebInspector.settings.textEditorAutoDetectIndent));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show whitespace characters"), WebInspector.settings.showWhitespacesInEditor));
+    if (WebInspector.experimentsSettings.frameworksDebuggingSupport.isEnabled())
+        p.appendChild(this._createSkipStackFrameSetting());
+    WebInspector.settings.skipStackFramesSwitch.addChangeListener(this._skipStackFramesSwitchOrPatternChanged, this);
+    WebInspector.settings.skipStackFramesPattern.addChangeListener(this._skipStackFramesSwitchOrPatternChanged, this);
 
     p = this._appendSection(WebInspector.UIString("Profiler"));
     p.appendChild(this._createCheckboxSetting(WebInspector.UIString("Show advanced heap snapshot properties"), WebInspector.settings.showAdvancedHeapSnapshotProperties));
@@ -428,6 +439,49 @@ WebInspector.GenericSettingsTab.prototype = {
     {
         // We need to manually update the checkbox state, since enabling JavaScript in the page can actually uncover the "forbidden" state.
         PageAgent.setScriptExecutionDisabled(WebInspector.settings.javaScriptDisabled.get(), this._updateScriptDisabledCheckbox.bind(this));
+    },
+
+    _skipStackFramesSwitchOrPatternChanged: function()
+    {
+        WebInspector.DebuggerModel.applySkipStackFrameSettings();
+    },
+
+    _createSkipStackFrameSetting: function()
+    {
+        var fragment = document.createDocumentFragment();
+        var labelElement = fragment.createChild("label");
+        var checkboxElement = labelElement.createChild("input");
+        checkboxElement.type = "checkbox";
+        checkboxElement.checked = WebInspector.settings.skipStackFramesSwitch.get();
+        checkboxElement.addEventListener("click", checkboxClicked, false);
+        labelElement.appendChild(document.createTextNode(WebInspector.UIString("Skip stepping through sources with particular names")));
+        var fieldsetElement = this._createInputSetting(WebInspector.UIString("Pattern"), WebInspector.settings.skipStackFramesPattern, false, 1000, "100px", regExpValidator);
+        fieldsetElement.disabled = !checkboxElement.checked;
+        fragment.appendChild(fieldsetElement);
+        return fragment;
+
+        /**
+         * @param {string} text
+         * @return {?string}
+         */
+        function regExpValidator(text)
+        {
+            try {
+                var unused = new RegExp(text);
+                // Keep closure compiler happy.
+                unused.unused = unused;
+                return null;
+            } catch (e) {
+                return "Invalid pattern";
+            }
+        }
+
+        function checkboxClicked()
+        {
+            var enabled = checkboxElement.checked;
+            fieldsetElement.disabled = !checkboxElement.checked;
+            WebInspector.settings.skipStackFramesSwitch.set(enabled);
+        }
     },
 
     __proto__: WebInspector.SettingsTab.prototype
@@ -567,11 +621,11 @@ WebInspector.WorkspaceSettingsTab.prototype = {
         folderPath = folderPath.trimMiddle(maxTotalPathLength - Math.min(maxFolderNameLength, folderName.length));
         folderName = folderName.trimMiddle(maxFolderNameLength);
 
+        var folderPathElement = pathElement.createChild("span");
+        folderPathElement.textContent = folderPath + "/";
+
         var nameElement = pathElement.createChild("span", "file-system-path-name");
         nameElement.textContent = folderName;
-
-        var folderPathElement = pathElement.createChild("span");
-        folderPathElement.textContent = folderPath;
     },
 
     /**

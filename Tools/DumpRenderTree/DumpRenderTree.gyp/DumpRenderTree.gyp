@@ -42,33 +42,11 @@
         ],
     },
     'includes': [
-        '../DumpRenderTree.gypi',
         '../../../Source/core/features.gypi',
+        '../../../Source/testing/runner/runner.gypi',
+        '../../../Source/testing/plugin/plugin.gypi',
     ],
     'targets': [
-        {
-            'target_name': 'ImageDiff',
-            'type': 'executable',
-            'dependencies': [
-                '<(DEPTH)/webkit/support/webkit_support.gyp:webkit_support_gfx',
-            ],
-            'include_dirs': [
-                '<(DEPTH)',
-            ],
-            'sources': [
-                '<(tools_dir)/DumpRenderTree/chromium/ImageDiff.cpp',
-            ],
-            'conditions': [
-                ['OS=="android" and android_webview_build==0', {
-                    # The Chromium Android port will compare images on host rather
-                    # than target (a device or emulator) for performance reasons.
-                    'toolsets': ['host'],
-                }],
-                ['OS=="android" and android_webview_build==1', {
-                    'type': 'none',
-                }],
-            ],
-        },
         {
             'target_name': 'TestRunner',
             'type': '<(component)',
@@ -78,7 +56,7 @@
             'dependencies': [
                 'TestRunner_resources',
                 '../../../public/blink.gyp:blink',
-                '<(source_dir)/WebKit/chromium/WebKit.gyp:webkit_test_support',
+                '<(source_dir)/web/web.gyp:webkit_test_support',
             ],
             'include_dirs': [
                 '<(DEPTH)',
@@ -161,7 +139,7 @@
                     'pak_inputs': [
                         '<(SHARED_INTERMEDIATE_DIR)/net/net_resources.pak',
                         '<(SHARED_INTERMEDIATE_DIR)/ui/gfx/gfx_resources.pak',
-                        '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_chromium_resources.pak',
+                        '<(SHARED_INTERMEDIATE_DIR)/webkit/blink_resources.pak',
                         '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_strings_en-US.pak',
                         '<(SHARED_INTERMEDIATE_DIR)/webkit/webkit_resources_100_percent.pak',
                 ]},
@@ -188,7 +166,6 @@
             'target_name': 'TestRunner_resources',
             'type': 'none',
             'dependencies': [
-                'ImageDiff',
                 'copy_TestNetscapePlugIn',
             ],
             'conditions': [
@@ -242,7 +219,6 @@
                 }],
                 ['OS=="android"', {
                     'dependencies!': [
-                        'ImageDiff',
                         'copy_TestNetscapePlugIn',
                     ],
                     'copies': [{
@@ -253,11 +229,6 @@
                             '<(source_dir)/testing/data/fonts/android_fallback_fonts.xml',
                         ]
                     }],
-                }],
-                ['OS=="android" and android_webview_build==0', {
-                    'dependencies': [
-                        'ImageDiff#host',
-                    ],
                 }],
             ],
         },
@@ -270,7 +241,7 @@
             ],
             'include_dirs': [
                 '<(DEPTH)',
-                '<(tools_dir)/DumpRenderTree/TestNetscapePlugIn',
+                '<(source_dir)/testing/plugin/',
                 '<(tools_dir)/DumpRenderTree/chromium/TestNetscapePlugIn/ForwardingHeaders',
             ],
             'conditions': [
@@ -286,7 +257,7 @@
                     },
                     'xcode_settings': {
                         'GCC_SYMBOLS_PRIVATE_EXTERN': 'NO',
-                        'INFOPLIST_FILE': '<(tools_dir)/DumpRenderTree/TestNetscapePlugIn/mac/Info.plist',
+                        'INFOPLIST_FILE': '<(source_dir)/testing/plugin/mac/Info.plist',
                     },
                 }],
                 ['os_posix == 1 and OS != "mac"', {
@@ -300,8 +271,8 @@
                         'snprintf=_snprintf',
                     ],
                     'sources': [
-                        '<(tools_dir)/DumpRenderTree/TestNetscapePlugIn/win/TestNetscapePlugin.def',
-                        '<(tools_dir)/DumpRenderTree/TestNetscapePlugIn/win/TestNetscapePlugin.rc',
+                        '<(source_dir)/testing/plugin/win/TestNetscapePlugin.def',
+                        '<(source_dir)/testing/plugin/win/TestNetscapePlugin.rc',
                     ],
                     # The .rc file requires that the name of the dll is npTestNetscapePlugIn.dll.
                     'product_name': 'npTestNetscapePlugIn',

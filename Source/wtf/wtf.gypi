@@ -67,8 +67,6 @@
             'LinkedStack.h',
             'ListHashSet.h',
             'Locker.h',
-            'MD5.cpp',
-            'MD5.h',
             'MainThread.cpp',
             'MainThread.h',
             'MallocZoneSupport.h',
@@ -214,8 +212,8 @@
         ],
         'wtf_unittest_files': [
             'PartitionAllocTest.cpp',
+            'SHA1Test.cpp',
             'testing/WTFTestHelpers.h',
-            'tests/AtomicString.cpp',
             'tests/CString.cpp',
             'tests/CheckedArithmeticOperations.cpp',
             'tests/Functional.cpp',

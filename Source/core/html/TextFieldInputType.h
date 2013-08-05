@@ -66,6 +66,7 @@ protected:
     virtual void disabledAttributeChanged() OVERRIDE;
     virtual void readonlyAttributeChanged() OVERRIDE;
     virtual bool supportsReadOnly() const OVERRIDE;
+    virtual void handleFocusEvent(Element* oldFocusedNode, FocusDirection) OVERRIDE;
     virtual void handleBlurEvent() OVERRIDE;
     virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) OVERRIDE;
     virtual void updateInnerTextValue() OVERRIDE;
@@ -78,7 +79,6 @@ protected:
     virtual void didSetValueByUserEdit(ValueChangeState);
 
 private:
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const OVERRIDE;
     virtual bool shouldShowFocusRingOnMouseFocus() const OVERRIDE;
     virtual bool isTextField() const OVERRIDE;
     virtual bool valueMissing(const String&) const OVERRIDE;

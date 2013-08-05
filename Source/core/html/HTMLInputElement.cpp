@@ -365,19 +365,14 @@ bool HTMLInputElement::hasCustomFocusLogic() const
     return m_inputType->hasCustomFocusLogic();
 }
 
-bool HTMLInputElement::isKeyboardFocusable(KeyboardEvent* event) const
+bool HTMLInputElement::isKeyboardFocusable() const
 {
-    return m_inputType->isKeyboardFocusable(event);
+    return m_inputType->isKeyboardFocusable();
 }
 
 bool HTMLInputElement::shouldShowFocusRingOnMouseFocus() const
 {
     return m_inputType->shouldShowFocusRingOnMouseFocus();
-}
-
-bool HTMLInputElement::isTextFormControlKeyboardFocusable(KeyboardEvent* event) const
-{
-    return HTMLTextFormControlElement::isKeyboardFocusable(event);
 }
 
 void HTMLInputElement::updateFocusAppearance(bool restorePreviousSelection)
@@ -391,6 +386,15 @@ void HTMLInputElement::updateFocusAppearance(bool restorePreviousSelection)
             document()->frame()->selection()->revealSelection();
     } else
         HTMLTextFormControlElement::updateFocusAppearance(restorePreviousSelection);
+}
+
+void HTMLInputElement::beginEditing()
+{
+    if (!isTextField())
+        return;
+
+    if (Frame* frame = document()->frame())
+        frame->editor()->textFieldDidBeginEditing(this);
 }
 
 void HTMLInputElement::endEditing()
@@ -501,9 +505,6 @@ void HTMLInputElement::updateType()
         if (document()->focusedElement() == this)
             document()->updateFocusAppearanceSoon(true /* restore selection */);
     }
-
-    if (ElementShadow* elementShadow = shadowOfParentForDistribution(this))
-        elementShadow->invalidateDistribution();
 
     setChangedSinceLastFormControlChangeEvent(false);
 

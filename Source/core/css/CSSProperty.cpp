@@ -329,10 +329,6 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyWebkitLocale:
     case CSSPropertyWebkitHighlight:
     case CSSPropertyWebkitHyphenateCharacter:
-    case CSSPropertyWebkitHyphenateLimitAfter:
-    case CSSPropertyWebkitHyphenateLimitBefore:
-    case CSSPropertyWebkitHyphenateLimitLines:
-    case CSSPropertyWebkitHyphens:
     case CSSPropertyWebkitLineAlign:
     case CSSPropertyWebkitLineBoxContain:
     case CSSPropertyWebkitLineBreak:
@@ -583,6 +579,7 @@ bool CSSProperty::isInheritedProperty(CSSPropertyID propertyID)
     case CSSPropertyGridRow:
     case CSSPropertyGridRowEnd:
     case CSSPropertyGridRowStart:
+    case CSSPropertyGridTemplate:
     case CSSPropertyJustifyContent:
     case CSSPropertyWebkitLineClamp:
     case CSSPropertyWebkitLogicalHeight:

@@ -737,6 +737,9 @@ public:
     const Vector<GridTrackSize>& gridDefinitionRows() const { return rareNonInheritedData->m_grid->m_gridDefinitionRows; }
     const NamedGridLinesMap& namedGridColumnLines() const { return rareNonInheritedData->m_grid->m_namedGridColumnLines; }
     const NamedGridLinesMap& namedGridRowLines() const { return rareNonInheritedData->m_grid->m_namedGridRowLines; }
+    const NamedGridAreaMap& namedGridArea() const { return rareNonInheritedData->m_grid->m_namedGridArea; }
+    size_t namedGridAreaRowCount() const { return rareNonInheritedData->m_grid->m_namedGridAreaRowCount; }
+    size_t namedGridAreaColumnCount() const { return rareNonInheritedData->m_grid->m_namedGridAreaColumnCount; }
     GridAutoFlow gridAutoFlow() const { return rareNonInheritedData->m_grid->m_gridAutoFlow; }
     const GridTrackSize& gridAutoColumns() const { return rareNonInheritedData->m_grid->m_gridAutoColumns; }
     const GridTrackSize& gridAutoRows() const { return rareNonInheritedData->m_grid->m_gridAutoRows; }
@@ -772,10 +775,6 @@ public:
     EOverflowWrap overflowWrap() const { return static_cast<EOverflowWrap>(rareInheritedData->overflowWrap); }
     LineBreak lineBreak() const { return static_cast<LineBreak>(rareInheritedData->lineBreak); }
     const AtomicString& highlight() const { return rareInheritedData->highlight; }
-    Hyphens hyphens() const { return static_cast<Hyphens>(rareInheritedData->hyphens); }
-    short hyphenationLimitBefore() const { return rareInheritedData->hyphenationLimitBefore; }
-    short hyphenationLimitAfter() const { return rareInheritedData->hyphenationLimitAfter; }
-    short hyphenationLimitLines() const { return rareInheritedData->hyphenationLimitLines; }
     const AtomicString& hyphenationString() const { return rareInheritedData->hyphenationString; }
     const AtomicString& locale() const { return rareInheritedData->locale; }
     EBorderFit borderFit() const { return static_cast<EBorderFit>(rareNonInheritedData->m_borderFit); }
@@ -1187,6 +1186,9 @@ public:
     void setGridDefinitionRows(const Vector<GridTrackSize>& lengths) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridDefinitionRows, lengths); }
     void setNamedGridColumnLines(const NamedGridLinesMap& namedGridColumnLines) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridColumnLines, namedGridColumnLines); }
     void setNamedGridRowLines(const NamedGridLinesMap& namedGridRowLines) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridRowLines, namedGridRowLines); }
+    void setNamedGridArea(const NamedGridAreaMap& namedGridArea) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridArea, namedGridArea); }
+    void setNamedGridAreaRowCount(size_t rowCount) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridAreaRowCount, rowCount); }
+    void setNamedGridAreaColumnCount(size_t columnCount) { SET_VAR(rareNonInheritedData.access()->m_grid, m_namedGridAreaColumnCount, columnCount); }
     void setGridAutoFlow(GridAutoFlow flow) { SET_VAR(rareNonInheritedData.access()->m_grid, m_gridAutoFlow, flow); }
 
     void setGridColumnStart(const GridPosition& columnStartPosition) { SET_VAR(rareNonInheritedData.access()->m_gridItem, m_gridColumnStart, columnStartPosition); }
@@ -1210,9 +1212,6 @@ public:
     void setLineBreak(LineBreak b) { SET_VAR(rareInheritedData, lineBreak, b); }
     void setHighlight(const AtomicString& h) { SET_VAR(rareInheritedData, highlight, h); }
     void setHyphens(Hyphens h) { SET_VAR(rareInheritedData, hyphens, h); }
-    void setHyphenationLimitBefore(short limit) { SET_VAR(rareInheritedData, hyphenationLimitBefore, limit); }
-    void setHyphenationLimitAfter(short limit) { SET_VAR(rareInheritedData, hyphenationLimitAfter, limit); }
-    void setHyphenationLimitLines(short limit) { SET_VAR(rareInheritedData, hyphenationLimitLines, limit); }
     void setHyphenationString(const AtomicString& h) { SET_VAR(rareInheritedData, hyphenationString, h); }
     void setLocale(const AtomicString& locale) { SET_VAR(rareInheritedData, locale, locale); }
     void setBorderFit(EBorderFit b) { SET_VAR(rareNonInheritedData, m_borderFit, b); }
@@ -1539,10 +1538,6 @@ public:
     static LineBreak initialLineBreak() { return LineBreakAuto; }
     static const AtomicString& initialHighlight() { return nullAtom; }
     static ESpeak initialSpeak() { return SpeakNormal; }
-    static Hyphens initialHyphens() { return HyphensManual; }
-    static short initialHyphenationLimitBefore() { return -1; }
-    static short initialHyphenationLimitAfter() { return -1; }
-    static short initialHyphenationLimitLines() { return -1; }
     static const AtomicString& initialHyphenationString() { return nullAtom; }
     static const AtomicString& initialLocale() { return nullAtom; }
     static EBorderFit initialBorderFit() { return BorderFitBorder; }
@@ -1594,6 +1589,9 @@ public:
 
     static NamedGridLinesMap initialNamedGridColumnLines() { return NamedGridLinesMap(); }
     static NamedGridLinesMap initialNamedGridRowLines() { return NamedGridLinesMap(); }
+
+    static NamedGridAreaMap initialNamedGridArea() { return NamedGridAreaMap(); }
+    static size_t initialNamedGridAreaCount() { return 0; }
 
     // 'auto' is the default.
     static GridPosition initialGridColumnStart() { return GridPosition(); }

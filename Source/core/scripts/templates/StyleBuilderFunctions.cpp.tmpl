@@ -15,22 +15,30 @@
 #include "core/css/BasicShapeFunctions.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/Pair.h"
-#include "core/css/resolver/StyleResolver.h"
+#include "core/css/resolver/StyleResolverState.h"
+#include "core/platform/animation/CSSAnimationDataList.h"
+
 
 {%- macro declare_initial_function(property_id) -%}
-void StyleBuilderFunctions::applyInitial{{property_id}}(StyleResolver* styleResolver, StyleResolverState& state)
+void StyleBuilderFunctions::applyInitial{{property_id}}(StyleResolverState& state)
 {%- endmacro %}
 
 {%- macro declare_inherit_function(property_id) -%}
-void StyleBuilderFunctions::applyInherit{{property_id}}(StyleResolver* styleResolver, StyleResolverState& state)
+void StyleBuilderFunctions::applyInherit{{property_id}}(StyleResolverState& state)
 {%- endmacro %}
 
 {%- macro declare_value_function(property_id) -%}
-void StyleBuilderFunctions::applyValue{{property_id}}(StyleResolver* styleResolver, StyleResolverState& state, CSSValue* value)
+void StyleBuilderFunctions::applyValue{{property_id}}(StyleResolverState& state, CSSValue* value)
 {%- endmacro %}
 
-{%- macro set_value(property) -%}
+// FIXME: This is duplicated in StyleBuilder.cpp.tmpl, but we'll move the
+// function definitions there over to here later.
+{%- macro set_value(property) %}
+{%- if property.svg -%}
+    state.style()->accessSVGStyle()->{{property.setter}}
+{%- else -%}
     state.style()->{{property.setter}}
+{%- endif -%}
 {%- endmacro %}
 
 namespace WebCore {
@@ -301,7 +309,7 @@ namespace WebCore {
 
 {%- if inherit_color %}
     if (primitiveValue->getValueID() == CSSValueCurrentcolor) {
-        applyInherit{{property_id}}(styleResolver, state);
+        applyInherit{{property_id}}(state);
         return;
     }
 {%- endif %}
@@ -574,9 +582,6 @@ namespace WebCore {
 }
 {%- endmacro %}
 
-{{ apply_value_number("CSSPropertyWebkitHyphenateLimitAfter", "CSSValueAuto") }}
-{{ apply_value_number("CSSPropertyWebkitHyphenateLimitBefore", "CSSValueAuto") }}
-{{ apply_value_number("CSSPropertyWebkitHyphenateLimitLines", "CSSValueNoLimit") }}
 {{ apply_value_number("CSSPropertyWebkitMarqueeRepetition", "CSSValueInfinite") }}
 
 {%- macro apply_value_shape(property_id) %}

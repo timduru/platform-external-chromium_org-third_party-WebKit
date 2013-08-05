@@ -49,15 +49,6 @@
 
 namespace WebCore {
 
-inline static ShadowRoot* oldestShadowRootFor(const Node* node)
-{
-    if (!node->isElementNode())
-        return 0;
-    if (ElementShadow* shadow = toElement(node)->shadow())
-        return shadow->oldestShadowRoot();
-    return 0;
-}
-
 // FIXME: This should use opaque GC roots.
 static void addReferencesForNodeWithEventListeners(v8::Isolate* isolate, Node* node, const v8::Persistent<v8::Object>& wrapper)
 {
@@ -179,14 +170,14 @@ private:
                 node->setV8CollectableDuringMinorGC(false);
                 newSpaceNodes->append(node);
             }
-            if (node->isShadowRoot()) {
-                if (ShadowRoot* youngerShadowRoot = toShadowRoot(node)->youngerShadowRoot()) {
-                    if (!traverseTree(youngerShadowRoot, newSpaceNodes))
+            if (ShadowRoot* shadowRoot = node->youngestShadowRoot()) {
+                if (!traverseTree(shadowRoot, newSpaceNodes))
+                    return false;
+            } else if (node->isShadowRoot()) {
+                if (ShadowRoot* shadowRoot = toShadowRoot(node)->olderShadowRoot()) {
+                    if (!traverseTree(shadowRoot, newSpaceNodes))
                         return false;
                 }
-            } else if (ShadowRoot* oldestShadowRoot = oldestShadowRootFor(node)) {
-                if (!traverseTree(oldestShadowRoot, newSpaceNodes))
-                    return false;
             }
         }
         return true;
@@ -372,7 +363,6 @@ void V8GCController::majorGCPrologue(bool constructRetainedObjectInfos, v8::Isol
             MajorGCWrapperVisitor visitor(isolate, constructRetainedObjectInfos);
             v8::V8::VisitHandlesWithClassIds(&visitor);
             visitor.notifyFinished();
-            V8PerIsolateData::from(isolate)->stringCache()->clearOnGC();
         }
         V8PerIsolateData::from(isolate)->setPreviousSamplingState(TRACE_EVENT_GET_SAMPLING_STATE());
         TRACE_EVENT_SET_SAMPLING_STATE("V8", "MajorGC");
@@ -380,7 +370,6 @@ void V8GCController::majorGCPrologue(bool constructRetainedObjectInfos, v8::Isol
         MajorGCWrapperVisitor visitor(isolate, constructRetainedObjectInfos);
         v8::V8::VisitHandlesWithClassIds(&visitor);
         visitor.notifyFinished();
-        V8PerIsolateData::from(isolate)->stringCache()->clearOnGC();
     }
 }
 

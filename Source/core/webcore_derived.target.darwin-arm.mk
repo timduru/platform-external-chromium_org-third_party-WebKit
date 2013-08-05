@@ -32,107 +32,107 @@ GYP_GENERATED_OUTPUTS :=
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)
 
-$(gyp_intermediate_dir)/V8DerivedSources01.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp
+$(gyp_intermediate_dir)/V8DerivedSources01.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources02.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources02.cpp
+$(gyp_intermediate_dir)/V8DerivedSources02.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources02.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources03.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources03.cpp
+$(gyp_intermediate_dir)/V8DerivedSources03.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources03.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources04.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources04.cpp
+$(gyp_intermediate_dir)/V8DerivedSources04.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources04.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources05.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources05.cpp
+$(gyp_intermediate_dir)/V8DerivedSources05.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources05.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources06.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources06.cpp
+$(gyp_intermediate_dir)/V8DerivedSources06.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources06.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources07.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources07.cpp
+$(gyp_intermediate_dir)/V8DerivedSources07.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources07.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources08.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources08.cpp
+$(gyp_intermediate_dir)/V8DerivedSources08.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources08.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources09.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources09.cpp
+$(gyp_intermediate_dir)/V8DerivedSources09.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources09.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources10.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources10.cpp
+$(gyp_intermediate_dir)/V8DerivedSources10.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources10.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources11.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources11.cpp
+$(gyp_intermediate_dir)/V8DerivedSources11.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources11.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources12.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources12.cpp
+$(gyp_intermediate_dir)/V8DerivedSources12.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources12.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources13.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources13.cpp
+$(gyp_intermediate_dir)/V8DerivedSources13.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources13.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources14.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources14.cpp
+$(gyp_intermediate_dir)/V8DerivedSources14.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources14.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources15.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources15.cpp
+$(gyp_intermediate_dir)/V8DerivedSources15.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources15.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources16.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources16.cpp
+$(gyp_intermediate_dir)/V8DerivedSources16.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources16.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources17.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources17.cpp
+$(gyp_intermediate_dir)/V8DerivedSources17.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources17.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources18.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources18.cpp
+$(gyp_intermediate_dir)/V8DerivedSources18.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources18.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8DerivedSources19.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources19.cpp
+$(gyp_intermediate_dir)/V8DerivedSources19.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources19.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/ColorData.cpp: $(gyp_shared_intermediate_dir)/webkit/ColorData.cpp
+$(gyp_intermediate_dir)/ColorData.cpp: $(gyp_shared_intermediate_dir)/blink/ColorData.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/CSSPropertyNames.cpp: $(gyp_shared_intermediate_dir)/webkit/CSSPropertyNames.cpp
+$(gyp_intermediate_dir)/CSSPropertyNames.cpp: $(gyp_shared_intermediate_dir)/blink/CSSPropertyNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/CSSValueKeywords.cpp: $(gyp_shared_intermediate_dir)/webkit/CSSValueKeywords.cpp
+$(gyp_intermediate_dir)/CSSValueKeywords.cpp: $(gyp_shared_intermediate_dir)/blink/CSSValueKeywords.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/HTMLElementFactory.cpp
+$(gyp_intermediate_dir)/HTMLElementFactory.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLElementFactory.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/HTMLNames.cpp: $(gyp_shared_intermediate_dir)/webkit/HTMLNames.cpp
+$(gyp_intermediate_dir)/HTMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp: $(gyp_shared_intermediate_dir)/webkit/FetchInitiatorTypeNames.cpp
+$(gyp_intermediate_dir)/FetchInitiatorTypeNames.cpp: $(gyp_shared_intermediate_dir)/blink/FetchInitiatorTypeNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/webkit/CalendarPicker.cpp
+$(gyp_intermediate_dir)/CalendarPicker.cpp: $(gyp_shared_intermediate_dir)/blink/CalendarPicker.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp: $(gyp_shared_intermediate_dir)/webkit/ColorSuggestionPicker.cpp
+$(gyp_intermediate_dir)/ColorSuggestionPicker.cpp: $(gyp_shared_intermediate_dir)/blink/ColorSuggestionPicker.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/Event.cpp: $(gyp_shared_intermediate_dir)/webkit/Event.cpp
+$(gyp_intermediate_dir)/Event.cpp: $(gyp_shared_intermediate_dir)/blink/Event.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/PickerCommon.cpp: $(gyp_shared_intermediate_dir)/webkit/PickerCommon.cpp
+$(gyp_intermediate_dir)/PickerCommon.cpp: $(gyp_shared_intermediate_dir)/blink/PickerCommon.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/UserAgentStyleSheetsData.cpp: $(gyp_shared_intermediate_dir)/webkit/UserAgentStyleSheetsData.cpp
+$(gyp_intermediate_dir)/UserAgentStyleSheetsData.cpp: $(gyp_shared_intermediate_dir)/blink/UserAgentStyleSheetsData.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8HTMLElementWrapperFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/V8HTMLElementWrapperFactory.cpp
+$(gyp_intermediate_dir)/V8HTMLElementWrapperFactory.cpp: $(gyp_shared_intermediate_dir)/blink/V8HTMLElementWrapperFactory.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/XLinkNames.cpp: $(gyp_shared_intermediate_dir)/webkit/XLinkNames.cpp
+$(gyp_intermediate_dir)/XLinkNames.cpp: $(gyp_shared_intermediate_dir)/blink/XLinkNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/XMLNSNames.cpp: $(gyp_shared_intermediate_dir)/webkit/XMLNSNames.cpp
+$(gyp_intermediate_dir)/XMLNSNames.cpp: $(gyp_shared_intermediate_dir)/blink/XMLNSNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/XMLNames.cpp: $(gyp_shared_intermediate_dir)/webkit/XMLNames.cpp
+$(gyp_intermediate_dir)/XMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/XMLNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/SVGNames.cpp: $(gyp_shared_intermediate_dir)/webkit/SVGNames.cpp
+$(gyp_intermediate_dir)/SVGNames.cpp: $(gyp_shared_intermediate_dir)/blink/SVGNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/MathMLNames.cpp: $(gyp_shared_intermediate_dir)/webkit/MathMLNames.cpp
+$(gyp_intermediate_dir)/MathMLNames.cpp: $(gyp_shared_intermediate_dir)/blink/MathMLNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/FontFamilyNames.cpp: $(gyp_shared_intermediate_dir)/webkit/FontFamilyNames.cpp
+$(gyp_intermediate_dir)/FontFamilyNames.cpp: $(gyp_shared_intermediate_dir)/blink/FontFamilyNames.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/HTMLEntityTable.cpp: $(gyp_shared_intermediate_dir)/webkit/HTMLEntityTable.cpp
+$(gyp_intermediate_dir)/HTMLEntityTable.cpp: $(gyp_shared_intermediate_dir)/blink/HTMLEntityTable.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp: $(gyp_shared_intermediate_dir)/webkit/RuntimeEnabledFeatures.cpp
+$(gyp_intermediate_dir)/RuntimeEnabledFeatures.cpp: $(gyp_shared_intermediate_dir)/blink/RuntimeEnabledFeatures.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/CSSParser.cpp: $(gyp_shared_intermediate_dir)/webkit/CSSParser.cpp
+$(gyp_intermediate_dir)/CSSParser.cpp: $(gyp_shared_intermediate_dir)/blink/CSSParser.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/CSSGrammar.cpp: $(gyp_shared_intermediate_dir)/webkit/CSSGrammar.cpp
+$(gyp_intermediate_dir)/CSSGrammar.cpp: $(gyp_shared_intermediate_dir)/blink/CSSGrammar.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/XPathGrammar.cpp: $(gyp_shared_intermediate_dir)/webkit/XPathGrammar.cpp
+$(gyp_intermediate_dir)/XPathGrammar.cpp: $(gyp_shared_intermediate_dir)/blink/XPathGrammar.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/InspectorFrontend.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.cpp
+$(gyp_intermediate_dir)/InspectorFrontend.cpp: $(gyp_shared_intermediate_dir)/blink/InspectorFrontend.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/InspectorBackendDispatcher.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp
+$(gyp_intermediate_dir)/InspectorBackendDispatcher.cpp: $(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/InspectorTypeBuilder.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.cpp
+$(gyp_intermediate_dir)/InspectorTypeBuilder.cpp: $(gyp_shared_intermediate_dir)/blink/InspectorTypeBuilder.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/InspectorInstrumentationImpl.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorInstrumentationImpl.cpp
+$(gyp_intermediate_dir)/InspectorInstrumentationImpl.cpp: $(gyp_shared_intermediate_dir)/blink/InspectorInstrumentationImpl.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/SVGElementFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/SVGElementFactory.cpp
+$(gyp_intermediate_dir)/SVGElementFactory.cpp: $(gyp_shared_intermediate_dir)/blink/SVGElementFactory.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/V8SVGElementWrapperFactory.cpp: $(gyp_shared_intermediate_dir)/webkit/V8SVGElementWrapperFactory.cpp
+$(gyp_intermediate_dir)/V8SVGElementWrapperFactory.cpp: $(gyp_shared_intermediate_dir)/blink/V8SVGElementWrapperFactory.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/StylePropertyShorthand.cpp: $(gyp_shared_intermediate_dir)/webkit/StylePropertyShorthand.cpp
+$(gyp_intermediate_dir)/StylePropertyShorthand.cpp: $(gyp_shared_intermediate_dir)/blink/StylePropertyShorthand.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/StyleBuilder.cpp: $(gyp_shared_intermediate_dir)/webkit/StyleBuilder.cpp
+$(gyp_intermediate_dir)/StyleBuilder.cpp: $(gyp_shared_intermediate_dir)/blink/StyleBuilder.cpp
 	mkdir -p $(@D); cp $< $@
-$(gyp_intermediate_dir)/StyleBuilderFunctions.cpp: $(gyp_shared_intermediate_dir)/webkit/StyleBuilderFunctions.cpp
+$(gyp_intermediate_dir)/StyleBuilderFunctions.cpp: $(gyp_shared_intermediate_dir)/blink/StyleBuilderFunctions.cpp
 	mkdir -p $(@D); cp $< $@
 LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/V8DerivedSources01.cpp \
@@ -188,8 +188,8 @@ LOCAL_GENERATED_SOURCES := \
 	$(gyp_intermediate_dir)/StyleBuilderFunctions.cpp
 
 GYP_COPIED_SOURCE_ORIGIN_DIRS := \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
-	$(gyp_shared_intermediate_dir)/webkit
+	$(gyp_shared_intermediate_dir)/blink/bindings \
+	$(gyp_shared_intermediate_dir)/blink
 
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/ActiveDOMCallback.cpp \
@@ -285,6 +285,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8EntrySyncCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8EventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8EventTargetCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8ErrorEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8FileReaderCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8FormDataCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8GeolocationCustom.cpp \
@@ -314,6 +315,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8MessagePortCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8MutationObserverCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8NodeCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8NodeIteratorCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8NodeListCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8OscillatorNodeCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8PannerNodeCustom.cpp \
@@ -331,6 +333,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8StyleSheetCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8TextCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8TrackEventCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8TreeWalkerCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8WebGLRenderingContextCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8WebKitPointCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8WindowCustom.cpp \
@@ -443,8 +446,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit/Source/bindings/v8/custom \
@@ -610,8 +613,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(gyp_shared_intermediate_dir)/shim_headers/ashmem/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icuuc/target \
 	$(gyp_shared_intermediate_dir)/shim_headers/icui18n/target \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit/Source/bindings/v8/custom \

@@ -130,7 +130,6 @@ class Prerenderer;
 class ProcessingInstruction;
 class Range;
 class RegisteredEventListener;
-class RenderArena;
 class RenderView;
 class RequestAnimationFrameCallback;
 class SVGDocumentExtensions;
@@ -490,6 +489,8 @@ public:
     PassRefPtr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element*);
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
+    void updateDistributionForNodeIfNeeded(Node*);
+
     // Returns true if page box (margin boxes and page borders) is visible.
     bool isPageBoxVisible(int pageIndex);
 
@@ -508,8 +509,6 @@ public:
     // Override ScriptExecutionContext methods to do additional work
     virtual void suspendActiveDOMObjects(ActiveDOMObject::ReasonForSuspension) OVERRIDE;
     virtual void resumeActiveDOMObjects() OVERRIDE;
-
-    RenderArena* renderArena() { return m_renderArena.get(); }
 
     // Implemented in RenderView.h to avoid a cyclic header dependency this just
     // returns renderer so callers can avoid verbose casts.
@@ -632,6 +631,7 @@ public:
     Element* focusedElement() const { return m_focusedElement.get(); }
     UserActionElementSet& userActionElements()  { return m_userActionElements; }
     const UserActionElementSet& userActionElements() const { return m_userActionElements; }
+    void setNeedsFocusedElementCheck();
     void didRunCheckFocusedElementTask() { m_didPostCheckFocusedElementTask = false; }
 
     // The m_ignoreAutofocus flag specifies whether or not the document has been changed by the user enough
@@ -927,8 +927,8 @@ public:
 
     const QualifiedName& idAttributeName() const { return m_idAttributeName; }
 
-    bool hasFullscreenController() const { return m_hasFullscreenController; }
-    void setHasFullscreenController() { m_hasFullscreenController = true; }
+    bool hasFullscreenElementStack() const { return m_hasFullscreenElementStack; }
+    void setHasFullscreenElementStack() { m_hasFullscreenElementStack = true; }
 
     void webkitExitPointerLock();
     Element* webkitPointerLockElement() const;
@@ -1013,7 +1013,7 @@ public:
     // Return a Locale for the default locale if the argument is null or empty.
     Locale& getCachedLocale(const AtomicString& locale = nullAtom);
 
-    DocumentTimeline* timeline() { return m_timeline.get(); }
+    DocumentTimeline* timeline() const { return m_timeline.get(); }
 
     void addToTopLayer(Element*, const Element* before = 0);
     void removeFromTopLayer(Element*);
@@ -1044,6 +1044,8 @@ protected:
 private:
     friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
+
+    void updateDistributionIfNeeded();
 
     void detachParser();
 
@@ -1216,8 +1218,6 @@ private:
     bool m_titleSetExplicitly;
     RefPtr<Element> m_titleElement;
 
-    RefPtr<RenderArena> m_renderArena;
-
     OwnPtr<AXObjectCache> m_axObjectCache;
     OwnPtr<DocumentMarkerController> m_markers;
 
@@ -1284,7 +1284,7 @@ private:
 
     QualifiedName m_idAttributeName;
 
-    bool m_hasFullscreenController; // For early return in FullscreenController::fromIfExists()
+    bool m_hasFullscreenElementStack; // For early return in FullscreenElementStack::fromIfExists()
 
     Vector<RefPtr<Element> > m_topLayerElements;
 

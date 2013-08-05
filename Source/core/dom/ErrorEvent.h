@@ -42,7 +42,7 @@ struct ErrorEventInit : public EventInit {
     String message;
     String filename;
     unsigned lineno;
-    unsigned column;
+    unsigned colno;
 };
 
 class ErrorEvent : public Event {
@@ -59,12 +59,16 @@ public:
     {
         return adoptRef(new ErrorEvent(type, initializer));
     }
+    static PassRefPtr<ErrorEvent> createSanitizedError()
+    {
+        return adoptRef(new ErrorEvent("Script error.", String(), 0, 0));
+    }
     virtual ~ErrorEvent();
 
     const String& message() const { return m_message; }
     const String& filename() const { return m_fileName; }
     unsigned lineno() const { return m_lineNumber; }
-    unsigned column() const { return m_columnNumber; }
+    unsigned colno() const { return m_columnNumber; }
 
     virtual const AtomicString& interfaceName() const;
 

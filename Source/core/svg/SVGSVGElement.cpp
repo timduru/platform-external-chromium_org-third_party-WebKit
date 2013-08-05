@@ -54,7 +54,7 @@
 #include "core/svg/SVGViewElement.h"
 #include "core/svg/SVGViewSpec.h"
 #include "core/svg/animation/SMILTimeContainer.h"
-#include <wtf/StdLibExtras.h>
+#include "wtf/StdLibExtras.h"
 
 namespace WebCore {
 
@@ -479,9 +479,9 @@ bool SVGSVGElement::rendererIsNeeded(const NodeRenderingContext& context)
 RenderObject* SVGSVGElement::createRenderer(RenderStyle*)
 {
     if (isOutermostSVGSVGElement())
-        return new (document()->renderArena()) RenderSVGRoot(this);
+        return new RenderSVGRoot(this);
 
-    return new (document()->renderArena()) RenderSVGViewportContainer(this);
+    return new RenderSVGViewportContainer(this);
 }
 
 Node::InsertionNotificationRequest SVGSVGElement::insertedInto(ContainerNode* rootParent)

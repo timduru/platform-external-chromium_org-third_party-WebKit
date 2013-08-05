@@ -306,10 +306,6 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyGridAutoFlow: return 250;
     case CSSPropertyWebkitHighlight: return 251;
     case CSSPropertyWebkitHyphenateCharacter: return 252;
-    case CSSPropertyWebkitHyphenateLimitAfter: return 253;
-    case CSSPropertyWebkitHyphenateLimitBefore: return 254;
-    case CSSPropertyWebkitHyphenateLimitLines: return 255;
-    case CSSPropertyWebkitHyphens: return 256;
     case CSSPropertyWebkitLineBoxContain: return 257;
     case CSSPropertyWebkitLineAlign: return 258;
     case CSSPropertyWebkitLineBreak: return 259;
@@ -488,6 +484,7 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     case CSSPropertyMixBlendMode: return 420;
     case CSSPropertyTouchAction: return 421;
     case CSSPropertyGridArea: return 422;
+    case CSSPropertyGridTemplate: return 423;
 
     // Add new features above this line (don't change the assigned numbers of the existing
     // items) and update maximumCSSSampleId() with the new maximum value.
@@ -502,7 +499,7 @@ int UseCounter::mapCSSPropertyIdToCSSSampleIdForHistogram(int id)
     return 0;
 }
 
-static int maximumCSSSampleId() { return 422; }
+static int maximumCSSSampleId() { return 423; }
 
 UseCounter::UseCounter()
 {
@@ -643,6 +640,16 @@ String UseCounter::deprecationMessage(Feature feature)
     // HTML Media Capture
     case CaptureAttributeAsEnum:
         return "Using the 'capture' attribute as an enum is deprecated. Please use it as a boolean and specify the media types that should be accepted in the 'accept' attribute.";
+
+    // Keyboard Event (DOM Level 3)
+    case KeyboardEventKeyLocation:
+        return "'KeyboardEvent.keyLocation'' is deprecated. Please use 'KeyboardEvent.location' instead.";
+
+    case CaptureEvents:
+        return "captureEvents() is deprecated. This method doesn't do anything.";
+
+    case ReleaseEvents:
+        return "releaseEvents() is deprecated. This method doesn't do anything.";
 
     // Features that aren't deprecated don't have a deprecation message.
     default:

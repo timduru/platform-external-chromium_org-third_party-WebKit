@@ -20,6 +20,7 @@
 #ifndef SVGMPathElement_h
 #define SVGMPathElement_h
 
+#include "SVGNames.h"
 #include "core/svg/SVGAnimatedBoolean.h"
 #include "core/svg/SVGAnimatedString.h"
 #include "core/svg/SVGElement.h"
@@ -54,6 +55,7 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual void svgAttributeChanged(const QualifiedName&) OVERRIDE;
 
+    virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE { return false; }
     void notifyParentOfPathChange(ContainerNode*);
 
     BEGIN_DECLARE_ANIMATED_PROPERTIES(SVGMPathElement)
@@ -61,6 +63,12 @@ private:
         DECLARE_ANIMATED_BOOLEAN(ExternalResourcesRequired, externalResourcesRequired)
     END_DECLARE_ANIMATED_PROPERTIES
 };
+
+inline SVGMPathElement* toSVGMPathElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(SVGNames::mpathTag));
+    return static_cast<SVGMPathElement*>(node);
+}
 
 } // namespace WebCore
 

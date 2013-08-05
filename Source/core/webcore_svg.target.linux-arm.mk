@@ -210,7 +210,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/svg/SVGStopElement.cpp \
 	third_party/WebKit/Source/core/svg/SVGStringList.cpp \
 	third_party/WebKit/Source/core/svg/SVGStyleElement.cpp \
-	third_party/WebKit/Source/core/svg/SVGStyledElement.cpp \
 	third_party/WebKit/Source/core/svg/SVGSwitchElement.cpp \
 	third_party/WebKit/Source/core/svg/SVGSymbolElement.cpp \
 	third_party/WebKit/Source/core/svg/SVGTRefElement.cpp \
@@ -226,6 +225,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/svg/SVGTransformList.cpp \
 	third_party/WebKit/Source/core/svg/SVGTransformable.cpp \
 	third_party/WebKit/Source/core/svg/SVGURIReference.cpp \
+	third_party/WebKit/Source/core/svg/SVGUnknownElement.cpp \
 	third_party/WebKit/Source/core/svg/SVGUseElement.cpp \
 	third_party/WebKit/Source/core/svg/SVGVKernElement.cpp \
 	third_party/WebKit/Source/core/svg/SVGViewElement.cpp \
@@ -352,8 +352,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
@@ -510,8 +510,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \

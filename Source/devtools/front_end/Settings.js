@@ -101,7 +101,6 @@ WebInspector.Settings = function()
     this.showMetricsRulers = this.createSetting("showMetricsRulers", false);
     this.overrideCSSMedia = this.createSetting("overrideCSSMedia", false);
     this.emulatedCSSMedia = this.createSetting("emulatedCSSMedia", "print");
-    this.showToolbarIcons = this.createSetting("showToolbarIcons", false);
     this.workerInspectorWidth = this.createSetting("workerInspectorWidth", 600);
     this.workerInspectorHeight = this.createSetting("workerInspectorHeight", 600);
     this.messageURLFilters = this.createSetting("messageURLFilters", {});
@@ -112,6 +111,8 @@ WebInspector.Settings = function()
     this.shortcutPanelSwitch = this.createSetting("shortcutPanelSwitch", false);
     this.portForwardings = this.createSetting("portForwardings", []);
     this.showWhitespacesInEditor = this.createSetting("showWhitespacesInEditor", false);
+    this.skipStackFramesSwitch = this.createSetting("skipStackFramesSwitch", false);
+    this.skipStackFramesPattern = this.createSetting("skipStackFramesPattern", "");
 }
 
 WebInspector.Settings.prototype = {
@@ -257,7 +258,7 @@ WebInspector.ExperimentsSettings = function()
     this.customizableToolbar = this._createExperiment("customizableToolbar", "Enable toolbar customization");
     this.tethering = this._createExperiment("tethering", "Enable port forwarding");
     this.drawerOverlay = this._createExperiment("drawerOverlay", "Open console as overlay");
-    this.textEditorAutocomplete = this._createExperiment("textEditorAutocomplete", "Enable text editor autocompletion");
+    this.frameworksDebuggingSupport = this._createExperiment("frameworksDebuggingSupport", "Enable frameworks debugging support");
 
     this._cleanUpSetting();
 }

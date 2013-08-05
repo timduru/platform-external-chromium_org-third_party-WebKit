@@ -36,12 +36,12 @@ DEFINE_ANIMATED_TRANSFORM_LIST(SVGGraphicsElement, SVGNames::transformAttr, Tran
 
 BEGIN_REGISTER_ANIMATED_PROPERTIES(SVGGraphicsElement)
     REGISTER_LOCAL_ANIMATED_PROPERTY(transform)
-    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGStyledElement)
+    REGISTER_PARENT_ANIMATED_PROPERTIES(SVGElement)
     REGISTER_PARENT_ANIMATED_PROPERTIES(SVGTests)
 END_REGISTER_ANIMATED_PROPERTIES
 
 SVGGraphicsElement::SVGGraphicsElement(const QualifiedName& tagName, Document* document, ConstructionType constructionType)
-    : SVGStyledElement(tagName, document, constructionType)
+    : SVGElement(tagName, document, constructionType)
 {
     registerAnimatedPropertiesForSVGGraphicsElement();
 }
@@ -103,7 +103,7 @@ bool SVGGraphicsElement::isSupportedAttribute(const QualifiedName& attrName)
 void SVGGraphicsElement::parseAttribute(const QualifiedName& name, const AtomicString& value)
 {
     if (!isSupportedAttribute(name)) {
-        SVGStyledElement::parseAttribute(name, value);
+        SVGElement::parseAttribute(name, value);
         return;
     }
 
@@ -123,7 +123,7 @@ void SVGGraphicsElement::parseAttribute(const QualifiedName& name, const AtomicS
 void SVGGraphicsElement::svgAttributeChanged(const QualifiedName& attrName)
 {
     if (!isSupportedAttribute(attrName)) {
-        SVGStyledElement::svgAttributeChanged(attrName);
+        SVGElement::svgAttributeChanged(attrName);
         return;
     }
 
@@ -163,7 +163,7 @@ SVGRect SVGGraphicsElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
 RenderObject* SVGGraphicsElement::createRenderer(RenderStyle*)
 {
     // By default, any subclass is expected to do path-based drawing
-    return new (document()->renderArena()) RenderSVGPath(this);
+    return new RenderSVGPath(this);
 }
 
 void SVGGraphicsElement::toClipPath(Path& path)

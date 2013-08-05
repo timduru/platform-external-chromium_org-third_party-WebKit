@@ -24,7 +24,6 @@ LOCAL_GENERATED_SOURCES :=
 GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
-	third_party/WebKit/Source/core/platform/Arena.cpp \
 	third_party/WebKit/Source/core/platform/CalculationValue.cpp \
 	third_party/WebKit/Source/core/platform/Clock.cpp \
 	third_party/WebKit/Source/core/platform/ContentType.cpp \
@@ -160,6 +159,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/FontFamily.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontFeatureSettings.cpp \
 	third_party/WebKit/Source/core/platform/graphics/FontFastPath.cpp \
+	third_party/WebKit/Source/core/platform/graphics/FrameData.cpp \
 	third_party/WebKit/Source/core/platform/graphics/LayoutBoxExtent.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GeneratorGeneratedImage.cpp \
 	third_party/WebKit/Source/core/platform/graphics/GeneratedImage.cpp \
@@ -196,7 +196,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/chromium/DeferredImageDecoder.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/DiscardablePixelRef.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/FontCacheAndroid.cpp \
-	third_party/WebKit/Source/core/platform/graphics/chromium/ImageChromium.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/ImageDecodingStore.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/ImageFrameGenerator.cpp \
 	third_party/WebKit/Source/core/platform/graphics/chromium/LazyDecodingPixelRef.cpp \
@@ -254,10 +253,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/harfbuzz/HarfBuzzShaper.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeSanitizer.cpp \
 	third_party/WebKit/Source/core/platform/graphics/opentype/OpenTypeVerticalData.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/FontCustomPlatformData.cpp \
+	third_party/WebKit/Source/core/platform/graphics/skia/FontCustomPlatformDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/FontPlatformDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/GlyphPageTreeNodeSkia.cpp \
-	third_party/WebKit/Source/core/platform/graphics/skia/ImageSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/NativeImageSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/OpaqueRegionSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SimpleFontDataSkia.cpp \
@@ -322,7 +320,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/sql/chromium/SQLiteFileSystemChromiumPosix.cpp \
 	third_party/WebKit/Source/core/platform/text/BidiContext.cpp \
 	third_party/WebKit/Source/core/platform/text/DateTimeFormat.cpp \
-	third_party/WebKit/Source/core/platform/text/Hyphenation.cpp \
 	third_party/WebKit/Source/core/platform/text/LineEnding.cpp \
 	third_party/WebKit/Source/core/platform/text/LocaleICU.cpp \
 	third_party/WebKit/Source/core/platform/text/LocaleToScriptMappingDefault.cpp \
@@ -446,8 +443,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
@@ -605,8 +602,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \

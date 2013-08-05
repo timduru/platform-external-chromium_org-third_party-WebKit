@@ -23,7 +23,6 @@
 #include "config.h"
 
 #include "core/platform/text/BidiResolver.h"
-#include "core/platform/text/Hyphenation.h"
 #include "core/rendering/InlineIterator.h"
 #include "core/rendering/InlineTextBox.h"
 #include "core/rendering/RenderCombineText.h"
@@ -427,7 +426,7 @@ static inline void ensureCharacterGetsLineBox(LineMidpointState& lineMidpointSta
 
 static inline BidiRun* createRun(int start, int end, RenderObject* obj, InlineBidiResolver& resolver)
 {
-    return new (obj->renderArena()) BidiRun(start, end, obj, resolver.context(), resolver.dir());
+    return new BidiRun(start, end, obj, resolver.context(), resolver.dir());
 }
 
 void RenderBlock::appendRunsForObject(BidiRunList<BidiRun>& runs, int start, int end, RenderObject* obj, InlineBidiResolver& resolver)
@@ -1203,7 +1202,7 @@ inline BidiRun* RenderBlock::handleTrailingSpaces(BidiRunList<BidiRun>& bidiRuns
         while (BidiContext* parent = baseContext->parent())
             baseContext = parent;
 
-        BidiRun* newTrailingRun = new (renderArena()) BidiRun(firstSpace, trailingSpaceRun->m_stop, trailingSpaceRun->m_object, baseContext, OtherNeutral);
+        BidiRun* newTrailingRun = new BidiRun(firstSpace, trailingSpaceRun->m_stop, trailingSpaceRun->m_object, baseContext, OtherNeutral);
         trailingSpaceRun->m_stop = firstSpace;
         if (direction == LTR)
             bidiRuns.addRun(newTrailingRun);
@@ -1481,15 +1480,15 @@ private:
     RenderFlowThread* m_flowThread;
 };
 
-static void deleteLineRange(LineLayoutState& layoutState, RenderArena* arena, RootInlineBox* startLine, RootInlineBox* stopLine = 0)
+static void deleteLineRange(LineLayoutState& layoutState, RootInlineBox* startLine, RootInlineBox* stopLine = 0)
 {
     RootInlineBox* boxToDelete = startLine;
     while (boxToDelete && boxToDelete != stopLine) {
         layoutState.updateRepaintRangeFromBox(boxToDelete);
-        // Note: deleteLineRange(renderArena(), firstRootBox()) is not identical to deleteLineBoxTree().
+        // Note: deleteLineRange(firstRootBox()) is not identical to deleteLineBoxTree().
         // deleteLineBoxTree uses nextLineBox() instead of nextRootBox() when traversing.
         RootInlineBox* next = boxToDelete->nextRootBox();
-        boxToDelete->deleteLine(arena);
+        boxToDelete->deleteLine();
         boxToDelete = next;
     }
 }
@@ -1534,7 +1533,7 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
     if (startLine) {
         if (!layoutState.usesRepaintBounds())
             layoutState.setRepaintRange(logicalHeight());
-        deleteLineRange(layoutState, renderArena(), startLine);
+        deleteLineRange(layoutState, startLine);
     }
 
     if (!layoutState.isFullLayout() && lastRootBox() && lastRootBox()->endsWithBreak()) {
@@ -1847,7 +1846,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
 
                         if (availableLogicalWidthForLine(oldLogicalHeight + adjustment, layoutState.lineInfo().isFirstLine()) != oldLineWidth) {
                             // We have to delete this line, remove all floats that got added, and let line layout re-run.
-                            lineBox->deleteLine(renderArena());
+                            lineBox->deleteLine();
                             end = restartLayoutRunsAndFloatsInRange(oldLogicalHeight, oldLogicalHeight + adjustment, lastFloatFromPreviousLine, resolver, oldEnd);
                             continue;
                         }
@@ -1987,7 +1986,7 @@ void RenderBlock::linkToEndLineIfNeeded(LineLayoutState& layoutState)
             setLogicalHeight(lastRootBox()->lineBottomWithLeading());
         } else {
             // Delete all the remaining lines.
-            deleteLineRange(layoutState, renderArena(), layoutState.endLine());
+            deleteLineRange(layoutState, layoutState.endLine());
         }
     }
 
@@ -1998,7 +1997,7 @@ void RenderBlock::linkToEndLineIfNeeded(LineLayoutState& layoutState)
         if (layoutState.checkForFloatsFromLastLine()) {
             LayoutUnit bottomVisualOverflow = lastRootBox()->logicalBottomVisualOverflow();
             LayoutUnit bottomLayoutOverflow = lastRootBox()->logicalBottomLayoutOverflow();
-            TrailingFloatsRootInlineBox* trailingFloatsLineBox = new (renderArena()) TrailingFloatsRootInlineBox(this);
+            TrailingFloatsRootInlineBox* trailingFloatsLineBox = new TrailingFloatsRootInlineBox(this);
             m_lineBoxes.appendLineBox(trailingFloatsLineBox);
             trailingFloatsLineBox->setConstructed();
             GlyphOverflowAndFallbackFontsMap textBoxDataMap;
@@ -2061,7 +2060,7 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
     LineLayoutState layoutState(isFullLayout, repaintLogicalTop, repaintLogicalBottom, flowThread);
 
     if (isFullLayout)
-        lineBoxes()->deleteLineBoxes(renderArena());
+        lineBoxes()->deleteLineBoxes();
 
     // Text truncation kicks in in two cases:
     //     1) If your overflow isn't visible and your text-overflow-mode isn't clip.
@@ -2229,12 +2228,11 @@ RootInlineBox* RenderBlock::determineStartPosition(LineLayoutState& layoutState,
     if (layoutState.isFullLayout()) {
         // FIXME: This should just call deleteLineBoxTree, but that causes
         // crashes for fast/repaint tests.
-        RenderArena* arena = renderArena();
         curr = firstRootBox();
         while (curr) {
             // Note: This uses nextRootBox() insted of nextLineBox() like deleteLineBoxTree does.
             RootInlineBox* next = curr->nextRootBox();
-            curr->deleteLine(arena);
+            curr->deleteLine();
             curr = next;
         }
         ASSERT(!firstLineBox() && !lastLineBox());
@@ -2413,7 +2411,7 @@ bool RenderBlock::matchedEndLine(LineLayoutState& layoutState, const InlineBidiR
             }
 
             // Now delete the lines that we failed to sync.
-            deleteLineRange(layoutState, renderArena(), originalEndLine, result);
+            deleteLineRange(layoutState, originalEndLine, result);
             return matched;
         }
     }
@@ -2563,72 +2561,6 @@ static ALWAYS_INLINE float textWidth(RenderText* text, unsigned from, unsigned l
     run.setTabSize(!collapseWhiteSpace, text->style()->tabSize());
     run.setXPos(xPos);
     return font.width(run, fallbackFonts, &glyphOverflow);
-}
-
-static void tryHyphenating(RenderText* text, const Font& font, const AtomicString& localeIdentifier, unsigned consecutiveHyphenatedLines, int consecutiveHyphenatedLinesLimit, int minimumPrefixLimit, int minimumSuffixLimit, unsigned lastSpace, unsigned pos, float xPos, int availableWidth, bool isFixedPitch, bool collapseWhiteSpace, int lastSpaceWordSpacing, InlineIterator& lineBreak, int nextBreakable, bool& hyphenated)
-{
-    // Map 'hyphenate-limit-{before,after}: auto;' to 2.
-    unsigned minimumPrefixLength;
-    unsigned minimumSuffixLength;
-
-    if (minimumPrefixLimit < 0)
-        minimumPrefixLength = 2;
-    else
-        minimumPrefixLength = static_cast<unsigned>(minimumPrefixLimit);
-
-    if (minimumSuffixLimit < 0)
-        minimumSuffixLength = 2;
-    else
-        minimumSuffixLength = static_cast<unsigned>(minimumSuffixLimit);
-
-    if (pos - lastSpace <= minimumSuffixLength)
-        return;
-
-    if (consecutiveHyphenatedLinesLimit >= 0 && consecutiveHyphenatedLines >= static_cast<unsigned>(consecutiveHyphenatedLinesLimit))
-        return;
-
-    int hyphenWidth = measureHyphenWidth(text, font);
-
-    float maxPrefixWidth = availableWidth - xPos - hyphenWidth - lastSpaceWordSpacing;
-    // If the maximum width available for the prefix before the hyphen is small, then it is very unlikely
-    // that an hyphenation opportunity exists, so do not bother to look for it.
-    if (maxPrefixWidth <= font.pixelSize() * 5 / 4)
-        return;
-
-    TextRun run = RenderBlock::constructTextRun(text, font, text, lastSpace, pos - lastSpace, text->style());
-    run.setCharactersLength(text->textLength() - lastSpace);
-    ASSERT(run.charactersLength() >= run.length());
-
-    run.setTabSize(!collapseWhiteSpace, text->style()->tabSize());
-    run.setXPos(xPos + lastSpaceWordSpacing);
-
-    unsigned prefixLength = font.offsetForPosition(run, maxPrefixWidth, false);
-    if (prefixLength < minimumPrefixLength)
-        return;
-
-    prefixLength = lastHyphenLocation(text->substring(lastSpace, pos - lastSpace), min(prefixLength, pos - lastSpace - minimumSuffixLength) + 1, localeIdentifier);
-    if (!prefixLength || prefixLength < minimumPrefixLength)
-        return;
-
-    // When lastSapce is a space, which it always is except sometimes at the beginning of a line or after collapsed
-    // space, it should not count towards hyphenate-limit-before.
-    if (prefixLength == minimumPrefixLength) {
-        UChar characterAtLastSpace = text->characterAt(lastSpace);
-        if (characterAtLastSpace == ' ' || characterAtLastSpace == '\n' || characterAtLastSpace == '\t' || characterAtLastSpace == noBreakSpace)
-            return;
-    }
-
-    ASSERT(pos - lastSpace - prefixLength >= minimumSuffixLength);
-
-#if !ASSERT_DISABLED
-    float prefixWidth = hyphenWidth + textWidth(text, lastSpace, prefixLength, font, xPos, isFixedPitch, collapseWhiteSpace) + lastSpaceWordSpacing;
-    ASSERT(xPos + prefixWidth <= availableWidth);
-#else
-    UNUSED_PARAM(isFixedPitch);
-#endif
-
-    lineBreak.moveTo(text, lastSpace + prefixLength, nextBreakable);
-    hyphenated = true;
 }
 
 class TrailingObjects {
@@ -3001,7 +2933,6 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
             RenderStyle* style = t->style(lineInfo.isFirstLine());
             const Font& f = style->font();
             bool isFixedPitch = f.isFixedPitch();
-            bool canHyphenate = style->hyphens() == HyphensAuto && WebCore::canHyphenate(style->locale());
 
             unsigned lastSpace = current.m_pos;
             float wordSpacing = currentStyle->wordSpacing();
@@ -3056,7 +2987,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
                 if (!collapseWhiteSpace || !currentCharacterIsSpace)
                     lineInfo.setEmpty(false, m_block, &width);
 
-                if (c == softHyphen && autoWrap && !hyphenWidth && style->hyphens() != HyphensNone) {
+                if (c == softHyphen && autoWrap && !hyphenWidth) {
                     hyphenWidth = measureHyphenWidth(t, f);
                     width.addUncommittedWidth(hyphenWidth);
                 }
@@ -3070,8 +3001,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
                     midWordBreak = width.committedWidth() + wrapW + charWidth > width.availableWidth();
                 }
 
-                bool betweenWords = c == '\n' || (currWS != PRE && !atStart && isBreakable(renderTextInfo.m_lineBreakIterator, current.m_pos, current.m_nextBreakablePosition)
-                    && (style->hyphens() != HyphensNone || (current.previousInSameNode() != softHyphen)));
+                bool betweenWords = c == '\n' || (currWS != PRE && !atStart && isBreakable(renderTextInfo.m_lineBreakIterator, current.m_pos, current.m_nextBreakablePosition));
 
                 if (betweenWords || midWordBreak) {
                     bool stoppedIgnoringSpaces = false;
@@ -3135,11 +3065,6 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
                             }
                         }
                         if (lineWasTooWide || !width.fitsOnLine()) {
-                            if (canHyphenate && !width.fitsOnLine()) {
-                                tryHyphenating(t, f, style->locale(), consecutiveHyphenatedLines, blockStyle->hyphenationLimitLines(), style->hyphenationLimitBefore(), style->hyphenationLimitAfter(), lastSpace, current.m_pos, width.currentWidth() - additionalTmpW, width.availableWidth(), isFixedPitch, collapseWhiteSpace, lastSpaceWordSpacing, lBreak, current.m_nextBreakablePosition, m_hyphenated);
-                                if (m_hyphenated)
-                                    goto end;
-                            }
                             if (lBreak.atTextParagraphSeparator()) {
                                 if (!stoppedIgnoringSpaces && current.m_pos > 0)
                                     ensureCharacterGetsLineBox(lineMidpointState, current);
@@ -3147,7 +3072,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
                                 lineInfo.setPreviousLineBrokeCleanly(true);
                                 wordMeasurement.endOffset = lBreak.m_pos;
                             }
-                            if (lBreak.m_obj && lBreak.m_pos && lBreak.m_obj->isText() && toRenderText(lBreak.m_obj)->textLength() && toRenderText(lBreak.m_obj)->characterAt(lBreak.m_pos - 1) == softHyphen && style->hyphens() != HyphensNone)
+                            if (lBreak.m_obj && lBreak.m_pos && lBreak.m_obj->isText() && toRenderText(lBreak.m_obj)->textLength() && toRenderText(lBreak.m_obj)->characterAt(lBreak.m_pos - 1) == softHyphen)
                                 m_hyphenated = true;
                             if (lBreak.m_pos && lBreak.m_pos != (unsigned)wordMeasurement.endOffset && !wordMeasurement.width) {
                                 if (charWidth) {
@@ -3267,10 +3192,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
             includeEndWidth = false;
 
             if (!width.fitsOnLine()) {
-                if (canHyphenate)
-                    tryHyphenating(t, f, style->locale(), consecutiveHyphenatedLines, blockStyle->hyphenationLimitLines(), style->hyphenationLimitBefore(), style->hyphenationLimitAfter(), lastSpace, current.m_pos, width.currentWidth() - additionalTmpW, width.availableWidth(), isFixedPitch, collapseWhiteSpace, lastSpaceWordSpacing, lBreak, current.m_nextBreakablePosition, m_hyphenated);
-
-                if (!m_hyphenated && lBreak.previousInSameNode() == softHyphen && style->hyphens() != HyphensNone)
+                if (!m_hyphenated && lBreak.previousInSameNode() == softHyphen)
                     m_hyphenated = true;
 
                 if (m_hyphenated)
@@ -3552,7 +3474,7 @@ void RenderBlock::layoutLineGridBox()
 
     setLineGridBox(0);
 
-    RootInlineBox* lineGridBox = new (renderArena()) RootInlineBox(this);
+    RootInlineBox* lineGridBox = new RootInlineBox(this);
     lineGridBox->setHasTextChildren(); // Needed to make the line ascent/descent actually be honored in quirks mode.
     lineGridBox->setConstructed();
     GlyphOverflowAndFallbackFontsMap textBoxDataMap;

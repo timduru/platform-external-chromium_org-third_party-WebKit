@@ -94,7 +94,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/EventTarget.cpp \
 	third_party/WebKit/Source/core/dom/ExceptionCodePlaceholder.cpp \
 	third_party/WebKit/Source/core/dom/FocusEvent.cpp \
-	third_party/WebKit/Source/core/dom/FullscreenController.cpp \
+	third_party/WebKit/Source/core/dom/FullscreenElementStack.cpp \
 	third_party/WebKit/Source/core/dom/GenericEventQueue.cpp \
 	third_party/WebKit/Source/core/dom/GestureEvent.cpp \
 	third_party/WebKit/Source/core/dom/IconURL.cpp \
@@ -293,8 +293,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
@@ -451,8 +451,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \

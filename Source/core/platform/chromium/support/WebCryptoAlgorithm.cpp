@@ -56,6 +56,11 @@ WebCryptoAlgorithm::WebCryptoAlgorithm(WebCryptoAlgorithmId id, const char* name
 {
 }
 
+WebCryptoAlgorithm WebCryptoAlgorithm::adoptParamsAndCreate(WebCryptoAlgorithmId id, const char* name, WebCryptoAlgorithmParams* params)
+{
+    return WebCryptoAlgorithm(id, name, adoptPtr(params));
+}
+
 WebCryptoAlgorithmId WebCryptoAlgorithm::id() const
 {
     return m_private->id;
@@ -91,6 +96,20 @@ WebCryptoHmacParams* WebCryptoAlgorithm::hmacParams() const
 {
     if (paramsType() == WebCryptoAlgorithmParamsTypeHmacParams)
         return static_cast<WebCryptoHmacParams*>(m_private->params.get());
+    return 0;
+}
+
+WebCryptoRsaSsaParams* WebCryptoAlgorithm::rsaSsaParams() const
+{
+    if (paramsType() == WebCryptoAlgorithmParamsTypeRsaSsaParams)
+        return static_cast<WebCryptoRsaSsaParams*>(m_private->params.get());
+    return 0;
+}
+
+WebCryptoRsaKeyGenParams* WebCryptoAlgorithm::rsaKeyGenParams() const
+{
+    if (paramsType() == WebCryptoAlgorithmParamsTypeRsaKeyGenParams)
+        return static_cast<WebCryptoRsaKeyGenParams*>(m_private->params.get());
     return 0;
 }
 

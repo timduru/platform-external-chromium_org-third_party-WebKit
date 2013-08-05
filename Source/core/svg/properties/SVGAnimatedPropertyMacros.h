@@ -26,7 +26,7 @@
 #include "core/svg/properties/SVGAnimatedProperty.h"
 #include "core/svg/properties/SVGAttributeToPropertyMap.h"
 #include "core/svg/properties/SVGPropertyTraits.h"
-#include <wtf/StdLibExtras.h>
+#include "wtf/StdLibExtras.h"
 
 namespace WebCore {
 
@@ -163,7 +163,7 @@ void OwnerType::synchronize##UpperProperty(SVGElement* maskedOwnerType) \
 #define BEGIN_DECLARE_ANIMATED_PROPERTIES(OwnerType) \
 public: \
     static SVGAttributeToPropertyMap& attributeToPropertyMap(); \
-    virtual SVGAttributeToPropertyMap& localAttributeToPropertyMap() const OVERRIDE; \
+    virtual SVGAttributeToPropertyMap& localAttributeToPropertyMap() const; \
     typedef OwnerType UseOwnerType;
 
 #define DECLARE_ANIMATED_PROPERTY(TearOffType, PropertyType, UpperProperty, LowerProperty) \

@@ -53,7 +53,7 @@
 #include "core/dom/EventDispatcher.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/FocusEvent.h"
-#include "core/dom/FullscreenController.h"
+#include "core/dom/FullscreenElementStack.h"
 #include "core/dom/MutationObserverInterestGroup.h"
 #include "core/dom/MutationRecord.h"
 #include "core/dom/NamedNodeMap.h"
@@ -75,6 +75,7 @@
 #include "core/html/HTMLFormControlsCollection.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLLabelElement.h"
+#include "core/html/HTMLNameCollection.h"
 #include "core/html/HTMLOptionsCollection.h"
 #include "core/html/HTMLTableRowsCollection.h"
 #include "core/html/parser/HTMLParserIdioms.h"
@@ -210,6 +211,11 @@ Element::~Element()
         data->setPseudoElement(AFTER, 0);
         data->setPseudoElement(BACKDROP, 0);
         data->clearShadow();
+
+        if (RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
+            if (ActiveAnimations* activeAnimations = data->activeAnimations())
+                activeAnimations->cssAnimations()->cancel();
+        }
     }
 
     if (isCustomElement())
@@ -899,7 +905,7 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ne
 {
     if (ElementShadow* parentElementShadow = shadowOfParentForDistribution(this)) {
         if (shouldInvalidateDistributionWhenAttributeChanged(parentElementShadow, name, newValue))
-            parentElementShadow->invalidateDistribution();
+            parentElementShadow->setNeedsDistributionRecalc();
     }
 
     parseAttribute(name, newValue);
@@ -1230,12 +1236,12 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
     if (hasRareData())
         elementRareData()->clearClassListValueForQuirksMode();
 
+    if (isUpgradedCustomElement() && inDocument())
+        CustomElement::didEnterDocument(this, document());
+
     TreeScope* scope = insertionPoint->treeScope();
     if (scope != treeScope())
         return InsertionDone;
-
-    if (isUpgradedCustomElement())
-        CustomElement::didEnterDocument(this, document());
 
     const AtomicString& idValue = getIdAttribute();
     if (!idValue.isNull())
@@ -1243,7 +1249,7 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
 
     const AtomicString& nameValue = getNameAttribute();
     if (!nameValue.isNull())
-        updateName(nullAtom, nameValue);
+        updateName(scope, nullAtom, nameValue);
 
     if (hasTagName(labelTag)) {
         if (scope->shouldCacheLabelsByForAttribute())
@@ -1255,7 +1261,7 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
 
 void Element::removedFrom(ContainerNode* insertionPoint)
 {
-    bool wasInDocument = insertionPoint->document();
+    bool wasInDocument = insertionPoint->inDocument();
 
     if (Element* before = pseudoElement(BEFORE))
         before->removedFrom(insertionPoint);
@@ -1282,7 +1288,7 @@ void Element::removedFrom(ContainerNode* insertionPoint)
 
         const AtomicString& nameValue = getNameAttribute();
         if (!nameValue.isNull())
-            updateName(nameValue, nullAtom);
+            updateName(insertionPoint->treeScope(), nameValue, nullAtom);
 
         if (hasTagName(labelTag)) {
             TreeScope* treeScope = insertionPoint->treeScope();
@@ -1367,6 +1373,11 @@ void Element::detach(const AttachContext& context)
         data->resetComputedStyle();
         data->resetDynamicRestyleObservations();
         data->setIsInsideRegion(false);
+
+        if (RuntimeEnabledFeatures::webAnimationsCSSEnabled() && !context.performingReattach) {
+            if (ActiveAnimations* activeAnimations = data->activeAnimations())
+                activeAnimations->cssAnimations()->cancel();
+        }
     }
     if (ElementShadow* shadow = this->shadow())
         shadow->detach(context);
@@ -1474,9 +1485,9 @@ bool Element::recalcStyle(StyleChange change)
         InspectorInstrumentation::didRecalculateStyleForElement(this);
 
         if (RenderObject* renderer = this->renderer()) {
-            if (localChange != NoChange || pseudoStyleCacheIsInvalid(currentStyle.get(), newStyle.get()) || (change == Force && renderer->requiresForcedStyleRecalcPropagation()) || shouldNotifyRendererWithIdenticalStyles())
+            if (localChange != NoChange || pseudoStyleCacheIsInvalid(currentStyle.get(), newStyle.get()) || (change == Force && renderer->requiresForcedStyleRecalcPropagation()) || shouldNotifyRendererWithIdenticalStyles()) {
                 renderer->setAnimatableStyle(newStyle.get());
-            else if (needsStyleRecalc()) {
+            } else if (needsStyleRecalc()) {
                 // Although no change occurred, we use the new style so that the cousin style sharing code won't get
                 // fooled into believing this style is the same.
                 renderer->setStyleInternal(newStyle.get());
@@ -1498,12 +1509,10 @@ bool Element::recalcStyle(StyleChange change)
     }
     StyleResolverParentPusher parentPusher(this);
 
-    if (ElementShadow* shadow = this->shadow()) {
-        for (ShadowRoot* root = shadow->youngestShadowRoot(); root; root = root->olderShadowRoot()) {
-            if (shouldRecalcStyle(change, root)) {
-                parentPusher.push();
-                root->recalcStyle(change);
-            }
+    for (ShadowRoot* root = youngestShadowRoot(); root; root = root->olderShadowRoot()) {
+        if (shouldRecalcStyle(change, root)) {
+            parentPusher.push();
+            root->recalcStyle(change);
         }
     }
 
@@ -1624,9 +1633,15 @@ ShadowRoot* Element::ensureUserAgentShadowRoot()
     return shadowRoot;
 }
 
+// FIXME: After replacing all internal shadowPseudoId with shadowPartId, remove this method.
 const AtomicString& Element::shadowPseudoId() const
 {
     return pseudo();
+}
+
+const AtomicString& Element::shadowPartId() const
+{
+    return part();
 }
 
 bool Element::childTypeAllowed(NodeType type) const
@@ -1735,7 +1750,7 @@ void Element::childrenChanged(bool changedByParser, Node* beforeChange, Node* af
         checkForSiblingStyleChanges(this, renderStyle(), false, beforeChange, afterChange, childCountDelta);
 
     if (ElementShadow* shadow = this->shadow())
-        shadow->invalidateDistribution();
+        shadow->setNeedsDistributionRecalc();
 }
 
 void Element::removeAllEventListeners()
@@ -2061,6 +2076,16 @@ void Element::blur()
     }
 }
 
+bool Element::isKeyboardFocusable() const
+{
+    return isFocusable() && tabIndex() >= 0;
+}
+
+bool Element::isMouseFocusable() const
+{
+    return isFocusable();
+}
+
 void Element::dispatchFocusEvent(Element* oldFocusedElement, FocusDirection)
 {
     RefPtr<FocusEvent> event = FocusEvent::create(eventNames().focusEvent, false, false, document()->defaultView(), 0, oldFocusedElement);
@@ -2148,6 +2173,7 @@ String Element::textFromChildren()
     return content.toString();
 }
 
+// FIXME: pseudo should be deprecated after all pseudo is replaced with ::part.
 const AtomicString& Element::pseudo() const
 {
     return getAttribute(pseudoAttr);
@@ -2156,6 +2182,16 @@ const AtomicString& Element::pseudo() const
 void Element::setPseudo(const AtomicString& value)
 {
     setAttribute(pseudoAttr, value);
+}
+
+const AtomicString& Element::part() const
+{
+    return getAttribute(partAttr);
+}
+
+void Element::setPart(const AtomicString& value)
+{
+    setAttribute(partAttr, value);
 }
 
 LayoutSize Element::minimumSizeForResizing() const
@@ -2548,12 +2584,12 @@ bool Element::childShouldCreateRenderer(const NodeRenderingContext& childContext
 
 void Element::webkitRequestFullscreen()
 {
-    FullscreenController::from(document())->requestFullScreenForElement(this, ALLOW_KEYBOARD_INPUT, FullscreenController::EnforceIFrameAllowFullScreenRequirement);
+    FullscreenElementStack::from(document())->requestFullScreenForElement(this, ALLOW_KEYBOARD_INPUT, FullscreenElementStack::EnforceIFrameAllowFullScreenRequirement);
 }
 
 void Element::webkitRequestFullScreen(unsigned short flags)
 {
-    FullscreenController::from(document())->requestFullScreenForElement(this, (flags | LEGACY_MOZILLA_REQUEST), FullscreenController::EnforceIFrameAllowFullScreenRequirement);
+    FullscreenElementStack::from(document())->requestFullScreenForElement(this, (flags | LEGACY_MOZILLA_REQUEST), FullscreenElementStack::EnforceIFrameAllowFullScreenRequirement);
 }
 
 bool Element::containsFullScreenElement() const
@@ -2643,7 +2679,7 @@ bool Element::shouldMoveToFlowThread(RenderStyle* styleToUse) const
 {
     ASSERT(styleToUse);
 
-    if (FullscreenController::isActiveFullScreenElement(this))
+    if (FullscreenElementStack::isActiveFullScreenElement(this))
         return false;
 
     if (isInShadowTree())
@@ -2720,17 +2756,48 @@ bool Element::hasNamedNodeMap() const
 
 inline void Element::updateName(const AtomicString& oldName, const AtomicString& newName)
 {
-    if (!inDocument() || isInShadowTree())
+    if (!isInTreeScope())
         return;
 
     if (oldName == newName)
         return;
 
-    if (shouldRegisterAsNamedItem())
-        updateNamedItemRegistration(oldName, newName);
+    updateName(treeScope(), oldName, newName);
 }
 
-inline void Element::updateId(const AtomicString& oldId, const AtomicString& newId)
+void Element::updateName(TreeScope* scope, const AtomicString& oldName, const AtomicString& newName)
+{
+    ASSERT(isInTreeScope());
+    ASSERT(oldName != newName);
+
+    if (!oldName.isEmpty())
+        scope->removeElementByName(oldName, this);
+    if (!newName.isEmpty())
+        scope->addElementByName(newName, this);
+
+    if (!inDocument() || isInShadowTree())
+        return;
+
+    Document* ownerDocument = document();
+    if (!ownerDocument->isHTMLDocument())
+        return;
+
+    if (WindowNameCollection::nodeMatchesIfNameAttributeMatch(this)) {
+        if (!oldName.isEmpty())
+            toHTMLDocument(ownerDocument)->windowNamedItemMap().remove(oldName.impl(), this);
+        if (!newName.isEmpty())
+            toHTMLDocument(ownerDocument)->windowNamedItemMap().add(newName.impl(), this);
+    }
+
+    if (DocumentNameCollection::nodeMatchesIfNameAttributeMatch(this)) {
+        if (!oldName.isEmpty())
+            toHTMLDocument(ownerDocument)->removeNamedDocumentItem(oldName, this);
+        if (!newName.isEmpty())
+            toHTMLDocument(ownerDocument)->addNamedDocumentItem(newName, this);
+    }
+}
+
+void Element::updateId(const AtomicString& oldId, const AtomicString& newId)
 {
     if (!isInTreeScope())
         return;
@@ -2751,8 +2818,26 @@ inline void Element::updateId(TreeScope* scope, const AtomicString& oldId, const
     if (!newId.isEmpty())
         scope->addElementById(newId, this);
 
-    if (shouldRegisterAsExtraNamedItem())
-        updateExtraNamedItemRegistration(oldId, newId);
+    if (!inDocument() || isInShadowTree())
+        return;
+
+    Document* ownerDocument = document();
+    if (!ownerDocument->isHTMLDocument())
+        return;
+
+    if (WindowNameCollection::nodeMatchesIfIdAttributeMatch(this)) {
+        if (!oldId.isEmpty())
+            toHTMLDocument(ownerDocument)->windowNamedItemMap().remove(oldId.impl(), this);
+        if (!newId.isEmpty())
+            toHTMLDocument(ownerDocument)->windowNamedItemMap().add(newId.impl(), this);
+    }
+
+    if (DocumentNameCollection::nodeMatchesIfIdAttributeMatch(this)) {
+        if (!oldId.isEmpty())
+            toHTMLDocument(ownerDocument)->removeNamedDocumentItem(oldId, this);
+        if (!newId.isEmpty())
+            toHTMLDocument(ownerDocument)->addNamedDocumentItem(newId, this);
+    }
 }
 
 void Element::updateLabel(TreeScope* scope, const AtomicString& oldForAttributeValue, const AtomicString& newForAttributeValue)
@@ -2836,30 +2921,6 @@ void Element::didMoveToNewDocument(Document* oldDocument)
         if (hasClass())
             setAttribute(HTMLNames::classAttr, getClassAttribute());
     }
-}
-
-void Element::updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName)
-{
-    if (!document()->isHTMLDocument())
-        return;
-
-    if (!oldName.isEmpty())
-        toHTMLDocument(document())->removeNamedItem(oldName);
-
-    if (!newName.isEmpty())
-        toHTMLDocument(document())->addNamedItem(newName);
-}
-
-void Element::updateExtraNamedItemRegistration(const AtomicString& oldId, const AtomicString& newId)
-{
-    if (!document()->isHTMLDocument())
-        return;
-
-    if (!oldId.isEmpty())
-        toHTMLDocument(document())->removeExtraNamedItem(oldId);
-
-    if (!newId.isEmpty())
-        toHTMLDocument(document())->addExtraNamedItem(newId);
 }
 
 PassRefPtr<HTMLCollection> Element::ensureCachedHTMLCollection(CollectionType type)

@@ -391,6 +391,13 @@ public:
         clearFlag(NotifyRendererWithIdenticalStyles);
     }
 
+    bool childNeedsDistributionRecalc() const { return getFlag(ChildNeedsDistributionRecalc); }
+    void setChildNeedsDistributionRecalc()  { setFlag(ChildNeedsDistributionRecalc); }
+    void clearChildNeedsDistributionRecalc()  { clearFlag(ChildNeedsDistributionRecalc); }
+    void markAncestorsWithChildNeedsDistributionRecalc();
+
+    void recalcDistribution();
+
     bool shouldNotifyRendererWithIdenticalStyles() const { return getFlag(NotifyRendererWithIdenticalStyles); }
 
     void setIsLink(bool f) { setFlag(f, IsLinkFlag); }
@@ -429,8 +436,6 @@ public:
     virtual bool supportsFocus() const;
     // Whether the node can actually be focused.
     bool isFocusable() const;
-    virtual bool isKeyboardFocusable(KeyboardEvent*) const;
-    virtual bool isMouseFocusable() const;
     virtual Node* focusDelegate();
     // This is called only when the node is focused.
     virtual bool shouldHaveFocusAppearance() const;
@@ -516,6 +521,9 @@ public:
     bool contains(const Node*) const;
     bool containsIncludingShadowDOM(const Node*) const;
     bool containsIncludingHostElements(const Node*) const;
+
+    // FIXME: Remove this when crbug.com/265716 cleans up contains semantics.
+    bool bindingsContains(const Node* node) const { return containsIncludingShadowDOM(node); }
 
     // Used to determine whether range offsets use characters or node indices.
     virtual bool offsetInCharacters() const;
@@ -750,10 +758,12 @@ private:
         CustomElementIsUpgradeCandidateOrUpgraded = 1 << 27,
         CustomElementHasDefinitionOrIsUpgraded = 1 << 28,
 
+        ChildNeedsDistributionRecalc = 1 << 29,
+
         DefaultNodeFlags = IsParsingChildrenFinishedFlag
     };
 
-    // 3 bits remaining
+    // 2 bits remaining
 
     bool getFlag(NodeFlags mask) const { return m_nodeFlags & mask; }
     void setFlag(bool f, NodeFlags mask) const { m_nodeFlags = (m_nodeFlags & ~mask) | (-(int32_t)f & mask); }

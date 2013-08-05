@@ -34,6 +34,7 @@
 #include "core/css/CSSBorderImage.h"
 #include "core/css/CSSFilterValue.h"
 #include "core/css/CSSFunctionValue.h"
+#include "core/css/CSSGridTemplateValue.h"
 #include "core/css/CSSLineBoxContainValue.h"
 #include "core/css/CSSMixFunctionValue.h"
 #include "core/css/CSSParser.h"
@@ -267,10 +268,6 @@ static const CSSPropertyID staticComputableProperties[] = {
     CSSPropertyGridRowStart,
     CSSPropertyWebkitHighlight,
     CSSPropertyWebkitHyphenateCharacter,
-    CSSPropertyWebkitHyphenateLimitAfter,
-    CSSPropertyWebkitHyphenateLimitBefore,
-    CSSPropertyWebkitHyphenateLimitLines,
-    CSSPropertyWebkitHyphens,
     CSSPropertyWebkitLineAlign,
     CSSPropertyWebkitLineBoxContain,
     CSSPropertyWebkitLineBreak,
@@ -1980,6 +1977,14 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
         case CSSPropertyGridArea:
             return getCSSPropertyValuesForGridShorthand(gridAreaShorthand());
 
+        case CSSPropertyGridTemplate:
+            if (!style->namedGridAreaRowCount()) {
+                ASSERT(!style->namedGridAreaColumnCount());
+                return cssValuePool().createIdentifierValue(CSSValueNone);
+            }
+
+            return CSSGridTemplateValue::create(style->namedGridArea(), style->namedGridAreaRowCount(), style->namedGridAreaColumnCount());
+
         case CSSPropertyHeight:
             if (renderer) {
                 // According to http://www.w3.org/TR/CSS2/visudet.html#the-height-property,
@@ -1993,24 +1998,10 @@ PassRefPtr<CSSValue> CSSComputedStyleDeclaration::getPropertyCSSValue(CSSPropert
             if (style->highlight() == nullAtom)
                 return cssValuePool().createIdentifierValue(CSSValueNone);
             return cssValuePool().createValue(style->highlight(), CSSPrimitiveValue::CSS_STRING);
-        case CSSPropertyWebkitHyphens:
-            return cssValuePool().createValue(style->hyphens());
         case CSSPropertyWebkitHyphenateCharacter:
             if (style->hyphenationString().isNull())
                 return cssValuePool().createIdentifierValue(CSSValueAuto);
             return cssValuePool().createValue(style->hyphenationString(), CSSPrimitiveValue::CSS_STRING);
-        case CSSPropertyWebkitHyphenateLimitAfter:
-            if (style->hyphenationLimitAfter() < 0)
-                return CSSPrimitiveValue::createIdentifier(CSSValueAuto);
-            return CSSPrimitiveValue::create(style->hyphenationLimitAfter(), CSSPrimitiveValue::CSS_NUMBER);
-        case CSSPropertyWebkitHyphenateLimitBefore:
-            if (style->hyphenationLimitBefore() < 0)
-                return CSSPrimitiveValue::createIdentifier(CSSValueAuto);
-            return CSSPrimitiveValue::create(style->hyphenationLimitBefore(), CSSPrimitiveValue::CSS_NUMBER);
-        case CSSPropertyWebkitHyphenateLimitLines:
-            if (style->hyphenationLimitLines() < 0)
-                return CSSPrimitiveValue::createIdentifier(CSSValueNoLimit);
-            return CSSPrimitiveValue::create(style->hyphenationLimitLines(), CSSPrimitiveValue::CSS_NUMBER);
         case CSSPropertyWebkitBorderFit:
             if (style->borderFit() == BorderFitBorder)
                 return cssValuePool().createIdentifierValue(CSSValueBorder);

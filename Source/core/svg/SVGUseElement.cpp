@@ -521,7 +521,7 @@ void SVGUseElement::buildShadowAndInstanceTree(SVGElement* target)
 
 RenderObject* SVGUseElement::createRenderer(RenderStyle*)
 {
-    return new (document()->renderArena()) RenderSVGTransformableContainer(this);
+    return new RenderSVGTransformableContainer(this);
 }
 
 static bool isDirectReference(const Node* node)
@@ -928,10 +928,10 @@ bool SVGUseElement::selfHasRelativeLengths() const
         return false;
 
     SVGElement* element = m_targetElementInstance->correspondingElement();
-    if (!element || !element->isSVGStyledElement())
+    if (!element)
         return false;
 
-    return toSVGStyledElement(element)->hasRelativeLengths();
+    return toSVGElement(element)->hasRelativeLengths();
 }
 
 void SVGUseElement::notifyFinished(Resource* resource)

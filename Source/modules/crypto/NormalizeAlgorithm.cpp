@@ -67,6 +67,7 @@ struct OperationParamsMapping {
 const AlgorithmNameMapping algorithmNameMappings[] = {
     {"AES-CBC", WebKit::WebCryptoAlgorithmIdAesCbc},
     {"HMAC", WebKit::WebCryptoAlgorithmIdHmac},
+    {"RSASSA-PKCS1-v1_5", WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5},
     {"SHA-1", WebKit::WebCryptoAlgorithmIdSha1},
     {"SHA-224", WebKit::WebCryptoAlgorithmIdSha224},
     {"SHA-256", WebKit::WebCryptoAlgorithmIdSha256},
@@ -80,11 +81,19 @@ const OperationParamsMapping operationParamsMappings[] = {
     {WebKit::WebCryptoAlgorithmIdAesCbc, Decrypt, WebKit::WebCryptoAlgorithmParamsTypeAesCbcParams},
     {WebKit::WebCryptoAlgorithmIdAesCbc, Encrypt, WebKit::WebCryptoAlgorithmParamsTypeAesCbcParams},
     {WebKit::WebCryptoAlgorithmIdAesCbc, GenerateKey, WebKit::WebCryptoAlgorithmParamsTypeAesKeyGenParams},
+    {WebKit::WebCryptoAlgorithmIdAesCbc, ImportKey, WebKit::WebCryptoAlgorithmParamsTypeNone},
 
     // HMAC (section 18.14.)
     {WebKit::WebCryptoAlgorithmIdHmac, Sign, WebKit::WebCryptoAlgorithmParamsTypeHmacParams},
     {WebKit::WebCryptoAlgorithmIdHmac, Verify, WebKit::WebCryptoAlgorithmParamsTypeHmacParams},
     {WebKit::WebCryptoAlgorithmIdHmac, GenerateKey, WebKit::WebCryptoAlgorithmParamsTypeHmacParams},
+    {WebKit::WebCryptoAlgorithmIdHmac, ImportKey, WebKit::WebCryptoAlgorithmParamsTypeHmacParams},
+
+    // RSASSA-PKCS1-v1_5 (section 18.4.)
+    {WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5, Sign, WebKit::WebCryptoAlgorithmParamsTypeRsaSsaParams},
+    {WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5, Verify, WebKit::WebCryptoAlgorithmParamsTypeRsaSsaParams},
+    {WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5, GenerateKey, WebKit::WebCryptoAlgorithmParamsTypeRsaKeyGenParams},
+    {WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5, ImportKey, WebKit::WebCryptoAlgorithmParamsTypeNone},
 
     // SHA-1 (section 18.16.)
     {WebKit::WebCryptoAlgorithmIdSha1, Digest, WebKit::WebCryptoAlgorithmParamsTypeNone},
@@ -181,20 +190,45 @@ PassOwnPtr<WebKit::WebCryptoAlgorithmParams> parseAesKeyGenParams(const Dictiona
     return adoptPtr(new WebKit::WebCryptoAesKeyGenParams(length));
 }
 
-PassOwnPtr<WebKit::WebCryptoAlgorithmParams> parseHmacParams(const Dictionary& raw)
+bool parseHash(const Dictionary& raw, WebKit::WebCryptoAlgorithm& hash)
 {
     Dictionary rawHash;
     if (!raw.get("hash", rawHash))
-        return nullptr;
+        return false;
 
-    // Normalizing the algorithm for a Digest operation means it will only
-    // match the SHA-* algorithms.
-    WebKit::WebCryptoAlgorithm hash;
     NonThrowExceptionState es;
-    if (!normalizeAlgorithm(rawHash, Digest, hash, es))
+    return normalizeAlgorithm(rawHash, Digest, hash, es);
+}
+
+PassOwnPtr<WebKit::WebCryptoAlgorithmParams> parseHmacParams(const Dictionary& raw)
+{
+    WebKit::WebCryptoAlgorithm hash;
+    if (!parseHash(raw, hash))
+        return nullptr;
+    return adoptPtr(new WebKit::WebCryptoHmacParams(hash));
+}
+
+PassOwnPtr<WebKit::WebCryptoAlgorithmParams> parseRsaSsaParams(const Dictionary& raw)
+{
+    WebKit::WebCryptoAlgorithm hash;
+    if (!parseHash(raw, hash))
+        return nullptr;
+    return adoptPtr(new WebKit::WebCryptoRsaSsaParams(hash));
+}
+
+PassOwnPtr<WebKit::WebCryptoAlgorithmParams> parseRsaKeyGenParams(const Dictionary& raw)
+{
+    // FIXME: This is losing precision; modulusLength is supposed to be a uint32
+    int32_t modulusLength;
+    if (!raw.get("modulusLength", modulusLength))
+        return nullptr;
+    if (modulusLength < 0)
         return nullptr;
 
-    return adoptPtr(new WebKit::WebCryptoHmacParams(hash));
+    RefPtr<Uint8Array> publicExponent;
+    if (!raw.get("publicExponent", publicExponent) || !publicExponent)
+        return nullptr;
+    return adoptPtr(new WebKit::WebCryptoRsaKeyGenParams(modulusLength, static_cast<const unsigned char*>(publicExponent->baseAddress()), publicExponent->byteLength()));
 }
 
 PassOwnPtr<WebKit::WebCryptoAlgorithmParams> parseAlgorithmParams(const Dictionary& raw, WebKit::WebCryptoAlgorithmParamsType type)
@@ -208,6 +242,10 @@ PassOwnPtr<WebKit::WebCryptoAlgorithmParams> parseAlgorithmParams(const Dictiona
         return parseAesKeyGenParams(raw);
     case WebKit::WebCryptoAlgorithmParamsTypeHmacParams:
         return parseHmacParams(raw);
+    case WebKit::WebCryptoAlgorithmParamsTypeRsaSsaParams:
+        return parseRsaSsaParams(raw);
+    case WebKit::WebCryptoAlgorithmParamsTypeRsaKeyGenParams:
+        return parseRsaKeyGenParams(raw);
     }
     ASSERT_NOT_REACHED();
     return nullptr;
@@ -260,16 +298,6 @@ bool normalizeAlgorithm(const Dictionary& raw, AlgorithmOperation op, WebKit::We
     }
 
     algorithm = WebKit::WebCryptoAlgorithm(info->algorithmId, info->algorithmName, params.release());
-    return true;
-}
-
-bool normalizeAlgorithmForImportKey(const Dictionary& raw, WebKit::WebCryptoAlgorithm& algorithm, ExceptionState& es)
-{
-    const AlgorithmInfo* info = algorithmInfo(raw, es);
-    if (!info)
-        return false;
-
-    algorithm = WebKit::WebCryptoAlgorithm(info->algorithmId, info->algorithmName, nullptr);
     return true;
 }
 

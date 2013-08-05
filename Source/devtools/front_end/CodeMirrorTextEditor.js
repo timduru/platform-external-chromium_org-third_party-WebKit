@@ -153,6 +153,7 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
     this.element.addEventListener("contextmenu", this._contextMenu.bind(this));
 
     this.element.addStyleClass("fill");
+    this.element.style.overflow = "hidden";
     this.element.firstChild.addStyleClass("source-code");
     this.element.firstChild.addStyleClass("fill");
     this._elementToWidget = new Map();
@@ -222,6 +223,11 @@ WebInspector.CodeMirrorTextEditor.LongLineModeLineLengthThreshold = 2000;
 WebInspector.CodeMirrorTextEditor.MaximumNumberOfWhitespacesPerSingleSpan = 16;
 
 WebInspector.CodeMirrorTextEditor.prototype = {
+    wasShown: function()
+    {
+        this._codeMirror.refresh();
+    },
+
     _guessIndentationLevel: function()
     {
         var tabRegex = /^\t+/;
@@ -250,7 +256,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
             return "\t";
         var minimumIndent = Infinity;
         for (var i in indents) {
-            if (indents[i] * 100 / this.linesCount < onePercentFilterThreshold)
+            if (indents[i] < onePercentFilterThreshold)
                 continue;
             var indent = parseInt(i, 10);
             if (minimumIndent > indent)
@@ -444,7 +450,6 @@ WebInspector.CodeMirrorTextEditor.prototype = {
             y >= gutterBox.y && y <= gutterBox.y + gutterBox.height)
             return null;
         var coords = this._codeMirror.coordsChar({left: x, top: y});
-        ++coords.ch;
         return this._toRange(coords, coords);
     },
 
@@ -849,7 +854,9 @@ WebInspector.CodeMirrorTextEditor.prototype = {
 
     onResize: function()
     {
-        this._codeMirror.refresh();
+        var width = this.element.parentElement.offsetWidth;
+        var height = this.element.parentElement.offsetHeight;
+        this._codeMirror.setSize(width, height);
     },
 
     /**

@@ -36,9 +36,9 @@
 #include "core/svg/SVGSVGElement.h"
 #include "core/svg/SVGURIReference.h"
 #include "core/svg/animation/SMILTimeContainer.h"
-#include <wtf/MathExtras.h>
-#include <wtf/StdLibExtras.h>
-#include <wtf/Vector.h>
+#include "wtf/MathExtras.h"
+#include "wtf/StdLibExtras.h"
+#include "wtf/Vector.h"
 
 using namespace std;
 
@@ -1111,7 +1111,7 @@ bool SVGSMILElement::progress(SMILTime elapsed, SVGSMILElement* resultElement, b
 
     if (oldActiveState == Active && m_activeState != Active) {
         endedActiveInterval();
-        if (m_activeState != Frozen)
+        if (m_activeState != Frozen && this == resultElement)
             clearAnimatedType(m_targetElement);
     }
 

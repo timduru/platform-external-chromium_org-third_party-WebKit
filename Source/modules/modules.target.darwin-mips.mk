@@ -36,6 +36,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/crypto/Key.cpp \
 	third_party/WebKit/Source/modules/crypto/KeyOperation.cpp \
 	third_party/WebKit/Source/modules/crypto/NormalizeAlgorithm.cpp \
+	third_party/WebKit/Source/modules/crypto/RsaKeyGenParams.cpp \
+	third_party/WebKit/Source/modules/crypto/RsaSsaParams.cpp \
 	third_party/WebKit/Source/modules/crypto/SubtleCrypto.cpp \
 	third_party/WebKit/Source/modules/crypto/WorkerCrypto.cpp \
 	third_party/WebKit/Source/modules/crypto/WorkerGlobalScopeCrypto.cpp \
@@ -52,6 +54,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/device_orientation/DeviceSensorEventDispatcher.cpp \
 	third_party/WebKit/Source/modules/device_orientation/NewDeviceOrientationController.cpp \
 	third_party/WebKit/Source/modules/donottrack/NavigatorDoNotTrack.cpp \
+	third_party/WebKit/Source/modules/encoding/TextDecoder.cpp \
+	third_party/WebKit/Source/modules/encoding/TextEncoder.cpp \
 	third_party/WebKit/Source/modules/encryptedmedia/MediaKeyMessageEvent.cpp \
 	third_party/WebKit/Source/modules/encryptedmedia/MediaKeyNeededEvent.cpp \
 	third_party/WebKit/Source/modules/encryptedmedia/MediaKeys.cpp \
@@ -373,8 +377,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \
@@ -515,8 +519,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/zlib \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
 	$(LOCAL_PATH)/third_party/WebKit \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
 	$(LOCAL_PATH)/third_party/skia/src/core \

@@ -160,10 +160,10 @@ bool HTMLAnchorElement::isMouseFocusable() const
     return HTMLElement::isMouseFocusable();
 }
 
-bool HTMLAnchorElement::isKeyboardFocusable(KeyboardEvent* event) const
+bool HTMLAnchorElement::isKeyboardFocusable() const
 {
     if (!isLink())
-        return HTMLElement::isKeyboardFocusable(event);
+        return HTMLElement::isKeyboardFocusable();
 
     if (!isFocusable())
         return false;
@@ -282,8 +282,14 @@ void HTMLAnchorElement::parseAttribute(const QualifiedName& name, const AtomicSt
     if (name == hrefAttr) {
         bool wasLink = isLink();
         setIsLink(!value.isNull());
-        if (wasLink != isLink())
+        if (wasLink != isLink()) {
             didAffectSelector(AffectedSelectorLink | AffectedSelectorVisited | AffectedSelectorEnabled);
+            if (wasLink && treeScope()->adjustedFocusedElement() == this) {
+                // We might want to call blur(), but it's dangerous to dispatch
+                // events here.
+                document()->setNeedsFocusedElementCheck();
+            }
+        }
         if (isLink()) {
             String parsedURL = stripLeadingAndTrailingHTMLSpaces(value);
             if (document()->isDNSPrefetchEnabled()) {
@@ -553,7 +559,7 @@ bool HTMLAnchorElement::isLiveLink() const
 
 void HTMLAnchorElement::sendPings(const KURL& destinationURL)
 {
-    if (!hasAttribute(pingAttr) || !document()->settings()->hyperlinkAuditingEnabled())
+    if (!hasAttribute(pingAttr) || !document()->settings() || !document()->settings()->hyperlinkAuditingEnabled())
         return;
 
     SpaceSplitString pingURLs(getAttribute(pingAttr), false);

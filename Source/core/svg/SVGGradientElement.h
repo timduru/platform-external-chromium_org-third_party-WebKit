@@ -26,8 +26,8 @@
 #include "core/svg/SVGAnimatedBoolean.h"
 #include "core/svg/SVGAnimatedEnumeration.h"
 #include "core/svg/SVGAnimatedTransformList.h"
+#include "core/svg/SVGElement.h"
 #include "core/svg/SVGExternalResourcesRequired.h"
-#include "core/svg/SVGStyledElement.h"
 #include "core/svg/SVGURIReference.h"
 #include "core/svg/SVGUnitTypes.h"
 
@@ -73,7 +73,7 @@ struct SVGPropertyTraits<SVGSpreadMethodType> {
     }
 };
 
-class SVGGradientElement : public SVGStyledElement,
+class SVGGradientElement : public SVGElement,
                            public SVGURIReference,
                            public SVGExternalResourcesRequired {
 public:

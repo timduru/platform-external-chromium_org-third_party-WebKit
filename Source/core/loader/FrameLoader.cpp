@@ -39,7 +39,6 @@
 #include "bindings/v8/DOMWrapperWorld.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/SerializedScriptValue.h"
-#include "core/accessibility/AXObjectCache.h"
 #include "core/dom/BeforeUnloadEvent.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
@@ -70,6 +69,7 @@
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/ContentSecurityPolicy.h"
+#include "core/page/ContentSecurityPolicyResponseHeaders.h"
 #include "core/page/DOMWindow.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
@@ -95,7 +95,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-static const char defaultAcceptHeader[] = "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8";
+static const char defaultAcceptHeader[] = "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8";
 
 bool isBackForwardLoadType(FrameLoadType type)
 {
@@ -155,12 +155,10 @@ FrameLoader::FrameLoader(Frame* frame, FrameLoaderClient* client)
     , m_client(client)
     , m_history(frame)
     , m_notifer(frame)
-    , m_subframeLoader(frame)
     , m_icon(adoptPtr(new IconController(frame)))
     , m_mixedContentChecker(frame)
     , m_state(FrameStateProvisional)
     , m_loadType(FrameLoadTypeStandard)
-    , m_delegateIsHandlingProvisionalLoadError(false)
     , m_inStopAllLoaders(false)
     , m_didCallImplicitClose(true)
     , m_wasUnloadEventEmitted(false)
@@ -402,10 +400,10 @@ void FrameLoader::cancelAndClear()
     if (!m_isComplete)
         closeURL();
 
-    clear(ClearScriptObjects | ClearWindowObject);
+    clear(false);
 }
 
-void FrameLoader::clear(ClearOptions options)
+void FrameLoader::clear(bool clearWindowProperties, bool clearScriptObjects, bool clearFrameView)
 {
     m_frame->editor()->clear();
 
@@ -421,7 +419,7 @@ void FrameLoader::clear(ClearOptions options)
     }
 
     // Do this after detaching the document so that the unload event works.
-    if (options & ClearWindowProperties) {
+    if (clearWindowProperties) {
         InspectorInstrumentation::frameWindowDiscarded(m_frame, m_frame->domWindow());
         m_frame->domWindow()->reset();
         m_frame->script()->clearWindowShell();
@@ -429,17 +427,16 @@ void FrameLoader::clear(ClearOptions options)
 
     m_frame->selection()->prepareForDestruction();
     m_frame->eventHandler()->clear();
-    if (m_frame->view())
+    if (clearFrameView && m_frame->view())
         m_frame->view()->clear();
 
     // Do not drop the DOMWindow (and Document) before the ScriptController and view are cleared
     // as some destructors might still try to access the document.
-    if (options & ClearWindowObject)
-        m_frame->clearDOMWindow();
+    m_frame->setDOMWindow(0);
 
     m_containsPlugins = false;
 
-    if (options & ClearScriptObjects)
+    if (clearScriptObjects)
         m_frame->script()->clearScriptObjects();
 
     m_frame->script()->enableEval();
@@ -804,10 +801,8 @@ void FrameLoader::loadInSameDocument(const KURL& url, PassRefPtr<SerializedScrip
     m_documentLoader->clearRedirectChain();
     m_documentLoader->setIsClientRedirect((m_startingClientRedirect && !isNewNavigation) || !UserGestureIndicator::processingUserGesture());
     m_documentLoader->setReplacesCurrentHistoryItem(!isNewNavigation);
-    if (m_documentLoader->isClientRedirect()) {
-        m_client->dispatchDidCompleteClientRedirect(oldURL);
+    if (m_documentLoader->isClientRedirect())
         m_documentLoader->appendRedirect(oldURL);
-    }
     m_documentLoader->appendRedirect(url);
 
     m_client->dispatchDidNavigateWithinPage();
@@ -1196,15 +1191,6 @@ void FrameLoader::setState(FrameState newState)
 
     if (newState == FrameStateProvisional)
         m_frame->navigationScheduler()->cancel();
-    else if (newState == FrameStateComplete)
-        frameLoadCompleted();
-}
-
-void FrameLoader::clearProvisionalLoad()
-{
-    setProvisionalDocumentLoader(0);
-    m_progressTracker->progressCompleted();
-    setState(FrameStateComplete);
 }
 
 void FrameLoader::commitProvisionalLoad()
@@ -1346,50 +1332,8 @@ void FrameLoader::checkLoadCompleteForThisFrame()
 
     switch (m_state) {
         case FrameStateProvisional: {
-            if (m_delegateIsHandlingProvisionalLoadError)
-                return;
-
-            RefPtr<DocumentLoader> pdl = m_provisionalDocumentLoader;
-            if (!pdl)
-                return;
-
-            // If we've received any errors we may be stuck in the provisional state and actually complete.
-            const ResourceError& error = pdl->mainDocumentError();
-            if (error.isNull())
-                return;
-
-            // Check all children first.
-            RefPtr<HistoryItem> item;
-            if (Page* page = m_frame->page())
-                if (isBackForwardLoadType(loadType()))
-                    // Reset the back forward list to the last committed history item at the top level.
-                    item = page->mainFrame()->loader()->history()->currentItem();
-
-            // Only reset if we aren't already going to a new provisional item.
-            bool shouldReset = !history()->provisionalItem();
-            if (!pdl->isLoadingInAPISense() || pdl->isStopping()) {
-                m_delegateIsHandlingProvisionalLoadError = true;
-                m_client->dispatchDidFailProvisionalLoad(error);
-                m_delegateIsHandlingProvisionalLoadError = false;
-
-                ASSERT(!pdl->isLoading());
-
-                // Finish resetting the load state, but only if another load hasn't been started by the
-                // delegate callback.
-                if (pdl == m_provisionalDocumentLoader)
-                    clearProvisionalLoad();
-                else if (activeDocumentLoader()) {
-                    KURL unreachableURL = activeDocumentLoader()->unreachableURL();
-                    if (!unreachableURL.isEmpty() && unreachableURL == pdl->request().url())
-                        shouldReset = false;
-                }
-            }
-            if (shouldReset && item)
-                if (Page* page = m_frame->page())
-                    page->backForward()->setCurrentItem(item.get());
             return;
         }
-
         case FrameStateCommittedPage: {
             DocumentLoader* dl = m_documentLoader.get();
             if (!dl || (dl->isLoadingInAPISense() && !dl->isStopping()))
@@ -1417,26 +1361,15 @@ void FrameLoader::checkLoadCompleteForThisFrame()
             }
 
             const ResourceError& error = dl->mainDocumentError();
-
-            AXObjectCache::AXLoadingEvent loadingEvent;
-            if (!error.isNull()) {
+            if (!error.isNull())
                 m_client->dispatchDidFailLoad(error);
-                loadingEvent = AXObjectCache::AXLoadingFailed;
-            } else {
+            else
                 m_client->dispatchDidFinishLoad();
-                loadingEvent = AXObjectCache::AXLoadingFinished;
-            }
-
-            // Notify accessibility.
-            if (AXObjectCache* cache = m_frame->document()->existingAXObjectCache())
-                cache->frameLoadingEventNotification(m_frame, loadingEvent);
-
             return;
         }
 
         case FrameStateComplete:
             m_loadType = FrameLoadTypeStandard;
-            frameLoadCompleted();
             return;
     }
 
@@ -1452,12 +1385,6 @@ void FrameLoader::didFirstLayout()
 {
     if (m_frame->page() && isBackForwardLoadType(m_loadType))
         history()->restoreScrollPositionAndViewState();
-}
-
-void FrameLoader::frameLoadCompleted()
-{
-    // Note: Can be called multiple times.
-    history()->updateForFrameLoadCompleted();
 }
 
 void FrameLoader::detachChildren()
@@ -1684,6 +1611,18 @@ void FrameLoader::receivedMainResourceError(const ResourceError& error)
     if (m_state == FrameStateProvisional && m_provisionalDocumentLoader) {
         if (m_submittedFormURL == m_provisionalDocumentLoader->originalRequestCopy().url())
             m_submittedFormURL = KURL();
+
+        m_client->dispatchDidFailProvisionalLoad(error);
+        if (loader != m_provisionalDocumentLoader)
+            return;
+        setProvisionalDocumentLoader(0);
+        m_progressTracker->progressCompleted();
+        setState(FrameStateComplete);
+
+        // Reset the back forward list to the last committed history item at the top level.
+        RefPtr<HistoryItem> item = m_frame->page()->mainFrame()->loader()->history()->currentItem();
+        if (isBackForwardLoadType(loadType()) && !history()->provisionalItem() && item)
+            m_frame->page()->backForward()->setCurrentItem(item.get());
     }
 
     checkCompleted();
@@ -1880,15 +1819,7 @@ void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> for
         m_provisionalDocumentLoader->appendRedirect(m_frame->document()->url());
     m_provisionalDocumentLoader->appendRedirect(m_provisionalDocumentLoader->request().url());
     m_client->dispatchDidStartProvisionalLoad();
-    if (m_provisionalDocumentLoader->isClientRedirect())
-        m_client->dispatchDidCompleteClientRedirect(m_frame->document()->url());
     ASSERT(m_provisionalDocumentLoader);
-
-    if (AXObjectCache* cache = m_frame->document()->existingAXObjectCache()) {
-        AXObjectCache::AXLoadingEvent loadingEvent = loadType() == FrameLoadTypeReload ? AXObjectCache::AXLoadingReloaded : AXObjectCache::AXLoadingStarted;
-        cache->frameLoadingEventNotification(m_frame, loadingEvent);
-    }
-
     m_provisionalDocumentLoader->startLoadingMainResource();
 }
 
@@ -2200,11 +2131,6 @@ void FrameLoader::didChangeTitle(DocumentLoader* loader)
         history()->setCurrentItemTitle(loader->title());
         m_client->dispatchDidReceiveTitle(loader->title());
     }
-}
-
-void FrameLoader::didChangeIcons(IconType type)
-{
-    m_client->dispatchDidChangeIcons(type);
 }
 
 void FrameLoader::dispatchDidCommitLoad()

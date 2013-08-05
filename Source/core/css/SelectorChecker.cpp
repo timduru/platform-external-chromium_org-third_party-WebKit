@@ -34,7 +34,7 @@
 #include "core/css/SiblingTraversalStrategies.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
-#include "core/dom/FullscreenController.h"
+#include "core/dom/FullscreenElementStack.h"
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/Text.h"
 #include "core/dom/shadow/InsertionPoint.h"
@@ -70,6 +70,27 @@ SelectorChecker::SelectorChecker(Document* document, Mode mode)
 {
 }
 
+static bool matchesCustomPseudoElement(const Element* element, const CSSSelector* selector)
+{
+    ShadowRoot* root = element->containingShadowRoot();
+    if (!root)
+        return false;
+
+    if (selector->pseudoType() != CSSSelector::PseudoPart) {
+        if (element->shadowPseudoId() != selector->value())
+            return false;
+        if (selector->pseudoType() == CSSSelector::PseudoWebKitCustomElement && root->type() != ShadowRoot::UserAgentShadowRoot)
+            return false;
+        return true;
+    }
+
+    if (element->shadowPartId() != selector->argument())
+        return false;
+    if (selector->isMatchUserAgentOnly() && root->type() != ShadowRoot::UserAgentShadowRoot)
+        return false;
+    return true;
+}
+
 // Recursive check of selectors and combinators
 // It can return 4 different values:
 // * SelectorMatches          - the selector matches the element e
@@ -85,13 +106,7 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
 
     if (context.selector->m_match == CSSSelector::PseudoElement) {
         if (context.selector->isCustomPseudoElement()) {
-            if (ShadowRoot* root = context.element->containingShadowRoot()) {
-                if (context.element->shadowPseudoId() != context.selector->value())
-                    return SelectorFailsLocally;
-
-                if (context.selector->pseudoType() == CSSSelector::PseudoWebKitCustomElement && root->type() != ShadowRoot::UserAgentShadowRoot)
-                    return SelectorFailsLocally;
-            } else
+            if (!matchesCustomPseudoElement(context.element, context.selector))
                 return SelectorFailsLocally;
         } else {
             if ((!context.elementStyle && m_mode == ResolvingStyle) || m_mode == QueryingRules)
@@ -265,7 +280,7 @@ static bool attributeValueMatches(const Attribute* attributeItem, CSSSelector::M
     case CSSSelector::List:
         {
             // Ignore empty selectors or selectors containing HTML spaces
-            if (containsHTMLSpace(selectorValue) || selectorValue.isEmpty())
+            if (selectorValue.isEmpty() || containsHTMLSpace(selectorValue))
                 return false;
 
             unsigned startSearchAt = 0;
@@ -692,7 +707,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
             // context's Document is in the fullscreen state has the 'full-screen' pseudoclass applied.
             if (element->isFrameElementBase() && element->containsFullScreenElement())
                 return true;
-            if (FullscreenController* fullscreen = FullscreenController::fromIfExists(element->document())) {
+            if (FullscreenElementStack* fullscreen = FullscreenElementStack::fromIfExists(element->document())) {
                 if (!fullscreen->webkitIsFullScreen())
                     return false;
                 return element == fullscreen->webkitCurrentFullScreenElement();
@@ -703,7 +718,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
         case CSSSelector::PseudoFullScreenDocument:
             // While a Document is in the fullscreen state, the 'full-screen-document' pseudoclass applies
             // to all elements of that Document.
-            if (!FullscreenController::isFullScreen(element->document()))
+            if (!FullscreenElementStack::isFullScreen(element->document()))
                 return false;
             return true;
         case CSSSelector::PseudoSeamlessDocument:
@@ -761,6 +776,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
     else if (selector->m_match == CSSSelector::PseudoElement && selector->pseudoType() == CSSSelector::PseudoCue) {
         SelectorCheckingContext subContext(context);
         subContext.isSubSelector = true;
+        subContext.behaviorAtBoundary = StaysWithinTreeScope;
 
         PseudoId ignoreDynamicPseudo = NOPSEUDO;
         const CSSSelector* const & selector = context.selector;

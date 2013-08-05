@@ -55,10 +55,6 @@ class ChromiumPortTestCase(port_testcase.PortTestCase):
         port.default_child_processes = lambda: 2
         self.assertEqual(port.default_max_locked_shards(), 1)
 
-    def test_default_timeout_ms(self):
-        self.assertEqual(self.make_port(options=MockOptions(configuration='Release')).default_timeout_ms(), 6000)
-        self.assertEqual(self.make_port(options=MockOptions(configuration='Debug')).default_timeout_ms(), 12000)
-
     def test_default_pixel_tests(self):
         self.assertEqual(self.make_port().default_pixel_tests(), True)
 
@@ -181,21 +177,22 @@ class ChromiumPortTestCase(port_testcase.PortTestCase):
         chromium_overrides_path = port.path_from_chromium_base(
             'webkit', 'tools', 'layout_tests', 'test_expectations.txt')
         never_fix_tests_path = port._filesystem.join(port.layout_tests_dir(), 'NeverFixTests')
+        slow_tests_path = port._filesystem.join(port.layout_tests_dir(), 'SlowTests')
         skia_overrides_path = port.path_from_chromium_base(
             'skia', 'skia_test_expectations.txt')
 
         port._filesystem.write_text_file(skia_overrides_path, 'dummay text')
 
         port._options.builder_name = 'DUMMY_BUILDER_NAME'
-        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path, chromium_overrides_path])
+        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path, slow_tests_path, chromium_overrides_path])
 
         port._options.builder_name = 'builder (deps)'
-        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path, chromium_overrides_path])
+        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path, slow_tests_path, chromium_overrides_path])
 
         # A builder which does NOT observe the Chromium test_expectations,
         # but still observes the Skia test_expectations...
         port._options.builder_name = 'builder'
-        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path])
+        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path, slow_tests_path])
 
     def test_expectations_ordering(self):
         # since we don't implement self.port_name in ChromiumPort.

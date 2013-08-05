@@ -28,7 +28,7 @@ CheckSecurityForNode
 Clamp
 Conditional=*
 Constructor
-ConstructorCallWith=ScriptExecutionContext
+ConstructorCallWith=ScriptExecutionContext|Document
 ConstructorRaisesException
 ConstructorTemplate=Event|TypedArray
 Custom
@@ -81,3 +81,4 @@ TreatReturnedNullStringAs=Null|Undefined
 TreatUndefinedAs=*
 URL
 Unforgeable
+Unserializable

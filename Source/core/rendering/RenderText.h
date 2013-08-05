@@ -67,7 +67,7 @@ public:
     enum ClippingOption { NoClipping, ClipToEllipsis };
     void absoluteQuads(Vector<FloatQuad>&, bool* wasFixed = 0, ClippingOption = NoClipping) const;
 
-    virtual VisiblePosition positionForPoint(const LayoutPoint&);
+    virtual PositionWithAffinity positionForPoint(const LayoutPoint&) OVERRIDE;
 
     bool is8Bit() const { return m_text.is8Bit(); }
     const LChar* characters8() const { return m_text.impl()->characters8(); }
@@ -152,7 +152,7 @@ protected:
     virtual void setTextInternal(PassRefPtr<StringImpl>);
     virtual UChar previousCharacter() const;
 
-    virtual void addLayerHitTestRects(LayerHitTestRects&, const RenderLayer* currentLayer, const LayoutPoint& layerOffset) const OVERRIDE;
+    virtual void addLayerHitTestRects(LayerHitTestRects&, const RenderLayer* currentLayer, const LayoutPoint& layerOffset, const LayoutRect& containerRect) const OVERRIDE;
 
     virtual InlineTextBox* createTextBox(); // Subclassed by SVG.
 

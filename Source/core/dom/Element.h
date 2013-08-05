@@ -48,6 +48,7 @@ class DOMTokenList;
 class Element;
 class ElementRareData;
 class ElementShadow;
+class Image;
 class InputMethodContext;
 class IntSize;
 class Locale;
@@ -130,9 +131,6 @@ private:
 #endif
 
 class ShareableElementData : public ElementData {
-    // This is needed because we malloc() space for a ShareableElementData plus
-    // optional following attributes, as a performance tweak.
-    NEW_DELETE_SAME_AS_MALLOC_FREE;
 public:
     static PassRefPtr<ShareableElementData> createWithAttributes(const Vector<Attribute>&);
 
@@ -442,7 +440,6 @@ public:
     ElementShadow* ensureShadow();
     PassRefPtr<ShadowRoot> createShadowRoot(ExceptionCode&);
     ShadowRoot* shadowRoot() const;
-    void ensureDistribution();
 
     bool hasAuthorShadowRoot() const { return shadowRoot(); }
 
@@ -450,6 +447,7 @@ public:
     ShadowRoot* ensureUserAgentShadowRoot();
 
     virtual const AtomicString& shadowPseudoId() const;
+    virtual const AtomicString& shadowPartId() const;
 
     RenderStyle* computedStyle(PseudoId = NOPSEUDO);
 
@@ -504,10 +502,13 @@ public:
 
     virtual const AtomicString& imageSourceURL() const;
     virtual String target() const { return String(); }
+    virtual Image* imageContents() { return 0; }
 
     virtual void focus(bool restorePreviousSelection = true, FocusDirection = FocusDirectionNone);
     virtual void updateFocusAppearance(bool restorePreviousSelection);
     virtual void blur();
+    virtual bool isKeyboardFocusable() const;
+    virtual bool isMouseFocusable() const;
     virtual void dispatchFocusEvent(Element* oldFocusedElement, FocusDirection);
     virtual void dispatchBlurEvent(Element* newFocusedElement);
     void dispatchFocusInEvent(const AtomicString& eventType, Element* oldFocusedElement);
@@ -520,8 +521,11 @@ public:
 
     virtual String title() const { return String(); }
 
+    // FIXME: pseudo should be deprecated after all pseudo is replaced with ::part.
     const AtomicString& pseudo() const;
     void setPseudo(const AtomicString&);
+    const AtomicString& part() const;
+    void setPart(const AtomicString&);
 
     LayoutSize minimumSizeForResizing() const;
     void setMinimumSizeForResizing(const LayoutSize&);
@@ -659,9 +663,6 @@ protected:
     virtual void didRecalcStyle(StyleChange);
     virtual PassRefPtr<RenderStyle> customStyleForRenderer();
 
-    virtual bool shouldRegisterAsNamedItem() const { return false; }
-    virtual bool shouldRegisterAsExtraNamedItem() const { return false; }
-
     void clearTabIndexExplicitlyIfNeeded();
     void setTabIndexExplicitly(short);
     virtual bool supportsFocus() const OVERRIDE;
@@ -710,6 +711,7 @@ private:
     void updateId(const AtomicString& oldId, const AtomicString& newId);
     void updateId(TreeScope*, const AtomicString& oldId, const AtomicString& newId);
     void updateName(const AtomicString& oldName, const AtomicString& newName);
+    void updateName(TreeScope*, const AtomicString& oldName, const AtomicString& newName);
     void updateLabel(TreeScope*, const AtomicString& oldForAttributeValue, const AtomicString& newForAttributeValue);
 
     void scrollByUnits(int units, ScrollGranularity);
@@ -751,9 +753,6 @@ private:
     unsigned rareDataChildIndex() const;
 
     SpellcheckAttributeState spellcheckAttributeState() const;
-
-    void updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
-    void updateExtraNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName);
 
     void unregisterNamedFlowContentNode();
 
@@ -957,6 +956,8 @@ inline Node::InsertionNotificationRequest Node::insertedInto(ContainerNode* inse
         setFlag(InDocumentFlag);
     if (parentOrShadowHostNode()->isInShadowTree())
         setFlag(IsInShadowTreeFlag);
+    if (childNeedsDistributionRecalc() && !insertionPoint->childNeedsDistributionRecalc())
+        insertionPoint->markAncestorsWithChildNeedsDistributionRecalc();
     return InsertionDone;
 }
 
@@ -987,6 +988,11 @@ inline const StylePropertySet* Element::presentationAttributeStyle()
 inline bool isShadowHost(const Node* node)
 {
     return node && node->isElementNode() && toElement(node)->shadow();
+}
+
+inline bool isShadowHost(const Element* element)
+{
+    return element && element->shadow();
 }
 
 inline size_t ElementData::length() const

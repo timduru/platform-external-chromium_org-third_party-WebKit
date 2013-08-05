@@ -14,18 +14,18 @@ gyp_shared_intermediate_dir := $(call intermediates-dir-for,GYP,shared)
 GYP_TARGET_DEPENDENCIES :=
 
 ### Rules for action "ConvertFileToHeaderWithCharacterArray":
-$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/xxd.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/InspectorOverlayPage.html $(GYP_TARGET_DEPENDENCIES)
-	@echo "Gyp action: Generating $(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h from inspector/InspectorOverlayPage.html ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; perl inspector/xxd.pl InspectorOverlayPage_html inspector/InspectorOverlayPage.html "$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h"
+$(gyp_shared_intermediate_dir)/blink/InspectorOverlayPage.h: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/blink/InspectorOverlayPage.h: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/InspectorOverlayPage.h: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/InspectorOverlayPage.h: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/blink/InspectorOverlayPage.h: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/xxd.pl $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/InspectorOverlayPage.html $(GYP_TARGET_DEPENDENCIES)
+	@echo "Gyp action: Generating $(gyp_shared_intermediate_dir)/blink/InspectorOverlayPage.h from inspector/InspectorOverlayPage.html ($@)"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/blink; perl inspector/xxd.pl InspectorOverlayPage_html inspector/InspectorOverlayPage.html "$(gyp_shared_intermediate_dir)/blink/InspectorOverlayPage.h"
 
 
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/webkit/InspectorOverlayPage.h
+	$(gyp_shared_intermediate_dir)/blink/InspectorOverlayPage.h
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)

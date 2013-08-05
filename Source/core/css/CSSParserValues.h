@@ -212,6 +212,7 @@ public:
     void setRelation(CSSSelector::Relation value) { m_selector->m_relation = value; }
     void setForPage() { m_selector->setForPage(); }
     void setRelationIsForShadowDistributed() { m_selector->setRelationIsForShadowDistributed(); }
+    void setMatchUserAgentOnly() { m_selector->setMatchUserAgentOnly(); }
 
     void adoptSelectorVector(Vector<OwnPtr<CSSParserSelector> >& selectorVector);
 
@@ -222,6 +223,7 @@ public:
 
     CSSSelector::PseudoType pseudoType() const { return m_selector->pseudoType(); }
     bool isCustomPseudoElement() const { return m_selector->isCustomPseudoElement(); }
+    bool needsCrossingTreeScopeBoundary() const { return isCustomPseudoElement() || pseudoType() == CSSSelector::PseudoCue; }
 
     bool isSimple() const;
     bool hasShadowPseudo() const;

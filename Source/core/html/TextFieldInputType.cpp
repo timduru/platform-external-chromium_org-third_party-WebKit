@@ -67,11 +67,6 @@ TextFieldInputType::~TextFieldInputType()
         m_innerSpinButton->removeSpinButtonOwner();
 }
 
-bool TextFieldInputType::isKeyboardFocusable(KeyboardEvent*) const
-{
-    return element()->isFocusable();
-}
-
 bool TextFieldInputType::shouldShowFocusRingOnMouseFocus() const
 {
     return true;
@@ -198,6 +193,12 @@ void TextFieldInputType::forwardEvent(Event* event)
     }
 }
 
+void TextFieldInputType::handleFocusEvent(Element* oldFocusedNode, FocusDirection focusDirection)
+{
+    InputType::handleFocusEvent(oldFocusedNode, focusDirection);
+    element()->beginEditing();
+}
+
 void TextFieldInputType::handleBlurEvent()
 {
     InputType::handleBlurEvent();
@@ -211,7 +212,7 @@ bool TextFieldInputType::shouldSubmitImplicitly(Event* event)
 
 RenderObject* TextFieldInputType::createRenderer(RenderStyle*) const
 {
-    return new (element()->document()->renderArena()) RenderTextControlSingleLine(element());
+    return new RenderTextControlSingleLine(element());
 }
 
 bool TextFieldInputType::needsContainer() const

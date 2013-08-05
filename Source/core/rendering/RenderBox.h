@@ -493,7 +493,7 @@ public:
 
     LayoutRect maskClipRect();
 
-    virtual VisiblePosition positionForPoint(const LayoutPoint&);
+    virtual PositionWithAffinity positionForPoint(const LayoutPoint&) OVERRIDE;
 
     void removeFloatingOrPositionedChildFromBlockLists();
 
@@ -555,8 +555,8 @@ public:
             return false;
 
         LayoutRect layoutOverflowRect = m_overflow->layoutOverflowRect();
-        flipForWritingMode(layoutOverflowRect);
-        return layoutOverflowRect.x() < x() || layoutOverflowRect.maxX() > x() + logicalWidth();
+        LayoutRect noOverflowRect = this->noOverflowRect();
+        return layoutOverflowRect.x() < noOverflowRect.x() || layoutOverflowRect.maxX() > noOverflowRect.maxX();
     }
 
     bool hasVerticalLayoutOverflow() const
@@ -565,8 +565,8 @@ public:
             return false;
 
         LayoutRect layoutOverflowRect = m_overflow->layoutOverflowRect();
-        flipForWritingMode(layoutOverflowRect);
-        return layoutOverflowRect.y() < y() || layoutOverflowRect.maxY() > y() + logicalHeight();
+        LayoutRect noOverflowRect = this->noOverflowRect();
+        return layoutOverflowRect.y() < noOverflowRect.y() || layoutOverflowRect.maxY() > noOverflowRect.maxY();
     }
 
     virtual RenderBox* createAnonymousBoxWithSameTypeAs(const RenderObject*) const
@@ -617,11 +617,12 @@ protected:
 
     RenderObject* splitAnonymousBoxesAroundChild(RenderObject* beforeChild);
 
-    virtual void addLayerHitTestRects(LayerHitTestRects&, const RenderLayer* currentCompositedLayer, const LayoutPoint& layerOffset) const OVERRIDE;
+    virtual void addLayerHitTestRects(LayerHitTestRects&, const RenderLayer* currentCompositedLayer, const LayoutPoint& layerOffset, const LayoutRect& containerRect) const OVERRIDE;
     virtual void computeSelfHitTestRects(Vector<LayoutRect>&, const LayoutPoint& layerOffset) const OVERRIDE;
 
 private:
     void updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOutside, const ShapeValue* oldShapeOutside);
+    void updateGridPositionAfterStyleChange(const RenderStyle*);
 
     bool includeVerticalScrollbarSize() const;
     bool includeHorizontalScrollbarSize() const;

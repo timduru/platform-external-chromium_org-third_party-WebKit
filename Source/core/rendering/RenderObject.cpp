@@ -30,6 +30,7 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "core/accessibility/AXObjectCache.h"
+#include "core/animation/ActiveAnimations.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/editing/EditingBoundary.h"
 #include "core/editing/FrameSelection.h"
@@ -43,13 +44,14 @@
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
+#include "core/page/UseCounter.h"
 #include "core/page/animation/AnimationController.h"
+#include "core/platform/Partitions.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/transforms/TransformState.h"
 #include "core/rendering/FlowThreadController.h"
 #include "core/rendering/HitTestResult.h"
-#include "core/rendering/RenderArena.h"
 #include "core/rendering/RenderCounter.h"
 #include "core/rendering/RenderDeprecatedFlexibleBox.h"
 #include "core/rendering/RenderFlexibleBox.h"
@@ -91,7 +93,6 @@ namespace WebCore {
 using namespace HTMLNames;
 
 #ifndef NDEBUG
-static void* baseOfRenderObjectBeingDeleted;
 
 RenderObject::SetLayoutNeededForbiddenScope::SetLayoutNeededForbiddenScope(RenderObject* renderObject, bool isForbidden)
     : m_renderObject(renderObject)
@@ -121,30 +122,26 @@ bool RenderObject::s_affectsParentBlock = false;
 
 RenderObjectAncestorLineboxDirtySet* RenderObject::s_ancestorLineboxDirtySet = 0;
 
-void* RenderObject::operator new(size_t sz, RenderArena* renderArena)
+void* RenderObject::operator new(size_t sz)
 {
-    return renderArena->allocate(sz);
+    return partitionAlloc(Partitions::getRenderingPartition(), sz);
 }
 
-void RenderObject::operator delete(void* ptr, size_t sz)
+void RenderObject::operator delete(void* ptr)
 {
-    ASSERT(baseOfRenderObjectBeingDeleted == ptr);
-
-    // Stash size where destroy can find it.
-    *(size_t *)ptr = sz;
+    partitionFree(ptr);
 }
 
 RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
 {
     Document* doc = element->document();
-    RenderArena* arena = doc->renderArena();
 
     // Minimal support for content properties replacing an entire element.
     // Works only if we have exactly one piece of content and it's a URL.
     // Otherwise acts as if we didn't support this feature.
     const ContentData* contentData = style->contentData();
     if (contentData && !contentData->next() && contentData->isImage() && !element->isPseudoElement()) {
-        RenderImage* image = new (arena) RenderImage(element);
+        RenderImage* image = new RenderImage(element);
         // RenderImageResourceStyleImage requires a style being present on the image but we don't want to
         // trigger a style change now as the node is not fully attached. Moving this code to style change
         // doesn't make sense as it should be run once at renderer creation.
@@ -160,56 +157,62 @@ RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
 
     if (element->hasTagName(rubyTag)) {
         if (style->display() == INLINE)
-            return new (arena) RenderRubyAsInline(element);
+            return new RenderRubyAsInline(element);
         else if (style->display() == BLOCK)
-            return new (arena) RenderRubyAsBlock(element);
+            return new RenderRubyAsBlock(element);
     }
     // treat <rt> as ruby text ONLY if it still has its default treatment of block
     if (element->hasTagName(rtTag) && style->display() == BLOCK)
-        return new (arena) RenderRubyText(element);
+        return new RenderRubyText(element);
     if (RuntimeEnabledFeatures::cssRegionsEnabled() && style->isDisplayRegionType() && !style->regionThread().isEmpty() && doc->renderView())
-        return new (arena) RenderRegion(element, 0);
+        return new RenderRegion(element, 0);
+
+    if (style->display() == RUN_IN)
+        UseCounter::count(doc, UseCounter::CSSDisplayRunIn);
+    else if (style->display() == COMPACT)
+        UseCounter::count(doc, UseCounter::CSSDisplayCompact);
+
     switch (style->display()) {
     case NONE:
         return 0;
     case INLINE:
-        return new (arena) RenderInline(element);
+        return new RenderInline(element);
     case BLOCK:
     case INLINE_BLOCK:
     case RUN_IN:
     case COMPACT:
         if ((!style->hasAutoColumnCount() || !style->hasAutoColumnWidth()) && doc->regionBasedColumnsEnabled())
-            return new (arena) RenderMultiColumnBlock(element);
-        return new (arena) RenderBlock(element);
+            return new RenderMultiColumnBlock(element);
+        return new RenderBlock(element);
     case LIST_ITEM:
-        return new (arena) RenderListItem(element);
+        return new RenderListItem(element);
     case TABLE:
     case INLINE_TABLE:
-        return new (arena) RenderTable(element);
+        return new RenderTable(element);
     case TABLE_ROW_GROUP:
     case TABLE_HEADER_GROUP:
     case TABLE_FOOTER_GROUP:
-        return new (arena) RenderTableSection(element);
+        return new RenderTableSection(element);
     case TABLE_ROW:
-        return new (arena) RenderTableRow(element);
+        return new RenderTableRow(element);
     case TABLE_COLUMN_GROUP:
     case TABLE_COLUMN:
-        return new (arena) RenderTableCol(element);
+        return new RenderTableCol(element);
     case TABLE_CELL:
-        return new (arena) RenderTableCell(element);
+        return new RenderTableCell(element);
     case TABLE_CAPTION:
-        return new (arena) RenderTableCaption(element);
+        return new RenderTableCaption(element);
     case BOX:
     case INLINE_BOX:
-        return new (arena) RenderDeprecatedFlexibleBox(element);
+        return new RenderDeprecatedFlexibleBox(element);
     case FLEX:
     case INLINE_FLEX:
-        return new (arena) RenderFlexibleBox(element);
+        return new RenderFlexibleBox(element);
     case GRID:
     case INLINE_GRID:
-        return new (arena) RenderGrid(element);
+        return new RenderGrid(element);
     case LAZY_BLOCK:
-        return new (arena) RenderLazyBlock(element);
+        return new RenderLazyBlock(element);
     }
 
     return 0;
@@ -684,6 +687,10 @@ void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderOb
         // calling setNeedsLayout during preferred width computation.
         SetLayoutNeededForbiddenScope layoutForbiddenScope(object, isSetNeedsLayoutForbidden());
 #endif
+
+        if (object->selfNeedsLayout())
+            return;
+
         // Don't mark the outermost object of an unrooted subtree. That object will be
         // marked when the subtree is added to the document.
         RenderObject* container = object->container();
@@ -1725,10 +1732,18 @@ void RenderObject::handleDynamicFloatPositionChange()
 
 void RenderObject::setAnimatableStyle(PassRefPtr<RenderStyle> style)
 {
-    if (!isText() && style && !RuntimeEnabledFeatures::webAnimationsCSSEnabled())
-        setStyle(animation()->updateAnimations(this, style.get()));
-    else
+    if (!isText() && style) {
+        if (RuntimeEnabledFeatures::webAnimationsCSSEnabled() && node() && node()->isElementNode()) {
+            Element* element = toElement(node());
+            if (CSSAnimations::needsUpdate(element, style.get()))
+                element->ensureActiveAnimations()->cssAnimations()->update(element, style.get());
+            setStyle(style);
+        } else {
+            setStyle(animation()->updateAnimations(this, style.get()));
+        }
+    } else {
         setStyle(style);
+    }
 }
 
 StyleDifference RenderObject::adjustStyleDifference(StyleDifference diff, unsigned contextSensitiveProperties) const
@@ -2289,13 +2304,33 @@ void RenderObject::computeLayerHitTestRects(LayerHitTestRects& layerRects) const
             return;
     }
 
-    this->addLayerHitTestRects(layerRects, currentLayer, layerOffset);
+    this->addLayerHitTestRects(layerRects, currentLayer, layerOffset, LayoutRect());
 }
 
-void RenderObject::addLayerHitTestRects(LayerHitTestRects& layerRects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset) const
+void RenderObject::addLayerHitTestRects(LayerHitTestRects& layerRects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset, const LayoutRect& containerRect) const
 {
     ASSERT(currentLayer);
     ASSERT(currentLayer == this->enclosingLayer());
+
+    // Compute the rects for this renderer only and add them to the results.
+    // Note that we could avoid passing the offset and instead adjust each result, but this
+    // seems slightly simpler.
+    Vector<LayoutRect> ownRects;
+    LayoutRect newContainerRect;
+    computeSelfHitTestRects(ownRects, layerOffset);
+
+    LayerHitTestRects::iterator iter = layerRects.find(currentLayer);
+    if (iter == layerRects.end())
+        iter = layerRects.add(currentLayer, Vector<LayoutRect>()).iterator;
+    for (size_t i = 0; i < ownRects.size(); i++) {
+        if (!containerRect.contains(ownRects[i])) {
+            iter->value.append(ownRects[i]);
+            if (newContainerRect.isEmpty())
+                newContainerRect = ownRects[i];
+        }
+    }
+    if (newContainerRect.isEmpty())
+        newContainerRect = containerRect;
 
     // If it's possible for children to have rects outside our bounds, then we need to descend into
     // the children and compute them.
@@ -2306,21 +2341,9 @@ void RenderObject::addLayerHitTestRects(LayerHitTestRects& layerRects, const Ren
     // rewrite Region to be more efficient. See https://bugs.webkit.org/show_bug.cgi?id=100814.
     if (!isRenderView()) {
         for (RenderObject* curr = firstChild(); curr; curr = curr->nextSibling()) {
-            curr->addLayerHitTestRects(layerRects, currentLayer,  layerOffset);
+            curr->addLayerHitTestRects(layerRects, currentLayer,  layerOffset, newContainerRect);
         }
     }
-
-    // Compute the rects for this renderer only and add them to the results.
-    // Note that we could avoid passing the offset and instead adjust each result, but this
-    // seems slightly simpler.
-    Vector<LayoutRect> ownRects;
-    computeSelfHitTestRects(ownRects, layerOffset);
-
-    LayerHitTestRects::iterator iter = layerRects.find(currentLayer);
-    if (iter == layerRects.end())
-        layerRects.add(currentLayer, ownRects);
-    else
-        iter->value.append(ownRects);
 }
 
 bool RenderObject::isRooted(RenderView** view) const
@@ -2634,11 +2657,12 @@ void RenderObject::destroyAndCleanupAnonymousWrappers()
 void RenderObject::destroy()
 {
     willBeDestroyed();
-    arenaDelete(renderArena(), this);
+    postDestroy();
 }
 
-void RenderObject::arenaDelete(RenderArena* arena, void* base)
+void RenderObject::postDestroy()
 {
+    // It seems ugly that this is not in willBeDestroyed().
     if (m_style) {
         for (const FillLayer* bgLayer = m_style->backgroundLayers(); bgLayer; bgLayer = bgLayer->next()) {
             if (StyleImage* backgroundImage = bgLayer->image())
@@ -2657,22 +2681,12 @@ void RenderObject::arenaDelete(RenderArena* arena, void* base)
             maskBoxImage->removeClient(this);
     }
 
-#ifndef NDEBUG
-    void* savedBase = baseOfRenderObjectBeingDeleted;
-    baseOfRenderObjectBeingDeleted = base;
-#endif
     delete this;
-#ifndef NDEBUG
-    baseOfRenderObjectBeingDeleted = savedBase;
-#endif
-
-    // Recover the size left there for us by operator delete and free the memory.
-    arena->free(*(size_t*)base, base);
 }
 
-VisiblePosition RenderObject::positionForPoint(const LayoutPoint&)
+PositionWithAffinity RenderObject::positionForPoint(const LayoutPoint&)
 {
-    return createVisiblePosition(caretMinOffset(), DOWNSTREAM);
+    return createPositionWithAffinity(caretMinOffset(), DOWNSTREAM);
 }
 
 void RenderObject::updateDragState(bool dragOn)
@@ -2767,6 +2781,24 @@ void RenderObject::layout()
         child = child->nextSibling();
     }
     setNeedsLayout(false);
+}
+
+// FIXME: Do we need this method at all? If setNeedsLayout early returns in all the right places,
+// then MarkOnlyThis is not needed for performance or correctness.
+void RenderObject::forceLayout()
+{
+    // This is the only way it's safe to use MarkOnlyThis (i.e. if we're immediately going to call layout).
+    // FIXME: Add asserts that we only ever do the MarkOnlyThis behavior from here.
+    setNeedsLayout(true, MarkOnlyThis);
+    layout();
+}
+
+// FIXME: Does this do anything different than forceLayout given that we're passing MarkOnlyThis.
+// I don't think it does and we should change all callers to use forceLayout.
+void RenderObject::forceChildLayout()
+{
+    setChildNeedsLayout(true, MarkOnlyThis);
+    forceLayout();
 }
 
 enum StyleCacheState {
@@ -3113,7 +3145,7 @@ Element* RenderObject::offsetParent() const
     return node && node->isElementNode() ? toElement(node) : 0;
 }
 
-VisiblePosition RenderObject::createVisiblePosition(int offset, EAffinity affinity)
+PositionWithAffinity RenderObject::createPositionWithAffinity(int offset, EAffinity affinity)
 {
     // If this is a non-anonymous renderer in an editable area, then it's simple.
     if (Node* node = nonPseudoNode()) {
@@ -3122,13 +3154,13 @@ VisiblePosition RenderObject::createVisiblePosition(int offset, EAffinity affini
             Position position = createLegacyEditingPosition(node, offset);
             Position candidate = position.downstream(CanCrossEditingBoundary);
             if (candidate.deprecatedNode()->rendererIsEditable())
-                return VisiblePosition(candidate, affinity);
+                return PositionWithAffinity(candidate, affinity);
             candidate = position.upstream(CanCrossEditingBoundary);
             if (candidate.deprecatedNode()->rendererIsEditable())
-                return VisiblePosition(candidate, affinity);
+                return PositionWithAffinity(candidate, affinity);
         }
         // FIXME: Eliminate legacy editing positions
-        return VisiblePosition(createLegacyEditingPosition(node, offset), affinity);
+        return PositionWithAffinity(createLegacyEditingPosition(node, offset), affinity);
     }
 
     // We don't want to cross the boundary between editable and non-editable
@@ -3143,7 +3175,7 @@ VisiblePosition RenderObject::createVisiblePosition(int offset, EAffinity affini
         RenderObject* renderer = child;
         while ((renderer = renderer->nextInPreOrder(parent))) {
             if (Node* node = renderer->nonPseudoNode())
-                return VisiblePosition(firstPositionInOrBeforeNode(node), DOWNSTREAM);
+                return PositionWithAffinity(firstPositionInOrBeforeNode(node), DOWNSTREAM);
         }
 
         // Find non-anonymous content before.
@@ -3152,28 +3184,28 @@ VisiblePosition RenderObject::createVisiblePosition(int offset, EAffinity affini
             if (renderer == parent)
                 break;
             if (Node* node = renderer->nonPseudoNode())
-                return VisiblePosition(lastPositionInOrAfterNode(node), DOWNSTREAM);
+                return PositionWithAffinity(lastPositionInOrAfterNode(node), DOWNSTREAM);
         }
 
         // Use the parent itself unless it too is anonymous.
         if (Node* node = parent->nonPseudoNode())
-            return VisiblePosition(firstPositionInOrBeforeNode(node), DOWNSTREAM);
+            return PositionWithAffinity(firstPositionInOrBeforeNode(node), DOWNSTREAM);
 
         // Repeat at the next level up.
         child = parent;
     }
 
     // Everything was anonymous. Give up.
-    return VisiblePosition();
+    return PositionWithAffinity();
 }
 
-VisiblePosition RenderObject::createVisiblePosition(const Position& position)
+PositionWithAffinity RenderObject::createPositionWithAffinity(const Position& position)
 {
     if (position.isNotNull())
-        return VisiblePosition(position);
+        return PositionWithAffinity(position);
 
     ASSERT(!node());
-    return createVisiblePosition(0, DOWNSTREAM);
+    return createPositionWithAffinity(0, DOWNSTREAM);
 }
 
 CursorDirective RenderObject::getCursor(const LayoutPoint&, Cursor&) const

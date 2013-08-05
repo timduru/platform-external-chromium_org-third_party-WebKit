@@ -39,6 +39,7 @@ namespace WebCore {
     V(adaptorFunctionPeer) \
     V(attributeListener) \
     V(callback) \
+    V(condition) \
     V(customElementAttributeChanged) \
     V(customElementCreated) \
     V(customElementDocument) \
@@ -52,6 +53,7 @@ namespace WebCore {
     V(detail) \
     V(document) \
     V(event) \
+    V(error) \
     V(listener) \
     V(scriptState) \
     V(sleepFunction) \

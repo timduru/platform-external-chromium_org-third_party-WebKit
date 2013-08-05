@@ -269,15 +269,9 @@ FloatSize Frame::resizePageRectsKeepingRatio(const FloatSize& originalSize, cons
     return resultSize;
 }
 
-void Frame::clearDOMWindow()
+void Frame::setDOMWindow(PassRefPtr<DOMWindow> domWindow)
 {
-    m_domWindow = 0;
-}
-
-void Frame::ensureDOMWindow()
-{
-    if (!m_domWindow)
-        m_domWindow = DOMWindow::create(this);
+    m_domWindow = domWindow;
 }
 
 Document* Frame::document() const
@@ -415,7 +409,7 @@ VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
     RenderObject* renderer = node->renderer();
     if (!renderer)
         return VisiblePosition();
-    VisiblePosition visiblePos = renderer->positionForPoint(result.localPoint());
+    VisiblePosition visiblePos = VisiblePosition(renderer->positionForPoint(result.localPoint()));
     if (visiblePos.isNull())
         visiblePos = firstPositionInOrBeforeNode(node);
     return visiblePos;

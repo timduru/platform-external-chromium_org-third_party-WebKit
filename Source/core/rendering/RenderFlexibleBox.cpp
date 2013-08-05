@@ -80,7 +80,7 @@ RenderFlexibleBox::~RenderFlexibleBox()
 
 RenderFlexibleBox* RenderFlexibleBox::createAnonymous(Document* document)
 {
-    RenderFlexibleBox* renderer = new (document->renderArena()) RenderFlexibleBox(0);
+    RenderFlexibleBox* renderer = new RenderFlexibleBox(0);
     renderer->setDocumentForAnonymous(document);
     return renderer;
 }
@@ -1338,8 +1338,7 @@ void RenderFlexibleBox::applyStretchAlignmentToChild(RenderBox* child, LayoutUni
             if (desiredLogicalHeight != child->logicalHeight()) {
                 child->setOverrideLogicalContentHeight(desiredLogicalHeight - child->borderAndPaddingLogicalHeight());
                 child->setLogicalHeight(0);
-                child->setChildNeedsLayout(true, MarkOnlyThis);
-                child->layout();
+                child->forceChildLayout();
             }
         }
     } else if (isColumnFlow() && child->style()->logicalWidth().isAuto()) {
@@ -1350,8 +1349,7 @@ void RenderFlexibleBox::applyStretchAlignmentToChild(RenderBox* child, LayoutUni
 
             if (childWidth != child->logicalWidth()) {
                 child->setOverrideLogicalContentWidth(childWidth - child->borderAndPaddingLogicalWidth());
-                child->setChildNeedsLayout(true, MarkOnlyThis);
-                child->layout();
+                child->forceChildLayout();
             }
         }
     }

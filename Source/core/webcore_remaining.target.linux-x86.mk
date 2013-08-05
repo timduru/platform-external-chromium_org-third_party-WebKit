@@ -59,6 +59,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/animation/KeyframeAnimationEffect.cpp \
 	third_party/WebKit/Source/core/animation/Player.cpp \
 	third_party/WebKit/Source/core/animation/TimedItem.cpp \
+	third_party/WebKit/Source/core/animation/css/CSSAnimatableValueFactory.cpp \
+	third_party/WebKit/Source/core/animation/css/CSSAnimations.cpp \
 	third_party/WebKit/Source/core/css/BasicShapeFunctions.cpp \
 	third_party/WebKit/Source/core/css/CSSArrayFunctionValue.cpp \
 	third_party/WebKit/Source/core/css/CSSAspectRatioValue.cpp \
@@ -82,6 +84,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/CSSFontSelector.cpp \
 	third_party/WebKit/Source/core/css/CSSFunctionValue.cpp \
 	third_party/WebKit/Source/core/css/CSSGradientValue.cpp \
+	third_party/WebKit/Source/core/css/CSSGridTemplateValue.cpp \
 	third_party/WebKit/Source/core/css/CSSGroupingRule.cpp \
 	third_party/WebKit/Source/core/css/CSSHostRule.cpp \
 	third_party/WebKit/Source/core/css/CSSImageGeneratorValue.cpp \
@@ -336,7 +339,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/ResourceLoadNotifier.cpp \
 	third_party/WebKit/Source/core/loader/ResourceLoader.cpp \
 	third_party/WebKit/Source/core/loader/SinkDocument.cpp \
-	third_party/WebKit/Source/core/loader/SubframeLoader.cpp \
 	third_party/WebKit/Source/core/loader/SubstituteData.cpp \
 	third_party/WebKit/Source/core/loader/TextResourceDecoder.cpp \
 	third_party/WebKit/Source/core/loader/TextResourceDecoderBuilder.cpp \
@@ -368,6 +370,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/Chrome.cpp \
 	third_party/WebKit/Source/core/page/Console.cpp \
 	third_party/WebKit/Source/core/page/ContentSecurityPolicy.cpp \
+	third_party/WebKit/Source/core/page/ContentSecurityPolicyResponseHeaders.cpp \
 	third_party/WebKit/Source/core/page/ContextMenuController.cpp \
 	third_party/WebKit/Source/core/page/CreateWindow.cpp \
 	third_party/WebKit/Source/core/page/DeviceController.cpp \
@@ -391,7 +394,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/FrameView.cpp \
 	third_party/WebKit/Source/core/page/History.cpp \
 	third_party/WebKit/Source/core/page/ImageBitmap.cpp \
-	third_party/WebKit/Source/core/page/ImageBitmapCallback.cpp \
+	third_party/WebKit/Source/core/page/ImageBitmapFactories.cpp \
 	third_party/WebKit/Source/core/page/Location.cpp \
 	third_party/WebKit/Source/core/page/MemoryInfo.cpp \
 	third_party/WebKit/Source/core/page/MouseEventWithHitTestResults.cpp \
@@ -609,8 +612,8 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \
@@ -771,8 +774,8 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH) \
 	$(LOCAL_PATH)/third_party/WebKit \
 	$(LOCAL_PATH)/third_party/WebKit/Source \
-	$(gyp_shared_intermediate_dir)/webkit \
-	$(gyp_shared_intermediate_dir)/webkit/bindings \
+	$(gyp_shared_intermediate_dir)/blink \
+	$(gyp_shared_intermediate_dir)/blink/bindings \
 	$(LOCAL_PATH)/third_party/angle_dx11/include/GLSLANG \
 	$(PWD)/external/icu4c/common \
 	$(PWD)/external/icu4c/i18n \

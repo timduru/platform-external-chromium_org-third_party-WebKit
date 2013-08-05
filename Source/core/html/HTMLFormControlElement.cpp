@@ -157,6 +157,11 @@ void HTMLFormControlElement::disabledAttributeChanged()
     didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
     if (renderer() && renderer()->style()->hasAppearance())
         renderer()->theme()->stateChanged(renderer(), EnabledState);
+    if (isDisabledFormControl() && treeScope()->adjustedFocusedElement() == this) {
+        // We might want to call blur(), but it's dangerous to dispatch events
+        // here.
+        document()->setNeedsFocusedElementCheck();
+    }
 }
 
 void HTMLFormControlElement::requiredAttributeChanged()
@@ -316,7 +321,7 @@ bool HTMLFormControlElement::rendererIsFocusable() const
     return HTMLElement::rendererIsFocusable();
 }
 
-bool HTMLFormControlElement::isKeyboardFocusable(KeyboardEvent*) const
+bool HTMLFormControlElement::isKeyboardFocusable() const
 {
     // Skip tabIndex check in a parent class.
     return isFocusable();

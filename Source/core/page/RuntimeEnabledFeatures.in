@@ -34,6 +34,7 @@ DeviceMotion status=test
 DeviceOrientation status=stable
 DialogElement status=experimental
 DirectoryUpload status=stable
+EncodingAPI status=experimental
 EncryptedMedia status=experimental
 EncryptedMediaAnyVersion status=stable
 ExperimentalCanvasFeatures status=test
@@ -78,7 +79,7 @@ SpeechSynthesis status=experimental
 Stream status=experimental
 StyleScoped status=experimental
 Touch status=stable
-Vibration status=test
+Vibration status=experimental
 VideoTrack status=stable
 WebAnimations
 WebAnimationsCSS depends_on=WebAnimations

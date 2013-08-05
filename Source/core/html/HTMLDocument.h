@@ -63,13 +63,14 @@ public:
 
     void clear();
 
-    void addNamedItem(const AtomicString& name);
-    void removeNamedItem(const AtomicString& name);
-    bool hasNamedItem(StringImpl* name);
+    void captureEvents() { }
+    void releaseEvents() { }
 
-    void addExtraNamedItem(const AtomicString& name);
-    void removeExtraNamedItem(const AtomicString& name);
-    bool hasExtraNamedItem(StringImpl* name);
+    DocumentOrderedMap& windowNamedItemMap() { return m_windowNamedItem; }
+
+    void addNamedDocumentItem(const AtomicString&, Element*);
+    void removeNamedDocumentItem(const AtomicString&, Element*);
+    DocumentOrderedMap& documentNamedItemMap() { return m_documentNamedItem; }
 
     static bool isCaseSensitiveAttribute(const QualifiedName&);
 
@@ -78,24 +79,10 @@ protected:
 
 private:
     HTMLBodyElement* bodyAsHTMLBodyElement() const;
-    void addItemToMap(HashCountedSet<StringImpl*>&, const AtomicString&);
-    void removeItemFromMap(HashCountedSet<StringImpl*>&, const AtomicString&);
 
-    HashCountedSet<StringImpl*> m_namedItemCounts;
-    HashCountedSet<StringImpl*> m_extraNamedItemCounts;
+    DocumentOrderedMap m_documentNamedItem;
+    DocumentOrderedMap m_windowNamedItem;
 };
-
-inline bool HTMLDocument::hasNamedItem(StringImpl* name)
-{
-    ASSERT(name);
-    return m_namedItemCounts.contains(name);
-}
-
-inline bool HTMLDocument::hasExtraNamedItem(StringImpl* name)
-{
-    ASSERT(name);
-    return m_extraNamedItemCounts.contains(name);
-}
 
 inline HTMLDocument* toHTMLDocument(Document* document)
 {

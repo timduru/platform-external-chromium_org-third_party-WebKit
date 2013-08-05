@@ -228,23 +228,17 @@ void RenderBlock::removeBlockFromFloatMaps(DeleteFloatMapValues deleteValues)
 {
     FloatingObjects* floats = floatingObjects();
 
-    // Container map entries are only cleared when the RenderBlock or the float are being destroyed.
-    // This means that it might contain obsolete entries, but the performance cost of modifying the
-    // container map during layout is very high, and it is much easier to deal with the extra entries
-    // when iterating container maps.
-    if (beingDestroyed()) {
-        FloatingObjectSetIterator end = floats->set().end();
-        for (FloatingObjectSetIterator floatIterator = floats->set().begin(); floatIterator != end; ++floatIterator) {
-            TrackedContainerMap::iterator it = gFloatingObjectContainerMap->find((*floatIterator)->m_renderer);
-            ASSERT(it != gFloatingObjectContainerMap->end());
-            if (it == gFloatingObjectContainerMap->end())
-                continue;
-            HashSet<RenderBlock*>* containerSet = it->value.get();
-            ASSERT(containerSet->contains(this));
-            containerSet->remove(this);
-            if (containerSet->isEmpty())
-                gFloatingObjectContainerMap->remove(it);
-        }
+    FloatingObjectSetIterator end = floats->set().end();
+    for (FloatingObjectSetIterator floatIterator = floats->set().begin(); floatIterator != end; ++floatIterator) {
+        TrackedContainerMap::iterator it = gFloatingObjectContainerMap->find((*floatIterator)->m_renderer);
+        ASSERT(it != gFloatingObjectContainerMap->end());
+        if (it == gFloatingObjectContainerMap->end())
+            continue;
+        HashSet<RenderBlock*>* containerSet = it->value.get();
+        ASSERT(containerSet->contains(this));
+        containerSet->remove(this);
+        if (containerSet->isEmpty())
+            gFloatingObjectContainerMap->remove(it);
     }
     if (deleteValues == DeleteAllValues)
         deleteAllValues(floats->set());
@@ -269,7 +263,7 @@ RenderBlock::~RenderBlock()
 
 RenderBlock* RenderBlock::createAnonymous(Document* document)
 {
-    RenderBlock* renderer = new (document->renderArena()) RenderBlock(0);
+    RenderBlock* renderer = new RenderBlock(0);
     renderer->setDocumentForAnonymous(document);
     return renderer;
 }
@@ -278,16 +272,6 @@ void RenderBlock::willBeDestroyed()
 {
     // Mark as being destroyed to avoid trouble with merges in removeChild().
     m_beingDestroyed = true;
-
-    if (!documentBeingDestroyed()) {
-        if (firstChild() && firstChild()->isRunIn()) {
-            // If we are moving inline children(run-in) from |this| to |parent|, then we need
-            // to clear our line box tree.
-            if (childrenInline())
-                deleteLineBoxTree();
-            moveRunInToOriginalPosition(firstChild());
-        }
-    }
 
     // Make sure to destroy anonymous children first while they are still connected to the rest of the tree, so that they will
     // properly dirty line boxes that they are removed from. Effects that do :before/:after only on hover could crash otherwise.
@@ -324,10 +308,10 @@ void RenderBlock::willBeDestroyed()
             parent()->dirtyLinesFromChangedChild(this);
     }
 
-    m_lineBoxes.deleteLineBoxes(renderArena());
+    m_lineBoxes.deleteLineBoxes();
 
     if (lineGridBox())
-        lineGridBox()->destroy(renderArena());
+        lineGridBox()->destroy();
 
     if (UNLIKELY(gDelayedUpdateScrollInfoSet != 0))
         gDelayedUpdateScrollInfoSet->remove(this);
@@ -734,9 +718,6 @@ void RenderBlock::splitFlow(RenderObject* beforeChild, RenderBlock* newBlockBox,
     // time in makeChildrenNonInline by just setting this explicitly up front.
     newBlockBox->setChildrenInline(false);
 
-    // We delayed adding the newChild until now so that the |newBlockBox| would be fully
-    // connected, thus allowing newChild access to a renderArena should it need
-    // to wrap itself in additional boxes (e.g., table construction).
     newBlockBox->addChild(newChild);
 
     // Always just do a full layout in order to ensure that line boxes (especially wrappers for images)
@@ -786,9 +767,6 @@ void RenderBlock::makeChildrenAnonymousColumnBlocks(RenderObject* beforeChild, R
     // time in makeChildrenNonInline by just setting this explicitly up front.
     newBlockBox->setChildrenInline(false);
 
-    // We delayed adding the newChild until now so that the |newBlockBox| would be fully
-    // connected, thus allowing newChild access to a renderArena should it need
-    // to wrap itself in additional boxes (e.g., table construction).
     newBlockBox->addChild(newChild);
 
     // Always just do a full layout in order to ensure that line boxes (especially wrappers for images)
@@ -1026,7 +1004,7 @@ void RenderBlock::deleteLineBoxTree()
             (*it)->m_originatingLine = 0;
         }
     }
-    m_lineBoxes.deleteLineBoxTree(renderArena());
+    m_lineBoxes.deleteLineBoxTree();
 
     if (AXObjectCache* cache = document()->existingAXObjectCache())
         cache->recomputeIsIgnored(this);
@@ -1034,7 +1012,7 @@ void RenderBlock::deleteLineBoxTree()
 
 RootInlineBox* RenderBlock::createRootInlineBox()
 {
-    return new (renderArena()) RootInlineBox(this);
+    return new RootInlineBox(this);
 }
 
 RootInlineBox* RenderBlock::createAndAppendRootInlineBox()
@@ -1952,9 +1930,9 @@ RenderBoxModelObject* RenderBlock::createReplacementRunIn(RenderBoxModelObject* 
 
     RenderBoxModelObject* newRunIn = 0;
     if (!runIn->isRenderBlock())
-        newRunIn = new (renderArena()) RenderBlock(runIn->node());
+        newRunIn = new RenderBlock(runIn->node());
     else
-        newRunIn = new (renderArena()) RenderInline(toElement(runIn->node()));
+        newRunIn = new RenderInline(toElement(runIn->node()));
 
     runIn->node()->setRenderer(newRunIn);
     newRunIn->setStyle(runIn->style());
@@ -1989,9 +1967,6 @@ void RenderBlock::moveRunInUnderSiblingBlockIfNeeded(RenderObject* runIn)
 
     RenderObject* curr = runIn->nextSibling();
     if (!curr || !curr->isRenderBlock() || !curr->childrenInline())
-        return;
-
-    if (toRenderBlock(curr)->beingDestroyed())
         return;
 
     // Per CSS3, "A run-in cannot run in to a block that already starts with a
@@ -2880,10 +2855,8 @@ void RenderBlock::layoutPositionedObjects(bool relayoutChildren, bool fixedPosit
         r->layoutIfNeeded();
 
         // Lay out again if our estimate was wrong.
-        if (needsBlockDirectionLocationSetBeforeLayout && logicalTopForChild(r) != oldLogicalTop) {
-            r->setChildNeedsLayout(true, MarkOnlyThis);
-            r->layoutIfNeeded();
-        }
+        if (needsBlockDirectionLocationSetBeforeLayout && logicalTopForChild(r) != oldLogicalTop)
+            r->forceChildLayout();
     }
 
     if (hasColumns())
@@ -3919,6 +3892,7 @@ void RenderBlock::insertIntoFloatingObjectMaps(FloatingObject* floatingObject)
     FloatingObjects* floats = floatingObjects();
     HashSet<RenderBlock*>* containerSet = gFloatingObjectContainerMap->get(floatingObject->renderer());
 
+    ASSERT(!containerSet || containerSet->contains(this) == floats->set().contains(floatingObject));
     floats->add(floatingObject);
 
     if (!containerSet) {
@@ -3941,11 +3915,13 @@ void RenderBlock::floatWillBeRemoved(RenderBox* floatingObject)
         RenderBlock* container = *it;
 
         TrackedFloatMap::iterator floatIterator = gFloatingObjectMap->find(container);
+        ASSERT(floatIterator != gFloatingObjectMap->end());
         if (floatIterator == gFloatingObjectMap->end())
             continue;
         FloatingObjects* floatingObjects = floatIterator->value.get();
         const FloatingObjectSet& floatingObjectSet = floatingObjects->set();
         FloatingObjectSetIterator floatIt = floatingObjectSet.find<RenderBox*, FloatingObjectHashTranslator>(floatingObject);
+        ASSERT(floatIt != floatingObjectSet.end());
         if (floatIt != floatingObjectSet.end())
             floatingObjects->remove(*floatIt);
         if (floatingObjects->set().isEmpty())
@@ -5271,7 +5247,7 @@ static inline bool isEditingBoundary(RenderObject* ancestor, RenderObject* child
 // FIXME: This function should go on RenderObject as an instance method. Then
 // all cases in which positionForPoint recurs could call this instead to
 // prevent crossing editable boundaries. This would require many tests.
-static VisiblePosition positionForPointRespectingEditingBoundaries(RenderBlock* parent, RenderBox* child, const LayoutPoint& pointInParentCoordinates)
+static PositionWithAffinity positionForPointRespectingEditingBoundaries(RenderBlock* parent, RenderBox* child, const LayoutPoint& pointInParentCoordinates)
 {
     LayoutPoint childLocation = child->location();
     if (child->isInFlowPositioned())
@@ -5299,16 +5275,16 @@ static VisiblePosition positionForPointRespectingEditingBoundaries(RenderBlock* 
     LayoutUnit childMiddle = parent->logicalWidthForChild(child) / 2;
     LayoutUnit logicalLeft = parent->isHorizontalWritingMode() ? pointInChildCoordinates.x() : pointInChildCoordinates.y();
     if (logicalLeft < childMiddle)
-        return ancestor->createVisiblePosition(childNode->nodeIndex(), DOWNSTREAM);
-    return ancestor->createVisiblePosition(childNode->nodeIndex() + 1, UPSTREAM);
+        return ancestor->createPositionWithAffinity(childNode->nodeIndex(), DOWNSTREAM);
+    return ancestor->createPositionWithAffinity(childNode->nodeIndex() + 1, UPSTREAM);
 }
 
-VisiblePosition RenderBlock::positionForPointWithInlineChildren(const LayoutPoint& pointInLogicalContents)
+PositionWithAffinity RenderBlock::positionForPointWithInlineChildren(const LayoutPoint& pointInLogicalContents)
 {
     ASSERT(childrenInline());
 
     if (!firstRootBox())
-        return createVisiblePosition(0, DOWNSTREAM);
+        return createPositionWithAffinity(0, DOWNSTREAM);
 
     bool linesAreFlipped = style()->isFlippedLinesWritingMode();
     bool blocksAreFlipped = style()->isFlippedBlocksWritingMode();
@@ -5364,7 +5340,7 @@ VisiblePosition RenderBlock::positionForPointWithInlineChildren(const LayoutPoin
                         box = newBox;
                 }
                 // y coordinate is above first root line box, so return the start of the first
-                return VisiblePosition(positionForBox(box, true), DOWNSTREAM);
+                return PositionWithAffinity(positionForBox(box, true), DOWNSTREAM);
             }
         }
 
@@ -5382,13 +5358,13 @@ VisiblePosition RenderBlock::positionForPointWithInlineChildren(const LayoutPoin
         ASSERT(moveCaretToBoundary);
         InlineBox* logicallyLastBox;
         if (lastRootBoxWithChildren->getLogicalEndBoxWithNode(logicallyLastBox))
-            return VisiblePosition(positionForBox(logicallyLastBox, false), DOWNSTREAM);
+            return PositionWithAffinity(positionForBox(logicallyLastBox, false), DOWNSTREAM);
     }
 
     // Can't reach this. We have a root line box, but it has no kids.
     // FIXME: This should ASSERT_NOT_REACHED(), but clicking on placeholder text
     // seems to hit this code path.
-    return createVisiblePosition(0, DOWNSTREAM);
+    return createPositionWithAffinity(0, DOWNSTREAM);
 }
 
 static inline bool isChildHitTestCandidate(RenderBox* box)
@@ -5396,7 +5372,7 @@ static inline bool isChildHitTestCandidate(RenderBox* box)
     return box->height() && box->style()->visibility() == VISIBLE && !box->isFloatingOrOutOfFlowPositioned();
 }
 
-VisiblePosition RenderBlock::positionForPoint(const LayoutPoint& point)
+PositionWithAffinity RenderBlock::positionForPoint(const LayoutPoint& point)
 {
     if (isTable())
         return RenderBox::positionForPoint(point);
@@ -5407,9 +5383,9 @@ VisiblePosition RenderBlock::positionForPoint(const LayoutPoint& point)
         LayoutUnit pointLogicalTop = isHorizontalWritingMode() ? point.y() : point.x();
 
         if (pointLogicalTop < 0 || (pointLogicalTop < logicalHeight() && pointLogicalLeft < 0))
-            return createVisiblePosition(caretMinOffset(), DOWNSTREAM);
+            return createPositionWithAffinity(caretMinOffset(), DOWNSTREAM);
         if (pointLogicalTop >= logicalHeight() || (pointLogicalTop >= 0 && pointLogicalLeft >= logicalWidth()))
-            return createVisiblePosition(caretMaxOffset(), DOWNSTREAM);
+            return createPositionWithAffinity(caretMaxOffset(), DOWNSTREAM);
     }
 
     LayoutPoint pointInContents = point;
@@ -6525,15 +6501,25 @@ int RenderBlock::baselinePosition(FontBaseline baselineType, bool firstLine, Lin
         // the normal flow.  We make an exception for marquees, since their baselines are meaningless
         // (the content inside them moves).  This matches WinIE as well, which just bottom-aligns them.
         // We also give up on finding a baseline if we have a vertical scrollbar, or if we are scrolled
-        // vertically (e.g., an overflow:hidden block that has had scrollTop moved) or if the baseline is outside
-        // of our content box.
+        // vertically (e.g., an overflow:hidden block that has had scrollTop moved).
+        // inline-block with overflow should use the bottom of margin box as well.
         bool ignoreBaseline = (layer() && (isMarquee() || (direction == HorizontalLine ? (layer()->verticalScrollbar() || layer()->scrollYOffset())
-            : (layer()->horizontalScrollbar() || layer()->scrollXOffset() != 0)))) || (isWritingModeRoot() && !isRubyRun());
+            : (layer()->horizontalScrollbar() || layer()->scrollXOffset())))) || (isWritingModeRoot() && !isRubyRun())
+            || (style()->isDisplayInlineType() && style()->overflowY() != OVISIBLE);
 
         int baselinePos = ignoreBaseline ? -1 : inlineBlockBaseline(direction);
 
-        LayoutUnit bottomOfContent = direction == HorizontalLine ? borderTop() + paddingTop() + contentHeight() : borderRight() + paddingRight() + contentWidth();
-        if (baselinePos != -1 && baselinePos <= bottomOfContent)
+        if (isDeprecatedFlexibleBox()) {
+            // Historically, we did this check for all baselines. But we can't
+            // remove this code from deprecated flexbox, because it effectively
+            // breaks -webkit-line-clamp, which is used in the wild -- we would
+            // calculate the baseline as if -webkit-line-clamp wasn't used.
+            // For simplicity, we use this for all uses of deprecated flexbox.
+            LayoutUnit bottomOfContent = direction == HorizontalLine ? borderTop() + paddingTop() + contentHeight() : borderRight() + paddingRight() + contentWidth();
+            if (baselinePos > bottomOfContent)
+                baselinePos = -1;
+        }
+        if (baselinePos != -1)
             return direction == HorizontalLine ? marginTop() + baselinePos : marginRight() + baselinePos;
 
         return RenderBox::baselinePosition(baselineType, firstLine, direction, linePositionMode);
@@ -6791,7 +6777,7 @@ void RenderBlock::createFirstLetterRenderer(RenderObject* firstLetterBlock, Rend
         // Construct a text fragment for the text after the first letter.
         // This text fragment might be empty.
         RenderTextFragment* remainingText =
-            new (renderArena()) RenderTextFragment(textObj->node() ? textObj->node() : textObj->document(), oldText.get(), length, oldText->length() - length);
+            new RenderTextFragment(textObj->node() ? textObj->node() : textObj->document(), oldText.get(), length, oldText->length() - length);
         remainingText->setStyle(textObj->style());
         if (remainingText->node())
             remainingText->node()->setRenderer(remainingText);
@@ -6803,7 +6789,7 @@ void RenderBlock::createFirstLetterRenderer(RenderObject* firstLetterBlock, Rend
 
         // construct text fragment for the first letter
         RenderTextFragment* letter =
-            new (renderArena()) RenderTextFragment(remainingText->node() ? remainingText->node() : remainingText->document(), oldText.get(), 0, length);
+            new RenderTextFragment(remainingText->node() ? remainingText->node() : remainingText->document(), oldText.get(), 0, length);
         letter->setStyle(pseudoStyle);
         firstLetter->addChild(letter);
 

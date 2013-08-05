@@ -115,6 +115,7 @@ die "You must specify a namespace (e.g. SVG) for <namespace>Names.h" unless $par
 die "You must specify a namespaceURI (e.g. http://www.w3.org/2000/svg)" unless $parameters{namespaceURI};
 
 $parameters{namespacePrefix} = $parameters{namespace} unless $parameters{namespacePrefix};
+$parameters{fallbackJSInterfaceName} = $parameters{fallbackInterfaceName} unless $parameters{fallbackJSInterfaceName};
 
 my $namesBasePath = "$outputDir/$parameters{namespace}Names";
 my $factoryBasePath = "$outputDir/$parameters{namespace}ElementFactory";
@@ -159,7 +160,8 @@ sub defaultParametersHash
         'guardFactoryWith' => '',
         'tagsNullNamespace' => 0,
         'attrsNullNamespace' => 0,
-        'fallbackInterfaceName' => ''
+        'fallbackInterfaceName' => '',
+        'fallbackJSInterfaceName' => ''
     );
 }
 
@@ -619,8 +621,6 @@ sub printNamesCppFile
 
     print F "DEFINE_GLOBAL(AtomicString, ${lowerNamespace}NamespaceURI)\n\n";
 
-    print F StaticString::GenerateStrings(\%allStrings);
-
     if (keys %allTags) {
         print F "// Tags\n";
         for my $name (sort keys %allTags) {
@@ -659,7 +659,7 @@ sub printNamesCppFile
     print(F "    // Namespace\n");
     print(F "    new ((void*)&${lowerNamespace}NamespaceURI) AtomicString(${lowerNamespace}NS);\n");
     print(F "\n");
-    print F StaticString::GenerateStringAsserts(\%allStrings);
+    print F StaticString::GenerateStringImpls(\%allStrings);
 
     if (keys %allTags) {
         my $tagsNamespace = $parameters{tagsNullNamespace} ? "nullAtom" : "${lowerNamespace}NS";
@@ -690,7 +690,7 @@ sub printJSElementIncludes
 
         print F "#include \"V8${JSInterfaceName}.h\"\n";
     }
-    print F "#include \"V8$parameters{fallbackInterfaceName}.h\"\n";
+    print F "#include \"V8$parameters{fallbackJSInterfaceName}.h\"\n";
 }
 
 sub printElementIncludes
@@ -966,7 +966,7 @@ sub printWrapperFunctions
     for my $tagName (sort keys %enabledTags) {
         # Avoid defining the same wrapper method twice.
         my $JSInterfaceName = $enabledTags{$tagName}{JSInterfaceName};
-        next if defined($tagsSeen{$JSInterfaceName}) || (usesDefaultJSWrapper($tagName) && ($parameters{fallbackInterfaceName} eq $parameters{namespace} . "Element"));
+        next if defined($tagsSeen{$JSInterfaceName}) || (usesDefaultJSWrapper($tagName) && ($parameters{fallbackJSInterfaceName} eq $parameters{namespace} . "Element"));
         $tagsSeen{$JSInterfaceName} = 1;
 
         my $conditional = $enabledTags{$tagName}{conditional};
@@ -1096,7 +1096,7 @@ END
 
     for my $tag (sort keys %enabledTags) {
         # Do not add the name to the map if it does not have a JS wrapper constructor or uses the default wrapper.
-        next if (usesDefaultJSWrapper($tag, \%enabledTags) && ($parameters{fallbackInterfaceName} eq $parameters{namespace} . "Element"));
+        next if (usesDefaultJSWrapper($tag, \%enabledTags) && ($parameters{fallbackJSInterfaceName} eq $parameters{namespace} . "Element"));
 
         my $conditional = $enabledTags{$tag}{conditional};
         if ($conditional) {
@@ -1203,7 +1203,7 @@ sub printWrapperFactoryHeaderFile
 
     print F <<END
 #include <V8$parameters{namespace}Element.h>
-#include <V8$parameters{fallbackInterfaceName}.h>
+#include <V8$parameters{fallbackJSInterfaceName}.h>
 #include <v8.h>
 
 namespace WebCore {
@@ -1216,9 +1216,9 @@ namespace WebCore {
     {
         return V8$parameters{namespace}Element::createWrapper(element, creationContext, isolate);
     }
-    inline v8::Handle<v8::Object> createV8$parameters{namespace}FallbackWrapper($parameters{fallbackInterfaceName}* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+    inline v8::Handle<v8::Object> createV8$parameters{namespace}FallbackWrapper($parameters{fallbackJSInterfaceName}* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
     {
-        return V8$parameters{fallbackInterfaceName}::createWrapper(element, creationContext, isolate);
+        return V8$parameters{fallbackJSInterfaceName}::createWrapper(element, creationContext, isolate);
     }
 }
 END
@@ -1263,8 +1263,6 @@ sub createGenericNamesFile
     printLicenseHeader($F);
     printCppHead($F, $basePrefix, $baseName, "WTF");
 
-    print F StaticString::GenerateStrings(\%parameters);
-
     while ( my ($name, $identifier) = each %parameters ) {
         print F "DEFINE_GLOBAL(AtomicString, $name)\n";
     }
@@ -1272,7 +1270,7 @@ sub createGenericNamesFile
     printInit($F, 0);
 
     print F "\n";
-    print F StaticString::GenerateStringAsserts(\%parameters);
+    print F StaticString::GenerateStringImpls(\%parameters);
 
     while ( my ($name, $identifier) = each %parameters ) {
         print F "    new ((void*)&$name) AtomicString(${name}Impl);\n";
@@ -1282,4 +1280,3 @@ sub createGenericNamesFile
     close F;
     exit 0;
 }
-

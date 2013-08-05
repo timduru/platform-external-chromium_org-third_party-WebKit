@@ -31,6 +31,7 @@
 #include "core/loader/DocumentLoader.h"
 
 #include "FetchInitiatorTypeNames.h"
+#include "bindings/v8/ScriptController.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/Document.h"
 #include "core/dom/DocumentParser.h"
@@ -376,11 +377,18 @@ bool DocumentLoader::isPostOrRedirectAfterPost(const ResourceRequest& newRequest
 
 void DocumentLoader::handleSubstituteDataLoadNow(DocumentLoaderTimer*)
 {
+    RefPtr<DocumentLoader> protect(this);
     KURL url = m_substituteData.responseURL();
     if (url.isEmpty())
         url = m_request.url();
     ResourceResponse response(url, m_substituteData.mimeType(), m_substituteData.content()->size(), m_substituteData.textEncoding(), "");
     responseReceived(0, response);
+    if (isStopping())
+        return;
+    if (m_substituteData.content()->size())
+        dataReceived(0, m_substituteData.content()->data(), m_substituteData.content()->size());
+    if (isLoadingMainResource())
+        finishedLoading(0);
 }
 
 void DocumentLoader::startDataLoadTimer()
@@ -430,6 +438,8 @@ bool DocumentLoader::shouldContinueForNavigationPolicy(const ResourceRequest& re
     if (policy == NavigationPolicyCurrentTab)
         return true;
     if (policy == NavigationPolicyIgnore)
+        return false;
+    if (!DOMWindow::allowPopUp(m_frame) && !ScriptController::processingUserGesture())
         return false;
     frameLoader()->client()->loadURLExternally(request, policy);
     return false;
@@ -597,13 +607,6 @@ void DocumentLoader::responseReceived(Resource* resource, const ResourceResponse
             if (hostedByObject)
                 cancelMainResourceLoad(ResourceError::cancelledError(m_request.url()));
         }
-    }
-
-    if (!isStopping() && m_substituteData.isValid()) {
-        if (m_substituteData.content()->size())
-            dataReceived(0, m_substituteData.content()->data(), m_substituteData.content()->size());
-        if (isLoadingMainResource())
-            finishedLoading(0);
     }
 }
 
@@ -1028,9 +1031,20 @@ PassRefPtr<DocumentWriter> DocumentLoader::createWriterFor(Frame* frame, const D
     if (document->isPluginDocument() && document->isSandboxed(SandboxPlugins))
         document = SinkDocument::create(DocumentInit(url, frame));
     bool shouldReuseDefaultView = frame->loader()->stateMachine()->isDisplayingInitialEmptyDocument() && frame->document()->isSecureTransitionTo(url);
-    FrameLoader::ClearOptions options = shouldReuseDefaultView ? 0 : (FrameLoader::ClearWindowProperties | FrameLoader::ClearScriptObjects | FrameLoader::ClearWindowObject);
-    frame->loader()->clear(options);
-    frame->ensureDOMWindow();
+
+    RefPtr<DOMWindow> originalDOMWindow;
+    if (shouldReuseDefaultView)
+        originalDOMWindow = frame->domWindow();
+    frame->loader()->clear(!shouldReuseDefaultView, !shouldReuseDefaultView);
+
+    if (!shouldReuseDefaultView) {
+        frame->setDOMWindow(DOMWindow::create(frame));
+    } else {
+        // Note that the old Document is still attached to the DOMWindow; the
+        // setDocument() call below will detach the old Document.
+        ASSERT(originalDOMWindow);
+        frame->setDOMWindow(originalDOMWindow);
+    }
 
     frame->loader()->setOutgoingReferrer(url);
     frame->domWindow()->setDocument(document);

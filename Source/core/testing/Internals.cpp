@@ -39,6 +39,7 @@
 #include "RuntimeEnabledFeatures.h"
 #include "TypeConversions.h"
 #include "bindings/v8/SerializedScriptValue.h"
+#include "bindings/v8/V8ThrowException.h"
 #include "core/css/StyleSheetContents.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
@@ -50,7 +51,7 @@
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/Element.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/FullscreenController.h"
+#include "core/dom/FullscreenElementStack.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/PseudoElement.h"
 #include "core/dom/Range.h"
@@ -92,6 +93,7 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
+#include "core/page/PagePopupController.h"
 #include "core/page/PrintContext.h"
 #include "core/page/Settings.h"
 #include "core/page/animation/AnimationController.h"
@@ -99,26 +101,26 @@
 #include "core/platform/ColorChooser.h"
 #include "core/platform/Cursor.h"
 #include "core/platform/Language.h"
+#include "core/platform/chromium/TraceEvent.h"
+#include "core/platform/graphics/GraphicsLayer.h"
 #include "core/platform/graphics/IntRect.h"
+#include "core/platform/graphics/filters/FilterOperation.h"
+#include "core/platform/graphics/filters/FilterOperations.h"
 #include "core/platform/graphics/gpu/SharedGraphicsContext3D.h"
+#include "core/platform/mock/PlatformSpeechSynthesizerMock.h"
+#include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderMenuList.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderTreeAsText.h"
 #include "core/rendering/RenderView.h"
+#include "core/testing/GCObservation.h"
 #include "core/workers/WorkerThread.h"
+#include "modules/speech/DOMWindowSpeechSynthesis.h"
+#include "modules/speech/SpeechSynthesis.h"
 #include "weborigin/SchemeRegistry.h"
 #include "wtf/dtoa.h"
 #include "wtf/text/StringBuffer.h"
-
-#include "core/page/PagePopupController.h"
-#include "core/platform/graphics/GraphicsLayer.h"
-#include "core/platform/graphics/filters/FilterOperation.h"
-#include "core/platform/graphics/filters/FilterOperations.h"
-#include "core/rendering/RenderLayerBacking.h"
-
-#include "core/platform/mock/PlatformSpeechSynthesizerMock.h"
-#include "modules/speech/DOMWindowSpeechSynthesis.h"
-#include "modules/speech/SpeechSynthesis.h"
+#include <v8.h>
 
 namespace WebCore {
 
@@ -260,6 +262,18 @@ String Internals::address(Node* node)
     sprintf(buf, "%p", node);
 
     return String(buf);
+}
+
+PassRefPtr<GCObservation> Internals::observeGC(ScriptValue scriptValue)
+{
+    v8::Handle<v8::Value> observedValue = scriptValue.v8Value();
+    ASSERT(!observedValue.IsEmpty());
+    if (observedValue->IsNull() || observedValue->IsUndefined()) {
+        V8ThrowException::throwTypeError("value to observe is null or undefined", v8::Isolate::GetCurrent());
+        return 0;
+    }
+
+    return GCObservation::create(observedValue);
 }
 
 bool Internals::isPreloaded(const String& url)
@@ -1307,6 +1321,10 @@ unsigned Internals::touchEventTargetLayerRectsUpdateCount(Document* document, Ex
 
 void Internals::touchEventTargetRectsChanged(const LayerHitTestRects& rects)
 {
+    // When profiling content_shell, it can be handy to exclude this time (since it's only
+    // present for testing / debugging).
+    TRACE_EVENT0("input", "Internals::touchEventTargetRectsChanged");
+
     m_touchEventTargetRectUpdateCount++;
 
     // Since it's not safe to hang onto the pointers in a LayerHitTestRects, we immediately
@@ -1820,28 +1838,28 @@ void Internals::webkitWillEnterFullScreenForElement(Document* document, Element*
 {
     if (!document)
         return;
-    FullscreenController::from(document)->webkitWillEnterFullScreenForElement(element);
+    FullscreenElementStack::from(document)->webkitWillEnterFullScreenForElement(element);
 }
 
 void Internals::webkitDidEnterFullScreenForElement(Document* document, Element* element)
 {
     if (!document)
         return;
-    FullscreenController::from(document)->webkitDidEnterFullScreenForElement(element);
+    FullscreenElementStack::from(document)->webkitDidEnterFullScreenForElement(element);
 }
 
 void Internals::webkitWillExitFullScreenForElement(Document* document, Element* element)
 {
     if (!document)
         return;
-    FullscreenController::from(document)->webkitWillExitFullScreenForElement(element);
+    FullscreenElementStack::from(document)->webkitWillExitFullScreenForElement(element);
 }
 
 void Internals::webkitDidExitFullScreenForElement(Document* document, Element* element)
 {
     if (!document)
         return;
-    FullscreenController::from(document)->webkitDidExitFullScreenForElement(element);
+    FullscreenElementStack::from(document)->webkitDidExitFullScreenForElement(element);
 }
 
 void Internals::registerURLSchemeAsBypassingContentSecurityPolicy(const String& scheme)

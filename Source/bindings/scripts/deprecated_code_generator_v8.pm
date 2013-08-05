@@ -2501,12 +2501,16 @@ END
     my ($parameterCheckString, $paramIndex, %replacements) = GenerateParametersCheck($function, $interface, "");
     $code .= $parameterCheckString;
 
-    if ($interface->extendedAttributes->{"ConstructorCallWith"} && $interface->extendedAttributes->{"ConstructorCallWith"} eq "ScriptExecutionContext") {
-        push(@beforeArgumentList, "context");
-        $code .= <<END;
-
-    ScriptExecutionContext* context = getScriptExecutionContext();
-END
+    if ($interface->extendedAttributes->{"ConstructorCallWith"}) {
+        if ($interface->extendedAttributes->{"ConstructorCallWith"} eq "ScriptExecutionContext") {
+            push(@beforeArgumentList, "context");
+            $code .= "\n";
+            $code .= "    ScriptExecutionContext* context = getScriptExecutionContext();";
+        } elsif ($interface->extendedAttributes->{"ConstructorCallWith"} eq "Document") {
+            push(@beforeArgumentList, "document");
+            $code .= "\n";
+            $code .= "    Document* document = toDocument(getScriptExecutionContext());";
+        }
     }
 
     if ($interface->extendedAttributes->{"ConstructorRaisesException"}) {
@@ -2612,9 +2616,13 @@ sub GenerateEventConstructor
     my $v8ClassName = GetV8ClassName($interface);
 
     my @anyAttributeNames;
+    my @serializableAnyAttributeNames;
     foreach my $attribute (@{$interface->attributes}) {
         if ($attribute->type eq "any") {
             push(@anyAttributeNames, $attribute->name);
+            if (!$attribute->extendedAttributes->{"Unserializable"}) {
+                push(@serializableAnyAttributeNames, $attribute->name);
+            }
         }
     }
 
@@ -2657,12 +2665,12 @@ END
     RefPtr<${implClassName}> event = ${implClassName}::create(type, eventInit);
 END
 
-    if (@anyAttributeNames) {
+    if (@serializableAnyAttributeNames) {
         # If we're in an isolated world, create a SerializedScriptValue and store it in the event for
         # later cloning if the property is accessed from another world.
         # The main world case is handled lazily (in Custom code).
         $implementation{nameSpaceInternal}->add("    if (isolatedWorldForIsolate(args.GetIsolate())) {\n");
-        foreach my $attrName (@anyAttributeNames) {
+        foreach my $attrName (@serializableAnyAttributeNames) {
             my $setter = "setSerialized" . FirstLetterToUpperCase($attrName);
             $implementation{nameSpaceInternal}->add(<<END);
         if (!${attrName}.IsEmpty())
@@ -2698,7 +2706,15 @@ END
         if ($attribute->extendedAttributes->{"InitializedByEventConstructor"}) {
             if ($attribute->type ne "any") {
                 my $attributeName = $attribute->name;
-                $code .= "    options.get(\"$attributeName\", eventInit.$attributeName);\n";
+                my $attributeImplName = GetImplName($attribute);
+                my $deprecation = $attribute->extendedAttributes->{"DeprecateAs"};
+                my $dictionaryGetter = "options.get(\"$attributeName\", eventInit.$attributeImplName)";
+                if ($attribute->extendedAttributes->{"DeprecateAs"}) {
+                    $code .= "    if ($dictionaryGetter)\n";
+                    $code .= "    " . GenerateDeprecationNotification($attribute->extendedAttributes->{"DeprecateAs"});
+                } else {
+                    $code .= "    $dictionaryGetter;\n";
+                }
             }
         }
     }
@@ -5134,7 +5150,7 @@ sub JSValueToNative
     }
 
     if ($type eq "NodeFilter") {
-        return "toNodeFilter($value)";
+        return "toNodeFilter($value, $getIsolate)";
     }
 
     if ($type eq "MediaQueryListListener") {

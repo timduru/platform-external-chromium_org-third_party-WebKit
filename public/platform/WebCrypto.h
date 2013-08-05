@@ -46,7 +46,7 @@ class WebCryptoOperationResult;
 class WebCrypto {
 public:
     // FIXME: Deprecated, delete once chromium side is updated.
-    virtual WebCryptoOperation* digest(const WebCryptoAlgorithm&) { return 0; }
+    virtual WebCryptoOperation* digest(const WebCryptoAlgorithm&) { WEBKIT_ASSERT_NOT_REACHED(); return 0; }
 
     // The following methods begin an asynchronous multi-part cryptographic
     // operation.
@@ -86,7 +86,11 @@ public:
     //
     // Once the cryptoOperation is no longer "in progress" the embedder is
     // responsible for freeing the cryptoOperation.
-    virtual void digest(const WebCryptoAlgorithm&, WebCryptoOperationResult&) { }
+    virtual void encrypt(const WebCryptoAlgorithm&, const WebCryptoKey&, WebCryptoOperationResult&) { WEBKIT_ASSERT_NOT_REACHED(); }
+    virtual void decrypt(const WebCryptoAlgorithm&, const WebCryptoKey&, WebCryptoOperationResult&) { WEBKIT_ASSERT_NOT_REACHED(); }
+    virtual void sign(const WebCryptoAlgorithm&, const WebCryptoKey&, WebCryptoOperationResult&) { WEBKIT_ASSERT_NOT_REACHED(); }
+    virtual void verifySignature(const WebCryptoAlgorithm&, const WebCryptoKey&, const unsigned char* signature, size_t, WebCryptoOperationResult&) { WEBKIT_ASSERT_NOT_REACHED(); }
+    virtual void digest(const WebCryptoAlgorithm&, WebCryptoOperationResult&) { WEBKIT_ASSERT_NOT_REACHED(); }
 
     // The following methods begin an asynchronous single-part key operation.
     //
@@ -118,7 +122,8 @@ public:
     //
     // Once the keyOperation is no longer "in progress" the embedder is
     // responsible for freeing the cryptoOperation.
-    virtual void importKey(WebCryptoKeyFormat, const unsigned char* keyData, size_t keyDataSize, const WebCryptoAlgorithm&, bool extractable, WebCryptoKeyUsageMask, WebCryptoKeyOperationResult&) { }
+    virtual void generateKey(const WebCryptoAlgorithm&, bool extractable, WebCryptoKeyUsageMask, WebCryptoKeyOperationResult&) { WEBKIT_ASSERT_NOT_REACHED(); }
+    virtual void importKey(WebCryptoKeyFormat, const unsigned char* keyData, size_t keyDataSize, const WebCryptoAlgorithm&, bool extractable, WebCryptoKeyUsageMask, WebCryptoKeyOperationResult&) { WEBKIT_ASSERT_NOT_REACHED(); }
 
 protected:
     virtual ~WebCrypto() { }
@@ -152,6 +157,7 @@ public:
     virtual void initializationSucceeded(WebCryptoOperation*) = 0;
     virtual void completeWithError() = 0;
     virtual void completeWithArrayBuffer(const WebArrayBuffer&) = 0;
+    virtual void completeWithBoolean(bool) = 0;
 
     virtual void ref() = 0;
     virtual void deref() = 0;
@@ -182,6 +188,7 @@ public:
     WEBKIT_EXPORT void initializationSucceeded(WebCryptoOperation*);
     WEBKIT_EXPORT void completeWithError();
     WEBKIT_EXPORT void completeWithArrayBuffer(const WebArrayBuffer&);
+    WEBKIT_EXPORT void completeWithBoolean(bool);
 
 private:
     WEBKIT_EXPORT void reset();

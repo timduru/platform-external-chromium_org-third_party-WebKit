@@ -925,7 +925,6 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, str2, args[1]);
 
     ScriptExecutionContext* context = getScriptExecutionContext();
-
     RefPtr<TestInterface> impl = TestInterface::create(context, str1, str2, es);
     v8::Handle<v8::Object> wrapper = args.Holder();
     if (es.throwIfNeeded())

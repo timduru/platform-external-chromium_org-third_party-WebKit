@@ -60,7 +60,6 @@ class Image : public RefCounted<Image> {
 public:
     virtual ~Image();
 
-    static PassRefPtr<Image> create(ImageObserver* = 0);
     static PassRefPtr<Image> loadPlatformResource(const char* name);
     static bool supportsType(const String&);
 
@@ -124,9 +123,6 @@ protected:
 
     static void fillWithSolidColor(GraphicsContext*, const FloatRect& dstRect, const Color&, CompositeOperator);
     static FloatRect adjustForNegativeSize(const FloatRect&); // A helper method for translating negative width and height values.
-
-    // FIXME (crbug.com/242060): This does not belong on Image.
-    static void paintSkBitmap(GraphicsContext*, const NativeImageSkia&, const SkRect& /*srcRect*/, const SkRect& /*destRect*/, const SkXfermode::Mode&);
 
     virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator, BlendMode) = 0;
     virtual void draw(GraphicsContext*, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator, BlendMode, RespectImageOrientationEnum);

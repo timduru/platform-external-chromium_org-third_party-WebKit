@@ -42,11 +42,13 @@ class RenderRegion;
 class StyleResolverState {
 WTF_MAKE_NONCOPYABLE(StyleResolverState);
 public:
-    StyleResolverState(const Document*, Element*, RenderStyle* parentStyle = 0, RenderRegion* regionForStyling = 0);
+    StyleResolverState(Document*, Element*, RenderStyle* parentStyle = 0, RenderRegion* regionForStyling = 0);
     ~StyleResolverState();
 
+    // In FontLoader and CanvasRenderingContext2D, we don't have an element to grab the document from.
+    // This is why we have to store the document separately.
+    Document* document() const { return m_document; }
     // These are all just pass-through methods to ElementResolveContext.
-    Document* document() const { return m_elementContext.document(); }
     Element* element() const { return m_elementContext.element(); }
     const ContainerNode* parentNode() const { return m_elementContext.parentNode(); }
     const RenderStyle* rootElementStyle() const { return m_elementContext.rootElementStyle(); }
@@ -75,6 +77,9 @@ public:
     void setApplyPropertyToVisitedLinkStyle(bool isApply) { m_applyPropertyToVisitedLinkStyle = isApply; }
     bool applyPropertyToRegularStyle() const { return m_applyPropertyToRegularStyle; }
     bool applyPropertyToVisitedLinkStyle() const { return m_applyPropertyToVisitedLinkStyle; }
+
+    // Holds all attribute names found while applying "content" properties that contain an "attr()" value.
+    Vector<AtomicString>& contentAttrValues() { return m_contentAttrValues; }
 
     void setLineHeightValue(CSSValue* value) { m_lineHeightValue = value; }
     CSSValue* lineHeightValue() { return m_lineHeightValue; }
@@ -121,6 +126,7 @@ private:
 
     void initElement(Element*);
 
+    Document* m_document;
     ElementResolveContext m_elementContext;
 
     // m_style is the primary output for each element's style resolve.
@@ -148,6 +154,7 @@ private:
     // CSSToStyleMap is a pure-logic class and only contains
     // a back-pointer to this object.
     CSSToStyleMap m_styleMap;
+    Vector<AtomicString> m_contentAttrValues;
 };
 
 } // namespace WebCore

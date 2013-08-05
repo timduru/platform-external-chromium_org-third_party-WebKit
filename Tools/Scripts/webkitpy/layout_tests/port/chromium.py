@@ -149,11 +149,6 @@ class ChromiumPort(Port):
     def default_baseline_search_path(self):
         return map(self._webkit_baseline_path, self.FALLBACK_PATHS[self.version()])
 
-    def default_timeout_ms(self):
-        if self.get_option('configuration') == 'Debug':
-            return 12 * 1000
-        return 6 * 1000
-
     def _check_file_exists(self, path_to_file, file_description,
                            override_step=None, logging=True):
         """Verify the file is present where expected or log an error.
@@ -308,6 +303,7 @@ class ChromiumPort(Port):
         paths = []
         paths.append(self.path_from_chromium_base('skia', 'skia_test_expectations.txt'))
         paths.append(self._filesystem.join(self.layout_tests_dir(), 'NeverFixTests'))
+        paths.append(self._filesystem.join(self.layout_tests_dir(), 'SlowTests'))
 
         builder_name = self.get_option('builder_name', 'DUMMY_BUILDER_NAME')
         if builder_name == 'DUMMY_BUILDER_NAME' or '(deps)' in builder_name or builder_name in self.try_builder_names:
@@ -351,7 +347,7 @@ class ChromiumPort(Port):
                              ['--force-compositing-mode']),
             VirtualTestSuite('virtual/softwarecompositing',
                              'compositing',
-                             ['--enable-software-compositing']),
+                             ['--enable-software-compositing', '--disable-gpu-compositing']),
             VirtualTestSuite('virtual/deferred/fast/images',
                              'fast/images',
                              ['--enable-deferred-image-decoding', '--enable-per-tile-painting', '--force-compositing-mode']),
@@ -388,7 +384,7 @@ class ChromiumPort(Port):
             self.path_from_chromium_base(), self.path_from_webkit_base(), configuration, comps)
 
     def _path_to_image_diff(self):
-        binary_name = 'ImageDiff'
+        binary_name = 'image_diff'
         return self._build_path(binary_name)
 
     def _check_driver_build_up_to_date(self, configuration):

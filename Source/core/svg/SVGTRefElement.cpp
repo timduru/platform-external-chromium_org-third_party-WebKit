@@ -215,7 +215,7 @@ void SVGTRefElement::svgAttributeChanged(const QualifiedName& attrName)
 
 RenderObject* SVGTRefElement::createRenderer(RenderStyle*)
 {
-    return new (document()->renderArena()) RenderSVGInline(this);
+    return new RenderSVGInline(this);
 }
 
 bool SVGTRefElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
@@ -270,7 +270,7 @@ void SVGTRefElement::buildPendingResource()
 
 Node::InsertionNotificationRequest SVGTRefElement::insertedInto(ContainerNode* rootParent)
 {
-    SVGStyledElement::insertedInto(rootParent);
+    SVGElement::insertedInto(rootParent);
     if (rootParent->inDocument())
         buildPendingResource();
     return InsertionDone;
@@ -278,7 +278,7 @@ Node::InsertionNotificationRequest SVGTRefElement::insertedInto(ContainerNode* r
 
 void SVGTRefElement::removedFrom(ContainerNode* rootParent)
 {
-    SVGStyledElement::removedFrom(rootParent);
+    SVGElement::removedFrom(rootParent);
     if (rootParent->inDocument())
         m_targetListener->detach();
 }

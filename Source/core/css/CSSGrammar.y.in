@@ -216,6 +216,7 @@ inline static CSSParserValue makeOperatorValue(int value)
 %token <string> MAXFUNCTION
 %token <string> VARFUNCTION
 %token <string> VAR_DEFINITION
+%token <string> PARTFUNCTION
 
 %token <string> UNICODERANGE
 
@@ -1153,12 +1154,10 @@ selector_list:
         $$ = parser->reusableSelectorVector();
         $$->shrink(0);
         $$->append(parser->sinkFloatingSelector($1));
-        parser->updateLastSelectorLineAndPosition();
     }
     | selector_list at_selector_end ',' maybe_space before_selector_group_item selector %prec UNIMPORTANT_TOK {
         $$ = $1;
         $$->append(parser->sinkFloatingSelector($6));
-        parser->updateLastSelectorLineAndPosition();
     }
    ;
 
@@ -1396,7 +1395,7 @@ pseudo:
     // used by ::cue(:past/:future)
     | ':' ':' CUEFUNCTION maybe_space simple_selector_list maybe_space closing_parenthesis {
         $$ = parser->createFloatingSelector();
-        $$->setMatch(CSSSelector::PseudoClass);
+        $$->setMatch(CSSSelector::PseudoElement);
         $$->adoptSelectorVector(*parser->sinkFloatingSelectorVector($5));
         $$->setValue($3);
         CSSSelector::PseudoType type = $$->pseudoType();
@@ -1492,6 +1491,21 @@ pseudo:
         }
     }
     | ':' NOTFUNCTION selector_recovery closing_parenthesis {
+        YYERROR;
+    }
+    | ':' ':' PARTFUNCTION maybe_space IDENT maybe_space closing_parenthesis {
+        $$ = parser->createFloatingSelector();
+        $$->setMatch(CSSSelector::PseudoElement);
+        $$->setArgument($5);
+        if ($5.startsWithIgnoringCase("-webkit"))
+            $$->setMatchUserAgentOnly();
+        parser->tokenToLowerCase($3);
+        $$->setValue($3);
+        CSSSelector::PseudoType type = $$->pseudoType();
+        if (type != CSSSelector::PseudoPart)
+            YYERROR;
+    }
+    | ':' ':' PARTFUNCTION selector_recovery closing_parenthesis {
         YYERROR;
     }
   ;

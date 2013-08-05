@@ -28,59 +28,33 @@
 
 #include "core/platform/ScrollbarThemeComposite.h"
 
-typedef id ScrollbarPainter;
-
 namespace WebCore {
 
-class ScrollbarThemeMac : public ScrollbarThemeComposite {
+class ScrollbarThemeMacCommon : public ScrollbarThemeComposite {
 public:
-    ScrollbarThemeMac();
-    virtual ~ScrollbarThemeMac();
+    ScrollbarThemeMacCommon();
+    virtual ~ScrollbarThemeMacCommon();
 
+    virtual void registerScrollbar(ScrollbarThemeClient*);
+    virtual void unregisterScrollbar(ScrollbarThemeClient*);
     void preferencesChanged();
 
-    virtual void updateEnabledState(ScrollbarThemeClient*);
-
-    virtual int scrollbarThickness(ScrollbarControlSize = RegularScrollbar);
-
     virtual bool supportsControlTints() const { return true; }
-    virtual bool usesOverlayScrollbars() const;
-    virtual void updateScrollbarOverlayStyle(ScrollbarThemeClient*);
 
     virtual double initialAutoscrollTimerDelay();
     virtual double autoscrollTimerDelay();
 
-    virtual ScrollbarButtonsPlacement buttonsPlacement() const;
-
-    virtual void registerScrollbar(ScrollbarThemeClient*);
-    virtual void unregisterScrollbar(ScrollbarThemeClient*);
-
-    void setNewPainterForScrollbar(ScrollbarThemeClient*, ScrollbarPainter);
-    ScrollbarPainter painterForScrollbar(ScrollbarThemeClient*);
-
-    static bool isCurrentlyDrawingIntoLayer();
-    static void setIsCurrentlyDrawingIntoLayer(bool);
-
-    virtual bool paint(ScrollbarThemeClient*, GraphicsContext*, const IntRect& damageRect);
     virtual void paintOverhangAreas(ScrollView*, GraphicsContext*, const IntRect& horizontalOverhangArea, const IntRect& verticalOverhangArea, const IntRect& dirtyRect);
     virtual void paintTickmarks(GraphicsContext*, ScrollbarThemeClient*, const IntRect&) OVERRIDE;
 
 protected:
-
-    virtual bool hasButtons(ScrollbarThemeClient*);
-    virtual bool hasThumb(ScrollbarThemeClient*);
-
-    virtual IntRect backButtonRect(ScrollbarThemeClient*, ScrollbarPart, bool painting = false);
-    virtual IntRect forwardButtonRect(ScrollbarThemeClient*, ScrollbarPart, bool painting = false);
-    virtual IntRect trackRect(ScrollbarThemeClient*, bool painting = false);
-
     virtual int maxOverlapBetweenPages() { return 40; }
-
-    virtual int minimumThumbLength(ScrollbarThemeClient*);
 
     virtual bool shouldCenterOnThumb(ScrollbarThemeClient*, const PlatformMouseEvent&);
     virtual bool shouldDragDocumentInsteadOfThumb(ScrollbarThemeClient*, const PlatformMouseEvent&);
     int scrollbarPartToHIPressedState(ScrollbarPart);
+
+    virtual void updateButtonPlacement() { }
 
     void paintGivenTickmarks(GraphicsContext*, ScrollbarThemeClient*, const IntRect&, const Vector<IntRect>&);
 

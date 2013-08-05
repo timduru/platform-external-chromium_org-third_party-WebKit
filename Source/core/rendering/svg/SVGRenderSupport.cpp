@@ -29,6 +29,7 @@
 #include "core/platform/graphics/transforms/TransformState.h"
 #include "core/rendering/RenderGeometryMap.h"
 #include "core/rendering/RenderLayer.h"
+#include "core/rendering/svg/RenderSVGInlineText.h"
 #include "core/rendering/svg/RenderSVGResourceClipper.h"
 #include "core/rendering/svg/RenderSVGResourceFilter.h"
 #include "core/rendering/svg/RenderSVGResourceMasker.h"
@@ -37,7 +38,7 @@
 #include "core/rendering/svg/RenderSVGViewportContainer.h"
 #include "core/rendering/svg/SVGResources.h"
 #include "core/rendering/svg/SVGResourcesCache.h"
-#include "core/svg/SVGStyledElement.h"
+#include "core/svg/SVGElement.h"
 #include "wtf/UnusedParam.h"
 
 namespace WebCore {
@@ -225,7 +226,7 @@ void SVGRenderSupport::layoutChildren(RenderObject* start, bool selfNeedsLayout)
         if (layoutSizeChanged) {
             // When selfNeedsLayout is false and the layout size changed, we have to check whether this child uses relative lengths
             if (SVGElement* element = child->node()->isSVGElement() ? toSVGElement(child->node()) : 0) {
-                if (element->isSVGStyledElement() && toSVGStyledElement(element)->hasRelativeLengths()) {
+                if (element->hasRelativeLengths()) {
                     // When the layout size changed and when using relative values tell the RenderSVGShape to update its shape object
                     if (child->isSVGShape())
                         toRenderSVGShape(child)->setNeedsShapeUpdate();
@@ -386,6 +387,14 @@ void SVGRenderSupport::applyStrokeStyleToStrokeData(StrokeData* strokeData, cons
         dashArray.append((*it).value(lengthContext));
 
     strokeData->setLineDash(dashArray, svgStyle->strokeDashOffset().value(lengthContext));
+}
+
+bool SVGRenderSupport::isEmptySVGInlineText(const RenderObject* object)
+{
+    // RenderSVGInlineText performs whitespace filtering in order to support xml:space
+    // (http://www.w3.org/TR/SVG/struct.html#LangSpaceAttrs), and can end up with an empty string
+    // even when its original constructor argument is non-empty.
+    return object->isSVGInlineText() && toRenderSVGInlineText(object)->hasEmptyText();
 }
 
 }

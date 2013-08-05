@@ -202,8 +202,9 @@ void HTMLObjectElement::parametersForPlugin(Vector<String>& paramNames, Vector<S
     // resource's URL to be given by a param named "src", "movie", "code" or "url"
     // if we know that resource points to a plug-in.
     if (url.isEmpty() && !urlParameter.isEmpty()) {
-        SubframeLoader* loader = document()->frame()->loader()->subframeLoader();
-        if (loader->resourceWillUsePlugin(urlParameter, serviceType, shouldPreferPlugInsForImages()))
+        KURL completedURL = document()->completeURL(urlParameter);
+        bool useFallback;
+        if (shouldUsePlugin(completedURL, serviceType, false, useFallback))
             url = urlParameter;
     }
 }
@@ -307,8 +308,7 @@ void HTMLObjectElement::updateWidget(PluginCreationOption pluginCreationOption)
     if (!renderer()) // Do not load the plugin if beforeload removed this element or its renderer.
         return;
 
-    SubframeLoader* loader = document()->frame()->loader()->subframeLoader();
-    bool success = beforeLoadAllowedLoad && hasValidClassId() && loader->requestObject(this, url, getNameAttribute(), serviceType, paramNames, paramValues);
+    bool success = beforeLoadAllowedLoad && hasValidClassId() && requestObject(url, serviceType, paramNames, paramValues);
     if (!success && fallbackContent)
         renderFallbackContent();
 }
@@ -427,14 +427,23 @@ void HTMLObjectElement::updateDocNamedItem()
             isNamedItem = false;
         child = child->nextSibling();
     }
-    if (isNamedItem != wasNamedItem && document()->isHTMLDocument()) {
+    if (isNamedItem != wasNamedItem && inDocument() && !isInShadowTree() && document()->isHTMLDocument()) {
         HTMLDocument* document = toHTMLDocument(this->document());
-        if (isNamedItem) {
-            document->addNamedItem(getNameAttribute());
-            document->addExtraNamedItem(getIdAttribute());
-        } else {
-            document->removeNamedItem(getNameAttribute());
-            document->removeExtraNamedItem(getIdAttribute());
+
+        const AtomicString& id = getIdAttribute();
+        if (!id.isEmpty()) {
+            if (isNamedItem)
+                document->addNamedDocumentItem(id, this);
+            else
+                document->removeNamedDocumentItem(id, this);
+        }
+
+        const AtomicString& name = getNameAttribute();
+        if (!name.isEmpty()) {
+            if (isNamedItem)
+                document->addNamedDocumentItem(name, this);
+            else
+                document->removeNamedDocumentItem(name, this);
         }
     }
     m_docNamedItem = isNamedItem;

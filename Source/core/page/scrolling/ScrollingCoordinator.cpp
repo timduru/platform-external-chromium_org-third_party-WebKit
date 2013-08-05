@@ -44,6 +44,9 @@
 #include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/Region.h"
 #include "core/platform/graphics/transforms/TransformState.h"
+#if OS(DARWIN)
+#include "core/platform/mac/ScrollAnimatorMac.h"
+#endif
 #include "core/plugins/PluginView.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
@@ -243,7 +246,7 @@ void ScrollingCoordinator::scrollableAreaScrollbarLayerDidChange(ScrollableArea*
 {
 // FIXME: Instead of hardcode here, we should make a setting flag.
 #if OS(DARWIN)
-    static const bool platformSupportsCoordinatedScrollbar = false;
+    static const bool platformSupportsCoordinatedScrollbar = ScrollAnimatorMac::canUseCoordinatedScrollbar();
     static const bool platformSupportsMainFrameOnly = false; // Don't care.
 #elif OS(ANDROID)
     static const bool platformSupportsCoordinatedScrollbar = true;
@@ -313,6 +316,8 @@ bool ScrollingCoordinator::scrollableAreaScrollLayerDidChange(ScrollableArea* sc
 
 static void convertLayerRectsToEnclosingCompositedLayer(const LayerHitTestRects& layerRects, LayerHitTestRects& compositorRects)
 {
+    TRACE_EVENT0("input", "ScrollingCoordinator::convertLayerRectsToEnclosingCompositedLayer");
+
     // We have a set of rects per RenderLayer, we need to map them to their bounding boxes in their
     // enclosing composited layer.
     for (LayerHitTestRects::const_iterator layerIter = layerRects.begin(); layerIter != layerRects.end(); ++layerIter) {
@@ -339,10 +344,9 @@ static void convertLayerRectsToEnclosingCompositedLayer(const LayerHitTestRects&
             compIter = compositorRects.add(compositedLayer, Vector<LayoutRect>()).iterator;
 
         // Transform each rect to the co-ordinate space of it's enclosing composited layer.
-        // Ideally we'd compute a transformation matrix once and re-use it for each rect, but
-        // there doesn't appear to be any easy way to do it (mapLocalToContainer will flatten
-        // the TransformState, so we can't use setQuad/mappedQuad over and over again). Perhaps
-        // RenderGeometryMap?
+        // Ideally we'd compute a transformation matrix once and re-use it for each rect.
+        // RenderGeometryMap can be used for this (but needs to be updated to support crossing
+        // iframe boundaries), but in practice doesn't appear to provide much performance benefit.
         for (size_t i = 0; i < layerIter->value.size(); ++i) {
             FloatQuad localQuad(layerIter->value[i]);
             TransformState transformState(TransformState::ApplyTransformDirection, localQuad);

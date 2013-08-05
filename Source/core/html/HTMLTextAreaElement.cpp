@@ -206,7 +206,7 @@ void HTMLTextAreaElement::parseAttribute(const QualifiedName& name, const Atomic
 
 RenderObject* HTMLTextAreaElement::createRenderer(RenderStyle*)
 {
-    return new (document()->renderArena()) RenderTextControlMultiLine(this);
+    return new RenderTextControlMultiLine(this);
 }
 
 bool HTMLTextAreaElement::appendFormData(FormDataList& encoding, bool)
@@ -235,7 +235,7 @@ bool HTMLTextAreaElement::hasCustomFocusLogic() const
     return true;
 }
 
-bool HTMLTextAreaElement::isKeyboardFocusable(KeyboardEvent*) const
+bool HTMLTextAreaElement::isKeyboardFocusable() const
 {
     // If a given text area can be focused at all, then it will always be keyboard focusable.
     return isFocusable();

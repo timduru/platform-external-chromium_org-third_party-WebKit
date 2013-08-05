@@ -126,7 +126,7 @@ class SummarizedResultsTest(unittest.TestCase):
 
     def test_num_failures_by_type(self):
         summary = summarized_results(self.port, expected=False, passing=False, flaky=False)
-        self.assertEquals(summary['num_failures_by_type'], {'CRASH': 1, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'NEEDSREBASELINE': 0, 'NEEDSMANUALREBASELINE': 0, 'PASS': 0, 'REBASELINE': 0, 'SKIP': 0, 'SLOW': 0, 'TIMEOUT': 2, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 1, 'WONTFIX': 0})
+        self.assertEquals(summary['num_failures_by_type'], {'CRASH': 1, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'NEEDSREBASELINE': 0, 'NEEDSMANUALREBASELINE': 0, 'PASS': 0, 'REBASELINE': 0, 'SKIP': 0, 'SLOW': 0, 'TIMEOUT': 2, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 1, 'WONTFIX': 1})
 
         summary = summarized_results(self.port, expected=True, passing=False, flaky=False)
         self.assertEquals(summary['num_failures_by_type'], {'CRASH': 1, 'MISSING': 0, 'TEXT': 0, 'IMAGE': 0, 'NEEDSREBASELINE': 0, 'NEEDSMANUALREBASELINE': 0, 'PASS': 1, 'REBASELINE': 0, 'SKIP': 0, 'SLOW': 0, 'TIMEOUT': 1, 'IMAGE+TEXT': 0, 'FAIL': 0, 'AUDIO': 1, 'WONTFIX': 0})
@@ -148,7 +148,6 @@ class SummarizedResultsTest(unittest.TestCase):
         self.port._options.builder_name = 'dummy builder'
         summary = summarized_results(self.port, expected=False, passing=True, flaky=False, extra_skipped_tests=['passes/text.html'])
         self.assertEquals(summary['tests']['passes']['text.html']['expected'], 'NOTRUN')
-        self.assertNotIn('bugs', summary['tests']['passes']['text.html'])
 
     def test_summarized_results_wontfix(self):
         self.port._options.builder_name = 'dummy builder'

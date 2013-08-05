@@ -30,6 +30,14 @@
 
 namespace WebCore {
 
+bool RenderSVGInline::isChildAllowed(RenderObject* child, RenderStyle* style) const
+{
+    if (SVGRenderSupport::isEmptySVGInlineText(child))
+        return false;
+
+    return RenderInline::isChildAllowed(child, style);
+}
+
 RenderSVGInline::RenderSVGInline(Element* element)
     : RenderInline(element)
 {
@@ -38,7 +46,7 @@ RenderSVGInline::RenderSVGInline(Element* element)
 
 InlineFlowBox* RenderSVGInline::createInlineFlowBox()
 {
-    InlineFlowBox* box = new (renderArena()) SVGInlineFlowBox(this);
+    InlineFlowBox* box = new SVGInlineFlowBox(this);
     box->setHasVirtualLogicalHeight();
     return box;
 }

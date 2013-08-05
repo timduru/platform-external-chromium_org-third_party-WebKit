@@ -407,14 +407,6 @@ public:
 
     LayoutRect getRectToExpose(const LayoutRect& visibleRect, const LayoutRect& exposeRect, const ScrollAlignment& alignX, const ScrollAlignment& alignY);
 
-    bool scrollsOverflow() const;
-    bool hasScrollbars() const { return m_hBar || m_vBar; }
-    void setHasHorizontalScrollbar(bool);
-    void setHasVerticalScrollbar(bool);
-
-    PassRefPtr<Scrollbar> createScrollbar(ScrollbarOrientation);
-    void destroyScrollbar(ScrollbarOrientation);
-
     bool hasHorizontalScrollbar() const { return horizontalScrollbar(); }
     bool hasVerticalScrollbar() const { return verticalScrollbar(); }
 
@@ -426,7 +418,6 @@ public:
     int verticalScrollbarWidth(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
     int horizontalScrollbarHeight(OverlayScrollbarSizeRelevancy = IgnoreOverlayScrollbarSize) const;
 
-    bool hasOverflowControls() const;
     // isPointInResizeControl() is used for testing if a pointer/touch position is in the resize control
     // area.
     bool isPointInResizeControl(const IntPoint& absolutePoint, ResizerHitTestType resizerHitTestType) const;
@@ -729,12 +720,9 @@ public:
 
     bool hasBlendMode() const;
 
-    // Overloaded new operator. Derived classes must override operator new
-    // in order to allocate out of the RenderArena.
-    void* operator new(size_t, RenderArena*);
-
-    // Overridden to prevent the normal delete from being called.
-    void operator delete(void*, size_t);
+    void* operator new(size_t);
+    // Only safe to call from RenderLayerModelObject::destroyLayer()
+    void operator delete(void*);
 
     bool isComposited() const { return m_backing != 0; }
     bool hasCompositedMask() const;
@@ -830,6 +818,14 @@ private:
         OnlyStackingContextsCanBeStackingContainers
     };
 
+    void setHasHorizontalScrollbar(bool);
+    void setHasVerticalScrollbar(bool);
+
+    PassRefPtr<Scrollbar> createScrollbar(ScrollbarOrientation);
+    void destroyScrollbar(ScrollbarOrientation);
+
+    bool hasOverflowControls() const;
+
     void updateZOrderLists();
     void rebuildZOrderLists();
     // See the comment for collectLayers for information about the layerToForceAsStackingContainer parameter.
@@ -902,9 +898,6 @@ private:
     IntSize scrolledContentOffset() const { return m_scrollOffset; }
 
     IntSize clampScrollOffset(const IntSize&) const;
-
-    // The normal operator new is disallowed on all render objects.
-    void* operator new(size_t) throw();
 
     void setNextSibling(RenderLayer* next) { m_next = next; }
     void setPreviousSibling(RenderLayer* prev) { m_previous = prev; }
@@ -1006,8 +999,6 @@ private:
 
     bool shouldBeSelfPaintingLayer() const;
 
-    int scrollPosition(Scrollbar*) const;
-
     // ScrollableArea interface
     virtual void invalidateScrollbarRect(Scrollbar*, const IntRect&);
     virtual void invalidateScrollCornerRect(const IntRect&);
@@ -1032,6 +1023,8 @@ private:
     virtual bool shouldSuspendScrollAnimations() const;
     virtual bool scrollbarsCanBeActive() const;
     virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;
+    virtual bool userInputScrollable(ScrollbarOrientation) const OVERRIDE;
+    virtual int pageStep(ScrollbarOrientation) const OVERRIDE;
 
     // Rectangle encompassing the scroll corner and resizer rect.
     IntRect scrollCornerAndResizerRect() const;
@@ -1099,14 +1092,6 @@ private:
     friend class RenderLayerBacking;
     friend class RenderLayerCompositor;
     friend class RenderLayerModelObject;
-
-    // Only safe to call from RenderLayerModelObject::destroyLayer(RenderArena*)
-    void destroy(RenderArena*);
-
-    LayoutUnit overflowTop() const;
-    LayoutUnit overflowBottom() const;
-    LayoutUnit overflowLeft() const;
-    LayoutUnit overflowRight() const;
 
     IntRect rectForHorizontalScrollbar(const IntRect& borderBoxRect) const;
     IntRect rectForVerticalScrollbar(const IntRect& borderBoxRect) const;
@@ -1210,7 +1195,7 @@ protected:
     IntSize m_scrollOffset;
 
     // The width/height of our scrolled area.
-    LayoutSize m_scrollSize;
+    LayoutRect m_overflowRect;
 
     // For layers with overflow, we have a pair of scrollbars.
     RefPtr<Scrollbar> m_hBar;

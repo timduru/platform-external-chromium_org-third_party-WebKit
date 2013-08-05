@@ -47,6 +47,7 @@
 #include "core/rendering/RenderFlexibleBox.h"
 #include "core/rendering/RenderFlowThread.h"
 #include "core/rendering/RenderGeometryMap.h"
+#include "core/rendering/RenderGrid.h"
 #include "core/rendering/RenderInline.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerCompositor.h"
@@ -305,6 +306,7 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
     }
 
     updateShapeOutsideInfoAfterStyleChange(style()->shapeOutside(), oldStyle ? oldStyle->shapeOutside() : 0);
+    updateGridPositionAfterStyleChange(oldStyle);
 }
 
 void RenderBox::updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOutside, const ShapeValue* oldShapeOutside)
@@ -319,6 +321,23 @@ void RenderBox::updateShapeOutsideInfoAfterStyleChange(const ShapeValue* shapeOu
     } else {
         ShapeOutsideInfo::removeInfo(this);
     }
+}
+
+void RenderBox::updateGridPositionAfterStyleChange(const RenderStyle* oldStyle)
+{
+    if (!oldStyle || !parent() || !parent()->isRenderGrid())
+        return;
+
+    if (oldStyle->gridColumnStart() == style()->gridColumnStart()
+        && oldStyle->gridColumnEnd() == style()->gridColumnEnd()
+        && oldStyle->gridRowStart() == style()->gridRowStart()
+        && oldStyle->gridRowEnd() == style()->gridRowEnd()
+        && oldStyle->order() == style()->order())
+        return;
+
+    // It should be possible to not dirty the grid in some cases (like moving an explicitly placed grid item).
+    // For now, it's more simple to just always recompute the grid.
+    toRenderGrid(parent())->dirtyGrid();
 }
 
 void RenderBox::updateFromStyle()
@@ -580,10 +599,10 @@ void RenderBox::addFocusRingRects(Vector<IntRect>& rects, const LayoutPoint& add
         rects.append(pixelSnappedIntRect(additionalOffset, size()));
 }
 
-void RenderBox::addLayerHitTestRects(LayerHitTestRects& layerRects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset) const
+void RenderBox::addLayerHitTestRects(LayerHitTestRects& layerRects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset, const LayoutRect& containerRect) const
 {
     LayoutPoint adjustedLayerOffset = layerOffset + locationOffset();
-    RenderBoxModelObject::addLayerHitTestRects(layerRects, currentLayer, adjustedLayerOffset);
+    RenderBoxModelObject::addLayerHitTestRects(layerRects, currentLayer, adjustedLayerOffset, containerRect);
 }
 
 void RenderBox::computeSelfHitTestRects(Vector<LayoutRect>& rects, const LayoutPoint& layerOffset) const
@@ -1814,14 +1833,14 @@ LayoutSize RenderBox::offsetFromContainer(RenderObject* o, const LayoutPoint& po
 
 InlineBox* RenderBox::createInlineBox()
 {
-    return new (renderArena()) InlineBox(this);
+    return new InlineBox(this);
 }
 
 void RenderBox::dirtyLineBoxes(bool fullLayout)
 {
     if (m_inlineBoxWrapper) {
         if (fullLayout) {
-            m_inlineBoxWrapper->destroy(renderArena());
+            m_inlineBoxWrapper->destroy();
             m_inlineBoxWrapper = 0;
         } else
             m_inlineBoxWrapper->dirtyLineBoxes();
@@ -1853,7 +1872,7 @@ void RenderBox::positionLineBox(InlineBox* box)
 
         // Nuke the box.
         box->remove();
-        box->destroy(renderArena());
+        box->destroy();
     } else if (isReplaced()) {
         setLocation(roundedLayoutPoint(box->topLeft()));
         setInlineBoxWrapper(box);
@@ -1865,7 +1884,7 @@ void RenderBox::deleteLineBoxWrapper()
     if (m_inlineBoxWrapper) {
         if (!documentBeingDestroyed())
             m_inlineBoxWrapper->remove();
-        m_inlineBoxWrapper->destroy(renderArena());
+        m_inlineBoxWrapper->destroy();
         m_inlineBoxWrapper = 0;
     }
 }
@@ -4052,11 +4071,11 @@ LayoutRect RenderBox::localCaretRect(InlineBox* box, int caretOffset, LayoutUnit
     return rect;
 }
 
-VisiblePosition RenderBox::positionForPoint(const LayoutPoint& point)
+PositionWithAffinity RenderBox::positionForPoint(const LayoutPoint& point)
 {
     // no children...return this render object's element, if there is one, and offset 0
     if (!firstChild())
-        return createVisiblePosition(nonPseudoNode() ? firstPositionInOrBeforeNode(nonPseudoNode()) : Position());
+        return createPositionWithAffinity(nonPseudoNode() ? firstPositionInOrBeforeNode(nonPseudoNode()) : Position());
 
     if (isTable() && nonPseudoNode()) {
         LayoutUnit right = contentWidth() + borderAndPaddingWidth();
@@ -4064,8 +4083,8 @@ VisiblePosition RenderBox::positionForPoint(const LayoutPoint& point)
 
         if (point.x() < 0 || point.x() > right || point.y() < 0 || point.y() > bottom) {
             if (point.x() <= right / 2)
-                return createVisiblePosition(firstPositionInOrBeforeNode(nonPseudoNode()));
-            return createVisiblePosition(lastPositionInOrAfterNode(nonPseudoNode()));
+                return createPositionWithAffinity(firstPositionInOrBeforeNode(nonPseudoNode()));
+            return createPositionWithAffinity(lastPositionInOrAfterNode(nonPseudoNode()));
         }
     }
 
@@ -4132,8 +4151,7 @@ VisiblePosition RenderBox::positionForPoint(const LayoutPoint& point)
 
     if (closestRenderer)
         return closestRenderer->positionForPoint(adjustedPoint - closestRenderer->locationOffset());
-
-    return createVisiblePosition(firstPositionInOrBeforeNode(nonPseudoNode()));
+    return createPositionWithAffinity(firstPositionInOrBeforeNode(nonPseudoNode()));
 }
 
 bool RenderBox::shrinkToAvoidFloats() const
@@ -4286,13 +4304,12 @@ void RenderBox::clearLayoutOverflow()
     if (!m_overflow)
         return;
 
-    LayoutRect noOverflowRect = this->noOverflowRect();
-    if (visualOverflowRect() == noOverflowRect) {
+    if (!hasVisualOverflow()) {
         m_overflow.clear();
         return;
     }
 
-    m_overflow->setLayoutOverflow(noOverflowRect);
+    m_overflow->setLayoutOverflow(noOverflowRect());
 }
 
 inline static bool percentageLogicalHeightIsResolvable(const RenderBox* box)

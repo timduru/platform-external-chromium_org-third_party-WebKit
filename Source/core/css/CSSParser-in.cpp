@@ -39,6 +39,7 @@
 #include "core/css/CSSCursorImageValue.h"
 #include "core/css/CSSFontFaceSrcValue.h"
 #include "core/css/CSSGradientValue.h"
+#include "core/css/CSSGridTemplateValue.h"
 #include "core/css/CSSImageSetValue.h"
 #include "core/css/CSSImageValue.h"
 #include "core/css/CSSInheritedValue.h"
@@ -260,7 +261,6 @@ CSSParser::CSSParser(const CSSParserContext& context, UseCounter* counter)
     , m_token(0)
     , m_lineNumber(0)
     , m_tokenStartLineNumber(0)
-    , m_lastSelectorLineNumber(0)
     , m_ruleHeaderType(CSSRuleSourceData::UNKNOWN_RULE)
     , m_allowImportRules(true)
     , m_allowNamespaceDeclarations(true)
@@ -802,10 +802,6 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (valueID == CSSValueAuto || valueID == CSSValueNone || valueID == CSSValueAntialiased || valueID == CSSValueSubpixelAntialiased)
             return true;
         break;
-    case CSSPropertyWebkitHyphens:
-        if (valueID == CSSValueNone || valueID == CSSValueManual || valueID == CSSValueAuto)
-            return true;
-        break;
     case CSSPropertyGridAutoFlow:
         if (valueID == CSSValueNone || valueID == CSSValueRow || valueID == CSSValueColumn)
             return RuntimeEnabledFeatures::cssGridLayoutEnabled();
@@ -996,7 +992,6 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     case CSSPropertyJustifyContent:
     case CSSPropertyWebkitFontKerning:
     case CSSPropertyWebkitFontSmoothing:
-    case CSSPropertyWebkitHyphens:
     case CSSPropertyGridAutoFlow:
     case CSSPropertyWebkitLineAlign:
     case CSSPropertyWebkitLineBreak:
@@ -2461,6 +2456,12 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             return false;
         return parseGridItemPositionShorthand(propId, important);
 
+    case CSSPropertyGridTemplate:
+        if (!RuntimeEnabledFeatures::cssGridLayoutEnabled())
+            return false;
+        parsedValue = parseGridTemplate();
+        break;
+
     case CSSPropertyWebkitMarginCollapse: {
         if (num == 1) {
             ShorthandScope scope(this, CSSPropertyWebkitMarginCollapse);
@@ -2534,17 +2535,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
 
     case CSSPropertyWebkitHyphenateCharacter:
         if (id == CSSValueAuto || value->unit == CSSPrimitiveValue::CSS_STRING)
-            validPrimitive = true;
-        break;
-
-    case CSSPropertyWebkitHyphenateLimitBefore:
-    case CSSPropertyWebkitHyphenateLimitAfter:
-        if (id == CSSValueAuto || validUnit(value, FInteger | FNonNeg, CSSStrictMode))
-            validPrimitive = true;
-        break;
-
-    case CSSPropertyWebkitHyphenateLimitLines:
-        if (id == CSSValueNoLimit || validUnit(value, FInteger | FNonNeg, CSSStrictMode))
             validPrimitive = true;
         break;
 
@@ -2802,7 +2792,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyJustifyContent:
     case CSSPropertyWebkitFontKerning:
     case CSSPropertyWebkitFontSmoothing:
-    case CSSPropertyWebkitHyphens:
     case CSSPropertyGridAutoFlow:
     case CSSPropertyWebkitLineAlign:
     case CSSPropertyWebkitLineBreak:
@@ -4802,6 +4791,79 @@ PassRefPtr<CSSPrimitiveValue> CSSParser::parseGridBreadth(CSSParserValue* curren
         return 0;
 
     return createPrimitiveNumericValue(currentValue);
+}
+
+PassRefPtr<CSSValue> CSSParser::parseGridTemplate()
+{
+    NamedGridAreaMap gridAreaMap;
+    size_t rowCount = 0;
+    size_t columnCount = 0;
+
+    while (CSSParserValue* currentValue = m_valueList->current()) {
+        if (currentValue->unit != CSSPrimitiveValue::CSS_STRING)
+            return 0;
+
+        String gridRowNames = currentValue->string;
+        if (!gridRowNames.length())
+            return 0;
+
+        Vector<String> columnNames;
+        gridRowNames.split(' ', columnNames);
+
+        if (!columnCount) {
+            columnCount = columnNames.size();
+            ASSERT(columnCount);
+        } else if (columnCount != columnNames.size()) {
+            // The declaration is invalid is all the rows don't have the number of columns.
+            return 0;
+        }
+
+        for (size_t currentCol = 0; currentCol < columnCount; ++currentCol) {
+            const String& gridAreaName = columnNames[currentCol];
+
+            // Unamed areas are always valid (we consider them to be 1x1).
+            if (gridAreaName == ".")
+                continue;
+
+            // We handle several grid areas with the same name at once to simplify the validation code.
+            size_t lookAheadCol;
+            for (lookAheadCol = currentCol; lookAheadCol < (columnCount - 1); ++lookAheadCol) {
+                if (columnNames[lookAheadCol + 1] != gridAreaName)
+                    break;
+            }
+
+            NamedGridAreaMap::iterator gridAreaIt = gridAreaMap.find(gridAreaName);
+            if (gridAreaIt == gridAreaMap.end()) {
+                gridAreaMap.add(gridAreaName, GridCoordinate(GridSpan(rowCount, rowCount), GridSpan(currentCol, lookAheadCol)));
+            } else {
+                GridCoordinate& gridCoordinate = gridAreaIt->value;
+
+                // The following checks test that the grid area is a single filled-in rectangle.
+                // 1. The new row is adjacent to the previously parsed row.
+                if (rowCount != gridCoordinate.rows.initialPositionIndex + 1)
+                    return 0;
+
+                // 2. The new area starts at the same position as the previously parsed area.
+                if (currentCol != gridCoordinate.columns.initialPositionIndex)
+                    return 0;
+
+                // 3. The new area ends at the same position as the previously parsed area.
+                if (lookAheadCol != gridCoordinate.columns.finalPositionIndex)
+                    return 0;
+
+                ++gridCoordinate.rows.finalPositionIndex;
+            }
+            currentCol = lookAheadCol;
+        }
+
+        ++rowCount;
+        m_valueList->next();
+    }
+
+    if (!rowCount || !columnCount)
+        return 0;
+
+    return CSSGridTemplateValue::create(gridAreaMap, rowCount, columnCount);
 }
 
 PassRefPtr<CSSValue> CSSParser::parseCounterContent(CSSParserValueList* args, bool counters)
@@ -8183,8 +8245,8 @@ PassRefPtr<CSSMixFunctionValue> CSSParser::parseMixFunction(CSSParserValue* valu
 
     bool hasBlendMode = false;
     bool hasAlphaCompositing = false;
-    CSSParserValue* arg;
-    while ((arg = argsList->current())) {
+
+    for (CSSParserValue* arg = argsList->current(); arg; arg = argsList->next()) {
         RefPtr<CSSValue> value;
 
         unsigned argNumber = argsList->currentIndex();
@@ -8207,8 +8269,6 @@ PassRefPtr<CSSMixFunctionValue> CSSParser::parseMixFunction(CSSParserValue* valu
             return 0;
 
         mixFunction->append(value.release());
-
-        arg = argsList->next();
     }
 
     return mixFunction;
@@ -8363,7 +8423,7 @@ PassRefPtr<CSSFilterValue> CSSParser::parseCustomFilterFunctionWithInlineSyntax(
     RefPtr<CSSValueList> shadersList = CSSValueList::createSpaceSeparated();
     bool hadAtLeastOneCustomShader = false;
     CSSParserValue* arg;
-    while ((arg = argsList->current())) {
+    for (arg = argsList->current(); arg; arg = argsList->next()) {
         RefPtr<CSSValue> value;
         if (arg->id == CSSValueNone)
             value = cssValuePool().createIdentifierValue(CSSValueNone);
@@ -8380,7 +8440,6 @@ PassRefPtr<CSSFilterValue> CSSParser::parseCustomFilterFunctionWithInlineSyntax(
         if (!value)
             break;
         shadersList->append(value.release());
-        argsList->next();
     }
 
     if (!shadersList->length() || !hadAtLeastOneCustomShader || shadersList->length() > 2 || !acceptCommaOperator(argsList))
@@ -8391,7 +8450,7 @@ PassRefPtr<CSSFilterValue> CSSParser::parseCustomFilterFunctionWithInlineSyntax(
     // 2. Parse the mesh size <vertex-mesh>
     RefPtr<CSSValueList> meshSizeList = CSSValueList::createSpaceSeparated();
 
-    while ((arg = argsList->current())) {
+    for (arg = argsList->current(); arg; arg = argsList->next()) {
         if (!validUnit(arg, FInteger | FNonNeg, CSSStrictMode))
             break;
         int integerValue = clampToInteger(arg->fValue);
@@ -8399,7 +8458,6 @@ PassRefPtr<CSSFilterValue> CSSParser::parseCustomFilterFunctionWithInlineSyntax(
         if (integerValue < 1)
             return 0;
         meshSizeList->append(cssValuePool().createValue(integerValue, CSSPrimitiveValue::CSS_NUMBER));
-        argsList->next();
     }
 
     if (meshSizeList->length() > 2)
@@ -9914,6 +9972,10 @@ inline bool CSSParser::detectFunctionTypeToken(int length)
             m_parsingMode = NthChildMode;
             return true;
         }
+        CASE("part") {
+            m_token = PARTFUNCTION;
+            return true;
+        }
     }
     return false;
 }
@@ -11052,7 +11114,7 @@ StyleRuleBase* CSSParser::createStyleRule(Vector<OwnPtr<CSSParserSelector> >* se
     StyleRule* result = 0;
     if (selectors) {
         m_allowImportRules = m_allowNamespaceDeclarations = false;
-        RefPtr<StyleRule> rule = StyleRule::create(m_lastSelectorLineNumber);
+        RefPtr<StyleRule> rule = StyleRule::create();
         rule->parserAdoptSelectorVector(*selectors);
         if (m_hasFontFaceOnlyValues)
             deleteFontFaceOnlyValues();
@@ -11127,7 +11189,7 @@ QualifiedName CSSParser::determineNameInNamespace(const AtomicString& prefix, co
 
 CSSParserSelector* CSSParser::rewriteSpecifiersWithNamespaceIfNeeded(CSSParserSelector* specifiers)
 {
-    if (m_defaultNamespace != starAtom || specifiers->isCustomPseudoElement())
+    if (m_defaultNamespace != starAtom || specifiers->needsCrossingTreeScopeBoundary())
         return rewriteSpecifiersWithElementName(nullAtom, starAtom, specifiers, /*tagIsForNamespaceRule*/true);
     if (CSSParserSelector* distributedPseudoElementSelector = specifiers->findDistributedPseudoElementSelector()) {
         specifiers->prependTagSelector(QualifiedName(nullAtom, starAtom, m_defaultNamespace), /*tagIsForNamespaceRule*/true);
@@ -11146,19 +11208,19 @@ CSSParserSelector* CSSParser::rewriteSpecifiersWithElementName(const AtomicStrin
         return rewriteSpecifiersForShadowDistributed(specifiers, distributedPseudoElementSelector);
     }
 
-    if (!specifiers->isCustomPseudoElement()) {
+    if (!specifiers->needsCrossingTreeScopeBoundary()) {
         if (tag == anyQName())
             return specifiers;
-        if (!(specifiers->pseudoType() == CSSSelector::PseudoCue))
-            specifiers->prependTagSelector(tag, tagIsForNamespaceRule);
+        specifiers->prependTagSelector(tag, tagIsForNamespaceRule);
         return specifiers;
     }
 
+    // We should treat ::cue in the same way as custom pseudo element.
     CSSParserSelector* lastShadowPseudo = specifiers;
     CSSParserSelector* history = specifiers;
     while (history->tagHistory()) {
         history = history->tagHistory();
-        if (history->isCustomPseudoElement() || history->hasShadowPseudo())
+        if (history->needsCrossingTreeScopeBoundary() || history->hasShadowPseudo())
             lastShadowPseudo = history;
     }
 
@@ -11204,12 +11266,12 @@ CSSParserSelector* CSSParser::rewriteSpecifiersForShadowDistributed(CSSParserSel
 
 CSSParserSelector* CSSParser::rewriteSpecifiers(CSSParserSelector* specifiers, CSSParserSelector* newSpecifier)
 {
-    if (newSpecifier->isCustomPseudoElement() || newSpecifier->pseudoType() == CSSSelector::PseudoCue) {
+    if (newSpecifier->needsCrossingTreeScopeBoundary()) {
         // Unknown pseudo element always goes at the top of selector chain.
         newSpecifier->appendTagHistory(CSSSelector::ShadowPseudo, sinkFloatingSelector(specifiers));
         return newSpecifier;
     }
-    if (specifiers->isCustomPseudoElement()) {
+    if (specifiers->needsCrossingTreeScopeBoundary()) {
         // Specifiers for unknown pseudo element go right behind it in the chain.
         specifiers->insertTagHistory(CSSSelector::SubSelector, sinkFloatingSelector(newSpecifier), CSSSelector::ShadowPseudo);
         return specifiers;
@@ -11333,11 +11395,6 @@ void CSSParser::invalidBlockHit()
 {
     if (m_styleSheet && !m_hadSyntacticallyValidCSSRule)
         m_styleSheet->setHasSyntacticallyValidCSSHeader(false);
-}
-
-void CSSParser::updateLastSelectorLineAndPosition()
-{
-    m_lastSelectorLineNumber = m_lineNumber + m_startPosition.m_line.zeroBasedInt();
 }
 
 void CSSParser::startRuleHeader(CSSRuleSourceData::Type ruleType)

@@ -33,8 +33,8 @@
 #include "core/svg/SVGParserUtilities.h"
 #include "core/svg/SVGPathElement.h"
 #include "core/svg/SVGPathUtilities.h"
-#include <wtf/MathExtras.h>
-#include <wtf/StdLibExtras.h>
+#include "wtf/MathExtras.h"
+#include "wtf/StdLibExtras.h"
 
 namespace WebCore {
 
@@ -137,7 +137,7 @@ void SVGAnimateMotionElement::updateAnimationPath()
 
     for (Node* child = firstChild(); child; child = child->nextSibling()) {
         if (child->hasTagName(SVGNames::mpathTag)) {
-            SVGMPathElement* mPath = static_cast<SVGMPathElement*>(child);
+            SVGMPathElement* mPath = toSVGMPathElement(child);
             SVGPathElement* pathElement = mPath->pathElement();
             if (pathElement) {
                 updatePathFromGraphicsElement(pathElement, m_animationPath);
@@ -200,8 +200,17 @@ void SVGAnimateMotionElement::clearAnimatedType(SVGElement* targetElement)
 {
     if (!targetElement)
         return;
-    if (AffineTransform* transform = targetElement->supplementalTransform())
-        transform->makeIdentity();
+
+    AffineTransform* transform = targetElement->supplementalTransform();
+    if (!transform)
+        return;
+
+    transform->makeIdentity();
+
+    if (RenderObject* targetRenderer = targetElement->renderer()) {
+        targetRenderer->setNeedsTransformUpdate();
+        RenderSVGResource::markForLayoutAndParentResourceInvalidation(targetRenderer);
+    }
 }
 
 bool SVGAnimateMotionElement::calculateToAtEndOfDurationValue(const String& toAtEndOfDurationString)

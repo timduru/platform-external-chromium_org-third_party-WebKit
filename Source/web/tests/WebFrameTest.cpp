@@ -62,6 +62,7 @@
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/SpellChecker.h"
+#include "core/editing/VisiblePosition.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/page/EventHandler.h"
@@ -95,6 +96,8 @@ using WebKit::URLTestHelpers::toKURL;
 using WebKit::FrameTestHelpers::runPendingTasks;
 
 namespace {
+
+const int touchPointPadding = 32;
 
 #define EXPECT_EQ_RECT(a, b) \
     EXPECT_EQ(a.x(), b.x()); \
@@ -1170,53 +1173,69 @@ TEST_F(WebFrameTest, DivAutoZoomParamsTest)
 
     WebRect wideDiv(200, 100, 400, 150);
     WebRect tallDiv(200, 300, 400, 800);
-    WebRect doubleTapPointWide(wideDiv.x + 50, wideDiv.y + 50, 0, 0);
-    WebRect doubleTapPointTall(tallDiv.x + 50, tallDiv.y + 50, 0, 0);
+    WebRect doubleTapPointWide(wideDiv.x + 50, wideDiv.y + 50, touchPointPadding, touchPointPadding);
+    WebRect doubleTapPointTall(tallDiv.x + 50, tallDiv.y + 50, touchPointPadding, touchPointPadding);
+    WebRect wideBlockBounds;
+    WebRect tallBlockBounds;
     float scale;
     WebPoint scroll;
-    bool isAnchor;
+    bool doubleTapShouldZoomOut;
 
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
     // Test double-tap zooming into wide div.
-    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPointWide, WebViewImpl::DoubleTap, scale, scroll, isAnchor);
+    wideBlockBounds = webViewImpl->computeBlockBounds(doubleTapPointWide, false);
+    webViewImpl->computeScaleAndScrollForBlockRect(wideBlockBounds, touchPointPadding, scale, scroll, doubleTapShouldZoomOut);
     // The div should horizontally fill the screen (modulo margins), and
     // vertically centered (modulo integer rounding).
     EXPECT_NEAR(viewportWidth / (float) wideDiv.width, scale, 0.1);
     EXPECT_NEAR(wideDiv.x, scroll.x, 20);
     EXPECT_EQ(0, scroll.y);
-    EXPECT_FALSE(isAnchor);
+    EXPECT_FALSE(doubleTapShouldZoomOut);
 
     setScaleAndScrollAndLayout(webViewImpl, scroll, scale);
 
     // Test zoom out back to minimum scale.
-    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPointWide, WebViewImpl::DoubleTap, scale, scroll, isAnchor);
-    EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
-    EXPECT_TRUE(isAnchor);
+    wideBlockBounds = webViewImpl->computeBlockBounds(doubleTapPointWide, false);
+    webViewImpl->computeScaleAndScrollForBlockRect(wideBlockBounds, touchPointPadding, scale, scroll, doubleTapShouldZoomOut);
+    EXPECT_TRUE(doubleTapShouldZoomOut);
 
+    scale = webViewImpl->minimumPageScaleFactor();
     setScaleAndScrollAndLayout(webViewImpl, WebPoint(0, 0), scale);
 
     // Test double-tap zooming into tall div.
-    webViewImpl->computeScaleAndScrollForHitRect(doubleTapPointTall, WebViewImpl::DoubleTap, scale, scroll, isAnchor);
+    tallBlockBounds = webViewImpl->computeBlockBounds(doubleTapPointTall, false);
+    webViewImpl->computeScaleAndScrollForBlockRect(tallBlockBounds, touchPointPadding, scale, scroll, doubleTapShouldZoomOut);
     // The div should start at the top left of the viewport.
     EXPECT_NEAR(viewportWidth / (float) tallDiv.width, scale, 0.1);
     EXPECT_NEAR(tallDiv.x, scroll.x, 20);
     EXPECT_NEAR(tallDiv.y, scroll.y, 20);
-    EXPECT_FALSE(isAnchor);
+    EXPECT_FALSE(doubleTapShouldZoomOut);
 
     // Test for Non-doubletap scaling
     // Test zooming into div.
-    webViewImpl->computeScaleAndScrollForHitRect(WebRect(250, 250, 10, 10), WebViewImpl::FindInPage, scale, scroll, isAnchor);
+    webViewImpl->computeScaleAndScrollForBlockRect(webViewImpl->computeBlockBounds(WebRect(250, 250, 10, 10), true), 0, scale, scroll, doubleTapShouldZoomOut);
     EXPECT_NEAR(viewportWidth / (float) wideDiv.width, scale, 0.1);
+}
+
+void simulatePageScale(WebViewImpl* webViewImpl, float& scale)
+{
+    WebCore::IntSize scrollDelta = webViewImpl->fakePageScaleAnimationTargetPositionForTesting() - webViewImpl->mainFrameImpl()->frameView()->scrollPosition();
+    float scaleDelta = webViewImpl->fakePageScaleAnimationPageScaleForTesting() / webViewImpl->pageScaleFactor();
+    webViewImpl->applyScrollAndScale(scrollDelta, scaleDelta);
+    scale = webViewImpl->pageScaleFactor();
+}
+
+void simulateMultiTargetZoom(WebViewImpl* webViewImpl, const WebRect& rect, float& scale)
+{
+    if (webViewImpl->zoomToMultipleTargetsRect(rect))
+        simulatePageScale(webViewImpl, scale);
 }
 
 void simulateDoubleTap(WebViewImpl* webViewImpl, WebPoint& point, float& scale)
 {
-    webViewImpl->animateZoomAroundPoint(point, WebViewImpl::DoubleTap);
+    webViewImpl->animateDoubleTapZoom(point);
     EXPECT_TRUE(webViewImpl->fakeDoubleTapAnimationPendingForTesting());
-    WebCore::IntSize scrollDelta = webViewImpl->fakeDoubleTapTargetPositionForTesting() - webViewImpl->mainFrameImpl()->frameView()->scrollPosition();
-    float scaleDelta = webViewImpl->fakeDoubleTapPageScaleFactorForTesting() / webViewImpl->pageScaleFactor();
-    webViewImpl->applyScrollAndScale(scrollDelta, scaleDelta);
-    scale = webViewImpl->pageScaleFactor();
+    simulatePageScale(webViewImpl, scale);
 }
 
 TEST_F(WebFrameTest, DivAutoZoomMultipleDivsTest)
@@ -1236,7 +1255,7 @@ TEST_F(WebFrameTest, DivAutoZoomMultipleDivsTest)
     m_webView->layout();
 
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
-    webViewImpl->enableFakeDoubleTapAnimationForTesting(true);
+    webViewImpl->enableFakePageScaleAnimationForTesting(true);
 
     WebRect topDiv(200, 100, 200, 150);
     WebRect bottomDiv(200, 300, 200, 150);
@@ -1263,7 +1282,7 @@ TEST_F(WebFrameTest, DivAutoZoomMultipleDivsTest)
 
     // If we didn't yet get an auto-zoom update and a second double-tap arrives, should go back to minimum scale.
     webViewImpl->applyScrollAndScale(WebSize(), 1.1f);
-    webViewImpl->animateZoomAroundPoint(topPoint, WebViewImpl::DoubleTap);
+    webViewImpl->animateDoubleTapZoom(topPoint);
     EXPECT_TRUE(webViewImpl->fakeDoubleTapAnimationPendingForTesting());
     simulateDoubleTap(webViewImpl, bottomPoint, scale);
     EXPECT_FLOAT_EQ(webViewImpl->minimumPageScaleFactor(), scale);
@@ -1283,7 +1302,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleBoundsTest)
     m_webView->layout();
 
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
-    webViewImpl->enableFakeDoubleTapAnimationForTesting(true);
+    webViewImpl->enableFakePageScaleAnimationForTesting(true);
 
     WebRect div(200, 100, 200, 150);
     WebPoint doubleTapPoint(div.x + 50, div.y + 50);
@@ -1345,7 +1364,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest)
     m_webView->layout();
 
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
-    webViewImpl->enableFakeDoubleTapAnimationForTesting(true);
+    webViewImpl->enableFakePageScaleAnimationForTesting(true);
     webViewImpl->page()->settings()->setTextAutosizingFontScaleFactor(textAutosizingFontScaleFactor);
 
     WebRect div(200, 100, 200, 150);
@@ -1409,6 +1428,42 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest)
     EXPECT_FLOAT_EQ(legibleScale, scale);
 }
 
+TEST_F(WebFrameTest, DivMultipleTargetZoomMultipleDivsTest)
+{
+    registerMockedHttpURLLoad("get_multiple_divs_for_auto_zoom_test.html");
+
+    const float deviceScaleFactor = 2.0f;
+    int viewportWidth = 640 / deviceScaleFactor;
+    int viewportHeight = 1280 / deviceScaleFactor;
+    float doubleTapZoomAlreadyLegibleRatio = 1.2f;
+    m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "get_multiple_divs_for_auto_zoom_test.html");
+    m_webView->enableFixedLayoutMode(true);
+    m_webView->resize(WebSize(viewportWidth, viewportHeight));
+    m_webView->setPageScaleFactorLimits(0.5f, 4);
+    m_webView->setDeviceScaleFactor(deviceScaleFactor);
+    m_webView->setPageScaleFactor(0.5f, WebPoint(0, 0));
+    m_webView->layout();
+
+    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
+    webViewImpl->enableFakePageScaleAnimationForTesting(true);
+
+    WebRect viewportRect(0, 0, viewportWidth, viewportHeight);
+    WebRect topDiv(200, 100, 200, 150);
+    WebRect bottomDiv(200, 300, 200, 150);
+    float scale;
+    setScaleAndScrollAndLayout(webViewImpl, WebPoint(0, 0), (webViewImpl->minimumPageScaleFactor()) * (1 + doubleTapZoomAlreadyLegibleRatio) / 2);
+
+    simulateMultiTargetZoom(webViewImpl, topDiv, scale);
+    EXPECT_FLOAT_EQ(1, scale);
+    simulateMultiTargetZoom(webViewImpl, bottomDiv, scale);
+    EXPECT_FLOAT_EQ(1, scale);
+    simulateMultiTargetZoom(webViewImpl, viewportRect, scale);
+    EXPECT_FLOAT_EQ(1, scale);
+    webViewImpl->setPageScaleFactor(webViewImpl->minimumPageScaleFactor(), WebPoint(0, 0));
+    simulateMultiTargetZoom(webViewImpl, topDiv, scale);
+    EXPECT_FLOAT_EQ(1, scale);
+}
+
 TEST_F(WebFrameTest, DivScrollIntoEditableTest)
 {
     registerMockedHttpURLLoad("get_scale_for_zoom_into_editable_test.html");
@@ -1427,7 +1482,7 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
     m_webView->settings()->setAutoZoomFocusedNodeToLegibleScale(true);
 
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
-    webViewImpl->enableFakeDoubleTapAnimationForTesting(true);
+    webViewImpl->enableFakePageScaleAnimationForTesting(true);
 
     WebRect editBoxWithText(200, 200, 250, 20);
     WebRect editBoxWithNoText(200, 250, 250, 20);
@@ -2549,6 +2604,11 @@ TEST_F(WebFrameTest, SelectRangeCanMoveSelectionEnd)
     // EXPECT_EQ("Editable 1. Editable 2. ]", selectionAsString(frame));
 }
 
+static int computeOffset(WebCore::RenderObject* renderer, int x, int y)
+{
+    return WebCore::VisiblePosition(renderer->positionForPoint(WebCore::LayoutPoint(x, y))).deepEquivalent().computeOffsetInContainerNode();
+}
+
 // positionForPoint returns the wrong values for contenteditable spans. See
 // http://crbug.com/238334.
 TEST_F(WebFrameTest, DISABLED_PositionForPointTest)
@@ -2557,15 +2617,15 @@ TEST_F(WebFrameTest, DISABLED_PositionForPointTest)
     m_webView = createWebViewForTextSelection(m_baseURL + "select_range_span_editable.html");
     WebFrameImpl* mainFrame = static_cast<WebFrameImpl*>(m_webView->mainFrame());
     WebCore::RenderObject* renderer = mainFrame->frame()->selection()->rootEditableElement()->renderer();
-    EXPECT_EQ(0, renderer->positionForPoint(WebCore::LayoutPoint(-1, -1)).deepEquivalent().computeOffsetInContainerNode());
-    EXPECT_EQ(64, renderer->positionForPoint(WebCore::LayoutPoint(1000, 1000)).deepEquivalent().computeOffsetInContainerNode());
+    EXPECT_EQ(0, computeOffset(renderer, -1, -1));
+    EXPECT_EQ(64, computeOffset(renderer, 1000, 1000));
 
     registerMockedHttpURLLoad("select_range_div_editable.html");
     m_webView = createWebViewForTextSelection(m_baseURL + "select_range_div_editable.html");
     mainFrame = static_cast<WebFrameImpl*>(m_webView->mainFrame());
     renderer = mainFrame->frame()->selection()->rootEditableElement()->renderer();
-    EXPECT_EQ(0, renderer->positionForPoint(WebCore::LayoutPoint(-1, -1)).deepEquivalent().computeOffsetInContainerNode());
-    EXPECT_EQ(64, renderer->positionForPoint(WebCore::LayoutPoint(1000, 1000)).deepEquivalent().computeOffsetInContainerNode());
+    EXPECT_EQ(0, computeOffset(renderer, -1, -1));
+    EXPECT_EQ(64, computeOffset(renderer, 1000, 1000));
 }
 
 #if !OS(DARWIN)
@@ -3466,5 +3526,30 @@ TEST_F(WebFrameTest, NavigateToSame)
     m_webView = 0;
 }
 
+TEST_F(WebFrameTest, WebNodeImageContents)
+{
+    m_webView = FrameTestHelpers::createWebViewAndLoad("about:blank", true);
+    WebFrame* frame = m_webView->mainFrame();
+
+    static const char bluePNG[] = "<img src=\"data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAoAAAAKCAYAAACNMs+9AAAAGElEQVQYV2NkYPj/n4EIwDiqEF8oUT94AFIQE/cCn90IAAAAAElFTkSuQmCC\">";
+
+    // Load up the image and test that we can extract the contents.
+    WebCore::KURL testURL = toKURL("about:blank");
+    frame->loadHTMLString(bluePNG, testURL);
+    runPendingTasks();
+
+    WebNode node = frame->document().body().firstChild();
+    EXPECT_TRUE(node.isElementNode());
+    WebElement element = node.to<WebElement>();
+    WebImage image = element.imageContents();
+    ASSERT_FALSE(image.isNull());
+    EXPECT_EQ(image.size().width, 10);
+    EXPECT_EQ(image.size().height, 10);
+//    FIXME: The rest of this test is disabled since the ImageDecodeCache state may be inconsistent when this test runs.
+//    crbug.com/266088
+//    SkBitmap bitmap = image.getSkBitmap();
+//    SkAutoLockPixels locker(bitmap);
+//    EXPECT_EQ(bitmap.getColor(0, 0), SK_ColorBLUE);
+}
 
 } // namespace

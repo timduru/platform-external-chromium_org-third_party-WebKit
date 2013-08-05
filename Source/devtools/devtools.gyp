@@ -294,7 +294,6 @@
         'devtools_profiles_js_files': [
             'front_end/BottomUpProfileDataGridTree.js',
             'front_end/CPUProfileView.js',
-            'front_end/CSSSelectorProfileView.js',
             'front_end/FlameChart.js',
             'front_end/HeapSnapshot.js',
             'front_end/HeapSnapshotDataGrids.js',
@@ -452,8 +451,6 @@
             'front_end/Images/timelinePillPurple.png',
             'front_end/Images/timelinePillRed.png',
             'front_end/Images/timelinePillYellow.png',
-            'front_end/Images/toolbarIcons.png',
-            'front_end/Images/toolbarIconsSmall.png',
             'front_end/Images/toolbarItemSelected.png',
             'front_end/Images/trackHoriz.png',
             'front_end/Images/trackVert.png',
@@ -492,7 +489,7 @@
                     'destination': '<(PRODUCT_DIR)/resources/inspector',
                     'files': [
                         '<@(devtools_files)',
-                        '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendCommands.js',
+                        '<(SHARED_INTERMEDIATE_DIR)/blink/InspectorBackendCommands.js',
                     ],
                     'conditions': [
                         ['debug_devtools==0', {
@@ -615,7 +612,7 @@
                         'script_name': 'scripts/generate_devtools_grd.py',
                         'input_pages': [
                             '<@(devtools_files)',
-                            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendCommands.js',
+                            '<(SHARED_INTERMEDIATE_DIR)/blink/InspectorBackendCommands.js',
                             '<(PRODUCT_DIR)/resources/inspector/devtools.html',
                         ],
                         'images': [
@@ -649,13 +646,13 @@
                 'protocol.json',
               ],
               'outputs': [
-                '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendCommands.js',
+                '<(SHARED_INTERMEDIATE_DIR)/blink/InspectorBackendCommands.js',
               ],
               'action': [
                 'python',
                 'scripts/CodeGeneratorFrontend.py',
                 'protocol.json',
-                '--output_js_dir', '<(SHARED_INTERMEDIATE_DIR)/webkit',
+                '--output_js_dir', '<(SHARED_INTERMEDIATE_DIR)/blink',
               ],
               'message': 'Generating Inspector protocol frontend sources from protocol.json',
               'msvs_cygwin_shell': 1,
@@ -681,11 +678,11 @@
                             '<@(_script_name)',
                             '<@(_input_page)',
                             '<@(devtools_files)',
-                            '<(SHARED_INTERMEDIATE_DIR)/webkit/InspectorBackendCommands.js'
+                            '<(SHARED_INTERMEDIATE_DIR)/blink/InspectorBackendCommands.js'
                         ],
                         'search_path': [
                             'front_end',
-                            '<(SHARED_INTERMEDIATE_DIR)/webkit',
+                            '<(SHARED_INTERMEDIATE_DIR)/blink',
                         ],
                         'outputs': ['<(PRODUCT_DIR)/resources/inspector/inspector.js'],
                         'action': ['python', '<@(_script_name)', '<@(_input_page)', '<@(_search_path)', '<@(_outputs)'],

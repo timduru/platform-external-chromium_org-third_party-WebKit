@@ -131,12 +131,12 @@ void HTMLLabelElement::defaultEventHandler(Event* evt)
 
         processingClick = true;
 
-        // Click the corresponding control.
-        element->dispatchSimulatedClick(evt);
-
         document()->updateLayoutIgnorePendingStylesheets();
         if (element->isMouseFocusable())
-            element->focus();
+            element->focus(true, FocusDirectionMouse);
+
+        // Click the corresponding control.
+        element->dispatchSimulatedClick(evt);
 
         processingClick = false;
 

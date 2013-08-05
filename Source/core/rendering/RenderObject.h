@@ -28,7 +28,7 @@
 
 #include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Element.h"
-#include "core/editing/TextAffinity.h"
+#include "core/dom/Position.h"
 #include "core/loader/cache/CachedImageClient.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/LayoutRect.h"
@@ -68,7 +68,6 @@ class RenderSVGResourceContainer;
 class RenderTable;
 class RenderTheme;
 class TransformState;
-class VisiblePosition;
 
 struct PaintInfo;
 
@@ -301,20 +300,11 @@ public:
 
     static RenderObject* createObject(Element*, RenderStyle*);
 
-    // Overloaded new operator.  Derived classes must override operator new
-    // in order to allocate out of the RenderArena.
-    void* operator new(size_t, RenderArena*);
-
-    // Overridden to prevent the normal delete from being called.
-    void operator delete(void*, size_t);
-
-private:
-    // The normal operator new is disallowed on all render objects.
-    void* operator new(size_t) throw();
+    // RenderObjects are allocated out of the rendering partition.
+    void* operator new(size_t);
+    void operator delete(void*);
 
 public:
-    RenderArena* renderArena() const { return document()->renderArena(); }
-
     bool isPseudoElement() const { return node() && node()->isPseudoElement(); }
 
     virtual bool isBR() const { return false; }
@@ -682,6 +672,9 @@ public:
     /* This function performs a layout only if one is needed. */
     void layoutIfNeeded() { if (needsLayout()) layout(); }
 
+    void forceLayout();
+    void forceChildLayout();
+
     // used for element state updates that cannot be fixed with a
     // repaint and do not need a relayout
     virtual void updateFromElement() { }
@@ -695,9 +688,9 @@ public:
     virtual void updateHitTestResult(HitTestResult&, const LayoutPoint&);
     virtual bool nodeAtPoint(const HitTestRequest&, HitTestResult&, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction);
 
-    virtual VisiblePosition positionForPoint(const LayoutPoint&);
-    VisiblePosition createVisiblePosition(int offset, EAffinity);
-    VisiblePosition createVisiblePosition(const Position&);
+    virtual PositionWithAffinity positionForPoint(const LayoutPoint&);
+    PositionWithAffinity createPositionWithAffinity(int offset, EAffinity);
+    PositionWithAffinity createPositionWithAffinity(const Position&);
 
     virtual void dirtyLinesFromChangedChild(RenderObject*);
 
@@ -1019,7 +1012,7 @@ protected:
 
     void clearLayoutRootIfNeeded() const;
     virtual void willBeDestroyed();
-    void arenaDelete(RenderArena*, void* objectBase);
+    void postDestroy();
 
     virtual bool canBeReplacedWithInlineRunIn() const;
 
@@ -1029,11 +1022,14 @@ protected:
     void setDocumentForAnonymous(Document* document) { ASSERT(isAnonymous()); m_node = document; }
 
     // Add hit-test rects for the render tree rooted at this node to the provided collection on a
-    // per-RenderLayer basis. CurrentLayer must be the enclosing layer,
-    // and layerOffset is the current offset within this layer. Subclass implementations will add
-    // any offset for this renderer within it's container, so callers should provide only the
-    // offset of the container within it's layer.
-    virtual void addLayerHitTestRects(LayerHitTestRects&, const RenderLayer* currentLayer, const LayoutPoint& layerOffset) const;
+    // per-RenderLayer basis.
+    // currentLayer must be the enclosing layer, and layerOffset is the current offset within
+    // this layer. Subclass implementations will add any offset for this renderer within it's
+    // container, so callers should provide only the offset of the container within it's layer.
+    // containerRect is a rect that has already been added for the currentLayer which is likely to
+    // be a container for child elements. Any rect wholly contained by containerRect can be
+    // skipped.
+    virtual void addLayerHitTestRects(LayerHitTestRects&, const RenderLayer* currentLayer, const LayoutPoint& layerOffset, const LayoutRect& containerRect) const;
 
     // Add hit-test rects for this renderer only to the provided list. layerOffset is the offset
     // of this renderer within the current layer that should be used for each result.

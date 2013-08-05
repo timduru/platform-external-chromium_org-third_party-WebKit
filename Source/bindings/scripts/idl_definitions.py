@@ -41,7 +41,6 @@ compatibility functions and hacks once Perl compiler gone.
 
 import abc
 import json
-import os.path
 import re
 
 
@@ -67,7 +66,7 @@ class BaseIdl:
 class TypedObject:
     """Object with a type, such as an Attribute or Operation (return value).
 
-    The type can be an actual Type, or can be a Typedef, which must be resolved
+    The type can be an actual type, or can be a typedef, which must be resolved
     before passing data to the code generator.
     """
     __metaclass__ = abc.ABCMeta
@@ -75,7 +74,7 @@ class TypedObject:
     extended_attributes = None
 
     def resolve_typedefs(self, typedefs):
-        """Resolve Typedefs to actual Types in the object."""
+        """Resolve typedefs to actual types in the object."""
         additional_extended_attributes = {}
         # Convert string representation to and from an IdlType object
         # to handle parsing
@@ -97,11 +96,10 @@ class IdlDefinitions(BaseIdl):
         self.callback_functions = callback_functions or {}
         self.enumerations = enumerations or {}
         self.exceptions = exceptions or {}
-        if file_name:
-            self.file_name = os.path.abspath(file_name)
+        self.file_name = file_name or None
         self.interfaces = interfaces or {}
-        # Typedefs are not exposed by bindings; resolve Typedefs with the
-        # actual Types and then discard the Typedefs.
+        # Typedefs are not exposed by bindings; resolve typedefs with the
+        # actual types and then discard the Typedefs.
         # http://www.w3.org/TR/WebIDL/#idl-typedefs
         if typedefs:
             self.resolve_typedefs(typedefs)
@@ -345,7 +343,7 @@ class IdlArgument(BaseIdl, TypedObject):
 
 
 class IdlType:
-    # FIXME: replace Type strings with these objects,
+    # FIXME: replace type strings with these objects,
     # so don't need to parse everywhere types are used.
     # Types are stored internally as strings, not objects,
     # e.g., as 'sequence<Foo>' or 'Foo[]',

@@ -28,6 +28,8 @@
 
 """Builds an IdlDefinitions object from an AST (produced by blink_idl_parser)."""
 
+import os
+
 from idl_definitions import IdlDefinitions, IdlInterface, IdlException, IdlOperation, IdlCallbackFunction, IdlArgument, IdlAttribute, IdlConstant, IdlEnum, IdlTypedef, IdlUnionType
 
 SPECIAL_KEYWORD_LIST = ['GETTER', 'SETTER', 'DELETER']
@@ -46,9 +48,11 @@ def file_node_to_idl_definitions(node):
     callback_functions = {}
     enumerations = {}
     exceptions = {}
-    file_name = node.GetName()  # FIXME: only needed for Perl, remove later
     interfaces = {}
     typedefs = {}
+
+    # FIXME: only needed for Perl, remove later
+    file_name = os.path.abspath(node.GetName())
 
     children = node.GetChildren()
     for child in children:
@@ -487,7 +491,9 @@ def type_node_to_type(node):
 
 def type_node_inner_to_type(node):
     node_class = node.GetClass()
-    # FIXME: Typedef is misspelled as Type*r*ef in base parser.
+    # Note Type*r*ef, not Typedef, meaning the type is an identifier, thus
+    # either a typedef shorthand (but not a Typedef declaration itself) or an
+    # interface type. We do not distinguish these, and just use the type name.
     if node_class in ['PrimitiveType', 'Typeref']:
         return node.GetName()
     elif node_class == 'Any':

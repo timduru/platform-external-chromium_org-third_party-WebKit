@@ -54,7 +54,7 @@ void RenderLayerModelObject::destroyLayer()
 {
     ASSERT(!hasLayer()); // Callers should have already called setHasLayer(false)
     ASSERT(m_layer);
-    m_layer->destroy(renderArena());
+    delete m_layer;
     m_layer = 0;
 }
 
@@ -63,7 +63,7 @@ void RenderLayerModelObject::ensureLayer()
     if (m_layer)
         return;
 
-    m_layer = new (renderArena()) RenderLayer(this);
+    m_layer = new RenderLayer(this);
     setHasLayer(true);
     m_layer->insertOnlyThisLayer();
 }
@@ -182,16 +182,18 @@ void RenderLayerModelObject::styleDidChange(StyleDifference diff, const RenderSt
     }
 }
 
-void RenderLayerModelObject::addLayerHitTestRects(LayerHitTestRects& rects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset) const
+void RenderLayerModelObject::addLayerHitTestRects(LayerHitTestRects& rects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset, const LayoutRect& containerRect) const
 {
     // If we have a new layer then our current layer/offset is irrelevant.
     LayoutPoint adjustedLayerOffset = layerOffset;
+    LayoutRect adjustedContainerRect = containerRect;
     if (hasLayer()) {
         currentLayer = layer();
         adjustedLayerOffset = LayoutPoint();
+        adjustedContainerRect = LayoutRect();
     }
 
-    RenderObject::addLayerHitTestRects(rects, currentLayer, adjustedLayerOffset);
+    RenderObject::addLayerHitTestRects(rects, currentLayer, adjustedLayerOffset, adjustedContainerRect);
 }
 
 } // namespace WebCore

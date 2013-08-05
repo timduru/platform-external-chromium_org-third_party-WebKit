@@ -32,9 +32,7 @@ namespace WebCore {
 
     // this class represents a selector for a StyleRule
     class CSSSelector {
-      // This is needed because CSSSelectorList::adoptSelectorVector() expects
-      // to be able to free() this type of object, as a performance tweak.
-      NEW_DELETE_SAME_AS_MALLOC_FREE;
+        WTF_MAKE_FAST_ALLOCATED;
     public:
         CSSSelector();
         CSSSelector(const CSSSelector&);
@@ -162,6 +160,7 @@ namespace WebCore {
             PseudoPastCue,
             PseudoSeamlessDocument,
             PseudoDistributed,
+            PseudoPart,
             PseudoUnresolved
         };
 
@@ -203,11 +202,13 @@ namespace WebCore {
         const QualifiedName& attribute() const;
         const AtomicString& argument() const { return m_hasRareData ? m_data.m_rareData->m_argument : nullAtom; }
         const CSSSelectorList* selectorList() const { return m_hasRareData ? m_data.m_rareData->m_selectorList.get() : 0; }
+        bool isMatchUserAgentOnly() const { return m_hasRareData ? m_data.m_rareData->m_matchUserAgentOnly : false; }
 
         void setValue(const AtomicString&);
         void setAttribute(const QualifiedName&);
         void setArgument(const AtomicString&);
         void setSelectorList(PassOwnPtr<CSSSelectorList>);
+        void setMatchUserAgentOnly();
 
         bool parseNth() const;
         bool matchNth(int count) const;
@@ -265,8 +266,9 @@ namespace WebCore {
             int m_a; // Used for :nth-*
             int m_b; // Used for :nth-*
             QualifiedName m_attribute; // used for attribute selector
-            AtomicString m_argument; // Used for :contains, :lang and :nth-*
+            AtomicString m_argument; // Used for :contains, :lang, :nth-* and ::part
             OwnPtr<CSSSelectorList> m_selectorList; // Used for :-webkit-any and :not
+            unsigned m_matchUserAgentOnly : 1; // Used to make ::part with "-webkit"-prefixed part name match only elements in UA shadow roots.
 
         private:
             RareData(PassRefPtr<StringImpl> value);
@@ -302,7 +304,7 @@ inline bool CSSSelector::isUnknownPseudoElement() const
 
 inline bool CSSSelector::isCustomPseudoElement() const
 {
-    return m_match == PseudoElement && (m_pseudoType == PseudoUserAgentCustomElement || m_pseudoType == PseudoWebKitCustomElement);
+    return m_match == PseudoElement && (m_pseudoType == PseudoUserAgentCustomElement || m_pseudoType == PseudoWebKitCustomElement || m_pseudoType == PseudoPart);
 }
 
 inline bool CSSSelector::isSiblingSelector() const

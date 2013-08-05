@@ -66,6 +66,7 @@
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/HistogramSupport.h"
+#include "core/platform/Partitions.h"
 #include "core/platform/PlatformGestureEvent.h"
 #include "core/platform/PlatformMouseEvent.h"
 #include "core/platform/ScrollAnimator.h"
@@ -90,7 +91,6 @@
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/HitTestingTransformState.h"
 #include "core/rendering/OverlapTestRequestClient.h"
-#include "core/rendering/RenderArena.h"
 #include "core/rendering/RenderFlowThread.h"
 #include "core/rendering/RenderGeometryMap.h"
 #include "core/rendering/RenderInline.h"
@@ -1318,6 +1318,29 @@ IntRect RenderLayer::scrollableAreaBoundingBox() const
     return renderer()->absoluteBoundingBoxRect();
 }
 
+bool RenderLayer::userInputScrollable(ScrollbarOrientation orientation) const
+{
+    RenderBox* box = renderBox();
+    ASSERT(box);
+
+    EOverflow overflowStyle = (orientation == HorizontalScrollbar) ?
+        renderer()->style()->overflowX() : renderer()->style()->overflowY();
+    return (overflowStyle == OSCROLL || overflowStyle == OAUTO);
+}
+
+int RenderLayer::pageStep(ScrollbarOrientation orientation) const
+{
+    RenderBox* box = renderBox();
+    ASSERT(box);
+
+    int length = (orientation == HorizontalScrollbar) ?
+        box->pixelSnappedClientWidth() : box->pixelSnappedClientHeight();
+    int minPageStep = static_cast<float>(length) * ScrollableArea::minFractionToStepWhenPaging();
+    int pageStep = max(minPageStep, length - ScrollableArea::maxOverlapBetweenPages());
+
+    return max(pageStep, 1);
+}
+
 RenderLayer* RenderLayer::enclosingTransformedAncestor() const
 {
     RenderLayer* curr = parent();
@@ -1616,23 +1639,14 @@ void RenderLayer::beginTransparencyLayers(GraphicsContext* context, const Render
     }
 }
 
-void* RenderLayer::operator new(size_t sz, RenderArena* renderArena)
+void* RenderLayer::operator new(size_t sz)
 {
-    return renderArena->allocate(sz);
+    return partitionAlloc(Partitions::getRenderingPartition(), sz);
 }
 
-void RenderLayer::operator delete(void* ptr, size_t sz)
+void RenderLayer::operator delete(void* ptr)
 {
-    // Stash size where destroy can find it.
-    *(size_t *)ptr = sz;
-}
-
-void RenderLayer::destroy(RenderArena* renderArena)
-{
-    delete this;
-
-    // Recover the size left there for us by operator delete and free the memory.
-    renderArena->free(*(size_t *)this, this);
+    partitionFree(ptr);
 }
 
 void RenderLayer::addChild(RenderLayer* child, RenderLayer* beforeChild)
@@ -2472,17 +2486,8 @@ void RenderLayer::resize(const PlatformEvent& evt, const LayoutSize& oldOffset)
 
 int RenderLayer::scrollSize(ScrollbarOrientation orientation) const
 {
-    Scrollbar* scrollbar = ((orientation == HorizontalScrollbar) ? m_hBar : m_vBar).get();
-    return scrollbar ? (scrollbar->totalSize() - scrollbar->visibleSize()) : 0;
-}
-
-int RenderLayer::scrollPosition(Scrollbar* scrollbar) const
-{
-    if (scrollbar->orientation() == HorizontalScrollbar)
-        return scrollXOffset();
-    if (scrollbar->orientation() == VerticalScrollbar)
-        return scrollYOffset();
-    return 0;
+    IntSize scrollDimensions = maximumScrollPosition() - minimumScrollPosition();
+    return (orientation == HorizontalScrollbar) ? scrollDimensions.width() : scrollDimensions.height();
 }
 
 IntPoint RenderLayer::scrollPosition() const
@@ -2501,9 +2506,7 @@ IntPoint RenderLayer::maximumScrollPosition() const
     if (!box || !box->hasOverflowClip())
         return -scrollOrigin();
 
-    LayoutRect overflowRect(box->layoutOverflowRect());
-    box->flipForWritingMode(overflowRect);
-    return -scrollOrigin() + enclosingIntRect(overflowRect).size() - enclosingIntRect(box->clientBoxRect()).size();
+    return -scrollOrigin() + enclosingIntRect(m_overflowRect).size() - enclosingIntRect(box->clientBoxRect()).size();
 }
 
 IntRect RenderLayer::visibleContentRect(VisibleContentRectIncludesScrollbars scrollbarInclusion) const
@@ -2843,14 +2846,6 @@ void RenderLayer::destroyScrollbar(ScrollbarOrientation orientation)
     scrollbar = 0;
 }
 
-bool RenderLayer::scrollsOverflow() const
-{
-    if (!renderer()->isBox())
-        return false;
-
-    return toRenderBox(renderer())->scrollsOverflow();
-}
-
 void RenderLayer::setHasHorizontalScrollbar(bool hasScrollbar)
 {
     if (hasScrollbar == hasHorizontalScrollbar())
@@ -2972,7 +2967,7 @@ int RenderLayer::scrollWidth() const
     ASSERT(renderBox());
     if (m_scrollDimensionsDirty)
         const_cast<RenderLayer*>(this)->computeScrollDimensions();
-    return snapSizeToPixel(m_scrollSize.width(), renderBox()->clientLeft() + renderBox()->x());
+    return snapSizeToPixel(m_overflowRect.width(), renderBox()->clientLeft() + renderBox()->x());
 }
 
 int RenderLayer::scrollHeight() const
@@ -2980,39 +2975,7 @@ int RenderLayer::scrollHeight() const
     ASSERT(renderBox());
     if (m_scrollDimensionsDirty)
         const_cast<RenderLayer*>(this)->computeScrollDimensions();
-    return snapSizeToPixel(m_scrollSize.height(), renderBox()->clientTop() + renderBox()->y());
-}
-
-LayoutUnit RenderLayer::overflowTop() const
-{
-    RenderBox* box = renderBox();
-    LayoutRect overflowRect(box->layoutOverflowRect());
-    box->flipForWritingMode(overflowRect);
-    return overflowRect.y();
-}
-
-LayoutUnit RenderLayer::overflowBottom() const
-{
-    RenderBox* box = renderBox();
-    LayoutRect overflowRect(box->layoutOverflowRect());
-    box->flipForWritingMode(overflowRect);
-    return overflowRect.maxY();
-}
-
-LayoutUnit RenderLayer::overflowLeft() const
-{
-    RenderBox* box = renderBox();
-    LayoutRect overflowRect(box->layoutOverflowRect());
-    box->flipForWritingMode(overflowRect);
-    return overflowRect.x();
-}
-
-LayoutUnit RenderLayer::overflowRight() const
-{
-    RenderBox* box = renderBox();
-    LayoutRect overflowRect(box->layoutOverflowRect());
-    box->flipForWritingMode(overflowRect);
-    return overflowRect.maxX();
+    return snapSizeToPixel(m_overflowRect.height(), renderBox()->clientTop() + renderBox()->y());
 }
 
 void RenderLayer::computeScrollDimensions()
@@ -3022,11 +2985,11 @@ void RenderLayer::computeScrollDimensions()
 
     m_scrollDimensionsDirty = false;
 
-    m_scrollSize.setWidth(overflowRight() - overflowLeft());
-    m_scrollSize.setHeight(overflowBottom() - overflowTop());
+    m_overflowRect = box->layoutOverflowRect();
+    box->flipForWritingMode(m_overflowRect);
 
-    int scrollableLeftOverflow = overflowLeft() - box->borderLeft();
-    int scrollableTopOverflow = overflowTop() - box->borderTop();
+    int scrollableLeftOverflow = m_overflowRect.x() - box->borderLeft();
+    int scrollableTopOverflow = m_overflowRect.y() - box->borderTop();
     setScrollOrigin(IntPoint(-scrollableLeftOverflow, -scrollableTopOverflow));
 }
 
@@ -3109,15 +3072,11 @@ void RenderLayer::updateScrollbarsAfterLayout()
     // Set up the range (and page step/line step).
     if (m_hBar) {
         int clientWidth = box->pixelSnappedClientWidth();
-        int pageStep = max(max<int>(clientWidth * Scrollbar::minFractionToStepWhenPaging(), clientWidth - Scrollbar::maxOverlapBetweenPages()), 1);
-        m_hBar->setSteps(Scrollbar::pixelsPerLineStep(), pageStep);
-        m_hBar->setProportion(clientWidth, m_scrollSize.width());
+        m_hBar->setProportion(clientWidth, m_overflowRect.width());
     }
     if (m_vBar) {
         int clientHeight = box->pixelSnappedClientHeight();
-        int pageStep = max(max<int>(clientHeight * Scrollbar::minFractionToStepWhenPaging(), clientHeight - Scrollbar::maxOverlapBetweenPages()), 1);
-        m_vBar->setSteps(Scrollbar::pixelsPerLineStep(), pageStep);
-        m_vBar->setProportion(clientHeight, m_scrollSize.height());
+        m_vBar->setProportion(clientHeight, m_overflowRect.height());
     }
 
     updateScrollableAreaSet(hasScrollableHorizontalOverflow() || hasScrollableVerticalOverflow());
@@ -3598,9 +3557,9 @@ void RenderLayer::paintLayerContentsAndReflection(GraphicsContext* context, cons
 void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPaintingInfo& paintingInfo, PaintLayerFlags paintFlags)
 {
     ASSERT(isSelfPaintingLayer() || hasSelfPaintingLayerDescendant());
+    ASSERT(!(paintFlags & PaintLayerAppliedTransform));
 
-    PaintLayerFlags localPaintFlags = paintFlags & ~(PaintLayerAppliedTransform);
-    bool haveTransparency = localPaintFlags & PaintLayerHaveTransparency;
+    bool haveTransparency = paintFlags & PaintLayerHaveTransparency;
     bool isSelfPaintingLayer = this->isSelfPaintingLayer();
     bool isPaintingOverlayScrollbars = paintFlags & PaintLayerPaintingOverlayScrollbars;
     bool isPaintingScrollingContent = paintFlags & PaintLayerPaintingCompositingScrollingPhase;
@@ -3623,7 +3582,7 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
 
     GraphicsContext* transparencyLayerContext = context;
 
-    if (localPaintFlags & PaintLayerPaintingRootBackgroundOnly && !renderer()->isRenderView() && !renderer()->isRoot())
+    if (paintFlags & PaintLayerPaintingRootBackgroundOnly && !renderer()->isRenderView() && !renderer()->isRoot())
         return;
 
     // Ensure our lists are up-to-date.
@@ -3726,12 +3685,12 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
     bool shouldPaintOwnContents = isPaintingCompositedForeground && shouldPaintContent;
     bool shouldPaintNormalFlowAndPosZOrderLists = isPaintingCompositedForeground;
     bool shouldPaintOverlayScrollbars = isPaintingOverlayScrollbars;
-    bool shouldPaintMask = (localPaintFlags & PaintLayerPaintingCompositingMaskPhase) && shouldPaintContent && renderer()->hasMask() && !selectionOnly;
+    bool shouldPaintMask = (paintFlags & PaintLayerPaintingCompositingMaskPhase) && shouldPaintContent && renderer()->hasMask() && !selectionOnly;
 
     PaintBehavior paintBehavior = PaintBehaviorNormal;
-    if (localPaintFlags & PaintLayerPaintingSkipRootBackground)
+    if (paintFlags & PaintLayerPaintingSkipRootBackground)
         paintBehavior |= PaintBehaviorSkipRootBackground;
-    else if (localPaintFlags & PaintLayerPaintingRootBackgroundOnly)
+    else if (paintFlags & PaintLayerPaintingRootBackgroundOnly)
         paintBehavior |= PaintBehaviorRootBackgroundOnly;
 
     LayerFragments layerFragments;
@@ -3739,9 +3698,9 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
         // Collect the fragments. This will compute the clip rectangles and paint offsets for each layer fragment, as well as whether or not the content of each
         // fragment should paint.
         collectFragments(layerFragments, localPaintingInfo.rootLayer, localPaintingInfo.region, localPaintingInfo.paintDirtyRect,
-            (localPaintFlags & PaintLayerTemporaryClipRects) ? TemporaryClipRects : PaintingClipRects, IgnoreOverlayScrollbarSize,
+            (paintFlags & PaintLayerTemporaryClipRects) ? TemporaryClipRects : PaintingClipRects, IgnoreOverlayScrollbarSize,
             (isPaintingOverflowContents) ? IgnoreOverflowClip : RespectOverflowClip, &offsetFromRoot);
-        updatePaintingInfoForFragments(layerFragments, localPaintingInfo, localPaintFlags, shouldPaintContent, &offsetFromRoot);
+        updatePaintingInfoForFragments(layerFragments, localPaintingInfo, paintFlags, shouldPaintContent, &offsetFromRoot);
     }
 
     if (shouldPaintBackground)
@@ -3749,7 +3708,7 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
                 localPaintingInfo, paintBehavior, paintingRootForRenderer);
 
     if (shouldPaintNegZOrderList)
-        paintList(negZOrderList(), context, localPaintingInfo, localPaintFlags);
+        paintList(negZOrderList(), context, localPaintingInfo, paintFlags);
 
     if (shouldPaintOwnContents)
         paintForegroundForFragments(layerFragments, context, transparencyLayerContext, paintingInfo.paintDirtyRect, haveTransparency,
@@ -3759,10 +3718,10 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
         paintOutlineForFragments(layerFragments, context, localPaintingInfo, paintBehavior, paintingRootForRenderer);
 
     if (shouldPaintNormalFlowAndPosZOrderLists)
-        paintList(m_normalFlowList.get(), context, localPaintingInfo, localPaintFlags);
+        paintList(m_normalFlowList.get(), context, localPaintingInfo, paintFlags);
 
     if (shouldPaintNormalFlowAndPosZOrderLists)
-        paintList(posZOrderList(), context, localPaintingInfo, localPaintFlags);
+        paintList(posZOrderList(), context, localPaintingInfo, paintFlags);
 
     if (shouldPaintOverlayScrollbars)
         paintOverflowControlsForFragments(layerFragments, context, localPaintingInfo);

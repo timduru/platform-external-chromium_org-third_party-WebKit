@@ -110,9 +110,6 @@ public:
     virtual void setPrerendererClient(WebPrerendererClient*) = 0;
     virtual void setSpellCheckClient(WebSpellCheckClient*) = 0;
     virtual void setValidationMessageClient(WebValidationMessageClient*) = 0;
-
-    // FIXME: Remove this once pasword_generator stops using it.
-    void addTextFieldDecoratorClient(WebPasswordGeneratorClient* client) { setPasswordGeneratorClient(client); };
     virtual void setPasswordGeneratorClient(WebPasswordGeneratorClient*) = 0;
 
     // Options -------------------------------------------------------------
@@ -214,6 +211,11 @@ public:
     // Animate a scale into the specified find-in-page rect.
     virtual void zoomToFindInPageRect(const WebRect&) = 0;
 
+    // Animate a scale into the specified rect where multiple targets were
+    // found from previous tap gesture.
+    // Returns false if it doesn't do any zooming.
+    virtual bool zoomToMultipleTargetsRect(const WebRect&) = 0;
+
 
     // Zoom ----------------------------------------------------------------
 
@@ -288,9 +290,6 @@ public:
     // and the minimum height required to display the main document without scrollbars.
     // The returned size has the page zoom factor applied.
     virtual WebSize contentsPreferredMinimumSize() = 0;
-
-    // FIXME(aelias): Delete this after Chromium switches to the other name.
-    void setIgnoreViewportTagMaximumScale(bool ignore) { setIgnoreViewportTagScaleLimits(ignore); }
 
     // The ratio of the current device's screen DPI to the target device's screen DPI.
     virtual float deviceScaleFactor() const = 0;

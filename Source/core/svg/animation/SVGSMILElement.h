@@ -28,8 +28,7 @@
 
 #include "core/svg/SVGElement.h"
 #include "core/svg/animation/SMILTime.h"
-
-#include <wtf/HashMap.h>
+#include "wtf/HashMap.h"
 
 namespace WebCore {
 
@@ -127,6 +126,8 @@ private:
     virtual void startedActiveInterval() = 0;
     void endedActiveInterval();
     virtual void updateAnimation(float percent, unsigned repeat, SVGSMILElement* resultElement) = 0;
+
+    virtual bool rendererIsNeeded(const NodeRenderingContext&) OVERRIDE { return false; }
 
     enum BeginOrEnd {
         Begin,

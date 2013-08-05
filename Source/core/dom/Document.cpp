@@ -153,7 +153,6 @@
 #include "core/platform/text/SegmentedString.h"
 #include "core/rendering/HitTestRequest.h"
 #include "core/rendering/HitTestResult.h"
-#include "core/rendering/RenderArena.h"
 #include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/rendering/TextAutosizer.h"
@@ -355,8 +354,10 @@ private:
         Element* element = document->focusedElement();
         if (!element)
             return;
-        if (document->childNeedsStyleRecalc())
+        if (document->childNeedsStyleRecalc()) {
+            document->setNeedsFocusedElementCheck();
             return;
+        }
         if (element->renderer() && element->renderer()->needsLayout())
             return;
         if (!element->isFocusable())
@@ -425,7 +426,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_eventQueue(DocumentEventQueue::create(this))
     , m_weakFactory(this)
     , m_idAttributeName(idAttr)
-    , m_hasFullscreenController(false)
+    , m_hasFullscreenElementStack(false)
     , m_loadEventDelayCount(0)
     , m_loadEventDelayTimer(this, &Document::loadEventDelayTimerFired)
     , m_referrerPolicy(ReferrerPolicyDefault)
@@ -503,7 +504,6 @@ Document::~Document()
 {
     ASSERT(!renderer());
     ASSERT(m_ranges.isEmpty());
-    ASSERT(!m_styleRecalcTimer.isActive());
     ASSERT(!m_parentTreeScope);
     ASSERT(!hasGuardRefCount());
 
@@ -527,8 +527,6 @@ Document::~Document()
     // if the DocumentParser outlives the Document it won't cause badness.
     ASSERT(!m_parser || m_parser->refCount() == 1);
     detachParser();
-
-    m_renderArena.clear();
 
     if (this == topDocument())
         clearAXObjectCache();
@@ -779,7 +777,7 @@ void Document::didLoadAllImports()
 
 bool Document::haveImportsLoaded() const
 {
-    return !m_import || m_import->haveChildrenLoaded();
+    return !m_import || !m_import->isBlocked();
 }
 
 PassRefPtr<DocumentFragment> Document::createDocumentFragment()
@@ -1219,11 +1217,11 @@ PassRefPtr<Range> Document::caretRangeFromPoint(int x, int y)
     RenderObject* renderer = node->renderer();
     if (!renderer)
         return 0;
-    VisiblePosition visiblePosition = renderer->positionForPoint(localPoint);
-    if (visiblePosition.isNull())
+    PositionWithAffinity positionWithAffinity = renderer->positionForPoint(localPoint);
+    if (positionWithAffinity.position().isNull())
         return 0;
 
-    Position rangeCompliantPosition = visiblePosition.deepEquivalent().parentAnchoredEquivalent();
+    Position rangeCompliantPosition = positionWithAffinity.position().parentAnchoredEquivalent();
     return Range::create(this, rangeCompliantPosition, rangeCompliantPosition);
 }
 
@@ -1539,7 +1537,7 @@ void Document::scheduleStyleRecalc()
     if (m_styleRecalcTimer.isActive())
         return;
 
-    ASSERT(needsStyleRecalc() || childNeedsStyleRecalc());
+    ASSERT(needsStyleRecalc() || childNeedsStyleRecalc() || childNeedsDistributionRecalc());
 
     m_styleRecalcTimer.startOneShot(0);
 
@@ -1567,6 +1565,29 @@ void Document::styleRecalcTimerFired(Timer<Document>*)
     updateStyleIfNeeded();
 }
 
+void Document::updateDistributionIfNeeded()
+{
+    if (!childNeedsDistributionRecalc())
+        return;
+    TRACE_EVENT0("webkit", "Document::recalcDistribution");
+    recalcDistribution();
+}
+
+void Document::updateDistributionForNodeIfNeeded(Node* node)
+{
+    if (node->inDocument()) {
+        updateDistributionIfNeeded();
+        return;
+    }
+    Node* root = node;
+    while (Node* host = root->shadowHost())
+        root = host;
+    while (Node* ancestor = root->parentOrShadowHostNode())
+        root = ancestor;
+    if (root->childNeedsDistributionRecalc())
+        root->recalcDistribution();
+}
+
 void Document::recalcStyle(StyleChange change)
 {
     // we should not enter style recalc while painting
@@ -1579,6 +1600,8 @@ void Document::recalcStyle(StyleChange change)
 
     TRACE_EVENT0("webkit", "Document::recalcStyle");
     TRACE_EVENT_SCOPED_SAMPLING_STATE("Blink", "RecalcStyle");
+
+    updateDistributionIfNeeded();
 
     // FIXME: We should update style on our ancestor chain before proceeding (especially for seamless),
     // however doing so currently causes several tests to crash, as Frame::setDocument calls Document::attach
@@ -1606,8 +1629,7 @@ void Document::recalcStyle(StyleChange change)
             frameView->beginDeferredRepaints();
         }
 
-        ASSERT(!renderer() || renderArena());
-        if (!renderer() || !renderArena())
+        if (!renderer())
             goto bailOut;
 
         if (styleChangeType() == SubtreeStyleChange)
@@ -1680,7 +1702,7 @@ void Document::updateStyleIfNeeded()
     ASSERT(isMainThread());
     ASSERT(!view() || (!view()->isInLayout() && !view()->isPainting()));
 
-    if (!needsStyleRecalc() && !childNeedsStyleRecalc())
+    if (!needsStyleRecalc() && !childNeedsStyleRecalc() && !childNeedsDistributionRecalc())
         return;
 
     AnimationUpdateBlock animationUpdateBlock(m_frame ? m_frame->animation() : 0);
@@ -1721,11 +1743,16 @@ void Document::updateLayout()
     if (frameView && renderer() && (frameView->layoutPending() || renderer()->needsLayout()))
         frameView->layout();
 
+    setNeedsFocusedElementCheck();
+}
+
+void Document::setNeedsFocusedElementCheck()
+{
     // FIXME: Using a Task doesn't look a good idea.
-    if (m_focusedElement && !m_didPostCheckFocusedElementTask) {
-        postTask(CheckFocusedElementTask::create());
-        m_didPostCheckFocusedElementTask = true;
-    }
+    if (!m_focusedElement || m_didPostCheckFocusedElementTask)
+        return;
+    postTask(CheckFocusedElementTask::create());
+    m_didPostCheckFocusedElementTask = true;
 }
 
 // FIXME: This is a bad idea and needs to be removed eventually.
@@ -1847,11 +1874,8 @@ void Document::attach(const AttachContext& context)
     ASSERT(!attached());
     ASSERT(!m_axObjectCache || this != topDocument());
 
-    if (!m_renderArena)
-        m_renderArena = RenderArena::create();
-
     // Create the rendering tree
-    setRenderer(new (m_renderArena.get()) RenderView(this));
+    setRenderer(new RenderView(this));
     renderView()->setIsInWindow(true);
 
     recalcStyle(Force);
@@ -1918,7 +1942,6 @@ void Document::detach(const AttachContext& context)
     // or this setting of the frame to 0 could be made explicit in each of the
     // callers of Document::detach().
     m_frame = 0;
-    m_renderArena.clear();
 
     if (m_mediaQueryMatcher)
         m_mediaQueryMatcher->documentDestroyed();
@@ -4062,12 +4085,12 @@ PassRefPtr<HTMLCollection> Document::all()
 
 PassRefPtr<HTMLCollection> Document::windowNamedItems(const AtomicString& name)
 {
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLNameCollection>(this, WindowNamedItems, name);
+    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<WindowNameCollection>(this, WindowNamedItems, name);
 }
 
 PassRefPtr<HTMLCollection> Document::documentNamedItems(const AtomicString& name)
 {
-    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<HTMLNameCollection>(this, DocumentNamedItems, name);
+    return ensureRareData()->ensureNodeLists()->addCacheWithAtomicName<DocumentNameCollection>(this, DocumentNamedItems, name);
 }
 
 void Document::finishedParsing()

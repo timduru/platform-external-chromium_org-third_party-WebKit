@@ -15,28 +15,28 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_core_generate_inspector_protocol_version_gyp)/generate_inspector_protocol_version.stamp
 
 ### Rules for action "generateInspectorProtocolBackendSources":
-$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInspector.py $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInspectorStrings.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/protocol.json $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInspector.py $(LOCAL_PATH)/third_party/WebKit/Source/core/inspector/CodeGeneratorInspectorStrings.py $(LOCAL_PATH)/third_party/WebKit/Source/devtools/protocol.json $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Generating Inspector protocol backend sources from protocol.json ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/webkit; python inspector/CodeGeneratorInspector.py ../devtools/protocol.json --output_dir "$(gyp_shared_intermediate_dir)/webkit"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/core; mkdir -p $(gyp_shared_intermediate_dir)/blink; python inspector/CodeGeneratorInspector.py ../devtools/protocol.json --output_dir "$(gyp_shared_intermediate_dir)/blink"
 
-$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.h: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.h: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.cpp: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.h: $(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.h: $(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/blink/InspectorFrontend.cpp: $(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/blink/InspectorFrontend.h: $(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/blink/InspectorTypeBuilder.cpp: $(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp ;
+$(gyp_shared_intermediate_dir)/blink/InspectorTypeBuilder.h: $(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp ;
 
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/InspectorBackendDispatcher.h \
-	$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/InspectorFrontend.h \
-	$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/InspectorTypeBuilder.h
+	$(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.cpp \
+	$(gyp_shared_intermediate_dir)/blink/InspectorBackendDispatcher.h \
+	$(gyp_shared_intermediate_dir)/blink/InspectorFrontend.cpp \
+	$(gyp_shared_intermediate_dir)/blink/InspectorFrontend.h \
+	$(gyp_shared_intermediate_dir)/blink/InspectorTypeBuilder.cpp \
+	$(gyp_shared_intermediate_dir)/blink/InspectorTypeBuilder.h
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)

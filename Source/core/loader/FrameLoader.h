@@ -40,7 +40,6 @@
 #include "core/loader/MixedContentChecker.h"
 #include "core/loader/ResourceLoadNotifier.h"
 #include "core/loader/ResourceLoaderOptions.h"
-#include "core/loader/SubframeLoader.h"
 #include "core/loader/cache/CachePolicy.h"
 #include "core/page/LayoutMilestones.h"
 #include "core/platform/Timer.h"
@@ -86,7 +85,6 @@ public:
 
     HistoryController* history() const { return &m_history; }
     ResourceLoadNotifier* notifier() const { return &m_notifer; }
-    SubframeLoader* subframeLoader() const { return &m_subframeLoader; }
     IconController* icon() const { return m_icon.get(); }
     MixedContentChecker* mixedContentChecker() const { return &m_mixedContentChecker; }
 
@@ -114,16 +112,8 @@ public:
     void stopLoading(UnloadEventPolicy);
     bool closeURL();
     void cancelAndClear();
-
-    // FIXME: clear() is trying to do too many things. We should break it down into smaller functions.
-
-    enum ClearOption {
-        ClearWindowProperties = 1 << 0,
-        ClearScriptObjects    = 1 << 1,
-        ClearWindowObject     = 1 << 2
-    };
-    typedef unsigned ClearOptions;
-    void clear(ClearOptions);
+    // FIXME: clear() is trying to do too many things. We should break it down into smaller functions (ideally with fewer raw Boolean parameters).
+    void clear(bool clearWindowProperties = true, bool clearScriptObjects = true, bool clearFrameView = true);
 
     void didAccessInitialDocument();
     void didAccessInitialDocumentTimerFired(Timer<FrameLoader>*);
@@ -153,7 +143,6 @@ public:
 
     bool subframeIsLoading() const;
     void didChangeTitle(DocumentLoader*);
-    void didChangeIcons(IconType);
 
     bool shouldTreatURLAsSrcdocDocument(const KURL&) const;
 
@@ -263,7 +252,6 @@ private:
     void setReferrerForFrameRequest(ResourceRequest&, ShouldSendReferrer);
     FrameLoadType determineFrameLoadType(const FrameLoadRequest&);
 
-    void clearProvisionalLoad();
     void frameLoadCompleted();
 
     SubstituteData defaultSubstituteDataForURL(const KURL&);
@@ -317,7 +305,6 @@ private:
     // Some of these could be lazily created for memory savings on devices.
     mutable HistoryController m_history;
     mutable ResourceLoadNotifier m_notifer;
-    mutable SubframeLoader m_subframeLoader;
     mutable FrameLoaderStateMachine m_stateMachine;
     OwnPtr<IconController> m_icon;
     mutable MixedContentChecker m_mixedContentChecker;
@@ -335,8 +322,6 @@ private:
     RefPtr<DocumentLoader> m_documentLoader;
     RefPtr<DocumentLoader> m_provisionalDocumentLoader;
     RefPtr<DocumentLoader> m_policyDocumentLoader;
-
-    bool m_delegateIsHandlingProvisionalLoadError;
 
     bool m_inStopAllLoaders;
 

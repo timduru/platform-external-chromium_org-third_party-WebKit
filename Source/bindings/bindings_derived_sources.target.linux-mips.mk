@@ -17,54 +17,54 @@ GYP_TARGET_DEPENDENCIES := \
 	$(call intermediates-dir-for,GYP,third_party_WebKit_Source_bindings_python_bindings_sources_gyp)/python_bindings_sources.stamp
 
 ### Rules for action "derived_sources_all_in_one":
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp: gyp_local_path := $(LOCAL_PATH)
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/action_derivedsourcesallinone.py $(gyp_shared_intermediate_dir)/InterfaceDependencies.txt $(GYP_TARGET_DEPENDENCIES)
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp: gyp_local_path := $(LOCAL_PATH)
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp: gyp_intermediate_dir := $(abspath $(gyp_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp: gyp_shared_intermediate_dir := $(abspath $(gyp_shared_intermediate_dir))
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp: export PATH := $(subst $(ANDROID_BUILD_PATHS),,$(PATH))
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp: $(LOCAL_PATH)/third_party/WebKit/Source/core/scripts/action_derivedsourcesallinone.py $(gyp_shared_intermediate_dir)/blink/InterfaceDependencies.txt $(GYP_TARGET_DEPENDENCIES)
 	@echo "Gyp action: Generating bindings derived sources ($@)"
-	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/bindings; mkdir -p $(gyp_shared_intermediate_dir)/webkit/bindings; python ../core/scripts/action_derivedsourcesallinone.py "$(gyp_shared_intermediate_dir)/InterfaceDependencies.txt" -- "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources02.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources03.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources04.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources05.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources06.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources07.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources08.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources09.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources10.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources11.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources12.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources13.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources14.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources15.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources16.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources17.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources18.cpp" "$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources19.cpp"
+	$(hide)cd $(gyp_local_path)/third_party/WebKit/Source/bindings; mkdir -p $(gyp_shared_intermediate_dir)/blink/bindings; python ../core/scripts/action_derivedsourcesallinone.py "$(gyp_shared_intermediate_dir)/blink/InterfaceDependencies.txt" -- "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources02.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources03.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources04.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources05.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources06.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources07.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources08.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources09.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources10.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources11.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources12.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources13.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources14.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources15.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources16.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources17.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources18.cpp" "$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources19.cpp"
 
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources02.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources03.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources04.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources05.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources06.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources07.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources08.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources09.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources10.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources11.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources12.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources13.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources14.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources15.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources16.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources17.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources18.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
-$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources19.cpp: $(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources02.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources03.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources04.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources05.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources06.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources07.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources08.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources09.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources10.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources11.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources12.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources13.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources14.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources15.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources16.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources17.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources18.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
+$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources19.cpp: $(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp ;
 
 
 GYP_GENERATED_OUTPUTS := \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources01.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources02.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources03.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources04.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources05.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources06.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources07.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources08.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources09.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources10.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources11.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources12.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources13.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources14.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources15.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources16.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources17.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources18.cpp \
-	$(gyp_shared_intermediate_dir)/webkit/bindings/V8DerivedSources19.cpp
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources01.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources02.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources03.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources04.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources05.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources06.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources07.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources08.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources09.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources10.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources11.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources12.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources13.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources14.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources15.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources16.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources17.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources18.cpp \
+	$(gyp_shared_intermediate_dir)/blink/bindings/V8DerivedSources19.cpp
 
 # Make sure our deps and generated files are built first.
 LOCAL_ADDITIONAL_DEPENDENCIES := $(GYP_TARGET_DEPENDENCIES) $(GYP_GENERATED_OUTPUTS)

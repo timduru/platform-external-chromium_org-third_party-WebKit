@@ -284,7 +284,7 @@ void SVGPathElement::invalidateMPathDependencies()
         HashSet<SVGElement*>::iterator end = dependencies->end();
         for (HashSet<SVGElement*>::iterator it = dependencies->begin(); it != end; ++it) {
             if ((*it)->hasTagName(SVGNames::mpathTag))
-                static_cast<SVGMPathElement*>(*it)->targetPathChanged();
+                toSVGMPathElement(*it)->targetPathChanged();
         }
     }
 }
@@ -403,7 +403,7 @@ FloatRect SVGPathElement::getBBox(StyleUpdateStrategy styleUpdateStrategy)
 RenderObject* SVGPathElement::createRenderer(RenderStyle*)
 {
     // By default, any subclass is expected to do path-based drawing
-    return new (document()->renderArena()) RenderSVGPath(this);
+    return new RenderSVGPath(this);
 }
 
 }

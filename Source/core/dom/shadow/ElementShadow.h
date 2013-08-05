@@ -61,21 +61,34 @@ public:
 
     void removeAllEventListeners();
 
-    void invalidateDistribution() { m_distributor.invalidateDistribution(host()); }
     void didAffectSelector(AffectedSelectorMask mask) { m_distributor.didAffectSelector(host(), mask); }
     void willAffectSelector() { m_distributor.willAffectSelector(host()); }
     const SelectRuleFeatureSet& ensureSelectFeatureSet() { return m_distributor.ensureSelectFeatureSet(this); }
 
+    // FIXME: Move all callers of this to APIs on ElementShadow and remove it.
     ContentDistributor& distributor() { return m_distributor; }
     const ContentDistributor& distributor() const { return m_distributor; }
 
+    void distributeIfNeeded()
+    {
+        if (m_needsDistributionRecalc)
+            m_distributor.distribute(host());
+        m_needsDistributionRecalc = false;
+    }
+    void clearDistribution() { m_distributor.clearDistribution(host()); }
+
+    void setNeedsDistributionRecalc();
+
 private:
-    ElementShadow() { }
+    ElementShadow()
+        : m_needsDistributionRecalc(false)
+    { }
 
     void removeAllShadowRoots();
 
     DoublyLinkedList<ShadowRoot> m_shadowRoots;
     ContentDistributor m_distributor;
+    bool m_needsDistributionRecalc;
 };
 
 inline Element* ElementShadow::host() const
@@ -91,11 +104,6 @@ inline ShadowRoot* Node::youngestShadowRoot() const
     if (ElementShadow* shadow = toElement(this)->shadow())
         return shadow->youngestShadowRoot();
     return 0;
-}
-
-inline void Element::ensureDistribution()
-{
-    ContentDistributor::ensureDistribution(this);
 }
 
 inline ElementShadow* ElementShadow::containingShadow() const

@@ -88,7 +88,7 @@ String SVGAElement::title() const
         return title;
 
     // Otherwise, use the title of this element.
-    return SVGStyledElement::title();
+    return SVGElement::title();
 }
 
 bool SVGAElement::isSupportedAttribute(const QualifiedName& attrName)
@@ -145,9 +145,9 @@ void SVGAElement::svgAttributeChanged(const QualifiedName& attrName)
 RenderObject* SVGAElement::createRenderer(RenderStyle*)
 {
     if (parentNode() && parentNode()->isSVGElement() && toSVGElement(parentNode())->isTextContent())
-        return new (document()->renderArena()) RenderSVGInline(this);
+        return new RenderSVGInline(this);
 
-    return new (document()->renderArena()) RenderSVGTransformableContainer(this);
+    return new RenderSVGTransformableContainer(this);
 }
 
 void SVGAElement::defaultEventHandler(Event* event)

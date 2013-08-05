@@ -24,10 +24,9 @@
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/svg/SVGAnimatedLength.h"
 #include "core/svg/SVGAnimatedString.h"
-#include "core/svg/SVGStyledElement.h"
-
-#include <wtf/PassRefPtr.h>
-#include <wtf/RefPtr.h>
+#include "core/svg/SVGElement.h"
+#include "wtf/PassRefPtr.h"
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
@@ -36,7 +35,7 @@ class FilterEffect;
 class RenderSVGResourceFilterPrimitive;
 class SVGFilterBuilder;
 
-class SVGFilterPrimitiveStandardAttributes : public SVGStyledElement {
+class SVGFilterPrimitiveStandardAttributes : public SVGElement {
 public:
     void setStandardAttributes(FilterEffect*) const;
 
