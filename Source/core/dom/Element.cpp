@@ -32,6 +32,7 @@
 #include "RuntimeEnabledFeatures.h"
 #include "SVGNames.h"
 #include "XMLNames.h"
+#include "bindings/v8/ExceptionState.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/animation/DocumentTimeline.h"
 #include "core/css/CSSParser.h"
@@ -75,7 +76,6 @@
 #include "core/html/HTMLFormControlsCollection.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLLabelElement.h"
-#include "core/html/HTMLNameCollection.h"
 #include "core/html/HTMLOptionsCollection.h"
 #include "core/html/HTMLTableRowsCollection.h"
 #include "core/html/parser/HTMLParserIdioms.h"
@@ -826,10 +826,10 @@ const AtomicString& Element::getAttributeNS(const AtomicString& namespaceURI, co
     return getAttribute(QualifiedName(nullAtom, localName, namespaceURI));
 }
 
-void Element::setAttribute(const AtomicString& localName, const AtomicString& value, ExceptionCode& ec)
+void Element::setAttribute(const AtomicString& localName, const AtomicString& value, ExceptionState& es)
 {
     if (!Document::isValidName(localName)) {
-        ec = InvalidCharacterError;
+        es.throwDOMException(InvalidCharacterError);
         return;
     }
 
@@ -1164,11 +1164,11 @@ String Element::nodeNamePreservingCase() const
     return m_tagName.toString();
 }
 
-void Element::setPrefix(const AtomicString& prefix, ExceptionCode& ec)
+void Element::setPrefix(const AtomicString& prefix, ExceptionState& es)
 {
-    ec = 0;
-    checkSetPrefix(prefix, ec);
-    if (ec)
+    es.clearException();
+    checkSetPrefix(prefix, es);
+    if (es.hadException())
         return;
 
     m_tagName.setPrefix(prefix.isEmpty() ? AtomicString() : prefix);
@@ -1249,7 +1249,7 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
 
     const AtomicString& nameValue = getNameAttribute();
     if (!nameValue.isNull())
-        updateName(scope, nullAtom, nameValue);
+        updateName(nullAtom, nameValue);
 
     if (hasTagName(labelTag)) {
         if (scope->shouldCacheLabelsByForAttribute())
@@ -1288,7 +1288,7 @@ void Element::removedFrom(ContainerNode* insertionPoint)
 
         const AtomicString& nameValue = getNameAttribute();
         if (!nameValue.isNull())
-            updateName(insertionPoint->treeScope(), nameValue, nullAtom);
+            updateName(nameValue, nullAtom);
 
         if (hasTagName(labelTag)) {
             TreeScope* treeScope = insertionPoint->treeScope();
@@ -1502,7 +1502,7 @@ bool Element::recalcStyle(StyleChange change)
             change = Force;
         }
 
-        if (styleChangeType() == SubtreeStyleChange)
+        if (styleChangeType() >= SubtreeStyleChange)
             change = Force;
         else if (change != Force)
             change = localChange;
@@ -1542,7 +1542,7 @@ bool Element::recalcStyle(StyleChange change)
             if (forceCheckOfNextElementSibling || forceCheckOfAnyElementSibling)
                 element->setNeedsStyleRecalc();
 
-            bool childRulesChanged = element->needsStyleRecalc() && element->styleChangeType() == SubtreeStyleChange;
+            bool childRulesChanged = element->needsStyleRecalc() && element->styleChangeType() >= SubtreeStyleChange;
             forceCheckOfNextElementSibling = childRulesChanged && hasDirectAdjacentRules;
             forceCheckOfAnyElementSibling = forceCheckOfAnyElementSibling || (childRulesChanged && hasIndirectAdjacentRules);
 
@@ -1583,7 +1583,7 @@ void Element::didAffectSelector(AffectedSelectorMask mask)
         elementShadow->didAffectSelector(mask);
 }
 
-PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionCode& ec)
+PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionState& es)
 {
     if (alwaysCreateUserAgentShadowRoot())
         ensureUserAgentShadowRoot();
@@ -1595,7 +1595,7 @@ PassRefPtr<ShadowRoot> Element::createShadowRoot(ExceptionCode& ec)
     // subtrees won't work well in that element. Until they are fixed, we disable
     // adding author shadow root for them.
     if (!areAuthorShadowsAllowed()) {
-        ec = HierarchyRequestError;
+        es.throwDOMException(HierarchyRequestError);
         return 0;
     }
     return ensureShadow()->addShadowRoot(this, ShadowRoot::AuthorShadowRoot);
@@ -1671,7 +1671,7 @@ static void inline checkForEmptyStyleChange(Element* element, RenderStyle* style
 static void checkForSiblingStyleChanges(Element* e, RenderStyle* style, bool finishedParsingCallback,
                                         Node* beforeChange, Node* afterChange, int childCountDelta)
 {
-    if (!e->attached() || e->document()->hasPendingForcedStyleRecalc() || e->styleChangeType() == SubtreeStyleChange)
+    if (!e->attached() || e->document()->hasPendingForcedStyleRecalc() || e->styleChangeType() >= SubtreeStyleChange)
         return;
 
     // :empty selector.
@@ -1811,10 +1811,10 @@ const Vector<RefPtr<Attr> >& Element::attrNodeList()
     return *attrNodeListForElement(this);
 }
 
-PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionCode& ec)
+PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionState& es)
 {
     if (!attrNode) {
-        ec = TypeMismatchError;
+        es.throwDOMException(TypeMismatchError);
         return 0;
     }
 
@@ -1825,7 +1825,7 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionCode& ec)
     // InUseAttributeError: Raised if node is an Attr that is already an attribute of another Element object.
     // The DOM user must explicitly clone Attr nodes to re-use them in other elements.
     if (attrNode->ownerElement()) {
-        ec = InUseAttributeError;
+        es.throwDOMException(InUseAttributeError);
         return 0;
     }
 
@@ -1849,19 +1849,19 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionCode& ec)
     return oldAttrNode.release();
 }
 
-PassRefPtr<Attr> Element::setAttributeNodeNS(Attr* attr, ExceptionCode& ec)
+PassRefPtr<Attr> Element::setAttributeNodeNS(Attr* attr, ExceptionState& es)
 {
-    return setAttributeNode(attr, ec);
+    return setAttributeNode(attr, es);
 }
 
-PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionCode& ec)
+PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionState& es)
 {
     if (!attr) {
-        ec = TypeMismatchError;
+        es.throwDOMException(TypeMismatchError);
         return 0;
     }
     if (attr->ownerElement() != this) {
-        ec = NotFoundError;
+        es.throwDOMException(NotFoundError);
         return 0;
     }
 
@@ -1871,7 +1871,7 @@ PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionCode& ec)
 
     size_t index = elementData()->getAttrIndex(attr);
     if (index == notFound) {
-        ec = NotFoundError;
+        es.throwDOMException(NotFoundError);
         return 0;
     }
 
@@ -1880,17 +1880,17 @@ PassRefPtr<Attr> Element::removeAttributeNode(Attr* attr, ExceptionCode& ec)
     return guard.release();
 }
 
-bool Element::parseAttributeName(QualifiedName& out, const AtomicString& namespaceURI, const AtomicString& qualifiedName, ExceptionCode& ec)
+bool Element::parseAttributeName(QualifiedName& out, const AtomicString& namespaceURI, const AtomicString& qualifiedName, ExceptionState& es)
 {
     String prefix, localName;
-    if (!Document::parseQualifiedName(qualifiedName, prefix, localName, ec))
+    if (!Document::parseQualifiedName(qualifiedName, prefix, localName, es))
         return false;
-    ASSERT(!ec);
+    ASSERT(!es.hadException());
 
     QualifiedName qName(prefix, localName, namespaceURI);
 
     if (!Document::hasValidNamespaceForAttributes(qName)) {
-        ec = NamespaceError;
+        es.throwDOMException(NamespaceError);
         return false;
     }
 
@@ -1898,10 +1898,10 @@ bool Element::parseAttributeName(QualifiedName& out, const AtomicString& namespa
     return true;
 }
 
-void Element::setAttributeNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, const AtomicString& value, ExceptionCode& ec)
+void Element::setAttributeNS(const AtomicString& namespaceURI, const AtomicString& qualifiedName, const AtomicString& value, ExceptionState& es)
 {
     QualifiedName parsedName = anyName;
-    if (!parseAttributeName(parsedName, namespaceURI, qualifiedName, ec))
+    if (!parseAttributeName(parsedName, namespaceURI, qualifiedName, es))
         return;
     setAttribute(parsedName, value);
 }
@@ -2074,6 +2074,11 @@ void Element::blur()
         else
             doc->setFocusedElement(0);
     }
+}
+
+bool Element::isFocusable() const
+{
+    return inDocument() && supportsFocus() && !isInert() && rendererIsFocusable();
 }
 
 bool Element::isKeyboardFocusable() const
@@ -2497,14 +2502,14 @@ RenderObject* Element::pseudoElementRenderer(PseudoId pseudoId) const
     return 0;
 }
 
-bool Element::webkitMatchesSelector(const String& selector, ExceptionCode& ec)
+bool Element::webkitMatchesSelector(const String& selector, ExceptionState& es)
 {
     if (selector.isEmpty()) {
-        ec = SyntaxError;
+        es.throwDOMException(SyntaxError);
         return false;
     }
 
-    SelectorQuery* selectorQuery = document()->selectorQueryCache()->add(selector, document(), ec);
+    SelectorQuery* selectorQuery = document()->selectorQueryCache()->add(selector, document(), es);
     if (!selectorQuery)
         return false;
     return selectorQuery->matches(this);
@@ -2756,48 +2761,17 @@ bool Element::hasNamedNodeMap() const
 
 inline void Element::updateName(const AtomicString& oldName, const AtomicString& newName)
 {
-    if (!isInTreeScope())
+    if (!inDocument() || isInShadowTree())
         return;
 
     if (oldName == newName)
         return;
 
-    updateName(treeScope(), oldName, newName);
+    if (shouldRegisterAsNamedItem())
+        updateNamedItemRegistration(oldName, newName);
 }
 
-void Element::updateName(TreeScope* scope, const AtomicString& oldName, const AtomicString& newName)
-{
-    ASSERT(isInTreeScope());
-    ASSERT(oldName != newName);
-
-    if (!oldName.isEmpty())
-        scope->removeElementByName(oldName, this);
-    if (!newName.isEmpty())
-        scope->addElementByName(newName, this);
-
-    if (!inDocument() || isInShadowTree())
-        return;
-
-    Document* ownerDocument = document();
-    if (!ownerDocument->isHTMLDocument())
-        return;
-
-    if (WindowNameCollection::nodeMatchesIfNameAttributeMatch(this)) {
-        if (!oldName.isEmpty())
-            toHTMLDocument(ownerDocument)->windowNamedItemMap().remove(oldName.impl(), this);
-        if (!newName.isEmpty())
-            toHTMLDocument(ownerDocument)->windowNamedItemMap().add(newName.impl(), this);
-    }
-
-    if (DocumentNameCollection::nodeMatchesIfNameAttributeMatch(this)) {
-        if (!oldName.isEmpty())
-            toHTMLDocument(ownerDocument)->removeNamedDocumentItem(oldName, this);
-        if (!newName.isEmpty())
-            toHTMLDocument(ownerDocument)->addNamedDocumentItem(newName, this);
-    }
-}
-
-void Element::updateId(const AtomicString& oldId, const AtomicString& newId)
+inline void Element::updateId(const AtomicString& oldId, const AtomicString& newId)
 {
     if (!isInTreeScope())
         return;
@@ -2818,26 +2792,8 @@ inline void Element::updateId(TreeScope* scope, const AtomicString& oldId, const
     if (!newId.isEmpty())
         scope->addElementById(newId, this);
 
-    if (!inDocument() || isInShadowTree())
-        return;
-
-    Document* ownerDocument = document();
-    if (!ownerDocument->isHTMLDocument())
-        return;
-
-    if (WindowNameCollection::nodeMatchesIfIdAttributeMatch(this)) {
-        if (!oldId.isEmpty())
-            toHTMLDocument(ownerDocument)->windowNamedItemMap().remove(oldId.impl(), this);
-        if (!newId.isEmpty())
-            toHTMLDocument(ownerDocument)->windowNamedItemMap().add(newId.impl(), this);
-    }
-
-    if (DocumentNameCollection::nodeMatchesIfIdAttributeMatch(this)) {
-        if (!oldId.isEmpty())
-            toHTMLDocument(ownerDocument)->removeNamedDocumentItem(oldId, this);
-        if (!newId.isEmpty())
-            toHTMLDocument(ownerDocument)->addNamedDocumentItem(newId, this);
-    }
+    if (shouldRegisterAsExtraNamedItem())
+        updateExtraNamedItemRegistration(oldId, newId);
 }
 
 void Element::updateLabel(TreeScope* scope, const AtomicString& oldForAttributeValue, const AtomicString& newForAttributeValue)
@@ -2921,6 +2877,30 @@ void Element::didMoveToNewDocument(Document* oldDocument)
         if (hasClass())
             setAttribute(HTMLNames::classAttr, getClassAttribute());
     }
+}
+
+void Element::updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName)
+{
+    if (!document()->isHTMLDocument())
+        return;
+
+    if (!oldName.isEmpty())
+        toHTMLDocument(document())->removeNamedItem(oldName);
+
+    if (!newName.isEmpty())
+        toHTMLDocument(document())->addNamedItem(newName);
+}
+
+void Element::updateExtraNamedItemRegistration(const AtomicString& oldId, const AtomicString& newId)
+{
+    if (!document()->isHTMLDocument())
+        return;
+
+    if (!oldId.isEmpty())
+        toHTMLDocument(document())->removeExtraNamedItem(oldId);
+
+    if (!newId.isEmpty())
+        toHTMLDocument(document())->addExtraNamedItem(newId);
 }
 
 PassRefPtr<HTMLCollection> Element::ensureCachedHTMLCollection(CollectionType type)

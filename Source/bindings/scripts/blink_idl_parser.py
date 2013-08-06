@@ -273,7 +273,7 @@ class BlinkIDLParser(IDLParser):
             p[0] = self.BuildProduction('ExtAttributes', p, 1, items)
 
     # [b50] Allow optional trailing comma
-    # FIXME: Blink-only, but bug filed to change spec:
+    # Blink-only, marked as WONTFIX in Web IDL spec:
     # https://www.w3.org/Bugs/Public/show_bug.cgi?id=22156
     def p_ExtendedAttributes(self, p):
         """ExtendedAttributes : ',' ExtendedAttribute ExtendedAttributes
@@ -287,7 +287,7 @@ class BlinkIDLParser(IDLParser):
         """ExtendedAttribute : ExtendedAttributeNoArgs
                              | ExtendedAttributeArgList
                              | ExtendedAttributeIdent
-                             | ExtendedAttributeIdentAndOrIdent
+                             | ExtendedAttributeIdentList
                              | ExtendedAttributeNamedArgList"""
         p[0] = p[1]
 
@@ -329,13 +329,30 @@ class BlinkIDLParser(IDLParser):
         elif len(p) == 3:
             p[0] = ListFromConcat(self.BuildTrue('NULLABLE'), p[2])
 
-    # [b76.1]
-    def p_ExtendedAttributeIdentAndOrIdent(self, p):
-        """ExtendedAttributeIdentAndOrIdent : identifier '=' identifier '&' identifier
-                                            | identifier '=' identifier '|' identifier"""
-        # FIXME: support arbitrary number of values, not just two.
+    # [b76.1] Add support for compound Extended Attribute values (A&B and A|B)
+    def p_ExtendedAttributeIdentList(self, p):
+        """ExtendedAttributeIdentList : identifier '=' identifier '&' IdentAndList
+                                      | identifier '=' identifier '|' IdentOrList"""
         value = self.BuildAttribute('VALUE', p[3] + p[4] + p[5])
         p[0] = self.BuildNamed('ExtAttribute', p, 1, value)
+
+    # [b76.2] A&B&C
+    def p_IdentAndList(self, p):
+        """IdentAndList : identifier '&' IdentAndList
+                        | identifier"""
+        if len(p) > 3:
+            p[0] = p[1] + p[2] + p[3]
+        else:
+            p[0] = p[1]
+
+    # [b76.3] A|B|C
+    def p_IdentOrList(self, p):
+        """IdentOrList : identifier '|' IdentOrList
+                       | identifier"""
+        if len(p) > 3:
+            p[0] = p[1] + p[2] + p[3]
+        else:
+            p[0] = p[1]
 
     def __dir__(self):
         # Remove REMOVED_RULES from listing so yacc doesn't parse them

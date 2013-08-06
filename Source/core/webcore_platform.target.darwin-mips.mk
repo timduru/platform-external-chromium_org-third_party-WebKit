@@ -121,7 +121,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/ClipboardMimeTypes.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ClipboardUtilitiesChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FileSystemChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/FileSystemChromiumLinux.cpp \
 	third_party/WebKit/Source/core/platform/chromium/FramelessScrollView.cpp \
 	third_party/WebKit/Source/core/platform/chromium/GamepadsChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/HistogramSupportChromium.cpp \

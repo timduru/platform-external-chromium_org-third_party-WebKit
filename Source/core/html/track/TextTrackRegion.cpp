@@ -34,8 +34,9 @@
 
 #include "core/html/track/TextTrackRegion.h"
 
+#include "bindings/v8/ExceptionState.h"
+#include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ClientRect.h"
-#include "core/dom/ExceptionCodePlaceholder.h"
 #include "core/html/DOMTokenList.h"
 #include "core/html/HTMLDivElement.h"
 #include "core/html/track/WebVTTParser.h"
@@ -99,85 +100,85 @@ void TextTrackRegion::setId(const String& id)
     m_id = id;
 }
 
-void TextTrackRegion::setWidth(double value, ExceptionCode& ec)
+void TextTrackRegion::setWidth(double value, ExceptionState& es)
 {
     if (std::isinf(value) || std::isnan(value)) {
-        ec = TypeError;
+        es.throwDOMException(TypeError);
         return;
     }
 
     if (value < 0 || value > 100) {
-        ec = IndexSizeError;
+        es.throwDOMException(IndexSizeError);
         return;
     }
 
     m_width = value;
 }
 
-void TextTrackRegion::setHeight(long value, ExceptionCode& ec)
+void TextTrackRegion::setHeight(long value, ExceptionState& es)
 {
     if (value < 0) {
-        ec = IndexSizeError;
+        es.throwDOMException(IndexSizeError);
         return;
     }
 
     m_heightInLines = value;
 }
 
-void TextTrackRegion::setRegionAnchorX(double value, ExceptionCode& ec)
+void TextTrackRegion::setRegionAnchorX(double value, ExceptionState& es)
 {
     if (std::isinf(value) || std::isnan(value)) {
-        ec = TypeError;
+        es.throwDOMException(TypeError);
         return;
     }
 
     if (value < 0 || value > 100) {
-        ec = IndexSizeError;
+        es.throwDOMException(IndexSizeError);
         return;
     }
 
     m_regionAnchor.setX(value);
 }
 
-void TextTrackRegion::setRegionAnchorY(double value, ExceptionCode& ec)
+void TextTrackRegion::setRegionAnchorY(double value, ExceptionState& es)
 {
     if (std::isinf(value) || std::isnan(value)) {
-        ec = TypeError;
+        es.throwDOMException(TypeError);
         return;
     }
 
     if (value < 0 || value > 100) {
-        ec = IndexSizeError;
+        es.throwDOMException(IndexSizeError);
         return;
     }
 
     m_regionAnchor.setY(value);
 }
 
-void TextTrackRegion::setViewportAnchorX(double value, ExceptionCode& ec)
+void TextTrackRegion::setViewportAnchorX(double value, ExceptionState& es)
 {
     if (std::isinf(value) || std::isnan(value)) {
-        ec = TypeError;
+        es.throwDOMException(TypeError);
         return;
     }
 
     if (value < 0 || value > 100) {
-        ec = IndexSizeError;
+        es.throwDOMException(IndexSizeError);
         return;
     }
 
     m_viewportAnchor.setX(value);
 }
 
-void TextTrackRegion::setViewportAnchorY(double value, ExceptionCode& ec)
+void TextTrackRegion::setViewportAnchorY(double value, ExceptionState& es)
 {
     if (std::isinf(value) || std::isnan(value)) {
-        ec = TypeError;
+        es.throwDOMException(TypeError);
         return;
     }
 
     if (value < 0 || value > 100) {
-        ec = IndexSizeError;
+        es.throwDOMException(IndexSizeError);
         return;
     }
 
@@ -194,12 +195,12 @@ const AtomicString TextTrackRegion::scroll() const
     return "";
 }
 
-void TextTrackRegion::setScroll(const AtomicString& value, ExceptionCode& ec)
+void TextTrackRegion::setScroll(const AtomicString& value, ExceptionState& es)
 {
     DEFINE_STATIC_LOCAL(const AtomicString, upScrollValueKeyword, ("up", AtomicString::ConstructFromLiteral));
 
     if (value != emptyString() && value != upScrollValueKeyword) {
-        ec = SyntaxError;
+        es.throwDOMException(SyntaxError);
         return;
     }
 
@@ -214,7 +215,7 @@ void TextTrackRegion::updateParametersFromRegion(TextTrackRegion* region)
     m_regionAnchor = FloatPoint(region->regionAnchorX(), region->regionAnchorY());
     m_viewportAnchor = FloatPoint(region->viewportAnchorX(), region->viewportAnchorY());
 
-    setScroll(region->scroll(), ASSERT_NO_EXCEPTION);
+    setScroll(region->scroll(), ASSERT_NO_EXCEPTION_STATE);
 }
 
 void TextTrackRegion::setRegionSettings(const String& input)
@@ -372,7 +373,7 @@ void TextTrackRegion::willRemoveTextTrackCueBox(TextTrackCueBox* box)
     double boxHeight = box->getBoundingClientRect()->bottom() - box->getBoundingClientRect()->top();
     float regionBottom = m_regionDisplayTree->getBoundingClientRect()->bottom();
 
-    m_cueContainer->classList()->remove(textTrackCueContainerScrollingClass(), IGNORE_EXCEPTION);
+    m_cueContainer->classList()->remove(textTrackCueContainerScrollingClass(), IGNORE_EXCEPTION_STATE);
 
     m_currentTop += boxHeight;
     m_cueContainer->setInlineStyleProperty(CSSPropertyTop, m_currentTop, CSSPrimitiveValue::CSS_PX);
@@ -384,7 +385,7 @@ void TextTrackRegion::appendTextTrackCueBox(PassRefPtr<TextTrackCueBox> displayB
     if (m_cueContainer->contains(displayBox.get()))
         return;
 
-    m_cueContainer->appendChild(displayBox, ASSERT_NO_EXCEPTION, AttachNow);
+    m_cueContainer->appendChild(displayBox, ASSERT_NO_EXCEPTION_STATE, AttachNow);
     displayLastTextTrackCueBox();
 }
 
@@ -399,7 +400,7 @@ void TextTrackRegion::displayLastTextTrackCueBox()
 
     // If it's a scrolling region, add the scrolling class.
     if (isScrollingRegion())
-        m_cueContainer->classList()->add(textTrackCueContainerScrollingClass(), IGNORE_EXCEPTION);
+        m_cueContainer->classList()->add(textTrackCueContainerScrollingClass(), IGNORE_EXCEPTION_STATE);
 
     float regionBottom = m_regionDisplayTree->getBoundingClientRect()->bottom();
 
