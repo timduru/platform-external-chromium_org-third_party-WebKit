@@ -136,6 +136,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebCachedURLRequest.cpp \
 	third_party/WebKit/Source/web/WebColorName.cpp \
 	third_party/WebKit/Source/web/WebCrossOriginPreflightResultCache.cpp \
+	third_party/WebKit/Source/web/WebCustomElement.cpp \
 	third_party/WebKit/Source/web/WebDOMActivityLogger.cpp \
 	third_party/WebKit/Source/web/WebDOMCustomEvent.cpp \
 	third_party/WebKit/Source/web/WebDOMEvent.cpp \

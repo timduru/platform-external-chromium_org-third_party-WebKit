@@ -1255,10 +1255,10 @@ void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap,
         es.throwDOMException(TypeMismatchError);
         return;
     }
-    if (!bitmap->bitmapWidth() || !bitmap->bitmapHeight())
+    if (!bitmap->bitmapRect().width() || !bitmap->bitmapRect().height())
         return;
 
-    drawImage(bitmap, 0, 0, bitmap->bitmapWidth(), bitmap->bitmapHeight(), x, y, width, height, es);
+    drawImage(bitmap, 0, 0, bitmap->width(), bitmap->height(), x, y, width, height, es);
 }
 
 void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap,
@@ -1272,6 +1272,7 @@ void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap,
 
     FloatRect srcRect(sx, sy, sw, sh);
     FloatRect dstRect(dx, dy, dw, dh);
+    FloatRect bitmapRect = bitmap->bitmapRect();
 
     if (!std::isfinite(dstRect.x()) || !std::isfinite(dstRect.y()) || !std::isfinite(dstRect.width()) || !std::isfinite(dstRect.height())
         || !std::isfinite(srcRect.x()) || !std::isfinite(srcRect.y()) || !std::isfinite(srcRect.width()) || !std::isfinite(srcRect.height()))
@@ -1279,28 +1280,34 @@ void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap,
 
     if (!dstRect.width() || !dstRect.height())
         return;
-
-    ASSERT(bitmap->height() && bitmap->width());
-
-    FloatRect normalizedSrcRect = normalizeRect(srcRect);
-    FloatRect normalizedDstRect = normalizeRect(dstRect);
-    FloatRect actualDstRect(FloatPoint(bitmap->bitmapOffset()), bitmap->bitmapSize());
-    actualDstRect.scale(normalizedDstRect.width() / bitmap->width(), normalizedDstRect.height() / bitmap->height());
-    actualDstRect.moveBy(normalizedDstRect.location());
-
-    FloatRect imageRect = FloatRect(FloatPoint(), bitmap->bitmapSize());
     if (!srcRect.width() || !srcRect.height()) {
         es.throwDOMException(IndexSizeError);
         return;
     }
-    if (!imageRect.intersects(normalizedSrcRect))
+
+    ASSERT(bitmap->height() && bitmap->width());
+    FloatRect normalizedSrcRect = normalizeRect(srcRect);
+    FloatRect normalizedDstRect = normalizeRect(dstRect);
+
+    // Clip the rects to where the user thinks that the image is situated.
+    clipRectsToImageRect(IntRect(IntPoint(), bitmap->size()), &normalizedSrcRect, &normalizedDstRect);
+
+    FloatRect intersectRect = intersection(bitmapRect, normalizedSrcRect);
+    FloatRect actualSrcRect(intersectRect);
+    actualSrcRect.move(-bitmapRect.x(), -bitmapRect.y());
+
+    FloatRect imageRect = FloatRect(FloatPoint(), bitmapRect.size());
+
+    FloatRect actualDstRect(FloatPoint(intersectRect.location() - normalizedSrcRect.location()), bitmapRect.size());
+    actualDstRect.scale(normalizedDstRect.width() / normalizedSrcRect.width() * intersectRect.width() / bitmapRect.width(),
+        normalizedDstRect.height() / normalizedSrcRect.height() * intersectRect.height() / bitmapRect.height());
+    actualDstRect.moveBy(normalizedDstRect.location());
+
+    if (!imageRect.intersects(actualSrcRect))
         return;
 
-    clipRectsToImageRect(imageRect, &normalizedSrcRect, &actualDstRect);
-
-    Image* imageForRendering = bitmap->bitmapImage();
-
-    drawImageInternal(imageForRendering, normalizedSrcRect, actualDstRect, state().m_globalComposite, state().m_globalBlend);
+    RefPtr<Image> imageForRendering = bitmap->bitmapImage();
+    drawImageInternal(imageForRendering.get(), actualSrcRect, actualDstRect, state().m_globalComposite, state().m_globalBlend);
 }
 
 void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, float x, float y, ExceptionState& es)
@@ -1342,8 +1349,6 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
         es.throwDOMException(TypeMismatchError);
         return;
     }
-
-    es.clearException();
 
     if (!std::isfinite(dstRect.x()) || !std::isfinite(dstRect.y()) || !std::isfinite(dstRect.width()) || !std::isfinite(dstRect.height())
         || !std::isfinite(srcRect.x()) || !std::isfinite(srcRect.y()) || !std::isfinite(srcRect.width()) || !std::isfinite(srcRect.height()))
@@ -1422,8 +1427,6 @@ void CanvasRenderingContext2D::drawImage(HTMLCanvasElement* sourceCanvas, const 
         es.throwDOMException(IndexSizeError);
         return;
     }
-
-    es.clearException();
 
     FloatRect normalizedSrcRect = normalizeRect(srcRect);
     FloatRect normalizedDstRect = normalizeRect(dstRect);
@@ -1504,8 +1507,6 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, const FloatRec
         return;
     }
 
-    es.clearException();
-
     if (video->readyState() == HTMLMediaElement::HAVE_NOTHING || video->readyState() == HTMLMediaElement::HAVE_METADATA)
         return;
 
@@ -1551,7 +1552,7 @@ void CanvasRenderingContext2D::drawImageFromRect(HTMLImageElement* image,
     if (!parseCompositeAndBlendOperator(compositeOperation, op, blendOp) || blendOp != BlendModeNormal)
         op = CompositeSourceOver;
 
-    drawImage(image, FloatRect(sx, sy, sw, sh), FloatRect(dx, dy, dw, dh), op, BlendModeNormal, IGNORE_EXCEPTION_STATE);
+    drawImage(image, FloatRect(sx, sy, sw, sh), FloatRect(dx, dy, dw, dh), op, BlendModeNormal, IGNORE_EXCEPTION);
 }
 
 void CanvasRenderingContext2D::setAlpha(float alpha)
@@ -1740,7 +1741,6 @@ PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLImageEleme
         return 0;
     }
     bool repeatX, repeatY;
-    es.clearException();
     CanvasPattern::parseRepetitionType(repetitionType, repeatX, repeatY, es);
     if (es.hadException())
         return 0;
@@ -1774,7 +1774,6 @@ PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLCanvasElem
     }
 
     bool repeatX, repeatY;
-    es.clearException();
     CanvasPattern::parseRepetitionType(repetitionType, repeatX, repeatY, es);
     if (es.hadException())
         return 0;
@@ -1858,7 +1857,6 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::createImageData(PassRefPtr<Image
 
 PassRefPtr<ImageData> CanvasRenderingContext2D::createImageData(float sw, float sh, ExceptionState& es) const
 {
-    es.clearException();
     if (!sw || !sh) {
         es.throwDOMException(IndexSizeError);
         return 0;
@@ -2314,12 +2312,12 @@ WebKit::WebLayer* CanvasRenderingContext2D::platformLayer() const
     return canvas()->buffer() ? canvas()->buffer()->platformLayer() : 0;
 }
 
-bool CanvasRenderingContext2D::webkitImageSmoothingEnabled() const
+bool CanvasRenderingContext2D::imageSmoothingEnabled() const
 {
     return state().m_imageSmoothingEnabled;
 }
 
-void CanvasRenderingContext2D::setWebkitImageSmoothingEnabled(bool enabled)
+void CanvasRenderingContext2D::setImageSmoothingEnabled(bool enabled)
 {
     if (enabled == state().m_imageSmoothingEnabled)
         return;
@@ -2345,7 +2343,7 @@ void CanvasRenderingContext2D::drawSystemFocusRing(Element* element)
 
     updateFocusRingAccessibility(m_path, element);
     if (element->focused())
-        drawFocusRing(m_path, element);
+        drawFocusRing(m_path);
 }
 
 bool CanvasRenderingContext2D::drawCustomFocusRing(Element* element)
@@ -2388,7 +2386,7 @@ void CanvasRenderingContext2D::updateFocusRingAccessibility(const Path& path, El
     }
 }
 
-void CanvasRenderingContext2D::drawFocusRing(const Path& path, Element* element)
+void CanvasRenderingContext2D::drawFocusRing(const Path& path)
 {
     GraphicsContext* c = drawingContext();
     if (!c)
@@ -2399,9 +2397,11 @@ void CanvasRenderingContext2D::drawFocusRing(const Path& path, Element* element)
     c->clearShadow();
     c->setCompositeOperation(CompositeSourceOver, BlendModeNormal);
 
-    RefPtr<RenderStyle> style(RenderStyle::createDefaultStyle());
+    // These should match the style defined in html.css.
     Color focusRingColor = RenderTheme::focusRingColor();
-    c->drawFocusRing(path, style->outlineWidth(), style->outlineOffset(), focusRingColor);
+    const int focusRingWidth = 5;
+    const int focusRingOutline = 0;
+    c->drawFocusRing(path, focusRingWidth, focusRingOutline, focusRingColor);
     didDraw(path.boundingRect());
 
     c->restore();

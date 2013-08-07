@@ -31,7 +31,7 @@
 #include "core/inspector/InspectorDOMStorageAgent.h"
 
 #include "InspectorFrontend.h"
-#include "bindings/v8/ExceptionStatePlaceholder.h"
+#include "bindings/v8/ExceptionState.h"
 #include "core/dom/DOMException.h"
 #include "core/dom/Document.h"
 #include "core/dom/ExceptionCode.h"
@@ -54,11 +54,12 @@ namespace DOMStorageAgentState {
 static const char domStorageAgentEnabled[] = "domStorageAgentEnabled";
 };
 
-static bool hadException(ExceptionCode ec, ErrorString* errorString)
+static bool hadException(ExceptionState& es, ErrorString* errorString)
 {
-    switch (ec) {
-    case 0:
+    if (!es.hadException())
         return false;
+
+    switch (es.code()) {
     case SecurityError:
         *errorString = "Security error";
         return true;
@@ -107,6 +108,22 @@ void InspectorDOMStorageAgent::disable(ErrorString*)
     m_state->setBoolean(DOMStorageAgentState::domStorageAgentEnabled, false);
 }
 
+void InspectorDOMStorageAgent::getValue(ErrorString* errorString, const RefPtr<JSONObject>& storageId, const String& key, TypeBuilder::OptOutput<WTF::String>* value)
+{
+    Frame* frame;
+    OwnPtr<StorageArea> storageArea = findStorageArea(errorString, storageId, frame);
+    if (!storageArea)
+        return;
+
+    TrackExceptionState es;
+    bool keyPresent = storageArea->contains(key, es, frame);
+    if (hadException(es, errorString) || !keyPresent)
+        return;
+
+    *value = storageArea->getItem(key, es, frame);
+    hadException(es, errorString);
+}
+
 void InspectorDOMStorageAgent::getDOMStorageItems(ErrorString* errorString, const RefPtr<JSONObject>& storageId, RefPtr<TypeBuilder::Array<TypeBuilder::Array<String> > >& items)
 {
     Frame* frame;
@@ -135,7 +152,7 @@ void InspectorDOMStorageAgent::getDOMStorageItems(ErrorString* errorString, cons
 static String toErrorString(ExceptionState& es)
 {
     if (es.hadException())
-        return DOMException::getErrorName(es);
+        return DOMException::getErrorName(es.code());
     return "";
 }
 

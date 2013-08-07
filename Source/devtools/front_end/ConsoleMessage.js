@@ -508,10 +508,13 @@ WebInspector.ConsoleMessageImpl.prototype = {
 
             var rowValue = {};
             const maxColumnsToRender = 20;
-            for (var j = 0; j < rowPreview.properties.length && columnNames.length < maxColumnsToRender; ++j) {
+            for (var j = 0; j < rowPreview.properties.length && j < maxColumnsToRender; ++j) {
                 var cellProperty = rowPreview.properties[j];
-                if (columnNames.indexOf(cellProperty.name) === -1)
+                if (columnNames.indexOf(cellProperty.name) === -1) {
+                    if (columnNames.length === maxColumnsToRender)
+                        continue;
                     columnNames.push(cellProperty.name);
+                }
                 rowValue[cellProperty.name] = this._renderPropertyPreview(cellProperty);
             }
             rows.push([rowProperty.name, rowValue]);
@@ -764,7 +767,7 @@ WebInspector.ConsoleMessageImpl.prototype = {
             break;
         }
 
-        if (this.type === WebInspector.ConsoleMessage.MessageType.StartGroup || this.type === WebInspector.ConsoleMessage.MessageType.StartGroupCollapsed)
+        if (this.isGroupStart())
             element.addStyleClass("console-group-title");
 
         element.appendChild(this.formattedMessage);
@@ -903,6 +906,14 @@ WebInspector.ConsoleMessageImpl.prototype = {
     get text()
     {
         return this._messageText;
+    },
+
+    /**
+     * @return {boolean}
+     */
+    isGroupStart: function()
+    {
+        return this.type === WebInspector.ConsoleMessage.MessageType.StartGroup || this.type === WebInspector.ConsoleMessage.MessageType.StartGroupCollapsed;
     },
 
     location: function()

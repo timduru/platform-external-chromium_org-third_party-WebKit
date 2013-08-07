@@ -92,7 +92,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/EventNames.cpp \
 	third_party/WebKit/Source/core/dom/EventPathWalker.cpp \
 	third_party/WebKit/Source/core/dom/EventTarget.cpp \
-	third_party/WebKit/Source/core/dom/ExceptionCodePlaceholder.cpp \
 	third_party/WebKit/Source/core/dom/FocusEvent.cpp \
 	third_party/WebKit/Source/core/dom/FullscreenElementStack.cpp \
 	third_party/WebKit/Source/core/dom/GenericEventQueue.cpp \
@@ -180,7 +179,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/default/chromium/PlatformMessagePortChannelChromium.cpp \
 	third_party/WebKit/Source/core/dom/shadow/ComposedShadowTreeWalker.cpp \
 	third_party/WebKit/Source/core/dom/shadow/ContentDistributor.cpp \
-	third_party/WebKit/Source/core/dom/shadow/ContentSelectorQuery.cpp \
 	third_party/WebKit/Source/core/dom/shadow/ElementShadow.cpp \
 	third_party/WebKit/Source/core/dom/shadow/InsertionPoint.cpp \
 	third_party/WebKit/Source/core/dom/shadow/SelectRuleFeatureSet.cpp \

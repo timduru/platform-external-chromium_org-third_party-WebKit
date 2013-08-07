@@ -104,7 +104,7 @@ void ContainerNode::takeAllChildrenFrom(ContainerNode* oldParent)
         if (children[i]->attached())
             children[i]->detach();
         // FIXME: We need a no mutation event version of adoptNode.
-        RefPtr<Node> child = document()->adoptNode(children[i].release(), ASSERT_NO_EXCEPTION_STATE);
+        RefPtr<Node> child = document()->adoptNode(children[i].release(), ASSERT_NO_EXCEPTION);
         parserAppendChild(child.get());
         // FIXME: Together with adoptNode above, the tree scope might get updated recursively twice
         // (if the document changed or oldParent was in a shadow tree, AND *this is in a shadow tree).
@@ -225,8 +225,6 @@ void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
 
     RefPtr<Node> protect(this);
 
-    es.clearException();
-
     // insertBefore(node, 0) is equivalent to appendChild(node)
     if (!refChild) {
         appendChild(newChild, es, attachBehavior);
@@ -322,7 +320,7 @@ void ContainerNode::parserInsertBefore(PassRefPtr<Node> newChild, Node* nextChil
         return;
 
     if (document() != newChild->document())
-        document()->adoptNode(newChild.get(), ASSERT_NO_EXCEPTION_STATE);
+        document()->adoptNode(newChild.get(), ASSERT_NO_EXCEPTION);
 
     insertBeforeCommon(nextChild, newChild.get());
 
@@ -341,8 +339,6 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
     ASSERT(refCount() || parentOrShadowHostNode());
 
     RefPtr<Node> protect(this);
-
-    es.clearException();
 
     if (oldChild == newChild) // nothing to do
         return;
@@ -462,8 +458,6 @@ void ContainerNode::removeChild(Node* oldChild, ExceptionState& es)
     ASSERT(refCount() || parentOrShadowHostNode());
 
     RefPtr<Node> protect(this);
-
-    es.clearException();
 
     // NotFoundError: Raised if oldChild is not a child of this node.
     if (!oldChild || oldChild->parentNode() != this) {
@@ -604,8 +598,6 @@ void ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionState& es, A
     // If it is, it can be deleted as a side effect of sending mutation events.
     ASSERT(refCount() || parentOrShadowHostNode());
 
-    es.clearException();
-
     // Make sure adding the new child is ok
     if (!checkAddChild(this, newChild.get(), es))
         return;
@@ -660,7 +652,7 @@ void ContainerNode::parserAppendChild(PassRefPtr<Node> newChild)
     ASSERT(!hasTagName(HTMLNames::templateTag));
 
     if (document() != newChild->document())
-        document()->adoptNode(newChild.get(), ASSERT_NO_EXCEPTION_STATE);
+        document()->adoptNode(newChild.get(), ASSERT_NO_EXCEPTION);
 
     Node* last = m_lastChild;
     {

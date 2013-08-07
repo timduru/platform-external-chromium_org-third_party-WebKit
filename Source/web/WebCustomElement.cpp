@@ -28,26 +28,18 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef WebHyphenator_h
-#define WebHyphenator_h
+#include "config.h"
+#include "WebCustomElement.h"
 
-#include "WebCommon.h"
-#include "WebString.h"
+#include "core/dom/CustomElement.h"
+
+using namespace WebCore;
 
 namespace WebKit {
 
-class WebHyphenator {
-public:
-    // Returns whether we can support hyphenation for the given locale.
-    virtual bool canHyphenate(const WebString& locale) { return false; }
-
-    // Returns the last position where we can add a hyphen before the given position.
-    virtual size_t computeLastHyphenLocation(const WebString& word, size_t beforeIndex, const WebString& locale) { return 0; }
-
-protected:
-    ~WebHyphenator() { }
-};
+void WebCustomElement::allowTagName(const WebString& localName)
+{
+    CustomElement::allowTagName(localName);
+}
 
 } // namespace WebKit
-
-#endif

@@ -35,6 +35,7 @@
 
 #include "core/animation/Player.h"
 #include "core/css/StylePropertySet.h"
+#include "core/dom/Document.h"
 #include "core/platform/animation/CSSAnimationData.h"
 #include "core/rendering/style/RenderStyleConstants.h"
 #include "wtf/HashMap.h"
@@ -52,6 +53,7 @@ class StyleResolver;
 class CSSAnimationUpdate FINAL {
 public:
     const StylePropertySet* styles() const { return m_styles.get(); }
+    // Returns whether player has been cancelled and should be filtered during style application.
     bool isFiltered(const Player* player) const { return m_filtered.contains(player); }
     void cancel(const Player* player)
     {
@@ -78,6 +80,19 @@ public:
 private:
     typedef HashMap<StringImpl*, Player*> AnimationMap;
     AnimationMap m_animations;
+    class EventDelegate FINAL : public TimedItemEventDelegate {
+    public:
+        EventDelegate(Element* target, const AtomicString& name)
+            : m_target(target)
+            , m_name(name)
+        {
+        }
+        virtual void onEventCondition(bool wasInPlay, bool isInPlay, double previousIteration, double currentIteration) OVERRIDE;
+    private:
+        void maybeDispatch(Document::ListenerType, AtomicString& eventName, double elapsedTime);
+        Element* m_target;
+        const AtomicString m_name;
+    };
 };
 
 } // namespace WebCore

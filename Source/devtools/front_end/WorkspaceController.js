@@ -28,48 +28,48 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef DeferredAnimatableValue_h
-#define DeferredAnimatableValue_h
+/**
+ * @constructor
+ */
+WebInspector.WorkspaceController = function(workspace)
+{
+    this._workspace = workspace;
+    WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.InspectedURLChanged, this._inspectedURLChanged, this);
+    window.addEventListener("focus", this._windowFocused.bind(this), false);
+}
 
-#include "core/animation/AnimatableValue.h"
-
-namespace WebCore {
-
-// Used as a sentinal value to indicate where a snapshot of an element's CSS value should go in a KeyframeAnimationEffect::KeyframeVector.
-class DeferredAnimatableValue : public AnimatableValue {
-public:
-    virtual ~DeferredAnimatableValue() { }
-
-    virtual PassRefPtr<CSSValue> toCSSValue() const OVERRIDE
+WebInspector.WorkspaceController.prototype = {
+    /**
+     * @param {WebInspector.Event} event
+     */
+    _inspectedURLChanged: function(event)
     {
-        ASSERT_NOT_REACHED();
-        return 0;
-    }
+        WebInspector.Revision.filterOutStaleRevisions();
+    },
 
-    virtual bool isDeferredSnapshot() const OVERRIDE { return true; }
-
-protected:
-    static PassRefPtr<DeferredAnimatableValue> create() { return adoptRef(new DeferredAnimatableValue()); }
-
-    virtual PassRefPtr<AnimatableValue> interpolateTo(const AnimatableValue*, double fraction) const OVERRIDE
+    /**
+     * @param {Event} event
+     */
+    _windowFocused: function(event)
     {
-        ASSERT_NOT_REACHED();
-        return 0;
+        if (!WebInspector.experimentsSettings.refreshFileSystemsOnFocus.isEnabled())
+            return;
+        if (this._fileSystemRefreshTimeout)
+            return;
+        this._fileSystemRefreshTimeout = setTimeout(refreshFileSystems.bind(this), 1000);
+
+        function refreshFileSystems()
+        {
+            delete this._fileSystemRefreshTimeout;
+            var projects = this._workspace.projects();
+            for (var i = 0; i < projects.length; ++i)
+                projects[i].refresh("/");
+        }
     }
+}
 
-    virtual PassRefPtr<AnimatableValue> addWith(const AnimatableValue*) const OVERRIDE
-    {
-        ASSERT_NOT_REACHED();
-        return 0;
-    }
+/**
+ * @type {?WebInspector.WorkspaceController}
+ */
+WebInspector.workspaceController = null;
 
-private:
-    DeferredAnimatableValue() : AnimatableValue(TypeDeferred) { }
-
-    friend class AnimatableValue;
-};
-
-
-} // namespace WebCore
-
-#endif // DeferredAnimatableValue_h

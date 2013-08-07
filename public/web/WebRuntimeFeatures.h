@@ -135,6 +135,11 @@ public:
     WEBKIT_EXPORT static void enableDataListElement(bool);
     WEBKIT_EXPORT static bool isDataListElementEnabled();
 
+    WEBKIT_EXPORT static void enableHTMLImports(bool);
+    WEBKIT_EXPORT static bool isHTMLImportsEnabled();
+
+    WEBKIT_EXPORT static void enableCustomElements(bool);
+
 private:
     WebRuntimeFeatures();
 };

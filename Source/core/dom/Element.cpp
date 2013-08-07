@@ -1166,7 +1166,6 @@ String Element::nodeNamePreservingCase() const
 
 void Element::setPrefix(const AtomicString& prefix, ExceptionState& es)
 {
-    es.clearException();
     checkSetPrefix(prefix, es);
     if (es.hadException())
         return;
@@ -1631,6 +1630,11 @@ ShadowRoot* Element::ensureUserAgentShadowRoot()
     ShadowRoot* shadowRoot = ensureShadow()->addShadowRoot(this, ShadowRoot::UserAgentShadowRoot);
     didAddUserAgentShadowRoot(shadowRoot);
     return shadowRoot;
+}
+
+bool Element::supportsShadowElementForUserAgentShadow() const
+{
+    return true;
 }
 
 // FIXME: After replacing all internal shadowPseudoId with shadowPartId, remove this method.
@@ -3086,7 +3090,7 @@ void Element::createUniqueElementData()
     }
 }
 
-InputMethodContext* Element::getInputContext()
+InputMethodContext* Element::inputMethodContext()
 {
     return ensureElementRareData()->ensureInputMethodContext(toHTMLElement(this));
 }

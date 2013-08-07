@@ -26,6 +26,7 @@
 #include "config.h"
 #include "core/editing/DeleteFromTextNodeCommand.h"
 
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Document.h"
@@ -70,7 +71,7 @@ void DeleteFromTextNodeCommand::doUnapply()
     if (!m_node->rendererIsEditable())
         return;
 
-    m_node->insertData(m_offset, m_text, IGNORE_EXCEPTION_STATE);
+    m_node->insertData(m_offset, m_text, IGNORE_EXCEPTION);
 
     if (AXObjectCache* cache = document()->existingAXObjectCache())
         cache->nodeTextChangeNotification(m_node.get(), AXObjectCache::AXTextInserted, m_offset, m_text);

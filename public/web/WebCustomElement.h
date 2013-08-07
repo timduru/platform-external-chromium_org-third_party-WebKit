@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,42 +28,26 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ContentSelectorQuery_h
-#define ContentSelectorQuery_h
+#ifndef WebCustomElement_h
+#define WebCustomElement_h
 
-#include "core/css/CSSSelectorList.h"
-#include "wtf/Forward.h"
-#include "wtf/Vector.h"
+#include "../platform/WebString.h"
 
-namespace WebCore {
+namespace WebKit {
 
-class Document;
-class Node;
-class InsertionPoint;
-
-class ContentSelectorDataList {
+class WebCustomElement {
 public:
-    void initialize(const CSSSelectorList&);
-    bool matches(const Vector<Node*>& siblings, int nthNode) const;
+    // Subsequent calls to document.register with this local name are
+    // exempt from Custom Element name validity checks. Because Custom
+    // Element processing requires the set of valid names to be known
+    // ahead of time, this method should be called before any elements
+    // with the given tag name are created.
+    WEBKIT_EXPORT static void allowTagName(const WebString& localName);
 
 private:
-    static bool checkContentSelector(const CSSSelector*, const Vector<Node*>& siblings, int nthNode);
-
-    Vector<const CSSSelector*> m_selectors;
+    WebCustomElement();
 };
 
-class ContentSelectorQuery {
-    WTF_MAKE_NONCOPYABLE(ContentSelectorQuery);
-public:
-    explicit ContentSelectorQuery(InsertionPoint*);
-
-    bool matches(const Vector<Node*>& siblings, int nthNode) const;
-
-private:
-    InsertionPoint* m_insertionPoint;
-    ContentSelectorDataList m_selectors;
-};
-
-}
+} // namespace WebKit
 
 #endif

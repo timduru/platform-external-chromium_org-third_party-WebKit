@@ -33,7 +33,6 @@
 
 #include "RuntimeEnabledFeatures.h"
 #include "WebMediaPlayerClientImpl.h"
-#include "modules/websockets/WebSocket.h"
 
 using namespace WebCore;
 
@@ -371,6 +370,21 @@ void WebRuntimeFeatures::enableDataListElement(bool enable)
 bool WebRuntimeFeatures::isDataListElementEnabled()
 {
     return RuntimeEnabledFeatures::dataListElementEnabled();
+}
+
+void WebRuntimeFeatures::enableHTMLImports(bool enable)
+{
+    RuntimeEnabledFeatures::setHTMLImportsEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isHTMLImportsEnabled()
+{
+    return RuntimeEnabledFeatures::htmlImportsEnabled();
+}
+
+void WebRuntimeFeatures::enableCustomElements(bool enable)
+{
+    RuntimeEnabledFeatures::setCustomDOMElementsEnabled(enable);
 }
 
 } // namespace WebKit

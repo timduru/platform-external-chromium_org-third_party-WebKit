@@ -332,7 +332,7 @@ public:
     virtual bool perform(ExceptionState&)
     {
         m_oldValue = m_node->nodeValue();
-        return redo(IGNORE_EXCEPTION_STATE);
+        return redo(IGNORE_EXCEPTION);
     }
 
     virtual bool undo(ExceptionState&)
@@ -405,7 +405,7 @@ bool DOMEditor::setNodeValue(Node* node, const String& value, ExceptionState& es
 static void populateErrorString(ExceptionState& es, ErrorString* errorString)
 {
     if (es.hadException())
-        *errorString = DOMException::getErrorName(es);
+        *errorString = DOMException::getErrorName(es.code());
 }
 
 bool DOMEditor::insertBefore(Node* parentNode, PassRefPtr<Node> node, Node* anchorNode, ErrorString* errorString)

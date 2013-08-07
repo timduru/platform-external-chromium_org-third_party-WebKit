@@ -229,7 +229,7 @@ void HTMLSelectElement::remove(int optionIndex)
     if (listIndex < 0)
         return;
 
-    listItems()[listIndex]->remove(IGNORE_EXCEPTION_STATE);
+    listItems()[listIndex]->remove(IGNORE_EXCEPTION);
 }
 
 void HTMLSelectElement::remove(HTMLOptionElement* option)
@@ -237,7 +237,7 @@ void HTMLSelectElement::remove(HTMLOptionElement* option)
     if (option->ownerSelectElement() != this)
         return;
 
-    option->remove(IGNORE_EXCEPTION_STATE);
+    option->remove(IGNORE_EXCEPTION);
 }
 
 String HTMLSelectElement::value() const
@@ -419,7 +419,6 @@ Node* HTMLSelectElement::item(unsigned index)
 
 void HTMLSelectElement::setOption(unsigned index, HTMLOptionElement* option, ExceptionState& es)
 {
-    es.clearException();
     if (index > maxSelectItems - 1)
         index = maxSelectItems - 1;
     int diff = index - length();
@@ -442,7 +441,6 @@ void HTMLSelectElement::setOption(unsigned index, HTMLOptionElement* option, Exc
 
 void HTMLSelectElement::setLength(unsigned newLen, ExceptionState& es)
 {
-    es.clearException();
     if (newLen > maxSelectItems)
         newLen = maxSelectItems;
     int diff = length() - newLen;

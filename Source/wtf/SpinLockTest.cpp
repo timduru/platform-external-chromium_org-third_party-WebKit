@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -29,24 +29,60 @@
  */
 
 #include "config.h"
-#include "core/dom/ExceptionCodePlaceholder.h"
+#include "wtf/SpinLock.h"
 
-namespace WebCore {
+#include "wtf/Threading.h"
+#include <gtest/gtest.h>
 
-#if !ASSERT_DISABLED
+namespace {
 
-NoExceptionAssertionChecker::NoExceptionAssertionChecker(const char* file, int line)
-    : ExceptionCodePlaceholder(defaultExceptionCode)
-    , m_file(file)
-    , m_line(line)
+static const size_t bufferSize = 16;
+
+static int lock = 0;
+
+static void fillBuffer(volatile char* buffer, char fillPattern)
 {
+    for (int i = 0; i < bufferSize; ++i)
+        buffer[i] = fillPattern;
 }
 
-NoExceptionAssertionChecker::~NoExceptionAssertionChecker()
+static void changeAndCheckBuffer(volatile char* buffer)
 {
-    ASSERT_AT(!m_code || m_code == defaultExceptionCode, m_file, m_line, "");
+    fillBuffer(buffer, '\0');
+    int total = 0;
+    for (int i = 0; i < bufferSize; ++i)
+        total += buffer[i];
+
+    EXPECT_EQ(0, total);
+
+    // This will mess with the other thread's calculation if we accidentally get
+    // concurrency.
+    fillBuffer(buffer, '!');
 }
 
-#endif
-
+static void threadMain(void* arg)
+{
+    volatile char* buffer = reinterpret_cast<volatile char*>(arg);
+    for (int i = 0; i < 500000; ++i) {
+        spinLockLock(&lock);
+        changeAndCheckBuffer(buffer);
+        spinLockUnlock(&lock);
+    }
 }
+
+TEST(WTF_SpinLock, Torture)
+{
+    char sharedBuffer[bufferSize];
+
+    ThreadIdentifier thread1 = createThread(threadMain, sharedBuffer, "thread1");
+    ThreadIdentifier thread2 = createThread(threadMain, sharedBuffer, "thread2");
+    EXPECT_NE(0, thread1);
+    EXPECT_NE(0, thread2);
+
+    int ret = waitForThreadCompletion(thread1);
+    EXPECT_EQ(0, ret);
+    ret = waitForThreadCompletion(thread2);
+    EXPECT_EQ(0, ret);
+}
+
+} // namespace

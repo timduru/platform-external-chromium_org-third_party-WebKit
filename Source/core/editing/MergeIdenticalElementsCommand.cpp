@@ -26,6 +26,7 @@
 #include "config.h"
 #include "core/editing/MergeIdenticalElementsCommand.h"
 
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Element.h"
 
@@ -54,9 +55,9 @@ void MergeIdenticalElementsCommand::doApply()
 
     size_t size = children.size();
     for (size_t i = 0; i < size; ++i)
-        m_element2->insertBefore(children[i].release(), m_atChild.get(), IGNORE_EXCEPTION_STATE);
+        m_element2->insertBefore(children[i].release(), m_atChild.get(), IGNORE_EXCEPTION);
 
-    m_element1->remove(IGNORE_EXCEPTION_STATE);
+    m_element1->remove(IGNORE_EXCEPTION);
 }
 
 void MergeIdenticalElementsCommand::doUnapply()

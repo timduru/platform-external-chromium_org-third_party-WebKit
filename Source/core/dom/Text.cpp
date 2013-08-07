@@ -53,8 +53,6 @@ PassRefPtr<Text> Text::createEditingText(Document* document, const String& data)
 
 PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionState& es)
 {
-    es.clearException();
-
     // IndexSizeError: Raised if the specified offset is negative or greater than
     // the number of 16-bit units in data.
     if (offset > length()) {
@@ -155,7 +153,7 @@ PassRefPtr<Text> Text::replaceWholeText(const String& newText)
     for (RefPtr<Node> n = startText; n && n != this && n->isTextNode() && n->parentNode() == parent;) {
         RefPtr<Node> nodeToRemove(n.release());
         n = nodeToRemove->nextSibling();
-        parent->removeChild(nodeToRemove.get(), IGNORE_EXCEPTION_STATE);
+        parent->removeChild(nodeToRemove.get(), IGNORE_EXCEPTION);
     }
 
     if (this != endText) {
@@ -163,13 +161,13 @@ PassRefPtr<Text> Text::replaceWholeText(const String& newText)
         for (RefPtr<Node> n = nextSibling(); n && n != onePastEndText && n->isTextNode() && n->parentNode() == parent;) {
             RefPtr<Node> nodeToRemove(n.release());
             n = nodeToRemove->nextSibling();
-            parent->removeChild(nodeToRemove.get(), IGNORE_EXCEPTION_STATE);
+            parent->removeChild(nodeToRemove.get(), IGNORE_EXCEPTION);
         }
     }
 
     if (newText.isEmpty()) {
         if (parent && parentNode() == parent)
-            parent->removeChild(this, IGNORE_EXCEPTION_STATE);
+            parent->removeChild(this, IGNORE_EXCEPTION);
         return 0;
     }
 

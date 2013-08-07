@@ -448,8 +448,8 @@ void FrameView::setFrameRect(const IntRect& newRect)
 
 bool FrameView::scheduleAnimation()
 {
-    if (hostWindow()) {
-        hostWindow()->scheduleAnimation();
+    if (HostWindow* window = hostWindow()) {
+        window->scheduleAnimation();
         return true;
     }
     return false;
@@ -758,25 +758,6 @@ GraphicsLayer* FrameView::layerForOverhangAreas() const
         return 0;
     return renderView->compositor()->layerForOverhangAreas();
 }
-
-GraphicsLayer* FrameView::setWantsLayerForTopOverHangArea(bool wantsLayer) const
-{
-    RenderView* renderView = this->renderView();
-    if (!renderView)
-        return 0;
-
-    return renderView->compositor()->updateLayerForTopOverhangArea(wantsLayer);
-}
-
-GraphicsLayer* FrameView::setWantsLayerForBottomOverHangArea(bool wantsLayer) const
-{
-    RenderView* renderView = this->renderView();
-    if (!renderView)
-        return 0;
-
-    return renderView->compositor()->updateLayerForBottomOverhangArea(wantsLayer);
-}
-
 #endif // ENABLE(RUBBER_BANDING)
 
 bool FrameView::hasCompositedContent() const

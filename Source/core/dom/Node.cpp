@@ -99,11 +99,13 @@ using namespace HTMLNames;
 
 void* Node::operator new(size_t size)
 {
+    ASSERT(isMainThread());
     return partitionAlloc(Partitions::getObjectModelPartition(), size);
 }
 
 void Node::operator delete(void* ptr)
 {
+    ASSERT(isMainThread());
     partitionFree(ptr);
 }
 
@@ -576,7 +578,7 @@ void Node::normalize()
         if (!text->length()) {
             // Care must be taken to get the next node before removing the current node.
             node = NodeTraversal::nextPostOrder(node.get());
-            text->remove(IGNORE_EXCEPTION_STATE);
+            text->remove(IGNORE_EXCEPTION);
             continue;
         }
 
@@ -588,7 +590,7 @@ void Node::normalize()
 
             // Remove empty text nodes.
             if (!nextText->length()) {
-                nextText->remove(IGNORE_EXCEPTION_STATE);
+                nextText->remove(IGNORE_EXCEPTION);
                 continue;
             }
 
@@ -596,7 +598,7 @@ void Node::normalize()
             unsigned offset = text->length();
             text->appendData(nextText->data());
             document()->textNodesMerged(nextText.get(), offset);
-            nextText->remove(IGNORE_EXCEPTION_STATE);
+            nextText->remove(IGNORE_EXCEPTION);
         }
 
         node = NodeTraversal::nextPostOrder(node.get());
@@ -2583,7 +2585,7 @@ void Node::removedLastRef()
 void Node::textRects(Vector<IntRect>& rects) const
 {
     RefPtr<Range> range = Range::create(document());
-    range->selectNodeContents(const_cast<Node*>(this), IGNORE_EXCEPTION_STATE);
+    range->selectNodeContents(const_cast<Node*>(this), IGNORE_EXCEPTION);
     range->textRects(rects);
 }
 

@@ -108,7 +108,7 @@ void DOMPatchSupport::patchDocument(const String& markup)
     OwnPtr<Digest> oldInfo = createDigest(m_document->documentElement(), 0);
     OwnPtr<Digest> newInfo = createDigest(newDocument->documentElement(), &m_unusedNodesMap);
 
-    if (!innerPatchNode(oldInfo.get(), newInfo.get(), IGNORE_EXCEPTION_STATE)) {
+    if (!innerPatchNode(oldInfo.get(), newInfo.get(), IGNORE_EXCEPTION)) {
         // Fall back to rewrite.
         m_document->write(markup);
         m_document->close();
@@ -155,7 +155,6 @@ Node* DOMPatchSupport::patchNode(Node* node, const String& markup, ExceptionStat
 
     if (!innerPatchChildren(parentNode, oldList, newList, es)) {
         // Fall back to total replace.
-        es.clearException();
         if (!m_domEditor->replaceChild(parentNode, fragment.release(), node, es))
             return 0;
     }

@@ -131,7 +131,7 @@ WebInspector.KeyboardShortcut.makeKeyFromEvent = function(keyboardEvent)
 }
 
 /**
- * @param {KeyboardEvent} event
+ * @param {KeyboardEvent|MouseEvent} event
  * @return {boolean}
  */
 WebInspector.KeyboardShortcut.eventHasCtrlOrMeta = function(event)
@@ -140,7 +140,7 @@ WebInspector.KeyboardShortcut.eventHasCtrlOrMeta = function(event)
 }
 
 /**
- * @param {KeyboardEvent} event
+ * @param {Event} event
  * @return {boolean}
  */
 WebInspector.KeyboardShortcut.hasNoModifiers = function(event)

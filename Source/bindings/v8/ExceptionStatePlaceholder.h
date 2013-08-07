@@ -32,13 +32,14 @@
 #define ExceptionStatePlaceholder_h
 
 #include "bindings/v8/ExceptionState.h"
-#include "core/dom/ExceptionCode.h"
 #include "wtf/Assertions.h"
 #include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
 class ExceptionState;
+
+typedef int ExceptionCode;
 
 class IgnorableExceptionState : public ExceptionState {
 public:
@@ -48,19 +49,11 @@ public:
     virtual void throwTypeError(const String& message = String()) OVERRIDE FINAL { }
 };
 
-class TrackExceptionState : public ExceptionState {
-public:
-    TrackExceptionState(): ExceptionState(0) { }
-    ExceptionState& returnThis() { return *this; }
-    virtual void throwDOMException(const ExceptionCode& ec, const String& message = String()) OVERRIDE FINAL { m_code = ec; };
-    virtual void throwTypeError(const String& message = String()) OVERRIDE FINAL { m_code = TypeError; }
-};
-
-#define IGNORE_EXCEPTION_STATE (::WebCore::IgnorableExceptionState().returnThis())
+#define IGNORE_EXCEPTION (::WebCore::IgnorableExceptionState().returnThis())
 
 #if ASSERT_DISABLED
 
-#define ASSERT_NO_EXCEPTION_STATE (::WebCore::IgnorableExceptionState().returnThis())
+#define ASSERT_NO_EXCEPTION (::WebCore::IgnorableExceptionState().returnThis())
 
 #else
 
@@ -76,7 +69,7 @@ private:
     int m_line;
 };
 
-#define ASSERT_NO_EXCEPTION_STATE (::WebCore::NoExceptionStateAssertionChecker(__FILE__, __LINE__).returnThis())
+#define ASSERT_NO_EXCEPTION (::WebCore::NoExceptionStateAssertionChecker(__FILE__, __LINE__).returnThis())
 
 #endif
 

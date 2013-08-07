@@ -54,6 +54,7 @@
 #include "core/dom/CDATASection.h"
 #include "core/dom/Comment.h"
 #include "core/dom/ContextFeatures.h"
+#include "core/dom/CustomElement.h"
 #include "core/dom/CustomElementRegistrationContext.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/DOMNamedFlowCollection.h"
@@ -713,7 +714,7 @@ PassRefPtr<Element> Document::createElement(const AtomicString& localName, const
 
     RefPtr<Element> element;
 
-    if (CustomElementRegistrationContext::isCustomTagName(localName) && registrationContext())
+    if (CustomElement::isCustomTagName(localName) && registrationContext())
         element = registrationContext()->createCustomTagElement(this, QualifiedName(nullAtom, localName, xhtmlNamespaceURI));
     else
         element = createElement(localName, es);
@@ -737,7 +738,7 @@ PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, 
     }
 
     RefPtr<Element> element;
-    if (CustomElementRegistrationContext::isCustomTagName(qName.localName()) && registrationContext())
+    if (CustomElement::isCustomTagName(qName.localName()) && registrationContext())
         element = registrationContext()->createCustomTagElement(this, qName);
     else
         element = createElementNS(namespaceURI, qualifiedName, es);
@@ -830,8 +831,6 @@ PassRefPtr<CSSStyleDeclaration> Document::createCSSStyleDeclaration()
 
 PassRefPtr<Node> Document::importNode(Node* importedNode, bool deep, ExceptionState& es)
 {
-    es.clearException();
-
     if (!importedNode) {
         es.throwDOMException(NotSupportedError);
         return 0;
@@ -1314,7 +1313,7 @@ void Document::setTitle(const String& title)
     else if (!m_titleElement) {
         if (HTMLElement* headElement = head()) {
             m_titleElement = createElement(titleTag, false);
-            headElement->appendChild(m_titleElement, ASSERT_NO_EXCEPTION_STATE, AttachLazily);
+            headElement->appendChild(m_titleElement, ASSERT_NO_EXCEPTION, AttachLazily);
         }
     }
 
@@ -2723,7 +2722,7 @@ void Document::processHttpEquivSetCookie(const String& content)
         return;
 
     // Exception (for sandboxed documents) ignored.
-    toHTMLDocument(this)->setCookie(content, IGNORE_EXCEPTION_STATE);
+    toHTMLDocument(this)->setCookie(content, IGNORE_EXCEPTION);
 }
 
 void Document::processHttpEquivXFrameOptions(const String& content)

@@ -41,7 +41,7 @@
 #include "WebNodeList.h"
 #include "WebPluginContainer.h"
 #include "WebPluginContainerImpl.h"
-#include "bindings/v8/ExceptionStatePlaceholder.h"
+#include "bindings/v8/ExceptionState.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
 #include "core/dom/Event.h"
@@ -206,7 +206,7 @@ WebElement WebNode::querySelector(const WebString& tag, WebExceptionCode& ec) co
 {
     TrackExceptionState es;
     WebElement element(m_private->querySelector(tag, es));
-    ec = es;
+    ec = es.code();
     return element;
 }
 

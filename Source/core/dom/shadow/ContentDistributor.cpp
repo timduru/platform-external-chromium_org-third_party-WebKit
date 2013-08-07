@@ -28,7 +28,6 @@
 #include "core/dom/shadow/ContentDistributor.h"
 
 #include "core/dom/NodeTraversal.h"
-#include "core/dom/shadow/ContentSelectorQuery.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/shadow/HTMLContentElement.h"
@@ -216,7 +215,10 @@ void ContentDistributor::distribute(Element* host)
         HTMLShadowElement* shadowElement = activeShadowInsertionPoints[i - 1];
         ShadowRoot* root = shadowElement->containingShadowRoot();
         ASSERT(root);
-        if (root->olderShadowRoot()) {
+        if (!shadowElement->shouldSelect()) {
+            if (root->olderShadowRoot())
+                root->olderShadowRoot()->ensureScopeDistribution()->setInsertionPointAssignedTo(shadowElement);
+        } else if (root->olderShadowRoot()) {
             distributeNodeChildrenTo(shadowElement, root->olderShadowRoot());
             root->olderShadowRoot()->ensureScopeDistribution()->setInsertionPointAssignedTo(shadowElement);
         } else {
@@ -230,13 +232,12 @@ void ContentDistributor::distribute(Element* host)
 void ContentDistributor::distributeSelectionsTo(InsertionPoint* insertionPoint, const Vector<Node*>& pool, Vector<bool>& distributed)
 {
     ContentDistribution distribution;
-    ContentSelectorQuery query(insertionPoint);
 
     for (size_t i = 0; i < pool.size(); ++i) {
         if (distributed[i])
             continue;
 
-        if (!query.matches(pool, i))
+        if (isHTMLContentElement(insertionPoint) && !toHTMLContentElement(insertionPoint)->canSelectNode(pool, i))
             continue;
 
         Node* child = pool[i];

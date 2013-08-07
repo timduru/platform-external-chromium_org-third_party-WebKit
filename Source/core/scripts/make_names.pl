@@ -802,11 +802,10 @@ printConditionalElementIncludes($F);
 print F <<END
 
 #include "ContextFeatures.h"
+#include "CustomElement.h"
 #include "Document.h"
 #include "RuntimeEnabledFeatures.h"
 #include "Settings.h"
-
-#include "CustomElementRegistrationContext.h"
 
 namespace WebCore {
 
@@ -860,7 +859,7 @@ print F <<END
     if (!document)
         return 0;
 
-    if (CustomElementRegistrationContext::isCustomTagName(qName.localName()) && document->registrationContext()) {
+    if (CustomElement::isCustomTagName(qName.localName()) && document->registrationContext()) {
         RefPtr<Element> element = document->registrationContext()->createCustomTagElement(document, qName);
         ASSERT_WITH_SECURITY_IMPLICATION(element->is$parameters{namespace}Element());
         return static_pointer_cast<$parameters{namespace}Element>(element.release());
@@ -1085,7 +1084,7 @@ END
 
     printWrapperFunctions($F);
 
-        print F <<END
+    print F <<END
 v8::Handle<v8::Object> createV8$parameters{namespace}Wrapper($parameters{namespace}Element* element, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     typedef HashMap<WTF::StringImpl*, Create$parameters{namespace}ElementWrapperFunction> FunctionMap;
@@ -1116,21 +1115,21 @@ END
     }
 
     Create$parameters{namespace}ElementWrapperFunction createWrapperFunction = map.get(element->localName().impl());
-    if (element->isCustomElement())
-        return CustomElementWrapper<$parameters{namespace}Element, V8$parameters{namespace}Element>::wrap(element, creationContext, isolate, createWrapperFunction);
-    if (createWrapperFunction)
-    {
 END
 ;
     if ($parameters{namespace} eq "HTML") {
         print F <<END
-        if (createWrapperFunction == createHTMLElementWrapper)
-           return V8HTMLElement::createWrapper(element, creationContext, isolate);
+    if (createWrapperFunction == createHTMLElementWrapper)
+        createWrapperFunction = createV8HTMLDirectWrapper;
 END
+;
     }
     print F <<END
+    if (element->isCustomElement())
+        return CustomElementWrapper<$parameters{namespace}Element, V8$parameters{namespace}Element>::wrap(element, creationContext, isolate, createWrapperFunction);
+
+    if (createWrapperFunction)
         return createWrapperFunction(element, creationContext, isolate);
-    }
 END
 ;
     if ($parameters{namespace} eq "SVG") {

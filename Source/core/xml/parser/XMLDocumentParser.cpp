@@ -37,6 +37,7 @@
 #include <wtf/Vector.h>
 #include "HTMLNames.h"
 #include "XMLNSNames.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/ScriptController.h"
 #include "bindings/v8/ScriptSourceCode.h"
@@ -1016,7 +1017,7 @@ void XMLDocumentParser::endElementNs()
 
     if (!scriptingContentIsAllowed(parserContentPolicy()) && n->isElementNode() && toScriptLoaderIfPossible(toElement(n.get()))) {
         popCurrentNode();
-        n->remove(IGNORE_EXCEPTION_STATE);
+        n->remove(IGNORE_EXCEPTION);
         return;
     }
 
@@ -1199,9 +1200,9 @@ void XMLDocumentParser::startDocument(const String& version, const String& encod
     }
 
     if (!version.isNull())
-        document()->setXMLVersion(version, ASSERT_NO_EXCEPTION_STATE);
+        document()->setXMLVersion(version, ASSERT_NO_EXCEPTION);
     if (standalone != StandaloneUnspecified)
-        document()->setXMLStandalone(standaloneInfo == StandaloneYes, ASSERT_NO_EXCEPTION_STATE);
+        document()->setXMLStandalone(standaloneInfo == StandaloneYes, ASSERT_NO_EXCEPTION);
     if (!encoding.isNull())
         document()->setXMLEncoding(encoding);
     document()->setHasXMLDeclaration(true);

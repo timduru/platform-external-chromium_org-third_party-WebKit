@@ -34,6 +34,7 @@
 #include "WebExceptionCode.h"
 #include "WebFrameImpl.h"
 #include "WebNode.h"
+#include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
@@ -79,19 +80,19 @@ int WebRange::endOffset() const
 
 WebNode WebRange::startContainer(WebExceptionCode& exceptionCode) const
 {
-    // FIXME: Create a wrappe class that just sets the internal int.
+    // FIXME: Create a wrapper class that just sets the internal int.
     TrackExceptionState es;
     RefPtr<Node> node(m_private->startContainer(es));
-    exceptionCode = es;
+    exceptionCode = es.code();
     return node.release();
 }
 
 WebNode WebRange::endContainer(WebExceptionCode& exceptionCode) const
 {
-    // FIXME: Create a wrappe class that just sets the internal int.
+    // FIXME: Create a wrapper class that just sets the internal int.
     TrackExceptionState es;
     RefPtr<Node> node(m_private->endContainer(es));
-    exceptionCode = es;
+    exceptionCode = es.code();
     return node.release();
 }
 
@@ -108,7 +109,7 @@ WebString WebRange::toPlainText() const
 WebRange WebRange::expandedToParagraph() const
 {
     WebRange copy(*this);
-    copy.m_private->expand("block", IGNORE_EXCEPTION_STATE);
+    copy.m_private->expand("block", IGNORE_EXCEPTION);
     return copy;
 }
 

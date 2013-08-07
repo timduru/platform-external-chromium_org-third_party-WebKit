@@ -34,7 +34,6 @@
 #include "HTMLNames.h"
 #include "InspectorFrontend.h"
 #include "bindings/v8/ExceptionState.h"
-#include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/dom/Attr.h"
 #include "core/dom/CharacterData.h"
@@ -217,7 +216,7 @@ void RevalidateStyleAttributeTask::onTimer(Timer<RevalidateStyleAttributeTask>*)
 String InspectorDOMAgent::toErrorString(ExceptionState& es)
 {
     if (es.hadException())
-        return DOMException::getErrorName(es);
+        return DOMException::getErrorName(es.code());
     return "";
 }
 

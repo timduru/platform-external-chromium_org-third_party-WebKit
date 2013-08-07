@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2011 Google Inc. All rights reserved.
+ * Copyright (C) 2013 Google Inc. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions are
@@ -28,64 +28,32 @@
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-#ifndef ExceptionCodePlaceholder_h
-#define ExceptionCodePlaceholder_h
+#ifndef WTF_SpinLock_h
+#define WTF_SpinLock_h
 
-#include "wtf/Assertions.h"
-#include "wtf/Noncopyable.h"
+// DESCRIPTION
+// spinLockLock() and spinLockUnlock() are simple spinlock primitives based on
+// the standard CPU primitive of atomic increment and decrement of an int at
+// a given memory address.
 
-namespace WebCore {
+#include "wtf/Atomics.h"
 
-typedef int ExceptionCode;
+namespace WTF {
 
-class ExceptionCodePlaceholder {
-    WTF_MAKE_NONCOPYABLE(ExceptionCodePlaceholder);
-public:
-    ExceptionCodePlaceholder();
-    explicit ExceptionCodePlaceholder(ExceptionCode);
-
-    operator ExceptionCode& () const { return m_code; }
-
-protected:
-    mutable ExceptionCode m_code;
-};
-
-inline ExceptionCodePlaceholder::ExceptionCodePlaceholder()
-    : m_code(0)
+ALWAYS_INLINE void spinLockLock(int volatile* lock)
 {
+    while (atomicIncrement(lock) != 1)
+        atomicDecrement(lock);
 }
 
-inline ExceptionCodePlaceholder::ExceptionCodePlaceholder(ExceptionCode code)
-    : m_code(code)
+ALWAYS_INLINE void spinLockUnlock(int volatile* lock)
 {
+    atomicDecrement(lock);
 }
 
-class IgnorableExceptionCode : public ExceptionCodePlaceholder {
-};
+} // namespace WTF
 
-#define IGNORE_EXCEPTION ::WebCore::IgnorableExceptionCode()
+using WTF::spinLockLock;
+using WTF::spinLockUnlock;
 
-#if ASSERT_DISABLED
-
-#define ASSERT_NO_EXCEPTION ::WebCore::IgnorableExceptionCode()
-
-#else
-
-class NoExceptionAssertionChecker : public ExceptionCodePlaceholder {
-public:
-    NoExceptionAssertionChecker(const char* file, int line);
-    ~NoExceptionAssertionChecker();
-
-private:
-    static const ExceptionCode defaultExceptionCode = 0xaaaaaaaa;
-    const char* m_file;
-    int m_line;
-};
-
-#define ASSERT_NO_EXCEPTION ::WebCore::NoExceptionAssertionChecker(__FILE__, __LINE__)
-
-#endif
-
-}
-
-#endif
+#endif // WTF_PartitionAlloc_h

@@ -93,7 +93,6 @@ void Attr::createTextChild()
 
 void Attr::setPrefix(const AtomicString& prefix, ExceptionState& es)
 {
-    es.clearException();
     checkSetPrefix(prefix, es);
     if (es.hadException())
         return;
@@ -139,7 +138,7 @@ void Attr::setValue(const AtomicString& value, ExceptionState&)
 
 void Attr::setNodeValue(const String& v)
 {
-    setValue(v, IGNORE_EXCEPTION_STATE);
+    setValue(v, IGNORE_EXCEPTION);
 }
 
 PassRefPtr<Node> Attr::cloneNode(bool /*deep*/)
