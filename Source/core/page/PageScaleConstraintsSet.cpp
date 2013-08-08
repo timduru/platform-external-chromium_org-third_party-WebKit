@@ -111,7 +111,9 @@ static float computeDeprecatedTargetDensityDPIFactor(const ViewportArguments& ar
         targetDPI = 240.0f;
     else if (arguments.deprecatedTargetDensityDPI != ViewportArguments::ValueAuto)
         targetDPI = arguments.deprecatedTargetDensityDPI;
-    return targetDPI > 0 ? (deviceScaleFactor * 120.0f) / targetDPI : 1.0f;
+    // Since the return value is multiplied by deviceScaleFactor and deviceScaleFactor is displayDPI / 160.0 the below expands to:
+    // (160.0f / targetDPI) * (displayDPI / 160.0f) which is the same as displayDPI / targetDPI, which is what we want to determine.
+    return targetDPI > 0 ? 160.0f / targetDPI : 1.0f;
 }
 
 static float getLayoutWidthForNonWideViewport(const FloatSize& deviceSize, float initialScale)
