@@ -158,7 +158,6 @@ public:
 
     void checkLoadComplete();
     void detachFromParent();
-    void detachViewsAndDocumentLoader();
 
     void addExtraFieldsToRequest(ResourceRequest&);
 
@@ -252,8 +251,6 @@ private:
     void setReferrerForFrameRequest(ResourceRequest&, ShouldSendReferrer);
     FrameLoadType determineFrameLoadType(const FrameLoadRequest&);
 
-    void frameLoadCompleted();
-
     SubstituteData defaultSubstituteDataForURL(const KURL&);
 
     bool fireBeforeUnloadEvent(Chrome&, FrameLoader*);
@@ -269,12 +266,6 @@ private:
     void scrollToFragmentWithParentBoundary(const KURL&);
 
     void checkLoadCompleteForThisFrame();
-
-    void setDocumentLoader(DocumentLoader*);
-    void setPolicyDocumentLoader(DocumentLoader*);
-    void setProvisionalDocumentLoader(DocumentLoader*);
-
-    void setState(FrameState);
 
     void closeOldDataSources();
 

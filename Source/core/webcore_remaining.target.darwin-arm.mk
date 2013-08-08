@@ -185,6 +185,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/ApplyBlockElementCommand.cpp \
 	third_party/WebKit/Source/core/editing/ApplyStyleCommand.cpp \
 	third_party/WebKit/Source/core/editing/BreakBlockquoteCommand.cpp \
+	third_party/WebKit/Source/core/editing/Caret.cpp \
 	third_party/WebKit/Source/core/editing/CompositeEditCommand.cpp \
 	third_party/WebKit/Source/core/editing/CreateLinkCommand.cpp \
 	third_party/WebKit/Source/core/editing/DeleteFromTextNodeCommand.cpp \

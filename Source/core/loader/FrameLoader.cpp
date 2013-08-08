@@ -193,8 +193,8 @@ FrameLoader::~FrameLoader()
 void FrameLoader::init()
 {
     // This somewhat odd set of steps gives the frame an initial empty document.
-    setPolicyDocumentLoader(m_client->createDocumentLoader(ResourceRequest(KURL(ParsedURLString, emptyString())), SubstituteData()).get());
-    setProvisionalDocumentLoader(m_policyDocumentLoader.get());
+    m_provisionalDocumentLoader = m_client->createDocumentLoader(ResourceRequest(KURL(ParsedURLString, emptyString())), SubstituteData());
+    m_provisionalDocumentLoader->setFrame(m_frame);
     m_provisionalDocumentLoader->startLoadingMainResource();
     m_frame->document()->cancelParsing();
     m_stateMachine.advanceTo(FrameLoaderStateMachine::DisplayingInitialEmptyDocument);
@@ -785,13 +785,6 @@ void FrameLoader::loadInSameDocument(const KURL& url, PassRefPtr<SerializedScrip
     m_isComplete = false;
     checkCompleted();
 
-    if (isNewNavigation) {
-        // This will clear previousItem from the rest of the frame tree that didn't
-        // doing any loading. We need to make a pass on this now, since for fragment
-        // navigation we'll not go through a real load and reach Completed state.
-        checkLoadComplete();
-    }
-
     // Generate start and stop notifications only when loader is completed so that we
     // don't fire them for fragment redirection that happens in window.onload handler.
     // See https://bugs.webkit.org/show_bug.cgi?id=31838
@@ -1005,7 +998,8 @@ void FrameLoader::loadWithNavigationAction(const ResourceRequest& request, const
 
     loader->setReplacesCurrentHistoryItem(type == FrameLoadTypeRedirectWithLockedBackForwardList);
     loader->setIsClientRedirect(m_startingClientRedirect);
-    setPolicyDocumentLoader(loader.get());
+    m_policyDocumentLoader = loader;
+    m_policyDocumentLoader->setFrame(m_frame);
     checkNavigationPolicyAndContinueLoad(formState, type);
 }
 
@@ -1083,7 +1077,9 @@ void FrameLoader::stopAllLoaders(ClearProvisionalItemPolicy clearProvisionalItem
     if (m_documentLoader)
         m_documentLoader->stopLoading();
 
-    setProvisionalDocumentLoader(0);
+    if (m_provisionalDocumentLoader)
+        m_provisionalDocumentLoader->detachFromFrame();
+    m_provisionalDocumentLoader = 0;
 
     m_checkTimer.stop();
 
@@ -1132,67 +1128,6 @@ bool FrameLoader::isLoading() const
     return docLoader->isLoading();
 }
 
-void FrameLoader::setDocumentLoader(DocumentLoader* loader)
-{
-    if (!loader && !m_documentLoader)
-        return;
-
-    ASSERT(loader != m_documentLoader);
-    ASSERT(!loader || loader->frameLoader() == this);
-
-    detachChildren();
-
-    // detachChildren() can trigger this frame's unload event, and therefore
-    // script can run and do just about anything. For example, an unload event that calls
-    // document.write("") on its parent frame can lead to a recursive detachChildren()
-    // invocation for this frame. In that case, we can end up at this point with a
-    // loader that hasn't been deleted but has been detached from its frame. Such a
-    // DocumentLoader has been sufficiently detached that we'll end up in an inconsistent
-    // state if we try to use it.
-    if (loader && !loader->frame())
-        return;
-
-    if (m_documentLoader)
-        m_documentLoader->detachFromFrame();
-
-    m_documentLoader = loader;
-}
-
-void FrameLoader::setPolicyDocumentLoader(DocumentLoader* loader)
-{
-    if (m_policyDocumentLoader == loader)
-        return;
-
-    ASSERT(m_frame);
-    if (loader)
-        loader->setFrame(m_frame);
-    if (m_policyDocumentLoader
-            && m_policyDocumentLoader != m_provisionalDocumentLoader
-            && m_policyDocumentLoader != m_documentLoader)
-        m_policyDocumentLoader->detachFromFrame();
-
-    m_policyDocumentLoader = loader;
-}
-
-void FrameLoader::setProvisionalDocumentLoader(DocumentLoader* loader)
-{
-    ASSERT(!loader || !m_provisionalDocumentLoader);
-    ASSERT(!loader || loader->frameLoader() == this);
-
-    if (m_provisionalDocumentLoader && m_provisionalDocumentLoader != m_documentLoader)
-        m_provisionalDocumentLoader->detachFromFrame();
-
-    m_provisionalDocumentLoader = loader;
-}
-
-void FrameLoader::setState(FrameState newState)
-{
-    m_state = newState;
-
-    if (newState == FrameStateProvisional)
-        m_frame->navigationScheduler()->cancel();
-}
-
 void FrameLoader::commitProvisionalLoad()
 {
     ASSERT(m_client->hasWebView());
@@ -1218,13 +1153,17 @@ void FrameLoader::commitProvisionalLoad()
     if (pdl != m_provisionalDocumentLoader)
         return;
 
-    setDocumentLoader(m_provisionalDocumentLoader.get());
-    setProvisionalDocumentLoader(0);
-    if (pdl != m_documentLoader) {
-        ASSERT(m_state == FrameStateComplete);
-        return;
-    }
-    setState(FrameStateCommittedPage);
+    // detachChildren() can trigger this frame's unload event, and therefore
+    // script can run and do just about anything. For example, an unload event that calls
+    // document.write("") on its parent frame can lead to a recursive detachChildren()
+    // invocation for this frame. Leave the loader that is being committed in a temporarily
+    // detached state, such that it can't be found and cancelled.
+    RefPtr<DocumentLoader> loaderBeingCommitted = m_provisionalDocumentLoader.release();
+    detachChildren();
+    if (m_documentLoader)
+        m_documentLoader->detachFromFrame();
+    m_documentLoader = loaderBeingCommitted;
+    m_state = FrameStateCommittedPage;
 
     if (isLoadingMainFrame())
         m_frame->page()->chrome().client()->needTouchEvents(false);
@@ -1329,51 +1268,39 @@ CachePolicy FrameLoader::subresourceCachePolicy() const
 void FrameLoader::checkLoadCompleteForThisFrame()
 {
     ASSERT(m_client->hasWebView());
+    if (m_state != FrameStateCommittedPage)
+        return;
 
-    switch (m_state) {
-        case FrameStateProvisional: {
-            return;
-        }
-        case FrameStateCommittedPage: {
-            DocumentLoader* dl = m_documentLoader.get();
-            if (!dl || (dl->isLoadingInAPISense() && !dl->isStopping()))
-                return;
+    if (!m_documentLoader || (m_documentLoader->isLoadingInAPISense() && !m_documentLoader->isStopping()))
+        return;
 
-            setState(FrameStateComplete);
+    m_state = FrameStateComplete;
 
-            // FIXME: Is this subsequent work important if we already navigated away?
-            // Maybe there are bugs because of that, or extra work we can skip because
-            // the new page is ready.
+    // FIXME: Is this subsequent work important if we already navigated away?
+    // Maybe there are bugs because of that, or extra work we can skip because
+    // the new page is ready.
 
-            // If the user had a scroll point, scroll to it, overriding the anchor point if any.
-            if (m_frame->page()) {
-                if (isBackForwardLoadType(m_loadType) || m_loadType == FrameLoadTypeReload || m_loadType == FrameLoadTypeReloadFromOrigin)
-                    history()->restoreScrollPositionAndViewState();
-            }
-
-            if (!m_stateMachine.committedFirstRealDocumentLoad())
-                return;
-
-            m_progressTracker->progressCompleted();
-            if (Page* page = m_frame->page()) {
-                if (m_frame == page->mainFrame())
-                    page->resetRelevantPaintedObjectCounter();
-            }
-
-            const ResourceError& error = dl->mainDocumentError();
-            if (!error.isNull())
-                m_client->dispatchDidFailLoad(error);
-            else
-                m_client->dispatchDidFinishLoad();
-            return;
-        }
-
-        case FrameStateComplete:
-            m_loadType = FrameLoadTypeStandard;
-            return;
+    // If the user had a scroll point, scroll to it, overriding the anchor point if any.
+    if (m_frame->page()) {
+        if (isBackForwardLoadType(m_loadType) || m_loadType == FrameLoadTypeReload || m_loadType == FrameLoadTypeReloadFromOrigin)
+            history()->restoreScrollPositionAndViewState();
     }
 
-    ASSERT_NOT_REACHED();
+    if (!m_stateMachine.committedFirstRealDocumentLoad())
+        return;
+
+    m_progressTracker->progressCompleted();
+    if (Page* page = m_frame->page()) {
+        if (m_frame == page->mainFrame())
+            page->resetRelevantPaintedObjectCounter();
+    }
+
+    const ResourceError& error = m_documentLoader->mainDocumentError();
+    if (!error.isNull())
+        m_client->dispatchDidFailLoad(error);
+    else
+        m_client->dispatchDidFinishLoad();
+    m_loadType = FrameLoadTypeStandard;
 }
 
 void FrameLoader::didLayout(LayoutMilestones milestones)
@@ -1481,7 +1408,10 @@ void FrameLoader::detachFromParent()
 
     InspectorInstrumentation::frameDetachedFromParent(m_frame);
 
-    detachViewsAndDocumentLoader();
+    if (m_documentLoader)
+        m_documentLoader->detachFromFrame();
+    m_documentLoader = 0;
+    m_client->detachedFromParent();
 
     m_progressTracker.clear();
 
@@ -1493,12 +1423,6 @@ void FrameLoader::detachFromParent()
         m_frame->willDetachPage();
         m_frame->detachFromPage();
     }
-}
-
-void FrameLoader::detachViewsAndDocumentLoader()
-{
-    setDocumentLoader(0);
-    m_client->detachedFromParent();
 }
 
 void FrameLoader::addExtraFieldsToRequest(ResourceRequest& request)
@@ -1615,9 +1539,10 @@ void FrameLoader::receivedMainResourceError(const ResourceError& error)
         m_client->dispatchDidFailProvisionalLoad(error);
         if (loader != m_provisionalDocumentLoader)
             return;
-        setProvisionalDocumentLoader(0);
+        m_provisionalDocumentLoader->detachFromFrame();
+        m_provisionalDocumentLoader = 0;
         m_progressTracker->progressCompleted();
-        setState(FrameStateComplete);
+        m_state = FrameStateComplete;
 
         // Reset the back forward list to the last committed history item at the top level.
         RefPtr<HistoryItem> item = m_frame->page()->mainFrame()->loader()->history()->currentItem();
@@ -1641,7 +1566,9 @@ void FrameLoader::checkNavigationPolicyAndContinueFragmentScroll(const Navigatio
     // If we have a provisional request for a different document, a fragment scroll should cancel it.
     if (m_provisionalDocumentLoader && !equalIgnoringFragmentIdentifier(m_provisionalDocumentLoader->request().url(), request.url())) {
         m_provisionalDocumentLoader->stopLoading();
-        setProvisionalDocumentLoader(0);
+        if (m_provisionalDocumentLoader)
+            m_provisionalDocumentLoader->detachFromFrame();
+        m_provisionalDocumentLoader = 0;
     }
     loadInSameDocument(request.url(), 0, isNewNavigation);
 }
@@ -1777,7 +1704,8 @@ void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> for
     bool canContinue = shouldContinue && shouldClose();
 
     if (!canContinue) {
-        setPolicyDocumentLoader(0);
+        m_policyDocumentLoader->detachFromFrame();
+        m_policyDocumentLoader = 0;
 
         // If the navigation request came from the back/forward menu, and we punt on it, we have the
         // problem that we have optimistically moved the b/f cursor already, so move it back.  For sanity,
@@ -1804,12 +1732,11 @@ void FrameLoader::checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState> for
         if (page->mainFrame() == m_frame)
             m_frame->page()->inspectorController()->resume();
     }
+    m_frame->navigationScheduler()->cancel();
 
-    setProvisionalDocumentLoader(m_policyDocumentLoader.get());
+    m_provisionalDocumentLoader = m_policyDocumentLoader.release();
     m_loadType = type;
-    setState(FrameStateProvisional);
-
-    setPolicyDocumentLoader(0);
+    m_state = FrameStateProvisional;
 
     if (formState)
         m_client->dispatchWillSubmitForm(formState);

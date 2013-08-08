@@ -964,10 +964,6 @@ void RenderLayerCompositor::computeCompositingRequirements(RenderLayer* ancestor
     // At this point we have finished collecting all reasons to composite this layer.
     layer->setCompositingReasons(reasonsToComposite);
 
-    // If the layer is going into compositing mode, repaint its old location.
-    if (!layer->isComposited() && willBeComposited)
-        repaintOnCompositingChange(layer);
-
     // Update backing now, so that we can use isComposited() reliably during tree traversal in rebuildCompositingLayerTree().
     if (updateBacking(layer, CompositingChangeRepaintNow))
         layersChanged = true;
@@ -1514,18 +1510,6 @@ void RenderLayerCompositor::updateRootLayerPosition()
         FrameView* frameView = m_renderView->frameView();
         m_containerLayer->setSize(frameView->unscaledVisibleContentSize());
     }
-
-#if ENABLE(RUBBER_BANDING)
-    if (m_contentShadowLayer) {
-        m_contentShadowLayer->setPosition(m_rootContentLayer->position());
-
-        FloatSize rootContentLayerSize = m_rootContentLayer->size();
-        if (m_contentShadowLayer->size() != rootContentLayerSize) {
-            m_contentShadowLayer->setSize(rootContentLayerSize);
-            ScrollbarTheme::theme()->setUpContentShadowLayer(m_contentShadowLayer.get());
-        }
-    }
-#endif
 }
 
 bool RenderLayerCompositor::has3DContent() const
@@ -1649,14 +1633,11 @@ const char* RenderLayerCompositor::logReasonsForCompositing(const RenderLayer* l
 
     if (reasons & CompositingReasonVideo)
         return "video";
-
-    if (reasons & CompositingReasonCanvas)
+    else if (reasons & CompositingReasonCanvas)
         return "canvas";
-
-    if (reasons & CompositingReasonPlugin)
+    else if (reasons & CompositingReasonPlugin)
         return "plugin";
-
-    if (reasons & CompositingReasonIFrame)
+    else if (reasons & CompositingReasonIFrame)
         return "iframe";
 
     if (reasons & CompositingReasonBackfaceVisibilityHidden)
@@ -2216,15 +2197,6 @@ bool RenderLayerCompositor::requiresOverhangAreasLayer() const
     // Chromium always wants a layer.
     return true;
 }
-
-bool RenderLayerCompositor::requiresContentShadowLayer() const
-{
-    // We don't want a layer if this is a subframe.
-    if (!isMainFrame())
-        return false;
-
-    return false;
-}
 #endif
 
 void RenderLayerCompositor::updateOverflowControlsLayers()
@@ -2246,23 +2218,6 @@ void RenderLayerCompositor::updateOverflowControlsLayers()
     } else if (m_layerForOverhangAreas) {
         m_layerForOverhangAreas->removeFromParent();
         m_layerForOverhangAreas = nullptr;
-    }
-
-    if (requiresContentShadowLayer()) {
-        if (!m_contentShadowLayer) {
-            m_contentShadowLayer = GraphicsLayer::create(graphicsLayerFactory(), this);
-#ifndef NDEBUG
-            m_contentShadowLayer->setName("content shadow");
-#endif
-            m_contentShadowLayer->setSize(m_rootContentLayer->size());
-            m_contentShadowLayer->setPosition(m_rootContentLayer->position());
-            ScrollbarTheme::theme()->setUpContentShadowLayer(m_contentShadowLayer.get());
-
-            m_scrollLayer->addChildBelow(m_contentShadowLayer.get(), m_rootContentLayer.get());
-        }
-    } else if (m_contentShadowLayer) {
-        m_contentShadowLayer->removeFromParent();
-        m_contentShadowLayer = nullptr;
     }
 #endif
 
