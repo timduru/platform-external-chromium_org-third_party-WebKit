@@ -566,7 +566,7 @@ void RenderTable::layout()
     }
 
     m_columnLogicalWidthChanged = false;
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 // Collect all the unique border values that we want to paint in a sorted list.
@@ -637,7 +637,7 @@ void RenderTable::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
             return;
     }
 
-    bool pushedClip = pushContentsClip(paintInfo, adjustedPaintOffset);
+    bool pushedClip = pushContentsClip(paintInfo, adjustedPaintOffset, ForceContentsClip);
     paintObject(paintInfo, adjustedPaintOffset);
     if (pushedClip)
         popContentsClip(paintInfo, paintPhase, adjustedPaintOffset);

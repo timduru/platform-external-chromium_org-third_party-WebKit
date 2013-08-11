@@ -29,6 +29,7 @@
 #include "core/page/EventHandler.h"
 
 #include "HTMLNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SVGNames.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Document.h"
@@ -54,7 +55,7 @@
 #include "core/html/HTMLFrameSetElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/cache/CachedImage.h"
+#include "core/loader/cache/ImageResource.h"
 #include "core/page/Chrome.h"
 #include "core/page/DragController.h"
 #include "core/page/DragState.h"
@@ -356,6 +357,7 @@ void EventHandler::clear()
     m_maxMouseMovedDuration = 0;
     m_baseEventType = PlatformEvent::NoType;
     m_didStartDrag = false;
+    m_touchPressed = false;
 }
 
 void EventHandler::nodeWillBeRemoved(Node* nodeToBeRemoved)
@@ -381,7 +383,6 @@ static inline bool dispatchSelectStart(Node* node)
 
 static VisibleSelection expandSelectionToRespectUserSelectAll(Node* targetNode, const VisibleSelection& selection)
 {
-#if ENABLE(USERSELECT_ALL)
     Node* rootUserSelectAll = Position::rootUserSelectAllForNode(targetNode);
     if (!rootUserSelectAll)
         return selection;
@@ -391,10 +392,6 @@ static VisibleSelection expandSelectionToRespectUserSelectAll(Node* targetNode, 
     newSelection.setExtent(positionAfterNode(rootUserSelectAll).downstream(CanCrossEditingBoundary));
 
     return newSelection;
-#else
-    UNUSED_PARAM(targetNode);
-    return selection;
-#endif
 }
 
 bool EventHandler::updateSelectionForMouseDownDispatchingSelectStart(Node* targetNode, const VisibleSelection& selection, TextGranularity granularity)
@@ -770,27 +767,27 @@ void EventHandler::updateSelectionForMouseDrag(const HitTestResult& hitTestResul
         newSelection = VisibleSelection(targetPosition);
     }
 
-#if ENABLE(USERSELECT_ALL)
-    Node* rootUserSelectAllForMousePressNode = Position::rootUserSelectAllForNode(m_mousePressNode.get());
-    if (rootUserSelectAllForMousePressNode && rootUserSelectAllForMousePressNode == Position::rootUserSelectAllForNode(target)) {
-        newSelection.setBase(positionBeforeNode(rootUserSelectAllForMousePressNode).upstream(CanCrossEditingBoundary));
-        newSelection.setExtent(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
-    } else {
-        // Reset base for user select all when base is inside user-select-all area and extent < base.
-        if (rootUserSelectAllForMousePressNode && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
-            newSelection.setBase(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
+    if (RuntimeEnabledFeatures::userSelectAllEnabled()) {
+        Node* rootUserSelectAllForMousePressNode = Position::rootUserSelectAllForNode(m_mousePressNode.get());
+        if (rootUserSelectAllForMousePressNode && rootUserSelectAllForMousePressNode == Position::rootUserSelectAllForNode(target)) {
+            newSelection.setBase(positionBeforeNode(rootUserSelectAllForMousePressNode).upstream(CanCrossEditingBoundary));
+            newSelection.setExtent(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
+        } else {
+            // Reset base for user select all when base is inside user-select-all area and extent < base.
+            if (rootUserSelectAllForMousePressNode && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
+                newSelection.setBase(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
 
-        Node* rootUserSelectAllForTarget = Position::rootUserSelectAllForNode(target);
-        if (rootUserSelectAllForTarget && m_mousePressNode->renderer() && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
-            newSelection.setExtent(positionBeforeNode(rootUserSelectAllForTarget).upstream(CanCrossEditingBoundary));
-        else if (rootUserSelectAllForTarget && m_mousePressNode->renderer())
-            newSelection.setExtent(positionAfterNode(rootUserSelectAllForTarget).downstream(CanCrossEditingBoundary));
-        else
-            newSelection.setExtent(targetPosition);
+            Node* rootUserSelectAllForTarget = Position::rootUserSelectAllForNode(target);
+            if (rootUserSelectAllForTarget && m_mousePressNode->renderer() && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
+                newSelection.setExtent(positionBeforeNode(rootUserSelectAllForTarget).upstream(CanCrossEditingBoundary));
+            else if (rootUserSelectAllForTarget && m_mousePressNode->renderer())
+                newSelection.setExtent(positionAfterNode(rootUserSelectAllForTarget).downstream(CanCrossEditingBoundary));
+            else
+                newSelection.setExtent(targetPosition);
+        }
+    } else {
+        newSelection.setExtent(targetPosition);
     }
-#else
-    newSelection.setExtent(targetPosition);
-#endif
 
     if (m_frame->selection()->granularity() != CharacterGranularity)
         newSelection.expandUsingGranularity(m_frame->selection()->granularity());
@@ -1146,7 +1143,7 @@ OptionalCursor EventHandler::selectCursor(const MouseEventWithHitTestResults& ev
             StyleImage* styleImage = (*cursors)[i].image();
             if (!styleImage)
                 continue;
-            CachedImage* cachedImage = styleImage->cachedImage();
+            ImageResource* cachedImage = styleImage->cachedImage();
             if (!cachedImage)
                 continue;
             float scale = styleImage->imageScaleFactor();

@@ -28,6 +28,7 @@
 #include "core/dom/RenderedDocumentMarker.h"
 #include "core/dom/Text.h"
 #include "core/editing/Editor.h"
+#include "core/editing/InputMethodController.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
@@ -47,6 +48,7 @@
 #include "core/rendering/svg/SVGTextRunRenderingContext.h"
 #include "wtf/Vector.h"
 #include "wtf/text/CString.h"
+#include "wtf/text/StringBuilder.h"
 
 using namespace std;
 
@@ -186,16 +188,6 @@ RenderObject::SelectionState InlineTextBox::selectionState()
     return state;
 }
 
-static void adjustCharactersAndLengthForHyphen(BufferForAppendingHyphen& charactersWithHyphen, RenderStyle* style, StringView& string, int& length)
-{
-    const AtomicString& hyphenString = style->hyphenString();
-    charactersWithHyphen.reserveCapacity(length + hyphenString.length());
-    charactersWithHyphen.append(string);
-    charactersWithHyphen.append(hyphenString);
-    string = charactersWithHyphen.toString().createView();
-    length += hyphenString.length();
-}
-
 LayoutRect InlineTextBox::localSelectionRect(int startPos, int endPos)
 {
     int sPos = max(startPos - m_start, 0);
@@ -212,7 +204,7 @@ LayoutRect InlineTextBox::localSelectionRect(int startPos, int endPos)
     RenderStyle* styleToUse = textObj->style(isFirstLineStyle());
     const Font& font = styleToUse->font();
 
-    BufferForAppendingHyphen charactersWithHyphen;
+    StringBuilder charactersWithHyphen;
     bool respectHyphen = ePos == m_len && hasHyphen();
     TextRun textRun = constructTextRun(styleToUse, font, respectHyphen ? &charactersWithHyphen : 0);
     if (respectHyphen)
@@ -545,8 +537,8 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         context->concatCTM(rotation(boxRect, Clockwise));
 
     // Determine whether or not we have composition underlines to draw.
-    bool containsComposition = renderer()->node() && renderer()->frame()->editor()->compositionNode() == renderer()->node();
-    bool useCustomUnderlines = containsComposition && renderer()->frame()->editor()->compositionUsesCustomUnderlines();
+    bool containsComposition = renderer()->node() && renderer()->frame()->inputMethodController().compositionNode() == renderer()->node();
+    bool useCustomUnderlines = containsComposition && renderer()->frame()->inputMethodController().compositionUsesCustomUnderlines();
 
     // Determine the text colors and selection colors.
     Color textFillColor;
@@ -650,10 +642,11 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
     // and composition underlines.
     if (paintInfo.phase != PaintPhaseSelection && paintInfo.phase != PaintPhaseTextClip && !isPrinting) {
 
-        if (containsComposition && !useCustomUnderlines)
+        if (containsComposition && !useCustomUnderlines) {
             paintCompositionBackground(context, boxOrigin, styleToUse, font,
-                renderer()->frame()->editor()->compositionStart(),
-                renderer()->frame()->editor()->compositionEnd());
+                renderer()->frame()->inputMethodController().compositionStart(),
+                renderer()->frame()->inputMethodController().compositionEnd());
+        }
 
         paintDocumentMarkers(context, boxOrigin, styleToUse, font, true);
 
@@ -686,7 +679,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         maximumLength = length;
     }
 
-    BufferForAppendingHyphen charactersWithHyphen;
+    StringBuilder charactersWithHyphen;
     TextRun textRun = constructTextRun(styleToUse, font, string, maximumLength, hasHyphen() ? &charactersWithHyphen : 0);
     if (hasHyphen())
         length = textRun.length();
@@ -780,7 +773,7 @@ void InlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset, 
         paintDocumentMarkers(context, boxOrigin, styleToUse, font, false);
 
         if (useCustomUnderlines) {
-            const Vector<CompositionUnderline>& underlines = renderer()->frame()->editor()->customCompositionUnderlines();
+            const Vector<CompositionUnderline>& underlines = renderer()->frame()->inputMethodController().customCompositionUnderlines();
             size_t numUnderlines = underlines.size();
 
             for (size_t index = 0; index < numUnderlines; ++index) {
@@ -865,7 +858,7 @@ void InlineTextBox::paintSelection(GraphicsContext* context, const FloatPoint& b
     if (string.length() != static_cast<unsigned>(length) || m_start)
         string.narrow(m_start, length);
 
-    BufferForAppendingHyphen charactersWithHyphen;
+    StringBuilder charactersWithHyphen;
     bool respectHyphen = ePos == length && hasHyphen();
     TextRun textRun = constructTextRun(style, font, string, textRenderer()->textLength() - m_start, respectHyphen ? &charactersWithHyphen : 0);
     if (respectHyphen)
@@ -1494,7 +1487,7 @@ bool InlineTextBox::containsCaretOffset(int offset) const
     return true;
 }
 
-TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, BufferForAppendingHyphen* charactersWithHyphen) const
+TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, StringBuilder* charactersWithHyphen) const
 {
     ASSERT(style);
 
@@ -1512,21 +1505,23 @@ TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, Bu
     return constructTextRun(style, font, string, textRenderer->textLength() - startPos, charactersWithHyphen);
 }
 
-TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, StringView string, int maximumLength, BufferForAppendingHyphen* charactersWithHyphen) const
+TextRun InlineTextBox::constructTextRun(RenderStyle* style, const Font& font, StringView string, int maximumLength, StringBuilder* charactersWithHyphen) const
 {
     ASSERT(style);
 
     RenderText* textRenderer = this->textRenderer();
     ASSERT(textRenderer);
 
-    int length = string.length();
-
     if (charactersWithHyphen) {
-        adjustCharactersAndLengthForHyphen(*charactersWithHyphen, style, string, length);
-        maximumLength = length;
+        const AtomicString& hyphenString = style->hyphenString();
+        charactersWithHyphen->reserveCapacity(string.length() + hyphenString.length());
+        charactersWithHyphen->append(string);
+        charactersWithHyphen->append(hyphenString);
+        string = charactersWithHyphen->toString().createView();
+        maximumLength = string.length();
     }
 
-    ASSERT(maximumLength >= length);
+    ASSERT(maximumLength >= static_cast<int>(string.length()));
 
     TextRun run(string, textPos(), expansion(), expansionBehavior(), direction(), dirOverride() || style->rtlOrdering() == VisualOrder, !textRenderer->canUseSimpleFontCodePath());
     run.setTabSize(!style->collapseWhiteSpace(), style->tabSize());

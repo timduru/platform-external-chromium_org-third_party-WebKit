@@ -29,7 +29,7 @@
 #include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Element.h"
 #include "core/dom/Position.h"
-#include "core/loader/cache/CachedImageClient.h"
+#include "core/loader/cache/ImageResourceClient.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/platform/graphics/transforms/TransformationMatrix.h"
@@ -135,7 +135,7 @@ const int showTreeCharacterOffset = 39;
 #endif
 
 // Base class for all rendering tree objects.
-class RenderObject : public CachedImageClient {
+class RenderObject : public ImageResourceClient {
     friend class RenderBlock;
     friend class RenderLayer;
     friend class RenderObjectChildList;
@@ -623,6 +623,7 @@ public:
 
     void markContainingBlocksForLayout(bool scheduleRelayout = true, RenderObject* newRoot = 0);
     void setNeedsLayout(bool needsLayout, MarkingBehavior = MarkContainingBlockChain);
+    void clearNeedsLayout();
     void setChildNeedsLayout(bool childNeedsLayout, MarkingBehavior = MarkContainingBlockChain);
     void setNeedsPositionedMovementLayout();
     void setNeedsSimplifiedNormalFlowLayout();
@@ -945,9 +946,9 @@ public:
     virtual int previousOffsetForBackwardDeletion(int current) const;
     virtual int nextOffset(int current) const;
 
-    virtual void imageChanged(CachedImage*, const IntRect* = 0);
+    virtual void imageChanged(ImageResource*, const IntRect* = 0);
     virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) { }
-    virtual bool willRenderImage(CachedImage*);
+    virtual bool willRenderImage(ImageResource*);
 
     void selectionStartEnd(int& spos, int& epos) const;
 
@@ -1196,6 +1197,7 @@ private:
 
     RenderObjectBitfields m_bitfields;
 
+    // FIXME: These private methods are silly. We should just call m_bitfields.setXXX(b) directly.
     void setNeedsPositionedMovementLayout(bool b) { m_bitfields.setNeedsPositionedMovementLayout(b); }
     void setNormalChildNeedsLayout(bool b) { m_bitfields.setNormalChildNeedsLayout(b); }
     void setPosChildNeedsLayout(bool b) { m_bitfields.setPosChildNeedsLayout(b); }
@@ -1240,43 +1242,44 @@ inline bool RenderObject::isBeforeOrAfterContent() const
 
 inline void RenderObject::setNeedsLayout(bool needsLayout, MarkingBehavior markParents)
 {
+    // FIXME: Remove the boolean argument to this function as it's no longer used.
+    ASSERT_UNUSED(needsLayout, needsLayout);
+    ASSERT(!isSetNeedsLayoutForbidden());
+
     bool alreadyNeededLayout = m_bitfields.needsLayout();
-    m_bitfields.setNeedsLayout(needsLayout);
-    if (needsLayout) {
-        ASSERT(!isSetNeedsLayoutForbidden());
-        if (!alreadyNeededLayout) {
-            if (markParents == MarkContainingBlockChain)
-                markContainingBlocksForLayout();
-            if (hasLayer())
-                setLayerNeedsFullRepaint();
-        }
-    } else {
-        setEverHadLayout(true);
-        setPosChildNeedsLayout(false);
-        setNeedsSimplifiedNormalFlowLayout(false);
-        setNormalChildNeedsLayout(false);
-        setNeedsPositionedMovementLayout(false);
-        setAncestorLineBoxDirty(false);
-#ifndef NDEBUG
-        checkBlockPositionedObjectsNeedLayout();
-#endif
+    m_bitfields.setNeedsLayout(true);
+    if (!alreadyNeededLayout) {
+        if (markParents == MarkContainingBlockChain)
+            markContainingBlocksForLayout();
+        if (hasLayer())
+            setLayerNeedsFullRepaint();
     }
+}
+
+inline void RenderObject::clearNeedsLayout()
+{
+    m_bitfields.setNeedsLayout(false);
+    setEverHadLayout(true);
+    setPosChildNeedsLayout(false);
+    setNeedsSimplifiedNormalFlowLayout(false);
+    setNormalChildNeedsLayout(false);
+    setNeedsPositionedMovementLayout(false);
+    setAncestorLineBoxDirty(false);
+#ifndef NDEBUG
+    checkBlockPositionedObjectsNeedLayout();
+#endif
 }
 
 inline void RenderObject::setChildNeedsLayout(bool childNeedsLayout, MarkingBehavior markParents)
 {
+    // FIXME: Remove the boolean argument to this function as it's no longer used.
+    ASSERT_UNUSED(childNeedsLayout, childNeedsLayout);
+    ASSERT(!isSetNeedsLayoutForbidden());
+
     bool alreadyNeededLayout = normalChildNeedsLayout();
-    setNormalChildNeedsLayout(childNeedsLayout);
-    if (childNeedsLayout) {
-        ASSERT(!isSetNeedsLayoutForbidden());
-        if (!alreadyNeededLayout && markParents == MarkContainingBlockChain)
-            markContainingBlocksForLayout();
-    } else {
-        setPosChildNeedsLayout(false);
-        setNeedsSimplifiedNormalFlowLayout(false);
-        setNormalChildNeedsLayout(false);
-        setNeedsPositionedMovementLayout(false);
-    }
+    setNormalChildNeedsLayout(true);
+    if (!alreadyNeededLayout && markParents == MarkContainingBlockChain)
+        markContainingBlocksForLayout();
 }
 
 inline void RenderObject::setNeedsPositionedMovementLayout()

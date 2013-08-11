@@ -172,6 +172,7 @@
             'front_end/TestController.js',
             'front_end/TextEditor.js',
             'front_end/TextEditorHighlighter.js',
+            'front_end/TextRange.js',
             'front_end/TextEditorModel.js',
             'front_end/TextPrompt.js',
             'front_end/TextUtils.js',
@@ -814,7 +815,7 @@
                         ],
                         'search_path': 'front_end',
                         'outputs': ['<(PRODUCT_DIR)/resources/inspector/CodeMirrorTextEditor.js'],
-                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)', 'true'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
                     }],
                 },
                 {

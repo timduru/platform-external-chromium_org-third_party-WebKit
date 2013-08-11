@@ -37,7 +37,9 @@
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Range.h"
 #include "core/editing/Editor.h"
+#include "core/editing/InputMethodController.h"
 #include "core/editing/RenderedPosition.h"
+#include "core/editing/TextIterator.h"
 #include "core/editing/TypingCommand.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
@@ -261,7 +263,7 @@ void FrameSelection::setSelection(const VisibleSelection& newSelection, SetSelec
 
     if (m_selection == s) {
         // Even if selection was not changed, selection offsets may have been changed.
-        m_frame->editor()->cancelCompositionIfSelectionIsInvalid();
+        m_frame->inputMethodController().cancelCompositionIfSelectionIsInvalid();
         notifyRendererOfSelectionChange(userTriggered);
         return;
     }
@@ -555,13 +557,11 @@ VisiblePosition FrameSelection::nextWordPositionForPlatform(const VisiblePositio
     return positionAfterCurrentWord;
 }
 
-#if ENABLE(USERSELECT_ALL)
 static void adjustPositionForUserSelectAll(VisiblePosition& pos, bool isForward)
 {
     if (Node* rootUserSelectAll = Position::rootUserSelectAllForNode(pos.deepEquivalent().anchorNode()))
         pos = isForward ? positionAfterNode(rootUserSelectAll).downstream(CanCrossEditingBoundary) : positionBeforeNode(rootUserSelectAll).upstream(CanCrossEditingBoundary);
 }
-#endif
 
 VisiblePosition FrameSelection::modifyExtendingRight(TextGranularity granularity)
 {
@@ -601,9 +601,7 @@ VisiblePosition FrameSelection::modifyExtendingRight(TextGranularity granularity
         pos = modifyExtendingForward(granularity);
         break;
     }
-#if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, directionOfEnclosingBlock() == LTR);
-#endif
     return pos;
 }
 
@@ -643,9 +641,7 @@ VisiblePosition FrameSelection::modifyExtendingForward(TextGranularity granulari
             pos = endOfDocument(pos);
         break;
     }
-#if ENABLE(USERSELECT_ALL)
-     adjustPositionForUserSelectAll(pos, directionOfEnclosingBlock() == LTR);
-#endif
+    adjustPositionForUserSelectAll(pos, directionOfEnclosingBlock() == LTR);
     return pos;
 }
 
@@ -768,9 +764,7 @@ VisiblePosition FrameSelection::modifyExtendingLeft(TextGranularity granularity)
         pos = modifyExtendingBackward(granularity);
         break;
     }
-#if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, !(directionOfEnclosingBlock() == LTR));
-#endif
     return pos;
 }
 
@@ -815,9 +809,7 @@ VisiblePosition FrameSelection::modifyExtendingBackward(TextGranularity granular
             pos = startOfDocument(pos);
         break;
     }
-#if ENABLE(USERSELECT_ALL)
     adjustPositionForUserSelectAll(pos, !(directionOfEnclosingBlock() == LTR));
-#endif
     return pos;
 }
 
@@ -1513,6 +1505,8 @@ void FrameSelection::focusedOrActiveStateChanged()
     // Caret appears in the active frame.
     if (activeAndFocused)
         setSelectionFromNone();
+    else
+        m_frame->editor()->spellCheckAfterBlur();
     setCaretVisibility(activeAndFocused ? Visible : Hidden);
 
     // Update for caps lock state
@@ -1745,6 +1739,24 @@ PassRefPtr<MutableStylePropertySet> FrameSelection::copyTypingStyle() const
     if (!m_typingStyle || !m_typingStyle->style())
         return 0;
     return m_typingStyle->style()->mutableCopy();
+}
+
+static String extractSelectedText(const FrameSelection& selection, TextIteratorBehavior behavior)
+{
+    // We remove '\0' characters because they are not visibly rendered to the user.
+    return plainText(selection.toNormalizedRange().get(), behavior).replace(0, "");
+}
+
+String FrameSelection::selectedText() const
+{
+    return extractSelectedText(*this, TextIteratorDefaultBehavior);
+}
+
+String FrameSelection::selectedTextForClipboard() const
+{
+    if (m_frame->settings() && m_frame->settings()->selectionIncludesAltImageText())
+        return extractSelectedText(*this, TextIteratorEmitsImageAltText);
+    return selectedText();
 }
 
 bool FrameSelection::shouldDeleteSelection(const VisibleSelection& selection) const

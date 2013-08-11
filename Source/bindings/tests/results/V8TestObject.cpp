@@ -25,7 +25,7 @@
 #include "RuntimeEnabledFeatures.h"
 #include "V8DOMStringList.h"
 #include "V8Document.h"
-#include "V8Float32Array.h"
+#include "V8EventTarget.h"
 #include "V8MessagePort.h"
 #include "V8Node.h"
 #include "V8SVGDocument.h"
@@ -51,6 +51,7 @@
 #include "bindings/v8/V8EventListenerList.h"
 #include "bindings/v8/V8HiddenPropertyName.h"
 #include "bindings/v8/V8ObjectConstructor.h"
+#include "bindings/v8/custom/V8Float32ArrayCustom.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/CustomElementCallbackDispatcher.h"
 #include "core/dom/Document.h"
@@ -88,7 +89,7 @@ void webCoreInitializeScriptWrappableForInterface(WebCore::TestObj* object)
 }
 
 namespace WebCore {
-WrapperTypeInfo V8TestObject::info = { V8TestObject::GetTemplate, V8TestObject::derefObject, 0, 0, 0, V8TestObject::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
+WrapperTypeInfo V8TestObject::info = { V8TestObject::GetTemplate, V8TestObject::derefObject, 0, V8TestObject::toEventTarget, 0, V8TestObject::installPerContextPrototypeProperties, &V8EventTarget::info, WrapperTypeObjectPrototype };
 
 namespace TestObjV8Internal {
 
@@ -461,33 +462,35 @@ static void stringAttrAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void eventListenerAttrAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void eventHandlerAttrAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    EventListener* listener = imp->eventListenerAttr(isolatedWorldForIsolate(info.GetIsolate()));
+    EventListener* listener = imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate()));
     v8SetReturnValue(info, listener ? v8::Handle<v8::Value>(V8AbstractEventListener::cast(listener)->getListenerObject(imp->scriptExecutionContext())) : v8::Handle<v8::Value>(v8::Null(info.GetIsolate())));
     return;
 }
 
-static void eventListenerAttrAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
+static void eventHandlerAttrAttrGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMGetter");
-    TestObjV8Internal::eventListenerAttrAttrGetter(name, info);
+    TestObjV8Internal::eventHandlerAttrAttrGetter(name, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
-static void eventListenerAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void eventHandlerAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    transferHiddenDependency(info.Holder(), imp->eventListenerAttr(isolatedWorldForIsolate(info.GetIsolate())), value, V8TestObject::eventListenerCacheIndex, info.GetIsolate());
-    imp->setEventListenerAttr(V8EventListenerList::getEventListener(value, true, ListenerFindOrCreate), isolatedWorldForIsolate(info.GetIsolate()));
+    if (!value->IsNull() && !value->IsFunction())
+        value = v8::Null(info.GetIsolate());
+    transferHiddenDependency(info.Holder(), imp->eventHandlerAttr(isolatedWorldForIsolate(info.GetIsolate())), value, V8TestObject::eventListenerCacheIndex, info.GetIsolate());
+    imp->setEventHandlerAttr(V8EventListenerList::getEventListener(value, true, ListenerFindOrCreate), isolatedWorldForIsolate(info.GetIsolate()));
     return;
 }
 
-static void eventListenerAttrAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+static void eventHandlerAttrAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMSetter");
-    TestObjV8Internal::eventListenerAttrAttrSetter(name, value, info);
+    TestObjV8Internal::eventHandlerAttrAttrSetter(name, value, info);
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
@@ -876,7 +879,7 @@ static void typedArrayAttrAttrGetterCallback(v8::Local<v8::String> name, const v
 static void typedArrayAttrAttrSetter(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     TestObj* imp = V8TestObject::toNative(info.Holder());
-    V8TRYCATCH_VOID(Float32Array*, v, V8Float32Array::HasInstance(value, info.GetIsolate(), worldType(info.GetIsolate())) ? V8Float32Array::toNative(v8::Handle<v8::Object>::Cast(value)) : 0);
+    V8TRYCATCH_VOID(Float32Array*, v, value->IsFloat32Array() ? V8Float32Array::toNative(v8::Handle<v8::Float32Array>::Cast(value)) : 0);
     imp->setTypedArrayAttr(WTF::getPtr(v));
     return;
 }
@@ -3762,6 +3765,30 @@ static void methodWithCallbackAndOptionalArgMethodCallback(const v8::FunctionCal
     TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
 }
 
+static void methodWithNullableCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    if (args.Length() < 1) {
+        throwNotEnoughArgumentsError(args.GetIsolate());
+        return;
+    }
+    TestObj* imp = V8TestObject::toNative(args.Holder());
+    if (args.Length() <= 0 || !(args[0]->IsFunction() || args[0]->IsNull())) {
+        throwTypeError(args.GetIsolate());
+        return;
+    }
+    RefPtr<TestCallback> callback = args[0]->IsNull() ? 0 : V8TestCallback::create(args[0], getScriptExecutionContext());
+    imp->methodWithNullableCallbackArg(callback);
+
+    return;
+}
+
+static void methodWithNullableCallbackArgMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args)
+{
+    TRACE_EVENT_SET_SAMPLING_STATE("Blink", "DOMMethod");
+    TestObjV8Internal::methodWithNullableCallbackArgMethod(args);
+    TRACE_EVENT_SET_SAMPLING_STATE("V8", "Execution");
+}
+
 static void staticMethodWithCallbackAndOptionalArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     RefPtr<TestCallback> callback;
@@ -5291,8 +5318,8 @@ static const V8DOMConfiguration::BatchedAttribute V8TestObjectAttrs[] = {
     {"unsignedLongLongAttr", TestObjV8Internal::unsignedLongLongAttrAttrGetterCallback, TestObjV8Internal::unsignedLongLongAttrAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'stringAttr'
     {"stringAttr", TestObjV8Internal::stringAttrAttrGetterCallback, TestObjV8Internal::stringAttrAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
-    // Attribute 'eventListenerAttr'
-    {"eventListenerAttr", TestObjV8Internal::eventListenerAttrAttrGetterCallback, TestObjV8Internal::eventListenerAttrAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
+    // Attribute 'eventHandlerAttr'
+    {"eventHandlerAttr", TestObjV8Internal::eventHandlerAttrAttrGetterCallback, TestObjV8Internal::eventHandlerAttrAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'testObjAttr'
     {"testObjAttr", TestObjV8Internal::testObjAttrAttrGetterCallback, TestObjV8Internal::testObjAttrAttrSetterCallback, 0, 0, 0 /* no data */, static_cast<v8::AccessControl>(v8::DEFAULT), static_cast<v8::PropertyAttribute>(v8::None), 0 /* on instance */},
     // Attribute 'XMLObjAttr'
@@ -5489,6 +5516,7 @@ static const V8DOMConfiguration::BatchedMethod V8TestObjectMethods[] = {
     {"methodWithCallbackArg", TestObjV8Internal::methodWithCallbackArgMethodCallback, 0, 1},
     {"methodWithNonCallbackArgAndCallbackArg", TestObjV8Internal::methodWithNonCallbackArgAndCallbackArgMethodCallback, 0, 2},
     {"methodWithCallbackAndOptionalArg", TestObjV8Internal::methodWithCallbackAndOptionalArgMethodCallback, 0, 0},
+    {"methodWithNullableCallbackArg", TestObjV8Internal::methodWithNullableCallbackArgMethodCallback, 0, 1},
     {"methodWithEnforceRangeInt8", TestObjV8Internal::methodWithEnforceRangeInt8MethodCallback, 0, 1},
     {"methodWithEnforceRangeUInt8", TestObjV8Internal::methodWithEnforceRangeUInt8MethodCallback, 0, 1},
     {"methodWithEnforceRangeInt32", TestObjV8Internal::methodWithEnforceRangeInt32MethodCallback, 0, 1},
@@ -5584,7 +5612,7 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestObjectTemplate(v8::Handle
     desc->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestObject", v8::Local<v8::FunctionTemplate>(), V8TestObject::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestObject", V8EventTarget::GetTemplate(isolate, currentWorldType), V8TestObject::internalFieldCount,
         V8TestObjectAttrs, WTF_ARRAY_LENGTH(V8TestObjectAttrs),
         V8TestObjectMethods, WTF_ARRAY_LENGTH(V8TestObjectMethods), isolate, currentWorldType);
     UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
@@ -5743,6 +5771,11 @@ void V8TestObject::installPerContextPrototypeProperties(v8::Handle<v8::Object> p
         proto->Set(v8::String::NewSymbol("enabledPerContextMethod1"), v8::FunctionTemplate::New(TestObjV8Internal::enabledPerContextMethod1MethodCallback, v8Undefined(), defaultSignature, 1)->GetFunction());
     if (context && context->isDocument() && ContextFeatures::featureNameEnabled(toDocument(context)))
         proto->Set(v8::String::NewSymbol("enabledPerContextMethod2"), v8::FunctionTemplate::New(TestObjV8Internal::enabledPerContextMethod2MethodCallback, v8Undefined(), defaultSignature, 1)->GetFunction());
+}
+
+EventTarget* V8TestObject::toEventTarget(v8::Handle<v8::Object> object)
+{
+    return toNative(object);
 }
 
 

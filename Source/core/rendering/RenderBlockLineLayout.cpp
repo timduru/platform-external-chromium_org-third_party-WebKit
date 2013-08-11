@@ -2114,7 +2114,7 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
                     toRenderInline(o)->updateAlwaysCreateLineBoxes(layoutState.isFullLayout());
                 if (layoutState.isFullLayout() || o->selfNeedsLayout())
                     dirtyLineBoxesForRenderer(o, layoutState.isFullLayout());
-                o->setNeedsLayout(false);
+                o->clearNeedsLayout();
             }
         }
 
@@ -3315,8 +3315,8 @@ void RenderBlock::addOverflowFromInlineChildren()
         endPadding = 1;
     for (RootInlineBox* curr = firstRootBox(); curr; curr = curr->nextRootBox()) {
         addLayoutOverflow(curr->paddedLayoutOverflowRect(endPadding));
-        if (!hasOverflowClip())
-            addVisualOverflow(curr->visualOverflowRect(curr->lineTop(), curr->lineBottom()));
+        LayoutRect visualOverflow = curr->visualOverflowRect(curr->lineTop(), curr->lineBottom());
+        addContentsVisualOverflow(visualOverflow);
     }
 }
 

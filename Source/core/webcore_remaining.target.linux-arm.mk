@@ -166,6 +166,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/StyleSheet.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetContents.cpp \
 	third_party/WebKit/Source/core/css/StyleSheetList.cpp \
+	third_party/WebKit/Source/core/css/resolver/AnimatedStyleBuilder.cpp \
 	third_party/WebKit/Source/core/css/resolver/ElementResolveContext.cpp \
 	third_party/WebKit/Source/core/css/resolver/ElementStyleResources.cpp \
 	third_party/WebKit/Source/core/css/resolver/FilterOperationResolver.cpp \
@@ -198,6 +199,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/FrameSelection.cpp \
 	third_party/WebKit/Source/core/editing/HTMLInterchange.cpp \
 	third_party/WebKit/Source/core/editing/IndentOutdentCommand.cpp \
+	third_party/WebKit/Source/core/editing/InputMethodController.cpp \
 	third_party/WebKit/Source/core/editing/InsertIntoTextNodeCommand.cpp \
 	third_party/WebKit/Source/core/editing/InsertLineBreakCommand.cpp \
 	third_party/WebKit/Source/core/editing/InsertListCommand.cpp \
@@ -340,7 +342,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/ResourceLoadNotifier.cpp \
 	third_party/WebKit/Source/core/loader/ResourceLoader.cpp \
 	third_party/WebKit/Source/core/loader/SinkDocument.cpp \
-	third_party/WebKit/Source/core/loader/SubstituteData.cpp \
 	third_party/WebKit/Source/core/loader/TextResourceDecoder.cpp \
 	third_party/WebKit/Source/core/loader/TextResourceDecoderBuilder.cpp \
 	third_party/WebKit/Source/core/loader/TextTrackLoader.cpp \
@@ -352,19 +353,19 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/archive/ArchiveResourceCollection.cpp \
 	third_party/WebKit/Source/core/loader/archive/MHTMLArchive.cpp \
 	third_party/WebKit/Source/core/loader/archive/MHTMLParser.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedCSSStyleSheet.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedDocument.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedFont.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedImage.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedRawResource.cpp \
+	third_party/WebKit/Source/core/loader/cache/CSSStyleSheetResource.cpp \
+	third_party/WebKit/Source/core/loader/cache/DocumentResource.cpp \
+	third_party/WebKit/Source/core/loader/cache/FontResource.cpp \
+	third_party/WebKit/Source/core/loader/cache/ImageResource.cpp \
+	third_party/WebKit/Source/core/loader/cache/RawResource.cpp \
 	third_party/WebKit/Source/core/loader/cache/Resource.cpp \
 	third_party/WebKit/Source/core/loader/cache/ResourcePtr.cpp \
 	third_party/WebKit/Source/core/loader/cache/ResourceFetcher.cpp \
 	third_party/WebKit/Source/core/loader/cache/FetchRequest.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedScript.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedShader.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedTextTrack.cpp \
-	third_party/WebKit/Source/core/loader/cache/CachedXSLStyleSheet.cpp \
+	third_party/WebKit/Source/core/loader/cache/ScriptResource.cpp \
+	third_party/WebKit/Source/core/loader/cache/ShaderResource.cpp \
+	third_party/WebKit/Source/core/loader/cache/TextTrackResource.cpp \
+	third_party/WebKit/Source/core/loader/cache/XSLStyleSheetResource.cpp \
 	third_party/WebKit/Source/core/loader/cache/MemoryCache.cpp \
 	third_party/WebKit/Source/core/page/AutoscrollController.cpp \
 	third_party/WebKit/Source/core/page/BarProp.cpp \
@@ -586,6 +587,7 @@ MY_DEFS_Debug := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
@@ -745,6 +747,7 @@ MY_DEFS_Release := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \

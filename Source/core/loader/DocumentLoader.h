@@ -35,7 +35,7 @@
 #include "core/loader/NavigationAction.h"
 #include "core/loader/ResourceLoaderOptions.h"
 #include "core/loader/SubstituteData.h"
-#include "core/loader/cache/CachedRawResource.h"
+#include "core/loader/cache/RawResource.h"
 #include "core/loader/cache/ResourcePtr.h"
 #include "core/platform/Timer.h"
 #include "core/platform/network/ResourceError.h"
@@ -65,7 +65,7 @@ namespace WebCore {
 
     typedef HashSet<RefPtr<ResourceLoader> > ResourceLoaderSet;
 
-    class DocumentLoader : public RefCounted<DocumentLoader>, private CachedRawResourceClient {
+    class DocumentLoader : public RefCounted<DocumentLoader>, private RawResourceClient {
         WTF_MAKE_FAST_ALLOCATED;
     public:
         static PassRefPtr<DocumentLoader> create(const ResourceRequest& request, const SubstituteData& data)
@@ -119,8 +119,6 @@ namespace WebCore {
         void setIsClientRedirect(bool isClientRedirect) { m_isClientRedirect = isClientRedirect; }
         bool replacesCurrentHistoryItem() const { return m_replacesCurrentHistoryItem; }
         void setReplacesCurrentHistoryItem(bool replacesCurrentHistoryItem) { m_replacesCurrentHistoryItem = replacesCurrentHistoryItem; }
-        void handledOnloadEvents();
-        bool wasOnloadHandled() { return m_wasOnloadHandled; }
         bool isLoadingInAPISense() const;
         void setTitle(const StringWithDirection&);
         const String& overrideEncoding() const { return m_overrideEncoding; }
@@ -179,8 +177,6 @@ namespace WebCore {
         void ensureWriter();
         void ensureWriter(const String& mimeType, const KURL& overridingURL = KURL());
 
-        // The URL of the document resulting from this DocumentLoader.
-        KURL documentURL() const;
         Document* document() const;
 
         void setRequest(const ResourceRequest&);
@@ -223,7 +219,7 @@ namespace WebCore {
         Frame* m_frame;
         RefPtr<ResourceFetcher> m_fetcher;
 
-        ResourcePtr<CachedRawResource> m_mainResource;
+        ResourcePtr<RawResource> m_mainResource;
         ResourceLoaderSet m_resourceLoaders;
         ResourceLoaderSet m_multipartResourceLoaders;
 
@@ -254,10 +250,6 @@ namespace WebCore {
         bool m_isStopping;
         bool m_isClientRedirect;
         bool m_replacesCurrentHistoryItem;
-
-        // FIXME: Document::m_processingLoadEvent and DocumentLoader::m_wasOnloadHandled are roughly the same
-        // and should be merged.
-        bool m_wasOnloadHandled;
 
         StringWithDirection m_pageTitle;
 

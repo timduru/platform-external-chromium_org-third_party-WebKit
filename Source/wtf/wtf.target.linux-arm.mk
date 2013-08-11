@@ -80,6 +80,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/wtf/Threading.cpp \
 	third_party/WebKit/Source/wtf/ThreadingPthreads.cpp \
 	third_party/WebKit/Source/wtf/TypeTraits.cpp \
+	third_party/WebKit/Source/wtf/WTF.cpp \
 	third_party/WebKit/Source/wtf/WTFThreadData.cpp \
 	third_party/WebKit/Source/wtf/dtoa.cpp \
 	third_party/WebKit/Source/wtf/text/AtomicString.cpp \

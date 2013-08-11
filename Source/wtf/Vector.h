@@ -34,6 +34,12 @@
 
 namespace WTF {
 
+#if defined(MEMORY_TOOL_REPLACES_ALLOCATOR)
+static const size_t kInitialVectorSize = 1;
+#else
+static const size_t kInitialVectorSize = 16;
+#endif
+
     template <bool needsDestruction, typename T>
     struct VectorDestructor;
 
@@ -618,8 +624,6 @@ namespace WTF {
 
         void reverse();
 
-        void checkConsistency();
-
     private:
         void expandCapacity(size_t newMinCapacity);
         const T* expandCapacity(size_t newMinCapacity, const T*);
@@ -668,8 +672,7 @@ namespace WTF {
         else if (other.size() > capacity()) {
             clear();
             reserveCapacity(other.size());
-            if (!begin())
-                return *this;
+            ASSERT(begin());
         }
 
 // Works around an assert in VS2010. See https://connect.microsoft.com/VisualStudio/feedback/details/558044/std-copy-should-not-check-dest-when-first-last
@@ -701,8 +704,7 @@ namespace WTF {
         else if (other.size() > capacity()) {
             clear();
             reserveCapacity(other.size());
-            if (!begin())
-                return *this;
+            ASSERT(begin());
         }
 
 // Works around an assert in VS2010. See https://connect.microsoft.com/VisualStudio/feedback/details/558044/std-copy-should-not-check-dest-when-first-last
@@ -778,8 +780,7 @@ namespace WTF {
         else if (newSize > capacity()) {
             clear();
             reserveCapacity(newSize);
-            if (!begin())
-                return;
+            ASSERT(begin());
         }
 
         std::fill(begin(), end(), val);
@@ -798,7 +799,7 @@ namespace WTF {
     template<typename T, size_t inlineCapacity>
     void Vector<T, inlineCapacity>::expandCapacity(size_t newMinCapacity)
     {
-        reserveCapacity(std::max(newMinCapacity, std::max(static_cast<size_t>(16), capacity() + capacity() / 4 + 1)));
+        reserveCapacity(std::max(newMinCapacity, std::max(static_cast<size_t>(kInitialVectorSize), capacity() + capacity() / 4 + 1)));
     }
 
     template<typename T, size_t inlineCapacity>
@@ -912,8 +913,7 @@ namespace WTF {
         size_t newSize = m_size + dataSize;
         if (newSize > capacity()) {
             data = expandCapacity(newSize, data);
-            if (!begin())
-                return;
+            ASSERT(begin());
         }
         RELEASE_ASSERT(newSize >= m_size);
         T* dest = end();
@@ -925,7 +925,7 @@ namespace WTF {
     template<typename T, size_t inlineCapacity> template<typename U>
     ALWAYS_INLINE void Vector<T, inlineCapacity>::append(const U& val)
     {
-        if (size() != capacity()) {
+        if (LIKELY(size() != capacity())) {
             new (NotNull, end()) T(val);
             ++m_size;
             return;
@@ -941,8 +941,7 @@ namespace WTF {
 
         const U* ptr = &val;
         ptr = expandCapacity(size() + 1, ptr);
-        if (!begin())
-            return;
+        ASSERT(begin());
 
         new (NotNull, end()) T(*ptr);
         ++m_size;
@@ -982,8 +981,7 @@ namespace WTF {
         size_t newSize = m_size + dataSize;
         if (newSize > capacity()) {
             data = expandCapacity(newSize, data);
-            if (!begin())
-                return;
+            ASSERT(begin());
         }
         RELEASE_ASSERT(newSize >= m_size);
         T* spot = begin() + position;
@@ -1000,8 +998,7 @@ namespace WTF {
         const U* data = &val;
         if (size() == capacity()) {
             data = expandCapacity(size() + 1, data);
-            if (!begin())
-                return;
+            ASSERT(begin());
         }
         T* spot = begin() + position;
         TypeOperations::moveOverlapping(spot, end(), spot + 1);

@@ -49,6 +49,7 @@ class Element;
 class ElementRareData;
 class ElementShadow;
 class ExceptionState;
+class HTMLDocument;
 class Image;
 class InputMethodContext;
 class IntSize;
@@ -447,8 +448,7 @@ public:
     ShadowRoot* userAgentShadowRoot() const;
     ShadowRoot* ensureUserAgentShadowRoot();
     virtual bool supportsShadowElementForUserAgentShadow() const;
-    virtual const AtomicString& shadowPseudoId() const;
-    virtual const AtomicString& shadowPartId() const;
+    virtual const AtomicString& shadowPseudoId() const { return !part().isEmpty() ? part() : pseudo(); }
 
     RenderStyle* computedStyle(PseudoId = NOPSEUDO);
 
@@ -529,10 +529,8 @@ public:
 
     virtual String title() const { return String(); }
 
-    // FIXME: pseudo should be deprecated after all pseudo is replaced with ::part.
     const AtomicString& pseudo() const;
-    void setPseudo(const AtomicString&);
-    const AtomicString& part() const;
+    virtual const AtomicString& part() const;
     void setPart(const AtomicString&);
 
     LayoutSize minimumSizeForResizing() const;
@@ -665,7 +663,7 @@ protected:
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0) OVERRIDE;
-    virtual void removeAllEventListeners() OVERRIDE FINAL;
+    virtual void removeAllEventListeners() OVERRIDE;
 
     virtual void willRecalcStyle(StyleChange);
     virtual void didRecalcStyle(StyleChange);
@@ -723,9 +721,12 @@ private:
     void synchronizeAttribute(const QualifiedName&) const;
     void synchronizeAttribute(const AtomicString& localName) const;
 
-    void updateId(const AtomicString& oldId, const AtomicString& newId);
-    void updateId(TreeScope*, const AtomicString& oldId, const AtomicString& newId);
     void updateName(const AtomicString& oldName, const AtomicString& newName);
+    void updateNameForTreeScope(TreeScope*, const AtomicString& oldName, const AtomicString& newName);
+    void updateNameForDocument(HTMLDocument*, const AtomicString& oldName, const AtomicString& newName);
+    void updateId(const AtomicString& oldId, const AtomicString& newId);
+    void updateIdForTreeScope(TreeScope*, const AtomicString& oldId, const AtomicString& newId);
+    void updateIdForDocument(HTMLDocument*, const AtomicString& oldId, const AtomicString& newId);
     void updateLabel(TreeScope*, const AtomicString& oldForAttributeValue, const AtomicString& newForAttributeValue);
 
     void scrollByUnits(int units, ScrollGranularity);
@@ -783,8 +784,6 @@ private:
     void detachAllAttrNodesFromElement();
     void detachAttrNodeFromElementWithValue(Attr*, const AtomicString& value);
     void detachAttrNodeAtIndex(Attr*, size_t index);
-
-    void createRendererIfNeeded(const AttachContext&);
 
     bool isJavaScriptURLAttribute(const Attribute&) const;
 

@@ -28,6 +28,7 @@
 
 #include "core/loader/cache/FetchRequest.h"
 #include "core/loader/cache/Resource.h"
+#include "wtf/CurrentTime.h"
 #include "wtf/text/TextPosition.h"
 
 namespace WebCore {
@@ -50,19 +51,21 @@ public:
 
     const String& charset() const { return m_charset; }
     const String& media() const { return m_mediaAttribute; }
+    double discoveryTime() const { return m_discoveryTime; }
     void setCharset(const String& charset) { m_charset = charset.isolatedCopy(); }
     void setCrossOriginModeAllowsCookies(bool allowsCookies) { m_crossOriginModeAllowsCookies = allowsCookies; }
     Resource::Type resourceType() const { return m_resourceType; }
 
 private:
     PreloadRequest(const String& initiatorName, const TextPosition& initiatorPosition, const String& resourceURL, const KURL& baseURL, Resource::Type resourceType, const String& mediaAttribute)
-        : m_initiatorName(initiatorName.isolatedCopy())
+        : m_initiatorName(initiatorName)
         , m_initiatorPosition(initiatorPosition)
         , m_resourceURL(resourceURL.isolatedCopy())
         , m_baseURL(baseURL.copy())
         , m_resourceType(resourceType)
         , m_mediaAttribute(mediaAttribute.isolatedCopy())
         , m_crossOriginModeAllowsCookies(false)
+        , m_discoveryTime(monotonicallyIncreasingTime())
     {
     }
 
@@ -76,6 +79,7 @@ private:
     Resource::Type m_resourceType;
     String m_mediaAttribute;
     bool m_crossOriginModeAllowsCookies;
+    double m_discoveryTime;
 };
 
 typedef Vector<OwnPtr<PreloadRequest> > PreloadRequestStream;

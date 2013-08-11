@@ -406,15 +406,24 @@ void RenderTableSection::distributeRowSpanHeightToRows(SpanningRenderTableCells&
 
         unsigned rowSpan = cell->rowSpan();
 
+        unsigned spanningCellEndIndex = rowIndex + rowSpan;
+        unsigned lastSpanningCellEndIndex = lastRowIndex + lastRowSpan;
+
         // Only heightest spanning cell will distribute it's extra height in row if more then one spanning cells
         // present at same level.
         if (rowIndex == lastRowIndex && rowSpan == lastRowSpan)
             continue;
 
-        int originalBeforePosition = m_rowPos[rowIndex + rowSpan];
+        int originalBeforePosition = m_rowPos[spanningCellEndIndex];
+
+        // When 2 spanning cells are ending at same row index then while extra height distribution of first spanning
+        // cell updates position of the last row so getting the original position of the last row in second spanning
+        // cell need to reduce the height changed by first spanning cell.
+        if (spanningCellEndIndex == lastSpanningCellEndIndex)
+            originalBeforePosition -= extraHeightToPropagate;
 
         if (extraHeightToPropagate) {
-            for (unsigned row = lastRowIndex + lastRowSpan; row <= rowIndex + rowSpan; row++)
+            for (unsigned row = lastSpanningCellEndIndex + 1; row <= spanningCellEndIndex; row++)
                 m_rowPos[row] += extraHeightToPropagate;
         }
 
@@ -436,7 +445,7 @@ void RenderTableSection::distributeRowSpanHeightToRows(SpanningRenderTableCells&
         // is distributing it's extra height in rows.
 
         // Calculate total percentage, total auto rows height and total rows height except percent rows.
-        for (unsigned row = rowIndex; row < (rowIndex + rowSpan); row++) {
+        for (unsigned row = rowIndex; row < spanningCellEndIndex; row++) {
             if (m_grid[row].logicalHeight.isPercent()) {
                 totalPercent += m_grid[row].logicalHeight.percent();
                 totalRemainingRowsHeight -= spanningRowsHeight.rowHeight[row - rowIndex];
@@ -454,13 +463,12 @@ void RenderTableSection::distributeRowSpanHeightToRows(SpanningRenderTableCells&
         ASSERT(!extraRowSpanningHeight);
 
         // Getting total changed height in the table
-        extraHeightToPropagate = m_rowPos[rowIndex + rowSpan] - originalBeforePosition;
-        m_rowPos[rowIndex + rowSpan] -= extraHeightToPropagate;
+        extraHeightToPropagate = m_rowPos[spanningCellEndIndex] - originalBeforePosition;
     }
 
     if (extraHeightToPropagate) {
         // Apply changed height by rowSpan cells to rows present at the end of the table
-        for (unsigned row = lastRowIndex + lastRowSpan; row <= m_grid.size(); row++)
+        for (unsigned row = lastRowIndex + lastRowSpan + 1; row <= m_grid.size(); row++)
             m_rowPos[row] += extraHeightToPropagate;
     }
 }
@@ -473,13 +481,15 @@ void RenderTableSection::updateBaselineForCell(RenderTableCell* cell, unsigned r
     if (!cell->isBaselineAligned())
         return;
 
-    LayoutUnit baselinePosition = cell->cellBaselinePosition();
-    if (baselinePosition > cell->borderBefore() + cell->paddingBefore()) {
+    // Ignoring the intrinsic padding as it depends on knowing the row's baseline, which won't be accurate
+    // until the end of this function.
+    LayoutUnit baselinePosition = cell->cellBaselinePosition() - cell->intrinsicPaddingBefore();
+    if (baselinePosition > cell->borderBefore() + (cell->paddingBefore() - cell->intrinsicPaddingBefore())) {
         m_grid[row].baseline = max(m_grid[row].baseline, baselinePosition);
 
         int cellStartRowBaselineDescent = 0;
         if (cell->rowSpan() == 1) {
-            baselineDescent = max(baselineDescent, cell->logicalHeightForRowSizing() - (baselinePosition - cell->intrinsicPaddingBefore()));
+            baselineDescent = max(baselineDescent, cell->logicalHeightForRowSizing() - baselinePosition);
             cellStartRowBaselineDescent = baselineDescent;
         }
         m_rowPos[row + 1] = max<int>(m_rowPos[row + 1], m_rowPos[row] + m_grid[row].baseline + cellStartRowBaselineDescent);
@@ -629,7 +639,7 @@ void RenderTableSection::layout()
     }
 
     statePusher.pop();
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 void RenderTableSection::distributeExtraLogicalHeightToPercentRows(int& extraLogicalHeight, int totalPercent)
@@ -1164,7 +1174,7 @@ void RenderTableSection::paint(PaintInfo& paintInfo, const LayoutPoint& paintOff
     LayoutPoint adjustedPaintOffset = paintOffset + location();
 
     PaintPhase phase = paintInfo.phase;
-    bool pushedClip = pushContentsClip(paintInfo, adjustedPaintOffset);
+    bool pushedClip = pushContentsClip(paintInfo, adjustedPaintOffset, ForceContentsClip);
     paintObject(paintInfo, adjustedPaintOffset);
     if (pushedClip)
         popContentsClip(paintInfo, phase, adjustedPaintOffset);

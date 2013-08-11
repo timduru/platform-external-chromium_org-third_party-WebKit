@@ -139,33 +139,17 @@ KURL History::urlForState(const String& urlString)
     return KURL(baseURL, urlString);
 }
 
-void History::stateObjectAdded(PassRefPtr<SerializedScriptValue> data, const String& title, const String& urlString, StateObjectType stateObjectType, ExceptionState& es)
+void History::stateObjectAdded(PassRefPtr<SerializedScriptValue> data, const String& title, const String& urlString, SameDocumentNavigationSource sameDocumentNavigationSource, ExceptionState& es)
 {
     if (!m_frame || !m_frame->page())
         return;
 
     KURL fullURL = urlForState(urlString);
     if (!fullURL.isValid() || !m_frame->document()->securityOrigin()->canRequest(fullURL)) {
-        es.throwDOMException(SecurityError);
+        es.throwDOMException(SecurityError, "A history state object with URL '" + fullURL.elidedString() + "' cannot be created in a document with origin '" + m_frame->document()->securityOrigin()->toString() + "'.");
         return;
     }
-
-    if (stateObjectType == StateObjectPush)
-        m_frame->loader()->history()->pushState(data, title, fullURL.string());
-    else if (stateObjectType == StateObjectReplace)
-        m_frame->loader()->history()->replaceState(data, title, fullURL.string());
-
-    if (!urlString.isEmpty())
-        m_frame->document()->updateURLForPushOrReplaceState(fullURL);
-
-    if (m_frame->loader()->documentLoader()->wasOnloadHandled())
-        m_frame->loader()->client()->postProgressStartedNotification();
-    m_frame->loader()->documentLoader()->clearRedirectChain();
-    m_frame->loader()->documentLoader()->appendRedirect(fullURL);
-    m_frame->loader()->client()->dispatchDidNavigateWithinPage();
-
-    if (m_frame->loader()->documentLoader()->wasOnloadHandled())
-        m_frame->loader()->client()->postProgressFinishedNotification();
+    m_frame->loader()->updateForSameDocumentNavigation(fullURL, sameDocumentNavigationSource, data, title);
 }
 
 } // namespace WebCore

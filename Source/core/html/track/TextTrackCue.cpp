@@ -42,6 +42,7 @@
 #include "core/html/HTMLDivElement.h"
 #include "core/html/track/TextTrack.h"
 #include "core/html/track/TextTrackCueList.h"
+#include "core/html/track/TextTrackRegionList.h"
 #include "core/html/track/WebVTTElement.h"
 #include "core/html/track/WebVTTParser.h"
 #include "core/rendering/RenderTextTrackCue.h"
@@ -95,7 +96,7 @@ TextTrackCueBox::TextTrackCueBox(Document* document, TextTrackCue* cue)
     : HTMLDivElement(divTag, document)
     , m_cue(cue)
 {
-    setPseudo(textTrackCueBoxShadowPseudoId());
+    setPart(textTrackCueBoxShadowPseudoId());
 }
 
 TextTrackCue* TextTrackCueBox::getCue() const
@@ -803,7 +804,7 @@ PassRefPtr<TextTrackCueBox> TextTrackCue::getDisplayTree(const IntSize& videoSiz
     // background box.
 
     // Note: This is contained by default in m_cueBackgroundBox.
-    m_cueBackgroundBox->setPseudo(cueShadowPseudoId());
+    m_cueBackgroundBox->setPart(cueShadowPseudoId());
     displayTree->appendChild(m_cueBackgroundBox, ASSERT_NO_EXCEPTION, AttachLazily);
 
     // FIXME(BUG 79916): Runs of children of WebVTT Ruby Objects that are not

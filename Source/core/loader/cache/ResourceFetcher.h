@@ -41,15 +41,15 @@
 
 namespace WebCore {
 
-class CachedCSSStyleSheet;
-class CachedDocument;
-class CachedFont;
-class CachedImage;
-class CachedRawResource;
-class CachedScript;
-class CachedShader;
-class CachedTextTrack;
-class CachedXSLStyleSheet;
+class CSSStyleSheetResource;
+class DocumentResource;
+class FontResource;
+class ImageResource;
+class RawResource;
+class ScriptResource;
+class ShaderResource;
+class TextTrackResource;
+class XSLStyleSheetResource;
 class Document;
 class DocumentLoader;
 class Frame;
@@ -78,19 +78,19 @@ public:
     using RefCounted<ResourceFetcher>::ref;
     using RefCounted<ResourceFetcher>::deref;
 
-    ResourcePtr<CachedImage> requestImage(FetchRequest&);
-    ResourcePtr<CachedCSSStyleSheet> requestCSSStyleSheet(FetchRequest&);
-    ResourcePtr<CachedCSSStyleSheet> requestUserCSSStyleSheet(FetchRequest&);
-    ResourcePtr<CachedScript> requestScript(FetchRequest&);
-    ResourcePtr<CachedFont> requestFont(FetchRequest&);
-    ResourcePtr<CachedRawResource> requestRawResource(FetchRequest&);
-    ResourcePtr<CachedRawResource> requestMainResource(FetchRequest&);
-    ResourcePtr<CachedDocument> requestSVGDocument(FetchRequest&);
-    ResourcePtr<CachedXSLStyleSheet> requestXSLStyleSheet(FetchRequest&);
+    ResourcePtr<ImageResource> requestImage(FetchRequest&);
+    ResourcePtr<CSSStyleSheetResource> requestCSSStyleSheet(FetchRequest&);
+    ResourcePtr<CSSStyleSheetResource> requestUserCSSStyleSheet(FetchRequest&);
+    ResourcePtr<ScriptResource> requestScript(FetchRequest&);
+    ResourcePtr<FontResource> requestFont(FetchRequest&);
+    ResourcePtr<RawResource> requestRawResource(FetchRequest&);
+    ResourcePtr<RawResource> requestMainResource(FetchRequest&);
+    ResourcePtr<DocumentResource> requestSVGDocument(FetchRequest&);
+    ResourcePtr<XSLStyleSheetResource> requestXSLStyleSheet(FetchRequest&);
     ResourcePtr<Resource> requestLinkResource(Resource::Type, FetchRequest&);
-    ResourcePtr<CachedTextTrack> requestTextTrack(FetchRequest&);
-    ResourcePtr<CachedShader> requestShader(FetchRequest&);
-    ResourcePtr<CachedRawResource> requestImport(FetchRequest&);
+    ResourcePtr<TextTrackResource> requestTextTrack(FetchRequest&);
+    ResourcePtr<ShaderResource> requestShader(FetchRequest&);
+    ResourcePtr<RawResource> requestImport(FetchRequest&);
 
     // Logs an access denied message to the console for the specified URL.
     void printAccessDeniedMessage(const KURL&) const;

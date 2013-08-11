@@ -87,6 +87,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/HTMLImageLoader.cpp \
 	third_party/WebKit/Source/core/html/HTMLImport.cpp \
 	third_party/WebKit/Source/core/html/HTMLImportsController.cpp \
+	third_party/WebKit/Source/core/html/HTMLImportLoader.cpp \
 	third_party/WebKit/Source/core/html/HTMLInputElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLKeygenElement.cpp \
 	third_party/WebKit/Source/core/html/HTMLLIElement.cpp \
@@ -145,6 +146,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/InputTypeNames.cpp \
 	third_party/WebKit/Source/core/html/LabelableElement.cpp \
 	third_party/WebKit/Source/core/html/LabelsNodeList.cpp \
+	third_party/WebKit/Source/core/html/LinkImport.cpp \
 	third_party/WebKit/Source/core/html/LinkRelAttribute.cpp \
 	third_party/WebKit/Source/core/html/LinkResource.cpp \
 	third_party/WebKit/Source/core/html/MediaController.cpp \
@@ -368,6 +370,7 @@ MY_DEFS_Debug := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
@@ -526,6 +529,7 @@ MY_DEFS_Release := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \

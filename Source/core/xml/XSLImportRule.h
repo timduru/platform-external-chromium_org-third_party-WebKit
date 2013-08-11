@@ -23,16 +23,16 @@
 #ifndef XSLImportRule_h
 #define XSLImportRule_h
 
-#include "core/loader/cache/CachedStyleSheetClient.h"
 #include "core/loader/cache/ResourcePtr.h"
+#include "core/loader/cache/StyleSheetResourceClient.h"
 #include "core/xml/XSLStyleSheet.h"
 #include <wtf/PassOwnPtr.h>
 
 namespace WebCore {
 
-class CachedXSLStyleSheet;
+class XSLStyleSheetResource;
 
-class XSLImportRule : private CachedStyleSheetClient {
+class XSLImportRule : private StyleSheetResourceClient {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     static PassOwnPtr<XSLImportRule> create(XSLStyleSheet* parentSheet, const String& href)
@@ -59,7 +59,7 @@ private:
     XSLStyleSheet* m_parentStyleSheet;
     String m_strHref;
     RefPtr<XSLStyleSheet> m_styleSheet;
-    ResourcePtr<CachedXSLStyleSheet> m_cachedSheet;
+    ResourcePtr<XSLStyleSheetResource> m_resource;
     bool m_loading;
 };
 

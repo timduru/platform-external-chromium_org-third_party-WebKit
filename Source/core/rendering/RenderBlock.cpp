@@ -1699,7 +1699,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
         }
     }
 
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 void RenderBlock::addOverflowFromChildren()
@@ -1714,8 +1714,7 @@ void RenderBlock::addOverflowFromChildren()
         if (columnCount(colInfo)) {
             LayoutRect lastRect = columnRectAt(colInfo, columnCount(colInfo) - 1);
             addLayoutOverflow(lastRect);
-            if (!hasOverflowClip())
-                addVisualOverflow(lastRect);
+            addContentsVisualOverflow(lastRect);
         }
     }
 }
@@ -1752,8 +1751,8 @@ void RenderBlock::computeOverflow(LayoutUnit oldClientAfterEdge, bool recomputeF
     LayoutUnit textIndent = textIndentOffset();
     if (textIndent < 0) {
         LayoutRect clientRect(noOverflowRect());
-        LayoutRect rectToApply = LayoutRect(clientRect.x() + min<LayoutUnit>(0, textIndent), clientRect.y(), clientRect.width() - min<LayoutUnit>(0, textIndent), clientRect.height());
-        addVisualOverflow(rectToApply);
+        LayoutRect rectToApply = LayoutRect(clientRect.x() + textIndent, clientRect.y(), clientRect.width() - textIndent, clientRect.height());
+        addContentsVisualOverflow(rectToApply);
     }
 
     // Add visual overflow from box-shadow and border-image-outset.
@@ -2681,8 +2680,9 @@ void RenderBlock::simplifiedNormalFlowLayout()
                     RootInlineBox* box = toRenderBox(o)->inlineBoxWrapper()->root();
                     lineBoxes.add(box);
                 }
-            } else if (o->isText() || (o->isRenderInline() && !walker.atEndOfInline()))
-                o->setNeedsLayout(false);
+            } else if (o->isText() || (o->isRenderInline() && !walker.atEndOfInline())) {
+                o->clearNeedsLayout();
+            }
         }
 
         // FIXME: Glyph overflow will get lost in this case, but not really a big deal.
@@ -2738,7 +2738,7 @@ bool RenderBlock::simplifiedLayout()
 
     updateScrollInfoAfterLayout();
 
-    setNeedsLayout(false);
+    clearNeedsLayout();
     return true;
 }
 
@@ -2812,7 +2812,7 @@ void RenderBlock::layoutPositionedObjects(bool relayoutChildren, bool fixedPosit
         // We don't have to do a full layout.  We just have to update our position. Try that first. If we have shrink-to-fit width
         // and we hit the available width constraint, the layoutIfNeeded() will catch it and do a full layout.
         if (r->needsPositionedMovementLayoutOnly() && r->tryLayoutDoingPositionedMovementOnly())
-            r->setNeedsLayout(false);
+            r->clearNeedsLayout();
 
         // If we are paginated or in a line grid, go ahead and compute a vertical position for our object now.
         // If it's wrong we'll lay out again.
@@ -2904,7 +2904,13 @@ void RenderBlock::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
             return;
     }
 
-    bool pushedClip = pushContentsClip(paintInfo, adjustedPaintOffset);
+    // There are some cases where not all clipped visual overflow is accounted for.
+    // FIXME: reduce the number of such cases.
+    ContentsClipBehavior contentsClipBehavior = ForceContentsClip;
+    if (hasOverflowClip() && !hasControlClip() && !(shouldPaintSelectionGaps() && phase == PaintPhaseForeground) && !hasCaret())
+        contentsClipBehavior = SkipContentsClipIfPossible;
+
+    bool pushedClip = pushContentsClip(paintInfo, adjustedPaintOffset, contentsClipBehavior);
     paintObject(paintInfo, adjustedPaintOffset);
     if (pushedClip)
         popContentsClip(paintInfo, phase, adjustedPaintOffset);
@@ -3097,8 +3103,7 @@ void RenderBlock::paintChild(RenderBox* child, PaintInfo& paintInfo, const Layou
         child->paint(paintInfo, childPoint);
 }
 
-
-void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffset, CaretType type)
+bool RenderBlock::hasCaret(CaretType type) const
 {
     // Paint the caret if the FrameSelection says so or if caret browsing is enabled
     bool caretBrowsing = frame()->settings() && frame()->settings()->caretBrowsingEnabled();
@@ -3111,13 +3116,18 @@ void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffse
         caretPainter = frame()->page()->dragCaretController()->caretRenderer();
         isContentEditable = frame()->page()->dragCaretController()->isContentEditable();
     }
+    return caretPainter == this && (isContentEditable || caretBrowsing);
+}
 
-    if (caretPainter == this && (isContentEditable || caretBrowsing)) {
-        if (type == CursorCaret)
-            frame()->selection()->paintCaret(paintInfo.context, paintOffset, paintInfo.rect);
-        else
-            frame()->page()->dragCaretController()->paintDragCaret(frame(), paintInfo.context, paintOffset, paintInfo.rect);
-    }
+void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffset, CaretType type)
+{
+    if (!hasCaret(type))
+        return;
+
+    if (type == CursorCaret)
+        frame()->selection()->paintCaret(paintInfo.context, paintOffset, paintInfo.rect);
+    else
+        frame()->page()->dragCaretController()->paintDragCaret(frame(), paintInfo.context, paintOffset, paintInfo.rect);
 }
 
 void RenderBlock::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -4236,31 +4246,42 @@ static bool rangesIntersect(int floatTop, int floatBottom, int objectTop, int ob
     return false;
 }
 
+template<>
+bool RenderBlock::FloatIntervalSearchAdapter<RenderBlock::FloatingObject::FloatLeft>::updateOffsetIfNeeded(const FloatingObject* floatingObject) const
+{
+    if (m_renderer->logicalRightForFloat(floatingObject) > m_offset) {
+        m_offset = m_renderer->logicalRightForFloat(floatingObject);
+        return true;
+    }
+    return false;
+}
+
+template<>
+bool RenderBlock::FloatIntervalSearchAdapter<RenderBlock::FloatingObject::FloatRight>::updateOffsetIfNeeded(const FloatingObject* floatingObject) const
+{
+    if (m_renderer->logicalLeftForFloat(floatingObject) < m_offset) {
+        m_offset = m_renderer->logicalLeftForFloat(floatingObject);
+        return true;
+    }
+    return false;
+}
+
 template <RenderBlock::FloatingObject::Type FloatTypeValue>
 inline void RenderBlock::FloatIntervalSearchAdapter<FloatTypeValue>::collectIfNeeded(const IntervalType& interval) const
 {
-    const FloatingObject* r = interval.data();
-    if (r->type() != FloatTypeValue || !rangesIntersect(interval.low(), interval.high(), m_lowValue, m_highValue))
+    const FloatingObject* floatingObject = interval.data();
+    if (floatingObject->type() != FloatTypeValue || !rangesIntersect(interval.low(), interval.high(), m_lowValue, m_highValue))
         return;
 
     // All the objects returned from the tree should be already placed.
-    ASSERT(r->isPlaced() && rangesIntersect(m_renderer->pixelSnappedLogicalTopForFloat(r), m_renderer->pixelSnappedLogicalBottomForFloat(r), m_lowValue, m_highValue));
+    ASSERT(floatingObject->isPlaced());
+    ASSERT(rangesIntersect(m_renderer->pixelSnappedLogicalTopForFloat(floatingObject), m_renderer->pixelSnappedLogicalBottomForFloat(floatingObject), m_lowValue, m_highValue));
 
-    if (FloatTypeValue == FloatingObject::FloatLeft
-        && m_renderer->logicalRightForFloat(r) > m_offset) {
-        m_offset = m_renderer->logicalRightForFloat(r);
-        if (m_heightRemaining)
-            *m_heightRemaining = m_renderer->logicalBottomForFloat(r) - m_lowValue;
-    }
+    bool floatIsNewExtreme = updateOffsetIfNeeded(floatingObject);
+    if (floatIsNewExtreme && m_heightRemaining)
+        *m_heightRemaining = m_renderer->logicalBottomForFloat(floatingObject) - m_lowValue;
 
-    if (FloatTypeValue == FloatingObject::FloatRight
-        && m_renderer->logicalLeftForFloat(r) < m_offset) {
-        m_offset = m_renderer->logicalLeftForFloat(r);
-        if (m_heightRemaining)
-            *m_heightRemaining = m_renderer->logicalBottomForFloat(r) - m_lowValue;
-    }
-
-    m_last = r;
+    m_last = floatingObject;
 }
 
 LayoutUnit RenderBlock::textIndentOffset() const
