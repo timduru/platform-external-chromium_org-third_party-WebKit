@@ -33,6 +33,7 @@
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
 #include "StylePropertyShorthand.h"
+#include "core/animation/AnimatableNumber.h"
 #include "core/animation/AnimatableValue.h"
 #include "core/animation/Animation.h"
 #include "core/animation/DocumentTimeline.h"
@@ -55,6 +56,7 @@
 #include "core/css/PageRuleCollector.h"
 #include "core/css/RuleSet.h"
 #include "core/css/StylePropertySet.h"
+#include "core/css/resolver/AnimatedStyleBuilder.h"
 #include "core/css/resolver/MatchResult.h"
 #include "core/css/resolver/MediaQueryResult.h"
 #include "core/css/resolver/SharedStyleFinder.h"
@@ -65,6 +67,8 @@
 #include "core/dom/NodeRenderStyle.h"
 #include "core/dom/NodeRenderingContext.h"
 #include "core/dom/Text.h"
+#include "core/dom/shadow/ContentDistributor.h"
+#include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLIFrameElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
@@ -287,7 +291,7 @@ StyleResolver::~StyleResolver()
 inline void StyleResolver::matchShadowDistributedRules(ElementRuleCollector& collector, bool includeEmptyRules)
 {
     // FIXME: Determine tree position.
-    TreePosition treePosition = ignoreTreePosition;
+    CascadeScope cascadeScope = ignoreCascadeScope;
 
     if (m_ruleSets.shadowDistributedRules().isEmpty())
         return;
@@ -304,7 +308,7 @@ inline void StyleResolver::matchShadowDistributedRules(ElementRuleCollector& col
     Vector<MatchRequest> matchRequests;
     m_ruleSets.shadowDistributedRules().collectMatchRequests(includeEmptyRules, matchRequests);
     for (size_t i = 0; i < matchRequests.size(); ++i)
-        collector.collectMatchingRules(matchRequests[i], ruleRange, treePosition);
+        collector.collectMatchingRules(matchRequests[i], ruleRange, cascadeScope);
     collector.sortAndTransferMatchedRules();
 
     collector.setBehaviorAtBoundary(previousBoundary);
@@ -318,24 +322,63 @@ void StyleResolver::matchHostRules(Element* element, ScopedStyleResolver* resolv
     resolver->matchHostRules(collector, includeEmptyRules);
 }
 
+static inline bool applyAuthorStylesOf(const Element* element)
+{
+    return element->treeScope()->applyAuthorStyles() || (element->shadow() && element->shadow()->applyAuthorStyles());
+}
+
+void StyleResolver::matchScopedAuthorRulesForShadowHost(Element* element, ElementRuleCollector& collector, bool includeEmptyRules, Vector<ScopedStyleResolver*, 8>& resolvers, Vector<ScopedStyleResolver*, 8>& resolversInShadowTree)
+{
+    collector.clearMatchedRules();
+    collector.matchedResult().ranges.lastAuthorRule = collector.matchedResult().matchedProperties.size() - 1;
+
+    CascadeScope cascadeScope = (resolvers.isEmpty() || resolvers.first()->treeScope() != element->treeScope()) ? resolvers.size() + 1 : resolvers.size();
+    CascadeOrder cascadeOrder = 0;
+    bool applyAuthorStyles = applyAuthorStylesOf(element);
+
+    for (int j = resolversInShadowTree.size() - 1; j >= 0; --j)
+        resolversInShadowTree.at(j)->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope, cascadeOrder++);
+
+    cascadeScope = resolvers.size();
+    for (unsigned i = 0; i < resolvers.size(); ++i)
+        resolvers.at(i)->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope--, cascadeOrder);
+
+    collector.sortAndTransferMatchedRules();
+
+    if (!resolvers.isEmpty())
+        matchHostRules(element, resolvers.first(), collector, includeEmptyRules);
+}
+
 void StyleResolver::matchScopedAuthorRules(Element* element, ElementRuleCollector& collector, bool includeEmptyRules)
 {
-    // fast path
     if (m_styleTree.hasOnlyScopedResolverForDocument()) {
-        m_styleTree.scopedStyleResolverForDocument()->matchAuthorRules(collector, includeEmptyRules, element->treeScope()->applyAuthorStyles());
+        m_styleTree.scopedStyleResolverForDocument()->matchAuthorRules(collector, includeEmptyRules, applyAuthorStylesOf(element));
         return;
     }
 
-    Vector<ScopedStyleResolver*, 8> stack;
-    m_styleTree.resolveScopedStyles(element, stack);
-    if (stack.isEmpty())
+    Vector<ScopedStyleResolver*, 8> resolvers;
+    m_styleTree.resolveScopedStyles(element, resolvers);
+
+    Vector<ScopedStyleResolver*, 8> resolversInShadowTree;
+    m_styleTree.collectScopedResolversForHostedShadowTrees(element, resolversInShadowTree);
+    if (!resolversInShadowTree.isEmpty()) {
+        matchScopedAuthorRulesForShadowHost(element, collector, includeEmptyRules, resolvers, resolversInShadowTree);
+        return;
+    }
+
+    if (resolvers.isEmpty())
         return;
 
-    bool applyAuthorStyles = element->treeScope()->applyAuthorStyles();
-    for (int i = stack.size() - 1; i >= 0; --i)
-        stack.at(i)->matchAuthorRules(collector, includeEmptyRules, applyAuthorStyles);
+    bool applyAuthorStyles = applyAuthorStylesOf(element);
+    CascadeScope cascadeScope = resolvers.size();
+    collector.clearMatchedRules();
+    collector.matchedResult().ranges.lastAuthorRule = collector.matchedResult().matchedProperties.size() - 1;
 
-    matchHostRules(element, stack.first(), collector, includeEmptyRules);
+    for (unsigned i = 0; i < resolvers.size(); ++i)
+        resolvers.at(i)->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope--);
+    collector.sortAndTransferMatchedRules();
+
+    matchHostRules(element, resolvers.first(), collector, includeEmptyRules);
 }
 
 void StyleResolver::matchAuthorRules(Element* element, ElementRuleCollector& collector, bool includeEmptyRules)
@@ -777,15 +820,17 @@ void StyleResolver::resolveKeyframes(Element* element, const RenderStyle* style,
         RefPtr<RenderStyle> keyframeStyle = styleForKeyframe(element, style, styleKeyframe);
         Vector<float> offsets;
         styleKeyframe->getKeys(offsets);
+        RefPtr<Keyframe> firstOffsetKeyframe;
         for (size_t j = 0; j < offsets.size(); ++j) {
             RefPtr<Keyframe> keyframe = Keyframe::create();
             keyframe->setOffset(offsets[j]);
             const StylePropertySet* properties = styleKeyframe->properties();
-            // FIXME: AnimatableValues should be shared between the keyframes at different offsets.
             for (unsigned k = 0; k < properties->propertyCount(); k++) {
                 CSSPropertyID property = properties->propertyAt(k).id();
-                keyframe->setPropertyValue(property, CSSAnimatableValueFactory::create(property, keyframeStyle.get()).get());
+                keyframe->setPropertyValue(property, firstOffsetKeyframe ? firstOffsetKeyframe->propertyValue(property) : CSSAnimatableValueFactory::create(property, keyframeStyle.get()).get());
             }
+            if (!firstOffsetKeyframe)
+                firstOffsetKeyframe = keyframe;
             keyframes.append(keyframe);
         }
     }
@@ -794,6 +839,7 @@ void StyleResolver::resolveKeyframes(Element* element, const RenderStyle* style,
         return;
 
     // Remove duplicate keyframes. In CSS the last keyframe at a given offset takes priority.
+    std::stable_sort(keyframes.begin(), keyframes.end(), Keyframe::compareOffsets);
     size_t targetIndex = 0;
     for (size_t i = 1; i < keyframes.size(); i++) {
         if (keyframes[i]->offset() != keyframes[targetIndex]->offset())
@@ -803,36 +849,43 @@ void StyleResolver::resolveKeyframes(Element* element, const RenderStyle* style,
     }
     keyframes.shrink(targetIndex + 1);
 
-    bool isStartKeyframeMissing = keyframes[0]->offset();
-    bool isEndKeyframeMissing = keyframes[keyframes.size() - 1]->offset() != 1;
-    if (!isStartKeyframeMissing && !isEndKeyframeMissing)
-        return;
-
     HashSet<CSSPropertyID> allProperties;
-    for (size_t i = 0; i < styleKeyframes.size(); ++i) {
-        const StyleKeyframe* styleKeyframe = styleKeyframes[i].get();
-        Vector<float> offsets;
-        styleKeyframe->getKeys(offsets);
-        const StylePropertySet* properties = styleKeyframe->properties();
-        for (unsigned j = 0; j < properties->propertyCount(); ++j) {
-            allProperties.add(properties->propertyAt(j).id());
-        }
+    for (size_t i = 0; i < keyframes.size(); i++) {
+        const HashSet<CSSPropertyID> keyframeProperties = keyframes[i]->properties();
+        for (HashSet<CSSPropertyID>::const_iterator iter = keyframeProperties.begin(); iter != keyframeProperties.end(); ++iter)
+            allProperties.add(*iter);
     }
 
-    if (isStartKeyframeMissing) {
-        RefPtr<Keyframe> keyframe = Keyframe::create();
-        keyframe->setOffset(0);
-        for (HashSet<CSSPropertyID>::const_iterator iter = allProperties.begin(); iter != allProperties.end(); ++iter)
-            keyframe->setPropertyValue(*iter, CSSAnimatableValueFactory::create(*iter, style).get());
-        keyframes.prepend(keyframe);
+    // Snapshot current property values for 0% and 100% if missing.
+    RefPtr<Keyframe> startKeyframe = keyframes[0];
+    if (startKeyframe->offset()) {
+        startKeyframe = Keyframe::create();
+        startKeyframe->setOffset(0);
+        keyframes.prepend(startKeyframe);
     }
-
-    if (isEndKeyframeMissing) {
-        RefPtr<Keyframe> keyframe = Keyframe::create();
-        keyframe->setOffset(1);
-        for (HashSet<CSSPropertyID>::const_iterator iter = allProperties.begin(); iter != allProperties.end(); ++iter)
-            keyframe->setPropertyValue(*iter, CSSAnimatableValueFactory::create(*iter, style).get());
-        keyframes.append(keyframe);
+    RefPtr<Keyframe> endKeyframe = keyframes[keyframes.size() - 1];
+    if (endKeyframe->offset() != 1) {
+        endKeyframe = Keyframe::create();
+        endKeyframe->setOffset(1);
+        keyframes.append(endKeyframe);
+    }
+    const HashSet<CSSPropertyID>& startKeyframeProperties = startKeyframe->properties();
+    const HashSet<CSSPropertyID>& endKeyframeProperties = endKeyframe->properties();
+    bool missingStartValues = startKeyframeProperties.size() < allProperties.size();
+    bool missingEndValues = endKeyframeProperties.size() < allProperties.size();
+    if (!missingStartValues && !missingEndValues)
+        return;
+    for (HashSet<CSSPropertyID>::const_iterator iter = allProperties.begin(); iter != allProperties.end(); ++iter) {
+        const CSSPropertyID property = *iter;
+        bool startNeedsValue = missingStartValues && !startKeyframeProperties.contains(property);
+        bool endNeedsValue = missingEndValues && !endKeyframeProperties.contains(property);
+        if (!startNeedsValue && !endNeedsValue)
+            continue;
+        RefPtr<AnimatableValue> snapshotValue = CSSAnimatableValueFactory::create(property, style);
+        if (startNeedsValue)
+            startKeyframe->setPropertyValue(property, snapshotValue.get());
+        if (endNeedsValue)
+            endKeyframe->setPropertyValue(property, snapshotValue.get());
     }
 }
 
@@ -1111,11 +1164,12 @@ void StyleResolver::applyAnimatedProperties(StyleResolverState& state, const Ele
             CSSPropertyID property = iter->key;
             if (!isPropertyForPass<pass>(property))
                 continue;
-            RefPtr<CSSValue> value = iter->value->compositeOnto(AnimatableValue::neutralValue())->toCSSValue();
+            RELEASE_ASSERT_WITH_MESSAGE(!iter->value->dependsOnUnderlyingValue(), "Not yet implemented: An interface for compositing onto the underlying value.");
+            RefPtr<AnimatableValue> animatableValue = iter->value->compositeOnto(0);
             if (pass == HighPriorityProperties && property == CSSPropertyLineHeight)
-                state.setLineHeightValue(value.get());
+                state.setLineHeightValue(toAnimatableNumber(animatableValue.get())->toCSSValue().get());
             else
-                StyleBuilder::applyProperty(property, state, value.get());
+                AnimatedStyleBuilder::applyProperty(property, state, animatableValue.get());
         }
     }
 }

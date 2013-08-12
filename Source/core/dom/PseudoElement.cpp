@@ -28,7 +28,6 @@
 #include "core/dom/PseudoElement.h"
 
 #include "core/dom/NodeRenderingContext.h"
-#include "core/inspector/InspectorInstrumentation.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/RenderQuote.h"
 #include "core/rendering/style/ContentData.h"
@@ -43,8 +42,8 @@ const QualifiedName& pseudoElementTagName()
 
 String PseudoElement::pseudoElementNameForEvents(PseudoId pseudoId)
 {
-    DEFINE_STATIC_LOCAL(const String, after, (ASCIILiteral("::after")));
-    DEFINE_STATIC_LOCAL(const String, before, (ASCIILiteral("::before")));
+    DEFINE_STATIC_LOCAL(const String, after, ("::after"));
+    DEFINE_STATIC_LOCAL(const String, before, ("::before"));
     switch (pseudoId) {
     case AFTER:
         return after;
@@ -66,7 +65,6 @@ PseudoElement::PseudoElement(Element* parent, PseudoId pseudoId)
 
 PseudoElement::~PseudoElement()
 {
-    InspectorInstrumentation::pseudoElementDestroyed(document()->page(), this);
 }
 
 PassRefPtr<RenderStyle> PseudoElement::customStyleForRenderer()

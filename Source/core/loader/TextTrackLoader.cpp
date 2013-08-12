@@ -31,9 +31,9 @@
 #include "core/dom/Document.h"
 #include "core/html/track/WebVTTParser.h"
 #include "core/loader/CrossOriginAccessControl.h"
-#include "core/loader/cache/CachedTextTrack.h"
 #include "core/loader/cache/FetchRequest.h"
 #include "core/loader/cache/ResourceFetcher.h"
+#include "core/loader/cache/TextTrackResource.h"
 #include "core/platform/Logging.h"
 #include "core/platform/SharedBuffer.h"
 #include "weborigin/SecurityOrigin.h"
@@ -113,7 +113,7 @@ void TextTrackLoader::deprecatedDidReceiveResource(Resource* resource)
 
 void TextTrackLoader::corsPolicyPreventedLoad()
 {
-    DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Cross-origin text track load denied by Cross-Origin Resource Sharing policy.")));
+    DEFINE_STATIC_LOCAL(String, consoleMessage, ("Cross-origin text track load denied by Cross-Origin Resource Sharing policy."));
     Document* document = toDocument(m_scriptExecutionContext);
     document->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, consoleMessage);
     m_state = Failed;

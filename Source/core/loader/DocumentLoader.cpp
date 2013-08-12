@@ -101,7 +101,6 @@ DocumentLoader::DocumentLoader(const ResourceRequest& req, const SubstituteData&
     , m_isStopping(false)
     , m_isClientRedirect(false)
     , m_replacesCurrentHistoryItem(false)
-    , m_wasOnloadHandled(false)
     , m_loadingMainResource(false)
     , m_timeOfLastDataReceived(0.0)
     , m_identifierForLoadWithoutResourceLoader(0)
@@ -378,10 +377,7 @@ bool DocumentLoader::isPostOrRedirectAfterPost(const ResourceRequest& newRequest
 void DocumentLoader::handleSubstituteDataLoadNow(DocumentLoaderTimer*)
 {
     RefPtr<DocumentLoader> protect(this);
-    KURL url = m_substituteData.responseURL();
-    if (url.isEmpty())
-        url = m_request.url();
-    ResourceResponse response(url, m_substituteData.mimeType(), m_substituteData.content()->size(), m_substituteData.textEncoding(), "");
+    ResourceResponse response(m_request.url(), m_substituteData.mimeType(), m_substituteData.content()->size(), m_substituteData.textEncoding(), "");
     responseReceived(0, response);
     if (isStopping())
         return;
@@ -406,35 +402,22 @@ void DocumentLoader::handleSubstituteDataLoadSoon()
 
 bool DocumentLoader::shouldContinueForNavigationPolicy(const ResourceRequest& request, PolicyCheckLoadType policyCheckLoadType)
 {
-    NavigationAction action = triggeringAction();
-    if (action.isEmpty()) {
-        action = NavigationAction(request, NavigationTypeOther);
-        setTriggeringAction(action);
-    }
-
     // Don't ask if we are loading an empty URL.
-    if (!request.isNull() && request.url().isEmpty())
+    if (request.url().isEmpty())
         return true;
 
-    // We are always willing to show alternate content for unreachable URLs;
-    // treat it like a reload so it maintains the right state for b/f list.
-    if (m_substituteData.isValid() && !m_substituteData.failingURL().isEmpty()) {
-        if (isBackForwardLoadType(frameLoader()->loadType()))
-            frameLoader()->setLoadType(FrameLoadTypeReload);
+    // We are always willing to show alternate content for unreachable URLs.
+    if (m_substituteData.isValid() && !m_substituteData.failingURL().isEmpty())
         return true;
-    }
 
     // If we're loading content into a subframe, check against the parent's Content Security Policy
     // and kill the load if that check fails.
     if (m_frame->ownerElement() && !m_frame->ownerElement()->document()->contentSecurityPolicy()->allowChildFrameFromSource(request.url()))
         return false;
 
-    if (request.isNull())
-        return false;
-
     NavigationPolicy policy = NavigationPolicyCurrentTab;
-    action.specifiesNavigationPolicy(&policy);
-    policy = frameLoader()->client()->decidePolicyForNavigation(request, action.type(), policy, policyCheckLoadType == PolicyCheckRedirect);
+    m_triggeringAction.specifiesNavigationPolicy(&policy);
+    policy = frameLoader()->client()->decidePolicyForNavigation(request, m_triggeringAction.type(), policy, policyCheckLoadType == PolicyCheckRedirect);
     if (policy == NavigationPolicyCurrentTab)
         return true;
     if (policy == NavigationPolicyIgnore)
@@ -629,7 +612,7 @@ void DocumentLoader::ensureWriter(const String& mimeType, const KURL& overriding
 
     String encoding = overrideEncoding().isNull() ? response().textEncodingName().impl() : overrideEncoding();
     bool userChosen = !overrideEncoding().isNull();
-    m_writer = createWriterFor(m_frame, 0, documentURL(), mimeType, encoding, false, false);
+    m_writer = createWriterFor(m_frame, 0, requestURL(), mimeType, encoding, false, false);
     m_writer->setDocumentWasLoadedAsPartOfNavigation();
     // This should be set before receivedFirstData().
     if (!overridingURL.isEmpty())
@@ -637,6 +620,7 @@ void DocumentLoader::ensureWriter(const String& mimeType, const KURL& overriding
 
     // Call receivedFirstData() exactly once per load.
     frameLoader()->receivedFirstData();
+    m_frame->document()->maybeHandleHttpRefresh(m_response.httpHeaderField("Refresh"), Document::HttpRefreshFromHeader);
 }
 
 void DocumentLoader::commitData(const char* bytes, size_t length)
@@ -853,16 +837,6 @@ const KURL& DocumentLoader::requestURL() const
     return request().url();
 }
 
-KURL DocumentLoader::documentURL() const
-{
-    KURL url = substituteData().responseURL();
-    if (url.isEmpty())
-        url = requestURL();
-    if (url.isEmpty())
-        url = m_response.url();
-    return url;
-}
-
 const String& DocumentLoader::responseMIMEType() const
 {
     return m_response.mimeType();
@@ -928,6 +902,7 @@ bool DocumentLoader::maybeLoadEmpty()
 
 void DocumentLoader::startLoadingMainResource()
 {
+    RefPtr<DocumentLoader> protect(this);
     m_mainDocumentError = ResourceError();
     timing()->markNavigationStart();
     ASSERT(!m_mainResource);
@@ -1001,12 +976,6 @@ void DocumentLoader::subresourceLoaderFinishedLoadingOnePart(ResourceLoader* loa
     checkLoadComplete();
     if (Frame* frame = m_frame)
         frame->loader()->checkLoadComplete();
-}
-
-void DocumentLoader::handledOnloadEvents()
-{
-    m_wasOnloadHandled = true;
-    applicationCacheHost()->stopDeferringEvents();
 }
 
 DocumentWriter* DocumentLoader::beginWriting(const String& mimeType, const String& encoding, const KURL& url)

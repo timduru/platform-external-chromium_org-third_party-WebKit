@@ -273,7 +273,7 @@ void RenderGrid::layoutBlock(bool relayoutChildren, LayoutUnit)
 
     repainter.repaintAfterLayout();
 
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 void RenderGrid::computeIntrinsicLogicalWidths(LayoutUnit& minLogicalWidth, LayoutUnit& maxLogicalWidth) const
@@ -514,7 +514,7 @@ LayoutUnit RenderGrid::logicalContentHeightForChild(RenderBox* child, Vector<Gri
     // doesn't return if the logical height is available so would need to be changed.
     // 2) Relayout if the column track's used breadth changed OR the logical height is unavailable.
     if (!child->needsLayout())
-        child->setNeedsLayout(true, MarkOnlyThis);
+        child->setNeedsLayout(MarkOnlyThis);
 
     child->setOverrideContainingBlockContentLogicalWidth(gridAreaBreadthForChild(child, ForColumns, columnTracks));
     // If |child| has a percentage logical height, we shouldn't let it override its intrinsic height, which is
@@ -855,7 +855,7 @@ void RenderGrid::layoutGridItems()
         LayoutUnit overrideContainingBlockContentLogicalWidth = gridAreaBreadthForChild(child, ForColumns, columnTracks);
         LayoutUnit overrideContainingBlockContentLogicalHeight = gridAreaBreadthForChild(child, ForRows, rowTracks);
         if (oldOverrideContainingBlockContentLogicalWidth != overrideContainingBlockContentLogicalWidth || oldOverrideContainingBlockContentLogicalHeight != overrideContainingBlockContentLogicalHeight)
-            child->setNeedsLayout(true, MarkOnlyThis);
+            child->setNeedsLayout(MarkOnlyThis);
 
         child->setOverrideContainingBlockContentLogicalWidth(overrideContainingBlockContentLogicalWidth);
         child->setOverrideContainingBlockContentLogicalHeight(overrideContainingBlockContentLogicalHeight);
@@ -975,7 +975,6 @@ size_t RenderGrid::resolveNamedGridLinePositionFromStyle(const GridPosition& pos
 
 size_t RenderGrid::resolveGridPositionFromStyle(const GridPosition& position, GridPositionSide side) const
 {
-    // FIXME: Handle other values for grid-{row,column} like ranges or line names.
     switch (position.type()) {
     case ExplicitPosition: {
         ASSERT(position.integerPosition());
@@ -997,8 +996,24 @@ size_t RenderGrid::resolveGridPositionFromStyle(const GridPosition& position, Gr
         return adjustGridPositionForSide(endOfTrack - resolvedPosition, side);
     }
     case NamedGridAreaPosition:
-        // FIXME: Support resolving named grid area (crbug.com/258092).
+    {
+        NamedGridAreaMap::const_iterator it = style()->namedGridArea().find(position.namedGridLine());
+        // Unknown grid area should have been computed to 'auto' by now.
+        ASSERT(it != style()->namedGridArea().end());
+        const GridCoordinate& gridAreaCoordinate = it->value;
+        switch (side) {
+        case ColumnStartSide:
+            return gridAreaCoordinate.columns.initialPositionIndex;
+        case ColumnEndSide:
+            return gridAreaCoordinate.columns.finalPositionIndex;
+        case RowStartSide:
+            return gridAreaCoordinate.rows.initialPositionIndex;
+        case RowEndSide:
+            return gridAreaCoordinate.rows.finalPositionIndex;
+        }
+        ASSERT_NOT_REACHED();
         return 0;
+    }
     case AutoPosition:
     case SpanPosition:
         // 'auto' and span depend on the opposite position for resolution (e.g. grid-row: auto / 1 or grid-column: span 3 / "myHeader").

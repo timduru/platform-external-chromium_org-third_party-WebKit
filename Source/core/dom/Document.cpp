@@ -123,9 +123,11 @@
 #include "core/loader/CookieJar.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoader.h"
+#include "core/loader/FrameLoaderClient.h"
 #include "core/loader/ImageLoader.h"
 #include "core/loader/Prerenderer.h"
 #include "core/loader/TextResourceDecoder.h"
+#include "core/loader/appcache/ApplicationCacheHost.h"
 #include "core/loader/cache/ResourceFetcher.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
@@ -408,8 +410,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_markers(adoptPtr(new DocumentMarkerController))
     , m_updateFocusAppearanceTimer(this, &Document::updateFocusAppearanceTimerFired)
     , m_cssTarget(0)
-    , m_processingLoadEvent(false)
-    , m_loadEventFinished(false)
+    , m_loadEventProgress(LoadEventNotRun)
     , m_startTime(currentTime())
     , m_overMinimumLayoutThreshold(false)
     , m_scriptRunner(ScriptRunner::create(this))
@@ -1057,9 +1058,9 @@ PassRefPtr<Element> Document::createElementNS(const String& namespaceURI, const 
 
 String Document::readyState() const
 {
-    DEFINE_STATIC_LOCAL(const String, loading, (ASCIILiteral("loading")));
-    DEFINE_STATIC_LOCAL(const String, interactive, (ASCIILiteral("interactive")));
-    DEFINE_STATIC_LOCAL(const String, complete, (ASCIILiteral("complete")));
+    DEFINE_STATIC_LOCAL(const String, loading, ("loading"));
+    DEFINE_STATIC_LOCAL(const String, interactive, ("interactive"));
+    DEFINE_STATIC_LOCAL(const String, complete, ("complete"));
 
     switch (m_readyState) {
     case Loading:
@@ -2083,6 +2084,8 @@ void Document::open(Document* ownerDocument)
 
     if (m_frame)
         m_frame->loader()->didExplicitOpen();
+    if (m_loadEventProgress != LoadEventInProgress && m_loadEventProgress != UnloadEventInProgress)
+        m_loadEventProgress = LoadEventNotRun;
 }
 
 void Document::detachParser()
@@ -2214,7 +2217,11 @@ void Document::implicitClose()
     }
 
     bool wasLocationChangePending = frame() && frame()->navigationScheduler()->locationChangePending();
-    bool doload = !parsing() && m_parser && !m_processingLoadEvent && !wasLocationChangePending;
+    bool doload = !parsing() && m_parser && !processingLoadEvent() && !wasLocationChangePending;
+
+    // If the load was blocked because of a pending location change and the location change triggers a same document
+    // navigation, don't fire load events after the same document navigation completes (unless there's an explicit open).
+    m_loadEventProgress = LoadEventTried;
 
     if (!doload)
         return;
@@ -2223,7 +2230,7 @@ void Document::implicitClose()
     // attached Document) to be destroyed.
     RefPtr<DOMWindow> protect(this->domWindow());
 
-    m_processingLoadEvent = true;
+    m_loadEventProgress = LoadEventInProgress;
 
     ScriptableDocumentParser* parser = scriptableDocumentParser();
     m_wellFormed = parser && parser->wellFormed();
@@ -2255,12 +2262,14 @@ void Document::implicitClose()
     enqueuePageshowEvent(PageshowEventNotPersisted);
     enqueuePopstateEvent(m_pendingStateObject ? m_pendingStateObject.release() : SerializedScriptValue::nullValue());
 
-    if (f)
-        f->loader()->handledOnloadEvents();
+    if (frame()) {
+        frame()->loader()->client()->dispatchDidHandleOnloadEvents();
+        loader()->applicationCacheHost()->stopDeferringEvents();
+    }
 
     // An event handler may have removed the frame
     if (!frame()) {
-        m_processingLoadEvent = false;
+        m_loadEventProgress = LoadEventCompleted;
         return;
     }
 
@@ -2271,12 +2280,11 @@ void Document::implicitClose()
     if (frame()->navigationScheduler()->locationChangePending() && elapsedTime() < cLayoutScheduleThreshold) {
         // Just bail out. Before or during the onload we were shifted to another page.
         // The old i-Bench suite does this. When this happens don't bother painting or laying out.
-        m_processingLoadEvent = false;
+        m_loadEventProgress = LoadEventCompleted;
         view()->unscheduleRelayout();
         return;
     }
 
-    frame()->loader()->checkCallImplicitClose();
     RenderObject* renderObject = renderer();
 
     // We used to force a synchronous display and flush here.  This really isn't
@@ -2291,7 +2299,7 @@ void Document::implicitClose()
             view()->layout();
     }
 
-    m_processingLoadEvent = false;
+    m_loadEventProgress = LoadEventCompleted;
 
     if (f && renderObject && AXObjectCache::accessibilityEnabled()) {
         // The AX cache may have been cleared at this point, but we need to make sure it contains an
@@ -2687,32 +2695,35 @@ void Document::processHttpEquivDefaultStyle(const String& content)
 
 void Document::processHttpEquivRefresh(const String& content)
 {
-    Frame* frame = this->frame();
-    if (!frame)
+    maybeHandleHttpRefresh(content, HttpRefreshFromMetaTag);
+}
+
+void Document::maybeHandleHttpRefresh(const String& content, HttpRefreshType httpRefreshType)
+{
+    if (m_isViewSource || !m_frame)
         return;
 
     double delay;
-    String refreshUrl;
-    if (parseHTTPRefresh(content, true, delay, refreshUrl)) {
-        if (refreshUrl.isEmpty())
-            refreshUrl = m_url.string();
-        else
-            refreshUrl = completeURL(refreshUrl).string();
+    String refreshURL;
+    if (!parseHTTPRefresh(content, httpRefreshType == HttpRefreshFromMetaTag, delay, refreshURL))
+        return;
+    if (refreshURL.isEmpty())
+        refreshURL = url().string();
+    else
+        refreshURL = completeURL(refreshURL).string();
 
-        if (protocolIsJavaScript(refreshUrl)) {
-            String message = "Refused to refresh " + m_url.elidedString() + " to a javascript: URL";
-            addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
-            return;
-        }
-
-        if (isSandboxed(SandboxAutomaticFeatures)) {
-            String message = "Refused to execute the redirect specified via '<meta http-equiv='refresh' content='...'>'. The document is sandboxed, and the 'allow-scripts' keyword is not set.";
-            addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
-            return;
-        }
-
-        frame->navigationScheduler()->scheduleRedirect(delay, refreshUrl);
+    if (protocolIsJavaScript(refreshURL)) {
+        String message = "Refused to refresh " + m_url.elidedString() + " to a javascript: URL";
+        addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
+        return;
     }
+
+    if (httpRefreshType == HttpRefreshFromMetaTag && isSandboxed(SandboxAutomaticFeatures)) {
+        String message = "Refused to execute the redirect specified via '<meta http-equiv='refresh' content='...'>'. The document is sandboxed, and the 'allow-scripts' keyword is not set.";
+        addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message);
+        return;
+    }
+    m_frame->navigationScheduler()->scheduleRedirect(delay, refreshURL);
 }
 
 void Document::processHttpEquivSetCookie(const String& content)
@@ -2971,11 +2982,31 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
     return true;
 }
 
-PassRefPtr<Node> Document::cloneNode(bool /*deep*/)
+PassRefPtr<Node> Document::cloneNode(bool deep)
 {
-    // Spec says cloning Document nodes is "implementation dependent"
-    // so we do not support it...
-    return 0;
+    RefPtr<Document> clone = cloneDocumentWithoutChildren();
+    clone->cloneDataFromDocument(*this);
+    if (deep)
+        cloneChildNodes(clone.get());
+    return clone.release();
+}
+
+PassRefPtr<Document> Document::cloneDocumentWithoutChildren()
+{
+    return create();
+}
+
+void Document::cloneDataFromDocument(const Document& other)
+{
+    m_url = other.url();
+    m_baseURL = other.baseURL();
+    m_baseURLOverride = other.baseURLOverride();
+    m_documentURI = other.documentURI();
+
+    setCompatibilityMode(other.compatibilityMode());
+    setContextFeatures(other.contextFeatures());
+    setSecurityOrigin(other.securityOrigin());
+    setDecoder(other.decoder());
 }
 
 StyleSheetList* Document::styleSheets()
@@ -3488,7 +3519,6 @@ void Document::dispatchWindowLoadEvent()
     if (!domWindow)
         return;
     domWindow->dispatchLoadEvent();
-    m_loadEventFinished = true;
 }
 
 void Document::addMutationEventListenerTypeIfEnabled(ListenerType listenerType)
@@ -3596,14 +3626,12 @@ String Document::domain() const
 void Document::setDomain(const String& newDomain, ExceptionState& es)
 {
     if (SchemeRegistry::isDomainRelaxationForbiddenForURLScheme(securityOrigin()->protocol())) {
-        es.throwDOMException(SecurityError);
+        es.throwDOMException(SecurityError, "'document.domain' assignment is forbidden for the '" + securityOrigin()->protocol() + "' scheme.");
         return;
     }
 
     // Both NS and IE specify that changing the domain is only allowed when
     // the new domain is a suffix of the old domain.
-
-    // FIXME: We should add logging indicating why a domain was not allowed.
 
     // If the new domain is the same as the old domain, still call
     // securityOrigin()->setDomainForDOM. This will change the
@@ -3620,24 +3648,25 @@ void Document::setDomain(const String& newDomain, ExceptionState& es)
 
     int oldLength = domain().length();
     int newLength = newDomain.length();
-    // e.g. newDomain = webkit.org (10) and domain() = www.webkit.org (14)
+    String exceptionMessage =  "'document.domain' assignment failed: '" + newDomain + "' is not a suffix of '" + domain() + "'.";
+    // e.g. newDomain = subdomain.www.example.com (25) and domain() = www.example.com (15)
     if (newLength >= oldLength) {
-        es.throwDOMException(SecurityError);
+        es.throwDOMException(SecurityError, exceptionMessage);
         return;
     }
 
     String test = domain();
-    // Check that it's a subdomain, not e.g. "ebkit.org"
+    // Check that it's a complete suffix, not e.g. "ample.com"
     if (test[oldLength - newLength - 1] != '.') {
-        es.throwDOMException(SecurityError);
+        es.throwDOMException(SecurityError, exceptionMessage);
         return;
     }
 
-    // Now test is "webkit.org" from domain()
+    // Now test is "example.com" from domain()
     // and we check that it's the same thing as newDomain
     test.remove(0, oldLength - newLength);
     if (test != newDomain) {
-        es.throwDOMException(SecurityError);
+        es.throwDOMException(SecurityError, exceptionMessage);
         return;
     }
 
@@ -4326,19 +4355,6 @@ bool Document::isContextThread() const
     return isMainThread();
 }
 
-void Document::updateURLForPushOrReplaceState(const KURL& url)
-{
-    Frame* f = frame();
-    if (!f)
-        return;
-
-    setURL(url);
-    f->loader()->setOutgoingReferrer(url);
-
-    if (DocumentLoader* documentLoader = loader())
-        documentLoader->replaceRequestURLForSameDocumentNavigation(url);
-}
-
 void Document::statePopped(PassRefPtr<SerializedScriptValue> stateObject)
 {
     if (!frame())
@@ -4768,8 +4784,11 @@ void Document::didRemoveTouchEventHandler(Node* handler)
 void Document::didRemoveEventTargetNode(Node* handler)
 {
     if (m_touchEventTargets) {
-        m_touchEventTargets->removeAll(handler);
-        if ((handler == this || m_touchEventTargets->isEmpty()) && parentDocument())
+        if (handler == this)
+            m_touchEventTargets->clear();
+        else
+            m_touchEventTargets->removeAll(handler);
+        if (m_touchEventTargets->isEmpty() && parentDocument())
             parentDocument()->didRemoveEventTargetNode(this);
     }
 }

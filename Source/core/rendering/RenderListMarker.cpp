@@ -26,7 +26,7 @@
 #include "core/rendering/RenderListMarker.h"
 
 #include "core/dom/Document.h"
-#include "core/loader/cache/CachedImage.h"
+#include "core/loader/cache/ImageResource.h"
 #include "core/platform/graphics/Font.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
 #include "core/rendering/RenderLayer.h"
@@ -1343,7 +1343,7 @@ void RenderListMarker::layout()
     if (endMargin.isFixed())
         setMarginEnd(endMargin.value());
 
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 void RenderListMarker::imageChanged(WrappedImagePtr o, const IntRect*)

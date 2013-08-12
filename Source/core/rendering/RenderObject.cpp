@@ -223,7 +223,7 @@ RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
 DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, renderObjectCounter, ("RenderObject"));
 
 RenderObject::RenderObject(Node* node)
-    : CachedImageClient()
+    : ImageResourceClient()
     , m_style(0)
     , m_node(node)
     , m_parent(0)
@@ -2782,7 +2782,7 @@ void RenderObject::layout()
         ASSERT(!child->needsLayout());
         child = child->nextSibling();
     }
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 // FIXME: Do we need this method at all? If setNeedsLayout early returns in all the right places,
@@ -2791,7 +2791,7 @@ void RenderObject::forceLayout()
 {
     // This is the only way it's safe to use MarkOnlyThis (i.e. if we're immediately going to call layout).
     // FIXME: Add asserts that we only ever do the MarkOnlyThis behavior from here.
-    setNeedsLayout(true, MarkOnlyThis);
+    setNeedsLayout(MarkOnlyThis);
     layout();
 }
 
@@ -2799,7 +2799,7 @@ void RenderObject::forceLayout()
 // I don't think it does and we should change all callers to use forceLayout.
 void RenderObject::forceChildLayout()
 {
-    setChildNeedsLayout(true, MarkOnlyThis);
+    setChildNeedsLayout(MarkOnlyThis);
     forceLayout();
 }
 
@@ -2994,7 +2994,7 @@ void RenderObject::collectAnnotatedRegions(Vector<AnnotatedRegionValue>& regions
         curr->collectAnnotatedRegions(regions);
 }
 
-bool RenderObject::willRenderImage(CachedImage*)
+bool RenderObject::willRenderImage(ImageResource*)
 {
     // Without visibility we won't render (and therefore don't care about animation).
     if (style()->visibility() != VISIBLE)
@@ -3072,7 +3072,7 @@ bool RenderObject::isInert() const
     return parentNode && toElement(parentNode)->isInert();
 }
 
-void RenderObject::imageChanged(CachedImage* image, const IntRect* rect)
+void RenderObject::imageChanged(ImageResource* image, const IntRect* rect)
 {
     imageChanged(static_cast<WrappedImagePtr>(image), rect);
 }

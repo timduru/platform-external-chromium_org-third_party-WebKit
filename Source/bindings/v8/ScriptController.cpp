@@ -222,7 +222,7 @@ v8::Local<v8::Value> ScriptController::compileAndRunScript(const ScriptSourceCod
         tryCatch.SetVerbose(true);
 
         v8::Handle<v8::String> code = v8String(source.source(), m_isolate);
-        OwnPtr<v8::ScriptData> scriptData = V8ScriptRunner::precompileScript(code, source.cachedScript());
+        OwnPtr<v8::ScriptData> scriptData = V8ScriptRunner::precompileScript(code, source.resource());
 
         // NOTE: For compatibility with WebCore, ScriptSourceCode's line starts at
         // 1, whereas v8 starts at 0.
@@ -668,8 +668,11 @@ ScriptValue ScriptController::executeScriptInMainWorld(const ScriptSourceCode& s
     if (v8Context.IsEmpty())
         return ScriptValue();
 
-    v8::Context::Scope scope(v8Context);
     RefPtr<Frame> protect(m_frame);
+    if (m_frame->loader()->stateMachine()->isDisplayingInitialEmptyDocument())
+        m_frame->loader()->didAccessInitialDocument();
+
+    v8::Context::Scope scope(v8Context);
     v8::Local<v8::Value> object = compileAndRunScript(sourceCode, corsStatus);
 
     m_sourceURL = savedSourceURL;

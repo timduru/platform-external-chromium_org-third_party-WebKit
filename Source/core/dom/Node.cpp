@@ -652,14 +652,10 @@ bool Node::rendererIsEditable(EditableLevel editableLevel, UserSelectAllTreatmen
 
     for (const Node* node = this; node; node = node->parentNode()) {
         if ((node->isHTMLElement() || node->isDocumentNode()) && node->renderer()) {
-#if ENABLE(USERSELECT_ALL)
             // Elements with user-select: all style are considered atomic
             // therefore non editable.
-            if (node->renderer()->style()->userSelect() == SELECT_ALL && treatment == UserSelectAllIsAlwaysNonEditable)
+            if (Position::nodeIsUserSelectAll(node) && treatment == UserSelectAllIsAlwaysNonEditable)
                 return false;
-#else
-            UNUSED_PARAM(treatment);
-#endif
             switch (node->renderer()->style()->userModify()) {
             case READ_ONLY:
                 return false;
@@ -1063,7 +1059,7 @@ void Node::attach(const AttachContext&)
             if (!next->isTextNode())
                 continue;
             ASSERT(!next->renderer());
-            toText(next)->createTextRendererIfNeeded();
+            toText(next)->reattach();
             // If we again decided not to create a renderer for next, we can bail out the loop,
             // because it won't affect the result of Text::textRendererIsNeeded() for the rest
             // of sibling nodes.
@@ -2620,6 +2616,22 @@ void Node::updateAncestorConnectedSubframeCountForInsertion() const
 
     for (Node* node = parentOrShadowHostNode(); node; node = node->parentOrShadowHostNode())
         node->incrementConnectedSubframeCount(count);
+}
+
+PassRefPtr<NodeList> Node::getDestinationInsertionPoints()
+{
+    document()->updateDistributionForNodeIfNeeded(this);
+    Vector<InsertionPoint*, 8> insertionPoints;
+    collectInsertionPointsWhereNodeIsDistributed(this, insertionPoints);
+    for (size_t i = 0; i < insertionPoints.size(); ++i) {
+        InsertionPoint* insertionPoint = insertionPoints[i];
+        ASSERT(insertionPoint->containingShadowRoot());
+        if (insertionPoint->containingShadowRoot()->type() == ShadowRoot::UserAgentShadowRoot)
+            return StaticNodeList::createEmpty();
+    }
+    Vector<RefPtr<Node> > asNodes;
+    asNodes.appendRange(insertionPoints.begin(), insertionPoints.end());
+    return StaticNodeList::adopt(asNodes);
 }
 
 void Node::registerScopedHTMLStyleChild()

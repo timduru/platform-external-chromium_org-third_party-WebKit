@@ -62,7 +62,7 @@ void BaseChooserOnlyDateAndTimeInputType::createShadowSubtree()
     DEFINE_STATIC_LOCAL(AtomicString, valueContainerPseudo, ("-webkit-date-and-time-value", AtomicString::ConstructFromLiteral));
 
     RefPtr<HTMLDivElement> valueContainer = HTMLDivElement::create(element()->document());
-    valueContainer->setPseudo(valueContainerPseudo);
+    valueContainer->setPart(valueContainerPseudo);
     element()->userAgentShadowRoot()->appendChild(valueContainer.get());
     updateAppearance();
 }
@@ -75,7 +75,7 @@ void BaseChooserOnlyDateAndTimeInputType::updateAppearance()
     String displayValue = visibleValue();
     if (displayValue.isEmpty()) {
         // Need to put something to keep text baseline.
-        displayValue = ASCIILiteral(" ");
+        displayValue = " ";
     }
     toHTMLElement(node)->setInnerText(displayValue, ASSERT_NO_EXCEPTION);
 }

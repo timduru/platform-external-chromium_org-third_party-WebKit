@@ -1699,7 +1699,7 @@ void RenderBlock::layoutBlock(bool relayoutChildren, LayoutUnit pageLogicalHeigh
         }
     }
 
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 void RenderBlock::addOverflowFromChildren()
@@ -1714,8 +1714,7 @@ void RenderBlock::addOverflowFromChildren()
         if (columnCount(colInfo)) {
             LayoutRect lastRect = columnRectAt(colInfo, columnCount(colInfo) - 1);
             addLayoutOverflow(lastRect);
-            if (!hasOverflowClip())
-                addVisualOverflow(lastRect);
+            addContentsVisualOverflow(lastRect);
         }
     }
 }
@@ -1752,8 +1751,8 @@ void RenderBlock::computeOverflow(LayoutUnit oldClientAfterEdge, bool recomputeF
     LayoutUnit textIndent = textIndentOffset();
     if (textIndent < 0) {
         LayoutRect clientRect(noOverflowRect());
-        LayoutRect rectToApply = LayoutRect(clientRect.x() + min<LayoutUnit>(0, textIndent), clientRect.y(), clientRect.width() - min<LayoutUnit>(0, textIndent), clientRect.height());
-        addVisualOverflow(rectToApply);
+        LayoutRect rectToApply = LayoutRect(clientRect.x() + textIndent, clientRect.y(), clientRect.width() - textIndent, clientRect.height());
+        addContentsVisualOverflow(rectToApply);
     }
 
     // Add visual overflow from box-shadow and border-image-outset.
@@ -1845,7 +1844,7 @@ void RenderBlock::adjustPositionedBlock(RenderBox* child, const MarginInfo& marg
     if (childLayer->staticBlockPosition() != logicalTop) {
         childLayer->setStaticBlockPosition(logicalTop);
         if (hasStaticBlockPosition)
-            child->setChildNeedsLayout(true, MarkOnlyThis);
+            child->setChildNeedsLayout(MarkOnlyThis);
     }
 }
 
@@ -2449,7 +2448,7 @@ void RenderBlock::updateBlockChildDirtyBitsBeforeLayout(bool relayoutChildren, R
     // FIXME: Technically percentage height objects only need a relayout if their percentage isn't going to be turned into
     // an auto value. Add a method to determine this, so that we can avoid the relayout.
     if (relayoutChildren || (child->hasRelativeLogicalHeight() && !isRenderView()))
-        child->setChildNeedsLayout(true, MarkOnlyThis);
+        child->setChildNeedsLayout(MarkOnlyThis);
 
     // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
     if (relayoutChildren && child->needsPreferredWidthsRecalculation())
@@ -2466,7 +2465,7 @@ void RenderBlock::layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloa
                 while (box != this) {
                     if (box->normalChildNeedsLayout())
                         break;
-                    box->setChildNeedsLayout(true, MarkOnlyThis);
+                    box->setChildNeedsLayout(MarkOnlyThis);
                     box = box->containingBlock();
                     ASSERT(box);
                     if (!box)
@@ -2610,7 +2609,7 @@ void RenderBlock::layoutBlockChild(RenderBox* child, MarginInfo& marginInfo, Lay
             // When the child shifts to clear an item, its width can
             // change (because it has more available line width).
             // So go ahead and mark the item as dirty.
-            child->setChildNeedsLayout(true, MarkOnlyThis);
+            child->setChildNeedsLayout(MarkOnlyThis);
         }
 
         if (childRenderBlock) {
@@ -2681,8 +2680,9 @@ void RenderBlock::simplifiedNormalFlowLayout()
                     RootInlineBox* box = toRenderBox(o)->inlineBoxWrapper()->root();
                     lineBoxes.add(box);
                 }
-            } else if (o->isText() || (o->isRenderInline() && !walker.atEndOfInline()))
-                o->setNeedsLayout(false);
+            } else if (o->isText() || (o->isRenderInline() && !walker.atEndOfInline())) {
+                o->clearNeedsLayout();
+            }
         }
 
         // FIXME: Glyph overflow will get lost in this case, but not really a big deal.
@@ -2738,7 +2738,7 @@ bool RenderBlock::simplifiedLayout()
 
     updateScrollInfoAfterLayout();
 
-    setNeedsLayout(false);
+    clearNeedsLayout();
     return true;
 }
 
@@ -2763,12 +2763,12 @@ void RenderBlock::markFixedPositionObjectForLayoutIfNeeded(RenderObject* child)
         LayoutUnit oldLeft = box->logicalLeft();
         box->updateLogicalWidth();
         if (box->logicalLeft() != oldLeft)
-            child->setChildNeedsLayout(true, MarkOnlyThis);
+            child->setChildNeedsLayout(MarkOnlyThis);
     } else if (hasStaticBlockPosition) {
         LayoutUnit oldTop = box->logicalTop();
         box->updateLogicalHeight();
         if (box->logicalTop() != oldTop)
-            child->setChildNeedsLayout(true, MarkOnlyThis);
+            child->setChildNeedsLayout(MarkOnlyThis);
     }
 }
 
@@ -2800,7 +2800,7 @@ void RenderBlock::layoutPositionedObjects(bool relayoutChildren, bool fixedPosit
         // objects that are positioned implicitly like this.  Such objects are rare, and so in typical DHTML menu usage (where everything is
         // positioned explicitly) this should not incur a performance penalty.
         if (relayoutChildren || (r->style()->hasStaticBlockPosition(isHorizontalWritingMode()) && r->parent() != this))
-            r->setChildNeedsLayout(true, MarkOnlyThis);
+            r->setChildNeedsLayout(MarkOnlyThis);
 
         // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
         if (relayoutChildren && r->needsPreferredWidthsRecalculation())
@@ -2812,7 +2812,7 @@ void RenderBlock::layoutPositionedObjects(bool relayoutChildren, bool fixedPosit
         // We don't have to do a full layout.  We just have to update our position. Try that first. If we have shrink-to-fit width
         // and we hit the available width constraint, the layoutIfNeeded() will catch it and do a full layout.
         if (r->needsPositionedMovementLayoutOnly() && r->tryLayoutDoingPositionedMovementOnly())
-            r->setNeedsLayout(false);
+            r->clearNeedsLayout();
 
         // If we are paginated or in a line grid, go ahead and compute a vertical position for our object now.
         // If it's wrong we'll lay out again.
@@ -2845,7 +2845,7 @@ void RenderBlock::markPositionedObjectsForLayout()
         TrackedRendererListHashSet::iterator end = positionedDescendants->end();
         for (TrackedRendererListHashSet::iterator it = positionedDescendants->begin(); it != end; ++it) {
             r = *it;
-            r->setChildNeedsLayout(true);
+            r->setChildNeedsLayout();
         }
     }
 }
@@ -2857,7 +2857,7 @@ void RenderBlock::markForPaginationRelayoutIfNeeded()
         return;
 
     if (view()->layoutState()->pageLogicalHeightChanged() || (view()->layoutState()->pageLogicalHeight() && view()->layoutState()->pageLogicalOffset(this, logicalTop()) != pageLogicalOffset()) || shouldBreakAtLineToAvoidWidow())
-        setChildNeedsLayout(true, MarkOnlyThis);
+        setChildNeedsLayout(MarkOnlyThis);
 }
 
 void RenderBlock::repaintOverhangingFloats(bool paintAllDescendants)
@@ -2904,7 +2904,13 @@ void RenderBlock::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
             return;
     }
 
-    bool pushedClip = pushContentsClip(paintInfo, adjustedPaintOffset);
+    // There are some cases where not all clipped visual overflow is accounted for.
+    // FIXME: reduce the number of such cases.
+    ContentsClipBehavior contentsClipBehavior = ForceContentsClip;
+    if (hasOverflowClip() && !hasControlClip() && !(shouldPaintSelectionGaps() && phase == PaintPhaseForeground) && !hasCaret())
+        contentsClipBehavior = SkipContentsClipIfPossible;
+
+    bool pushedClip = pushContentsClip(paintInfo, adjustedPaintOffset, contentsClipBehavior);
     paintObject(paintInfo, adjustedPaintOffset);
     if (pushedClip)
         popContentsClip(paintInfo, phase, adjustedPaintOffset);
@@ -3097,8 +3103,7 @@ void RenderBlock::paintChild(RenderBox* child, PaintInfo& paintInfo, const Layou
         child->paint(paintInfo, childPoint);
 }
 
-
-void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffset, CaretType type)
+bool RenderBlock::hasCaret(CaretType type) const
 {
     // Paint the caret if the FrameSelection says so or if caret browsing is enabled
     bool caretBrowsing = frame()->settings() && frame()->settings()->caretBrowsingEnabled();
@@ -3111,13 +3116,18 @@ void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffse
         caretPainter = frame()->page()->dragCaretController()->caretRenderer();
         isContentEditable = frame()->page()->dragCaretController()->isContentEditable();
     }
+    return caretPainter == this && (isContentEditable || caretBrowsing);
+}
 
-    if (caretPainter == this && (isContentEditable || caretBrowsing)) {
-        if (type == CursorCaret)
-            frame()->selection()->paintCaret(paintInfo.context, paintOffset, paintInfo.rect);
-        else
-            frame()->page()->dragCaretController()->paintDragCaret(frame(), paintInfo.context, paintOffset, paintInfo.rect);
-    }
+void RenderBlock::paintCaret(PaintInfo& paintInfo, const LayoutPoint& paintOffset, CaretType type)
+{
+    if (!hasCaret(type))
+        return;
+
+    if (type == CursorCaret)
+        frame()->selection()->paintCaret(paintInfo.context, paintOffset, paintInfo.rect);
+    else
+        frame()->page()->dragCaretController()->paintDragCaret(frame(), paintInfo.context, paintOffset, paintInfo.rect);
 }
 
 void RenderBlock::paintObject(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
@@ -3836,7 +3846,7 @@ void RenderBlock::removePositionedObjects(RenderBlock* o, ContainingBlockState c
         r = *it;
         if (!o || r->isDescendantOf(o)) {
             if (containingBlockState == NewContainingBlock)
-                r->setChildNeedsLayout(true, MarkOnlyThis);
+                r->setChildNeedsLayout(MarkOnlyThis);
 
             // It is parent blocks job to add positioned child to positioned objects list of its containing block
             // Parent layout needs to be invalidated to ensure this happens.
@@ -3844,7 +3854,7 @@ void RenderBlock::removePositionedObjects(RenderBlock* o, ContainingBlockState c
             while (p && !p->isRenderBlock())
                 p = p->parent();
             if (p)
-                p->setChildNeedsLayout(true);
+                p->setChildNeedsLayout();
 
             deadObjects.append(r);
         }
@@ -3886,7 +3896,7 @@ RenderBlock::FloatingObject* RenderBlock::insertFloatingObject(RenderBox* o)
     // Just go ahead and lay out the float.
     bool isChildRenderBlock = o->isRenderBlock();
     if (isChildRenderBlock && !o->needsLayout() && view()->layoutState()->pageLogicalHeightChanged())
-        o->setChildNeedsLayout(true, MarkOnlyThis);
+        o->setChildNeedsLayout(MarkOnlyThis);
 
     bool needsBlockDirectionLocationSetBeforeLayout = isChildRenderBlock && view()->layoutState()->needsBlockDirectionLocationSetBeforeLayout();
     if (!needsBlockDirectionLocationSetBeforeLayout || isWritingModeRoot()) // We are unsplittable if we're a block flow root.
@@ -4118,7 +4128,7 @@ bool RenderBlock::positionNewFloats()
                 setLogicalTopForChild(childBox, floatLogicalLocation.y() + marginBeforeForChild(childBox));
 
                 if (childBlock)
-                    childBlock->setChildNeedsLayout(true, MarkOnlyThis);
+                    childBlock->setChildNeedsLayout(MarkOnlyThis);
                 childBox->layoutIfNeeded();
             }
         }
@@ -4236,31 +4246,42 @@ static bool rangesIntersect(int floatTop, int floatBottom, int objectTop, int ob
     return false;
 }
 
+template<>
+bool RenderBlock::FloatIntervalSearchAdapter<RenderBlock::FloatingObject::FloatLeft>::updateOffsetIfNeeded(const FloatingObject* floatingObject) const
+{
+    if (m_renderer->logicalRightForFloat(floatingObject) > m_offset) {
+        m_offset = m_renderer->logicalRightForFloat(floatingObject);
+        return true;
+    }
+    return false;
+}
+
+template<>
+bool RenderBlock::FloatIntervalSearchAdapter<RenderBlock::FloatingObject::FloatRight>::updateOffsetIfNeeded(const FloatingObject* floatingObject) const
+{
+    if (m_renderer->logicalLeftForFloat(floatingObject) < m_offset) {
+        m_offset = m_renderer->logicalLeftForFloat(floatingObject);
+        return true;
+    }
+    return false;
+}
+
 template <RenderBlock::FloatingObject::Type FloatTypeValue>
 inline void RenderBlock::FloatIntervalSearchAdapter<FloatTypeValue>::collectIfNeeded(const IntervalType& interval) const
 {
-    const FloatingObject* r = interval.data();
-    if (r->type() != FloatTypeValue || !rangesIntersect(interval.low(), interval.high(), m_lowValue, m_highValue))
+    const FloatingObject* floatingObject = interval.data();
+    if (floatingObject->type() != FloatTypeValue || !rangesIntersect(interval.low(), interval.high(), m_lowValue, m_highValue))
         return;
 
     // All the objects returned from the tree should be already placed.
-    ASSERT(r->isPlaced() && rangesIntersect(m_renderer->pixelSnappedLogicalTopForFloat(r), m_renderer->pixelSnappedLogicalBottomForFloat(r), m_lowValue, m_highValue));
+    ASSERT(floatingObject->isPlaced());
+    ASSERT(rangesIntersect(m_renderer->pixelSnappedLogicalTopForFloat(floatingObject), m_renderer->pixelSnappedLogicalBottomForFloat(floatingObject), m_lowValue, m_highValue));
 
-    if (FloatTypeValue == FloatingObject::FloatLeft
-        && m_renderer->logicalRightForFloat(r) > m_offset) {
-        m_offset = m_renderer->logicalRightForFloat(r);
-        if (m_heightRemaining)
-            *m_heightRemaining = m_renderer->logicalBottomForFloat(r) - m_lowValue;
-    }
+    bool floatIsNewExtreme = updateOffsetIfNeeded(floatingObject);
+    if (floatIsNewExtreme && m_heightRemaining)
+        *m_heightRemaining = m_renderer->logicalBottomForFloat(floatingObject) - m_lowValue;
 
-    if (FloatTypeValue == FloatingObject::FloatRight
-        && m_renderer->logicalLeftForFloat(r) < m_offset) {
-        m_offset = m_renderer->logicalLeftForFloat(r);
-        if (m_heightRemaining)
-            *m_heightRemaining = m_renderer->logicalBottomForFloat(r) - m_lowValue;
-    }
-
-    m_last = r;
+    m_last = floatingObject;
 }
 
 LayoutUnit RenderBlock::textIndentOffset() const
@@ -4748,7 +4769,7 @@ void RenderBlock::markShapeInsideDescendantsForLayout()
     if (!everHadLayout())
         return;
     if (childrenInline()) {
-        setNeedsLayout(true);
+        setNeedsLayout();
         return;
     }
     for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
@@ -4765,7 +4786,7 @@ void RenderBlock::markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove
         return;
 
     MarkingBehavior markParents = inLayout ? MarkOnlyThis : MarkContainingBlockChain;
-    setChildNeedsLayout(true, markParents);
+    setChildNeedsLayout(markParents);
 
     if (floatToRemove)
         removeFloatingObject(floatToRemove);
@@ -4863,7 +4884,7 @@ LayoutUnit RenderBlock::getClearDelta(RenderBox* child, LayoutUnit logicalTop)
                 // we need to force a relayout as though we shifted. This happens because of the dynamic addition of overhanging floats
                 // from previous siblings when negative margins exist on a child (see the addOverhangingFloats call at the end of collapseMargins).
                 if (childLogicalWidthAtOldLogicalTopOffset != childLogicalWidthAtNewLogicalTopOffset)
-                    child->setChildNeedsLayout(true, MarkOnlyThis);
+                    child->setChildNeedsLayout(MarkOnlyThis);
                 return newLogicalTop - logicalTop;
             }
 
@@ -7552,7 +7573,7 @@ LayoutUnit RenderBlock::adjustBlockChildForPagination(LayoutUnit logicalTopAfter
             // When the child shifts to clear an item, its width can
             // change (because it has more available line width).
             // So go ahead and mark the item as dirty.
-            child->setChildNeedsLayout(true, MarkOnlyThis);
+            child->setChildNeedsLayout(MarkOnlyThis);
         }
 
         if (childRenderBlock) {

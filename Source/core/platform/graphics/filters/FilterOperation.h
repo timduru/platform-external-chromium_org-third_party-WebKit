@@ -26,12 +26,10 @@
 #ifndef FilterOperation_h
 #define FilterOperation_h
 
-#include "core/loader/cache/CachedSVGDocumentReference.h"
+#include "core/loader/cache/DocumentResourceReference.h"
 #include "core/platform/Length.h"
 #include "core/platform/graphics/Color.h"
-#include "core/platform/graphics/LayoutSize.h"
 #include "core/platform/graphics/filters/Filter.h"
-#include "core/platform/graphics/filters/FilterEffect.h"
 #include "core/platform/graphics/filters/ReferenceFilter.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
@@ -74,13 +72,6 @@ public:
 
     virtual PassRefPtr<FilterOperation> blend(const FilterOperation* /*from*/, double /*progress*/, bool /*blendToPassthrough*/ = false)
     {
-        ASSERT(!blendingNeedsRendererSize());
-        return 0;
-    }
-
-    virtual PassRefPtr<FilterOperation> blend(const FilterOperation* /*from*/, double /*progress*/, const LayoutSize&, bool /*blendToPassthrough*/ = false)
-    {
-        ASSERT(blendingNeedsRendererSize());
         return 0;
     }
 
@@ -93,8 +84,6 @@ public:
     virtual bool affectsOpacity() const { return false; }
     // True if the the value of one pixel can affect the value of another pixel under this operation, such as blur.
     virtual bool movesPixels() const { return false; }
-    // True if the filter needs the size of the box in order to calculate the animations.
-    virtual bool blendingNeedsRendererSize() const { return false; }
 
 protected:
     FilterOperation(OperationType type)
@@ -160,8 +149,8 @@ public:
     const String& url() const { return m_url; }
     const String& fragment() const { return m_fragment; }
 
-    CachedSVGDocumentReference* cachedSVGDocumentReference() const { return m_cachedSVGDocumentReference.get(); }
-    void setCachedSVGDocumentReference(PassOwnPtr<CachedSVGDocumentReference> cachedSVGDocumentReference) { m_cachedSVGDocumentReference = cachedSVGDocumentReference; }
+    DocumentResourceReference* documentResourceReference() const { return m_documentResourceReference.get(); }
+    void setDocumentResourceReference(PassOwnPtr<DocumentResourceReference> documentResourceReference) { m_documentResourceReference = documentResourceReference; }
 
     ReferenceFilter* filter() const { return m_filter.get(); }
     void setFilter(PassRefPtr<ReferenceFilter> filter) { m_filter = filter; }
@@ -185,7 +174,7 @@ private:
 
     String m_url;
     String m_fragment;
-    OwnPtr<CachedSVGDocumentReference> m_cachedSVGDocumentReference;
+    OwnPtr<DocumentResourceReference> m_documentResourceReference;
     RefPtr<ReferenceFilter> m_filter;
 };
 

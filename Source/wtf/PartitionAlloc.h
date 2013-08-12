@@ -191,12 +191,12 @@ ALWAYS_INLINE void* partitionBucketAlloc(PartitionBucket* bucket)
 
 ALWAYS_INLINE void* partitionAlloc(PartitionRoot* root, size_t size)
 {
-    size_t index = size >> kBucketShift;
-    ASSERT(index < kNumBuckets);
-    ASSERT(size == index << kBucketShift);
 #if defined(MEMORY_TOOL_REPLACES_ALLOCATOR)
     return malloc(size);
 #else
+    size_t index = size >> kBucketShift;
+    ASSERT(index < kNumBuckets);
+    ASSERT(size == index << kBucketShift);
     PartitionBucket* bucket = &root->buckets[index];
     return partitionBucketAlloc(bucket);
 #endif
@@ -234,14 +234,18 @@ ALWAYS_INLINE void partitionFree(void* ptr)
 #endif
 }
 
+ALWAYS_INLINE size_t partitionAllocRoundup(size_t size)
+{
+    return (size + kAllocationGranularityMask) & ~kAllocationGranularityMask;
+}
+
 ALWAYS_INLINE void* partitionAllocGeneric(PartitionRoot* root, size_t size)
 {
 #if defined(MEMORY_TOOL_REPLACES_ALLOCATOR)
     return malloc(size);
 #else
     if (LIKELY(size <= kMaxAllocation)) {
-        size += kAllocationGranularityMask;
-        size &= ~kAllocationGranularityMask;
+        size = partitionAllocRoundup(size);
         spinLockLock(&root->lock);
         void* ret = partitionAlloc(root, size);
         spinLockUnlock(&root->lock);

@@ -63,7 +63,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/ScrollableArea.cpp \
 	third_party/WebKit/Source/core/platform/Scrollbar.cpp \
 	third_party/WebKit/Source/core/platform/ScrollbarTheme.cpp \
-	third_party/WebKit/Source/core/platform/ScrollbarThemeComposite.cpp \
 	third_party/WebKit/Source/core/platform/SecureTextInput.cpp \
 	third_party/WebKit/Source/core/platform/SharedBuffer.cpp \
 	third_party/WebKit/Source/core/platform/SharedBufferChunkReader.cpp \
@@ -138,6 +137,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/SSLKeyGeneratorChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ScrollbarThemeChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/ScrollbarThemeChromiumAndroid.cpp \
+	third_party/WebKit/Source/core/platform/chromium/ScrollbarThemeChromiumOverlay.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SharedTimerChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SoundChromiumPosix.cpp \
 	third_party/WebKit/Source/core/platform/chromium/StatsCounterChromium.cpp \
@@ -216,7 +216,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/filters/custom/FECustomFilter.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/custom/ValidatedCustomFilterOperation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/DistantLightSource.cpp \
-	third_party/WebKit/Source/core/platform/graphics/filters/DropShadowImageFilter.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/FEBlend.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/FEColorMatrix.cpp \
 	third_party/WebKit/Source/core/platform/graphics/filters/FEComponentTransfer.cpp \
@@ -260,6 +259,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/graphics/skia/SimpleFontDataSkia.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SkiaSharedBufferStream.cpp \
 	third_party/WebKit/Source/core/platform/graphics/skia/SkiaUtils.cpp \
+	third_party/WebKit/Source/core/platform/graphics/transforms/InterpolatedTransformOperation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/transforms/Matrix3DTransformOperation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/transforms/MatrixTransformOperation.cpp \
 	third_party/WebKit/Source/core/platform/graphics/transforms/PerspectiveTransformOperation.cpp \
@@ -417,6 +417,7 @@ MY_DEFS_Debug := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
@@ -576,6 +577,7 @@ MY_DEFS_Release := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \

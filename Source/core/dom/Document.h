@@ -63,8 +63,8 @@ class Attr;
 class CDATASection;
 class CSSStyleDeclaration;
 class CSSStyleSheet;
-class CachedCSSStyleSheet;
-class CachedScript;
+class CSSStyleSheetResource;
+class ScriptResource;
 class CanvasRenderingContext;
 class CharacterData;
 class Comment;
@@ -907,11 +907,22 @@ public:
     void initSecurityContext(const DocumentInit&);
     void initContentSecurityPolicy(const ContentSecurityPolicyResponseHeaders&);
 
-    void updateURLForPushOrReplaceState(const KURL&);
     void statePopped(PassRefPtr<SerializedScriptValue>);
 
-    bool processingLoadEvent() const { return m_processingLoadEvent; }
-    bool loadEventFinished() const { return m_loadEventFinished; }
+    enum LoadEventProgress {
+        LoadEventNotRun,
+        LoadEventTried,
+        LoadEventInProgress,
+        LoadEventCompleted,
+        UnloadEventInProgress,
+        UnloadEventHandled
+    };
+    bool loadEventStillNeeded() const { return m_loadEventProgress == LoadEventNotRun; }
+    bool processingLoadEvent() const { return m_loadEventProgress == LoadEventInProgress; }
+    bool loadEventFinished() const { return m_loadEventProgress >= LoadEventCompleted; }
+    bool unloadEventStillNeeded() const { return m_loadEventProgress >= LoadEventTried && m_loadEventProgress <= UnloadEventInProgress; }
+    void unloadEventStarted() { m_loadEventProgress = UnloadEventInProgress; }
+    void unloadEventWasHandled() { m_loadEventProgress = UnloadEventHandled; }
 
     virtual bool isContextThread() const;
     virtual bool isJSExecutionForbidden() const { return false; }
@@ -1000,7 +1011,7 @@ public:
     void decrementActiveParserCount();
 
     void setContextFeatures(PassRefPtr<ContextFeatures>);
-    ContextFeatures* contextFeatures() { return m_contextFeatures.get(); }
+    ContextFeatures* contextFeatures() const { return m_contextFeatures.get(); }
 
     DocumentSharedObjectPool* sharedObjectPool() { return m_sharedObjectPool.get(); }
 
@@ -1030,8 +1041,17 @@ public:
 
     virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0);
 
+    virtual DOMWindow* executingWindow() OVERRIDE { return domWindow(); }
+    virtual void userEventWasHandled() OVERRIDE { resetLastHandledUserGestureTimestamp(); }
+
     PassRefPtr<FontLoader> fontloader();
     DocumentLifecycleNotifier* lifecycleNotifier();
+
+    enum HttpRefreshType {
+        HttpRefreshFromHeader,
+        HttpRefreshFromMetaTag
+    };
+    void maybeHandleHttpRefresh(const String&, HttpRefreshType);
 
 protected:
     Document(const DocumentInit&, DocumentClassFlags = DefaultDocumentClass);
@@ -1041,6 +1061,8 @@ protected:
     void clearXMLVersion() { m_xmlVersion = String(); }
 
     virtual void dispose() OVERRIDE;
+
+    virtual PassRefPtr<Document> cloneDocumentWithoutChildren();
 
 private:
     friend class Node;
@@ -1061,6 +1083,7 @@ private:
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
     virtual PassRefPtr<Node> cloneNode(bool deep = true);
+    void cloneDataFromDocument(const Document&);
 
     virtual void refScriptExecutionContext() { ref(); }
     virtual void derefScriptExecutionContext() { deref(); }
@@ -1226,12 +1249,7 @@ private:
 
     Element* m_cssTarget;
 
-    // FIXME: Merge these 2 variables into an enum. Also, FrameLoader::m_didCallImplicitClose
-    // is almost a duplication of this data, so that should probably get merged in too.
-    // FIXME: Document::m_processingLoadEvent and DocumentLoader::m_wasOnloadHandled are roughly the same
-    // and should be merged.
-    bool m_processingLoadEvent;
-    bool m_loadEventFinished;
+    LoadEventProgress m_loadEventProgress;
 
     RefPtr<SerializedScriptValue> m_pendingStateObject;
     double m_startTime;

@@ -36,13 +36,13 @@
 #include "core/css/CSSCrossfadeValue.h"
 #include "core/css/CSSImageValue.h"
 #include "core/css/CSSPrimitiveValue.h"
-#include "core/loader/cache/CachedImage.h"
+#include "core/loader/cache/ImageResource.h"
 #include "core/page/animation/AnimationBase.h"
 #include "core/platform/FloatConversion.h"
 #include "core/rendering/ClipPathOperation.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/style/RenderStyle.h"
-#include "core/rendering/style/StyleCachedImage.h"
+#include "core/rendering/style/StyleFetchedImage.h"
 #include "core/rendering/style/StyleGeneratedImage.h"
 #include "wtf/Noncopyable.h"
 
@@ -123,7 +123,7 @@ static inline TransformOperations blendFunc(const AnimationBase* anim, const Tra
 {
     if (anim->isTransformFunctionListValid())
         return to.blendByMatchingOperations(from, progress);
-    return to.blendByUsingMatrixInterpolation(from, progress, anim->renderer()->isBox() ? toRenderBox(anim->renderer())->borderBoxRect().size() : LayoutSize());
+    return to.blendByUsingMatrixInterpolation(from, progress);
 }
 
 static inline PassRefPtr<ClipPathOperation> blendFunc(const AnimationBase*, ClipPathOperation* from, ClipPathOperation* to, double progress)
@@ -159,10 +159,6 @@ static inline PassRefPtr<ShapeValue> blendFunc(const AnimationBase*, ShapeValue*
 static inline PassRefPtr<FilterOperation> blendFunc(const AnimationBase* anim, FilterOperation* fromOp, FilterOperation* toOp, double progress, bool blendToPassthrough = false)
 {
     ASSERT(toOp);
-    if (toOp->blendingNeedsRendererSize()) {
-        LayoutSize size = anim->renderer()->isBox() ? toRenderBox(anim->renderer())->borderBoxRect().size() : LayoutSize();
-        return toOp->blend(fromOp, progress, size, blendToPassthrough);
-    }
     return toOp->blend(fromOp, progress, blendToPassthrough);
 }
 
@@ -231,7 +227,31 @@ static inline SVGLength blendFunc(const AnimationBase*, const SVGLength& from, c
     return to.blend(from, narrowPrecisionToFloat(progress));
 }
 
-static inline PassRefPtr<StyleImage> crossfadeBlend(const AnimationBase*, StyleCachedImage* fromStyleImage, StyleCachedImage* toStyleImage, double progress)
+static inline Vector<SVGLength> blendFunc(const AnimationBase*, const Vector<SVGLength>& from, const Vector<SVGLength>& to, double progress)
+{
+    size_t fromLength = from.size();
+    size_t toLength = to.size();
+    if (!fromLength)
+        return !progress ? from : to;
+    if (!toLength)
+        return progress == 1 ? from : to;
+
+    size_t resultLength = fromLength;
+    if (fromLength != toLength) {
+        if (!(fromLength % toLength))
+            resultLength = fromLength;
+        else if (!(toLength % fromLength))
+            resultLength = toLength;
+        else
+            resultLength = fromLength * toLength;
+    }
+    Vector<SVGLength> result(resultLength);
+    for (size_t i = 0; i < resultLength; ++i)
+        result[i] = to[i % toLength].blend(from[i % fromLength], narrowPrecisionToFloat(progress));
+    return result;
+}
+
+static inline PassRefPtr<StyleImage> crossfadeBlend(const AnimationBase*, StyleFetchedImage* fromStyleImage, StyleFetchedImage* toStyleImage, double progress)
 {
     // If progress is at one of the extremes, we want getComputedStyle to show the image,
     // not a completed cross-fade, so we hand back one of the existing images.
@@ -240,11 +260,11 @@ static inline PassRefPtr<StyleImage> crossfadeBlend(const AnimationBase*, StyleC
     if (progress == 1)
         return toStyleImage;
 
-    CachedImage* fromCachedImage = static_cast<CachedImage*>(fromStyleImage->data());
-    CachedImage* toCachedImage = static_cast<CachedImage*>(toStyleImage->data());
+    ImageResource* fromImageResource = static_cast<ImageResource*>(fromStyleImage->data());
+    ImageResource* toImageResource = static_cast<ImageResource*>(toStyleImage->data());
 
-    RefPtr<CSSImageValue> fromImageValue = CSSImageValue::create(fromCachedImage->url(), fromStyleImage);
-    RefPtr<CSSImageValue> toImageValue = CSSImageValue::create(toCachedImage->url(), toStyleImage);
+    RefPtr<CSSImageValue> fromImageValue = CSSImageValue::create(fromImageResource->url(), fromStyleImage);
+    RefPtr<CSSImageValue> toImageValue = CSSImageValue::create(toImageResource->url(), toStyleImage);
     RefPtr<CSSCrossfadeValue> crossfadeValue = CSSCrossfadeValue::create(fromImageValue, toImageValue);
 
     crossfadeValue->setPercentage(CSSPrimitiveValue::create(progress, CSSPrimitiveValue::CSS_NUMBER));
@@ -257,8 +277,8 @@ static inline PassRefPtr<StyleImage> blendFunc(const AnimationBase* anim, StyleI
     if (!from || !to)
         return to;
 
-    if (from->isCachedImage() && to->isCachedImage())
-        return crossfadeBlend(anim, static_cast<StyleCachedImage*>(from), static_cast<StyleCachedImage*>(to), progress);
+    if (from->isImageResource() && to->isImageResource())
+        return crossfadeBlend(anim, static_cast<StyleFetchedImage*>(from), static_cast<StyleFetchedImage*>(to), progress);
 
     // FIXME: Support transitioning generated images as well. (gradients, etc.)
 
@@ -1159,6 +1179,7 @@ void CSSPropertyAnimation::ensurePropertyMap()
     gPropertyWrappers->append(new PropertyWrapperSVGPaint(CSSPropertyStroke, &RenderStyle::strokePaintType, &RenderStyle::strokePaintColor, &RenderStyle::setStrokePaintColor));
     gPropertyWrappers->append(new PropertyWrapper<float>(CSSPropertyStrokeOpacity, &RenderStyle::strokeOpacity, &RenderStyle::setStrokeOpacity));
     gPropertyWrappers->append(new PropertyWrapper<SVGLength>(CSSPropertyStrokeWidth, &RenderStyle::strokeWidth, &RenderStyle::setStrokeWidth));
+    gPropertyWrappers->append(new PropertyWrapper< Vector<SVGLength> >(CSSPropertyStrokeDasharray, &RenderStyle::strokeDashArray, &RenderStyle::setStrokeDashArray));
     gPropertyWrappers->append(new PropertyWrapper<SVGLength>(CSSPropertyStrokeDashoffset, &RenderStyle::strokeDashOffset, &RenderStyle::setStrokeDashOffset));
     gPropertyWrappers->append(new PropertyWrapper<float>(CSSPropertyStrokeMiterlimit, &RenderStyle::strokeMiterLimit, &RenderStyle::setStrokeMiterLimit));
 

@@ -705,7 +705,7 @@ void Internals::setShadowPseudoId(Element* element, const String& id, ExceptionS
         return;
     }
 
-    return element->setPseudo(id);
+    return element->setPart(id);
 }
 
 String Internals::visiblePlaceholder(Element* element)
@@ -1813,17 +1813,6 @@ void Internals::setDeviceScaleFactor(float scaleFactor, ExceptionState& es)
     }
     Page* page = document->page();
     page->setDeviceScaleFactor(scaleFactor);
-}
-
-void Internals::setPageScaleFactor(float scaleFactor, int x, int y, ExceptionState& es)
-{
-    Document* document = contextDocument();
-    if (!document || !document->page()) {
-        es.throwDOMException(InvalidAccessError);
-        return;
-    }
-    Page* page = document->page();
-    page->setPageScaleFactor(scaleFactor, IntPoint(x, y));
 }
 
 void Internals::setIsCursorVisible(Document* document, bool isVisible, ExceptionState& es)

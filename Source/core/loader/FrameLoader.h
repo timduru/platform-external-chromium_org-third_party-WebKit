@@ -174,7 +174,6 @@ public:
 
     void receivedFirstData();
 
-    void handledOnloadEvents();
     String userAgent(const KURL&) const;
 
     void dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*);
@@ -192,8 +191,6 @@ public:
     void setOpener(Frame*);
 
     void resetMultipleFormSubmissionProtection();
-
-    void checkCallImplicitClose();
 
     void frameDetached();
 
@@ -238,6 +235,8 @@ public:
     };
     PageDismissalType pageDismissalEventBeingDispatched() const { return m_pageDismissalEventBeingDispatched; }
 
+    void updateForSameDocumentNavigation(const KURL&, SameDocumentNavigationSource, PassRefPtr<SerializedScriptValue>, const String& title);
+
 private:
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
@@ -258,7 +257,6 @@ private:
     void didAllowNavigationViaBeforeUnloadConfirmationPanel() { m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel = true; }
     void clearAllowNavigationViaBeforeUnloadConfirmationPanel() { m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel = false; }
 
-    void checkNavigationPolicyAndContinueLoad(PassRefPtr<FormState>, FrameLoadType);
     void checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction&, bool isNewNavigation);
     void checkNewWindowPolicyAndContinue(PassRefPtr<FormState>, const String& frameName, const NavigationAction&);
 
@@ -318,8 +316,6 @@ private:
 
     String m_outgoingReferrer;
 
-    bool m_didCallImplicitClose;
-    bool m_wasUnloadEventEmitted;
     PageDismissalType m_pageDismissalEventBeingDispatched;
     bool m_isComplete;
 

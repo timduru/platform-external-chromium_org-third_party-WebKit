@@ -72,8 +72,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/filesystem/DirectoryReaderSync.cpp \
 	third_party/WebKit/Source/modules/filesystem/DraggedIsolatedFileSystem.cpp \
 	third_party/WebKit/Source/modules/filesystem/Entry.cpp \
-	third_party/WebKit/Source/modules/filesystem/EntryArray.cpp \
-	third_party/WebKit/Source/modules/filesystem/EntryArraySync.cpp \
 	third_party/WebKit/Source/modules/filesystem/EntryBase.cpp \
 	third_party/WebKit/Source/modules/filesystem/EntrySync.cpp \
 	third_party/WebKit/Source/modules/filesystem/FileEntry.cpp \
@@ -358,6 +356,7 @@ MY_DEFS_Debug := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
 	'-DUSE_STLPORT=1' \
@@ -503,6 +502,7 @@ MY_DEFS_Release := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DANDROID' \
 	'-D__GNU_SOURCE=1' \
 	'-DUSE_STLPORT=1' \

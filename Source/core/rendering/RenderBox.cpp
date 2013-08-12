@@ -219,7 +219,7 @@ void RenderBox::styleWillChange(StyleDifference diff, const RenderStyle* newStyl
             if (oldStyle->position() == StaticPosition)
                 repaint();
             else if (newStyle->hasOutOfFlowPosition())
-                parent()->setChildNeedsLayout(true);
+                parent()->setChildNeedsLayout();
             if (isFloating() && !isOutOfFlowPositioned() && newStyle->hasOutOfFlowPosition())
                 removeFloatingOrPositionedChildFromBlockLists();
         }
@@ -247,7 +247,7 @@ void RenderBox::styleDidChange(StyleDifference diff, const RenderStyle* oldStyle
         // to determine the new static position.
         if (isOutOfFlowPositioned() && newStyle->hasStaticBlockPosition(isHorizontalWritingMode()) && oldStyle->marginBefore() != newStyle->marginBefore()
             && parent() && !parent()->normalChildNeedsLayout())
-            parent()->setChildNeedsLayout(true);
+            parent()->setChildNeedsLayout();
     }
 
     if (RenderBlock::hasPercentHeightContainerMap() && firstChild()
@@ -388,7 +388,7 @@ void RenderBox::layout()
 
     RenderObject* child = firstChild();
     if (!child) {
-        setNeedsLayout(false);
+        clearNeedsLayout();
         return;
     }
 
@@ -400,7 +400,7 @@ void RenderBox::layout()
     }
     statePusher.pop();
     invalidateBackgroundObscurationStatus();
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 // More IE extensions.  clientWidth and clientHeight represent the interior of an object
@@ -1517,7 +1517,7 @@ bool RenderBox::repaintLayerRectsForImage(WrappedImagePtr image, const FillLayer
     return false;
 }
 
-bool RenderBox::pushContentsClip(PaintInfo& paintInfo, const LayoutPoint& accumulatedOffset)
+bool RenderBox::pushContentsClip(PaintInfo& paintInfo, const LayoutPoint& accumulatedOffset, ContentsClipBehavior contentsClipBehavior)
 {
     if (paintInfo.phase == PaintPhaseBlockBackground || paintInfo.phase == PaintPhaseSelfOutline || paintInfo.phase == PaintPhaseMask)
         return false;
@@ -1528,6 +1528,27 @@ bool RenderBox::pushContentsClip(PaintInfo& paintInfo, const LayoutPoint& accumu
     if (!isControlClip && !isOverflowClip)
         return false;
 
+    LayoutRect clipRect = isControlClip ? controlClipRect(accumulatedOffset) : overflowClipRect(accumulatedOffset, paintInfo.renderRegion);
+    RoundedRect clipRoundedRect(0, 0, 0, 0);
+    bool hasBorderRadius = style()->hasBorderRadius();
+    if (hasBorderRadius)
+        clipRoundedRect = style()->getRoundedInnerBorderFor(LayoutRect(accumulatedOffset, size()));
+
+    if (contentsClipBehavior == SkipContentsClipIfPossible) {
+        LayoutRect contentsVisualOverflow = contentsVisualOverflowRect();
+        if (contentsVisualOverflow.isEmpty())
+            return false;
+
+        LayoutRect conservativeClipRect = clipRect;
+        if (hasBorderRadius)
+            conservativeClipRect.intersect(clipRoundedRect.radiusCenterRect());
+        conservativeClipRect.moveBy(-accumulatedOffset);
+        if (hasLayer())
+            conservativeClipRect.move(scrolledContentOffset());
+        if (conservativeClipRect.contains(contentsVisualOverflow))
+            return false;
+    }
+
     if (paintInfo.phase == PaintPhaseOutline)
         paintInfo.phase = PaintPhaseChildOutlines;
     else if (paintInfo.phase == PaintPhaseChildBlockBackground) {
@@ -1535,11 +1556,10 @@ bool RenderBox::pushContentsClip(PaintInfo& paintInfo, const LayoutPoint& accumu
         paintObject(paintInfo, accumulatedOffset);
         paintInfo.phase = PaintPhaseChildBlockBackgrounds;
     }
-    IntRect clipRect = pixelSnappedIntRect(isControlClip ? controlClipRect(accumulatedOffset) : overflowClipRect(accumulatedOffset, paintInfo.renderRegion));
     paintInfo.context->save();
-    if (style()->hasBorderRadius())
-        paintInfo.context->clipRoundedRect(style()->getRoundedInnerBorderFor(LayoutRect(accumulatedOffset, size())));
-    paintInfo.context->clip(clipRect);
+    if (hasBorderRadius)
+        paintInfo.context->clipRoundedRect(clipRoundedRect);
+    paintInfo.context->clip(pixelSnappedIntRect(clipRect));
     return true;
 }
 
@@ -1858,7 +1878,7 @@ void RenderBox::positionLineBox(InlineBox* box)
             RootInlineBox* root = box->root();
             root->block()->setStaticInlinePositionForChild(this, root->lineTopWithLeading(), LayoutUnit::fromFloatRound(box->logicalLeft()));
             if (style()->hasStaticInlinePosition(box->isHorizontal()))
-                setChildNeedsLayout(true, MarkOnlyThis); // Just go ahead and mark the positioned object as needing layout, so it will update its position properly.
+                setChildNeedsLayout(MarkOnlyThis); // Just go ahead and mark the positioned object as needing layout, so it will update its position properly.
         } else {
             // Our object was a block originally, so we make our normal flow position be
             // just below the line box (as though all the inlines that came before us got
@@ -1866,7 +1886,7 @@ void RenderBox::positionLineBox(InlineBox* box)
             // in flow).  This value was cached in the y() of the box.
             layer()->setStaticBlockPosition(box->logicalTop());
             if (style()->hasStaticBlockPosition(box->isHorizontal()))
-                setChildNeedsLayout(true, MarkOnlyThis); // Just go ahead and mark the positioned object as needing layout, so it will update its position properly.
+                setChildNeedsLayout(MarkOnlyThis); // Just go ahead and mark the positioned object as needing layout, so it will update its position properly.
         }
 
         // Nuke the box.
@@ -4210,7 +4230,8 @@ void RenderBox::addVisualEffectOverflow()
     }
 
     // Add in the final overflow with shadows and outsets combined.
-    addVisualOverflow(LayoutRect(overflowMinX, overflowMinY, overflowMaxX - overflowMinX, overflowMaxY - overflowMinY));
+    LayoutRect visualEffectOverflow(overflowMinX, overflowMinY, overflowMaxX - overflowMinX, overflowMaxY - overflowMinY);
+    addVisualOverflow(visualEffectOverflow);
 }
 
 void RenderBox::addOverflowFromChild(RenderBox* child, const LayoutSize& delta)
@@ -4229,11 +4250,11 @@ void RenderBox::addOverflowFromChild(RenderBox* child, const LayoutSize& delta)
     // Add in visual overflow from the child.  Even if the child clips its overflow, it may still
     // have visual overflow of its own set from box shadows or reflections.  It is unnecessary to propagate this
     // overflow if we are clipping our own overflow.
-    if (child->hasSelfPaintingLayer() || hasOverflowClip())
+    if (child->hasSelfPaintingLayer())
         return;
     LayoutRect childVisualOverflowRect = child->visualOverflowRectForPropagation(style());
     childVisualOverflowRect.move(delta);
-    addVisualOverflow(childVisualOverflowRect);
+    addContentsVisualOverflow(childVisualOverflowRect);
 }
 
 void RenderBox::addLayoutOverflow(const LayoutRect& rect)
@@ -4298,12 +4319,24 @@ void RenderBox::addVisualOverflow(const LayoutRect& rect)
     m_overflow->addVisualOverflow(rect);
 }
 
+void RenderBox::addContentsVisualOverflow(const LayoutRect& rect)
+{
+    if (!hasOverflowClip()) {
+        addVisualOverflow(rect);
+        return;
+    }
+
+    if (!m_overflow)
+        m_overflow = adoptPtr(new RenderOverflow(clientBoxRect(), borderBoxRect()));
+    m_overflow->addContentsVisualOverflow(rect);
+}
+
 void RenderBox::clearLayoutOverflow()
 {
     if (!m_overflow)
         return;
 
-    if (!hasVisualOverflow()) {
+    if (!hasVisualOverflow() && contentsVisualOverflowRect().isEmpty()) {
         m_overflow.clear();
         return;
     }

@@ -155,9 +155,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/style/ShadowData.cpp \
 	third_party/WebKit/Source/core/rendering/style/StyleBackgroundData.cpp \
 	third_party/WebKit/Source/core/rendering/style/StyleBoxData.cpp \
-	third_party/WebKit/Source/core/rendering/style/StyleCachedImage.cpp \
-	third_party/WebKit/Source/core/rendering/style/StyleCachedImageSet.cpp \
-	third_party/WebKit/Source/core/rendering/style/StyleCachedShader.cpp \
+	third_party/WebKit/Source/core/rendering/style/StyleFetchedImage.cpp \
+	third_party/WebKit/Source/core/rendering/style/StyleFetchedImageSet.cpp \
+	third_party/WebKit/Source/core/rendering/style/StyleFetchedShader.cpp \
 	third_party/WebKit/Source/core/rendering/style/StyleCustomFilterProgramCache.cpp \
 	third_party/WebKit/Source/core/rendering/style/StyleCustomFilterProgram.cpp \
 	third_party/WebKit/Source/core/rendering/style/StyleDeprecatedFlexibleBoxData.cpp \
@@ -260,6 +260,7 @@ MY_DEFS_Debug := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \
@@ -422,6 +423,7 @@ MY_DEFS_Release := \
 	'-DSK_BUILD_FOR_ANDROID' \
 	'-DUSE_CHROMIUM_SKIA' \
 	'-DSK_USE_POSIX_THREADS' \
+	'-DSK_DEFERRED_CANVAS_USES_FACTORIES=1' \
 	'-DCHROME_PNG_WRITE_SUPPORT' \
 	'-DPNG_USER_CONFIG' \
 	'-DLIBXML_STATIC' \

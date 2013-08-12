@@ -37,10 +37,10 @@
 #include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventSender.h"
-#include "core/html/HTMLImportsController.h"
+#include "core/html/LinkImport.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/loader/cache/CachedCSSStyleSheet.h"
+#include "core/loader/cache/CSSStyleSheetResource.h"
 #include "core/loader/cache/FetchRequest.h"
 #include "core/loader/cache/ResourceFetcher.h"
 #include "core/page/ContentSecurityPolicy.h"
@@ -288,11 +288,16 @@ void HTMLLinkElement::dispatchPendingLoadEvents()
 void HTMLLinkElement::dispatchPendingEvent(LinkEventSender* eventSender)
 {
     ASSERT_UNUSED(eventSender, eventSender == &linkLoadEventSender());
-    ASSERT(linkStyle());
-    if (linkStyle()->hasLoadedSheet())
+    ASSERT(m_link);
+    if (m_link->hasLoaded())
         linkLoaded();
     else
         linkLoadingErrored();
+}
+
+void HTMLLinkElement::scheduleEvent()
+{
+    linkLoadEventSender().dispatchEventSoon(this);
 }
 
 void HTMLLinkElement::startLoadingDynamicSheet()
@@ -386,8 +391,8 @@ LinkStyle::~LinkStyle()
     if (m_sheet)
         m_sheet->clearOwnerNode();
 
-    if (m_cachedSheet)
-        m_cachedSheet->removeClient(this);
+    if (m_resource)
+        m_resource->removeClient(this);
 }
 
 Document* LinkStyle::document()
@@ -395,7 +400,7 @@ Document* LinkStyle::document()
     return m_owner->document();
 }
 
-void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CachedCSSStyleSheet* cachedStyleSheet)
+void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const String& charset, const CSSStyleSheetResource* cachedStyleSheet)
 {
     if (!m_owner->inDocument()) {
         ASSERT(!m_sheet);
@@ -407,7 +412,7 @@ void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const 
 
     CSSParserContext parserContext(m_owner->document(), baseURL, charset);
 
-    if (RefPtr<StyleSheetContents> restoredSheet = const_cast<CachedCSSStyleSheet*>(cachedStyleSheet)->restoreParsedStyleSheet(parserContext)) {
+    if (RefPtr<StyleSheetContents> restoredSheet = const_cast<CSSStyleSheetResource*>(cachedStyleSheet)->restoreParsedStyleSheet(parserContext)) {
         ASSERT(restoredSheet->isCacheable());
         ASSERT(!restoredSheet->isLoading());
 
@@ -438,7 +443,7 @@ void LinkStyle::setCSSStyleSheet(const String& href, const KURL& baseURL, const 
     styleSheet->checkLoaded();
 
     if (styleSheet->isCacheable())
-        const_cast<CachedCSSStyleSheet*>(cachedStyleSheet)->saveParsedStyleSheet(styleSheet);
+        const_cast<CSSStyleSheetResource*>(cachedStyleSheet)->saveParsedStyleSheet(styleSheet);
 }
 
 bool LinkStyle::sheetLoaded()
@@ -455,7 +460,8 @@ void LinkStyle::notifyLoadedSheetAndAllCriticalSubresources(bool errorOccurred)
     if (m_firedLoad)
         return;
     m_loadedSheet = !errorOccurred;
-    linkLoadEventSender().dispatchEventSoon(m_owner);
+    if (m_owner)
+        m_owner->scheduleEvent();
     m_firedLoad = true;
 }
 
@@ -579,10 +585,10 @@ void LinkStyle::process()
     if ((m_disabledState != Disabled) && m_owner->relAttribute().isStyleSheet()
         && document()->frame() && builder.url().isValid()) {
 
-        if (m_cachedSheet) {
+        if (m_resource) {
             removePendingSheet();
-            m_cachedSheet->removeClient(this);
-            m_cachedSheet = 0;
+            m_resource->removeClient(this);
+            m_resource = 0;
         }
 
         if (!m_owner->shouldLoadLink())
@@ -605,10 +611,10 @@ void LinkStyle::process()
 
         // Load stylesheets that are not needed for the rendering immediately with low priority.
         FetchRequest request = builder.build(blocking);
-        m_cachedSheet = document()->fetcher()->requestCSSStyleSheet(request);
+        m_resource = document()->fetcher()->requestCSSStyleSheet(request);
 
-        if (m_cachedSheet)
-            m_cachedSheet->addClient(this);
+        if (m_resource)
+            m_resource->addClient(this);
         else {
             // The request may have been denied if (for example) the stylesheet is local and the document is remote.
             m_loading = false;

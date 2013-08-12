@@ -31,7 +31,7 @@
 #include "core/html/HTMLInputElement.h"
 #include "core/html/InputTypeNames.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/loader/cache/CachedImage.h"
+#include "core/loader/cache/ImageResource.h"
 #include "core/rendering/RenderImage.h"
 #include "wtf/PassOwnPtr.h"
 
@@ -70,8 +70,8 @@ bool ImageInputType::appendFormData(FormDataList& encoding, bool) const
         return true;
     }
 
-    DEFINE_STATIC_LOCAL(String, dotXString, (ASCIILiteral(".x")));
-    DEFINE_STATIC_LOCAL(String, dotYString, (ASCIILiteral(".y")));
+    DEFINE_STATIC_LOCAL(String, dotXString, (".x"));
+    DEFINE_STATIC_LOCAL(String, dotYString, (".y"));
     encoding.appendData(name + dotXString, m_clickLocation.x());
     encoding.appendData(name + dotYString, m_clickLocation.y());
 
@@ -138,7 +138,7 @@ void ImageInputType::attach()
         return;
 
     RenderImageResource* imageResource = renderer->imageResource();
-    imageResource->setCachedImage(imageLoader->image());
+    imageResource->setImageResource(imageLoader->image());
 
     // If we have no image at all because we have no src attribute, set
     // image height and width for the alt text instead.

@@ -29,6 +29,7 @@
 #include "core/page/EventHandler.h"
 
 #include "HTMLNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "SVGNames.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/Document.h"
@@ -54,7 +55,7 @@
 #include "core/html/HTMLFrameSetElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/cache/CachedImage.h"
+#include "core/loader/cache/ImageResource.h"
 #include "core/page/Chrome.h"
 #include "core/page/DragController.h"
 #include "core/page/DragState.h"
@@ -356,6 +357,7 @@ void EventHandler::clear()
     m_maxMouseMovedDuration = 0;
     m_baseEventType = PlatformEvent::NoType;
     m_didStartDrag = false;
+    m_touchPressed = false;
 }
 
 void EventHandler::nodeWillBeRemoved(Node* nodeToBeRemoved)
@@ -381,7 +383,6 @@ static inline bool dispatchSelectStart(Node* node)
 
 static VisibleSelection expandSelectionToRespectUserSelectAll(Node* targetNode, const VisibleSelection& selection)
 {
-#if ENABLE(USERSELECT_ALL)
     Node* rootUserSelectAll = Position::rootUserSelectAllForNode(targetNode);
     if (!rootUserSelectAll)
         return selection;
@@ -391,10 +392,6 @@ static VisibleSelection expandSelectionToRespectUserSelectAll(Node* targetNode, 
     newSelection.setExtent(positionAfterNode(rootUserSelectAll).downstream(CanCrossEditingBoundary));
 
     return newSelection;
-#else
-    UNUSED_PARAM(targetNode);
-    return selection;
-#endif
 }
 
 bool EventHandler::updateSelectionForMouseDownDispatchingSelectStart(Node* targetNode, const VisibleSelection& selection, TextGranularity granularity)
@@ -770,27 +767,27 @@ void EventHandler::updateSelectionForMouseDrag(const HitTestResult& hitTestResul
         newSelection = VisibleSelection(targetPosition);
     }
 
-#if ENABLE(USERSELECT_ALL)
-    Node* rootUserSelectAllForMousePressNode = Position::rootUserSelectAllForNode(m_mousePressNode.get());
-    if (rootUserSelectAllForMousePressNode && rootUserSelectAllForMousePressNode == Position::rootUserSelectAllForNode(target)) {
-        newSelection.setBase(positionBeforeNode(rootUserSelectAllForMousePressNode).upstream(CanCrossEditingBoundary));
-        newSelection.setExtent(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
-    } else {
-        // Reset base for user select all when base is inside user-select-all area and extent < base.
-        if (rootUserSelectAllForMousePressNode && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
-            newSelection.setBase(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
+    if (RuntimeEnabledFeatures::userSelectAllEnabled()) {
+        Node* rootUserSelectAllForMousePressNode = Position::rootUserSelectAllForNode(m_mousePressNode.get());
+        if (rootUserSelectAllForMousePressNode && rootUserSelectAllForMousePressNode == Position::rootUserSelectAllForNode(target)) {
+            newSelection.setBase(positionBeforeNode(rootUserSelectAllForMousePressNode).upstream(CanCrossEditingBoundary));
+            newSelection.setExtent(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
+        } else {
+            // Reset base for user select all when base is inside user-select-all area and extent < base.
+            if (rootUserSelectAllForMousePressNode && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
+                newSelection.setBase(positionAfterNode(rootUserSelectAllForMousePressNode).downstream(CanCrossEditingBoundary));
 
-        Node* rootUserSelectAllForTarget = Position::rootUserSelectAllForNode(target);
-        if (rootUserSelectAllForTarget && m_mousePressNode->renderer() && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
-            newSelection.setExtent(positionBeforeNode(rootUserSelectAllForTarget).upstream(CanCrossEditingBoundary));
-        else if (rootUserSelectAllForTarget && m_mousePressNode->renderer())
-            newSelection.setExtent(positionAfterNode(rootUserSelectAllForTarget).downstream(CanCrossEditingBoundary));
-        else
-            newSelection.setExtent(targetPosition);
+            Node* rootUserSelectAllForTarget = Position::rootUserSelectAllForNode(target);
+            if (rootUserSelectAllForTarget && m_mousePressNode->renderer() && comparePositions(target->renderer()->positionForPoint(hitTestResult.localPoint()), m_mousePressNode->renderer()->positionForPoint(m_dragStartPos)) < 0)
+                newSelection.setExtent(positionBeforeNode(rootUserSelectAllForTarget).upstream(CanCrossEditingBoundary));
+            else if (rootUserSelectAllForTarget && m_mousePressNode->renderer())
+                newSelection.setExtent(positionAfterNode(rootUserSelectAllForTarget).downstream(CanCrossEditingBoundary));
+            else
+                newSelection.setExtent(targetPosition);
+        }
+    } else {
+        newSelection.setExtent(targetPosition);
     }
-#else
-    newSelection.setExtent(targetPosition);
-#endif
 
     if (m_frame->selection()->granularity() != CharacterGranularity)
         newSelection.expandUsingGranularity(m_frame->selection()->granularity());
@@ -1146,7 +1143,7 @@ OptionalCursor EventHandler::selectCursor(const MouseEventWithHitTestResults& ev
             StyleImage* styleImage = (*cursors)[i].image();
             if (!styleImage)
                 continue;
-            CachedImage* cachedImage = styleImage->cachedImage();
+            ImageResource* cachedImage = styleImage->cachedImage();
             if (!cachedImage)
                 continue;
             float scale = styleImage->imageScaleFactor();
@@ -1686,10 +1683,10 @@ bool EventHandler::handlePasteGlobalSelection(const PlatformMouseEvent& mouseEve
 
     if (!m_frame->page())
         return false;
-    Frame* focusFrame = m_frame->page()->focusController()->focusedOrMainFrame();
+    Frame* focusFrame = m_frame->page()->focusController().focusedOrMainFrame();
     // Do not paste here if the focus was moved somewhere else.
     if (m_frame == focusFrame && m_frame->editor()->client()->supportsGlobalSelection())
-        return m_frame->editor()->command(ASCIILiteral("PasteGlobalSelection")).execute();
+        return m_frame->editor()->command("PasteGlobalSelection").execute();
 
     return false;
 }
@@ -2060,14 +2057,14 @@ bool EventHandler::dispatchMouseEvent(const AtomicString& eventType, Node* targe
         // clear swallowEvent if the page already set it (e.g., by canceling
         // default behavior).
         if (elementIsMouseFocusable) {
-            if (!page->focusController()->setFocusedElement(element, m_frame, FocusDirectionMouse))
+            if (!page->focusController().setFocusedElement(element, m_frame, FocusDirectionMouse))
                 swallowEvent = true;
         } else if (!element || !element->focused()) {
             // We call setFocusedElement even with !element in order to blur
             // current focus element when a link is clicked; this is expected by
             // some sites that rely on onChange handlers running from form
             // fields before the button click is processed.
-            if (!page->focusController()->setFocusedElement(0, m_frame))
+            if (!page->focusController().setFocusedElement(0, m_frame))
                 swallowEvent = true;
         }
     }
@@ -2858,7 +2855,7 @@ void EventHandler::fakeMouseMoveEventTimerFired(Timer<EventHandler>* timer)
     if (!view)
         return;
 
-    if (!m_frame->page() || !m_frame->page()->focusController()->isActive())
+    if (!m_frame->page() || !m_frame->page()->focusController().isActive())
         return;
 
     // Don't dispatch a synthetic mouse move event if the mouse cursor is not visible to the user.
@@ -3010,13 +3007,13 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
     if (initialKeyEvent.type() == PlatformEvent::RawKeyDown) {
         node->dispatchEvent(keydown, IGNORE_EXCEPTION);
         // If frame changed as a result of keydown dispatch, then return true to avoid sending a subsequent keypress message to the new frame.
-        bool changedFocusedFrame = m_frame->page() && m_frame != m_frame->page()->focusController()->focusedOrMainFrame();
+        bool changedFocusedFrame = m_frame->page() && m_frame != m_frame->page()->focusController().focusedOrMainFrame();
         return keydown->defaultHandled() || keydown->defaultPrevented() || changedFocusedFrame;
     }
 
     node->dispatchEvent(keydown, IGNORE_EXCEPTION);
     // If frame changed as a result of keydown dispatch, then return early to avoid sending a subsequent keypress message to the new frame.
-    bool changedFocusedFrame = m_frame->page() && m_frame != m_frame->page()->focusController()->focusedOrMainFrame();
+    bool changedFocusedFrame = m_frame->page() && m_frame != m_frame->page()->focusController().focusedOrMainFrame();
     bool keydownResult = keydown->defaultHandled() || keydown->defaultPrevented() || changedFocusedFrame;
     if (keydownResult)
         return keydownResult;
@@ -3413,7 +3410,7 @@ void EventHandler::defaultArrowEventHandler(FocusDirection focusDirection, Keybo
     if (m_frame->document()->inDesignMode())
         return;
 
-    if (page->focusController()->advanceFocus(focusDirection))
+    if (page->focusController().advanceFocus(focusDirection))
         event->setDefaultHandled();
 }
 
@@ -3437,7 +3434,7 @@ void EventHandler::defaultTabEventHandler(KeyboardEvent* event)
     if (m_frame->document()->inDesignMode())
         return;
 
-    if (page->focusController()->advanceFocus(focusDirection))
+    if (page->focusController().advanceFocus(focusDirection))
         event->setDefaultHandled();
 }
 
@@ -3833,7 +3830,7 @@ void EventHandler::focusDocumentView()
     Page* page = m_frame->page();
     if (!page)
         return;
-    page->focusController()->setFocusedFrame(m_frame);
+    page->focusController().setFocusedFrame(m_frame);
 }
 
 unsigned EventHandler::accessKeyModifiers()

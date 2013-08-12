@@ -159,7 +159,7 @@ PassRefPtr<NativeImageSkia> SVGImage::nativeImageForCurrentFrame()
 }
 
 void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize containerSize, float zoom, const FloatRect& srcRect,
-    const FloatSize& scale, const FloatPoint& phase, CompositeOperator compositeOp, const FloatRect& dstRect)
+    const FloatSize& scale, const FloatPoint& phase, CompositeOperator compositeOp, const FloatRect& dstRect, BlendMode blendMode)
 {
     FloatRect zoomedContainerRect = FloatRect(FloatPoint(), containerSize);
     zoomedContainerRect.scale(zoom);
@@ -186,7 +186,7 @@ void SVGImage::drawPatternForContainer(GraphicsContext* context, const FloatSize
     FloatRect scaledSrcRect = srcRect;
     scaledSrcRect.scale(imageBufferScale.width(), imageBufferScale.height());
 
-    image->drawPattern(context, scaledSrcRect, scaleWithoutCTM, phase, compositeOp, dstRect);
+    image->drawPattern(context, scaledSrcRect, scaleWithoutCTM, phase, compositeOp, dstRect, blendMode);
 }
 
 void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const FloatRect& srcRect, CompositeOperator compositeOp, BlendMode blendMode)
@@ -332,7 +332,7 @@ bool SVGImage::dataChanged(bool allDataReceived)
         pageClients.chromeClient = m_chromeClient.get();
 
         // FIXME: If this SVG ends up loading itself, we might leak the world.
-        // The Cache code does not know about CachedImages holding Frames and
+        // The Cache code does not know about ImageResources holding Frames and
         // won't know to break the cycle.
         // This will become an issue when SVGImage will be able to load other
         // SVGImage objects, but we're safe now, because SVGImage can only be

@@ -49,10 +49,9 @@
 #include "core/workers/WorkerGlobalScopeProxy.h"
 #include "wtf/Assertions.h"
 #include "wtf/CryptographicallyRandomNumber.h"
-#include "wtf/CurrentTime.h"
 #include "wtf/MainThread.h"
-#include "wtf/Threading.h"
 #include "wtf/UnusedParam.h"
+#include "wtf/WTF.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/TextEncoding.h"
 #include "public/platform/Platform.h"
@@ -103,8 +102,8 @@ void initialize(Platform* platform)
 
     v8::V8::SetEntropySource(&generateEntropy);
     v8::V8::SetArrayBufferAllocator(WebCore::v8ArrayBufferAllocator());
-    static const char* kArrayBufferFlag = "--harmony_array_buffer";
-    v8::V8::SetFlagsFromString(kArrayBufferFlag, strlen(kArrayBufferFlag));
+    static const char* kTypedArraysFlag = "--harmony_array_buffer --harmony_typed_arrays";
+    v8::V8::SetFlagsFromString(kTypedArraysFlag, strlen(kTypedArraysFlag));
     v8::V8::Initialize();
     WebCore::V8PerIsolateData::ensureInitialized(v8::Isolate::GetCurrent());
 
@@ -194,6 +193,7 @@ void shutdownWithoutV8()
     ASSERT(!s_endOfTaskRunner);
     WebCore::ImageDecodingStore::shutdown();
     WebCore::shutdown();
+    WTF::shutdown();
     Platform::shutdown();
     WebPrerenderingSupport::shutdown();
 }

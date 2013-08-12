@@ -54,13 +54,13 @@
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/TextResourceDecoder.h"
-#include "core/loader/cache/CachedCSSStyleSheet.h"
-#include "core/loader/cache/CachedFont.h"
-#include "core/loader/cache/CachedImage.h"
-#include "core/loader/cache/CachedScript.h"
+#include "core/loader/cache/CSSStyleSheetResource.h"
+#include "core/loader/cache/FontResource.h"
+#include "core/loader/cache/ImageResource.h"
 #include "core/loader/cache/MemoryCache.h"
 #include "core/loader/cache/Resource.h"
 #include "core/loader/cache/ResourceFetcher.h"
+#include "core/loader/cache/ScriptResource.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
@@ -195,14 +195,14 @@ bool InspectorPageAgent::cachedResourceContent(Resource* cachedResource, String*
     if (cachedResource) {
         switch (cachedResource->type()) {
         case Resource::CSSStyleSheet:
-            *result = static_cast<CachedCSSStyleSheet*>(cachedResource)->sheetText(false);
+            *result = static_cast<CSSStyleSheetResource*>(cachedResource)->sheetText(false);
             return true;
         case Resource::Script:
-            *result = static_cast<CachedScript*>(cachedResource)->script();
+            *result = static_cast<WebCore::ScriptResource*>(cachedResource)->script();
             return true;
         case Resource::MainResource:
             return false;
-        case Resource::RawResource: {
+        case Resource::Raw: {
             SharedBuffer* buffer = cachedResource->resourceBuffer();
             if (!buffer)
                 return false;
@@ -268,7 +268,7 @@ TypeBuilder::Page::ResourceType::Enum InspectorPageAgent::resourceTypeJson(Inspe
         return TypeBuilder::Page::ResourceType::Document;
     case ImageResource:
         return TypeBuilder::Page::ResourceType::Image;
-    case FontResource:
+    case Font:
         return TypeBuilder::Page::ResourceType::Font;
     case StylesheetResource:
         return TypeBuilder::Page::ResourceType::Stylesheet;
@@ -287,17 +287,17 @@ TypeBuilder::Page::ResourceType::Enum InspectorPageAgent::resourceTypeJson(Inspe
 InspectorPageAgent::ResourceType InspectorPageAgent::cachedResourceType(const Resource& cachedResource)
 {
     switch (cachedResource.type()) {
-    case Resource::ImageResource:
+    case Resource::Image:
         return InspectorPageAgent::ImageResource;
-    case Resource::FontResource:
-        return InspectorPageAgent::FontResource;
+    case Resource::Font:
+        return InspectorPageAgent::Font;
     case Resource::CSSStyleSheet:
         // Fall through.
     case Resource::XSLStyleSheet:
         return InspectorPageAgent::StylesheetResource;
     case Resource::Script:
         return InspectorPageAgent::ScriptResource;
-    case Resource::RawResource:
+    case Resource::Raw:
         return InspectorPageAgent::XHRResource;
     case Resource::MainResource:
         return InspectorPageAgent::DocumentResource;
@@ -494,14 +494,14 @@ static Vector<Resource*> cachedResourcesForFrame(Frame* frame)
         Resource* cachedResource = it->value.get();
 
         switch (cachedResource->type()) {
-        case Resource::ImageResource:
+        case Resource::Image:
             // Skip images that were not auto loaded (images disabled in the user agent).
-            if (static_cast<CachedImage*>(cachedResource)->stillNeedsLoad())
+            if (static_cast<ImageResource*>(cachedResource)->stillNeedsLoad())
                 continue;
             break;
-        case Resource::FontResource:
+        case Resource::Font:
             // Skip fonts that were referenced in CSS but never used/downloaded.
-            if (static_cast<CachedFont*>(cachedResource)->stillNeedsLoad())
+            if (static_cast<FontResource*>(cachedResource)->stillNeedsLoad())
                 continue;
             break;
         default:
@@ -900,8 +900,8 @@ Frame* InspectorPageAgent::assertFrame(ErrorString* errorString, const String& f
 
 String InspectorPageAgent::resourceSourceMapURL(const String& url)
 {
-    DEFINE_STATIC_LOCAL(String, sourceMapHttpHeader, (ASCIILiteral("SourceMap")));
-    DEFINE_STATIC_LOCAL(String, deprecatedSourceMapHttpHeader, (ASCIILiteral("X-SourceMap")));
+    DEFINE_STATIC_LOCAL(String, sourceMapHttpHeader, ("SourceMap"));
+    DEFINE_STATIC_LOCAL(String, deprecatedSourceMapHttpHeader, ("X-SourceMap"));
     if (url.isEmpty())
         return String();
     Frame* frame = mainFrame();

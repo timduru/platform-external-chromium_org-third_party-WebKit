@@ -41,6 +41,7 @@
 #include "core/html/parser/HTMLTreeBuilder.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/Frame.h"
+#include "core/platform/chromium/TraceEvent.h"
 #include "wtf/Functional.h"
 
 namespace WebCore {
@@ -683,10 +684,11 @@ void HTMLDocumentParser::append(PassRefPtr<StringImpl> inputSource)
             startBackgroundParser();
 
         ASSERT(inputSource->hasOneRef());
-        Closure closure = bind(&BackgroundHTMLParser::append, m_backgroundParser, String(inputSource));
+        TRACE_EVENT1("net", "HTMLDocumentParser::append", "size", inputSource->length());
         // NOTE: Important that the String temporary is destroyed before we post the task
         // otherwise the String could call deref() on a StringImpl now owned by the background parser.
         // We would like to ASSERT(closure.arg3()->hasOneRef()) but sadly the args are private.
+        Closure closure = bind(&BackgroundHTMLParser::append, m_backgroundParser, String(inputSource));
         HTMLParserThread::shared()->postTask(closure);
         return;
     }
@@ -694,6 +696,7 @@ void HTMLDocumentParser::append(PassRefPtr<StringImpl> inputSource)
     // pumpTokenizer can cause this parser to be detached from the Document,
     // but we need to ensure it isn't deleted yet.
     RefPtr<HTMLDocumentParser> protect(this);
+    TRACE_EVENT1("net", "HTMLDocumentParser::append", "size", inputSource->length());
     String source(inputSource);
 
     if (m_preloadScanner) {
@@ -875,18 +878,18 @@ void HTMLDocumentParser::resumeParsingAfterScriptExecution()
     endIfDelayed();
 }
 
-void HTMLDocumentParser::watchForLoad(Resource* cachedScript)
+void HTMLDocumentParser::watchForLoad(Resource* resource)
 {
-    ASSERT(!cachedScript->isLoaded());
+    ASSERT(!resource->isLoaded());
     // addClient would call notifyFinished if the load were complete.
     // Callers do not expect to be re-entered from this call, so they should
     // not an already-loaded Resource.
-    cachedScript->addClient(this);
+    resource->addClient(this);
 }
 
-void HTMLDocumentParser::stopWatchingForLoad(Resource* cachedScript)
+void HTMLDocumentParser::stopWatchingForLoad(Resource* resource)
 {
-    cachedScript->removeClient(this);
+    resource->removeClient(this);
 }
 
 void HTMLDocumentParser::appendCurrentInputStreamToPreloadScannerAndScan()

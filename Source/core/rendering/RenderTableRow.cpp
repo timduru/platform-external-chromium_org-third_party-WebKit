@@ -27,7 +27,7 @@
 
 #include "HTMLNames.h"
 #include "core/dom/Document.h"
-#include "core/loader/cache/CachedImage.h"
+#include "core/loader/cache/ImageResource.h"
 #include "core/rendering/HitTestResult.h"
 #include "core/rendering/PaintInfo.h"
 #include "core/rendering/RenderTableCell.h"
@@ -84,7 +84,7 @@ void RenderTableRow::styleDidChange(StyleDifference diff, const RenderStyle* old
             for (RenderBox* childBox = firstChildBox(); childBox; childBox = childBox->nextSiblingBox()) {
                 if (!childBox->isTableCell())
                     continue;
-                childBox->setChildNeedsLayout(true, MarkOnlyThis);
+                childBox->setChildNeedsLayout(MarkOnlyThis);
             }
         }
     }
@@ -167,7 +167,7 @@ void RenderTableRow::layout()
         if (child->isTableCell()) {
             RenderTableCell* cell = toRenderTableCell(child);
             if (!cell->needsLayout() && paginated && view()->layoutState()->pageLogicalHeight() && view()->layoutState()->pageLogicalOffset(cell, cell->logicalTop()) != cell->pageLogicalOffset())
-                cell->setChildNeedsLayout(true, MarkOnlyThis);
+                cell->setChildNeedsLayout(MarkOnlyThis);
 
             if (child->needsLayout()) {
                 cell->computeAndSetBlockDirectionMargins(table());
@@ -190,7 +190,7 @@ void RenderTableRow::layout()
 
     statePusher.pop();
     // RenderTableSection::layoutRows will set our logical height and width later, so it calls updateLayerTransform().
-    setNeedsLayout(false);
+    clearNeedsLayout();
 }
 
 LayoutRect RenderTableRow::clippedOverflowRectForRepaint(const RenderLayerModelObject* repaintContainer) const

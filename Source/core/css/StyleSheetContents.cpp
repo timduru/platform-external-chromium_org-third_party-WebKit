@@ -28,7 +28,7 @@
 #include "core/css/StyleRule.h"
 #include "core/css/StyleRuleImport.h"
 #include "core/dom/Node.h"
-#include "core/loader/cache/CachedCSSStyleSheet.h"
+#include "core/loader/cache/CSSStyleSheetResource.h"
 #include "weborigin/SecurityOrigin.h"
 #include "wtf/Deque.h"
 
@@ -269,7 +269,7 @@ const AtomicString& StyleSheetContents::determineNamespace(const AtomicString& p
     return it->value;
 }
 
-void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cachedStyleSheet, const SecurityOrigin* securityOrigin)
+void StyleSheetContents::parseAuthorStyleSheet(const CSSStyleSheetResource* cachedStyleSheet, const SecurityOrigin* securityOrigin)
 {
     bool enforceMIMEType = isStrictParserMode(m_parserContext.mode);
     bool hasValidMIMEType = false;
@@ -290,7 +290,7 @@ void StyleSheetContents::parseAuthorStyleSheet(const CachedCSSStyleSheet* cached
     }
     if (m_parserContext.needsSiteSpecificQuirks && isStrictParserMode(m_parserContext.mode)) {
         // Work around <https://bugs.webkit.org/show_bug.cgi?id=28350>.
-        DEFINE_STATIC_LOCAL(const String, mediaWikiKHTMLFixesStyleSheet, (ASCIILiteral("/* KHTML fix stylesheet */\n/* work around the horizontal scrollbars */\n#column-content { margin-left: 0; }\n\n")));
+        DEFINE_STATIC_LOCAL(const String, mediaWikiKHTMLFixesStyleSheet, ("/* KHTML fix stylesheet */\n/* work around the horizontal scrollbars */\n#column-content { margin-left: 0; }\n\n"));
         // There are two variants of KHTMLFixes.css. One is equal to mediaWikiKHTMLFixesStyleSheet,
         // while the other lacks the second trailing newline.
         if (baseURL().string().endsWith("/KHTMLFixes.css") && !sheetText.isNull() && mediaWikiKHTMLFixesStyleSheet.startsWith(sheetText)
@@ -348,7 +348,7 @@ void StyleSheetContents::checkLoaded()
         ownerNode->notifyLoadedSheetAndAllCriticalSubresources(m_didLoadErrorOccur);
 }
 
-void StyleSheetContents::notifyLoadedSheet(const CachedCSSStyleSheet* sheet)
+void StyleSheetContents::notifyLoadedSheet(const CSSStyleSheetResource* sheet)
 {
     ASSERT(sheet);
     m_didLoadErrorOccur |= sheet->errorOccurred();

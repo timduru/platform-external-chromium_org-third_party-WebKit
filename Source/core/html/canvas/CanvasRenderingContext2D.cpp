@@ -53,7 +53,7 @@
 #include "core/html/canvas/CanvasPattern.h"
 #include "core/html/canvas/CanvasStyle.h"
 #include "core/html/canvas/DOMPath.h"
-#include "core/loader/cache/CachedImage.h"
+#include "core/loader/cache/ImageResource.h"
 #include "core/page/ImageBitmap.h"
 #include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/FloatQuad.h"
@@ -78,7 +78,7 @@ static const int defaultFontSize = 10;
 static const char* const defaultFontFamily = "sans-serif";
 static const char* const defaultFont = "10px sans-serif";
 
-static bool isOriginClean(CachedImage* cachedImage, SecurityOrigin* securityOrigin)
+static bool isOriginClean(ImageResource* cachedImage, SecurityOrigin* securityOrigin)
 {
     if (!cachedImage->image()->hasSingleSecurityOrigin())
         return false;
@@ -1171,14 +1171,14 @@ bool CanvasRenderingContext2D::shouldDrawShadows() const
     return alphaChannel(state().m_shadowColor) && (state().m_shadowBlur || !state().m_shadowOffset.isZero());
 }
 
-static LayoutSize size(HTMLImageElement* image)
+static LayoutSize sizeFor(HTMLImageElement* image)
 {
-    if (CachedImage* cachedImage = image->cachedImage())
+    if (ImageResource* cachedImage = image->cachedImage())
         return cachedImage->imageSizeForRenderer(image->renderer(), 1.0f); // FIXME: Not sure about this.
     return IntSize();
 }
 
-static IntSize size(HTMLVideoElement* video)
+static IntSize sizeFor(HTMLVideoElement* video)
 {
     if (MediaPlayer* player = video->player())
         return player->naturalSize();
@@ -1294,9 +1294,10 @@ void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap,
 
     FloatRect intersectRect = intersection(bitmapRect, normalizedSrcRect);
     FloatRect actualSrcRect(intersectRect);
-    actualSrcRect.move(-bitmapRect.x(), -bitmapRect.y());
 
-    FloatRect imageRect = FloatRect(FloatPoint(), bitmapRect.size());
+    IntPoint bitmapOffset = bitmap->bitmapOffset();
+    actualSrcRect.move(bitmapOffset - bitmapRect.location());
+    FloatRect imageRect = FloatRect(bitmapOffset, bitmapRect.size());
 
     FloatRect actualDstRect(FloatPoint(intersectRect.location() - normalizedSrcRect.location()), bitmapRect.size());
     actualDstRect.scale(normalizedDstRect.width() / normalizedSrcRect.width() * intersectRect.width() / bitmapRect.width(),
@@ -1316,8 +1317,8 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, float x, float
         es.throwDOMException(TypeMismatchError);
         return;
     }
-    LayoutSize s = size(image);
-    drawImage(image, x, y, s.width(), s.height(), es);
+    LayoutSize size = sizeFor(image);
+    drawImage(image, x, y, size.width(), size.height(), es);
 }
 
 void CanvasRenderingContext2D::drawImage(HTMLImageElement* image,
@@ -1327,8 +1328,8 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image,
         es.throwDOMException(TypeMismatchError);
         return;
     }
-    LayoutSize s = size(image);
-    drawImage(image, FloatRect(0, 0, s.width(), s.height()), FloatRect(x, y, width, height), es);
+    LayoutSize size = sizeFor(image);
+    drawImage(image, FloatRect(0, 0, size.width(), size.height()), FloatRect(x, y, width, height), es);
 }
 
 void CanvasRenderingContext2D::drawImage(HTMLImageElement* image,
@@ -1354,16 +1355,23 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
         || !std::isfinite(srcRect.x()) || !std::isfinite(srcRect.y()) || !std::isfinite(srcRect.width()) || !std::isfinite(srcRect.height()))
         return;
 
-    if (!dstRect.width() || !dstRect.height())
+    ImageResource* cachedImage = image->cachedImage();
+    if (!cachedImage || !image->complete())
         return;
 
-    if (!image->complete())
+    LayoutSize size = sizeFor(image);
+    if (!size.width() || !size.height()) {
+        es.throwDOMException(InvalidStateError);
+        return;
+    }
+
+    if (!dstRect.width() || !dstRect.height())
         return;
 
     FloatRect normalizedSrcRect = normalizeRect(srcRect);
     FloatRect normalizedDstRect = normalizeRect(dstRect);
 
-    FloatRect imageRect = FloatRect(FloatPoint(), size(image));
+    FloatRect imageRect = FloatRect(FloatPoint(), size);
     if (!srcRect.width() || !srcRect.height()) {
         es.throwDOMException(IndexSizeError);
         return;
@@ -1372,10 +1380,6 @@ void CanvasRenderingContext2D::drawImage(HTMLImageElement* image, const FloatRec
         return;
 
     clipRectsToImageRect(imageRect, &normalizedSrcRect, &normalizedDstRect);
-
-    CachedImage* cachedImage = image->cachedImage();
-    if (!cachedImage)
-        return;
 
     checkOrigin(image);
 
@@ -1478,8 +1482,8 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, float x, float
         es.throwDOMException(TypeMismatchError);
         return;
     }
-    IntSize s = size(video);
-    drawImage(video, x, y, s.width(), s.height(), es);
+    IntSize size = sizeFor(video);
+    drawImage(video, x, y, size.width(), size.height(), es);
 }
 
 void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video,
@@ -1489,8 +1493,8 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video,
         es.throwDOMException(TypeMismatchError);
         return;
     }
-    IntSize s = size(video);
-    drawImage(video, FloatRect(0, 0, s.width(), s.height()), FloatRect(x, y, width, height), es);
+    IntSize size = sizeFor(video);
+    drawImage(video, FloatRect(0, 0, size.width(), size.height()), FloatRect(x, y, width, height), es);
 }
 
 void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video,
@@ -1510,7 +1514,7 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, const FloatRec
     if (video->readyState() == HTMLMediaElement::HAVE_NOTHING || video->readyState() == HTMLMediaElement::HAVE_METADATA)
         return;
 
-    FloatRect videoRect = FloatRect(FloatPoint(), size(video));
+    FloatRect videoRect = FloatRect(FloatPoint(), sizeFor(video));
     if (!srcRect.width() || !srcRect.height()) {
         es.throwDOMException(IndexSizeError);
         return;
@@ -1537,7 +1541,7 @@ void CanvasRenderingContext2D::drawImage(HTMLVideoElement* video, const FloatRec
     c->translate(normalizedDstRect.x(), normalizedDstRect.y());
     c->scale(FloatSize(normalizedDstRect.width() / normalizedSrcRect.width(), normalizedDstRect.height() / normalizedSrcRect.height()));
     c->translate(-normalizedSrcRect.x(), -normalizedSrcRect.y());
-    video->paintCurrentFrameInContext(c, IntRect(IntPoint(), size(video)));
+    video->paintCurrentFrameInContext(c, IntRect(IntPoint(), sizeFor(video)));
     stateSaver.restore();
     didDraw(dstRect);
 }
@@ -1748,7 +1752,7 @@ PassRefPtr<CanvasPattern> CanvasRenderingContext2D::createPattern(HTMLImageEleme
     if (!image->complete())
         return 0;
 
-    CachedImage* cachedImage = image->cachedImage();
+    ImageResource* cachedImage = image->cachedImage();
     Image* imageForRendering = cachedImage ? cachedImage->imageForRenderer(image->renderer()) : 0;
     if (!imageForRendering)
         return CanvasPattern::create(Image::nullImage(), repeatX, repeatY, true);
@@ -1892,7 +1896,7 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::webkitGetImageDataHD(float sx, f
 PassRefPtr<ImageData> CanvasRenderingContext2D::getImageData(ImageBuffer::CoordinateSystem coordinateSystem, float sx, float sy, float sw, float sh, ExceptionState& es) const
 {
     if (!canvas()->originClean()) {
-        DEFINE_STATIC_LOCAL(String, consoleMessage, (ASCIILiteral("Unable to get image data from canvas because the canvas has been tainted by cross-origin data.")));
+        DEFINE_STATIC_LOCAL(String, consoleMessage, ("Unable to get image data from canvas because the canvas has been tainted by cross-origin data."));
         canvas()->document()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, consoleMessage);
         es.throwDOMException(SecurityError);
         return 0;
@@ -2051,13 +2055,13 @@ String CanvasRenderingContext2D::font() const
 
 void CanvasRenderingContext2D::setFont(const String& newFont)
 {
-    MutableStylePropertyMap::iterator i = m_cachedFonts.find(newFont);
-    RefPtr<MutableStylePropertySet> parsedStyle = i != m_cachedFonts.end() ? i->value : 0;
+    MutableStylePropertyMap::iterator i = m_fetchedFonts.find(newFont);
+    RefPtr<MutableStylePropertySet> parsedStyle = i != m_fetchedFonts.end() ? i->value : 0;
 
     if (!parsedStyle) {
         parsedStyle = MutableStylePropertySet::create();
         CSSParser::parseValue(parsedStyle.get(), CSSPropertyFont, newFont, true, strictToCSSParserMode(!m_usesCSSCompatibilityParseMode), 0);
-        m_cachedFonts.add(newFont, parsedStyle);
+        m_fetchedFonts.add(newFont, parsedStyle);
     }
     if (parsedStyle->isEmpty())
         return;
@@ -2342,7 +2346,10 @@ void CanvasRenderingContext2D::drawSystemFocusRing(Element* element)
         return;
 
     updateFocusRingAccessibility(m_path, element);
-    if (element->focused())
+    // Note: we need to check document->focusedElement() rather than just calling
+    // element->focused(), because element->focused() isn't updated until after
+    // focus events fire.
+    if (element->document() && element->document()->focusedElement() == element)
         drawFocusRing(m_path);
 }
 

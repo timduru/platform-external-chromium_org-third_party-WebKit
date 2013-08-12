@@ -29,7 +29,7 @@
 #include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/NamedFlow.h"
-#include "core/dom/NodeRenderingContext.h"
+#include "core/dom/NodeRenderingTraversal.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Position.h"
 #include "core/dom/Range.h"
@@ -88,6 +88,18 @@ void RenderNamedFlowThread::clearContentNodes()
     }
 
     m_contentNodes.clear();
+}
+
+void RenderNamedFlowThread::updateWritingMode()
+{
+    if (RenderRegion* firstRegion = m_regionList.first()) {
+        if (style()->writingMode() != firstRegion->style()->writingMode()) {
+            // The first region defines the principal writing mode for the entire flow.
+            RefPtr<RenderStyle> newStyle = RenderStyle::clone(style());
+            newStyle->setWritingMode(firstRegion->style()->writingMode());
+            setStyle(newStyle);
+        }
+    }
 }
 
 RenderObject* RenderNamedFlowThread::nextRendererForNode(Node* node) const
@@ -244,6 +256,9 @@ void RenderNamedFlowThread::addRegionToNamedFlowThread(RenderRegion* renderRegio
 
     renderRegion->setIsValid(true);
     addRegionToList(m_regionList, renderRegion);
+
+    if (m_regionList.first() == renderRegion)
+        updateWritingMode();
 }
 
 void RenderNamedFlowThread::addRegionToThread(RenderRegion* renderRegion)
@@ -283,6 +298,7 @@ void RenderNamedFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
     }
 
     ASSERT(m_regionList.contains(renderRegion));
+    bool wasFirst = m_regionList.first() == renderRegion;
     m_regionList.remove(renderRegion);
 
     if (canBeDestroyed())
@@ -291,8 +307,16 @@ void RenderNamedFlowThread::removeRegionFromThread(RenderRegion* renderRegion)
     // After removing all the regions in the flow the following layout needs to dispatch the regionLayoutUpdate event
     if (m_regionList.isEmpty())
         setDispatchRegionLayoutUpdateEvent(true);
+    else if (wasFirst)
+        updateWritingMode();
 
     invalidateRegions();
+}
+
+void RenderNamedFlowThread::regionChangedWritingMode(RenderRegion* region)
+{
+    if (m_regionList.first() == region)
+        updateWritingMode();
 }
 
 void RenderNamedFlowThread::computeOversetStateForRegions(LayoutUnit oldClientAfterEdge)
@@ -455,18 +479,15 @@ const AtomicString& RenderNamedFlowThread::flowThreadName() const
 
 bool RenderNamedFlowThread::isChildAllowed(RenderObject* child, RenderStyle* style) const
 {
-    ASSERT(child);
-    ASSERT(style);
-
     if (!child->node())
         return true;
 
     ASSERT(child->node()->isElementNode());
-    RenderObject* parentRenderer = NodeRenderingContext(child->node()).parentRenderer();
-    if (!parentRenderer)
+    Node* originalParent = NodeRenderingTraversal::parent(child->node());
+    if (!originalParent || !originalParent->renderer())
         return true;
 
-    return parentRenderer->isChildAllowed(child, style);
+    return originalParent->renderer()->isChildAllowed(child, style);
 }
 
 void RenderNamedFlowThread::dispatchRegionLayoutUpdateEvent()

@@ -167,6 +167,7 @@ my %nonWrapperTypes = ("CompareHow" => 1,
                        "DOMTimeStamp" => 1,
                        "Dictionary" => 1,
                        "EventListener" => 1,
+                       "EventHandler" => 1,
                        "MediaQueryListListener" => 1,
                        "NodeFilter" => 1,
                        "SerializedScriptValue" => 1,
@@ -420,14 +421,14 @@ sub AddIncludesForType
     return if SkipIncludeHeader($type);
 
     # Default includes
-    if ($type eq "EventListener") {
+    if ($type eq "EventListener" or $type eq "EventHandler") {
         AddToImplIncludes("core/dom/EventListener.h");
     } elsif ($type eq "SerializedScriptValue") {
         AddToImplIncludes("bindings/v8/SerializedScriptValue.h");
     } elsif ($type eq "any" || IsCallbackFunctionType($type)) {
         AddToImplIncludes("bindings/v8/ScriptValue.h");
-    } elsif ($type eq "ArrayBuffer") {
-        AddToImplIncludes("bindings/v8/custom/V8ArrayBufferCustom.h");
+    } elsif (IsTypedArrayType($type)) {
+        AddToImplIncludes("bindings/v8/custom/V8${type}Custom.h");
     } else {
         AddToImplIncludes("V8${type}.h");
     }
@@ -439,7 +440,7 @@ sub HeaderFilesForInterface
     my $implClassName = shift;
 
     my @includes = ();
-    if (IsTypedArrayType($interfaceName) or $interfaceName eq "ArrayBuffer") {
+    if (IsTypedArrayType($interfaceName)) {
         push(@includes, "wtf/${interfaceName}.h");
     } elsif (!SkipIncludeHeader($interfaceName)) {
         my $idlFilename = IDLFileForInterface($interfaceName) or die("Could NOT find IDL file for interface \"$interfaceName\" $!\n");
@@ -912,17 +913,6 @@ END
     }
 }
 
-sub HasEventListenerAttribute
-{
-    my $interface = shift;
-
-    foreach my $attribute (@{$interface->attributes}) {
-        return 1 if $attribute->type eq "EventListener";
-    }
-
-    return 0;
-}
-
 sub GetInternalFields
 {
     my $interface = shift;
@@ -930,7 +920,7 @@ sub GetInternalFields
     my @customInternalFields = ();
     # Event listeners on DOM nodes are explicitly supported in the GC controller.
     if (!InheritsInterface($interface, "Node") &&
-        (InheritsInterface($interface, "EventTarget") || HasEventListenerAttribute($interface))) {
+        InheritsInterface($interface, "EventTarget")) {
         push(@customInternalFields, "eventListenerCacheIndex");
     }
     return @customInternalFields;
@@ -1434,7 +1424,7 @@ END
     $getterString = "${functionName}(" . join(", ", @arguments) . ")";
 
     my $expression;
-    if ($attribute->type eq "EventListener" && $interface->name eq "Window") {
+    if ($attribute->type eq "EventHandler" && $interface->name eq "Window") {
         $code .= "    if (!imp->document())\n";
         $code .= "        return;\n";
     }
@@ -1568,7 +1558,7 @@ END
     v8SetReturnValue(info, value);
     return;
 END
-    } elsif ($attribute->type eq "EventListener") {
+    } elsif ($attribute->type eq "EventHandler") {
         AddToImplIncludes("bindings/v8/V8AbstractEventListener.h");
         my $getterFunc = ToMethodName($attribute->name);
         # FIXME: Pass the main world ID for main-world-only getters.
@@ -1673,8 +1663,15 @@ sub GenerateCustomElementInvocationScopeIfNeeded
 {
     my $code = "";
     my $ext = shift;
+    my $annotation = $ext->{"CustomElementCallbacks"} || "";
 
-    if ($ext->{"DeliverCustomElementCallbacks"} or $ext->{"Reflect"}) {
+    if ($annotation eq "None") {
+        # Explicit CustomElementCallbacks=None overrides any other
+        # heuristic.
+        return $code;
+    }
+
+    if ($annotation eq "Enable" or $ext->{"Reflect"}) {
         AddToImplIncludes("core/dom/CustomElementCallbackDispatcher.h");
         $code .= <<END;
     CustomElementCallbackDispatcher::CallbackDeliveryScope deliveryScope;
@@ -1802,7 +1799,7 @@ END
     }
 
     my $nativeType = GetNativeType($attribute->type, $attribute->extendedAttributes, "parameter");
-    if ($attribute->type eq "EventListener") {
+    if ($attribute->type eq "EventHandler") {
         if ($interface->name eq "Window") {
             $code .= "    if (!imp->document())\n";
             $code .= "        return;\n";
@@ -1841,9 +1838,12 @@ END
         $code .= "    ExceptionState es(info.GetIsolate());\n";
     }
 
-    if ($attribute->type eq "EventListener") {
+    if ($attribute->type eq "EventHandler") {
         my $implSetterFunctionName = FirstLetterToUpperCase($attrName);
         AddToImplIncludes("bindings/v8/V8AbstractEventListener.h");
+        # Non callable input should be treated as null
+        $code .= "    if (!value->IsNull() && !value->IsFunction())\n";
+        $code .= "        value = v8::Null(info.GetIsolate());\n";
         if (!InheritsInterface($interface, "Node")) {
             my $attrImplName = GetImplName($attribute);
             $code .= "    transferHiddenDependency(info.Holder(), imp->${attrImplName}(isolatedWorldForIsolate(info.GetIsolate())), value, ${v8ClassName}::eventListenerCacheIndex, info.GetIsolate());\n";
@@ -2326,11 +2326,19 @@ sub GenerateParametersCheck
                 $parameterCheckString .= "        $parameterName = ${v8ClassName}::create(args[$paramIndex], getScriptExecutionContext());\n";
                 $parameterCheckString .= "    }\n";
             } else {
-                $parameterCheckString .= "    if (args.Length() <= $paramIndex || !args[$paramIndex]->IsFunction()) {\n";
+                $parameterCheckString .= "    if (args.Length() <= $paramIndex || ";
+                if ($parameter->isNullable) {
+                    $parameterCheckString .= "!(args[$paramIndex]->IsFunction() || args[$paramIndex]->IsNull())";
+                } else {
+                    $parameterCheckString .= "!args[$paramIndex]->IsFunction()";
+                }
+                $parameterCheckString .= ") {\n";
                 $parameterCheckString .= "        throwTypeError(args.GetIsolate());\n";
                 $parameterCheckString .= "        return;\n";
                 $parameterCheckString .= "    }\n";
-                $parameterCheckString .= "    RefPtr<" . $parameter->type . "> $parameterName = ${v8ClassName}::create(args[$paramIndex], getScriptExecutionContext());\n";
+                $parameterCheckString .= "    RefPtr<" . $parameter->type . "> $parameterName = ";
+                $parameterCheckString .= "args[$paramIndex]->IsNull() ? 0 : " if $parameter->isNullable;
+                $parameterCheckString .= "${v8ClassName}::create(args[$paramIndex], getScriptExecutionContext());\n";
             }
         } elsif ($parameter->extendedAttributes->{"Clamp"}) {
                 my $nativeValue = "${parameterName}NativeValue";
@@ -2725,24 +2733,6 @@ END
 
 END
     $implementation{nameSpaceWebCore}->add($code);
-}
-
-sub GenerateTypedArrayConstructor
-{
-    my $interface = shift;
-    my $implClassName = GetImplName($interface);
-    my $v8ClassName = GetV8ClassName($interface);
-
-    my ($nativeType, $arrayType) = GetNativeTypeOfTypedArray($interface);
-    AddToImplIncludes("bindings/v8/custom/V8ArrayBufferViewCustom.h");
-
-    $implementation{nameSpaceInternal}->add(<<END);
-static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-    return constructWebGLArray<$implClassName, ${v8ClassName}, $nativeType>(args, &${v8ClassName}::info, $arrayType);
-}
-
-END
 }
 
 sub GenerateNamedConstructor
@@ -3921,7 +3911,7 @@ END
             next;
         }
 
-        if ($attrType eq "EventListener" && $interfaceName eq "Window") {
+        if ($attrType eq "EventHandler" && $interfaceName eq "Window") {
             $attrExt->{"OnProto"} = 1;
         }
 
@@ -4149,8 +4139,6 @@ END
             GenerateConstructor($interface);
         } elsif (IsConstructorTemplate($interface, "Event")) {
             GenerateEventConstructor($interface);
-        } elsif (IsConstructorTemplate($interface, "TypedArray")) {
-            GenerateTypedArrayConstructor($interface);
         }
     }
     if (IsConstructable($interface)) {
@@ -5033,8 +5021,8 @@ sub GetNativeType
 
     die "UnionType is not supported" if IsUnionType($type);
 
-    if ($type eq "ArrayBuffer") {
-        return $isParameter ? "ArrayBuffer*" : "RefPtr<ArrayBuffer>";
+    if (IsTypedArrayType($type)) {
+        return $isParameter ? "${type}*" : "RefPtr<${type}>";
     }
 
     # We need to check [ImplementedAs] extended attribute for wrapper types.
@@ -5162,9 +5150,9 @@ sub JSValueToNative
         return "V8DOMWrapper::isDOMWrapper($value) ? toWrapperTypeInfo(v8::Handle<v8::Object>::Cast($value))->toEventTarget(v8::Handle<v8::Object>::Cast($value)) : 0";
     }
 
-    if ($type eq "ArrayBuffer") {
+    if (IsTypedArrayType($type)) {
         AddIncludesForType($type);
-        return "$value->IsArrayBuffer() ? V8ArrayBuffer::toNative(v8::Handle<v8::ArrayBuffer>::Cast($value)) : 0"
+        return "$value->Is${type}() ? V8${type}::toNative(v8::Handle<v8::${type}>::Cast($value)) : 0"
     }
 
     if ($type eq "XPathNSResolver") {
@@ -5198,7 +5186,7 @@ sub CreateCustomSignature
     foreach my $parameter (@{$function->parameters}) {
         if ($first) { $first = 0; }
         else { $code .= ", "; }
-        if (IsWrapperType($parameter->type) && $parameter->type ne "ArrayBuffer") {
+        if (IsWrapperType($parameter->type) && not IsTypedArrayType($parameter->type)) {
             if ($parameter->type eq "XPathNSResolver") {
                 # Special case for XPathNSResolver.  All other browsers accepts a callable,
                 # so, even though it's against IDL, accept objects here.
@@ -5287,7 +5275,7 @@ sub IsCallbackInterface
 {
     my $type = shift;
     return 0 unless IsWrapperType($type);
-    return 0 if $type eq "ArrayBuffer";
+    return 0 if IsTypedArrayType($type);
 
     my $idlFile = IDLFileForInterface($type)
         or die("Could NOT find IDL file for interface \"$type\"!\n");

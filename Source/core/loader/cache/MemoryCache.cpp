@@ -30,6 +30,7 @@
 #include "core/loader/cache/ResourcePtr.h"
 #include "core/page/FrameView.h"
 #include "core/platform/Logging.h"
+#include "core/platform/chromium/TraceEvent.h"
 #include "core/workers/WorkerGlobalScope.h"
 #include "core/workers/WorkerLoaderProxy.h"
 #include "core/workers/WorkerThread.h"
@@ -151,7 +152,7 @@ unsigned MemoryCache::liveCapacity() const
 void MemoryCache::pruneLiveResources()
 {
     unsigned capacity = liveCapacity();
-    if (capacity && m_liveSize <= capacity)
+    if (!m_liveSize || (capacity && m_liveSize <= capacity))
         return;
 
     unsigned targetSize = static_cast<unsigned>(capacity * cTargetPrunePercentage); // Cut by a percentage to avoid immediately pruning again.
@@ -198,7 +199,7 @@ void MemoryCache::pruneLiveResources()
 void MemoryCache::pruneDeadResources()
 {
     unsigned capacity = deadCapacity();
-    if (capacity && m_deadSize <= capacity)
+    if (!m_deadSize || (capacity && m_deadSize <= capacity))
         return;
 
     unsigned targetSize = static_cast<unsigned>(capacity * cTargetPrunePercentage); // Cut by a percentage to avoid immediately pruning again.
@@ -524,7 +525,7 @@ MemoryCache::Statistics MemoryCache::getStatistics()
     for (ResourceMap::iterator i = m_resources.begin(); i != e; ++i) {
         Resource* resource = i->value;
         switch (resource->type()) {
-        case Resource::ImageResource:
+        case Resource::Image:
             stats.images.addResource(resource);
             break;
         case Resource::CSSStyleSheet:
@@ -536,7 +537,7 @@ MemoryCache::Statistics MemoryCache::getStatistics()
         case Resource::XSLStyleSheet:
             stats.xslStyleSheets.addResource(resource);
             break;
-        case Resource::FontResource:
+        case Resource::Font:
             stats.fonts.addResource(resource);
             break;
         default:
@@ -559,6 +560,7 @@ void MemoryCache::evictResources()
 
 void MemoryCache::prune()
 {
+    TRACE_EVENT0("renderer", "MemoryCache::prune()");
     if (m_liveSize + m_deadSize <= m_capacity && m_maxDeadCapacity && m_deadSize <= m_maxDeadCapacity) // Fast path.
         return;
     if (m_inPruneResources)

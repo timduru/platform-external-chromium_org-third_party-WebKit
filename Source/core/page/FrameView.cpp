@@ -883,7 +883,15 @@ void FrameView::layout(bool allowSubtree)
             m_inSynchronousPostLayout = false;
         }
 
-        document->evaluateMediaQueryList();
+        // Viewport-dependent media queries may cause us to need completely different style information.
+        if (!document->styleResolverIfExists() || document->styleResolverIfExists()->affectedByViewportChange()) {
+            document->styleResolverChanged(DeferRecalcStyle);
+            // FIXME: This instrumentation event is not strictly accurate since cached media query results
+            //        do not persist across StyleResolver rebuilds.
+            InspectorInstrumentation::mediaQueryResultChanged(document);
+        } else {
+            document->evaluateMediaQueryList();
+        }
 
         // If there is any pagination to apply, it will affect the RenderView's style, so we should
         // take care of that now.
@@ -962,9 +970,9 @@ void FrameView::layout(bool allowSubtree)
                     RenderBox* rootRenderer = document->documentElement() ? document->documentElement()->renderBox() : 0;
                     RenderBox* bodyRenderer = rootRenderer && document->body() ? document->body()->renderBox() : 0;
                     if (bodyRenderer && bodyRenderer->stretchesToViewport())
-                        bodyRenderer->setChildNeedsLayout(true);
+                        bodyRenderer->setChildNeedsLayout();
                     else if (rootRenderer && rootRenderer->stretchesToViewport())
-                        rootRenderer->setChildNeedsLayout(true);
+                        rootRenderer->setChildNeedsLayout();
                 }
             }
         }
@@ -1111,7 +1119,7 @@ void FrameView::layoutLazyBlocks()
     for (RenderLazyBlock* block = renderView()->firstLazyBlock(); block; block = block->next()) {
         if (!block->isNested())
             continue;
-        block->setNeedsLayout(true);
+        block->setNeedsLayout();
         layout();
     }
 }
@@ -1561,7 +1569,7 @@ void FrameView::setViewportConstrainedObjectsNeedLayout()
     ViewportConstrainedObjectSet::const_iterator end = m_viewportConstrainedObjects->end();
     for (ViewportConstrainedObjectSet::const_iterator it = m_viewportConstrainedObjects->begin(); it != end; ++it) {
         RenderObject* renderer = *it;
-        renderer->setNeedsLayout(true);
+        renderer->setNeedsLayout();
     }
 }
 
@@ -1871,7 +1879,7 @@ void FrameView::scheduleRelayout()
     // When frame seamless is enabled, the contents of the frame could affect the layout of the parent frames.
     // Also invalidate parent frame starting from the owner element of this frame.
     if (m_frame->ownerRenderer() && frame()->document()->shouldDisplaySeamlesslyWithParent())
-        m_frame->ownerRenderer()->setNeedsLayout(true, MarkContainingBlockChain);
+        m_frame->ownerRenderer()->setNeedsLayout(MarkContainingBlockChain);
 
     int delay = m_frame->document()->minimumLayoutDelay();
     if (m_layoutTimer.isActive() && m_delayedLayout && !delay)
@@ -1962,7 +1970,7 @@ void FrameView::setNeedsLayout()
     }
 
     if (RenderView* renderView = this->renderView())
-        renderView->setNeedsLayout(true);
+        renderView->setNeedsLayout();
 }
 
 void FrameView::unscheduleRelayout()
@@ -2232,12 +2240,6 @@ void FrameView::performPostLayoutTasks()
 
     m_actionScheduler->resume();
 
-    // Viewport-dependent media queries may cause us to need completely different style information.
-    if (m_frame->document()->styleResolver()->affectedByViewportChange()) {
-        m_frame->document()->styleResolverChanged(DeferRecalcStyle);
-        InspectorInstrumentation::mediaQueryResultChanged(m_frame->document());
-    }
-
     // Refetch render view since it can be destroyed by updateWidget() call above.
     renderView = this->renderView();
     if (renderView && !renderView->printing()) {
@@ -2451,7 +2453,7 @@ IntRect FrameView::windowClipRectForFrameOwner(const HTMLFrameOwnerElement* owne
 bool FrameView::isActive() const
 {
     Page* page = frame()->page();
-    return page && page->focusController()->isActive();
+    return page && page->focusController().isActive();
 }
 
 void FrameView::scrollTo(const IntSize& newOffset)

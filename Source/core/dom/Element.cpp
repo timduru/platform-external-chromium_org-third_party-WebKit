@@ -1238,22 +1238,32 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
     if (isUpgradedCustomElement() && inDocument())
         CustomElement::didEnterDocument(this, document());
 
-    TreeScope* scope = insertionPoint->treeScope();
-    if (scope != treeScope())
+    if (insertionPoint->treeScope() != treeScope())
         return InsertionDone;
 
+    HTMLDocument* newDocument = inDocument() && !isInShadowTree() && document()->isHTMLDocument() ? toHTMLDocument(document()) : 0;
+
     const AtomicString& idValue = getIdAttribute();
-    if (!idValue.isNull())
-        updateId(scope, nullAtom, idValue);
+    if (!idValue.isNull()) {
+        updateIdForTreeScope(treeScope(), nullAtom, idValue);
+        if (newDocument)
+            updateIdForDocument(newDocument, nullAtom, idValue);
+    }
 
     const AtomicString& nameValue = getNameAttribute();
-    if (!nameValue.isNull())
-        updateName(nullAtom, nameValue);
+    if (!nameValue.isNull()) {
+        updateNameForTreeScope(treeScope(), nullAtom, nameValue);
+        if (newDocument)
+            updateNameForDocument(newDocument, nullAtom, nameValue);
+    }
 
     if (hasTagName(labelTag)) {
-        if (scope->shouldCacheLabelsByForAttribute())
-            updateLabel(scope, nullAtom, fastGetAttribute(forAttr));
+        if (treeScope()->shouldCacheLabelsByForAttribute())
+            updateLabel(treeScope(), nullAtom, fastGetAttribute(forAttr));
     }
+
+    if (parentElement() && parentElement()->isInCanvasSubtree())
+        setIsInCanvasSubtree(true);
 
     return InsertionDone;
 }
@@ -1261,6 +1271,7 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
 void Element::removedFrom(ContainerNode* insertionPoint)
 {
     bool wasInDocument = insertionPoint->inDocument();
+    bool wasInShadowTree = isInShadowTree(); // Of course, we might still be in a shadow tree...
 
     if (Element* before = pseudoElement(BEFORE))
         before->removedFrom(insertionPoint);
@@ -1281,22 +1292,31 @@ void Element::removedFrom(ContainerNode* insertionPoint)
     setSavedLayerScrollOffset(IntSize());
 
     if (insertionPoint->isInTreeScope() && treeScope() == document()) {
+        TreeScope* oldScope = insertionPoint->treeScope();
+        HTMLDocument* oldDocument = wasInDocument && !wasInShadowTree && oldScope->documentScope()->isHTMLDocument() ? toHTMLDocument(oldScope->documentScope()) : 0;
+
         const AtomicString& idValue = getIdAttribute();
-        if (!idValue.isNull())
-            updateId(insertionPoint->treeScope(), idValue, nullAtom);
+        if (!idValue.isNull()) {
+            updateIdForTreeScope(oldScope, idValue, nullAtom);
+            if (oldDocument)
+                updateIdForDocument(oldDocument, idValue, nullAtom);
+        }
 
         const AtomicString& nameValue = getNameAttribute();
-        if (!nameValue.isNull())
-            updateName(nameValue, nullAtom);
+        if (!nameValue.isNull()) {
+            updateNameForTreeScope(oldScope, nameValue, nullAtom);
+            if (oldDocument)
+                updateNameForDocument(oldDocument, nameValue, nullAtom);
+        }
 
         if (hasTagName(labelTag)) {
-            TreeScope* treeScope = insertionPoint->treeScope();
-            if (treeScope->shouldCacheLabelsByForAttribute())
-                updateLabel(treeScope, fastGetAttribute(forAttr), nullAtom);
+            if (oldScope->shouldCacheLabelsByForAttribute())
+                updateLabel(oldScope, fastGetAttribute(forAttr), nullAtom);
         }
     }
 
     ContainerNode::removedFrom(insertionPoint);
+
     if (wasInDocument) {
         if (hasPendingResources())
             document()->accessSVGExtensions()->removeElementFromPendingResources(this);
@@ -1304,11 +1324,9 @@ void Element::removedFrom(ContainerNode* insertionPoint)
         if (isUpgradedCustomElement())
             CustomElement::didLeaveDocument(this, insertionPoint->document());
     }
-}
 
-void Element::createRendererIfNeeded(const AttachContext& context)
-{
-    NodeRenderingContext(this, context.resolvedStyle).createRendererForElementIfNeeded();
+    if (hasRareData())
+        elementRareData()->setIsInCanvasSubtree(false);
 }
 
 void Element::attach(const AttachContext& context)
@@ -1317,10 +1335,7 @@ void Element::attach(const AttachContext& context)
     StyleResolverParentPusher parentPusher(this);
     WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
 
-    createRendererIfNeeded(context);
-
-    if (parentElement() && parentElement()->isInCanvasSubtree())
-        setIsInCanvasSubtree(true);
+    NodeRenderingContext(this, context.resolvedStyle).createRendererForElementIfNeeded();
 
     createPseudoElementIfNeeded(BEFORE);
 
@@ -1368,10 +1383,13 @@ void Element::detach(const AttachContext& context)
         data->setPseudoElement(BEFORE, 0);
         data->setPseudoElement(AFTER, 0);
         data->setPseudoElement(BACKDROP, 0);
-        data->setIsInCanvasSubtree(false);
-        data->resetComputedStyle();
+        data->clearComputedStyle();
         data->resetDynamicRestyleObservations();
         data->setIsInsideRegion(false);
+
+        // Only clear the style state if we're not going to reuse the style from recalcStyle.
+        if (!context.resolvedStyle)
+            data->resetStyleState();
 
         if (RuntimeEnabledFeatures::webAnimationsCSSEnabled() && !context.performingReattach) {
             if (ActiveAnimations* activeAnimations = data->activeAnimations())
@@ -1449,17 +1467,16 @@ bool Element::recalcStyle(StyleChange change)
     bool hasDirectAdjacentRules = childrenAffectedByDirectAdjacentRules();
     bool hasIndirectAdjacentRules = childrenAffectedByForwardPositionalRules();
 
-    if (change > NoChange || needsStyleRecalc()) {
-        if (hasRareData())
-            elementRareData()->resetComputedStyle();
+    if (hasRareData() && (change > NoChange || needsStyleRecalc())) {
+        ElementRareData* data = elementRareData();
+        data->resetStyleState();
+        data->clearComputedStyle();
     }
+
     if (hasParentStyle && (change >= Inherit || needsStyleRecalc())) {
         StyleChange localChange = Detach;
         RefPtr<RenderStyle> newStyle;
         if (currentStyle) {
-            // FIXME: This still recalcs style twice when changing display types, but saves
-            // us from recalcing twice when going from none -> anything else which is more
-            // common, especially during lazy attach.
             newStyle = styleForRenderer();
             localChange = Node::diff(currentStyle.get(), newStyle.get(), document());
         } else if (attached() && isActiveInsertionPoint(this)) {
@@ -1471,10 +1488,6 @@ bool Element::recalcStyle(StyleChange change)
             AttachContext reattachContext;
             reattachContext.resolvedStyle = newStyle.get();
             reattach(reattachContext);
-
-            // attach recalculates the style for all children. No need to do it twice.
-            clearNeedsStyleRecalc();
-            clearChildNeedsStyleRecalc();
 
             if (hasCustomStyleCallbacks())
                 didRecalcStyle(change);
@@ -1632,20 +1645,15 @@ ShadowRoot* Element::ensureUserAgentShadowRoot()
     return shadowRoot;
 }
 
+Element* Element::uaShadowElementById(const AtomicString& id) const
+{
+    ShadowRoot* shadowRoot = userAgentShadowRoot();
+    return shadowRoot ? shadowRoot->getElementById(id) : 0;
+}
+
 bool Element::supportsShadowElementForUserAgentShadow() const
 {
     return true;
-}
-
-// FIXME: After replacing all internal shadowPseudoId with shadowPartId, remove this method.
-const AtomicString& Element::shadowPseudoId() const
-{
-    return pseudo();
-}
-
-const AtomicString& Element::shadowPartId() const
-{
-    return part();
 }
 
 bool Element::childTypeAllowed(NodeType type) const
@@ -2030,7 +2038,7 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
         // If a focus event handler changes the focus to a different node it
         // does not make sense to continue and update appearence.
         protect = this;
-        if (!page->focusController()->setFocusedElement(this, doc->frame(), direction))
+        if (!page->focusController().setFocusedElement(this, doc->frame(), direction))
             return;
     }
 
@@ -2073,8 +2081,8 @@ void Element::blur()
     cancelFocusAppearanceUpdate();
     if (treeScope()->adjustedFocusedElement() == this) {
         Document* doc = document();
-        if (doc->frame())
-            doc->frame()->page()->focusController()->setFocusedElement(0, doc->frame());
+        if (doc->page())
+            doc->page()->focusController().setFocusedElement(0, doc->frame());
         else
             doc->setFocusedElement(0);
     }
@@ -2182,15 +2190,10 @@ String Element::textFromChildren()
     return content.toString();
 }
 
-// FIXME: pseudo should be deprecated after all pseudo is replaced with ::part.
+// pseudo is used via shadowPseudoId.
 const AtomicString& Element::pseudo() const
 {
     return getAttribute(pseudoAttr);
-}
-
-void Element::setPseudo(const AtomicString& value)
-{
-    setAttribute(pseudoAttr, value);
 }
 
 const AtomicString& Element::part() const
@@ -2763,19 +2766,47 @@ bool Element::hasNamedNodeMap() const
 }
 #endif
 
-inline void Element::updateName(const AtomicString& oldName, const AtomicString& newName)
+void Element::updateName(const AtomicString& oldName, const AtomicString& newName)
 {
-    if (!inDocument() || isInShadowTree())
+    if (!isInTreeScope())
         return;
 
     if (oldName == newName)
         return;
 
+    updateNameForTreeScope(treeScope(), oldName, newName);
+
+    if (!inDocument() || isInShadowTree())
+        return;
+
+    Document* htmlDocument = document();
+    if (!htmlDocument->isHTMLDocument())
+        return;
+
+    updateNameForDocument(toHTMLDocument(htmlDocument), oldName, newName);
+}
+
+void Element::updateNameForTreeScope(TreeScope* scope, const AtomicString& oldName, const AtomicString& newName)
+{
+    ASSERT(isInTreeScope());
+    ASSERT(oldName != newName);
+
+    if (!oldName.isEmpty())
+        scope->removeElementByName(oldName, this);
+    if (!newName.isEmpty())
+        scope->addElementByName(newName, this);
+}
+
+void Element::updateNameForDocument(HTMLDocument* document, const AtomicString& oldName, const AtomicString& newName)
+{
+    ASSERT(inDocument() && !isInShadowTree());
+    ASSERT(oldName != newName);
+
     if (shouldRegisterAsNamedItem())
         updateNamedItemRegistration(oldName, newName);
 }
 
-inline void Element::updateId(const AtomicString& oldId, const AtomicString& newId)
+void Element::updateId(const AtomicString& oldId, const AtomicString& newId)
 {
     if (!isInTreeScope())
         return;
@@ -2783,10 +2814,19 @@ inline void Element::updateId(const AtomicString& oldId, const AtomicString& new
     if (oldId == newId)
         return;
 
-    updateId(treeScope(), oldId, newId);
+    updateIdForTreeScope(treeScope(), oldId, newId);
+
+    if (!inDocument() || isInShadowTree())
+        return;
+
+    Document* htmlDocument = document();
+    if (!htmlDocument->isHTMLDocument())
+        return;
+
+    updateIdForDocument(toHTMLDocument(htmlDocument), oldId, newId);
 }
 
-inline void Element::updateId(TreeScope* scope, const AtomicString& oldId, const AtomicString& newId)
+void Element::updateIdForTreeScope(TreeScope* scope, const AtomicString& oldId, const AtomicString& newId)
 {
     ASSERT(isInTreeScope());
     ASSERT(oldId != newId);
@@ -2795,6 +2835,12 @@ inline void Element::updateId(TreeScope* scope, const AtomicString& oldId, const
         scope->removeElementById(oldId, this);
     if (!newId.isEmpty())
         scope->addElementById(newId, this);
+}
+
+void Element::updateIdForDocument(HTMLDocument* document, const AtomicString& oldId, const AtomicString& newId)
+{
+    ASSERT(inDocument() && !isInShadowTree());
+    ASSERT(oldId != newId);
 
     if (shouldRegisterAsExtraNamedItem())
         updateExtraNamedItemRegistration(oldId, newId);
@@ -2885,8 +2931,7 @@ void Element::didMoveToNewDocument(Document* oldDocument)
 
 void Element::updateNamedItemRegistration(const AtomicString& oldName, const AtomicString& newName)
 {
-    if (!document()->isHTMLDocument())
-        return;
+    ASSERT(document()->isHTMLDocument());
 
     if (!oldName.isEmpty())
         toHTMLDocument(document())->removeNamedItem(oldName);
@@ -2897,8 +2942,7 @@ void Element::updateNamedItemRegistration(const AtomicString& oldName, const Ato
 
 void Element::updateExtraNamedItemRegistration(const AtomicString& oldId, const AtomicString& newId)
 {
-    if (!document()->isHTMLDocument())
-        return;
+    ASSERT(document()->isHTMLDocument());
 
     if (!oldId.isEmpty())
         toHTMLDocument(document())->removeExtraNamedItem(oldId);
@@ -3035,6 +3079,10 @@ void Element::cloneAttributesFromElement(const Element& other)
         m_elementData.clear();
         return;
     }
+
+    // We can't update window and document's named item maps since the presence of image and object elements depend on other attributes and children.
+    // Fortunately, those named item maps are only updated when this element is in the document, which should never be the case.
+    ASSERT(!inDocument());
 
     const AtomicString& oldID = getIdAttribute();
     const AtomicString& newID = other.getIdAttribute();

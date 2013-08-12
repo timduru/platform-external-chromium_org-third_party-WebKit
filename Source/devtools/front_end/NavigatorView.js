@@ -58,6 +58,7 @@ WebInspector.NavigatorView = function()
     this._rootNode.populate();
 
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.InspectedURLChanged, this._inspectedURLChanged, this);
+    this.element.addEventListener("contextmenu", this.handleContextMenu.bind(this), false);
 }
 
 WebInspector.NavigatorView.Events = {
@@ -239,23 +240,58 @@ WebInspector.NavigatorView.prototype = {
         this._rootNode.reset();
     },
 
-    handleContextMenu: function(event, uiSourceCode)
+    /**
+     * @param {Event} event
+     */
+    handleContextMenu: function(event)
     {
         var contextMenu = new WebInspector.ContextMenu(event);
-        contextMenu.appendApplicableItems(uiSourceCode);
+        this._appendAddFolderItem(contextMenu);
         contextMenu.show();
     },
 
+    /**
+     * @param {WebInspector.ContextMenu} contextMenu
+     */
+    _appendAddFolderItem: function(contextMenu)
+    {
+        function addFolder()
+        {
+            WebInspector.isolatedFileSystemManager.addFileSystem();
+        }
+
+        var addFolderLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Add folder to workspace" : "Add Folder to Workspace");
+        contextMenu.appendItem(addFolderLabel, addFolder);
+    },
+
+    /**
+     * @param {Event} event
+     * @param {WebInspector.UISourceCode} uiSourceCode
+     */
+    handleFileContextMenu: function(event, uiSourceCode)
+    {
+        var contextMenu = new WebInspector.ContextMenu(event);
+        contextMenu.appendApplicableItems(uiSourceCode);
+        contextMenu.appendSeparator();
+        this._appendAddFolderItem(contextMenu);
+        contextMenu.show();
+    },
+
+    /**
+     * @param {Event} event
+     * @param {WebInspector.NavigatorFolderTreeNode} node
+     */
     handleFolderContextMenu: function(event, node)
     {
         var contextMenu = new WebInspector.ContextMenu(event);
         var path = "/";
-        while (node.parent !== this._rootNode) {
-            path = "/" + node.id + path;
-            node = node.parent;
+        var projectNode = node;
+        while (projectNode.parent !== this._rootNode) {
+            path = "/" + projectNode.id + path;
+            projectNode = projectNode.parent;
         }
 
-        var project = node._project;
+        var project = projectNode._project;
 
         if (project.type() === WebInspector.projectTypes.FileSystem) {
             function refresh()
@@ -274,10 +310,26 @@ WebInspector.NavigatorView.prototype = {
             contextMenu.appendItem(WebInspector.UIString("Refresh"), refresh.bind(this));
             contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "New file" : "New File"), create.bind(this));
         }
+        contextMenu.appendSeparator();
+        this._appendAddFolderItem(contextMenu);
+        if (project.type() === WebInspector.projectTypes.FileSystem && node === projectNode) {
+            function removeFolder()
+            {
+                var shouldRemove = window.confirm(WebInspector.UIString("Are you sure you want to remove this folder?"));
+                if (shouldRemove)
+                    project.remove();
+            }
+
+            var removeFolderLabel = WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Remove folder from workspace" : "Remove Folder from Workspace");
+            contextMenu.appendItem(removeFolderLabel, removeFolder);
+        }
 
         contextMenu.show();
     },
 
+    /**
+     * @param {Event} event
+     */
    _treeKeyPress: function(event)
    {
         if (WebInspector.isBeingEdited(this._scriptsTree.childrenListElement))
@@ -617,7 +669,7 @@ WebInspector.NavigatorSourceTreeElement.prototype = {
     _handleContextMenuEvent: function(event)
     {
         this.select();
-        this._navigatorView.handleContextMenu(event, this._uiSourceCode);
+        this._navigatorView.handleFileContextMenu(event, this._uiSourceCode);
     },
 
     __proto__: WebInspector.BaseNavigatorTreeElement.prototype

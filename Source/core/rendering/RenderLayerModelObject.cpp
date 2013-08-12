@@ -145,7 +145,7 @@ void RenderLayerModelObject::styleDidChange(StyleDifference diff, const RenderSt
     if (requiresLayer()) {
         if (!layer() && layerCreationAllowedForSubtree()) {
             if (s_wasFloating && isFloating())
-                setChildNeedsLayout(true);
+                setChildNeedsLayout();
             ensureLayer();
             if (parent() && !needsLayout() && containingBlock()) {
                 layer()->setRepaintStatus(NeedsFullRepaint);
@@ -159,7 +159,7 @@ void RenderLayerModelObject::styleDidChange(StyleDifference diff, const RenderSt
         setHasReflection(false);
         layer()->removeOnlyThisLayer(); // calls destroyLayer() which clears m_layer
         if (s_wasFloating && isFloating())
-            setChildNeedsLayout(true);
+            setChildNeedsLayout();
         if (s_hadTransform)
             setNeedsLayoutAndPrefWidthsRecalc();
     }
@@ -167,7 +167,7 @@ void RenderLayerModelObject::styleDidChange(StyleDifference diff, const RenderSt
     if (layer()) {
         layer()->styleChanged(diff, oldStyle);
         if (s_hadLayer && layer()->isSelfPaintingLayer() != s_layerWasSelfPainting)
-            setChildNeedsLayout(true);
+            setChildNeedsLayout();
     }
 
     if (FrameView *frameView = view()->frameView()) {
@@ -184,16 +184,20 @@ void RenderLayerModelObject::styleDidChange(StyleDifference diff, const RenderSt
 
 void RenderLayerModelObject::addLayerHitTestRects(LayerHitTestRects& rects, const RenderLayer* currentLayer, const LayoutPoint& layerOffset, const LayoutRect& containerRect) const
 {
-    // If we have a new layer then our current layer/offset is irrelevant.
-    LayoutPoint adjustedLayerOffset = layerOffset;
-    LayoutRect adjustedContainerRect = containerRect;
     if (hasLayer()) {
-        currentLayer = layer();
-        adjustedLayerOffset = LayoutPoint();
-        adjustedContainerRect = LayoutRect();
+        if (isRenderView()) {
+            // RenderView is handled with a special fast-path, but it needs to know the current layer.
+            RenderObject::addLayerHitTestRects(rects, layer(), LayoutPoint(), LayoutRect());
+        } else {
+            // Since a RenderObject never lives outside it's container RenderLayer, we can switch
+            // to marking entire layers instead. This may sometimes mark more than necessary (when
+            // a layer is made of disjoint objects) but in practice is a significant performance
+            // savings.
+            layer()->addLayerHitTestRects(rects);
+        }
+    } else {
+        RenderObject::addLayerHitTestRects(rects, currentLayer, layerOffset, containerRect);
     }
-
-    RenderObject::addLayerHitTestRects(rects, currentLayer, adjustedLayerOffset, adjustedContainerRect);
 }
 
 } // namespace WebCore

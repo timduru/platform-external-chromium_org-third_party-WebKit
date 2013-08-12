@@ -468,13 +468,12 @@ void XMLHttpRequest::open(const String& method, const KURL& url, bool async, Exc
     }
 
     if (!isAllowedHTTPMethod(method)) {
-        es.throwDOMException(SecurityError);
+        es.throwDOMException(SecurityError, "'XMLHttpRequest.open' does not support the '" + method + "' method.");
         return;
     }
 
     if (!ContentSecurityPolicy::shouldBypassMainWorld(scriptExecutionContext()) && !scriptExecutionContext()->contentSecurityPolicy()->allowConnectToSource(url)) {
-        // FIXME: Should this be throwing an exception?
-        es.throwDOMException(SecurityError);
+        es.throwDOMException(SecurityError, "Refused to connect to '" + url.elidedString() + "' because it violates the document's Content Security Policy.");
         return;
     }
 
@@ -595,7 +594,7 @@ void XMLHttpRequest::send(const String& body, ExceptionState& es)
     if (!body.isNull() && areMethodAndURLValidForSend()) {
         String contentType = getRequestHeader("Content-Type");
         if (contentType.isEmpty()) {
-            setRequestHeaderInternal("Content-Type", "application/xml");
+            setRequestHeaderInternal("Content-Type", "text/plain;charset=UTF-8");
         } else {
             replaceCharsetInMediaType(contentType, "UTF-8");
             m_requestHeaders.set("Content-Type", contentType);
@@ -647,7 +646,7 @@ void XMLHttpRequest::send(DOMFormData* body, ExceptionState& es)
 
         String contentType = getRequestHeader("Content-Type");
         if (contentType.isEmpty()) {
-            contentType = String(ASCIILiteral("multipart/form-data; boundary=")) + m_requestEntityBody->boundary().data();
+            contentType = String("multipart/form-data; boundary=") + m_requestEntityBody->boundary().data();
             setRequestHeaderInternal("Content-Type", contentType);
         }
     }

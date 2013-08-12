@@ -220,6 +220,13 @@ void WebPluginContainerImpl::clipRectChanged()
     reportGeometry();
 }
 
+void WebPluginContainerImpl::eventListenersRemoved()
+{
+    // We're no longer registered to receive touch events, so don't try to remove
+    // the touch event handlers in our destructor.
+    m_touchEventRequestType = TouchEventRequestTypeNone;
+}
+
 void WebPluginContainerImpl::setParentVisible(bool parentVisible)
 {
     // We override this function to make sure that geometry updates are sent
@@ -847,7 +854,7 @@ void WebPluginContainerImpl::focusPlugin()
 {
     Frame* containingFrame = static_cast<FrameView*>(parent())->frame();
     if (Page* currentPage = containingFrame->page())
-        currentPage->focusController()->setFocusedElement(m_element, containingFrame);
+        currentPage->focusController().setFocusedElement(m_element, containingFrame);
     else
         containingFrame->document()->setFocusedElement(m_element);
 }

@@ -121,9 +121,9 @@ bool HTMLDocument::hasFocus()
     Page* page = this->page();
     if (!page)
         return false;
-    if (!page->focusController()->isActive())
+    if (!page->focusController().isActive() || !page->focusController().isFocused())
         return false;
-    if (Frame* focusedFrame = page->focusController()->focusedFrame()) {
+    if (Frame* focusedFrame = page->focusController().focusedFrame()) {
         if (focusedFrame->tree()->isDescendantOf(frame()))
             return true;
     }
@@ -214,6 +214,11 @@ void HTMLDocument::setVlinkColor(const String& value)
         if (bodyElement->vLink() != value)
             bodyElement->setVLink(value);
     }
+}
+
+PassRefPtr<Document> HTMLDocument::cloneDocumentWithoutChildren()
+{
+    return create();
 }
 
 // --------------------------------------------------------------------------
