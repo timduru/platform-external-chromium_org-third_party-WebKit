@@ -2530,7 +2530,7 @@ IntSize RenderLayer::overhangAmount() const
 bool RenderLayer::isActive() const
 {
     Page* page = renderer()->frame()->page();
-    return page && page->focusController()->isActive();
+    return page && page->focusController().isActive();
 }
 
 static int cornerStart(const RenderStyle* style, int minX, int maxX, int thickness)
@@ -3056,7 +3056,7 @@ void RenderLayer::updateScrollbarsAfterLayout()
             if (!m_inOverflowRelayout) {
                 // Our proprietary overflow: overlay value doesn't trigger a layout.
                 m_inOverflowRelayout = true;
-                renderer()->setNeedsLayout(true, MarkOnlyThis);
+                renderer()->setNeedsLayout(MarkOnlyThis);
                 if (renderer()->isRenderBlock()) {
                     RenderBlock* block = toRenderBlock(renderer());
                     block->scrollbarsChanged(autoHorizontalScrollBarChanged, autoVerticalScrollBarChanged);

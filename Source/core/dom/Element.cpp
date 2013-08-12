@@ -1645,6 +1645,12 @@ ShadowRoot* Element::ensureUserAgentShadowRoot()
     return shadowRoot;
 }
 
+Element* Element::uaShadowElementById(const AtomicString& id) const
+{
+    ShadowRoot* shadowRoot = userAgentShadowRoot();
+    return shadowRoot ? shadowRoot->getElementById(id) : 0;
+}
+
 bool Element::supportsShadowElementForUserAgentShadow() const
 {
     return true;
@@ -2032,7 +2038,7 @@ void Element::focus(bool restorePreviousSelection, FocusDirection direction)
         // If a focus event handler changes the focus to a different node it
         // does not make sense to continue and update appearence.
         protect = this;
-        if (!page->focusController()->setFocusedElement(this, doc->frame(), direction))
+        if (!page->focusController().setFocusedElement(this, doc->frame(), direction))
             return;
     }
 
@@ -2075,8 +2081,8 @@ void Element::blur()
     cancelFocusAppearanceUpdate();
     if (treeScope()->adjustedFocusedElement() == this) {
         Document* doc = document();
-        if (doc->frame())
-            doc->frame()->page()->focusController()->setFocusedElement(0, doc->frame());
+        if (doc->page())
+            doc->page()->focusController().setFocusedElement(0, doc->frame());
         else
             doc->setFocusedElement(0);
     }
