@@ -383,7 +383,6 @@ LOCAL_C_INCLUDES_Debug := \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
 	$(LOCAL_PATH)/third_party/skia/include/gpu \
-	$(LOCAL_PATH)/third_party/skia/include/gpu/gl \
 	$(LOCAL_PATH)/third_party/skia/include/lazy \
 	$(LOCAL_PATH)/third_party/skia/include/pathops \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
@@ -532,7 +531,6 @@ LOCAL_C_INCLUDES_Release := \
 	$(LOCAL_PATH)/third_party/skia/include/effects \
 	$(LOCAL_PATH)/third_party/skia/include/pdf \
 	$(LOCAL_PATH)/third_party/skia/include/gpu \
-	$(LOCAL_PATH)/third_party/skia/include/gpu/gl \
 	$(LOCAL_PATH)/third_party/skia/include/lazy \
 	$(LOCAL_PATH)/third_party/skia/include/pathops \
 	$(LOCAL_PATH)/third_party/skia/include/pipe \
