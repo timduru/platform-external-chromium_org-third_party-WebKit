@@ -1691,6 +1691,7 @@ void WebViewImpl::resize(const WebSize& newSize)
             float viewportWidthRatio = static_cast<float>(newSize.width) / oldSize.width;
             float contentsWidthRatio = static_cast<float>(contentsSize().width()) / oldContentsWidth;
             float scaleMultiplier = viewportWidthRatio / contentsWidthRatio;
+            scaleMultiplier = 1.0f;
 
             IntSize viewportSize = view->visibleContentRect().size();
             if (scaleMultiplier != 1) {
