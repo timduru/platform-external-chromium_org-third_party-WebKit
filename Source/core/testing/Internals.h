@@ -135,8 +135,6 @@ public:
     void setEnableMockPagePopup(bool, ExceptionState&);
     PassRefPtr<PagePopupController> pagePopupController();
 
-    PassRefPtr<ClientRect> unscaledViewportRect(ExceptionState&);
-
     PassRefPtr<ClientRect> absoluteCaretBounds(ExceptionState&);
 
     PassRefPtr<ClientRect> boundingBox(Element*, ExceptionState&);

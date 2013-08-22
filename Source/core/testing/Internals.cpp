@@ -788,17 +788,6 @@ PassRefPtr<PagePopupController> Internals::pagePopupController()
     return s_pagePopupDriver ? s_pagePopupDriver->pagePopupController() : 0;
 }
 
-PassRefPtr<ClientRect> Internals::unscaledViewportRect(ExceptionState& es)
-{
-    Document* document = contextDocument();
-    if (!document || !document->view()) {
-        es.throwDOMException(InvalidAccessError);
-        return ClientRect::create();
-    }
-
-    return ClientRect::create(document->view()->visibleContentRect());
-}
-
 PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionState& es)
 {
     Document* document = contextDocument();
