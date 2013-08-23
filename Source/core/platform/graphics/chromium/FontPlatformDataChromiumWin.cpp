@@ -53,7 +53,7 @@ void FontPlatformData::setupPaint(SkPaint* paint) const
 {
     const float ts = m_size >= 0 ? m_size : 12;
     paint->setTextSize(SkFloatToScalar(m_size));
-    paint->setTypeface(m_typeface);
+    paint->setTypeface(typeface());
 }
 #endif
 
@@ -154,6 +154,7 @@ FontPlatformData::FontPlatformData(float size, bool bold, bool oblique)
     , m_size(size)
     , m_orientation(Horizontal)
     , m_scriptCache(0)
+    , m_typeface(0)
     , m_paintTextFlags(0)
     , m_isHashTableDeletedValue(false)
 {
@@ -181,6 +182,25 @@ FontPlatformData::FontPlatformData(const FontPlatformData& data, float textSize)
 {
 }
 
+FontPlatformData::FontPlatformData(SkTypeface* tf, const char* family, float textSize, bool fakeBold, bool fakeItalic, FontOrientation orientation)
+    : m_font(0)
+    , m_size(textSize)
+    , m_orientation(orientation)
+    , m_scriptCache(0)
+    , m_typeface(tf)
+    , m_isHashTableDeletedValue(false)
+{
+    // FIXME: This can be removed together with m_font once the last few
+    // uses of hfont() has been eliminated.
+    LOGFONT logFont;
+    SkLOGFONTFromTypeface(tf, &logFont);
+    logFont.lfHeight = -textSize;
+    HFONT hFont = CreateFontIndirect(&logFont);
+    if (hFont)
+        m_font = RefCountedHFONT::create(hFont);
+    m_paintTextFlags = computePaintTextFlags(logFont);
+}
+
 FontPlatformData& FontPlatformData::operator=(const FontPlatformData& data)
 {
     if (this != &data) {
@@ -202,6 +222,18 @@ FontPlatformData::~FontPlatformData()
 {
     ScriptFreeCache(&m_scriptCache);
     m_scriptCache = 0;
+}
+
+String FontPlatformData::fontFamilyName() const
+{
+    HWndDC dc(0);
+    HGDIOBJ oldFont = static_cast<HFONT>(SelectObject(dc, hfont()));
+    WCHAR name[LF_FACESIZE];
+    unsigned resultLength = GetTextFace(dc, LF_FACESIZE, name);
+    if (resultLength > 0)
+        resultLength--; // ignore the null terminator
+    SelectObject(dc, oldFont);
+    return String(name, resultLength);
 }
 
 bool FontPlatformData::isFixedPitch() const
@@ -230,7 +262,7 @@ bool FontPlatformData::isFixedPitch() const
 
     return treatAsFixedPitch;
 #else
-    return typeface()->isFixedPitch();
+    return typeface() && typeface()->isFixedPitch();
 #endif
 }
 

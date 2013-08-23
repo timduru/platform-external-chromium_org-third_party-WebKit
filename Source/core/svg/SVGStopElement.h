@@ -21,6 +21,7 @@
 #ifndef SVGStopElement_h
 #define SVGStopElement_h
 
+#include "SVGNames.h"
 #include "core/svg/SVGAnimatedNumber.h"
 #include "core/svg/SVGElement.h"
 
@@ -49,10 +50,10 @@ private:
     END_DECLARE_ANIMATED_PROPERTIES
 };
 
-inline SVGStopElement* toSVGStopElement(SVGElement* element)
+inline SVGStopElement* toSVGStopElement(Node* node)
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!element || element->isGradientStop());
-    return static_cast<SVGStopElement*>(element);
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || toSVGElement(node)->isGradientStop());
+    return static_cast<SVGStopElement*>(node);
 }
 
 } // namespace WebCore

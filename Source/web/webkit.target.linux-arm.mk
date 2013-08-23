@@ -74,7 +74,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/AssertMatchingEnums.cpp \
 	third_party/WebKit/Source/web/AssociatedURLLoader.cpp \
 	third_party/WebKit/Source/web/AsyncFileSystemChromium.cpp \
-	third_party/WebKit/Source/web/AsyncFileWriterChromium.cpp \
 	third_party/WebKit/Source/web/AutofillPopupMenuClient.cpp \
 	third_party/WebKit/Source/web/BackForwardClientImpl.cpp \
 	third_party/WebKit/Source/web/ChromeClientImpl.cpp \
@@ -105,7 +104,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/InspectorFrontendClientImpl.cpp \
 	third_party/WebKit/Source/web/LinkHighlight.cpp \
 	third_party/WebKit/Source/web/LocalFileSystemClient.cpp \
-	third_party/WebKit/Source/web/MIDIClientImpl.cpp \
+	third_party/WebKit/Source/web/MIDIClientProxy.cpp \
 	third_party/WebKit/Source/web/MediaSourcePrivateImpl.cpp \
 	third_party/WebKit/Source/web/NotificationPresenterImpl.cpp \
 	third_party/WebKit/Source/web/PageOverlay.cpp \
@@ -192,6 +191,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebInputEventConversion.cpp \
 	third_party/WebKit/Source/web/WebKit.cpp \
 	third_party/WebKit/Source/web/WebLabelElement.cpp \
+	third_party/WebKit/Source/web/WebMIDIClientMock.cpp \
 	third_party/WebKit/Source/web/WebMIDIPermissionRequest.cpp \
 	third_party/WebKit/Source/web/WebMediaPlayerClientImpl.cpp \
 	third_party/WebKit/Source/web/WebMediaSourceImpl.cpp \
@@ -250,11 +250,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebWorkerInfo.cpp \
 	third_party/WebKit/Source/web/WebWorkerRunLoop.cpp \
 	third_party/WebKit/Source/web/WorkerAllowMainThreadBridgeBase.cpp \
-	third_party/WebKit/Source/web/WorkerAsyncFileSystemChromium.cpp \
-	third_party/WebKit/Source/web/WorkerAsyncFileWriterChromium.cpp \
-	third_party/WebKit/Source/web/WorkerFileSystemCallbacksBridge.cpp \
 	third_party/WebKit/Source/web/WorkerFileSystemClient.cpp \
-	third_party/WebKit/Source/web/WorkerFileWriterCallbacksBridge.cpp \
 	third_party/WebKit/Source/web/android/WebInputEventFactory.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRenderStyle.cpp \
 	third_party/WebKit/Source/web/linux/WebFontRendering.cpp \
@@ -331,7 +327,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
@@ -480,7 +475,6 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \

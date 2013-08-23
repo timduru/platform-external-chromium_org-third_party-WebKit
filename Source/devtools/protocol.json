@@ -414,9 +414,29 @@
             {
                 "name": "captureScreenshot",
                 "description": "Capture page screenshot.",
+                "parameters": [
+                    { "name": "format", "type": "string", "optional": true, "enum": ["jpeg", "png"], "description": "Image compression format." },
+                    { "name": "quality", "type": "integer", "optional": true, "description": "Compression quality from range [0..100]." },
+                    { "name": "scale", "type": "number", "optional": true, "description": "Image scale from range [0..1]." }
+                ],
                 "returns": [
                     { "name": "data", "type": "string", "description": "Base64-encoded image data (PNG)." }
                 ]
+            },
+            {
+                "name": "startScreencast",
+                "description": "Starts sending each frame using the <code>screencastFrame</code> event.",
+                "parameters": [
+                    { "name": "format", "type": "string", "optional": true, "enum": ["jpeg", "png"], "description": "Image compression format." },
+                    { "name": "quality", "type": "integer", "optional": true, "description": "Compression quality from range [0..100]." },
+                    { "name": "scale", "type": "number", "optional": true, "description": "Image scale from range [0..1]." }
+                ],
+                "hidden": true
+            },
+            {
+                "name": "stopScreencast",
+                "description": "Stops sending each frame in the <code>screencastFrame</code>.",
+                "hidden": true
             },
             {
                 "name": "handleJavaScriptDialog",
@@ -525,6 +545,14 @@
                 "description": "Fired when the JavaScript is enabled/disabled on the page",
                 "parameters": [
                     { "name": "isEnabled", "type": "boolean", "description": "Whether script execution is enabled or disabled on the page." }
+                ],
+                "hidden": true
+            },
+            {
+                "name": "screencastFrame",
+                "description": "Compressed image data requested by the <code>startScreencast</code>.",
+                "parameters": [
+                    { "name": "data", "type": "string", "description": "Base64-encoded compressed image." }
                 ],
                 "hidden": true
             }
@@ -2436,6 +2464,15 @@
                 ],
                 "description": "This object represents a Named Flow.",
                 "hidden": true
+            },
+            {
+                "id": "PlatformFontUsage",
+                "type": "object",
+                "properties": [
+                    { "name": "familyName", "type": "string", "description": "Font's family name reported by platform."},
+                    { "name": "glyphCount", "type": "number", "description": "Amount of glyphs that were rendered with this font."}
+                ],
+                "description": "Information about amount of glyphs that were rendered with given font."
             }
         ],
         "commands": [
@@ -2481,6 +2518,17 @@
                     { "name": "computedStyle", "type": "array", "items": { "$ref": "CSSComputedStyleProperty" }, "description": "Computed style for the specified DOM node." }
                 ],
                 "description": "Returns the computed style for a DOM node identified by <code>nodeId</code>."
+            },
+            {
+                "name": "getPlatformFontsForNode",
+                "parameters": [
+                    { "name": "nodeId", "$ref": "DOM.NodeId" }
+                ],
+                "returns": [
+                    { "name": "fonts", "type": "array", "items": { "$ref": "PlatformFontUsage"}, "description": "Usage statistics for every employed platform font." }
+                ],
+                "description": "Requests information about platform fonts which we used to render child TextNodes in the given node.",
+                "hidden": true
             },
             {
                 "name": "getAllStyleSheets",
@@ -3216,7 +3264,6 @@
                 "description": "Profile.",
                 "properties": [
                     { "name": "head", "$ref": "CPUProfileNode" },
-                    { "name": "idleTime", "type": "number", "description": "Idle time in seconds." },
                     { "name": "startTime", "type": "number", "description": "Profiling start time in seconds." },
                     { "name": "endTime", "type": "number", "description": "Profiling end time in seconds." },
                     { "name": "samples", "optional": true, "type": "array", "items": { "type": "integer" }, "description": "Ids of samples top nodes." }
@@ -3498,8 +3545,10 @@
                 "description": "Resource state descriptor.",
                 "properties": [
                     { "name": "name", "type": "string", "description": "State name." },
+                    { "name": "enumValueForName", "type": "string", "optional": true, "description": "String representation of the enum value, if <code>name</code> stands for an enum." },
                     { "name": "value", "$ref": "CallArgument", "optional": true, "description": "The value associated with the particular state." },
-                    { "name": "values", "type": "array", "items": { "$ref": "ResourceStateDescriptor" }, "optional": true, "description": "Array of values associated with the particular state. Either <code>value</code> or <code>values</code> will be specified." }
+                    { "name": "values", "type": "array", "items": { "$ref": "ResourceStateDescriptor" }, "optional": true, "description": "Array of values associated with the particular state. Either <code>value</code> or <code>values</code> will be specified." },
+                    { "name": "isArray", "type": "boolean", "optional": true, "description": "True iff the given <code>values</code> items stand for an array rather than a list of grouped states." }
                 ]
             },
             {
@@ -3518,9 +3567,11 @@
                 "type": "object",
                 "properties": [
                     { "name": "description", "type": "string", "description": "String representation of the object." },
+                    { "name": "enumName", "type": "string", "optional": true, "description": "Enum name, if any, that stands for the value (for example, a WebGL enum name)." },
                     { "name": "resourceId", "$ref": "ResourceId", "optional": true, "description": "Resource identifier. Specified for <code>Resource</code> objects only." },
                     { "name": "type", "type": "string", "optional": true, "enum": ["object", "function", "undefined", "string", "number", "boolean"], "description": "Object type. Specified for non <code>Resource</code> objects only." },
-                    { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date"], "description": "Object subtype hint. Specified for <code>object</code> type values only." }
+                    { "name": "subtype", "type": "string", "optional": true, "enum": ["array", "null", "node", "regexp", "date"], "description": "Object subtype hint. Specified for <code>object</code> type values only." },
+                    { "name": "remoteObject", "$ref": "Runtime.RemoteObject", "optional": true, "description": "The <code>RemoteObject</code>, if requested." }
                 ]
             },
             {
@@ -3718,7 +3769,8 @@
                     { "name": "modifiers", "type": "integer", "optional": true, "description": "Bit field representing pressed modifier keys. Alt=1, Ctrl=2, Meta/Command=4, Shift=8 (default: 0)." },
                     { "name": "timestamp", "type": "number", "optional": true, "description": "Time at which the event occurred. Measured in UTC time in seconds since January 1, 1970 (default: current time)." },
                     { "name": "button", "type": "string", "enum": ["none", "left", "middle", "right"], "optional": true, "description": "Mouse button (default: \"none\")." },
-                    { "name": "clickCount", "type": "integer", "optional": true, "description": "Number of times the mouse button was clicked (default: 0)." }
+                    { "name": "clickCount", "type": "integer", "optional": true, "description": "Number of times the mouse button was clicked (default: 0)." },
+                    { "name": "deviceSpace", "type": "boolean", "optional": true, "hidden": true, "description": "If true, x and y are given in device pixels wrt current viewport." }
                 ],
                 "description": "Dispatches a mouse event to the page."
             },
@@ -3732,6 +3784,20 @@
                     { "name": "timestamp", "type": "number", "optional": true, "description": "Time at which the event occurred. Measured in UTC time in seconds since January 1, 1970 (default: current time)." }
                 ],
                 "description": "Dispatches a touch event to the page."
+            },
+            {
+                "name": "dispatchGestureEvent",
+                "hidden": true,
+                "parameters": [
+                    { "name": "type", "type": "string", "enum": ["scrollBegin", "scrollEnd", "scrollUpdate", "tapDown", "tap", "pinchBegin", "pinchEnd", "pinchUpdate"], "description": "Type of the gesture event." },
+                    { "name": "x", "type": "integer", "description": "X coordinate relative to the screen's viewport."},
+                    { "name": "y", "type": "integer", "description": "Y coordinate relative to the screen's viewport."},
+                    { "name": "timestamp", "type": "number", "optional": true, "description": "Time at which the event occurred. Measured in UTC time in seconds since January 1, 1970 (default: current time)." },
+                    { "name": "deltaX", "type": "integer", "optional": true, "description": "Delta X where apllies."},
+                    { "name": "deltaY", "type": "integer", "optional": true, "description": "Delta Y where apllies."},
+                    { "name": "pinchScale", "type": "number", "optional": true, "description": "Pinch scale." }
+                ],
+                "description": "Dispatches a gesture event to the page."
             }
         ],
         "events": []
@@ -3757,6 +3823,10 @@
                     { "name": "offsetY", "type": "number", "description": "Offset from parent layer, X coordinate." },
                     { "name": "width", "type": "number", "description": "Layer width." },
                     { "name": "height", "type": "number", "description": "Layer height." },
+                    { "name": "transform", "type": "array", "items": { "type": "number" }, "minItems": 16, "maxItems": 16, "optional": true, "description": "Transformation matrix for layer, default is identity matrix" },
+                    { "name": "anchorX", "type": "number", "optional": true, "description": "Transform anchor point X, absent if no transform specified" },
+                    { "name": "anchorY", "type": "number", "optional": true, "description": "Transform anchor point Y, absent if no transform specified" },
+                    { "name": "anchorZ", "type": "number", "optional": true, "description": "Transform anchor point Z, absent if no transform specified" },
                     { "name": "paintCount", "type": "integer", "description": "Indicates how many time this layer has painted." }
                 ]
             }

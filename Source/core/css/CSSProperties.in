@@ -80,6 +80,7 @@ max-width type_name=Length, initial=initialMaxSize, converter=convertLengthMaxSi
 min-height type_name=Length, initial=initialMinSize, converter=convertLengthSizing
 min-width type_name=Length, initial=initialMinSize, converter=convertLengthSizing
 mix-blend-mode type_name=BlendMode, name_for_methods=BlendMode
+object-fit type_name=ObjectFit
 opacity type_name=float
 order type_name=int
 orphans type_name=short, custom_all
@@ -187,7 +188,7 @@ z-index type_name=int, custom_all
 -webkit-margin-before-collapse type_name=EMarginCollapse
 -webkit-margin-bottom-collapse type_name=EMarginCollapse, name_for_methods=MarginAfterCollapse
 -webkit-margin-top-collapse type_name=EMarginCollapse, name_for_methods=MarginBeforeCollapse
--webkit-marquee-direction
+-internal-marquee-direction type_name=EMarqueeDirection, name_for_methods=MarqueeDirection
 -webkit-marquee-increment custom_value
 -webkit-marquee-repetition type_name=int, name_for_methods=MarqueeLoopCount, custom_value
 -webkit-marquee-speed custom_value

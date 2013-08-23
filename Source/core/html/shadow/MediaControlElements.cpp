@@ -751,7 +751,7 @@ void MediaControlTextTrackContainerElement::updateDisplay()
 #endif
             if (displayBox->hasChildNodes() && !contains(displayBox.get())) {
                 // Note: the display tree of a cue is removed when the active flag of the cue is unset.
-                appendChild(displayBox, ASSERT_NO_EXCEPTION, AttachNow);
+                appendChild(displayBox);
             }
 #if ENABLE(WEBVTT_REGIONS)
         } else {

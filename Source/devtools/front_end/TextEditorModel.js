@@ -128,7 +128,7 @@ WebInspector.TextEditorModel.prototype = {
     },
 
     /**
-     * @param {string} text 
+     * @param {string} text
      */
     setText: function(text)
     {
@@ -343,7 +343,7 @@ WebInspector.TextEditorModel.prototype = {
 
     /**
      * @param {WebInspector.TextRange} range
-     * @return {string}  
+     * @return {string}
      */
     copyRange: function(range)
     {
@@ -364,8 +364,8 @@ WebInspector.TextEditorModel.prototype = {
 
     /**
      * @param {number} line
-     * @param {string} name  
-     * @param {Object?} value  
+     * @param {string} name
+     * @param {Object?} value
      */
     setAttribute: function(line, name, value)
     {
@@ -379,8 +379,8 @@ WebInspector.TextEditorModel.prototype = {
 
     /**
      * @param {number} line
-     * @param {string} name  
-     * @return {Object|null} value  
+     * @param {string} name
+     * @return {Object|null} value
      */
     getAttribute: function(line, name)
     {

@@ -34,6 +34,8 @@
 #include "InspectorFrontend.h"
 #include "bindings/v8/ScriptDebugServer.h"
 #include "bindings/v8/ScriptObject.h"
+#include "bindings/v8/ScriptSourceCode.h"
+#include "core/fetch/Resource.h"
 #include "core/inspector/ContentSearchUtils.h"
 #include "core/inspector/InjectedScript.h"
 #include "core/inspector/InjectedScriptManager.h"
@@ -42,7 +44,6 @@
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/inspector/ScriptArguments.h"
 #include "core/inspector/ScriptCallStack.h"
-#include "core/loader/cache/Resource.h"
 #include "core/platform/JSONValues.h"
 #include "core/platform/text/RegularExpression.h"
 #include "wtf/text/WTFString.h"
@@ -236,6 +237,15 @@ void InspectorDebuggerAgent::addMessageToConsole(MessageSource source, MessageTy
     addMessageToConsole(source, type);
 }
 
+String InspectorDebuggerAgent::preprocessEventListener(Frame* frame, const String& source, const String& url, const String& functionName)
+{
+    return scriptDebugServer().preprocessEventListener(frame, source, url, functionName);
+}
+
+PassOwnPtr<ScriptSourceCode> InspectorDebuggerAgent::preprocess(Frame* frame, const ScriptSourceCode& sourceCode)
+{
+    return scriptDebugServer().preprocess(frame, sourceCode);
+}
 
 static PassRefPtr<JSONObject> buildObjectForBreakpointCookie(const String& url, int lineNumber, int columnNumber, const String& condition, bool isRegex, bool isAnti)
 {

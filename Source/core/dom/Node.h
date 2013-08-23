@@ -25,6 +25,7 @@
 #ifndef Node_h
 #define Node_h
 
+#include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/ScriptWrappable.h"
 #include "core/dom/EventTarget.h"
 #include "core/dom/MutationObserver.h"
@@ -114,7 +115,7 @@ private:
 };
 
 enum AttachBehavior {
-    AttachNow,
+    DeprecatedAttachNow,
     AttachLazily,
 };
 
@@ -204,10 +205,10 @@ public:
     // These should all actually return a node, but this is only important for language bindings,
     // which will already know and hold a ref on the right node to return. Returning bool allows
     // these methods to be more efficient since they don't need to return a ref
-    void insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState&, AttachBehavior = AttachNow);
-    void replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState&, AttachBehavior = AttachNow);
+    void insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
+    void replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
     void removeChild(Node* child, ExceptionState&);
-    void appendChild(PassRefPtr<Node> newChild, ExceptionState&, AttachBehavior = AttachNow);
+    void appendChild(PassRefPtr<Node> newChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
 
     bool hasChildNodes() const { return firstChild(); }
     virtual PassRefPtr<Node> cloneNode(bool deep = true) = 0;
@@ -245,12 +246,12 @@ public:
 
     enum CustomElementState {
         NotCustomElement,
-        UpgradeCandidate,
-        Defined,
+        WaitingForParser,
+        WaitingForUpgrade,
         Upgraded
     };
     bool isCustomElement() const { return customElementState() != NotCustomElement; }
-    CustomElementState customElementState() const { return CustomElementState((getFlag(CustomElementHasDefinitionOrIsUpgraded) ? 2 : 0) | (getFlag(CustomElementIsUpgradeCandidateOrUpgraded) ? 1 : 0)); }
+    CustomElementState customElementState() const { return CustomElementState((getFlag(CustomElementWaitingForParserOrIsUpgraded) ? 1 : 0) | (getFlag(CustomElementWaitingForUpgradeOrIsUpgraded) ? 2 : 0)); }
     void setCustomElementState(CustomElementState newState);
 
     virtual bool isMediaControlElement() const { return false; }
@@ -400,9 +401,7 @@ public:
 
     bool shouldNotifyRendererWithIdenticalStyles() const { return getFlag(NotifyRendererWithIdenticalStyles); }
 
-    void setIsLink(bool f) { setFlag(f, IsLinkFlag); }
-    void setIsLink() { setFlag(IsLinkFlag); }
-    void clearIsLink() { clearFlag(IsLinkFlag); }
+    void setIsLink(bool f);
 
     void setInNamedFlow() { setFlag(InNamedFlowFlag); }
     void clearInNamedFlow() { clearFlag(InNamedFlowFlag); }
@@ -432,6 +431,10 @@ public:
     virtual Node* focusDelegate();
     // This is called only when the node is focused.
     virtual bool shouldHaveFocusAppearance() const;
+
+    // Whether the node is inert. This can't be in Element because text nodes
+    // must be recognized as inert to prevent text selection.
+    bool isInert() const;
 
     enum UserSelectAllTreatment {
         UserSelectAllDoesNotAffectEditability,
@@ -608,9 +611,9 @@ public:
     //
     virtual void removedFrom(ContainerNode* insertionPoint);
 
-#ifndef NDEBUG
     String debugName() const;
 
+#ifndef NDEBUG
     virtual void formatForDebugger(char* buffer, unsigned length) const;
 
     void showNode(const char* prefix = "") const;
@@ -713,6 +716,9 @@ public:
 
     PassRefPtr<NodeList> getDestinationInsertionPoints();
 
+    void setAlreadySpellChecked(bool flag) { setFlag(flag, AlreadySpellCheckedFlag); }
+    bool isAlreadySpellChecked() { return getFlag(AlreadySpellCheckedFlag); }
+
 private:
     enum NodeFlags {
         IsTextFlag = 1,
@@ -750,10 +756,11 @@ private:
 
         NotifyRendererWithIdenticalStyles = 1 << 26,
 
-        CustomElementIsUpgradeCandidateOrUpgraded = 1 << 27,
-        CustomElementHasDefinitionOrIsUpgraded = 1 << 28,
+        CustomElementWaitingForParserOrIsUpgraded = 1 << 27,
+        CustomElementWaitingForUpgradeOrIsUpgraded = 1 << 28,
 
         ChildNeedsDistributionRecalc = 1 << 29,
+        AlreadySpellCheckedFlag = 1 << 30,
 
         DefaultNodeFlags = IsParsingChildrenFinishedFlag
     };
@@ -838,6 +845,9 @@ private:
     bool isUserActionElementFocused() const;
 
     void setStyleChange(StyleChangeType);
+
+    void detachNode(Node*, const AttachContext&);
+    void clearAttached() { clearFlag(IsAttachedFlag); }
 
     // Used to share code between lazyAttach and setNeedsStyleRecalc.
     void markAncestorsWithChildNeedsStyleRecalc();

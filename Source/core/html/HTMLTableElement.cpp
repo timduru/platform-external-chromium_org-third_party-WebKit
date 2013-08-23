@@ -158,7 +158,7 @@ PassRefPtr<HTMLElement> HTMLTableElement::createTBody()
     RefPtr<HTMLTableSectionElement> body = HTMLTableSectionElement::create(tbodyTag, document());
     Node* referenceElement = lastBody() ? lastBody()->nextSibling() : 0;
 
-    insertBefore(body, referenceElement, ASSERT_NO_EXCEPTION);
+    insertBefore(body, referenceElement);
     return body.release();
 }
 
@@ -221,13 +221,13 @@ PassRefPtr<HTMLElement> HTMLTableElement::insertRow(int index, ExceptionState& e
             RefPtr<HTMLTableSectionElement> newBody = HTMLTableSectionElement::create(tbodyTag, document());
             RefPtr<HTMLTableRowElement> newRow = HTMLTableRowElement::create(document());
             newBody->appendChild(newRow, es);
-            appendChild(newBody.release(), es, AttachLazily);
+            appendChild(newBody.release(), es);
             return newRow.release();
         }
     }
 
     RefPtr<HTMLTableRowElement> newRow = HTMLTableRowElement::create(document());
-    parent->insertBefore(newRow, row.get(), es, AttachLazily);
+    parent->insertBefore(newRow, row.get(), es);
     return newRow.release();
 }
 

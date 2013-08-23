@@ -44,7 +44,6 @@
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/ProgressTracker.h"
-#include "core/loader/ResourceLoader.h"
 #include "core/page/Chrome.h"
 #include "core/page/EventHandler.h"
 #include "core/page/FrameView.h"
@@ -452,22 +451,13 @@ void FrameLoaderClientImpl::dispatchDidLayout(LayoutMilestones milestones)
         m_webFrame->client()->didFirstVisuallyNonEmptyLayout(m_webFrame);
 }
 
-NavigationPolicy FrameLoaderClientImpl::decidePolicyForNavigation(const ResourceRequest& request, NavigationType type, NavigationPolicy policy, bool /*isRedirect*/)
+NavigationPolicy FrameLoaderClientImpl::decidePolicyForNavigation(const ResourceRequest& request, DocumentLoader* loader, NavigationPolicy policy)
 {
-
     if (!m_webFrame->client())
         return NavigationPolicyIgnore;
-
-    // FIXME: We need to pull isRedirect off of provisionalDataSourceImpl() for compat reasons,
-    // but it seems wrong, since the request that triggered this policy check might not be the
-    // provisional data source.
-    WebDataSourceImpl* ds = m_webFrame->provisionalDataSourceImpl();
-    if (!ds)
-        return policy;
-
-    WrappedResourceRequest webRequest(request);
-    WebNavigationPolicy webPolicy = m_webFrame->client()->decidePolicyForNavigation(
-        m_webFrame, webRequest, WebDataSourceImpl::toWebNavigationType(type), static_cast<WebNavigationPolicy>(policy), ds->isRedirect());
+    WebDataSourceImpl* ds = WebDataSourceImpl::fromDocumentLoader(loader);
+    WebNavigationPolicy webPolicy = m_webFrame->client()->decidePolicyForNavigation(m_webFrame, ds->extraData(), WrappedResourceRequest(request),
+        ds->navigationType(), static_cast<WebNavigationPolicy>(policy), ds->isRedirect());
     return static_cast<NavigationPolicy>(webPolicy);
 }
 
@@ -503,7 +493,7 @@ void FrameLoaderClientImpl::postProgressEstimateChangedNotification()
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview && webview->client()) {
         webview->client()->didChangeLoadProgress(
-            m_webFrame, m_webFrame->frame()->page()->progress()->estimatedProgress());
+            m_webFrame, m_webFrame->frame()->page()->progress().estimatedProgress());
     }
 }
 
@@ -524,36 +514,11 @@ void FrameLoaderClientImpl::loadURLExternally(const ResourceRequest& request, Na
     }
 }
 
-bool FrameLoaderClientImpl::shouldGoToHistoryItem(HistoryItem* item) const
+void FrameLoaderClientImpl::navigateBackForward(int offset) const
 {
-    const KURL& url = item->url();
-    if (!url.protocolIs(backForwardNavigationScheme))
-        return true;
-
-    // Else, we'll punt this history navigation to the embedder.  It is
-    // necessary that we intercept this here, well before the FrameLoader
-    // has made any state changes for this history traversal.
-
-    bool ok;
-    int offset = url.lastPathComponent().toIntStrict(&ok);
-    if (!ok) {
-        ASSERT_NOT_REACHED();
-        return false;
-    }
-
     WebViewImpl* webview = m_webFrame->viewImpl();
     if (webview->client())
         webview->client()->navigateBackForwardSoon(offset);
-
-    return false;
-}
-
-bool FrameLoaderClientImpl::shouldStopLoadingForHistoryItem(HistoryItem* targetItem) const
-{
-    // Don't stop loading for pseudo-back-forward URLs, since they will get
-    // translated and then pass through again.
-    const KURL& url = targetItem->url();
-    return !url.protocolIs(backForwardNavigationScheme);
 }
 
 void FrameLoaderClientImpl::didAccessInitialDocument()
@@ -765,8 +730,8 @@ bool FrameLoaderClientImpl::willCheckAndDispatchMessageEvent(
         return false;
 
     WebFrame* source = 0;
-    if (event && event->source() && event->source()->document())
-        source = WebFrameImpl::fromFrame(event->source()->document()->frame());
+    if (event && event->source() && event->source()->toDOMWindow() && event->source()->toDOMWindow()->document())
+        source = WebFrameImpl::fromFrame(event->source()->toDOMWindow()->document()->frame());
     return m_webFrame->client()->willCheckAndDispatchMessageEvent(
         source, m_webFrame, WebSecurityOrigin(target), WebDOMMessageEvent(event));
 }

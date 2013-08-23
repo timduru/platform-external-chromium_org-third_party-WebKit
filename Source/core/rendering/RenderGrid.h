@@ -77,7 +77,7 @@ private:
     LayoutUnit computeUsedBreadthOfMinLength(TrackSizingDirection, const GridLength&) const;
     LayoutUnit computeUsedBreadthOfMaxLength(TrackSizingDirection, const GridLength&, LayoutUnit usedBreadth) const;
     LayoutUnit computeUsedBreadthOfSpecifiedLength(TrackSizingDirection, const Length&) const;
-    void resolveContentBasedTrackSizingFunctions(TrackSizingDirection, Vector<GridTrack>& columnTracks, Vector<GridTrack>& rowTracks, LayoutUnit& availableLogicalSpace);
+    void resolveContentBasedTrackSizingFunctions(TrackSizingDirection, Vector<GridTrack>& columnTracks, Vector<GridTrack>& rowTracks, Vector<size_t>, LayoutUnit& availableLogicalSpace);
 
     void growGrid(TrackSizingDirection);
     void insertItemIntoGrid(RenderBox*, size_t rowTrack, size_t columnTrack);
@@ -142,7 +142,9 @@ private:
         return m_grid.size();
     }
 
-    Vector<Vector<Vector<RenderBox*, 1> > > m_grid;
+    typedef Vector<RenderBox*, 1> GridCell;
+    typedef Vector<Vector<GridCell> > GridRepresentation;
+    GridRepresentation m_grid;
     bool m_gridIsDirty;
     HashMap<const RenderBox*, GridCoordinate> m_gridItemCoordinate;
     OrderIterator m_orderIterator;

@@ -44,14 +44,14 @@
 #include "core/editing/ReplaceSelectionCommand.h"
 #include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
+#include "core/fetch/ImageResource.h"
+#include "core/fetch/ResourceFetcher.h"
 #include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLPlugInElement.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/cache/ImageResource.h"
-#include "core/loader/cache/ResourceFetcher.h"
 #include "core/page/DragActions.h"
 #include "core/page/DragClient.h"
 #include "core/page/DragSession.h"
@@ -169,10 +169,10 @@ static PassRefPtr<DocumentFragment> documentFragmentFromDragData(DragData* dragD
                         title = url;
                 }
                 RefPtr<Node> anchorText = document->createTextNode(title);
-                anchor->appendChild(anchorText, IGNORE_EXCEPTION);
+                anchor->appendChild(anchorText);
                 RefPtr<DocumentFragment> fragment = document->createDocumentFragment();
-                fragment->appendChild(anchor, IGNORE_EXCEPTION);
-                return fragment.get();
+                fragment->appendChild(anchor);
+                return fragment.release();
             }
         }
     }

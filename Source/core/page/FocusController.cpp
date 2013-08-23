@@ -32,10 +32,10 @@
 #include "core/accessibility/AXObjectCache.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/NodeRenderingTraversal.h"
-#include "core/dom/NodeTraversal.h"
 #include "core/dom/Range.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/ShadowRoot.h"
@@ -124,7 +124,7 @@ static inline void dispatchEventsOnWindowAndFocusedNode(Document* document, bool
         document->focusedElement()->dispatchBlurEvent(0);
     document->dispatchWindowEvent(Event::create(focused ? eventNames().focusEvent : eventNames().blurEvent, false, false));
     if (focused && document->focusedElement())
-        document->focusedElement()->dispatchFocusEvent(0, FocusDirectionNone);
+        document->focusedElement()->dispatchFocusEvent(0, FocusDirectionPage);
 }
 
 static inline bool hasCustomFocusLogic(Element* element)
@@ -244,7 +244,7 @@ Node* FocusController::findFocusableNodeDecendingDownIntoFrameDocument(FocusDire
     // 1) a focusable node, or
     // 2) the deepest-nested HTMLFrameOwnerElement.
     while (node && node->isFrameOwnerElement()) {
-        HTMLFrameOwnerElement* owner = static_cast<HTMLFrameOwnerElement*>(node);
+        HTMLFrameOwnerElement* owner = toHTMLFrameOwnerElement(node);
         if (!owner->contentFrame())
             break;
         Node* foundNode = findFocusableNode(direction, FocusNavigationScope::focusNavigationScopeOwnedByIFrame(owner), 0);
@@ -335,7 +335,7 @@ bool FocusController::advanceFocusInDocumentOrder(FocusDirection direction, bool
     if (element->isFrameOwnerElement() && (!element->isPluginElement() || !element->isKeyboardFocusable())) {
         // We focus frames rather than frame owners.
         // FIXME: We should not focus frames that have no scrollbars, as focusing them isn't useful to the user.
-        HTMLFrameOwnerElement* owner = static_cast<HTMLFrameOwnerElement*>(element);
+        HTMLFrameOwnerElement* owner = toHTMLFrameOwnerElement(element);
         if (!owner->contentFrame())
             return false;
 
@@ -603,7 +603,7 @@ bool FocusController::setFocusedElement(Element* element, PassRefPtr<Frame> newF
     if (oldFocusedElement && oldFocusedElement->isRootEditableElement() && !relinquishesEditingFocus(oldFocusedElement))
         return false;
 
-    m_page->editorClient()->willSetInputMethodState();
+    m_page->editorClient().willSetInputMethodState();
 
     clearSelectionIfNeeded(oldFocusedFrame.get(), newFocusedFrame.get(), element);
 

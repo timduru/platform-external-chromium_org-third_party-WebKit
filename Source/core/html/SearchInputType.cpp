@@ -34,6 +34,7 @@
 #include "HTMLNames.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/KeyboardEvent.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/InputTypeNames.h"
 #include "core/html/shadow/ShadowElementNames.h"
@@ -56,9 +57,8 @@ PassOwnPtr<InputType> SearchInputType::create(HTMLInputElement* element)
     return adoptPtr(new SearchInputType(element));
 }
 
-void SearchInputType::attach()
+void SearchInputType::countUsage()
 {
-    TextFieldInputType::attach();
     observeFeatureIfVisible(UseCounter::InputTypeSearch);
 }
 
@@ -95,8 +95,8 @@ void SearchInputType::createShadowSubtree()
     ASSERT(container);
     ASSERT(textWrapper);
 
-    container->insertBefore(SearchFieldDecorationElement::create(element()->document()), textWrapper, IGNORE_EXCEPTION);
-    container->insertBefore(SearchFieldCancelButtonElement::create(element()->document()), textWrapper->nextSibling(), IGNORE_EXCEPTION);
+    container->insertBefore(SearchFieldDecorationElement::create(element()->document()), textWrapper);
+    container->insertBefore(SearchFieldCancelButtonElement::create(element()->document()), textWrapper->nextSibling());
 }
 
 void SearchInputType::handleKeydownEvent(KeyboardEvent* event)
@@ -150,14 +150,30 @@ bool SearchInputType::searchEventsShouldBeDispatched() const
 
 void SearchInputType::didSetValueByUserEdit(ValueChangeState state)
 {
-    if (element()->uaShadowElementById(ShadowElementNames::clearButton()))
-        toRenderSearchField(element()->renderer())->updateCancelButtonVisibility();
+    updateCancelButtonVisibility();
 
     // If the incremental attribute is set, then dispatch the search event
     if (searchEventsShouldBeDispatched())
         startSearchEventTimer();
 
     TextFieldInputType::didSetValueByUserEdit(state);
+}
+
+void SearchInputType::updateInnerTextValue()
+{
+    BaseTextInputType::updateInnerTextValue();
+    updateCancelButtonVisibility();
+}
+
+void SearchInputType::updateCancelButtonVisibility()
+{
+    Element* button = element()->userAgentShadowRoot()->getElementById(ShadowElementNames::clearButton());
+    if (!button)
+        return;
+    if (element()->value().isEmpty())
+        button->setInlineStyleProperty(CSSPropertyVisibility, CSSValueHidden);
+    else
+        button->removeInlineStyleProperty(CSSPropertyVisibility);
 }
 
 bool SearchInputType::supportsInputModeAttribute() const

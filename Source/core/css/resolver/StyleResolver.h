@@ -212,10 +212,9 @@ public:
     // FIXME: It could be better to call m_ruleSets.appendAuthorStyleSheets() directly after we factor StyleRsolver further.
     // https://bugs.webkit.org/show_bug.cgi?id=108890
     void appendAuthorStyleSheets(unsigned firstNew, const Vector<RefPtr<CSSStyleSheet> >&);
-    // FIXME: resetAuthorStyle() will be removed when rulesets are reset in a per-scoping node manner.
-    void resetAuthorStyle();
     void resetAuthorStyle(const ContainerNode*);
     void resetAtHostRules(const ContainerNode*);
+    void finishAppendAuthorStyleSheets();
 
     DocumentRuleSets& ruleSets() { return m_ruleSets; }
     const DocumentRuleSets& ruleSets() const { return m_ruleSets; }
@@ -254,9 +253,6 @@ public:
     void addViewportDependentMediaQueryResult(const MediaQueryExp*, bool result);
     bool hasViewportDependentMediaQueries() const { return !m_viewportDependentMediaQueryResults.isEmpty(); }
     bool affectedByViewportChange() const;
-
-    // FIXME: This likely belongs on RuleSet.
-    void addKeyframeStyle(PassRefPtr<StyleRuleKeyframes>);
 
     // FIXME: Regions should not require special logic in StyleResolver.
     bool checkRegionStyle(Element* regionElement);

@@ -37,7 +37,6 @@
 #include "core/fileapi/FileError.h"
 #include "core/platform/AsyncFileSystem.h"
 #include "core/platform/FileMetadata.h"
-#include "modules/filesystem/AsyncFileWriter.h"
 #include "modules/filesystem/DOMFilePath.h"
 #include "modules/filesystem/DirectoryEntrySync.h"
 #include "modules/filesystem/ErrorCallback.h"
@@ -135,6 +134,12 @@ public:
             m_result->m_file = File::createForFileSystemFile(m_url, metadata).get();
         }
     }
+
+    virtual bool shouldBlockUntilCompletion() const OVERRIDE
+    {
+        return true;
+    }
+
 private:
     CreateFileHelper(PassRefPtr<CreateFileResult> result, const String& name, const KURL& url, FileSystemType type)
         : m_result(result)

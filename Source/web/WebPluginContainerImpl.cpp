@@ -220,13 +220,6 @@ void WebPluginContainerImpl::clipRectChanged()
     reportGeometry();
 }
 
-void WebPluginContainerImpl::eventListenersRemoved()
-{
-    // We're no longer registered to receive touch events, so don't try to remove
-    // the touch event handlers in our destructor.
-    m_touchEventRequestType = TouchEventRequestTypeNone;
-}
-
 void WebPluginContainerImpl::setParentVisible(bool parentVisible)
 {
     // We override this function to make sure that geometry updates are sent
@@ -700,7 +693,7 @@ void WebPluginContainerImpl::handleMouseEvent(MouseEvent* event)
     Page* page = parentView->frame()->page();
     if (!page)
         return;
-    ChromeClientImpl* chromeClient = static_cast<ChromeClientImpl*>(page->chrome().client());
+    ChromeClientImpl* chromeClient = static_cast<ChromeClientImpl*>(&page->chrome().client());
     chromeClient->setCursorForPlugin(cursorInfo);
 }
 

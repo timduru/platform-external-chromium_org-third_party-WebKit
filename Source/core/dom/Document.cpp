@@ -37,6 +37,7 @@
 #include "XMLNames.h"
 #include "bindings/v8/CustomElementConstructorBuilder.h"
 #include "bindings/v8/Dictionary.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "bindings/v8/ScriptController.h"
@@ -51,10 +52,10 @@
 #include "core/css/StyleSheetList.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attr.h"
+#include "core/dom/BeforeUnloadEvent.h"
 #include "core/dom/CDATASection.h"
 #include "core/dom/Comment.h"
 #include "core/dom/ContextFeatures.h"
-#include "core/dom/CustomElement.h"
 #include "core/dom/CustomElementRegistrationContext.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/DOMNamedFlowCollection.h"
@@ -66,6 +67,7 @@
 #include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventFactory.h"
 #include "core/dom/EventListener.h"
@@ -97,6 +99,7 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
+#include "core/fetch/ResourceFetcher.h"
 #include "core/html/FormController.h"
 #include "core/html/HTMLAllCollection.h"
 #include "core/html/HTMLAnchorElement.h"
@@ -108,6 +111,7 @@
 #include "core/html/HTMLHtmlElement.h"
 #include "core/html/HTMLIFrameElement.h"
 #include "core/html/HTMLImport.h"
+#include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLLinkElement.h"
 #include "core/html/HTMLNameCollection.h"
 #include "core/html/HTMLScriptElement.h"
@@ -128,7 +132,6 @@
 #include "core/loader/Prerenderer.h"
 #include "core/loader/TextResourceDecoder.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
-#include "core/loader/cache/ResourceFetcher.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/ContentSecurityPolicy.h"
@@ -144,7 +147,6 @@
 #include "core/page/PageConsole.h"
 #include "core/page/PointerLockController.h"
 #include "core/page/Settings.h"
-#include "core/page/ValidationMessageClient.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
 #include "core/platform/DateComponents.h"
@@ -401,7 +403,6 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_bParsing(false)
     , m_styleRecalcTimer(this, &Document::styleRecalcTimerFired)
     , m_inStyleRecalc(false)
-    , m_closeAfterStyleRecalc(false)
     , m_gotoAnchorNeededAfterStylesheetsLoad(false)
     , m_containsValidityStyleRules(false)
     , m_updateFocusAppearanceRestoresSelection(false)
@@ -435,6 +436,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_referrerPolicy(ReferrerPolicyDefault)
     , m_directionSetOnDocumentElement(false)
     , m_writingModeSetOnDocumentElement(false)
+    , m_didAllowNavigationViaBeforeUnloadConfirmationPanel(false)
     , m_writeRecursionIsTooDeep(false)
     , m_writeRecursionDepth(0)
     , m_wheelEventHandlerCount(0)
@@ -715,7 +717,7 @@ PassRefPtr<Element> Document::createElement(const AtomicString& localName, const
 
     RefPtr<Element> element;
 
-    if (CustomElement::isCustomTagName(localName) && registrationContext())
+    if (CustomElement::isValidName(localName) && registrationContext())
         element = registrationContext()->createCustomTagElement(this, QualifiedName(nullAtom, localName, xhtmlNamespaceURI));
     else
         element = createElement(localName, es);
@@ -739,7 +741,7 @@ PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, 
     }
 
     RefPtr<Element> element;
-    if (CustomElement::isCustomTagName(qName.localName()) && registrationContext())
+    if (CustomElement::isValidName(qName.localName()) && registrationContext())
         element = registrationContext()->createCustomTagElement(this, qName);
     else
         element = createElementNS(namespaceURI, qualifiedName, es);
@@ -755,7 +757,7 @@ ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicS
     return registerElement(state, name, Dictionary(), es);
 }
 
-ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, const Dictionary& options, ExceptionState& es)
+ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, const Dictionary& options, ExceptionState& es, CustomElement::NameSet validNames)
 {
     if (!registrationContext()) {
         es.throwDOMException(NotSupportedError);
@@ -763,7 +765,7 @@ ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicS
     }
 
     CustomElementConstructorBuilder constructorBuilder(state, &options);
-    registrationContext()->registerElement(this, &constructorBuilder, name, es);
+    registrationContext()->registerElement(this, &constructorBuilder, name, validNames, es);
     return constructorBuilder.bindingsReturnValue();
 }
 
@@ -939,7 +941,7 @@ PassRefPtr<Node> Document::adoptNode(PassRefPtr<Node> source, ExceptionState& es
         }
 
         if (source->isFrameOwnerElement()) {
-            HTMLFrameOwnerElement* frameOwnerElement = toFrameOwnerElement(source.get());
+            HTMLFrameOwnerElement* frameOwnerElement = toHTMLFrameOwnerElement(source.get());
             if (frame() && frame()->tree()->isDescendantOf(frameOwnerElement->contentFrame())) {
                 es.throwDOMException(HierarchyRequestError);
                 return 0;
@@ -1082,8 +1084,11 @@ void Document::setReadyState(ReadyState readyState)
 
     switch (readyState) {
     case Loading:
-        if (!m_documentTiming.domLoading)
+        if (!m_documentTiming.domLoading) {
             m_documentTiming.domLoading = monotonicallyIncreasingTime();
+            if (RuntimeEnabledFeatures::webAnimationsEnabled())
+                m_timeline->setZeroTimeAsPerfTime(m_documentTiming.domLoading);
+        }
         break;
     case Interactive:
         if (!m_documentTiming.domInteractive)
@@ -1293,6 +1298,7 @@ void Document::updateTitle(const StringWithDirection& title)
 
     m_rawTitle = title;
 
+    StringWithDirection oldTitle = m_title;
     if (m_rawTitle.string().isEmpty())
         m_title = StringWithDirection();
     else {
@@ -1301,8 +1307,11 @@ void Document::updateTitle(const StringWithDirection& title)
         else
             m_title = canonicalizedTitle<UChar>(this, m_rawTitle);
     }
-    if (Frame* f = frame())
-        f->loader()->setTitle(m_title);
+
+    if (!m_frame || oldTitle == m_title)
+        return;
+    m_frame->loader()->history()->setCurrentItemTitle(m_title);
+    m_frame->loader()->client()->dispatchDidReceiveTitle(m_title);
 }
 
 void Document::setTitle(const String& title)
@@ -1314,7 +1323,7 @@ void Document::setTitle(const String& title)
     else if (!m_titleElement) {
         if (HTMLElement* headElement = head()) {
             m_titleElement = createElement(titleTag, false);
-            headElement->appendChild(m_titleElement, ASSERT_NO_EXCEPTION, AttachLazily);
+            headElement->appendChild(m_titleElement);
         }
     }
 
@@ -1680,12 +1689,6 @@ void Document::recalcStyle(StyleChange change)
         }
     }
 
-    // If we wanted to call implicitClose() during recalcStyle, do so now that we're finished.
-    if (m_closeAfterStyleRecalc) {
-        m_closeAfterStyleRecalc = false;
-        implicitClose();
-    }
-
     STYLE_STATS_PRINT();
     STYLE_STATS_CLEAR();
 
@@ -1888,11 +1891,8 @@ void Document::detach(const AttachContext& context)
 {
     ASSERT(attached());
 
-    if (page()) {
-        page()->pointerLockController()->documentDetached(this);
-        if (ValidationMessageClient* client = page()->validationMessageClient())
-            client->documentDetached(*this);
-    }
+    if (page())
+        page()->documentDetached(this);
 
     if (this == topDocument())
         clearAXObjectCache();
@@ -1953,6 +1953,12 @@ void Document::detach(const AttachContext& context)
 void Document::prepareForDestruction()
 {
     disconnectDescendantFrames();
+
+    // The process of disconnecting descendant frames could have already
+    // detached us.
+    if (!attached())
+        return;
+
     if (DOMWindow* window = this->domWindow())
         window->willDetachDocumentFromFrame();
     detach();
@@ -2122,7 +2128,7 @@ PassRefPtr<DocumentParser> Document::implicitOpen()
     // collection update in order to ensure they inherit all the relevant data
     // from their parent.
     if (shouldDisplaySeamlesslyWithParent())
-        styleResolverChanged(DeferRecalcStyle);
+        styleResolverChanged(RecalcStyleDeferred);
 
     m_parser = createParser();
     setParsing(true);
@@ -2163,9 +2169,9 @@ void Document::setBody(PassRefPtr<HTMLElement> prpNewBody, ExceptionState& es)
         return;
 
     if (oldBody)
-        documentElement()->replaceChild(newBody.release(), oldBody, es, AttachLazily);
+        documentElement()->replaceChild(newBody.release(), oldBody, es);
     else
-        documentElement()->appendChild(newBody.release(), es, AttachLazily);
+        documentElement()->appendChild(newBody.release(), es);
 }
 
 HTMLHeadElement* Document::head()
@@ -2210,11 +2216,7 @@ void Document::explicitClose()
 
 void Document::implicitClose()
 {
-    // If we're in the middle of recalcStyle, we need to defer the close until the style information is accurate and all elements are re-attached.
-    if (m_inStyleRecalc) {
-        m_closeAfterStyleRecalc = true;
-        return;
-    }
+    ASSERT(!inStyleRecalc());
 
     bool wasLocationChangePending = frame() && frame()->navigationScheduler()->locationChangePending();
     bool doload = !parsing() && m_parser && !processingLoadEvent() && !wasLocationChangePending;
@@ -2322,6 +2324,95 @@ void Document::implicitClose()
         accessSVGExtensions()->startAnimations();
 }
 
+bool Document::dispatchBeforeUnloadEvent(Chrome& chrome, Document* navigatingDocument)
+{
+    if (!m_domWindow)
+        return true;
+
+    if (!body())
+        return true;
+
+    RefPtr<Document> protect(this);
+
+    RefPtr<BeforeUnloadEvent> beforeUnloadEvent = BeforeUnloadEvent::create();
+    m_loadEventProgress = BeforeUnloadEventInProgress;
+    dispatchWindowEvent(beforeUnloadEvent.get(), this);
+    m_loadEventProgress = BeforeUnloadEventCompleted;
+    if (!beforeUnloadEvent->defaultPrevented())
+        defaultEventHandler(beforeUnloadEvent.get());
+    if (beforeUnloadEvent->result().isNull())
+        return true;
+
+    if (navigatingDocument->m_didAllowNavigationViaBeforeUnloadConfirmationPanel) {
+        addConsoleMessage(JSMessageSource, ErrorMessageLevel, "Blocked attempt to show multiple 'beforeunload' confirmation panels for a single navigation.");
+        return true;
+    }
+
+    String text = displayStringModifiedByEncoding(beforeUnloadEvent->result());
+    if (chrome.runBeforeUnloadConfirmPanel(text, m_frame)) {
+        navigatingDocument->m_didAllowNavigationViaBeforeUnloadConfirmationPanel = true;
+        return true;
+    }
+    return false;
+}
+
+void Document::dispatchUnloadEvents()
+{
+    RefPtr<Document> protect(this);
+    if (m_parser)
+        m_parser->stopParsing();
+
+    if (m_loadEventProgress >= LoadEventTried && m_loadEventProgress <= UnloadEventInProgress) {
+        Element* currentFocusedElement = focusedElement();
+        if (currentFocusedElement && currentFocusedElement->hasTagName(inputTag))
+            toHTMLInputElement(currentFocusedElement)->endEditing();
+        if (m_loadEventProgress < PageHideInProgress) {
+            m_loadEventProgress = PageHideInProgress;
+            dispatchWindowEvent(PageTransitionEvent::create(eventNames().pagehideEvent, false), this);
+            if (!m_frame)
+                return;
+
+            // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed
+            // while dispatching the event, so protect it to prevent writing the end
+            // time into freed memory.
+            RefPtr<DocumentLoader> documentLoader =  m_frame->loader()->provisionalDocumentLoader();
+            m_loadEventProgress = UnloadEventInProgress;
+            RefPtr<Event> unloadEvent(Event::create(eventNames().unloadEvent, false, false));
+            if (documentLoader && !documentLoader->timing()->unloadEventStart() && !documentLoader->timing()->unloadEventEnd()) {
+                DocumentLoadTiming* timing = documentLoader->timing();
+                ASSERT(timing->navigationStart());
+                timing->markUnloadEventStart();
+                dispatchWindowEvent(unloadEvent, this);
+                timing->markUnloadEventEnd();
+            } else {
+                m_frame->domWindow()->dispatchEvent(unloadEvent, m_frame->document());
+            }
+        }
+        updateStyleIfNeeded();
+        m_loadEventProgress = UnloadEventHandled;
+    }
+
+    if (!m_frame)
+        return;
+
+    // Don't remove event listeners from a transitional empty document (see https://bugs.webkit.org/show_bug.cgi?id=28716 for more information).
+    bool keepEventListeners = m_frame->loader()->stateMachine()->isDisplayingInitialEmptyDocument() && m_frame->loader()->provisionalDocumentLoader()
+        && isSecureTransitionTo(m_frame->loader()->provisionalDocumentLoader()->url());
+    if (!keepEventListeners)
+        removeAllEventListeners();
+}
+
+Document::PageDismissalType Document::pageDismissalEventBeingDispatched() const
+{
+    if (m_loadEventProgress == BeforeUnloadEventInProgress)
+        return BeforeUnloadDismissal;
+    if (m_loadEventProgress == PageHideInProgress)
+        return PageHideDismissal;
+    if (m_loadEventProgress == UnloadEventInProgress)
+        return UnloadDismissal;
+    return NoDismissal;
+}
+
 void Document::setParsing(bool b)
 {
     m_bParsing = b;
@@ -2424,7 +2515,7 @@ EventTarget* Document::errorEventTarget()
 
 void Document::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack> callStack)
 {
-    addMessage(JSMessageSource, ErrorMessageLevel, errorMessage, sourceURL, lineNumber, callStack);
+    internalAddMessage(JSMessageSource, ErrorMessageLevel, errorMessage, sourceURL, lineNumber, callStack, 0);
 }
 
 void Document::setURL(const KURL& url)
@@ -2613,6 +2704,7 @@ Frame* Document::findUnsafeParentScrollPropagationBoundary()
 
 void Document::seamlessParentUpdatedStylesheets()
 {
+    m_styleSheetCollection->didModifySeamlessParentStyleSheet();
     styleResolverChanged(RecalcStyleImmediately);
 }
 
@@ -2690,7 +2782,7 @@ void Document::processHttpEquivDefaultStyle(const String& content)
     // -dwh
     m_styleSheetCollection->setSelectedStylesheetSetName(content);
     m_styleSheetCollection->setPreferredStylesheetSetName(content);
-    styleResolverChanged(DeferRecalcStyle);
+    styleResolverChanged(RecalcStyleDeferred);
 }
 
 void Document::processHttpEquivRefresh(const String& content)
@@ -2751,8 +2843,13 @@ void Document::processHttpEquivXFrameOptions(const String& content)
         // intent, we must navigate away from the possibly partially-rendered document to a location that
         // doesn't inherit the parent's SecurityOrigin.
         frame->navigationScheduler()->scheduleLocationChange(securityOrigin(), SecurityOrigin::urlWithUniqueSecurityOrigin(), String());
-        addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, message, requestIdentifier);
+        addConsoleMessageWithRequestIdentifier(SecurityMessageSource, ErrorMessageLevel, message, requestIdentifier);
     }
+}
+
+static bool isInvalidSeparator(UChar c)
+{
+    return c == ';';
 }
 
 // Though isspace() considers \t and \v to be whitespace, Win IE doesn't.
@@ -2763,6 +2860,8 @@ static bool isSeparator(UChar c)
 
 void Document::processArguments(const String& features, void* data, ArgumentsCallback callback)
 {
+    bool error = false;
+
     // Tread lightly in this code -- it was specifically designed to mimic Win IE's parsing behavior.
     int keyBegin, keyEnd;
     int valueBegin, valueEnd;
@@ -2780,12 +2879,15 @@ void Document::processArguments(const String& features, void* data, ArgumentsCal
         keyBegin = i;
 
         // skip to first separator
-        while (!isSeparator(buffer[i]))
+        while (!isSeparator(buffer[i])) {
+            error |= isInvalidSeparator(buffer[i]);
             i++;
+        }
         keyEnd = i;
 
         // skip to first '=', but don't skip past a ',' or the end of the string
         while (buffer[i] != '=') {
+            error |= isInvalidSeparator(buffer[i]);
             if (buffer[i] == ',' || i >= length)
                 break;
             i++;
@@ -2800,8 +2902,10 @@ void Document::processArguments(const String& features, void* data, ArgumentsCal
         valueBegin = i;
 
         // skip to first separator
-        while (!isSeparator(buffer[i]))
+        while (!isSeparator(buffer[i])) {
+            error |= isInvalidSeparator(buffer[i]);
             i++;
+        }
         valueEnd = i;
 
         ASSERT_WITH_SECURITY_IMPLICATION(i <= length);
@@ -2810,6 +2914,8 @@ void Document::processArguments(const String& features, void* data, ArgumentsCal
         String valueString = buffer.substring(valueBegin, valueEnd - valueBegin);
         callback(keyString, valueString, this, data);
     }
+    if (error)
+        reportViewportWarning(this, InvalidKeyValuePairSeparatorError, String(), String());
 }
 
 void Document::processViewport(const String& features, ViewportArguments::Type origin)
@@ -2982,31 +3088,11 @@ bool Document::canReplaceChild(Node* newChild, Node* oldChild)
     return true;
 }
 
-PassRefPtr<Node> Document::cloneNode(bool deep)
+PassRefPtr<Node> Document::cloneNode(bool /*deep*/)
 {
-    RefPtr<Document> clone = cloneDocumentWithoutChildren();
-    clone->cloneDataFromDocument(*this);
-    if (deep)
-        cloneChildNodes(clone.get());
-    return clone.release();
-}
-
-PassRefPtr<Document> Document::cloneDocumentWithoutChildren()
-{
-    return create();
-}
-
-void Document::cloneDataFromDocument(const Document& other)
-{
-    m_url = other.url();
-    m_baseURL = other.baseURL();
-    m_baseURLOverride = other.baseURLOverride();
-    m_documentURI = other.documentURI();
-
-    setCompatibilityMode(other.compatibilityMode());
-    setContextFeatures(other.contextFeatures());
-    setSecurityOrigin(other.securityOrigin());
-    setDecoder(other.decoder());
+    // Spec says cloning Document nodes is "implementation dependent"
+    // so we do not support it...
+    return 0;
 }
 
 StyleSheetList* Document::styleSheets()
@@ -3029,7 +3115,7 @@ String Document::selectedStylesheetSet() const
 void Document::setSelectedStylesheetSet(const String& aString)
 {
     m_styleSheetCollection->setSelectedStylesheetSetName(aString);
-    styleResolverChanged(DeferRecalcStyle);
+    styleResolverChanged(RecalcStyleDeferred);
 }
 
 void Document::evaluateMediaQueryList()
@@ -3050,7 +3136,7 @@ void Document::styleResolverChanged(StyleResolverUpdateType updateType, StyleRes
 
     bool needsRecalc = m_styleSheetCollection->updateActiveStyleSheets(updateMode);
 
-    if (updateType >= DeferRecalcStyle) {
+    if (updateType >= RecalcStyleDeferred) {
         setNeedsStyleRecalc();
         return;
     }
@@ -3276,7 +3362,7 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
         m_focusedElement->setFocus(true);
 
         if (m_focusedElement->isRootEditableElement())
-            frame()->editor()->didBeginEditing();
+            frame()->editor()->didBeginEditing(m_focusedElement.get());
 
         // eww, I suck. set the qt focus correctly
         // ### find a better place in the code for this
@@ -3571,7 +3657,7 @@ HTMLFrameOwnerElement* Document::ownerElement() const
 
 String Document::cookie(ExceptionState& es) const
 {
-    if (page() && !page()->settings()->cookieEnabled())
+    if (page() && !page()->settings().cookieEnabled())
         return String();
 
     // FIXME: The HTML5 DOM spec states that this attribute can raise an
@@ -3579,7 +3665,13 @@ String Document::cookie(ExceptionState& es) const
     // browsing context.
 
     if (!securityOrigin()->canAccessCookies()) {
-        es.throwDOMException(SecurityError);
+        String accessDeniedMessage = "Access to 'cookie' is denied for this document.";
+        if (isSandboxed(SandboxOrigin))
+            es.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
+        else if (url().protocolIs("data"))
+            es.throwSecurityError(accessDeniedMessage + " Cookies are disabled inside 'data:' URLs.");
+        else
+            es.throwSecurityError(accessDeniedMessage);
         return String();
     }
 
@@ -3592,7 +3684,7 @@ String Document::cookie(ExceptionState& es) const
 
 void Document::setCookie(const String& value, ExceptionState& es)
 {
-    if (page() && !page()->settings()->cookieEnabled())
+    if (page() && !page()->settings().cookieEnabled())
         return;
 
     // FIXME: The HTML5 DOM spec states that this attribute can raise an
@@ -3600,7 +3692,13 @@ void Document::setCookie(const String& value, ExceptionState& es)
     // browsing context.
 
     if (!securityOrigin()->canAccessCookies()) {
-        es.throwDOMException(SecurityError);
+        String accessDeniedMessage = "Access to 'cookie' is denied for this document.";
+        if (isSandboxed(SandboxOrigin))
+            es.throwSecurityError(accessDeniedMessage + " The document is sandboxed and lacks the 'allow-same-origin' flag.");
+        else if (url().protocolIs("data"))
+            es.throwSecurityError(accessDeniedMessage + " Cookies are disabled inside 'data:' URLs.");
+        else
+            es.throwSecurityError(accessDeniedMessage);
         return;
     }
 
@@ -3613,8 +3711,8 @@ void Document::setCookie(const String& value, ExceptionState& es)
 
 String Document::referrer() const
 {
-    if (frame())
-        return frame()->loader()->referrer();
+    if (loader())
+        return loader()->request().httpReferrer();
     return String();
 }
 
@@ -3626,7 +3724,7 @@ String Document::domain() const
 void Document::setDomain(const String& newDomain, ExceptionState& es)
 {
     if (SchemeRegistry::isDomainRelaxationForbiddenForURLScheme(securityOrigin()->protocol())) {
-        es.throwDOMException(SecurityError, "'document.domain' assignment is forbidden for the '" + securityOrigin()->protocol() + "' scheme.");
+        es.throwSecurityError(ExceptionMessages::failedToSet("domain", "Document", "assignment is forbidden for the '" + securityOrigin()->protocol() + "' scheme."));
         return;
     }
 
@@ -3648,17 +3746,17 @@ void Document::setDomain(const String& newDomain, ExceptionState& es)
 
     int oldLength = domain().length();
     int newLength = newDomain.length();
-    String exceptionMessage =  "'document.domain' assignment failed: '" + newDomain + "' is not a suffix of '" + domain() + "'.";
+    String exceptionMessage =  ExceptionMessages::failedToSet("domain", "Document", "'" + newDomain + "' is not a suffix of '" + domain() + "'.");
     // e.g. newDomain = subdomain.www.example.com (25) and domain() = www.example.com (15)
     if (newLength >= oldLength) {
-        es.throwDOMException(SecurityError, exceptionMessage);
+        es.throwSecurityError(exceptionMessage);
         return;
     }
 
     String test = domain();
     // Check that it's a complete suffix, not e.g. "ample.com"
     if (test[oldLength - newLength - 1] != '.') {
-        es.throwDOMException(SecurityError, exceptionMessage);
+        es.throwSecurityError(exceptionMessage);
         return;
     }
 
@@ -3666,7 +3764,7 @@ void Document::setDomain(const String& newDomain, ExceptionState& es)
     // and we check that it's the same thing as newDomain
     test.remove(0, oldLength - newLength);
     if (test != newDomain) {
-        es.throwDOMException(SecurityError, exceptionMessage);
+        es.throwSecurityError(exceptionMessage);
         return;
     }
 
@@ -4447,18 +4545,34 @@ void Document::parseDNSPrefetchControlHeader(const String& dnsPrefetchControl)
     m_haveExplicitlyDisabledDNSPrefetch = true;
 }
 
-void Document::addConsoleMessage(MessageSource source, MessageLevel level, const String& message, unsigned long requestIdentifier)
+void Document::addMessage(MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, ScriptState* state)
 {
-    if (!isContextThread()) {
-        postTask(AddConsoleMessageTask::create(source, level, message));
-        return;
-    }
-
-    if (Page* page = this->page())
-        page->console()->addMessage(source, level, message, requestIdentifier, this);
+    internalAddMessage(source, level, message, sourceURL, lineNumber, 0, state);
 }
 
-void Document::addMessage(MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack, ScriptState* state, unsigned long requestIdentifier)
+void Document::internalAddMessage(MessageSource source, MessageLevel level, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack> callStack, ScriptState* state)
+{
+    if (!isContextThread()) {
+        postTask(AddConsoleMessageTask::create(source, level, message));
+        return;
+    }
+    Page* page = this->page();
+    if (!page)
+        return;
+
+    String messageURL = sourceURL;
+    if (!state && sourceURL.isNull() && !lineNumber) {
+        messageURL = url().string();
+        if (parsing() && !isInDocumentWrite() && scriptableDocumentParser()) {
+            ScriptableDocumentParser* parser = scriptableDocumentParser();
+            if (!parser->isWaitingForScripts() && !parser->isExecutingScript())
+                lineNumber = parser->lineNumber().oneBasedInt();
+        }
+    }
+    page->console().addMessage(source, level, message, messageURL, lineNumber, 0, callStack, state, 0);
+}
+
+void Document::addConsoleMessageWithRequestIdentifier(MessageSource source, MessageLevel level, const String& message, unsigned long requestIdentifier)
 {
     if (!isContextThread()) {
         postTask(AddConsoleMessageTask::create(source, level, message));
@@ -4466,7 +4580,7 @@ void Document::addMessage(MessageSource source, MessageLevel level, const String
     }
 
     if (Page* page = this->page())
-        page->console()->addMessage(source, level, message, sourceURL, lineNumber, 0, callStack, state, requestIdentifier);
+        page->console().addMessage(source, level, message, String(), 0, 0, 0, 0, requestIdentifier);
 }
 
 struct PerformTaskContext {
@@ -4632,18 +4746,18 @@ void Document::webkitExitPointerLock()
 {
     if (!page())
         return;
-    if (Element* target = page()->pointerLockController()->element()) {
+    if (Element* target = page()->pointerLockController().element()) {
         if (target->document() != this)
             return;
     }
-    page()->pointerLockController()->requestPointerUnlock();
+    page()->pointerLockController().requestPointerUnlock();
 }
 
 Element* Document::webkitPointerLockElement() const
 {
-    if (!page() || page()->pointerLockController()->lockPending())
+    if (!page() || page()->pointerLockController().lockPending())
         return 0;
-    if (Element* element = page()->pointerLockController()->element()) {
+    if (Element* element = page()->pointerLockController().element()) {
         if (element->document() == this)
             return element;
     }
@@ -4752,7 +4866,7 @@ void Document::didAddTouchEventHandler(Node* handler)
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
             scrollingCoordinator->touchEventTargetRectsDidChange(this);
         if (m_touchEventTargets->size() == 1)
-            page->chrome().client()->needTouchEvents(true);
+            page->chrome().client().needTouchEvents(true);
     }
 }
 
@@ -4760,7 +4874,9 @@ void Document::didRemoveTouchEventHandler(Node* handler)
 {
     if (!m_touchEventTargets.get())
         return;
-    ASSERT(m_touchEventTargets->contains(handler));
+    // TODO(rbyers): Re-enable this ASSERT - http://crbug.com/254203.
+    // The known failure is benign, but the fix somehow causes a perf regression.
+    // ASSERT(m_touchEventTargets->contains(handler));
     m_touchEventTargets->remove(handler);
     if (Document* parent = parentDocument()) {
         parent->didRemoveTouchEventHandler(this);
@@ -4778,17 +4894,14 @@ void Document::didRemoveTouchEventHandler(Node* handler)
         if (frame->document() && frame->document()->hasTouchEventHandlers())
             return;
     }
-    page->chrome().client()->needTouchEvents(false);
+    page->chrome().client().needTouchEvents(false);
 }
 
 void Document::didRemoveEventTargetNode(Node* handler)
 {
     if (m_touchEventTargets) {
-        if (handler == this)
-            m_touchEventTargets->clear();
-        else
-            m_touchEventTargets->removeAll(handler);
-        if (m_touchEventTargets->isEmpty() && parentDocument())
+        m_touchEventTargets->removeAll(handler);
+        if ((handler == this || m_touchEventTargets->isEmpty()) && parentDocument())
             parentDocument()->didRemoveEventTargetNode(this);
     }
 }
@@ -5121,7 +5234,7 @@ void Document::didAssociateFormControlsTimerFired(Timer<Document>* timer)
     Vector<RefPtr<Element> > associatedFormControls;
     copyToVector(m_associatedFormControls, associatedFormControls);
 
-    frame()->page()->chrome().client()->didAssociateFormControls(associatedFormControls);
+    frame()->page()->chrome().client().didAssociateFormControls(associatedFormControls);
     m_associatedFormControls.clear();
 }
 

@@ -24,7 +24,7 @@
 #define HTMLDocument_h
 
 #include "core/dom/Document.h"
-#include "core/loader/cache/ResourceClient.h"
+#include "core/fetch/ResourceClient.h"
 #include "wtf/HashCountedSet.h"
 
 namespace WebCore {
@@ -75,8 +75,6 @@ public:
     bool hasExtraNamedItem(StringImpl* name);
 
     static bool isCaseSensitiveAttribute(const QualifiedName&);
-
-    virtual PassRefPtr<Document> cloneDocumentWithoutChildren() OVERRIDE FINAL;
 
 protected:
     HTMLDocument(const DocumentInit&, DocumentClassFlags extendedDocumentClasses = DefaultDocumentClass);

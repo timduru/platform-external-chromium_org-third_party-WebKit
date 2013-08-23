@@ -30,11 +30,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/crypto/AesKeyGenParams.cpp \
 	third_party/WebKit/Source/modules/crypto/Algorithm.cpp \
 	third_party/WebKit/Source/modules/crypto/Crypto.cpp \
-	third_party/WebKit/Source/modules/crypto/CryptoOperation.cpp \
 	third_party/WebKit/Source/modules/crypto/DOMWindowCrypto.cpp \
+	third_party/WebKit/Source/modules/crypto/HmacKeyParams.cpp \
 	third_party/WebKit/Source/modules/crypto/HmacParams.cpp \
 	third_party/WebKit/Source/modules/crypto/Key.cpp \
-	third_party/WebKit/Source/modules/crypto/KeyOperation.cpp \
 	third_party/WebKit/Source/modules/crypto/NormalizeAlgorithm.cpp \
 	third_party/WebKit/Source/modules/crypto/RsaKeyGenParams.cpp \
 	third_party/WebKit/Source/modules/crypto/RsaSsaParams.cpp \
@@ -91,6 +90,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/geolocation/Geolocation.cpp \
 	third_party/WebKit/Source/modules/geolocation/GeolocationController.cpp \
 	third_party/WebKit/Source/modules/geolocation/NavigatorGeolocation.cpp \
+	third_party/WebKit/Source/modules/imagebitmap/ImageBitmapFactories.cpp \
 	third_party/WebKit/Source/modules/indexeddb/DOMWindowIndexedDatabase.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBAny.cpp \
 	third_party/WebKit/Source/modules/indexeddb/IDBCursor.cpp \
@@ -344,7 +344,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
@@ -489,7 +488,6 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \

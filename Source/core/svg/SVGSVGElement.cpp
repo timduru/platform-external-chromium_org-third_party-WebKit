@@ -28,6 +28,7 @@
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/css/CSSHelper.h"
 #include "core/dom/Document.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/EventListener.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/NodeTraversal.h"
@@ -718,7 +719,7 @@ void SVGSVGElement::setupInitialView(const String& fragmentIdentifier, Element* 
         if (SVGViewElement* viewElement = anchorNode->hasTagName(SVGNames::viewTag) ? static_cast<SVGViewElement*>(anchorNode) : 0) {
             SVGElement* element = SVGLocatable::nearestViewportElement(viewElement);
             if (element->hasTagName(SVGNames::svgTag)) {
-                SVGSVGElement* svg = static_cast<SVGSVGElement*>(element);
+                SVGSVGElement* svg = toSVGSVGElement(element);
                 svg->inheritViewAttributes(viewElement);
 
                 if (RenderObject* renderer = svg->renderer())

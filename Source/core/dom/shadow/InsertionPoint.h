@@ -32,8 +32,7 @@
 #define InsertionPoint_h
 
 #include "core/css/CSSSelectorList.h"
-#include "core/dom/shadow/ContentDistributor.h"
-#include "core/dom/shadow/ElementShadow.h"
+#include "core/dom/shadow/ContentDistribution.h"
 #include "core/html/HTMLElement.h"
 #include "wtf/Forward.h"
 
@@ -44,7 +43,7 @@ public:
     virtual ~InsertionPoint();
 
     bool hasDistribution() const { return !m_distribution.isEmpty(); }
-    void setDistribution(ContentDistribution& distribution) { m_distribution.swap(distribution); }
+    void setDistribution(ContentDistribution&);
     void clearDistribution() { m_distribution.clear(); }
     bool isActive() const;
 
@@ -66,8 +65,6 @@ public:
     Node* last() const { return m_distribution.isEmpty() ? 0 : m_distribution.last().get(); }
     Node* nextTo(const Node* node) const { return m_distribution.nextTo(node); }
     Node* previousTo(const Node* node) const { return m_distribution.previousTo(node); }
-
-    void lazyAttachDistribution(ShouldSetAttached);
 
 protected:
     InsertionPoint(const QualifiedName&, Document*);

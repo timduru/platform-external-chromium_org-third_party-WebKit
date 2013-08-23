@@ -39,6 +39,13 @@
 #include "core/dom/DeviceOrientationController.h"
 #include "core/dom/Document.h"
 #include "core/dom/UserGestureIndicator.h"
+#include "core/fetch/CSSStyleSheetResource.h"
+#include "core/fetch/FontResource.h"
+#include "core/fetch/ImageResource.h"
+#include "core/fetch/MemoryCache.h"
+#include "core/fetch/Resource.h"
+#include "core/fetch/ResourceFetcher.h"
+#include "core/fetch/ScriptResource.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/inspector/ContentSearchUtils.h"
 #include "core/inspector/DOMPatchSupport.h"
@@ -54,13 +61,6 @@
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/TextResourceDecoder.h"
-#include "core/loader/cache/CSSStyleSheetResource.h"
-#include "core/loader/cache/FontResource.h"
-#include "core/loader/cache/ImageResource.h"
-#include "core/loader/cache/MemoryCache.h"
-#include "core/loader/cache/Resource.h"
-#include "core/loader/cache/ResourceFetcher.h"
-#include "core/loader/cache/ScriptResource.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
@@ -396,7 +396,7 @@ void InspectorPageAgent::disable(ErrorString*)
     setShowPaintRects(0, false);
     setShowDebugBorders(0, false);
     setShowFPSCounter(0, false);
-    setEmulatedMedia(0, "");
+    setEmulatedMedia(0, String());
     setContinuousPaintingEnabled(0, false);
     setShowScrollBottleneckRects(0, false);
     setShowViewportSizeOnResize(0, false, 0);
@@ -693,7 +693,7 @@ bool InspectorPageAgent::deviceMetricsChanged(int width, int height, double font
     // These two always fit an int.
     int currentWidth = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenWidthOverride));
     int currentHeight = static_cast<int>(m_state->getLong(PageAgentState::pageAgentScreenHeightOverride));
-    double currentFontScaleFactor = m_state->getDouble(PageAgentState::pageAgentFontScaleFactorOverride);
+    double currentFontScaleFactor = m_state->getDouble(PageAgentState::pageAgentFontScaleFactorOverride, 1);
     bool currentFitWindow = m_state->getBoolean(PageAgentState::pageAgentFitWindow);
 
     return width != currentWidth || height != currentHeight || fontScaleFactor != currentFontScaleFactor || fitWindow != currentFitWindow;
@@ -823,7 +823,7 @@ void InspectorPageAgent::didCommitLoad(Frame*, DocumentLoader* loader)
 {
     if (loader->frame() == m_page->mainFrame()) {
         m_scriptToEvaluateOnLoadOnce = m_pendingScriptToEvaluateOnLoadOnce;
-        m_scriptPreprocessor = m_pendingScriptPreprocessor;
+        m_scriptPreprocessorSource = m_pendingScriptPreprocessor;
         m_pendingScriptToEvaluateOnLoadOnce = String();
         m_pendingScriptPreprocessor = String();
     }
@@ -1247,24 +1247,34 @@ void InspectorPageAgent::applyEmulatedMedia(String* media)
 
 void InspectorPageAgent::setForceCompositingMode(ErrorString* errorString, bool force)
 {
-    Settings* settings = m_page->settings();
-    if (force && !settings->acceleratedCompositingEnabled()) {
+    Settings& settings = m_page->settings();
+    if (force && !settings.acceleratedCompositingEnabled()) {
         if (errorString)
             *errorString = "Compositing mode is not supported";
         return;
     }
     m_state->setBoolean(PageAgentState::forceCompositingMode, force);
-    if (settings->forceCompositingMode() == force)
+    if (settings.forceCompositingMode() == force)
         return;
     m_didForceCompositingMode = force;
-    settings->setForceCompositingMode(force);
+    settings.setForceCompositingMode(force);
     Frame* mainFrame = m_page->mainFrame();
     if (!mainFrame)
         return;
     mainFrame->view()->updateCompositingLayersAfterStyleChange();
 }
 
-void InspectorPageAgent::captureScreenshot(ErrorString*, String*)
+void InspectorPageAgent::captureScreenshot(ErrorString*, const String*, const int*, const double*, String*)
+{
+    // Handled on the browser level.
+}
+
+void InspectorPageAgent::startScreencast(ErrorString*, const String*, const int*, const double*)
+{
+    // Handled on the browser level.
+}
+
+void InspectorPageAgent::stopScreencast(ErrorString*)
 {
     // Handled on the browser level.
 }

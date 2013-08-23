@@ -195,6 +195,8 @@ public:
     virtual bool isKeyboardFocusable() const;
     virtual bool shouldShowFocusRingOnMouseFocus() const;
     virtual bool shouldUseInputMethod() const;
+    virtual void enableSecureTextInput();
+    virtual void disableSecureTextInput();
     virtual void handleFocusEvent(Element* oldFocusedElement, FocusDirection);
     virtual void handleBlurEvent();
     virtual void accessKeyAction(bool sendMouseEvents);
@@ -212,13 +214,7 @@ public:
     virtual HTMLElement* containerElement() const { return 0; }
     virtual HTMLElement* innerBlockElement() const { return 0; }
     virtual HTMLElement* innerTextElement() const { return 0; }
-    virtual HTMLElement* innerSpinButtonElement() const { return 0; }
-#if ENABLE(INPUT_SPEECH)
-    virtual HTMLElement* speechButtonElement() const { return 0; }
-#endif
     virtual HTMLElement* passwordGeneratorButtonElement() const { return 0; }
-    virtual HTMLElement* sliderThumbElement() const { return 0; }
-    virtual HTMLElement* sliderTrackElement() const { return 0; }
     virtual HTMLElement* placeholderElement() const;
 
     // Miscellaneous functions
@@ -228,7 +224,9 @@ public:
     virtual PassRefPtr<RenderStyle> customStyleForRenderer(PassRefPtr<RenderStyle>);
     virtual void attach();
     virtual void detach();
+    virtual void countUsage();
     virtual void minOrMaxAttributeChanged();
+    virtual void sanitizeValueInResponseToMinOrMaxAttributeChange();
     virtual void stepAttributeChanged();
     virtual void altAttributeChanged();
     virtual void srcAttributeChanged();

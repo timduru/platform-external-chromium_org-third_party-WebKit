@@ -37,6 +37,7 @@
 #include "../platform/WebURLError.h"
 #include "../platform/WebURLRequest.h"
 #include "WebDOMMessageEvent.h"
+#include "WebDataSource.h"
 #include "WebIconURL.h"
 #include "WebNavigationPolicy.h"
 #include "WebNavigationType.h"
@@ -137,7 +138,7 @@ public:
     // The client may choose to alter the navigation policy.  Otherwise,
     // defaultPolicy should just be returned.
     virtual WebNavigationPolicy decidePolicyForNavigation(
-        WebFrame*, const WebURLRequest&, WebNavigationType,
+        WebFrame*, WebDataSource::ExtraData*, const WebURLRequest&, WebNavigationType,
         WebNavigationPolicy defaultPolicy, bool isRedirect) { return defaultPolicy; }
 
 
@@ -299,29 +300,6 @@ public:
     // where on the screen the selection rect is currently located.
     virtual void reportFindInPageSelection(
         int identifier, int activeMatchOrdinal, const WebRect& selection) { }
-
-    // FileSystem ----------------------------------------------------
-
-    // Requests to open a FileSystem.
-    // |size| indicates how much storage space (in bytes) the caller expects
-    // to need.
-    // WebFileSystemCallbacks::didOpenFileSystem() must be called with
-    // a name and root path for the requested FileSystem when the operation
-    // is completed successfully. WebFileSystemCallbacks::didFail() must be
-    // called otherwise. The create bool is for indicating whether or not to
-    // create root path for file systems if it do not exist.
-    virtual void openFileSystem(
-        WebFrame*, WebFileSystemType, long long size,
-        bool create, WebFileSystemCallbacks*) { }
-
-    // Deletes FileSystem.
-    // WebFileSystemCallbacks::didSucceed() must be called when the operation
-    // is completed successfully. WebFileSystemCallbacks::didFail() must be
-    // called otherwise.
-    // All in-flight operations and following operations may fail after the
-    // FileSystem is deleted.
-    virtual void deleteFileSystem(
-        WebFrame*, WebFileSystemType, WebFileSystemCallbacks*) { }
 
     // Quota ---------------------------------------------------------
 

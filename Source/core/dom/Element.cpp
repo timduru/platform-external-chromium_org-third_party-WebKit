@@ -953,7 +953,7 @@ void Element::attributeChanged(const QualifiedName& name, const AtomicString& ne
 inline void Element::attributeChangedFromParserOrByCloning(const QualifiedName& name, const AtomicString& newValue, AttributeModificationReason reason)
 {
     if (name == isAttr)
-        CustomElementRegistrationContext::setTypeExtension(this, newValue);
+        CustomElementRegistrationContext::setTypeExtension(this, newValue, reason == ModifiedDirectly ? CustomElementRegistrationContext::CreatedByParser : CustomElementRegistrationContext::NotCreatedByParser);
     attributeChanged(name, newValue, reason);
 }
 
@@ -1053,7 +1053,7 @@ void Element::classAttributeChanged(const AtomicString& newClassString)
 bool Element::shouldInvalidateDistributionWhenAttributeChanged(ElementShadow* elementShadow, const QualifiedName& name, const AtomicString& newValue)
 {
     ASSERT(elementShadow);
-    const SelectRuleFeatureSet& featureSet = elementShadow->distributor().ensureSelectFeatureSet(elementShadow);
+    const SelectRuleFeatureSet& featureSet = elementShadow->ensureSelectFeatureSet();
 
     if (isIdAttributeName(name)) {
         AtomicString oldId = elementData()->idForStyleResolution();
@@ -1206,14 +1206,6 @@ RenderObject* Element::createRenderer(RenderStyle* style)
     return RenderObject::createObject(this, style);
 }
 
-bool Element::isInert() const
-{
-    const Element* dialog = document()->activeModalDialog();
-    if (dialog && !containsIncludingShadowDOM(dialog) && !dialog->containsIncludingShadowDOM(this))
-        return true;
-    return document()->ownerElement() && document()->ownerElement()->isInert();
-}
-
 Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertionPoint)
 {
     // need to do superclass processing first so inDocument() is true
@@ -1228,6 +1220,9 @@ Node::InsertionNotificationRequest Element::insertedInto(ContainerNode* insertio
 
     if (Element* after = pseudoElement(AFTER))
         after->insertedInto(insertionPoint);
+
+    if (Element* backdrop = pseudoElement(BACKDROP))
+        backdrop->insertedInto(insertionPoint);
 
     if (!insertionPoint->isInTreeScope())
         return InsertionDone;
@@ -1279,7 +1274,7 @@ void Element::removedFrom(ContainerNode* insertionPoint)
         setContainsFullScreenElementOnAncestorsCrossingFrameBoundaries(false);
 
     if (document()->page())
-        document()->page()->pointerLockController()->elementRemoved(this);
+        document()->page()->pointerLockController().elementRemoved(this);
 
     setSavedLayerScrollOffset(IntSize());
 
@@ -1317,6 +1312,16 @@ void Element::attach(const AttachContext& context)
     PostAttachCallbackDisabler callbackDisabler(this);
     StyleResolverParentPusher parentPusher(this);
     WidgetHierarchyUpdatesSuspensionScope suspendWidgetHierarchyUpdates;
+
+    // We've already been through detach when doing a lazyAttach, but we might
+    // need to clear any state that's been added since then.
+    if (hasRareData() && styleChangeType() == LazyAttachStyleChange) {
+        ElementRareData* data = elementRareData();
+        data->clearComputedStyle();
+        data->resetDynamicRestyleObservations();
+        if (!context.resolvedStyle)
+            data->resetStyleState();
+    }
 
     NodeRenderingContext(this, context.resolvedStyle).createRendererForElementIfNeeded();
 
@@ -1534,10 +1539,11 @@ bool Element::recalcStyle(StyleChange change)
         } else if (child->isElementNode()) {
             Element* element = toElement(child);
 
+            bool childRulesChanged = element->needsStyleRecalc() && element->styleChangeType() >= SubtreeStyleChange;
+
             if (forceCheckOfNextElementSibling || forceCheckOfAnyElementSibling)
                 element->setNeedsStyleRecalc();
 
-            bool childRulesChanged = element->needsStyleRecalc() && element->styleChangeType() >= SubtreeStyleChange;
             forceCheckOfNextElementSibling = childRulesChanged && hasDirectAdjacentRules;
             forceCheckOfAnyElementSibling = forceCheckOfAnyElementSibling || (childRulesChanged && hasIndirectAdjacentRules);
 
@@ -1550,8 +1556,10 @@ bool Element::recalcStyle(StyleChange change)
         forceReattachOfAnyWhitespaceSibling = didReattach || forceReattachOfAnyWhitespaceSibling;
     }
 
-    if (shouldRecalcStyle(change, this))
+    if (shouldRecalcStyle(change, this)) {
         updatePseudoElement(AFTER, change);
+        updatePseudoElement(BACKDROP, change);
+    }
 
     clearNeedsStyleRecalc();
     clearChildNeedsStyleRecalc();
@@ -1626,12 +1634,6 @@ ShadowRoot* Element::ensureUserAgentShadowRoot()
     ShadowRoot* shadowRoot = ensureShadow()->addShadowRoot(this, ShadowRoot::UserAgentShadowRoot);
     didAddUserAgentShadowRoot(shadowRoot);
     return shadowRoot;
-}
-
-Element* Element::uaShadowElementById(const AtomicString& id) const
-{
-    ShadowRoot* shadowRoot = userAgentShadowRoot();
-    return shadowRoot ? shadowRoot->getElementById(id) : 0;
 }
 
 bool Element::supportsShadowElementForUserAgentShadow() const
@@ -1770,6 +1772,8 @@ void Element::finishParsingChildren()
     checkForSiblingStyleChanges(this, renderStyle(), true, lastChild(), 0, 0);
     if (StyleResolver* styleResolver = document()->styleResolverIfExists())
         styleResolver->popParentElement(this);
+    if (isCustomElement())
+        CustomElement::didFinishParsingChildren(this);
 }
 
 #ifndef NDEBUG
@@ -1827,7 +1831,7 @@ PassRefPtr<Attr> Element::setAttributeNode(Attr* attrNode, ExceptionState& es)
     synchronizeAllAttributes();
     UniqueElementData* elementData = ensureUniqueElementData();
 
-    size_t index = elementData->getAttributeItemIndex(attrNode->qualifiedName());
+    size_t index = elementData->getAttributeItemIndex(attrNode->qualifiedName(), shouldIgnoreAttributeCase(this));
     if (index != notFound) {
         if (oldAttrNode)
             detachAttrNodeFromElementWithValue(oldAttrNode.get(), elementData->attributeItem(index)->value());
@@ -2630,7 +2634,7 @@ void Element::setIsInTopLayer(bool inTopLayer)
 void Element::webkitRequestPointerLock()
 {
     if (document()->page())
-        document()->page()->pointerLockController()->requestPointerLock(this);
+        document()->page()->pointerLockController().requestPointerLock(this);
 }
 
 SpellcheckAttributeState Element::spellcheckAttributeState() const

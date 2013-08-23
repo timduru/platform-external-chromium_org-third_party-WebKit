@@ -113,10 +113,12 @@ public:
     static void refreshPlugins(bool reload);
     PluginData* pluginData() const;
 
-    EditorClient* editorClient() const { return m_editorClient; }
+    EditorClient& editorClient() const { return *m_editorClient; }
 
     void setMainFrame(PassRefPtr<Frame>);
     Frame* mainFrame() const { return m_mainFrame.get(); }
+
+    void documentDetached(Document*);
 
     bool openedByDOM() const;
     void setOpenedByDOM();
@@ -143,9 +145,9 @@ public:
     DragCaretController& dragCaretController() const { return *m_dragCaretController; }
     DragController& dragController() const { return *m_dragController; }
     FocusController& focusController() const { return *m_focusController; }
-    ContextMenuController* contextMenuController() const { return m_contextMenuController.get(); }
-    InspectorController* inspectorController() const { return m_inspectorController.get(); }
-    PointerLockController* pointerLockController() const { return m_pointerLockController.get(); }
+    ContextMenuController& contextMenuController() const { return *m_contextMenuController; }
+    InspectorController& inspectorController() const { return *m_inspectorController; }
+    PointerLockController& pointerLockController() const { return *m_pointerLockController; }
     ValidationMessageClient* validationMessageClient() const { return m_validationMessageClient; }
     void setValidationMessageClient(ValidationMessageClient* client) { m_validationMessageClient = client; }
 
@@ -167,11 +169,11 @@ public:
     String mainThreadScrollingReasonsAsText();
     PassRefPtr<ClientRectList> nonFastScrollableRects(const Frame*);
 
-    Settings* settings() const { return m_settings.get(); }
-    ProgressTracker* progress() const { return m_progress.get(); }
-    BackForwardController* backForward() const { return m_backForwardController.get(); }
+    Settings& settings() const { return *m_settings; }
+    ProgressTracker& progress() const { return *m_progress; }
+    BackForwardController& backForward() const { return *m_backForwardController; }
 
-    UseCounter* useCounter() { return &m_UseCounter; }
+    UseCounter& useCounter() { return m_useCounter; }
 
     void setTabKeyCyclesThroughElements(bool b) { m_tabKeyCyclesThroughElements = b; }
     bool tabKeyCyclesThroughElements() const { return m_tabKeyCyclesThroughElements; }
@@ -230,7 +232,7 @@ public:
     bool isPainting() const { return m_isPainting; }
 #endif
 
-    PageConsole* console() { return m_console.get(); }
+    PageConsole& console() { return *m_console; }
 
     double timerAlignmentInterval() const;
 
@@ -261,30 +263,30 @@ private:
 
     virtual PassOwnPtr<LifecycleNotifier> createLifecycleNotifier() OVERRIDE;
 
-    OwnPtr<AutoscrollController> m_autoscrollController;
-    OwnPtr<Chrome> m_chrome;
+    const OwnPtr<AutoscrollController> m_autoscrollController;
+    const OwnPtr<Chrome> m_chrome;
     const OwnPtr<DragCaretController> m_dragCaretController;
     const OwnPtr<DragController> m_dragController;
-    OwnPtr<FocusController> m_focusController;
-    OwnPtr<ContextMenuController> m_contextMenuController;
-    OwnPtr<InspectorController> m_inspectorController;
-    OwnPtr<PointerLockController> m_pointerLockController;
+    const OwnPtr<FocusController> m_focusController;
+    const OwnPtr<ContextMenuController> m_contextMenuController;
+    const OwnPtr<InspectorController> m_inspectorController;
+    const OwnPtr<PointerLockController> m_pointerLockController;
     RefPtr<ScrollingCoordinator> m_scrollingCoordinator;
 
-    OwnPtr<Settings> m_settings;
-    OwnPtr<ProgressTracker> m_progress;
+    const OwnPtr<Settings> m_settings;
+    const OwnPtr<ProgressTracker> m_progress;
 
-    OwnPtr<BackForwardController> m_backForwardController;
+    const OwnPtr<BackForwardController> m_backForwardController;
     RefPtr<Frame> m_mainFrame;
 
     mutable RefPtr<PluginData> m_pluginData;
 
-    RefPtr<RenderTheme> m_theme;
+    const RefPtr<RenderTheme> m_theme;
 
-    EditorClient* m_editorClient;
+    EditorClient* const m_editorClient;
     ValidationMessageClient* m_validationMessageClient;
 
-    UseCounter m_UseCounter;
+    UseCounter m_useCounter;
 
     int m_subframeCount;
     bool m_openedByDOM;

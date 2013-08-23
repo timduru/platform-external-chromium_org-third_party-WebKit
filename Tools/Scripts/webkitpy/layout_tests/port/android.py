@@ -182,9 +182,10 @@ class AndroidCommands(object):
     _adb_command_path = None
     _adb_command_path_options = []
 
-    def __init__(self, executive, device_serial):
+    def __init__(self, executive, device_serial, debug_logging):
         self._executive = executive
         self._device_serial = device_serial
+        self._debug_logging = debug_logging
 
     # Local public methods.
 
@@ -220,8 +221,8 @@ class AndroidCommands(object):
         else:
             error_handler = None
 
-        result = self._executive.run_command(self.adb_command() + command,
-                error_handler=error_handler)
+        result = self._executive.run_command(self.adb_command() + command, error_handler=error_handler,
+                                             debug_logging=self._debug_logging)
 
         # We limit the length to avoid outputting too verbose commands, such as "adb logcat".
         self._log_debug('Run adb result: ' + result[:80])
@@ -231,14 +232,14 @@ class AndroidCommands(object):
         return self._device_serial
 
     def adb_command(self):
-        return [AndroidCommands.adb_command_path(self._executive), '-s', self._device_serial]
+        return [AndroidCommands.adb_command_path(self._executive, self._debug_logging), '-s', self._device_serial]
 
     @staticmethod
     def set_adb_command_path_options(paths):
         AndroidCommands._adb_command_path_options = paths
 
     @staticmethod
-    def adb_command_path(executive):
+    def adb_command_path(executive, debug_logging):
         if AndroidCommands._adb_command_path:
             return AndroidCommands._adb_command_path
 
@@ -247,7 +248,7 @@ class AndroidCommands(object):
         command_path = None
         command_version = None
         for path_option in AndroidCommands._adb_command_path_options:
-            path_version = AndroidCommands._determine_adb_version(path_option, executive)
+            path_version = AndroidCommands._determine_adb_version(path_option, executive, debug_logging)
             if not path_version:
                 continue
             if command_version != None and path_version < command_version:
@@ -266,14 +267,19 @@ class AndroidCommands(object):
     def _log_error(self, message):
         _log.error('[%s] %s' % (self._device_serial, message))
 
+    def _log_info(self, message):
+        _log.info('[%s] %s' % (self._device_serial, message))
+
     def _log_debug(self, message):
-        _log.debug('[%s] %s' % (self._device_serial, message))
+        if self._debug_logging:
+            _log.debug('[%s] %s' % (self._device_serial, message))
 
     @staticmethod
-    def _determine_adb_version(adb_command_path, executive):
+    def _determine_adb_version(adb_command_path, executive, debug_logging):
         re_version = re.compile('^.*version ([\d\.]+)$')
         try:
-            output = executive.run_command([adb_command_path, 'version'], error_handler=executive.ignore_error)
+            output = executive.run_command([adb_command_path, 'version'], error_handler=executive.ignore_error,
+                                           debug_logging=debug_logging)
         except OSError:
             return None
 
@@ -291,17 +297,18 @@ class AndroidDevices(object):
     # to participate in running the layout tests.
     MINIMUM_BATTERY_PERCENTAGE = 30
 
-    def __init__(self, executive, default_device=None):
+    def __init__(self, executive, default_device=None, debug_logging=False):
         self._usable_devices = []
         self._default_device = default_device
         self._prepared_devices = []
+        self._debug_logging = debug_logging
 
     def usable_devices(self, executive):
         if self._usable_devices:
             return self._usable_devices
 
         if self._default_device:
-            self._usable_devices = [AndroidCommands(executive, self._default_device)]
+            self._usable_devices = [AndroidCommands(executive, self._default_device, self._debug_logging)]
             return self._usable_devices
 
         # Example "adb devices" command output:
@@ -309,14 +316,14 @@ class AndroidDevices(object):
         #   0123456789ABCDEF        device
         re_device = re.compile('^([a-zA-Z0-9_:.-]+)\tdevice$', re.MULTILINE)
 
-        result = executive.run_command([AndroidCommands.adb_command_path(executive), 'devices'],
-                error_handler=executive.ignore_error)
+        result = executive.run_command([AndroidCommands.adb_command_path(executive, debug_logging=self._debug_logging), 'devices'],
+                                       error_handler=executive.ignore_error, debug_logging=self._debug_logging)
         devices = re_device.findall(result)
         if not devices:
             raise AssertionError('Unable to find attached Android devices. ADB output: %s' % result)
 
         for device_serial in devices:
-            commands = AndroidCommands(executive, device_serial)
+            commands = AndroidCommands(executive, device_serial, self._debug_logging)
             if self._battery_level_for_device(commands) < AndroidDevices.MINIMUM_BATTERY_PERCENTAGE:
                 continue
 
@@ -383,7 +390,8 @@ class AndroidPort(chromium.ChromiumPort):
         if hasattr(self._options, 'adb_device') and len(self._options.adb_device):
             default_device = self._options.adb_device
 
-        self._devices = AndroidDevices(self._executive, default_device)
+        self._debug_logging = self.get_option('android_logging')
+        self._devices = AndroidDevices(self._executive, default_device, self._debug_logging)
 
         # Tell AndroidCommands where to search for the "adb" command.
         AndroidCommands.set_adb_command_path_options(['adb',
@@ -398,10 +406,6 @@ class AndroidPort(chromium.ChromiumPort):
 
     def path_to_md5sum_host(self):
         return self._build_path(MD5SUM_HOST_FILE_NAME)
-
-    # Overridden public methods.
-    def buildbot_archives_baselines(self):
-        return False
 
     def additional_drt_flag(self):
         return self._driver_details.additional_command_line_flags()
@@ -518,12 +522,21 @@ class AndroidPort(chromium.ChromiumPort):
     def _driver_class(self):
         return ChromiumAndroidDriver
 
+    # Android maintains a temporary expectations file for the purpose of ramping
+    # up the set of layout tests being ran. Lines in this file will be removed
+    # as the bot starts running them. Remove this method when the file is empty.
+    def _port_specific_expectations_files(self):
+        paths = super(AndroidPort, self)._port_specific_expectations_files()
+        paths.append(self._filesystem.join(self.layout_tests_dir(), 'platform',
+                                           AndroidPort.port_name, 'TestExpectations'))
+        return paths
+
     # Local private methods.
 
     @staticmethod
-    def _android_server_process_constructor(port, server_name, cmd_line, env=None):
+    def _android_server_process_constructor(port, server_name, cmd_line, env=None, logging=False):
         return server_process.ServerProcess(port, server_name, cmd_line, env,
-                                            universal_newlines=True, treat_no_data_as_crash=True)
+                                            universal_newlines=True, treat_no_data_as_crash=True, logging=logging)
 
 
 class AndroidPerf(SingleFileOutputProfiler):
@@ -660,6 +673,7 @@ class ChromiumAndroidDriver(driver.Driver):
         self._android_devices = android_devices
         self._android_commands = android_devices.get_device(port._executive, worker_number)
         self._driver_details = driver_details
+        self._debug_logging = self._port._debug_logging
 
         # FIXME: If we taught ProfileFactory about "target" devices we could
         # just use the logic in Driver instead of duplicating it here.
@@ -760,7 +774,8 @@ class ChromiumAndroidDriver(driver.Driver):
         _log.error('[%s] %s' % (self._android_commands.get_serial(), message))
 
     def _log_debug(self, message):
-        _log.debug('[%s] %s' % (self._android_commands.get_serial(), message))
+        if self._debug_logging:
+            _log.debug('[%s] %s' % (self._android_commands.get_serial(), message))
 
     def _abort(self, message):
         raise AssertionError('[%s] %s' % (self._android_commands.get_serial(), message))
@@ -770,7 +785,7 @@ class ChromiumAndroidDriver(driver.Driver):
         assert md5sum_output
         return [line.split('  ')[0] for line in md5sum_output]
 
-    def _push_file_if_needed(self, host_file, device_file):
+    def _files_match(self, host_file, device_file):
         assert os.path.exists(host_file)
         device_hashes = self._extract_hashes_from_md5sum_output(
                 self._port.host.executive.popen(self._android_commands.adb_command() + ['shell', MD5SUM_DEVICE_PATH, device_file],
@@ -778,10 +793,11 @@ class ChromiumAndroidDriver(driver.Driver):
         host_hashes = self._extract_hashes_from_md5sum_output(
                 self._port.host.executive.popen(args=['%s_host' % self._md5sum_path, host_file],
                                                 stdout=subprocess.PIPE).stdout)
-        if host_hashes and device_hashes == host_hashes:
-            return
+        return host_hashes and device_hashes == host_hashes
 
-        self._android_commands.push(host_file, device_file)
+    def _push_file_if_needed(self, host_file, device_file):
+        if not self._files_match(host_file, device_file):
+            self._android_commands.push(host_file, device_file)
 
     def _push_executable(self):
         self._push_file_if_needed(self._port.path_to_forwarder(), self._driver_details.device_forwarder_path())
@@ -790,6 +806,10 @@ class ChromiumAndroidDriver(driver.Driver):
 
         self._push_file_if_needed(self._port._build_path('android_main_fonts.xml'), self._driver_details.device_directory() + 'android_main_fonts.xml')
         self._push_file_if_needed(self._port._build_path('android_fallback_fonts.xml'), self._driver_details.device_directory() + 'android_fallback_fonts.xml')
+
+        if self._files_match(self._port._build_path('apks', 'ContentShell.apk'),
+                             '/data/app/org.chromium.content_shell_apk-1.apk'):
+            return
 
         self._android_commands.run(['uninstall', self._driver_details.package_name()])
         driver_host_path = self._port._path_to_driver()

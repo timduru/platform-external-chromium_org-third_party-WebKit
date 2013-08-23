@@ -44,6 +44,7 @@ class IDBCallbacks;
 class IDBCursorBackendInterface;
 class IDBRequest;
 class ScriptExecutionContext;
+class SharedBuffer;
 
 class IDBCursor : public ScriptWrappable, public RefCounted<IDBCursor> {
 public:
@@ -60,9 +61,9 @@ public:
 
     // Implement the IDL
     const String& direction() const { return directionToString(m_direction); }
-    const ScriptValue& key() const { return m_currentKeyValue; }
-    const ScriptValue& primaryKey() const { return m_currentPrimaryKeyValue; }
-    const ScriptValue& value() const { return m_currentValue; }
+    ScriptValue key(ScriptExecutionContext*);
+    ScriptValue primaryKey(ScriptExecutionContext*);
+    ScriptValue value(ScriptExecutionContext*);
     IDBAny* source() const { return m_source.get(); }
 
     PassRefPtr<IDBRequest> update(ScriptState*, ScriptValue&, ExceptionState&);
@@ -70,11 +71,15 @@ public:
     void continueFunction(ScriptExecutionContext*, const ScriptValue& key, ExceptionState&);
     PassRefPtr<IDBRequest> deleteFunction(ScriptExecutionContext*, ExceptionState&);
 
+    bool isKeyDirty() const { return m_keyDirty; }
+    bool isPrimaryKeyDirty() const { return m_primaryKeyDirty; }
+    bool isValueDirty() const { return m_valueDirty; }
+
     void continueFunction(PassRefPtr<IDBKey>, ExceptionState&);
     void postSuccessHandlerCallback();
     void close();
-    void setValueReady(DOMRequestState*, PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, ScriptValue&);
-    PassRefPtr<IDBKey> idbPrimaryKey() { return m_currentPrimaryKey; }
+    void setValueReady(PassRefPtr<IDBKey>, PassRefPtr<IDBKey> primaryKey, PassRefPtr<SharedBuffer> value);
+    PassRefPtr<IDBKey> idbPrimaryKey() { return m_primaryKey; }
 
 protected:
     IDBCursor(PassRefPtr<IDBCursorBackendInterface>, IndexedDB::CursorDirection, IDBRequest*, IDBAny* source, IDBTransaction*);
@@ -92,13 +97,12 @@ private:
     RefPtr<IDBTransaction> m_transaction;
     IDBTransaction::OpenCursorNotifier m_transactionNotifier;
     bool m_gotValue;
-    // These values are held because m_backend may advance while they
-    // are still valid for the current success handlers.
-    ScriptValue m_currentKeyValue;
-    ScriptValue m_currentPrimaryKeyValue;
-    RefPtr<IDBKey> m_currentKey;
-    RefPtr<IDBKey> m_currentPrimaryKey;
-    ScriptValue m_currentValue;
+    bool m_keyDirty;
+    bool m_primaryKeyDirty;
+    bool m_valueDirty;
+    RefPtr<IDBKey> m_key;
+    RefPtr<IDBKey> m_primaryKey;
+    RefPtr<SharedBuffer> m_value;
 };
 
 } // namespace WebCore

@@ -31,7 +31,6 @@
 #include "bindings/v8/V8DOMWrapper.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/dom/ExceptionCode.h"
 #include "core/page/Frame.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "wtf/GetPtr.h"
@@ -73,13 +72,8 @@ static void itemMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
         return;
     }
     TestEventTarget* imp = V8TestEventTarget::toNative(args.Holder());
-    ExceptionState es(args.GetIsolate());
-    V8TRYCATCH_VOID(int, index, toUInt32(args[0]));
-    if (UNLIKELY(index < 0)) {
-        setDOMException(IndexSizeError, args.GetIsolate());
-        return;
-    }
-    v8SetReturnValue(args, toV8(imp->item(index), args.Holder(), args.GetIsolate()));
+    V8TRYCATCH_VOID(unsigned, index, toUInt32(args[0]));
+    v8SetReturnValue(args, imp->item(index), args.Holder());
     return;
 }
 
@@ -98,7 +92,7 @@ static void namedItemMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
     }
     TestEventTarget* imp = V8TestEventTarget::toNative(args.Holder());
     V8TRYCATCH_FOR_V8STRINGRESOURCE_VOID(V8StringResource<>, name, args[0]);
-    v8SetReturnValue(args, toV8(imp->namedItem(name), args.Holder(), args.GetIsolate()));
+    v8SetReturnValue(args, imp->namedItem(name), args.Holder());
     return;
 }
 
@@ -116,7 +110,7 @@ static void indexedPropertyGetter(uint32_t index, const v8::PropertyCallbackInfo
     RefPtr<Node> element = collection->item(index);
     if (!element)
         return;
-    v8SetReturnValue(info, toV8Fast(element.release(), info, collection));
+    v8SetReturnValueFast(info, element.release(), collection);
 }
 
 static void indexedPropertyGetterCallback(uint32_t index, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -175,7 +169,7 @@ static void namedPropertyGetter(v8::Local<v8::String> name, const v8::PropertyCa
     RefPtr<Node> element = collection->namedItem(propertyName);
     if (!element)
         return;
-    v8SetReturnValue(info, toV8Fast(element.release(), info, collection));
+    v8SetReturnValueFast(info, element.release(), collection);
 }
 
 static void namedPropertyGetterCallback(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -334,7 +328,7 @@ EventTarget* V8TestEventTarget::toEventTarget(v8::Handle<v8::Object> object)
 v8::Handle<v8::Object> V8TestEventTarget::createWrapper(PassRefPtr<TestEventTarget> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper<V8TestEventTarget>(impl.get(), isolate).IsEmpty());
+    ASSERT(!DOMDataStore::containsWrapper<V8TestEventTarget>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());
         // Might be a XXXConstructor::info instead of an XXX::info. These will both have

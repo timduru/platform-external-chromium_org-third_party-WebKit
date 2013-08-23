@@ -52,6 +52,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/CustomElementCallbackQueue.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementCallbackScheduler.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementDefinition.cpp \
+	third_party/WebKit/Source/core/dom/CustomElementException.cpp \
+	third_party/WebKit/Source/core/dom/CustomElementObserver.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementRegistrationContext.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementRegistry.cpp \
 	third_party/WebKit/Source/core/dom/CustomElementUpgradeCandidateMap.cpp \
@@ -148,6 +150,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/ScriptedAnimationController.cpp \
 	third_party/WebKit/Source/core/dom/SecurityContext.cpp \
 	third_party/WebKit/Source/core/dom/SelectorQuery.cpp \
+	third_party/WebKit/Source/core/dom/ShadowTreeStyleSheetCollection.cpp \
 	third_party/WebKit/Source/core/dom/SpaceSplitString.cpp \
 	third_party/WebKit/Source/core/dom/StaticNodeList.cpp \
 	third_party/WebKit/Source/core/dom/StringCallback.cpp \
@@ -178,7 +181,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/WindowEventContext.cpp \
 	third_party/WebKit/Source/core/dom/default/chromium/PlatformMessagePortChannelChromium.cpp \
 	third_party/WebKit/Source/core/dom/shadow/ComposedShadowTreeWalker.cpp \
-	third_party/WebKit/Source/core/dom/shadow/ContentDistributor.cpp \
+	third_party/WebKit/Source/core/dom/shadow/ContentDistribution.cpp \
+	third_party/WebKit/Source/core/dom/shadow/ScopeContentDistribution.cpp \
 	third_party/WebKit/Source/core/dom/shadow/ElementShadow.cpp \
 	third_party/WebKit/Source/core/dom/shadow/InsertionPoint.cpp \
 	third_party/WebKit/Source/core/dom/shadow/SelectRuleFeatureSet.cpp \
@@ -254,7 +258,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
@@ -412,7 +415,6 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \

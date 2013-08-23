@@ -195,10 +195,10 @@ bool WebPagePopupImpl::initializePage()
     pageClients.chromeClient = m_chromeClient.get();
 
     m_page = adoptPtr(new Page(pageClients));
-    m_page->settings()->setScriptEnabled(true);
-    m_page->settings()->setAllowScriptsToCloseWindows(true);
+    m_page->settings().setScriptEnabled(true);
+    m_page->settings().setAllowScriptsToCloseWindows(true);
     m_page->setDeviceScaleFactor(m_webView->deviceScaleFactor());
-    m_page->settings()->setDeviceSupportsTouch(m_webView->page()->settings()->deviceSupportsTouch());
+    m_page->settings().setDeviceSupportsTouch(m_webView->page()->settings().deviceSupportsTouch());
 
     unsigned layoutMilestones = DidFirstLayout | DidFirstVisuallyNonEmptyLayout;
     m_page->addLayoutMilestones(static_cast<LayoutMilestones>(layoutMilestones));
@@ -320,7 +320,6 @@ void WebPagePopupImpl::closePopup()
     if (m_page) {
         m_page->clearPageGroup();
         m_page->mainFrame()->loader()->stopAllLoaders();
-        m_page->mainFrame()->loader()->stopLoading(UnloadEventPolicyNone);
         DOMWindowPagePopup::uninstall(m_page->mainFrame()->domWindow());
     }
     m_closing = true;

@@ -53,6 +53,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableHeaderContainer.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableRow.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableNumber.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableTransform.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableValue.cpp \
 	third_party/WebKit/Source/core/animation/Animation.cpp \
 	third_party/WebKit/Source/core/animation/DocumentTimeline.cpp \
@@ -221,7 +222,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/SetSelectionCommand.cpp \
 	third_party/WebKit/Source/core/editing/SimplifyMarkupCommand.cpp \
 	third_party/WebKit/Source/core/editing/SmartReplaceICU.cpp \
-	third_party/WebKit/Source/core/editing/SpellChecker.cpp \
+	third_party/WebKit/Source/core/editing/SpellCheckRequester.cpp \
 	third_party/WebKit/Source/core/editing/SpellingCorrectionCommand.cpp \
 	third_party/WebKit/Source/core/editing/SplitElementCommand.cpp \
 	third_party/WebKit/Source/core/editing/SplitTextNodeCommand.cpp \
@@ -239,6 +240,22 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/chromium/EditorChromium.cpp \
 	third_party/WebKit/Source/core/editing/htmlediting.cpp \
 	third_party/WebKit/Source/core/editing/markup.cpp \
+	third_party/WebKit/Source/core/fetch/CSSStyleSheetResource.cpp \
+	third_party/WebKit/Source/core/fetch/DocumentResource.cpp \
+	third_party/WebKit/Source/core/fetch/FontResource.cpp \
+	third_party/WebKit/Source/core/fetch/ImageResource.cpp \
+	third_party/WebKit/Source/core/fetch/RawResource.cpp \
+	third_party/WebKit/Source/core/fetch/Resource.cpp \
+	third_party/WebKit/Source/core/fetch/ResourceFetcher.cpp \
+	third_party/WebKit/Source/core/fetch/ResourceLoadNotifier.cpp \
+	third_party/WebKit/Source/core/fetch/ResourceLoader.cpp \
+	third_party/WebKit/Source/core/fetch/ResourcePtr.cpp \
+	third_party/WebKit/Source/core/fetch/FetchRequest.cpp \
+	third_party/WebKit/Source/core/fetch/ScriptResource.cpp \
+	third_party/WebKit/Source/core/fetch/ShaderResource.cpp \
+	third_party/WebKit/Source/core/fetch/TextTrackResource.cpp \
+	third_party/WebKit/Source/core/fetch/XSLStyleSheetResource.cpp \
+	third_party/WebKit/Source/core/fetch/MemoryCache.cpp \
 	third_party/WebKit/Source/core/fileapi/Blob.cpp \
 	third_party/WebKit/Source/core/fileapi/BlobBuilder.cpp \
 	third_party/WebKit/Source/core/fileapi/BlobRegistry.cpp \
@@ -339,8 +356,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/Prerenderer.cpp \
 	third_party/WebKit/Source/core/loader/PrerendererClient.cpp \
 	third_party/WebKit/Source/core/loader/ProgressTracker.cpp \
-	third_party/WebKit/Source/core/loader/ResourceLoadNotifier.cpp \
-	third_party/WebKit/Source/core/loader/ResourceLoader.cpp \
 	third_party/WebKit/Source/core/loader/SinkDocument.cpp \
 	third_party/WebKit/Source/core/loader/TextResourceDecoder.cpp \
 	third_party/WebKit/Source/core/loader/TextResourceDecoderBuilder.cpp \
@@ -348,25 +363,11 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/ThreadableLoader.cpp \
 	third_party/WebKit/Source/core/loader/UniqueIdentifier.cpp \
 	third_party/WebKit/Source/core/loader/WorkerThreadableLoader.cpp \
-	third_party/WebKit/Source/core/loader/appcache/DOMApplicationCache.cpp \
+	third_party/WebKit/Source/core/loader/appcache/ApplicationCache.cpp \
 	third_party/WebKit/Source/core/loader/archive/ArchiveResource.cpp \
 	third_party/WebKit/Source/core/loader/archive/ArchiveResourceCollection.cpp \
 	third_party/WebKit/Source/core/loader/archive/MHTMLArchive.cpp \
 	third_party/WebKit/Source/core/loader/archive/MHTMLParser.cpp \
-	third_party/WebKit/Source/core/loader/cache/CSSStyleSheetResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/DocumentResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/FontResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/ImageResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/RawResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/Resource.cpp \
-	third_party/WebKit/Source/core/loader/cache/ResourcePtr.cpp \
-	third_party/WebKit/Source/core/loader/cache/ResourceFetcher.cpp \
-	third_party/WebKit/Source/core/loader/cache/FetchRequest.cpp \
-	third_party/WebKit/Source/core/loader/cache/ScriptResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/ShaderResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/TextTrackResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/XSLStyleSheetResource.cpp \
-	third_party/WebKit/Source/core/loader/cache/MemoryCache.cpp \
 	third_party/WebKit/Source/core/page/AutoscrollController.cpp \
 	third_party/WebKit/Source/core/page/BarProp.cpp \
 	third_party/WebKit/Source/core/page/Chrome.cpp \
@@ -382,6 +383,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/DOMTimer.cpp \
 	third_party/WebKit/Source/core/page/DOMWindow.cpp \
 	third_party/WebKit/Source/core/page/DOMWindowBase64.cpp \
+	third_party/WebKit/Source/core/page/DOMWindowLifecycleNotifier.cpp \
+	third_party/WebKit/Source/core/page/DOMWindowLifecycleObserver.cpp \
 	third_party/WebKit/Source/core/page/DOMWindowTimers.cpp \
 	third_party/WebKit/Source/core/page/DOMWindowPagePopup.cpp \
 	third_party/WebKit/Source/core/page/DOMWindowProperty.cpp \
@@ -396,12 +399,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/FrameView.cpp \
 	third_party/WebKit/Source/core/page/History.cpp \
 	third_party/WebKit/Source/core/page/ImageBitmap.cpp \
-	third_party/WebKit/Source/core/page/ImageBitmapFactories.cpp \
 	third_party/WebKit/Source/core/page/Location.cpp \
 	third_party/WebKit/Source/core/page/MemoryInfo.cpp \
 	third_party/WebKit/Source/core/page/MouseEventWithHitTestResults.cpp \
 	third_party/WebKit/Source/core/page/Navigator.cpp \
 	third_party/WebKit/Source/core/page/NavigatorBase.cpp \
+	third_party/WebKit/Source/core/page/NavigatorID.cpp \
 	third_party/WebKit/Source/core/page/Page.cpp \
 	third_party/WebKit/Source/core/page/PageConsole.cpp \
 	third_party/WebKit/Source/core/page/PageGroup.cpp \
@@ -575,7 +578,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
@@ -734,7 +736,6 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \

@@ -30,6 +30,7 @@
 
 #include "bindings/v8/ScriptValue.h"
 #include "core/dom/ContainerNode.h"
+#include "core/dom/CustomElement.h"
 #include "core/dom/DOMTimeStamp.h"
 #include "core/dom/DocumentEventQueue.h"
 #include "core/dom/DocumentInit.h"
@@ -67,6 +68,7 @@ class CSSStyleSheetResource;
 class ScriptResource;
 class CanvasRenderingContext;
 class CharacterData;
+class Chrome;
 class Comment;
 class ContentSecurityPolicyResponseHeaders;
 class ContextFeatures;
@@ -168,9 +170,7 @@ enum PageshowEventPersistence {
     PageshowEventPersisted = 1
 };
 
-// FIXME: We should rename DeferRecalcStyle to RecalcStyleDeferred to be consitent.
-
-enum StyleResolverUpdateType { RecalcStyleImmediately, DeferRecalcStyle };
+enum StyleResolverUpdateType { RecalcStyleImmediately, RecalcStyleDeferred };
 
 enum StyleResolverUpdateMode {
     // Discards the StyleResolver and rebuilds it.
@@ -259,6 +259,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(blur);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(error);
@@ -448,9 +449,9 @@ public:
 
     // FIXME: Switch all callers of styleResolverChanged to these or better ones and then make them
     // do something smarter.
-    void removedStyleSheet(StyleSheet*, StyleResolverUpdateType type = DeferRecalcStyle) { styleResolverChanged(type); }
-    void addedStyleSheet(StyleSheet*, StyleResolverUpdateType type = DeferRecalcStyle) { styleResolverChanged(type); }
-    void modifiedStyleSheet(StyleSheet*, StyleResolverUpdateType type = DeferRecalcStyle) { styleResolverChanged(type); }
+    void removedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
+    void addedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
+    void modifiedStyleSheet(StyleSheet*, StyleResolverUpdateType type = RecalcStyleDeferred) { styleResolverChanged(type); }
 
     void didAccessStyleResolver();
 
@@ -544,6 +545,17 @@ public:
     void explicitClose();
     // implicitClose() actually does the work of closing the input stream.
     void implicitClose();
+
+    bool dispatchBeforeUnloadEvent(Chrome&, Document* navigatingDocument);
+    void dispatchUnloadEvents();
+
+    enum PageDismissalType {
+        NoDismissal = 0,
+        BeforeUnloadDismissal = 1,
+        PageHideDismissal = 2,
+        UnloadDismissal = 3
+    };
+    PageDismissalType pageDismissalEventBeingDispatched() const;
 
     void cancelParsing();
 
@@ -754,6 +766,8 @@ public:
     String title() const { return m_title.string(); }
     void setTitle(const String&);
 
+    const StringWithDirection& titleWithDirection() const { return m_title; }
+
     Element* titleElement() const { return m_titleElement.get(); }
     void setTitleElement(const StringWithDirection&, Element* titleElement);
     void removeTitle(Element* titleElement);
@@ -914,15 +928,15 @@ public:
         LoadEventTried,
         LoadEventInProgress,
         LoadEventCompleted,
+        BeforeUnloadEventInProgress,
+        BeforeUnloadEventCompleted,
+        PageHideInProgress,
         UnloadEventInProgress,
         UnloadEventHandled
     };
     bool loadEventStillNeeded() const { return m_loadEventProgress == LoadEventNotRun; }
     bool processingLoadEvent() const { return m_loadEventProgress == LoadEventInProgress; }
     bool loadEventFinished() const { return m_loadEventProgress >= LoadEventCompleted; }
-    bool unloadEventStillNeeded() const { return m_loadEventProgress >= LoadEventTried && m_loadEventProgress <= UnloadEventInProgress; }
-    void unloadEventStarted() { m_loadEventProgress = UnloadEventInProgress; }
-    void unloadEventWasHandled() { m_loadEventProgress = UnloadEventHandled; }
 
     virtual bool isContextThread() const;
     virtual bool isJSExecutionForbidden() const { return false; }
@@ -994,7 +1008,8 @@ public:
     PassRefPtr<Element> createElement(const AtomicString& localName, const AtomicString& typeExtension, ExceptionState&);
     PassRefPtr<Element> createElementNS(const AtomicString& namespaceURI, const String& qualifiedName, const AtomicString& typeExtension, ExceptionState&);
     ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, ExceptionState&);
-    ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionState&);
+    // FIXME: When embedders switch to using WebDocument::registerEmbedderCustomElement, make the default name set StandardNames.
+    ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionState&, CustomElement::NameSet validNames = CustomElement::AllNames);
     CustomElementRegistrationContext* registrationContext() { return m_registrationContext.get(); }
 
     void setImport(HTMLImport*);
@@ -1011,7 +1026,7 @@ public:
     void decrementActiveParserCount();
 
     void setContextFeatures(PassRefPtr<ContextFeatures>);
-    ContextFeatures* contextFeatures() const { return m_contextFeatures.get(); }
+    ContextFeatures* contextFeatures() { return m_contextFeatures.get(); }
 
     DocumentSharedObjectPool* sharedObjectPool() { return m_sharedObjectPool.get(); }
 
@@ -1039,7 +1054,7 @@ public:
 
     void didAssociateFormControl(Element*);
 
-    virtual void addConsoleMessage(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier = 0);
+    void addConsoleMessageWithRequestIdentifier(MessageSource, MessageLevel, const String& message, unsigned long requestIdentifier);
 
     virtual DOMWindow* executingWindow() OVERRIDE { return domWindow(); }
     virtual void userEventWasHandled() OVERRIDE { resetLastHandledUserGestureTimestamp(); }
@@ -1062,8 +1077,6 @@ protected:
 
     virtual void dispose() OVERRIDE;
 
-    virtual PassRefPtr<Document> cloneDocumentWithoutChildren();
-
 private:
     friend class Node;
     friend class IgnoreDestructiveWriteCountIncrementer;
@@ -1083,7 +1096,6 @@ private:
     virtual NodeType nodeType() const;
     virtual bool childTypeAllowed(NodeType) const;
     virtual PassRefPtr<Node> cloneNode(bool deep = true);
-    void cloneDataFromDocument(const Document&);
 
     virtual void refScriptExecutionContext() { ref(); }
     virtual void derefScriptExecutionContext() { deref(); }
@@ -1092,7 +1104,8 @@ private:
     virtual const KURL& virtualURL() const; // Same as url(), but needed for ScriptExecutionContext to implement it without a performance loss for direct calls.
     virtual KURL virtualCompleteURL(const String&) const; // Same as completeURL() for the same reason as above.
 
-    virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>, ScriptState* = 0, unsigned long requestIdentifier = 0);
+    virtual void addMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, ScriptState*);
+    void internalAddMessage(MessageSource, MessageLevel, const String& message, const String& sourceURL, unsigned lineNumber, PassRefPtr<ScriptCallStack>, ScriptState*);
 
     virtual double timerAlignmentInterval() const;
 
@@ -1226,7 +1239,6 @@ private:
 
     Timer<Document> m_styleRecalcTimer;
     bool m_inStyleRecalc;
-    bool m_closeAfterStyleRecalc;
 
     bool m_gotoAnchorNeededAfterStylesheetsLoad;
     bool m_isDNSPrefetchEnabled;
@@ -1316,6 +1328,8 @@ private:
 
     bool m_directionSetOnDocumentElement;
     bool m_writingModeSetOnDocumentElement;
+
+    bool m_didAllowNavigationViaBeforeUnloadConfirmationPanel;
 
     DocumentTiming m_documentTiming;
     RefPtr<MediaQueryMatcher> m_mediaQueryMatcher;

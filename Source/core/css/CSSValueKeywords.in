@@ -966,6 +966,9 @@ saturation
 color
 luminosity
 
+// object-fit
+scale-down
+
 // overflow
 -webkit-paged-x
 -webkit-paged-y
@@ -983,6 +986,12 @@ span
 // (scan:) media feature
 progressive
 interlace
+
+// CSS_PROP_PAINT_ORDER
+// normal
+// fill
+// stroke
+markers
 
 //
 // CSS3 viewport-length keywords

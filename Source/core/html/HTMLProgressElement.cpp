@@ -157,9 +157,9 @@ void HTMLProgressElement::didAddUserAgentShadowRoot(ShadowRoot* root)
     RefPtr<ProgressValueElement> value = ProgressValueElement::create(document());
     m_value = value.get();
     m_value->setWidthPercentage(HTMLProgressElement::IndeterminatePosition * 100);
-    bar->appendChild(m_value, ASSERT_NO_EXCEPTION);
+    bar->appendChild(m_value);
 
-    inner->appendChild(bar, ASSERT_NO_EXCEPTION);
+    inner->appendChild(bar);
 }
 
 bool HTMLProgressElement::shouldAppearIndeterminate() const

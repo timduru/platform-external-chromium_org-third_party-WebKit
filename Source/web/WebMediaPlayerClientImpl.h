@@ -85,10 +85,13 @@ public:
     virtual void keyNeeded(const WebString& keySystem, const WebString& sessionId, const unsigned char* initData, unsigned initDataLength);
     virtual WebPlugin* createHelperPlugin(const WebString& pluginType, WebFrame*);
     virtual void closeHelperPlugin();
+    virtual void closeHelperPluginSoon(WebFrame*);
     virtual bool needsWebLayerForVideo() const;
     virtual void setWebLayer(WebLayer*);
     virtual void addTextTrack(WebInbandTextTrack*);
     virtual void removeTextTrack(WebInbandTextTrack*);
+    virtual void mediaSourceOpened(WebMediaSourceNew*);
+    virtual void requestSeek(double);
 
     // MediaPlayer methods:
     virtual void load(const WTF::String& url) OVERRIDE;

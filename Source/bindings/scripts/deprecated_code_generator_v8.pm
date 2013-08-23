@@ -821,12 +821,23 @@ END
         $header{nameSpaceWebCore}->add(<<END);
 class ${nativeType};
 v8::Handle<v8::Value> toV8(${nativeType}*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
-v8::Handle<v8::Value> toV8ForMainWorld(${nativeType}*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
+
+template<class CallbackInfo>
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, ${nativeType}* impl, v8::Handle<v8::Object> creationContext)
+{
+    v8SetReturnValue(callbackInfo, toV8(impl, creationContext, callbackInfo.GetIsolate()));
+}
+
+template<class CallbackInfo>
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, ${nativeType}* impl, v8::Handle<v8::Object> creationContext)
+{
+     v8SetReturnValue(callbackInfo, toV8(impl, creationContext, callbackInfo.GetIsolate()));
+}
 
 template<class CallbackInfo, class Wrappable>
-inline v8::Handle<v8::Value> toV8Fast(${nativeType}* impl, const CallbackInfo& callbackInfo, Wrappable*)
+inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, ${nativeType}* impl, Wrappable*)
 {
-    return toV8(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
+     v8SetReturnValue(callbackInfo, toV8(impl, callbackInfo.Holder(), callbackInfo.GetIsolate()));
 }
 
 END
@@ -845,7 +856,7 @@ END
 inline v8::Handle<v8::Object> wrap(${nativeType}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl);
-    ASSERT(DOMDataStore::getWrapper<${v8ClassName}>(impl, isolate).IsEmpty());
+    ASSERT(!DOMDataStore::containsWrapper<${v8ClassName}>(impl, isolate));
     return $createWrapperCall(impl, creationContext, isolate);
 }
 END
@@ -863,31 +874,44 @@ inline v8::Handle<v8::Value> toV8(${nativeType}* impl, v8::Handle<v8::Object> cr
     return wrap(impl, creationContext, isolate);
 }
 
-inline v8::Handle<v8::Value> toV8ForMainWorld(${nativeType}* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+template<typename CallbackInfo>
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, ${nativeType}* impl, v8::Handle<v8::Object> creationContext)
 {
-    ASSERT(worldType(isolate) == MainWorld);
-    if (UNLIKELY(!impl))
-        return v8::Null(isolate);
-    v8::Handle<v8::Value> wrapper = DOMDataStore::getWrapperForMainWorld<${v8ClassName}>(impl);
-    if (!wrapper.IsEmpty())
-        return wrapper;
-    return wrap(impl, creationContext, isolate);
+    if (UNLIKELY(!impl)) {
+        v8SetReturnValueNull(callbackInfo);
+        return;
+    }
+    if (DOMDataStore::setReturnValueFromWrapper<${v8ClassName}>(callbackInfo.GetReturnValue(), impl))
+        return;
+    v8::Handle<v8::Object> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8SetReturnValue(callbackInfo, wrapper);
+}
+
+template<typename CallbackInfo>
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, ${nativeType}* impl, v8::Handle<v8::Object> creationContext)
+{
+    ASSERT(worldType(callbackInfo.GetIsolate()) == MainWorld);
+    if (UNLIKELY(!impl)) {
+        v8SetReturnValueNull(callbackInfo);
+        return;
+    }
+    if (DOMDataStore::setReturnValueFromWrapperForMainWorld<${v8ClassName}>(callbackInfo.GetReturnValue(), impl))
+        return;
+    v8::Handle<v8::Value> wrapper = wrap(impl, creationContext, callbackInfo.GetIsolate());
+    v8SetReturnValue(callbackInfo, wrapper);
 }
 
 template<class CallbackInfo, class Wrappable>
-inline v8::Handle<v8::Value> toV8Fast(${nativeType}* impl, const CallbackInfo& callbackInfo, Wrappable* wrappable)
+inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, ${nativeType}* impl, Wrappable* wrappable)
 {
-    if (UNLIKELY(!impl))
-        return v8::Null(callbackInfo.GetIsolate());
-    v8::Handle<v8::Object> wrapper = DOMDataStore::getWrapperFast<${v8ClassName}>(impl, callbackInfo, wrappable);
-    if (!wrapper.IsEmpty())
-        return wrapper;
-    return wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
-}
-
-inline v8::Handle<v8::Value> toV8ForMainWorld(PassRefPtr< ${nativeType} > impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
-{
-    return toV8ForMainWorld(impl.get(), creationContext, isolate);
+    if (UNLIKELY(!impl)) {
+        v8SetReturnValueNull(callbackInfo);
+        return;
+    }
+    if (DOMDataStore::setReturnValueFromWrapperFast<${v8ClassName}>(callbackInfo.GetReturnValue(), impl, callbackInfo.Holder(), wrappable))
+        return;
+    v8::Handle<v8::Object> wrapper = wrap(impl, callbackInfo.Holder(), callbackInfo.GetIsolate());
+    v8SetReturnValue(callbackInfo, wrapper);
 }
 
 END
@@ -895,15 +919,27 @@ END
 
     $header{nameSpaceWebCore}->add(<<END);
 
-template<class CallbackInfo, class Wrappable>
-inline v8::Handle<v8::Value> toV8Fast(PassRefPtr< ${nativeType} > impl, const CallbackInfo& callbackInfo, Wrappable* wrappable)
-{
-    return toV8Fast(impl.get(), callbackInfo, wrappable);
-}
-
 inline v8::Handle<v8::Value> toV8(PassRefPtr< ${nativeType} > impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     return toV8(impl.get(), creationContext, isolate);
+}
+
+template<class CallbackInfo>
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr< ${nativeType} > impl, v8::Handle<v8::Object> creationContext)
+{
+    v8SetReturnValue(callbackInfo, impl.get(), creationContext);
+}
+
+template<class CallbackInfo>
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr< ${nativeType} > impl, v8::Handle<v8::Object> creationContext)
+{
+    v8SetReturnValueForMainWorld(callbackInfo, impl.get(), creationContext);
+}
+
+template<class CallbackInfo, class Wrappable>
+inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, PassRefPtr< ${nativeType} > impl, Wrappable* wrappable)
+{
+    v8SetReturnValueFast(callbackInfo, impl.get(), wrappable);
 }
 
 END
@@ -1292,6 +1328,16 @@ sub GenerateNormalAttrGetterCallback
     $implementation{nameSpaceInternal}->add($code);
 }
 
+sub GetCachedAttr
+{
+    my $attribute = shift;
+    my $attrExt = $attribute->extendedAttributes;
+    if (($attribute->type eq "any" || $attribute->type eq "SerializedScriptValue") && $attrExt->{"CachedAttribute"}) {
+        return $attrExt->{"CachedAttribute"};
+    }
+    return "";
+}
+
 sub GenerateNormalAttrGetter
 {
     my $attribute = shift;
@@ -1304,6 +1350,7 @@ sub GenerateNormalAttrGetter
     my $attrExt = $attribute->extendedAttributes;
     my $attrName = $attribute->name;
     my $attrType = $attribute->type;
+    my $attrCached = GetCachedAttr($attribute);
 
     if (HasCustomGetter($attrExt)) {
         return;
@@ -1364,8 +1411,24 @@ END
             return;
             # Skip the rest of the function!
         }
-        if ($attribute->type eq "SerializedScriptValue" && $attrExt->{"CachedAttribute"}) {
-            $code .= <<END;
+        my $imp = 0;
+        if ($attrCached) {
+            if ($attrCached ne "VALUE_IS_MISSING") {
+                $imp = 1;
+                $code .= <<END;
+    v8::Handle<v8::String> propertyName = v8::String::NewSymbol("${attrName}");
+    v8::Handle<v8::Value> value;
+    ${implClassName}* imp = ${v8ClassName}::toNative(info.Holder());
+    if (!imp->$attrCached()) {
+        value = info.Holder()->GetHiddenValue(propertyName);
+        if (!value.IsEmpty()) {
+            v8SetReturnValue(info, value);
+            return;
+        }
+    }
+END
+            } else {
+                $code .= <<END;
     v8::Handle<v8::String> propertyName = v8::String::NewSymbol("${attrName}");
     v8::Handle<v8::Value> value = info.Holder()->GetHiddenValue(propertyName);
     if (!value.IsEmpty()) {
@@ -1373,8 +1436,9 @@ END
         return;
     }
 END
+            }
         }
-        if (!$attribute->isStatic) {
+        if (!$attribute->isStatic && !$imp) {
             $code .= <<END;
     ${implClassName}* imp = ${v8ClassName}::toNative(info.Holder());
 END
@@ -1485,16 +1549,16 @@ END
         my $v8ReturnType = "V8" . $returnType;
         $code .= "    $nativeReturnType result = ${getterString};\n";
         if ($forMainWorldSuffix) {
-          $code .= "    v8::Handle<v8::Value> wrapper = result.get() ? v8::Handle<v8::Value>(DOMDataStore::getWrapper${forMainWorldSuffix}<${v8ReturnType}>(result.get())) : v8Undefined();\n";
+            $code .= "    if (result.get() && DOMDataStore::setReturnValueFromWrapper${forMainWorldSuffix}<${v8ReturnType}>(info.GetReturnValue(), result.get()))\n";
         } else {
-          $code .= "    v8::Handle<v8::Value> wrapper = result.get() ? v8::Handle<v8::Value>(DOMDataStore::getWrapper<${v8ReturnType}>(result.get(), info.GetIsolate())) : v8Undefined();\n";
+            $code .= "    if (result.get() && DOMDataStore::setReturnValueFromWrapper<${v8ReturnType}>(info.GetReturnValue(), result.get()))\n";
         }
-        $code .= "    if (wrapper.IsEmpty()) {\n";
-        $code .= "        wrapper = toV8(result.get(), info.Holder(), info.GetIsolate());\n"; # FIXME: Could use wrap here since the wrapper is empty.
-        $code .= "        if (!wrapper.IsEmpty())\n";
-        $code .= "            V8HiddenPropertyName::setNamedHiddenReference(info.Holder(), \"${attrName}\", wrapper);\n";
+        $code .= "        return;\n";
+        $code .= "    v8::Handle<v8::Value> wrapper = toV8(result.get(), info.Holder(), info.GetIsolate());\n";
+        $code .= "    if (!wrapper.IsEmpty()) {\n";
+        $code .= "        V8HiddenPropertyName::setNamedHiddenReference(info.Holder(), \"${attrName}\", wrapper);\n";
+        $code .= "        v8SetReturnValue(info, wrapper);\n";
         $code .= "    }\n";
-        $code .= "    v8SetReturnValue(info, wrapper);\n";
         $code .= "    return;\n";
         $code .= "}\n\n";
         $code .= "#endif // ${conditionalString}\n\n" if $conditionalString;
@@ -1507,9 +1571,9 @@ END
         my $svgNativeType = GetSVGTypeNeedingTearOff($attrType);
         # Convert from abstract SVGProperty to real type, so the right toJS() method can be invoked.
         if ($forMainWorldSuffix eq "ForMainWorld") {
-            $code .= "    v8SetReturnValue(info, toV8ForMainWorld(static_cast<$svgNativeType*>($expression), info.Holder(), info.GetIsolate()));\n";
+            $code .= "    v8SetReturnValueForMainWorld(info, static_cast<$svgNativeType*>($expression), info.Holder());\n";
         } else {
-            $code .= "    v8SetReturnValue(info, toV8Fast(static_cast<$svgNativeType*>($expression), info, imp));\n";
+            $code .= "    v8SetReturnValueFast(info, static_cast<$svgNativeType*>($expression), imp);\n";
         }
         $code .= "    return;\n";
     } elsif (IsSVGTypeNeedingTearOff($attrType) and not $interfaceName =~ /List$/) {
@@ -1544,16 +1608,19 @@ END
                 $wrappedValue = "WTF::getPtr(${tearOffType}::create($expression))";
         }
         if ($forMainWorldSuffix eq "ForMainWorld") {
-            $code .= "    v8SetReturnValue(info, toV8ForMainWorld($wrappedValue, info.Holder(), info.GetIsolate()));\n";
+            $code .= "    v8SetReturnValueForMainWorld(info, $wrappedValue, info.Holder());\n";
         } else {
-            $code .= "    v8SetReturnValue(info, toV8Fast($wrappedValue, info, imp));\n";
+            $code .= "    v8SetReturnValueFast(info, $wrappedValue, imp);\n";
         }
         $code .= "    return;\n";
-    } elsif ($attribute->type eq "SerializedScriptValue" && $attrExt->{"CachedAttribute"}) {
-        my $getterFunc = ToMethodName($attribute->name);
+    } elsif ($attrCached) {
+        if ($attribute->type eq "SerializedScriptValue") {
+            $code .= "    RefPtr<SerializedScriptValue> serialized = $getterString;\n";
+            $code .= "    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));\n";
+        } else {
+            $code .= "    value = $getterString.v8Value();\n";
+        }
         $code .= <<END;
-    RefPtr<SerializedScriptValue> serialized = imp->${getterFunc}();
-    value = serialized ? serialized->deserialize() : v8::Handle<v8::Value>(v8::Null(info.GetIsolate()));
     info.Holder()->SetHiddenValue(propertyName, value);
     v8SetReturnValue(info, value);
     return;
@@ -1727,6 +1794,7 @@ sub GenerateNormalAttrSetter
     my $attrName = $attribute->name;
     my $attrExt = $attribute->extendedAttributes;
     my $attrType = $attribute->type;
+    my $attrCached = GetCachedAttr($attribute);
 
     if (HasCustomSetter($attrExt)) {
         return;
@@ -1894,7 +1962,7 @@ END
         }
     }
 
-    if ($attribute->type eq "SerializedScriptValue" && $attribute->extendedAttributes->{"CachedAttribute"}) {
+    if ($attrCached) {
         $code .= <<END;
     info.Holder()->DeleteHiddenValue(v8::String::NewSymbol("${attrName}")); // Invalidate the cached value.
 END
@@ -2191,14 +2259,6 @@ END
     }
 
     my $raisesExceptions = $function->extendedAttributes->{"RaisesException"};
-    if (!$raisesExceptions) {
-        foreach my $parameter (@{$function->parameters}) {
-            if ($parameter->extendedAttributes->{"IsIndex"}) {
-                $raisesExceptions = 1;
-            }
-        }
-    }
-
     if ($raisesExceptions) {
         AddToImplIncludes("bindings/v8/ExceptionState.h");
         $code .= "    ExceptionState es(args.GetIsolate());\n";
@@ -2417,14 +2477,6 @@ sub GenerateParametersCheck
             }
         }
 
-        if ($parameter->extendedAttributes->{"IsIndex"}) {
-            AddToImplIncludes("core/dom/ExceptionCode.h");
-            $parameterCheckString .= "    if (UNLIKELY($parameterName < 0)) {\n";
-            $parameterCheckString .= "        setDOMException(IndexSizeError, args.GetIsolate());\n";
-            $parameterCheckString .= "        return;\n";
-            $parameterCheckString .= "    }\n";
-        }
-
         $paramIndex++;
     }
     return ($parameterCheckString, $paramIndex, %replacements);
@@ -2479,13 +2531,6 @@ sub GenerateSingleConstructorCallback
     my $raisesExceptions = $function->extendedAttributes->{"RaisesException"};
     if ($interface->extendedAttributes->{"ConstructorRaisesException"}) {
         $raisesExceptions = 1;
-    }
-    if (!$raisesExceptions) {
-        foreach my $parameter (@{$function->parameters}) {
-            if ($parameter->extendedAttributes->{"IsIndex"}) {
-                $raisesExceptions = 1;
-            }
-        }
     }
 
     my @beforeArgumentList;
@@ -2745,13 +2790,6 @@ sub GenerateNamedConstructor
     my $raisesExceptions = $function->extendedAttributes->{"RaisesException"};
     if ($interface->extendedAttributes->{"ConstructorRaisesException"}) {
         $raisesExceptions = 1;
-    }
-    if (!$raisesExceptions) {
-        foreach my $parameter (@{$function->parameters}) {
-            if ($parameter->extendedAttributes->{"IsIndex"}) {
-                $raisesExceptions = 1;
-            }
-        }
     }
 
     my $maybeObserveFeature = GenerateFeatureObservation($function->extendedAttributes->{"MeasureAs"});
@@ -4728,7 +4766,7 @@ sub GenerateToV8Converters
 v8::Handle<v8::Object> ${v8ClassName}::createWrapper(${createWrapperArgumentType} impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper<${v8ClassName}>(impl.get(), isolate).IsEmpty());
+    ASSERT(!DOMDataStore::containsWrapper<${v8ClassName}>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());
         // Might be a XXXConstructor::info instead of an XXX::info. These will both have
@@ -4931,12 +4969,12 @@ sub GenerateFunctionCallString
         # FIXME: Update for all ScriptWrappables.
         if (IsDOMNodeType($interfaceName)) {
             if ($forMainWorldSuffix eq "ForMainWorld") {
-                $code .= $indent . "v8SetReturnValue(args, toV8ForMainWorld(WTF::getPtr(${svgNativeType}::create($return)), args.Holder(), args.GetIsolate()));\n";
+                $code .= $indent . "v8SetReturnValueForMainWorld(args, WTF::getPtr(${svgNativeType}::create($return), args.Holder()));\n";
             } else {
-                $code .= $indent . "v8SetReturnValue(args, toV8Fast(WTF::getPtr(${svgNativeType}::create($return)), args, imp));\n";
+                $code .= $indent . "v8SetReturnValueFast(args, WTF::getPtr(${svgNativeType}::create($return)), imp);\n";
             }
         } else {
-            $code .= $indent . "v8SetReturnValue(args, toV8${forMainWorldSuffix}(WTF::getPtr(${svgNativeType}::create($return)), args.Holder(), args.GetIsolate()));\n";
+            $code .= $indent . "v8SetReturnValue${forMainWorldSuffix}(args, WTF::getPtr(${svgNativeType}::create($return)), args.Holder());\n";
         }
         $code .= $indent . "return;\n";
         return $code;
@@ -4982,10 +5020,6 @@ sub GetNativeType
     return "double" if $type eq "double";
     return "int" if $type eq "long" or $type eq "int" or $type eq "short" or $type eq "byte";
     if ($type eq "unsigned long" or $type eq "unsigned int" or $type eq "unsigned short" or $type eq "octet") {
-        if ($extendedAttributes->{"IsIndex"}) {
-            # Special-case index arguments because we need to check that they aren't < 0.
-            return "int";
-        }
         return "unsigned";
     }
     return "long long" if $type eq "long long";
@@ -5052,7 +5086,9 @@ sub GetNativeTypeForCallbacks
     return "PassRefPtr<SerializedScriptValue>" if $type eq "SerializedScriptValue";
 
     # Callbacks use raw pointers, so pass isParameter = 1
-    return GetNativeType($type, {}, "parameter");
+    my $nativeType = GetNativeType($type, {}, "parameter");
+    return "const $nativeType&" if $nativeType =~ /^Vector/;
+    return $nativeType;
 }
 
 sub JSValueToNativeStatement
@@ -5065,10 +5101,6 @@ sub JSValueToNativeStatement
     my $getIsolate = shift;
 
     my $nativeType = GetNativeType($type, $extendedAttributes, "parameter");
-    if ($type eq "unsigned long" and $extendedAttributes->{"IsIndex"}) {
-        # Special-case index arguments because we need to check that they aren't < 0.
-        $nativeType = "int";
-    }
     my $native_value = JSValueToNative($type, $extendedAttributes, $jsValue, $getIsolate);
     my $code = "";
     if ($type eq "DOMString" || IsEnumType($type)) {
@@ -5478,17 +5510,13 @@ sub NativeToJSValue
         # FIXME: Use safe handles
         if ($isReturnValue) {
             if ($forMainWorldSuffix eq "ForMainWorld") {
-                return "${indent}v8SetReturnValue(${getCallbackInfo}, toV8ForMainWorld($nativeValue, $getCallbackInfo.Holder(), $getCallbackInfo.GetIsolate()));";
+                return "${indent}v8SetReturnValueForMainWorld(${getCallbackInfo}, $nativeValue, $getCallbackInfo.Holder());";
             }
-            return "${indent}v8SetReturnValue(${getCallbackInfo}, toV8Fast($nativeValue$getCallbackInfoArg$getScriptWrappableArg));";
+            return "${indent}v8SetReturnValueFast(${getCallbackInfo}, $nativeValue$getScriptWrappableArg);";
         }
-        if ($forMainWorldSuffix eq "ForMainWorld") {
-            return "$indent$receiver toV8ForMainWorld($nativeValue, $getCallbackInfo.Holder(), $getCallbackInfo.GetIsolate());";
-        }
-        return "$indent$receiver toV8Fast($nativeValue$getCallbackInfoArg$getScriptWrappableArg);";
     }
     # FIXME: Use safe handles
-    return "${indent}v8SetReturnValue(${getCallbackInfo}, toV8($nativeValue, $getCreationContext, $getIsolate));" if $isReturnValue;
+    return "${indent}v8SetReturnValue(${getCallbackInfo}, $nativeValue, $getCreationContext);" if $isReturnValue;
     return "$indent$receiver toV8($nativeValue, $getCreationContext, $getIsolate);";
 }
 

@@ -27,6 +27,7 @@
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ChildListMutationScope.h"
 #include "core/dom/ContainerNodeAlgorithms.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/FullscreenElementStack.h"
@@ -173,10 +174,6 @@ static inline bool checkAcceptChild(ContainerNode* newParent, Node* newChild, No
         return false;
     }
 
-    if (newChild->inDocument() && newChild->isDocumentTypeNode()) {
-        es.throwDOMException(HierarchyRequestError);
-        return false;
-    }
     if (containsConsideringHostElements(newChild, newParent)) {
         es.throwDOMException(HierarchyRequestError);
         return false;

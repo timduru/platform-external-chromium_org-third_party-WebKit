@@ -31,6 +31,7 @@
 #include <math.h>
 #include "HTMLNames.h"
 #include "RuntimeEnabledFeatures.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/Document.h"
@@ -342,12 +343,6 @@ bool HTMLCanvasElement::is3D() const
     return m_context && m_context->is3d();
 }
 
-void HTMLCanvasElement::makeRenderingResultsAvailable()
-{
-    if (m_context)
-        m_context->paintRenderingResultsToCanvas();
-}
-
 void HTMLCanvasElement::makePresentationCopy()
 {
     if (!m_presentedImage) {
@@ -385,7 +380,7 @@ String HTMLCanvasElement::toEncodingMimeType(const String& mimeType)
 String HTMLCanvasElement::toDataURL(const String& mimeType, const double* quality, ExceptionState& es)
 {
     if (!m_originClean) {
-        es.throwDOMException(SecurityError);
+        es.throwSecurityError(ExceptionMessages::failedToExecute("toDataURL", "HTMLCanvasElement", "tainted canvases may not be exported."));
         return String();
     }
 
@@ -400,7 +395,8 @@ String HTMLCanvasElement::toDataURL(const String& mimeType, const double* qualit
     if (imageData)
         return ImageDataToDataURL(*imageData, encodingMimeType, quality);
 
-    makeRenderingResultsAvailable();
+    if (m_context)
+        m_context->paintRenderingResultsToCanvas();
 
     return buffer()->toDataURL(encodingMimeType, quality);
 }

@@ -30,13 +30,13 @@
 #ifndef DocumentLoader_h
 #define DocumentLoader_h
 
+#include "core/fetch/RawResource.h"
+#include "core/fetch/ResourceLoaderOptions.h"
+#include "core/fetch/ResourcePtr.h"
 #include "core/loader/DocumentLoadTiming.h"
 #include "core/loader/DocumentWriter.h"
 #include "core/loader/NavigationAction.h"
-#include "core/loader/ResourceLoaderOptions.h"
 #include "core/loader/SubstituteData.h"
-#include "core/loader/cache/RawResource.h"
-#include "core/loader/cache/ResourcePtr.h"
 #include "core/platform/Timer.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceRequest.h"
@@ -108,7 +108,6 @@ namespace WebCore {
         const String& responseMIMEType() const;
 
         void replaceRequestURLForSameDocumentNavigation(const KURL&);
-        bool isStopping() const { return m_isStopping; }
         void stopLoading();
         void setCommitted(bool committed) { m_committed = committed; }
         bool isCommitted() const { return m_committed; }
@@ -120,7 +119,6 @@ namespace WebCore {
         bool replacesCurrentHistoryItem() const { return m_replacesCurrentHistoryItem; }
         void setReplacesCurrentHistoryItem(bool replacesCurrentHistoryItem) { m_replacesCurrentHistoryItem = replacesCurrentHistoryItem; }
         bool isLoadingInAPISense() const;
-        void setTitle(const StringWithDirection&);
         const String& overrideEncoding() const { return m_overrideEncoding; }
 
         bool scheduleArchiveLoad(Resource*, const ResourceRequest&);
@@ -128,14 +126,13 @@ namespace WebCore {
 
         enum PolicyCheckLoadType {
             PolicyCheckStandard,
-            PolicyCheckRedirect
+            PolicyCheckFragment
         };
         bool shouldContinueForNavigationPolicy(const ResourceRequest&, PolicyCheckLoadType);
         const NavigationAction& triggeringAction() const { return m_triggeringAction; }
         void setTriggeringAction(const NavigationAction& action) { m_triggeringAction = action; }
 
         void setOverrideEncoding(const String& encoding) { m_overrideEncoding = encoding; }
-        const StringWithDirection& title() const { return m_pageTitle; }
 
         KURL urlForHistory() const;
 
@@ -247,11 +244,8 @@ namespace WebCore {
         ResourceError m_mainDocumentError;
 
         bool m_committed;
-        bool m_isStopping;
         bool m_isClientRedirect;
         bool m_replacesCurrentHistoryItem;
-
-        StringWithDirection m_pageTitle;
 
         String m_overrideEncoding;
 

@@ -464,9 +464,13 @@ public:
     bool hasAutoVerticalScrollbar() const { return hasOverflowClip() && (style()->overflowY() == OAUTO || style()->overflowY() == OOVERLAY); }
     bool hasAutoHorizontalScrollbar() const { return hasOverflowClip() && (style()->overflowX() == OAUTO || style()->overflowX() == OOVERLAY); }
     bool scrollsOverflow() const { return scrollsOverflowX() || scrollsOverflowY(); }
-    bool scrollsOverflowX() const { return hasOverflowClip() && (style()->overflowX() == OSCROLL || hasAutoHorizontalScrollbar()); }
-    bool scrollsOverflowY() const { return hasOverflowClip() && (style()->overflowY() == OSCROLL || hasAutoVerticalScrollbar()); }
+    virtual bool scrollsOverflowX() const { return hasOverflowClip() && (style()->overflowX() == OSCROLL || hasAutoHorizontalScrollbar()); }
+    virtual bool scrollsOverflowY() const { return hasOverflowClip() && (style()->overflowY() == OSCROLL || hasAutoVerticalScrollbar()); }
     bool usesCompositedScrolling() const;
+
+    // Elements such as the <input> field override this to specify that they are scrollable
+    // outside the context of the CSS overflow style
+    virtual bool isIntristicallyScrollable(ScrollbarOrientation orientation) const { return false; }
 
     bool hasUnsplittableScrollingOverflow() const;
     bool isUnsplittableForPagination() const;
@@ -512,7 +516,7 @@ public:
     bool shrinkToAvoidFloats() const;
     virtual bool avoidsFloats() const;
 
-    virtual void markForPaginationRelayoutIfNeeded() { }
+    virtual void markForPaginationRelayoutIfNeeded(SubtreeLayoutScope&) { }
 
     bool isWritingModeRoot() const { return !parent() || parent()->style()->writingMode() != style()->writingMode(); }
 
@@ -669,6 +673,10 @@ private:
     virtual void computePreferredLogicalWidths() { setPreferredLogicalWidthsDirty(false); }
 
     virtual LayoutRect frameRectForStickyPositioning() const OVERRIDE FINAL { return frameRect(); }
+
+    // This method performs the actual scroll. Override if scrolling without a RenderLayer. The scroll() and logicalScroll()
+    // are responsible for scroll propagation/bubbling and call this method to do the actual scrolling
+    virtual bool scrollImpl(ScrollDirection, ScrollGranularity, float);
 
 private:
     // The width/height of the contents + borders + padding.  The x/y location is relative to our container (which is not always our parent).

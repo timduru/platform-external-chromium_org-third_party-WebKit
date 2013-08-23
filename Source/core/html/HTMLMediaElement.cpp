@@ -2751,7 +2751,7 @@ void HTMLMediaElement::configureTextTrackGroup(const TrackGroup& group)
     LOG(Media, "HTMLMediaElement::configureTextTrackGroup(%d)", group.kind);
 
     Page* page = document()->page();
-    Settings* settings = page ? page->settings() : 0;
+    Settings* settings = page ? &page->settings() : 0;
 
     // First, find the track in the group that should be enabled (if any).
     Vector<RefPtr<TextTrack> > currentlyEnabledTracks;
@@ -3175,6 +3175,16 @@ void HTMLMediaElement::mediaPlayerPlaybackStateChanged()
         pauseInternal();
     else
         playInternal();
+}
+
+void HTMLMediaElement::mediaPlayerRequestSeek(double time)
+{
+    // The player is the source of this seek request.
+    if (m_mediaController) {
+        m_mediaController->setCurrentTime(time, IGNORE_EXCEPTION);
+        return;
+    }
+    setCurrentTime(time, IGNORE_EXCEPTION);
 }
 
 // MediaPlayerPresentation methods
@@ -3688,7 +3698,7 @@ bool HTMLMediaElement::createMediaControls()
     if (isFullscreen())
         mediaControls->enteredFullscreen();
 
-    ensureUserAgentShadowRoot()->appendChild(mediaControls, ASSERT_NO_EXCEPTION);
+    ensureUserAgentShadowRoot()->appendChild(mediaControls);
 
     if (!controls() || !inDocument())
         mediaControls->hide();

@@ -28,8 +28,8 @@
 
 #include <limits>
 #include "core/dom/Document.h"
+#include "core/fetch/ResourceFetcher.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/loader/cache/ResourceFetcher.h"
 #include "core/page/Chrome.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
@@ -44,8 +44,8 @@ namespace WebCore {
 static void setImageLoadingSettings(Page* page)
 {
     for (Frame* frame = page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
-        frame->document()->fetcher()->setImagesEnabled(page->settings()->areImagesEnabled());
-        frame->document()->fetcher()->setAutoLoadImages(page->settings()->loadsImagesAutomatically());
+        frame->document()->fetcher()->setImagesEnabled(page->settings().areImagesEnabled());
+        frame->document()->fetcher()->setAutoLoadImages(page->settings().loadsImagesAutomatically());
     }
 }
 
@@ -137,7 +137,9 @@ Settings::Settings(Page* page)
     , m_cssStickyPositionEnabled(true)
     , m_dnsPrefetchingEnabled(false)
     , m_touchEventEmulationEnabled(false)
+    , m_viewportEnabled(false)
     , m_setImageLoadingSettingsTimer(this, &Settings::imageLoadingSettingsTimerFired)
+    , m_compositorDrivenAcceleratedScrollingEnabled(false)
 {
     m_page = page; // Page is not yet fully initialized wen constructing Settings, so keeping m_page null over initializeDefaultFontFamilies() call.
 }
@@ -378,6 +380,16 @@ void Settings::setOpenGLMultisamplingEnabled(bool flag)
 bool Settings::openGLMultisamplingEnabled()
 {
     return m_openGLMultisamplingEnabled;
+}
+
+void Settings::setViewportEnabled(bool enabled)
+{
+    if (m_viewportEnabled == enabled)
+        return;
+
+    m_viewportEnabled = enabled;
+    if (m_page->mainFrame())
+        m_page->mainFrame()->document()->updateViewportArguments();
 }
 
 } // namespace WebCore

@@ -34,9 +34,8 @@ class RenderTextControlSingleLine : public RenderTextControl {
 public:
     RenderTextControlSingleLine(HTMLInputElement*);
     virtual ~RenderTextControlSingleLine();
-    // FIXME: Move create*Style() to their classes.
+    // FIXME: Move createInnerTextStyle() to TextControlInnerTextElement.
     virtual PassRefPtr<RenderStyle> createInnerTextStyle(const RenderStyle* startStyle) const;
-    PassRefPtr<RenderStyle> createInnerBlockStyle(const RenderStyle* startStyle) const;
 
     void capsLockStateMayHaveChanged();
 
@@ -67,8 +66,6 @@ private:
     virtual int scrollHeight() const;
     virtual void setScrollLeft(int);
     virtual void setScrollTop(int);
-    virtual bool scroll(ScrollDirection, ScrollGranularity, float multiplier = 1, Node** stopNode = 0);
-    virtual bool logicalScroll(ScrollLogicalDirection, ScrollGranularity, float multiplier = 1, Node** stopNode = 0);
 
     int textBlockWidth() const;
     virtual float getAvgCharWidth(AtomicString family);
@@ -111,9 +108,16 @@ void toRenderTextControlSingleLine(const RenderTextControlSingleLine*);
 class RenderTextControlInnerBlock : public RenderBlock {
 public:
     RenderTextControlInnerBlock(Element* element) : RenderBlock(element) { }
+    virtual int inlineBlockBaseline(LineDirectionMode direction) const OVERRIDE { return lastLineBoxBaseline(direction); }
 
 private:
-    virtual bool hasLineIfEmpty() const { return true; }
+    virtual bool isIntristicallyScrollable(ScrollbarOrientation orientation) const OVERRIDE
+    {
+        return orientation == HorizontalScrollbar;
+    }
+    virtual bool scrollsOverflowX() const OVERRIDE { return hasOverflowClip(); }
+    virtual bool scrollsOverflowY() const OVERRIDE { return false; }
+    virtual bool hasLineIfEmpty() const OVERRIDE { return true; }
 };
 
 }

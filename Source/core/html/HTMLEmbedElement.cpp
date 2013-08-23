@@ -52,6 +52,11 @@ PassRefPtr<HTMLEmbedElement> HTMLEmbedElement::create(const QualifiedName& tagNa
     return adoptRef(new HTMLEmbedElement(tagName, document, createdByParser));
 }
 
+PassRefPtr<HTMLEmbedElement> HTMLEmbedElement::create(Document* document)
+{
+    return create(embedTag, document, false);
+}
+
 static inline RenderWidget* findWidgetRenderer(const Node* n)
 {
     if (!n->renderer())
@@ -183,7 +188,7 @@ bool HTMLEmbedElement::rendererIsNeeded(const NodeRenderingContext& context)
     ContainerNode* p = parentNode();
     if (p && p->hasTagName(objectTag)) {
         ASSERT(p->renderer());
-        if (!static_cast<HTMLObjectElement*>(p)->useFallbackContent()) {
+        if (!toHTMLObjectElement(p)->useFallbackContent()) {
             ASSERT(!p->renderer()->isEmbeddedObject());
             return false;
         }

@@ -29,10 +29,11 @@
 
 #include "bindings/v8/ExceptionState.h"
 #include "core/css/resolver/StyleResolver.h"
+#include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Text.h"
-#include "core/dom/shadow/ContentDistributor.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/InsertionPoint.h"
+#include "core/dom/shadow/ScopeContentDistribution.h"
 #include "core/editing/markup.h"
 #include "core/platform/HistogramSupport.h"
 
@@ -75,6 +76,8 @@ ShadowRoot::~ShadowRoot()
 {
     ASSERT(!m_prev);
     ASSERT(!m_next);
+
+    documentInternal()->styleSheetCollection()->didRemoveShadowRoot(this);
 
     // We cannot let ContainerNode destructor call willBeDeletedFrom()
     // for this ShadowRoot instance because TreeScope destructor

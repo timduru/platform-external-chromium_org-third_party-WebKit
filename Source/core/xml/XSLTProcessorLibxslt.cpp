@@ -21,22 +21,12 @@
  */
 
 #include "config.h"
-
 #include "core/xml/XSLTProcessor.h"
 
-#include <libxslt/imports.h>
-#include <libxslt/security.h>
-#include <libxslt/variables.h>
-#include <libxslt/xsltutils.h>
-#include <wtf/Assertions.h>
-#include <wtf/text/CString.h>
-#include <wtf/text/StringBuffer.h>
-#include <wtf/unicode/UTF8.h>
-#include <wtf/Vector.h>
 #include "core/dom/Document.h"
 #include "core/dom/TransformSource.h"
 #include "core/editing/markup.h"
-#include "core/loader/cache/ResourceFetcher.h"
+#include "core/fetch/ResourceFetcher.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/PageConsole.h"
@@ -48,6 +38,15 @@
 #include "core/xml/XSLTUnicodeSort.h"
 #include "core/xml/parser/XMLDocumentParser.h"
 #include "weborigin/SecurityOrigin.h"
+#include "wtf/Assertions.h"
+#include "wtf/Vector.h"
+#include "wtf/text/CString.h"
+#include "wtf/text/StringBuffer.h"
+#include "wtf/unicode/UTF8.h"
+#include <libxslt/imports.h>
+#include <libxslt/security.h>
+#include <libxslt/variables.h>
+#include <libxslt/xsltutils.h>
 
 namespace WebCore {
 
@@ -116,7 +115,7 @@ static xmlDocPtr docLoaderFunc(const xmlChar* uri,
         PageConsole* console = 0;
         Frame* frame = globalProcessor->xslStylesheet()->ownerDocument()->frame();
         if (frame && frame->page())
-            console = frame->page()->console();
+            console = &frame->page()->console();
         xmlSetStructuredErrorFunc(console, XSLTProcessor::parseErrorFunc);
         xmlSetGenericErrorFunc(console, XSLTProcessor::genericErrorFunc);
 

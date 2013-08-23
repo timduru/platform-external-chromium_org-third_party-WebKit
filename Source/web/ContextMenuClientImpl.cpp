@@ -122,7 +122,7 @@ static String selectMisspelledWord(Frame* selectedFrame)
 
     // Selection is empty, so change the selection to the word under the cursor.
     HitTestResult hitTestResult = selectedFrame->eventHandler()->
-        hitTestResultAtPoint(selectedFrame->page()->contextMenuController()->hitTestResult().pointInInnerNodeFrame());
+        hitTestResultAtPoint(selectedFrame->page()->contextMenuController().hitTestResult().pointInInnerNodeFrame());
     Node* innerNode = hitTestResult.innerNode();
     VisiblePosition pos(innerNode->renderer()->positionForPoint(
         hitTestResult.localPoint()));
@@ -184,7 +184,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
     if (!m_webView->contextMenuAllowed())
         return;
 
-    HitTestResult r = m_webView->page()->contextMenuController()->hitTestResult();
+    HitTestResult r = m_webView->page()->contextMenuController().hitTestResult();
     Frame* selectedFrame = r.innerNodeFrame();
 
     WebContextMenuData data;
@@ -221,8 +221,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
 
         // We know that if absoluteMediaURL() is not empty, then this
         // is a media element.
-        HTMLMediaElement* mediaElement =
-            toMediaElement(r.innerNonSharedNode());
+        HTMLMediaElement* mediaElement = toHTMLMediaElement(r.innerNonSharedNode());
         if (isHTMLVideoElement(mediaElement))
             data.mediaType = WebContextMenuData::MediaTypeVideo;
         else if (mediaElement->hasTagName(HTMLNames::audioTag))
@@ -273,8 +272,12 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
         }
     }
 
-    data.isImageBlocked =
-        (data.mediaType == WebContextMenuData::MediaTypeImage) && !r.image();
+    // An image can to be null for many reasons, like being blocked, no image
+    // data received from server yet.
+    data.hasImageContents =
+        (data.mediaType == WebContextMenuData::MediaTypeImage)
+        && r.image() && !(r.image()->isNull());
+    data.isImageBlocked = !data.hasImageContents;
 
     // If it's not a link, an image, a media element, or an image/media link,
     // show a selection menu or a more generic page menu.
@@ -366,6 +369,12 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
     WebFrame* selected_web_frame = WebFrameImpl::fromFrame(selectedFrame);
     if (m_webView->client())
         m_webView->client()->showContextMenu(selected_web_frame, data);
+}
+
+void ContextMenuClientImpl::clearContextMenu()
+{
+    if (m_webView->client())
+        m_webView->client()->clearContextMenu();
 }
 
 static void populateSubMenuItems(const Vector<ContextMenuItem>& inputMenu, WebVector<WebMenuItemInfo>& subMenuItems)

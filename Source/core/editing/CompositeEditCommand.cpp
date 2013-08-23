@@ -890,7 +890,7 @@ void CompositeEditCommand::removePlaceholderAt(const Position& p)
 PassRefPtr<Node> CompositeEditCommand::insertNewDefaultParagraphElementAt(const Position& position)
 {
     RefPtr<Element> paragraphElement = createDefaultParagraphElement(document());
-    paragraphElement->appendChild(createBreakElement(document()), IGNORE_EXCEPTION);
+    paragraphElement->appendChild(createBreakElement(document()));
     insertNodeAt(paragraphElement, position);
     return paragraphElement.release();
 }
@@ -1052,7 +1052,7 @@ void CompositeEditCommand::cleanupAfterDeletion(VisiblePosition destination)
         Node* node = position.deprecatedNode();
 
         // Bail if we'd remove an ancestor of our destination.
-        if (destinationNode->isDescendantOf(node))
+        if (destinationNode && destinationNode->isDescendantOf(node))
             return;
 
         // Normally deletion will leave a br as a placeholder.

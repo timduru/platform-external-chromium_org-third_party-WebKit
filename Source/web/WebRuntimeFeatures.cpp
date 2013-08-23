@@ -96,6 +96,16 @@ bool WebRuntimeFeatures::isDeviceOrientationEnabled()
     return RuntimeEnabledFeatures::deviceOrientationEnabled();
 }
 
+void WebRuntimeFeatures::enableDialogElement(bool enable)
+{
+    RuntimeEnabledFeatures::setDialogElementEnabled(enable);
+}
+
+bool WebRuntimeFeatures::isDialogElementEnabled()
+{
+    return RuntimeEnabledFeatures::dialogElementEnabled();
+}
+
 void WebRuntimeFeatures::enableEncryptedMedia(bool enable)
 {
     RuntimeEnabledFeatures::setEncryptedMediaEnabled(enable);
@@ -176,12 +186,7 @@ bool WebRuntimeFeatures::isGeolocationEnabled()
 
 void WebRuntimeFeatures::enableLazyLayout(bool enable)
 {
-    RuntimeEnabledFeatures::setLazyLayoutEnabled(enable);
-}
-
-bool WebRuntimeFeatures::isLazyLayoutEnabled()
-{
-    return RuntimeEnabledFeatures::lazyLayoutEnabled();
+    // FIXME: Remove this once Chromium stops calling this.
 }
 
 void WebRuntimeFeatures::enableLocalStorage(bool enable)
@@ -382,14 +387,26 @@ bool WebRuntimeFeatures::isHTMLImportsEnabled()
     return RuntimeEnabledFeatures::htmlImportsEnabled();
 }
 
+// FIXME: Remove this when embedders switch to enableEmbedderCustomElements.
 void WebRuntimeFeatures::enableCustomElements(bool enable)
 {
-    RuntimeEnabledFeatures::setCustomDOMElementsEnabled(enable);
+    RuntimeEnabledFeatures::setCustomElementsEnabled(enable);
+    enableEmbedderCustomElements(enable);
+}
+
+void WebRuntimeFeatures::enableEmbedderCustomElements(bool enable)
+{
+    RuntimeEnabledFeatures::setEmbedderCustomElementsEnabled(enable);
 }
 
 void WebRuntimeFeatures::enableOverlayScrollbars(bool enable)
 {
     RuntimeEnabledFeatures::setOverlayScrollbarsEnabled(enable);
+}
+
+void WebRuntimeFeatures::enableInputModeAttribute(bool enable)
+{
+    RuntimeEnabledFeatures::setInputModeAttributeEnabled(enable);
 }
 
 } // namespace WebKit

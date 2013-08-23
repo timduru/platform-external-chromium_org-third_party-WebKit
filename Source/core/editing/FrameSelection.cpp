@@ -34,6 +34,7 @@
 #include "core/dom/CharacterData.h"
 #include "core/dom/Document.h"
 #include "core/dom/Element.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Range.h"
 #include "core/editing/Editor.h"
@@ -1761,7 +1762,7 @@ String FrameSelection::selectedTextForClipboard() const
 
 bool FrameSelection::shouldDeleteSelection(const VisibleSelection& selection) const
 {
-    return m_frame->editor()->client()->shouldDeleteRange(selection.toNormalizedRange().get());
+    return m_frame->editor()->client().shouldDeleteRange(selection.toNormalizedRange().get());
 }
 
 FloatRect FrameSelection::bounds(bool clipToVisibleContent) const
@@ -1806,7 +1807,7 @@ static HTMLFormElement* scanForForm(Node* start)
         if (element->isHTMLElement() && toHTMLElement(element)->isFormControlElement())
             return toHTMLFormControlElement(element)->form();
         if (element->hasTagName(frameTag) || element->hasTagName(iframeTag)) {
-            Node* childDocument = static_cast<HTMLFrameElementBase*>(element)->contentDocument();
+            Node* childDocument = toHTMLFrameElementBase(element)->contentDocument();
             if (HTMLFormElement* frameResult = scanForForm(childDocument))
                 return frameResult;
         }

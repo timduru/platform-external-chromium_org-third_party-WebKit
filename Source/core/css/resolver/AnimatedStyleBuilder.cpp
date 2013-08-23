@@ -32,11 +32,13 @@
 #include "core/css/resolver/AnimatedStyleBuilder.h"
 
 #include "core/animation/AnimatableNumber.h"
+#include "core/animation/AnimatableTransform.h"
 #include "core/animation/AnimatableUnknown.h"
 #include "core/animation/AnimatableValue.h"
 #include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/StyleResolverState.h"
 #include "core/rendering/style/RenderStyle.h"
+#include "wtf/MathExtras.h"
 
 namespace WebCore {
 
@@ -46,6 +48,11 @@ Length animatableValueToLength(const AnimatableValue* value, const StyleResolver
 {
     const RenderStyle* style = state.style();
     return toAnimatableNumber(value)->toLength(style, state.rootElementStyle(), style->effectiveZoom());
+}
+
+unsigned animatableValueToUnsigned(const AnimatableValue* value)
+{
+    return clampTo<unsigned>(round(toAnimatableNumber(value)->toDouble()));
 }
 
 } // namespace
@@ -62,6 +69,18 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     }
     RenderStyle* style = state.style();
     switch (property) {
+    case CSSPropertyBorderBottomWidth:
+        style->setBorderBottomWidth(animatableValueToUnsigned(value));
+        return;
+    case CSSPropertyBorderLeftWidth:
+        style->setBorderLeftWidth(animatableValueToUnsigned(value));
+        return;
+    case CSSPropertyBorderRightWidth:
+        style->setBorderRightWidth(animatableValueToUnsigned(value));
+        return;
+    case CSSPropertyBorderTopWidth:
+        style->setBorderTopWidth(animatableValueToUnsigned(value));
+        return;
     case CSSPropertyBottom:
         style->setBottom(animatableValueToLength(value, state));
         return;
@@ -121,6 +140,9 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
         return;
     case CSSPropertyWebkitPerspectiveOriginY:
         style->setPerspectiveOriginY(animatableValueToLength(value, state));
+        return;
+    case CSSPropertyWebkitTransform:
+        style->setTransform(toAnimatableTransform(value)->transformOperations());
         return;
     case CSSPropertyWebkitTransformOriginX:
         style->setTransformOriginX(animatableValueToLength(value, state));

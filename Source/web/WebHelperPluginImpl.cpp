@@ -131,7 +131,6 @@ void WebHelperPluginImpl::closeHelperPlugin()
     if (m_page) {
         m_page->clearPageGroup();
         m_page->mainFrame()->loader()->stopAllLoaders();
-        m_page->mainFrame()->loader()->stopLoading(UnloadEventPolicyNone);
     }
 
     // We must destroy the page now in case the host page is being destroyed, in
@@ -186,8 +185,8 @@ bool WebHelperPluginImpl::initializePage(const String& pluginType, const WebDocu
     pageClients.chromeClient = m_chromeClient.get();
 
     m_page = adoptPtr(new Page(pageClients));
-    ASSERT(!m_page->settings()->isScriptEnabled());
-    m_page->settings()->setPluginsEnabled(true);
+    ASSERT(!m_page->settings().isScriptEnabled());
+    m_page->settings().setPluginsEnabled(true);
 
     unsigned layoutMilestones = DidFirstLayout | DidFirstVisuallyNonEmptyLayout;
     m_page->addLayoutMilestones(static_cast<LayoutMilestones>(layoutMilestones));
@@ -238,8 +237,7 @@ void WebHelperPluginImpl::close()
 
 WebHelperPlugin* WebHelperPlugin::create(WebWidgetClient* client)
 {
-    if (!client)
-        CRASH();
+    RELEASE_ASSERT(client);
     // A WebHelperPluginImpl instance usually has two references.
     //  - One owned by the instance itself. It represents the visible widget.
     //  - One owned by the hosting element. It's released when the hosting

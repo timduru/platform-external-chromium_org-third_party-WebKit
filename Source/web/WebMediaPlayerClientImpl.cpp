@@ -6,6 +6,7 @@
 #include "WebMediaPlayerClientImpl.h"
 
 #include "InbandTextTrackPrivateImpl.h"
+#include "MediaSourcePrivateImpl.h"
 #include "WebAudioSourceProvider.h"
 #include "WebDocument.h"
 #include "WebFrameClient.h"
@@ -172,11 +173,20 @@ WebPlugin* WebMediaPlayerClientImpl::createHelperPlugin(const WebString& pluginT
     return plugin;
 }
 
+
+// FIXME: Remove this override and cast when Chromium is updated to use closeHelperPluginSoon().
 void WebMediaPlayerClientImpl::closeHelperPlugin()
 {
+    Frame* frame = static_cast<HTMLMediaElement*>(m_client)->document()->frame();
+    WebFrameImpl* webFrame = WebFrameImpl::fromFrame(frame);
+    closeHelperPluginSoon(webFrame);
+}
+
+void WebMediaPlayerClientImpl::closeHelperPluginSoon(WebFrame* frame)
+{
     ASSERT(m_helperPlugin);
-    m_helperPlugin->closeHelperPlugin();
-    m_helperPlugin = 0;
+    WebViewImpl* webView = static_cast<WebViewImpl*>(frame->view());
+    webView->closeHelperPluginSoon(m_helperPlugin.release());
 }
 
 void WebMediaPlayerClientImpl::setWebLayer(WebLayer* layer)
@@ -208,6 +218,17 @@ void WebMediaPlayerClientImpl::removeTextTrack(WebInbandTextTrack* textTrack)
     // that was passed to addTextTrack.  (The object from which we are downcasting includes
     // WebInbandTextTrack as one of the intefaces from which inherits.)
     m_client->mediaPlayerDidRemoveTrack(static_cast<InbandTextTrackPrivateImpl*>(textTrack->client()));
+}
+
+void WebMediaPlayerClientImpl::mediaSourceOpened(WebMediaSourceNew* webMediaSource)
+{
+    ASSERT(webMediaSource);
+    m_mediaSource->setPrivateAndOpen(adoptPtr(new MediaSourcePrivateImpl(adoptPtr(webMediaSource))));
+}
+
+void WebMediaPlayerClientImpl::requestSeek(double time)
+{
+    m_client->mediaPlayerRequestSeek(time);
 }
 
 // MediaPlayer -------------------------------------------------
@@ -671,6 +692,7 @@ WebMediaPlayerClientImpl::WebMediaPlayerClientImpl(MediaPlayerClient* client)
     , m_isMediaStream(false)
     , m_delayingLoad(false)
     , m_preload(MediaPlayer::Auto)
+    , m_helperPlugin(0)
     , m_videoLayer(0)
     , m_opaque(false)
     , m_needsWebLayerForVideo(false)

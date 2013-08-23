@@ -35,7 +35,8 @@
 #include "core/accessibility/AccessibilitySVGRoot.h"
 #include "core/accessibility/AccessibilitySpinButton.h"
 #include "core/accessibility/AccessibilityTable.h"
-#include "core/dom/NodeTraversal.h"
+#include "core/dom/ElementTraversal.h"
+#include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/RenderedPosition.h"
 #include "core/editing/VisibleUnits.h"
@@ -46,6 +47,7 @@
 #include "core/html/HTMLOptionElement.h"
 #include "core/html/HTMLSelectElement.h"
 #include "core/html/HTMLTextAreaElement.h"
+#include "core/html/shadow/ShadowElementNames.h"
 #include "core/loader/ProgressTracker.h"
 #include "core/page/Page.h"
 #include "core/platform/LocalizedStrings.h"
@@ -304,7 +306,7 @@ ScrollableArea* AccessibilityRenderObject::getScrollableAreaIfScrollable() const
     if (!box->canBeScrolledAndHasScrollableArea())
         return 0;
 
-    return box->layer();
+    return box->scrollableArea();
 }
 
 AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
@@ -776,7 +778,7 @@ bool AccessibilityRenderObject::computeAccessibilityIsIgnored() const
                 return true;
         }
 
-        if (isNativeImage()) {
+        if (isNativeImage() && m_renderer->isImage()) {
             // check for one-dimensional image
             RenderImage* image = toRenderImage(m_renderer);
             if (image->height() <= 1 || image->width() <= 1)
@@ -1325,7 +1327,7 @@ void AccessibilityRenderObject::checkCachedElementRect() const
         dirty = true;
 
     if (box->canBeScrolledAndHasScrollableArea()) {
-        ScrollableArea* scrollableArea = box->layer();
+        ScrollableArea* scrollableArea = box->scrollableArea();
         if (scrollableArea && scrollableArea->scrollPosition() != m_cachedScrollPosition)
             dirty = true;
     }
@@ -1349,7 +1351,7 @@ void AccessibilityRenderObject::updateCachedElementRect() const
     m_cachedFrameRect = box->frameRect();
 
     if (box->canBeScrolledAndHasScrollableArea()) {
-        ScrollableArea* scrollableArea = box->layer();
+        ScrollableArea* scrollableArea = box->scrollableArea();
         if (scrollableArea)
             m_cachedScrollPosition = scrollableArea->scrollPosition();
     }
@@ -1611,11 +1613,9 @@ double AccessibilityRenderObject::estimatedLoadingProgress() const
     if (isLoaded())
         return 1.0;
 
-    Page* page = m_renderer->document()->page();
-    if (!page)
-        return 0;
-
-    return page->progress()->estimatedProgress();
+    if (Page* page = m_renderer->document()->page())
+        return page->progress().estimatedProgress();
+    return 0;
 }
 
 //
@@ -1694,7 +1694,7 @@ PlainTextRange AccessibilityRenderObject::selectedTextRange() const
         return PlainTextRange();
 
     AccessibilityRole ariaRole = ariaRoleAttribute();
-    if (isNativeTextControl() && ariaRole == UnknownRole) {
+    if (isNativeTextControl() && ariaRole == UnknownRole && m_renderer->isTextControl()) {
         HTMLTextFormControlElement* textControl = toRenderTextControl(m_renderer)->textFormControlElement();
         return PlainTextRange(textControl->selectionStart(), textControl->selectionEnd() - textControl->selectionStart());
     }
@@ -1717,7 +1717,7 @@ String AccessibilityRenderObject::selectedText() const
     if (isPasswordField())
         return String(); // need to return something distinct from empty string
 
-    if (isNativeTextControl()) {
+    if (isNativeTextControl() && m_renderer->isTextControl()) {
         HTMLTextFormControlElement* textControl = toRenderTextControl(m_renderer)->textFormControlElement();
         return textControl->selectedText();
     }
@@ -1758,7 +1758,7 @@ void AccessibilityRenderObject::setFocused(bool on)
 
 void AccessibilityRenderObject::setSelectedTextRange(const PlainTextRange& range)
 {
-    if (isNativeTextControl()) {
+    if (isNativeTextControl() && m_renderer->isTextControl()) {
         HTMLTextFormControlElement* textControl = toRenderTextControl(m_renderer)->textFormControlElement();
         textControl->setSelectionRange(range.start, range.start + range.length);
         return;
@@ -1879,7 +1879,7 @@ VisiblePosition AccessibilityRenderObject::visiblePositionForIndex(int index) co
     if (!m_renderer)
         return VisiblePosition();
 
-    if (isNativeTextControl())
+    if (isNativeTextControl() && m_renderer->isTextControl())
         return toRenderTextControl(m_renderer)->textFormControlElement()->visiblePositionForIndex(index);
 
     if (!allowsTextRanges() && !m_renderer->isText())
@@ -1902,7 +1902,7 @@ or), UPSTREAM);
 
 int AccessibilityRenderObject::indexForVisiblePosition(const VisiblePosition& pos) const
 {
-    if (isNativeTextControl()) {
+    if (isNativeTextControl() && m_renderer->isTextControl()) {
         HTMLTextFormControlElement* textControl = toRenderTextControl(m_renderer)->textFormControlElement();
         return textControl->indexForVisiblePosition(pos);
     }
@@ -2332,12 +2332,12 @@ void AccessibilityRenderObject::addTextFieldChildren()
         return;
 
     HTMLInputElement* input = toHTMLInputElement(node);
-    HTMLElement* spinButtonElement = input->innerSpinButtonElement();
+    Element* spinButtonElement = input->userAgentShadowRoot()->getElementById(ShadowElementNames::spinButton());
     if (!spinButtonElement || !spinButtonElement->isSpinButtonElement())
         return;
 
     AccessibilitySpinButton* axSpinButton = static_cast<AccessibilitySpinButton*>(axObjectCache()->getOrCreate(SpinButtonRole));
-    axSpinButton->setSpinButtonElement(static_cast<SpinButtonElement*>(spinButtonElement));
+    axSpinButton->setSpinButtonElement(toSpinButtonElement(spinButtonElement));
     axSpinButton->setParent(this);
     m_children.append(axSpinButton);
 }

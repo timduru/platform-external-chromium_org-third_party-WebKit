@@ -31,6 +31,7 @@
 #include "config.h"
 #include "modules/filesystem/DirectoryReaderSync.h"
 
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/ExceptionCode.h"
 #include "modules/filesystem/DirectoryEntry.h"
@@ -53,8 +54,8 @@ EntrySyncVector DirectoryReaderSync::readEntries(ExceptionState& es)
         return EntrySyncVector();
 
     EntriesSyncCallbackHelper helper(m_fileSystem->asyncFileSystem());
-    if (!m_fileSystem->readDirectory(this, m_fullPath, helper.successCallback(), helper.errorCallback())) {
-        es.throwDOMException(InvalidModificationError);
+    if (!m_fileSystem->readDirectory(this, m_fullPath, helper.successCallback(), helper.errorCallback(), DOMFileSystemBase::Synchronous)) {
+        es.throwDOMException(InvalidModificationError, ExceptionMessages::failedToExecute("readEntries", "DirectoryReaderSync"));
         setHasMoreEntries(false);
         return EntrySyncVector();
     }

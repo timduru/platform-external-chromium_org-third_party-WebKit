@@ -29,13 +29,14 @@
 #include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Element.h"
 #include "core/dom/Position.h"
-#include "core/loader/cache/ImageResourceClient.h"
+#include "core/fetch/ImageResourceClient.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/platform/graphics/transforms/TransformationMatrix.h"
 #include "core/rendering/PaintPhase.h"
 #include "core/rendering/RenderObjectChildList.h"
 #include "core/rendering/ScrollBehavior.h"
+#include "core/rendering/SubtreeLayoutScope.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/StyleInheritedData.h"
 #include "wtf/HashSet.h"
@@ -149,9 +150,7 @@ public:
 
     virtual const char* renderName() const = 0;
 
-#ifndef NDEBUG
     String debugName() const;
-#endif
 
     RenderObject* parent() const { return m_parent; }
     bool isDescendantOf(const RenderObject*) const;
@@ -332,7 +331,6 @@ public:
     virtual bool isProgress() const { return false; }
     virtual bool isRenderBlock() const { return false; }
     virtual bool isRenderSVGBlock() const { return false; };
-    virtual bool isRenderLazyBlock() const { return false; }
     virtual bool isRenderButton() const { return false; }
     virtual bool isRenderIFrame() const { return false; }
     virtual bool isRenderImage() const { return false; }
@@ -548,15 +546,15 @@ public:
 
     bool needsLayout() const
     {
-        return m_bitfields.needsLayout() || m_bitfields.normalChildNeedsLayout() || m_bitfields.posChildNeedsLayout()
+        return m_bitfields.selfNeedsLayout() || m_bitfields.normalChildNeedsLayout() || m_bitfields.posChildNeedsLayout()
             || m_bitfields.needsSimplifiedNormalFlowLayout() || m_bitfields.needsPositionedMovementLayout();
     }
 
-    bool selfNeedsLayout() const { return m_bitfields.needsLayout(); }
+    bool selfNeedsLayout() const { return m_bitfields.selfNeedsLayout(); }
     bool needsPositionedMovementLayout() const { return m_bitfields.needsPositionedMovementLayout(); }
     bool needsPositionedMovementLayoutOnly() const
     {
-        return m_bitfields.needsPositionedMovementLayout() && !m_bitfields.needsLayout() && !m_bitfields.normalChildNeedsLayout()
+        return m_bitfields.needsPositionedMovementLayout() && !m_bitfields.selfNeedsLayout() && !m_bitfields.normalChildNeedsLayout()
             && !m_bitfields.posChildNeedsLayout() && !m_bitfields.needsSimplifiedNormalFlowLayout();
     }
 
@@ -621,10 +619,10 @@ public:
 
     Element* offsetParent() const;
 
-    void markContainingBlocksForLayout(bool scheduleRelayout = true, RenderObject* newRoot = 0);
-    void setNeedsLayout(MarkingBehavior = MarkContainingBlockChain);
+    void markContainingBlocksForLayout(bool scheduleRelayout = true, RenderObject* newRoot = 0, SubtreeLayoutScope* = 0);
+    void setNeedsLayout(MarkingBehavior = MarkContainingBlockChain, SubtreeLayoutScope* = 0);
     void clearNeedsLayout();
-    void setChildNeedsLayout(MarkingBehavior = MarkContainingBlockChain);
+    void setChildNeedsLayout(MarkingBehavior = MarkContainingBlockChain, SubtreeLayoutScope* = 0);
     void setNeedsPositionedMovementLayout();
     void setNeedsSimplifiedNormalFlowLayout();
     void setPreferredLogicalWidthsDirty(bool, MarkingBehavior = MarkContainingBlockChain);
@@ -663,6 +661,7 @@ public:
 
     void updateFillImages(const FillLayer*, const FillLayer*);
     void updateImage(StyleImage*, StyleImage*);
+    void updateShapeImage(const ShapeValue*, const ShapeValue*);
 
     virtual void paint(PaintInfo&, const LayoutPoint&);
 
@@ -902,6 +901,7 @@ public:
     virtual bool canBeSelectionLeaf() const { return false; }
     bool hasSelectedChildren() const { return selectionState() != SelectionNone; }
 
+    bool isSelectable() const;
     // Obtains the selection colors that should be used when painting a selection.
     Color selectionBackgroundColor() const;
     Color selectionForegroundColor() const;
@@ -1070,6 +1070,8 @@ private:
         return styleColor;
     }
 
+    void removeShapeImageClient(ShapeValue*);
+
 #ifndef NDEBUG
     void checkBlockPositionedObjectsNeedLayout();
 #endif
@@ -1106,7 +1108,7 @@ private:
 
     public:
         RenderObjectBitfields(Node* node)
-            : m_needsLayout(false)
+            : m_selfNeedsLayout(false)
             , m_needsPositionedMovementLayout(false)
             , m_normalChildNeedsLayout(false)
             , m_posChildNeedsLayout(false)
@@ -1136,7 +1138,7 @@ private:
         }
 
         // 31 bits have been used here. There is one bit available.
-        ADD_BOOLEAN_BITFIELD(needsLayout, NeedsLayout);
+        ADD_BOOLEAN_BITFIELD(selfNeedsLayout, SelfNeedsLayout);
         ADD_BOOLEAN_BITFIELD(needsPositionedMovementLayout, NeedsPositionedMovementLayout);
         ADD_BOOLEAN_BITFIELD(normalChildNeedsLayout, NormalChildNeedsLayout);
         ADD_BOOLEAN_BITFIELD(posChildNeedsLayout, PosChildNeedsLayout);
@@ -1197,7 +1199,7 @@ private:
 
     RenderObjectBitfields m_bitfields;
 
-    // FIXME: These private methods are silly. We should just call m_bitfields.setXXX(b) directly.
+    void setSelfNeedsLayout(bool b) { m_bitfields.setSelfNeedsLayout(b); }
     void setNeedsPositionedMovementLayout(bool b) { m_bitfields.setNeedsPositionedMovementLayout(b); }
     void setNormalChildNeedsLayout(bool b) { m_bitfields.setNormalChildNeedsLayout(b); }
     void setPosChildNeedsLayout(bool b) { m_bitfields.setPosChildNeedsLayout(b); }
@@ -1240,14 +1242,14 @@ inline bool RenderObject::isBeforeOrAfterContent() const
     return isBeforeContent() || isAfterContent();
 }
 
-inline void RenderObject::setNeedsLayout(MarkingBehavior markParents)
+inline void RenderObject::setNeedsLayout(MarkingBehavior markParents, SubtreeLayoutScope* layouter)
 {
     ASSERT(!isSetNeedsLayoutForbidden());
-    bool alreadyNeededLayout = m_bitfields.needsLayout();
-    m_bitfields.setNeedsLayout(true);
+    bool alreadyNeededLayout = m_bitfields.selfNeedsLayout();
+    setSelfNeedsLayout(true);
     if (!alreadyNeededLayout) {
-        if (markParents == MarkContainingBlockChain)
-            markContainingBlocksForLayout();
+        if (markParents == MarkContainingBlockChain && (!layouter || layouter->root() != this))
+            markContainingBlocksForLayout(true, 0, layouter);
         if (hasLayer())
             setLayerNeedsFullRepaint();
     }
@@ -1255,7 +1257,7 @@ inline void RenderObject::setNeedsLayout(MarkingBehavior markParents)
 
 inline void RenderObject::clearNeedsLayout()
 {
-    m_bitfields.setNeedsLayout(false);
+    setSelfNeedsLayout(false);
     setEverHadLayout(true);
     setPosChildNeedsLayout(false);
     setNeedsSimplifiedNormalFlowLayout(false);
@@ -1267,13 +1269,14 @@ inline void RenderObject::clearNeedsLayout()
 #endif
 }
 
-inline void RenderObject::setChildNeedsLayout(MarkingBehavior markParents)
+inline void RenderObject::setChildNeedsLayout(MarkingBehavior markParents, SubtreeLayoutScope* layouter)
 {
     ASSERT(!isSetNeedsLayoutForbidden());
     bool alreadyNeededLayout = normalChildNeedsLayout();
     setNormalChildNeedsLayout(true);
-    if (!alreadyNeededLayout && markParents == MarkContainingBlockChain)
-        markContainingBlocksForLayout();
+    // FIXME: Replace MarkOnlyThis with the SubtreeLayoutScope code path and remove the MarkingBehavior argument entirely.
+    if (!alreadyNeededLayout && markParents == MarkContainingBlockChain && (!layouter || layouter->root() != this))
+        markContainingBlocksForLayout(true, 0, layouter);
 }
 
 inline void RenderObject::setNeedsPositionedMovementLayout()

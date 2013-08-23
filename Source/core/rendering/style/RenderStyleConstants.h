@@ -205,6 +205,9 @@ enum EUserSelect {
     SELECT_NONE, SELECT_TEXT, SELECT_ALL
 };
 
+// CSS3 Image Values
+enum ObjectFit { ObjectFitFill, ObjectFitContain, ObjectFitCover, ObjectFitNone, ObjectFitScaleDown };
+
 // Word Break Values. Matches WinIE, rather than CSS3
 
 enum EWordBreak {
@@ -431,7 +434,6 @@ enum EDisplay {
     TABLE_CAPTION, BOX, INLINE_BOX,
     FLEX, INLINE_FLEX,
     GRID, INLINE_GRID,
-    LAZY_BLOCK,
     NONE
 };
 

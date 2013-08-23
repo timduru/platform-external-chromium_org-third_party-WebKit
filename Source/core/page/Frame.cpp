@@ -39,10 +39,10 @@
 #include "core/editing/InputMethodController.h"
 #include "core/editing/htmlediting.h"
 #include "core/editing/markup.h"
+#include "core/fetch/ResourceFetcher.h"
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
-#include "core/loader/cache/ResourceFetcher.h"
 #include "core/page/Chrome.h"
 #include "core/page/ChromeClient.h"
 #include "core/page/DOMWindow.h"
@@ -139,7 +139,7 @@ PassRefPtr<Frame> Frame::create(Page* page, HTMLFrameOwnerElement* ownerElement,
 Frame::~Frame()
 {
     setView(0);
-    loader()->cancelAndClear();
+    loader()->clear(ClearScriptObjects | ClearWindowObject);
 
     // FIXME: We should not be doing all this work inside the destructor
 
@@ -219,7 +219,7 @@ void Frame::sendOrientationChangeEvent(int orientation)
 
 Settings* Frame::settings() const
 {
-    return m_page ? m_page->settings() : 0;
+    return m_page ? &m_page->settings() : 0;
 }
 
 void Frame::setPrinting(bool printing, const FloatSize& pageSize, const FloatSize& originalPageSize, float maximumShrinkRatio, AdjustViewSizeOrNot shouldAdjustViewSize)
@@ -579,7 +579,7 @@ void Frame::deviceOrPageScaleFactorChanged()
     for (RefPtr<Frame> child = tree()->firstChild(); child; child = child->tree()->nextSibling())
         child->deviceOrPageScaleFactorChanged();
 
-    m_page->chrome().client()->deviceOrPageScaleFactorChanged();
+    m_page->chrome().client().deviceOrPageScaleFactorChanged();
 }
 
 void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
@@ -593,7 +593,7 @@ void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
             count += frame->document()->wheelEventHandlerCount();
     }
 
-    m_page->chrome().client()->numWheelEventHandlersChanged(count);
+    m_page->chrome().client().numWheelEventHandlersChanged(count);
 }
 
 bool Frame::isURLAllowed(const KURL& url) const
@@ -707,6 +707,17 @@ PassOwnPtr<DragImage> Frame::dragImageForSelection()
 
     RefPtr<Image> image = buffer->copyImage();
     return DragImage::create(image.get());
+}
+
+double Frame::devicePixelRatio() const
+{
+    if (!m_page)
+        return 0;
+
+    double ratio = m_page->deviceScaleFactor();
+    if (RuntimeEnabledFeatures::devicePixelRatioIncludesZoomEnabled())
+        ratio *= pageZoomFactor();
+    return ratio;
 }
 
 } // namespace WebCore

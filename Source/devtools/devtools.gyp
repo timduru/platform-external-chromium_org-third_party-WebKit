@@ -105,6 +105,7 @@
             'front_end/JavaScriptFormatter.js',
             'front_end/jsdifflib.js',
             'front_end/KeyboardShortcut.js',
+            'front_end/LayersPanelDescriptor.js',
             'front_end/Linkifier.js',
             'front_end/LiveEditSupport.js',
             'front_end/NativeBreakpointsSidebarPane.js',
@@ -138,6 +139,7 @@
             'front_end/ResourceView.js',
             'front_end/RuntimeModel.js',
             'front_end/SASSSourceMapping.js',
+            'front_end/ScreencastView.js',
             'front_end/Script.js',
             'front_end/ScriptFormatter.js',
             'front_end/ScriptFormatterWorker.js',
@@ -223,6 +225,7 @@
             'front_end/resourceView.css',
             'front_end/resourcesPanel.css',
             'front_end/revisionHistory.css',
+            'front_end/screencastView.css',
             'front_end/scriptsPanel.css',
             'front_end/sidebarPane.css',
             'front_end/spectrum.css',
@@ -231,6 +234,7 @@
             'front_end/textPrompt.css',
             'front_end/timelinePanel.css',
             'front_end/canvasProfiler.css',
+            'front_end/layersPanel.css',
         ],
         'devtools_elements_js_files': [
             'front_end/CSSNamedFlowCollectionsView.js',
@@ -310,6 +314,7 @@
             'front_end/ProfileLauncherView.js',
             'front_end/TopDownProfileDataGridTree.js',
             'front_end/CanvasProfileView.js',
+            'front_end/CanvasReplayStateView.js',
         ],
 
         'devtools_audits_js_files': [
@@ -350,6 +355,7 @@
             '<@(devtools_timeline_js_files)',
             '<@(devtools_profiles_js_files)',
             '<@(devtools_audits_js_files)',
+            '<@(devtools_layers_js_files)',
             '<@(devtools_codemirror_js_files)',
         ],
         'devtools_uglifyjs_files': [
@@ -457,6 +463,14 @@
             'front_end/Images/trackHoriz.png',
             'front_end/Images/trackVert.png',
         ],
+
+        'devtools_layers_js_files': [
+            'front_end/LayersPanel.js',
+            'front_end/LayerTreeModel.js',
+            'front_end/LayerTree.js',
+            'front_end/Layers3DView.js',
+        ],
+
         'devtools_extension_api_files': [
             'front_end/ExtensionAPI.js',
             'front_end/DevToolsExtensionAPI.js'
@@ -481,6 +495,7 @@
                                      'concatenated_devtools_profiles_js',
                                      'concatenated_devtools_audits_js',
                                      'concatenated_devtools_codemirror_js',
+                                     'concatenated_devtools_layers_js',
                                      'concatenated_heap_snapshot_worker_js',
                                      'concatenated_script_formatter_worker_js',
                                      'concatenated_devtools_css'],
@@ -566,6 +581,7 @@
                                      'concatenated_devtools_profiles_js',
                                      'concatenated_devtools_audits_js',
                                      'concatenated_devtools_codemirror_js',
+                                     'concatenated_devtools_layers_js',
                                      'concatenated_heap_snapshot_worker_js',
                                      'concatenated_script_formatter_worker_js',
                                      'concatenated_devtools_css'],
@@ -582,6 +598,7 @@
                             '<(PRODUCT_DIR)/resources/inspector/TimelinePanel.js',
                             '<(PRODUCT_DIR)/resources/inspector/ProfilesPanel.js',
                             '<(PRODUCT_DIR)/resources/inspector/AuditsPanel.js',
+                            '<(PRODUCT_DIR)/resources/inspector/LayersPanel.js',
                             '<(PRODUCT_DIR)/resources/inspector/CodeMirrorTextEditor.js',
                             '<(PRODUCT_DIR)/resources/inspector/HeapSnapshotWorker.js',
                             '<(PRODUCT_DIR)/resources/inspector/ScriptFormatterWorker.js',
@@ -853,6 +870,22 @@
                         ],
                         'search_path': 'front_end',
                         'outputs': ['<(PRODUCT_DIR)/resources/inspector/ScriptFormatterWorker.js'],
+                        'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
+                    }],
+                },
+                {
+                    'target_name': 'concatenated_devtools_layers_js',
+                    'type': 'none',
+                    'actions': [{
+                        'action_name': 'concatenate_devtools_layers_js',
+                        'script_name': 'scripts/inline_js_imports.py',
+                        'input_file': 'front_end/LayersPanel.js',
+                        'inputs': [
+                            '<@(_script_name)',
+                            '<@(devtools_layers_js_files)',
+                        ],
+                        'search_path': 'front_end',
+                        'outputs': ['<(PRODUCT_DIR)/resources/inspector/LayersPanel.js'],
                         'action': ['python', '<@(_script_name)', '<@(_input_file)', '<@(_search_path)', '<@(_outputs)'],
                     }],
                 },

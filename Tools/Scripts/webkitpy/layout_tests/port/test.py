@@ -47,7 +47,6 @@ class TestInstance(object):
         self.crash = False
         self.web_process_crash = False
         self.exception = False
-        self.hang = False
         self.keyboard = False
         self.error = ''
         self.timeout = False
@@ -82,8 +81,8 @@ class TestList(object):
             test.__dict__[key] = value
         self.tests[name] = test
 
-    def add_reftest(self, name, reference_name, same_image):
-        self.add(name, actual_checksum='xxx', actual_image='XXX', is_reftest=True)
+    def add_reftest(self, name, reference_name, same_image, crash=False):
+        self.add(name, actual_checksum='xxx', actual_image='XXX', is_reftest=True, crash=crash)
         if same_image:
             self.add(reference_name, actual_checksum='xxx', actual_image='XXX', is_reftest=True)
         else:
@@ -101,18 +100,17 @@ class TestList(object):
 #
 # These numbers may need to be updated whenever we add or delete tests.
 #
-TOTAL_TESTS = 106
-TOTAL_SKIPS = 27
+TOTAL_TESTS = 105
+TOTAL_SKIPS = 25
 
 UNEXPECTED_PASSES = 1
-UNEXPECTED_FAILURES = 22
+UNEXPECTED_FAILURES = 23
 
 def unit_test_list():
     tests = TestList()
     tests.add('failures/expected/crash.html', crash=True)
     tests.add('failures/expected/exception.html', exception=True)
     tests.add('failures/expected/timeout.html', timeout=True)
-    tests.add('failures/expected/hang.html', hang=True)
     tests.add('failures/expected/missing_text.html', expected_text=None)
     tests.add('failures/expected/needsrebaseline.html', actual_text='needsrebaseline text')
     tests.add('failures/expected/needsmanualrebaseline.html', actual_text='needsmanualrebaseline text')
@@ -207,11 +205,11 @@ layer at (0,0) size 800x34
     tests.add_reftest('passes/phpreftest.php', 'passes/phpreftest-expected-mismatch.svg', same_image=False)
     tests.add_reftest('failures/expected/reftest.html', 'failures/expected/reftest-expected.html', same_image=False)
     tests.add_reftest('failures/expected/mismatch.html', 'failures/expected/mismatch-expected-mismatch.html', same_image=True)
+    tests.add_reftest('failures/unexpected/crash-reftest.html', 'failures/unexpected/crash-reftest-expected.html', same_image=True, crash=True)
     tests.add_reftest('failures/unexpected/reftest.html', 'failures/unexpected/reftest-expected.html', same_image=False)
     tests.add_reftest('failures/unexpected/mismatch.html', 'failures/unexpected/mismatch-expected-mismatch.html', same_image=True)
     tests.add('failures/unexpected/reftest-nopixel.html', actual_checksum=None, actual_image=None, is_reftest=True)
     tests.add('failures/unexpected/reftest-nopixel-expected.html', actual_checksum=None, actual_image=None, is_reftest=True)
-    # FIXME: Add a reftest which crashes.
     tests.add('reftests/foo/test.html')
     tests.add('reftests/foo/test-ref.html')
 
@@ -270,9 +268,9 @@ PERF_TEST_DIR = '/test.checkout/PerformanceTests'
 # we don't need a real filesystem to run the tests.
 def add_unit_tests_to_mock_filesystem(filesystem):
     # Add the test_expectations file.
-    filesystem.maybe_make_directory(LAYOUT_TEST_DIR + '/platform/test')
-    if not filesystem.exists(LAYOUT_TEST_DIR + '/platform/test/TestExpectations'):
-        filesystem.write_text_file(LAYOUT_TEST_DIR + '/platform/test/TestExpectations', """
+    filesystem.maybe_make_directory(LAYOUT_TEST_DIR)
+    if not filesystem.exists(LAYOUT_TEST_DIR + '/TestExpectations'):
+        filesystem.write_text_file(LAYOUT_TEST_DIR + '/TestExpectations', """
 Bug(test) failures/expected/crash.html [ Crash ]
 Bug(test) failures/expected/image.html [ ImageOnlyFailure ]
 Bug(test) failures/expected/needsrebaseline.html [ NeedsRebaseline ]
@@ -290,7 +288,6 @@ Bug(test) failures/expected/newlines_with_excess_CR.html [ Failure ]
 Bug(test) failures/expected/reftest.html [ ImageOnlyFailure ]
 Bug(test) failures/expected/text.html [ Failure ]
 Bug(test) failures/expected/timeout.html [ Timeout ]
-Bug(test) failures/expected/hang.html [ WontFix ]
 Bug(test) failures/expected/keyboard.html [ WontFix ]
 Bug(test) failures/expected/exception.html [ WontFix ]
 Bug(test) failures/unexpected/pass.html [ Failure ]
@@ -571,8 +568,6 @@ class TestDriver(Driver):
             raise KeyboardInterrupt
         if test.exception:
             raise ValueError('exception from ' + test_name)
-        if test.hang:
-            time.sleep((float(driver_input.timeout) * 4) / 1000.0 + 1.0)  # The 1.0 comes from thread_padding_sec in layout_test_runnery.
 
         audio = None
         actual_text = test.actual_text

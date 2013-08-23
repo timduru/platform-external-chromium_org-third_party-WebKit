@@ -40,6 +40,7 @@
 #include "core/dom/ChildListMutationScope.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/DocumentFragment.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Range.h"
@@ -728,7 +729,7 @@ PassRefPtr<DocumentFragment> createFragmentFromMarkupWithContext(Document* docum
     // TD, we need to include the enclosing TABLE tag as well.
     RefPtr<DocumentFragment> fragment = DocumentFragment::create(document);
     if (specialCommonAncestor)
-        fragment->appendChild(specialCommonAncestor, ASSERT_NO_EXCEPTION);
+        fragment->appendChild(specialCommonAncestor);
     else
         fragment->takeAllChildrenFrom(toContainerNode(commonAncestor));
 
@@ -751,7 +752,7 @@ static void fillContainerFromString(ContainerNode* paragraph, const String& stri
     Document* document = paragraph->document();
 
     if (string.isEmpty()) {
-        paragraph->appendChild(createBlockPlaceholderElement(document), ASSERT_NO_EXCEPTION);
+        paragraph->appendChild(createBlockPlaceholderElement(document));
         return;
     }
 
@@ -768,11 +769,11 @@ static void fillContainerFromString(ContainerNode* paragraph, const String& stri
         // append the non-tab textual part
         if (!s.isEmpty()) {
             if (!tabText.isEmpty()) {
-                paragraph->appendChild(createTabSpanElement(document, tabText), ASSERT_NO_EXCEPTION);
+                paragraph->appendChild(createTabSpanElement(document, tabText));
                 tabText = emptyString();
             }
             RefPtr<Node> textNode = document->createTextNode(stringWithRebalancedWhitespace(s, first, i + 1 == numEntries));
-            paragraph->appendChild(textNode.release(), ASSERT_NO_EXCEPTION);
+            paragraph->appendChild(textNode.release());
         }
 
         // there is a tab after every entry, except the last entry
@@ -780,7 +781,7 @@ static void fillContainerFromString(ContainerNode* paragraph, const String& stri
         if (i + 1 != numEntries)
             tabText.append('\t');
         else if (!tabText.isEmpty())
-            paragraph->appendChild(createTabSpanElement(document, tabText), ASSERT_NO_EXCEPTION);
+            paragraph->appendChild(createTabSpanElement(document, tabText));
 
         first = false;
     }
@@ -828,11 +829,11 @@ PassRefPtr<DocumentFragment> createFragmentFromText(Range* context, const String
     string.replace('\r', '\n');
 
     if (shouldPreserveNewline(*context)) {
-        fragment->appendChild(document->createTextNode(string), ASSERT_NO_EXCEPTION);
+        fragment->appendChild(document->createTextNode(string));
         if (string.endsWith('\n')) {
             RefPtr<Element> element = createBreakElement(document);
             element->setAttribute(classAttr, AppleInterchangeNewline);
-            fragment->appendChild(element.release(), ASSERT_NO_EXCEPTION);
+            fragment->appendChild(element.release());
         }
         return fragment.release();
     }
@@ -874,7 +875,7 @@ PassRefPtr<DocumentFragment> createFragmentFromText(Range* context, const String
                 element = createDefaultParagraphElement(document);
             fillContainerFromString(element.get(), s);
         }
-        fragment->appendChild(element.release(), ASSERT_NO_EXCEPTION);
+        fragment->appendChild(element.release());
     }
     return fragment.release();
 }
@@ -889,8 +890,8 @@ PassRefPtr<DocumentFragment> createFragmentFromNodes(Document *document, const V
     size_t size = nodes.size();
     for (size_t i = 0; i < size; ++i) {
         RefPtr<Element> element = createDefaultParagraphElement(document);
-        element->appendChild(nodes[i], ASSERT_NO_EXCEPTION);
-        fragment->appendChild(element.release(), ASSERT_NO_EXCEPTION);
+        element->appendChild(nodes[i]);
+        fragment->appendChild(element.release());
     }
 
     return fragment.release();
@@ -997,10 +998,10 @@ static inline void removeElementPreservingChildren(PassRefPtr<DocumentFragment> 
     RefPtr<Node> nextChild;
     for (RefPtr<Node> child = element->firstChild(); child; child = nextChild) {
         nextChild = child->nextSibling();
-        element->removeChild(child.get(), ASSERT_NO_EXCEPTION);
-        fragment->insertBefore(child, element, ASSERT_NO_EXCEPTION);
+        element->removeChild(child.get());
+        fragment->insertBefore(child, element);
     }
-    fragment->removeChild(element, ASSERT_NO_EXCEPTION);
+    fragment->removeChild(element);
 }
 
 PassRefPtr<DocumentFragment> createContextualFragment(const String& markup, HTMLElement* element, ParserContentPolicy parserContentPolicy, ExceptionState& es)
@@ -1038,17 +1039,6 @@ PassRefPtr<DocumentFragment> createContextualFragment(const String& markup, HTML
     return fragment.release();
 }
 
-static inline bool hasOneChild(ContainerNode* node)
-{
-    Node* firstChild = node->firstChild();
-    return firstChild && !firstChild->nextSibling();
-}
-
-static inline bool hasOneTextChild(ContainerNode* node)
-{
-    return hasOneChild(node) && node->firstChild()->isTextNode();
-}
-
 void replaceChildrenWithFragment(ContainerNode* container, PassRefPtr<DocumentFragment> fragment, ExceptionState& es)
 {
     RefPtr<ContainerNode> containerNode(container);
@@ -1060,12 +1050,12 @@ void replaceChildrenWithFragment(ContainerNode* container, PassRefPtr<DocumentFr
         return;
     }
 
-    if (hasOneTextChild(containerNode.get()) && hasOneTextChild(fragment.get())) {
+    if (containerNode->hasOneTextChild() && fragment->hasOneTextChild()) {
         toText(containerNode->firstChild())->setData(toText(fragment->firstChild())->data());
         return;
     }
 
-    if (hasOneChild(containerNode.get())) {
+    if (containerNode->hasOneChild()) {
         containerNode->replaceChild(fragment, containerNode->firstChild(), es);
         return;
     }
@@ -1080,14 +1070,14 @@ void replaceChildrenWithText(ContainerNode* container, const String& text, Excep
 
     ChildListMutationScope mutation(containerNode.get());
 
-    if (hasOneTextChild(containerNode.get())) {
+    if (containerNode->hasOneTextChild()) {
         toText(containerNode->firstChild())->setData(text);
         return;
     }
 
     RefPtr<Text> textNode = Text::create(containerNode->document(), text);
 
-    if (hasOneChild(containerNode.get())) {
+    if (containerNode->hasOneChild()) {
         containerNode->replaceChild(textNode.release(), containerNode->firstChild(), es);
         return;
     }

@@ -28,8 +28,8 @@
 #include "config.h"
 #include "core/html/InputType.h"
 
-#include <limits>
 #include "HTMLNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/accessibility/AXObjectCache.h"
@@ -69,7 +69,6 @@
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/shadow/HTMLShadowElement.h"
 #include "core/page/Page.h"
-#include "RuntimeEnabledFeatures.h"
 #include "core/platform/DateComponents.h"
 #include "core/platform/LocalizedStrings.h"
 #include "core/platform/text/TextBreakIterator.h"
@@ -78,6 +77,7 @@
 #include "wtf/Assertions.h"
 #include "wtf/HashMap.h"
 #include "wtf/text/StringHash.h"
+#include <limits>
 
 namespace WebCore {
 
@@ -120,7 +120,7 @@ static PassOwnPtr<InputTypeFactoryMap> createInputTypeFactoryMap()
 PassOwnPtr<InputType> InputType::create(HTMLInputElement* element, const AtomicString& typeName)
 {
     static const InputTypeFactoryMap* factoryMap = createInputTypeFactoryMap().leakPtr();
-    PassOwnPtr<InputType> (*factory)(HTMLInputElement*) = typeName.isEmpty() ? 0 : factoryMap->get(typeName);
+    InputTypeFactoryFunction factory = typeName.isEmpty() ? 0 : factoryMap->get(typeName);
     if (!factory)
         factory = TextInputType::create;
     return factory(element);
@@ -468,6 +468,7 @@ void InputType::destroyShadowSubtree()
     // It's ok to clear contents of all other ShadowRoots because they must have
     // been created by InputFieldPasswordGeneratorButtonElement, and we don't allow adding
     // AuthorShadowRoot to HTMLInputElement.
+    // FIXME: Remove the PasswordGeneratorButtonElement's shadow root and then remove this loop.
     while ((root = root->youngerShadowRoot())) {
         root->removeChildren();
         root->appendChild(HTMLShadowElement::create(shadowTag, element()->document()));
@@ -544,6 +545,14 @@ void InputType::handleBlurEvent()
 {
 }
 
+void InputType::enableSecureTextInput()
+{
+}
+
+void InputType::disableSecureTextInput()
+{
+}
+
 void InputType::accessKeyAction(bool)
 {
     element()->focus(false);
@@ -554,6 +563,10 @@ void InputType::attach()
 }
 
 void InputType::detach()
+{
+}
+
+void InputType::countUsage()
 {
 }
 
@@ -576,6 +589,10 @@ bool InputType::canChangeFromAnotherType() const
 }
 
 void InputType::minOrMaxAttributeChanged()
+{
+}
+
+void InputType::sanitizeValueInResponseToMinOrMaxAttributeChange()
 {
 }
 
@@ -1043,7 +1060,7 @@ void InputType::stepUpFromRenderer(int n)
     // FIXME: Not any changes after stepping, even if it is an invalid value, may be better.
     // (e.g. Stepping-up for <input type="number" value="foo" step="any" /> => "foo")
     if (!stepRange.hasStep())
-      return;
+        return;
 
     EventQueueScope scope;
     const Decimal step = stepRange.step();
@@ -1067,9 +1084,9 @@ void InputType::stepUpFromRenderer(int n)
             current = stepRange.maximum() - nextDiff;
         setValueAsDecimal(current, DispatchNoEvent, IGNORE_EXCEPTION);
     }
-    if ((sign > 0 && current < stepRange.minimum()) || (sign < 0 && current > stepRange.maximum()))
+    if ((sign > 0 && current < stepRange.minimum()) || (sign < 0 && current > stepRange.maximum())) {
         setValueAsDecimal(sign > 0 ? stepRange.minimum() : stepRange.maximum(), DispatchInputAndChangeEvent, IGNORE_EXCEPTION);
-    else {
+    } else {
         if (stepMismatch(element()->value())) {
             ASSERT(!step.isZero());
             const Decimal base = stepRange.stepBase();

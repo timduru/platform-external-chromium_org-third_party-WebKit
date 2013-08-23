@@ -23,7 +23,6 @@
 #define ContainerNodeAlgorithms_h
 
 #include "core/dom/Document.h"
-#include "core/dom/NodeTraversal.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "wtf/Assertions.h"
@@ -289,7 +288,7 @@ inline void ChildFrameDisconnector::collectFrameOwners(Node* root)
         return;
 
     if (root->isHTMLElement() && root->isFrameOwnerElement())
-        m_frameOwners.append(toFrameOwnerElement(root));
+        m_frameOwners.append(toHTMLFrameOwnerElement(root));
 
     for (Node* child = root->firstChild(); child; child = child->nextSibling())
         collectFrameOwners(child);

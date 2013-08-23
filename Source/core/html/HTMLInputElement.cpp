@@ -183,31 +183,9 @@ HTMLElement* HTMLInputElement::innerBlockElement() const
     return m_inputType->innerBlockElement();
 }
 
-HTMLElement* HTMLInputElement::innerSpinButtonElement() const
-{
-    return m_inputType->innerSpinButtonElement();
-}
-
-#if ENABLE(INPUT_SPEECH)
-HTMLElement* HTMLInputElement::speechButtonElement() const
-{
-    return m_inputType->speechButtonElement();
-}
-#endif
-
 HTMLElement* HTMLInputElement::passwordGeneratorButtonElement() const
 {
     return m_inputType->passwordGeneratorButtonElement();
-}
-
-HTMLElement* HTMLInputElement::sliderThumbElement() const
-{
-    return m_inputType->sliderThumbElement();
-}
-
-HTMLElement* HTMLInputElement::sliderTrackElement() const
-{
-    return m_inputType->sliderTrackElement();
 }
 
 HTMLElement* HTMLInputElement::placeholderElement() const
@@ -385,7 +363,7 @@ void HTMLInputElement::beginEditing()
         return;
 
     if (Frame* frame = document()->frame())
-        frame->editor()->textFieldDidBeginEditing(this);
+        frame->editor()->textAreaOrTextFieldDidBeginEditing(this);
 }
 
 void HTMLInputElement::endEditing()
@@ -405,10 +383,12 @@ bool HTMLInputElement::shouldUseInputMethod()
 void HTMLInputElement::handleFocusEvent(Element* oldFocusedElement, FocusDirection direction)
 {
     m_inputType->handleFocusEvent(oldFocusedElement, direction);
+    m_inputType->enableSecureTextInput();
 }
 
 void HTMLInputElement::handleBlurEvent()
 {
+    m_inputType->disableSecureTextInput();
     m_inputType->handleBlurEvent();
 }
 
@@ -722,6 +702,7 @@ void HTMLInputElement::parseAttribute(const QualifiedName& name, const AtomicStr
         UseCounter::count(document(), UseCounter::IncrementalAttribute);
     } else if (name == minAttr) {
         m_inputType->minOrMaxAttributeChanged();
+        m_inputType->sanitizeValueInResponseToMinOrMaxAttributeChange();
         setNeedsValidityCheck();
         UseCounter::count(document(), UseCounter::MinAttribute);
     } else if (name == maxAttr) {
@@ -812,6 +793,7 @@ void HTMLInputElement::attach(const AttachContext& context)
     HTMLTextFormControlElement::attach(context);
 
     m_inputType->attach();
+    m_inputType->countUsage();
 
     if (document()->focusedElement() == this)
         document()->updateFocusAppearanceSoon(true /* restore selection */);

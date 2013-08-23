@@ -35,6 +35,7 @@
 #include "core/rendering/RenderTableCol.h"
 #include "core/rendering/RenderTableRow.h"
 #include "core/rendering/RenderView.h"
+#include "core/rendering/SubtreeLayoutScope.h"
 #include "wtf/HashSet.h"
 #include "wtf/Vector.h"
 
@@ -612,6 +613,7 @@ void RenderTableSection::layout()
 
     const Vector<int>& columnPos = table()->columnPositions();
 
+    SubtreeLayoutScope layouter(this);
     for (unsigned r = 0; r < m_grid.size(); ++r) {
         Row& row = m_grid[r].row;
         unsigned cols = row.size();
@@ -631,7 +633,7 @@ void RenderTableSection::layout()
                 endCol++;
             }
             int tableLayoutLogicalWidth = columnPos[endCol] - columnPos[startColumn] - table()->hBorderSpacing();
-            cell->setCellLogicalWidth(tableLayoutLogicalWidth);
+            cell->setCellLogicalWidth(tableLayoutLogicalWidth, layouter);
         }
 
         if (RenderTableRow* rowRenderer = m_grid[r].rowRenderer)
@@ -736,6 +738,11 @@ int RenderTableSection::distributeExtraLogicalHeightToRows(int extraLogicalHeigh
     return extraLogicalHeight - remainingExtraLogicalHeight;
 }
 
+static bool shouldFlexCellChild(RenderObject* cellDescendant)
+{
+    return cellDescendant->isReplaced() || (cellDescendant->isBox() && toRenderBox(cellDescendant)->scrollsOverflow());
+}
+
 void RenderTableSection::layoutRows()
 {
 #ifndef NDEBUG
@@ -795,33 +802,24 @@ void RenderTableSection::layoutRows()
             bool flexAllChildren = cell->style()->logicalHeight().isFixed()
                 || (!table()->style()->logicalHeight().isAuto() && rHeight != cell->logicalHeight());
 
-            for (RenderObject* o = cell->firstChild(); o; o = o->nextSibling()) {
-                if (!o->isText() && o->style()->logicalHeight().isPercent() && (flexAllChildren || o->isReplaced() || (o->isBox() && toRenderBox(o)->scrollsOverflow()))) {
-                    // Tables with no sections do not flex.
-                    if (!o->isTable() || toRenderTable(o)->hasSections()) {
-                        o->setNeedsLayout(MarkOnlyThis);
-                        cellChildrenFlex = true;
-                    }
+            for (RenderObject* child = cell->firstChild(); child; child = child->nextSibling()) {
+                if (!child->isText() && child->style()->logicalHeight().isPercent()
+                    && (flexAllChildren || shouldFlexCellChild(child))
+                    && (!child->isTable() || toRenderTable(child)->hasSections())) {
+                    cellChildrenFlex = true;
+                    break;
                 }
             }
 
-            if (TrackedRendererListHashSet* percentHeightDescendants = cell->percentHeightDescendants()) {
-                TrackedRendererListHashSet::iterator end = percentHeightDescendants->end();
-                for (TrackedRendererListHashSet::iterator it = percentHeightDescendants->begin(); it != end; ++it) {
-                    RenderBox* box = *it;
-                    if (!box->isReplaced() && !box->scrollsOverflow() && !flexAllChildren)
-                        continue;
-
-                    while (box != cell) {
-                        if (box->normalChildNeedsLayout())
+            if (!cellChildrenFlex) {
+                if (TrackedRendererListHashSet* percentHeightDescendants = cell->percentHeightDescendants()) {
+                    TrackedRendererListHashSet::iterator end = percentHeightDescendants->end();
+                    for (TrackedRendererListHashSet::iterator it = percentHeightDescendants->begin(); it != end; ++it) {
+                        if (flexAllChildren || shouldFlexCellChild(*it)) {
+                            cellChildrenFlex = true;
                             break;
-                        box->setChildNeedsLayout(MarkOnlyThis);
-                        box = box->containingBlock();
-                        ASSERT(box);
-                        if (!box)
-                            break;
+                        }
                     }
-                    cellChildrenFlex = true;
                 }
             }
 
@@ -840,14 +838,15 @@ void RenderTableSection::layoutRows()
                 }
             }
 
-            cell->computeIntrinsicPadding(rHeight);
+            SubtreeLayoutScope layouter(cell);
+            cell->computeIntrinsicPadding(rHeight, layouter);
 
             LayoutRect oldCellRect = cell->frameRect();
 
             setLogicalPositionForCell(cell, c);
 
             if (!cell->needsLayout() && view()->layoutState()->pageLogicalHeight() && view()->layoutState()->pageLogicalOffset(cell, cell->logicalTop()) != cell->pageLogicalOffset())
-                cell->setChildNeedsLayout(MarkOnlyThis);
+                layouter.setChildNeedsLayout(cell);
 
             cell->layoutIfNeeded();
 

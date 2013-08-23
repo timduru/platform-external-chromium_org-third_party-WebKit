@@ -38,6 +38,7 @@
 #include "public/platform/WebURLRequest.h"
 #include "public/web/WebAccessibilityNotification.h"
 #include "public/web/WebDOMMessageEvent.h"
+#include "public/web/WebDataSource.h"
 #include "public/web/WebDragOperation.h"
 #include "public/web/WebEditingAction.h"
 #include "public/web/WebIconURL.h"
@@ -66,6 +67,8 @@ class WebGeolocationClientMock;
 class WebImage;
 class WebMIDIAccessor;
 class WebMIDIAccessorClient;
+class WebMIDIClient;
+class WebMIDIClientMock;
 class WebNode;
 class WebNotificationPresenter;
 class WebPlugin;
@@ -136,11 +139,14 @@ public:
 
     WebKit::WebDeviceOrientationClientMock* deviceOrientationClientMock();
     WebKit::WebGeolocationClientMock* geolocationClientMock();
+    WebKit::WebMIDIClientMock* midiClientMock();
     MockWebSpeechInputController* speechInputControllerMock();
     MockWebSpeechRecognizer* speechRecognizerMock();
 #endif
 
     WebTaskList* taskList() { return &m_taskList; }
+
+    WebKit::WebView* webView();
 
 protected:
     WebTestProxyBase();
@@ -174,6 +180,7 @@ protected:
     void printPage(WebKit::WebFrame*);
     WebKit::WebNotificationPresenter* notificationPresenter();
     WebKit::WebGeolocationClient* geolocationClient();
+    WebKit::WebMIDIClient* webMIDIClient();
     WebKit::WebSpeechInputController* speechInputController(WebKit::WebSpeechInputListener*);
     WebKit::WebSpeechRecognizer* speechRecognizer();
     WebKit::WebDeviceOrientationClient* deviceOrientationClient();
@@ -208,7 +215,7 @@ protected:
     void didReceiveResponse(WebKit::WebFrame*, unsigned identifier, const WebKit::WebURLResponse&);
     void didChangeResourcePriority(WebKit::WebFrame*, unsigned identifier, const WebKit::WebURLRequest::Priority&);
     void didFinishResourceLoad(WebKit::WebFrame*, unsigned identifier);
-    WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame*, const WebKit::WebURLRequest&, WebKit::WebNavigationType, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect);
+    WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame*, WebKit::WebDataSource::ExtraData*, const WebKit::WebURLRequest&, WebKit::WebNavigationType, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect);
     bool willCheckAndDispatchMessageEvent(WebKit::WebFrame* sourceFrame, WebKit::WebFrame* targetFrame, WebKit::WebSecurityOrigin target, WebKit::WebDOMMessageEvent);
     void resetInputMethod();
 
@@ -224,7 +231,6 @@ private:
     void animateNow();
 
     WebKit::WebWidget* webWidget();
-    WebKit::WebView* webView();
 
     TestInterfaces* m_testInterfaces;
     WebTestDelegate* m_delegate;
@@ -247,6 +253,7 @@ private:
     int m_chooserCount;
 
     std::auto_ptr<WebKit::WebGeolocationClientMock> m_geolocationClient;
+    std::auto_ptr<WebKit::WebMIDIClientMock> m_midiClient;
     std::auto_ptr<WebKit::WebDeviceOrientationClientMock> m_deviceOrientationClient;
     std::auto_ptr<MockWebSpeechRecognizer> m_speechRecognizer;
     std::auto_ptr<MockWebSpeechInputController> m_speechInputController;
@@ -402,6 +409,10 @@ public:
     virtual WebKit::WebGeolocationClient* geolocationClient()
     {
         return WebTestProxyBase::geolocationClient();
+    }
+    virtual WebKit::WebMIDIClient* webMIDIClient()
+    {
+        return WebTestProxyBase::webMIDIClient();
     }
     virtual WebKit::WebSpeechInputController* speechInputController(WebKit::WebSpeechInputListener* listener)
     {
@@ -559,12 +570,12 @@ public:
     {
         return WebTestProxyBase::runModalBeforeUnloadDialog(frame, message);
     }
-    virtual WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame* frame, const WebKit::WebURLRequest& request, WebKit::WebNavigationType type, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect)
+    virtual WebKit::WebNavigationPolicy decidePolicyForNavigation(WebKit::WebFrame* frame, WebKit::WebDataSource::ExtraData* extraData, const WebKit::WebURLRequest& request, WebKit::WebNavigationType type, WebKit::WebNavigationPolicy defaultPolicy, bool isRedirect)
     {
-        WebKit::WebNavigationPolicy policy = WebTestProxyBase::decidePolicyForNavigation(frame, request, type, defaultPolicy, isRedirect);
+        WebKit::WebNavigationPolicy policy = WebTestProxyBase::decidePolicyForNavigation(frame, extraData, request, type, defaultPolicy, isRedirect);
         if (policy == WebKit::WebNavigationPolicyIgnore)
             return policy;
-        return Base::decidePolicyForNavigation(frame, request, type, defaultPolicy, isRedirect);
+        return Base::decidePolicyForNavigation(frame, extraData, request, type, defaultPolicy, isRedirect);
     }
     virtual bool willCheckAndDispatchMessageEvent(WebKit::WebFrame* sourceFrame, WebKit::WebFrame* targetFrame, WebKit::WebSecurityOrigin target, WebKit::WebDOMMessageEvent event)
     {

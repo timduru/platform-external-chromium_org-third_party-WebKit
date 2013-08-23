@@ -494,6 +494,14 @@ body:not(.platform-mac) .toolbar-item.close-left {
   cursor: default;
 }
 
+#root {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+}
+
 #main {
     position: absolute;
     z-index: 1;
@@ -2427,6 +2435,16 @@ body.inactive li.selected .bubble.search-matches {
 .source-frame-eval-expression {
     outline: 1px solid rgb(163, 41, 34);
     background-color: rgb(255, 255, 194);
+}
+
+.source-frame-stepin-mark {
+    text-decoration: underline;
+    background-color: #bfccfe;
+}
+
+.source-frame-stepin-mark-highlighted {
+    text-decoration: underline;
+    background-color: #698cfe;
 }
 
 .workers-list {

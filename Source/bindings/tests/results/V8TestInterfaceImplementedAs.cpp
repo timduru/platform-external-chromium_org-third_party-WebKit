@@ -95,7 +95,7 @@ static void aAttrSetterCallback(v8::Local<v8::String> name, v8::Local<v8::Value>
 static void bAttrGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
 {
     RealClass* imp = V8TestInterfaceImplementedAs::toNative(info.Holder());
-    v8SetReturnValue(info, toV8Fast(imp->b(), info, imp));
+    v8SetReturnValueFast(info, imp->b(), imp);
     return;
 }
 
@@ -228,7 +228,7 @@ bool V8TestInterfaceImplementedAs::HasInstanceInAnyWorld(v8::Handle<v8::Value> v
 v8::Handle<v8::Object> V8TestInterfaceImplementedAs::createWrapper(PassRefPtr<RealClass> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
-    ASSERT(DOMDataStore::getWrapper<V8TestInterfaceImplementedAs>(impl.get(), isolate).IsEmpty());
+    ASSERT(!DOMDataStore::containsWrapper<V8TestInterfaceImplementedAs>(impl.get(), isolate));
     if (ScriptWrappable::wrapperCanBeStoredInObject(impl.get())) {
         const WrapperTypeInfo* actualInfo = ScriptWrappable::getTypeInfoFromObject(impl.get());
         // Might be a XXXConstructor::info instead of an XXX::info. These will both have

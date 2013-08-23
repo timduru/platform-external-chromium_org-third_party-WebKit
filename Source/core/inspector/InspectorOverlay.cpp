@@ -59,19 +59,19 @@ namespace {
 
 class InspectorOverlayChromeClient: public EmptyChromeClient {
 public:
-    InspectorOverlayChromeClient(ChromeClient* client, InspectorOverlay* overlay)
+    InspectorOverlayChromeClient(ChromeClient& client, InspectorOverlay* overlay)
         : m_client(client)
         , m_overlay(overlay)
     { }
 
     virtual void setCursor(const Cursor& cursor)
     {
-        m_client->setCursor(cursor);
+        m_client.setCursor(cursor);
     }
 
     virtual void setToolTip(const String& tooltip, TextDirection direction)
     {
-        m_client->setToolTip(tooltip, direction);
+        m_client.setToolTip(tooltip, direction);
     }
 
     virtual void invalidateRootView(const IntRect& rect)
@@ -88,8 +88,9 @@ public:
     {
         m_overlay->invalidate();
     }
+
 private:
-    ChromeClient* m_client;
+    ChromeClient& m_client;
     InspectorOverlay* m_overlay;
 };
 
@@ -253,6 +254,14 @@ void InspectorOverlay::paint(GraphicsContext& context)
 void InspectorOverlay::invalidate()
 {
     m_client->highlight();
+}
+
+bool InspectorOverlay::handleGestureEvent(const PlatformGestureEvent& event)
+{
+    if (isEmpty())
+        return false;
+
+    return overlayPage()->mainFrame()->eventHandler()->handleGestureEvent(event);
 }
 
 bool InspectorOverlay::handleMouseEvent(const PlatformMouseEvent& event)
@@ -580,21 +589,21 @@ Page* InspectorOverlay::overlayPage()
     m_overlayPage = adoptPtr(new Page(pageClients));
     m_overlayPage->setGroupType(Page::InspectorPageGroup);
 
-    Settings* settings = m_page->settings();
-    Settings* overlaySettings = m_overlayPage->settings();
+    Settings& settings = m_page->settings();
+    Settings& overlaySettings = m_overlayPage->settings();
 
-    overlaySettings->setStandardFontFamily(settings->standardFontFamily());
-    overlaySettings->setSerifFontFamily(settings->serifFontFamily());
-    overlaySettings->setSansSerifFontFamily(settings->sansSerifFontFamily());
-    overlaySettings->setCursiveFontFamily(settings->cursiveFontFamily());
-    overlaySettings->setFantasyFontFamily(settings->fantasyFontFamily());
-    overlaySettings->setPictographFontFamily(settings->pictographFontFamily());
-    overlaySettings->setMinimumFontSize(settings->minimumFontSize());
-    overlaySettings->setMinimumLogicalFontSize(settings->minimumLogicalFontSize());
-    overlaySettings->setMediaEnabled(false);
-    overlaySettings->setScriptEnabled(true);
-    overlaySettings->setPluginsEnabled(false);
-    overlaySettings->setLoadsImagesAutomatically(true);
+    overlaySettings.setStandardFontFamily(settings.standardFontFamily());
+    overlaySettings.setSerifFontFamily(settings.serifFontFamily());
+    overlaySettings.setSansSerifFontFamily(settings.sansSerifFontFamily());
+    overlaySettings.setCursiveFontFamily(settings.cursiveFontFamily());
+    overlaySettings.setFantasyFontFamily(settings.fantasyFontFamily());
+    overlaySettings.setPictographFontFamily(settings.pictographFontFamily());
+    overlaySettings.setMinimumFontSize(settings.minimumFontSize());
+    overlaySettings.setMinimumLogicalFontSize(settings.minimumLogicalFontSize());
+    overlaySettings.setMediaEnabled(false);
+    overlaySettings.setScriptEnabled(true);
+    overlaySettings.setPluginsEnabled(false);
+    overlaySettings.setLoadsImagesAutomatically(true);
 
     RefPtr<Frame> frame = Frame::create(m_overlayPage.get(), 0, dummyFrameLoaderClient);
     frame->setView(FrameView::create(frame.get()));

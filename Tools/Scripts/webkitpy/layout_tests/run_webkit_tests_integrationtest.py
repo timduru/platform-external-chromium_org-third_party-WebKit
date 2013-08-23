@@ -288,13 +288,6 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         self.assertEqual(details.exit_code, 0)
         self.assertEqual(len(host.user.opened_urls), 1)
 
-    def test_hung_thread(self):
-        details, err, _ = logging_run(['--run-singly', '--time-out-ms=50', 'failures/expected/hang.html'], tests_included=True)
-        # Note that hang.html is marked as WontFix and all WontFix tests are
-        # expected to Pass, so that actually running them generates an "unexpected" error.
-        self.assertEqual(details.exit_code, 1)
-        self.assertNotEmpty(err)
-
     def test_keyboard_interrupt(self):
         # Note that this also tests running a test marked as SKIP if
         # you specify it explicitly.
@@ -441,10 +434,6 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
             self.assertFalse('passes/image.html' in batch)
             has_passes_text = has_passes_text or ('passes/text.html' in batch)
         self.assertTrue(has_passes_text)
-
-    def test_run_singly_actually_runs_tests(self):
-        details, _, _ = logging_run(['--run-singly'], tests_included=True)
-        self.assertEqual(details.exit_code, test.UNEXPECTED_FAILURES - 1)  # failures/expected/hang.html actually passes w/ --run-singly.
 
     def test_single_file(self):
         tests_run = get_tests_run(['passes/text.html'])
@@ -601,7 +590,7 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
 
         host = MockHost()
         details, err, _ = logging_run(['--debug-rwt-logging', 'failures/unexpected'], tests_included=True, host=host)
-        self.assertEqual(details.exit_code, 16)
+        self.assertEqual(details.exit_code, 17)  # FIXME: This should be a constant in test.py .
         self.assertTrue('Retrying' in err.getvalue())
 
     def test_retrying_default_value_test_list(self):
@@ -616,7 +605,7 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         filename = '/tmp/foo.txt'
         host.filesystem.write_text_file(filename, 'failures')
         details, err, _ = logging_run(['--debug-rwt-logging', '--test-list=%s' % filename], tests_included=True, host=host)
-        self.assertEqual(details.exit_code, 16)
+        self.assertEqual(details.exit_code, 17)
         self.assertTrue('Retrying' in err.getvalue())
 
     def test_retrying_and_flaky_tests(self):
@@ -711,6 +700,11 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         self.assertEqual(results["num_regressions"], 5)
         self.assertEqual(results["num_flaky"], 0)
 
+    def test_reftest_crash(self):
+        test_results = get_test_results(['failures/unexpected/crash-reftest.html'])
+        # The list of references should be empty since the test crashed and we didn't run any references.
+        self.assertEqual(test_results[0].references, [])
+
     def test_additional_platform_directory(self):
         self.assertTrue(passing_run(['--additional-platform-directory', '/tmp/foo']))
         self.assertTrue(passing_run(['--additional-platform-directory', '/tmp/../foo']))
@@ -789,6 +783,13 @@ class RunTest(unittest.TestCase, StreamTestingMixin):
         self.assertTrue('text.html passed' in logging_stream.getvalue())
         self.assertTrue('image.html passed' in logging_stream.getvalue())
 
+    def disabled_test_driver_logging(self):
+        # FIXME: Figure out how to either use a mock-test port to
+        # get output or mack mock ports work again.
+        host = Host()
+        _, err, _ = logging_run(['--platform', 'mock-win', '--driver-logging', 'fast/harness/results.html'],
+                                tests_included=True, host=host)
+        self.assertTrue('OUT:' in err.getvalue())
 
 class EndToEndTest(unittest.TestCase):
     def test_reftest_with_two_notrefs(self):

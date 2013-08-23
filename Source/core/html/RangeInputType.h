@@ -44,7 +44,7 @@ public:
 
 private:
     RangeInputType(HTMLInputElement*);
-    virtual void attach() OVERRIDE;
+    virtual void countUsage() OVERRIDE;
     virtual bool isRangeControl() const OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual double valueAsDouble() const OVERRIDE;
@@ -62,13 +62,13 @@ private:
     virtual Decimal parseToNumber(const String&, const Decimal&) const OVERRIDE;
     virtual String serialize(const Decimal&) const OVERRIDE;
     virtual void accessKeyAction(bool sendMouseEvents) OVERRIDE;
-    virtual void minOrMaxAttributeChanged() OVERRIDE;
+    virtual void sanitizeValueInResponseToMinOrMaxAttributeChange() OVERRIDE;
     virtual void setValue(const String&, bool valueChanged, TextFieldEventBehavior) OVERRIDE;
     virtual String fallbackValue() const OVERRIDE;
     virtual String sanitizeValue(const String& proposedValue) const OVERRIDE;
     virtual bool shouldRespectListAttribute() OVERRIDE;
-    virtual HTMLElement* sliderThumbElement() const OVERRIDE;
-    virtual HTMLElement* sliderTrackElement() const OVERRIDE;
+    SliderThumbElement* sliderThumbElement() const;
+    Element* sliderTrackElement() const;
     virtual void listAttributeTargetChanged() OVERRIDE;
     void updateTickMarkValues();
     virtual Decimal findClosestTickMarkValue(const Decimal&) OVERRIDE;

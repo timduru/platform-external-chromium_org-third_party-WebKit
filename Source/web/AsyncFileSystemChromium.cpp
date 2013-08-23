@@ -30,15 +30,14 @@
 #include "config.h"
 #include "AsyncFileSystemChromium.h"
 
-#include "AsyncFileWriterChromium.h"
 #include "WebFileSystemCallbacksImpl.h"
-#include "WebFileWriter.h"
 #include "core/platform/AsyncFileSystemCallbacks.h"
 #include "core/platform/FileMetadata.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebFileInfo.h"
 #include "public/platform/WebFileSystem.h"
-#include "weborigin/SecurityOrigin.h"
+#include "public/platform/WebFileWriter.h"
+#include "public/platform/WebFileWriterClient.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/StringBuilder.h"
 
@@ -50,9 +49,7 @@ PassOwnPtr<AsyncFileSystem> AsyncFileSystem::create()
 }
 
 AsyncFileSystemChromium::AsyncFileSystemChromium()
-    : m_webFileSystem(WebKit::Platform::current()->fileSystem())
 {
-    ASSERT(m_webFileSystem);
 }
 
 AsyncFileSystemChromium::~AsyncFileSystemChromium()
@@ -61,65 +58,67 @@ AsyncFileSystemChromium::~AsyncFileSystemChromium()
 
 void AsyncFileSystemChromium::move(const KURL& sourcePath, const KURL& destinationPath, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->move(sourcePath, destinationPath, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->move(sourcePath, destinationPath, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::copy(const KURL& sourcePath, const KURL& destinationPath, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->copy(sourcePath, destinationPath, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->copy(sourcePath, destinationPath, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::remove(const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->remove(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->remove(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::removeRecursively(const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->removeRecursively(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->removeRecursively(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::readMetadata(const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->readMetadata(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->readMetadata(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::createFile(const KURL& path, bool exclusive, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->createFile(path, exclusive, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->createFile(path, exclusive, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::createDirectory(const KURL& path, bool exclusive, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->createDirectory(path, exclusive, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->createDirectory(path, exclusive, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::fileExists(const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->fileExists(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->fileExists(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::directoryExists(const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->directoryExists(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->directoryExists(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::readDirectory(const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->readDirectory(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->readDirectory(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
-void AsyncFileSystemChromium::createWriter(AsyncFileWriterClient* client, const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
+void AsyncFileSystemChromium::createWriter(WebKit::WebFileWriterClient* client, const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    OwnPtr<AsyncFileWriterChromium> asyncFileWriter = AsyncFileWriterChromium::create(client);
-    WebKit::WebFileWriterClient* writerClient = asyncFileWriter.get();
-
-    m_webFileSystem->createFileWriter(path, writerClient, new WebKit::WebFileSystemCallbacksImpl(callbacks, asyncFileWriter.release()));
+    webFileSystem()->createFileWriter(path, client, new WebKit::WebFileSystemCallbacksImpl(callbacks));
 }
 
 void AsyncFileSystemChromium::createSnapshotFileAndReadMetadata(const KURL& path, PassOwnPtr<AsyncFileSystemCallbacks> callbacks)
 {
-    m_webFileSystem->createSnapshotFileAndReadMetadata(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+    webFileSystem()->createSnapshotFileAndReadMetadata(path, new WebKit::WebFileSystemCallbacksImpl(callbacks));
+}
+
+WebKit::WebFileSystem* AsyncFileSystemChromium::webFileSystem()
+{
+    return WebKit::Platform::current()->fileSystem();
 }
 
 } // namespace WebCore

@@ -22,6 +22,7 @@
 #define HTMLFrameOwnerElement_h
 
 #include "core/html/HTMLElement.h"
+#include "wtf/HashCountedSet.h"
 
 namespace WebCore {
 
@@ -76,7 +77,7 @@ private:
     SandboxFlags m_sandboxFlags;
 };
 
-inline HTMLFrameOwnerElement* toFrameOwnerElement(Node* node)
+inline HTMLFrameOwnerElement* toHTMLFrameOwnerElement(Node* node)
 {
     ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isFrameOwnerElement());
     return static_cast<HTMLFrameOwnerElement*>(node);
@@ -105,9 +106,9 @@ public:
     }
 
 private:
-    static HashSet<Node*>& disabledSubtreeRoots()
+    static HashCountedSet<Node*>& disabledSubtreeRoots()
     {
-        DEFINE_STATIC_LOCAL(HashSet<Node*>, nodes, ());
+        DEFINE_STATIC_LOCAL(HashCountedSet<Node*>, nodes, ());
         return nodes;
     }
 

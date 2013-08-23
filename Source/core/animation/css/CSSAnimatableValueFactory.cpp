@@ -33,6 +33,7 @@
 
 #include "CSSValueKeywords.h"
 #include "core/animation/AnimatableNumber.h"
+#include "core/animation/AnimatableTransform.h"
 #include "core/animation/AnimatableUnknown.h"
 #include "core/platform/Length.h"
 #include "core/rendering/style/RenderStyle.h"
@@ -50,19 +51,15 @@ namespace WebCore {
 // CSSPropertyBorderBottomColor
 // CSSPropertyBorderBottomLeftRadius
 // CSSPropertyBorderBottomRightRadius
-// CSSPropertyBorderBottomWidth
 // CSSPropertyBorderImageOutset
 // CSSPropertyBorderImageSlice
 // CSSPropertyBorderImageSource
 // CSSPropertyBorderImageWidth
 // CSSPropertyBorderLeftColor
-// CSSPropertyBorderLeftWidth
 // CSSPropertyBorderRightColor
-// CSSPropertyBorderRightWidth
 // CSSPropertyBorderTopColor
 // CSSPropertyBorderTopLeftRadius
 // CSSPropertyBorderTopRightRadius
-// CSSPropertyBorderTopWidth
 // CSSPropertyBoxShadow
 // CSSPropertyClip
 // CSSPropertyColor
@@ -112,7 +109,6 @@ namespace WebCore {
 // CSSPropertyWebkitShapeInside
 // CSSPropertyWebkitTextFillColor
 // CSSPropertyWebkitTextStrokeColor
-// CSSPropertyWebkitTransform
 // CSSPropertyWebkitTransformOriginZ
 // CSSPropertyWidows
 // CSSPropertyWordSpacing
@@ -167,6 +163,14 @@ inline static PassRefPtr<AnimatableValue> createFromDouble(double value)
 PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID property, const RenderStyle* style)
 {
     switch (property) {
+    case CSSPropertyBorderBottomWidth:
+        return createFromDouble(style->borderBottomWidth());
+    case CSSPropertyBorderLeftWidth:
+        return createFromDouble(style->borderLeftWidth());
+    case CSSPropertyBorderRightWidth:
+        return createFromDouble(style->borderRightWidth());
+    case CSSPropertyBorderTopWidth:
+        return createFromDouble(style->borderTopWidth());
     case CSSPropertyBottom:
         return createFromLength(style->bottom(), style);
     case CSSPropertyHeight:
@@ -207,6 +211,8 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return createFromLength(style->perspectiveOriginX(), style);
     case CSSPropertyWebkitPerspectiveOriginY:
         return createFromLength(style->perspectiveOriginY(), style);
+    case CSSPropertyWebkitTransform:
+        return AnimatableTransform::create(style->transform());
     case CSSPropertyWebkitTransformOriginX:
         return createFromLength(style->transformOriginX(), style);
     case CSSPropertyWebkitTransformOriginY:

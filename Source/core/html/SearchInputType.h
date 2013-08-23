@@ -47,7 +47,7 @@ public:
 
 private:
     SearchInputType(HTMLInputElement*);
-    virtual void attach() OVERRIDE;
+    virtual void countUsage() OVERRIDE;
     virtual RenderObject* createRenderer(RenderStyle*) const OVERRIDE;
     virtual const AtomicString& formControlType() const OVERRIDE;
     virtual bool shouldRespectSpeechAttribute() OVERRIDE;
@@ -57,12 +57,12 @@ private:
     virtual void handleKeydownEvent(KeyboardEvent*) OVERRIDE;
     virtual void didSetValueByUserEdit(ValueChangeState) OVERRIDE;
     virtual bool supportsInputModeAttribute() const OVERRIDE;
+    virtual void updateInnerTextValue() OVERRIDE;
 
     void searchEventTimerFired(Timer<SearchInputType>*);
     bool searchEventsShouldBeDispatched() const;
     void startSearchEventTimer();
-    HTMLElement* searchDecorationElement() const;
-    HTMLElement* cancelButtonElement() const;
+    void updateCancelButtonVisibility();
 
     Timer<SearchInputType> m_searchEventTimer;
 };

@@ -93,7 +93,7 @@ class _BaseTestCase(unittest.TestCase):
 
 
 class TestCopyExistingBaselinesInternal(_BaseTestCase):
-    command_constructor = CopyExistingBaselinesInternal  # AKA webkit-patch rebaseline-test-internal
+    command_constructor = CopyExistingBaselinesInternal
 
     def setUp(self):
         super(TestCopyExistingBaselinesInternal, self).setUp()
@@ -180,6 +180,37 @@ class TestCopyExistingBaselinesInternal(_BaseTestCase):
         self.assertMultiLineEqual(self._read(self.tool.filesystem.join(port.layout_tests_dir(), 'platform/test-win-win7/failures/expected/image-expected.txt')), 'original win7 result')
         self.assertFalse(self.tool.filesystem.exists(self.tool.filesystem.join(port.layout_tests_dir(), 'platform/mac-leopard/userscripts/another-test-expected.txt')))
         self.assertMultiLineEqual(out, '{"add": [], "remove-lines": []}\n')
+
+    def test_no_copy_skipped_test(self):
+        self.tool.executive = MockExecutive2()
+
+        port = self.tool.port_factory.get('test-win-win7')
+        fs = self.tool.filesystem
+        self._write(fs.join(port.layout_tests_dir(), 'platform/test-win-win7/failures/expected/image-expected.txt'), 'original win7 result')
+        expectations_path = fs.join(port.path_to_generic_test_expectations_file())
+        self._write(expectations_path, (
+            "[ Win ] failures/expected/image.html [ Failure ]\n"
+            "[ Linux ] failures/expected/image.html [ Skip ]\n"))
+        old_exact_matches = builders._exact_matches
+        oc = OutputCapture()
+        try:
+            builders._exact_matches = {
+                "MOCK Linux": {"port_name": "test-linux-x86_64", "specifiers": set(["mock-specifier"])},
+                "MOCK Leopard": {"port_name": "test-mac-leopard", "specifiers": set(["mock-specifier"])},
+                "MOCK Win7": {"port_name": "test-win-win7", "specifiers": set(["mock-specifier"])},
+            }
+
+            options = MockOptions(builder="MOCK Win7", suffixes="txt", verbose=True, test="failures/expected/image.html", results_directory=None)
+
+            oc.capture_output()
+            self.command.execute(options, [], self.tool)
+        finally:
+            out, _, _ = oc.restore_output()
+            builders._exact_matches = old_exact_matches
+
+        self.assertFalse(fs.exists(fs.join(port.layout_tests_dir(), 'platform/test-linux-x86_64/failures/expected/image-expected.txt')))
+        self.assertEqual(self._read(fs.join(port.layout_tests_dir(), 'platform/test-win-win7/failures/expected/image-expected.txt')),
+                         'original win7 result')
 
 
 class TestRebaselineTest(_BaseTestCase):
@@ -396,7 +427,7 @@ class TestRebaselineJsonUpdatesExpectationsFiles(_BaseTestCase):
         self.command._rebaseline(options,  {"userscripts/first-test.html": {"WebKit Mac10.7": ["txt", "png"]}})
 
         new_expectations = self._read(self.lion_expectations_path)
-        self.assertMultiLineEqual(new_expectations, "Bug(x) [ Linux MountainLion SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
+        self.assertMultiLineEqual(new_expectations, "Bug(x) [ Android Linux MountainLion SnowLeopard Win ] userscripts/first-test.html [ ImageOnlyFailure ]\n")
 
 
 class TestRebaseline(_BaseTestCase):
@@ -591,7 +622,8 @@ class TestAutoRebaseline(_BaseTestCase):
 
     def setUp(self):
         super(TestAutoRebaseline, self).setUp()
-        self.command.latest_revision_processed_on_all_bots = lambda: 9000
+        self.command.latest_revision_processed_on_all_bots = lambda log_server: 9000
+        self.command.bot_revision_data = lambda log_server: [{"builder": "Mock builder", "revision": "9000"}]
 
     def test_tests_to_rebaseline(self):
         def blame(path):
@@ -607,11 +639,12 @@ class TestAutoRebaseline(_BaseTestCase):
         self.tool.scm().blame = blame
 
         min_revision = 9000
-        self.assertEqual(self.command.tests_to_rebaseline(self.tool, min_revision, print_revisions=False), (
+        self.assertEqual(self.command.tests_to_rebaseline(self.tool, min_revision, print_revisions=False, log_server=None), (
                 set(['path/to/rebaseline-without-bug-number.html', 'path/to/rebaseline-with-modifiers.html', 'path/to/rebaseline-without-modifiers.html']),
                 5678,
                 'foobarbaz1@chromium.org',
-                set(['24182', '234'])))
+                set(['24182', '234']),
+                True))
 
     def test_tests_to_rebaseline_over_limit(self):
         def blame(path):
@@ -626,11 +659,12 @@ class TestAutoRebaseline(_BaseTestCase):
             expected_list_of_tests.append("path/to/rebaseline-%s.html" % i)
 
         min_revision = 9000
-        self.assertEqual(self.command.tests_to_rebaseline(self.tool, min_revision, print_revisions=False), (
+        self.assertEqual(self.command.tests_to_rebaseline(self.tool, min_revision, print_revisions=False, log_server=None), (
                 set(expected_list_of_tests),
                 5678,
                 'foobarbaz1@chromium.org',
-                set(['24182'])))
+                set(['24182']),
+                True))
 
     def test_commit_message(self):
         author = "foo@chromium.org"
@@ -661,7 +695,7 @@ TBR=foo@chromium.org
 """
         self.tool.scm().blame = blame
 
-        self.command.execute(MockOptions(optimize=True, verbose=False, move_overwritten_baselines=False, results_directory=False), [], self.tool)
+        self.command.execute(MockOptions(optimize=True, verbose=False, move_overwritten_baselines=False, results_directory=False, log_server=None), [], self.tool)
         self.assertEqual(self.tool.executive.calls, [])
 
     def test_execute(self):
@@ -738,13 +772,13 @@ crbug.com/24182 path/to/locally-changed-lined.html [ NeedsRebaseline ]
             }
 
             self.command.tree_status = lambda: 'closed'
-            self.command.execute(MockOptions(optimize=True, verbose=False, move_overwritten_baselines=False, results_directory=False), [], self.tool)
+            self.command.execute(MockOptions(optimize=True, verbose=False, move_overwritten_baselines=False, results_directory=False, log_server=None), [], self.tool)
             self.assertEqual(self.tool.executive.calls, [])
 
             self.command.tree_status = lambda: 'open'
 
             self.tool.executive.calls = []
-            self.command.execute(MockOptions(optimize=True, verbose=False, move_overwritten_baselines=False, results_directory=False), [], self.tool)
+            self.command.execute(MockOptions(optimize=True, verbose=False, move_overwritten_baselines=False, results_directory=False, log_server=None), [], self.tool)
             self.assertEqual(self.tool.executive.calls, [
                 [
                     ['echo', 'copy-existing-baselines-internal', '--suffixes', 'txt,png', '--builder', 'MOCK Leopard', '--test', 'fast/dom/prototype-chocolate.html'],
@@ -826,7 +860,7 @@ Bug(foo) fast/dom/prototype-taco.html [ NeedsRebaseline ]
             }
 
             self.command.tree_status = lambda: 'open'
-            self.command.execute(MockOptions(optimize=True, verbose=False, move_overwritten_baselines=False, results_directory=False), [], self.tool)
+            self.command.execute(MockOptions(optimize=True, verbose=False, move_overwritten_baselines=False, results_directory=False, log_server=None), [], self.tool)
             self.assertEqual(self.tool.executive.calls, [
                 [
                     ['echo', 'copy-existing-baselines-internal', '--suffixes', 'txt', '--builder', 'MOCK Leopard', '--test', 'fast/dom/prototype-taco.html'],

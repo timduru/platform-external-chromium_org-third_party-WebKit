@@ -57,6 +57,9 @@ public:
     WEBKIT_EXPORT static void enableDeviceOrientation(bool);
     WEBKIT_EXPORT static bool isDeviceOrientationEnabled();
 
+    WEBKIT_EXPORT static void enableDialogElement(bool);
+    WEBKIT_EXPORT static bool isDialogElementEnabled();
+
     WEBKIT_EXPORT static void enableEncryptedMedia(bool);
     WEBKIT_EXPORT static bool isEncryptedMediaEnabled();
 
@@ -79,7 +82,6 @@ public:
     WEBKIT_EXPORT static bool isGeolocationEnabled();
 
     WEBKIT_EXPORT static void enableLazyLayout(bool);
-    WEBKIT_EXPORT static bool isLazyLayoutEnabled();
 
     WEBKIT_EXPORT static void enableLocalStorage(bool);
     WEBKIT_EXPORT static bool isLocalStorageEnabled();
@@ -138,9 +140,13 @@ public:
     WEBKIT_EXPORT static void enableHTMLImports(bool);
     WEBKIT_EXPORT static bool isHTMLImportsEnabled();
 
+    // FIXME: Remove this when embedders switch to enableEmbedderCustomElements.
     WEBKIT_EXPORT static void enableCustomElements(bool);
+    WEBKIT_EXPORT static void enableEmbedderCustomElements(bool);
 
     WEBKIT_EXPORT static void enableOverlayScrollbars(bool);
+
+    WEBKIT_EXPORT static void enableInputModeAttribute(bool);
 
 private:
     WebRuntimeFeatures();

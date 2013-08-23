@@ -61,7 +61,7 @@
 #include "core/dom/Range.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
-#include "core/editing/SpellChecker.h"
+#include "core/editing/SpellCheckRequester.h"
 #include "core/editing/VisiblePosition.h"
 #include "core/html/HTMLFormElement.h"
 #include "core/loader/FrameLoadRequest.h"
@@ -1378,7 +1378,7 @@ TEST_F(WebFrameTest, DivAutoZoomScaleFontScaleFactorTest)
 
     WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(m_webView);
     webViewImpl->enableFakePageScaleAnimationForTesting(true);
-    webViewImpl->page()->settings()->setTextAutosizingFontScaleFactor(textAutosizingFontScaleFactor);
+    webViewImpl->page()->settings().setTextAutosizingFontScaleFactor(textAutosizingFontScaleFactor);
 
     WebRect div(200, 100, 200, 150);
     WebPoint doubleTapPoint(div.x + 50, div.y + 50);
@@ -1559,8 +1559,8 @@ TEST_F(WebFrameTest, DivScrollIntoEditableTest)
 class TestReloadDoesntRedirectWebFrameClient : public WebFrameClient {
 public:
     virtual WebNavigationPolicy decidePolicyForNavigation(
-        WebFrame*, const WebURLRequest&, WebNavigationType,
-        WebNavigationPolicy defaultPolicy, bool isRedirect)
+        WebFrame*, WebDataSource::ExtraData*, const WebURLRequest&, WebNavigationType,
+        WebNavigationPolicy defaultPolicy, bool isRedirect) OVERRIDE
     {
         EXPECT_FALSE(isRedirect);
         return WebNavigationPolicyCurrentTab;
@@ -3232,7 +3232,7 @@ TEST_F(WebFrameTest, CancelSpellingRequestCrash)
 
     element->focus();
     frame->frame()->editor()->replaceSelectionWithText("A", false, false);
-    frame->frame()->editor()->spellChecker()->cancelCheck();
+    frame->frame()->editor()->spellCheckRequester().cancelCheck();
 
     m_webView->close();
     m_webView = 0;

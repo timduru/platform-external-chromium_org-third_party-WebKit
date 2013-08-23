@@ -88,6 +88,8 @@ private:
     virtual void updateWidget(PluginCreationOption);
     void updateDocNamedItem();
 
+    void reattachFallbackContent();
+
     bool hasFallbackContent() const;
 
     // FIXME: This function should not deal with url or serviceType
@@ -108,6 +110,12 @@ private:
     bool m_docNamedItem : 1;
     bool m_useFallbackContent : 1;
 };
+
+inline HTMLObjectElement* toHTMLObjectElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::objectTag));
+    return static_cast<HTMLObjectElement*>(node);
+}
 
 }
 

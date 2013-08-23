@@ -63,7 +63,6 @@
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
-#include "core/rendering/RenderLazyBlock.h"
 #include "core/rendering/RenderListItem.h"
 #include "core/rendering/RenderMarquee.h"
 #include "core/rendering/RenderMultiColumnBlock.h"
@@ -83,6 +82,7 @@
 #include "core/rendering/svg/SVGRenderSupport.h"
 #include "wtf/RefCountedLeakCounter.h"
 #include "wtf/UnusedParam.h"
+#include "wtf/text/StringBuilder.h"
 #include <algorithm>
 #include <stdio.h>
 
@@ -213,8 +213,6 @@ RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
     case GRID:
     case INLINE_GRID:
         return new RenderGrid(element);
-    case LAZY_BLOCK:
-        return new RenderLazyBlock(element);
     }
 
     return 0;
@@ -255,7 +253,6 @@ RenderTheme* RenderObject::theme() const
     return document()->page()->theme();
 }
 
-#ifndef NDEBUG
 String RenderObject::debugName() const
 {
     StringBuilder name;
@@ -268,7 +265,6 @@ String RenderObject::debugName() const
 
     return name.toString();
 }
-#endif
 
 bool RenderObject::isDescendantOf(const RenderObject* obj) const
 {
@@ -673,10 +669,11 @@ static inline bool objectIsRelayoutBoundary(const RenderObject* object)
     return true;
 }
 
-void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderObject* newRoot)
+void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderObject* newRoot, SubtreeLayoutScope* layouter)
 {
     ASSERT(!scheduleRelayout || !newRoot);
     ASSERT(!isSetNeedsLayoutForbidden());
+    ASSERT(!layouter || this != layouter->root());
 
     RenderObject* object = container();
     RenderObject* last = this;
@@ -720,6 +717,12 @@ void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderOb
                 return;
             object->setNormalChildNeedsLayout(true);
             ASSERT(!object->isSetNeedsLayoutForbidden());
+        }
+
+        if (layouter) {
+            layouter->addRendererToLayout(object);
+            if (object == layouter->root())
+                return;
         }
 
         if (object == newRoot)
@@ -1121,7 +1124,7 @@ void RenderObject::drawLineForBoxSide(GraphicsContext* graphicsContext, int x1, 
 void RenderObject::paintFocusRing(PaintInfo& paintInfo, const LayoutPoint& paintOffset, RenderStyle* style)
 {
     Vector<IntRect> focusRingRects;
-    addFocusRingRects(focusRingRects, paintOffset, paintInfo.paintContainer);
+    addFocusRingRects(focusRingRects, paintOffset, paintInfo.paintContainer());
     if (style->outlineStyleIsAuto())
         paintInfo.context->drawFocusRing(focusRingRects, style->outlineWidth(), style->outlineOffset(), resolveColor(style, CSSPropertyOutlineColor));
     else
@@ -1654,15 +1657,15 @@ void RenderObject::showRenderTreeAndMark(const RenderObject* markedObject1, cons
 
 #endif // NDEBUG
 
-static bool shouldUseSelectionColor(const RenderStyle& style)
+bool RenderObject::isSelectable() const
 {
-    return style.userSelect() != SELECT_NONE || style.userModify() != READ_ONLY;
+    return !isInert() && !(style()->userSelect() == SELECT_NONE && style()->userModify() == READ_ONLY);
 }
 
 Color RenderObject::selectionBackgroundColor() const
 {
     Color backgroundColor= Color::transparent;
-    if (shouldUseSelectionColor(*style())) {
+    if (isSelectable()) {
         RefPtr<RenderStyle> pseudoStyle = getUncachedPseudoStyle(PseudoStyleRequest(SELECTION));
         if (pseudoStyle) {
             StyleColor styleColor = resolveCurrentColor(pseudoStyle.get(), CSSPropertyBackgroundColor);
@@ -1682,8 +1685,7 @@ Color RenderObject::selectionColor(int colorProperty) const
 {
     // If the element is unselectable, or we are only painting the selection,
     // don't override the foreground color with the selection foreground color.
-    if (!shouldUseSelectionColor(*style())
-        || (frame()->view()->paintBehavior() & PaintBehaviorSelectionOnly))
+    if (!isSelectable() || (frame()->view()->paintBehavior() & PaintBehaviorSelectionOnly))
         return Color::transparent;
 
     Color color;
@@ -1864,10 +1866,13 @@ void RenderObject::setStyle(PassRefPtr<RenderStyle> style)
     updateImage(oldStyle ? oldStyle->borderImage().image() : 0, m_style ? m_style->borderImage().image() : 0);
     updateImage(oldStyle ? oldStyle->maskBoxImage().image() : 0, m_style ? m_style->maskBoxImage().image() : 0);
 
+    updateShapeImage(oldStyle ? oldStyle->shapeInside() : 0, m_style ? m_style->shapeInside() : 0);
+
     // We need to ensure that view->maximalOutlineSize() is valid for any repaints that happen
     // during styleDidChange (it's used by clippedOverflowRectForRepaint()).
-    if (m_style->outlineWidth() > 0 && m_style->outlineSize() > maximalOutlineSize(PaintPhaseOutline))
-        toRenderView(document()->renderer())->setMaximalOutlineSize(m_style->outlineSize());
+    // FIXME: Do this more cleanly. http://crbug.com/273904
+    if (m_style->outlineWidth() > 0 && m_style->outlineSize() > view()->maximalOutlineSize())
+        view()->setMaximalOutlineSize(m_style->outlineSize());
 
     bool doesNotNeedLayout = !m_parent || isText();
 
@@ -2103,6 +2108,12 @@ void RenderObject::updateImage(StyleImage* oldImage, StyleImage* newImage)
         if (newImage)
             newImage->addClient(this);
     }
+}
+
+void RenderObject::updateShapeImage(const ShapeValue* oldShapeValue, const ShapeValue* newShapeValue)
+{
+    if (oldShapeValue || newShapeValue)
+        updateImage(oldShapeValue ? oldShapeValue->image() : 0, newShapeValue ? newShapeValue->image() : 0);
 }
 
 LayoutRect RenderObject::viewRect() const
@@ -2656,6 +2667,14 @@ void RenderObject::destroyAndCleanupAnonymousWrappers()
     // WARNING: |this| is deleted here.
 }
 
+void RenderObject::removeShapeImageClient(ShapeValue* shapeValue)
+{
+    if (!shapeValue)
+        return;
+    if (StyleImage* shapeImage = shapeValue->image())
+        shapeImage->removeClient(this);
+}
+
 void RenderObject::destroy()
 {
     willBeDestroyed();
@@ -2681,6 +2700,8 @@ void RenderObject::postDestroy()
 
         if (StyleImage* maskBoxImage = m_style->maskBoxImage().image())
             maskBoxImage->removeClient(this);
+
+        removeShapeImageClient(m_style->shapeInside());
     }
 
     delete this;
@@ -2785,22 +2806,18 @@ void RenderObject::layout()
     clearNeedsLayout();
 }
 
-// FIXME: Do we need this method at all? If setNeedsLayout early returns in all the right places,
-// then MarkOnlyThis is not needed for performance or correctness.
 void RenderObject::forceLayout()
 {
-    // This is the only way it's safe to use MarkOnlyThis (i.e. if we're immediately going to call layout).
-    // FIXME: Add asserts that we only ever do the MarkOnlyThis behavior from here.
-    setNeedsLayout(MarkOnlyThis);
+    setSelfNeedsLayout(true);
     layout();
 }
 
-// FIXME: Does this do anything different than forceLayout given that we're passing MarkOnlyThis.
-// I don't think it does and we should change all callers to use forceLayout.
+// FIXME: Does this do anything different than forceLayout given that we don't walk
+// the containing block chain. If not, we should change all callers to use forceLayout.
 void RenderObject::forceChildLayout()
 {
-    setChildNeedsLayout(MarkOnlyThis);
-    forceLayout();
+    setNormalChildNeedsLayout(true);
+    layout();
 }
 
 enum StyleCacheState {
@@ -3066,10 +3083,7 @@ bool RenderObject::isInert() const
     const RenderObject* renderer = this;
     while (!renderer->node())
         renderer = renderer->parent();
-    const Node* parentNode = renderer->node();
-    while (parentNode && !parentNode->isElementNode())
-        parentNode = parentNode->parentNode();
-    return parentNode && toElement(parentNode)->isInert();
+    return renderer->node()->isInert();
 }
 
 void RenderObject::imageChanged(ImageResource* image, const IntRect* rect)

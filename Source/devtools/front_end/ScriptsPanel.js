@@ -160,7 +160,6 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.DebuggerResumed, this._debuggerResumed, this);
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.CallFrameSelected, this._callFrameSelected, this);
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.ConsoleCommandEvaluatedInSelectedCallFrame, this._consoleCommandEvaluatedInSelectedCallFrame, this);
-    WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.ExecutionLineChanged, this._executionLineChanged, this);
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.BreakpointsActiveStateChanged, this._breakpointsActiveStateChanged, this);
 
     WebInspector.startBatchUpdate();
@@ -173,6 +172,9 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     WebInspector.debuggerModel.addEventListener(WebInspector.DebuggerModel.Events.GlobalObjectCleared, this._debuggerReset, this);
 
     WebInspector.advancedSearchController.registerSearchScope(new WebInspector.ScriptsSearchScope(this._workspace));
+
+    this._boundOnKeyUp = this._onKeyUp.bind(this);
+    this._boundOnKeyDown = this._onKeyDown.bind(this);
 }
 
 WebInspector.ScriptsPanel.prototype = {
@@ -203,10 +205,16 @@ WebInspector.ScriptsPanel.prototype = {
     {
         WebInspector.Panel.prototype.wasShown.call(this);
         this._navigatorController.wasShown();
+
+        this.element.addEventListener("keydown", this._boundOnKeyDown, false);
+        this.element.addEventListener("keyup", this._boundOnKeyUp, false);
     },
 
     willHide: function()
     {
+        this.element.removeEventListener("keydown", this._boundOnKeyDown, false);
+        this.element.removeEventListener("keyup", this._boundOnKeyUp, false);
+
         WebInspector.Panel.prototype.willHide.call(this);
         WebInspector.closeViewInDrawer();
     },
@@ -510,28 +518,28 @@ WebInspector.ScriptsPanel.prototype = {
         delete this._executionSourceFrame;
     },
 
-    _executionLineChanged: function(event)
+    _setExecutionLine: function(uiLocation)
     {
-        var uiLocation = event.data;
-
-        this._clearCurrentExecutionLine();
-        if (!uiLocation)
-            return;
+        var callFrame = WebInspector.debuggerModel.selectedCallFrame()
         var sourceFrame = this._getOrCreateSourceFrame(uiLocation.uiSourceCode);
-        sourceFrame.setExecutionLine(uiLocation.lineNumber);
+        sourceFrame.setExecutionLine(uiLocation.lineNumber, callFrame);
         this._executionSourceFrame = sourceFrame;
     },
 
-    _revealExecutionLine: function(uiLocation)
+    _executionLineChanged: function(uiLocation)
     {
+        this._clearCurrentExecutionLine();
+        this._setExecutionLine(uiLocation);
+
         var uiSourceCode = uiLocation.uiSourceCode;
-        // Some scripts (anonymous and snippets evaluations) are not added to files select by default.
-        if (this._currentUISourceCode && this._currentUISourceCode.scriptFile() && this._currentUISourceCode.scriptFile().isDivergingFromVM())
+        var scriptFile = this._currentUISourceCode ? this._currentUISourceCode.scriptFile() : null;
+        if (scriptFile && (scriptFile.isDivergingFromVM() || scriptFile.isMergingToVM()))
             return;
-        if (this._toggleFormatSourceButton.toggled && !uiSourceCode.formatted())
-            uiSourceCode.setFormatted(true);
+
         var sourceFrame = this._showFile(uiSourceCode);
         sourceFrame.revealLine(uiLocation.lineNumber);
+        if (sourceFrame.canEditSource())
+            sourceFrame.setSelection(WebInspector.TextRange.createFromLocation(uiLocation.lineNumber, 0));
         sourceFrame.focus();
     },
 
@@ -545,7 +553,7 @@ WebInspector.ScriptsPanel.prototype = {
         this.sidebarPanes.scopechain.update(callFrame);
         this.sidebarPanes.watchExpressions.refreshExpressions();
         this.sidebarPanes.callstack.setSelectedCallFrame(callFrame);
-        callFrame.createLiveLocation(this._revealExecutionLine.bind(this));
+        callFrame.createLiveLocation(this._executionLineChanged.bind(this));
     },
 
     _editorClosed: function(event)
@@ -734,6 +742,34 @@ WebInspector.ScriptsPanel.prototype = {
      * @param {Event=} event
      * @return {boolean}
      */
+    _stepIntoSelectionClicked: function(event)
+    {
+        if (!this._paused)
+            return true;
+
+        if (this._executionSourceFrame) {
+            var stepIntoMarkup = this._executionSourceFrame.stepIntoMarkup();
+            if (stepIntoMarkup)
+                stepIntoMarkup.iterateSelection(event.shiftKey);
+        }
+        return true;
+    },
+
+    doStepIntoSelection: function(rawLocation)
+    {
+        if (!this._paused)
+            return;
+
+        this._paused = false;
+        this._stepping = true;
+        this._clearInterface();
+        WebInspector.debuggerModel.stepIntoSelection(rawLocation);
+    },
+
+    /**
+     * @param {Event=} event
+     * @return {boolean}
+     */
     _stepOutClicked: function(event)
     {
         if (!this._paused)
@@ -800,6 +836,9 @@ WebInspector.ScriptsPanel.prototype = {
         handler = this._stepIntoClicked.bind(this);
         this._stepIntoButton = this._createButtonAndRegisterShortcuts("scripts-step-into", title, handler, WebInspector.ScriptsPanelDescriptor.ShortcutKeys.StepInto);
         debugToolbar.appendChild(this._stepIntoButton.element);
+
+        // Step into selection (keyboard shortcut only).
+        this.registerShortcuts(WebInspector.ScriptsPanelDescriptor.ShortcutKeys.StepIntoSelection, this._stepIntoSelectionClicked.bind(this))
 
         // Step out.
         title = WebInspector.UIString("Step out of current function (%s).");
@@ -951,6 +990,35 @@ WebInspector.ScriptsPanel.prototype = {
     {
         var view = /** @type {WebInspector.SourceFrame} */ (this.visibleView);
         view.replaceAllWith(query, text);
+    },
+
+    _onKeyDown: function(event)
+    {
+        if (event.keyCode !== WebInspector.KeyboardShortcut.Keys.CtrlOrMeta.code)
+            return;
+        if (!this._paused || !this._executionSourceFrame)
+            return;
+        var stepIntoMarkup = this._executionSourceFrame.stepIntoMarkup();
+        if (stepIntoMarkup)
+            stepIntoMarkup.startIteratingSelection();
+    },
+
+    _onKeyUp: function(event)
+    {
+        if (event.keyCode !== WebInspector.KeyboardShortcut.Keys.CtrlOrMeta.code)
+            return;
+        if (!this._paused || !this._executionSourceFrame)
+            return;
+        var stepIntoMarkup = this._executionSourceFrame.stepIntoMarkup();
+        if (!stepIntoMarkup)
+            return;
+        var currentPosition = stepIntoMarkup.getSelectedItemIndex();
+        if (typeof currentPosition === "undefined") {
+            stepIntoMarkup.stopIteratingSelection();
+        } else {
+            var rawLocation = stepIntoMarkup.getRawPosition(currentPosition);
+            this.doStepIntoSelection(rawLocation);
+        }
     },
 
     _toggleFormatSource: function()

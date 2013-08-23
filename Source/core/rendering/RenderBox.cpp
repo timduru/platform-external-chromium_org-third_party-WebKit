@@ -708,10 +708,15 @@ int RenderBox::instrinsicScrollbarLogicalWidth() const
     return 0;
 }
 
-bool RenderBox::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier, Node** stopNode)
+bool RenderBox::scrollImpl(ScrollDirection direction, ScrollGranularity granularity, float multiplier)
 {
     RenderLayer* l = layer();
-    if (l && l->scroll(direction, granularity, multiplier)) {
+    return l && l->scroll(direction, granularity, multiplier);
+}
+
+bool RenderBox::scroll(ScrollDirection direction, ScrollGranularity granularity, float multiplier, Node** stopNode)
+{
+    if (scrollImpl(direction, granularity, multiplier)) {
         if (stopNode)
             *stopNode = node();
         return true;
@@ -728,18 +733,11 @@ bool RenderBox::scroll(ScrollDirection direction, ScrollGranularity granularity,
 
 bool RenderBox::logicalScroll(ScrollLogicalDirection direction, ScrollGranularity granularity, float multiplier, Node** stopNode)
 {
-    bool scrolled = false;
-
-    RenderLayer* l = layer();
-    if (l) {
-        if (l->scroll(logicalToPhysical(direction, isHorizontalWritingMode(), style()->isFlippedBlocksWritingMode()), granularity, multiplier))
-            scrolled = true;
-
-        if (scrolled) {
-            if (stopNode)
-                *stopNode = node();
-            return true;
-        }
+    if (scrollImpl(logicalToPhysical(direction, isHorizontalWritingMode(), style()->isFlippedBlocksWritingMode()),
+        granularity, multiplier)) {
+        if (stopNode)
+            *stopNode = node();
+        return true;
     }
 
     if (stopNode && *stopNode && *stopNode == node())
@@ -808,6 +806,8 @@ IntSize RenderBox::calculateAutoscrollDirection(const IntPoint& windowPoint) con
     IntSize offset;
     IntPoint point = frameView->windowToContents(windowPoint);
     IntRect box(absoluteBoundingBoxRect());
+    if (isRenderView())
+        box.moveBy(frameView->windowToContents(IntPoint()));
 
     if (point.x() < box.x() + autoscrollBeltSize)
         point.move(-autoscrollBeltSize, 0);
@@ -1538,6 +1538,11 @@ bool RenderBox::pushContentsClip(PaintInfo& paintInfo, const LayoutPoint& accumu
         LayoutRect contentsVisualOverflow = contentsVisualOverflowRect();
         if (contentsVisualOverflow.isEmpty())
             return false;
+
+        // FIXME: Get rid of this slop from here and elsewhere.
+        // Instead, properly include the outline in visual overflow.
+        if (RenderView* view = this->view())
+            contentsVisualOverflow.inflate(view->maximalOutlineSize());
 
         LayoutRect conservativeClipRect = clipRect;
         if (hasBorderRadius)
@@ -2729,6 +2734,17 @@ LayoutUnit RenderBox::computePercentageLogicalHeight(const Length& height) const
     } else if (cbstyle->logicalHeight().isPercent() && !isOutOfFlowPositionedWithSpecifiedHeight) {
         // We need to recur and compute the percentage height for our containing block.
         LayoutUnit heightWithScrollbar = cb->computePercentageLogicalHeight(cbstyle->logicalHeight());
+        if (heightWithScrollbar != -1) {
+            LayoutUnit contentBoxHeightWithScrollbar = cb->adjustContentBoxLogicalHeightForBoxSizing(heightWithScrollbar);
+            // We need to adjust for min/max height because this method does not
+            // handle the min/max of the current block, its caller does. So the
+            // return value from the recursive call will not have been adjusted
+            // yet.
+            LayoutUnit contentBoxHeight = cb->constrainContentBoxLogicalHeightByMinMax(contentBoxHeightWithScrollbar - cb->scrollbarLogicalHeight(), -1);
+            availableHeight = max<LayoutUnit>(0, contentBoxHeight);
+        }
+    } else if (cbstyle->logicalHeight().isViewportPercentage()) {
+        LayoutUnit heightWithScrollbar = valueForLength(cbstyle->logicalHeight(), 0, view());
         if (heightWithScrollbar != -1) {
             LayoutUnit contentBoxHeightWithScrollbar = cb->adjustContentBoxLogicalHeightForBoxSizing(heightWithScrollbar);
             // We need to adjust for min/max height because this method does not

@@ -982,7 +982,7 @@ static bool createGridTrackSize(CSSValue* value, GridTrackSize& trackSize, const
     return true;
 }
 
-static bool createGridTrackList(CSSValue* value, Vector<GridTrackSize>& trackSizes, NamedGridLinesMap& namedGridLines, const StyleResolverState& state)
+static bool createGridTrackList(CSSValue* value, Vector<GridTrackSize>& trackSizes, NamedGridLinesMap& namedGridLines, OrderedNamedGridLines& orderedNamedGridLines, const StyleResolverState& state)
 {
     // Handle 'none'.
     if (value->isPrimitiveValue()) {
@@ -999,8 +999,11 @@ static bool createGridTrackList(CSSValue* value, Vector<GridTrackSize>& trackSiz
         if (currValue->isPrimitiveValue()) {
             CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(currValue);
             if (primitiveValue->isString()) {
-                NamedGridLinesMap::AddResult result = namedGridLines.add(primitiveValue->getStringValue(), Vector<size_t>());
+                String namedGridLine = primitiveValue->getStringValue();
+                NamedGridLinesMap::AddResult result = namedGridLines.add(namedGridLine, Vector<size_t>());
                 result.iterator->value.append(currentNamedGridLine);
+                OrderedNamedGridLines::AddResult orderedInsertionResult = orderedNamedGridLines.add(currentNamedGridLine, Vector<String>());
+                orderedInsertionResult.iterator->value.append(namedGridLine);
                 continue;
             }
         }
@@ -1107,6 +1110,38 @@ static Color colorFromSVGColorCSSValue(SVGColor* svgColor, const StyleColor& fgC
     else
         color = svgColor->color();
     return color;
+}
+
+static EPaintOrder paintOrderFlattened(CSSValue* cssPaintOrder)
+{
+    if (cssPaintOrder->isValueList()) {
+        int paintOrder = 0;
+        CSSValueListInspector iter(cssPaintOrder);
+        for (size_t i = 0; i < iter.length(); i++) {
+            CSSPrimitiveValue* value = static_cast<CSSPrimitiveValue*>(iter.item(i));
+
+            EPaintOrderType paintOrderType = PT_NONE;
+            switch (value->getValueID()) {
+            case CSSValueFill:
+                paintOrderType = PT_FILL;
+                break;
+            case CSSValueStroke:
+                paintOrderType = PT_STROKE;
+                break;
+            case CSSValueMarkers:
+                paintOrderType = PT_MARKERS;
+                break;
+            default:
+                ASSERT_NOT_REACHED();
+                break;
+            }
+
+            paintOrder |= (paintOrderType << kPaintOrderBitwidth*i);
+        }
+        return (EPaintOrder)paintOrder;
+    }
+
+    return PO_NORMAL;
 }
 
 static bool numberToFloat(const CSSPrimitiveValue* primitiveValue, float& out)
@@ -1395,6 +1430,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         state.setLineHeightValue(0);
         state.fontBuilder().fromSystemFont(primitiveValue->getValueID(), state.style()->effectiveZoom());
         return;
+    case CSSPropertyAnimation:
     case CSSPropertyBackground:
     case CSSPropertyBackgroundPosition:
     case CSSPropertyBackgroundRepeat:
@@ -1429,7 +1465,6 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     case CSSPropertyGridRow:
     case CSSPropertyGridArea:
     case CSSPropertyWebkitMarginCollapse:
-    case CSSPropertyWebkitMarquee:
     case CSSPropertyWebkitMask:
     case CSSPropertyWebkitMaskPosition:
     case CSSPropertyWebkitMaskRepeat:
@@ -1724,40 +1759,48 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         if (isInherit) {
             state.style()->setGridDefinitionColumns(state.parentStyle()->gridDefinitionColumns());
             state.style()->setNamedGridColumnLines(state.parentStyle()->namedGridColumnLines());
+            state.style()->setOrderedNamedGridColumnLines(state.parentStyle()->orderedNamedGridColumnLines());
             return;
         }
         if (isInitial) {
             state.style()->setGridDefinitionColumns(RenderStyle::initialGridDefinitionColumns());
             state.style()->setNamedGridColumnLines(RenderStyle::initialNamedGridColumnLines());
+            state.style()->setOrderedNamedGridColumnLines(RenderStyle::initialOrderedNamedGridColumnLines());
             return;
         }
 
         Vector<GridTrackSize> trackSizes;
         NamedGridLinesMap namedGridLines;
-        if (!createGridTrackList(value, trackSizes, namedGridLines, state))
+        OrderedNamedGridLines orderedNamedGridLines;
+        if (!createGridTrackList(value, trackSizes, namedGridLines, orderedNamedGridLines, state))
             return;
         state.style()->setGridDefinitionColumns(trackSizes);
         state.style()->setNamedGridColumnLines(namedGridLines);
+        state.style()->setOrderedNamedGridColumnLines(orderedNamedGridLines);
         return;
     }
     case CSSPropertyGridDefinitionRows: {
         if (isInherit) {
             state.style()->setGridDefinitionRows(state.parentStyle()->gridDefinitionRows());
             state.style()->setNamedGridRowLines(state.parentStyle()->namedGridRowLines());
+            state.style()->setOrderedNamedGridRowLines(state.parentStyle()->orderedNamedGridRowLines());
             return;
         }
         if (isInitial) {
             state.style()->setGridDefinitionRows(RenderStyle::initialGridDefinitionRows());
             state.style()->setNamedGridRowLines(RenderStyle::initialNamedGridRowLines());
+            state.style()->setOrderedNamedGridRowLines(RenderStyle::initialOrderedNamedGridRowLines());
             return;
         }
 
         Vector<GridTrackSize> trackSizes;
         NamedGridLinesMap namedGridLines;
-        if (!createGridTrackList(value, trackSizes, namedGridLines, state))
+        OrderedNamedGridLines orderedNamedGridLines;
+        if (!createGridTrackList(value, trackSizes, namedGridLines, orderedNamedGridLines, state))
             return;
         state.style()->setGridDefinitionRows(trackSizes);
         state.style()->setNamedGridRowLines(namedGridLines);
+        state.style()->setOrderedNamedGridRowLines(orderedNamedGridLines);
         return;
     }
 
@@ -1822,6 +1865,14 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     }
 
     // These properties are aliased and we already applied the property on the prefixed version.
+    case CSSPropertyAnimationDelay:
+    case CSSPropertyAnimationDirection:
+    case CSSPropertyAnimationDuration:
+    case CSSPropertyAnimationFillMode:
+    case CSSPropertyAnimationIterationCount:
+    case CSSPropertyAnimationName:
+    case CSSPropertyAnimationPlayState:
+    case CSSPropertyAnimationTimingFunction:
     case CSSPropertyTransitionDelay:
     case CSSPropertyTransitionDuration:
     case CSSPropertyTransitionProperty:
@@ -1895,6 +1946,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     case CSSPropertyMinHeight:
     case CSSPropertyMixBlendMode:
     case CSSPropertyMinWidth:
+    case CSSPropertyObjectFit:
     case CSSPropertyOpacity:
     case CSSPropertyOrphans:
     case CSSPropertyOutlineColor:
@@ -1997,7 +2049,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     case CSSPropertyWebkitLineClamp:
     case CSSPropertyWebkitLineGrid:
     case CSSPropertyWebkitLineSnap:
-    case CSSPropertyWebkitMarqueeDirection:
+    case CSSPropertyInternalMarqueeDirection:
     case CSSPropertyWebkitMarqueeIncrement:
     case CSSPropertyWebkitMarqueeRepetition:
     case CSSPropertyWebkitMarqueeSpeed:
@@ -2314,6 +2366,12 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         EGlyphOrientation orientation;
         if (degreeToGlyphOrientation(primitiveValue, orientation))
             state.style()->accessSVGStyle()->setGlyphOrientationHorizontal(orientation);
+        break;
+    }
+    case CSSPropertyPaintOrder: {
+        HANDLE_SVG_INHERIT_AND_INITIAL(paintOrder, PaintOrder)
+        if (value->isValueList())
+            state.style()->accessSVGStyle()->setPaintOrder(paintOrderFlattened(value));
         break;
     }
     case CSSPropertyGlyphOrientationVertical:

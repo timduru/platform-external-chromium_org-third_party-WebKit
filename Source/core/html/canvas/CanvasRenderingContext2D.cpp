@@ -34,6 +34,7 @@
 #include "core/html/canvas/CanvasRenderingContext2D.h"
 
 #include "CSSPropertyNames.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/accessibility/AXObjectCache.h"
@@ -42,6 +43,7 @@
 #include "core/css/StylePropertySet.h"
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/ExceptionCode.h"
+#include "core/fetch/ImageResource.h"
 #include "core/html/HTMLCanvasElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLMediaElement.h"
@@ -53,7 +55,6 @@
 #include "core/html/canvas/CanvasPattern.h"
 #include "core/html/canvas/CanvasStyle.h"
 #include "core/html/canvas/DOMPath.h"
-#include "core/loader/cache/ImageResource.h"
 #include "core/page/ImageBitmap.h"
 #include "core/platform/graphics/DrawLooper.h"
 #include "core/platform/graphics/FloatQuad.h"
@@ -1308,6 +1309,9 @@ void CanvasRenderingContext2D::drawImage(ImageBitmap* bitmap,
         return;
 
     RefPtr<Image> imageForRendering = bitmap->bitmapImage();
+    if (!imageForRendering)
+        return;
+
     drawImageInternal(imageForRendering.get(), actualSrcRect, actualDstRect, state().m_globalComposite, state().m_globalBlend);
 }
 
@@ -1457,8 +1461,8 @@ void CanvasRenderingContext2D::drawImage(HTMLCanvasElement* sourceCanvas, const 
     // as that will do a readback to software.
     CanvasRenderingContext* sourceContext = sourceCanvas->renderingContext();
     // FIXME: Implement an accelerated path for drawing from a WebGL canvas to a 2d canvas when possible.
-    if (!isAccelerated() || !sourceContext || !sourceContext->isAccelerated() || !sourceContext->is2d())
-        sourceCanvas->makeRenderingResultsAvailable();
+    if (sourceContext && sourceContext->is3d())
+        sourceContext->paintRenderingResultsToCanvas();
 
     if (rectContainsCanvas(normalizedDstRect)) {
         c->drawImageBuffer(buffer, normalizedDstRect, normalizedSrcRect, state().m_globalComposite, state().m_globalBlend);
@@ -1896,9 +1900,7 @@ PassRefPtr<ImageData> CanvasRenderingContext2D::webkitGetImageDataHD(float sx, f
 PassRefPtr<ImageData> CanvasRenderingContext2D::getImageData(ImageBuffer::CoordinateSystem coordinateSystem, float sx, float sy, float sw, float sh, ExceptionState& es) const
 {
     if (!canvas()->originClean()) {
-        DEFINE_STATIC_LOCAL(String, consoleMessage, ("Unable to get image data from canvas because the canvas has been tainted by cross-origin data."));
-        canvas()->document()->addConsoleMessage(SecurityMessageSource, ErrorMessageLevel, consoleMessage);
-        es.throwDOMException(SecurityError);
+        es.throwSecurityError(ExceptionMessages::failedToExecute("getImageData", "CanvasRenderingContext2D", "the canvas has been tainted by cross-origin data."));
         return 0;
     }
 
@@ -2379,16 +2381,33 @@ bool CanvasRenderingContext2D::focusRingCallIsValid(const Path& path, Element* e
 
 void CanvasRenderingContext2D::updateFocusRingAccessibility(const Path& path, Element* element)
 {
+    if (!canvas()->renderer())
+        return;
+
     // If accessibility is already enabled in this frame, associate this path's
     // bounding box with the accessible object. Do this even if the element
     // isn't focused because assistive technology might try to explore the object's
     // location before it gets focus.
     if (AXObjectCache* axObjectCache = element->document()->existingAXObjectCache()) {
         if (AccessibilityObject* obj = axObjectCache->getOrCreate(element)) {
+            // Get the bounding rect and apply transformations.
+            FloatRect bounds = m_path.boundingRect();
+            AffineTransform ctm = state().m_transform;
+            FloatRect transformedBounds = ctm.mapRect(bounds);
+            LayoutRect elementRect = LayoutRect(transformedBounds);
+
+            // Offset by the canvas rect and set the bounds of the accessible element.
             IntRect canvasRect = canvas()->renderer()->absoluteBoundingBoxRect();
-            LayoutRect rect = LayoutRect(path.boundingRect());
-            rect.moveBy(canvasRect.location());
-            obj->setElementRect(rect);
+            elementRect.moveBy(canvasRect.location());
+            obj->setElementRect(elementRect);
+
+            // Set the bounds of any ancestor accessible elements, up to the canvas element,
+            // otherwise this element will appear to not be within its parent element.
+            obj = obj->parentObject();
+            while (obj && obj->node() != canvas()) {
+                obj->setElementRect(elementRect);
+                obj = obj->parentObject();
+            }
         }
     }
 }

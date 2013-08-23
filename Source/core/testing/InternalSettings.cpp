@@ -58,6 +58,7 @@ namespace WebCore {
 
 InternalSettings::Backup::Backup(Settings* settings)
     : m_originalCSSExclusionsEnabled(RuntimeEnabledFeatures::cssExclusionsEnabled())
+    , m_originalCSSShapesEnabled(RuntimeEnabledFeatures::cssShapesEnabled())
     , m_originalAuthorShadowDOMForAnyElementEnabled(RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
     , m_originalExperimentalWebSocketEnabled(settings->experimentalWebSocketEnabled())
     , m_originalStyleScoped(RuntimeEnabledFeatures::styleScopedEnabled())
@@ -66,7 +67,6 @@ InternalSettings::Backup::Backup(Settings* settings)
     , m_originalTextAutosizingWindowSizeOverride(settings->textAutosizingWindowSizeOverride())
     , m_originalTextAutosizingFontScaleFactor(settings->textAutosizingFontScaleFactor())
     , m_originalMediaTypeOverride(settings->mediaTypeOverride())
-    , m_originalLazyLayoutEnabled(RuntimeEnabledFeatures::lazyLayoutEnabled())
     , m_originalMockScrollbarsEnabled(settings->mockScrollbarsEnabled())
     , m_langAttributeAwareFormControlUIEnabled(RuntimeEnabledFeatures::langAttributeAwareFormControlUIEnabled())
     , m_imagesEnabled(settings->areImagesEnabled())
@@ -80,6 +80,7 @@ InternalSettings::Backup::Backup(Settings* settings)
 void InternalSettings::Backup::restoreTo(Settings* settings)
 {
     RuntimeEnabledFeatures::setCSSExclusionsEnabled(m_originalCSSExclusionsEnabled);
+    RuntimeEnabledFeatures::setCSSShapesEnabled(m_originalCSSShapesEnabled);
     RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(m_originalAuthorShadowDOMForAnyElementEnabled);
     settings->setExperimentalWebSocketEnabled(m_originalExperimentalWebSocketEnabled);
     RuntimeEnabledFeatures::setStyleScopedEnabled(m_originalStyleScoped);
@@ -88,7 +89,6 @@ void InternalSettings::Backup::restoreTo(Settings* settings)
     settings->setTextAutosizingWindowSizeOverride(m_originalTextAutosizingWindowSizeOverride);
     settings->setTextAutosizingFontScaleFactor(m_originalTextAutosizingFontScaleFactor);
     settings->setMediaTypeOverride(m_originalMediaTypeOverride);
-    RuntimeEnabledFeatures::setLazyLayoutEnabled(m_originalLazyLayoutEnabled);
     settings->setMockScrollbarsEnabled(m_originalMockScrollbarsEnabled);
     RuntimeEnabledFeatures::setLangAttributeAwareFormControlUIEnabled(m_langAttributeAwareFormControlUIEnabled);
     settings->setImagesEnabled(m_imagesEnabled);
@@ -134,7 +134,7 @@ InternalSettings::~InternalSettings()
 InternalSettings::InternalSettings(Page* page)
     : InternalSettingsGenerated(page)
     , m_page(page)
-    , m_backup(page->settings())
+    , m_backup(&page->settings())
 {
 }
 
@@ -152,7 +152,7 @@ Settings* InternalSettings::settings() const
 {
     if (!page())
         return 0;
-    return page()->settings();
+    return &page()->settings();
 }
 
 void InternalSettings::setMockScrollbarsEnabled(bool enabled, ExceptionState& es)
@@ -180,6 +180,12 @@ void InternalSettings::setTouchEventEmulationEnabled(bool enabled, ExceptionStat
 {
     InternalSettingsGuardForSettings();
     settings()->setTouchEventEmulationEnabled(enabled);
+}
+
+void InternalSettings::setViewportEnabled(bool enabled, ExceptionState& es)
+{
+    InternalSettingsGuardForSettings();
+    settings()->setViewportEnabled(enabled);
 }
 
 // FIXME: This is a temporary flag and should be removed once accelerated
@@ -282,11 +288,6 @@ void InternalSettings::setEditingBehavior(const String& editingBehavior, Excepti
         settings()->setEditingBehaviorType(EditingAndroidBehavior);
     else
         es.throwDOMException(SyntaxError);
-}
-
-void InternalSettings::setLazyLayoutEnabled(bool enabled)
-{
-    RuntimeEnabledFeatures::setLazyLayoutEnabled(enabled);
 }
 
 void InternalSettings::setLangAttributeAwareFormControlUIEnabled(bool enabled)

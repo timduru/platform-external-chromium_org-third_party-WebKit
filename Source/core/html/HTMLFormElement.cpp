@@ -32,11 +32,11 @@
 #include "core/dom/Attribute.h"
 #include "core/dom/AutocompleteErrorEvent.h"
 #include "core/dom/Document.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/NamedNodesCollection.h"
 #include "core/dom/NodeRenderingContext.h"
-#include "core/dom/NodeTraversal.h"
 #include "core/html/FormController.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLImageElement.h"
@@ -657,36 +657,9 @@ bool HTMLFormElement::checkInvalidControlsAndCollectUnhandled(Vector<RefPtr<Form
     return hasInvalidControls;
 }
 
-Node* HTMLFormElement::elementForAlias(const AtomicString& alias)
-{
-    if (alias.isEmpty() || !m_elementAliases)
-        return 0;
-    return m_elementAliases->get(alias.impl());
-}
-
-void HTMLFormElement::addElementAlias(Node* element, const AtomicString& alias)
-{
-    if (alias.isEmpty())
-        return;
-    if (!m_elementAliases)
-        m_elementAliases = adoptPtr(new AliasMap);
-    m_elementAliases->set(alias.impl(), element);
-}
-
 void HTMLFormElement::getNamedElements(const AtomicString& name, Vector<RefPtr<Node> >& namedItems)
 {
     elements()->namedItems(name, namedItems);
-
-    Node* aliasElement = elementForAlias(name);
-    if (aliasElement) {
-        if (namedItems.find(aliasElement) == notFound) {
-            // We have seen it before but it is gone now. Still, we need to return it.
-            // FIXME: The above comment is not clear enough; it does not say why we need to do this.
-            namedItems.append(aliasElement);
-        }
-    }
-    if (namedItems.size() && namedItems.first() != aliasElement)
-        addElementAlias(namedItems.first().get(), name);
 }
 
 bool HTMLFormElement::shouldAutocomplete() const

@@ -76,6 +76,7 @@
 ../core/dom/Notation.idl
 ../core/dom/OverflowEvent.idl
 ../core/dom/PageTransitionEvent.idl
+../core/dom/ParentNode.idl
 ../core/dom/PopStateEvent.idl
 ../core/dom/ProcessingInstruction.idl
 ../core/dom/ProgressEvent.idl
@@ -229,16 +230,17 @@
 ../core/inspector/InspectorFrontendHost.idl
 ../core/inspector/InspectorOverlayHost.idl
 ../core/inspector/JavaScriptCallFrame.idl
-../core/loader/appcache/DOMApplicationCache.idl
+../core/loader/appcache/ApplicationCache.idl
 ../core/page/BarProp.idl
 ../core/page/Console.idl
 ../core/page/EventSource.idl
 ../core/page/History.idl
 ../core/page/ImageBitmap.idl
-../core/page/ImageBitmapFactories.idl
 ../core/page/Location.idl
 ../core/page/MemoryInfo.idl
 ../core/page/Navigator.idl
+../core/page/NavigatorID.idl
+../core/page/NavigatorOnLine.idl
 ../core/page/PagePopupController.idl
 ../core/page/Performance.idl
 ../core/page/PerformanceEntry.idl
@@ -270,6 +272,7 @@
 ../core/workers/WorkerLocation.idl
 ../core/xml/DOMParser.idl
 ../core/xml/XMLHttpRequest.idl
+../core/xml/XMLHttpRequestEventTarget.idl
 ../core/xml/XMLHttpRequestProgressEvent.idl
 ../core/xml/XMLHttpRequestUpload.idl
 ../core/xml/XMLSerializer.idl
@@ -282,7 +285,7 @@
 ../modules/crypto/AesKeyGenParams.idl
 ../modules/crypto/Algorithm.idl
 ../modules/crypto/Crypto.idl
-../modules/crypto/CryptoOperation.idl
+../modules/crypto/HmacKeyParams.idl
 ../modules/crypto/HmacParams.idl
 ../modules/crypto/Key.idl
 ../modules/crypto/RsaKeyGenParams.idl
@@ -557,7 +560,6 @@
 ../core/css/Rect.idl
 ../core/dom/ChildNode.idl
 ../core/dom/DocumentFullscreen.idl
-../core/dom/ParentNode.idl
 ../core/dom/RequestAnimationFrameCallback.idl
 ../core/dom/StringCallback.idl
 ../core/html/VoidCallback.idl
@@ -598,6 +600,8 @@
 ../modules/geolocation/NavigatorGeolocation.idl
 ../modules/geolocation/PositionCallback.idl
 ../modules/geolocation/PositionErrorCallback.idl
+../modules/imagebitmap/ImageBitmapFactories.idl
+../modules/imagebitmap/WindowImageBitmapFactories.idl
 ../modules/indexeddb/WindowIndexedDatabase.idl
 ../modules/indexeddb/WorkerGlobalScopeIndexedDatabase.idl
 ../modules/mediasource/URLMediaSource.idl

@@ -37,6 +37,7 @@ namespace WebCore {
 class Document;
 
 enum ViewportErrorCode {
+    InvalidKeyValuePairSeparatorError,
     UnrecognizedViewportArgumentKeyError,
     UnrecognizedViewportArgumentValueError,
     TruncatedViewportArgumentValueError,
@@ -87,7 +88,7 @@ struct ViewportArguments {
     }
 
     // All arguments are in CSS units.
-    PageScaleConstraints resolve(const FloatSize& initialViewportSize, const FloatSize& deviceSize, int defaultWidth) const;
+    PageScaleConstraints resolve(const FloatSize& initialViewportSize, int defaultWidth) const;
 
     float width;
     float minWidth;

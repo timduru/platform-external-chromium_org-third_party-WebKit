@@ -407,7 +407,7 @@ public:
         return this == &other;
     }
 
-    virtual void handleEvent(ScriptExecutionContext*, Event* event) OVERRIDE
+    virtual void handleEvent(ScriptExecutionContext* context, Event* event) OVERRIDE
     {
         if (event->type() != eventNames().successEvent) {
             m_requestCallback->sendFailure("Unexpected event type.");
@@ -454,9 +454,9 @@ public:
         }
 
         RefPtr<DataEntry> dataEntry = DataEntry::create()
-            .setKey(m_injectedScript.wrapObject(idbCursor->key(), String()))
-            .setPrimaryKey(m_injectedScript.wrapObject(idbCursor->primaryKey(), String()))
-            .setValue(m_injectedScript.wrapObject(idbCursor->value(), String()));
+            .setKey(m_injectedScript.wrapObject(idbCursor->key(context), String()))
+            .setPrimaryKey(m_injectedScript.wrapObject(idbCursor->primaryKey(context), String()))
+            .setValue(m_injectedScript.wrapObject(idbCursor->value(context), String()));
         m_result->addItem(dataEntry);
 
     }

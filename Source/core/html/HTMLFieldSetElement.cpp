@@ -26,7 +26,7 @@
 #include "core/html/HTMLFieldSetElement.h"
 
 #include "HTMLNames.h"
-#include "core/dom/NodeTraversal.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/html/HTMLCollection.h"
 #include "core/html/HTMLLegendElement.h"
 #include "core/html/HTMLObjectElement.h"
@@ -116,7 +116,7 @@ void HTMLFieldSetElement::refreshElementsIfNeeded() const
 
     for (Element* element = ElementTraversal::firstWithin(this); element; element = ElementTraversal::next(element, this)) {
         if (element->hasTagName(objectTag)) {
-            m_associatedElements.append(static_cast<HTMLObjectElement*>(element));
+            m_associatedElements.append(toHTMLObjectElement(element));
             continue;
         }
 

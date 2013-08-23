@@ -35,6 +35,7 @@
 #include "SVGNames.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/CustomElement.h"
+#include "core/dom/CustomElementCallbackScheduler.h"
 #include "core/dom/CustomElementDefinition.h"
 #include "core/dom/Element.h"
 #include "core/html/HTMLElement.h"
@@ -44,9 +45,9 @@
 
 namespace WebCore {
 
-void CustomElementRegistrationContext::registerElement(Document* document, CustomElementConstructorBuilder* constructorBuilder, const AtomicString& type, ExceptionState& es)
+void CustomElementRegistrationContext::registerElement(Document* document, CustomElementConstructorBuilder* constructorBuilder, const AtomicString& type, CustomElement::NameSet validNames, ExceptionState& es)
 {
-    CustomElementDefinition* definition = m_registry.registerElement(document, constructorBuilder, type, es);
+    CustomElementDefinition* definition = m_registry.registerElement(document, constructorBuilder, type, validNames, es);
 
     if (!definition)
         return;
@@ -57,9 +58,9 @@ void CustomElementRegistrationContext::registerElement(Document* document, Custo
         didResolveElement(definition, *it);
 }
 
-PassRefPtr<Element> CustomElementRegistrationContext::createCustomTagElement(Document* document, const QualifiedName& tagName)
+PassRefPtr<Element> CustomElementRegistrationContext::createCustomTagElement(Document* document, const QualifiedName& tagName, CreationMode mode)
 {
-    ASSERT(CustomElement::isCustomTagName(tagName.localName()));
+    ASSERT(CustomElement::isValidName(tagName.localName()));
 
     if (!document)
         return 0;
@@ -75,6 +76,7 @@ PassRefPtr<Element> CustomElementRegistrationContext::createCustomTagElement(Doc
         return Element::create(tagName, document);
     }
 
+    element->setCustomElementState(mode == CreatedByParser ? Element::WaitingForParser : Element::WaitingForUpgrade);
     resolve(element.get(), nullAtom);
     return element.release();
 }
@@ -88,7 +90,7 @@ void CustomElementRegistrationContext::resolve(Element* element, const AtomicStr
 {
     // If an element has a custom tag name it takes precedence over
     // the "is" attribute (if any).
-    const AtomicString& type = CustomElement::isCustomTagName(element->localName())
+    const AtomicString& type = CustomElement::isValidName(element->localName())
         ? element->localName()
         : typeExtension;
     ASSERT(!type.isNull());
@@ -108,12 +110,8 @@ void CustomElementRegistrationContext::didResolveElement(CustomElementDefinition
 
 void CustomElementRegistrationContext::didCreateUnresolvedElement(const CustomElementDescriptor& descriptor, Element* element)
 {
+    ASSERT(element->customElementState() == Element::WaitingForParser || element->customElementState() == Element::WaitingForUpgrade);
     m_candidates.add(descriptor, element);
-}
-
-void CustomElementRegistrationContext::customElementWasDestroyed(Element* element)
-{
-    m_candidates.remove(element);
 }
 
 PassRefPtr<CustomElementRegistrationContext> CustomElementRegistrationContext::create()
@@ -129,7 +127,7 @@ void CustomElementRegistrationContext::setIsAttributeAndTypeExtension(Element* e
     setTypeExtension(element, type);
 }
 
-void CustomElementRegistrationContext::setTypeExtension(Element* element, const AtomicString& type)
+void CustomElementRegistrationContext::setTypeExtension(Element* element, const AtomicString& type, CreationMode mode)
 {
     if (!element->isHTMLElement() && !element->isSVGElement())
         return;
@@ -144,7 +142,9 @@ void CustomElementRegistrationContext::setTypeExtension(Element* element, const 
     }
 
     // Custom tags take precedence over type extensions
-    ASSERT(!CustomElement::isCustomTagName(element->localName()));
+    ASSERT(!CustomElement::isValidName(element->localName()));
+
+    element->setCustomElementState(mode == CreatedByParser ? Element::WaitingForParser : Element::WaitingForUpgrade);
 
     if (CustomElementRegistrationContext* context = element->document()->registrationContext())
         context->didGiveTypeExtension(element, type);

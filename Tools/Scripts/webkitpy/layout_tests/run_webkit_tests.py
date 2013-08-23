@@ -99,14 +99,15 @@ def parse_args(args):
     option_group_definitions.append(("Configuration options", configuration_options()))
     option_group_definitions.append(("Printing Options", printing.print_options()))
 
-    # FIXME: These options should move onto the ChromiumPort.
-    option_group_definitions.append(("Chromium-specific Options", [
-        optparse.make_option("--nocheck-sys-deps", action="store_true",
-            default=False,
-            help="Don't check the system dependencies (themes)"),
+    option_group_definitions.append(("Android-specific Options", [
         optparse.make_option("--adb-device",
             action="append", default=[],
             help="Run Android layout tests on these devices."),
+
+        # FIXME: Flip this to be off by default once we can log the device setup more cleanly.
+        optparse.make_option("--no-android-logging",
+            action="store_false", dest='android_logging', default=True,
+            help="Do not log android-specific debug messages (default is to log as part of --debug-rwt-logging"),
     ]))
 
     option_group_definitions.append(("Results Options", [
@@ -177,6 +178,9 @@ def parse_args(args):
         optparse.make_option("-n", "--dry-run", action="store_true",
             default=False,
             help="Do everything but actually run the tests or upload results."),
+        optparse.make_option("--nocheck-sys-deps", action="store_true",
+            default=False,
+            help="Don't check the system dependencies (themes)"),
         optparse.make_option("--wrapper",
             help="wrapper command to insert before invocations of "
                  "the driver; option is split on whitespace before "
@@ -216,7 +220,7 @@ def parse_args(args):
             help=("Run a the tests in batches (n), after every n tests, "
                   "the driver is relaunched."), type="int", default=None),
         optparse.make_option("--run-singly", action="store_true",
-            default=False, help="run a separate driver for each test (implies --verbose)"),
+            default=False, help="DEPRECATED, same as --batch-size=1 --verbose"),
         optparse.make_option("--child-processes",
             help="Number of drivers to run in parallel."),
         # FIXME: Display default number of child processes that will run.
@@ -236,11 +240,6 @@ def parse_args(args):
             dest="retry_failures",
             help="Don't re-try any tests that produce unexpected results."),
 
-        # FIXME: Remove this after we remove the flag from the v8 bot.
-        optparse.make_option("--retry-crashes", action="store_true",
-            default=False,
-            help="ignored (we now always retry crashes when we retry failures)."),
-
         optparse.make_option("--max-locked-shards", type="int", default=0,
             help="Set the maximum number of locked shards"),
         optparse.make_option("--additional-env-var", type="string", action="append", default=[],
@@ -249,6 +248,8 @@ def parse_args(args):
             help="Output per-test profile information."),
         optparse.make_option("--profiler", action="store",
             help="Output per-test profile information, using the specified profiler."),
+        optparse.make_option("--driver-logging", action="store_true",
+            help="Print detailed logging of the driver/content_shell"),
     ]))
 
     option_group_definitions.append(("Miscellaneous Options", [
@@ -330,6 +331,7 @@ def _set_up_derived_options(port, options):
         options.pixel_test_directories = list(varified_dirs)
 
     if options.run_singly:
+        options.batch_size = 1
         options.verbose = True
 
 

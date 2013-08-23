@@ -81,7 +81,7 @@ public:
     virtual void takeFocus(WebCore::FocusDirection);
     virtual void focusedNodeChanged(WebCore::Node*);
     virtual WebCore::Page* createWindow(
-        WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&, const WebCore::NavigationAction&, WebCore::NavigationPolicy);
+        WebCore::Frame*, const WebCore::FrameLoadRequest&, const WebCore::WindowFeatures&, WebCore::NavigationPolicy);
     virtual void show(WebCore::NavigationPolicy);
     virtual bool canRunModal();
     virtual void runModal();
@@ -175,7 +175,7 @@ public:
     virtual bool isPasswordGenerationEnabled() const OVERRIDE;
     virtual void openPasswordGenerator(WebCore::HTMLInputElement*) OVERRIDE;
 
-    virtual bool shouldRunModalDialogDuringPageDismissal(const DialogType&, const String& dialogMessage, WebCore::FrameLoader::PageDismissalType) const;
+    virtual bool shouldRunModalDialogDuringPageDismissal(const DialogType&, const String& dialogMessage, WebCore::Document::PageDismissalType) const;
 
     virtual bool shouldRubberBandInDirection(WebCore::ScrollDirection) const;
     virtual void numWheelEventHandlersChanged(unsigned);

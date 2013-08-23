@@ -26,9 +26,9 @@
 #include "SVGNames.h"
 #include "XLinkNames.h"
 #include "core/dom/Document.h"
-#include "core/loader/cache/FetchRequest.h"
-#include "core/loader/cache/ImageResource.h"
-#include "core/loader/cache/ResourceFetcher.h"
+#include "core/fetch/FetchRequest.h"
+#include "core/fetch/ImageResource.h"
+#include "core/fetch/ResourceFetcher.h"
 #include "core/platform/graphics/Image.h"
 #include "core/rendering/svg/RenderSVGResource.h"
 #include "core/svg/SVGElementInstance.h"
@@ -193,7 +193,8 @@ void SVGFEImageElement::notifyFinished(Resource*)
     if (!parent->hasTagName(SVGNames::filterTag) || !parent->renderer())
         return;
 
-    RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer());
+    if (RenderObject* renderer = this->renderer())
+        RenderSVGResource::markForLayoutAndParentResourceInvalidation(renderer);
 }
 
 PassRefPtr<FilterEffect> SVGFEImageElement::build(SVGFilterBuilder*, Filter* filter)

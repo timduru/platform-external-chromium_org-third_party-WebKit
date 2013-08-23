@@ -29,6 +29,7 @@
 #include "core/dom/NodeRenderingTraversal.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/FrameSelection.h"
+#include "core/fetch/ImageResource.h"
 #include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLAreaElement.h"
 #include "core/html/HTMLImageElement.h"
@@ -37,7 +38,6 @@
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/html/HTMLVideoElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/loader/cache/ImageResource.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/platform/Scrollbar.h"
@@ -317,7 +317,7 @@ HTMLMediaElement* HitTestResult::mediaElement() const
         return 0;
 
     if (isHTMLVideoElement(m_innerNonSharedNode.get()) || m_innerNonSharedNode->hasTagName(HTMLNames::audioTag))
-        return static_cast<HTMLMediaElement*>(m_innerNonSharedNode.get());
+        return toHTMLMediaElement(m_innerNonSharedNode.get());
     return 0;
 }
 

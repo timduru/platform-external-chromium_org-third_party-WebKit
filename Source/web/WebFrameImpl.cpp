@@ -123,7 +123,7 @@
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/InputMethodController.h"
-#include "core/editing/SpellChecker.h"
+#include "core/editing/SpellCheckRequester.h"
 #include "core/editing/TextAffinity.h"
 #include "core/editing/TextIterator.h"
 #include "core/editing/htmlediting.h"
@@ -218,8 +218,7 @@ static void frameContentAsPlainText(size_t maxChars, Frame* frame, StringBuilder
 
     // TextIterator iterates over the visual representation of the DOM. As such,
     // it requires you to do a layout before using it (otherwise it'll crash).
-    if (frame->view()->needsLayout())
-        frame->view()->layout();
+    document->updateLayout();
 
     // Select the document body.
     RefPtr<Range> range(document->createRange());
@@ -717,8 +716,7 @@ WebFrame* WebFrameImpl::findChildByExpression(const WebString& xpath) const
     Node* node = xpathResult->iterateNext(IGNORE_EXCEPTION);
     if (!node || !node->isFrameOwnerElement())
         return 0;
-    HTMLFrameOwnerElement* frameElement = toFrameOwnerElement(node);
-    return fromFrame(frameElement->contentFrame());
+    return fromFrame(toHTMLFrameOwnerElement(node)->contentFrame());
 }
 
 WebDocument WebFrameImpl::document() const
@@ -984,7 +982,6 @@ void WebFrameImpl::stopLoading()
     // FIXME: Figure out what we should really do here.  It seems like a bug
     // that FrameLoader::stopLoading doesn't call stopAllLoaders.
     frame()->loader()->stopAllLoaders();
-    frame()->loader()->stopLoading(UnloadEventPolicyNone);
 }
 
 WebDataSource* WebFrameImpl::provisionalDataSource() const
@@ -1032,7 +1029,7 @@ WebHistoryItem WebFrameImpl::currentHistoryItem() const
         || !frame()->loader()->activeDocumentLoader()->isLoadingInAPISense()))
         frame()->loader()->history()->saveDocumentAndScrollState();
 
-    return WebHistoryItem(frame()->page()->backForward()->currentItem());
+    return WebHistoryItem(frame()->page()->backForward().currentItem());
 }
 
 void WebFrameImpl::enableViewSourceMode(bool enable)
@@ -1233,7 +1230,7 @@ void WebFrameImpl::requestTextChecking(const WebElement& webElement)
     if (webElement.isNull())
         return;
     RefPtr<Range> rangeToCheck = rangeOfContents(const_cast<Element*>(webElement.constUnwrap<Element>()));
-    frame()->editor()->spellChecker()->requestCheckingFor(SpellCheckRequest::create(TextCheckingTypeSpelling | TextCheckingTypeGrammar, TextCheckingProcessBatch, rangeToCheck, rangeToCheck));
+    frame()->editor()->spellCheckRequester().requestCheckingFor(SpellCheckRequest::create(TextCheckingTypeSpelling | TextCheckingTypeGrammar, TextCheckingProcessBatch, rangeToCheck, rangeToCheck));
 }
 
 void WebFrameImpl::replaceMisspelledRange(const WebString& text)
@@ -1366,6 +1363,11 @@ void WebFrameImpl::moveCaretSelection(const WebPoint& point)
     VisiblePosition position = visiblePositionForWindowPoint(point);
     if (frame()->selection()->shouldChangeSelection(position))
         frame()->selection()->moveTo(position, UserTriggered);
+}
+
+void WebFrameImpl::setCaretVisible(bool visible)
+{
+    frame()->selection()->setCaretVisible(visible);
 }
 
 VisiblePosition WebFrameImpl::visiblePositionForWindowPoint(const WebPoint& point)
@@ -2230,8 +2232,7 @@ WebFrameImpl* WebFrameImpl::fromFrameOwnerElement(Element* element)
     // FIXME: Why do we check specifically for <iframe> and <frame> here? Why can't we get the WebFrameImpl from an <object> element, for example.
     if (!element || !element->isFrameOwnerElement() || (!element->hasTagName(HTMLNames::iframeTag) && !element->hasTagName(HTMLNames::frameTag)))
         return 0;
-    HTMLFrameOwnerElement* frameElement = toFrameOwnerElement(element);
-    return fromFrame(frameElement->contentFrame());
+    return fromFrame(toHTMLFrameOwnerElement(element)->contentFrame());
 }
 
 WebViewImpl* WebFrameImpl::viewImpl() const

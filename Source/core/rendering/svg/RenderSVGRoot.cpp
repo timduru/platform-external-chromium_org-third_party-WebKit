@@ -40,6 +40,7 @@
 #include "core/rendering/svg/SVGResourcesCache.h"
 #include "core/svg/SVGElement.h"
 #include "core/svg/SVGSVGElement.h"
+#include "core/svg/graphics/SVGImage.h"
 
 using namespace std;
 
@@ -110,22 +111,7 @@ void RenderSVGRoot::computeIntrinsicRatioInformation(FloatSize& intrinsicSize, d
 
 bool RenderSVGRoot::isEmbeddedThroughSVGImage() const
 {
-    if (!node())
-        return false;
-
-    Frame* frame = node()->document()->frame();
-    if (!frame)
-        return false;
-
-    // Test whether we're embedded through an img.
-    if (!frame->page())
-        return false;
-
-    ChromeClient* chromeClient = frame->page()->chrome().client();
-    if (!chromeClient || !chromeClient->isSVGImageChromeClient())
-        return false;
-
-    return true;
+    return SVGImage::isInSVGImage(toSVGSVGElement(node()));
 }
 
 bool RenderSVGRoot::isEmbeddedThroughFrameContainingSVGDocument() const

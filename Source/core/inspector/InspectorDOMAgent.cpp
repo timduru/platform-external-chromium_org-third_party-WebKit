@@ -70,6 +70,7 @@
 #include "core/page/Frame.h"
 #include "core/page/FrameTree.h"
 #include "core/page/Page.h"
+#include "core/platform/PlatformGestureEvent.h"
 #include "core/platform/PlatformMouseEvent.h"
 #include "core/platform/PlatformTouchEvent.h"
 #include "core/rendering/HitTestResult.h"
@@ -160,6 +161,11 @@ static Node* hoveredNodeForPoint(Frame* frame, const IntPoint& point, bool ignor
     while (node && node->nodeType() == Node::TEXT_NODE)
         node = node->parentNode();
     return node;
+}
+
+static Node* hoveredNodeForEvent(Frame* frame, const PlatformGestureEvent& event, bool ignorePointerEventsNone)
+{
+    return hoveredNodeForPoint(frame, event.position(), ignorePointerEventsNone);
 }
 
 static Node* hoveredNodeForEvent(Frame* frame, const PlatformMouseEvent& event, bool ignorePointerEventsNone)
@@ -343,8 +349,7 @@ void InspectorDOMAgent::unbind(Node* node, NodeToIdMap* nodesMap)
     m_idToNode.remove(id);
 
     if (node->isFrameOwnerElement()) {
-        const HTMLFrameOwnerElement* frameOwner = static_cast<const HTMLFrameOwnerElement*>(node);
-        Document* contentDocument = frameOwner->contentDocument();
+        Document* contentDocument = toHTMLFrameOwnerElement(node)->contentDocument();
         if (m_domListener)
             m_domListener->didRemoveDocument(contentDocument);
         if (contentDocument)
@@ -1053,6 +1058,19 @@ bool InspectorDOMAgent::handleMousePress()
     return false;
 }
 
+bool InspectorDOMAgent::handleGestureEvent(Frame* frame, const PlatformGestureEvent& event)
+{
+    if (m_searchingForNode == NotSearching || event.type() != PlatformEvent::GestureTap)
+        return false;
+    Node* node = hoveredNodeForEvent(frame, event, false);
+    if (node && m_inspectModeHighlightConfig) {
+        m_overlay->highlightNode(node, 0 /* eventTarget */, *m_inspectModeHighlightConfig);
+        inspect(node);
+        return true;
+    }
+    return false;
+}
+
 bool InspectorDOMAgent::handleTouchEvent(Frame* frame, const PlatformTouchEvent& event)
 {
     if (m_searchingForNode == NotSearching)
@@ -1380,12 +1398,10 @@ PassRefPtr<TypeBuilder::DOM::Node> InspectorDOMAgent::buildObjectForNode(Node* n
         Element* element = toElement(node);
         value->setAttributes(buildArrayForElementAttributes(element));
         if (node->isFrameOwnerElement()) {
-            HTMLFrameOwnerElement* frameOwner = static_cast<HTMLFrameOwnerElement*>(node);
-            Frame* frame = frameOwner->contentFrame();
-            if (frame)
+            HTMLFrameOwnerElement* frameOwner = toHTMLFrameOwnerElement(node);
+            if (Frame* frame = frameOwner->contentFrame())
                 value->setFrameId(m_pageAgent->frameId(frame));
-            Document* doc = frameOwner->contentDocument();
-            if (doc)
+            if (Document* doc = frameOwner->contentDocument())
                 value->setContentDocument(buildObjectForNode(doc, 0, nodesMap));
         }
 

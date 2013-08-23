@@ -45,7 +45,8 @@ namespace WebCore {
 
 PassRefPtr<MessageEvent> createConnectEvent(PassRefPtr<MessagePort> port)
 {
-    RefPtr<MessageEvent> event = MessageEvent::create(adoptPtr(new MessagePortArray(1, port)));
+    RefPtr<MessagePort> sourcePort = port;
+    RefPtr<MessageEvent> event = MessageEvent::create(adoptPtr(new MessagePortArray(1, sourcePort)), "", "", sourcePort);
     event->initEvent(eventNames().connectEvent, false, false);
     return event.release();
 }
@@ -82,7 +83,7 @@ SharedWorkerThread* SharedWorkerGlobalScope::thread()
 void SharedWorkerGlobalScope::logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack> callStack)
 {
     WorkerGlobalScope::logExceptionToConsole(errorMessage, sourceURL, lineNumber, columnNumber, callStack);
-    addMessageToWorkerConsole(JSMessageSource, ErrorMessageLevel, errorMessage, sourceURL, lineNumber, callStack);
+    addMessageToWorkerConsole(JSMessageSource, ErrorMessageLevel, errorMessage, sourceURL, lineNumber, callStack, 0);
 }
 
 } // namespace WebCore

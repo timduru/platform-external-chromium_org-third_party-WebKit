@@ -25,6 +25,7 @@
 
 #include "HTMLNames.h"
 #include "core/dom/ClassNodeList.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/NodeList.h"
 #include "core/dom/NodeRareData.h"
 #include "core/dom/NodeTraversal.h"
@@ -211,7 +212,7 @@ template <> inline bool isMatchingElement(const HTMLCollection* htmlCollection, 
     case MapAreas:
         return element->hasLocalName(areaTag);
     case DocApplets:
-        return element->hasLocalName(appletTag) || (element->hasLocalName(objectTag) && static_cast<HTMLObjectElement*>(element)->containsJavaApplet());
+        return element->hasLocalName(appletTag) || (element->hasLocalName(objectTag) && toHTMLObjectElement(element)->containsJavaApplet());
     case DocEmbeds:
         return element->hasLocalName(embedTag);
     case DocLinks:

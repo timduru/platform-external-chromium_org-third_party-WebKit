@@ -48,6 +48,7 @@
 #include "core/platform/network/DNS.h"
 #include "core/platform/network/ResourceRequest.h"
 #include "core/rendering/RenderImage.h"
+#include "core/svg/graphics/SVGImage.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebPrescientNetworking.h"
 #include "public/platform/WebURL.h"
@@ -172,7 +173,7 @@ bool HTMLAnchorElement::isKeyboardFocusable() const
     if (!page)
         return false;
 
-    if (!page->chrome().client()->tabsToLinks())
+    if (!page->chrome().client().tabsToLinks())
         return false;
 
     if (isInCanvasSubtree())

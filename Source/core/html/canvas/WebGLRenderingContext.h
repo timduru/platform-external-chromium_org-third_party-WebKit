@@ -506,6 +506,12 @@ public:
     bool m_synthesizedErrorsToConsole;
     int m_numGLErrorsToConsoleAllowed;
 
+    bool m_multisamplingAllowed;
+    bool m_multisamplingObserverRegistered;
+
+    GC3Duint m_onePlusMaxEnabledAttribIndex;
+    unsigned long m_onePlusMaxNonDefaultTextureUnit;
+
     // Enabled extension objects.
     RefPtr<ANGLEInstancedArrays> m_angleInstancedArrays;
     RefPtr<EXTFragDepth> m_extFragDepth;
@@ -526,12 +532,19 @@ public:
     RefPtr<WebGLCompressedTextureS3TC> m_webglCompressedTextureS3TC;
     RefPtr<WebGLDepthTexture> m_webglDepthTexture;
 
+    enum ExtensionFlags {
+        ApprovedExtension   = 0x00,
+        DraftExtension      = 0x01,
+        PrivilegedExtension = 0x02,
+        PrefixedExtension   = 0x04,
+    };
+
     class ExtensionTracker {
     public:
-        ExtensionTracker(bool privileged, bool draft, bool prefixed, const char** prefixes)
-            : m_privileged(privileged)
-            , m_draft(draft)
-            , m_prefixed(prefixed)
+        ExtensionTracker(ExtensionFlags flags, const char** prefixes)
+            : m_privileged(flags & PrivilegedExtension)
+            , m_draft(flags & DraftExtension)
+            , m_prefixed(flags & PrefixedExtension)
             , m_prefixes(prefixes)
         {
         }
@@ -572,8 +585,8 @@ public:
     template <typename T>
     class TypedExtensionTracker : public ExtensionTracker {
     public:
-        TypedExtensionTracker(RefPtr<T>& extensionField, bool privileged, bool draft, bool prefixed, const char** prefixes)
-            : ExtensionTracker(privileged, draft, prefixed, prefixes)
+        TypedExtensionTracker(RefPtr<T>& extensionField, ExtensionFlags flags, const char** prefixes)
+            : ExtensionTracker(flags, prefixes)
             , m_extensionField(extensionField)
         {
         }
@@ -620,9 +633,9 @@ public:
     Vector<ExtensionTracker*> m_extensions;
 
     template <typename T>
-    void registerExtension(RefPtr<T>& extensionPtr, bool privileged, bool draft, bool prefixed, const char** prefixes)
+    void registerExtension(RefPtr<T>& extensionPtr, ExtensionFlags flags = ApprovedExtension, const char** prefixes = 0)
     {
-        m_extensions.append(new TypedExtensionTracker<T>(extensionPtr, privileged, draft, prefixed, prefixes));
+        m_extensions.append(new TypedExtensionTracker<T>(extensionPtr, flags, prefixes));
     }
 
     // Errors raised by synthesizeGLError() while the context is lost.
@@ -710,6 +723,11 @@ public:
     bool validateTexFunc(const char* functionName, TexFuncValidationFunctionType, TexFuncValidationSourceType, GC3Denum target, GC3Dint level, GC3Denum internalformat, GC3Dsizei width,
         GC3Dsizei height, GC3Dint border, GC3Denum format, GC3Denum type, GC3Dint xoffset, GC3Dint yoffset);
 
+    // Helper function to check input width and height for functions {copy, compressed}Tex{Sub}Image.
+    // Generates GL error and returns false if width or height is invalid.
+    bool validateTexFuncDimensions(const char* functionName, TexFuncValidationFunctionType,
+        GC3Denum target, GC3Dint level, GC3Dsizei width, GC3Dsizei height);
+
     // Helper function to check input parameters for functions {copy}Tex{Sub}Image.
     // Generates GL error and returns false if parameters are invalid.
     bool validateTexFuncParameters(const char* functionName,
@@ -750,7 +768,7 @@ public:
 
     // Helper function to validate compressed texture dimensions are valid for
     // the given format.
-    bool validateCompressedTexDimensions(const char* functionName, GC3Dint level, GC3Dsizei width, GC3Dsizei height, GC3Denum format);
+    bool validateCompressedTexDimensions(const char* functionName, TexFuncValidationFunctionType, GC3Denum target, GC3Dint level, GC3Dsizei width, GC3Dsizei height, GC3Denum format);
 
     // Helper function to validate compressed texture dimensions are valid for
     // the given format.
@@ -873,8 +891,9 @@ public:
     void restoreCurrentTexture2D();
 
     virtual void multisamplingChanged(bool);
-    bool m_multisamplingAllowed;
-    bool m_multisamplingObserverRegistered;
+
+    void findNewMaxEnabledAttribIndex();
+    void findNewMaxNonDefaultTextureUnit();
 
     friend class WebGLStateRestorer;
     friend class WebGLRenderingContextEvictionManager;

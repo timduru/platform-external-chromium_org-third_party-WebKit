@@ -205,6 +205,8 @@ public:
     // Returns all reasons (direct, indirectly due to subtree, and indirectly due to overlap) that a layer should be composited.
     CompositingReasons reasonsForCompositing(const RenderLayer*) const;
 
+    virtual String debugName(const GraphicsLayer*) OVERRIDE;
+
 private:
     class OverlapMap;
 
@@ -283,6 +285,8 @@ private:
     bool requiresCompositingForBackfaceVisibilityHidden(RenderObject*) const;
     bool requiresCompositingForFilters(RenderObject*) const;
     bool requiresCompositingForBlending(RenderObject* renderer) const;
+    bool requiresCompositingForOverflowScrollingParent(const RenderLayer*) const;
+    bool requiresCompositingForOutOfFlowClipping(const RenderLayer*) const;
     bool requiresCompositingForScrollableFrame() const;
     bool requiresCompositingForPosition(RenderObject*, const RenderLayer*, RenderLayer::ViewportConstrainedNotCompositedReason* = 0) const;
     bool requiresCompositingForOverflowScrolling(const RenderLayer*) const;

@@ -33,7 +33,7 @@
 #include "core/css/SelectorCheckerFastPath.h"
 #include "core/css/SiblingTraversalStrategies.h"
 #include "core/dom/Document.h"
-#include "core/dom/NodeTraversal.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/StaticNodeList.h"
 
 namespace WebCore {
@@ -490,7 +490,7 @@ SelectorQuery* SelectorQueryCache::add(const AtomicString& selectors, Document* 
     CSSSelectorList selectorList;
     parser.parseSelector(selectors, selectorList);
 
-    if (!selectorList.first() || selectorList.hasInvalidSelector()) {
+    if (!selectorList.first()) {
         es.throwDOMException(SyntaxError);
         return 0;
     }

@@ -87,6 +87,9 @@ public:
     Node* lastChild() const { return m_lastChild; }
     bool hasChildNodes() const { return m_firstChild; }
 
+    bool hasOneChild() const { return m_firstChild && !m_firstChild->nextSibling(); }
+    bool hasOneTextChild() const { return hasOneChild() && m_firstChild->isTextNode(); }
+
     // ParentNode interface API
     PassRefPtr<HTMLCollection> children();
     Element* firstElementChild() const;
@@ -96,10 +99,10 @@ public:
     unsigned childNodeCount() const;
     Node* childNode(unsigned index) const;
 
-    void insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachNow);
-    void replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachNow);
+    void insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
+    void replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
     void removeChild(Node* child, ExceptionState& = ASSERT_NO_EXCEPTION);
-    void appendChild(PassRefPtr<Node> newChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachNow);
+    void appendChild(PassRefPtr<Node> newChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
 
     // These methods are only used during parsing.
     // They don't send DOM mutation events or handle reparenting.

@@ -233,9 +233,9 @@ void HTMLMeterElement::didAddUserAgentShadowRoot(ShadowRoot* root)
     m_value = MeterValueElement::create(document());
     m_value->setWidthPercentage(0);
     m_value->updatePseudo();
-    bar->appendChild(m_value, ASSERT_NO_EXCEPTION);
+    bar->appendChild(m_value);
 
-    inner->appendChild(bar, ASSERT_NO_EXCEPTION);
+    inner->appendChild(bar);
 }
 
 } // namespace

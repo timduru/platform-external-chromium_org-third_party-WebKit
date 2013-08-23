@@ -39,7 +39,6 @@
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerBacking.h"
 #include "core/rendering/RenderLayerCompositor.h"
-#include "core/rendering/RenderLazyBlock.h"
 #include "core/rendering/RenderSelectionInfo.h"
 #include "core/rendering/RenderWidget.h"
 
@@ -57,7 +56,6 @@ RenderView::RenderView(Document* document)
     , m_pageLogicalHeightChanged(false)
     , m_layoutState(0)
     , m_layoutStateDisableCount(0)
-    , m_firstLazyBlock(0)
     , m_renderQuoteHead(0)
     , m_renderCounterCount(0)
 {
@@ -114,12 +112,6 @@ LayoutUnit RenderView::availableLogicalHeight(AvailableLogicalHeightType heightT
 bool RenderView::isChildAllowed(RenderObject* child, RenderStyle*) const
 {
     return child->isBox();
-}
-
-void RenderView::markLazyBlocksForLayout()
-{
-    for (RenderLazyBlock* block = m_firstLazyBlock; block; block = block->next())
-        block->setNeedsLayout();
 }
 
 void RenderView::layoutContent(const LayoutState& state)
@@ -257,10 +249,12 @@ void RenderView::layout()
     if (shouldUsePrintingLayout())
         m_minPreferredLogicalWidth = m_maxPreferredLogicalWidth = logicalWidth();
 
+    SubtreeLayoutScope layoutScope(this);
+
     // Use calcWidth/Height to get the new width/height, since this will take the full page zoom factor into account.
     bool relayoutChildren = !shouldUsePrintingLayout() && (!m_frameView || width() != viewWidth() || height() != viewHeight());
     if (relayoutChildren) {
-        setChildNeedsLayout(MarkOnlyThis);
+        layoutScope.setChildNeedsLayout(this);
         for (RenderObject* child = firstChild(); child; child = child->nextSibling()) {
             if ((child->isBox() && toRenderBox(child)->hasRelativeLogicalHeight())
                     || child->style()->logicalHeight().isPercent()
@@ -270,7 +264,7 @@ void RenderView::layout()
                     || child->style()->logicalMinHeight().isViewportPercentage()
                     || child->style()->logicalMaxHeight().isViewportPercentage()
                     || child->isSVGRoot())
-                child->setChildNeedsLayout(MarkOnlyThis);
+                layoutScope.setChildNeedsLayout(child);
         }
     }
 
@@ -332,23 +326,34 @@ void RenderView::mapLocalToContainer(const RenderLayerModelObject* repaintContai
 
 const RenderObject* RenderView::pushMappingToContainer(const RenderLayerModelObject* ancestorToStopAt, RenderGeometryMap& geometryMap) const
 {
-    // If a container was specified, and was not 0 or the RenderView,
-    // then we should have found it by now.
-    ASSERT_ARG(ancestorToStopAt, !ancestorToStopAt || ancestorToStopAt == this);
-
-    LayoutSize scrollOffset;
+    LayoutSize offsetForFixedPosition;
+    LayoutSize offset;
+    RenderObject* container = 0;
 
     if (m_frameView)
-        scrollOffset = m_frameView->scrollOffsetForFixedPosition();
+        offsetForFixedPosition = m_frameView->scrollOffsetForFixedPosition();
 
-    if (!ancestorToStopAt && shouldUseTransformFromContainer(0)) {
+    if (geometryMap.mapCoordinatesFlags() & TraverseDocumentBoundaries) {
+        if (RenderPart* parentDocRenderer = frame()->ownerRenderer()) {
+            offset = -m_frameView->scrollOffset();
+            offset += toLayoutSize(parentDocRenderer->contentBoxRect().location());
+            container = parentDocRenderer;
+        }
+    }
+
+    // If a container was specified, and was not 0 or the RenderView, then we
+    // should have found it by now unless we're traversing to a parent document.
+    ASSERT_ARG(ancestorToStopAt, !ancestorToStopAt || ancestorToStopAt == this || container);
+
+    if ((!ancestorToStopAt || container) && shouldUseTransformFromContainer(container)) {
         TransformationMatrix t;
-        getTransformFromContainer(0, LayoutSize(), t);
-        geometryMap.pushView(this, scrollOffset, &t);
-    } else
-        geometryMap.pushView(this, scrollOffset);
+        getTransformFromContainer(container, LayoutSize(), t);
+        geometryMap.push(this, t, false, false, false, true, offsetForFixedPosition);
+    } else {
+        geometryMap.push(this, offset, false, false, false, false, offsetForFixedPosition);
+    }
 
-    return 0;
+    return container;
 }
 
 void RenderView::mapAbsoluteToLocalPoint(MapCoordinatesFlags mode, TransformState& transformState) const
@@ -1098,7 +1103,7 @@ FlowThreadController* RenderView::flowThreadController()
     return m_flowThreadController.get();
 }
 
-RenderBlock::IntervalArena* RenderView::intervalArena()
+IntervalArena* RenderView::intervalArena()
 {
     if (!m_intervalArena)
         m_intervalArena = IntervalArena::create();

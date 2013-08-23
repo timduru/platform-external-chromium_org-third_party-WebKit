@@ -46,6 +46,10 @@ var WebInspector = {
         var audits = new WebInspector.PanelDescriptor("audits", WebInspector.UIString("Audits"), "AuditsPanel", "AuditsPanel.js");
         var console = new WebInspector.PanelDescriptor("console", WebInspector.UIString("Console"), "ConsolePanel");
         var allDescriptors = [elements, resources, network, scripts, timeline, profiles, audits, console];
+        if (WebInspector.experimentsSettings.layersPanel.isEnabled()) {
+            var layers = new WebInspector.LayersPanelDescriptor();
+            allDescriptors.push(layers);
+        }
         var allProfilers = [profiles];
         if (WebInspector.experimentsSettings.customizableToolbar.isEnabled()) {
             allProfilers = [];
@@ -163,7 +167,7 @@ var WebInspector = {
     {
         animationType = animationType || WebInspector.Drawer.AnimationType.Normal;
 
-        if (this.consoleView.isShowing())
+        if (this.consoleView.isShowing() && !WebInspector.drawer.isHiding())
             return;
 
         if (WebInspector.drawer.visible)
@@ -582,6 +586,18 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     if (WebInspector.experimentsSettings.tethering.isEnabled())
         this._setupTethering();
 
+    if (WebInspector.experimentsSettings.screencast.isEnabled()) {
+        WebInspector._splitView = new WebInspector.SplitView(true, "screencastSplitView");
+        WebInspector._splitView.markAsRoot();
+        WebInspector._splitView.show(document.body);
+
+        var screencastView = new WebInspector.ScreencastView();
+        screencastView.show(WebInspector._splitView.firstElement());
+        WebInspector._splitView.secondElement().appendChild(document.getElementById("root"));
+        WebInspector.inspectorView.element.remove();
+        WebInspector.inspectorView.show(document.getElementById("main"));
+    }
+
     WebInspector.notifications.dispatchEventToListeners(WebInspector.Events.InspectorLoaded);
 }
 
@@ -623,6 +639,8 @@ WebInspector.windowResize = function(event)
         WebInspector.toolbar.resize();
     if (WebInspector.settingsController)
         WebInspector.settingsController.resize();
+    if (WebInspector._splitView)
+        WebInspector._splitView.doResize();
 }
 
 WebInspector.setDockingUnavailable = function(unavailable)
@@ -716,7 +734,11 @@ WebInspector._registerShortcuts = function()
     ];
     section.addRelatedKeys(keys, WebInspector.UIString("Go back/forward in panel history"));
 
-    section.addKey(shortcut.makeDescriptor(shortcut.Keys.Esc), WebInspector.UIString("Toggle console"));
+    var toggleConsoleLabel = WebInspector.UIString("Toggle console");
+    if (WebInspector.experimentsSettings.openConsoleWithCtrlTilde.isEnabled())
+        section.addKey(shortcut.makeDescriptor(shortcut.Keys.Esc), toggleConsoleLabel);
+    else
+        section.addKey(shortcut.makeDescriptor(shortcut.Keys.Tilde, shortcut.Modifiers.CtrlOrMeta), toggleConsoleLabel);
     section.addKey(shortcut.makeDescriptor("f", shortcut.Modifiers.CtrlOrMeta), WebInspector.UIString("Search"));
 
     var advancedSearchShortcut = WebInspector.AdvancedSearchController.createShortcut();
@@ -844,6 +866,7 @@ WebInspector.postDocumentKeyDown = function(event)
     if (event.handled)
         return;
 
+    var openConsoleWithCtrlTildeEnabled = WebInspector.experimentsSettings.openConsoleWithCtrlTilde.isEnabled();
     if (event.keyIdentifier === Esc) {
         if (WebInspector.searchController.isSearchVisible()) {
             WebInspector.searchController.closeSearch();
@@ -852,7 +875,12 @@ WebInspector.postDocumentKeyDown = function(event)
         // If drawer is open with some view other than console then close it.
         if (!this._toggleConsoleButton.toggled && WebInspector.drawer.visible)
             this.closeViewInDrawer();
-        else
+        else if (this._toggleConsoleButton.toggled || !openConsoleWithCtrlTildeEnabled)
+            this._toggleConsoleButtonClicked();
+    }
+
+    if (WebInspector.experimentsSettings.openConsoleWithCtrlTilde.isEnabled()) {
+        if (event.keyCode === WebInspector.KeyboardShortcut.Keys.Tilde.code && WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event))
             this._toggleConsoleButtonClicked();
     }
 }

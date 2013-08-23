@@ -102,8 +102,6 @@ public:
     bool layoutPending() const;
     bool isInLayout() const { return m_inLayout; }
 
-    void layoutLazyBlocks();
-
     RenderObject* layoutRoot(bool onlyDuringLayout = false) const;
     void clearLayoutRoot() { m_layoutRoot = 0; }
     int layoutCount() const { return m_layoutCount; }
@@ -234,7 +232,7 @@ public:
 
     StyleColor documentBackgroundColor() const;
 
-    static double currentPaintTimeStamp() { return sCurrentPaintTimeStamp; } // returns 0 if not painting
+    static double currentFrameTimeStamp() { return s_currentFrameTimeStamp; }
 
     void updateLayoutAndStyleIfNeededRecursive();
 
@@ -299,7 +297,7 @@ public:
     bool addScrollableArea(ScrollableArea*);
     // Returns whether the scrollable area has just been removed.
     bool removeScrollableArea(ScrollableArea*);
-    bool containsScrollableArea(ScrollableArea*) const;
+    bool containsScrollableArea(const ScrollableArea*) const;
     const ScrollableAreaSet* scrollableAreas() const { return m_scrollableAreas.get(); }
 
     // With CSS style "resize:" enabled, a little resizer handle will appear at the bottom
@@ -365,9 +363,12 @@ private:
 
     void paintControlTints();
 
-    void forceLayoutParentViewIfNeeded();
-    void performPostLayoutTasks();
     void autoSizeIfEnabled();
+    void forceLayoutParentViewIfNeeded();
+    void performPreLayoutTasks();
+    void performLayout(RenderObject* rootForThisLayout, bool inSubtreeLayout);
+    void scheduleOrPerformPostLayoutTasks();
+    void performPostLayoutTasks();
 
     virtual void repaintContentRectangle(const IntRect&);
     virtual void contentsResized() OVERRIDE;
@@ -396,6 +397,8 @@ private:
     virtual GraphicsLayer* layerForOverhangAreas() const OVERRIDE;
 #endif
 
+    void sendResizeEventIfNeeded();
+
     void updateScrollableAreaSet();
 
     virtual void notifyPageThatContentAreaWillPaint() const;
@@ -420,7 +423,8 @@ private:
     virtual AXObjectCache* axObjectCache() const;
     void removeFromAXObjectCache();
 
-    static double sCurrentPaintTimeStamp; // used for detecting decoded resource thrash in the cache
+    static double s_currentFrameTimeStamp; // used for detecting decoded resource thrash in the cache
+    static bool s_inPaintContents;
 
     LayoutSize m_size;
     LayoutSize m_margins;

@@ -130,22 +130,22 @@ bool DateTimeFormatValidator::validateFormat(const String& format, const BaseMul
 
 DateTimeEditElement* BaseMultipleFieldsDateAndTimeInputType::dateTimeEditElement() const
 {
-    return toDateTimeEditElement(element()->uaShadowElementById(ShadowElementNames::dateTimeEdit()));
+    return toDateTimeEditElement(element()->userAgentShadowRoot()->getElementById(ShadowElementNames::dateTimeEdit()));
 }
 
 SpinButtonElement* BaseMultipleFieldsDateAndTimeInputType::spinButtonElement() const
 {
-    return toSpinButtonElement(element()->uaShadowElementById(ShadowElementNames::spinButton()));
+    return toSpinButtonElement(element()->userAgentShadowRoot()->getElementById(ShadowElementNames::spinButton()));
 }
 
 ClearButtonElement* BaseMultipleFieldsDateAndTimeInputType::clearButtonElement() const
 {
-    return toClearButtonElement(element()->uaShadowElementById(ShadowElementNames::clearButton()));
+    return toClearButtonElement(element()->userAgentShadowRoot()->getElementById(ShadowElementNames::clearButton()));
 }
 
 PickerIndicatorElement* BaseMultipleFieldsDateAndTimeInputType::pickerIndicatorElement() const
 {
-    return toPickerIndicatorElement(element()->uaShadowElementById(ShadowElementNames::pickerIndicator()));
+    return toPickerIndicatorElement(element()->userAgentShadowRoot()->getElementById(ShadowElementNames::pickerIndicator()));
 }
 
 inline bool BaseMultipleFieldsDateAndTimeInputType::containsFocusedShadowElement() const
@@ -380,7 +380,7 @@ void BaseMultipleFieldsDateAndTimeInputType::handleFocusEvent(Element* oldFocuse
     if (direction == FocusDirectionBackward) {
         if (element()->document()->page())
             element()->document()->page()->focusController().advanceFocus(direction);
-    } else if (direction == FocusDirectionNone || direction == FocusDirectionMouse) {
+    } else if (direction == FocusDirectionNone || direction == FocusDirectionMouse || direction == FocusDirectionPage) {
         edit->focusByOwner(oldFocusedElement);
     } else
         edit->focusByOwner();

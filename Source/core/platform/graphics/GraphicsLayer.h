@@ -46,6 +46,7 @@
 #include "public/platform/WebCompositingReasons.h"
 #include "public/platform/WebContentLayer.h"
 #include "public/platform/WebImageLayer.h"
+#include "public/platform/WebLayerClient.h"
 #include "public/platform/WebLayerScrollClient.h"
 #include "public/platform/WebSolidColorLayer.h"
 
@@ -71,7 +72,7 @@ class TimingFunction;
 class AnimationValue {
     WTF_MAKE_FAST_ALLOCATED;
 public:
-    explicit AnimationValue(float keyTime, PassRefPtr<TimingFunction> timingFunction = 0)
+    explicit AnimationValue(double keyTime, PassRefPtr<TimingFunction> timingFunction = 0)
         : m_keyTime(keyTime)
         , m_timingFunction(timingFunction)
     {
@@ -79,12 +80,12 @@ public:
 
     virtual ~AnimationValue() { }
 
-    float keyTime() const { return m_keyTime; }
+    double keyTime() const { return m_keyTime; }
     const TimingFunction* timingFunction() const { return m_timingFunction.get(); }
     virtual PassOwnPtr<AnimationValue> clone() const = 0;
 
 private:
-    float m_keyTime;
+    double m_keyTime;
     RefPtr<TimingFunction> m_timingFunction;
 };
 
@@ -92,7 +93,7 @@ private:
 // FIXME: Should be moved to its own header file.
 class FloatAnimationValue : public AnimationValue {
 public:
-    FloatAnimationValue(float keyTime, float value, PassRefPtr<TimingFunction> timingFunction = 0)
+    FloatAnimationValue(double keyTime, float value, PassRefPtr<TimingFunction> timingFunction = 0)
         : AnimationValue(keyTime, timingFunction)
         , m_value(value)
     {
@@ -109,7 +110,7 @@ private:
 // FIXME: Should be moved to its own header file.
 class TransformAnimationValue : public AnimationValue {
 public:
-    explicit TransformAnimationValue(float keyTime, const TransformOperations* value = 0, PassRefPtr<TimingFunction> timingFunction = 0)
+    explicit TransformAnimationValue(double keyTime, const TransformOperations* value = 0, PassRefPtr<TimingFunction> timingFunction = 0)
         : AnimationValue(keyTime, timingFunction)
     {
         if (value)
@@ -127,7 +128,7 @@ private:
 // FIXME: Should be moved to its own header file.
 class FilterAnimationValue : public AnimationValue {
 public:
-    explicit FilterAnimationValue(float keyTime, const FilterOperations* value = 0, PassRefPtr<TimingFunction> timingFunction = 0)
+    explicit FilterAnimationValue(double keyTime, const FilterOperations* value = 0, PassRefPtr<TimingFunction> timingFunction = 0)
         : AnimationValue(keyTime, timingFunction)
     {
         if (value)
@@ -198,7 +199,7 @@ protected:
 // GraphicsLayer is an abstraction for a rendering surface with backing store,
 // which may have associated transformation and animations.
 
-class GraphicsLayer : public GraphicsContextPainter, public WebKit::WebAnimationDelegate, public WebKit::WebLayerScrollClient {
+class GraphicsLayer : public GraphicsContextPainter, public WebKit::WebAnimationDelegate, public WebKit::WebLayerScrollClient, public WebKit::WebLayerClient {
     WTF_MAKE_NONCOPYABLE(GraphicsLayer); WTF_MAKE_FAST_ALLOCATED;
 public:
     enum ContentsLayerPurpose {
@@ -214,9 +215,8 @@ public:
 
     GraphicsLayerClient* client() const { return m_client; }
 
-    // Layer name. Only used to identify layers in debug output
-    const String& name() const { return m_name; }
-    void setName(const String&);
+    // WebKit::WebLayerClient implementation.
+    virtual WebKit::WebString debugName(WebKit::WebLayer*) OVERRIDE;
 
     void setCompositingReasons(WebKit::WebCompositingReasons);
 
@@ -466,7 +466,6 @@ protected:
     void dumpAdditionalProperties(TextStream&, int /*indent*/, LayerTreeFlags) const { }
 
     // Helper functions used by settors to keep layer's the state consistent.
-    void updateNames();
     void updateChildList();
     void updateLayerIsDrawable();
     void updateContentsRect();
@@ -477,7 +476,6 @@ protected:
     WebKit::WebLayer* contentsLayerIfRegistered();
 
     GraphicsLayerClient* m_client;
-    String m_name;
 
     // Offset from the owning renderer
     IntSize m_offsetFromRenderer;
@@ -521,8 +519,6 @@ protected:
     IntRect m_contentsRect;
 
     int m_repaintCount;
-
-    String m_nameBase;
 
     Color m_contentsSolidColor;
 

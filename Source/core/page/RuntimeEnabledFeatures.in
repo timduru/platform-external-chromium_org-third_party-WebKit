@@ -19,21 +19,26 @@ AnimatedWebP status=experimental
 ApplicationCache status=stable
 AuthorShadowDOMForAnyElement
 Crypto status=test
+CSSAnimationUnprefixed status=experimental
 CSSCompositing status=experimental
 CSSExclusions status=experimental
 CSSGridLayout status=experimental
 CSSRegions status=experimental
+CSSShapes status=experimental, writeable=True
 CSSTouchAction status=test
 CSSVariables status=experimental
 CSS3Text status=experimental
 CSS3TextDecorations status=experimental
-CustomDOMElements status=experimental
+CustomElements status=experimental
 Database status=stable
 DataListElement status=stable
 DeviceMotion status=test
 DeviceOrientation status=stable
+DevicePixelRatioIncludesZoom status=experimental
 DialogElement status=experimental
 DirectoryUpload status=stable
+// FIXME: Remove this separate feature when CustomElements are always enabled
+EmbedderCustomElements
 EncodingAPI status=experimental
 EncryptedMedia status=experimental
 EncryptedMediaAnyVersion status=stable
@@ -53,13 +58,13 @@ InputModeAttribute status=test
 InputTypeColor status=stable
 InputTypeWeek status=stable
 LangAttributeAwareFormControlUI
-LazyLayout
 LegacyEncryptedMedia status=stable
 LocalStorage status=stable
 Media status=stable
 MediaSource status=experimental
 MediaStream status=stable
 Notifications status=stable
+ObjectFitPosition status=experimental
 PagePopup status=stable
 ParseSVGAsHTML
 PathOpsSVGClipping
@@ -79,6 +84,7 @@ SpeechInput status=stable
 SpeechSynthesis status=experimental
 Stream status=experimental
 StyleScoped status=experimental
+SVGPaintOrder status=experimental
 Touch status=stable
 UserSelectAll status=experimental
 Vibration status=experimental

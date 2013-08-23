@@ -32,18 +32,12 @@ namespace WebCore {
 
     class NavigatorBase {
     public:
-        String appName() const;
-        String appVersion() const;
         virtual String userAgent() const = 0;
-        String platform() const;
 
+        // FIXME: The following should be moved to NavigatorID and
+        // exposed on WorkerNavigator as well.
         String appCodeName() const;
         String product() const;
-        String productSub() const;
-        String vendor() const;
-        String vendorSub() const;
-
-        bool onLine() const;
 
     protected:
         virtual ~NavigatorBase();

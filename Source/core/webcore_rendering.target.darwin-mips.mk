@@ -30,6 +30,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/EllipsisBox.cpp \
 	third_party/WebKit/Source/core/rendering/FilterEffectRenderer.cpp \
 	third_party/WebKit/Source/core/rendering/FixedTableLayout.cpp \
+	third_party/WebKit/Source/core/rendering/FloatingObjects.cpp \
 	third_party/WebKit/Source/core/rendering/FlowThreadController.cpp \
 	third_party/WebKit/Source/core/rendering/TextAutosizer.cpp \
 	third_party/WebKit/Source/core/rendering/HitTestingTransformState.cpp \
@@ -76,8 +77,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderLayerBacking.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerCompositor.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerFilterInfo.cpp \
+	third_party/WebKit/Source/core/rendering/RenderLayerScrollableArea.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLayerModelObject.cpp \
-	third_party/WebKit/Source/core/rendering/RenderLazyBlock.cpp \
 	third_party/WebKit/Source/core/rendering/RenderLineBoxList.cpp \
 	third_party/WebKit/Source/core/rendering/RenderListBox.cpp \
 	third_party/WebKit/Source/core/rendering/RenderListItem.cpp \
@@ -136,8 +137,10 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderWordBreak.cpp \
 	third_party/WebKit/Source/core/rendering/RootInlineBox.cpp \
 	third_party/WebKit/Source/core/rendering/ScrollBehavior.cpp \
+	third_party/WebKit/Source/core/rendering/SubtreeLayoutScope.cpp \
 	third_party/WebKit/Source/core/rendering/break_lines.cpp \
 	third_party/WebKit/Source/core/rendering/shapes/PolygonShape.cpp \
+	third_party/WebKit/Source/core/rendering/shapes/RasterShape.cpp \
 	third_party/WebKit/Source/core/rendering/shapes/RectangleShape.cpp \
 	third_party/WebKit/Source/core/rendering/shapes/Shape.cpp \
 	third_party/WebKit/Source/core/rendering/shapes/ShapeInfo.cpp \
@@ -245,7 +248,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
@@ -403,7 +405,6 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \

@@ -55,9 +55,9 @@ HTMLElement* PasswordInputType::passwordGeneratorButtonElement() const
 
 bool PasswordInputType::isPasswordGenerationEnabled() const
 {
-    Document* document = element()->document();
-    ChromeClient* chromeClient = document->page() ? document->page()->chrome().client() : 0;
-    return chromeClient && chromeClient->isPasswordGenerationEnabled();
+    if (Page* page = element()->document()->page())
+        return page->chrome().client().isPasswordGenerationEnabled();
+    return false;
 }
 
 bool PasswordInputType::needsContainer() const
@@ -130,18 +130,16 @@ bool PasswordInputType::isPasswordField() const
     return true;
 }
 
-void PasswordInputType::handleFocusEvent(Element* oldFocusedElement, FocusDirection direction)
+void PasswordInputType::enableSecureTextInput()
 {
-    BaseTextInputType::handleFocusEvent(oldFocusedElement, direction);
     if (element()->document()->frame())
         element()->document()->setUseSecureKeyboardEntryWhenActive(true);
 }
 
-void PasswordInputType::handleBlurEvent()
+void PasswordInputType::disableSecureTextInput()
 {
     if (element()->document()->frame())
         element()->document()->setUseSecureKeyboardEntryWhenActive(false);
-    BaseTextInputType::handleBlurEvent();
 }
 
 } // namespace WebCore

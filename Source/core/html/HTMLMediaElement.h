@@ -362,6 +362,7 @@ private:
     virtual void mediaPlayerTimeChanged() OVERRIDE;
     virtual void mediaPlayerDurationChanged() OVERRIDE;
     virtual void mediaPlayerPlaybackStateChanged() OVERRIDE;
+    virtual void mediaPlayerRequestSeek(double) OVERRIDE;
     virtual void mediaPlayerRepaint() OVERRIDE;
     virtual void mediaPlayerSizeChanged() OVERRIDE;
     virtual void mediaPlayerEngineUpdated() OVERRIDE;
@@ -600,14 +601,14 @@ struct ValueToString<TextTrackCue*> {
 };
 #endif
 
-inline bool isMediaElement(Node* node)
+inline bool isHTMLMediaElement(Node* node)
 {
     return node && node->isElementNode() && toElement(node)->isMediaElement();
 }
 
-inline HTMLMediaElement* toMediaElement(Node* node)
+inline HTMLMediaElement* toHTMLMediaElement(Node* node)
 {
-    ASSERT_WITH_SECURITY_IMPLICATION(!node || isMediaElement(node));
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || isHTMLMediaElement(node));
     return static_cast<HTMLMediaElement*>(node);
 }
 

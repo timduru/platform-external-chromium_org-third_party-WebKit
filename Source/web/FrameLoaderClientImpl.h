@@ -92,7 +92,7 @@ public:
     virtual void dispatchDidFinishDocumentLoad();
     virtual void dispatchDidFinishLoad();
     virtual void dispatchDidLayout(WebCore::LayoutMilestones);
-    virtual WebCore::NavigationPolicy decidePolicyForNavigation(const WebCore::ResourceRequest&, WebCore::NavigationType, WebCore::NavigationPolicy, bool isRedirect);
+    virtual WebCore::NavigationPolicy decidePolicyForNavigation(const WebCore::ResourceRequest&, WebCore::DocumentLoader*, WebCore::NavigationPolicy);
     virtual void dispatchWillRequestResource(WebCore::FetchRequest*);
     virtual void dispatchWillSendSubmitEvent(PassRefPtr<WebCore::FormState>);
     virtual void dispatchWillSubmitForm(PassRefPtr<WebCore::FormState>);
@@ -100,8 +100,7 @@ public:
     virtual void postProgressEstimateChangedNotification();
     virtual void postProgressFinishedNotification();
     virtual void loadURLExternally(const WebCore::ResourceRequest&, WebCore::NavigationPolicy, const String& suggestedName = String());
-    virtual bool shouldGoToHistoryItem(WebCore::HistoryItem*) const;
-    virtual bool shouldStopLoadingForHistoryItem(WebCore::HistoryItem*) const;
+    virtual void navigateBackForward(int offset) const;
     virtual void didAccessInitialDocument();
     virtual void didDisownOpener();
     virtual void didDisplayInsecureContent();

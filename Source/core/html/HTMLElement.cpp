@@ -212,6 +212,7 @@ AtomicString HTMLElement::eventNameForAttributeName(const QualifiedName& attrNam
         attributeNameToEventNameMap.set(onmouseoverAttr.localName(), eventNames().mouseoverEvent);
         attributeNameToEventNameMap.set(onmouseupAttr.localName(), eventNames().mouseupEvent);
         attributeNameToEventNameMap.set(onmousewheelAttr.localName(), eventNames().mousewheelEvent);
+        attributeNameToEventNameMap.set(onwheelAttr.localName(), eventNames().wheelEvent);
         attributeNameToEventNameMap.set(onfocusAttr.localName(), eventNames().focusEvent);
         attributeNameToEventNameMap.set(onfocusinAttr.localName(), eventNames().focusinEvent);
         attributeNameToEventNameMap.set(onfocusoutAttr.localName(), eventNames().focusoutEvent);
@@ -499,7 +500,7 @@ Node* HTMLElement::insertAdjacent(const String& where, Node* newChild, Exception
 
     if (equalIgnoringCase(where, "beforeBegin")) {
         if (ContainerNode* parent = this->parentNode()) {
-            parent->insertBefore(newChild, this, es, AttachLazily);
+            parent->insertBefore(newChild, this, es);
             if (!es.hadException())
                 return newChild;
         }
@@ -507,18 +508,18 @@ Node* HTMLElement::insertAdjacent(const String& where, Node* newChild, Exception
     }
 
     if (equalIgnoringCase(where, "afterBegin")) {
-        insertBefore(newChild, firstChild(), es, AttachLazily);
+        insertBefore(newChild, firstChild(), es);
         return es.hadException() ? 0 : newChild;
     }
 
     if (equalIgnoringCase(where, "beforeEnd")) {
-        appendChild(newChild, es, AttachLazily);
+        appendChild(newChild, es);
         return es.hadException() ? 0 : newChild;
     }
 
     if (equalIgnoringCase(where, "afterEnd")) {
         if (ContainerNode* parent = this->parentNode()) {
-            parent->insertBefore(newChild, nextSibling(), es, AttachLazily);
+            parent->insertBefore(newChild, nextSibling(), es);
             if (!es.hadException())
                 return newChild;
         }
@@ -1079,6 +1080,11 @@ void HTMLElement::defaultEventHandler(Event* event)
 void HTMLElement::handleKeypressEvent(KeyboardEvent* event)
 {
     if (!document()->settings() || !document()->settings()->spatialNavigationEnabled() || !supportsFocus())
+        return;
+    // if the element is a text form control (like <input type=text> or <textarea>)
+    // or has contentEditable attribute on, we should enter a space or newline
+    // even in spatial navigation mode instead of handling it as a "click" action.
+    if (isTextFormControl() || isContentEditable())
         return;
     int charCode = event->charCode();
     if (charCode == '\r' || charCode == ' ') {

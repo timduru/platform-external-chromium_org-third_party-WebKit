@@ -31,6 +31,7 @@
 #include "config.h"
 #include "core/inspector/InspectorInstrumentation.h"
 
+#include "core/fetch/FetchInitiatorInfo.h"
 #include "core/inspector/InspectorAgent.h"
 #include "core/inspector/InspectorCSSAgent.h"
 #include "core/inspector/InspectorConsoleAgent.h"
@@ -41,7 +42,6 @@
 #include "core/inspector/InspectorTimelineAgent.h"
 #include "core/inspector/InstrumentingAgents.h"
 #include "core/inspector/WorkerInspectorController.h"
-#include "core/loader/cache/FetchInitiatorInfo.h"
 #include "core/workers/WorkerGlobalScope.h"
 
 namespace WebCore {
@@ -146,6 +146,20 @@ bool collectingHTMLParseErrorsImpl(InstrumentingAgents* instrumentingAgents)
     return false;
 }
 
+PassOwnPtr<ScriptSourceCode> preprocessImpl(InstrumentingAgents* instrumentingAgents, Frame* frame, const ScriptSourceCode& sourceCode)
+{
+    if (InspectorDebuggerAgent* debuggerAgent = instrumentingAgents->inspectorDebuggerAgent())
+        return debuggerAgent->preprocess(frame, sourceCode);
+    return PassOwnPtr<ScriptSourceCode>();
+}
+
+String preprocessEventListenerImpl(InstrumentingAgents* instrumentingAgents, Frame* frame, const String& source, const String& url, const String& functionName)
+{
+    if (InspectorDebuggerAgent* debuggerAgent = instrumentingAgents->inspectorDebuggerAgent())
+        return debuggerAgent->preprocessEventListener(frame, source, url, functionName);
+    return source;
+}
+
 bool canvasAgentEnabled(ScriptExecutionContext* scriptExecutionContext)
 {
     InstrumentingAgents* instrumentingAgents = instrumentingAgentsForScriptExecutionContext(scriptExecutionContext);
@@ -247,9 +261,7 @@ const char PageId[] = "pageId";
 InstrumentingAgents* instrumentationForPage(Page* page)
 {
     ASSERT(isMainThread());
-    if (InspectorController* controller = page->inspectorController())
-        return controller->m_instrumentingAgents.get();
-    return 0;
+    return page->inspectorController().m_instrumentingAgents.get();
 }
 
 InstrumentingAgents* instrumentationForWorkerGlobalScope(WorkerGlobalScope* workerGlobalScope)

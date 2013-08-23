@@ -56,13 +56,16 @@ static void setPropertySwitchesFromRuntimeFeatures()
     setCSSPropertiesEnabled(regionProperites, WTF_ARRAY_LENGTH(regionProperites), RuntimeEnabledFeatures::cssRegionsEnabled());
     CSSPropertyID exclusionProperties[] = {
         CSSPropertyWebkitWrapFlow,
+        CSSPropertyWebkitWrapThrough,
+    };
+    setCSSPropertiesEnabled(exclusionProperties, WTF_ARRAY_LENGTH(exclusionProperties), RuntimeEnabledFeatures::cssExclusionsEnabled());
+    CSSPropertyID shapeProperties[] = {
         CSSPropertyWebkitShapeMargin,
         CSSPropertyWebkitShapePadding,
-        CSSPropertyWebkitWrapThrough,
         CSSPropertyWebkitShapeInside,
         CSSPropertyWebkitShapeOutside,
     };
-    setCSSPropertiesEnabled(exclusionProperties, WTF_ARRAY_LENGTH(exclusionProperties), RuntimeEnabledFeatures::cssExclusionsEnabled());
+    setCSSPropertiesEnabled(shapeProperties, WTF_ARRAY_LENGTH(shapeProperties), RuntimeEnabledFeatures::cssShapesEnabled());
     CSSPropertyID css3TextDecorationProperties[] = {
         CSSPropertyTextDecorationColor,
         CSSPropertyTextDecorationLine,
@@ -92,7 +95,9 @@ static void setPropertySwitchesFromRuntimeFeatures()
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyBackgroundBlendMode, RuntimeEnabledFeatures::cssCompositingEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyMixBlendMode, RuntimeEnabledFeatures::cssCompositingEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyTouchAction, RuntimeEnabledFeatures::cssTouchActionEnabled());
+    RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyPaintOrder, RuntimeEnabledFeatures::svgPaintOrderEnabled());
     RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyVariable, RuntimeEnabledFeatures::cssVariablesEnabled());
+    RuntimeCSSEnabled::setCSSPropertyEnabled(CSSPropertyObjectFit, RuntimeEnabledFeatures::objectFitPositionEnabled());
 }
 
 static BoolVector& propertySwitches()
@@ -116,6 +121,11 @@ size_t indexForProperty(CSSPropertyID propertyId)
 
 bool RuntimeCSSEnabled::isCSSPropertyEnabled(CSSPropertyID propertyId)
 {
+    // Internal properties shouldn't be exposed to the web
+    // so they are considered to be always disabled.
+    if (isInternalProperty(propertyId))
+        return false;
+
     return propertySwitches()[indexForProperty(propertyId)];
 }
 

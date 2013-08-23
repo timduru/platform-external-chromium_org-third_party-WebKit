@@ -158,11 +158,19 @@ WebInspector.Setting = function(name, defaultValue, eventSupport, storage)
 }
 
 WebInspector.Setting.prototype = {
+    /**
+     * @param {function(WebInspector.Event)} listener
+     * @param {Object=} thisObject
+     */
     addChangeListener: function(listener, thisObject)
     {
         this._eventSupport.addEventListener(this._name, listener, thisObject);
     },
 
+    /**
+     * @param {function(WebInspector.Event)} listener
+     * @param {Object=} thisObject
+     */
     removeChangeListener: function(listener, thisObject)
     {
         this._eventSupport.removeEventListener(this._name, listener, thisObject);
@@ -261,6 +269,10 @@ WebInspector.ExperimentsSettings = function()
     this.frameworksDebuggingSupport = this._createExperiment("frameworksDebuggingSupport", "Enable frameworks debugging support");
     this.refreshFileSystemsOnFocus = this._createExperiment("refreshFileSystemsOnFocus", "Refresh file system folders on window focus");
     this.scrollBeyondEndOfFile = this._createExperiment("scrollBeyondEndOfFile", "Support scrolling beyond end of file");
+    this.layersPanel = this._createExperiment("layersPanel", "Show Layers panel");
+    this.screencast = this._createExperiment("screencast", "Enable screencast");
+    this.stepIntoSelection = this._createExperiment("stepIntoSelection", "Show step-in candidates while debugging.");
+    this.openConsoleWithCtrlTilde = this._createExperiment("openConsoleWithCtrlTilde", "Open console with Ctrl/Cmd+Tilde, not Esc");
 
     this._cleanUpSetting();
 }

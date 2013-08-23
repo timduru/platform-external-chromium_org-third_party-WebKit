@@ -71,6 +71,7 @@
 #include "core/dom/shadow/InsertionPoint.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/htmlediting.h"
+#include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLStyleElement.h"
 #include "core/html/RadioNodeList.h"
@@ -83,6 +84,7 @@
 #include "core/platform/Partitions.h"
 #include "core/rendering/FlowThreadController.h"
 #include "core/rendering/RenderBox.h"
+#include "core/svg/graphics/SVGImage.h"
 #include "wtf/HashSet.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCountedLeakCounter.h"
@@ -782,6 +784,11 @@ void Node::recalcDistribution()
     clearChildNeedsDistributionRecalc();
 }
 
+void Node::setIsLink(bool isLink)
+{
+    setFlag(isLink && !SVGImage::isInSVGImage(toElement(this)), IsLinkFlag);
+}
+
 void Node::markAncestorsWithChildNeedsDistributionRecalc()
 {
     for (Node* node = this; node && !node->childNeedsDistributionRecalc(); node = node->parentOrShadowHostNode())
@@ -833,25 +840,14 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType, StyleChangeSource sou
 
 void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
 {
-    // It's safe to synchronously attach here because we're in the middle of style recalc
-    // while it's not safe to mark nodes as needing style recalc except in the loop in
-    // Element::recalcStyle because we may mark an ancestor as not needing recalc and
-    // then the node would never get updated. One place this currently happens is
-    // HTMLObjectElement::renderFallbackContent which may call lazyAttach from inside
-    // attach which was triggered by a recalcStyle.
-    if (document()->inStyleRecalc()) {
-        attach();
-        return;
-    }
     markAncestorsWithChildNeedsStyleRecalc();
     for (Node* node = this; node; node = NodeTraversal::next(node, this)) {
         node->setStyleChange(LazyAttachStyleChange);
-        node->setChildNeedsStyleRecalc();
+        if (node->isContainerNode())
+            node->setChildNeedsStyleRecalc();
         // FIXME: This flag is only used by HTMLFrameElementBase and doesn't look needed.
         if (shouldSetAttached == SetAttached)
             node->setAttached();
-        if (isActiveInsertionPoint(node))
-            toInsertionPoint(node)->lazyAttachDistribution(shouldSetAttached);
         for (ShadowRoot* root = node->youngestShadowRoot(); root; root = root->olderShadowRoot())
             root->lazyAttach(shouldSetAttached);
     }
@@ -866,6 +862,14 @@ bool Node::shouldHaveFocusAppearance() const
 {
     ASSERT(focused());
     return true;
+}
+
+bool Node::isInert() const
+{
+    const Element* dialog = document()->activeModalDialog();
+    if (dialog && !containsIncludingShadowDOM(dialog) && !dialog->containsIncludingShadowDOM(this))
+        return true;
+    return document()->ownerElement() && document()->ownerElement()->isInert();
 }
 
 unsigned Node::nodeIndex() const
@@ -1030,6 +1034,33 @@ bool Node::containsIncludingHostElements(const Node* node) const
     return false;
 }
 
+inline void Node::detachNode(Node* root, const AttachContext& context)
+{
+    Node* node = root;
+    while (node) {
+        if (node->styleChangeType() == LazyAttachStyleChange) {
+            // FIXME: This is needed because Node::lazyAttach marks nodes as being attached even
+            // though they've never been through attach(). This allows us to avoid doing all the
+            // virtual calls to detach() and other associated work.
+            node->clearAttached();
+            node->clearChildNeedsStyleRecalc();
+
+            for (ShadowRoot* shadowRoot = node->youngestShadowRoot(); shadowRoot; shadowRoot = shadowRoot->olderShadowRoot())
+                detachNode(shadowRoot, context);
+
+            node = NodeTraversal::next(node, root);
+            continue;
+        }
+        // Handle normal reattaches from style recalc (ex. display type changes)
+        // or descendants of lazy attached nodes that got actually attached, for example,
+        // by innerHTML or editing.
+        // FIXME: innerHTML and editing should also lazyAttach.
+        if (node->attached())
+            node->detach(context);
+        node = NodeTraversal::nextSkippingChildren(node, root);
+    }
+}
+
 void Node::reattach(const AttachContext& context)
 {
     // FIXME: Text::updateTextRenderer calls reattach outside a style recalc.
@@ -1037,8 +1068,7 @@ void Node::reattach(const AttachContext& context)
     AttachContext reattachContext(context);
     reattachContext.performingReattach = true;
 
-    if (attached())
-        detach(reattachContext);
+    detachNode(this, reattachContext);
     attach(reattachContext);
 }
 
@@ -1110,7 +1140,7 @@ void Node::detach(const AttachContext& context)
         }
     }
 
-    clearFlag(IsAttachedFlag);
+    clearAttached();
 
 #ifndef NDEBUG
     detachingNode = 0;
@@ -1681,7 +1711,7 @@ void Node::setTextContent(const String& text, ExceptionState& es)
             ChildListMutationScope mutation(this);
             container->removeChildren();
             if (!text.isEmpty())
-                container->appendChild(document()->createTextNode(text), es, AttachLazily);
+                container->appendChild(document()->createTextNode(text), es);
             return;
         }
         case DOCUMENT_NODE:
@@ -1867,8 +1897,6 @@ FloatPoint Node::convertFromPage(const FloatPoint& p) const
     return p;
 }
 
-#ifndef NDEBUG
-
 String Node::debugName() const
 {
     StringBuilder name;
@@ -1892,6 +1920,8 @@ String Node::debugName() const
 
     return name.toString();
 }
+
+#ifndef NDEBUG
 
 static void appendAttributeDesc(const Node* node, StringBuilder& stringBuilder, const QualifiedName& name, const char* attrDesc)
 {
@@ -2125,7 +2155,13 @@ void Node::didMoveToNewDocument(Document* oldDocument)
         if (AXObjectCache* cache = oldDocument->existingAXObjectCache())
             cache->remove(this);
 
-    const EventListenerVector& wheelListeners = getEventListeners(eventNames().mousewheelEvent);
+    const EventListenerVector& mousewheelListeners = getEventListeners(eventNames().mousewheelEvent);
+    for (size_t i = 0; i < mousewheelListeners.size(); ++i) {
+        oldDocument->didRemoveWheelEventHandler();
+        document()->didAddWheelEventHandler();
+    }
+
+    const EventListenerVector& wheelListeners = getEventListeners(eventNames().wheelEvent);
     for (size_t i = 0; i < wheelListeners.size(); ++i) {
         oldDocument->didRemoveWheelEventHandler();
         document()->didAddWheelEventHandler();
@@ -2158,7 +2194,7 @@ static inline bool tryAddEventListener(Node* targetNode, const AtomicString& eve
 
     if (Document* document = targetNode->document()) {
         document->addListenerTypeIfNeeded(eventType);
-        if (eventType == eventNames().mousewheelEvent)
+        if (eventType == eventNames().wheelEvent || eventType == eventNames().mousewheelEvent)
             document->didAddWheelEventHandler();
         else if (eventNames().isTouchEventType(eventType))
             document->didAddTouchEventHandler(targetNode);
@@ -2180,7 +2216,7 @@ static inline bool tryRemoveEventListener(Node* targetNode, const AtomicString& 
     // FIXME: Notify Document that the listener has vanished. We need to keep track of a number of
     // listeners for each type, not just a bool - see https://bugs.webkit.org/show_bug.cgi?id=33861
     if (Document* document = targetNode->document()) {
-        if (eventType == eventNames().mousewheelEvent)
+        if (eventType == eventNames().wheelEvent || eventType == eventNames().mousewheelEvent)
             document->didRemoveWheelEventHandler();
         else if (eventNames().isTouchEventType(eventType))
             document->didRemoveTouchEventHandler(targetNode);
@@ -2464,9 +2500,8 @@ void Node::defaultEventHandler(Event* event)
         if (dispatchDOMActivateEvent(detail, event))
             event->setDefaultHandled();
     } else if (eventType == eventNames().contextmenuEvent) {
-        if (Frame* frame = document()->frame())
-            if (Page* page = frame->page())
-                page->contextMenuController()->handleContextMenuEvent(event);
+        if (Page* page = document()->page())
+            page->contextMenuController().handleContextMenuEvent(event);
     } else if (eventType == eventNames().textInputEvent) {
         if (event->hasInterface(eventNames().interfaceForTextEvent))
             if (Frame* frame = document()->frame())
@@ -2488,7 +2523,7 @@ void Node::defaultEventHandler(Event* event)
             }
         }
 #endif
-    } else if (eventType == eventNames().mousewheelEvent && event->hasInterface(eventNames().interfaceForWheelEvent)) {
+    } else if ((eventType == eventNames().wheelEvent || eventType == eventNames().mousewheelEvent) && event->hasInterface(eventNames().interfaceForWheelEvent)) {
         WheelEvent* wheelEvent = static_cast<WheelEvent*>(event);
 
         // If we don't have a renderer, send the wheel event to the first node we find with a renderer.
@@ -2623,15 +2658,14 @@ PassRefPtr<NodeList> Node::getDestinationInsertionPoints()
     document()->updateDistributionForNodeIfNeeded(this);
     Vector<InsertionPoint*, 8> insertionPoints;
     collectInsertionPointsWhereNodeIsDistributed(this, insertionPoints);
+    Vector<RefPtr<Node> > filteredInsertionPoints;
     for (size_t i = 0; i < insertionPoints.size(); ++i) {
         InsertionPoint* insertionPoint = insertionPoints[i];
         ASSERT(insertionPoint->containingShadowRoot());
-        if (insertionPoint->containingShadowRoot()->type() == ShadowRoot::UserAgentShadowRoot)
-            return StaticNodeList::createEmpty();
+        if (insertionPoint->containingShadowRoot()->type() != ShadowRoot::UserAgentShadowRoot)
+            filteredInsertionPoints.append(insertionPoint);
     }
-    Vector<RefPtr<Node> > asNodes;
-    asNodes.appendRange(insertionPoints.begin(), insertionPoints.end());
-    return StaticNodeList::adopt(asNodes);
+    return StaticNodeList::adopt(filteredInsertionPoints);
 }
 
 void Node::registerScopedHTMLStyleChild()
@@ -2707,22 +2741,22 @@ void Node::setCustomElementState(CustomElementState newState)
         ASSERT_NOT_REACHED(); // Everything starts in this state
         return;
 
-    case UpgradeCandidate:
+    case WaitingForParser:
         ASSERT(NotCustomElement == oldState);
         break;
 
-    case Defined:
-        ASSERT(UpgradeCandidate == oldState || NotCustomElement == oldState);
+    case WaitingForUpgrade:
+        ASSERT(NotCustomElement == oldState || WaitingForParser == oldState);
         break;
 
     case Upgraded:
-        ASSERT(Defined == oldState);
+        ASSERT(WaitingForParser == oldState || WaitingForUpgrade == oldState);
         break;
     }
 
     ASSERT(isHTMLElement() || isSVGElement());
-    setFlag(newState & 1, CustomElementIsUpgradeCandidateOrUpgraded);
-    setFlag(newState & 2, CustomElementHasDefinitionOrIsUpgraded);
+    setFlag(newState & 1, CustomElementWaitingForParserOrIsUpgraded);
+    setFlag(newState & 2, CustomElementWaitingForUpgradeOrIsUpgraded);
 
     if (oldState == NotCustomElement || newState == Upgraded)
         setNeedsStyleRecalc(); // :unresolved has changed

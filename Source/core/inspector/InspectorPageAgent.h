@@ -115,7 +115,9 @@ public:
     virtual void setTouchEmulationEnabled(ErrorString*, bool);
     virtual void setEmulatedMedia(ErrorString*, const String&);
     virtual void setForceCompositingMode(ErrorString*, bool force);
-    virtual void captureScreenshot(ErrorString*, String* data);
+    virtual void captureScreenshot(ErrorString*, const String* format, const int* quality, const double* scale, String* data);
+    virtual void startScreencast(ErrorString*, const String* format, const int* quality, const double* scale);
+    virtual void stopScreencast(ErrorString*);
     virtual void handleJavaScriptDialog(ErrorString*, bool accept, const String* promptText);
     virtual void setShowViewportSizeOnResize(ErrorString*, bool show, const bool* showGrid);
 
@@ -168,7 +170,7 @@ public:
     String loaderId(DocumentLoader*);
     Frame* findFrameWithSecurityOrigin(const String& originRawString);
     Frame* assertFrame(ErrorString*, const String& frameId);
-    String scriptPreprocessor() { return m_scriptPreprocessor; }
+    String scriptPreprocessorSource() { return m_scriptPreprocessorSource; }
     String resourceSourceMapURL(const String& url);
     static DocumentLoader* assertDocumentLoader(ErrorString*, Frame*);
 
@@ -192,7 +194,7 @@ private:
     String m_pendingScriptToEvaluateOnLoadOnce;
     String m_scriptToEvaluateOnLoadOnce;
     String m_pendingScriptPreprocessor;
-    String m_scriptPreprocessor;
+    String m_scriptPreprocessorSource;
     HashMap<Frame*, String> m_frameToIdentifier;
     HashMap<String, Frame*> m_identifierToFrame;
     HashMap<DocumentLoader*, String> m_loaderToIdentifier;

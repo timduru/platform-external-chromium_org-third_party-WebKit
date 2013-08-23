@@ -47,6 +47,8 @@
 #include "core/xml/XMLHttpRequest.h"
 #include "wtf/ArrayBuffer.h"
 
+#include <v8.h>
+
 namespace WebCore {
 
 void V8XMLHttpRequest::constructorCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -90,37 +92,58 @@ void V8XMLHttpRequest::responseAttrGetterCustom(v8::Local<v8::String> name, cons
         responseTextAttrGetterCustom(name, info);
         return;
 
+    case XMLHttpRequest::ResponseTypeJSON:
+        {
+            v8::Isolate* isolate = info.GetIsolate();
+
+            ExceptionState es(isolate);
+            ScriptString jsonSource = xmlHttpRequest->responseJSONSource(es);
+            if (es.throwIfNeeded())
+                return;
+
+            if (jsonSource.hasNoValue() || !jsonSource.v8Value()->IsString()) {
+                v8SetReturnValue(info, v8NullWithCheck(isolate));
+                return;
+            }
+
+            // Catch syntax error.
+            v8::TryCatch exceptionCatcher;
+
+            v8::Handle<v8::Value> json = v8::JSON::Parse(jsonSource.v8Value().As<v8::String>());
+
+            if (exceptionCatcher.HasCaught() || json.IsEmpty())
+                v8SetReturnValue(info, v8NullWithCheck(isolate));
+            else
+                v8SetReturnValue(info, json);
+
+            return;
+        }
+
     case XMLHttpRequest::ResponseTypeDocument:
         {
             ExceptionState es(info.GetIsolate());
             Document* document = xmlHttpRequest->responseXML(es);
             if (es.throwIfNeeded())
                 return;
-            v8SetReturnValue(info, toV8Fast(document, info, xmlHttpRequest));
+            v8SetReturnValueFast(info, document, xmlHttpRequest);
             return;
         }
 
     case XMLHttpRequest::ResponseTypeBlob:
         {
-            ExceptionState es(info.GetIsolate());
-            Blob* blob = xmlHttpRequest->responseBlob(es);
-            if (es.throwIfNeeded())
-                return;
-            v8SetReturnValue(info, toV8Fast(blob, info, xmlHttpRequest));
+            Blob* blob = xmlHttpRequest->responseBlob();
+            v8SetReturnValueFast(info, blob, xmlHttpRequest);
             return;
         }
 
     case XMLHttpRequest::ResponseTypeArrayBuffer:
         {
-            ExceptionState es(info.GetIsolate());
-            ArrayBuffer* arrayBuffer = xmlHttpRequest->responseArrayBuffer(es);
-            if (es.throwIfNeeded())
-                return;
+            ArrayBuffer* arrayBuffer = xmlHttpRequest->responseArrayBuffer();
             if (arrayBuffer && !arrayBuffer->hasDeallocationObserver()) {
                 arrayBuffer->setDeallocationObserver(V8ArrayBufferDeallocationObserver::instance());
                 v8::V8::AdjustAmountOfExternalAllocatedMemory(arrayBuffer->byteLength());
             }
-            v8SetReturnValue(info, toV8Fast(arrayBuffer, info, xmlHttpRequest));
+            v8SetReturnValueFast(info, arrayBuffer, xmlHttpRequest);
             return;
         }
     }

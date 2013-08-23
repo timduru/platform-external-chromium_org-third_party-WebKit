@@ -57,11 +57,11 @@ static void getNamedItems(HTMLOptionsCollection* collection, const AtomicString&
     }
 
     if (namedItems.size() == 1) {
-        v8SetReturnValue(callbackInfo, toV8Fast(namedItems.at(0).release(), callbackInfo, collection));
+        v8SetReturnValueFast(callbackInfo, namedItems.at(0).release(), collection);
         return;
     }
 
-    v8SetReturnValue(callbackInfo, toV8Fast(NamedNodesCollection::create(namedItems), callbackInfo, collection));
+    v8SetReturnValueFast(callbackInfo, NamedNodesCollection::create(namedItems), collection);
 }
 
 void V8HTMLOptionsCollection::namedItemMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)

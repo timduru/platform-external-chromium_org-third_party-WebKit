@@ -98,14 +98,14 @@ class AndroidCommandsTest(unittest.TestCase):
         return MockExecutive2(run_command_fn=self._mock_executive.run_command)
 
     def make_android_commands(self, device_count, serial):
-        return android.AndroidCommands(self.make_executive(device_count), serial)
+        return android.AndroidCommands(self.make_executive(device_count), serial, debug_logging=False)
 
     # The "adb" binary with the latest version should be used.
     def serial_test_adb_command_path(self):
         executive = self.make_executive(0)
 
         android.AndroidCommands.set_adb_command_path_options(['path1', 'path2', 'path3'])
-        self.assertEqual('path2', android.AndroidCommands.adb_command_path(executive))
+        self.assertEqual('path2', android.AndroidCommands.adb_command_path(executive, debug_logging=False))
 
     # The used adb command should include the device's serial number, and get_serial() should reflect this.
     def test_adb_command_and_get_serial(self):
@@ -170,13 +170,39 @@ class AndroidPortTest(chromium_port_testcase.ChromiumPortTestCase):
         self.assertEqual(self.make_port(options=optparse.Values({'configuration': 'Release'})).default_timeout_ms(), 10000)
         self.assertEqual(self.make_port(options=optparse.Values({'configuration': 'Debug'})).default_timeout_ms(), 10000)
 
+    def test_expectations_files(self):
+        port = self.make_port()
+        port.port_name = 'chromium'
+
+        android_path = port._filesystem.join(port.layout_tests_dir(), 'platform', 'android', 'TestExpectations')
+        generic_path = port.path_to_generic_test_expectations_file()
+        chromium_overrides_path = port.path_from_chromium_base(
+            'webkit', 'tools', 'layout_tests', 'test_expectations.txt')
+        never_fix_tests_path = port._filesystem.join(port.layout_tests_dir(), 'NeverFixTests')
+        slow_tests_path = port._filesystem.join(port.layout_tests_dir(), 'SlowTests')
+        skia_overrides_path = port.path_from_chromium_base(
+            'skia', 'skia_test_expectations.txt')
+
+        port._filesystem.write_text_file(skia_overrides_path, 'dummay text')
+
+        port._options.builder_name = 'DUMMY_BUILDER_NAME'
+        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path, slow_tests_path, chromium_overrides_path, android_path])
+
+        port._options.builder_name = 'builder (deps)'
+        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path, slow_tests_path, chromium_overrides_path, android_path])
+
+        # A builder which does NOT observe the Chromium test_expectations,
+        # but still observes the Skia test_expectations...
+        port._options.builder_name = 'builder'
+        self.assertEqual(port.expectations_files(), [generic_path, skia_overrides_path, never_fix_tests_path, slow_tests_path, android_path])
+
 
 class ChromiumAndroidDriverTest(unittest.TestCase):
     def setUp(self):
         self._mock_adb = MockAndroidDebugBridge(1)
         self._mock_executive = MockExecutive2(run_command_fn=self._mock_adb.run_command)
 
-        android_commands = android.AndroidCommands(self._mock_executive, '123456789ABCDEF0')
+        android_commands = android.AndroidCommands(self._mock_executive, '123456789ABCDEF0', debug_logging=False)
         self._port = android.AndroidPort(MockSystemHost(executive=self._mock_executive), 'android')
         self._driver = android.ChromiumAndroidDriver(self._port, worker_number=0,
             pixel_tests=True, driver_details=android.ContentShellDriverDetails(), android_devices=self._port._devices)

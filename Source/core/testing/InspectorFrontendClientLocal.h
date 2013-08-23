@@ -32,9 +32,9 @@
 #define InspectorFrontendClientLocal_h
 
 #include "core/inspector/InspectorFrontendClient.h"
-#include <wtf/Forward.h>
-#include <wtf/Noncopyable.h>
-#include <wtf/text/WTFString.h>
+#include "wtf/Forward.h"
+#include "wtf/Noncopyable.h"
+#include "wtf/text/WTFString.h"
 
 namespace WebCore {
 
@@ -47,7 +47,7 @@ class Page;
 class InspectorFrontendClientLocal : public InspectorFrontendClient {
     WTF_MAKE_NONCOPYABLE(InspectorFrontendClientLocal); WTF_MAKE_FAST_ALLOCATED;
 public:
-    InspectorFrontendClientLocal(InspectorController*, Page*);
+    InspectorFrontendClientLocal(InspectorController&, Page*);
     virtual ~InspectorFrontendClientLocal();
 
     virtual void windowObjectCleared();
@@ -80,7 +80,6 @@ public:
     virtual bool isUnderTest() { return true; }
 
 private:
-    InspectorController* m_inspectorController;
     Page* m_frontendPage;
     // TODO(yurys): this ref shouldn't be needed.
     RefPtr<InspectorFrontendHost> m_frontendHost;

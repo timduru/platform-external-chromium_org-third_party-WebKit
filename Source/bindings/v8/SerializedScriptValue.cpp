@@ -2366,9 +2366,10 @@ SerializedScriptValue::SerializedScriptValue()
 
 inline void neuterBinding(ArrayBuffer* object)
 {
-    Vector<DOMDataStore*>& allStores = V8PerIsolateData::current()->allStores();
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    Vector<DOMDataStore*>& allStores = V8PerIsolateData::from(isolate)->allStores();
     for (size_t i = 0; i < allStores.size(); i++) {
-        v8::Handle<v8::Object> wrapper = allStores[i]->get<V8ArrayBuffer>(object);
+        v8::Handle<v8::Object> wrapper = allStores[i]->get<V8ArrayBuffer>(object, isolate);
         if (!wrapper.IsEmpty()) {
             ASSERT(wrapper->IsArrayBuffer());
             v8::Handle<v8::ArrayBuffer>::Cast(wrapper)->Neuter();
@@ -2378,9 +2379,10 @@ inline void neuterBinding(ArrayBuffer* object)
 
 inline void neuterBinding(ArrayBufferView* object)
 {
-    Vector<DOMDataStore*>& allStores = V8PerIsolateData::current()->allStores();
+    v8::Isolate* isolate = v8::Isolate::GetCurrent();
+    Vector<DOMDataStore*>& allStores = V8PerIsolateData::from(isolate)->allStores();
     for (size_t i = 0; i < allStores.size(); i++) {
-        v8::Handle<v8::Object> wrapper = allStores[i]->get<V8ArrayBufferView>(object);
+        v8::Handle<v8::Object> wrapper = allStores[i]->get<V8ArrayBufferView>(object, isolate);
         if (!wrapper.IsEmpty())
             wrapper->SetIndexedPropertiesToExternalArrayData(0, v8::kExternalByteArray, 0);
     }

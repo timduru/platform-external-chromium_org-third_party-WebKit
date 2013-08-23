@@ -488,7 +488,7 @@ static inline bool isSimpleLengthPropertyID(CSSPropertyID propertyId, bool& acce
     case CSSPropertyWebkitShapeMargin:
     case CSSPropertyWebkitShapePadding:
         acceptsNegativeNumbers = false;
-        return RuntimeEnabledFeatures::cssExclusionsEnabled();
+        return RuntimeEnabledFeatures::cssShapesEnabled();
     case CSSPropertyBottom:
     case CSSPropertyLeft:
     case CSSPropertyMarginBottom:
@@ -606,8 +606,6 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
             return true;
         if (valueID == CSSValueGrid || valueID == CSSValueInlineGrid)
             return RuntimeEnabledFeatures::cssGridLayoutEnabled();
-        if (valueID == CSSValueLazyBlock)
-            return RuntimeEnabledFeatures::lazyLayoutEnabled();
         break;
 
     case CSSPropertyEmptyCells: // show | hide | inherit
@@ -635,6 +633,12 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         // for the list of supported list-style-types.
         if ((valueID >= CSSValueDisc && valueID <= CSSValueKatakanaIroha) || valueID == CSSValueNone)
             return true;
+        break;
+    case CSSPropertyObjectFit:
+        if (RuntimeEnabledFeatures::objectFitPositionEnabled()) {
+            if (valueID == CSSValueFill || valueID == CSSValueContain || valueID == CSSValueCover || valueID == CSSValueNone || valueID == CSSValueScaleDown)
+                return true;
+        }
         break;
     case CSSPropertyOutlineStyle: // (<border-style> except hidden) | auto | inherit
         if (valueID == CSSValueAuto || valueID == CSSValueNone || (valueID >= CSSValueInset && valueID <= CSSValueDouble))
@@ -825,7 +829,7 @@ static inline bool isValidKeywordPropertyAndValue(CSSPropertyID propertyId, int 
         if (valueID == CSSValueCollapse || valueID == CSSValueSeparate || valueID == CSSValueDiscard)
             return true;
         break;
-    case CSSPropertyWebkitMarqueeDirection:
+    case CSSPropertyInternalMarqueeDirection:
         if (valueID == CSSValueForwards || valueID == CSSValueBackwards || valueID == CSSValueAhead || valueID == CSSValueReverse || valueID == CSSValueLeft || valueID == CSSValueRight || valueID == CSSValueDown
             || valueID == CSSValueUp || valueID == CSSValueAuto)
             return true;
@@ -944,6 +948,7 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     case CSSPropertyImageRendering:
     case CSSPropertyListStylePosition:
     case CSSPropertyListStyleType:
+    case CSSPropertyObjectFit:
     case CSSPropertyOutlineStyle:
     case CSSPropertyOverflowWrap:
     case CSSPropertyOverflowX:
@@ -1000,7 +1005,7 @@ static inline bool isKeywordPropertyID(CSSPropertyID propertyId)
     case CSSPropertyWebkitMarginBeforeCollapse:
     case CSSPropertyWebkitMarginBottomCollapse:
     case CSSPropertyWebkitMarginTopCollapse:
-    case CSSPropertyWebkitMarqueeDirection:
+    case CSSPropertyInternalMarqueeDirection:
     case CSSPropertyWebkitMarqueeStyle:
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRegionBreakAfter:
@@ -1656,6 +1661,9 @@ void CSSParser::setCurrentProperty(CSSPropertyID propId)
 
 bool CSSParser::parseValue(CSSPropertyID propId, bool important)
 {
+    if (m_context.mode != UASheetMode && isInternalProperty(propId))
+        return false;
+
     if (m_useCounter)
         m_useCounter->count(propId);
 
@@ -2113,6 +2121,12 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     }
 
     case CSSPropertyTextDecoration:
+        // Fall through 'text-decoration-line' parsing if CSS 3 Text Decoration
+        // is disabled to match CSS 2.1 rules for parsing 'text-decoration'.
+        if (RuntimeEnabledFeatures::css3TextDecorationsEnabled()) {
+            // [ <text-decoration-line> || <text-decoration-style> || <text-decoration-color> ] | inherit
+            return parseShorthand(CSSPropertyTextDecoration, textDecorationShorthand(), important);
+        }
     case CSSPropertyWebkitTextDecorationsInEffect:
     case CSSPropertyTextDecorationLine:
         // none | [ underline || overline || line-through || blink ] | inherit
@@ -2315,8 +2329,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             }
         }
         break;
-    case CSSPropertyWebkitMarquee:
-        return parseShorthand(propId, webkitMarqueeShorthand(), important);
     case CSSPropertyWebkitMarqueeIncrement:
         if (id == CSSValueSmall || id == CSSValueLarge || id == CSSValueMedium)
             validPrimitive = true;
@@ -2402,6 +2414,16 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         }
         return false;
     }
+    case CSSPropertyAnimationDelay:
+    case CSSPropertyAnimationDirection:
+    case CSSPropertyAnimationDuration:
+    case CSSPropertyAnimationFillMode:
+    case CSSPropertyAnimationName:
+    case CSSPropertyAnimationPlayState:
+    case CSSPropertyAnimationIterationCount:
+    case CSSPropertyAnimationTimingFunction:
+        if (!RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled())
+            break;
     case CSSPropertyWebkitAnimationDelay:
     case CSSPropertyWebkitAnimationDirection:
     case CSSPropertyWebkitAnimationDuration:
@@ -2593,7 +2615,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyBorder:
         // [ 'border-width' || 'border-style' || <color> ] | inherit
     {
-        if (parseShorthand(propId, borderShorthandForParsing(), important)) {
+        if (parseShorthand(propId, parsingShorthandForProperty(CSSPropertyBorder), important)) {
             // The CSS3 Borders and Backgrounds specification says that border also resets border-image. It's as
             // though a value of none was specified for the image.
             addExpandedPropertyForValue(CSSPropertyBorderImage, cssValuePool().createImplicitInitialValue(), important);
@@ -2657,8 +2679,11 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         return parseShorthand(propId, webkitColumnRuleShorthand(), important);
     case CSSPropertyWebkitTextStroke:
         return parseShorthand(propId, webkitTextStrokeShorthand(), important);
+    case CSSPropertyAnimation:
+        if (!RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled())
+            break;
     case CSSPropertyWebkitAnimation:
-        return parseAnimationShorthand(important);
+        return parseAnimationShorthand(propId, important);
     case CSSPropertyTransition:
     case CSSPropertyWebkitTransition:
         return parseTransitionShorthand(propId, important);
@@ -2713,7 +2738,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         break;
     case CSSPropertyWebkitShapeInside:
     case CSSPropertyWebkitShapeOutside:
-        if (!RuntimeEnabledFeatures::cssExclusionsEnabled())
+        if (!RuntimeEnabledFeatures::cssShapesEnabled())
             return false;
         if (id == CSSValueAuto)
             validPrimitive = true;
@@ -2728,7 +2753,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
         break;
     case CSSPropertyWebkitShapeMargin:
     case CSSPropertyWebkitShapePadding:
-        validPrimitive = (RuntimeEnabledFeatures::cssExclusionsEnabled() && !id && validUnit(value, FLength | FNonNeg));
+        validPrimitive = (RuntimeEnabledFeatures::cssShapesEnabled() && !id && validUnit(value, FLength | FNonNeg));
         break;
     case CSSPropertyBorderBottomStyle:
     case CSSPropertyBorderCollapse:
@@ -2746,6 +2771,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyImageRendering:
     case CSSPropertyListStylePosition:
     case CSSPropertyListStyleType:
+    case CSSPropertyObjectFit:
     case CSSPropertyOutlineStyle:
     case CSSPropertyOverflowWrap:
     case CSSPropertyOverflowX:
@@ -2804,7 +2830,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyWebkitMarginBeforeCollapse:
     case CSSPropertyWebkitMarginBottomCollapse:
     case CSSPropertyWebkitMarginTopCollapse:
-    case CSSPropertyWebkitMarqueeDirection:
+    case CSSPropertyInternalMarqueeDirection:
     case CSSPropertyWebkitMarqueeStyle:
     case CSSPropertyWebkitPrintColorAdjust:
     case CSSPropertyWebkitRegionBreakAfter:
@@ -3073,18 +3099,18 @@ void CSSParser::addAnimationValue(RefPtr<CSSValue>& lval, PassRefPtr<CSSValue> r
         lval = rval;
 }
 
-bool CSSParser::parseAnimationShorthand(bool important)
+bool CSSParser::parseAnimationShorthand(CSSPropertyID propId, bool important)
 {
-    const StylePropertyShorthand& animationProperties = webkitAnimationShorthandForParsing();
-    const unsigned numProperties = 7;
+    const StylePropertyShorthand& animationProperties = parsingShorthandForProperty(propId);
+    const unsigned numProperties = 8;
 
     // The list of properties in the shorthand should be the same
     // length as the list with animation name in last position, even though they are
     // in a different order.
-    ASSERT(numProperties == webkitAnimationShorthandForParsing().length());
-    ASSERT(numProperties == webkitAnimationShorthand().length());
+    ASSERT(numProperties == animationProperties.length());
+    ASSERT(numProperties == shorthandForProperty(propId).length());
 
-    ShorthandScope scope(this, CSSPropertyWebkitAnimation);
+    ShorthandScope scope(this, propId);
 
     bool parsedProperty[numProperties] = { false };
     AnimationParseContext context;
@@ -3116,10 +3142,6 @@ bool CSSParser::parseAnimationShorthand(bool important)
                     break;
                 }
             }
-
-            // There are more values to process but 'none' or 'all' were already defined as the animation property, the declaration becomes invalid.
-            if (!context.animationPropertyKeywordAllowed() && context.hasCommittedFirstAnimation())
-                return false;
         }
 
         // if we didn't find at least one match, this is an
@@ -4450,6 +4472,7 @@ bool CSSParser::parseAnimationProperty(CSSPropertyID propId, RefPtr<CSSValue>& r
         }
         else {
             switch (propId) {
+                case CSSPropertyAnimationDelay:
                 case CSSPropertyWebkitAnimationDelay:
                 case CSSPropertyTransitionDelay:
                 case CSSPropertyWebkitTransitionDelay:
@@ -4457,11 +4480,13 @@ bool CSSParser::parseAnimationProperty(CSSPropertyID propId, RefPtr<CSSValue>& r
                     if (currValue)
                         m_valueList->next();
                     break;
+                case CSSPropertyAnimationDirection:
                 case CSSPropertyWebkitAnimationDirection:
                     currValue = parseAnimationDirection();
                     if (currValue)
                         m_valueList->next();
                     break;
+                case CSSPropertyAnimationDuration:
                 case CSSPropertyWebkitAnimationDuration:
                 case CSSPropertyTransitionDuration:
                 case CSSPropertyWebkitTransitionDuration:
@@ -4469,21 +4494,25 @@ bool CSSParser::parseAnimationProperty(CSSPropertyID propId, RefPtr<CSSValue>& r
                     if (currValue)
                         m_valueList->next();
                     break;
+                case CSSPropertyAnimationFillMode:
                 case CSSPropertyWebkitAnimationFillMode:
                     currValue = parseAnimationFillMode();
                     if (currValue)
                         m_valueList->next();
                     break;
+                case CSSPropertyAnimationIterationCount:
                 case CSSPropertyWebkitAnimationIterationCount:
                     currValue = parseAnimationIterationCount();
                     if (currValue)
                         m_valueList->next();
                     break;
+                case CSSPropertyAnimationName:
                 case CSSPropertyWebkitAnimationName:
                     currValue = parseAnimationName();
                     if (currValue)
                         m_valueList->next();
                     break;
+                case CSSPropertyAnimationPlayState:
                 case CSSPropertyWebkitAnimationPlayState:
                     currValue = parseAnimationPlayState();
                     if (currValue)
@@ -4497,6 +4526,7 @@ bool CSSParser::parseAnimationProperty(CSSPropertyID propId, RefPtr<CSSValue>& r
                     if (currValue)
                         m_valueList->next();
                     break;
+                case CSSPropertyAnimationTimingFunction:
                 case CSSPropertyWebkitAnimationTimingFunction:
                 case CSSPropertyTransitionTimingFunction:
                 case CSSPropertyWebkitTransitionTimingFunction:
@@ -9013,7 +9043,8 @@ bool CSSParser::parseTextDecoration(CSSPropertyID propId, bool important)
             value = m_valueList->next();
     }
 
-    if (list->length() && isValid) {
+    // Values are either valid or in shorthand scope.
+    if (list->length() && (isValid || inShorthand())) {
         addTextDecorationProperty(propId, list.release(), important);
         return true;
     }
@@ -10205,7 +10236,7 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
     --length;
 
     // charset, font-face, import, media, namespace, page, supports,
-    // -webkit-keyframes, and -webkit-mediaquery are not affected by hasEscape.
+    // -webkit-keyframes, keyframes, and -webkit-mediaquery are not affected by hasEscape.
     SWITCH(name, length) {
         CASE("bottom-left") {
             if (LIKELY(!hasEscape))
@@ -10240,6 +10271,10 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
         CASE("import") {
             m_parsingMode = MediaQueryMode;
             m_token = IMPORT_SYM;
+        }
+        CASE("keyframes") {
+            if (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled())
+                m_token = KEYFRAMES_SYM;
         }
         CASE("left-top") {
             if (LIKELY(!hasEscape))
@@ -11157,7 +11192,7 @@ void CSSParser::logError(const String& message, const CSSParserLocation& locatio
 {
     unsigned lineNumberInStyleSheet;
     unsigned columnNumber = 0;
-    PageConsole* console = m_styleSheet->singleOwnerDocument()->page()->console();
+    PageConsole& console = m_styleSheet->singleOwnerDocument()->page()->console();
     if (InspectorInstrumentation::hasFrontends()) {
         ensureLineEndings();
         TextPosition tokenPosition = TextPosition::fromOffsetAndLineEndings(location.offset, *m_lineEndings);
@@ -11166,10 +11201,10 @@ void CSSParser::logError(const String& message, const CSSParserLocation& locatio
     } else {
         lineNumberInStyleSheet = location.lineNumber;
     }
-    console->addMessage(CSSMessageSource, WarningMessageLevel, message, m_styleSheet->baseURL().string(), lineNumberInStyleSheet + m_startPosition.m_line.zeroBasedInt() + 1, columnNumber + 1);
+    console.addMessage(CSSMessageSource, WarningMessageLevel, message, m_styleSheet->baseURL().string(), lineNumberInStyleSheet + m_startPosition.m_line.zeroBasedInt() + 1, columnNumber + 1);
 }
 
-StyleRuleKeyframes* CSSParser::createKeyframesRule(const String& name, PassOwnPtr<Vector<RefPtr<StyleKeyframe> > > popKeyframes)
+StyleRuleKeyframes* CSSParser::createKeyframesRule(const String& name, PassOwnPtr<Vector<RefPtr<StyleKeyframe> > > popKeyframes, bool isPrefixed)
 {
     OwnPtr<Vector<RefPtr<StyleKeyframe> > > keyframes = popKeyframes;
     m_allowImportRules = m_allowNamespaceDeclarations = false;
@@ -11177,6 +11212,7 @@ StyleRuleKeyframes* CSSParser::createKeyframesRule(const String& name, PassOwnPt
     for (size_t i = 0; i < keyframes->size(); ++i)
         rule->parserAppendKeyframe(keyframes->at(i));
     rule->setName(name);
+    rule->setVendorPrefixed(isPrefixed);
     StyleRuleKeyframes* rulePtr = rule.get();
     m_parsedRules.append(rule.release());
     endRuleBody();
@@ -11484,7 +11520,7 @@ StyleKeyframe* CSSParser::createKeyframe(CSSParserValueList* keys)
     StringBuilder keyString;
     for (unsigned i = 0; i < keys->size(); ++i) {
         ASSERT(keys->valueAt(i)->unit == CSSPrimitiveValue::CSS_NUMBER);
-        float key = static_cast<float>(keys->valueAt(i)->fValue);
+        double key = keys->valueAt(i)->fValue;
         if (key < 0 || key > 100) {
             // As per http://www.w3.org/TR/css3-animations/#keyframes,
             // "If a keyframe selector specifies negative percentage values

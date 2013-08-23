@@ -50,6 +50,7 @@ public:
         void restoreTo(Settings*);
 
         bool m_originalCSSExclusionsEnabled;
+        bool m_originalCSSShapesEnabled;
         bool m_originalAuthorShadowDOMForAnyElementEnabled;
         bool m_originalExperimentalWebSocketEnabled;
         bool m_originalStyleScoped;
@@ -58,7 +59,6 @@ public:
         IntSize m_originalTextAutosizingWindowSizeOverride;
         float m_originalTextAutosizingFontScaleFactor;
         String m_originalMediaTypeOverride;
-        bool m_originalLazyLayoutEnabled;
         bool m_originalMockScrollbarsEnabled;
         bool m_originalUsesOverlayScrollbars;
         bool m_langAttributeAwareFormControlUIEnabled;
@@ -97,6 +97,7 @@ public:
     void setTextAutosizingWindowSizeOverride(int width, int height, ExceptionState&);
     void setTouchEventEmulationEnabled(bool, ExceptionState&);
     void setUsesOverlayScrollbars(bool, ExceptionState&);
+    void setViewportEnabled(bool, ExceptionState&);
 
     // FIXME: This is a temporary flag and should be removed once accelerated
     // overflow scroll is ready (crbug.com/254111).
@@ -109,7 +110,6 @@ public:
     void setCSSExclusionsEnabled(bool);
     void setExperimentalWebSocketEnabled(bool);
     void setLangAttributeAwareFormControlUIEnabled(bool);
-    void setLazyLayoutEnabled(bool);
     void setStyleScopedEnabled(bool);
 
 private:

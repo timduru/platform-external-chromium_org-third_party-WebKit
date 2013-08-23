@@ -34,13 +34,13 @@
 
 #include "core/dom/IconURL.h"
 #include "core/dom/SecurityContext.h"
+#include "core/fetch/CachePolicy.h"
+#include "core/fetch/ResourceLoadNotifier.h"
+#include "core/fetch/ResourceLoaderOptions.h"
 #include "core/loader/FrameLoaderStateMachine.h"
 #include "core/loader/FrameLoaderTypes.h"
 #include "core/loader/HistoryController.h"
 #include "core/loader/MixedContentChecker.h"
-#include "core/loader/ResourceLoadNotifier.h"
-#include "core/loader/ResourceLoaderOptions.h"
-#include "core/loader/cache/CachePolicy.h"
 #include "core/page/LayoutMilestones.h"
 #include "core/platform/Timer.h"
 #include "wtf/Forward.h"
@@ -107,13 +107,10 @@ public:
     // Warning: stopAllLoaders can and will detach the Frame out from under you. All callers need to either protect the Frame
     // or guarantee they won't in any way access the Frame after stopAllLoaders returns.
     void stopAllLoaders(ClearProvisionalItemPolicy = ShouldClearProvisionalItem);
-    void stopForUserCancel(bool deferCheckLoadComplete = false);
-    void stop();
-    void stopLoading(UnloadEventPolicy);
+    void stopLoading();
     bool closeURL();
-    void cancelAndClear();
-    // FIXME: clear() is trying to do too many things. We should break it down into smaller functions (ideally with fewer raw Boolean parameters).
-    void clear(bool clearWindowProperties = true, bool clearScriptObjects = true, bool clearFrameView = true);
+    // FIXME: clear() is trying to do too many things. We should break it down into smaller functions.
+    void clear(ClearOptions);
 
     void didAccessInitialDocument();
     void didAccessInitialDocumentTimerFired(Timer<FrameLoader>*);
@@ -121,7 +118,6 @@ public:
     bool isLoading() const;
 
     int numPendingOrLoadingRequests(bool recurse) const;
-    String referrer() const;
     String outgoingReferrer() const;
     String outgoingOrigin() const;
 
@@ -142,7 +138,6 @@ public:
     bool isLoadingMainFrame() const;
 
     bool subframeIsLoading() const;
-    void didChangeTitle(DocumentLoader*);
 
     bool shouldTreatURLAsSrcdocDocument(const KURL&) const;
 
@@ -200,10 +195,6 @@ public:
     void finishedParsing();
     void checkCompleted();
 
-    bool isComplete() const;
-
-    void setTitle(const StringWithDirection&);
-
     void commitProvisionalLoad();
 
     FrameLoaderStateMachine* stateMachine() const { return &m_stateMachine; }
@@ -214,7 +205,6 @@ public:
 
     bool shouldInterruptLoadForXFrameOptions(const String&, const KURL&, unsigned long requestIdentifier);
 
-    void completed();
     bool allAncestorsAreComplete() const; // including this
 
     bool suppressOpenerInNewFrame() const { return m_suppressOpenerInNewFrame; }
@@ -227,23 +217,15 @@ public:
     bool containsPlugins() const { return m_containsPlugins; }
     bool allowPlugins(ReasonForCallingAllowPlugins);
 
-    enum PageDismissalType {
-        NoDismissal = 0,
-        BeforeUnloadDismissal = 1,
-        PageHideDismissal = 2,
-        UnloadDismissal = 3
-    };
-    PageDismissalType pageDismissalEventBeingDispatched() const { return m_pageDismissalEventBeingDispatched; }
-
     void updateForSameDocumentNavigation(const KURL&, SameDocumentNavigationSource, PassRefPtr<SerializedScriptValue>, const String& title);
 
 private:
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
+    void completed();
+
     void checkTimerFired(Timer<FrameLoader>*);
 
-    void loadSameDocumentItem(HistoryItem*);
-    void loadDifferentDocumentItem(HistoryItem*);
     void insertDummyHistoryItem();
 
     bool prepareRequestForThisFrame(FrameLoadRequest&);
@@ -251,11 +233,6 @@ private:
     FrameLoadType determineFrameLoadType(const FrameLoadRequest&);
 
     SubstituteData defaultSubstituteDataForURL(const KURL&);
-
-    bool fireBeforeUnloadEvent(Chrome&, FrameLoader*);
-    bool hasAllowedNavigationViaBeforeUnloadConfirmationPanel() const { return m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel; }
-    void didAllowNavigationViaBeforeUnloadConfirmationPanel() { m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel = true; }
-    void clearAllowNavigationViaBeforeUnloadConfirmationPanel() { m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel = false; }
 
     void checkNavigationPolicyAndContinueFragmentScroll(const NavigationAction&, bool isNewNavigation);
     void checkNewWindowPolicyAndContinue(PassRefPtr<FormState>, const String& frameName, const NavigationAction&);
@@ -266,8 +243,6 @@ private:
     void checkLoadCompleteForThisFrame();
 
     void closeOldDataSources();
-
-    void dispatchDidCommitLoad();
 
     // Calls continueLoadAfterNavigationPolicy
     void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,
@@ -281,7 +256,6 @@ private:
     void loadInSameDocument(const KURL&, PassRefPtr<SerializedScriptValue> stateObject, bool isNewNavigation);
 
     void scheduleCheckCompleted();
-    void scheduleCheckLoadComplete();
     void startCheckCompleteTimer();
 
     bool shouldTreatURLAsSameAsCurrent(const KURL&) const;
@@ -316,17 +290,15 @@ private:
 
     String m_outgoingReferrer;
 
-    PageDismissalType m_pageDismissalEventBeingDispatched;
+    // FIXME: This is only used in checkCompleted(). Figure out a way to disentangle it.
     bool m_isComplete;
 
-    bool m_needsClear;
     bool m_containsPlugins;
 
     KURL m_submittedFormURL;
 
     Timer<FrameLoader> m_checkTimer;
     bool m_shouldCallCheckCompleted;
-    bool m_shouldCallCheckLoadComplete;
 
     Frame* m_opener;
     HashSet<Frame*> m_openedFrames;
@@ -337,8 +309,6 @@ private:
     bool m_startingClientRedirect;
 
     SandboxFlags m_forcedSandboxFlags;
-
-    bool m_hasAllowedNavigationViaBeforeUnloadConfirmationPanel;
 
     RefPtr<HistoryItem> m_requestedHistoryItem;
 };

@@ -23,10 +23,10 @@
 #ifndef RenderBlock_h
 #define RenderBlock_h
 
-#include "core/platform/PODIntervalTree.h"
 #include "core/platform/graphics/TextRun.h"
 #include "core/platform/text/TextBreakIterator.h"
 #include "core/rendering/ColumnInfo.h"
+#include "core/rendering/FloatingObjects.h"
 #include "core/rendering/GapRects.h"
 #include "core/rendering/RenderBox.h"
 #include "core/rendering/RenderLineBoxList.h"
@@ -78,11 +78,6 @@ typedef unsigned TextRunFlags;
 class RenderBlock : public RenderBox {
 public:
     friend class LineLayoutState;
-#ifndef NDEBUG
-    // Used by the PODIntervalTree for debugging the FloatingObject.
-    template <class> friend struct ValueToString;
-#endif
-
     explicit RenderBlock(ContainerNode*);
     virtual ~RenderBlock();
 
@@ -154,7 +149,9 @@ public:
     void markAllDescendantsWithFloatsForLayout(RenderBox* floatToRemove = 0, bool inLayout = true);
     void markSiblingsWithFloatsForLayout(RenderBox* floatToRemove = 0);
     void markPositionedObjectsForLayout();
-    virtual void markForPaginationRelayoutIfNeeded() OVERRIDE FINAL;
+    // FIXME: Do we really need this to be virtual? It's just so we can call this on
+    // RenderBoxes without needed to check whether they're RenderBlocks first.
+    virtual void markForPaginationRelayoutIfNeeded(SubtreeLayoutScope&) OVERRIDE FINAL;
 
     bool containsFloats() const { return m_floatingObjects && !m_floatingObjects->set().isEmpty(); }
     bool containsFloat(RenderBox*) const;
@@ -455,6 +452,7 @@ public:
     }
     ShapeInsideInfo* layoutShapeInsideInfo() const;
     bool allowsShapeInsideInfoSharing() const { return !isInline() && !isFloating(); }
+    virtual void imageChanged(WrappedImagePtr, const IntRect* = 0) OVERRIDE;
 
 protected:
     virtual void willBeDestroyed();
@@ -494,7 +492,7 @@ protected:
     virtual void layout();
 
     void layoutPositionedObjects(bool relayoutChildren, bool fixedPositionObjectsOnly = false);
-    void markFixedPositionObjectForLayoutIfNeeded(RenderObject* child);
+    void markFixedPositionObjectForLayoutIfNeeded(RenderObject* child, SubtreeLayoutScope&);
 
     virtual void paint(PaintInfo&, const LayoutPoint&);
     virtual void paintObject(PaintInfo&, const LayoutPoint&);
@@ -583,8 +581,6 @@ protected:
     virtual void checkForPaginationLogicalHeightChange(LayoutUnit& pageLogicalHeight, bool& pageLogicalHeightChanged, bool& hasSpecifiedPageLogicalHeight);
 
 private:
-    enum ShapeOutsideFloatOffsetMode { ShapeOutsideFloatShapeOffset, ShapeOutsideFloatMarginBoxOffset };
-
     LayoutUnit logicalRightFloatOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, LayoutUnit* heightRemaining, LayoutUnit logicalHeight, ShapeOutsideFloatOffsetMode) const;
     LayoutUnit logicalLeftFloatOffsetForLine(LayoutUnit logicalTop, LayoutUnit fixedOffset, LayoutUnit* heightRemaining, LayoutUnit logicalHeight, ShapeOutsideFloatOffsetMode) const;
     LayoutUnit adjustLogicalRightOffsetForLine(LayoutUnit offsetFromFloats, bool applyTextIndent) const;
@@ -624,7 +620,7 @@ private:
 
     virtual void repaintOverhangingFloats(bool paintAllDescendants) OVERRIDE FINAL;
 
-    void layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloatLogicalBottom);
+    void layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloatLogicalBottom, SubtreeLayoutScope&);
     void layoutInlineChildren(bool relayoutChildren, LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom);
     BidiRun* handleTrailingSpaces(BidiRunList<BidiRun>&, BidiContext*);
 
@@ -634,7 +630,7 @@ private:
     virtual RootInlineBox* createRootInlineBox(); // Subclassed by SVG and Ruby.
 
     // Called to lay out the legend for a fieldset or the ruby text of a ruby run.
-    virtual RenderObject* layoutSpecialExcludedChild(bool /*relayoutChildren*/) { return 0; }
+    virtual RenderObject* layoutSpecialExcludedChild(bool /*relayoutChildren*/, SubtreeLayoutScope&) { return 0; }
 
     void createFirstLetterRenderer(RenderObject* firstLetterBlock, RenderObject* currentChild);
     void updateFirstLetterStyle(RenderObject* firstLetterBlock, RenderObject* firstLetterContainer);
@@ -654,144 +650,7 @@ private:
         bool everHadLayout;
     };
 
-    struct FloatingObject {
-        WTF_MAKE_NONCOPYABLE(FloatingObject); WTF_MAKE_FAST_ALLOCATED;
-    public:
-        // Note that Type uses bits so you can use FloatLeftRight as a mask to query for both left and right.
-        enum Type { FloatLeft = 1, FloatRight = 2, FloatLeftRight = 3 };
-
-        FloatingObject(EFloat type)
-            : m_renderer(0)
-            , m_originatingLine(0)
-            , m_paginationStrut(0)
-            , m_shouldPaint(true)
-            , m_isDescendant(false)
-            , m_isPlaced(false)
-#ifndef NDEBUG
-            , m_isInPlacedTree(false)
-#endif
-        {
-            ASSERT(type != NoFloat);
-            if (type == LeftFloat)
-                m_type = FloatLeft;
-            else if (type == RightFloat)
-                m_type = FloatRight;
-        }
-
-        FloatingObject(Type type, const LayoutRect& frameRect)
-            : m_renderer(0)
-            , m_originatingLine(0)
-            , m_frameRect(frameRect)
-            , m_paginationStrut(0)
-            , m_type(type)
-            , m_shouldPaint(true)
-            , m_isDescendant(false)
-            , m_isPlaced(true)
-#ifndef NDEBUG
-            , m_isInPlacedTree(false)
-#endif
-        {
-        }
-
-        FloatingObject* clone() const
-        {
-            FloatingObject* cloneObject = new FloatingObject(type(), m_frameRect);
-            cloneObject->m_renderer = m_renderer;
-            cloneObject->m_originatingLine = m_originatingLine;
-            cloneObject->m_paginationStrut = m_paginationStrut;
-            cloneObject->m_shouldPaint = m_shouldPaint;
-            cloneObject->m_isDescendant = m_isDescendant;
-            cloneObject->m_isPlaced = m_isPlaced;
-            return cloneObject;
-        }
-
-        Type type() const { return static_cast<Type>(m_type); }
-        RenderBox* renderer() const { return m_renderer; }
-
-        bool isPlaced() const { return m_isPlaced; }
-        void setIsPlaced(bool placed = true) { m_isPlaced = placed; }
-
-        inline LayoutUnit x() const { ASSERT(isPlaced()); return m_frameRect.x(); }
-        inline LayoutUnit maxX() const { ASSERT(isPlaced()); return m_frameRect.maxX(); }
-        inline LayoutUnit y() const { ASSERT(isPlaced()); return m_frameRect.y(); }
-        inline LayoutUnit maxY() const { ASSERT(isPlaced()); return m_frameRect.maxY(); }
-        inline LayoutUnit width() const { return m_frameRect.width(); }
-        inline LayoutUnit height() const { return m_frameRect.height(); }
-
-        void setX(LayoutUnit x) { ASSERT(!isInPlacedTree()); m_frameRect.setX(x); }
-        void setY(LayoutUnit y) { ASSERT(!isInPlacedTree()); m_frameRect.setY(y); }
-        void setWidth(LayoutUnit width) { ASSERT(!isInPlacedTree()); m_frameRect.setWidth(width); }
-        void setHeight(LayoutUnit height) { ASSERT(!isInPlacedTree()); m_frameRect.setHeight(height); }
-
-        const LayoutRect& frameRect() const { ASSERT(isPlaced()); return m_frameRect; }
-        void setFrameRect(const LayoutRect& frameRect) { ASSERT(!isInPlacedTree()); m_frameRect = frameRect; }
-
-#ifndef NDEBUG
-        bool isInPlacedTree() const { return m_isInPlacedTree; }
-        void setIsInPlacedTree(bool value) { m_isInPlacedTree = value; }
-#endif
-
-        bool shouldPaint() const { return m_shouldPaint; }
-        void setShouldPaint(bool shouldPaint) { m_shouldPaint = shouldPaint; }
-        bool isDescendant() const { return m_isDescendant; }
-        void setIsDescendant(bool isDescendant) { m_isDescendant = isDescendant; }
-
-        RenderBox* m_renderer;
-        RootInlineBox* m_originatingLine;
-        LayoutRect m_frameRect;
-        int m_paginationStrut;
-
-    private:
-        unsigned m_type : 2; // Type (left or right aligned)
-        unsigned m_shouldPaint : 1;
-        unsigned m_isDescendant : 1;
-        unsigned m_isPlaced : 1;
-#ifndef NDEBUG
-        unsigned m_isInPlacedTree : 1;
-#endif
-    };
-
     LayoutPoint flipFloatForWritingModeForChild(const FloatingObject*, const LayoutPoint&) const;
-
-    LayoutUnit logicalTopForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->y() : child->x(); }
-    LayoutUnit logicalBottomForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->maxY() : child->maxX(); }
-    LayoutUnit logicalLeftForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->x() : child->y(); }
-    LayoutUnit logicalRightForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->maxX() : child->maxY(); }
-    LayoutUnit logicalWidthForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->width() : child->height(); }
-
-    int pixelSnappedLogicalTopForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->frameRect().pixelSnappedY() : child->frameRect().pixelSnappedX(); }
-    int pixelSnappedLogicalBottomForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->frameRect().pixelSnappedMaxY() : child->frameRect().pixelSnappedMaxX(); }
-    int pixelSnappedLogicalLeftForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->frameRect().pixelSnappedX() : child->frameRect().pixelSnappedY(); }
-    int pixelSnappedLogicalRightForFloat(const FloatingObject* child) const { return isHorizontalWritingMode() ? child->frameRect().pixelSnappedMaxX() : child->frameRect().pixelSnappedMaxY(); }
-
-    void setLogicalTopForFloat(FloatingObject* child, LayoutUnit logicalTop)
-    {
-        if (isHorizontalWritingMode())
-            child->setY(logicalTop);
-        else
-            child->setX(logicalTop);
-    }
-    void setLogicalLeftForFloat(FloatingObject* child, LayoutUnit logicalLeft)
-    {
-        if (isHorizontalWritingMode())
-            child->setX(logicalLeft);
-        else
-            child->setY(logicalLeft);
-    }
-    void setLogicalHeightForFloat(FloatingObject* child, LayoutUnit logicalHeight)
-    {
-        if (isHorizontalWritingMode())
-            child->setHeight(logicalHeight);
-        else
-            child->setWidth(logicalHeight);
-    }
-    void setLogicalWidthForFloat(FloatingObject* child, LayoutUnit logicalWidth)
-    {
-        if (isHorizontalWritingMode())
-            child->setWidth(logicalWidth);
-        else
-            child->setHeight(logicalWidth);
-    }
 
     LayoutUnit xPositionForFloatIncludingMargin(const FloatingObject* child) const
     {
@@ -1148,107 +1007,10 @@ public:
     RenderRegion* clampToStartAndEndRegions(RenderRegion*) const;
 
 protected:
-    struct FloatingObjectHashFunctions {
-        static unsigned hash(FloatingObject* key) { return DefaultHash<RenderBox*>::Hash::hash(key->m_renderer); }
-        static bool equal(FloatingObject* a, FloatingObject* b) { return a->m_renderer == b->m_renderer; }
-        static const bool safeToCompareToEmptyOrDeleted = true;
-    };
-    struct FloatingObjectHashTranslator {
-        static unsigned hash(RenderBox* key) { return DefaultHash<RenderBox*>::Hash::hash(key); }
-        static bool equal(FloatingObject* a, RenderBox* b) { return a->m_renderer == b; }
-    };
-    typedef ListHashSet<FloatingObject*, 4, FloatingObjectHashFunctions> FloatingObjectSet;
-    typedef FloatingObjectSet::const_iterator FloatingObjectSetIterator;
-    typedef PODInterval<int, FloatingObject*> FloatingObjectInterval;
-    typedef PODIntervalTree<int, FloatingObject*> FloatingObjectTree;
-    typedef PODFreeListArena<PODRedBlackTree<FloatingObjectInterval>::Node> IntervalArena;
-
-    template <FloatingObject::Type FloatTypeValue>
-    class FloatIntervalSearchAdapter {
-    public:
-        typedef FloatingObjectInterval IntervalType;
-
-        FloatIntervalSearchAdapter(const RenderBlock* renderer, int lowValue, int highValue, LayoutUnit& offset, LayoutUnit* heightRemaining)
-            : m_renderer(renderer)
-            , m_lowValue(lowValue)
-            , m_highValue(highValue)
-            , m_offset(offset)
-            , m_heightRemaining(heightRemaining)
-            , m_last(0)
-        {
-        }
-
-        inline int lowValue() const { return m_lowValue; }
-        inline int highValue() const { return m_highValue; }
-        void collectIfNeeded(const IntervalType&) const;
-
-        // When computing the offset caused by the floats on a given line, if
-        // the outermost float on that line has a shape-outside, the inline
-        // content that butts up against that float must be positioned using
-        // the contours of the shape, not the margin box of the float.
-        // We save the last float encountered so that the offset can be
-        // computed correctly by the code using this adapter.
-        const FloatingObject* lastFloat() const { return m_last; }
-
-    private:
-        bool updateOffsetIfNeeded(const FloatingObject*) const;
-
-        const RenderBlock* m_renderer;
-        int m_lowValue;
-        int m_highValue;
-        LayoutUnit& m_offset;
-        LayoutUnit* m_heightRemaining;
-        // This member variable is mutable because the collectIfNeeded method
-        // is declared as const, even though it doesn't actually respect that
-        // contract. It modifies other member variables via loopholes in the
-        // const behavior. Instead of using loopholes, I decided it was better
-        // to make the fact that this is modified in a const method explicit.
-        mutable const FloatingObject* m_last;
-    };
 
     void createFloatingObjects();
 
 public:
-
-    class FloatingObjects {
-        WTF_MAKE_NONCOPYABLE(FloatingObjects); WTF_MAKE_FAST_ALLOCATED;
-    public:
-        void clear();
-        void add(FloatingObject*);
-        void remove(FloatingObject*);
-        void addPlacedObject(FloatingObject*);
-        void removePlacedObject(FloatingObject*);
-        void setHorizontalWritingMode(bool b = true) { m_horizontalWritingMode = b; }
-
-        bool hasLeftObjects() const { return m_leftObjectsCount > 0; }
-        bool hasRightObjects() const { return m_rightObjectsCount > 0; }
-        const FloatingObjectSet& set() const { return m_set; }
-        const FloatingObjectTree& placedFloatsTree()
-        {
-            computePlacedFloatsTreeIfNeeded();
-            return m_placedFloatsTree;
-        }
-    private:
-        FloatingObjects(const RenderBlock*, bool horizontalWritingMode);
-        void computePlacedFloatsTree();
-        inline void computePlacedFloatsTreeIfNeeded()
-        {
-            if (!m_placedFloatsTree.isInitialized())
-                computePlacedFloatsTree();
-        }
-        void increaseObjectsCount(FloatingObject::Type);
-        void decreaseObjectsCount(FloatingObject::Type);
-        FloatingObjectInterval intervalForFloatingObject(FloatingObject*);
-
-        FloatingObjectSet m_set;
-        FloatingObjectTree m_placedFloatsTree;
-        unsigned m_leftObjectsCount;
-        unsigned m_rightObjectsCount;
-        bool m_horizontalWritingMode;
-        const RenderBlock* m_renderer;
-
-        friend void RenderBlock::createFloatingObjects();
-    };
 
     // Allocated only when some of these fields have non-default values
     struct RenderBlockRareData {
@@ -1335,16 +1097,6 @@ inline const RenderBlock* toRenderBlock(const RenderObject* object)
 
 // This will catch anyone doing an unnecessary cast.
 void toRenderBlock(const RenderBlock*);
-
-#ifndef NDEBUG
-// These structures are used by PODIntervalTree for debugging purposes.
-template <> struct ValueToString<int> {
-    static String string(const int value);
-};
-template<> struct ValueToString<RenderBlock::FloatingObject*> {
-    static String string(const RenderBlock::FloatingObject*);
-};
-#endif
 
 } // namespace WebCore
 

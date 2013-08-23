@@ -87,7 +87,7 @@ public:
 
     const Attribute* attributeItem(unsigned index) const;
     const Attribute* getAttributeItem(const QualifiedName&) const;
-    size_t getAttributeItemIndex(const QualifiedName&) const;
+    size_t getAttributeItemIndex(const QualifiedName&, bool shouldIgnoreCase = false) const;
     size_t getAttributeItemIndex(const AtomicString& name, bool shouldIgnoreAttributeCase) const;
     size_t getAttrIndex(Attr*) const;
 
@@ -216,6 +216,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(scroll);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(select);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(submit);
+    DEFINE_ATTRIBUTE_EVENT_LISTENER(wheel);
 
     // These four attribute event handler attributes are overridden by HTMLBodyElement
     // and HTMLFrameSetElement to forward to the DOMWindow.
@@ -446,7 +447,6 @@ public:
 
     ShadowRoot* userAgentShadowRoot() const;
     ShadowRoot* ensureUserAgentShadowRoot();
-    Element* uaShadowElementById(const AtomicString& id) const;
     virtual bool supportsShadowElementForUserAgentShadow() const;
     virtual const AtomicString& shadowPseudoId() const { return !part().isEmpty() ? part() : pseudo(); }
 
@@ -594,7 +594,6 @@ public:
     // to event listeners, and prevents DOMActivate events from being sent at all.
     virtual bool isDisabledFormControl() const { return false; }
 
-    bool isInert() const;
     virtual bool shouldBeReparentedUnderRenderView(const RenderStyle*) const { return isInTopLayer(); }
 
     virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
@@ -644,6 +643,8 @@ public:
 
     InputMethodContext* inputMethodContext();
 
+    virtual void setPrefix(const AtomicString&, ExceptionState&) OVERRIDE FINAL;
+
 protected:
     Element(const QualifiedName& tagName, Document* document, ConstructionType type)
         : ContainerNode(document, type)
@@ -663,7 +664,7 @@ protected:
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0) OVERRIDE;
-    virtual void removeAllEventListeners() OVERRIDE;
+    virtual void removeAllEventListeners() OVERRIDE FINAL;
 
     virtual void willRecalcStyle(StyleChange);
     virtual void didRecalcStyle(StyleChange);
@@ -728,7 +729,6 @@ private:
 
     void scrollByUnits(int units, ScrollGranularity);
 
-    virtual void setPrefix(const AtomicString&, ExceptionState&) OVERRIDE FINAL;
     virtual NodeType nodeType() const OVERRIDE FINAL;
     virtual bool childTypeAllowed(NodeType) const OVERRIDE FINAL;
 
@@ -1037,12 +1037,12 @@ inline const Attribute* ElementData::attributeBase() const
     return static_cast<const ShareableElementData*>(this)->m_attributeArray;
 }
 
-inline size_t ElementData::getAttributeItemIndex(const QualifiedName& name) const
+inline size_t ElementData::getAttributeItemIndex(const QualifiedName& name, bool shouldIgnoreCase) const
 {
     const Attribute* begin = attributeBase();
     for (unsigned i = 0; i < length(); ++i) {
         const Attribute& attribute = begin[i];
-        if (attribute.name().matches(name))
+        if (attribute.name().matchesPossiblyIgnoringCase(name, shouldIgnoreCase))
             return i;
     }
     return notFound;

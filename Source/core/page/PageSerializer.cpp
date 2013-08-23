@@ -42,13 +42,13 @@
 #include "core/dom/Element.h"
 #include "core/dom/Text.h"
 #include "core/editing/MarkupAccumulator.h"
+#include "core/fetch/ImageResource.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLLinkElement.h"
 #include "core/html/HTMLStyleElement.h"
 #include "core/html/parser/HTMLMetaCharsetParser.h"
-#include "core/loader/cache/ImageResource.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/SerializedResource.h"
@@ -150,7 +150,7 @@ void SerializerMarkupAccumulator::appendCustomAttributes(StringBuilder& out, Ele
     if (!element->isFrameOwnerElement())
         return;
 
-    HTMLFrameOwnerElement* frameOwner = toFrameOwnerElement(element);
+    HTMLFrameOwnerElement* frameOwner = toHTMLFrameOwnerElement(element);
     Frame* frame = frameOwner->contentFrame();
     if (!frame)
         return;

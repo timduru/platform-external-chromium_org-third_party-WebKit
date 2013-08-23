@@ -51,6 +51,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/MIMETypeFromURL.cpp \
 	third_party/WebKit/Source/core/platform/NotImplemented.cpp \
 	third_party/WebKit/Source/core/platform/Partitions.cpp \
+	third_party/WebKit/Source/core/platform/Pasteboard.cpp \
 	third_party/WebKit/Source/core/platform/PlatformEvent.cpp \
 	third_party/WebKit/Source/core/platform/PlatformInstrumentation.cpp \
 	third_party/WebKit/Source/core/platform/PlatformSpeechSynthesisUtterance.cpp \
@@ -63,6 +64,9 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/ScrollableArea.cpp \
 	third_party/WebKit/Source/core/platform/Scrollbar.cpp \
 	third_party/WebKit/Source/core/platform/ScrollbarTheme.cpp \
+	third_party/WebKit/Source/core/platform/ScrollbarThemeAndroid.cpp \
+	third_party/WebKit/Source/core/platform/ScrollbarThemeNonMacCommon.cpp \
+	third_party/WebKit/Source/core/platform/ScrollbarThemeOverlay.cpp \
 	third_party/WebKit/Source/core/platform/SecureTextInput.cpp \
 	third_party/WebKit/Source/core/platform/SharedBuffer.cpp \
 	third_party/WebKit/Source/core/platform/SharedBufferChunkReader.cpp \
@@ -128,16 +132,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/chromium/LocalizedStringsChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MemoryUsageSupportChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/MIMETypeRegistryChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/PasteboardChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/PlatformKeyboardEventChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/PlatformScreenChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/PlatformSpeechSynthesizerChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/Prerender.cpp \
 	third_party/WebKit/Source/core/platform/chromium/PrerenderHandle.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SSLKeyGeneratorChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/ScrollbarThemeChromium.cpp \
-	third_party/WebKit/Source/core/platform/chromium/ScrollbarThemeChromiumAndroid.cpp \
-	third_party/WebKit/Source/core/platform/chromium/ScrollbarThemeChromiumOverlay.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SharedTimerChromium.cpp \
 	third_party/WebKit/Source/core/platform/chromium/SoundChromiumPosix.cpp \
 	third_party/WebKit/Source/core/platform/chromium/StatsCounterChromium.cpp \
@@ -292,6 +292,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/platform/midi/MIDIAccessor.cpp \
 	third_party/WebKit/Source/core/platform/mock/DeviceOrientationClientMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/GeolocationClientMock.cpp \
+	third_party/WebKit/Source/core/platform/mock/MIDIClientMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/PlatformSpeechSynthesizerMock.cpp \
 	third_party/WebKit/Source/core/platform/mock/ScrollbarThemeMock.cpp \
 	third_party/WebKit/Source/core/platform/network/BlobData.cpp \
@@ -405,7 +406,6 @@ MY_DEFS_Debug := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
@@ -564,7 +564,6 @@ MY_DEFS_Release := \
 	'-DENABLE_MEDIA_CAPTURE=1' \
 	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
-	'-DENABLE_PRINTING=0' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \

@@ -27,17 +27,17 @@
 #include "HTMLNames.h"
 #include "bindings/v8/ScriptEventListener.h"
 #include "core/dom/Attribute.h"
+#include "core/dom/ElementTraversal.h"
 #include "core/dom/EventNames.h"
 #include "core/dom/NodeList.h"
-#include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
+#include "core/fetch/ImageResource.h"
 #include "core/html/FormDataList.h"
 #include "core/html/HTMLDocument.h"
 #include "core/html/HTMLImageLoader.h"
 #include "core/html/HTMLMetaElement.h"
 #include "core/html/HTMLParamElement.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/loader/cache/ImageResource.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/page/Settings.h"
@@ -232,7 +232,7 @@ bool HTMLObjectElement::shouldAllowQuickTimeClassIdQuirk()
     // fallback content, which ensures the quirk will disable itself if Wiki
     // Server is updated to generate an alternate embed tag as fallback content.
     if (!document()->page()
-        || !document()->page()->settings()->needsSiteSpecificQuirks()
+        || !document()->page()->settings().needsSiteSpecificQuirks()
         || hasFallbackContent()
         || !equalIgnoringCase(classId(), "clsid:02BF25D5-8C17-4B23-BC80-D3488ABDDC6B"))
         return false;
@@ -356,6 +356,17 @@ const AtomicString& HTMLObjectElement::imageSourceURL() const
     return getAttribute(dataAttr);
 }
 
+// FIXME: Remove this hack.
+void HTMLObjectElement::reattachFallbackContent()
+{
+    // This can happen inside of attach() in the middle of a recalcStyle so we need to
+    // reattach synchronously here.
+    if (document()->inStyleRecalc())
+        reattach();
+    else
+        lazyReattach();
+}
+
 void HTMLObjectElement::renderFallbackContent()
 {
     if (useFallbackContent())
@@ -370,7 +381,7 @@ void HTMLObjectElement::renderFallbackContent()
         if (!isImageType()) {
             // If we don't think we have an image type anymore, then clear the image from the loader.
             m_imageLoader->setImage(0);
-            lazyReattach();
+            reattachFallbackContent();
             return;
         }
     }
@@ -378,7 +389,7 @@ void HTMLObjectElement::renderFallbackContent()
     m_useFallbackContent = true;
 
     // FIXME: Style gets recalculated which is suboptimal.
-    lazyReattach();
+    reattachFallbackContent();
 }
 
 // FIXME: This should be removed, all callers are almost certainly wrong.
@@ -450,8 +461,7 @@ bool HTMLObjectElement::containsJavaApplet() const
                 && equalIgnoringCase(child->getNameAttribute(), "type")
                 && MIMETypeRegistry::isJavaAppletMIMEType(child->getAttribute(valueAttr).string()))
             return true;
-        if (child->hasTagName(objectTag)
-                && static_cast<HTMLObjectElement*>(child)->containsJavaApplet())
+        if (child->hasTagName(objectTag) && toHTMLObjectElement(child)->containsJavaApplet())
             return true;
         if (child->hasTagName(appletTag))
             return true;
