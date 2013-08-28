@@ -35,12 +35,43 @@
 #include "core/dom/UserTypingGestureIndicator.h"
 #include "core/editing/Editor.h"
 #include "core/editing/TypingCommand.h"
+#include "core/html/HTMLTextAreaElement.h"
 #include "core/page/EditorClient.h"
 #include "core/page/EventHandler.h"
 #include "core/page/Frame.h"
 #include "core/rendering/RenderObject.h"
 
 namespace WebCore {
+
+PlainTextOffsets::PlainTextOffsets()
+    : m_start(notFound)
+    , m_end(notFound)
+{
+}
+
+PlainTextOffsets::PlainTextOffsets(int start, int end)
+    : m_start(start)
+    , m_end(end)
+{
+    ASSERT(start != notFound);
+    ASSERT(end != notFound);
+    ASSERT(start <= end);
+}
+
+// ----------------------------
+
+InputMethodController::SelectionOffsetsScope::SelectionOffsetsScope(InputMethodController* inputMethodController)
+    : m_inputMethodController(inputMethodController)
+    , m_offsets(inputMethodController->getSelectionOffsets())
+{
+}
+
+InputMethodController::SelectionOffsetsScope::~SelectionOffsetsScope()
+{
+    m_inputMethodController->setSelectionOffsets(m_offsets);
+}
+
+// ----------------------------
 
 PassOwnPtr<InputMethodController> InputMethodController::create(Frame* frame)
 {
@@ -282,28 +313,36 @@ void InputMethodController::setComposition(const String& text, const Vector<Comp
 
 void InputMethodController::setCompositionFromExistingText(const Vector<CompositionUnderline>& underlines, unsigned compositionStart, unsigned compositionEnd)
 {
-    m_compositionNode = 0;
-    m_customCompositionUnderlines.clear();
-
+    Node* editable = m_frame->selection()->rootEditableElement();
     Position base = m_frame->selection()->base().downstream();
-    if (base.anchorType() != Position::PositionIsOffsetInAnchor)
-        return;
     Node* baseNode = base.anchorNode();
-    unsigned baseOffset = base.offsetInContainerNode();
-    if (!baseNode || baseNode != m_frame->selection()->extent().anchorNode() || !baseNode->isTextNode())
-        return;
+    if (editable->firstChild() == baseNode && editable->lastChild() == baseNode && baseNode->isTextNode()) {
+        m_compositionNode = 0;
+        m_customCompositionUnderlines.clear();
 
-    m_compositionNode = toText(baseNode);
-    m_compositionStart = compositionStart;
-    m_compositionEnd = compositionEnd;
-    m_customCompositionUnderlines = underlines;
-    size_t numUnderlines = m_customCompositionUnderlines.size();
-    for (size_t i = 0; i < numUnderlines; ++i) {
-        m_customCompositionUnderlines[i].startOffset += baseOffset;
-        m_customCompositionUnderlines[i].endOffset += baseOffset;
+        if (base.anchorType() != Position::PositionIsOffsetInAnchor)
+            return;
+        if (!baseNode || baseNode != m_frame->selection()->extent().anchorNode())
+            return;
+
+        m_compositionNode = toText(baseNode);
+        m_compositionStart = compositionStart;
+        m_compositionEnd = compositionEnd;
+        m_customCompositionUnderlines = underlines;
+        size_t numUnderlines = m_customCompositionUnderlines.size();
+        for (size_t i = 0; i < numUnderlines; ++i) {
+            m_customCompositionUnderlines[i].startOffset += compositionStart;
+            m_customCompositionUnderlines[i].endOffset += compositionStart;
+        }
+        if (baseNode->renderer())
+            baseNode->renderer()->repaint();
+        return;
     }
-    if (baseNode->renderer())
-        baseNode->renderer()->repaint();
+
+    Editor::RevealSelectionScope revealSelectionScope(&editor());
+    SelectionOffsetsScope selectionOffsetsScope(this);
+    setSelectionOffsets(PlainTextOffsets(compositionStart, compositionEnd));
+    setComposition(m_frame->selectedText(), underlines, 0, 0);
 }
 
 PassRefPtr<Range> InputMethodController::compositionRange() const
@@ -316,6 +355,27 @@ PassRefPtr<Range> InputMethodController::compositionRange() const
     if (start >= end)
         return 0;
     return Range::create(m_compositionNode->document(), m_compositionNode.get(), start, m_compositionNode.get(), end);
+}
+
+PlainTextOffsets InputMethodController::getSelectionOffsets() const
+{
+    RefPtr<Range> range = m_frame->selection()->selection().firstRange();
+    if (!range)
+        return PlainTextOffsets();
+    size_t location;
+    size_t length;
+    // FIXME: We should change TextIterator::getLocationAndLengthFromRange() returns PlainTextOffsets.
+    if (TextIterator::getLocationAndLengthFromRange(m_frame->selection()->rootEditableElementOrTreeScopeRootNode(), range.get(), location, length))
+        return PlainTextOffsets(location, location + length);
+    return PlainTextOffsets();
+}
+
+bool InputMethodController::setSelectionOffsets(const PlainTextOffsets& selectionOffsets)
+{
+    if (selectionOffsets.isNull())
+        return false;
+    // FIXME: We should move Editor::setSelectionOffsets() into InputMethodController class.
+    return editor().setSelectionOffsets(selectionOffsets.start(), selectionOffsets.end());
 }
 
 } // namespace WebCore
