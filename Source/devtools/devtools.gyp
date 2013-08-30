@@ -73,6 +73,7 @@
             'front_end/DefaultScriptMapping.js',
             'front_end/DockController.js',
             'front_end/Drawer.js',
+            'front_end/EditFileSystemDialog.js',
             'front_end/ElementsPanelDescriptor.js',
             'front_end/ElementsTreeOutline.js',
             'front_end/EmptyView.js',
@@ -158,13 +159,9 @@
             'front_end/SimpleWorkspaceProvider.js',
             'front_end/SnippetStorage.js',
             'front_end/SoftContextMenu.js',
-            'front_end/SourceCSSTokenizer.js',
             'front_end/SourceFrame.js',
-            'front_end/SourceHTMLTokenizer.js',
-            'front_end/SourceJavaScriptTokenizer.js',
             'front_end/SourceMap.js',
             'front_end/SourceMapping.js',
-            'front_end/SourceTokenizer.js',
             'front_end/Spectrum.js',
             'front_end/SplitView.js',
             'front_end/StatusBarButton.js',
@@ -173,9 +170,7 @@
             'front_end/TabbedPane.js',
             'front_end/TestController.js',
             'front_end/TextEditor.js',
-            'front_end/TextEditorHighlighter.js',
             'front_end/TextRange.js',
-            'front_end/TextEditorModel.js',
             'front_end/TextPrompt.js',
             'front_end/TextUtils.js',
             'front_end/TimelineGrid.js',
@@ -242,6 +237,7 @@
             'front_end/ElementsPanel.js',
             'front_end/EventListenersSidebarPane.js',
             'front_end/MetricsSidebarPane.js',
+            'front_end/PlatformFontsSidebarPane.js',
             'front_end/PropertiesSidebarPane.js',
             'front_end/StylesSidebarPane.js',
         ],
@@ -329,12 +325,16 @@
 
         'devtools_codemirror_js_files': [
             'front_end/CodeMirrorTextEditor.js',
+            'front_end/CodeMirrorUtils.js',
+        ],
+        'devtools_cm_files': [
             'front_end/cm/clike.js',
             'front_end/cm/closebrackets.js',
             'front_end/cm/codemirror.js',
             'front_end/cm/coffeescript.js',
             'front_end/cm/comment.js',
             'front_end/cm/css.js',
+            'front_end/cm/headlesscodemirror.js',
             'front_end/cm/htmlembedded.js',
             'front_end/cm/htmlmixed.js',
             'front_end/cm/javascript.js',
@@ -346,7 +346,6 @@
             'front_end/cm/shell.js',
             'front_end/cm/xml.js',
         ],
-
         'devtools_modules_js_files': [
             '<@(devtools_elements_js_files)',
             '<@(devtools_resources_js_files)',
@@ -358,7 +357,7 @@
             '<@(devtools_layers_js_files)',
             '<@(devtools_codemirror_js_files)',
         ],
-        'devtools_uglifyjs_files': [
+        'devtools_uglify_files': [
             'front_end/UglifyJS/parse-js.js',
         ],
         'devtools_image_files': [
@@ -469,6 +468,7 @@
             'front_end/LayerTreeModel.js',
             'front_end/LayerTree.js',
             'front_end/Layers3DView.js',
+            'front_end/LayerDetailsView.js',
         ],
 
         'devtools_extension_api_files': [
@@ -517,7 +517,18 @@
                 {
                     'destination': '<(PRODUCT_DIR)/resources/inspector/UglifyJS',
                     'files': [
-                        '<@(devtools_uglifyjs_files)',
+                        '<@(devtools_uglify_files)',
+                    ],
+                    'conditions': [
+                        ['debug_devtools==0', {
+                            'files/': [['exclude', '\\.(js|css|html)$']],
+                        }],
+                    ],
+                },
+                {
+                    'destination': '<(PRODUCT_DIR)/resources/inspector/cm',
+                    'files': [
+                        '<@(devtools_cm_files)',
                     ],
                     'conditions': [
                         ['debug_devtools==0', {
@@ -829,6 +840,7 @@
                         'inputs': [
                             '<@(_script_name)',
                             '<@(devtools_codemirror_js_files)',
+                            '<@(devtools_cm_files)',
                         ],
                         'search_path': 'front_end',
                         'outputs': ['<(PRODUCT_DIR)/resources/inspector/CodeMirrorTextEditor.js'],
@@ -866,7 +878,7 @@
                         'inputs': [
                             '<@(_script_name)',
                             '<@(_input_file)',
-                            '<@(devtools_uglifyjs_files)'
+                            '<@(devtools_uglify_files)'
                         ],
                         'search_path': 'front_end',
                         'outputs': ['<(PRODUCT_DIR)/resources/inspector/ScriptFormatterWorker.js'],

@@ -38,6 +38,7 @@
 #include "core/css/CSSCrossfadeValue.h"
 #include "core/css/CSSCursorImageValue.h"
 #include "core/css/CSSFontFaceSrcValue.h"
+#include "core/css/CSSFunctionValue.h"
 #include "core/css/CSSGradientValue.h"
 #include "core/css/CSSGridTemplateValue.h"
 #include "core/css/CSSImageSetValue.h"
@@ -207,6 +208,7 @@ CSSParserContext::CSSParserContext(CSSParserMode mode, const KURL& baseURL)
     , isCSSCustomFilterEnabled(false)
     , isCSSStickyPositionEnabled(false)
     , needsSiteSpecificQuirks(false)
+    , useLegacyBackgroundSizeShorthandBehavior(false)
 {
 }
 
@@ -218,6 +220,7 @@ CSSParserContext::CSSParserContext(Document* document, const KURL& baseURL, cons
     , isCSSCustomFilterEnabled(document->settings() ? document->settings()->isCSSCustomFilterEnabled() : false)
     , isCSSStickyPositionEnabled(document->cssStickyPositionEnabled())
     , needsSiteSpecificQuirks(document->settings() ? document->settings()->needsSiteSpecificQuirks() : false)
+    , useLegacyBackgroundSizeShorthandBehavior(document->settings() ? document->settings()->useLegacyBackgroundSizeShorthandBehavior() : false)
 {
 }
 
@@ -229,7 +232,8 @@ bool operator==(const CSSParserContext& a, const CSSParserContext& b)
         && a.isHTMLDocument == b.isHTMLDocument
         && a.isCSSCustomFilterEnabled == b.isCSSCustomFilterEnabled
         && a.isCSSStickyPositionEnabled == b.isCSSStickyPositionEnabled
-        && a.needsSiteSpecificQuirks == b.needsSiteSpecificQuirks;
+        && a.needsSiteSpecificQuirks == b.needsSiteSpecificQuirks
+        && a.useLegacyBackgroundSizeShorthandBehavior == b.useLegacyBackgroundSizeShorthandBehavior;
 }
 
 CSSParser::CSSParser(const CSSParserContext& context, UseCounter* counter)
@@ -1264,7 +1268,7 @@ bool CSSParser::parseSystemColor(RGBA32& color, const String& string, Document* 
     if (id <= 0)
         return false;
 
-    color = document->page()->theme()->systemColor(id).rgb();
+    color = RenderTheme::theme().systemColor(id).rgb();
     return true;
 }
 
@@ -2909,6 +2913,11 @@ static bool parseBackgroundClip(CSSParserValue* parserValue, RefPtr<CSSValue>& c
     return false;
 }
 
+bool CSSParser::useLegacyBackgroundSizeShorthandBehavior() const
+{
+    return m_context.useLegacyBackgroundSizeShorthandBehavior;
+}
+
 const int cMaxFillProperties = 9;
 
 bool CSSParser::parseFillShorthand(CSSPropertyID propId, const CSSPropertyID* properties, int numProperties, bool important)
@@ -3043,6 +3052,8 @@ bool CSSParser::parseFillShorthand(CSSPropertyID propId, const CSSPropertyID* pr
             addProperty(CSSPropertyWebkitMaskRepeatY, repeatYValue.release(), important);
         } else if ((properties[i] == CSSPropertyBackgroundClip || properties[i] == CSSPropertyWebkitMaskClip) && !foundClip)
             // Value is already set while updating origin
+            continue;
+        else if (properties[i] == CSSPropertyBackgroundSize && !parsedProperty[i] && useLegacyBackgroundSizeShorthandBehavior())
             continue;
         else
             addProperty(properties[i], values[i].release(), important);
@@ -4775,10 +4786,10 @@ bool CSSParser::parseGridTrackList(CSSPropertyID propId, bool important)
                 return false;
             seenTrackSizeOrRepeatFunction = true;
         } else {
-            RefPtr<CSSPrimitiveValue> primitiveValue = parseGridTrackSize(*m_valueList);
-            if (!primitiveValue)
+            RefPtr<CSSValue> value = parseGridTrackSize(*m_valueList);
+            if (!value)
                 return false;
-            values->append(primitiveValue);
+            values->append(value);
             seenTrackSizeOrRepeatFunction = true;
         }
 
@@ -4818,7 +4829,7 @@ bool CSSParser::parseGridTrackRepeatFunction(CSSValueList& list)
     }
 
     while (CSSParserValue* argumentValue = arguments->current()) {
-        RefPtr<CSSPrimitiveValue> trackSize = parseGridTrackSize(*arguments);
+        RefPtr<CSSValue> trackSize = parseGridTrackSize(*arguments);
         if (!trackSize)
             return false;
 
@@ -4842,7 +4853,7 @@ bool CSSParser::parseGridTrackRepeatFunction(CSSValueList& list)
     return true;
 }
 
-PassRefPtr<CSSPrimitiveValue> CSSParser::parseGridTrackSize(CSSParserValueList& inputList)
+PassRefPtr<CSSValue> CSSParser::parseGridTrackSize(CSSParserValueList& inputList)
 {
     ASSERT(RuntimeEnabledFeatures::cssGridLayoutEnabled());
 
@@ -4866,7 +4877,10 @@ PassRefPtr<CSSPrimitiveValue> CSSParser::parseGridTrackSize(CSSParserValueList& 
         if (!maxTrackBreadth)
             return 0;
 
-        return createPrimitiveValuePair(minTrackBreadth, maxTrackBreadth);
+        RefPtr<CSSValueList> parsedArguments = CSSValueList::createCommaSeparated();
+        parsedArguments->append(minTrackBreadth);
+        parsedArguments->append(maxTrackBreadth);
+        return CSSFunctionValue::create("minmax(", parsedArguments);
     }
 
     return parseGridBreadth(currentValue);
@@ -9144,11 +9158,13 @@ PassRefPtr<CSSValue> CSSParser::parseTextIndent()
         }
     }
 
-#if ENABLE(CSS3_TEXT)
-    // The case where text-indent has only <length>(or <percentage>) value
-    // is handled above if statement even though CSS3_TEXT is enabled.
+    if (!RuntimeEnabledFeatures::css3TextEnabled())
+        return 0;
 
-    // [ [ <length> | <percentage> ] && -webkit-each-line ] | inherit
+    // The case where text-indent has only <length>(or <percentage>) value
+    // is handled above if statement even though css3TextEnabled() returns true.
+
+    // [ [ <length> | <percentage> ] && each-line ] | inherit
     if (m_valueList->size() != 2)
         return 0;
 
@@ -9156,20 +9172,19 @@ PassRefPtr<CSSValue> CSSParser::parseTextIndent()
     CSSParserValue* secondValue = m_valueList->next();
     CSSParserValue* lengthOrPercentageValue = 0;
 
-    // [ <length> | <percentage> ] -webkit-each-line
-    if (validUnit(firstValue, FLength | FPercent) && secondValue->id == CSSValueWebkitEachLine)
+    // [ <length> | <percentage> ] each-line
+    if (validUnit(firstValue, FLength | FPercent) && secondValue->id == CSSValueEachLine)
         lengthOrPercentageValue = firstValue;
-    // -webkit-each-line [ <length> | <percentage> ]
-    else if (firstValue->id == CSSValueWebkitEachLine && validUnit(secondValue, FLength | FPercent))
+    // each-line [ <length> | <percentage> ]
+    else if (firstValue->id == CSSValueEachLine && validUnit(secondValue, FLength | FPercent))
         lengthOrPercentageValue = secondValue;
 
     if (lengthOrPercentageValue) {
         list->append(createPrimitiveNumericValue(lengthOrPercentageValue));
-        list->append(cssValuePool().createIdentifierValue(CSSValueWebkitEachLine));
+        list->append(cssValuePool().createIdentifierValue(CSSValueEachLine));
         m_valueList->next();
         return list.release();
     }
-#endif
 
     return 0;
 }

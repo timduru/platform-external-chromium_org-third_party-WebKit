@@ -14,9 +14,9 @@
 #include "WebHelperPluginImpl.h"
 #include "WebInbandTextTrack.h"
 #include "WebMediaPlayer.h"
-#include "WebMediaSourceImpl.h"
 #include "WebViewImpl.h"
 #include "core/html/HTMLMediaElement.h"
+#include "core/html/HTMLMediaSource.h"
 #include "core/html/TimeRanges.h"
 #include "core/page/Frame.h"
 #include "core/platform/NotImplemented.h"
@@ -157,8 +157,7 @@ WebPlugin* WebMediaPlayerClientImpl::createHelperPlugin(const WebString& pluginT
 {
     ASSERT(!m_helperPlugin);
 
-    WebViewImpl* webView = static_cast<WebViewImpl*>(frame->view());
-    m_helperPlugin = webView->createHelperPlugin(pluginType, frame->document());
+    m_helperPlugin = toWebViewImpl(frame->view())->createHelperPlugin(pluginType, frame->document());
     if (!m_helperPlugin)
         return 0;
 
@@ -185,8 +184,7 @@ void WebMediaPlayerClientImpl::closeHelperPlugin()
 void WebMediaPlayerClientImpl::closeHelperPluginSoon(WebFrame* frame)
 {
     ASSERT(m_helperPlugin);
-    WebViewImpl* webView = static_cast<WebViewImpl*>(frame->view());
-    webView->closeHelperPluginSoon(m_helperPlugin.release());
+    toWebViewImpl(frame->view())->closeHelperPluginSoon(m_helperPlugin.release());
 }
 
 void WebMediaPlayerClientImpl::setWebLayer(WebLayer* layer)
@@ -220,7 +218,7 @@ void WebMediaPlayerClientImpl::removeTextTrack(WebInbandTextTrack* textTrack)
     m_client->mediaPlayerDidRemoveTrack(static_cast<InbandTextTrackPrivateImpl*>(textTrack->client()));
 }
 
-void WebMediaPlayerClientImpl::mediaSourceOpened(WebMediaSourceNew* webMediaSource)
+void WebMediaPlayerClientImpl::mediaSourceOpened(WebMediaSource* webMediaSource)
 {
     ASSERT(webMediaSource);
     m_mediaSource->setPrivateAndOpen(adoptPtr(new MediaSourcePrivateImpl(adoptPtr(webMediaSource))));
@@ -283,12 +281,15 @@ void WebMediaPlayerClientImpl::loadInternal()
         m_audioSourceProvider.wrap(m_webMediaPlayer->audioSourceProvider());
 #endif
 
+        WebMediaPlayer::LoadType loadType = WebMediaPlayer::LoadTypeURL;
+
+        if (m_mediaSource)
+            loadType = WebMediaPlayer::LoadTypeMediaSource;
+        else if (m_isMediaStream)
+            loadType = WebMediaPlayer::LoadTypeMediaStream;
+
         WebMediaPlayer::CORSMode corsMode = static_cast<WebMediaPlayer::CORSMode>(m_client->mediaPlayerCORSMode());
-        if (m_mediaSource) {
-            m_webMediaPlayer->load(m_url, new WebMediaSourceImpl(m_mediaSource), corsMode);
-            return;
-        }
-        m_webMediaPlayer->load(m_url, corsMode);
+        m_webMediaPlayer->load(loadType, m_url, corsMode);
     }
 }
 

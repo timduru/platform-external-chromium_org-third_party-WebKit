@@ -65,7 +65,7 @@ RenderView::RenderView(Document* document)
     m_minPreferredLogicalWidth = 0;
     m_maxPreferredLogicalWidth = 0;
 
-    setPreferredLogicalWidthsDirty(true, MarkOnlyThis);
+    setPreferredLogicalWidthsDirty(MarkOnlyThis);
 
     setPositionState(AbsolutePosition); // to 0,0 :)
 }
@@ -242,7 +242,6 @@ void RenderView::layoutContentInAutoLogicalHeightRegions(const LayoutState& stat
 
 void RenderView::layout()
 {
-    StackStats::LayoutCheckPoint layoutCheckPoint;
     if (!document()->paginated())
         setPageLogicalHeight(0);
 
@@ -501,8 +500,9 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
             paintInfo.context->setCompositeOperation(CompositeCopy);
             paintInfo.context->fillRect(paintInfo.rect, baseColor);
             paintInfo.context->setCompositeOperation(previousOperator);
-        } else
+        } else {
             paintInfo.context->clearRect(paintInfo.rect);
+        }
     }
 }
 

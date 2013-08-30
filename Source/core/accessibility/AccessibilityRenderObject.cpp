@@ -52,7 +52,6 @@
 #include "core/page/Page.h"
 #include "core/platform/LocalizedStrings.h"
 #include "core/rendering/HitTestResult.h"
-#include "core/rendering/RenderFieldset.h"
 #include "core/rendering/RenderFileUploadControl.h"
 #include "core/rendering/RenderHTMLCanvas.h"
 #include "core/rendering/RenderImage.h"
@@ -265,24 +264,6 @@ Document* AccessibilityRenderObject::topDocument() const
     return document()->topDocument();
 }
 
-HTMLLabelElement* AccessibilityRenderObject::labelElementContainer() const
-{
-    if (!m_renderer)
-        return 0;
-
-    // the control element should not be considered part of the label
-    if (isControl())
-        return 0;
-
-    // find if this has a parent that is a label
-    for (Node* parentNode = m_renderer->node(); parentNode; parentNode = parentNode->parentNode()) {
-        if (isHTMLLabelElement(parentNode))
-            return toHTMLLabelElement(parentNode);
-    }
-
-    return 0;
-}
-
 bool AccessibilityRenderObject::shouldNotifyActiveDescendant() const
 {
     // We want to notify that the combo box has changed its active descendant,
@@ -326,7 +307,7 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     if (node && node->isLink()) {
         if (cssBox && cssBox->isImage())
             return ImageMapRole;
-        return WebCoreLinkRole;
+        return LinkRole;
     }
     if (cssBox && cssBox->isListItem())
         return ListItemRole;
@@ -420,22 +401,25 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
         return FormRole;
 
     if (node && node->hasTagName(articleTag))
-        return DocumentArticleRole;
+        return ArticleRole;
 
     if (node && node->hasTagName(mainTag))
-        return LandmarkMainRole;
+        return MainRole;
 
     if (node && node->hasTagName(navTag))
-        return LandmarkNavigationRole;
+        return NavigationRole;
 
     if (node && node->hasTagName(asideTag))
-        return LandmarkComplementaryRole;
+        return ComplementaryRole;
 
     if (node && node->hasTagName(sectionTag))
-        return DocumentRegionRole;
+        return RegionRole;
 
     if (node && node->hasTagName(addressTag))
-        return LandmarkContentInfoRole;
+        return ContentInfoRole;
+
+    if (node && node->hasTagName(dialogTag))
+        return DialogRole;
 
     // The HTML element should not be exposed as an element. That's what the RenderView element does.
     if (node && isHTMLHtmlElement(node))
@@ -444,9 +428,12 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     // There should only be one banner/contentInfo per page. If header/footer are being used within an article or section
     // then it should not be exposed as whole page's banner/contentInfo
     if (node && node->hasTagName(headerTag) && !isDescendantOfElementType(articleTag) && !isDescendantOfElementType(sectionTag))
-        return LandmarkBannerRole;
+        return BannerRole;
     if (node && node->hasTagName(footerTag) && !isDescendantOfElementType(articleTag) && !isDescendantOfElementType(sectionTag))
         return FooterRole;
+
+    if (node && node->hasTagName(aTag) && isClickable())
+        return LinkRole;
 
     if (m_renderer->isBlockFlow())
         return GroupRole;
@@ -606,26 +593,6 @@ bool AccessibilityRenderObject::isSelected() const
         return true;
 
     return false;
-}
-
-//
-// Check whether certain properties can be modified.
-//
-
-bool AccessibilityRenderObject::canSetValueAttribute() const
-{
-    if (equalIgnoringCase(getAttribute(aria_readonlyAttr), "true"))
-        return false;
-
-    if (isProgressIndicator() || isSlider())
-        return true;
-
-    if (isTextControl() && !isNativeTextControl())
-        return true;
-
-    // Any node could be contenteditable, so isReadOnly should be relied upon
-    // for this information for all elements.
-    return !isReadOnly();
 }
 
 //
@@ -843,47 +810,6 @@ const AtomicString& AccessibilityRenderObject::accessKey() const
     return toElement(node)->getAttribute(accesskeyAttr);
 }
 
-AccessibilityObject* AccessibilityRenderObject::correspondingControlForLabelElement() const
-{
-    HTMLLabelElement* labelElement = labelElementContainer();
-    if (!labelElement)
-        return 0;
-
-    HTMLElement* correspondingControl = labelElement->control();
-    if (!correspondingControl)
-        return 0;
-
-    // Make sure the corresponding control isn't a descendant of this label
-    // that's in the middle of being destroyed.
-    if (correspondingControl->renderer() && !correspondingControl->renderer()->parent())
-        return 0;
-
-    return axObjectCache()->getOrCreate(correspondingControl);
-}
-
-bool AccessibilityRenderObject::exposesTitleUIElement() const
-{
-    if (!isControl())
-        return false;
-
-    // If this control is ignored (because it's invisible),
-    // then the label needs to be exposed so it can be visible to accessibility.
-    if (accessibilityIsIgnored())
-        return true;
-
-    // Checkboxes and radio buttons use the text of their title ui element as their own AXTitle.
-    // This code controls whether the title ui element should appear in the AX tree (usually, no).
-    // It should appear if the control already has a label (which will be used as the AXTitle instead).
-    if (isCheckboxOrRadio())
-        return hasTextAlternative();
-
-    // When controls have their own descriptions, the title element should be ignored.
-    if (hasTextAlternative())
-        return false;
-
-    return true;
-}
-
 AccessibilityOrientation AccessibilityRenderObject::orientation() const
 {
     const AtomicString& ariaOrientation = getAttribute(aria_orientationAttr);
@@ -911,25 +837,6 @@ int AccessibilityRenderObject::textLength() const
         return -1; // need to return something distinct from 0
 
     return text().length();
-}
-
-AccessibilityObject* AccessibilityRenderObject::titleUIElement() const
-{
-    if (!m_renderer)
-        return 0;
-
-    // if isFieldset is true, the renderer is guaranteed to be a RenderFieldset
-    if (isFieldset())
-        return axObjectCache()->getOrCreate(toRenderFieldset(m_renderer)->findLegend(RenderFieldset::IncludeFloatingOrOutOfFlow));
-
-    Node* node = m_renderer->node();
-    if (!node || !node->isElementNode())
-        return 0;
-    HTMLLabelElement* label = labelForElement(toElement(node));
-    if (label && label->renderer())
-        return axObjectCache()->getOrCreate(label);
-
-    return 0;
 }
 
 KURL AccessibilityRenderObject::url() const
@@ -969,7 +876,6 @@ String AccessibilityRenderObject::actionVerb() const
     case CheckBoxRole:
         return isChecked() ? AXCheckedCheckBoxActionVerb() : AXUncheckedCheckBoxActionVerb();
     case LinkRole:
-    case WebCoreLinkRole:
         return AXLinkActionVerb();
     default:
         return emptyString();
@@ -1187,14 +1093,14 @@ const AtomicString& AccessibilityRenderObject::ariaLiveRegionStatus() const
     // These roles have implicit live region status.
     if (liveRegionStatus.isEmpty()) {
         switch (roleValue()) {
-        case ApplicationAlertDialogRole:
-        case ApplicationAlertRole:
+        case AlertDialogRole:
+        case AlertRole:
             return liveRegionStatusAssertive;
-        case ApplicationLogRole:
-        case ApplicationStatusRole:
+        case LogRole:
+        case StatusRole:
             return liveRegionStatusPolite;
-        case ApplicationTimerRole:
-        case ApplicationMarqueeRole:
+        case TimerRole:
+        case MarqueeRole:
             return liveRegionStatusOff;
         default:
             break;
@@ -1732,30 +1638,6 @@ String AccessibilityRenderObject::selectedText() const
 // Modify or take an action on an object.
 //
 
-void AccessibilityRenderObject::setFocused(bool on)
-{
-    if (!canSetFocusAttribute())
-        return;
-
-    Document* document = this->document();
-    if (!on)
-        document->setFocusedElement(0);
-    else {
-        Node* node = this->node();
-        if (node && node->isElementNode()) {
-            // If this node is already the currently focused node, then calling focus() won't do anything.
-            // That is a problem when focus is removed from the webpage to chrome, and then returns.
-            // In these cases, we need to do what keyboard and mouse focus do, which is reset focus first.
-            if (document->focusedElement() == node)
-                document->setFocusedElement(0);
-
-            toElement(node)->focus();
-        } else {
-            document->setFocusedElement(0);
-        }
-    }
-}
-
 void AccessibilityRenderObject::setSelectedTextRange(const PlainTextRange& range)
 {
     if (isNativeTextControl() && m_renderer->isTextControl()) {
@@ -1981,16 +1863,6 @@ bool AccessibilityRenderObject::isAllowedChildOfTree() const
             return false;
     }
     return true;
-}
-
-bool AccessibilityRenderObject::hasTextAlternative() const
-{
-    // ARIA: section 2A, bullet #3 says if aria-labeledby or aria-label appears, it should
-    // override the "label" element association.
-    if (!ariaLabeledByAttribute().isEmpty() || !getAttribute(aria_labelAttr).isEmpty())
-        return true;
-
-    return false;
 }
 
 void AccessibilityRenderObject::ariaListboxSelectedChildren(AccessibilityChildrenVector& result)

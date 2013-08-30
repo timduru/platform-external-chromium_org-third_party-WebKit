@@ -479,7 +479,7 @@ static PassRefPtr<CSSRuleList> asCSSRuleList(CSSRule* rule)
     if (rule->type() == CSSRule::MEDIA_RULE)
         return static_cast<CSSMediaRule*>(rule)->cssRules();
 
-    if (rule->type() == CSSRule::WEBKIT_KEYFRAMES_RULE)
+    if (rule->type() == CSSRule::KEYFRAMES_RULE)
         return static_cast<CSSKeyframesRule*>(rule)->cssRules();
 
     if (rule->type() == CSSRule::HOST_RULE)
@@ -822,6 +822,8 @@ String InspectorStyle::shorthandValue(const String& shorthandProperty) const
 {
     String value = m_style->getPropertyValue(shorthandProperty);
     if (value.isEmpty()) {
+        StringBuilder builder;
+
         for (unsigned i = 0; i < m_style->length(); ++i) {
             String individualProperty = m_style->item(i);
             if (m_style->getPropertyShorthand(individualProperty) != shorthandProperty)
@@ -831,10 +833,12 @@ String InspectorStyle::shorthandValue(const String& shorthandProperty) const
             String individualValue = m_style->getPropertyValue(individualProperty);
             if (individualValue == "initial")
                 continue;
-            if (value.length())
-                value.append(" ");
-            value.append(individualValue);
+            if (!builder.isEmpty())
+                builder.append(" ");
+            builder.append(individualValue);
         }
+
+        return builder.toString();
     }
     return value;
 }

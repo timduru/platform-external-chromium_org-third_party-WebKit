@@ -56,10 +56,12 @@
         '<@(python_webcore_test_support_idl_files)',
     ],
     'code_generator_template_files': [
+        'templates/attributes.cpp',
         'templates/callback_interface.cpp',
         'templates/callback_interface.h',
         'templates/interface.cpp',
         'templates/interface.h',
+        'templates/interface_macros.cpp',
     ],
 
     'bindings_output_dir': '<(SHARED_INTERMEDIATE_DIR)/blink/bindings',

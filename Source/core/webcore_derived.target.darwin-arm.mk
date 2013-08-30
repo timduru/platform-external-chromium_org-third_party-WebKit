@@ -303,7 +303,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLMediaElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLOptionsCollectionCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HTMLPlugInElementCustom.cpp \
-	third_party/WebKit/Source/bindings/v8/custom/V8HTMLSelectElementCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8HistoryCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8IDBAnyCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8ImageDataCustom.cpp \

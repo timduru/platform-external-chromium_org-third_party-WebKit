@@ -155,7 +155,7 @@ void TextFieldInputType::handleKeydownEvent(KeyboardEvent* event)
     if (!element()->focused())
         return;
     Frame* frame = element()->document()->frame();
-    if (!frame || !frame->editor()->doTextFieldCommandFromEvent(element(), event))
+    if (!frame || !frame->editor().doTextFieldCommandFromEvent(element(), event))
         return;
     event->setDefaultHandled();
 }
@@ -233,9 +233,7 @@ bool TextFieldInputType::needsContainer() const
 
 bool TextFieldInputType::shouldHaveSpinButton() const
 {
-    Document* document = element()->document();
-    RefPtr<RenderTheme> theme = document->page() ? document->page()->theme() : RenderTheme::defaultTheme();
-    return theme->shouldHaveSpinButton(element());
+    return RenderTheme::theme().shouldHaveSpinButton(element());
 }
 
 void TextFieldInputType::createShadowSubtree()
@@ -408,7 +406,7 @@ void TextFieldInputType::updatePlaceholderText()
     String placeholderText = element()->strippedPlaceholder();
     if (placeholderText.isEmpty()) {
         if (m_placeholder) {
-            m_placeholder->parentNode()->removeChild(m_placeholder.get(), ASSERT_NO_EXCEPTION);
+            m_placeholder->parentNode()->removeChild(m_placeholder.get());
             m_placeholder.clear();
         }
         return;
@@ -416,19 +414,9 @@ void TextFieldInputType::updatePlaceholderText()
     if (!m_placeholder) {
         m_placeholder = HTMLDivElement::create(element()->document());
         m_placeholder->setPart(AtomicString("-webkit-input-placeholder", AtomicString::ConstructFromLiteral));
-        element()->userAgentShadowRoot()->insertBefore(m_placeholder, m_container ? m_container->nextSibling() : innerTextElement()->nextSibling(), ASSERT_NO_EXCEPTION, DeprecatedAttachNow);
+        element()->userAgentShadowRoot()->insertBefore(m_placeholder, m_container ? m_container->nextSibling() : innerTextElement()->nextSibling());
     }
-    m_placeholder->setInnerText(placeholderText, ASSERT_NO_EXCEPTION);
-    element()->fixPlaceholderRenderer(m_placeholder.get(), m_container ? m_container.get() : m_innerText.get());
-}
-
-void TextFieldInputType::attach()
-{
-    InputType::attach();
-    // If container exists, the container should not have any content data.
-    ASSERT(!m_container || !m_container->renderStyle() || !m_container->renderStyle()->hasContent());
-
-    element()->fixPlaceholderRenderer(m_placeholder.get(), m_container ? m_container.get() : m_innerText.get());
+    m_placeholder->setTextContent(placeholderText, ASSERT_NO_EXCEPTION);
 }
 
 bool TextFieldInputType::appendFormData(FormDataList& list, bool multipart) const
@@ -469,7 +457,7 @@ void TextFieldInputType::didSetValueByUserEdit(ValueChangeState state)
     if (!element()->focused())
         return;
     if (Frame* frame = element()->document()->frame())
-        frame->editor()->textDidChangeInTextField(element());
+        frame->editor().textDidChangeInTextField(element());
 }
 
 void TextFieldInputType::spinButtonStepDown()

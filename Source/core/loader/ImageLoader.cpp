@@ -173,7 +173,7 @@ void ImageLoader::updateFromElement()
             document->fetcher()->m_documentResources.set(newImage->url(), newImage.get());
             document->fetcher()->setAutoLoadImages(autoLoadOtherImages);
         } else {
-            newImage = document->fetcher()->requestImage(request);
+            newImage = document->fetcher()->fetchImage(request);
         }
 
         // If we do not have an image here, it means that a cross-site
@@ -422,7 +422,7 @@ void ImageLoader::dispatchPendingErrorEvent()
         return;
     m_hasPendingErrorEvent = false;
     if (element()->document()->attached())
-        element()->dispatchEvent(Event::create(eventNames().errorEvent, false, false));
+        element()->dispatchEvent(Event::create(eventNames().errorEvent));
 
     // Only consider updating the protection ref-count of the Element immediately before returning
     // from this function as doing so might result in the destruction of this ImageLoader.

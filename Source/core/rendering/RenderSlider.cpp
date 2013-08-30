@@ -87,7 +87,7 @@ void RenderSlider::computePreferredLogicalWidths()
     m_minPreferredLogicalWidth += toAdd;
     m_maxPreferredLogicalWidth += toAdd;
 
-    setPreferredLogicalWidthsDirty(false);
+    clearPreferredLogicalWidthsDirty();
 }
 
 inline SliderThumbElement* RenderSlider::sliderThumbElement() const
@@ -97,7 +97,6 @@ inline SliderThumbElement* RenderSlider::sliderThumbElement() const
 
 void RenderSlider::layout()
 {
-    StackStats::LayoutCheckPoint layoutCheckPoint;
     // FIXME: Find a way to cascade appearance.
     // http://webkit.org/b/62535
     RenderBox* thumbBox = sliderThumbElement()->renderBox();

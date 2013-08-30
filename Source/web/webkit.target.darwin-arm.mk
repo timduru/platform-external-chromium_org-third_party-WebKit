@@ -194,7 +194,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebMIDIClientMock.cpp \
 	third_party/WebKit/Source/web/WebMIDIPermissionRequest.cpp \
 	third_party/WebKit/Source/web/WebMediaPlayerClientImpl.cpp \
-	third_party/WebKit/Source/web/WebMediaSourceImpl.cpp \
 	third_party/WebKit/Source/web/WebMediaStreamRegistry.cpp \
 	third_party/WebKit/Source/web/WebNetworkStateNotifier.cpp \
 	third_party/WebKit/Source/web/WebNode.cpp \
@@ -224,6 +223,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebSecurityOrigin.cpp \
 	third_party/WebKit/Source/web/WebSecurityPolicy.cpp \
 	third_party/WebKit/Source/web/WebSelectElement.cpp \
+	third_party/WebKit/Source/web/WebSelector.cpp \
 	third_party/WebKit/Source/web/WebSerializedScriptValue.cpp \
 	third_party/WebKit/Source/web/WebSettingsImpl.cpp \
 	third_party/WebKit/Source/web/WebSharedWorkerImpl.cpp \
@@ -243,7 +243,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/web/WebUserGestureIndicator.cpp \
 	third_party/WebKit/Source/web/WebUserGestureToken.cpp \
 	third_party/WebKit/Source/web/WebUserMediaRequest.cpp \
-	third_party/WebKit/Source/web/WebViewBenchmarkSupportImpl.cpp \
 	third_party/WebKit/Source/web/WebViewImpl.cpp \
 	third_party/WebKit/Source/web/WebWorkerBase.cpp \
 	third_party/WebKit/Source/web/WebWorkerClientImpl.cpp \

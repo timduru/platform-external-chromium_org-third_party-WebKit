@@ -44,7 +44,7 @@
 #include "weborigin/KURL.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
-#include "wtf/Threading.h"
+#include "wtf/ThreadingPrimitives.h"
 
 namespace WebCore {
 class AudioSourceProviderClient;
@@ -90,7 +90,7 @@ public:
     virtual void setWebLayer(WebLayer*);
     virtual void addTextTrack(WebInbandTextTrack*);
     virtual void removeTextTrack(WebInbandTextTrack*);
-    virtual void mediaSourceOpened(WebMediaSourceNew*);
+    virtual void mediaSourceOpened(WebMediaSource*);
     virtual void requestSeek(double);
 
     // MediaPlayer methods:

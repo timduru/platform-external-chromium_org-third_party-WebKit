@@ -25,7 +25,6 @@ GYP_COPIED_SOURCE_ORIGIN_DIRS :=
 
 LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/ActiveDOMObject.cpp \
-	third_party/WebKit/Source/core/dom/AnimationEvent.cpp \
 	third_party/WebKit/Source/core/dom/Attr.cpp \
 	third_party/WebKit/Source/core/dom/BeforeTextInsertedEvent.cpp \
 	third_party/WebKit/Source/core/dom/BeforeUnloadEvent.cpp \
@@ -156,6 +155,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/StringCallback.cpp \
 	third_party/WebKit/Source/core/dom/StyleElement.cpp \
 	third_party/WebKit/Source/core/dom/StyleSheetCollection.cpp \
+	third_party/WebKit/Source/core/dom/StyleSheetCollections.cpp \
 	third_party/WebKit/Source/core/dom/StyleSheetScopingNodeList.cpp \
 	third_party/WebKit/Source/core/dom/TagNodeList.cpp \
 	third_party/WebKit/Source/core/dom/Text.cpp \
@@ -177,12 +177,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/dom/UserTypingGestureIndicator.cpp \
 	third_party/WebKit/Source/core/dom/ViewportArguments.cpp \
 	third_party/WebKit/Source/core/dom/VisitedLinkState.cpp \
+	third_party/WebKit/Source/core/dom/WebKitAnimationEvent.cpp \
 	third_party/WebKit/Source/core/dom/WheelEvent.cpp \
 	third_party/WebKit/Source/core/dom/WindowEventContext.cpp \
 	third_party/WebKit/Source/core/dom/default/chromium/PlatformMessagePortChannelChromium.cpp \
-	third_party/WebKit/Source/core/dom/shadow/ComposedShadowTreeWalker.cpp \
+	third_party/WebKit/Source/core/dom/shadow/ComposedTreeWalker.cpp \
 	third_party/WebKit/Source/core/dom/shadow/ContentDistribution.cpp \
-	third_party/WebKit/Source/core/dom/shadow/ScopeContentDistribution.cpp \
 	third_party/WebKit/Source/core/dom/shadow/ElementShadow.cpp \
 	third_party/WebKit/Source/core/dom/shadow/InsertionPoint.cpp \
 	third_party/WebKit/Source/core/dom/shadow/SelectRuleFeatureSet.cpp \

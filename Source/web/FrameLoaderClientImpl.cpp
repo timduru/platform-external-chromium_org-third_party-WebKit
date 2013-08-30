@@ -33,27 +33,7 @@
 #include "FrameLoaderClientImpl.h"
 
 #include "HTMLNames.h"
-#include "core/dom/Document.h"
-#include "core/dom/MessageEvent.h"
-#include "core/dom/MouseEvent.h"
-#include "core/history/HistoryItem.h"
-#include "core/html/HTMLAppletElement.h"
-#include "core/html/HTMLFormElement.h"  // needed by core/loader/FormState.h
-#include "core/loader/DocumentLoader.h"
-#include "core/loader/FormState.h"
-#include "core/loader/FrameLoadRequest.h"
-#include "core/loader/FrameLoader.h"
-#include "core/loader/ProgressTracker.h"
-#include "core/page/Chrome.h"
-#include "core/page/EventHandler.h"
-#include "core/page/FrameView.h"
-#include "core/page/Page.h"
-#include "core/platform/MIMETypeRegistry.h"
-#include "core/platform/mediastream/RTCPeerConnectionHandler.h"
-#include "core/platform/network/HTTPParsers.h"
-#include "core/plugins/PluginData.h"
-#include "core/rendering/HitTestResult.h"
-#include <v8.h>
+#include "RuntimeEnabledFeatures.h"
 #include "WebAutofillClient.h"
 #include "WebCachedURLRequest.h"
 #include "WebDOMEvent.h"
@@ -73,12 +53,33 @@
 #include "WebViewClient.h"
 #include "WebViewImpl.h"
 #include "bindings/v8/ScriptController.h"
+#include "core/dom/Document.h"
+#include "core/dom/MessageEvent.h"
+#include "core/dom/MouseEvent.h"
 #include "core/dom/UserGestureIndicator.h"
+#include "core/history/HistoryItem.h"
+#include "core/html/HTMLAppletElement.h"
+#include "core/html/HTMLFormElement.h" // needed by core/loader/FormState.h
+#include "core/loader/DocumentLoader.h"
+#include "core/loader/FormState.h"
+#include "core/loader/FrameLoadRequest.h"
+#include "core/loader/FrameLoader.h"
+#include "core/loader/ProgressTracker.h"
+#include "core/page/Chrome.h"
+#include "core/page/EventHandler.h"
+#include "core/page/FrameView.h"
+#include "core/page/Page.h"
 #include "core/page/Settings.h"
 #include "core/page/WindowFeatures.h"
+#include "core/platform/MIMETypeRegistry.h"
 #include "core/platform/chromium/support/WrappedResourceRequest.h"
 #include "core/platform/chromium/support/WrappedResourceResponse.h"
+#include "core/platform/mediastream/RTCPeerConnectionHandler.h"
+#include "core/platform/network/HTTPParsers.h"
 #include "core/platform/network/SocketStreamHandleInternal.h"
+#include "core/plugins/PluginData.h"
+#include "core/rendering/HitTestResult.h"
+#include "modules/device_orientation/DeviceMotionController.h"
 #include "public/platform/Platform.h"
 #include "public/platform/WebMimeRegistry.h"
 #include "public/platform/WebSocketStreamHandle.h"
@@ -88,19 +89,11 @@
 #include "wtf/StringExtras.h"
 #include "wtf/text/CString.h"
 #include "wtf/text/WTFString.h"
+#include <v8.h>
 
 using namespace WebCore;
 
 namespace WebKit {
-
-// Domain for internal error codes.
-static const char internalErrorDomain[] = "WebKit";
-
-// An internal error code.  Used to note a policy change error resulting from
-// dispatchDecidePolicyForMIMEType not passing the PolicyUse option.
-enum {
-    PolicyChangeError = -10000,
-};
 
 FrameLoaderClientImpl::FrameLoaderClientImpl(WebFrameImpl* frame)
     : m_webFrame(frame)
@@ -124,8 +117,11 @@ void FrameLoaderClientImpl::frameLoaderDestroyed()
 
 void FrameLoaderClientImpl::dispatchDidClearWindowObjectInWorld(DOMWrapperWorld*)
 {
-    if (m_webFrame->client())
+    if (m_webFrame->client()) {
         m_webFrame->client()->didClearWindowObject(m_webFrame);
+        if (RuntimeEnabledFeatures::deviceMotionEnabled())
+            DeviceMotionController::from(m_webFrame->frame()->document());
+    }
 }
 
 void FrameLoaderClientImpl::documentElementAvailable()
@@ -371,10 +367,10 @@ void FrameLoaderClientImpl::dispatchDidStartProvisionalLoad()
         m_webFrame->client()->didStartProvisionalLoad(m_webFrame);
 }
 
-void FrameLoaderClientImpl::dispatchDidReceiveTitle(const StringWithDirection& title)
+void FrameLoaderClientImpl::dispatchDidReceiveTitle(const String& title)
 {
     if (m_webFrame->client())
-        m_webFrame->client()->didReceiveTitle(m_webFrame, title.string(), title.direction() == LTR ? WebTextDirectionLeftToRight : WebTextDirectionRightToLeft);
+        m_webFrame->client()->didReceiveTitle(m_webFrame, title, WebTextDirectionLeftToRight);
 }
 
 void FrameLoaderClientImpl::dispatchDidChangeIcons(WebCore::IconType type)
@@ -396,17 +392,6 @@ void FrameLoaderClientImpl::dispatchDidCommitLoad()
 void FrameLoaderClientImpl::dispatchDidFailProvisionalLoad(
     const ResourceError& error)
 {
-
-    // If a policy change occured, then we do not want to inform the plugin
-    // delegate.  See http://b/907789 for details.  FIXME: This means the
-    // plugin won't receive NPP_URLNotify, which seems like it could result in
-    // a memory leak in the plugin!!
-    if (error.domain() == internalErrorDomain
-        && error.errorCode() == PolicyChangeError) {
-        m_webFrame->didFail(ResourceError::cancelledError(error.failingURL()), true);
-        return;
-    }
-
     OwnPtr<WebPluginLoadObserver> observer = pluginLoadObserver();
     m_webFrame->didFail(error, true);
     if (observer)
@@ -557,13 +542,6 @@ void FrameLoaderClientImpl::didDispatchPingLoader(const KURL& url)
         m_webFrame->client()->didDispatchPingLoader(m_webFrame, url);
 }
 
-ResourceError FrameLoaderClientImpl::interruptedForPolicyChangeError(
-    const ResourceRequest& request)
-{
-    return ResourceError(internalErrorDomain, PolicyChangeError,
-                         request.url().string(), String());
-}
-
 PassRefPtr<DocumentLoader> FrameLoaderClientImpl::createDocumentLoader(
     const ResourceRequest& request,
     const SubstituteData& data)
@@ -601,11 +579,8 @@ void FrameLoaderClientImpl::transitionToCommittedForNewPage()
 PassRefPtr<Frame> FrameLoaderClientImpl::createFrame(
     const KURL& url,
     const String& name,
-    HTMLFrameOwnerElement* ownerElement,
     const String& referrer,
-    bool allowsScrolling,
-    int marginWidth,
-    int marginHeight)
+    HTMLFrameOwnerElement* ownerElement)
 {
     FrameLoadRequest frameRequest(m_webFrame->frame()->document()->securityOrigin(),
         ResourceRequest(url, referrer), name);

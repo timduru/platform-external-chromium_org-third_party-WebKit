@@ -84,7 +84,7 @@ public:
     virtual void dispatchDidNavigateWithinPage();
     virtual void dispatchWillClose();
     virtual void dispatchDidStartProvisionalLoad();
-    virtual void dispatchDidReceiveTitle(const WebCore::StringWithDirection&);
+    virtual void dispatchDidReceiveTitle(const String&);
     virtual void dispatchDidChangeIcons(WebCore::IconType);
     virtual void dispatchDidCommitLoad();
     virtual void dispatchDidFailProvisionalLoad(const WebCore::ResourceError&);
@@ -107,17 +107,12 @@ public:
     virtual void didRunInsecureContent(WebCore::SecurityOrigin*, const WebCore::KURL& insecureURL);
     virtual void didDetectXSS(const WebCore::KURL&, bool didBlockEntirePage);
     virtual void didDispatchPingLoader(const WebCore::KURL&);
-    virtual WebCore::ResourceError interruptedForPolicyChangeError(const WebCore::ResourceRequest&);
     virtual PassRefPtr<WebCore::DocumentLoader> createDocumentLoader(
         const WebCore::ResourceRequest&, const WebCore::SubstituteData&);
     virtual WTF::String userAgent(const WebCore::KURL&);
     virtual WTF::String doNotTrackValue();
     virtual void transitionToCommittedForNewPage();
-    virtual PassRefPtr<WebCore::Frame> createFrame(
-        const WebCore::KURL& url, const WTF::String& name,
-        WebCore::HTMLFrameOwnerElement* ownerElement,
-        const WTF::String& referrer, bool allowsScrolling,
-        int marginWidth, int marginHeight);
+    virtual PassRefPtr<WebCore::Frame> createFrame(const WebCore::KURL&, const WTF::String& name, const WTF::String& referrer, WebCore::HTMLFrameOwnerElement*);
     virtual PassRefPtr<WebCore::Widget> createPlugin(
         const WebCore::IntSize&, WebCore::HTMLPlugInElement*, const WebCore::KURL&,
         const Vector<WTF::String>&, const Vector<WTF::String>&,

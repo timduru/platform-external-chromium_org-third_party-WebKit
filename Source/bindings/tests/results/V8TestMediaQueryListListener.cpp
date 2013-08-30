@@ -84,7 +84,7 @@ static void methodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args
 
 } // namespace TestMediaQueryListListenerV8Internal
 
-static const V8DOMConfiguration::BatchedMethod V8TestMediaQueryListListenerMethods[] = {
+static const V8DOMConfiguration::MethodConfiguration V8TestMediaQueryListListenerMethods[] = {
     {"method", TestMediaQueryListListenerV8Internal::methodMethodCallback, 0, 1},
 };
 
@@ -93,14 +93,14 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8TestMediaQueryListListenerTem
     desc->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "TestMediaQueryListListener", v8::Local<v8::FunctionTemplate>(), V8TestMediaQueryListListener::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(desc, "TestMediaQueryListListener", v8::Local<v8::FunctionTemplate>(), V8TestMediaQueryListListener::internalFieldCount,
         0, 0,
         V8TestMediaQueryListListenerMethods, WTF_ARRAY_LENGTH(V8TestMediaQueryListListenerMethods), isolate, currentWorldType);
-    UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
+    UNUSED_PARAM(defaultSignature);
     v8::Local<v8::ObjectTemplate> instance = desc->InstanceTemplate();
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
-    UNUSED_PARAM(instance); // In some cases, it will not be used.
-    UNUSED_PARAM(proto); // In some cases, it will not be used.
+    UNUSED_PARAM(instance);
+    UNUSED_PARAM(proto);
 
     // Custom toString template
     desc->Set(v8::String::NewSymbol("toString"), V8PerIsolateData::current()->toStringTemplate());
@@ -134,7 +134,6 @@ bool V8TestMediaQueryListListener::HasInstanceInAnyWorld(v8::Handle<v8::Value> v
         || V8PerIsolateData::from(isolate)->hasInstance(&info, value, WorkerWorld);
 }
 
-
 v8::Handle<v8::Object> V8TestMediaQueryListListener::createWrapper(PassRefPtr<TestMediaQueryListListener> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
@@ -146,14 +145,15 @@ v8::Handle<v8::Object> V8TestMediaQueryListListener::createWrapper(PassRefPtr<Te
         RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == info.derefObjectFunction);
     }
 
-
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
+
     installPerContextProperties(wrapper, impl.get(), isolate);
     V8DOMWrapper::associateObjectWithWrapper<V8TestMediaQueryListListener>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
+
 void V8TestMediaQueryListListener::derefObject(void* object)
 {
     fromInternalPointer(object)->deref();

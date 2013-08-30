@@ -34,6 +34,7 @@
 #include "../platform/WebColor.h"
 #include "../platform/WebGraphicsContext3D.h"
 #include "../platform/WebString.h"
+#include "WebAXEnums.h"
 #include "WebAccessibilityNotification.h"
 #include "WebContentDetectionResult.h"
 #include "WebDragOperation.h"
@@ -125,9 +126,12 @@ public:
 
     // Misc ----------------------------------------------------------------
 
+    // Whether or not we should report a detailed message for the given source.
+    virtual bool shouldReportDetailedMessageForSource(const WebString& source) { return false; }
+
     // A new message was added to the console.
     virtual void didAddMessageToConsole(
-        const WebConsoleMessage&, const WebString& sourceName, unsigned sourceLine) { }
+        const WebConsoleMessage&, const WebString& sourceName, unsigned sourceLine, const WebString& stackTrace) { }
 
     // Called when script in the page calls window.print().  If frame is
     // non-null, then it selects a particular frame, including its
@@ -308,9 +312,11 @@ public:
 
     // Accessibility -------------------------------------------------------
 
-    // Notifies embedder about an accessibility notification.
-    virtual void postAccessibilityNotification(const WebAccessibilityObject&, WebAccessibilityNotification) { }
+    // Notifies embedder about an accessibility event.
+    virtual void postAccessibilityEvent(const WebAccessibilityObject&, WebAXEvent) { }
 
+    // Deprecated.
+    virtual void postAccessibilityNotification(const WebAccessibilityObject&, WebAccessibilityNotification) { }
 
     // Developer tools -----------------------------------------------------
 

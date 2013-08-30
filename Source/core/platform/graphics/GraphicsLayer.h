@@ -48,6 +48,7 @@
 #include "public/platform/WebImageLayer.h"
 #include "public/platform/WebLayerClient.h"
 #include "public/platform/WebLayerScrollClient.h"
+#include "public/platform/WebNinePatchLayer.h"
 #include "public/platform/WebSolidColorLayer.h"
 
 namespace WebKit {
@@ -205,6 +206,7 @@ public:
     enum ContentsLayerPurpose {
         NoContentsLayer = 0,
         ContentsLayerForImage,
+        ContentsLayerForNinePatch,
         ContentsLayerForVideo,
         ContentsLayerForCanvas,
     };
@@ -219,6 +221,7 @@ public:
     virtual WebKit::WebString debugName(WebKit::WebLayer*) OVERRIDE;
 
     void setCompositingReasons(WebKit::WebCompositingReasons);
+    WebKit::WebCompositingReasons compositingReasons() const { return m_compositingReasons; }
 
     GraphicsLayer* parent() const { return m_parent; };
     void setParent(GraphicsLayer*); // Internal use only.
@@ -249,6 +252,8 @@ public:
     bool isReplicated() const { return m_replicaLayer; }
     // The layer that replicates this layer (if any).
     GraphicsLayer* replicaLayer() const { return m_replicaLayer; }
+    // The layer being replicated.
+    GraphicsLayer* replicatedLayer() const { return m_replicatedLayer; }
 
     const FloatPoint& replicatedLayerPosition() const { return m_replicatedLayerPosition; }
     void setReplicatedLayerPosition(const FloatPoint& p) { m_replicatedLayerPosition = p; }
@@ -348,6 +353,7 @@ public:
 
     // Layer contents
     void setContentsToImage(Image*);
+    void setContentsToNinePatch(Image*, const IntRect& aperture);
     bool shouldDirectlyCompositeImage(Image*) const { return true; }
     void setContentsToMedia(WebKit::WebLayer*); // video or plug-in
     // Pass an invalid color to remove the contents layer.
@@ -374,12 +380,7 @@ public:
 
     void dumpLayer(TextStream&, int indent = 0, LayerTreeFlags = LayerTreeNormal) const;
 
-    void setShowRepaintCounter(bool show) { m_showRepaintCounter = show; }
-    bool isShowingRepaintCounter() const { return m_showRepaintCounter; }
-
-    // FIXME: this is really a paint count.
-    int repaintCount() const { return m_repaintCount; }
-    int incrementRepaintCount() { return ++m_repaintCount; }
+    int paintCount() const { return m_paintCount; }
 
     // z-position is the z-equivalent of position(). It's only used for debugging purposes.
     float zPosition() const { return m_zPosition; }
@@ -452,9 +453,9 @@ protected:
     // rotations of >= 180 degrees
     static int validateTransformOperations(const KeyframeValueList&, bool& hasBigRotation);
 
-    // The layer being replicated.
-    GraphicsLayer* replicatedLayer() const { return m_replicatedLayer; }
     void setReplicatedLayer(GraphicsLayer* layer) { m_replicatedLayer = layer; }
+
+    int incrementPaintCount() { return ++m_paintCount; }
 
     // Any factory classes that want to create a GraphicsLayer need to be friends.
     friend class WebKit::GraphicsLayerFactoryChromium;
@@ -501,7 +502,6 @@ protected:
     bool m_masksToBounds : 1;
     bool m_drawsContent : 1;
     bool m_contentsVisible : 1;
-    bool m_showRepaintCounter : 1;
 
     GraphicsLayerPaintingPhase m_paintingPhase;
     CompositingCoordinatesOrientation m_contentsOrientation; // affects orientation of layer contents
@@ -518,12 +518,13 @@ protected:
 
     IntRect m_contentsRect;
 
-    int m_repaintCount;
+    int m_paintCount;
 
     Color m_contentsSolidColor;
 
     OwnPtr<WebKit::WebContentLayer> m_layer;
     OwnPtr<WebKit::WebImageLayer> m_imageLayer;
+    OwnPtr<WebKit::WebNinePatchLayer> m_ninePatchLayer;
     OwnPtr<WebKit::WebSolidColorLayer> m_contentsSolidColorLayer;
     WebKit::WebLayer* m_contentsLayer;
     // We don't have ownership of m_contentsLayer, but we do want to know if a given layer is the
@@ -543,6 +544,7 @@ protected:
     AnimationIdMap m_animationIdMap;
 
     ScrollableArea* m_scrollableArea;
+    WebKit::WebCompositingReasons m_compositingReasons;
 };
 
 

@@ -60,9 +60,8 @@
 #include "core/dom/StaticNodeList.h"
 #include "core/dom/TreeScope.h"
 #include "core/dom/ViewportArguments.h"
-#include "core/dom/shadow/ComposedShadowTreeWalker.h"
+#include "core/dom/shadow/ComposedTreeWalker.h"
 #include "core/dom/shadow/ElementShadow.h"
-#include "core/dom/shadow/ScopeContentDistribution.h"
 #include "core/dom/shadow/SelectRuleFeatureSet.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/Editor.h"
@@ -171,10 +170,9 @@ static bool markerTypesFrom(const String& markerType, DocumentMarker::MarkerType
 
 static SpellCheckRequester* spellCheckRequester(Document* document)
 {
-    if (!document || !document->frame() || !document->frame()->editor())
+    if (!document || !document->frame())
         return 0;
-
-    return &document->frame()->editor()->spellCheckRequester();
+    return &document->frame()->editor().spellCheckRequester();
 }
 
 const char* Internals::internalsId = "internals";
@@ -201,10 +199,10 @@ void Internals::resetToConsistentState(Page* page)
     delete s_pagePopupDriver;
     s_pagePopupDriver = 0;
     page->chrome().client().resetPagePopupDriver();
-    if (!page->mainFrame()->editor()->isContinuousSpellCheckingEnabled())
-        page->mainFrame()->editor()->toggleContinuousSpellChecking();
-    if (page->mainFrame()->editor()->isOverwriteModeEnabled())
-        page->mainFrame()->editor()->toggleOverwriteModeEnabled();
+    if (!page->mainFrame()->editor().isContinuousSpellCheckingEnabled())
+        page->mainFrame()->editor().toggleContinuousSpellChecking();
+    if (page->mainFrame()->editor().isOverwriteModeEnabled())
+        page->mainFrame()->editor().toggleOverwriteModeEnabled();
 }
 
 Internals::Internals(Document* document)
@@ -487,9 +485,7 @@ size_t Internals::countElementShadow(const Node* root, ExceptionState& es) const
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
-    if (const ScopeContentDistribution* distribution = toShadowRoot(root)->scopeDistribution())
-        return distribution->numberOfElementShadowChildren();
-    return 0;
+    return toShadowRoot(root)->childShadowRootCount();
 }
 
 bool Internals::attached(Node* node, ExceptionState& es)
@@ -508,7 +504,7 @@ Node* Internals::nextSiblingByWalker(Node* node, ExceptionState& es)
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
-    ComposedShadowTreeWalker walker(node);
+    ComposedTreeWalker walker(node);
     walker.nextSibling();
     return walker.get();
 }
@@ -519,7 +515,7 @@ Node* Internals::firstChildByWalker(Node* node, ExceptionState& es)
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
-    ComposedShadowTreeWalker walker(node);
+    ComposedTreeWalker walker(node);
     walker.firstChild();
     return walker.get();
 }
@@ -530,7 +526,7 @@ Node* Internals::lastChildByWalker(Node* node, ExceptionState& es)
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
-    ComposedShadowTreeWalker walker(node);
+    ComposedTreeWalker walker(node);
     walker.lastChild();
     return walker.get();
 }
@@ -541,7 +537,7 @@ Node* Internals::nextNodeByWalker(Node* node, ExceptionState& es)
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
-    ComposedShadowTreeWalker walker(node);
+    ComposedTreeWalker walker(node);
     walker.next();
     return walker.get();
 }
@@ -552,7 +548,7 @@ Node* Internals::previousNodeByWalker(Node* node, ExceptionState& es)
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
-    ComposedShadowTreeWalker walker(node);
+    ComposedTreeWalker walker(node);
     walker.previous();
     return walker.get();
 }
@@ -980,7 +976,6 @@ String Internals::viewportAsText(Document* document, float, int availableWidth, 
     // Update initial viewport size.
     IntSize initialViewportSize(availableWidth, availableHeight);
     document->page()->mainFrame()->view()->setFrameRect(IntRect(IntPoint::zero(), initialViewportSize));
-    document->styleResolver()->viewportStyleResolver()->resolve();
 
     ViewportArguments arguments = page->viewportArguments();
     PageScaleConstraints constraints = arguments.resolve(initialViewportSize, 980 /* defaultLayoutWidthForNonMobilePages */);
@@ -1519,16 +1514,16 @@ bool Internals::hasSpellingMarker(Document* document, int from, int length, Exce
     if (!document || !document->frame())
         return 0;
 
-    return document->frame()->editor()->selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
+    return document->frame()->editor().selectionStartHasMarkerFor(DocumentMarker::Spelling, from, length);
 }
 
 void Internals::setContinuousSpellCheckingEnabled(bool enabled, ExceptionState&)
 {
-    if (!contextDocument() || !contextDocument()->frame() || !contextDocument()->frame()->editor())
+    if (!contextDocument() || !contextDocument()->frame())
         return;
 
-    if (enabled != contextDocument()->frame()->editor()->isContinuousSpellCheckingEnabled())
-        contextDocument()->frame()->editor()->toggleContinuousSpellChecking();
+    if (enabled != contextDocument()->frame()->editor().isContinuousSpellCheckingEnabled())
+        contextDocument()->frame()->editor().toggleContinuousSpellChecking();
 }
 
 bool Internals::isOverwriteModeEnabled(Document* document, ExceptionState&)
@@ -1536,7 +1531,7 @@ bool Internals::isOverwriteModeEnabled(Document* document, ExceptionState&)
     if (!document || !document->frame())
         return 0;
 
-    return document->frame()->editor()->isOverwriteModeEnabled();
+    return document->frame()->editor().isOverwriteModeEnabled();
 }
 
 void Internals::toggleOverwriteModeEnabled(Document* document, ExceptionState&)
@@ -1544,7 +1539,7 @@ void Internals::toggleOverwriteModeEnabled(Document* document, ExceptionState&)
     if (!document || !document->frame())
         return;
 
-    document->frame()->editor()->toggleOverwriteModeEnabled();
+    document->frame()->editor().toggleOverwriteModeEnabled();
 }
 
 unsigned Internals::numberOfLiveNodes() const
@@ -1636,7 +1631,7 @@ bool Internals::hasGrammarMarker(Document* document, int from, int length, Excep
     if (!document || !document->frame())
         return 0;
 
-    return document->frame()->editor()->selectionStartHasMarkerFor(DocumentMarker::Grammar, from, length);
+    return document->frame()->editor().selectionStartHasMarkerFor(DocumentMarker::Grammar, from, length);
 }
 
 unsigned Internals::numberOfScrollableAreas(Document* document, ExceptionState&)
@@ -1708,6 +1703,32 @@ PassRefPtr<NodeList> Internals::paintOrderListBeforePromote(Element* element, Ex
 PassRefPtr<NodeList> Internals::paintOrderListAfterPromote(Element* element, ExceptionState& es)
 {
     return paintOrderList(element, es, RenderLayer::AfterPromote);
+}
+
+bool Internals::scrollsWithRespectTo(Element* element1, Element* element2, ExceptionState& es)
+{
+    if (!element1 || !element2) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    element1->document()->updateLayout();
+
+    RenderObject* renderer1 = element1->renderer();
+    RenderObject* renderer2 = element2->renderer();
+    if (!renderer1 || !renderer2 || !renderer1->isBox() || !renderer2->isBox()) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    RenderLayer* layer1 = toRenderBox(renderer1)->layer();
+    RenderLayer* layer2 = toRenderBox(renderer2)->layer();
+    if (!layer1 || !layer2) {
+        es.throwDOMException(InvalidAccessError);
+        return 0;
+    }
+
+    return layer1->scrollsWithRespectTo(layer2);
 }
 
 String Internals::layerTreeAsText(Document* document, unsigned flags, ExceptionState& es) const
@@ -1841,7 +1862,7 @@ void Internals::insertAuthorCSS(Document* document, const String& css) const
     RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(document);
     parsedSheet->setIsUserStyleSheet(false);
     parsedSheet->parseString(css);
-    document->styleSheetCollection()->addAuthorSheet(parsedSheet);
+    document->styleSheetCollections()->addAuthorSheet(parsedSheet);
 }
 
 void Internals::insertUserCSS(Document* document, const String& css) const
@@ -1849,7 +1870,7 @@ void Internals::insertUserCSS(Document* document, const String& css) const
     RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(document);
     parsedSheet->setIsUserStyleSheet(true);
     parsedSheet->parseString(css);
-    document->styleSheetCollection()->addUserSheet(parsedSheet);
+    document->styleSheetCollections()->addUserSheet(parsedSheet);
 }
 
 String Internals::counterValue(Element* element)

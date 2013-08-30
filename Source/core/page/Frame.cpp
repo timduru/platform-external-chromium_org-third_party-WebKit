@@ -104,7 +104,7 @@ inline Frame::Frame(Page* page, HTMLFrameOwnerElement* ownerElement, FrameLoader
     , m_navigationScheduler(this)
     , m_ownerElement(ownerElement)
     , m_script(adoptPtr(new ScriptController(this)))
-    , m_editor(adoptPtr(new Editor(this)))
+    , m_editor(adoptPtr(new Editor(*this)))
     , m_selection(adoptPtr(new FrameSelection(this)))
     , m_eventHandler(adoptPtr(new EventHandler(this)))
     , m_animationController(adoptPtr(new AnimationController(this)))
@@ -201,11 +201,6 @@ void Frame::setView(PassRefPtr<FrameView> view)
 
     if (m_view && m_page && m_page->mainFrame() == this)
         m_view->setVisibleContentScaleFactor(m_page->pageScaleFactor());
-
-    // Only one form submission is allowed per view of a part.
-    // Since this part may be getting reused as a result of being
-    // pulled from the back/forward cache, reset this flag.
-    loader()->resetMultipleFormSubmissionProtection();
 }
 
 #if ENABLE(ORIENTATION_EVENTS)
@@ -450,14 +445,14 @@ PassRefPtr<Range> Frame::rangeForPoint(const IntPoint& framePoint)
     VisiblePosition previous = position.previous();
     if (previous.isNotNull()) {
         RefPtr<Range> previousCharacterRange = makeRange(previous, position);
-        LayoutRect rect = editor()->firstRectForRange(previousCharacterRange.get());
+        LayoutRect rect = editor().firstRectForRange(previousCharacterRange.get());
         if (rect.contains(framePoint))
             return previousCharacterRange.release();
     }
 
     VisiblePosition next = position.next();
     if (RefPtr<Range> nextCharacterRange = makeRange(position, next)) {
-        LayoutRect rect = editor()->firstRectForRange(nextCharacterRange.get());
+        LayoutRect rect = editor().firstRectForRange(nextCharacterRange.get());
         if (rect.contains(framePoint))
             return nextCharacterRange.release();
     }

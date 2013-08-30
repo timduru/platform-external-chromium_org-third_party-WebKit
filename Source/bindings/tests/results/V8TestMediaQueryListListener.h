@@ -21,7 +21,7 @@
 #ifndef V8TestMediaQueryListListener_h
 #define V8TestMediaQueryListListener_h
 
-#include "bindings/bindings/tests/idls/TestMediaQueryListListener.h"
+#include "bindings/tests/idls/TestMediaQueryListListener.h"
 #include "bindings/v8/V8Binding.h"
 #include "bindings/v8/V8DOMWrapper.h"
 #include "bindings/v8/WrapperTypeInfo.h"
@@ -51,6 +51,7 @@ public:
     }
     static void installPerContextProperties(v8::Handle<v8::Object>, TestMediaQueryListListener*, v8::Isolate*) { }
     static void installPerContextPrototypeProperties(v8::Handle<v8::Object>, v8::Isolate*) { }
+
 private:
     friend v8::Handle<v8::Object> wrap(TestMediaQueryListListener*, v8::Handle<v8::Object> creationContext, v8::Isolate*);
     static v8::Handle<v8::Object> createWrapper(PassRefPtr<TestMediaQueryListListener>, v8::Handle<v8::Object> creationContext, v8::Isolate*);
@@ -61,7 +62,6 @@ class WrapperTypeTraits<TestMediaQueryListListener > {
 public:
     static WrapperTypeInfo* info() { return &V8TestMediaQueryListListener::info; }
 };
-
 
 inline v8::Handle<v8::Object> wrap(TestMediaQueryListListener* impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
@@ -120,26 +120,25 @@ inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, TestMediaQuer
     v8SetReturnValue(callbackInfo, wrapper);
 }
 
-
-inline v8::Handle<v8::Value> toV8(PassRefPtr< TestMediaQueryListListener > impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
+inline v8::Handle<v8::Value> toV8(PassRefPtr<TestMediaQueryListListener > impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     return toV8(impl.get(), creationContext, isolate);
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr< TestMediaQueryListListener > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValue(const CallbackInfo& callbackInfo, PassRefPtr<TestMediaQueryListListener > impl, v8::Handle<v8::Object> creationContext)
 {
     v8SetReturnValue(callbackInfo, impl.get(), creationContext);
 }
 
 template<class CallbackInfo>
-inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr< TestMediaQueryListListener > impl, v8::Handle<v8::Object> creationContext)
+inline void v8SetReturnValueForMainWorld(const CallbackInfo& callbackInfo, PassRefPtr<TestMediaQueryListListener > impl, v8::Handle<v8::Object> creationContext)
 {
     v8SetReturnValueForMainWorld(callbackInfo, impl.get(), creationContext);
 }
 
 template<class CallbackInfo, class Wrappable>
-inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, PassRefPtr< TestMediaQueryListListener > impl, Wrappable* wrappable)
+inline void v8SetReturnValueFast(const CallbackInfo& callbackInfo, PassRefPtr<TestMediaQueryListListener > impl, Wrappable* wrappable)
 {
     v8SetReturnValueFast(callbackInfo, impl.get(), wrappable);
 }

@@ -195,7 +195,6 @@ LayoutUnit RenderSVGRoot::computeReplacedLogicalHeight() const
 
 void RenderSVGRoot::layout()
 {
-    StackStats::LayoutCheckPoint layoutCheckPoint;
     ASSERT(needsLayout());
 
     m_resourcesNeedingToInvalidateClients.clear();
@@ -334,6 +333,18 @@ void RenderSVGRoot::removeChild(RenderObject* child)
 {
     SVGResourcesCache::clientWillBeRemovedFromTree(child);
     RenderReplaced::removeChild(child);
+}
+
+void RenderSVGRoot::insertedIntoTree()
+{
+    RenderReplaced::insertedIntoTree();
+    SVGResourcesCache::clientWasAddedToTree(this, style());
+}
+
+void RenderSVGRoot::willBeRemovedFromTree()
+{
+    SVGResourcesCache::clientWillBeRemovedFromTree(this);
+    RenderReplaced::willBeRemovedFromTree();
 }
 
 // RenderBox methods will expect coordinates w/o any transforms in coordinates

@@ -224,12 +224,10 @@ ScriptString XMLHttpRequest::responseText(ExceptionState& es)
     return m_responseText;
 }
 
-ScriptString XMLHttpRequest::responseJSONSource(ExceptionState& es)
+ScriptString XMLHttpRequest::responseJSONSource()
 {
-    if (m_responseTypeCode != ResponseTypeJSON) {
-        es.throwDOMException(InvalidStateError);
-        return ScriptString();
-    }
+    ASSERT(m_responseTypeCode == ResponseTypeJSON);
+
     if (m_error || m_state != DONE)
         return ScriptString();
     return m_responseText;
@@ -585,7 +583,7 @@ void XMLHttpRequest::send(Document* document, ExceptionState& es)
         String body = createMarkup(document);
 
         // FIXME: This should use value of document.inputEncoding to determine the encoding to use.
-        m_requestEntityBody = FormData::create(UTF8Encoding().normalizeAndEncode(body, WTF::EntitiesForUnencodables));
+        m_requestEntityBody = FormData::create(UTF8Encoding().encode(body, WTF::EntitiesForUnencodables));
         if (m_upload)
             m_requestEntityBody->setAlwaysStream(true);
     }
@@ -607,7 +605,7 @@ void XMLHttpRequest::send(const String& body, ExceptionState& es)
             m_requestHeaders.set("Content-Type", contentType);
         }
 
-        m_requestEntityBody = FormData::create(UTF8Encoding().normalizeAndEncode(body, WTF::EntitiesForUnencodables));
+        m_requestEntityBody = FormData::create(UTF8Encoding().encode(body, WTF::EntitiesForUnencodables));
         if (m_upload)
             m_requestEntityBody->setAlwaysStream(true);
     }

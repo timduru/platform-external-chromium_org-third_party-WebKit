@@ -136,8 +136,11 @@ bool HTMLFrameOwnerElement::loadOrRedirectSubframe(const KURL& url, const Atomic
         return false;
     }
 
+    if (!SubframeLoadingDisabler::canLoadFrame(this))
+        return false;
+
     String referrer = SecurityPolicy::generateReferrerHeader(document()->referrerPolicy(), url, parentFrame->loader()->outgoingReferrer());
-    RefPtr<Frame> childFrame = parentFrame->loader()->client()->createFrame(url, frameName, this, referrer, allowScrollingInContentFrame(), marginWidth(), marginHeight());
+    RefPtr<Frame> childFrame = parentFrame->loader()->client()->createFrame(url, frameName, referrer, this);
 
     if (!childFrame)  {
         parentFrame->loader()->checkCompleted();

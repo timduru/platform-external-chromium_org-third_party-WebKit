@@ -30,10 +30,12 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/crypto/AesKeyGenParams.cpp \
 	third_party/WebKit/Source/modules/crypto/Algorithm.cpp \
 	third_party/WebKit/Source/modules/crypto/Crypto.cpp \
+	third_party/WebKit/Source/modules/crypto/CryptoResult.cpp \
 	third_party/WebKit/Source/modules/crypto/DOMWindowCrypto.cpp \
 	third_party/WebKit/Source/modules/crypto/HmacKeyParams.cpp \
 	third_party/WebKit/Source/modules/crypto/HmacParams.cpp \
 	third_party/WebKit/Source/modules/crypto/Key.cpp \
+	third_party/WebKit/Source/modules/crypto/KeyPair.cpp \
 	third_party/WebKit/Source/modules/crypto/NormalizeAlgorithm.cpp \
 	third_party/WebKit/Source/modules/crypto/RsaKeyGenParams.cpp \
 	third_party/WebKit/Source/modules/crypto/RsaSsaParams.cpp \
@@ -259,6 +261,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/modules/webmidi/MIDIPort.cpp \
 	third_party/WebKit/Source/modules/webmidi/NavigatorWebMIDI.cpp \
 	third_party/WebKit/Source/modules/websockets/MainThreadWebSocketChannel.cpp \
+	third_party/WebKit/Source/modules/websockets/NewWebSocketChannelImpl.cpp \
 	third_party/WebKit/Source/modules/websockets/ThreadableWebSocketChannelClientWrapper.cpp \
 	third_party/WebKit/Source/modules/websockets/WebSocket.cpp \
 	third_party/WebKit/Source/modules/websockets/WebSocketChannel.cpp \

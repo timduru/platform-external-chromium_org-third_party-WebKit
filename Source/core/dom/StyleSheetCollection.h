@@ -43,7 +43,7 @@ namespace WebCore {
 
 class ContainerNode;
 class CSSStyleSheet;
-class DocumentStyleSheetCollection;
+class StyleSheetCollections;
 class Node;
 class StyleSheet;
 class StyleSheetContents;
@@ -95,18 +95,6 @@ protected:
 
     DocumentOrderedList m_styleSheetCandidateNodes;
     StyleSheetScopingNodeList m_scopingNodesForStyleScoped;
-};
-
-// FIXME: rename this class to DocumentStyleSheetCollection.
-class StyleSheetCollectionForDocument FINAL : public StyleSheetCollection {
-    WTF_MAKE_NONCOPYABLE(StyleSheetCollectionForDocument); WTF_MAKE_FAST_ALLOCATED;
-public:
-    explicit StyleSheetCollectionForDocument(TreeScope*);
-
-    bool updateActiveStyleSheets(DocumentStyleSheetCollection*, StyleResolverUpdateMode);
-
-private:
-    void collectStyleSheets(DocumentStyleSheetCollection*, Vector<RefPtr<StyleSheet> >& styleSheets, Vector<RefPtr<CSSStyleSheet> >& activeSheets);
 };
 
 }

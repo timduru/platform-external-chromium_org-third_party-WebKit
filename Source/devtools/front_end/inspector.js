@@ -586,7 +586,7 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     if (WebInspector.experimentsSettings.tethering.isEnabled())
         this._setupTethering();
 
-    if (WebInspector.experimentsSettings.screencast.isEnabled()) {
+    if (WebInspector.queryParamsObject["remoteFrontend"] && WebInspector.experimentsSettings.screencast.isEnabled()) {
         WebInspector._splitView = new WebInspector.SplitView(true, "screencastSplitView");
         WebInspector._splitView.markAsRoot();
         WebInspector._splitView.show(document.body);
@@ -1014,6 +1014,26 @@ WebInspector.inspect = function(payload, hints)
             object.release();
         }
         object.pushNodeToFrontend(callback);
+        return;
+    }
+
+    if (object.type === "function") {
+        function didGetDetails(error, response)
+        {
+            object.release();
+
+            if (error) {
+                console.error(error);
+                return;
+            }
+
+            var uiLocation = WebInspector.debuggerModel.rawLocationToUILocation(response.location);
+            if (!uiLocation)
+                return;
+
+            WebInspector.showPanel("scripts").showUILocation(uiLocation);
+        }
+        DebuggerAgent.getFunctionDetails(object.objectId, didGetDetails.bind(this));
         return;
     }
 

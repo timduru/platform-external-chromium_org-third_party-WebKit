@@ -32,8 +32,10 @@
 #include "MediaSourcePrivateImpl.h"
 
 #include "SourceBufferPrivateImpl.h"
-#include "WebMediaSource.h"
 #include "WebSourceBuffer.h"
+
+#include "public/platform/WebMediaSource.h"
+
 #include <algorithm>
 #include <limits>
 #include "wtf/PassOwnPtr.h"
@@ -41,7 +43,7 @@
 
 namespace WebKit {
 
-MediaSourcePrivateImpl::MediaSourcePrivateImpl(PassOwnPtr<WebKit::WebMediaSourceNew> webMediaSource)
+MediaSourcePrivateImpl::MediaSourcePrivateImpl(PassOwnPtr<WebKit::WebMediaSource> webMediaSource)
     : m_webMediaSource(webMediaSource)
 {
 }
@@ -80,7 +82,7 @@ void MediaSourcePrivateImpl::setDuration(double duration)
 void MediaSourcePrivateImpl::markEndOfStream(WebCore::MediaSourcePrivate::EndOfStreamStatus status)
 {
     if (m_webMediaSource)
-        m_webMediaSource->markEndOfStream(static_cast<WebMediaSourceNew::EndOfStreamStatus>(status));
+        m_webMediaSource->markEndOfStream(static_cast<WebMediaSource::EndOfStreamStatus>(status));
 }
 
 void MediaSourcePrivateImpl::unmarkEndOfStream()

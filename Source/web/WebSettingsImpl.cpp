@@ -256,6 +256,11 @@ void WebSettingsImpl::setAuthorAndUserStylesEnabled(bool enabled)
     m_settings->setAuthorAndUserStylesEnabled(enabled);
 }
 
+void WebSettingsImpl::setUseLegacyBackgroundSizeShorthandBehavior(bool useLegacyBackgroundSizeShorthandBehavior)
+{
+    m_settings->setUseLegacyBackgroundSizeShorthandBehavior(useLegacyBackgroundSizeShorthandBehavior);
+}
+
 void WebSettingsImpl::setUseWideViewport(bool useWideViewport)
 {
     m_settings->setUseWideViewport(useWideViewport);
@@ -433,6 +438,11 @@ void WebSettingsImpl::setAcceleratedCompositingForVideoEnabled(bool enabled)
 void WebSettingsImpl::setAcceleratedCompositingForOverflowScrollEnabled(bool enabled)
 {
     m_settings->setAcceleratedCompositingForOverflowScrollEnabled(enabled);
+}
+
+void WebSettingsImpl::setCompositorDrivenAcceleratedScrollingEnabled(bool enabled)
+{
+    m_settings->setCompositorDrivenAcceleratedScrollingEnabled(enabled);
 }
 
 void WebSettingsImpl::setAcceleratedCompositingForFixedRootBackgroundEnabled(bool enabled)
@@ -683,6 +693,11 @@ void WebSettingsImpl::setPinchOverlayScrollbarThickness(int thickness)
 void WebSettingsImpl::setPinchVirtualViewportEnabled(bool enabled)
 {
     m_settings->setPinchVirtualViewportEnabled(enabled);
+}
+
+void WebSettingsImpl::setUseSolidColorScrollbars(bool enabled)
+{
+    m_settings->setUseSolidColorScrollbars(enabled);
 }
 
 } // namespace WebKit

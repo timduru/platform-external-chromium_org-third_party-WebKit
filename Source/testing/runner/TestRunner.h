@@ -114,7 +114,6 @@ public:
     bool shouldDumpProgressFinishedCallback() const;
     bool deferMainResourceDataLoad() const;
     bool shouldStayOnPageAfterHandlingBeforeUnload() const;
-    void setTitleTextDirection(WebKit::WebTextDirection);
     const std::set<std::string>* httpHeadersToClear() const;
     void setTopLoadingFrame(WebKit::WebFrame*, bool);
     WebKit::WebFrame* topLoadingFrame() const;
@@ -131,6 +130,8 @@ public:
     void requestPointerUnlock();
     bool isPointerLocked();
     void setToolTipText(const WebKit::WebString&);
+
+    bool midiAccessorResult();
 
     // A single item in the work queue.
     class WorkItem {
@@ -464,6 +465,7 @@ private:
     void setMockGeolocationPositionUnavailableError(const CppArgumentList&, CppVariant*);
 
     // MIDI function to control permission handling.
+    void setMIDIAccessorResult(const CppArgumentList&, CppVariant*);
     void setMIDISysExPermission(const CppArgumentList&, CppVariant*);
 
 #if ENABLE_NOTIFICATIONS
@@ -471,6 +473,8 @@ private:
     void grantWebNotificationPermission(const CppArgumentList&, CppVariant*);
     // Simulates a click on a desktop notification.
     void simulateLegacyWebNotificationClick(const CppArgumentList&, CppVariant*);
+    // Cancel all active desktop notifications.
+    void cancelAllActiveNotifications(const CppArgumentList& arguments, CppVariant* result);
 #endif
 
     // Speech input related functions.
@@ -572,9 +576,6 @@ private:
 
     // Bound variable to return the name of this platform (chromium).
     CppVariant m_platformName;
-
-    // Bound variable tracking the directionality of the <title> tag.
-    CppVariant m_titleTextDirection;
 
     // Bound variable counting the number of top URLs visited.
     CppVariant m_webHistoryItemCount;
@@ -680,6 +681,9 @@ private:
 
     // If true, layout is to target printed pages.
     bool m_isPrinting;
+
+    // If false, MockWebMIDIAccessor fails on startSession() for testing.
+    bool m_midiAccessorResult;
 
     bool m_shouldStayOnPageAfterHandlingBeforeUnload;
 

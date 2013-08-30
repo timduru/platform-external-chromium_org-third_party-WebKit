@@ -131,9 +131,11 @@ smartInsertDeleteEnabled initial=defaultSmartInsertDeleteEnabled
 selectTrailingWhitespaceEnabled initial=defaultSelectTrailingWhitespaceEnabled
 
 selectionIncludesAltImageText initial=false
+useLegacyBackgroundSizeShorthandBehavior initial=false
 
 # This setting enables touch based text selection and editing.
 touchEditingEnabled initial=false
 
 experimentalWebSocketEnabled initial=false
 pinchVirtualViewportEnabled initial=false
+useSolidColorScrollbars initial=false

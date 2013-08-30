@@ -140,7 +140,7 @@ bool HTMLTextFormControlElement::placeholderShouldBeVisible() const
         && isEmptyValue()
         && isEmptySuggestedValue()
         && !isPlaceholderEmpty()
-        && (document()->focusedElement() != this || (renderer() && renderer()->theme()->shouldShowPlaceholderWhenFocused()))
+        && (document()->focusedElement() != this || (RenderTheme::theme().shouldShowPlaceholderWhenFocused()))
         && (!renderer() || renderer()->style()->visibility() == VISIBLE);
 }
 
@@ -154,24 +154,6 @@ void HTMLTextFormControlElement::updatePlaceholderVisibility(bool placeholderVal
     if (!placeholder)
         return;
     placeholder->setInlineStyleProperty(CSSPropertyVisibility, placeholderShouldBeVisible() ? CSSValueVisible : CSSValueHidden);
-}
-
-void HTMLTextFormControlElement::fixPlaceholderRenderer(HTMLElement* placeholder, HTMLElement* siblingElement)
-{
-    // FIXME: We should change the order of DOM nodes. But it makes an assertion
-    // failure in editing code.
-    if (!placeholder || !placeholder->renderer())
-        return;
-    RenderObject* placeholderRenderer = placeholder->renderer();
-    RenderObject* siblingRenderer = siblingElement->renderer();
-    if (!siblingRenderer)
-        return;
-    if (placeholderRenderer->nextSibling() == siblingRenderer)
-        return;
-    RenderObject* parentRenderer = placeholderRenderer->parent();
-    ASSERT(siblingRenderer->parent() == parentRenderer);
-    parentRenderer->removeChild(placeholderRenderer);
-    parentRenderer->addChild(placeholderRenderer, siblingRenderer);
 }
 
 void HTMLTextFormControlElement::setSelectionStart(int start)
@@ -493,7 +475,7 @@ void HTMLTextFormControlElement::selectionChanged(bool userTriggered)
 
     if (Frame* frame = document()->frame()) {
         if (frame->selection()->isRange() && userTriggered)
-            dispatchEvent(Event::create(eventNames().selectEvent, true, false));
+            dispatchEvent(Event::createBubble(eventNames().selectEvent));
     }
 }
 

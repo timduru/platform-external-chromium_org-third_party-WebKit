@@ -448,9 +448,6 @@ void ScrollingCoordinator::setTouchEventTargetRects(const LayerHitTestRects& lay
     HashSet<const RenderLayer*> oldLayersWithTouchRects;
     m_layersWithTouchRects.swap(oldLayersWithTouchRects);
 
-    // Note that ideally we'd clear the touch event handler region on all layers first,
-    // in case there are others that no longer have any handlers. But it's unlikely to
-    // matter much in practice (just makes us more conservative).
     for (LayerHitTestRects::const_iterator iter = compositorRects.begin(); iter != compositorRects.end(); ++iter) {
         const RenderLayer* layer = iter->key;
         WebVector<WebRect> webRects(iter->value.size());
@@ -469,11 +466,12 @@ void ScrollingCoordinator::setTouchEventTargetRects(const LayerHitTestRects& lay
 
     // If there are any layers left that we haven't updated, clear them out.
     for (HashSet<const RenderLayer*>::iterator it = oldLayersWithTouchRects.begin(); it != oldLayersWithTouchRects.end(); ++it) {
-        RenderLayerBacking* backing = (*it)->backing();
-        GraphicsLayer* graphicsLayer = backing->scrollingContentsLayer();
-        if (!graphicsLayer)
-            graphicsLayer = backing->graphicsLayer();
-        graphicsLayer->platformLayer()->setTouchEventHandlerRegion(WebVector<WebRect>());
+        if (RenderLayerBacking* backing = (*it)->backing()) {
+            GraphicsLayer* graphicsLayer = backing->scrollingContentsLayer();
+            if (!graphicsLayer)
+                graphicsLayer = backing->graphicsLayer();
+            graphicsLayer->platformLayer()->setTouchEventHandlerRegion(WebVector<WebRect>());
+        }
     }
 }
 
@@ -777,8 +775,11 @@ bool ScrollingCoordinator::hasVisibleSlowRepaintViewportConstrainedObjects(Frame
 
 MainThreadScrollingReasons ScrollingCoordinator::mainThreadScrollingReasons() const
 {
+    // The main thread scrolling reasons are applicable to scrolls of the main
+    // frame. If it does not exist or if it is not scrollable, there is no
+    // reason to force main thread scrolling.
     FrameView* frameView = m_page->mainFrame()->view();
-    if (!frameView)
+    if (!frameView || !frameView->isScrollable())
         return static_cast<MainThreadScrollingReasons>(0);
 
     MainThreadScrollingReasons mainThreadScrollingReasons = (MainThreadScrollingReasons)0;

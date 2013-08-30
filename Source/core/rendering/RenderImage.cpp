@@ -219,7 +219,7 @@ void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* r
     bool shouldRepaint = true;
     if (intrinsicSizeChanged) {
         if (!preferredLogicalWidthsDirty())
-            setPreferredLogicalWidthsDirty(true);
+            setPreferredLogicalWidthsDirty();
 
         bool hasOverrideSize = hasOverrideHeight() || hasOverrideWidth();
         if (!hasOverrideSize && !imageSizeChanged) {
@@ -579,7 +579,6 @@ void RenderImage::updateAltText()
 
 void RenderImage::layout()
 {
-    StackStats::LayoutCheckPoint layoutCheckPoint;
     RenderReplaced::layout();
     updateInnerContentRect();
 }

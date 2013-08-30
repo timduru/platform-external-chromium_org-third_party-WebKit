@@ -32,12 +32,14 @@
 #define TimedItem_h
 
 #include "core/animation/Timing.h"
+#include "wtf/OwnPtr.h"
 #include "wtf/PassOwnPtr.h"
 #include "wtf/RefCounted.h"
 
 namespace WebCore {
 
 class Player;
+class TimedItem;
 
 static inline bool isNull(double value)
 {
@@ -63,7 +65,7 @@ public:
     class EventDelegate {
     public:
         virtual ~EventDelegate() { };
-        virtual void onEventCondition(bool isFirstSample, Phase previousPhase, Phase currentPhase, double previousIteration, double currentIteration) = 0;
+        virtual void onEventCondition(const TimedItem*, bool isFirstSample, Phase previousPhase, double previousIteration) = 0;
     };
 
     virtual ~TimedItem() { }
@@ -78,7 +80,9 @@ public:
     double currentIteration() const { return ensureCalculated().currentIteration; }
     double activeDuration() const { return ensureCalculated().activeDuration; }
     double timeFraction() const { return ensureCalculated().timeFraction; }
-    Player* player() const { return m_player; }
+    const Player* player() const { return m_player; }
+
+    const Timing& specified() const { return m_specified; }
 
 protected:
     TimedItem(const Timing&, PassOwnPtr<EventDelegate> = nullptr);

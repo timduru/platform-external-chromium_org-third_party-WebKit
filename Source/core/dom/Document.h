@@ -48,7 +48,6 @@
 #include "core/page/PageVisibilityState.h"
 #include "weborigin/ReferrerPolicy.h"
 #include "core/platform/Timer.h"
-#include "core/platform/text/StringWithDirection.h"
 #include "core/rendering/HitTestRequest.h"
 #include "wtf/Deque.h"
 #include "wtf/HashSet.h"
@@ -88,7 +87,6 @@ class DocumentLoader;
 class DocumentMarkerController;
 class DocumentParser;
 class DocumentSharedObjectPool;
-class DocumentStyleSheetCollection;
 class DocumentTimeline;
 class DocumentType;
 class Element;
@@ -103,6 +101,7 @@ class FrameView;
 class HTMLAllCollection;
 class HTMLCanvasElement;
 class HTMLCollection;
+class HTMLDialogElement;
 class HTMLDocument;
 class HTMLElement;
 class HTMLFrameOwnerElement;
@@ -147,6 +146,7 @@ class SerializedScriptValue;
 class Settings;
 class StyleResolver;
 class StyleSheet;
+class StyleSheetCollections;
 class StyleSheetContents;
 class StyleSheetList;
 class Text;
@@ -290,7 +290,7 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(securitypolicyviolation);
 
     void setViewportArguments(const ViewportArguments& viewportArguments) { m_viewportArguments = viewportArguments; }
-    ViewportArguments viewportArguments() const { return m_viewportArguments; }
+    const ViewportArguments& viewportArguments() const { return m_viewportArguments; }
 #ifndef NDEBUG
     bool didDispatchViewportPropertiesChanged() const { return m_didDispatchViewportPropertiesChanged; }
 #endif
@@ -298,6 +298,7 @@ public:
     void setReferrerPolicy(ReferrerPolicy referrerPolicy) { m_referrerPolicy = referrerPolicy; }
     ReferrerPolicy referrerPolicy() const { return m_referrerPolicy; }
 
+    void setDoctype(PassRefPtr<DocumentType>);
     DocumentType* doctype() const { return m_docType.get(); }
 
     DOMImplementation* implementation();
@@ -351,11 +352,11 @@ public:
 
     String defaultCharset() const;
 
-    String inputEncoding() const { return Document::encoding(); }
-    String charset() const { return Document::encoding(); }
-    String characterSet() const { return Document::encoding(); }
+    String inputEncoding() const { return Document::encodingName(); }
+    String charset() const { return Document::encodingName(); }
+    String characterSet() const { return Document::encodingName(); }
 
-    String encoding() const;
+    String encodingName() const;
 
     void setCharset(const String&);
 
@@ -439,7 +440,7 @@ public:
     // This is a DOM function.
     StyleSheetList* styleSheets();
 
-    DocumentStyleSheetCollection* styleSheetCollection() { return m_styleSheetCollection.get(); }
+    StyleSheetCollections* styleSheetCollections() { return m_styleSheetCollections.get(); }
 
     bool gotoAnchorNeededAfterStylesheetsLoad() { return m_gotoAnchorNeededAfterStylesheetsLoad; }
     void setGotoAnchorNeededAfterStylesheetsLoad(bool b) { m_gotoAnchorNeededAfterStylesheetsLoad = b; }
@@ -762,14 +763,11 @@ public:
     HTMLIFrameElement* seamlessParentIFrame() const;
     bool shouldDisplaySeamlesslyWithParent() const;
 
-    // Used by DOM bindings; no direction known.
-    String title() const { return m_title.string(); }
+    String title() const { return m_title; }
     void setTitle(const String&);
 
-    const StringWithDirection& titleWithDirection() const { return m_title; }
-
     Element* titleElement() const { return m_titleElement.get(); }
-    void setTitleElement(const StringWithDirection&, Element* titleElement);
+    void setTitleElement(const String& title, Element* titleElement);
     void removeTitle(Element* titleElement);
 
     String cookie(ExceptionState&) const;
@@ -857,8 +855,6 @@ public:
     void incDOMTreeVersion() { m_domTreeVersion = ++s_globalTreeVersion; }
     uint64_t domTreeVersion() const { return m_domTreeVersion; }
 
-    void setDocType(PassRefPtr<DocumentType>);
-
     enum PendingSheetLayout { NoLayoutWithPendingSheets, DidLayoutWithPendingSheets, IgnoreLayoutWithPendingSheets };
 
     bool didLayoutWithPendingStylesheets() const { return m_pendingSheetLayout == DidLayoutWithPendingSheets; }
@@ -894,6 +890,9 @@ public:
     void setDecoder(PassRefPtr<TextResourceDecoder>);
     TextResourceDecoder* decoder() const { return m_decoder.get(); }
 
+    void setEncoding(const WTF::TextEncoding&);
+    const WTF::TextEncoding& encoding() const { return m_encoding; }
+
     String displayStringModifiedByEncoding(const String&) const;
     PassRefPtr<StringImpl> displayStringModifiedByEncoding(PassRefPtr<StringImpl>) const;
     void displayBufferModifiedByEncoding(LChar* buffer, unsigned len) const
@@ -920,6 +919,8 @@ public:
     void initSecurityContext();
     void initSecurityContext(const DocumentInit&);
     void initContentSecurityPolicy(const ContentSecurityPolicyResponseHeaders&);
+
+    bool allowInlineEventHandlers(Node*, EventListener*, const String& contextURL, const WTF::OrdinalNumber& contextLine);
 
     void statePopped(PassRefPtr<SerializedScriptValue>);
 
@@ -1008,8 +1009,7 @@ public:
     PassRefPtr<Element> createElement(const AtomicString& localName, const AtomicString& typeExtension, ExceptionState&);
     PassRefPtr<Element> createElementNS(const AtomicString& namespaceURI, const String& qualifiedName, const AtomicString& typeExtension, ExceptionState&);
     ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, ExceptionState&);
-    // FIXME: When embedders switch to using WebDocument::registerEmbedderCustomElement, make the default name set StandardNames.
-    ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionState&, CustomElement::NameSet validNames = CustomElement::AllNames);
+    ScriptValue registerElement(WebCore::ScriptState*, const AtomicString& name, const Dictionary& options, ExceptionState&, CustomElement::NameSet validNames = CustomElement::StandardNames);
     CustomElementRegistrationContext* registrationContext() { return m_registrationContext.get(); }
 
     void setImport(HTMLImport*);
@@ -1045,7 +1045,7 @@ public:
     void addToTopLayer(Element*, const Element* before = 0);
     void removeFromTopLayer(Element*);
     const Vector<RefPtr<Element> >& topLayerElements() const { return m_topLayerElements; }
-    Element* activeModalDialog() const { return !m_topLayerElements.isEmpty() ? m_topLayerElements.last().get() : 0; }
+    HTMLDialogElement* activeModalDialog() const;
 
     const Document* templateDocument() const;
     Document* ensureTemplateDocument();
@@ -1109,7 +1109,7 @@ private:
 
     virtual double timerAlignmentInterval() const;
 
-    void updateTitle(const StringWithDirection&);
+    void updateTitle(const String&);
     void updateFocusAppearanceTimerFired(Timer<Document>*);
     void updateBaseURL();
 
@@ -1224,7 +1224,7 @@ private:
 
     MutationObserverOptions m_mutationObserverTypes;
 
-    OwnPtr<DocumentStyleSheetCollection> m_styleSheetCollection;
+    OwnPtr<StyleSheetCollections> m_styleSheetCollections;
     RefPtr<StyleSheetList> m_styleSheetList;
 
     OwnPtr<FormController> m_formController;
@@ -1249,8 +1249,8 @@ private:
     // http://www.whatwg.org/specs/web-apps/current-work/#ignore-destructive-writes-counter
     unsigned m_ignoreDestructiveWriteCount;
 
-    StringWithDirection m_title;
-    StringWithDirection m_rawTitle;
+    String m_title;
+    String m_rawTitle;
     bool m_titleSetExplicitly;
     RefPtr<Element> m_titleElement;
 
@@ -1282,6 +1282,7 @@ private:
     String m_contentLanguage;
 
     RefPtr<TextResourceDecoder> m_decoder;
+    WTF::TextEncoding m_encoding;
 
     InheritedBool m_designMode;
 

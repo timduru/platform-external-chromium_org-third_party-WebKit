@@ -46,6 +46,7 @@
 #include "core/css/BasicShapeFunctions.h"
 #include "core/css/CSSAspectRatioValue.h"
 #include "core/css/CSSCursorImageValue.h"
+#include "core/css/CSSFunctionValue.h"
 #include "core/css/CSSGradientValue.h"
 #include "core/css/CSSGridTemplateValue.h"
 #include "core/css/CSSImageSetValue.h"
@@ -516,17 +517,13 @@ void StyleBuilderFunctions::applyValueCSSPropertyTextDecoration(StyleResolverSta
 void StyleBuilderFunctions::applyInheritCSSPropertyTextIndent(StyleResolverState& state)
 {
     state.style()->setTextIndent(state.parentStyle()->textIndent());
-#if ENABLE(CSS3_TEXT)
     state.style()->setTextIndentLine(state.parentStyle()->textIndentLine());
-#endif
 }
 
 void StyleBuilderFunctions::applyInitialCSSPropertyTextIndent(StyleResolverState& state)
 {
     state.style()->setTextIndent(RenderStyle::initialTextIndent());
-#if ENABLE(CSS3_TEXT)
     state.style()->setTextIndentLine(RenderStyle::initialTextIndentLine());
-#endif
 }
 
 void StyleBuilderFunctions::applyValueCSSPropertyTextIndent(StyleResolverState& state, CSSValue* value)
@@ -534,9 +531,9 @@ void StyleBuilderFunctions::applyValueCSSPropertyTextIndent(StyleResolverState& 
     if (!value->isValueList())
         return;
 
-    // [ <length> | <percentage> ] -webkit-each-line
+    // [ <length> | <percentage> ] each-line
     // The order is guaranteed. See CSSParser::parseTextIndent.
-    // The second value, -webkit-each-line is handled only when CSS3_TEXT is enabled.
+    // The second value, each-line is handled only when css3TextEnabled() returns true.
 
     CSSValueList* valueList = toCSSValueList(value);
     CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(valueList->itemWithoutBoundsCheck(0));
@@ -544,16 +541,13 @@ void StyleBuilderFunctions::applyValueCSSPropertyTextIndent(StyleResolverState& 
     ASSERT(!lengthOrPercentageValue.isUndefined());
     state.style()->setTextIndent(lengthOrPercentageValue);
 
-#if ENABLE(CSS3_TEXT)
     ASSERT(valueList->length() <= 2);
     CSSPrimitiveValue* eachLineValue = toCSSPrimitiveValue(valueList->item(1));
     if (eachLineValue) {
-        ASSERT(eachLineValue->getValueID() == CSSValueWebkitEachLine);
+        ASSERT(eachLineValue->getValueID() == CSSValueEachLine);
         state.style()->setTextIndentLine(TextIndentEachLine);
-    } else {
+    } else
         state.style()->setTextIndentLine(TextIndentFirstLine);
-    }
-#endif
 }
 
 void StyleBuilderFunctions::applyValueCSSPropertyVerticalAlign(StyleResolverState& state, CSSValue* value)
@@ -959,12 +953,8 @@ static bool createGridTrackBreadth(CSSPrimitiveValue* primitiveValue, const Styl
 
 static bool createGridTrackSize(CSSValue* value, GridTrackSize& trackSize, const StyleResolverState& state)
 {
-    if (!value->isPrimitiveValue())
-        return false;
-
-    CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
-    Pair* minMaxTrackBreadth = primitiveValue->getPairValue();
-    if (!minMaxTrackBreadth) {
+    if (value->isPrimitiveValue()) {
+        CSSPrimitiveValue* primitiveValue = toCSSPrimitiveValue(value);
         GridLength workingLength;
         if (!createGridTrackBreadth(primitiveValue, state, workingLength))
             return false;
@@ -973,9 +963,12 @@ static bool createGridTrackSize(CSSValue* value, GridTrackSize& trackSize, const
         return true;
     }
 
+    CSSFunctionValue* minmaxFunction = toCSSFunctionValue(value);
+    CSSValueList* arguments = minmaxFunction->arguments();
+    ASSERT_WITH_SECURITY_IMPLICATION(arguments->length() == 2);
     GridLength minTrackBreadth;
     GridLength maxTrackBreadth;
-    if (!createGridTrackBreadth(minMaxTrackBreadth->first(), state, minTrackBreadth) || !createGridTrackBreadth(minMaxTrackBreadth->second(), state, maxTrackBreadth))
+    if (!createGridTrackBreadth(toCSSPrimitiveValue(arguments->itemWithoutBoundsCheck(0)), state, minTrackBreadth) || !createGridTrackBreadth(toCSSPrimitiveValue(arguments->itemWithoutBoundsCheck(1)), state, maxTrackBreadth))
         return false;
 
     trackSize.setMinMax(minTrackBreadth, maxTrackBreadth);

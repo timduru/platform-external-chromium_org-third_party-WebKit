@@ -36,7 +36,6 @@
 #include "V8NodeList.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/V8Binding.h"
-#include "bindings/v8/custom/V8HTMLSelectElementCustom.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/NamedNodesCollection.h"
 #include "core/html/HTMLOptionElement.h"
@@ -70,13 +69,6 @@ void V8HTMLOptionsCollection::namedItemMethodCustom(const v8::FunctionCallbackIn
     getNamedItems(imp, toWebCoreString(args[0]), args);
 }
 
-void V8HTMLOptionsCollection::removeMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
-{
-    HTMLOptionsCollection* imp = V8HTMLOptionsCollection::toNative(args.Holder());
-    HTMLSelectElement* base = toHTMLSelectElement(imp->ownerNode());
-    removeElement(base, args);
-}
-
 void V8HTMLOptionsCollection::addMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     if (!V8HTMLOptionElement::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate()))) {
@@ -101,7 +93,7 @@ void V8HTMLOptionsCollection::addMethodCustom(const v8::FunctionCallbackInfo<v8:
     es.throwIfNeeded();
 }
 
-void V8HTMLOptionsCollection::lengthAttrSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
+void V8HTMLOptionsCollection::lengthAttributeSetterCustom(v8::Local<v8::String> name, v8::Local<v8::Value> value, const v8::PropertyCallbackInfo<void>& info)
 {
     HTMLOptionsCollection* imp = V8HTMLOptionsCollection::toNative(info.Holder());
     double v = value->NumberValue();

@@ -38,12 +38,15 @@ WebInspector.Layers3DView = function(model)
     WebInspector.View.call(this);
     this.element.classList.add("fill");
     this.element.classList.add("layers-3d-view");
+    this._emptyView = new WebInspector.EmptyView(WebInspector.UIString("Not in the composited mode.\nConsider forcing composited mode in Settings."));
     this._model = model;
     this._model.addEventListener(WebInspector.LayerTreeModel.Events.LayerTreeChanged, this._update, this);
     this._rotatingContainerElement = this.element.createChild("div", "fill rotating-container");
     this.element.addEventListener("mousemove", this._onMouseMove.bind(this), false);
     this.element.addEventListener("mouseout", this._onMouseMove.bind(this), false);
     this.element.addEventListener("mousedown", this._onMouseDown.bind(this), false);
+    this.element.addEventListener("mouseup", this._onMouseUp.bind(this), false);
+    this.element.addEventListener("contextmenu", this._onContextMenu.bind(this), false);
     this.element.addEventListener("click", this._onClick.bind(this), false);
     this._elementsByLayerId = {};
     this._rotateX = 0;
@@ -72,7 +75,7 @@ WebInspector.Layers3DView.Events = {
 WebInspector.Layers3DView.prototype = {
     onResize: function()
     {
-        this._scale();
+        this._update();
     },
 
     willHide: function()
@@ -125,28 +128,33 @@ WebInspector.Layers3DView.prototype = {
         this._setOutline(WebInspector.Layers3DView.OutlineType.Selected, layer);
     },
 
-    _scale: function()
+    _computeScale: function()
     {
-        const padding = 40;
-        var scale = 1;
         var root = this._model.root();
         if (!root)
             return;
+        const padding = 40;
         var scaleX = this.element.clientWidth / (root.width() + 2 * padding);
         var scaleY = this.element.clientHeight / (root.height() + 2 * padding);
-        scale = Math.min(scaleX, scaleY);
-        this._lastScale = scale;
-        var element = this._elementForLayer(root);
-        element.style.webkitTransform = "scale3d(" + scale + "," + scale + "," + scale + ")";
-        element.style.left = ((this.element.clientWidth - root.width() * scale) >> 1) + "px";
-        element.style.top = ((this.element.clientHeight - root.height() * scale) >> 1) + "px";
-        const screenLayerThickness = 4;
+        this._scale = Math.min(scaleX, scaleY);
         const screenLayerSpacing = 20;
-        var layerThickness = Math.ceil(screenLayerThickness / scale) + "px";
-        var layerSpacing = Math.ceil(screenLayerSpacing / scale) + "px";
+        this._layerSpacing = Math.ceil(screenLayerSpacing / this._scale) + "px";
+    },
+
+    _applyScale: function()
+    {
+        var root = this._model.root();
+        if (!root)
+            return;
+        var element = this._elementForLayer(root);
+        element.style.webkitTransform = "scale3d(" + this._scale + "," + this._scale + "," + this._scale + ")";
+        element.style.left = ((this.element.clientWidth - root.width() * this._scale) >> 1) + "px";
+        element.style.top = ((this.element.clientHeight - root.height() * this._scale) >> 1) + "px";
+        const screenLayerThickness = 4;
+        var layerThickness = Math.ceil(screenLayerThickness / this._scale) + "px";
         this._scaleAdjustmentStylesheet.textContent = ".layer-container .side-wall { height: " + layerThickness + "; width: " + layerThickness + "; } " +
             ".layer-container .back-wall { -webkit-transform: translateZ(-" + layerThickness + "); } " +
-            ".layer-container { -webkit-transform: translateZ(" + layerSpacing + "); }";
+            ".layer-container { -webkit-transform: translateZ(" + this._layerSpacing + "); }";
     },
 
     _update: function()
@@ -155,6 +163,11 @@ WebInspector.Layers3DView.prototype = {
             this._needsUpdate = true;
             return;
         }
+        if (!this._model.root()) {
+            this._emptyView.show(this.element);
+            return;
+        }
+        this._emptyView.detach();
         function updateLayer(layer)
         {
             var element = this._elementForLayer(layer);
@@ -166,9 +179,10 @@ WebInspector.Layers3DView.prototype = {
                 childElement = nextElement;
             }
         }
+        this._computeScale();
         this._model.forEachLayer(updateLayer.bind(this));
+        this._applyScale();
         this._needsUpdate = false;
-        this._scale();
     },
 
     /**
@@ -197,6 +211,7 @@ WebInspector.Layers3DView.prototype = {
         var style = element.style;
         var parentElement = layer.parent() ? this._elementForLayer(layer.parent()) : this._rotatingContainerElement;
         element.__depth = (parentElement.__depth || 0) + 1;
+        element.enableStyleClass("invisible", layer.invisible());
         style.left  = layer.offsetX() + "px";
         style.top  = layer.offsetY() + "px";
         style.width  = layer.width() + "px";
@@ -208,7 +223,7 @@ WebInspector.Layers3DView.prototype = {
                 return x.toFixed(5);
             }
             // Avoid exponential notation in CSS.
-            style.webkitTransform = "matrix3d(" + transform.map(toFixed5).join(",") + ")";
+            style.webkitTransform = "matrix3d(" + transform.map(toFixed5).join(",") + ") translateZ(" + this._layerSpacing + ")";
             var anchor = layer.anchorPoint();
             style.webkitTransformOrigin = Math.round(anchor[0] * 100) + "% " + Math.round(anchor[1] * 100) + "% " + anchor[2];
         } else {
@@ -243,10 +258,36 @@ WebInspector.Layers3DView.prototype = {
     {
         if (event.which !== 1)
             return;
+        this._setReferencePoint(event);
+    },
+
+    /**
+     * @param {Event} event
+     */
+    _setReferencePoint: function(event)
+    {
         this._originX = event.clientX;
         this._originY = event.clientY;
         this._oldRotateX = this._rotateX;
         this._oldRotateY = this._rotateY;
+    },
+
+    _resetReferencePoint: function()
+    {
+        delete this._originX;
+        delete this._originY;
+        delete this._oldRotateX;
+        delete this._oldRotateY;
+    },
+
+    /**
+     * @param {Event} event
+     */
+    _onMouseUp: function(event)
+    {
+        if (event.which !== 1)
+            return;
+        this._resetReferencePoint();
     },
 
     /**
@@ -272,10 +313,32 @@ WebInspector.Layers3DView.prototype = {
             return;
         }
         if (event.which === 1) {
+            // Set reference point if we missed mousedown.
+            if (typeof this._originX !== "number")
+                this._setReferencePoint(event);
             this._rotateX = this._oldRotateX + (this._originY - event.clientY) / 2;
             this._rotateY = this._oldRotateY - (this._originX - event.clientX) / 4;
-            this._rotatingContainerElement.style.webkitTransform = "rotateX(" + this._rotateX + "deg) rotateY(" + this._rotateY + "deg)";
+            // Translate well to front so that no matter how we turn the plane, no parts of it goes below  parent.
+            // This makes sure mouse events go to proper layers, not straight to the parent.
+            this._rotatingContainerElement.style.webkitTransform = "translateZ(10000px) rotateX(" + this._rotateX + "deg) rotateY(" + this._rotateY + "deg)";
         }
+    },
+
+    /**
+     * @param {Event} event
+     */
+    _onContextMenu: function(event)
+    {
+        var layer = this._layerFromEventPoint(event);
+        var nodeId = layer && layer.nodeId();
+        if (!nodeId)
+            return;
+        var domNode = WebInspector.domAgent.nodeForId(nodeId);
+        if (!domNode)
+            return;
+        var contextMenu = new WebInspector.ContextMenu(event);
+        contextMenu.appendApplicableItems(domNode);
+        contextMenu.show();
     },
 
     _onClick: function(event)

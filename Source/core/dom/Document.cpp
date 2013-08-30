@@ -64,7 +64,6 @@
 #include "core/dom/DocumentLifecycleObserver.h"
 #include "core/dom/DocumentMarkerController.h"
 #include "core/dom/DocumentSharedObjectPool.h"
-#include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Element.h"
 #include "core/dom/ElementTraversal.h"
@@ -90,6 +89,7 @@
 #include "core/dom/ScriptRunner.h"
 #include "core/dom/ScriptedAnimationController.h"
 #include "core/dom/SelectorQuery.h"
+#include "core/dom/StyleSheetCollections.h"
 #include "core/dom/TouchList.h"
 #include "core/dom/TransformSource.h"
 #include "core/dom/TreeWalker.h"
@@ -105,6 +105,7 @@
 #include "core/html/HTMLAnchorElement.h"
 #include "core/html/HTMLCanvasElement.h"
 #include "core/html/HTMLCollection.h"
+#include "core/html/HTMLDialogElement.h"
 #include "core/html/HTMLDocument.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLHeadElement.h"
@@ -176,6 +177,7 @@
 #include "wtf/StdLibExtras.h"
 #include "wtf/UnusedParam.h"
 #include "wtf/text/StringBuffer.h"
+#include "wtf/text/TextEncodingRegistry.h"
 
 using namespace std;
 using namespace WTF;
@@ -300,7 +302,7 @@ static bool acceptsEditingFocus(Element* element)
     if (!frame || !root)
         return false;
 
-    return frame->editor()->shouldBeginEditing(rangeOfContents(root).get());
+    return frame->editor().shouldBeginEditing(rangeOfContents(root).get());
 }
 
 static bool canAccessAncestor(const SecurityOrigin* activeSecurityOrigin, Frame* targetFrame)
@@ -396,7 +398,7 @@ Document::Document(const DocumentInit& initializer, DocumentClassFlags documentC
     , m_domTreeVersion(++s_globalTreeVersion)
     , m_listenerTypes(0)
     , m_mutationObserverTypes(0)
-    , m_styleSheetCollection(DocumentStyleSheetCollection::create(this))
+    , m_styleSheetCollections(StyleSheetCollections::create(this))
     , m_visitedLinkState(VisitedLinkState::create(this))
     , m_visuallyOrdered(false)
     , m_readyState(Complete)
@@ -536,7 +538,7 @@ Document::~Document()
     if (this == topDocument())
         clearAXObjectCache();
 
-    m_decoder = 0;
+    setDecoder(PassRefPtr<TextResourceDecoder>());
 
     if (m_styleSheetList)
         m_styleSheetList->detachFromDocument();
@@ -546,7 +548,7 @@ Document::~Document()
         m_import = 0;
     }
 
-    m_styleSheetCollection.clear();
+    m_styleSheetCollections.clear();
 
     if (m_elemSheet)
         m_elemSheet->clearOwnerNode();
@@ -587,6 +589,7 @@ void Document::dispose()
     m_documentElement = 0;
     m_contextFeatures = ContextFeatures::defaultSwitch();
     m_userActionElements.documentDidRemoveLastRef();
+    m_associatedFormControls.clear();
 
     detachParser();
 
@@ -647,8 +650,8 @@ void Document::setCompatibilityMode(CompatibilityMode mode)
     selectorQueryCache()->invalidate();
     if (inQuirksMode() != wasInQuirksMode) {
         // All user stylesheets have to reparse using the different mode.
-        m_styleSheetCollection->clearPageUserSheet();
-        m_styleSheetCollection->invalidateInjectedStyleSheetCache();
+        m_styleSheetCollections->clearPageUserSheet();
+        m_styleSheetCollections->invalidateInjectedStyleSheetCache();
     }
 }
 
@@ -657,7 +660,7 @@ String Document::compatMode() const
     return inQuirksMode() ? "BackCompat" : "CSS1Compat";
 }
 
-void Document::setDocType(PassRefPtr<DocumentType> docType)
+void Document::setDoctype(PassRefPtr<DocumentType> docType)
 {
     // This should never be called more than once.
     ASSERT(!m_docType || !docType);
@@ -804,6 +807,10 @@ PassRefPtr<CDATASection> Document::createCDATASection(const String& data, Except
 {
     if (isHTMLDocument()) {
         es.throwDOMException(NotSupportedError);
+        return 0;
+    }
+    if (data.find("]]>") != WTF::notFound) {
+        es.throwDOMException(InvalidCharacterError, "String cannot contain ']]>' since that is the end delimiter of a CData section.");
         return 0;
     }
     return CDATASection::create(this, data);
@@ -1101,17 +1108,15 @@ void Document::setReadyState(ReadyState readyState)
     }
 
     m_readyState = readyState;
-    dispatchEvent(Event::create(eventNames().readystatechangeEvent, false, false));
+    dispatchEvent(Event::create(eventNames().readystatechangeEvent));
 }
 
-String Document::encoding() const
+String Document::encodingName() const
 {
     // TextEncoding::domName() returns a char*, no need to allocate a new
     // String for it each time.
     // FIXME: We should fix TextEncoding to speak AtomicString anyway.
-    if (TextResourceDecoder* d = decoder())
-        return AtomicString(d->encoding().domName());
-    return String();
+    return AtomicString(m_encoding.domName());
 }
 
 String Document::defaultCharset() const
@@ -1126,6 +1131,7 @@ void Document::setCharset(const String& charset)
     if (!decoder())
         return;
     decoder()->setEncoding(charset, TextResourceDecoder::UserChosenEncoding);
+    setEncoding(m_decoder->encoding());
 }
 
 void Document::setContentLanguage(const String& language)
@@ -1238,9 +1244,8 @@ PassRefPtr<Range> Document::caretRangeFromPoint(int x, int y)
  *  3. Collapse internal whitespace.
  */
 template <typename CharacterType>
-static inline StringWithDirection canonicalizedTitle(Document* document, const StringWithDirection& titleWithDirection)
+static inline String canonicalizedTitle(Document* document, const String& title)
 {
-    const String& title = titleWithDirection.string();
     const CharacterType* characters = title.getCharacters<CharacterType>();
     unsigned length = title.length();
     unsigned i;
@@ -1256,7 +1261,7 @@ static inline StringWithDirection canonicalizedTitle(Document* document, const S
     }
 
     if (i == length)
-        return StringWithDirection();
+        return String();
 
     // Replace control characters with spaces, and backslashes with currency symbols, and collapse whitespace.
     bool previousCharWasWS = false;
@@ -1281,32 +1286,30 @@ static inline StringWithDirection canonicalizedTitle(Document* document, const S
     }
 
     if (!builderIndex && buffer[builderIndex] == ' ')
-        return StringWithDirection();
+        return String();
 
     buffer.shrink(builderIndex + 1);
 
     // Replace the backslashes with currency symbols if the encoding requires it.
     document->displayBufferModifiedByEncoding(buffer.characters(), buffer.length());
 
-    return StringWithDirection(String::adopt(buffer), titleWithDirection.direction());
+    return String::adopt(buffer);
 }
 
-void Document::updateTitle(const StringWithDirection& title)
+void Document::updateTitle(const String& title)
 {
     if (m_rawTitle == title)
         return;
 
     m_rawTitle = title;
 
-    StringWithDirection oldTitle = m_title;
-    if (m_rawTitle.string().isEmpty())
-        m_title = StringWithDirection();
-    else {
-        if (m_rawTitle.string().is8Bit())
-            m_title = canonicalizedTitle<LChar>(this, m_rawTitle);
-        else
-            m_title = canonicalizedTitle<UChar>(this, m_rawTitle);
-    }
+    String oldTitle = m_title;
+    if (m_rawTitle.isEmpty())
+        m_title = String();
+    else if (m_rawTitle.is8Bit())
+        m_title = canonicalizedTitle<LChar>(this, m_rawTitle);
+    else
+        m_title = canonicalizedTitle<UChar>(this, m_rawTitle);
 
     if (!m_frame || oldTitle == m_title)
         return;
@@ -1327,8 +1330,7 @@ void Document::setTitle(const String& title)
         }
     }
 
-    // The DOM API has no method of specifying direction, so assume LTR.
-    updateTitle(StringWithDirection(title, LTR));
+    updateTitle(title);
 
     if (m_titleElement) {
         ASSERT(isHTMLTitleElement(m_titleElement.get()));
@@ -1337,7 +1339,7 @@ void Document::setTitle(const String& title)
     }
 }
 
-void Document::setTitleElement(const StringWithDirection& title, Element* titleElement)
+void Document::setTitleElement(const String& title, Element* titleElement)
 {
     if (titleElement != m_titleElement) {
         if (m_titleElement || m_titleSetExplicitly)
@@ -1357,19 +1359,20 @@ void Document::removeTitle(Element* titleElement)
     m_titleElement = 0;
     m_titleSetExplicitly = false;
 
+    // FIXME: This is broken for SVG.
     // Update title based on first title element in the head, if one exists.
     if (HTMLElement* headElement = head()) {
-        for (Node* e = headElement->firstChild(); e; e = e->nextSibling()) {
-            if (isHTMLTitleElement(e)) {
-                HTMLTitleElement* titleElement = toHTMLTitleElement(e);
-                setTitleElement(titleElement->textWithDirection(), titleElement);
-                break;
-            }
+        for (Element* element = headElement->firstElementChild(); element; element = element->nextElementSibling()) {
+            if (!isHTMLTitleElement(element))
+                continue;
+            HTMLTitleElement* title = toHTMLTitleElement(element);
+            setTitleElement(title->text(), title);
+            break;
         }
     }
 
     if (!m_titleElement)
-        updateTitle(StringWithDirection());
+        updateTitle(String());
 }
 
 PageVisibilityState Document::visibilityState() const
@@ -1395,7 +1398,7 @@ bool Document::webkitHidden() const
 
 void Document::dispatchVisibilityStateChangeEvent()
 {
-    dispatchEvent(Event::create(eventNames().webkitvisibilitychangeEvent, false, false));
+    dispatchEvent(Event::create(eventNames().webkitvisibilitychangeEvent));
 }
 
 DOMSecurityPolicy* Document::securityPolicy()
@@ -1620,13 +1623,13 @@ void Document::recalcStyle(StyleChange change)
     // re-attaching our containing iframe, which when asked HTMLFrameElementBase::isURLAllowed
     // hits a null-dereference due to security code always assuming the document has a SecurityOrigin.
 
-    if (m_styleSheetCollection->needsUpdateActiveStylesheetsOnStyleRecalc())
-        m_styleSheetCollection->updateActiveStyleSheets(FullStyleUpdate);
+    if (m_styleSheetCollections->needsUpdateActiveStylesheetsOnStyleRecalc())
+        m_styleSheetCollections->updateActiveStyleSheets(FullStyleUpdate);
 
     InspectorInstrumentationCookie cookie = InspectorInstrumentation::willRecalculateStyle(this);
 
     if (m_elemSheet && m_elemSheet->contents()->usesRemUnits())
-        m_styleSheetCollection->setUsesRemUnit(true);
+        m_styleSheetCollections->setUsesRemUnit(true);
 
     m_inStyleRecalc = true;
     {
@@ -1673,15 +1676,15 @@ void Document::recalcStyle(StyleChange change)
         unscheduleStyleRecalc();
 
         // FIXME: SVG <use> element can schedule a recalc in the middle of an already running one.
-        // See DocumentStyleSheetCollection::updateActiveStyleSheets.
-        if (m_styleSheetCollection->needsUpdateActiveStylesheetsOnStyleRecalc())
+        // See StyleSheetCollections::updateActiveStyleSheets.
+        if (m_styleSheetCollections->needsUpdateActiveStylesheetsOnStyleRecalc())
             setNeedsStyleRecalc();
 
         m_inStyleRecalc = false;
 
         // Pseudo element removal and similar may only work with these flags still set. Reset them after the style recalc.
         if (m_styleResolver)
-            m_styleSheetCollection->resetCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
+            m_styleSheetCollections->resetCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
 
         if (frameView) {
             frameView->resumeScheduledEvents();
@@ -1740,8 +1743,6 @@ void Document::updateLayout()
         oe->document()->updateLayout();
 
     updateStyleIfNeeded();
-
-    StackStats::LayoutCheckPoint layoutCheckPoint;
 
     // Only do a layout if changes have occurred that make it necessary.
     if (frameView && renderer() && (frameView->layoutPending() || renderer()->needsLayout()))
@@ -1865,7 +1866,7 @@ void Document::createStyleResolver()
     if (Settings* docSettings = settings())
         matchAuthorAndUserStyles = docSettings->authorAndUserStylesEnabled();
     m_styleResolver = adoptPtr(new StyleResolver(this, matchAuthorAndUserStyles));
-    m_styleSheetCollection->combineCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
+    m_styleSheetCollections->combineCSSFeatureFlags(m_styleResolver->ruleFeatureSet());
 }
 
 void Document::clearStyleResolver()
@@ -2340,7 +2341,7 @@ bool Document::dispatchBeforeUnloadEvent(Chrome& chrome, Document* navigatingDoc
     m_loadEventProgress = BeforeUnloadEventCompleted;
     if (!beforeUnloadEvent->defaultPrevented())
         defaultEventHandler(beforeUnloadEvent.get());
-    if (beforeUnloadEvent->result().isNull())
+    if (beforeUnloadEvent->returnValue().isNull())
         return true;
 
     if (navigatingDocument->m_didAllowNavigationViaBeforeUnloadConfirmationPanel) {
@@ -2348,7 +2349,7 @@ bool Document::dispatchBeforeUnloadEvent(Chrome& chrome, Document* navigatingDoc
         return true;
     }
 
-    String text = displayStringModifiedByEncoding(beforeUnloadEvent->result());
+    String text = displayStringModifiedByEncoding(beforeUnloadEvent->returnValue());
     if (chrome.runBeforeUnloadConfirmPanel(text, m_frame)) {
         navigatingDocument->m_didAllowNavigationViaBeforeUnloadConfirmationPanel = true;
         return true;
@@ -2377,7 +2378,7 @@ void Document::dispatchUnloadEvents()
             // time into freed memory.
             RefPtr<DocumentLoader> documentLoader =  m_frame->loader()->provisionalDocumentLoader();
             m_loadEventProgress = UnloadEventInProgress;
-            RefPtr<Event> unloadEvent(Event::create(eventNames().unloadEvent, false, false));
+            RefPtr<Event> unloadEvent(Event::create(eventNames().unloadEvent));
             if (documentLoader && !documentLoader->timing()->unloadEventStart() && !documentLoader->timing()->unloadEventEnd()) {
                 DocumentLoadTiming* timing = documentLoader->timing();
                 ASSERT(timing->navigationStart());
@@ -2704,7 +2705,7 @@ Frame* Document::findUnsafeParentScrollPropagationBoundary()
 
 void Document::seamlessParentUpdatedStylesheets()
 {
-    m_styleSheetCollection->didModifySeamlessParentStyleSheet();
+    m_styleSheetCollections->didModifySeamlessParentStyleSheet();
     styleResolverChanged(RecalcStyleImmediately);
 }
 
@@ -2780,8 +2781,8 @@ void Document::processHttpEquivDefaultStyle(const String& content)
     // For more info, see the test at:
     // http://www.hixie.ch/tests/evil/css/import/main/preferred.html
     // -dwh
-    m_styleSheetCollection->setSelectedStylesheetSetName(content);
-    m_styleSheetCollection->setPreferredStylesheetSetName(content);
+    m_styleSheetCollections->setSelectedStylesheetSetName(content);
+    m_styleSheetCollections->setPreferredStylesheetSetName(content);
     styleResolverChanged(RecalcStyleDeferred);
 }
 
@@ -3104,17 +3105,17 @@ StyleSheetList* Document::styleSheets()
 
 String Document::preferredStylesheetSet() const
 {
-    return m_styleSheetCollection->preferredStylesheetSetName();
+    return m_styleSheetCollections->preferredStylesheetSetName();
 }
 
 String Document::selectedStylesheetSet() const
 {
-    return m_styleSheetCollection->selectedStylesheetSetName();
+    return m_styleSheetCollections->selectedStylesheetSetName();
 }
 
 void Document::setSelectedStylesheetSet(const String& aString)
 {
-    m_styleSheetCollection->setSelectedStylesheetSetName(aString);
+    m_styleSheetCollections->setSelectedStylesheetSetName(aString);
     styleResolverChanged(RecalcStyleDeferred);
 }
 
@@ -3134,14 +3135,14 @@ void Document::styleResolverChanged(StyleResolverUpdateType updateType, StyleRes
     }
     m_didCalculateStyleResolver = true;
 
-    bool needsRecalc = m_styleSheetCollection->updateActiveStyleSheets(updateMode);
+    bool needsRecalc = m_styleSheetCollections->updateActiveStyleSheets(updateMode);
 
     if (updateType >= RecalcStyleDeferred) {
         setNeedsStyleRecalc();
         return;
     }
 
-    if (didLayoutWithPendingStylesheets() && !m_styleSheetCollection->hasPendingSheets()) {
+    if (didLayoutWithPendingStylesheets() && !m_styleSheetCollections->hasPendingSheets()) {
         m_pendingSheetLayout = IgnoreLayoutWithPendingSheets;
         if (renderer())
             renderView()->repaintViewAndCompositedLayers();
@@ -3313,7 +3314,7 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
         }
 
         if (oldFocusedElement->isRootEditableElement())
-            frame()->editor()->didEndEditing();
+            frame()->editor().didEndEditing();
 
         if (view()) {
             Widget* oldWidget = widgetForElement(oldFocusedElement.get());
@@ -3362,7 +3363,7 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
         m_focusedElement->setFocus(true);
 
         if (m_focusedElement->isRootEditableElement())
-            frame()->editor()->didBeginEditing(m_focusedElement.get());
+            frame()->editor().didBeginEditing(m_focusedElement.get());
 
         // eww, I suck. set the qt focus correctly
         // ### find a better place in the code for this
@@ -3389,7 +3390,7 @@ bool Document::setFocusedElement(PassRefPtr<Element> prpNewFocusedElement, Focus
             cache->handleFocusedUIElementChanged(oldFocusedElement.get(), newFocusedElement.get());
     }
 
-    if (!focusChangeBlocked)
+    if (!focusChangeBlocked && page())
         page()->chrome().focusedNodeChanged(m_focusedElement.get());
 
 SetFocusedElementDone:
@@ -3629,11 +3630,11 @@ void Document::addListenerTypeIfNeeded(const AtomicString& eventType)
         addMutationEventListenerTypeIfEnabled(DOMCHARACTERDATAMODIFIED_LISTENER);
     else if (eventType == eventNames().overflowchangedEvent)
         addListenerType(OVERFLOWCHANGED_LISTENER);
-    else if (eventType == eventNames().webkitAnimationStartEvent)
+    else if (eventType == eventNames().webkitAnimationStartEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationstartEvent))
         addListenerType(ANIMATIONSTART_LISTENER);
-    else if (eventType == eventNames().webkitAnimationEndEvent)
+    else if (eventType == eventNames().webkitAnimationEndEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationendEvent))
         addListenerType(ANIMATIONEND_LISTENER);
-    else if (eventType == eventNames().webkitAnimationIterationEvent)
+    else if (eventType == eventNames().webkitAnimationIterationEvent || (RuntimeEnabledFeatures::cssAnimationUnprefixedEnabled() && eventType == eventNames().animationiterationEvent))
         addListenerType(ANIMATIONITERATION_LISTENER);
     else if (eventType == eventNames().webkitTransitionEndEvent || eventType == eventNames().transitionendEvent)
         addListenerType(TRANSITIONEND_LISTENER);
@@ -3939,6 +3940,32 @@ bool Document::parseQualifiedName(const String& qualifiedName, String& prefix, S
 void Document::setDecoder(PassRefPtr<TextResourceDecoder> decoder)
 {
     m_decoder = decoder;
+    setEncoding(m_decoder ? m_decoder->encoding() : WTF::TextEncoding());
+}
+
+void Document::setEncoding(const WTF::TextEncoding& encoding)
+{
+    if (m_encoding == encoding)
+        return;
+
+    // It's possible for the encoding of the document to change while we're decoding
+    // data. That can only occur while we're processing the <head> portion of the
+    // document. There isn't much user-visible content in the <head>, but there is
+    // the <title> element. This function detects that situation and re-decodes the
+    // document's title so that the user doesn't see an incorrectly decoded title
+    // in the title bar.
+    if (m_titleElement
+        && !m_titleElement->firstElementChild()
+        && m_encoding == Latin1Encoding()
+        && m_titleElement->textContent().containsOnlyLatin1()) {
+
+        CString originalBytes = m_titleElement->textContent().latin1();
+        OwnPtr<TextCodec> codec = newTextCodec(encoding);
+        String correctlyDecodedTitle = codec->decode(originalBytes.data(), originalBytes.length(), true);
+        m_titleElement->setTextContent(correctlyDecodedTitle, IGNORE_EXCEPTION);
+    }
+
+    m_encoding = encoding;
 }
 
 KURL Document::completeURL(const String& url, const KURL& baseURLOverride) const
@@ -3974,9 +4001,7 @@ static Editor::Command command(Document* document, const String& commandName, bo
         return Editor::Command();
 
     document->updateStyleIfNeeded();
-
-    return frame->editor()->command(commandName,
-        userInterface ? CommandFromDOMWithUserInterface : CommandFromDOM);
+    return frame->editor().command(commandName, userInterface ? CommandFromDOMWithUserInterface : CommandFromDOM);
 }
 
 bool Document::execCommand(const String& commandName, bool userInterface, const String& value)
@@ -4227,7 +4252,7 @@ void Document::finishedParsing()
     setParsing(false);
     if (!m_documentTiming.domContentLoadedEventStart)
         m_documentTiming.domContentLoadedEventStart = monotonicallyIncreasingTime();
-    dispatchEvent(Event::create(eventNames().DOMContentLoadedEvent, true, false));
+    dispatchEvent(Event::createBubble(eventNames().DOMContentLoadedEvent));
     if (!m_documentTiming.domContentLoadedEventEnd)
         m_documentTiming.domContentLoadedEventEnd = monotonicallyIncreasingTime();
 
@@ -4439,6 +4464,25 @@ void Document::initContentSecurityPolicy(const ContentSecurityPolicyResponseHead
     if (m_frame && m_frame->tree()->parent() && (shouldInheritSecurityOriginFromOwner(m_url) || isPluginDocument()))
         contentSecurityPolicy()->copyStateFrom(m_frame->tree()->parent()->document()->contentSecurityPolicy());
     contentSecurityPolicy()->didReceiveHeaders(headers);
+}
+
+bool Document::allowInlineEventHandlers(Node* node, EventListener* listener, const String& contextURL, const WTF::OrdinalNumber& contextLine)
+{
+    if (!contentSecurityPolicy()->allowInlineEventHandlers(contextURL, contextLine))
+        return false;
+
+    // HTML says that inline script needs browsing context to create its execution environment.
+    // http://www.whatwg.org/specs/web-apps/current-work/multipage/webappapis.html#event-handler-attributes
+    // Also, if the listening node came from other document, which happens on context-less event dispatching,
+    // we also need to ask the owner document of the node.
+    if (!m_frame)
+        return false;
+    if (!m_frame->script()->canExecuteScripts(NotAboutToExecuteScript))
+        return false;
+    if (node && node->document() != this && !node->document()->allowInlineEventHandlers(node, listener, contextURL, contextLine))
+        return false;
+
+    return true;
 }
 
 void Document::didUpdateSecurityOrigin()
@@ -4742,6 +4786,13 @@ void Document::removeFromTopLayer(Element* element)
     element->setIsInTopLayer(false);
 }
 
+HTMLDialogElement* Document::activeModalDialog() const
+{
+    if (m_topLayerElements.isEmpty())
+        return 0;
+    return static_cast<HTMLDialogElement*>(m_topLayerElements.last().get());
+}
+
 void Document::webkitExitPointerLock()
 {
     if (!page())
@@ -4874,9 +4925,7 @@ void Document::didRemoveTouchEventHandler(Node* handler)
 {
     if (!m_touchEventTargets.get())
         return;
-    // TODO(rbyers): Re-enable this ASSERT - http://crbug.com/254203.
-    // The known failure is benign, but the fix somehow causes a perf regression.
-    // ASSERT(m_touchEventTargets->contains(handler));
+    ASSERT(m_touchEventTargets->contains(handler));
     m_touchEventTargets->remove(handler);
     if (Document* parent = parentDocument()) {
         parent->didRemoveTouchEventHandler(this);
@@ -4899,9 +4948,12 @@ void Document::didRemoveTouchEventHandler(Node* handler)
 
 void Document::didRemoveEventTargetNode(Node* handler)
 {
-    if (m_touchEventTargets) {
-        m_touchEventTargets->removeAll(handler);
-        if ((handler == this || m_touchEventTargets->isEmpty()) && parentDocument())
+    if (m_touchEventTargets && !m_touchEventTargets->isEmpty()) {
+        if (handler == this)
+            m_touchEventTargets->clear();
+        else
+            m_touchEventTargets->removeAll(handler);
+        if (m_touchEventTargets->isEmpty() && parentDocument())
             parentDocument()->didRemoveEventTargetNode(this);
     }
 }
@@ -5180,7 +5232,7 @@ void Document::updateHoverActiveState(const HitTestRequest& request, Element* in
 
 bool Document::haveStylesheetsLoaded() const
 {
-    return !m_styleSheetCollection->hasPendingSheets() || m_ignorePendingStylesheets;
+    return !m_styleSheetCollections->hasPendingSheets() || m_ignorePendingStylesheets;
 }
 
 Locale& Document::getCachedLocale(const AtomicString& locale)

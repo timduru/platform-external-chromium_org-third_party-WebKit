@@ -40,6 +40,7 @@ namespace WebCore {
     macro(blocked) \
     macro(blur) \
     macro(cached) \
+    macro(cancel) \
     macro(change) \
     macro(chargingchange) \
     macro(chargingtimechange) \
@@ -190,8 +191,11 @@ namespace WebCore {
     macro(stalled) \
     macro(suspend) \
     \
+    macro(animationend) \
     macro(webkitAnimationEnd) \
+    macro(animationstart) \
     macro(webkitAnimationStart) \
+    macro(animationiteration) \
     macro(webkitAnimationIteration) \
     \
     macro(webkitTransitionEnd) \

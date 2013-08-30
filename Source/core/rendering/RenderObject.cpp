@@ -246,13 +246,6 @@ RenderObject::~RenderObject()
 #endif
 }
 
-RenderTheme* RenderObject::theme() const
-{
-    ASSERT(document()->page());
-
-    return document()->page()->theme();
-}
-
 String RenderObject::debugName() const
 {
     StringBuilder name;
@@ -748,12 +741,17 @@ void RenderObject::checkBlockPositionedObjectsNeedLayout()
 }
 #endif
 
-void RenderObject::setPreferredLogicalWidthsDirty(bool shouldBeDirty, MarkingBehavior markParents)
+void RenderObject::setPreferredLogicalWidthsDirty(MarkingBehavior markParents)
 {
     bool alreadyDirty = preferredLogicalWidthsDirty();
-    m_bitfields.setPreferredLogicalWidthsDirty(shouldBeDirty);
-    if (shouldBeDirty && !alreadyDirty && markParents == MarkContainingBlockChain && (isText() || !style()->hasOutOfFlowPosition()))
+    m_bitfields.setPreferredLogicalWidthsDirty(true);
+    if (!alreadyDirty && markParents == MarkContainingBlockChain && (isText() || !style()->hasOutOfFlowPosition()))
         invalidateContainerPreferredLogicalWidths();
+}
+
+void RenderObject::clearPreferredLogicalWidthsDirty()
+{
+    m_bitfields.setPreferredLogicalWidthsDirty(false);
 }
 
 void RenderObject::invalidateContainerPreferredLogicalWidths()
@@ -1164,7 +1162,7 @@ void RenderObject::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRec
     int outlineOffset = styleToUse->outlineOffset();
 
     if (styleToUse->outlineStyleIsAuto() || hasOutlineAnnotation()) {
-        if (theme()->shouldDrawDefaultFocusRing(this)) {
+        if (RenderTheme::theme().shouldDrawDefaultFocusRing(this)) {
             // Only paint the focus ring by hand if the theme isn't able to draw the focus ring.
             paintFocusRing(paintInfo, paintRect.location(), styleToUse);
         }
@@ -1217,7 +1215,7 @@ void RenderObject::paintOutline(PaintInfo& paintInfo, const LayoutRect& paintRec
     drawLineForBoxSide(graphicsContext, leftOuter, bottomInner, rightOuter, bottomOuter, BSBottom, outlineColor, outlineStyle, outlineWidth, outlineWidth);
 
     if (useTransparencyLayer)
-        graphicsContext->endTransparencyLayer();
+        graphicsContext->endLayer();
 }
 
 IntRect RenderObject::absoluteBoundingBoxRect(bool useTransforms) const
@@ -1674,8 +1672,8 @@ Color RenderObject::selectionBackgroundColor() const
         }
 
         backgroundColor = frame()->selection()->isFocusedAndActive() ?
-            theme()->activeSelectionBackgroundColor() :
-            theme()->inactiveSelectionBackgroundColor();
+            RenderTheme::theme().activeSelectionBackgroundColor() :
+            RenderTheme::theme().inactiveSelectionBackgroundColor();
     }
 
     return backgroundColor;
@@ -1694,8 +1692,8 @@ Color RenderObject::selectionColor(int colorProperty) const
         color = styleColor.isValid() ? styleColor.color() : resolveColor(pseudoStyle.get(), CSSPropertyColor);
     } else
         color = frame()->selection()->isFocusedAndActive() ?
-                theme()->activeSelectionForegroundColor() :
-                theme()->inactiveSelectionForegroundColor();
+            RenderTheme::theme().activeSelectionForegroundColor() :
+            RenderTheme::theme().inactiveSelectionForegroundColor();
 
     return color;
 }
@@ -1736,16 +1734,9 @@ void RenderObject::handleDynamicFloatPositionChange()
 
 void RenderObject::setAnimatableStyle(PassRefPtr<RenderStyle> style)
 {
-    if (!isText() && style) {
-        if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
-            setStyle(animation()->updateAnimations(this, style.get()));
-            return;
-        }
-        if (node() && node()->isElementNode()) {
-            Element* element = toElement(node());
-            if (CSSAnimations::needsUpdate(element, style.get()))
-                element->ensureActiveAnimations()->cssAnimations()->update(element, style.get());
-        }
+    if (!isText() && style && !RuntimeEnabledFeatures::webAnimationsCSSEnabled()) {
+        setStyle(animation()->updateAnimations(this, style.get()));
+        return;
     }
     setStyle(style);
 }
@@ -2795,7 +2786,6 @@ void RenderObject::scheduleRelayout()
 
 void RenderObject::layout()
 {
-    StackStats::LayoutCheckPoint layoutCheckPoint;
     ASSERT(needsLayout());
     RenderObject* child = firstChild();
     while (child) {
@@ -2853,7 +2843,7 @@ static PassRefPtr<RenderStyle> firstLineStyleForCachedUncachedType(StyleCacheSta
 
 PassRefPtr<RenderStyle> RenderObject::uncachedFirstLineStyle(RenderStyle* style) const
 {
-    if (!document()->styleSheetCollection()->usesFirstLineRules())
+    if (!document()->styleSheetCollections()->usesFirstLineRules())
         return 0;
 
     ASSERT(!isText());
@@ -2863,7 +2853,7 @@ PassRefPtr<RenderStyle> RenderObject::uncachedFirstLineStyle(RenderStyle* style)
 
 RenderStyle* RenderObject::cachedFirstLineStyle() const
 {
-    ASSERT(document()->styleSheetCollection()->usesFirstLineRules());
+    ASSERT(document()->styleSheetCollections()->usesFirstLineRules());
 
     if (RefPtr<RenderStyle> style = firstLineStyleForCachedUncachedType(Cached, isText() ? parent() : this, m_style.get()))
         return style.get();

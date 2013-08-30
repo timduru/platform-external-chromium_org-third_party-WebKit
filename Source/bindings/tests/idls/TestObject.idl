@@ -182,8 +182,6 @@ callback TestCallbackFunction = void (TestEnumType formal1, TestObject formal2);
     [Conditional=Condition1&Condition2] attribute TestObjectectBConstructor conditionalAttr5;
     [Conditional=Condition1|Condition2] attribute TestObjectectCConstructor conditionalAttr6;
 
-    [Conditional=Condition1] const unsigned short CONDITIONAL_CONST = 0;
-
     readonly attribute any cachedAttribute1;
     readonly attribute any cachedAttribute2;
 
@@ -218,15 +216,11 @@ callback TestCallbackFunction = void (TestEnumType formal1, TestObject formal2);
     void classMethodWithClamp([Clamp] unsigned short objArgsShort, [Clamp] unsigned long objArgsLong);
 
     // 'EnabledAtRuntime' methods and attributes.
-    [EnabledAtRuntime] void enabledAtRuntimeMethod1(long longArg);
-    [EnabledAtRuntime=FeatureName] void enabledAtRuntimeMethod2(long longArg);
-    [EnabledAtRuntime] attribute long enabledAtRuntimeAttr1;
-    [EnabledAtRuntime=FeatureName] attribute long enabledAtRuntimeAttr2;
+    [EnabledAtRuntime=FeatureName] void enabledAtRuntimeMethod(long longArg);
+    [EnabledAtRuntime=FeatureName] attribute long enabledAtRuntimeAttr;
     // 'EnabledPerContext' methods and attributes.
-    [EnabledPerContext] void enabledPerContextMethod1(long longArg);
-    [EnabledPerContext=FeatureName] void enabledPerContextMethod2(long longArg);
-    [EnabledPerContext] attribute long enabledPerContextAttr1;
-    [EnabledPerContext=FeatureName] attribute long enabledPerContextAttr2;
+    [EnabledPerContext=FeatureName] void enabledPerContextMethod(long longArg);
+    [EnabledPerContext=FeatureName] attribute long enabledPerContextAttr;
 
     attribute float[]                   floatArray;
     attribute double[]                  doubleArray;
@@ -259,20 +253,6 @@ callback TestCallbackFunction = void (TestEnumType formal1, TestObject formal2);
     readonly attribute long      description;
     attribute long               id;
     readonly attribute DOMString hash;
-
-    // Check constants and enums.
-    const unsigned short CONST_VALUE_0 = 0;
-    const unsigned short CONST_VALUE_1 = 1;
-    const unsigned short CONST_VALUE_2 = 2;
-    const unsigned short CONST_VALUE_4 = 4;
-    const unsigned short CONST_VALUE_8 = 8;
-    const short CONST_VALUE_9 = -1;
-    const DOMString CONST_VALUE_10 = "my constant string";
-    const unsigned short CONST_VALUE_11 = 0xffffffff;
-    const unsigned short CONST_VALUE_12 = 0x01;
-    const unsigned short CONST_VALUE_13 = 0X20;
-    const unsigned short CONST_VALUE_14 = 0x1abc;
-    [Reflect=CONST_IMPL] const unsigned short CONST_JAVASCRIPT = 15;
 
     [Replaceable] readonly attribute long replaceableAttribute;
 

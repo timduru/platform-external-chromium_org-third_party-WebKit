@@ -200,12 +200,6 @@ RenderLayer::~RenderLayer()
             frameView->removeResizerArea(this);
     }
 
-    if (!m_renderer->documentBeingDestroyed()) {
-        Node* node = m_renderer->node();
-        if (node && node->isElementNode())
-            toElement(node)->setSavedLayerScrollOffset(m_scrollOffset);
-    }
-
     if (!m_renderer->documentBeingDestroyed())
         compositor()->removeOutOfFlowPositionedLayer(this);
 
@@ -656,6 +650,68 @@ void RenderLayer::computePaintOrderList(PaintOrderListType type, Vector<RefPtr<N
         for (size_t index = 0; index < posZOrderList->size(); ++index)
             list.append(posZOrderList->at(index)->renderer()->node());
     }
+}
+
+bool RenderLayer::scrollsWithRespectTo(const RenderLayer* other) const
+{
+    const EPosition position = renderer()->style()->position();
+    const EPosition otherPosition = other->renderer()->style()->position();
+    const RenderObject* containingBlock = renderer()->containingBlock();
+    const RenderObject* otherContainingBlock = other->renderer()->containingBlock();
+    const RenderLayer* rootLayer = renderer()->view()->compositor()->rootRenderLayer();
+
+    // Fixed-position elements are a special case. They are static with respect
+    // to the viewport, which is not represented by any RenderObject, and their
+    // containingBlock() method returns the root HTML element (while its true
+    // containingBlock should really be the viewport). The real measure for a
+    // non-transformed fixed-position element is as follows: any fixed position
+    // element, A, scrolls with respect an element, B, if and only if B is not
+    // fixed position.
+    //
+    // Unfortunately, it gets a bit more complicated - a fixed-position element
+    // which has a transform acts exactly as an absolute-position element
+    // (including having a real, non-viewport containing block).
+    //
+    // Below, a "root" fixed position element is defined to be one whose
+    // containing block is the root. These root-fixed-position elements are
+    // the only ones that need this special case code - other fixed position
+    // elements, as well as all absolute, relative, and static elements use the
+    // logic below.
+    const bool isRootFixedPos = position == FixedPosition && containingBlock->enclosingLayer() == rootLayer;
+    const bool otherIsRootFixedPos = otherPosition == FixedPosition && otherContainingBlock->enclosingLayer() == rootLayer;
+
+    if (isRootFixedPos && otherIsRootFixedPos)
+        return false;
+    if (isRootFixedPos || otherIsRootFixedPos)
+        return true;
+
+    FrameView* frameView = renderer()->view()->frameView();
+
+    if (containingBlock == otherContainingBlock)
+        return false;
+
+    // Maintain a set of containing blocks between the first layer and its
+    // closest scrollable ancestor.
+    HashSet<const RenderObject*> containingBlocks;
+    while (containingBlock) {
+        if (frameView && frameView->containsScrollableArea(containingBlock->enclosingLayer()->scrollableArea()))
+            break;
+        containingBlocks.add(containingBlock);
+        containingBlock = containingBlock->containingBlock();
+    }
+
+    // Do the same for the 2nd layer, but if we find a common containing block,
+    // it means both layers are contained within a single non-scrolling subtree.
+    // Hence, they will not scroll with respect to each other.
+    while (otherContainingBlock) {
+        if (containingBlocks.contains(otherContainingBlock))
+            return false;
+        if (frameView && frameView->containsScrollableArea(otherContainingBlock->enclosingLayer()->scrollableArea()))
+            break;
+        otherContainingBlock = otherContainingBlock->containingBlock();
+    }
+
+    return true;
 }
 
 void RenderLayer::computeRepaintRects(const RenderLayerModelObject* repaintContainer, const RenderGeometryMap* geometryMap)
@@ -2176,9 +2232,9 @@ void RenderLayer::setScrollOffset(const IntPoint& newScrollOffset)
             computeScrollDimensions();
     }
 
-    if (m_scrollOffset == toIntSize(newScrollOffset))
+    if (m_scrollableArea->scrollOffset() == toIntSize(newScrollOffset))
         return;
-    m_scrollOffset = toIntSize(newScrollOffset);
+    m_scrollableArea->setScrollOffset(toIntSize(newScrollOffset));
 
     Frame* frame = renderer()->frame();
     InspectorInstrumentation::willScrollLayer(renderer());
@@ -2526,11 +2582,6 @@ int RenderLayer::scrollSize(ScrollbarOrientation orientation) const
     return (orientation == HorizontalScrollbar) ? scrollDimensions.width() : scrollDimensions.height();
 }
 
-IntPoint RenderLayer::scrollPosition() const
-{
-    return IntPoint(m_scrollOffset);
-}
-
 IntPoint RenderLayer::minimumScrollPosition() const
 {
     return -scrollOrigin();
@@ -2543,20 +2594,6 @@ IntPoint RenderLayer::maximumScrollPosition() const
         return -scrollOrigin();
 
     return -scrollOrigin() + enclosingIntRect(m_overflowRect).size() - enclosingIntRect(box->clientBoxRect()).size();
-}
-
-IntRect RenderLayer::visibleContentRect(ScrollableArea::VisibleContentRectIncludesScrollbars scrollbarInclusion) const
-{
-    int verticalScrollbarWidth = 0;
-    int horizontalScrollbarHeight = 0;
-    if (scrollbarInclusion == ScrollableArea::IncludeScrollbars) {
-        verticalScrollbarWidth = (verticalScrollbar() && !verticalScrollbar()->isOverlayScrollbar()) ? verticalScrollbar()->width() : 0;
-        horizontalScrollbarHeight = (horizontalScrollbar() && !horizontalScrollbar()->isOverlayScrollbar()) ? horizontalScrollbar()->height() : 0;
-    }
-
-    return IntRect(IntPoint(scrollXOffset(), scrollYOffset()),
-                   IntSize(max(0, m_layerSize.width() - verticalScrollbarWidth),
-                           max(0, m_layerSize.height() - horizontalScrollbarHeight)));
 }
 
 IntSize RenderLayer::overhangAmount() const
@@ -3637,6 +3674,7 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
     // Apply clip-path to context.
     bool hasClipPath = false;
     RenderStyle* style = renderer()->style();
+    RenderSVGResourceClipper* resourceClipper = 0;
     if (renderer()->hasClipPath() && !context->paintingDisabled() && style) {
         ASSERT(style->clipPath());
         if (style->clipPath()->getOperationType() == ClipPathOperation::SHAPE) {
@@ -3662,7 +3700,11 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
                 }
 
                 // FIXME: This should use a safer cast such as toRenderSVGResourceContainer().
-                static_cast<RenderSVGResourceClipper*>(element->renderer())->applyClippingToContext(renderer(), rootRelativeBounds, paintingInfo.paintDirtyRect, context);
+                resourceClipper = static_cast<RenderSVGResourceClipper*>(element->renderer());
+                if (!resourceClipper->applyClippingToContext(renderer(), rootRelativeBounds, paintingInfo.paintDirtyRect, context)) {
+                    // No need to post-apply the clipper if this failed.
+                    resourceClipper = 0;
+                }
             }
         }
     }
@@ -3783,10 +3825,13 @@ void RenderLayer::paintLayerContents(GraphicsContext* context, const LayerPainti
 
     // End our transparency layer
     if (haveTransparency && m_usedTransparency && !m_paintingInsideReflection) {
-        context->endTransparencyLayer();
+        context->endLayer();
         context->restore();
         m_usedTransparency = false;
     }
+
+    if (resourceClipper)
+        resourceClipper->postApplyResource(renderer(), context, ApplyToDefaultMode, 0, 0);
 
     if (hasClipPath)
         context->restore();
@@ -6394,6 +6439,21 @@ const IntPoint& RenderLayer::scrollOrigin() const
     }
 
     return m_scrollableArea->scrollOrigin();
+}
+
+int RenderLayer::scrollXOffset() const
+{
+    return m_scrollableArea->scrollXOffset();
+}
+
+int RenderLayer::scrollYOffset() const
+{
+    return m_scrollableArea->scrollYOffset();
+}
+
+IntSize RenderLayer::scrolledContentOffset() const
+{
+    return m_scrollableArea->scrollOffset();
 }
 
 bool RenderLayer::hasOverlayScrollbars() const

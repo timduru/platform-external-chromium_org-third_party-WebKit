@@ -32,6 +32,7 @@ importScript("CSSNamedFlowCollectionsView.js");
 importScript("CSSNamedFlowView.js");
 importScript("EventListenersSidebarPane.js");
 importScript("MetricsSidebarPane.js");
+importScript("PlatformFontsSidebarPane.js");
 importScript("PropertiesSidebarPane.js");
 importScript("StylesSidebarPane.js");
 
@@ -67,7 +68,7 @@ WebInspector.ElementsPanel = function()
     this.contentElement.addEventListener("contextmenu", this._contextMenuEventFired.bind(this), true);
     this.splitView.sidebarElement.addEventListener("contextmenu", this._sidebarContextMenuEventFired.bind(this), false);
 
-    this.treeOutline = new WebInspector.ElementsTreeOutline(true, true, false, this._populateContextMenu.bind(this), this._setPseudoClassForNodeId.bind(this));
+    this.treeOutline = new WebInspector.ElementsTreeOutline(true, true, this._populateContextMenu.bind(this), this._setPseudoClassForNodeId.bind(this));
     this.treeOutline.wireToDomAgent();
 
     this.treeOutline.addEventListener(WebInspector.ElementsTreeOutline.Events.SelectedNodeChanged, this._selectedNodeChanged, this);
@@ -79,6 +80,7 @@ WebInspector.ElementsPanel = function()
     this.crumbsElement.addEventListener("mouseout", this._mouseMovedOutOfCrumbs.bind(this), false);
 
     this.sidebarPanes = {};
+    this.sidebarPanes.platformFonts = new WebInspector.PlatformFontsSidebarPane();
     this.sidebarPanes.computedStyle = new WebInspector.ComputedStyleSidebarPane();
     this.sidebarPanes.styles = new WebInspector.StylesSidebarPane(this.sidebarPanes.computedStyle, this._setPseudoClassForNodeId.bind(this));
     this.sidebarPanes.metrics = new WebInspector.MetricsSidebarPane();
@@ -88,6 +90,7 @@ WebInspector.ElementsPanel = function()
 
     this.sidebarPanes.styles.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updateStyles.bind(this, false));
     this.sidebarPanes.metrics.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updateMetrics.bind(this));
+    this.sidebarPanes.platformFonts.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updatePlatformFonts.bind(this));
     this.sidebarPanes.properties.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updateProperties.bind(this));
     this.sidebarPanes.eventListeners.addEventListener(WebInspector.SidebarPane.EventTypes.wasShown, this.updateEventListeners.bind(this));
 
@@ -233,6 +236,7 @@ WebInspector.ElementsPanel.prototype = {
 
         this.updateStyles(true);
         this.updateMetrics();
+        this.updatePlatformFonts();
         this.updateProperties();
         this.updateEventListeners();
     },
@@ -586,6 +590,8 @@ WebInspector.ElementsPanel.prototype = {
         // Once styles are edited, the Metrics pane should be updated.
         this.sidebarPanes.metrics.needsUpdate = true;
         this.updateMetrics();
+        this.sidebarPanes.platformFonts.needsUpdate = true;
+        this.updatePlatformFonts();
     },
 
     _metricsPaneEdited: function()
@@ -997,6 +1003,16 @@ WebInspector.ElementsPanel.prototype = {
         metricsSidebarPane.needsUpdate = false;
     },
 
+    updatePlatformFonts: function()
+    {
+        var platformFontsSidebar = this.sidebarPanes.platformFonts;
+        if (!platformFontsSidebar.isShowing() || !platformFontsSidebar.needsUpdate)
+            return;
+
+        platformFontsSidebar.update(this.selectedDOMNode());
+        platformFontsSidebar.needsUpdate = false;
+    },
+
     updateProperties: function()
     {
         var propertiesSidebarPane = this.sidebarPanes.properties;
@@ -1084,24 +1100,39 @@ WebInspector.ElementsPanel.prototype = {
      */
     appendApplicableItems: function(event, contextMenu, target)
     {
-        if (!(target instanceof WebInspector.RemoteObject))
-            return;
-        var remoteObject = /** @type {WebInspector.RemoteObject} */ (target);
-        if (remoteObject.subtype !== "node")
-            return;
-
+        /**
+         * @param {?DOMAgent.NodeId} nodeId
+         */
         function selectNode(nodeId)
         {
             if (nodeId)
                 WebInspector.domAgent.inspectElement(nodeId);
         }
-  
-        function revealElement()
+
+        /**
+         * @param {WebInspector.RemoteObject} remoteObject
+         */
+        function revealElement(remoteObject)
         {
             remoteObject.pushNodeToFrontend(selectNode);
         }
 
-        contextMenu.appendItem(WebInspector.UIString(WebInspector.useLowerCaseMenuTitles() ? "Reveal in Elements panel" : "Reveal in Elements Panel"), revealElement.bind(this));
+        var commandCallback;
+        if (target instanceof WebInspector.RemoteObject) {
+            var remoteObject = /** @type {WebInspector.RemoteObject} */ (target);
+            if (remoteObject.subtype === "node")
+                commandCallback = revealElement.bind(this, remoteObject);
+        } else if (target instanceof WebInspector.DOMNode) {
+            var domNode = /** @type {WebInspector.DOMNode} */ (target);
+            if (domNode.id)
+                commandCallback = WebInspector.domAgent.inspectElement.bind(WebInspector.domAgent, domNode.id);
+        }
+        if (!commandCallback)
+            return;
+        // Skip adding "Reveal..." menu item for our own tree outline.
+        if (this.treeOutline.element.isAncestor(event.target))
+            return;
+        contextMenu.appendItem(WebInspector.useLowerCaseMenuTitles() ? "Reveal in Elements panel" : "Reveal in Elements Panel", commandCallback);
     },
 
     _sidebarContextMenuEventFired: function(event)
@@ -1140,15 +1171,17 @@ WebInspector.ElementsPanel.prototype = {
         computedPane.element.addStyleClass("fill");
         var expandComputed = computedPane.expand.bind(computedPane);
 
-        this.sidebarPanes.metrics.show(computedPane.bodyElement);
-        this.sidebarPanes.metrics.setExpandCallback(expandComputed);
-
         computedPane.bodyElement.appendChild(this.sidebarPanes.computedStyle.titleElement);
         computedPane.bodyElement.addStyleClass("metrics-and-computed");
         this.sidebarPanes.computedStyle.show(computedPane.bodyElement);
         this.sidebarPanes.computedStyle.setExpandCallback(expandComputed);
 
+        this.sidebarPanes.platformFonts.show(computedPane.bodyElement);
+
         if (vertically) {
+            this.sidebarPanes.metrics.show(computedPane.bodyElement, this.sidebarPanes.computedStyle.element);
+            this.sidebarPanes.metrics.setExpandCallback(expandComputed);
+
             this.sidebarPaneView = new WebInspector.SidebarTabbedPane();
 
             var compositePane = new WebInspector.SidebarPane(this.sidebarPanes.styles.title());
@@ -1173,13 +1206,48 @@ WebInspector.ElementsPanel.prototype = {
         } else {
             this.sidebarPaneView = new WebInspector.SidebarTabbedPane();
 
-            this.sidebarPaneView.addPane(this.sidebarPanes.styles);
+            var stylesPane = new WebInspector.SidebarPane(this.sidebarPanes.styles.title());
+            stylesPane.element.addStyleClass("composite");
+            stylesPane.element.addStyleClass("fill");
+            var expandStyles = stylesPane.expand.bind(stylesPane);
+            stylesPane.bodyElement.addStyleClass("metrics-and-styles");
+            this.sidebarPanes.styles.show(stylesPane.bodyElement);
+            this.sidebarPanes.styles.setExpandCallback(expandStyles);
+            this.sidebarPanes.metrics.setExpandCallback(expandStyles);
+            stylesPane.bodyElement.appendChild(this.sidebarPanes.styles.titleElement);
+
+            /**
+             * @param {WebInspector.SidebarPane} pane
+             * @param {Element=} beforeElement
+             */
+            function showMetrics(pane, beforeElement)
+            {
+                this.sidebarPanes.metrics.show(pane.bodyElement, beforeElement);
+            }
+
+            /**
+             * @param {WebInspector.Event} event
+             */
+            function tabSelected(event)
+            {
+                var tabId = /** @type {string} */ (event.data.tabId);
+                if (tabId === computedPane.title())
+                    showMetrics.call(this, computedPane, this.sidebarPanes.computedStyle.element);
+                if (tabId === stylesPane.title())
+                    showMetrics.call(this, stylesPane);
+            }
+
+            this.sidebarPaneView.addEventListener(WebInspector.TabbedPane.EventTypes.TabSelected, tabSelected, this);
+
+            showMetrics.call(this, stylesPane);
+            this.sidebarPaneView.addPane(stylesPane);
             this.sidebarPaneView.addPane(computedPane);
 
             this.sidebarPaneView.addPane(this.sidebarPanes.eventListeners);
             this.sidebarPaneView.addPane(this.sidebarPanes.domBreakpoints);
             this.sidebarPaneView.addPane(this.sidebarPanes.properties);
         }
+
         this.sidebarPaneView.show(this.splitView.sidebarElement);
         this.sidebarPanes.styles.expand();
     },

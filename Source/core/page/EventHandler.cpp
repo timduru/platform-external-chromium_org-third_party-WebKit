@@ -52,6 +52,7 @@
 #include "core/editing/htmlediting.h"
 #include "core/fetch/ImageResource.h"
 #include "core/history/BackForwardController.h"
+#include "core/html/HTMLDialogElement.h"
 #include "core/html/HTMLFrameElementBase.h"
 #include "core/html/HTMLFrameSetElement.h"
 #include "core/html/HTMLInputElement.h"
@@ -463,7 +464,7 @@ void EventHandler::selectClosestWordFromMouseEvent(const MouseEventWithHitTestRe
 {
     if (m_mouseDownMayStartSelect) {
         selectClosestWordFromHitTestResult(result.hitTestResult(),
-            (result.event().clickCount() == 2 && m_frame->editor()->isSelectTrailingWhitespaceEnabled()) ? ShouldAppendTrailingWhitespace : DontAppendTrailingWhitespace);
+            (result.event().clickCount() == 2 && m_frame->editor().isSelectTrailingWhitespaceEnabled()) ? ShouldAppendTrailingWhitespace : DontAppendTrailingWhitespace);
     }
 }
 
@@ -471,7 +472,7 @@ void EventHandler::selectClosestMisspellingFromMouseEvent(const MouseEventWithHi
 {
     if (m_mouseDownMayStartSelect) {
         selectClosestMisspellingFromHitTestResult(result.hitTestResult(),
-            (result.event().clickCount() == 2 && m_frame->editor()->isSelectTrailingWhitespaceEnabled()) ? ShouldAppendTrailingWhitespace : DontAppendTrailingWhitespace);
+            (result.event().clickCount() == 2 && m_frame->editor().isSelectTrailingWhitespaceEnabled()) ? ShouldAppendTrailingWhitespace : DontAppendTrailingWhitespace);
     }
 }
 
@@ -573,7 +574,7 @@ bool EventHandler::handleMousePressEventSingleClick(const MouseEventWithHitTestR
                 pos = selectionInUserSelectAll.end();
         }
 
-        if (!m_frame->editor()->behavior().shouldConsiderSelectionAsDirectional()) {
+        if (!m_frame->editor().behavior().shouldConsiderSelectionAsDirectional()) {
             // See <rdar://problem/3668157> REGRESSION (Mail): shift-click deselects when selection
             // was created right-to-left
             Position start = newSelection.start();
@@ -1278,9 +1279,6 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
     m_lastMouseDownUserGestureToken = gestureIndicator.currentToken();
 
-    // FIXME (bug 68185): this call should be made at another abstraction layer
-    m_frame->loader()->resetMultipleFormSubmissionProtection();
-
     cancelFakeMouseMoveEvent();
     if (m_eventHandlerWillResetCapturingMouseEventsNode)
         m_capturingMouseEventsNode = 0;
@@ -1428,13 +1426,13 @@ ScrollableArea* EventHandler::associatedScrollableArea(const RenderLayer* layer)
     return 0;
 }
 
-bool EventHandler::mouseMoved(const PlatformMouseEvent& event)
+bool EventHandler::handleMouseMoveEvent(const PlatformMouseEvent& event)
 {
     RefPtr<FrameView> protector(m_frame->view());
     MaximumDurationTracker maxDurationTracker(&m_maxMouseMovedDuration);
 
     HitTestResult hoveredNode = HitTestResult(LayoutPoint());
-    bool result = handleMouseMoveEvent(event, &hoveredNode);
+    bool result = handleMouseMoveOrLeaveEvent(event, &hoveredNode);
 
     Page* page = m_frame->page();
     if (!page)
@@ -1455,13 +1453,19 @@ bool EventHandler::mouseMoved(const PlatformMouseEvent& event)
     return result;
 }
 
+void EventHandler::handleMouseLeaveEvent(const PlatformMouseEvent& event)
+{
+    RefPtr<FrameView> protector(m_frame->view());
+    handleMouseMoveOrLeaveEvent(event);
+}
+
 static Cursor& syntheticTouchCursor()
 {
     DEFINE_STATIC_LOCAL(Cursor, c, (Image::loadPlatformResource("syntheticTouchCursor").get(), IntPoint(10, 10)));
     return c;
 }
 
-bool EventHandler::handleMouseMoveEvent(const PlatformMouseEvent& mouseEvent, HitTestResult* hoveredNode, bool onlyUpdateScrollbars)
+bool EventHandler::handleMouseMoveOrLeaveEvent(const PlatformMouseEvent& mouseEvent, HitTestResult* hoveredNode, bool onlyUpdateScrollbars)
 {
     ASSERT(m_frame);
     ASSERT(m_frame->view());
@@ -1697,8 +1701,8 @@ bool EventHandler::handlePasteGlobalSelection(const PlatformMouseEvent& mouseEve
         return false;
     Frame* focusFrame = m_frame->page()->focusController().focusedOrMainFrame();
     // Do not paste here if the focus was moved somewhere else.
-    if (m_frame == focusFrame && m_frame->editor()->client().supportsGlobalSelection())
-        return m_frame->editor()->command("PasteGlobalSelection").execute();
+    if (m_frame == focusFrame && m_frame->editor().client().supportsGlobalSelection())
+        return m_frame->editor().command("PasteGlobalSelection").execute();
 
     return false;
 }
@@ -2191,10 +2195,10 @@ void EventHandler::defaultWheelEventHandler(Node* startNode, WheelEvent* wheelEv
 
     // Break up into two scrolls if we need to.  Diagonal movement on
     // a MacBook pro is an example of a 2-dimensional mouse wheel event (where both deltaX and deltaY can be set).
-    if (scrollNode(wheelEvent->rawDeltaX(), granularity, ScrollLeft, ScrollRight, startNode, &stopNode))
+    if (scrollNode(wheelEvent->deltaX(), granularity, ScrollRight, ScrollLeft, startNode, &stopNode))
         wheelEvent->setDefaultHandled();
 
-    if (scrollNode(wheelEvent->rawDeltaY(), granularity, ScrollUp, ScrollDown, startNode, &stopNode))
+    if (scrollNode(wheelEvent->deltaY(), granularity, ScrollDown, ScrollUp, startNode, &stopNode))
         wheelEvent->setDefaultHandled();
 
     if (!m_latchedWheelEventNode)
@@ -2332,7 +2336,7 @@ bool EventHandler::handleGestureTap(const PlatformGestureEvent& gestureEvent)
     PlatformMouseEvent fakeMouseMove(adjustedPoint, gestureEvent.globalPosition(),
         NoButton, PlatformEvent::MouseMoved, /* clickCount */ 0,
         gestureEvent.shiftKey(), gestureEvent.ctrlKey(), gestureEvent.altKey(), gestureEvent.metaKey(), gestureEvent.timestamp());
-    mouseMoved(fakeMouseMove);
+    handleMouseMoveEvent(fakeMouseMove);
 
     int tapCount = 1;
     // FIXME: deletaX is overloaded to mean different things for different gestures.
@@ -2705,7 +2709,7 @@ bool EventHandler::sendContextMenuEvent(const PlatformMouseEvent& event)
 
         if (mev.hitTestResult().isMisspelled())
             selectClosestMisspellingFromMouseEvent(mev);
-        else if (m_frame->editor()->behavior().shouldSelectOnContextualMenuClick())
+        else if (m_frame->editor().behavior().shouldSelectOnContextualMenuClick())
             selectClosestWordOrLinkFromMouseEvent(mev);
     }
 
@@ -2742,7 +2746,7 @@ bool EventHandler::sendContextMenuEventForKey()
 
     if (start.deprecatedNode() && (selection->rootEditableElement() || selection->isRange())) {
         RefPtr<Range> selectionRange = selection->toNormalizedRange();
-        IntRect firstRect = m_frame->editor()->firstRectForRange(selectionRange.get());
+        IntRect firstRect = m_frame->editor().firstRectForRange(selectionRange.get());
 
         int x = rightAligned ? firstRect.maxX() : firstRect.x();
         // In a multiline edit, firstRect.maxY() would endup on the next line, so -1.
@@ -2877,7 +2881,7 @@ void EventHandler::fakeMouseMoveEventTimerFired(Timer<EventHandler>* timer)
     bool metaKey;
     PlatformKeyboardEvent::getCurrentModifierState(shiftKey, ctrlKey, altKey, metaKey);
     PlatformMouseEvent fakeMouseMoveEvent(m_lastKnownMousePosition, m_lastKnownMouseGlobalPosition, NoButton, PlatformEvent::MouseMoved, 0, shiftKey, ctrlKey, altKey, metaKey, currentTime());
-    mouseMoved(fakeMouseMoveEvent);
+    handleMouseMoveEvent(fakeMouseMoveEvent);
 }
 
 void EventHandler::cancelFakeMouseMoveEvent()
@@ -2989,9 +2993,6 @@ bool EventHandler::keyEvent(const PlatformKeyboardEvent& initialKeyEvent)
     if (FrameView* view = m_frame->view())
         view->resetDeferredRepaintDelay();
 
-    // FIXME (bug 68185): this call should be made at another abstraction layer
-    m_frame->loader()->resetMultipleFormSubmissionProtection();
-
     // In IE, access keys are special, they are handled after default keydown processing, but cannot be canceled - this is hard to match.
     // On Mac OS X, we process them before dispatching keydown, as the default keydown handler implements Emacs key bindings, which may conflict
     // with access keys. Then we dispatch keydown, but suppress its default handling.
@@ -3070,13 +3071,15 @@ static FocusDirection focusDirectionForKey(const AtomicString& keyIdentifier)
 void EventHandler::defaultKeyboardEventHandler(KeyboardEvent* event)
 {
     if (event->type() == eventNames().keydownEvent) {
-        m_frame->editor()->handleKeyboardEvent(event);
+        m_frame->editor().handleKeyboardEvent(event);
         if (event->defaultHandled())
             return;
         if (event->keyIdentifier() == "U+0009")
             defaultTabEventHandler(event);
         else if (event->keyIdentifier() == "U+0008")
             defaultBackspaceEventHandler(event);
+        else if (event->keyIdentifier() == "U+001B")
+            defaultEscapeEventHandler(event);
         else {
             FocusDirection direction = focusDirectionForKey(event->keyIdentifier());
             if (direction != FocusDirectionNone)
@@ -3084,7 +3087,7 @@ void EventHandler::defaultKeyboardEventHandler(KeyboardEvent* event)
         }
     }
     if (event->type() == eventNames().keypressEvent) {
-        m_frame->editor()->handleKeyboardEvent(event);
+        m_frame->editor().handleKeyboardEvent(event);
         if (event->defaultHandled())
             return;
         if (event->charCode() == ' ')
@@ -3348,7 +3351,7 @@ bool EventHandler::isKeyboardOptionTab(KeyboardEvent* event)
 
 void EventHandler::defaultTextInputEventHandler(TextEvent* event)
 {
-    if (m_frame->editor()->handleTextEvent(event))
+    if (m_frame->editor().handleTextEvent(event))
         event->setDefaultHandled();
 }
 
@@ -3380,7 +3383,7 @@ void EventHandler::defaultBackspaceEventHandler(KeyboardEvent* event)
     if (event->ctrlKey() || event->metaKey() || event->altKey() || event->altGraphKey())
         return;
 
-    if (!m_frame->editor()->behavior().shouldNavigateBackOnBackspace())
+    if (!m_frame->editor().behavior().shouldNavigateBackOnBackspace())
         return;
 
     Page* page = m_frame->page();
@@ -3397,7 +3400,6 @@ void EventHandler::defaultBackspaceEventHandler(KeyboardEvent* event)
     if (handledEvent)
         event->setDefaultHandled();
 }
-
 
 void EventHandler::defaultArrowEventHandler(FocusDirection focusDirection, KeyboardEvent* event)
 {
@@ -3444,6 +3446,12 @@ void EventHandler::defaultTabEventHandler(KeyboardEvent* event)
 
     if (page->focusController().advanceFocus(focusDirection))
         event->setDefaultHandled();
+}
+
+void EventHandler::defaultEscapeEventHandler(KeyboardEvent* event)
+{
+    if (HTMLDialogElement* dialog = m_frame->document()->activeModalDialog())
+        dialog->dispatchEvent(Event::createCancelable(eventNames().cancelEvent));
 }
 
 void EventHandler::capsLockStateMayHaveChanged()
@@ -3794,7 +3802,7 @@ bool EventHandler::passMouseMoveEventToSubframe(MouseEventWithHitTestResults& me
 {
     if (m_mouseDownMayStartDrag && !m_mouseDownWasInSubframe)
         return false;
-    subframe->eventHandler()->handleMouseMoveEvent(mev.event(), hoveredNode);
+    subframe->eventHandler()->handleMouseMoveOrLeaveEvent(mev.event(), hoveredNode);
     return true;
 }
 

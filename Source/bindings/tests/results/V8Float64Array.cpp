@@ -126,7 +126,7 @@ v8::Handle<v8::Object> wrap(Float64Array* impl, v8::Handle<v8::Object> creationC
     return wrapper;
 }
 
-static const V8DOMConfiguration::BatchedMethod V8Float64ArrayMethods[] = {
+static const V8DOMConfiguration::MethodConfiguration V8Float64ArrayMethods[] = {
     {"set", Float64ArrayV8Internal::setMethodCallback, 0, 0},
 };
 
@@ -151,16 +151,16 @@ static v8::Handle<v8::FunctionTemplate> ConfigureV8Float64ArrayTemplate(v8::Hand
     desc->ReadOnlyPrototype();
 
     v8::Local<v8::Signature> defaultSignature;
-    defaultSignature = V8DOMConfiguration::configureTemplate(desc, "Float64Array", V8ArrayBufferView::GetTemplate(isolate, currentWorldType), V8Float64Array::internalFieldCount,
+    defaultSignature = V8DOMConfiguration::installDOMClassTemplate(desc, "Float64Array", V8ArrayBufferView::GetTemplate(isolate, currentWorldType), V8Float64Array::internalFieldCount,
         0, 0,
         V8Float64ArrayMethods, WTF_ARRAY_LENGTH(V8Float64ArrayMethods), isolate, currentWorldType);
-    UNUSED_PARAM(defaultSignature); // In some cases, it will not be used.
+    UNUSED_PARAM(defaultSignature);
     desc->SetCallHandler(V8Float64Array::constructorCallback);
     desc->SetLength(1);
     v8::Local<v8::ObjectTemplate> instance = desc->InstanceTemplate();
     v8::Local<v8::ObjectTemplate> proto = desc->PrototypeTemplate();
-    UNUSED_PARAM(instance); // In some cases, it will not be used.
-    UNUSED_PARAM(proto); // In some cases, it will not be used.
+    UNUSED_PARAM(instance);
+    UNUSED_PARAM(proto);
     desc->InstanceTemplate()->SetIndexedPropertyHandler(Float64ArrayV8Internal::indexedPropertyGetterCallback, Float64ArrayV8Internal::indexedPropertySetterCallback, 0, 0, indexedPropertyEnumerator<Float64Array>);
 
     // Custom Signature 'foo'
@@ -201,7 +201,6 @@ bool V8Float64Array::HasInstanceInAnyWorld(v8::Handle<v8::Value> value, v8::Isol
         || V8PerIsolateData::from(isolate)->hasInstance(&info, value, WorkerWorld);
 }
 
-
 v8::Handle<v8::Object> V8Float64Array::createWrapper(PassRefPtr<Float64Array> impl, v8::Handle<v8::Object> creationContext, v8::Isolate* isolate)
 {
     ASSERT(impl.get());
@@ -213,10 +212,10 @@ v8::Handle<v8::Object> V8Float64Array::createWrapper(PassRefPtr<Float64Array> im
         RELEASE_ASSERT_WITH_SECURITY_IMPLICATION(actualInfo->derefObjectFunction == info.derefObjectFunction);
     }
 
-
     v8::Handle<v8::Object> wrapper = V8DOMWrapper::createWrapper(creationContext, &info, toInternalPointer(impl.get()), isolate);
     if (UNLIKELY(wrapper.IsEmpty()))
         return wrapper;
+
     if (!impl->buffer()->hasDeallocationObserver()) {
         v8::V8::AdjustAmountOfExternalAllocatedMemory(impl->buffer()->byteLength());
         impl->buffer()->setDeallocationObserver(V8ArrayBufferDeallocationObserver::instance());
@@ -225,6 +224,7 @@ v8::Handle<v8::Object> V8Float64Array::createWrapper(PassRefPtr<Float64Array> im
     V8DOMWrapper::associateObjectWithWrapper<V8Float64Array>(impl, &info, wrapper, isolate, WrapperConfiguration::Independent);
     return wrapper;
 }
+
 void V8Float64Array::derefObject(void* object)
 {
     fromInternalPointer(object)->deref();

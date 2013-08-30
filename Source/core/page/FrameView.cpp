@@ -1451,8 +1451,8 @@ bool FrameView::scrollToFragment(const KURL& url)
         return true;
 
     // Try again after decoding the ref, based on the document's encoding.
-    if (TextResourceDecoder* decoder = m_frame->document()->decoder())
-        return scrollToAnchor(decodeURLEscapeSequences(fragmentIdentifier, decoder->encoding()));
+    if (m_frame->document()->encoding().isValid())
+        return scrollToAnchor(decodeURLEscapeSequences(fragmentIdentifier, m_frame->document()->encoding()));
 
     return false;
 }
@@ -2799,8 +2799,7 @@ void FrameView::updateControlTints()
     if (!m_frame || m_frame->document()->url().isEmpty())
         return;
 
-    RenderView* renderView = this->renderView();
-    if ((renderView && renderView->theme()->supportsControlTints()) || hasCustomScrollbars())
+    if (RenderTheme::theme().supportsControlTints() || hasCustomScrollbars())
         paintControlTints();
 }
 

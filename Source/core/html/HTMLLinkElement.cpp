@@ -34,9 +34,9 @@
 #include "core/css/resolver/StyleResolver.h"
 #include "core/dom/Attribute.h"
 #include "core/dom/Document.h"
-#include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventSender.h"
+#include "core/dom/StyleSheetCollections.h"
 #include "core/fetch/CSSStyleSheetResource.h"
 #include "core/fetch/FetchRequest.h"
 #include "core/fetch/ResourceFetcher.h"
@@ -80,7 +80,7 @@ HTMLLinkElement::~HTMLLinkElement()
     m_link.clear();
 
     if (inDocument())
-        document()->styleSheetCollection()->removeStyleSheetCandidateNode(this);
+        document()->styleSheetCollections()->removeStyleSheetCandidateNode(this);
 
     linkLoadEventSender().cancelEvent(this);
 }
@@ -198,7 +198,7 @@ Node::InsertionNotificationRequest HTMLLinkElement::insertedInto(ContainerNode* 
     if (m_isInShadowTree)
         return InsertionDone;
 
-    document()->styleSheetCollection()->addStyleSheetCandidateNode(this, m_createdByParser);
+    document()->styleSheetCollections()->addStyleSheetCandidateNode(this, m_createdByParser);
 
     process();
     return InsertionDone;
@@ -216,7 +216,7 @@ void HTMLLinkElement::removedFrom(ContainerNode* insertionPoint)
         ASSERT(!linkStyle() || !linkStyle()->hasSheet());
         return;
     }
-    document()->styleSheetCollection()->removeStyleSheetCandidateNode(this);
+    document()->styleSheetCollections()->removeStyleSheetCandidateNode(this);
 
     RefPtr<StyleSheet> removedSheet = sheet();
 
@@ -240,32 +240,32 @@ bool HTMLLinkElement::styleSheetIsLoading() const
 
 void HTMLLinkElement::linkLoaded()
 {
-    dispatchEvent(Event::create(eventNames().loadEvent, false, false));
+    dispatchEvent(Event::create(eventNames().loadEvent));
 }
 
 void HTMLLinkElement::linkLoadingErrored()
 {
-    dispatchEvent(Event::create(eventNames().errorEvent, false, false));
+    dispatchEvent(Event::create(eventNames().errorEvent));
 }
 
 void HTMLLinkElement::didStartLinkPrerender()
 {
-    dispatchEvent(Event::create(eventNames().webkitprerenderstartEvent, false, false));
+    dispatchEvent(Event::create(eventNames().webkitprerenderstartEvent));
 }
 
 void HTMLLinkElement::didStopLinkPrerender()
 {
-    dispatchEvent(Event::create(eventNames().webkitprerenderstopEvent, false, false));
+    dispatchEvent(Event::create(eventNames().webkitprerenderstopEvent));
 }
 
 void HTMLLinkElement::didSendLoadForLinkPrerender()
 {
-    dispatchEvent(Event::create(eventNames().webkitprerenderloadEvent, false, false));
+    dispatchEvent(Event::create(eventNames().webkitprerenderloadEvent));
 }
 
 void HTMLLinkElement::didSendDOMContentLoadedForLinkPrerender()
 {
-    dispatchEvent(Event::create(eventNames().webkitprerenderdomcontentloadedEvent, false, false));
+    dispatchEvent(Event::create(eventNames().webkitprerenderdomcontentloadedEvent));
 }
 
 bool HTMLLinkElement::sheetLoaded()
@@ -496,7 +496,7 @@ void LinkStyle::addPendingSheet(PendingSheetType type)
 
     if (m_pendingSheetType == NonBlocking)
         return;
-    m_owner->document()->styleSheetCollection()->addPendingSheet();
+    m_owner->document()->styleSheetCollections()->addPendingSheet();
 }
 
 void LinkStyle::removePendingSheet(RemovePendingSheetNotificationType notification)
@@ -508,7 +508,7 @@ void LinkStyle::removePendingSheet(RemovePendingSheetNotificationType notificati
         return;
     if (type == NonBlocking) {
         // Tell StyleSheetCollections to re-compute styleSheets of this m_owner's treescope.
-        m_owner->document()->styleSheetCollection()->modifiedStyleSheetCandidateNode(m_owner);
+        m_owner->document()->styleSheetCollections()->modifiedStyleSheetCandidateNode(m_owner);
         // Document::removePendingSheet() triggers the style selector recalc for blocking sheets.
         // FIXME: We don't have enough knowledge at this point to know if we're adding or removing a sheet
         // so we can't call addedStyleSheet() or removedStyleSheet().
@@ -516,10 +516,10 @@ void LinkStyle::removePendingSheet(RemovePendingSheetNotificationType notificati
         return;
     }
 
-    m_owner->document()->styleSheetCollection()->removePendingSheet(m_owner,
+    m_owner->document()->styleSheetCollections()->removePendingSheet(m_owner,
         notification == RemovePendingSheetNotifyImmediately
-        ? DocumentStyleSheetCollection::RemovePendingSheetNotifyImmediately
-        : DocumentStyleSheetCollection::RemovePendingSheetNotifyLater);
+        ? StyleSheetCollections::RemovePendingSheetNotifyImmediately
+        : StyleSheetCollections::RemovePendingSheetNotifyLater);
 }
 
 void LinkStyle::setDisabledState(bool disabled)
@@ -613,7 +613,7 @@ void LinkStyle::process()
 
         // Load stylesheets that are not needed for the rendering immediately with low priority.
         FetchRequest request = builder.build(blocking);
-        m_resource = document()->fetcher()->requestCSSStyleSheet(request);
+        m_resource = document()->fetcher()->fetchCSSStyleSheet(request);
 
         if (m_resource)
             m_resource->addClient(this);

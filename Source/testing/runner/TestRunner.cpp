@@ -279,10 +279,12 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
     bindMethod("setGeolocationPermission", &TestRunner::setGeolocationPermission);
     bindMethod("setMockGeolocationPositionUnavailableError", &TestRunner::setMockGeolocationPositionUnavailableError);
     bindMethod("setMockGeolocationPosition", &TestRunner::setMockGeolocationPosition);
+    bindMethod("setMIDIAccessorResult", &TestRunner::setMIDIAccessorResult);
     bindMethod("setMIDISysExPermission", &TestRunner::setMIDISysExPermission);
 #if ENABLE_NOTIFICATIONS
     bindMethod("grantWebNotificationPermission", &TestRunner::grantWebNotificationPermission);
     bindMethod("simulateLegacyWebNotificationClick", &TestRunner::simulateLegacyWebNotificationClick);
+    bindMethod("cancelAllActiveNotifications", &TestRunner::cancelAllActiveNotifications);
 #endif
     bindMethod("addMockSpeechInputResult", &TestRunner::addMockSpeechInputResult);
     bindMethod("setMockSpeechInputDumpRect", &TestRunner::setMockSpeechInputDumpRect);
@@ -299,7 +301,6 @@ TestRunner::TestRunner(TestInterfaces* interfaces)
 
     // Properties.
     bindProperty("globalFlag", &m_globalFlag);
-    bindProperty("titleTextDirection", &m_titleTextDirection);
     bindProperty("platformName", &m_platformName);
     bindProperty("tooltipText", &m_tooltipText);
     bindProperty("disableNotifyDone", &m_disableNotifyDone);
@@ -421,13 +422,13 @@ void TestRunner::reset()
     m_testRepaint = false;
     m_sweepHorizontally = false;
     m_isPrinting = false;
+    m_midiAccessorResult = true;
     m_shouldStayOnPageAfterHandlingBeforeUnload = false;
     m_shouldDumpResourcePriorities = false;
 
     m_httpHeadersToClear.clear();
 
     m_globalFlag.set(false);
-    m_titleTextDirection.set("ltr");
     m_webHistoryItemCount.set(0);
     m_interceptPostMessage.set(false);
     m_platformName.set("chromium");
@@ -629,11 +630,6 @@ bool TestRunner::shouldStayOnPageAfterHandlingBeforeUnload() const
     return m_shouldStayOnPageAfterHandlingBeforeUnload;
 }
 
-void TestRunner::setTitleTextDirection(WebKit::WebTextDirection dir)
-{
-    m_titleTextDirection.set(dir == WebKit::WebTextDirectionLeftToRight ? "ltr" : "rtl");
-}
-
 const std::set<std::string>* TestRunner::httpHeadersToClear() const
 {
     return &m_httpHeadersToClear;
@@ -727,6 +723,11 @@ bool TestRunner::isPointerLocked()
 void TestRunner::setToolTipText(const WebKit::WebString& text)
 {
     m_tooltipText.set(text.utf8());
+}
+
+bool TestRunner::midiAccessorResult()
+{
+    return m_midiAccessorResult;
 }
 
 TestRunner::TestPageOverlay::TestPageOverlay(WebKit::WebView* webView) : m_webView(webView)
@@ -1829,6 +1830,14 @@ void TestRunner::setMockGeolocationPositionUnavailableError(const CppArgumentLis
         windowList.at(i)->geolocationClientMock()->setPositionUnavailableError(WebString::fromUTF8(arguments[0].toString()));
 }
 
+void TestRunner::setMIDIAccessorResult(const CppArgumentList& arguments, CppVariant* result)
+{
+    result->setNull();
+    if (arguments.size() < 1 || !arguments[0].isBool())
+        return;
+    m_midiAccessorResult = arguments[0].toBoolean();
+}
+
 void TestRunner::setMIDISysExPermission(const CppArgumentList& arguments, CppVariant* result)
 {
     result->setNull();
@@ -1857,6 +1866,12 @@ void TestRunner::simulateLegacyWebNotificationClick(const CppArgumentList& argum
         return;
     }
     result->set(m_notificationPresenter->simulateClick(WebString::fromUTF8(arguments[0].toString())));
+}
+
+void TestRunner::cancelAllActiveNotifications(const CppArgumentList& arguments, CppVariant* result)
+{
+    m_notificationPresenter->cancelAllActiveNotifications();
+    result->set(true);
 }
 #endif
 

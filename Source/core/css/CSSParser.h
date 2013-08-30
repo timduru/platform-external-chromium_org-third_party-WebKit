@@ -180,7 +180,7 @@ public:
     bool parseSingleGridAreaLonghand(RefPtr<CSSValue>&);
     bool parseGridTrackList(CSSPropertyID, bool important);
     bool parseGridTrackRepeatFunction(CSSValueList&);
-    PassRefPtr<CSSPrimitiveValue> parseGridTrackSize(CSSParserValueList& inputList);
+    PassRefPtr<CSSValue> parseGridTrackSize(CSSParserValueList& inputList);
     PassRefPtr<CSSPrimitiveValue> parseGridBreadth(CSSParserValue*);
     PassRefPtr<CSSValue> parseGridTemplate();
 
@@ -615,6 +615,8 @@ private:
     bool m_inViewport;
 
     CSSParserLocation m_locationLabel;
+
+    bool useLegacyBackgroundSizeShorthandBehavior() const;
 
     int (CSSParser::*m_lexFunc)(void*);
 

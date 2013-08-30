@@ -427,9 +427,6 @@ bool isSpecialElement(const Node *n)
     if (renderer->style()->isFloating())
         return true;
 
-    if (renderer->style()->position() != StaticPosition)
-        return true;
-
     return false;
 }
 
@@ -821,7 +818,7 @@ bool isEmptyTableCell(const Node* node)
 
 PassRefPtr<HTMLElement> createDefaultParagraphElement(Document* document)
 {
-    switch (document->frame()->editor()->defaultParagraphSeparator()) {
+    switch (document->frame()->editor().defaultParagraphSeparator()) {
     case EditorParagraphSeparatorIsDiv:
         return HTMLDivElement::create(document);
     case EditorParagraphSeparatorIsP:

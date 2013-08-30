@@ -239,7 +239,7 @@ private:
     void addToOverlapMapRecursive(OverlapMap&, RenderLayer*, RenderLayer* ancestorLayer = 0);
 
     // Returns true if any layer's compositing changed
-    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingState&, bool& layersChanged, bool& descendantHas3DTransform);
+    void computeCompositingRequirements(RenderLayer* ancestorLayer, RenderLayer*, OverlapMap*, struct CompositingState&, bool& layersChanged, bool& descendantHas3DTransform, Vector<RenderLayer*>& unclippedDescendants);
 
     // Recurses down the tree, parenting descendant compositing layers and collecting an array of child layers for the current compositing layer.
     void rebuildCompositingLayerTree(RenderLayer*, Vector<GraphicsLayer*>& childGraphicsLayersOfEnclosingLayer, int depth);
@@ -300,7 +300,7 @@ private:
     bool requiresVerticalScrollbarLayer() const;
     bool requiresScrollCornerLayer() const;
 #if ENABLE(RUBBER_BANDING)
-    bool requiresOverhangAreasLayer() const;
+    bool requiresOverhangLayers() const;
 #endif
 
 #if !LOG_DISABLED
@@ -352,6 +352,7 @@ private:
     OwnPtr<GraphicsLayer> m_layerForScrollCorner;
 #if ENABLE(RUBBER_BANDING)
     OwnPtr<GraphicsLayer> m_layerForOverhangAreas;
+    OwnPtr<GraphicsLayer> m_layerForOverhangShadow;
 #endif
 
 #if !LOG_DISABLED

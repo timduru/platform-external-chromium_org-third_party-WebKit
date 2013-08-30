@@ -447,7 +447,6 @@ public:
 
     ShadowRoot* userAgentShadowRoot() const;
     ShadowRoot* ensureUserAgentShadowRoot();
-    virtual bool supportsShadowElementForUserAgentShadow() const;
     virtual const AtomicString& shadowPseudoId() const { return !part().isEmpty() ? part() : pseudo(); }
 
     RenderStyle* computedStyle(PseudoId = NOPSEUDO);
@@ -664,7 +663,7 @@ protected:
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
     virtual void removedFrom(ContainerNode*) OVERRIDE;
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0) OVERRIDE;
-    virtual void removeAllEventListeners() OVERRIDE FINAL;
+    virtual void removeAllEventListeners() OVERRIDE;
 
     virtual void willRecalcStyle(StyleChange);
     virtual void didRecalcStyle(StyleChange);
@@ -697,6 +696,9 @@ private:
     PropertySetCSSStyleDeclaration* inlineStyleCSSOMWrapper();
     void setInlineStyleFromString(const AtomicString&);
     MutableStylePropertySet* ensureMutableInlineStyle();
+
+    StyleChange recalcOwnStyle(StyleChange);
+    void recalcChildStyle(StyleChange);
 
     void makePresentationAttributeCacheKey(PresentationAttributeCacheKey&) const;
     void rebuildPresentationAttributeStyle();

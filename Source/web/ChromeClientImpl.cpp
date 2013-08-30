@@ -128,6 +128,13 @@ static WebAccessibilityNotification toWebAccessibilityNotification(AXObjectCache
     return static_cast<WebAccessibilityNotification>(notification);
 }
 
+// Converts a WebCore::AXObjectCache::AXNotification to a WebKit::WebAXEvent
+static WebAXEvent toWebAXEvent(AXObjectCache::AXNotification notification)
+{
+    // These enums have the same values; enforced in AssertMatchingEnums.cpp.
+    return static_cast<WebAXEvent>(notification);
+}
+
 ChromeClientImpl::ChromeClientImpl(WebViewImpl* webView)
     : m_webView(webView)
     , m_toolbarsVisible(true)
@@ -238,7 +245,7 @@ Page* ChromeClientImpl::createWindow(
     if (policy == WebNavigationPolicyIgnore)
         policy = getNavigationPolicy();
 
-    WebViewImpl* newView = static_cast<WebViewImpl*>(
+    WebViewImpl* newView = toWebViewImpl(
         m_webView->client()->createView(WebFrameImpl::fromFrame(frame), WrappedResourceRequest(r.resourceRequest()), features, r.frameName(), policy));
     if (!newView)
         return 0;
@@ -343,7 +350,7 @@ bool ChromeClientImpl::statusbarVisible()
 void ChromeClientImpl::setScrollbarsVisible(bool value)
 {
     m_scrollbarsVisible = value;
-    WebFrameImpl* webFrame = static_cast<WebFrameImpl*>(m_webView->mainFrame());
+    WebFrameImpl* webFrame = toWebFrameImpl(m_webView->mainFrame());
     if (webFrame)
         webFrame->setCanHaveScrollbars(value);
 }
@@ -368,17 +375,19 @@ void ChromeClientImpl::setResizable(bool value)
     m_resizable = value;
 }
 
-void ChromeClientImpl::addMessageToConsole(MessageSource source,
-                                           MessageLevel level,
-                                           const String& message,
-                                           unsigned lineNumber,
-                                           const String& sourceID)
+bool ChromeClientImpl::shouldReportDetailedMessageForSource(const String& url)
+{
+    return m_webView->client() && m_webView->client()->shouldReportDetailedMessageForSource(url);
+}
+
+void ChromeClientImpl::addMessageToConsole(MessageSource source, MessageLevel level, const String& message, unsigned lineNumber, const String& sourceID, const String& stackTrace)
 {
     if (m_webView->client()) {
         m_webView->client()->didAddMessageToConsole(
             WebConsoleMessage(static_cast<WebConsoleMessage::Level>(level), message),
             sourceID,
-            lineNumber);
+            lineNumber,
+            stackTrace);
     }
 }
 
@@ -799,8 +808,12 @@ void ChromeClientImpl::getPopupMenuInfo(PopupContainer* popupContainer,
 void ChromeClientImpl::postAccessibilityNotification(AccessibilityObject* obj, AXObjectCache::AXNotification notification)
 {
     // Alert assistive technology about the accessibility object notification.
-    if (obj)
-        m_webView->client()->postAccessibilityNotification(WebAccessibilityObject(obj), toWebAccessibilityNotification(notification));
+    if (!obj)
+        return;
+
+    // FIXME: Remove this first call once Chromium has switched over to using the second. (http://crbug.com/269034)
+    m_webView->client()->postAccessibilityNotification(WebAccessibilityObject(obj), toWebAccessibilityNotification(notification));
+    m_webView->client()->postAccessibilityEvent(WebAccessibilityObject(obj), toWebAXEvent(notification));
 }
 
 String ChromeClientImpl::acceptLanguages()

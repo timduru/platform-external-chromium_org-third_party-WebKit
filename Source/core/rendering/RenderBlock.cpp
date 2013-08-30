@@ -1377,7 +1377,6 @@ void RenderBlock::updateScrollInfoAfterLayout()
 
 void RenderBlock::layout()
 {
-    StackStats::LayoutCheckPoint layoutCheckPoint;
     OverflowEventDispatcher dispatcher(this);
 
     // Update our first letter info now.
@@ -1811,7 +1810,7 @@ void RenderBlock::addVisualOverflowFromTheme()
         return;
 
     IntRect inflatedRect = pixelSnappedBorderBoxRect();
-    theme()->adjustRepaintRect(this, inflatedRect);
+    RenderTheme::theme().adjustRepaintRect(this, inflatedRect);
     addVisualOverflow(inflatedRect);
 }
 
@@ -2449,7 +2448,7 @@ void RenderBlock::updateBlockChildDirtyBitsBeforeLayout(bool relayoutChildren, R
 
     // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
     if (relayoutChildren && child->needsPreferredWidthsRecalculation())
-        child->setPreferredLogicalWidthsDirty(true, MarkOnlyThis);
+        child->setPreferredLogicalWidthsDirty(MarkOnlyThis);
 }
 
 void RenderBlock::layoutBlockChildren(bool relayoutChildren, LayoutUnit& maxFloatLogicalBottom, SubtreeLayoutScope& layoutScope)
@@ -2809,7 +2808,7 @@ void RenderBlock::layoutPositionedObjects(bool relayoutChildren, bool fixedPosit
 
         // If relayoutChildren is set and the child has percentage padding or an embedded content box, we also need to invalidate the childs pref widths.
         if (relayoutChildren && r->needsPreferredWidthsRecalculation())
-            r->setPreferredLogicalWidthsDirty(true, MarkOnlyThis);
+            r->setPreferredLogicalWidthsDirty(MarkOnlyThis);
 
         if (!r->needsLayout())
             r->markForPaginationRelayoutIfNeeded(layoutScope);
@@ -5153,7 +5152,7 @@ PositionWithAffinity RenderBlock::positionForPointWithInlineChildren(const Layou
         }
     }
 
-    bool moveCaretToBoundary = document()->frame()->editor()->behavior().shouldMoveCaretToHorizontalBoundaryWhenPastTopOrBottom();
+    bool moveCaretToBoundary = document()->frame()->editor().behavior().shouldMoveCaretToHorizontalBoundaryWhenPastTopOrBottom();
 
     if (!moveCaretToBoundary && !closestBox && lastRootBoxWithChildren) {
         // y coordinate is below last root line box, pretend we hit it
@@ -5765,7 +5764,7 @@ void RenderBlock::computePreferredLogicalWidths()
     m_minPreferredLogicalWidth += borderAndPadding;
     m_maxPreferredLogicalWidth += borderAndPadding;
 
-    setPreferredLogicalWidthsDirty(false);
+    clearPreferredLogicalWidthsDirty();
 }
 
 struct InlineMinMaxIterator {
@@ -5971,7 +5970,7 @@ void RenderBlock::computeInlinePreferredLogicalWidths(LayoutUnit& minLogicalWidt
                     inlineMin += childMin;
                     inlineMax += childMax;
 
-                    child->setPreferredLogicalWidthsDirty(false);
+                    child->clearPreferredLogicalWidthsDirty();
                 } else {
                     // Inline replaced elts add in their margins to their min/max values.
                     LayoutUnit margins = 0;
@@ -6302,7 +6301,7 @@ LayoutUnit RenderBlock::lineHeight(bool firstLine, LineDirectionMode direction, 
     if (isReplaced() && linePositionMode == PositionOnContainingLine)
         return RenderBox::lineHeight(firstLine, direction, linePositionMode);
 
-    if (firstLine && document()->styleSheetCollection()->usesFirstLineRules()) {
+    if (firstLine && document()->styleSheetCollections()->usesFirstLineRules()) {
         RenderStyle* s = style(firstLine);
         if (s != style())
             return s->computedLineHeight(view());
@@ -6325,8 +6324,8 @@ int RenderBlock::baselinePosition(FontBaseline baselineType, bool firstLine, Lin
         // FIXME: Might be better to have a custom CSS property instead, so that if the theme
         // is turned off, checkboxes/radios will still have decent baselines.
         // FIXME: Need to patch form controls to deal with vertical lines.
-        if (style()->hasAppearance() && !theme()->isControlContainer(style()->appearance()))
-            return theme()->baselinePosition(this);
+        if (style()->hasAppearance() && !RenderTheme::theme().isControlContainer(style()->appearance()))
+            return RenderTheme::theme().baselinePosition(this);
 
         // CSS2.1 states that the baseline of an inline block is the baseline of the last line box in
         // the normal flow.  We make an exception for marquees, since their baselines are meaningless
@@ -6522,7 +6521,7 @@ void RenderBlock::updateFirstLetterStyle(RenderObject* firstLetterBlock, RenderO
     RenderStyle* pseudoStyle = styleForFirstLetter(firstLetterBlock, firstLetterContainer);
     ASSERT(firstLetter->isFloating() || firstLetter->isInline());
 
-    if (Node::diff(firstLetter->style(), pseudoStyle, document()) == Node::Detach) {
+    if (Node::diff(firstLetter->style(), pseudoStyle, document()) == Node::Reattach) {
         // The first-letter renderer needs to be replaced. Create a new renderer of the right type.
         RenderObject* newFirstLetter;
         if (pseudoStyle->display() == INLINE)
@@ -6633,7 +6632,7 @@ void RenderBlock::createFirstLetterRenderer(RenderObject* firstLetterBlock, Rend
 
 void RenderBlock::updateFirstLetter()
 {
-    if (!document()->styleSheetCollection()->usesFirstLetterRules())
+    if (!document()->styleSheetCollections()->usesFirstLetterRules())
         return;
     // Don't recur
     if (style()->styleType() == FIRST_LETTER)

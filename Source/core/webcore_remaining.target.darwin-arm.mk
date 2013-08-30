@@ -52,11 +52,15 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableColumn.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableHeaderContainer.cpp \
 	third_party/WebKit/Source/core/accessibility/AccessibilityTableRow.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableColor.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableImage.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableLengthBox.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableNumber.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableTransform.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableValue.cpp \
 	third_party/WebKit/Source/core/animation/Animation.cpp \
 	third_party/WebKit/Source/core/animation/DocumentTimeline.cpp \
+	third_party/WebKit/Source/core/animation/InertAnimation.cpp \
 	third_party/WebKit/Source/core/animation/KeyframeAnimationEffect.cpp \
 	third_party/WebKit/Source/core/animation/Player.cpp \
 	third_party/WebKit/Source/core/animation/TimedItem.cpp \
@@ -372,6 +376,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/page/BarProp.cpp \
 	third_party/WebKit/Source/core/page/Chrome.cpp \
 	third_party/WebKit/Source/core/page/Console.cpp \
+	third_party/WebKit/Source/core/page/ConsoleBase.cpp \
 	third_party/WebKit/Source/core/page/ContentSecurityPolicy.cpp \
 	third_party/WebKit/Source/core/page/ContentSecurityPolicyResponseHeaders.cpp \
 	third_party/WebKit/Source/core/page/ContextMenuController.cpp \
@@ -466,6 +471,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/workers/SharedWorkerGlobalScope.cpp \
 	third_party/WebKit/Source/core/workers/SharedWorkerThread.cpp \
 	third_party/WebKit/Source/core/workers/Worker.cpp \
+	third_party/WebKit/Source/core/workers/WorkerConsole.cpp \
 	third_party/WebKit/Source/core/workers/WorkerEventQueue.cpp \
 	third_party/WebKit/Source/core/workers/WorkerGlobalScopeProxy.cpp \
 	third_party/WebKit/Source/core/workers/WorkerGlobalScope.cpp \

@@ -26,9 +26,9 @@
 #ifndef RenderObject_h
 #define RenderObject_h
 
-#include "core/dom/DocumentStyleSheetCollection.h"
 #include "core/dom/Element.h"
 #include "core/dom/Position.h"
+#include "core/dom/StyleSheetCollections.h"
 #include "core/fetch/ImageResourceClient.h"
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/LayoutRect.h"
@@ -40,8 +40,6 @@
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/style/StyleInheritedData.h"
 #include "wtf/HashSet.h"
-#include "wtf/StackStats.h"
-#include "wtf/UnusedParam.h"
 
 namespace WebCore {
 
@@ -66,7 +64,6 @@ class RenderLayerModelObject;
 class RenderNamedFlowThread;
 class RenderSVGResourceContainer;
 class RenderTable;
-class RenderTheme;
 class TransformState;
 
 struct PaintInfo;
@@ -145,8 +142,6 @@ public:
     // marked as anonymous in the constructor.
     explicit RenderObject(Node*);
     virtual ~RenderObject();
-
-    RenderTheme* theme() const;
 
     virtual const char* renderName() const = 0;
 
@@ -625,13 +620,14 @@ public:
     void setChildNeedsLayout(MarkingBehavior = MarkContainingBlockChain, SubtreeLayoutScope* = 0);
     void setNeedsPositionedMovementLayout();
     void setNeedsSimplifiedNormalFlowLayout();
-    void setPreferredLogicalWidthsDirty(bool, MarkingBehavior = MarkContainingBlockChain);
+    void setPreferredLogicalWidthsDirty(MarkingBehavior = MarkContainingBlockChain);
+    void clearPreferredLogicalWidthsDirty();
     void invalidateContainerPreferredLogicalWidths();
 
     void setNeedsLayoutAndPrefWidthsRecalc()
     {
         setNeedsLayout();
-        setPreferredLogicalWidthsDirty(true);
+        setPreferredLogicalWidthsDirty();
     }
 
     void setPositionState(EPosition position)
@@ -759,7 +755,7 @@ public:
     virtual LayoutUnit maxPreferredLogicalWidth() const { return 0; }
 
     RenderStyle* style() const { return m_style.get(); }
-    RenderStyle* firstLineStyle() const { return document()->styleSheetCollection()->usesFirstLineRules() ? cachedFirstLineStyle() : style(); }
+    RenderStyle* firstLineStyle() const { return document()->styleSheetCollections()->usesFirstLineRules() ? cachedFirstLineStyle() : style(); }
     RenderStyle* style(bool firstLine) const { return firstLine ? firstLineStyle() : style(); }
 
     inline Color resolveColor(const RenderStyle* styleToUse, int colorProperty) const

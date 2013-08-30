@@ -128,7 +128,6 @@ modules = [
         "dependencies": ["common"],
         "sources": [
             "Checkbox.js",
-            "CodeMirrorTextEditor.js",
             "ContextMenu.js",
             "CompletionDictionary.js",
             "DOMSyntaxHighlighter.js",
@@ -155,7 +154,6 @@ modules = [
             "ShowMoreDataGridNode.js",
             "SidebarOverlay.js",
             "SoftContextMenu.js",
-            "SourceTokenizer.js",
             "Spectrum.js",
             "SplitView.js",
             "SidebarView.js",
@@ -163,9 +161,7 @@ modules = [
             "SuggestBox.js",
             "TabbedPane.js",
             "TextEditor.js",
-            "TextEditorHighlighter.js",
             "TextRange.js",
-            "TextEditorModel.js",
             "TextPrompt.js",
             "TextUtils.js",
             "TimelineGrid.js",
@@ -208,6 +204,7 @@ modules = [
             "ElementsPanelDescriptor.js",
             "EventListenersSidebarPane.js",
             "MetricsSidebarPane.js",
+            "PlatformFontsSidebarPane.js",
             "PropertiesSidebarPane.js",
             "StylesSidebarPane.js",
         ]
@@ -313,6 +310,14 @@ modules = [
         ]
     },
     {
+        "name": "codemirror",
+        "dependencies": ["components"],
+        "sources": [
+            "CodeMirrorTextEditor.js",
+            "CodeMirrorUtils.js",
+        ]
+    },
+    {
         "name": "layers",
         "dependencies": ["components"],
         "sources": [
@@ -320,6 +325,7 @@ modules = [
             "LayersPanel.js",
             "LayerTree.js",
             "Layers3DView.js",
+            "LayerDetailsView.js",
         ]
     },
     {
@@ -339,6 +345,7 @@ modules = [
         "dependencies": ["components", "extensions"],
         "sources": [
             "SettingsScreen.js",
+            "EditFileSystemDialog.js",
             "OverridesView.js",
         ]
     },

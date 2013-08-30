@@ -64,6 +64,7 @@ public:
     virtual void setAcceleratedCompositingForFixedPositionEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForFixedRootBackgroundEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForOverflowScrollEnabled(bool) = 0;
+    virtual void setCompositorDrivenAcceleratedScrollingEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForTransitionEnabled(bool)  = 0;
     virtual void setAcceleratedCompositingForPluginsEnabled(bool) = 0;
     virtual void setAcceleratedCompositingForScrollableFramesEnabled(bool) = 0;
@@ -170,6 +171,8 @@ public:
     virtual void setUnsafePluginPastingEnabled(bool) = 0;
     virtual void setUserStyleSheetLocation(const WebURL&) = 0;
     virtual void setUsesEncodingDetector(bool) = 0;
+    virtual void setUseLegacyBackgroundSizeShorthandBehavior(bool) = 0;
+    virtual void setUseSolidColorScrollbars(bool) = 0;
     virtual void setUseWideViewport(bool) = 0;
     virtual void setValidationMessageTimerMagnification(int) = 0;
     virtual void setViewportEnabled(bool) = 0;

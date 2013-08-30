@@ -4,6 +4,8 @@
 ../core/css/CSSFontFaceRule.idl
 ../core/css/CSSHostRule.idl
 ../core/css/CSSImportRule.idl
+../core/css/CSSKeyframeRule.idl
+../core/css/CSSKeyframesRule.idl
 ../core/css/CSSMediaRule.idl
 ../core/css/CSSPageRule.idl
 ../core/css/CSSPrimitiveValue.idl
@@ -26,8 +28,6 @@
 ../core/css/StyleSheetList.idl
 ../core/css/WebKitCSSFilterRule.idl
 ../core/css/WebKitCSSFilterValue.idl
-../core/css/WebKitCSSKeyframeRule.idl
-../core/css/WebKitCSSKeyframesRule.idl
 ../core/css/WebKitCSSMatrix.idl
 ../core/css/WebKitCSSMixFunctionValue.idl
 ../core/css/WebKitCSSRegionRule.idl
@@ -35,6 +35,7 @@
 ../core/dom/Attr.idl
 ../core/dom/AutocompleteErrorEvent.idl
 ../core/dom/BeforeLoadEvent.idl
+../core/dom/BeforeUnloadEvent.idl
 ../core/dom/CDATASection.idl
 ../core/dom/CharacterData.idl
 ../core/dom/ClientRect.idl
@@ -232,12 +233,12 @@
 ../core/inspector/JavaScriptCallFrame.idl
 ../core/loader/appcache/ApplicationCache.idl
 ../core/page/BarProp.idl
+../core/page/ConsoleBase.idl
 ../core/page/Console.idl
 ../core/page/EventSource.idl
 ../core/page/History.idl
 ../core/page/ImageBitmap.idl
 ../core/page/Location.idl
-../core/page/MemoryInfo.idl
 ../core/page/Navigator.idl
 ../core/page/NavigatorID.idl
 ../core/page/NavigatorOnLine.idl
@@ -246,7 +247,6 @@
 ../core/page/PerformanceEntry.idl
 ../core/page/PerformanceMark.idl
 ../core/page/PerformanceMeasure.idl
-../core/page/PerformanceNavigation.idl
 ../core/page/PerformanceResourceTiming.idl
 ../core/page/PerformanceTiming.idl
 ../core/page/Screen.idl
@@ -269,6 +269,7 @@
 ../core/workers/SharedWorkerGlobalScope.idl
 ../core/workers/Worker.idl
 ../core/workers/WorkerGlobalScope.idl
+../core/workers/WorkerConsole.idl
 ../core/workers/WorkerLocation.idl
 ../core/xml/DOMParser.idl
 ../core/xml/XMLHttpRequest.idl
@@ -288,6 +289,7 @@
 ../modules/crypto/HmacKeyParams.idl
 ../modules/crypto/HmacParams.idl
 ../modules/crypto/Key.idl
+../modules/crypto/KeyPair.idl
 ../modules/crypto/RsaKeyGenParams.idl
 ../modules/crypto/RsaSsaParams.idl
 ../modules/crypto/SubtleCrypto.idl
@@ -577,6 +579,8 @@
 ../core/html/canvas/WebGLTexture.idl
 ../core/html/canvas/WebGLUniformLocation.idl
 ../core/html/canvas/WebGLVertexArrayObjectOES.idl
+../core/page/MemoryInfo.idl
+../core/page/PerformanceNavigation.idl
 ../core/page/WindowBase64.idl
 ../core/page/WindowPagePopup.idl
 ../core/page/WindowTimers.idl

@@ -48,7 +48,7 @@ namespace WebCore {
 
 static void dispatchChildInsertionEvents(Node*);
 static void dispatchChildRemovalEvents(Node*);
-static void updateTreeAfterInsertion(ContainerNode*, Node*, AttachBehavior);
+static void updateTreeAfterInsertion(ContainerNode*, Node*);
 
 typedef pair<NodeCallback, RefPtr<Node> > CallbackInfo;
 typedef Vector<CallbackInfo> NodeCallbackQueue;
@@ -62,6 +62,17 @@ ChildNodesLazySnapshot* ChildNodesLazySnapshot::latestSnapshot = 0;
 #ifndef NDEBUG
 unsigned NoEventDispatchAssertion::s_count = 0;
 #endif
+
+static inline void attachAfterInsertion(Node* node, AttachBehavior attachBehavior = AttachLazily)
+{
+    if (node->attached() || !node->parentNode() || !node->parentNode()->attached())
+        return;
+
+    if (attachBehavior == AttachLazily)
+        node->lazyAttach();
+    else
+        node->attach();
+}
 
 static void collectChildrenAndRemoveFromOldParent(Node* node, NodeVector& nodes, ExceptionState& es)
 {
@@ -106,13 +117,11 @@ void ContainerNode::takeAllChildrenFrom(ContainerNode* oldParent)
             children[i]->detach();
         // FIXME: We need a no mutation event version of adoptNode.
         RefPtr<Node> child = document()->adoptNode(children[i].release(), ASSERT_NO_EXCEPTION);
-        parserAppendChild(child.get());
         // FIXME: Together with adoptNode above, the tree scope might get updated recursively twice
         // (if the document changed or oldParent was in a shadow tree, AND *this is in a shadow tree).
         // Can we do better?
         treeScope()->adoptIfNeeded(child.get());
-        if (attached() && !child->attached())
-            child->attach();
+        parserAppendChild(child.get(), DeprecatedAttachNow);
     }
 }
 
@@ -214,7 +223,7 @@ static inline bool checkReplaceChild(ContainerNode* newParent, Node* newChild, N
     return checkAcceptChild(newParent, newChild, oldChild, es);
 }
 
-void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& es, AttachBehavior attachBehavior)
+void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& es)
 {
     // Check that this node is not "floating".
     // If it is, it can be deleted as a side effect of sending mutation events.
@@ -224,7 +233,7 @@ void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
 
     // insertBefore(node, 0) is equivalent to appendChild(node)
     if (!refChild) {
-        appendChild(newChild, es, attachBehavior);
+        appendChild(newChild, es);
         return;
     }
 
@@ -273,7 +282,7 @@ void ContainerNode::insertBefore(PassRefPtr<Node> newChild, Node* refChild, Exce
 
         insertBeforeCommon(next.get(), child);
 
-        updateTreeAfterInsertion(this, child, attachBehavior);
+        updateTreeAfterInsertion(this, child);
     }
 
     dispatchSubtreeModifiedEvent();
@@ -305,7 +314,7 @@ void ContainerNode::insertBeforeCommon(Node* nextChild, Node* newChild)
     newChild->setNextSibling(nextChild);
 }
 
-void ContainerNode::parserInsertBefore(PassRefPtr<Node> newChild, Node* nextChild)
+void ContainerNode::parserInsertBefore(PassRefPtr<Node> newChild, Node* nextChild, AttachBehavior attachBehavior)
 {
     ASSERT(newChild);
     ASSERT(nextChild);
@@ -326,10 +335,13 @@ void ContainerNode::parserInsertBefore(PassRefPtr<Node> newChild, Node* nextChil
     ChildListMutationScope(this).childAdded(newChild.get());
 
     childrenChanged(true, newChild->previousSibling(), nextChild, 1);
+
     ChildNodeInsertionNotifier(this).notify(newChild.get());
+
+    attachAfterInsertion(newChild.get(), attachBehavior);
 }
 
-void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& es, AttachBehavior attachBehavior)
+void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& es)
 {
     // Check that this node is not "floating".
     // If it is, it can be deleted as a side effect of sending mutation events.
@@ -407,7 +419,7 @@ void ContainerNode::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, Exce
                 appendChildToContainer(child, this);
         }
 
-        updateTreeAfterInsertion(this, child, attachBehavior);
+        updateTreeAfterInsertion(this, child);
     }
 
     dispatchSubtreeModifiedEvent();
@@ -587,7 +599,7 @@ void ContainerNode::removeChildren()
     dispatchSubtreeModifiedEvent();
 }
 
-void ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionState& es, AttachBehavior attachBehavior)
+void ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionState& es)
 {
     RefPtr<ContainerNode> protect(this);
 
@@ -635,13 +647,13 @@ void ContainerNode::appendChild(PassRefPtr<Node> newChild, ExceptionState& es, A
             appendChildToContainer(child, this);
         }
 
-        updateTreeAfterInsertion(this, child, attachBehavior);
+        updateTreeAfterInsertion(this, child);
     }
 
     dispatchSubtreeModifiedEvent();
 }
 
-void ContainerNode::parserAppendChild(PassRefPtr<Node> newChild)
+void ContainerNode::parserAppendChild(PassRefPtr<Node> newChild, AttachBehavior attachBehavior)
 {
     ASSERT(newChild);
     ASSERT(!newChild->parentNode()); // Use appendChild if you need to handle reparenting (and want DOM mutation events).
@@ -665,6 +677,8 @@ void ContainerNode::parserAppendChild(PassRefPtr<Node> newChild)
 
     childrenChanged(true, last, 0, 1);
     ChildNodeInsertionNotifier(this).notify(newChild.get());
+
+    attachAfterInsertion(newChild.get(), attachBehavior);
 }
 
 void ContainerNode::suspendPostAttachCallbacks()
@@ -891,7 +905,7 @@ void ContainerNode::setActive(bool down, bool pause)
         if (renderStyle()->affectedByActive() || (isElementNode() && toElement(this)->childrenAffectedByActive()))
             setNeedsStyleRecalc();
         if (renderStyle()->hasAppearance())
-            renderer()->theme()->stateChanged(renderer(), PressedState);
+            RenderTheme::theme().stateChanged(renderer(), PressedState);
     }
 }
 
@@ -919,7 +933,7 @@ void ContainerNode::setHovered(bool over)
         if (renderStyle()->affectedByHover() || (isElementNode() && toElement(this)->childrenAffectedByHover()))
             setNeedsStyleRecalc();
         if (renderer() && renderer()->style()->hasAppearance())
-            renderer()->theme()->stateChanged(renderer(), HoverState);
+            RenderTheme::theme().stateChanged(renderer(), HoverState);
     }
 }
 
@@ -1015,7 +1029,7 @@ static void dispatchChildRemovalEvents(Node* child)
     }
 }
 
-static void updateTreeAfterInsertion(ContainerNode* parent, Node* child, AttachBehavior attachBehavior)
+static void updateTreeAfterInsertion(ContainerNode* parent, Node* child)
 {
     ASSERT(parent->refCount());
     ASSERT(child->refCount());
@@ -1026,14 +1040,8 @@ static void updateTreeAfterInsertion(ContainerNode* parent, Node* child, AttachB
 
     ChildNodeInsertionNotifier(parent).notify(child);
 
-    // FIXME: Attachment should be the first operation in this function, but some code
-    // (for example, HTMLFormControlElement's autofocus support) requires this ordering.
-    if (parent->attached() && !child->attached() && child->parentNode() == parent) {
-        if (attachBehavior == AttachLazily)
-            child->lazyAttach();
-        else
-            child->attach();
-    }
+    // FIXME: Decide if it's safe to go through ::insertedInto while aleady attached() and then move this first.
+    attachAfterInsertion(child);
 
     dispatchChildInsertionEvents(child);
 }

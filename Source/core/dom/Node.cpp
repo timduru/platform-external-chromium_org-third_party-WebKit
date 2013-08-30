@@ -72,6 +72,7 @@
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/editing/htmlediting.h"
 #include "core/html/HTMLAnchorElement.h"
+#include "core/html/HTMLDialogElement.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/html/HTMLStyleElement.h"
 #include "core/html/RadioNodeList.h"
@@ -282,7 +283,7 @@ Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2, Docum
     if (display1 != display2 || fl1 != fl2 || colSpan1 != colSpan2
         || (specifiesColumns1 != specifiesColumns2 && doc->settings()->regionBasedColumnsEnabled())
         || (s1 && s2 && !s1->contentDataEquivalent(s2)))
-        ch = Detach;
+        ch = Reattach;
     else if (!s1 || !s2)
         ch = Inherit;
     else if (*s1 == *s2)
@@ -312,15 +313,15 @@ Node::StyleChange Node::diff(const RenderStyle* s1, const RenderStyle* s2, Docum
     // When text-combine is on, we use RenderCombineText, otherwise RenderText.
     // https://bugs.webkit.org/show_bug.cgi?id=55069
     if ((s1 && s2) && (s1->hasTextCombine() != s2->hasTextCombine()))
-        ch = Detach;
+        ch = Reattach;
 
     // We need to reattach the node, so that it is moved to the correct RenderFlowThread.
     if ((s1 && s2) && (s1->flowThread() != s2->flowThread()))
-        ch = Detach;
+        ch = Reattach;
 
     // When the region thread has changed, we need to prepare a separate render region object.
     if ((s1 && s2) && (s1->regionThread() != s2->regionThread()))
-        ch = Detach;
+        ch = Reattach;
 
     return ch;
 }
@@ -383,7 +384,7 @@ void Node::willBeDeletedFrom(Document* document)
 
 NodeRareData* Node::rareData() const
 {
-    ASSERT(hasRareData());
+    ASSERT_WITH_SECURITY_IMPLICATION(hasRareData());
     return static_cast<NodeRareData*>(m_data.m_rareData);
 }
 
@@ -515,18 +516,18 @@ Node* Node::pseudoAwareLastChild() const
     return lastChild();
 }
 
-void Node::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& es, AttachBehavior attachBehavior)
+void Node::insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& es)
 {
     if (isContainerNode())
-        toContainerNode(this)->insertBefore(newChild, refChild, es, attachBehavior);
+        toContainerNode(this)->insertBefore(newChild, refChild, es);
     else
         es.throwDOMException(HierarchyRequestError);
 }
 
-void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& es, AttachBehavior attachBehavior)
+void Node::replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& es)
 {
     if (isContainerNode())
-        toContainerNode(this)->replaceChild(newChild, oldChild, es, attachBehavior);
+        toContainerNode(this)->replaceChild(newChild, oldChild, es);
     else
         es.throwDOMException(HierarchyRequestError);
 }
@@ -539,10 +540,10 @@ void Node::removeChild(Node* oldChild, ExceptionState& es)
         es.throwDOMException(NotFoundError);
 }
 
-void Node::appendChild(PassRefPtr<Node> newChild, ExceptionState& es, AttachBehavior attachBehavior)
+void Node::appendChild(PassRefPtr<Node> newChild, ExceptionState& es)
 {
     if (isContainerNode())
-        toContainerNode(this)->appendChild(newChild, es, attachBehavior);
+        toContainerNode(this)->appendChild(newChild, es);
     else
         es.throwDOMException(HierarchyRequestError);
 }
@@ -866,7 +867,7 @@ bool Node::shouldHaveFocusAppearance() const
 
 bool Node::isInert() const
 {
-    const Element* dialog = document()->activeModalDialog();
+    const HTMLDialogElement* dialog = document()->activeModalDialog();
     if (dialog && !containsIncludingShadowDOM(dialog) && !dialog->containsIncludingShadowDOM(this))
         return true;
     return document()->ownerElement() && document()->ownerElement()->isInert();
@@ -2477,12 +2478,12 @@ bool Node::dispatchWheelEvent(const PlatformWheelEvent& event)
 
 void Node::dispatchChangeEvent()
 {
-    dispatchScopedEvent(Event::create(eventNames().changeEvent, true, false));
+    dispatchScopedEvent(Event::createBubble(eventNames().changeEvent));
 }
 
 void Node::dispatchInputEvent()
 {
-    dispatchScopedEvent(Event::create(eventNames().inputEvent, true, false));
+    dispatchScopedEvent(Event::createBubble(eventNames().inputEvent));
 }
 
 void Node::defaultEventHandler(Event* event)

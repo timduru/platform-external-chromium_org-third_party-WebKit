@@ -100,6 +100,11 @@ enum StyleChangeSource {
     StyleChangeFromRenderer
 };
 
+enum AttachBehavior {
+    DeprecatedAttachNow,
+    AttachLazily,
+};
+
 class NodeRareDataBase {
 public:
     RenderObject* renderer() const { return m_renderer; }
@@ -112,11 +117,6 @@ protected:
 
 private:
     RenderObject* m_renderer;
-};
-
-enum AttachBehavior {
-    DeprecatedAttachNow,
-    AttachLazily,
 };
 
 class Node : public EventTarget, public ScriptWrappable, public TreeShared<Node> {
@@ -166,7 +166,7 @@ public:
     static bool isSupported(const String& feature, const String& version);
     static void dumpStatistics();
 
-    enum StyleChange { NoChange, NoInherit, Inherit, Detach, Force };
+    enum StyleChange { NoChange, NoInherit, Inherit, Force, Reattach };
     static StyleChange diff(const RenderStyle*, const RenderStyle*, Document*);
 
     virtual ~Node();
@@ -205,10 +205,10 @@ public:
     // These should all actually return a node, but this is only important for language bindings,
     // which will already know and hold a ref on the right node to return. Returning bool allows
     // these methods to be more efficient since they don't need to return a ref
-    void insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
-    void replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
+    void insertBefore(PassRefPtr<Node> newChild, Node* refChild, ExceptionState& = ASSERT_NO_EXCEPTION);
+    void replaceChild(PassRefPtr<Node> newChild, Node* oldChild, ExceptionState& = ASSERT_NO_EXCEPTION);
     void removeChild(Node* child, ExceptionState&);
-    void appendChild(PassRefPtr<Node> newChild, ExceptionState& = ASSERT_NO_EXCEPTION, AttachBehavior = AttachLazily);
+    void appendChild(PassRefPtr<Node> newChild, ExceptionState& = ASSERT_NO_EXCEPTION);
 
     bool hasChildNodes() const { return firstChild(); }
     virtual PassRefPtr<Node> cloneNode(bool deep = true) = 0;

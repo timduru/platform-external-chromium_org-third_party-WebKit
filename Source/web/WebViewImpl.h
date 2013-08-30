@@ -44,7 +44,6 @@
 #include "WebInputEvent.h"
 #include "WebNavigationPolicy.h"
 #include "WebView.h"
-#include "WebViewBenchmarkSupportImpl.h"
 #include "core/page/PagePopupDriver.h"
 #include "core/page/PageScaleConstraintsSet.h"
 #include "core/platform/Timer.h"
@@ -121,7 +120,6 @@ class WebPagePopupImpl;
 class WebPrerendererClient;
 class WebSettingsImpl;
 class WebTouchEvent;
-class WebViewBenchmarkSupport;
 class FullscreenController;
 
 class WebViewImpl : public WebView
@@ -311,7 +309,6 @@ public:
     virtual void addPageOverlay(WebPageOverlay*, int /* zOrder */);
     virtual void removePageOverlay(WebPageOverlay*);
     virtual void transferActiveWheelFlingAnimation(const WebActiveWheelFlingParameters&);
-    virtual WebViewBenchmarkSupport* benchmarkSupport();
     virtual void setShowPaintRects(bool);
     virtual void setShowDebugBorders(bool);
     virtual void setShowFPSCounter(bool);
@@ -375,8 +372,6 @@ public:
     {
         return m_page.get();
     }
-
-    WebCore::RenderTheme* theme() const;
 
     // Returns the main frame associated with this view. This may be null when
     // the page is shutting down, but will be valid at all other times.
@@ -646,6 +641,7 @@ private:
     void pointerLockMouseEvent(const WebInputEvent&);
 
     // PageWidgetEventHandler functions
+    virtual void handleMouseLeave(WebCore::Frame&, const WebMouseEvent&) OVERRIDE;
     virtual void handleMouseDown(WebCore::Frame&, const WebMouseEvent&) OVERRIDE;
     virtual void handleMouseUp(WebCore::Frame&, const WebMouseEvent&) OVERRIDE;
     virtual bool handleMouseWheel(WebCore::Frame&, const WebMouseWheelEvent&) OVERRIDE;
@@ -793,8 +789,6 @@ private:
     // If set, the (plugin) node which has mouse capture.
     RefPtr<WebCore::Node> m_mouseCaptureNode;
 
-    WebViewBenchmarkSupportImpl m_benchmarkSupport;
-
     WebCore::IntRect m_rootLayerScrollDamage;
     WebLayerTreeView* m_layerTreeView;
     WebLayer* m_rootLayer;
@@ -842,6 +836,13 @@ private:
     WebCore::Timer<WebViewImpl> m_helperPluginCloseTimer;
     Vector<RefPtr<WebHelperPluginImpl> > m_helperPluginsPendingClose;
 };
+
+inline WebViewImpl* toWebViewImpl(WebView* webView)
+{
+    // We have no ways to check if the specified WebView is an instance of
+    // WebViewImpl because WebViewImpl is the only implementation of WebView.
+    return static_cast<WebViewImpl*>(webView);
+}
 
 } // namespace WebKit
 

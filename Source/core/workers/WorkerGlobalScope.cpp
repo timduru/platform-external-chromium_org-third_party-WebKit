@@ -57,12 +57,6 @@
 #include "wtf/RefPtr.h"
 #include "wtf/UnusedParam.h"
 
-#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
-#include "modules/notifications/NotificationCenter.h"
-#endif
-
-
-
 namespace WebCore {
 
 class CloseWorkerGlobalScopeTask : public ScriptExecutionContext::Task {
@@ -167,6 +161,13 @@ void WorkerGlobalScope::close()
     // tasks with isCleanupTask()==true will be executed.
     m_closing = true;
     postTask(CloseWorkerGlobalScopeTask::create());
+}
+
+WorkerConsole* WorkerGlobalScope::console()
+{
+    if (!m_console)
+        m_console = WorkerConsole::create(this);
+    return m_console.get();
 }
 
 WorkerNavigator* WorkerGlobalScope::navigator() const

@@ -1065,11 +1065,15 @@ void InspectorCSSAgent::collectPlatformFontsForRenderer(RenderText* renderer, Ha
 }
 
 void InspectorCSSAgent::getPlatformFontsForNode(ErrorString* errorString, int nodeId,
-    RefPtr<TypeBuilder::Array<TypeBuilder::CSS::PlatformFontUsage> >& platformFontUsage)
+    String* cssFamilyName, RefPtr<TypeBuilder::Array<TypeBuilder::CSS::PlatformFontUsage> >& platformFonts)
 {
     Node* node = m_domAgent->assertNode(errorString, nodeId);
     if (!node)
         return;
+
+    RefPtr<CSSComputedStyleDeclaration> computedStyleInfo = CSSComputedStyleDeclaration::create(node, true);
+    *cssFamilyName = computedStyleInfo->getPropertyValue(CSSPropertyFontFamily);
+
     Vector<Node*> textNodes;
     if (node->nodeType() == Node::TEXT_NODE) {
         if (node->renderer())
@@ -1097,12 +1101,12 @@ void InspectorCSSAgent::getPlatformFontsForNode(ErrorString* errorString, int no
         }
     }
 
-    platformFontUsage = TypeBuilder::Array<TypeBuilder::CSS::PlatformFontUsage>::create();
+    platformFonts = TypeBuilder::Array<TypeBuilder::CSS::PlatformFontUsage>::create();
     for (HashMap<String, int>::iterator it = fontStats.begin(), end = fontStats.end(); it != end; ++it) {
         RefPtr<TypeBuilder::CSS::PlatformFontUsage> platformFont = TypeBuilder::CSS::PlatformFontUsage::create()
             .setFamilyName(it->key)
             .setGlyphCount(it->value);
-        platformFontUsage->addItem(platformFont);
+        platformFonts->addItem(platformFont);
     }
 }
 
@@ -1583,7 +1587,7 @@ PassRefPtr<TypeBuilder::CSS::CSSRule> InspectorCSSAgent::buildObjectForRule(CSSS
     // Since the inspector wants to walk the parent chain, we construct the full wrappers here.
     // FIXME: This could be factored better. StyleResolver::styleRulesForElement should return a StyleRule vector, not a CSSRuleList.
     if (!rule->parentStyleSheet()) {
-        rule = styleResolver->inspectorCSSOMWrappers().getWrapperForRuleInSheets(rule->styleRule(), styleResolver->document()->styleSheetCollection());
+        rule = styleResolver->inspectorCSSOMWrappers().getWrapperForRuleInSheets(rule->styleRule(), styleResolver->document()->styleSheetCollections());
         if (!rule)
             return 0;
     }

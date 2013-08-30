@@ -112,6 +112,8 @@ WebInspector.ScriptsPanel = function(workspaceForTest)
     this.sidebarPanes = {};
     this.sidebarPanes.watchExpressions = new WebInspector.WatchExpressionsSidebarPane();
     this.sidebarPanes.callstack = new WebInspector.CallStackSidebarPane();
+    this.sidebarPanes.callstack.addEventListener(WebInspector.CallStackSidebarPane.Events.CallFrameSelected, this._callFrameSelectedInSidebar.bind(this));
+
     this.sidebarPanes.scopechain = new WebInspector.ScopeChainSidebarPane();
     this.sidebarPanes.jsBreakpoints = new WebInspector.JavaScriptBreakpointsSidebarPane(WebInspector.breakpointManager, this._showSourceLocation.bind(this));
     this.sidebarPanes.domBreakpoints = WebInspector.domBreakpointsSidebarPane.createProxy(this);
@@ -417,6 +419,14 @@ WebInspector.ScriptsPanel.prototype = {
     },
 
     /**
+     * @param {WebInspector.UILocation} uiLocation
+     */
+    showUILocation: function(uiLocation)
+    {
+        this._showSourceLocation(uiLocation.uiSourceCode, uiLocation.lineNumber, uiLocation.columnNumber);
+    },
+
+    /**
      * @param {WebInspector.UISourceCode} uiSourceCode
      * @param {number=} lineNumber
      * @param {number=} columnNumber
@@ -533,9 +543,9 @@ WebInspector.ScriptsPanel.prototype = {
 
         var uiSourceCode = uiLocation.uiSourceCode;
         var scriptFile = this._currentUISourceCode ? this._currentUISourceCode.scriptFile() : null;
-        if (scriptFile && (scriptFile.isDivergingFromVM() || scriptFile.isMergingToVM()))
+        if (this._skipExecutionLineRevealing)
             return;
-
+        this._skipExecutionLineRevealing = true;
         var sourceFrame = this._showFile(uiSourceCode);
         sourceFrame.revealLine(uiLocation.lineNumber);
         if (sourceFrame.canEditSource())
@@ -689,6 +699,7 @@ WebInspector.ScriptsPanel.prototype = {
     _togglePause: function(event)
     {
         if (this._paused) {
+            delete this._skipExecutionLineRevealing;
             this._paused = false;
             this._waitingToPause = false;
             DebuggerAgent.resume();
@@ -711,6 +722,7 @@ WebInspector.ScriptsPanel.prototype = {
         if (!this._paused)
             return true;
 
+        delete this._skipExecutionLineRevealing;
         this._paused = false;
         this._stepping = true;
 
@@ -729,6 +741,7 @@ WebInspector.ScriptsPanel.prototype = {
         if (!this._paused)
             return true;
 
+        delete this._skipExecutionLineRevealing;
         this._paused = false;
         this._stepping = true;
 
@@ -760,6 +773,7 @@ WebInspector.ScriptsPanel.prototype = {
         if (!this._paused)
             return;
 
+        delete this._skipExecutionLineRevealing;
         this._paused = false;
         this._stepping = true;
         this._clearInterface();
@@ -775,6 +789,7 @@ WebInspector.ScriptsPanel.prototype = {
         if (!this._paused)
             return true;
 
+        delete this._skipExecutionLineRevealing;
         this._paused = false;
         this._stepping = true;
 
@@ -782,6 +797,28 @@ WebInspector.ScriptsPanel.prototype = {
 
         DebuggerAgent.stepOut();
         return true;
+    },
+
+    /**
+     * @param {WebInspector.Event} event
+     */
+    _callFrameSelectedInSidebar: function(event)
+    {
+        var callFrame = /** @type {WebInspector.DebuggerModel.CallFrame} */ (event.data);
+        delete this._skipExecutionLineRevealing;
+        WebInspector.debuggerModel.setSelectedCallFrame(callFrame);
+    },
+
+    continueToLocation: function(rawLocation)
+    {
+        if (!this._paused)
+            return;
+
+        delete this._skipExecutionLineRevealing;
+        this._paused = false;
+        this._stepping = true;
+        this._clearInterface();
+        WebInspector.debuggerModel.continueToLocation(rawLocation);
     },
 
     _toggleBreakpointsClicked: function(event)

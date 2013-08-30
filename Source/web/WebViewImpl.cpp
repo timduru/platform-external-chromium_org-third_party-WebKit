@@ -405,7 +405,6 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_autofillPopup(0)
     , m_isTransparent(false)
     , m_tabsToLinks(false)
-    , m_benchmarkSupport(this)
     , m_layerTreeView(0)
     , m_rootLayer(0)
     , m_rootGraphicsLayer(0)
@@ -486,11 +485,6 @@ WebViewImpl::~WebViewImpl()
     ASSERT(m_helperPluginsPendingClose.isEmpty());
 }
 
-RenderTheme* WebViewImpl::theme() const
-{
-    return m_page ? m_page->theme() : RenderTheme::defaultTheme().get();
-}
-
 WebFrameImpl* WebViewImpl::mainFrameImpl()
 {
     return m_page ? WebFrameImpl::fromFrame(m_page->mainFrame()) : 0;
@@ -506,6 +500,12 @@ void WebViewImpl::setTabKeyCyclesThroughElements(bool value)
 {
     if (m_page)
         m_page->setTabKeyCyclesThroughElements(value);
+}
+
+void WebViewImpl::handleMouseLeave(Frame& mainFrame, const WebMouseEvent& event)
+{
+    m_client->setMouseOverURL(WebURL());
+    PageWidgetEventHandler::handleMouseLeave(mainFrame, event);
 }
 
 void WebViewImpl::handleMouseDown(Frame& mainFrame, const WebMouseEvent& event)
@@ -846,11 +846,6 @@ bool WebViewImpl::startPageScaleAnimation(const IntPoint& targetPosition, bool u
 void WebViewImpl::enableFakePageScaleAnimationForTesting(bool enable)
 {
     m_enableFakePageScaleAnimationForTesting = enable;
-}
-
-WebViewBenchmarkSupport* WebViewImpl::benchmarkSupport()
-{
-    return &m_benchmarkSupport;
 }
 
 void WebViewImpl::setShowFPSCounter(bool show)
@@ -2039,15 +2034,12 @@ bool WebViewImpl::setComposition(
     Frame* focused = focusedWebCoreFrame();
     if (!focused || !m_imeAcceptEvents)
         return false;
-    Editor* editor = focused->editor();
-    if (!editor)
-        return false;
 
     // The input focus has been moved to another WebWidget object.
     // We should use this |editor| object only to complete the ongoing
     // composition.
     InputMethodController& inputMethodController = focused->inputMethodController();
-    if (!editor->canEdit() && !inputMethodController.hasComposition())
+    if (!focused->editor().canEdit() && !inputMethodController.hasComposition())
         return false;
 
     // We should verify the parent node of this IME composition node are
@@ -2105,9 +2097,9 @@ bool WebViewImpl::confirmComposition(const WebString& text, ConfirmCompositionBe
     Frame* focused = focusedWebCoreFrame();
     if (!focused || !m_imeAcceptEvents)
         return false;
-    Editor* editor = focused->editor();
+    Editor& editor = focused->editor();
     InputMethodController& inputMethodController = focused->inputMethodController();
-    if (!editor || (!inputMethodController.hasComposition() && !text.length()))
+    if (!inputMethodController.hasComposition() && !text.length())
         return false;
 
     // We should verify the parent node of this IME composition node are
@@ -2131,10 +2123,11 @@ bool WebViewImpl::confirmComposition(const WebString& text, ConfirmCompositionBe
 
             inputMethodController.confirmComposition();
             if (selectionBehavior == KeepSelection)
-                editor->setSelectionOffsets(location, location + length);
+                editor.setSelectionOffsets(location, location + length);
         }
-    } else
-        editor->insertText(String(text), 0);
+    } else {
+        editor.insertText(String(text), 0);
+    }
 
     return true;
 }
@@ -2176,8 +2169,7 @@ WebTextInputInfo WebViewImpl::textInputInfo()
     if (info.type == WebTextInputTypeNone)
         return info;
 
-    Editor* editor = focused->editor();
-    if (!editor || !editor->canEdit())
+    if (!focused->editor().canEdit())
         return info;
 
     info.value = plainText(rangeOfContents(node).get());
@@ -2304,14 +2296,14 @@ bool WebViewImpl::selectionBounds(WebRect& anchor, WebRect& focus) const
             selectedRange->startOffset(),
             selectedRange->startContainer(),
             selectedRange->startOffset()));
-        anchor = frame->editor()->firstRectForRange(range.get());
+        anchor = frame->editor().firstRectForRange(range.get());
 
         range = Range::create(selectedRange->endContainer()->document(),
             selectedRange->endContainer(),
             selectedRange->endOffset(),
             selectedRange->endContainer(),
             selectedRange->endOffset());
-        focus = frame->editor()->firstRectForRange(range.get());
+        focus = frame->editor().firstRectForRange(range.get());
     }
 
     IntRect scaledAnchor(frame->view()->contentsToWindow(anchor));
@@ -2358,11 +2350,8 @@ bool WebViewImpl::setEditableSelectionOffsets(int start, int end)
     if (!focused)
         return false;
 
-    Editor* editor = focused->editor();
-    if (!editor || !editor->canEdit())
-        return false;
-
-    return editor->setSelectionOffsets(start, end);
+    Editor& editor = focused->editor();
+    return editor.canEdit() && editor.setSelectionOffsets(start, end);
 }
 
 bool WebViewImpl::setCompositionFromExistingText(int compositionStart, int compositionEnd, const WebVector<WebCompositionUnderline>& underlines)
@@ -2371,8 +2360,7 @@ bool WebViewImpl::setCompositionFromExistingText(int compositionStart, int compo
     if (!focused)
         return false;
 
-    Editor* editor = focused->editor();
-    if (!editor || !editor->canEdit())
+    if (!focused->editor().canEdit())
         return false;
 
     InputMethodController& inputMethodController = focused->inputMethodController();
@@ -2406,8 +2394,8 @@ void WebViewImpl::extendSelectionAndDelete(int before, int after)
     if (!focused)
         return;
 
-    Editor* editor = focused->editor();
-    if (!editor || !editor->canEdit())
+    Editor& editor = focused->editor();
+    if (!editor.canEdit())
         return;
 
     FrameSelection* selection = focused->selection();
@@ -2418,7 +2406,7 @@ void WebViewImpl::extendSelectionAndDelete(int before, int after)
     size_t length;
     RefPtr<Range> range = selection->selection().firstRange();
     if (range && TextIterator::getLocationAndLengthFromRange(selection->rootEditableElement(), range.get(), location, length)) {
-        editor->setSelectionOffsets(max(static_cast<int>(location) - before, 0), location + length + after);
+        editor.setSelectionOffsets(max(static_cast<int>(location) - before, 0), location + length + after);
         focused->document()->execCommand("delete", true);
     }
 }
@@ -2473,21 +2461,21 @@ void WebViewImpl::setTextDirection(WebTextDirection direction)
     if (!focused)
         return;
 
-    Editor* editor = focused->editor();
-    if (!editor || !editor->canEdit())
+    Editor& editor = focused->editor();
+    if (!editor.canEdit())
         return;
 
     switch (direction) {
     case WebTextDirectionDefault:
-        editor->setBaseWritingDirection(NaturalWritingDirection);
+        editor.setBaseWritingDirection(NaturalWritingDirection);
         break;
 
     case WebTextDirectionLeftToRight:
-        editor->setBaseWritingDirection(LeftToRightWritingDirection);
+        editor.setBaseWritingDirection(LeftToRightWritingDirection);
         break;
 
     case WebTextDirectionRightToLeft:
-        editor->setBaseWritingDirection(RightToLeftWritingDirection);
+        editor.setBaseWritingDirection(RightToLeftWritingDirection);
         break;
 
     default:
@@ -2555,7 +2543,7 @@ WebString WebViewImpl::pageEncoding() const
     if (!m_page->mainFrame()->document()->loader())
         return WebString();
 
-    return m_page->mainFrame()->document()->encoding();
+    return m_page->mainFrame()->document()->encodingName();
 }
 
 void WebViewImpl::setPageEncoding(const WebString& encodingName)
@@ -2599,7 +2587,7 @@ WebFrame* WebViewImpl::findFrameByName(
 {
     if (!relativeToFrame)
         relativeToFrame = mainFrame();
-    Frame* frame = static_cast<WebFrameImpl*>(relativeToFrame)->frame();
+    Frame* frame = toWebFrameImpl(relativeToFrame)->frame();
     frame = frame->tree()->find(name);
     return WebFrameImpl::fromFrame(frame);
 }
@@ -2618,8 +2606,7 @@ void WebViewImpl::setFocusedFrame(WebFrame* frame)
             frame->selection()->setFocused(false);
         return;
     }
-    WebFrameImpl* frameImpl = static_cast<WebFrameImpl*>(frame);
-    Frame* webcoreFrame = frameImpl->frame();
+    Frame* webcoreFrame = toWebFrameImpl(frame)->frame();
     webcoreFrame->page()->focusController().setFocusedFrame(webcoreFrame);
 }
 
@@ -3194,7 +3181,7 @@ void WebViewImpl::copyImageAt(const WebPoint& point)
         return;
     }
 
-    m_page->mainFrame()->editor()->copyImage(result);
+    m_page->mainFrame()->editor().copyImage(result);
 }
 
 void WebViewImpl::dragSourceEndedAt(
@@ -3589,7 +3576,7 @@ void WebViewImpl::setSelectionColors(unsigned activeBackgroundColor,
                                      unsigned inactiveForegroundColor) {
 #if ENABLE(DEFAULT_RENDER_THEME)
     RenderThemeChromiumDefault::setSelectionColors(activeBackgroundColor, activeForegroundColor, inactiveBackgroundColor, inactiveForegroundColor);
-    theme()->platformColorsDidChange();
+    RenderTheme::theme().platformColorsDidChange();
 #endif
 }
 

@@ -613,7 +613,7 @@
       'sources/': [
         # FIXME: Figure out how to store these patterns in a variable.
         ['exclude', '(cf|cg|harfbuzz|mac|opentype|svg|win)/'],
-        ['exclude', '(?<!Chromium)(CF|CG|Mac|OpenType|Win)\\.(cpp|mm?)$'],
+        ['exclude', '(?<!Chromium)(CF|CG|Mac|Win)\\.(cpp|mm?)$'],
 
         # Used only by mac.
         ['exclude', 'platform/Theme\\.cpp$'],
@@ -786,9 +786,11 @@
                 ['include', 'platform/graphics/skia/SimpleFontDataSkia\\.cpp$'],
                 ['include', 'platform/graphics/skia/GlyphPageTreeNodeSkia\\.cpp$'],
                 ['include', 'platform/graphics/skia/FontCacheSkiaWin\\.cpp$'],
+                ['include', 'platform/graphics/skia/FontCustomPlatformDataSkia\\.cpp$'],
                 ['exclude', 'platform/graphics/chromium/SimpleFontDataChromiumWin\\.cpp$'],
                 ['exclude', 'platform/graphics/chromium/GlyphPageTreeNodeChromiumWin\\.cpp$'],
                 ['exclude', 'platform/graphics/chromium/FontCacheChromiumWin\\.cpp$'],
+                ['exclude', 'platform/graphics/win/FontCustomPlatformDataWin\\.cpp$'],
               ],
             }],
           ],
@@ -890,7 +892,7 @@
 
         # FIXME: Figure out how to store these patterns in a variable.
         ['exclude', '(cf|cg|mac|opentype|svg|win)/'],
-        ['exclude', '(?<!Chromium)(CF|CG|Mac|OpenType|Win)\\.(cpp|mm?)$'],
+        ['exclude', '(?<!Chromium)(CF|CG|Mac|Win)\\.(cpp|mm?)$'],
         # Previous rule excludes things like ChromiumFooWin, include those.
         ['include', 'rendering/.*Chromium.*\\.(cpp|mm?)$'],
       ],
@@ -976,7 +978,7 @@
 
         # FIXME: Figure out how to store these patterns in a variable.
         ['exclude', '(cf|cg|mac|opentype|svg|win)/'],
-        ['exclude', '(?<!Chromium)(CF|CG|Mac|OpenType|Win)\\.(cpp|mm?)$'],
+        ['exclude', '(?<!Chromium)(CF|CG|Mac|Win)\\.(cpp|mm?)$'],
       ],
       'conditions': [
         # Shard this taret into parts to work around linker limitations.

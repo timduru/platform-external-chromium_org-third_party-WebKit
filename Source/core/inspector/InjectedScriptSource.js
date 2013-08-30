@@ -575,7 +575,7 @@ InjectedScript.prototype = {
         try {
             if (injectCommandLineAPI && inspectedWindow.console) {
                 inspectedWindow.console._commandLineAPI = new CommandLineAPI(this._commandLineAPIImpl, isEvalOnCallFrame ? object : null);
-                expression = "with ((window && window.console && window.console._commandLineAPI) || {}) {\n" + expression + "\n}";
+                expression = "with ((console && console._commandLineAPI) || {}) {\n" + expression + "\n}";
             }
             var result = evalFunction.call(object, expression);
             if (objectGroup === "console")
@@ -848,7 +848,7 @@ InjectedScript.prototype = {
             case 1 /* Node.ELEMENT_NODE */:
                 description += obj.id ? "#" + obj.id : "";
                 var className = obj.className;
-                description += (className && typeof className === "string") ? "." + className : "";
+                description += (className && typeof className === "string") ? "." + className.trim().replace(/\s+/g, ".") : "";
                 break;
             case 10 /*Node.DOCUMENT_TYPE_NODE */:
                 description = "<!DOCTYPE " + description + ">";

@@ -76,7 +76,7 @@ enum VerticalScrollbarState {
 
 class TestData {
 public:
-    void setWebView(WebView* webView) { m_webView = static_cast<WebViewImpl*>(webView); }
+    void setWebView(WebView* webView) { m_webView = toWebViewImpl(webView); }
     void setSize(const WebSize& newSize) { m_size = newSize; }
     HorizontalScrollbarState horizontalScrollbarState() const
     {
@@ -265,7 +265,7 @@ TEST_F(WebViewTest, FocusIsInactive)
 
     webView->setFocus(true);
     webView->setIsActive(true);
-    WebFrameImpl* frame = static_cast<WebFrameImpl*>(webView->mainFrame());
+    WebFrameImpl* frame = toWebFrameImpl(webView->mainFrame());
     EXPECT_TRUE(frame->frame()->document()->isHTMLDocument());
 
     WebCore::HTMLDocument* document = static_cast<WebCore::HTMLDocument*>(frame->frame()->document());
@@ -340,7 +340,7 @@ void WebViewTest::testAutoResize(const WebSize& minAutoResize, const WebSize& ma
     WebView* webView = FrameTestHelpers::createWebViewAndLoad(url, true, 0, &client);
     client.testData().setWebView(webView);
 
-    WebFrameImpl* frame = static_cast<WebFrameImpl*>(webView->mainFrame());
+    WebFrameImpl* frame = toWebFrameImpl(webView->mainFrame());
     WebCore::FrameView* frameView = frame->frame()->view();
     frameView->layout();
     EXPECT_FALSE(frameView->layoutPending());
@@ -481,7 +481,7 @@ TEST_F(WebViewTest, SetEditableSelectionOffsetsAndTextInputInfo)
     WebView* webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "input_field_populated.html");
     webView->setInitialFocus(false);
     webView->setEditableSelectionOffsets(5, 13);
-    WebFrameImpl* frame = static_cast<WebFrameImpl*>(webView->mainFrame());
+    WebFrameImpl* frame = toWebFrameImpl(webView->mainFrame());
     EXPECT_EQ("56789abc", frame->selectionAsText());
     WebTextInputInfo info = webView->textInputInfo();
     EXPECT_EQ("0123456789abcdefghijklmnopqrstuvwxyz", info.value);
@@ -495,7 +495,7 @@ TEST_F(WebViewTest, SetEditableSelectionOffsetsAndTextInputInfo)
     webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "content_editable_populated.html");
     webView->setInitialFocus(false);
     webView->setEditableSelectionOffsets(8, 19);
-    frame = static_cast<WebFrameImpl*>(webView->mainFrame());
+    frame = toWebFrameImpl(webView->mainFrame());
     EXPECT_EQ("89abcdefghi", frame->selectionAsText());
     info = webView->textInputInfo();
     EXPECT_EQ("0123456789abcdefghijklmnopqrstuvwxyz", info.value);
@@ -629,7 +629,7 @@ TEST_F(WebViewTest, SetCompositionFromExistingText)
     underlines[0] = WebKit::WebCompositionUnderline(0, 4, 0, false);
     webView->setEditableSelectionOffsets(4, 10);
     webView->setCompositionFromExistingText(8, 12, underlines);
-    WebVector<WebCompositionUnderline> underlineResults = static_cast<WebViewImpl*>(webView)->compositionUnderlines();
+    WebVector<WebCompositionUnderline> underlineResults = toWebViewImpl(webView)->compositionUnderlines();
     EXPECT_EQ(8u, underlineResults[0].startOffset);
     EXPECT_EQ(12u, underlineResults[0].endOffset);
     WebTextInputInfo info = webView->textInputInfo();
@@ -662,7 +662,7 @@ TEST_F(WebViewTest, SetCompositionFromExistingTextInTextArea)
 
     webView->setEditableSelectionOffsets(31, 31);
     webView->setCompositionFromExistingText(30, 34, underlines);
-    WebVector<WebCompositionUnderline> underlineResults = static_cast<WebViewImpl*>(webView)->compositionUnderlines();
+    WebVector<WebCompositionUnderline> underlineResults = toWebViewImpl(webView)->compositionUnderlines();
     EXPECT_EQ(2u, underlineResults[0].startOffset);
     EXPECT_EQ(6u, underlineResults[0].endOffset);
     info = webView->textInputInfo();
@@ -703,7 +703,7 @@ TEST_F(WebViewTest, IsSelectionAnchorFirst)
 TEST_F(WebViewTest, HistoryResetScrollAndScaleState)
 {
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("hello_world.html"));
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "hello_world.html"));
+    WebViewImpl* webViewImpl = toWebViewImpl(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "hello_world.html"));
     webViewImpl->resize(WebSize(640, 480));
     webViewImpl->layout();
     EXPECT_EQ(0, webViewImpl->mainFrame()->scrollOffset().width);
@@ -757,7 +757,7 @@ TEST_F(WebViewTest, EnterFullscreenResetScrollAndScaleState)
 {
     EnterFullscreenWebViewClient client;
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("hello_world.html"));
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "hello_world.html", true, 0, &client));
+    WebViewImpl* webViewImpl = toWebViewImpl(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "hello_world.html", true, 0, &client));
     webViewImpl->settings()->setFullScreenEnabled(true);
     webViewImpl->resize(WebSize(640, 480));
     webViewImpl->layout();
@@ -939,7 +939,7 @@ TEST_F(WebViewTest, LongPressSelection)
 
     WebString target = WebString::fromUTF8("target");
     WebString onselectstartfalse = WebString::fromUTF8("onselectstartfalse");
-    WebFrameImpl* frame = static_cast<WebFrameImpl*>(webView->mainFrame());
+    WebFrameImpl* frame = toWebFrameImpl(webView->mainFrame());
 
     EXPECT_TRUE(tapElementById(webView, WebInputEvent::GestureLongPress, onselectstartfalse));
     EXPECT_EQ("", std::string(frame->selectionAsText().utf8().data()));
@@ -959,14 +959,12 @@ TEST_F(WebViewTest, SelectionOnDisabledInput)
 
     std::string testWord = "This text should be selected.";
 
-    WebFrameImpl* frame = static_cast<WebFrameImpl*>(webView->mainFrame());
+    WebFrameImpl* frame = toWebFrameImpl(webView->mainFrame());
     EXPECT_EQ(testWord, std::string(frame->selectionAsText().utf8().data()));
 
     size_t location;
     size_t length;
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(webView);
-
-    EXPECT_TRUE(webViewImpl->caretOrSelectionRange(&location, &length));
+    EXPECT_TRUE(toWebViewImpl(webView)->caretOrSelectionRange(&location, &length));
     EXPECT_EQ(location, 0UL);
     EXPECT_EQ(length, testWord.length());
 
@@ -983,14 +981,12 @@ TEST_F(WebViewTest, SelectionOnReadOnlyInput)
 
     std::string testWord = "This text should be selected.";
 
-    WebFrameImpl* frame = static_cast<WebFrameImpl*>(webView->mainFrame());
+    WebFrameImpl* frame = toWebFrameImpl(webView->mainFrame());
     EXPECT_EQ(testWord, std::string(frame->selectionAsText().utf8().data()));
 
     size_t location;
     size_t length;
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(webView);
-
-    EXPECT_TRUE(webViewImpl->caretOrSelectionRange(&location, &length));
+    EXPECT_TRUE(toWebViewImpl(webView)->caretOrSelectionRange(&location, &length));
     EXPECT_EQ(location, 0UL);
     EXPECT_EQ(length, testWord.length());
 
@@ -1120,7 +1116,7 @@ TEST_F(WebViewTest, SetCompositionFromExistingTextTriggersAutofillTextChange)
 TEST_F(WebViewTest, ShadowRoot)
 {
     URLTestHelpers::registerMockedURLFromBaseURL(WebString::fromUTF8(m_baseURL.c_str()), WebString::fromUTF8("shadow_dom_test.html"));
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "shadow_dom_test.html", true));
+    WebViewImpl* webViewImpl = toWebViewImpl(FrameTestHelpers::createWebViewAndLoad(m_baseURL + "shadow_dom_test.html", true));
 
     WebDocument document = webViewImpl->mainFrame()->document();
     {
@@ -1141,9 +1137,9 @@ TEST_F(WebViewTest, ShadowRoot)
 TEST_F(WebViewTest, HelperPlugin)
 {
     HelperPluginCreatingWebViewClient client;
-    WebViewImpl* webViewImpl = static_cast<WebViewImpl*>(FrameTestHelpers::createWebView(true, 0, &client));
+    WebViewImpl* webViewImpl = toWebViewImpl(FrameTestHelpers::createWebView(true, 0, &client));
 
-    WebFrameImpl* frame = static_cast<WebFrameImpl*>(webViewImpl->mainFrame());
+    WebFrameImpl* frame = toWebFrameImpl(webViewImpl->mainFrame());
     client.setWebFrameClient(frame->client());
 
     WebHelperPluginImpl* helperPlugin = webViewImpl->createHelperPlugin("dummy-plugin-type", frame->document());

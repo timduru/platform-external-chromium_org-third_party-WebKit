@@ -94,7 +94,6 @@
 #include "core/storage/Storage.h"
 #include "core/storage/StorageArea.h"
 #include "core/storage/StorageNamespace.h"
-#include "modules/device_orientation/DeviceMotionController.h"
 #include "weborigin/KURL.h"
 #include "weborigin/SecurityOrigin.h"
 #include "weborigin/SecurityPolicy.h"
@@ -956,7 +955,7 @@ bool DOMWindow::find(const String& string, bool caseSensitive, bool backwards, b
         return false;
 
     // FIXME (13016): Support wholeWord, searchInFrames and showDialog
-    return m_frame->editor()->findString(string, !backwards, caseSensitive, wrap, false);
+    return m_frame->editor().findString(string, !backwards, caseSensitive, wrap, false);
 }
 
 bool DOMWindow::offscreenBuffering() const
@@ -1419,6 +1418,8 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
             didAddStorageEventListener(this);
     }
 
+    lifecycleNotifier()->notifyAddEventListener(this, eventType);
+
     if (eventType == eventNames().unloadEvent) {
         addUnloadEventListener(this);
     } else if (eventType == eventNames().beforeunloadEvent) {
@@ -1431,9 +1432,6 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
             // Subframes return false from allowsBeforeUnloadListeners.
             UseCounter::count(this, UseCounter::SubFrameBeforeUnloadRegistered);
         }
-    } else if (eventType == eventNames().devicemotionEvent && RuntimeEnabledFeatures::deviceMotionEnabled()) {
-        if (DeviceMotionController* controller = DeviceMotionController::from(document()))
-            controller->startUpdating();
     } else if (eventType == eventNames().deviceorientationEvent && RuntimeEnabledFeatures::deviceOrientationEnabled()) {
         if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
             controller->addDeviceEventListener(this);
@@ -1454,13 +1452,12 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
             document->didRemoveTouchEventHandler(document);
     }
 
-    if (eventType == eventNames().unloadEvent)
+    lifecycleNotifier()->notifyRemoveEventListener(this, eventType);
+
+    if (eventType == eventNames().unloadEvent) {
         removeUnloadEventListener(this);
-    else if (eventType == eventNames().beforeunloadEvent && allowsBeforeUnloadListeners(this))
+    } else if (eventType == eventNames().beforeunloadEvent && allowsBeforeUnloadListeners(this)) {
         removeBeforeUnloadEventListener(this);
-    else if (eventType == eventNames().devicemotionEvent) {
-        if (DeviceMotionController* controller = DeviceMotionController::from(document()))
-            controller->stopUpdating();
     } else if (eventType == eventNames().deviceorientationEvent) {
         if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
             controller->removeDeviceEventListener(this);
@@ -1471,7 +1468,7 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
 
 void DOMWindow::dispatchLoadEvent()
 {
-    RefPtr<Event> loadEvent(Event::create(eventNames().loadEvent, false, false));
+    RefPtr<Event> loadEvent(Event::create(eventNames().loadEvent));
     if (m_frame && m_frame->loader()->documentLoader() && !m_frame->loader()->documentLoader()->timing()->loadEventStart()) {
         // The DocumentLoader (and thus its DocumentLoadTiming) might get destroyed while dispatching
         // the event, so protect it to prevent writing the end time into freed memory.
@@ -1488,7 +1485,7 @@ void DOMWindow::dispatchLoadEvent()
     // the DOM.
     Element* ownerElement = m_frame ? m_frame->ownerElement() : 0;
     if (ownerElement)
-        ownerElement->dispatchEvent(Event::create(eventNames().loadEvent, false, false));
+        ownerElement->dispatchEvent(Event::create(eventNames().loadEvent));
 
     InspectorInstrumentation::loadEventFired(frame());
 }
@@ -1515,7 +1512,8 @@ void DOMWindow::removeAllEventListeners()
 {
     EventTarget::removeAllEventListeners();
 
-    lifecycleNotifier()->notifyRemoveAllEventListeners();
+    lifecycleNotifier()->notifyRemoveAllEventListeners(this);
+
     if (DeviceOrientationController* controller = DeviceOrientationController::from(page()))
         controller->removeAllDeviceEventListeners(this);
     if (Document* document = this->document())

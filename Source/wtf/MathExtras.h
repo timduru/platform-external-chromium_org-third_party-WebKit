@@ -33,11 +33,6 @@
 #include <float.h>
 #include <limits>
 #include <stdint.h>
-#include <stdlib.h>
-
-#if OS(SOLARIS)
-#include <ieeefp.h>
-#endif
 
 #if OS(OPENBSD)
 #include <sys/types.h>
@@ -74,24 +69,6 @@ const float piOverFourFloat = static_cast<float>(M_PI_4);
 inline double wtf_ceil(double x) { return copysign(ceil(x), x); }
 
 #define ceil(x) wtf_ceil(x)
-
-#endif
-
-#if OS(SOLARIS)
-
-namespace std {
-
-#ifndef isfinite
-inline bool isfinite(double x) { return finite(x) && !isnand(x); }
-#endif
-#ifndef signbit
-inline bool signbit(double x) { return copysign(1.0, x) < 0; }
-#endif
-#ifndef isinf
-inline bool isinf(double x) { return !finite(x) && !isnand(x); }
-#endif
-
-} // namespace std
 
 #endif
 

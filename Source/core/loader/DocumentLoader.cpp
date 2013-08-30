@@ -418,6 +418,11 @@ void DocumentLoader::redirectReceived(Resource* resource, ResourceRequest& reque
     willSendRequest(request, redirectResponse);
 }
 
+static bool isFormSubmission(NavigationType type)
+{
+    return type == NavigationTypeFormSubmitted || type == NavigationTypeFormResubmitted;
+}
+
 void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const ResourceResponse& redirectResponse)
 {
     // Note that there are no asserts here as there are for the other callbacks. This is due to the
@@ -425,8 +430,7 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
     // deferrals plays less of a part in this function in preventing the bad behavior deferring
     // callbacks is meant to prevent.
     ASSERT(!newRequest.isNull());
-
-    if (!frameLoader()->checkIfFormActionAllowedByCSP(newRequest.url())) {
+    if (isFormSubmission(m_triggeringAction.type()) && !m_frame->document()->contentSecurityPolicy()->allowFormAction(newRequest.url())) {
         cancelMainResourceLoad(ResourceError::cancelledError(newRequest.url()));
         return;
     }
@@ -472,7 +476,7 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
     appendRedirect(newRequest.url());
     frameLoader()->client()->dispatchDidReceiveServerRedirectForProvisionalLoad();
     if (!shouldContinueForNavigationPolicy(newRequest, PolicyCheckStandard))
-        stopLoadingForPolicyChange();
+        cancelMainResourceLoad(ResourceError::cancelledError(m_request.url()));
 }
 
 static bool canShowMIMEType(const String& mimeType, Page* page)
@@ -537,7 +541,7 @@ void DocumentLoader::responseReceived(Resource* resource, const ResourceResponse
             frame()->document()->addConsoleMessageWithRequestIdentifier(SecurityMessageSource, ErrorMessageLevel, message, identifier);
             frame()->document()->enforceSandboxFlags(SandboxOrigin);
             if (HTMLFrameOwnerElement* ownerElement = frame()->ownerElement())
-                ownerElement->dispatchEvent(Event::create(eventNames().loadEvent, false, false));
+                ownerElement->dispatchEvent(Event::create(eventNames().loadEvent));
 
             // The load event might have detached this frame. In that case, the load will already have been cancelled during detach.
             if (frameLoader())
@@ -558,7 +562,7 @@ void DocumentLoader::responseReceived(Resource* resource, const ResourceResponse
 
     if (!shouldContinueForResponse()) {
         InspectorInstrumentation::continueWithPolicyIgnore(m_frame, this, m_mainResource->identifier(), m_response);
-        stopLoadingForPolicyChange();
+        cancelMainResourceLoad(ResourceError::cancelledError(m_request.url()));
         return;
     }
 
@@ -575,13 +579,6 @@ void DocumentLoader::responseReceived(Resource* resource, const ResourceResponse
                 cancelMainResourceLoad(ResourceError::cancelledError(m_request.url()));
         }
     }
-}
-
-void DocumentLoader::stopLoadingForPolicyChange()
-{
-    ResourceError error = frameLoader()->client()->interruptedForPolicyChangeError(m_request);
-    error.setIsCancellation(true);
-    cancelMainResourceLoad(error);
 }
 
 void DocumentLoader::ensureWriter()
@@ -726,7 +723,7 @@ bool DocumentLoader::isLoadingInAPISense() const
 void DocumentLoader::createArchive()
 {
     m_archive = MHTMLArchive::create(m_response.url(), mainResourceData().get());
-    ASSERT(m_archive);
+    RELEASE_ASSERT(m_archive);
 
     addAllArchiveResources(m_archive.get());
     ArchiveResource* mainResource = m_archive->mainResource();
@@ -910,7 +907,7 @@ void DocumentLoader::startLoadingMainResource()
     DEFINE_STATIC_LOCAL(ResourceLoaderOptions, mainResourceLoadOptions,
         (SendCallbacks, SniffContent, DoNotBufferData, AllowStoredCredentials, ClientRequestedCredentials, AskClientForCrossOriginCredentials, SkipSecurityCheck, CheckContentSecurityPolicy, UseDefaultOriginRestrictionsForType, DocumentContext));
     FetchRequest cachedResourceRequest(request, FetchInitiatorTypeNames::document, mainResourceLoadOptions);
-    m_mainResource = m_fetcher->requestMainResource(cachedResourceRequest);
+    m_mainResource = m_fetcher->fetchMainResource(cachedResourceRequest);
     if (!m_mainResource) {
         setRequest(ResourceRequest());
         // If the load was aborted by clearing m_request, it's possible the ApplicationCacheHost

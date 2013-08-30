@@ -222,6 +222,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/html/canvas/WebGLTexture.cpp \
 	third_party/WebKit/Source/core/html/canvas/WebGLUniformLocation.cpp \
 	third_party/WebKit/Source/core/html/canvas/WebGLVertexArrayObjectOES.cpp \
+	third_party/WebKit/Source/core/html/forms/InputTypeView.cpp \
 	third_party/WebKit/Source/core/html/parser/BackgroundHTMLParser.cpp \
 	third_party/WebKit/Source/core/html/parser/BackgroundHTMLInputStream.cpp \
 	third_party/WebKit/Source/core/html/parser/CSSPreloadScanner.cpp \

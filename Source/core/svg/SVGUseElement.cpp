@@ -235,7 +235,7 @@ void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
             KURL url = document()->completeURL(hrefCurrentValue());
             if (url.hasFragmentIdentifier()) {
                 FetchRequest request(ResourceRequest(url.string()), localName());
-                setDocumentResource(document()->fetcher()->requestSVGDocument(request));
+                setDocumentResource(document()->fetcher()->fetchSVGDocument(request));
             }
         } else {
             setDocumentResource(0);
@@ -257,6 +257,13 @@ void SVGUseElement::svgAttributeChanged(const QualifiedName& attrName)
     }
 
     ASSERT_NOT_REACHED();
+}
+
+void SVGUseElement::attach(const AttachContext& context)
+{
+    if (m_needsShadowTreeRecreation)
+        buildPendingResource();
+    SVGGraphicsElement::attach(context);
 }
 
 void SVGUseElement::willRecalcStyle(StyleChange)
@@ -884,7 +891,7 @@ SVGElementInstance* SVGUseElement::instanceForShadowTreeElement(Node* element, S
 
 void SVGUseElement::invalidateShadowTree()
 {
-    if (!renderer() || m_needsShadowTreeRecreation)
+    if (!attached() || m_needsShadowTreeRecreation)
         return;
     m_needsShadowTreeRecreation = true;
     setNeedsStyleRecalc();
@@ -943,7 +950,7 @@ void SVGUseElement::notifyFinished(Resource* resource)
 
     invalidateShadowTree();
     if (resource->errorOccurred())
-        dispatchEvent(Event::create(eventNames().errorEvent, false, false));
+        dispatchEvent(Event::create(eventNames().errorEvent));
     else if (!resource->wasCanceled())
         SVGExternalResourcesRequired::dispatchLoadEvent(this);
 }

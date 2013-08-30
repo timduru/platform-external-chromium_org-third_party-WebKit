@@ -136,7 +136,7 @@ void HTMLFormControlElement::parseAttribute(const QualifiedName& name, const Ato
             setNeedsWillValidateCheck();
             setNeedsStyleRecalc();
             if (renderer() && renderer()->style()->hasAppearance())
-                renderer()->theme()->stateChanged(renderer(), ReadOnlyState);
+                RenderTheme::theme().stateChanged(renderer(), ReadOnlyState);
         }
     } else if (name == requiredAttr) {
         bool wasRequired = m_isRequired;
@@ -156,7 +156,7 @@ void HTMLFormControlElement::disabledAttributeChanged()
     setNeedsWillValidateCheck();
     didAffectSelector(AffectedSelectorDisabled | AffectedSelectorEnabled);
     if (renderer() && renderer()->style()->hasAppearance())
-        renderer()->theme()->stateChanged(renderer(), EnabledState);
+        RenderTheme::theme().stateChanged(renderer(), EnabledState);
     if (isDisabledFormControl() && treeScope()->adjustedFocusedElement() == this) {
         // We might want to call blur(), but it's dangerous to dispatch events
         // here.
@@ -438,7 +438,7 @@ bool HTMLFormControlElement::checkValidity(Vector<RefPtr<FormAssociatedElement> 
     // An event handler can deref this object.
     RefPtr<HTMLFormControlElement> protector(this);
     RefPtr<Document> originalDocument(document());
-    bool needsDefaultAction = dispatchEvent(Event::create(eventNames().invalidEvent, false, true));
+    bool needsDefaultAction = dispatchEvent(Event::createCancelable(eventNames().invalidEvent));
     if (needsDefaultAction && unhandledInvalidControls && inDocument() && originalDocument == document())
         unhandledInvalidControls->append(this);
     return false;

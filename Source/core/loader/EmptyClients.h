@@ -104,7 +104,8 @@ public:
 
     virtual void setResizable(bool) OVERRIDE { }
 
-    virtual void addMessageToConsole(MessageSource, MessageLevel, const String&, unsigned, const String&) OVERRIDE { }
+    virtual bool shouldReportDetailedMessageForSource(const String&) OVERRIDE { return false; }
+    virtual void addMessageToConsole(MessageSource, MessageLevel, const String&, unsigned, const String&, const String&) OVERRIDE { }
 
     virtual bool canRunBeforeUnloadConfirmPanel() OVERRIDE { return false; }
     virtual bool runBeforeUnloadConfirmPanel(const String&, Frame*) OVERRIDE { return true; }
@@ -198,7 +199,7 @@ public:
     virtual void dispatchDidReceiveServerRedirectForProvisionalLoad() OVERRIDE { }
     virtual void dispatchWillClose() OVERRIDE { }
     virtual void dispatchDidStartProvisionalLoad() OVERRIDE { }
-    virtual void dispatchDidReceiveTitle(const StringWithDirection&) OVERRIDE { }
+    virtual void dispatchDidReceiveTitle(const String&) OVERRIDE { }
     virtual void dispatchDidChangeIcons(IconType) OVERRIDE { }
     virtual void dispatchDidCommitLoad() OVERRIDE { }
     virtual void dispatchDidFailProvisionalLoad(const ResourceError&) OVERRIDE { }
@@ -218,8 +219,6 @@ public:
 
     virtual void loadURLExternally(const ResourceRequest&, NavigationPolicy, const String& = String()) OVERRIDE { }
 
-    virtual ResourceError interruptedForPolicyChangeError(const ResourceRequest&) OVERRIDE { return ResourceError("", 0, "", ""); }
-
     virtual PassRefPtr<DocumentLoader> createDocumentLoader(const ResourceRequest&, const SubstituteData&) OVERRIDE;
 
     virtual String userAgent(const KURL&) OVERRIDE { return ""; }
@@ -233,7 +232,7 @@ public:
     virtual void didRunInsecureContent(SecurityOrigin*, const KURL&) OVERRIDE { }
     virtual void didDetectXSS(const KURL&, bool) OVERRIDE { }
     virtual void didDispatchPingLoader(const KURL&) OVERRIDE { }
-    virtual PassRefPtr<Frame> createFrame(const KURL&, const String&, HTMLFrameOwnerElement*, const String&, bool, int, int) OVERRIDE;
+    virtual PassRefPtr<Frame> createFrame(const KURL&, const String&, const String&, HTMLFrameOwnerElement*) OVERRIDE;
     virtual PassRefPtr<Widget> createPlugin(const IntSize&, HTMLPlugInElement*, const KURL&, const Vector<String>&, const Vector<String>&, const String&, bool) OVERRIDE;
     virtual PassRefPtr<Widget> createJavaAppletWidget(const IntSize&, HTMLAppletElement*, const KURL&, const Vector<String>&, const Vector<String>&) OVERRIDE;
 
