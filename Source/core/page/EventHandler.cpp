@@ -1460,6 +1460,11 @@ bool EventHandler::handleMouseMoveEvent(const PlatformMouseEvent& mouseEvent, Hi
         return true;
     }
 
+    // FIXME: Both mouseMoved() and handleMouseMoveEvent() are publicly exposed. Fix eternal
+    // callers to use mouseMoved() instead, and remove the need to double-protect FrameView
+    // when handleMouseMoveEvent() is called by mouseMoved().
+    RefPtr<FrameView> protector(m_frame->view());
+
     setLastKnownMousePosition(mouseEvent);
 
     if (m_hoverTimer.isActive())

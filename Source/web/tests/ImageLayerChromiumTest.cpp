@@ -84,7 +84,7 @@ public:
     }
 
     // Stub implementations of pure virtual Image functions.
-    virtual void destroyDecodedData() OVERRIDE
+    virtual void destroyDecodedData(bool) OVERRIDE
     {
     }
 
