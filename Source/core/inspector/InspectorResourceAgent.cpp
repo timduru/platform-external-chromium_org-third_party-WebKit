@@ -706,12 +706,6 @@ void InspectorResourceAgent::loadResourceForFrontend(ErrorString* errorString, c
         return;
     }
 
-    KURL kurl = KURL(ParsedURLString, url);
-    if (kurl.isLocalFile()) {
-        *errorString = "Can not load local file";
-        return;
-    }
-
     ResourceRequest request(url);
     request.setHTTPMethod("GET");
     request.setCachePolicy(ReloadIgnoringCacheData);
@@ -728,7 +722,7 @@ void InspectorResourceAgent::loadResourceForFrontend(ErrorString* errorString, c
     }
 
     ThreadableLoaderOptions options;
-    options.allowCredentials = DoNotAllowStoredCredentials;
+    options.allowCredentials = AllowStoredCredentials;
     options.crossOriginRequestPolicy = AllowCrossOriginRequests;
     options.sendLoadCallbacks = SendCallbacks;
 

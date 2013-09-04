@@ -1141,15 +1141,15 @@ WebInspector.ElementsPanel.prototype = {
         computedPane.element.addStyleClass("fill");
         var expandComputed = computedPane.expand.bind(computedPane);
 
-        this.sidebarPanes.metrics.show(computedPane.bodyElement);
-        this.sidebarPanes.metrics.setExpandCallback(expandComputed);
-
         computedPane.bodyElement.appendChild(this.sidebarPanes.computedStyle.titleElement);
         computedPane.bodyElement.addStyleClass("metrics-and-computed");
         this.sidebarPanes.computedStyle.show(computedPane.bodyElement);
         this.sidebarPanes.computedStyle.setExpandCallback(expandComputed);
 
         if (vertically) {
+            this.sidebarPanes.metrics.show(computedPane.bodyElement, this.sidebarPanes.computedStyle.element);
+            this.sidebarPanes.metrics.setExpandCallback(expandComputed);
+
             this.sidebarPaneView = new WebInspector.SidebarTabbedPane();
 
             var compositePane = new WebInspector.SidebarPane(this.sidebarPanes.styles.title());
@@ -1174,13 +1174,48 @@ WebInspector.ElementsPanel.prototype = {
         } else {
             this.sidebarPaneView = new WebInspector.SidebarTabbedPane();
 
-            this.sidebarPaneView.addPane(this.sidebarPanes.styles);
+            var stylesPane = new WebInspector.SidebarPane(this.sidebarPanes.styles.title());
+            stylesPane.element.addStyleClass("composite");
+            stylesPane.element.addStyleClass("fill");
+            var expandStyles = stylesPane.expand.bind(stylesPane);
+            stylesPane.bodyElement.addStyleClass("metrics-and-styles");
+            this.sidebarPanes.styles.show(stylesPane.bodyElement);
+            this.sidebarPanes.styles.setExpandCallback(expandStyles);
+            this.sidebarPanes.metrics.setExpandCallback(expandStyles);
+            stylesPane.bodyElement.appendChild(this.sidebarPanes.styles.titleElement);
+
+            /**
+             * @param {WebInspector.SidebarPane} pane
+             * @param {Element=} beforeElement
+             */
+            function showMetrics(pane, beforeElement)
+            {
+                this.sidebarPanes.metrics.show(pane.bodyElement, beforeElement);
+            }
+
+            /**
+             * @param {WebInspector.Event} event
+             */
+            function tabSelected(event)
+            {
+                var tabId = /** @type {string} */ (event.data.tabId);
+                if (tabId === computedPane.title())
+                    showMetrics.call(this, computedPane, this.sidebarPanes.computedStyle.element);
+                if (tabId === stylesPane.title())
+                    showMetrics.call(this, stylesPane);
+            }
+
+            this.sidebarPaneView.addEventListener(WebInspector.TabbedPane.EventTypes.TabSelected, tabSelected, this);
+
+            showMetrics.call(this, stylesPane);
+            this.sidebarPaneView.addPane(stylesPane);
             this.sidebarPaneView.addPane(computedPane);
 
             this.sidebarPaneView.addPane(this.sidebarPanes.eventListeners);
             this.sidebarPaneView.addPane(this.sidebarPanes.domBreakpoints);
             this.sidebarPaneView.addPane(this.sidebarPanes.properties);
         }
+
         this.sidebarPaneView.show(this.splitView.sidebarElement);
         this.sidebarPanes.styles.expand();
     },

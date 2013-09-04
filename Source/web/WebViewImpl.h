@@ -220,9 +220,12 @@ public:
     virtual void zoomToFindInPageRect(const WebRect&);
     virtual void advanceFocus(bool reverse);
     virtual double zoomLevel();
+    virtual double setZoomLevel(double);
     virtual double setZoomLevel(bool textOnly, double zoomLevel);
     virtual void zoomLimitsChanged(double minimumZoomLevel,
                                    double maximumZoomLevel);
+    virtual float textZoomFactor();
+    virtual float setTextZoomFactor(float);
     virtual void setInitialPageScaleOverride(float);
     virtual bool zoomToMultipleTargetsRect(const WebRect&);
     virtual float pageScaleFactor() const;
@@ -444,17 +447,6 @@ public:
     WebCore::IntSize maxAutoSize() const
     {
         return m_maxAutoSize;
-    }
-
-    // Sets the emulated text zoom factor
-    // (may not be 1 in the device metrics emulation mode).
-    void setEmulatedTextZoomFactor(float);
-
-    // Returns the emulated text zoom factor
-    // (which may not be 1 in the device metrics emulation mode).
-    float emulatedTextZoomFactor() const
-    {
-        return m_emulatedTextZoomFactor;
     }
 
     void updatePageDefinedPageScaleConstraints(const WebCore::ViewportArguments&);
@@ -816,8 +808,6 @@ private:
 
     OwnPtr<DeviceOrientationClientProxy> m_deviceOrientationClientProxy;
     OwnPtr<GeolocationClientProxy> m_geolocationClientProxy;
-
-    float m_emulatedTextZoomFactor;
 
     UserMediaClientImpl m_userMediaClientImpl;
     MIDIClientImpl m_midiClientImpl;

@@ -755,25 +755,25 @@ void EventSender::doLeapForward(int milliseconds)
 // WebKit/WebView/WebView.mm)
 void EventSender::textZoomIn(const CppArgumentList&, CppVariant* result)
 {
-    webview()->setZoomLevel(true, webview()->zoomLevel() + 1);
+    webview()->setTextZoomFactor(webview()->textZoomFactor() * 1.2f);
     result->setNull();
 }
 
 void EventSender::textZoomOut(const CppArgumentList&, CppVariant* result)
 {
-    webview()->setZoomLevel(true, webview()->zoomLevel() - 1);
+    webview()->setTextZoomFactor(webview()->textZoomFactor() / 1.2f);
     result->setNull();
 }
 
 void EventSender::zoomPageIn(const CppArgumentList&, CppVariant* result)
 {
-    webview()->setZoomLevel(false, webview()->zoomLevel() + 1);
+    webview()->setZoomLevel(webview()->zoomLevel() + 1);
     result->setNull();
 }
 
 void EventSender::zoomPageOut(const CppArgumentList&, CppVariant* result)
 {
-    webview()->setZoomLevel(false, webview()->zoomLevel() - 1);
+    webview()->setZoomLevel(webview()->zoomLevel() - 1);
     result->setNull();
 }
 

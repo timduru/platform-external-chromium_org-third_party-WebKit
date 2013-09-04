@@ -566,6 +566,11 @@
     position: relative;
 }
 
+.sidebar-pane.composite .metrics-and-styles .metrics {
+    border-top: 1px solid rgb(64%, 64%, 64%);
+    border-bottom: none;
+}
+
 .sidebar-pane.composite .sidebar-pane-toolbar > .sidebar-pane-subtitle {
     left: 8px;
 }

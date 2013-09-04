@@ -833,16 +833,6 @@ void Node::setNeedsStyleRecalc(StyleChangeType changeType, StyleChangeSource sou
 
 void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
 {
-    // It's safe to synchronously attach here because we're in the middle of style recalc
-    // while it's not safe to mark nodes as needing style recalc except in the loop in
-    // Element::recalcStyle because we may mark an ancestor as not needing recalc and
-    // then the node would never get updated. One place this currently happens is
-    // HTMLObjectElement::renderFallbackContent which may call lazyAttach from inside
-    // attach which was triggered by a recalcStyle.
-    if (document()->inStyleRecalc()) {
-        attach();
-        return;
-    }
     markAncestorsWithChildNeedsStyleRecalc();
     for (Node* node = this; node; node = NodeTraversal::next(node, this)) {
         node->setStyleChange(LazyAttachStyleChange);
@@ -850,8 +840,6 @@ void Node::lazyAttach(ShouldSetAttached shouldSetAttached)
         // FIXME: This flag is only used by HTMLFrameElementBase and doesn't look needed.
         if (shouldSetAttached == SetAttached)
             node->setAttached();
-        if (isActiveInsertionPoint(node))
-            toInsertionPoint(node)->lazyAttachDistribution(shouldSetAttached);
         for (ShadowRoot* root = node->youngestShadowRoot(); root; root = root->olderShadowRoot())
             root->lazyAttach(shouldSetAttached);
     }

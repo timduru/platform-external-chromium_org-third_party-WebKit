@@ -54,6 +54,8 @@ InsertionPoint::~InsertionPoint()
 
 void InsertionPoint::attach(const AttachContext& context)
 {
+    // FIXME: This loop shouldn't be needed since the distributed nodes should
+    // never be detached, we can probably remove it.
     for (size_t i = 0; i < m_distribution.size(); ++i) {
         if (!m_distribution.at(i)->attached())
             m_distribution.at(i)->attach(context);
@@ -64,18 +66,10 @@ void InsertionPoint::attach(const AttachContext& context)
 
 void InsertionPoint::detach(const AttachContext& context)
 {
-    for (size_t i = 0; i < m_distribution.size(); ++i) {
-        if (m_distribution.at(i)->attached())
-            m_distribution.at(i)->detach(context);
-    }
+    for (size_t i = 0; i < m_distribution.size(); ++i)
+        m_distribution.at(i)->lazyReattachIfAttached();
 
     HTMLElement::detach(context);
-}
-
-void InsertionPoint::lazyAttachDistribution(ShouldSetAttached shouldSetAttached)
-{
-    for (size_t i = 0; i < m_distribution.size(); ++i)
-        m_distribution.at(i)->lazyAttach(shouldSetAttached);
 }
 
 void InsertionPoint::willRecalcStyle(StyleChange change)
