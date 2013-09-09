@@ -46,13 +46,13 @@ class Element;
 
 class CustomElement {
 public:
-    // FIXME: CustomElementRegistry requires isValidTypeName to be a
-    // superset of isCustomTagName; consider either merging these or
-    // separating them completely into
-    // isCustomTagName/isTypeExtensionName.
-    static bool isValidTypeName(const AtomicString& type);
-    static bool isCustomTagName(const AtomicString& localName);
-    static void allowTagName(const AtomicString& localName);
+    enum NameSet {
+        EmbedderNames = 1 << 0,
+        StandardNames = 1 << 1,
+        AllNames = EmbedderNames | StandardNames
+    };
+    static bool isValidName(const AtomicString& name, NameSet validNames = AllNames);
+    static void addEmbedderCustomElementName(const AtomicString& name);
 
     // API for registration contexts
     static void define(Element*, PassRefPtr<CustomElementDefinition>);
@@ -70,7 +70,7 @@ public:
 private:
     CustomElement();
 
-    static Vector<AtomicString>& allowedCustomTagNames();
+    static Vector<AtomicString>& embedderCustomElementNames();
 
     // Maps resolved elements to their definitions
 

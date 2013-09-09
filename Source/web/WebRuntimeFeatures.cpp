@@ -382,9 +382,16 @@ bool WebRuntimeFeatures::isHTMLImportsEnabled()
     return RuntimeEnabledFeatures::htmlImportsEnabled();
 }
 
+// FIXME: Remove this when embedders switch to enableEmbedderCustomElements.
 void WebRuntimeFeatures::enableCustomElements(bool enable)
 {
     RuntimeEnabledFeatures::setCustomDOMElementsEnabled(enable);
+    enableEmbedderCustomElements(enable);
+}
+
+void WebRuntimeFeatures::enableEmbedderCustomElements(bool enable)
+{
+    RuntimeEnabledFeatures::setEmbedderCustomElementsEnabled(enable);
 }
 
 void WebRuntimeFeatures::enableOverlayScrollbars(bool enable)

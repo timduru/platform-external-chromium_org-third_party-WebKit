@@ -44,9 +44,9 @@
 
 namespace WebCore {
 
-void CustomElementRegistrationContext::registerElement(Document* document, CustomElementConstructorBuilder* constructorBuilder, const AtomicString& type, ExceptionState& es)
+void CustomElementRegistrationContext::registerElement(Document* document, CustomElementConstructorBuilder* constructorBuilder, const AtomicString& type, CustomElement::NameSet validNames, ExceptionState& es)
 {
-    CustomElementDefinition* definition = m_registry.registerElement(document, constructorBuilder, type, es);
+    CustomElementDefinition* definition = m_registry.registerElement(document, constructorBuilder, type, validNames, es);
 
     if (!definition)
         return;
@@ -59,7 +59,7 @@ void CustomElementRegistrationContext::registerElement(Document* document, Custo
 
 PassRefPtr<Element> CustomElementRegistrationContext::createCustomTagElement(Document* document, const QualifiedName& tagName)
 {
-    ASSERT(CustomElement::isCustomTagName(tagName.localName()));
+    ASSERT(CustomElement::isValidName(tagName.localName()));
 
     if (!document)
         return 0;
@@ -88,7 +88,7 @@ void CustomElementRegistrationContext::resolve(Element* element, const AtomicStr
 {
     // If an element has a custom tag name it takes precedence over
     // the "is" attribute (if any).
-    const AtomicString& type = CustomElement::isCustomTagName(element->localName())
+    const AtomicString& type = CustomElement::isValidName(element->localName())
         ? element->localName()
         : typeExtension;
     ASSERT(!type.isNull());
@@ -144,7 +144,7 @@ void CustomElementRegistrationContext::setTypeExtension(Element* element, const 
     }
 
     // Custom tags take precedence over type extensions
-    ASSERT(!CustomElement::isCustomTagName(element->localName()));
+    ASSERT(!CustomElement::isValidName(element->localName()));
 
     if (CustomElementRegistrationContext* context = element->document()->registrationContext())
         context->didGiveTypeExtension(element, type);

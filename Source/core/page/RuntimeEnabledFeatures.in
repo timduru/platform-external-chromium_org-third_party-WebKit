@@ -34,6 +34,8 @@ DeviceMotion status=test
 DeviceOrientation status=stable
 DialogElement status=experimental
 DirectoryUpload status=stable
+// FIXME: Remove this separate feature when CustomElements are always enabled
+EmbedderCustomElements
 EncodingAPI status=experimental
 EncryptedMedia status=experimental
 EncryptedMediaAnyVersion status=stable

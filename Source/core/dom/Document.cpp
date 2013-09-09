@@ -54,7 +54,6 @@
 #include "core/dom/CDATASection.h"
 #include "core/dom/Comment.h"
 #include "core/dom/ContextFeatures.h"
-#include "core/dom/CustomElement.h"
 #include "core/dom/CustomElementRegistrationContext.h"
 #include "core/dom/DOMImplementation.h"
 #include "core/dom/DOMNamedFlowCollection.h"
@@ -715,7 +714,7 @@ PassRefPtr<Element> Document::createElement(const AtomicString& localName, const
 
     RefPtr<Element> element;
 
-    if (CustomElement::isCustomTagName(localName) && registrationContext())
+    if (CustomElement::isValidName(localName) && registrationContext())
         element = registrationContext()->createCustomTagElement(this, QualifiedName(nullAtom, localName, xhtmlNamespaceURI));
     else
         element = createElement(localName, es);
@@ -739,7 +738,7 @@ PassRefPtr<Element> Document::createElementNS(const AtomicString& namespaceURI, 
     }
 
     RefPtr<Element> element;
-    if (CustomElement::isCustomTagName(qName.localName()) && registrationContext())
+    if (CustomElement::isValidName(qName.localName()) && registrationContext())
         element = registrationContext()->createCustomTagElement(this, qName);
     else
         element = createElementNS(namespaceURI, qualifiedName, es);
@@ -755,7 +754,7 @@ ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicS
     return registerElement(state, name, Dictionary(), es);
 }
 
-ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, const Dictionary& options, ExceptionState& es)
+ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicString& name, const Dictionary& options, ExceptionState& es, CustomElement::NameSet validNames)
 {
     if (!registrationContext()) {
         es.throwDOMException(NotSupportedError);
@@ -763,7 +762,7 @@ ScriptValue Document::registerElement(WebCore::ScriptState* state, const AtomicS
     }
 
     CustomElementConstructorBuilder constructorBuilder(state, &options);
-    registrationContext()->registerElement(this, &constructorBuilder, name, es);
+    registrationContext()->registerElement(this, &constructorBuilder, name, validNames, es);
     return constructorBuilder.bindingsReturnValue();
 }
 
