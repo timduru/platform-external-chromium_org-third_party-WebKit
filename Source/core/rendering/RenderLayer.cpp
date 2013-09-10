@@ -1975,7 +1975,18 @@ void RenderLayer::updateNeedsCompositedScrolling()
 
     ASSERT(renderer()->view()->frameView() && renderer()->view()->frameView()->containsScrollableArea(this));
     bool needsCompositedScrolling = acceleratedCompositingForOverflowScrollEnabled()
+#if 0
+    // WEBVIEW RELEASE BRANCH HACK for http://b/10626443
+    // Chromium M30 refrains from promoting overflow-scroll regions to layers if
+    // it may violate CSS-standard stacking order. But this causes awful
+    // scrolling performance. Classic WebView promotes everything to layers
+    // without concern for standards details. Hack Chromium M30 to do the same
+    // here.
+    // Note that this problem should become obsolete soon when
+    // https://codereview.chromium.org/20103002/ lands allowing Chromium to
+    // promote everything to layers without violating web standards.
         && canBeStackingContainer()
+#endif
         && !hasUnclippedDescendant();
 
     // We gather a boolean value for use with Google UMA histograms to
