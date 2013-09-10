@@ -704,13 +704,19 @@ void FrameLoader::resetMultipleFormSubmissionProtection()
     m_submittedFormURL = KURL();
 }
 
-void FrameLoader::updateForSameDocumentNavigation(const KURL& newURL, SameDocumentNavigationSource sameDocumentNavigationSource, PassRefPtr<SerializedScriptValue> data, const String& title)
+void FrameLoader::updateForSameDocumentNavigation(const KURL& newURL, SameDocumentNavigationSource sameDocumentNavigationSource, PassRefPtr<SerializedScriptValue> data, const String& title, UpdateBackForwardListPolicy updateBackForwardList)
 {
     // Update the data source's request with the new URL to fake the URL change
     KURL oldURL = m_frame->document()->url();
     m_frame->document()->setURL(newURL);
     setOutgoingReferrer(newURL);
     documentLoader()->replaceRequestURLForSameDocumentNavigation(newURL);
+
+    // updateBackForwardListForFragmentScroll() must happen after
+    // replaceRequestURLForSameDocumentNavigation(), since we add based on
+    // the current request.
+    if (updateBackForwardList == UpdateBackForwardList)
+        history()->updateBackForwardListForFragmentScroll();
 
     if (sameDocumentNavigationSource == SameDocumentNavigationDefault)
         history()->updateForSameDocumentNavigation();
@@ -750,10 +756,10 @@ void FrameLoader::loadInSameDocument(const KURL& url, PassRefPtr<SerializedScrip
         m_frame->eventHandler()->stopAutoscrollTimer();
         m_frame->document()->enqueueHashchangeEvent(oldURL, url);
     }
-
     m_documentLoader->setIsClientRedirect((m_startingClientRedirect && !isNewNavigation) || !UserGestureIndicator::processingUserGesture());
     m_documentLoader->setReplacesCurrentHistoryItem(!isNewNavigation);
-    updateForSameDocumentNavigation(url, SameDocumentNavigationDefault, 0, String());
+    UpdateBackForwardListPolicy updateBackForwardList = isNewNavigation && !shouldTreatURLAsSameAsCurrent(url) && !stateObject ? UpdateBackForwardList : DoNotUpdateBackForwardList;
+    updateForSameDocumentNavigation(url, SameDocumentNavigationDefault, 0, String(), updateBackForwardList);
 
     // It's important to model this as a load that starts and immediately finishes.
     // Otherwise, the parent frame may think we never finished loading.
@@ -1493,8 +1499,6 @@ void FrameLoader::checkNavigationPolicyAndContinueFragmentScroll(const Navigatio
             m_provisionalDocumentLoader->detachFromFrame();
         m_provisionalDocumentLoader = 0;
     }
-    if (isNewNavigation && !shouldTreatURLAsSameAsCurrent(request.url()))
-        history()->updateBackForwardListForFragmentScroll();
     loadInSameDocument(request.url(), 0, isNewNavigation);
 }
 
