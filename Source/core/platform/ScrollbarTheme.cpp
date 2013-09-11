@@ -119,6 +119,10 @@ bool ScrollbarTheme::paint(ScrollbarThemeClient* scrollbar, GraphicsContext* gra
 
 ScrollbarPart ScrollbarTheme::hitTest(ScrollbarThemeClient* scrollbar, const IntPoint& position)
 {
+    // Hack patch for WebView release branch: equivalent to Blink r157179
+    if (usesOverlayScrollbars())
+        return NoPart;
+
     ScrollbarPart result = NoPart;
     if (!scrollbar->enabled())
         return result;
