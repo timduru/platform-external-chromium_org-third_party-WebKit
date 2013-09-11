@@ -115,8 +115,15 @@ public:
     // FIXME: clear() is trying to do too many things. We should break it down into smaller functions (ideally with fewer raw Boolean parameters).
     void clear(bool clearWindowProperties = true, bool clearScriptObjects = true, bool clearFrameView = true);
 
+    // Sets a timer to notify the client that the initial empty document has
+    // been accessed, and thus it is no longer safe to show a provisional URL
+    // above the document without risking a URL spoof.
     void didAccessInitialDocument();
-    void didAccessInitialDocumentTimerFired(Timer<FrameLoader>*);
+
+    // If the initial empty document is showing and has been accessed, this
+    // cancels the timer and immediately notifies the client in cases that
+    // waiting to notify would allow a URL spoof.
+    void notifyIfInitialDocumentAccessed();
 
     bool isLoading() const;
 
@@ -245,6 +252,7 @@ private:
     bool allChildrenAreComplete() const; // immediate children, not all descendants
 
     void checkTimerFired(Timer<FrameLoader>*);
+    void didAccessInitialDocumentTimerFired(Timer<FrameLoader>*);
 
     void loadSameDocumentItem(HistoryItem*);
     void loadDifferentDocumentItem(HistoryItem*);

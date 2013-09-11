@@ -1058,6 +1058,15 @@ void FrameLoader::didAccessInitialDocumentTimerFired(Timer<FrameLoader>*)
     m_client->didAccessInitialDocument();
 }
 
+void FrameLoader::notifyIfInitialDocumentAccessed()
+{
+    if (m_didAccessInitialDocumentTimer.isActive()
+        && m_stateMachine.isDisplayingInitialEmptyDocument()) {
+        m_didAccessInitialDocumentTimer.stop();
+        didAccessInitialDocumentTimerFired(0);
+    }
+}
+
 bool FrameLoader::isLoading() const
 {
     DocumentLoader* docLoader = activeDocumentLoader();
@@ -1898,7 +1907,7 @@ void FrameLoader::loadDifferentDocumentItem(HistoryItem* item)
         addHTTPOriginIfNeeded(request, securityOrigin->toString());
     }
 
-    loadWithNavigationAction(request, NavigationAction(request, FrameLoadTypeBackForward, false), FrameLoadTypeBackForward, 0, SubstituteData());
+    loadWithNavigationAction(request, NavigationAction(request, FrameLoadTypeBackForward, formData), FrameLoadTypeBackForward, 0, SubstituteData());
 }
 
 void FrameLoader::loadHistoryItem(HistoryItem* item)

@@ -399,9 +399,6 @@ void Page::setPageScaleFactor(float scale, const IntPoint& origin)
 {
     FrameView* view = mainFrame()->view();
 
-    bool oldProgrammaticScroll = view->inProgrammaticScroll();
-    view->setInProgrammaticScroll(false);
-
     if (scale != m_pageScaleFactor) {
         m_pageScaleFactor = scale;
 
@@ -416,8 +413,6 @@ void Page::setPageScaleFactor(float scale, const IntPoint& origin)
 
     if (view && view->scrollPosition() != origin)
         view->notifyScrollPositionChanged(origin);
-
-    view->setInProgrammaticScroll(oldProgrammaticScroll);
 }
 
 void Page::setDeviceScaleFactor(float scaleFactor)
