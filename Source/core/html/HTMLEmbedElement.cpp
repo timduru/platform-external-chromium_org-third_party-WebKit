@@ -31,8 +31,6 @@
 #include "core/html/HTMLObjectElement.h"
 #include "core/html/PluginDocument.h"
 #include "core/html/parser/HTMLParserIdioms.h"
-#include "core/loader/FrameLoader.h"
-#include "core/page/Frame.h"
 #include "core/rendering/RenderEmbeddedObject.h"
 #include "core/rendering/RenderWidget.h"
 
@@ -40,19 +38,19 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLEmbedElement::HTMLEmbedElement(const QualifiedName& tagName, Document* document, bool createdByParser)
+inline HTMLEmbedElement::HTMLEmbedElement(const QualifiedName& tagName, Document& document, bool createdByParser)
     : HTMLPlugInImageElement(tagName, document, createdByParser, ShouldPreferPlugInsForImages)
 {
     ASSERT(hasTagName(embedTag));
     ScriptWrappable::init(this);
 }
 
-PassRefPtr<HTMLEmbedElement> HTMLEmbedElement::create(const QualifiedName& tagName, Document* document, bool createdByParser)
+PassRefPtr<HTMLEmbedElement> HTMLEmbedElement::create(const QualifiedName& tagName, Document& document, bool createdByParser)
 {
     return adoptRef(new HTMLEmbedElement(tagName, document, createdByParser));
 }
 
-PassRefPtr<HTMLEmbedElement> HTMLEmbedElement::create(Document* document)
+PassRefPtr<HTMLEmbedElement> HTMLEmbedElement::create(Document& document)
 {
     return create(embedTag, document, false);
 }
@@ -158,11 +156,11 @@ void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
     RefPtr<HTMLEmbedElement> protect(this); // Loading the plugin might remove us from the document.
     bool beforeLoadAllowedLoad = dispatchBeforeLoadEvent(m_url);
     if (!beforeLoadAllowedLoad) {
-        if (document()->isPluginDocument()) {
+        if (document().isPluginDocument()) {
             // Plugins inside plugin documents load differently than other plugins. By the time
             // we are here in a plugin document, the load of the plugin (which is the plugin document's
             // main resource) has already started. We need to explicitly cancel the main resource load here.
-            toPluginDocument(document())->cancelManualPluginLoad();
+            toPluginDocument(document()).cancelManualPluginLoad();
         }
         return;
     }
@@ -173,12 +171,12 @@ void HTMLEmbedElement::updateWidget(PluginCreationOption pluginCreationOption)
     requestObject(m_url, m_serviceType, paramNames, paramValues);
 }
 
-bool HTMLEmbedElement::rendererIsNeeded(const NodeRenderingContext& context)
+bool HTMLEmbedElement::rendererIsNeeded(const RenderStyle& style)
 {
     if (isImageType())
-        return HTMLPlugInImageElement::rendererIsNeeded(context);
+        return HTMLPlugInImageElement::rendererIsNeeded(style);
 
-    Frame* frame = document()->frame();
+    Frame* frame = document().frame();
     if (!frame)
         return false;
 
@@ -192,7 +190,7 @@ bool HTMLEmbedElement::rendererIsNeeded(const NodeRenderingContext& context)
             return false;
         }
     }
-    return HTMLPlugInImageElement::rendererIsNeeded(context);
+    return HTMLPlugInImageElement::rendererIsNeeded(style);
 }
 
 bool HTMLEmbedElement::isURLAttribute(const Attribute& attribute) const
@@ -200,7 +198,7 @@ bool HTMLEmbedElement::isURLAttribute(const Attribute& attribute) const
     return attribute.name() == srcAttr || HTMLPlugInImageElement::isURLAttribute(attribute);
 }
 
-const AtomicString& HTMLEmbedElement::imageSourceURL() const
+const AtomicString HTMLEmbedElement::imageSourceURL() const
 {
     return getAttribute(srcAttr);
 }
@@ -209,7 +207,7 @@ void HTMLEmbedElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) cons
 {
     HTMLPlugInImageElement::addSubresourceAttributeURLs(urls);
 
-    addSubresourceURL(urls, document()->completeURL(getAttribute(srcAttr)));
+    addSubresourceURL(urls, document().completeURL(getAttribute(srcAttr)));
 }
 
 }

@@ -197,7 +197,7 @@ void SVGInlineTextBox::paintSelectionBackground(PaintInfo& paintInfo)
 
     RenderObject* parentRenderer = parent()->renderer();
     ASSERT(parentRenderer);
-    ASSERT(!parentRenderer->document()->printing());
+    ASSERT(!parentRenderer->document().printing());
 
     // Determine whether or not we're selected.
     bool paintSelectedTextOnly = paintInfo.phase == PaintPhaseSelection;
@@ -206,7 +206,7 @@ void SVGInlineTextBox::paintSelectionBackground(PaintInfo& paintInfo)
         return;
 
     Color backgroundColor = renderer()->selectionBackgroundColor();
-    if (!backgroundColor.alpha())
+    if (!backgroundColor.isValid() || !backgroundColor.alpha())
         return;
 
     RenderSVGInlineText* textRenderer = toRenderSVGInlineText(this->textRenderer());
@@ -270,7 +270,7 @@ void SVGInlineTextBox::paint(PaintInfo& paintInfo, const LayoutPoint&, LayoutUni
     ASSERT(parentRenderer);
 
     bool paintSelectedTextOnly = paintInfo.phase == PaintPhaseSelection;
-    bool hasSelection = !parentRenderer->document()->printing() && selectionState() != RenderObject::SelectionNone;
+    bool hasSelection = !parentRenderer->document().printing() && selectionState() != RenderObject::SelectionNone;
     if (!hasSelection && paintSelectedTextOnly)
         return;
 
@@ -368,7 +368,7 @@ bool SVGInlineTextBox::acquirePaintingResource(GraphicsContext*& context, float 
     ASSERT(style);
     ASSERT(m_paintingResourceMode != ApplyToDefaultMode);
 
-    StyleColor fallbackColor;
+    Color fallbackColor;
     if (m_paintingResourceMode & ApplyToFillMode)
         m_paintingResource = RenderSVGResource::fillPaintingResource(renderer, style, fallbackColor);
     else if (m_paintingResourceMode & ApplyToStrokeMode)
@@ -384,7 +384,7 @@ bool SVGInlineTextBox::acquirePaintingResource(GraphicsContext*& context, float 
     if (!m_paintingResource->applyResource(renderer, style, context, m_paintingResourceMode)) {
         if (fallbackColor.isValid()) {
             RenderSVGResourceSolidColor* fallbackResource = RenderSVGResource::sharedSolidPaintingResource();
-            fallbackResource->setColor(fallbackColor.color());
+            fallbackResource->setColor(fallbackColor);
 
             m_paintingResource = fallbackResource;
             m_paintingResource->applyResource(renderer, style, context, m_paintingResourceMode);
@@ -641,7 +641,7 @@ void SVGInlineTextBox::paintTextWithShadows(GraphicsContext* context, RenderStyl
         DrawLooper drawLooper;
         do {
             FloatSize offset(shadow->x(), shadow->y());
-            drawLooper.addShadow(offset, shadow->blur(), textRenderer->resolveColor(shadow->color(), Color::stdShadowColor),
+            drawLooper.addShadow(offset, shadow->blur(), shadow->color(),
                 DrawLooper::ShadowRespectsTransforms, DrawLooper::ShadowRespectsAlpha);
         } while ((shadow = shadow->next()));
         drawLooper.addUnmodifiedContent();

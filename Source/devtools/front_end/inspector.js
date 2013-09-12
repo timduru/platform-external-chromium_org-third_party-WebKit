@@ -95,6 +95,12 @@ var WebInspector = {
         if (this.inspectElementModeController)
             mainStatusBar.insertBefore(this.inspectElementModeController.toggleSearchButton.element, bottomStatusBarContainer);
 
+        if (WebInspector.queryParamsObject["remoteFrontend"] && WebInspector.experimentsSettings.screencast.isEnabled()) {
+            this._toggleScreencastButton = new WebInspector.StatusBarButton(WebInspector.UIString("Toggle screencast."), "screencast-status-bar-item");
+            this._toggleScreencastButton.addEventListener("click", this._toggleScreencastButtonClicked.bind(this), false);
+            mainStatusBar.insertBefore(this._toggleScreencastButton.element, bottomStatusBarContainer);
+        }
+
         mainStatusBar.appendChild(this.settingsController.statusBarItem);
     },
 
@@ -109,6 +115,29 @@ var WebInspector = {
             this.closeConsole(animationType);
         else
             this.showConsole(animationType);
+    },
+
+    _toggleScreencastButtonClicked: function()
+    {
+        this._toggleScreencastButton.toggled = !this._toggleScreencastButton.toggled;
+
+        if (!this._screencastView) {
+            // Rebuild the UI upon first invocation.
+            this._screencastView = new WebInspector.ScreencastView();
+            this._screencastSplitView = new WebInspector.SplitView(true, "screencastSplitView");
+            this._screencastSplitView.markAsRoot();
+            this._screencastSplitView.show(document.body);
+
+            this._screencastView.show(this._screencastSplitView.firstElement());
+            this._screencastSplitView.secondElement().appendChild(document.getElementById("root"));
+            this.inspectorView.element.remove();
+            this.inspectorView.show(document.getElementById("main"));
+        }
+
+        if (this._toggleScreencastButton.toggled)
+            this._screencastSplitView.showBoth();
+        else
+            this._screencastSplitView.showOnlySecond();
     },
 
     /**
@@ -304,51 +333,6 @@ var WebInspector = {
     {
         // Create scripts panel upon demand.
         WebInspector.panel("scripts");
-    },
-
-    _setupTethering: function()
-    {
-        if (!this._portForwardings) {
-            this._portForwardings = {};
-            WebInspector.settings.portForwardings.addChangeListener(this._setupTethering.bind(this));
-        }
-        var entries = WebInspector.settings.portForwardings.get();
-        var newForwardings = {};
-        for (var i = 0; i < entries.length; ++i)
-            newForwardings[entries[i].port] = entries[i].location;
-
-        for (var port in this._portForwardings) {
-            if (!newForwardings[port])
-                unbind(port);
-        }
-
-        for (var port in newForwardings) {
-            if (this._portForwardings[port] && newForwardings[port] === this._portForwardings[port])
-                continue;
-            if (this._portForwardings[port])
-              unbind(port);
-            bind(port, newForwardings[port]);
-        }
-        this._portForwardings = newForwardings;
-
-        /**
-         * @param {string} port
-         * @param {string} location
-         */
-        function bind(port, location)
-        {
-            var command = { method: "Tethering.bind", params: { port: parseInt(port, 10), location: location }, id: InspectorBackend.nextCallbackId() };
-            InspectorBackend.sendMessageObjectToBackend(command);
-        }
-
-        /**
-         * @param {string} port
-         */
-        function unbind(port)
-        {
-            var command = { method: "Tethering.unbind", params: { port: parseInt(port, 10) }, id: InspectorBackend.nextCallbackId() };
-            InspectorBackend.sendMessageObjectToBackend(command);
-        }
     }
 }
 
@@ -583,21 +567,6 @@ WebInspector._doLoadedDoneWithCapabilities = function()
     WebInspector.WorkerManager.loadCompleted();
     InspectorFrontendAPI.loadCompleted();
 
-    if (WebInspector.experimentsSettings.tethering.isEnabled())
-        this._setupTethering();
-
-    if (WebInspector.queryParamsObject["remoteFrontend"] && WebInspector.experimentsSettings.screencast.isEnabled()) {
-        WebInspector._splitView = new WebInspector.SplitView(true, "screencastSplitView");
-        WebInspector._splitView.markAsRoot();
-        WebInspector._splitView.show(document.body);
-
-        var screencastView = new WebInspector.ScreencastView();
-        screencastView.show(WebInspector._splitView.firstElement());
-        WebInspector._splitView.secondElement().appendChild(document.getElementById("root"));
-        WebInspector.inspectorView.element.remove();
-        WebInspector.inspectorView.show(document.getElementById("main"));
-    }
-
     WebInspector.notifications.dispatchEventToListeners(WebInspector.Events.InspectorLoaded);
 }
 
@@ -639,8 +608,8 @@ WebInspector.windowResize = function(event)
         WebInspector.toolbar.resize();
     if (WebInspector.settingsController)
         WebInspector.settingsController.resize();
-    if (WebInspector._splitView)
-        WebInspector._splitView.doResize();
+    if (WebInspector._screencastSplitView)
+        WebInspector._screencastSplitView.doResize();
 }
 
 WebInspector.setDockingUnavailable = function(unavailable)
@@ -773,15 +742,6 @@ WebInspector._registerShortcuts = function()
  */
 WebInspector.documentKeyDown = function(event)
 {
-    const helpKey = WebInspector.isMac() ? "U+003F" : "U+00BF"; // "?" for both platforms
-
-    if (event.keyIdentifier === "F1" ||
-        (event.keyIdentifier === helpKey && event.shiftKey && (!WebInspector.isBeingEdited(event.target) || event.metaKey))) {
-        this.settingsController.showSettingsScreen(WebInspector.SettingsScreen.Tabs.General);
-        event.consume(true);
-        return;
-    }
-
     if (WebInspector.currentFocusElement() && WebInspector.currentFocusElement().handleKeyEvent) {
         WebInspector.currentFocusElement().handleKeyEvent(event);
         if (event.handled) {
@@ -815,6 +775,7 @@ WebInspector.documentKeyDown = function(event)
             break;
         case "U+0052": // R key
             if (WebInspector.KeyboardShortcut.eventHasCtrlOrMeta(event)) {
+                DebuggerAgent.setSkipAllPauses(true, true);
                 PageAgent.reload(event.shiftKey);
                 event.consume(true);
             }
@@ -861,7 +822,16 @@ WebInspector.documentKeyDown = function(event)
 
 WebInspector.postDocumentKeyDown = function(event)
 {
-    var Esc = "U+001B";
+    const helpKey = WebInspector.isMac() ? "U+003F" : "U+00BF"; // "?" for both platforms
+
+    if (event.keyIdentifier === "F1" ||
+        (event.keyIdentifier === helpKey && event.shiftKey && (!WebInspector.isBeingEdited(event.target) || event.metaKey))) {
+        this.settingsController.showSettingsScreen(WebInspector.SettingsScreen.Tabs.General);
+        event.consume(true);
+        return;
+    }
+
+    const Esc = "U+001B";
 
     if (event.handled)
         return;

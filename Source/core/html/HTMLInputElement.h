@@ -47,7 +47,7 @@ struct DateTimeChooserParameters;
 
 class HTMLInputElement : public HTMLTextFormControlElement {
 public:
-    static PassRefPtr<HTMLInputElement> create(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
+    static PassRefPtr<HTMLInputElement> create(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
     virtual ~HTMLInputElement();
 
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitspeechchange);
@@ -180,7 +180,7 @@ public:
     void setSelectionRangeForBinding(int start, int end, ExceptionState&);
     void setSelectionRangeForBinding(int start, int end, const String& direction, ExceptionState&);
 
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
+    virtual bool rendererIsNeeded(const RenderStyle&);
     virtual RenderObject* createRenderer(RenderStyle*);
     virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
 
@@ -257,7 +257,7 @@ public:
     bool capture() const;
 #endif
 
-    static const int maximumLength;
+    static const unsigned maximumLength;
 
     unsigned height() const;
     unsigned width() const;
@@ -287,7 +287,7 @@ public:
     bool supportsInputModeAttribute() const;
 
 protected:
-    HTMLInputElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
+    HTMLInputElement(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
 
     virtual void defaultEventHandler(Event*);
 
@@ -295,6 +295,7 @@ private:
     enum AutoCompleteSetting { Uninitialized, On, Off };
 
     virtual void didAddUserAgentShadowRoot(ShadowRoot*) OVERRIDE;
+    virtual void didAddShadowRoot(ShadowRoot&) OVERRIDE;
 
     virtual void willChangeForm() OVERRIDE;
     virtual void didChangeForm() OVERRIDE;

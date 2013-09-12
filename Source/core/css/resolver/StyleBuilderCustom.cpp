@@ -172,8 +172,8 @@ void StyleBuilderFunctions::applyValueCSSPropertyDirection(StyleResolverState& s
 {
     state.style()->setDirection(*toCSSPrimitiveValue(value));
     Element* element = state.element();
-    if (element && element == element->document()->documentElement())
-        element->document()->setDirectionSetOnDocumentElement(true);
+    if (element && element == element->document().documentElement())
+        element->document().setDirectionSetOnDocumentElement(true);
 }
 
 static inline bool isValidDisplayValue(StyleResolverState& state, EDisplay displayPropertyValue)
@@ -276,7 +276,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyLineHeight(StyleResolverState& 
         lineHeight = RenderStyle::initialLineHeight();
     } else if (primitiveValue->isLength()) {
         double multiplier = state.style()->effectiveZoom();
-        if (Frame* frame = state.document()->frame())
+        if (Frame* frame = state.document().frame())
             multiplier *= frame->textZoomFactor();
         lineHeight = primitiveValue->computeLength<Length>(state.style(), state.rootElementStyle(), multiplier);
     } else if (primitiveValue->isPercentage()) {
@@ -329,7 +329,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyResize(StyleResolverState& stat
     case 0:
         return;
     case CSSValueAuto:
-        if (Settings* settings = state.document()->settings())
+        if (Settings* settings = state.document().settings())
             r = settings->textAreasAreResizable() ? RESIZE_BOTH : RESIZE_NONE;
         break;
     default:
@@ -645,7 +645,7 @@ void StyleBuilderFunctions::applyValueCSSPropertyWebkitClipPath(StyleResolverSta
             state.style()->setClipPath(ShapeClipPathOperation::create(basicShapeForValue(state, primitiveValue->getShapeValue())));
         } else if (primitiveValue->primitiveType() == CSSPrimitiveValue::CSS_URI) {
             String cssURLValue = primitiveValue->getStringValue();
-            KURL url = state.document()->completeURL(cssURLValue);
+            KURL url = state.document().completeURL(cssURLValue);
             // FIXME: It doesn't work with forward or external SVG references (see https://bugs.webkit.org/show_bug.cgi?id=90405)
             state.style()->setClipPath(ReferenceClipPathOperation::create(cssURLValue, url.fragmentIdentifier()));
         }
@@ -1095,11 +1095,11 @@ static bool degreeToGlyphOrientation(CSSPrimitiveValue* primitiveValue, EGlyphOr
     return true;
 }
 
-static Color colorFromSVGColorCSSValue(SVGColor* svgColor, const StyleColor& fgColor)
+static Color colorFromSVGColorCSSValue(SVGColor* svgColor, const Color& fgColor)
 {
     Color color;
     if (svgColor->colorType() == SVGColor::SVG_COLORTYPE_CURRENTCOLOR)
-        color = fgColor.color();
+        color = fgColor;
     else
         color = svgColor->color();
     return color;
@@ -1159,7 +1159,7 @@ static bool percentageOrNumberToFloat(const CSSPrimitiveValue* primitiveValue, f
     return numberToFloat(primitiveValue, out);
 }
 
-static String fragmentIdentifier(const CSSPrimitiveValue* primitiveValue, Document* document)
+static String fragmentIdentifier(const CSSPrimitiveValue* primitiveValue, Document& document)
 {
     if (primitiveValue->primitiveType() != CSSPrimitiveValue::CSS_URI)
         return String();
@@ -1266,6 +1266,10 @@ void StyleBuilder::applyProperty(CSSPropertyID id, StyleResolverState& state, CS
         return;
     }
 
+    CSSPrimitiveValue* primitiveValue = value->isPrimitiveValue() ? toCSSPrimitiveValue(value) : 0;
+    if (primitiveValue && primitiveValue->getValueID() == CSSValueCurrentcolor)
+        state.style()->setHasCurrentColor();
+
     if (isInherit && !state.parentStyle()->hasExplicitlyInheritedProperties() && !CSSProperty::isInheritedProperty(id))
         state.parentStyle()->setHasExplicitlyInheritedProperties();
 
@@ -1314,7 +1318,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
                 CSSValue* item = i.value();
                 if (item->isImageGeneratorValue()) {
                     if (item->isGradientValue())
-                        state.style()->setContent(StyleGeneratedImage::create(static_cast<CSSGradientValue*>(item)->gradientWithStylesResolved(state.document()->textLinkColors()).get()), didSet);
+                        state.style()->setContent(StyleGeneratedImage::create(static_cast<CSSGradientValue*>(item)->gradientWithStylesResolved(state.document().textLinkColors(), state.style()->color()).get()), didSet);
                     else
                         state.style()->setContent(StyleGeneratedImage::create(static_cast<CSSImageGeneratorValue*>(item)), didSet);
                     didSet = true;
@@ -1494,9 +1498,9 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
             int blur = item->blur ? item->blur->computeLength<int>(state.style(), state.rootElementStyle(), zoomFactor) : 0;
             int spread = item->spread ? item->spread->computeLength<int>(state.style(), state.rootElementStyle(), zoomFactor) : 0;
             ShadowStyle shadowStyle = item->style && item->style->getValueID() == CSSValueInset ? Inset : Normal;
-            StyleColor color;
+            Color color;
             if (item->color)
-                color = state.document()->textLinkColors().colorFromPrimitiveValue(item->color.get());
+                color = state.document().textLinkColors().colorFromPrimitiveValue(item->color.get(), state.style()->visitedDependentColor(CSSPropertyColor));
             else if (state.style())
                 color = state.style()->color();
 
@@ -1552,7 +1556,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         if (!primitiveValue || !primitiveValue->getValueID())
             return;
         state.style()->setDraggableRegionMode(primitiveValue->getValueID() == CSSValueDrag ? DraggableRegionDrag : DraggableRegionNoDrag);
-        state.document()->setHasAnnotatedRegions(true);
+        state.document().setHasAnnotatedRegions(true);
         return;
     }
     case CSSPropertyWebkitTextStrokeWidth: {
@@ -1614,7 +1618,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
         if (!primitiveValue)
             break;
 
-        StyleColor col = state.document()->textLinkColors().colorFromPrimitiveValue(primitiveValue);
+        Color col = state.document().textLinkColors().colorFromPrimitiveValue(primitiveValue, state.style()->visitedDependentColor(CSSPropertyColor));
         state.style()->setTapHighlightColor(col);
         return;
     }
@@ -1682,8 +1686,8 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
             state.setWritingMode(*primitiveValue);
 
         // FIXME: It is not ok to modify document state while applying style.
-        if (state.element() && state.element() == state.document()->documentElement())
-            state.document()->setWritingModeSetOnDocumentElement(true);
+        if (state.element() && state.element() == state.document().documentElement())
+            state.document().setWritingModeSetOnDocumentElement(true);
         return;
     }
 
@@ -2119,6 +2123,7 @@ void StyleBuilder::oldApplyProperty(CSSPropertyID id, StyleResolverState& state,
     case CSSPropertyColorRendering:
     case CSSPropertyDominantBaseline:
     case CSSPropertyFillRule:
+    case CSSPropertyMaskSourceType:
     case CSSPropertyMaskType:
     case CSSPropertyShapeRendering:
     case CSSPropertyStrokeLinecap:

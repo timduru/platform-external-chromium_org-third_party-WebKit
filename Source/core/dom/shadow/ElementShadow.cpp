@@ -57,10 +57,10 @@ ElementShadow::~ElementShadow()
 
 ShadowRoot* ElementShadow::addShadowRoot(Element* shadowHost, ShadowRoot::ShadowRootType type)
 {
-    RefPtr<ShadowRoot> shadowRoot = ShadowRoot::create(shadowHost->document(), type);
+    RefPtr<ShadowRoot> shadowRoot = ShadowRoot::create(&shadowHost->document(), type);
 
     shadowRoot->setParentOrShadowHostNode(shadowHost);
-    shadowRoot->setParentTreeScope(shadowHost->treeScope());
+    shadowRoot->setParentTreeScope(&shadowHost->treeScope());
     m_shadowRoots.push(shadowRoot.get());
     ChildNodeInsertionNotifier(shadowHost).notify(shadowRoot.get());
     setNeedsDistributionRecalc();
@@ -70,6 +70,7 @@ ShadowRoot* ElementShadow::addShadowRoot(Element* shadowHost, ShadowRoot::Shadow
     // The youngest shadow root's apply-author-styles is default (false). So we can just set m_applyAuthorStyles false.
     m_applyAuthorStyles = false;
 
+    shadowHost->didAddShadowRoot(*shadowRoot);
     InspectorInstrumentation::didPushShadowRoot(shadowHost, shadowRoot.get());
 
     return shadowRoot.get();
@@ -82,14 +83,14 @@ void ElementShadow::removeAllShadowRoots()
 
     while (RefPtr<ShadowRoot> oldRoot = m_shadowRoots.head()) {
         InspectorInstrumentation::willPopShadowRoot(shadowHost, oldRoot.get());
-        shadowHost->document()->removeFocusedElementOfSubtree(oldRoot.get());
+        shadowHost->document().removeFocusedElementOfSubtree(oldRoot.get());
 
         if (oldRoot->attached())
             oldRoot->detach();
 
         m_shadowRoots.removeHead();
         oldRoot->setParentOrShadowHostNode(0);
-        oldRoot->setParentTreeScope(shadowHost->document());
+        oldRoot->setParentTreeScope(&shadowHost->document());
         oldRoot->setPrev(0);
         oldRoot->setNext(0);
         ChildNodeRemovalNotifier(shadowHost).notify(oldRoot.get());

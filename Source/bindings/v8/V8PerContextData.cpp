@@ -138,6 +138,14 @@ v8::Local<v8::Function> V8PerContextData::constructorForTypeSlowCase(WrapperType
     return function;
 }
 
+v8::Local<v8::Object> V8PerContextData::prototypeForType(WrapperTypeInfo* type)
+{
+    v8::Local<v8::Object> constructor = constructorForType(type);
+    if (constructor.IsEmpty())
+        return v8::Local<v8::Object>();
+    return constructor->Get(v8String("prototype", m_isolate)).As<v8::Object>();
+}
+
 void V8PerContextData::addCustomElementBinding(CustomElementDefinition* definition, PassOwnPtr<CustomElementBinding> binding)
 {
     ASSERT(!m_customElementBindings->contains(definition));
@@ -190,7 +198,7 @@ bool V8PerContextDebugData::setContextDebugData(v8::Handle<v8::Context> context,
 {
     if (!debugData(context)->IsUndefined())
         return false;
-    v8::HandleScope scope;
+    v8::HandleScope scope(context->GetIsolate());
     v8::Handle<v8::Value> debugData = createDebugData(worldName, debugId);
     setDebugData(context, debugData);
     return true;
@@ -198,7 +206,7 @@ bool V8PerContextDebugData::setContextDebugData(v8::Handle<v8::Context> context,
 
 int V8PerContextDebugData::contextDebugId(v8::Handle<v8::Context> context)
 {
-    v8::HandleScope scope;
+    v8::HandleScope scope(context->GetIsolate());
     v8::Handle<v8::Value> data = debugData(context);
 
     if (!data->IsString())

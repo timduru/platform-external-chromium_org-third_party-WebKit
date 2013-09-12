@@ -447,7 +447,7 @@ void RenderFrameSet::layout()
         oldBounds = clippedOverflowRectForRepaint(repaintContainer);
     }
 
-    if (!parent()->isFrameSet() && !document()->printing()) {
+    if (!parent()->isFrameSet() && !document().printing()) {
         setWidth(view()->viewWidth());
         setHeight(view()->viewHeight());
     }
@@ -480,6 +480,16 @@ void RenderFrameSet::layout()
     }
 
     clearNeedsLayout();
+}
+
+static void clearNeedsLayoutOnHiddenFrames(RenderBox* frame)
+{
+    for (; frame; frame = frame->nextSiblingBox()) {
+        frame->setWidth(0);
+        frame->setHeight(0);
+        frame->clearNeedsLayout();
+        clearNeedsLayoutOnHiddenFrames(frame->firstChildBox());
+    }
 }
 
 void RenderFrameSet::positionFrames()
@@ -517,12 +527,8 @@ void RenderFrameSet::positionFrames()
         yPos += height + borderThickness;
     }
 
-    // all the remaining frames are hidden to avoid ugly spurious unflowed frames
-    for (; child; child = child->nextSiblingBox()) {
-        child->setWidth(0);
-        child->setHeight(0);
-        child->clearNeedsLayout();
-    }
+    // All the remaining frames are hidden to avoid ugly spurious unflowed frames.
+    clearNeedsLayoutOnHiddenFrames(child);
 }
 
 void RenderFrameSet::startResizing(GridAxis& axis, int position)

@@ -47,9 +47,9 @@ InsertIntoTextNodeCommand::InsertIntoTextNodeCommand(PassRefPtr<Text> node, unsi
 
 void InsertIntoTextNodeCommand::doApply()
 {
-    bool passwordEchoEnabled = document()->settings() && document()->settings()->passwordEchoEnabled();
+    bool passwordEchoEnabled = document().settings() && document().settings()->passwordEchoEnabled();
     if (passwordEchoEnabled)
-        document()->updateLayoutIgnorePendingStylesheets();
+        document().updateLayoutIgnorePendingStylesheets();
 
     if (!m_node->rendererIsEditable())
         return;
@@ -60,7 +60,7 @@ void InsertIntoTextNodeCommand::doApply()
             renderText->momentarilyRevealLastTypedCharacter(m_offset + m_text.length() - 1);
     }
 
-    m_node->insertData(m_offset, m_text, IGNORE_EXCEPTION, DeprecatedAttachNow);
+    m_node->insertData(m_offset, m_text, IGNORE_EXCEPTION, CharacterData::DeprecatedRecalcStyleImmediatlelyForEditing);
 }
 
 void InsertIntoTextNodeCommand::doUnapply()
@@ -68,14 +68,7 @@ void InsertIntoTextNodeCommand::doUnapply()
     if (!m_node->rendererIsEditable())
         return;
 
-    m_node->deleteData(m_offset, m_text.length(), IGNORE_EXCEPTION, DeprecatedAttachNow);
+    m_node->deleteData(m_offset, m_text.length(), IGNORE_EXCEPTION, CharacterData::DeprecatedRecalcStyleImmediatlelyForEditing);
 }
-
-#ifndef NDEBUG
-void InsertIntoTextNodeCommand::getNodesInCommand(HashSet<Node*>& nodes)
-{
-    addNodeAndDescendants(m_node.get(), nodes);
-}
-#endif
 
 } // namespace WebCore

@@ -33,11 +33,12 @@
 #include "core/loader/DocumentThreadableLoader.h"
 
 #include "core/dom/Document.h"
+#include "core/fetch/CrossOriginAccessControl.h"
 #include "core/fetch/FetchRequest.h"
 #include "core/fetch/RawResource.h"
+#include "core/fetch/Resource.h"
 #include "core/fetch/ResourceFetcher.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/loader/CrossOriginAccessControl.h"
 #include "core/loader/CrossOriginPreflightResultCache.h"
 #include "core/loader/DocumentThreadableLoaderClient.h"
 #include "core/loader/FrameLoader.h"
@@ -286,7 +287,7 @@ void DocumentThreadableLoader::didReceiveResponse(unsigned long identifier, cons
     if (m_actualRequest) {
         DocumentLoader* loader = m_document->frame()->loader()->documentLoader();
         InspectorInstrumentationCookie cookie = InspectorInstrumentation::willReceiveResourceResponse(m_document->frame(), identifier, response);
-        InspectorInstrumentation::didReceiveResourceResponse(cookie, identifier, loader, response, 0);
+        InspectorInstrumentation::didReceiveResourceResponse(cookie, identifier, loader, response, m_resource ? m_resource->loader() : 0);
 
         if (!passesAccessControlCheck(response, m_options.allowCredentials, securityOrigin(), accessControlErrorDescription)) {
             preflightFailure(identifier, response.url().string(), accessControlErrorDescription);
@@ -412,8 +413,8 @@ void DocumentThreadableLoader::loadRequest(const ResourceRequest& request, Secur
     ASSERT(m_sameOriginRequest || requestURL.user().isEmpty());
     ASSERT(m_sameOriginRequest || requestURL.pass().isEmpty());
 
+    ThreadableLoaderOptions options = m_options;
     if (m_async) {
-        ThreadableLoaderOptions options = m_options;
         options.crossOriginCredentialPolicy = DoNotAskClientForCrossOriginCredentials;
         if (m_actualRequest) {
             // Don't sniff content or send load callbacks for the preflight request.
@@ -445,12 +446,11 @@ void DocumentThreadableLoader::loadRequest(const ResourceRequest& request, Secur
     ResourceResponse response;
     unsigned long identifier = std::numeric_limits<unsigned long>::max();
     if (Frame* frame = m_document->frame()) {
-        Frame* top = frame->tree()->top();
-        if (!top->loader()->mixedContentChecker()->canDisplayInsecureContent(top->document()->securityOrigin(), requestURL)) {
+        if (!m_document->fetcher()->checkInsecureContent(Resource::Raw, requestURL, options.mixedContentBlockingTreatment)) {
             m_client->didFail(error);
             return;
         }
-        identifier = frame->loader()->loadResourceSynchronously(request, m_options.allowCredentials, error, response, data);
+        identifier = m_document->fetcher()->fetchSynchronously(request, m_options.allowCredentials, error, response, data);
     }
 
     InspectorInstrumentation::documentThreadableLoaderStartedLoadingForClient(m_document, identifier, m_client);

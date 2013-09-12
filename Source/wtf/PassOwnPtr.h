@@ -33,8 +33,6 @@
 
 namespace WTF {
 
-    // Unlike most of our smart pointers, PassOwnPtr can take either the pointer type or the pointed-to type.
-
     template<typename T> class OwnPtr;
     template<typename T> class PassOwnPtr;
     template<typename T> PassOwnPtr<T> adoptPtr(T*);
@@ -42,7 +40,7 @@ namespace WTF {
     template<typename T> class PassOwnPtr {
         WTF_DISALLOW_CONSTRUCTION_FROM_ZERO(PassOwnPtr);
     public:
-        typedef typename RemovePointer<T>::Type ValueType;
+        typedef T ValueType;
         typedef ValueType* PtrType;
 
         PassOwnPtr() : m_ptr(0) { }
@@ -52,7 +50,7 @@ namespace WTF {
         // a const PassOwnPtr. However, it makes it much easier to work with PassOwnPtr
         // temporaries, and we don't have a need to use real const PassOwnPtrs anyway.
         PassOwnPtr(const PassOwnPtr& o) : m_ptr(o.leakPtr()) { }
-        template<typename U> PassOwnPtr(const PassOwnPtr<U>& o) : m_ptr(o.leakPtr()) { }
+        template<typename U> PassOwnPtr(const PassOwnPtr<U>& o, EnsurePtrConvertibleArgDecl(U, T)) : m_ptr(o.leakPtr()) { }
 
         ~PassOwnPtr() { deleteOwnedPtr(m_ptr); }
 

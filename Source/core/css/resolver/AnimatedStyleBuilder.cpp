@@ -38,12 +38,14 @@
 #include "core/animation/AnimatableTransform.h"
 #include "core/animation/AnimatableUnknown.h"
 #include "core/animation/AnimatableValue.h"
+#include "core/animation/AnimatableVisibility.h"
 #include "core/animation/css/CSSAnimations.h"
 #include "core/css/CSSPrimitiveValueMappings.h"
 #include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/StyleResolverState.h"
 #include "core/rendering/style/RenderStyle.h"
 #include "wtf/MathExtras.h"
+#include "wtf/TypeTraits.h"
 
 namespace WebCore {
 
@@ -62,6 +64,22 @@ Length animatableValueToLength(const AnimatableValue* value, const StyleResolver
 unsigned animatableValueToUnsigned(const AnimatableValue* value)
 {
     return clampTo<unsigned>(round(toAnimatableNumber(value)->toDouble()));
+}
+
+unsigned short animatableValueToUnsignedShort(const AnimatableValue* value)
+{
+    return clampTo<unsigned short>(round(toAnimatableNumber(value)->toDouble()));
+}
+
+int animatableValueToInt(const AnimatableValue* value)
+{
+    return clampTo<int>(round(toAnimatableNumber(value)->toDouble()));
+}
+
+template<typename T> T animatableValueRoundClampTo(const AnimatableValue* value)
+{
+    COMPILE_ASSERT(WTF::IsInteger<T>::value, ShouldUseIntegralTypeTWhenRoundingValues);
+    return clampTo<T>(round(toAnimatableNumber(value)->toDouble()));
 }
 
 LengthBox animatableValueToLengthBox(const AnimatableValue* value, const StyleResolverState& state)
@@ -94,7 +112,7 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
         style->setVisitedLinkBorderBottomColor(toAnimatableColor(value)->visitedLinkColor());
         return;
     case CSSPropertyBorderBottomWidth:
-        style->setBorderBottomWidth(animatableValueToUnsigned(value));
+        style->setBorderBottomWidth(animatableValueRoundClampTo<unsigned>(value));
         return;
     case CSSPropertyBorderImageOutset:
         style->setBorderImageOutset(animatableValueToLengthBox(value, state));
@@ -113,21 +131,21 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
         style->setVisitedLinkBorderLeftColor(toAnimatableColor(value)->visitedLinkColor());
         return;
     case CSSPropertyBorderLeftWidth:
-        style->setBorderLeftWidth(animatableValueToUnsigned(value));
+        style->setBorderLeftWidth(animatableValueRoundClampTo<unsigned>(value));
         return;
     case CSSPropertyBorderRightColor:
         style->setBorderRightColor(toAnimatableColor(value)->color());
         style->setVisitedLinkBorderRightColor(toAnimatableColor(value)->visitedLinkColor());
         return;
     case CSSPropertyBorderRightWidth:
-        style->setBorderRightWidth(animatableValueToUnsigned(value));
+        style->setBorderRightWidth(animatableValueRoundClampTo<unsigned>(value));
         return;
     case CSSPropertyBorderTopColor:
         style->setBorderTopColor(toAnimatableColor(value)->color());
         style->setVisitedLinkBorderTopColor(toAnimatableColor(value)->visitedLinkColor());
         return;
     case CSSPropertyBorderTopWidth:
-        style->setBorderTopWidth(animatableValueToUnsigned(value));
+        style->setBorderTopWidth(animatableValueRoundClampTo<unsigned>(value));
         return;
     case CSSPropertyBottom:
         style->setBottom(animatableValueToLength(value, state));
@@ -178,6 +196,12 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
     case CSSPropertyOutlineColor:
         style->setOutlineColor(toAnimatableColor(value)->color());
         style->setVisitedLinkOutlineColor(toAnimatableColor(value)->visitedLinkColor());
+        return;
+    case CSSPropertyOutlineOffset:
+        style->setOutlineOffset(animatableValueToInt(value));
+        return;
+    case CSSPropertyOutlineWidth:
+        style->setOutlineWidth(animatableValueRoundClampTo<unsigned short>(value));
         return;
     case CSSPropertyPaddingBottom:
         style->setPaddingBottom(animatableValueToLength(value, state));
@@ -240,6 +264,9 @@ void AnimatedStyleBuilder::applyProperty(CSSPropertyID property, StyleResolverSt
         return;
     case CSSPropertyWidth:
         style->setWidth(animatableValueToLength(value, state));
+        return;
+    case CSSPropertyVisibility:
+        style->setVisibility(toAnimatableVisibility(value)->visibility());
         return;
     default:
         RELEASE_ASSERT_WITH_MESSAGE(!CSSAnimations::isAnimatableProperty(property), "Web Animations not yet implemented: Unable to apply AnimatableValue to RenderStyle: %s", getPropertyNameString(property).utf8().data());

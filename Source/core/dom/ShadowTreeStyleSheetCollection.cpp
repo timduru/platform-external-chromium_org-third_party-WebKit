@@ -41,7 +41,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-ShadowTreeStyleSheetCollection::ShadowTreeStyleSheetCollection(ShadowRoot* shadowRoot)
+ShadowTreeStyleSheetCollection::ShadowTreeStyleSheetCollection(ShadowRoot& shadowRoot)
     : StyleSheetCollection(shadowRoot)
 {
 }
@@ -65,7 +65,7 @@ void ShadowTreeStyleSheetCollection::collectStyleSheets(StyleSheetCollections* c
         AtomicString title = element->getAttribute(titleAttr);
         bool enabledViaScript = false;
 
-        sheet = static_cast<HTMLStyleElement*>(node)->sheet();
+        sheet = toHTMLStyleElement(node)->sheet();
         if (sheet && !sheet->disabled() && sheet->isCSSStyleSheet())
             activeSheet = static_cast<CSSStyleSheet*>(sheet);
 

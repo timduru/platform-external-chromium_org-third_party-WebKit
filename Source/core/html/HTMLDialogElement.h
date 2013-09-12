@@ -36,7 +36,7 @@ class QualifiedName;
 
 class HTMLDialogElement FINAL : public HTMLElement {
 public:
-    static PassRefPtr<HTMLDialogElement> create(const QualifiedName&, Document*);
+    static PassRefPtr<HTMLDialogElement> create(const QualifiedName&, Document&);
 
     void close(const String& returnValue, ExceptionState&);
     void show();
@@ -46,7 +46,7 @@ public:
     void setReturnValue(const String& returnValue) { m_returnValue = returnValue; }
 
 private:
-    HTMLDialogElement(const QualifiedName&, Document*);
+    HTMLDialogElement(const QualifiedName&, Document&);
 
     virtual PassRefPtr<RenderStyle> customStyleForRenderer() OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
@@ -60,6 +60,12 @@ private:
     LayoutUnit m_top;
     String m_returnValue;
 };
+
+inline HTMLDialogElement* toHTMLDialogElement(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->hasTagName(HTMLNames::dialogTag));
+    return static_cast<HTMLDialogElement*>(node);
+}
 
 } // namespace WebCore
 

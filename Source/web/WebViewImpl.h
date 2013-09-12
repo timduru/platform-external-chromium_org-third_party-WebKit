@@ -102,7 +102,7 @@ class SpeechInputClientImpl;
 class SpeechRecognitionClientProxy;
 class UserMediaClientImpl;
 class ValidationMessageClientImpl;
-class WebAccessibilityObject;
+class WebAXObject;
 class WebActiveGestureAnimation;
 class WebCompositorImpl;
 class WebDevToolsAgentClient;
@@ -218,9 +218,12 @@ public:
     virtual void zoomToFindInPageRect(const WebRect&);
     virtual void advanceFocus(bool reverse);
     virtual double zoomLevel();
+    virtual double setZoomLevel(double);
     virtual double setZoomLevel(bool textOnly, double zoomLevel);
     virtual void zoomLimitsChanged(double minimumZoomLevel,
                                    double maximumZoomLevel);
+    virtual float textZoomFactor();
+    virtual float setTextZoomFactor(float);
     virtual void setInitialPageScaleOverride(float);
     virtual bool zoomToMultipleTargetsRect(const WebRect&);
     virtual float pageScaleFactor() const;
@@ -287,7 +290,7 @@ public:
     virtual void setInspectorSetting(const WebString& key,
                                      const WebString& value);
     virtual WebDevToolsAgent* devToolsAgent();
-    virtual WebAccessibilityObject accessibilityObject();
+    virtual WebAXObject accessibilityObject();
     virtual void applyAutofillSuggestions(
         const WebNode&,
         const WebVector<WebString>& names,
@@ -441,17 +444,6 @@ public:
         return m_maxAutoSize;
     }
 
-    // Sets the emulated text zoom factor
-    // (may not be 1 in the device metrics emulation mode).
-    void setEmulatedTextZoomFactor(float);
-
-    // Returns the emulated text zoom factor
-    // (which may not be 1 in the device metrics emulation mode).
-    float emulatedTextZoomFactor() const
-    {
-        return m_emulatedTextZoomFactor;
-    }
-
     void updatePageDefinedPageScaleConstraints(const WebCore::ViewportArguments&);
 
     // Start a system drag and drop operation.
@@ -467,10 +459,8 @@ public:
         m_autofillPopupShowing = false;
     }
 
-#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     // Returns the provider of desktop notifications.
     NotificationPresenterImpl* notificationPresenterImpl();
-#endif
 
     // Tries to scroll a frame or any parent of a frame. Returns true if the view
     // was scrolled.
@@ -524,7 +514,7 @@ public:
     // a plugin can update its own zoom, say because of its own UI.
     void fullFramePluginZoomLevelChanged(double zoomLevel);
 
-    void computeScaleAndScrollForBlockRect(const WebRect& blockRect, float padding, float& scale, WebPoint& scroll, bool& doubleTapShouldZoomOut);
+    void computeScaleAndScrollForBlockRect(const WebRect& blockRect, float padding, float defaultScaleWhenAlreadyLegible, float& scale, WebPoint& scroll);
     WebCore::Node* bestTapNode(const WebCore::PlatformGestureEvent& tapEvent);
     void enableTapHighlight(const WebCore::PlatformGestureEvent& tapEvent);
     void computeScaleAndScrollForFocusedNode(WebCore::Node* focusedNode, float& scale, WebCore::IntPoint& scroll, bool& needAnimation);
@@ -571,6 +561,7 @@ public:
     WebVector<WebCompositionUnderline> compositionUnderlines() const;
 
 private:
+    float legibleScale() const;
     void refreshPageScaleFactorAfterLayout();
     void setUserAgentPageScaleConstraints(WebCore::PageScaleConstraints newConstraints);
     float clampPageScaleFactorToLimits(float) const;
@@ -781,10 +772,8 @@ private:
     typedef HashMap<WTF::String, WTF::String> SettingsMap;
     OwnPtr<SettingsMap> m_inspectorSettingsMap;
 
-#if ENABLE(NOTIFICATIONS) || ENABLE(LEGACY_NOTIFICATIONS)
     // The provider of desktop notifications;
     NotificationPresenterImpl m_notificationPresenter;
-#endif
 
     // If set, the (plugin) node which has mouse capture.
     RefPtr<WebCore::Node> m_mouseCaptureNode;
@@ -809,8 +798,6 @@ private:
 
     OwnPtr<DeviceOrientationClientProxy> m_deviceOrientationClientProxy;
     OwnPtr<GeolocationClientProxy> m_geolocationClientProxy;
-
-    float m_emulatedTextZoomFactor;
 
     UserMediaClientImpl m_userMediaClientImpl;
     OwnPtr<MIDIClientProxy> m_midiClientProxy;

@@ -42,7 +42,7 @@
 
 using namespace std;
 
-#if OS(UNIX) && !OS(DARWIN)
+#if OS(POSIX) && !OS(MACOSX)
 // The position of the scrollbar thumb affects the appearance of the steppers, so
 // when the thumb moves, we have to invalidate them for painting.
 #define THUMB_POSITION_AFFECTS_BUTTONS
@@ -50,7 +50,7 @@ using namespace std;
 
 namespace WebCore {
 
-PassRefPtr<Scrollbar> Scrollbar::createNativeScrollbar(ScrollableArea* scrollableArea, ScrollbarOrientation orientation, ScrollbarControlSize size)
+PassRefPtr<Scrollbar> Scrollbar::create(ScrollableArea* scrollableArea, ScrollbarOrientation orientation, ScrollbarControlSize size)
 {
     return adoptRef(new Scrollbar(scrollableArea, orientation, size));
 }
@@ -121,11 +121,11 @@ bool Scrollbar::isScrollViewScrollbar() const
     return parent() && parent()->isFrameView() && toFrameView(parent())->isScrollViewScrollbar(this);
 }
 
-TextDirection Scrollbar::textDirection() const
+bool Scrollbar::isLeftSideVerticalScrollbar() const
 {
     if (m_orientation == VerticalScrollbar && m_scrollableArea)
-        return m_scrollableArea->textDirection();
-    return LTR;
+        return m_scrollableArea->shouldPlaceVerticalScrollbarOnLeft();
+    return false;
 }
 
 void Scrollbar::offsetDidChange()
@@ -442,7 +442,7 @@ void Scrollbar::mouseUp(const PlatformMouseEvent& mouseEvent)
     }
 
     if (parent() && parent()->isFrameView())
-        toFrameView(parent())->frame()->eventHandler()->setMousePressed(false);
+        toFrameView(parent())->frame().eventHandler()->setMousePressed(false);
 }
 
 void Scrollbar::mouseDown(const PlatformMouseEvent& evt)

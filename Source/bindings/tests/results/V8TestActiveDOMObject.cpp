@@ -31,7 +31,6 @@
 #include "bindings/v8/V8DOMWrapper.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/page/Frame.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
@@ -91,7 +90,7 @@ bool namedSecurityCheck(v8::Local<v8::Object> host, v8::Local<v8::Value> key, v8
 
 static void excitingFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -113,7 +112,7 @@ static void excitingFunctionMethodCallback(const v8::FunctionCallbackInfo<v8::Va
 
 static void postMessageMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }

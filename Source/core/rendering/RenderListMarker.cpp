@@ -1070,9 +1070,9 @@ RenderListMarker::~RenderListMarker()
 
 RenderListMarker* RenderListMarker::createAnonymous(RenderListItem* item)
 {
-    Document* document = item->document();
+    Document& document = item->document();
     RenderListMarker* renderer = new RenderListMarker(item);
-    renderer->setDocumentForAnonymous(document);
+    renderer->setDocumentForAnonymous(&document);
     return renderer;
 }
 
@@ -1601,7 +1601,7 @@ void RenderListMarker::updateMargins()
     LayoutUnit marginStart = 0;
     LayoutUnit marginEnd = 0;
 
-    if (isInside() && !m_listItem->isFloating()) {
+    if (isInside()) {
         if (isImage())
             marginEnd = cMarkerPadding;
         else switch (style()->listStyleType()) {

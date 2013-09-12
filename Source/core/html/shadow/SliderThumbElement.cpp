@@ -73,7 +73,7 @@ inline static bool hasVerticalAppearance(HTMLInputElement* input)
 // --------------------------------
 
 RenderSliderThumb::RenderSliderThumb(SliderThumbElement* element)
-    : RenderBlock(element)
+    : RenderBlockFlow(element)
 {
 }
 
@@ -195,13 +195,13 @@ void RenderSliderContainer::layout()
 
 // --------------------------------
 
-inline SliderThumbElement::SliderThumbElement(Document* document)
+inline SliderThumbElement::SliderThumbElement(Document& document)
     : HTMLDivElement(HTMLNames::divTag, document)
     , m_inDragMode(false)
 {
 }
 
-PassRefPtr<SliderThumbElement> SliderThumbElement::create(Document* document)
+PassRefPtr<SliderThumbElement> SliderThumbElement::create(Document& document)
 {
     RefPtr<SliderThumbElement> element = adoptRef(new SliderThumbElement(document));
     element->setAttribute(idAttr, ShadowElementNames::sliderThumb());
@@ -256,7 +256,6 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
     if (!input->renderer() || !renderBox() || !trackElement->renderBox())
         return;
 
-    input->setTextAsOfLastFormControlChangeEvent(input->value());
     LayoutPoint offset = roundedLayoutPoint(input->renderer()->absoluteToLocal(point, UseTransforms));
     bool isVertical = hasVerticalAppearance(input.get());
     bool isLeftToRightDirection = renderBox()->style()->isLeftToRightDirection();
@@ -312,7 +311,7 @@ void SliderThumbElement::setPositionFromPoint(const LayoutPoint& point)
 
 void SliderThumbElement::startDragging()
 {
-    if (Frame* frame = document()->frame()) {
+    if (Frame* frame = document().frame()) {
         frame->eventHandler()->setCapturingMouseEventsNode(this);
         m_inDragMode = true;
     }
@@ -323,7 +322,7 @@ void SliderThumbElement::stopDragging()
     if (!m_inDragMode)
         return;
 
-    if (Frame* frame = document()->frame())
+    if (Frame* frame = document().frame())
         frame->eventHandler()->setCapturingMouseEventsNode(0);
     m_inDragMode = false;
     if (renderer())
@@ -389,7 +388,7 @@ bool SliderThumbElement::willRespondToMouseClickEvents()
 void SliderThumbElement::detach(const AttachContext& context)
 {
     if (m_inDragMode) {
-        if (Frame* frame = document()->frame())
+        if (Frame* frame = document().frame())
             frame->eventHandler()->setCapturingMouseEventsNode(0);
     }
     HTMLDivElement::detach(context);
@@ -436,12 +435,12 @@ const AtomicString& SliderThumbElement::part() const
 
 // --------------------------------
 
-inline SliderContainerElement::SliderContainerElement(Document* document)
+inline SliderContainerElement::SliderContainerElement(Document& document)
     : HTMLDivElement(HTMLNames::divTag, document)
 {
 }
 
-PassRefPtr<SliderContainerElement> SliderContainerElement::create(Document* document)
+PassRefPtr<SliderContainerElement> SliderContainerElement::create(Document& document)
 {
     return adoptRef(new SliderContainerElement(document));
 }

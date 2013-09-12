@@ -370,20 +370,29 @@ void RenderTableSection::distributeExtraRowSpanHeightToRemainingRows(RenderTable
     extraRowSpanningHeight -= accumulatedPositionIncrease;
 }
 
-// To avoid unneeded extra height distributions, we apply the following sorting algorithm:
-// 1. We sort by increasing start row but decreasing last row (ie the top-most, shortest cells first).
-// 2. For cells spanning the same rows, we sort by intrinsic size.
-static bool compareRowSpanCellsInHeightDistributionOrder(const RenderTableCell* cell2, const RenderTableCell* cell1)
+static bool cellIsFullyIncludedInOtherCell(const RenderTableCell* cell1, const RenderTableCell* cell2)
 {
-    unsigned cellRowIndex1 = cell1->rowIndex();
-    unsigned cellRowSpan1 = cell1->rowSpan();
-    unsigned cellRowIndex2 = cell2->rowIndex();
-    unsigned cellRowSpan2 = cell2->rowSpan();
+    return (cell1->rowIndex() >= cell2->rowIndex() && (cell1->rowIndex() + cell1->rowSpan()) <= (cell2->rowIndex() + cell2->rowSpan()));
+}
 
-    if (cellRowIndex1 == cellRowIndex2 && cellRowSpan1 == cellRowSpan2)
-        return (cell2->logicalHeightForRowSizing() > cell1->logicalHeightForRowSizing());
+// To avoid unneeded extra height distributions, we apply the following sorting algorithm:
+static bool compareRowSpanCellsInHeightDistributionOrder(const RenderTableCell* cell1, const RenderTableCell* cell2)
+{
+    // Sorting bigger height cell first if cells are at same index with same span because we will skip smaller
+    // height cell to distribute it's extra height.
+    if (cell1->rowIndex() == cell2->rowIndex() && cell1->rowSpan() == cell2->rowSpan())
+        return (cell1->logicalHeightForRowSizing() > cell2->logicalHeightForRowSizing());
+    // Sorting inner most cell first because if inner spanning cell'e extra height is distributed then outer
+    // spanning cell's extra height will adjust accordingly. In reverse order, there is more chances that outer
+    // spanning cell's height will exceed than defined by user.
+    if (cellIsFullyIncludedInOtherCell(cell1, cell2))
+        return true;
+    // Sorting lower row index first because first we need to apply the extra height of spanning cell which
+    // comes first in the table so lower rows's position would increment in sequence.
+    if (cellIsFullyIncludedInOtherCell(cell2, cell1))
+        return (cell1->rowIndex() < cell2->rowIndex());
 
-    return (cellRowIndex2 >= cellRowIndex1 && (cellRowIndex2 + cellRowSpan2) <= (cellRowIndex1 + cellRowSpan1));
+    return false;
 }
 
 // Distribute rowSpan cell height in rows those comes in rowSpan cell based on the ratio of row's height if
@@ -511,7 +520,12 @@ int RenderTableSection::calcRowLogicalHeight()
     LayoutStateMaintainer statePusher(viewRenderer);
 
     m_rowPos.resize(m_grid.size() + 1);
-    m_rowPos[0] = table()->vBorderSpacing();
+
+    // We ignore the border-spacing on any non-top section as it is already included in the previous section's last row position.
+    if (this == table()->topSection())
+        m_rowPos[0] = table()->vBorderSpacing();
+    else
+        m_rowPos[0] = 0;
 
     SpanningRenderTableCells rowSpanCells;
 
@@ -1157,11 +1171,7 @@ void RenderTableSection::paint(PaintInfo& paintInfo, const LayoutPoint& paintOff
 {
     ANNOTATE_GRAPHICS_CONTEXT(paintInfo, this);
 
-    // put this back in when all layout tests can handle it
-    // ASSERT(!needsLayout());
-    // avoid crashing on bugs that cause us to paint with dirty layout
-    if (needsLayout())
-        return;
+    ASSERT_WITH_SECURITY_IMPLICATION(!needsLayout());
 
     unsigned totalRows = m_grid.size();
     unsigned totalCols = table()->columns().size();
@@ -1667,7 +1677,7 @@ RenderTableSection* RenderTableSection::createAnonymousWithParentRenderer(const 
 {
     RefPtr<RenderStyle> newStyle = RenderStyle::createAnonymousStyleWithDisplay(parent->style(), TABLE_ROW_GROUP);
     RenderTableSection* newSection = new RenderTableSection(0);
-    newSection->setDocumentForAnonymous(parent->document());
+    newSection->setDocumentForAnonymous(&parent->document());
     newSection->setStyle(newStyle.release());
     return newSection;
 }

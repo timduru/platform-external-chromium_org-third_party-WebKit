@@ -36,16 +36,17 @@
 #include "core/dom/Document.h"
 #include "core/dom/DocumentParser.h"
 #include "core/dom/Event.h"
+#include "core/fetch/FetchContext.h"
 #include "core/fetch/MemoryCache.h"
 #include "core/fetch/ResourceFetcher.h"
 #include "core/fetch/ResourceLoader.h"
+#include "core/fetch/TextResourceDecoder.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/DocumentWriter.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/loader/SinkDocument.h"
-#include "core/loader/TextResourceDecoder.h"
 #include "core/loader/UniqueIdentifier.h"
 #include "core/loader/appcache/ApplicationCacheHost.h"
 #include "core/loader/archive/ArchiveResourceCollection.h"
@@ -65,24 +66,6 @@
 #include "wtf/text/WTFString.h"
 
 namespace WebCore {
-
-static void cancelAll(const ResourceLoaderSet& loaders)
-{
-    Vector<RefPtr<ResourceLoader> > loadersCopy;
-    copyToVector(loaders, loadersCopy);
-    size_t size = loadersCopy.size();
-    for (size_t i = 0; i < size; ++i)
-        loadersCopy[i]->cancel();
-}
-
-static void setAllDefersLoading(const ResourceLoaderSet& loaders, bool defers)
-{
-    Vector<RefPtr<ResourceLoader> > loadersCopy;
-    copyToVector(loaders, loadersCopy);
-    size_t size = loadersCopy.size();
-    for (size_t i = 0; i < size; ++i)
-        loadersCopy[i]->setDefersLoading(defers);
-}
 
 static bool isArchiveMIMEType(const String& mimeType)
 {
@@ -208,9 +191,7 @@ void DocumentLoader::mainReceivedError(const ResourceError& error)
 {
     ASSERT(!error.isNull());
     ASSERT(!mainResourceLoader() || !mainResourceLoader()->defersLoading());
-
     m_applicationCacheHost->failedLoadingMainResource();
-
     if (!frameLoader())
         return;
     setMainDocumentError(error);
@@ -242,9 +223,6 @@ void DocumentLoader::stopLoading()
             m_frame->loader()->stopLoading();
     }
 
-    // Always cancel multipart loaders
-    cancelAll(m_multipartResourceLoaders);
-
     clearArchiveResources();
 
     if (!loading)
@@ -253,7 +231,7 @@ void DocumentLoader::stopLoading()
     if (isLoadingMainResource()) {
         // Stop the main resource loader and let it send the cancelled message.
         cancelMainResourceLoad(ResourceError::cancelledError(m_request.url()));
-    } else if (!m_resourceLoaders.isEmpty()) {
+    } else if (m_fetcher->isFetching()) {
         // The main resource loader already finished loading. Set the cancelled error on the
         // document and let the resourceLoaders send individual cancelled messages below.
         setMainDocumentError(ResourceError::cancelledError(m_request.url()));
@@ -263,7 +241,7 @@ void DocumentLoader::stopLoading()
         mainReceivedError(ResourceError::cancelledError(m_request.url()));
     }
 
-    stopLoadingSubresources();
+    m_fetcher->stopFetching();
 }
 
 void DocumentLoader::commitIfReady()
@@ -279,7 +257,7 @@ bool DocumentLoader::isLoading() const
     if (document() && document()->hasActiveParser())
         return true;
 
-    return isLoadingMainResource() || !m_resourceLoaders.isEmpty();
+    return isLoadingMainResource() || m_fetcher->isFetching();
 }
 
 void DocumentLoader::notifyFinished(Resource* resource)
@@ -304,7 +282,7 @@ void DocumentLoader::finishedLoading(double finishTime)
     RefPtr<DocumentLoader> protect(this);
 
     if (m_identifierForLoadWithoutResourceLoader) {
-        frameLoader()->notifier()->dispatchDidFinishLoading(this, m_identifierForLoadWithoutResourceLoader, finishTime);
+        m_frame->fetchContext().dispatchDidFinishLoading(this, m_identifierForLoadWithoutResourceLoader, finishTime);
         m_identifierForLoadWithoutResourceLoader = 0;
     }
 
@@ -346,11 +324,8 @@ void DocumentLoader::finishedLoading(double finishTime)
     clearMainResourceHandle();
 }
 
-bool DocumentLoader::isPostOrRedirectAfterPost(const ResourceRequest& newRequest, const ResourceResponse& redirectResponse)
+bool DocumentLoader::isRedirectAfterPost(const ResourceRequest& newRequest, const ResourceResponse& redirectResponse)
 {
-    if (newRequest.httpMethod() == "POST")
-        return true;
-
     int status = redirectResponse.httpStatusCode();
     if (((status >= 301 && status <= 303) || status == 307)
         && m_originalRequest.httpMethod() == "POST")
@@ -395,7 +370,7 @@ bool DocumentLoader::shouldContinueForNavigationPolicy(const ResourceRequest& re
 
     // If we're loading content into a subframe, check against the parent's Content Security Policy
     // and kill the load if that check fails.
-    if (m_frame->ownerElement() && !m_frame->ownerElement()->document()->contentSecurityPolicy()->allowChildFrameFromSource(request.url()))
+    if (m_frame->ownerElement() && !m_frame->ownerElement()->document().contentSecurityPolicy()->allowChildFrameFromSource(request.url()))
         return false;
 
     NavigationPolicy policy = NavigationPolicyCurrentTab;
@@ -456,8 +431,7 @@ void DocumentLoader::willSendRequest(ResourceRequest& newRequest, const Resource
     // If we're fielding a redirect in response to a POST, force a load from origin, since
     // this is a common site technique to return to a page viewing some data that the POST
     // just modified.
-    // Also, POST requests always load from origin, but this does not affect subresources.
-    if (newRequest.cachePolicy() == UseProtocolCachePolicy && isPostOrRedirectAfterPost(newRequest, redirectResponse))
+    if (newRequest.cachePolicy() == UseProtocolCachePolicy && isRedirectAfterPost(newRequest, redirectResponse))
         newRequest.setCachePolicy(ReloadIgnoringCacheData);
 
     Frame* parent = m_frame->tree()->parent();
@@ -558,7 +532,7 @@ void DocumentLoader::responseReceived(Resource* resource, const ResourceResponse
         m_mainResource->setDataBufferingPolicy(BufferData);
 
     if (m_identifierForLoadWithoutResourceLoader)
-        frameLoader()->notifier()->dispatchDidReceiveResponse(this, m_identifierForLoadWithoutResourceLoader, m_response, 0);
+        m_frame->fetchContext().dispatchDidReceiveResponse(this, m_identifierForLoadWithoutResourceLoader, m_response, 0);
 
     if (!shouldContinueForResponse()) {
         InspectorInstrumentation::continueWithPolicyIgnore(m_frame, this, m_mainResource->identifier(), m_response);
@@ -568,15 +542,11 @@ void DocumentLoader::responseReceived(Resource* resource, const ResourceResponse
 
     if (m_response.isHTTP()) {
         int status = m_response.httpStatusCode();
-        if (status < 200 || status >= 300) {
-            bool hostedByObject = frameLoader()->isHostedByObjectElement();
-
-            frameLoader()->handleFallbackContent();
+        if ((status < 200 || status >= 300) && m_frame->ownerElement() && m_frame->ownerElement()->isObjectElement()) {
+            m_frame->ownerElement()->renderFallbackContent();
             // object elements are no longer rendered after we fallback, so don't
             // keep trying to process data from their load
-
-            if (hostedByObject)
-                cancelMainResourceLoad(ResourceError::cancelledError(m_request.url()));
+            cancelMainResourceLoad(ResourceError::cancelledError(m_request.url()));
         }
     }
 }
@@ -625,7 +595,7 @@ void DocumentLoader::dataReceived(Resource* resource, const char* data, int leng
     RefPtr<DocumentLoader> protectLoader(this);
 
     if (m_identifierForLoadWithoutResourceLoader)
-        frameLoader()->notifier()->dispatchDidReceiveData(this, m_identifierForLoadWithoutResourceLoader, data, length, -1);
+        frame()->fetchContext().dispatchDidReceiveData(this, m_identifierForLoadWithoutResourceLoader, data, length, -1);
 
     m_applicationCacheHost->mainResourceDataReceived(data, length);
     m_timeOfLastDataReceived = monotonicallyIncreasingTime();
@@ -827,36 +797,7 @@ void DocumentLoader::setDefersLoading(bool defers)
     if (mainResourceLoader() && mainResourceLoader()->isLoadedBy(m_fetcher.get()))
         mainResourceLoader()->setDefersLoading(defers);
 
-    setAllDefersLoading(m_resourceLoaders, defers);
-}
-
-void DocumentLoader::stopLoadingSubresources()
-{
-    cancelAll(m_resourceLoaders);
-}
-
-void DocumentLoader::addResourceLoader(ResourceLoader* loader)
-{
-    // The main resource's underlying ResourceLoader will ask to be added here.
-    // It is much simpler to handle special casing of main resource loads if we don't
-    // let it be added. In the main resource load case, mainResourceLoader()
-    // will still be null at this point, but document() should be zero here if and only
-    // if we are just starting the main resource load.
-    if (!document())
-        return;
-    ASSERT(!m_resourceLoaders.contains(loader));
-    ASSERT(!mainResourceLoader() || mainResourceLoader() != loader);
-    m_resourceLoaders.add(loader);
-}
-
-void DocumentLoader::removeResourceLoader(ResourceLoader* loader)
-{
-    if (!m_resourceLoaders.contains(loader))
-        return;
-    m_resourceLoaders.remove(loader);
-    checkLoadComplete();
-    if (Frame* frame = m_frame)
-        frame->loader()->checkLoadComplete();
+    m_fetcher->setDefersLoading(defers);
 }
 
 bool DocumentLoader::maybeLoadEmpty()
@@ -898,7 +839,7 @@ void DocumentLoader::startLoadingMainResource()
 
     if (m_substituteData.isValid()) {
         m_identifierForLoadWithoutResourceLoader = createUniqueIdentifier();
-        frameLoader()->notifier()->dispatchWillSendRequest(this, m_identifierForLoadWithoutResourceLoader, m_request, ResourceResponse());
+        frame()->fetchContext().dispatchWillSendRequest(this, m_identifierForLoadWithoutResourceLoader, m_request, ResourceResponse());
         handleSubstituteDataLoadSoon();
         return;
     }
@@ -939,15 +880,6 @@ void DocumentLoader::cancelMainResourceLoad(const ResourceError& resourceError)
         mainResourceLoader()->cancel(error);
 
     mainReceivedError(error);
-}
-
-void DocumentLoader::subresourceLoaderFinishedLoadingOnePart(ResourceLoader* loader)
-{
-    m_multipartResourceLoaders.add(loader);
-    m_resourceLoaders.remove(loader);
-    checkLoadComplete();
-    if (Frame* frame = m_frame)
-        frame->loader()->checkLoadComplete();
 }
 
 DocumentWriter* DocumentLoader::beginWriting(const String& mimeType, const String& encoding, const KURL& url)

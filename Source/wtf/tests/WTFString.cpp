@@ -40,12 +40,6 @@ TEST(WTF, StringCreationFromLiteral)
     ASSERT_TRUE(stringFromLiteral == "Explicit construction syntax");
     ASSERT_TRUE(stringFromLiteral.is8Bit());
     ASSERT_TRUE(String("Explicit construction syntax") == stringFromLiteral);
-
-    String stringWithTemplate("Template Literal", String::ConstructFromLiteral);
-    ASSERT_EQ(strlen("Template Literal"), stringWithTemplate.length());
-    ASSERT_TRUE(stringWithTemplate == "Template Literal");
-    ASSERT_TRUE(stringWithTemplate.is8Bit());
-    ASSERT_TRUE(String("Template Literal") == stringWithTemplate);
 }
 
 TEST(WTF, StringASCII)
@@ -152,6 +146,19 @@ TEST(WTF, StringReplaceWithLiteral)
     ASSERT_FALSE(testString.is8Bit());
     testString.replaceWithLiteral('3', "NotFound");
     ASSERT_STREQ("résumé", testString.utf8().data());
+}
+
+TEST(WTF, StringComparisonOfSameStringVectors)
+{
+    Vector<String> stringVector;
+    stringVector.append("one");
+    stringVector.append("two");
+
+    Vector<String> sameStringVector;
+    sameStringVector.append("one");
+    sameStringVector.append("two");
+
+    ASSERT_EQ(stringVector, sameStringVector);
 }
 
 } // namespace

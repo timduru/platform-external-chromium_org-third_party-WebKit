@@ -263,7 +263,7 @@ void RenderLayerCompositor::cacheAcceleratedCompositingFlags()
     bool showRepaintCounter = false;
     bool forceCompositingMode = false;
 
-    if (Settings* settings = m_renderView->document()->settings()) {
+    if (Settings* settings = m_renderView->document().settings()) {
         hasAcceleratedCompositing = settings->acceleratedCompositingEnabled();
 
         // We allow the chrome to override the settings, in case the page is rendered
@@ -362,7 +362,7 @@ void RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
     if (!m_reevaluateCompositingAfterLayout && !m_compositing)
         return;
 
-    AnimationUpdateBlock animationUpdateBlock(m_renderView->frameView()->frame()->animation());
+    AnimationUpdateBlock animationUpdateBlock(m_renderView->frameView()->frame().animation());
 
     TemporaryChange<bool> postLayoutChange(m_inPostLayoutUpdate, true);
 
@@ -431,8 +431,8 @@ void RenderLayerCompositor::updateCompositingLayers(CompositingUpdateType update
         m_obligatoryBackingStoreBytes = 0;
         m_secondaryBackingStoreBytes = 0;
 
-        Frame* frame = m_renderView->frameView()->frame();
-        LOG(Compositing, "\nUpdate %d of %s.\n", m_rootLayerUpdateCount, isMainFrame() ? "main frame" : frame->tree()->uniqueName().string().utf8().data());
+        Frame& frame = m_renderView->frameView()->frame();
+        LOG(Compositing, "\nUpdate %d of %s.\n", m_rootLayerUpdateCount, isMainFrame() ? "main frame" : frame.tree()->uniqueName().string().utf8().data());
     }
 #endif
 
@@ -1193,6 +1193,13 @@ void RenderLayerCompositor::frameViewDidChangeSize()
     }
 }
 
+enum AcceleratedFixedRootBackgroundHistogramBuckets {
+    ScrolledMainFrameBucket = 0,
+    ScrolledMainFrameWithAcceleratedFixedRootBackground = 1,
+    ScrolledMainFrameWithUnacceleratedFixedRootBackground = 2,
+    AcceleratedFixedRootBackgroundHistogramMax = 3
+};
+
 void RenderLayerCompositor::frameViewDidScroll()
 {
     FrameView* frameView = m_renderView->frameView();
@@ -1203,7 +1210,7 @@ void RenderLayerCompositor::frameViewDidScroll()
 
     bool scrollingCoordinatorHandlesOffset = false;
     if (ScrollingCoordinator* scrollingCoordinator = this->scrollingCoordinator()) {
-        if (Settings* settings = m_renderView->document()->settings()) {
+        if (Settings* settings = m_renderView->document().settings()) {
             if (isMainFrame() || settings->compositedScrollingForFramesEnabled())
                 scrollingCoordinatorHandlesOffset = scrollingCoordinator->scrollableAreaScrollLayerDidChange(frameView);
         }
@@ -1216,6 +1223,20 @@ void RenderLayerCompositor::frameViewDidScroll()
         m_scrollLayer->setPosition(-frameView->minimumScrollPosition());
     else
         m_scrollLayer->setPosition(-scrollPosition);
+
+
+    HistogramSupport::histogramEnumeration("Renderer.AcceleratedFixedRootBackground",
+        ScrolledMainFrameBucket,
+        AcceleratedFixedRootBackgroundHistogramMax);
+
+    if (!m_renderView->rootBackgroundIsEntirelyFixed())
+        return;
+
+    HistogramSupport::histogramEnumeration("Renderer.AcceleratedFixedRootBackground",
+        !!fixedRootBackgroundLayer()
+            ? ScrolledMainFrameWithAcceleratedFixedRootBackground
+            : ScrolledMainFrameWithUnacceleratedFixedRootBackground,
+        AcceleratedFixedRootBackgroundHistogramMax);
 }
 
 void RenderLayerCompositor::frameViewDidLayout()
@@ -1907,7 +1928,7 @@ bool RenderLayerCompositor::requiresCompositingForTransition(RenderObject* rende
     if (!(m_compositingTriggers & ChromeClient::AnimationTrigger))
         return false;
 
-    if (Settings* settings = m_renderView->document()->settings()) {
+    if (Settings* settings = m_renderView->document().settings()) {
         if (!settings->acceleratedCompositingForTransitionEnabled())
             return false;
     }
@@ -2030,7 +2051,7 @@ bool RenderLayerCompositor::requiresCompositingForPosition(RenderObject* rendere
         return false;
 
     // FIXME: acceleratedCompositingForFixedPositionEnabled should probably be renamed acceleratedCompositingForViewportConstrainedPositionEnabled().
-    if (Settings* settings = m_renderView->document()->settings()) {
+    if (Settings* settings = m_renderView->document().settings()) {
         if (!settings->acceleratedCompositingForFixedPositionEnabled())
             return false;
     }
@@ -2098,8 +2119,10 @@ bool RenderLayerCompositor::requiresCompositingForPosition(RenderObject* rendere
         LayoutRect layerBounds = layer->calculateLayerBounds(rootRenderLayer(), 0, RenderLayer::DefaultCalculateLayerBoundsFlags
             | RenderLayer::ExcludeHiddenDescendants | RenderLayer::DontConstrainForMask | RenderLayer::IncludeCompositedDescendants);
         if (!viewBounds.intersects(enclosingIntRect(layerBounds))) {
-            if (viewportConstrainedNotCompositedReason)
+            if (viewportConstrainedNotCompositedReason) {
                 *viewportConstrainedNotCompositedReason = RenderLayer::NotCompositedForBoundsOutOfView;
+                m_reevaluateCompositingAfterLayout = true;
+            }
             return false;
         }
     }
@@ -2169,7 +2192,7 @@ void RenderLayerCompositor::paintContents(const GraphicsLayer* graphicsLayer, Gr
 
 bool RenderLayerCompositor::supportsFixedRootBackgroundCompositing() const
 {
-    if (Settings* settings = m_renderView->document()->settings()) {
+    if (Settings* settings = m_renderView->document().settings()) {
         if (settings->acceleratedCompositingForFixedRootBackgroundEnabled())
             return true;
     }
@@ -2237,7 +2260,7 @@ void RenderLayerCompositor::didCommitChangesForLayer(const GraphicsLayer*) const
 
 static bool shouldCompositeOverflowControls(FrameView* view)
 {
-    if (Page* page = view->frame()->page()) {
+    if (Page* page = view->frame().page()) {
         if (ScrollingCoordinator* scrollingCoordinator = page->scrollingCoordinator())
             if (scrollingCoordinator->coordinatesScrollingForFrameView(view))
                 return true;
@@ -2464,17 +2487,17 @@ void RenderLayerCompositor::attachRootLayer(RootLayerAttachment attachment)
             ASSERT_NOT_REACHED();
             break;
         case RootLayerAttachedViaChromeClient: {
-            Frame* frame = m_renderView->frameView()->frame();
-            Page* page = frame ? frame->page() : 0;
+            Frame& frame = m_renderView->frameView()->frame();
+            Page* page = frame.page();
             if (!page)
                 return;
-            page->chrome().client().attachRootGraphicsLayer(frame, rootGraphicsLayer());
+            page->chrome().client().attachRootGraphicsLayer(&frame, rootGraphicsLayer());
             break;
         }
         case RootLayerAttachedViaEnclosingFrame: {
             // The layer will get hooked up via RenderLayerBacking::updateGraphicsLayerConfiguration()
             // for the frame's renderer in the parent document.
-            m_renderView->document()->ownerElement()->scheduleLayerUpdate();
+            m_renderView->document().ownerElement()->scheduleLayerUpdate();
             break;
         }
     }
@@ -2496,16 +2519,16 @@ void RenderLayerCompositor::detachRootLayer()
         else
             m_rootContentLayer->removeFromParent();
 
-        if (HTMLFrameOwnerElement* ownerElement = m_renderView->document()->ownerElement())
+        if (HTMLFrameOwnerElement* ownerElement = m_renderView->document().ownerElement())
             ownerElement->scheduleLayerUpdate();
         break;
     }
     case RootLayerAttachedViaChromeClient: {
-        Frame* frame = m_renderView->frameView()->frame();
-        Page* page = frame ? frame->page() : 0;
+        Frame& frame = m_renderView->frameView()->frame();
+        Page* page = frame.page();
         if (!page)
             return;
-        page->chrome().client().attachRootGraphicsLayer(frame, 0);
+        page->chrome().client().attachRootGraphicsLayer(&frame, 0);
     }
     break;
     case RootLayerUnattached:
@@ -2522,7 +2545,7 @@ void RenderLayerCompositor::updateRootLayerAttachment()
 
 bool RenderLayerCompositor::isMainFrame() const
 {
-    return !m_renderView->document()->ownerElement();
+    return !m_renderView->document().ownerElement();
 }
 
 // IFrames are special, because we hook compositing layers together across iframe boundaries
@@ -2530,18 +2553,18 @@ bool RenderLayerCompositor::isMainFrame() const
 // to use a synthetic style change to get the iframes into RenderLayers in order to allow them to composite.
 void RenderLayerCompositor::notifyIFramesOfCompositingChange()
 {
-    Frame* frame = m_renderView->frameView() ? m_renderView->frameView()->frame() : 0;
-    if (!frame)
+    if (!m_renderView->frameView())
         return;
+    Frame& frame = m_renderView->frameView()->frame();
 
-    for (Frame* child = frame->tree()->firstChild(); child; child = child->tree()->traverseNext(frame)) {
+    for (Frame* child = frame.tree()->firstChild(); child; child = child->tree()->traverseNext(&frame)) {
         if (child->document() && child->document()->ownerElement())
             child->document()->ownerElement()->scheduleLayerUpdate();
     }
 
     // Compositing also affects the answer to RenderIFrame::requiresAcceleratedCompositing(), so
     // we need to schedule a style recalc in our parent document.
-    if (HTMLFrameOwnerElement* ownerElement = m_renderView->document()->ownerElement())
+    if (HTMLFrameOwnerElement* ownerElement = m_renderView->document().ownerElement())
         ownerElement->scheduleLayerUpdate();
 }
 
@@ -2705,10 +2728,7 @@ GraphicsLayerFactory* RenderLayerCompositor::graphicsLayerFactory() const
 
 Page* RenderLayerCompositor::page() const
 {
-    if (Frame* frame = m_renderView->frameView()->frame())
-        return frame->page();
-
-    return 0;
+    return m_renderView->frameView()->frame().page();
 }
 
 String RenderLayerCompositor::debugName(const GraphicsLayer* graphicsLayer)

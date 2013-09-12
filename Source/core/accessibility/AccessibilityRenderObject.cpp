@@ -49,6 +49,7 @@
 #include "core/html/HTMLTextAreaElement.h"
 #include "core/html/shadow/ShadowElementNames.h"
 #include "core/loader/ProgressTracker.h"
+#include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/LocalizedStrings.h"
 #include "core/rendering/HitTestResult.h"
@@ -61,6 +62,7 @@
 #include "core/rendering/RenderMenuList.h"
 #include "core/rendering/RenderTextControlSingleLine.h"
 #include "core/rendering/RenderTextFragment.h"
+#include "core/rendering/RenderView.h"
 #include "core/rendering/RenderWidget.h"
 #include "core/svg/SVGDocument.h"
 #include "core/svg/SVGSVGElement.h"
@@ -435,7 +437,7 @@ AccessibilityRole AccessibilityRenderObject::determineAccessibilityRole()
     if (node && node->hasTagName(aTag) && isClickable())
         return LinkRole;
 
-    if (m_renderer->isBlockFlow())
+    if (m_renderer->isRenderBlockFlow())
         return GroupRole;
 
     // If the element does not have role, but it has ARIA attributes, accessibility should fallback to exposing it as a group.
@@ -512,7 +514,7 @@ bool AccessibilityRenderObject::isLinked() const
 
 bool AccessibilityRenderObject::isLoaded() const
 {
-    return !m_renderer->document()->parser();
+    return !m_renderer->document().parser();
 }
 
 bool AccessibilityRenderObject::isOffScreen() const
@@ -530,15 +532,12 @@ bool AccessibilityRenderObject::isReadOnly() const
     ASSERT(m_renderer);
 
     if (isWebArea()) {
-        Document* document = m_renderer->document();
-        if (!document)
-            return true;
-
-        HTMLElement* body = document->body();
+        Document& document = m_renderer->document();
+        HTMLElement* body = document.body();
         if (body && body->rendererIsEditable())
             return false;
 
-        return !document->rendererIsEditable();
+        return !document.rendererIsEditable();
     }
 
     return AccessibilityNodeObject::isReadOnly();
@@ -559,18 +558,15 @@ bool AccessibilityRenderObject::isFocused() const
     if (!m_renderer)
         return false;
 
-    Document* document = m_renderer->document();
-    if (!document)
-        return false;
-
-    Element* focusedElement = document->focusedElement();
+    Document& document = m_renderer->document();
+    Element* focusedElement = document.focusedElement();
     if (!focusedElement)
         return false;
 
     // A web area is represented by the Document node in the DOM tree, which isn't focusable.
     // Check instead if the frame's selection controller is focused
     if (focusedElement == m_renderer->node()
-        || (roleValue() == WebAreaRole && document->frame()->selection()->isFocusedAndActive()))
+        || (roleValue() == WebAreaRole && document.frame()->selection().isFocusedAndActive()))
         return true;
 
     return false;
@@ -724,7 +720,7 @@ bool AccessibilityRenderObject::computeAccessibilityIsIgnored() const
     if (node && node->hasTagName(spanTag))
         return true;
 
-    if (m_renderer->isBlockFlow() && m_renderer->childrenInline() && !canSetFocusAttribute())
+    if (m_renderer->isRenderBlockFlow() && m_renderer->childrenInline() && !canSetFocusAttribute())
         return !toRenderBlock(m_renderer)->firstLineBox() && !mouseButtonListener();
 
     // ignore images seemingly used as spacers
@@ -847,7 +843,7 @@ KURL AccessibilityRenderObject::url() const
     }
 
     if (isWebArea())
-        return m_renderer->document()->url();
+        return m_renderer->document().url();
 
     if (isImage() && m_renderer->node() && m_renderer->node()->hasTagName(imgTag))
         return toHTMLImageElement(m_renderer->node())->src();
@@ -969,7 +965,7 @@ AccessibilityObject* AccessibilityRenderObject::activeDescendant() const
     if (activeDescendantAttrStr.isNull() || activeDescendantAttrStr.isEmpty())
         return 0;
 
-    Element* target = element->treeScope()->getElementById(activeDescendantAttrStr);
+    Element* target = element->treeScope().getElementById(activeDescendantAttrStr);
     if (!target)
         return 0;
 
@@ -1148,9 +1144,9 @@ String AccessibilityRenderObject::textUnderElement() const
         // If possible, use a text iterator to get the text, so that whitespace
         // is handled consistently.
         if (Node* node = this->node()) {
-            if (Frame* frame = node->document()->frame()) {
+            if (Frame* frame = node->document().frame()) {
                 // catch stale WebCoreAXObject (see <rdar://problem/3960196>)
-                if (frame->document() != node->document())
+                if (frame->document() != &node->document())
                     return String();
 
                 return plainText(rangeOfContents(node).get(), textIteratorBehaviorForTextRange());
@@ -1319,7 +1315,7 @@ AccessibilityObject* AccessibilityRenderObject::accessibilityHitTest(const IntPo
     if (!obj)
         return 0;
 
-    AccessibilityObject* result = obj->document()->axObjectCache()->getOrCreate(obj);
+    AccessibilityObject* result = obj->document().axObjectCache()->getOrCreate(obj);
     result->updateChildrenIfNecessary();
 
     // Allow the element to perform any hit-testing it might need to do to reach non-render children.
@@ -1519,7 +1515,7 @@ double AccessibilityRenderObject::estimatedLoadingProgress() const
     if (isLoaded())
         return 1.0;
 
-    if (Page* page = m_renderer->document()->page())
+    if (Page* page = m_renderer->document().page())
         return page->progress().estimatedProgress();
     return 0;
 }
@@ -1537,16 +1533,16 @@ Document* AccessibilityRenderObject::document() const
 {
     if (!m_renderer)
         return 0;
-    return m_renderer->document();
+    return &m_renderer->document();
 }
 
 FrameView* AccessibilityRenderObject::documentFrameView() const
 {
-    if (!m_renderer || !m_renderer->document())
+    if (!m_renderer)
         return 0;
 
     // this is the RenderObject's Document's Frame's FrameView
-    return m_renderer->document()->view();
+    return m_renderer->document().view();
 }
 
 Element* AccessibilityRenderObject::anchorElement() const
@@ -1613,7 +1609,7 @@ PlainTextRange AccessibilityRenderObject::selectedTextRange() const
 
 VisibleSelection AccessibilityRenderObject::selection() const
 {
-    return m_renderer->frame()->selection()->selection();
+    return m_renderer->frame()->selection().selection();
 }
 
 String AccessibilityRenderObject::selectedText() const
@@ -1646,14 +1642,12 @@ void AccessibilityRenderObject::setSelectedTextRange(const PlainTextRange& range
         return;
     }
 
-    Document* document = m_renderer->document();
-    if (!document)
-        return;
-    Frame* frame = document->frame();
+    Document& document = m_renderer->document();
+    Frame* frame = document.frame();
     if (!frame)
         return;
     Node* node = m_renderer->node();
-    frame->selection()->setSelection(VisibleSelection(Position(node, range.start, Position::PositionIsOffsetInAnchor),
+    frame->selection().setSelection(VisibleSelection(Position(node, range.start, Position::PositionIsOffsetInAnchor),
         Position(node, range.start + range.length, Position::PositionIsOffsetInAnchor), DOWNSTREAM));
 }
 
@@ -1685,7 +1679,7 @@ void AccessibilityRenderObject::scrollTo(const IntPoint& point) const
         return;
 
     RenderLayer* layer = box->layer();
-    layer->scrollToOffset(toIntSize(point), RenderLayer::ScrollOffsetClamped);
+    layer->scrollToOffset(toIntSize(point), ScrollOffsetClamped);
 }
 
 //
@@ -1697,13 +1691,13 @@ void AccessibilityRenderObject::handleActiveDescendantChanged()
     Element* element = toElement(renderer()->node());
     if (!element)
         return;
-    Document* doc = renderer()->document();
-    if (!doc->frame()->selection()->isFocusedAndActive() || doc->focusedElement() != element)
+    Document& doc = renderer()->document();
+    if (!doc.frame()->selection().isFocusedAndActive() || doc.focusedElement() != element)
         return;
     AccessibilityRenderObject* activedescendant = static_cast<AccessibilityRenderObject*>(activeDescendant());
 
     if (activedescendant && shouldNotifyActiveDescendant())
-        doc->axObjectCache()->postNotification(m_renderer, AXObjectCache::AXActiveDescendantChanged, true);
+        doc.axObjectCache()->postNotification(m_renderer, AXObjectCache::AXActiveDescendantChanged, true);
 }
 
 void AccessibilityRenderObject::handleAriaExpandedChanged()
@@ -1968,11 +1962,11 @@ AccessibilityObject* AccessibilityRenderObject::internalLinkElement() const
         return 0;
 
     // check if URL is the same as current URL
-    KURL documentURL = m_renderer->document()->url();
+    KURL documentURL = m_renderer->document().url();
     if (!equalIgnoringFragmentIdentifier(documentURL, linkURL))
         return 0;
 
-    Node* linkedNode = m_renderer->document()->findAnchor(fragmentIdentifier);
+    Node* linkedNode = m_renderer->document().findAnchor(fragmentIdentifier);
     if (!linkedNode)
         return 0;
 
@@ -2092,15 +2086,10 @@ AccessibilitySVGRoot* AccessibilityRenderObject::remoteSVGRootElement() const
     if (!image || !image->isSVGImage())
         return 0;
 
-    SVGImage* svgImage = static_cast<SVGImage*>(image);
-    FrameView* frameView = svgImage->frameView();
+    FrameView* frameView = toSVGImage(image)->frameView();
     if (!frameView)
         return 0;
-    Frame* frame = frameView->frame();
-    if (!frame)
-        return 0;
-
-    Document* doc = frame->document();
+    Document* doc = frameView->frame().document();
     if (!doc || !doc->isSVGDocument())
         return 0;
 
@@ -2111,7 +2100,7 @@ AccessibilitySVGRoot* AccessibilityRenderObject::remoteSVGRootElement() const
     if (!rendererRoot)
         return 0;
 
-    AccessibilityObject* rootSVGObject = frame->document()->axObjectCache()->getOrCreate(rendererRoot);
+    AccessibilityObject* rootSVGObject = doc->axObjectCache()->getOrCreate(rendererRoot);
 
     // In order to connect the AX hierarchy from the SVG root element from the loaded resource
     // the parent must be set, because there's no other way to get back to who created the image.

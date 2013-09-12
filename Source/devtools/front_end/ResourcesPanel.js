@@ -135,15 +135,6 @@ WebInspector.ResourcesPanel.prototype = {
         this._initialize();
     },
 
-    /**
-     * @param {KeyboardEvent} event
-     */
-    handleShortcut: function(event)
-    {
-        if (this.visibleView && typeof this.visibleView.handleShortcut === "function")
-            return this.visibleView.handleShortcut(event);
-    },
-
     _initialize: function()
     {
         if (!this._initialized && this.isShowing() && this._cachedResourcesWereLoaded) {
@@ -1310,8 +1301,6 @@ WebInspector.FrameResourceTreeElement.prototype = {
     {
         var contextMenu = new WebInspector.ContextMenu(event);
         contextMenu.appendApplicableItems(this._resource);
-        if (this._resource.request)
-            contextMenu.appendApplicableItems(this._resource.request);
         contextMenu.show();
     },
 

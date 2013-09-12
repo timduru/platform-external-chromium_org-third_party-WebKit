@@ -33,7 +33,6 @@
 #include "bindings/v8/custom/V8ArrayBufferViewCustom.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/page/Frame.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "wtf/UnusedParam.h"
 
@@ -127,7 +126,7 @@ static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
         TestOverloadedConstructorsV8Internal::constructor4(args);
         return;
     }
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }

@@ -139,23 +139,24 @@ v8::Handle<v8::Object> wrap(Node* impl, v8::Handle<v8::Object> creationContext, 
     case Node::TEXT_NODE:
         return wrap(toText(impl), creationContext, isolate);
     case Node::CDATA_SECTION_NODE:
-        return wrap(static_cast<CDATASection*>(impl), creationContext, isolate);
-    case Node::ENTITY_NODE:
-        return wrap(static_cast<Entity*>(impl), creationContext, isolate);
+        return wrap(toCDATASection(impl), creationContext, isolate);
     case Node::PROCESSING_INSTRUCTION_NODE:
-        return wrap(static_cast<ProcessingInstruction*>(impl), creationContext, isolate);
+        return wrap(toProcessingInstruction(impl), creationContext, isolate);
     case Node::COMMENT_NODE:
-        return wrap(static_cast<Comment*>(impl), creationContext, isolate);
+        return wrap(toComment(impl), creationContext, isolate);
     case Node::DOCUMENT_NODE:
         return wrap(toDocument(impl), creationContext, isolate);
     case Node::DOCUMENT_TYPE_NODE:
-        return wrap(static_cast<DocumentType*>(impl), creationContext, isolate);
+        return wrap(toDocumentType(impl), creationContext, isolate);
     case Node::DOCUMENT_FRAGMENT_NODE:
         if (impl->isShadowRoot())
             return wrap(toShadowRoot(impl), creationContext, isolate);
-        return wrap(static_cast<DocumentFragment*>(impl), creationContext, isolate);
+        return wrap(toDocumentFragment(impl), creationContext, isolate);
+    case Node::ENTITY_NODE:
     case Node::NOTATION_NODE:
-        return wrap(static_cast<Notation*>(impl), creationContext, isolate);
+        // We never create objects of Entity and Notation.
+        ASSERT_NOT_REACHED();
+        break;
     default:
         break; // ENTITY_REFERENCE_NODE or XPATH_NAMESPACE_NODE
     }

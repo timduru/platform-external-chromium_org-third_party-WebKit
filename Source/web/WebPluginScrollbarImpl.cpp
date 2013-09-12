@@ -50,7 +50,7 @@ WebPluginScrollbar* WebPluginScrollbar::createForPlugin(Orientation orientation,
                                                         WebPluginContainer* pluginContainer,
                                                         WebPluginScrollbarClient* client)
 {
-    WebPluginContainerImpl* plugin = static_cast<WebPluginContainerImpl*>(pluginContainer);
+    WebPluginContainerImpl* plugin = toPluginContainerImpl(pluginContainer);
     return new WebPluginScrollbarImpl(orientation, plugin->scrollbarGroup(), client);
 }
 
@@ -66,7 +66,7 @@ WebPluginScrollbarImpl::WebPluginScrollbarImpl(Orientation orientation,
     , m_client(client)
     , m_scrollOffset(0)
 {
-    m_scrollbar = Scrollbar::createNativeScrollbar(
+    m_scrollbar = Scrollbar::create(
         static_cast<ScrollableArea*>(m_group),
         static_cast<WebCore::ScrollbarOrientation>(orientation),
         WebCore::RegularScrollbar);
@@ -189,7 +189,7 @@ WebScrollbar::Orientation WebPluginScrollbarImpl::orientation() const
     return WebScrollbar::Vertical;
 }
 
-bool WebPluginScrollbarImpl::isRightToLeft() const
+bool WebPluginScrollbarImpl::isLeftSideVerticalScrollbar() const
 {
     return false;
 }

@@ -33,7 +33,7 @@ class CSSStyleSheet;
 
 class ProcessingInstruction FINAL : public CharacterData, private StyleSheetResourceClient {
 public:
-    static PassRefPtr<ProcessingInstruction> create(Document*, const String& target, const String& data);
+    static PassRefPtr<ProcessingInstruction> create(Document&, const String& target, const String& data);
     virtual ~ProcessingInstruction();
 
     const String& target() const { return m_target; }
@@ -53,7 +53,7 @@ public:
 
 private:
     friend class CharacterData;
-    ProcessingInstruction(Document*, const String& target, const String& data);
+    ProcessingInstruction(Document&, const String& target, const String& data);
 
     virtual String nodeName() const;
     virtual NodeType nodeType() const;
@@ -91,6 +91,12 @@ inline ProcessingInstruction* toProcessingInstruction(Node* node)
     return static_cast<ProcessingInstruction*>(node);
 }
 
-} //namespace
+inline const ProcessingInstruction* toProcessingInstruction(const Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->nodeType() == Node::PROCESSING_INSTRUCTION_NODE);
+    return static_cast<const ProcessingInstruction*>(node);
+}
+
+} // namespace WebCore
 
 #endif

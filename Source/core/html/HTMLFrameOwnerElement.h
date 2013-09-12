@@ -59,8 +59,12 @@ public:
     virtual bool loadedNonEmptyDocument() const { return false; }
     virtual void didLoadNonEmptyDocument() { }
 
+    virtual void renderFallbackContent() { }
+
+    virtual bool isObjectElement() const { return false; }
+
 protected:
-    HTMLFrameOwnerElement(const QualifiedName& tagName, Document*);
+    HTMLFrameOwnerElement(const QualifiedName& tagName, Document&);
     void setSandboxFlags(SandboxFlags);
 
     bool loadOrRedirectSubframe(const KURL&, const AtomicString& frameName, bool lockBackForwardList);
@@ -77,6 +81,12 @@ inline HTMLFrameOwnerElement* toHTMLFrameOwnerElement(Node* node)
 {
     ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isFrameOwnerElement());
     return static_cast<HTMLFrameOwnerElement*>(node);
+}
+
+inline const HTMLFrameOwnerElement* toHTMLFrameOwnerElement(const Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isFrameOwnerElement());
+    return static_cast<const HTMLFrameOwnerElement*>(node);
 }
 
 class SubframeLoadingDisabler {

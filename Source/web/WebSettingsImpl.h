@@ -115,6 +115,7 @@ public:
     virtual void setLoadWithOverviewMode(bool);
     virtual void setLocalStorageEnabled(bool);
     virtual void setMediaPlaybackRequiresUserGesture(bool);
+    virtual void setMediaFullscreenRequiresUserGesture(bool);
     virtual void setMemoryInfoEnabled(bool);
     virtual void setMinimumAccelerated2dCanvasSize(int);
     virtual void setMinimumFontSize(int);
@@ -165,10 +166,13 @@ public:
     virtual void setUseWideViewport(bool);
     virtual void setValidationMessageTimerMagnification(int);
     virtual void setViewportEnabled(bool);
+    virtual void setViewportMetaLayoutSizeQuirk(bool);
+    virtual void setViewportMetaZeroValuesQuirk(bool);
     virtual void setVisualWordMovementEnabled(bool);
     virtual void setWebAudioEnabled(bool);
     virtual void setWebGLErrorsToConsoleEnabled(bool);
     virtual void setWebSecurityEnabled(bool);
+    virtual void setWideViewportQuirkEnabled(bool);
     virtual void setXSSAuditorEnabled(bool);
 
     bool showFPSCounter() const { return m_showFPSCounter; }
@@ -179,6 +183,7 @@ public:
     bool doubleTapToZoomEnabled() const { return m_doubleTapToZoomEnabled; }
     bool perTilePaintingEnabled() const { return m_perTilePaintingEnabled; }
     bool supportDeprecatedTargetDensityDPI() const { return m_supportDeprecatedTargetDensityDPI; }
+    bool viewportMetaLayoutSizeQuirk() const { return m_viewportMetaLayoutSizeQuirk; }
     int pinchOverlayScrollbarThickness() const { return m_pinchOverlayScrollbarThickness; }
 
 private:
@@ -192,6 +197,10 @@ private:
     bool m_doubleTapToZoomEnabled;
     bool m_perTilePaintingEnabled;
     bool m_supportDeprecatedTargetDensityDPI;
+    // This quirk is to maintain compatibility with Android apps built on
+    // the Android SDK prior to and including version 18. Presumably, this
+    // can be removed any time after 2015. See http://crbug.com/277369.
+    bool m_viewportMetaLayoutSizeQuirk;
     int m_pinchOverlayScrollbarThickness;
 };
 

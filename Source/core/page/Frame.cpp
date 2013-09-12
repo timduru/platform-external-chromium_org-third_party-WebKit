@@ -34,6 +34,7 @@
 #include "bindings/v8/ScriptController.h"
 #include "core/dom/DocumentType.h"
 #include "core/dom/Event.h"
+#include "core/dom/WheelController.h"
 #include "core/editing/Editor.h"
 #include "core/editing/FrameSelection.h"
 #include "core/editing/InputMethodController.h"
@@ -41,6 +42,7 @@
 #include "core/editing/markup.h"
 #include "core/fetch/ResourceFetcher.h"
 #include "core/html/HTMLFrameElementBase.h"
+#include "core/inspector/InspectorInstrumentation.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/FrameLoaderClient.h"
 #include "core/page/Chrome.h"
@@ -78,7 +80,7 @@ static inline Frame* parentFromOwnerElement(HTMLFrameOwnerElement* ownerElement)
 {
     if (!ownerElement)
         return 0;
-    return ownerElement->document()->frame();
+    return ownerElement->document().frame();
 }
 
 static inline float parentPageZoomFactor(Frame* frame)
@@ -133,6 +135,7 @@ PassRefPtr<Frame> Frame::create(Page* page, HTMLFrameOwnerElement* ownerElement,
     RefPtr<Frame> frame = adoptRef(new Frame(page, ownerElement, client));
     if (!ownerElement)
         page->setMainFrame(frame);
+    InspectorInstrumentation::frameAttachedToParent(frame.get());
     return frame.release();
 }
 
@@ -163,7 +166,7 @@ bool Frame::inScope(TreeScope* scope) const
     HTMLFrameOwnerElement* owner = doc->ownerElement();
     if (!owner)
         return false;
-    return owner->treeScope() == scope;
+    return &owner->treeScope() == scope;
 }
 
 void Frame::addDestructionObserver(FrameDestructionObserver* observer)
@@ -208,7 +211,7 @@ void Frame::sendOrientationChangeEvent(int orientation)
 {
     m_orientation = orientation;
     if (Document* doc = document())
-        doc->dispatchWindowEvent(Event::create(eventNames().orientationchangeEvent, false, false));
+        doc->dispatchWindowEvent(Event::create(eventNames().orientationchangeEvent));
 }
 #endif // ENABLE(ORIENTATION_EVENTS)
 
@@ -303,25 +306,24 @@ Frame* Frame::frameForWidget(const Widget* widget)
 {
     ASSERT_ARG(widget, widget);
 
-    if (RenderWidget* renderer = RenderWidget::find(widget))
+    if (RenderWidget* renderer = RenderWidget::find(widget)) {
         if (Node* node = renderer->node())
-            return node->document()->frame();
+            return node->document().frame();
+    }
 
     // Assume all widgets are either a FrameView or owned by a RenderWidget.
     // FIXME: That assumption is not right for scroll bars!
     ASSERT_WITH_SECURITY_IMPLICATION(widget->isFrameView());
-    return toFrameView(widget)->frame();
+    return &toFrameView(widget)->frame();
 }
 
 void Frame::clearTimers(FrameView *view, Document *document)
 {
     if (view) {
         view->unscheduleRelayout();
-        if (view->frame()) {
-            if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
-                view->frame()->animation()->suspendAnimationsForDocument(document);
-            view->frame()->eventHandler()->stopAutoscrollTimer();
-        }
+        if (!RuntimeEnabledFeatures::webAnimationsCSSEnabled())
+            view->frame().animation()->suspendAnimationsForDocument(document);
+        view->frame().eventHandler()->stopAutoscrollTimer();
     }
 }
 
@@ -400,12 +402,12 @@ String Frame::displayStringModifiedByEncoding(const String& str) const
 
 String Frame::selectedText() const
 {
-    return selection()->selectedText();
+    return selection().selectedText();
 }
 
 String Frame::selectedTextForClipboard() const
 {
-    return selection()->selectedTextForClipboard();
+    return selection().selectedTextForClipboard();
 }
 
 VisiblePosition Frame::visiblePositionForPoint(const IntPoint& framePoint)
@@ -433,7 +435,7 @@ Document* Frame::documentAtPoint(const IntPoint& point)
 
     if (contentRenderer())
         result = eventHandler()->hitTestResultAtPoint(pt, HitTestRequest::ReadOnly | HitTestRequest::Active | HitTestRequest::DisallowShadowContent);
-    return result.innerNode() ? result.innerNode()->document() : 0;
+    return result.innerNode() ? &result.innerNode()->document() : 0;
 }
 
 PassRefPtr<Range> Frame::rangeForPoint(const IntPoint& framePoint)
@@ -460,7 +462,7 @@ PassRefPtr<Range> Frame::rangeForPoint(const IntPoint& framePoint)
     return 0;
 }
 
-void Frame::createView(const IntSize& viewportSize, const StyleColor& backgroundColor, bool transparent,
+void Frame::createView(const IntSize& viewportSize, const Color& backgroundColor, bool transparent,
     const IntSize& fixedLayoutSize, bool useFixedLayout, ScrollbarMode horizontalScrollbarMode, bool horizontalLock,
     ScrollbarMode verticalScrollbarMode, bool verticalLock)
 {
@@ -487,7 +489,7 @@ void Frame::createView(const IntSize& viewportSize, const StyleColor& background
     setView(frameView);
 
     if (backgroundColor.isValid())
-        frameView->updateBackgroundRecursively(backgroundColor.color(), transparent);
+        frameView->updateBackgroundRecursively(backgroundColor, transparent);
 
     if (isMainFrame)
         frameView->setParentVisible(true);
@@ -558,7 +560,7 @@ void Frame::setPageAndTextZoomFactors(float pageZoomFactor, float textZoomFactor
     m_pageZoomFactor = pageZoomFactor;
     m_textZoomFactor = textZoomFactor;
 
-    document->recalcStyle(Node::Force);
+    document->recalcStyle(Force);
 
     for (RefPtr<Frame> child = tree()->firstChild(); child; child = child->tree()->nextSibling())
         child->setPageAndTextZoomFactors(m_pageZoomFactor, m_textZoomFactor);
@@ -585,7 +587,7 @@ void Frame::notifyChromeClientWheelEventHandlerCountChanged() const
     unsigned count = 0;
     for (const Frame* frame = this; frame; frame = frame->tree()->traverseNext()) {
         if (frame->document())
-            count += frame->document()->wheelEventHandlerCount();
+            count += WheelController::from(frame->document())->wheelEventHandlerCount();
     }
 
     m_page->chrome().client().numWheelEventHandlersChanged(count);
@@ -677,14 +679,14 @@ PassOwnPtr<DragImage> Frame::nodeImage(Node* node)
 
 PassOwnPtr<DragImage> Frame::dragImageForSelection()
 {
-    if (!selection()->isRange())
+    if (!selection().isRange())
         return nullptr;
 
     const ScopedFramePaintingState state(this, 0);
     m_view->setPaintBehavior(PaintBehaviorSelectionOnly | PaintBehaviorFlattenCompositingLayers);
     document()->updateLayout();
 
-    IntRect paintingRect = enclosingIntRect(selection()->bounds());
+    IntRect paintingRect = enclosingIntRect(selection().bounds());
 
     float deviceScaleFactor = 1;
     if (m_page)

@@ -32,16 +32,18 @@
 
 #include "bindings/v8/ScriptFunctionCall.h"
 #include "core/dom/UserGestureIndicator.h"
+#include "core/fetch/ResourceFetcher.h"
+#include "core/fetch/TextResourceDecoder.h"
 #include "core/inspector/InspectorController.h"
 #include "core/inspector/InspectorFrontendClient.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/TextResourceDecoder.h"
 #include "core/page/ContextMenuController.h"
 #include "core/page/ContextMenuProvider.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/ContextMenu.h"
 #include "core/platform/ContextMenuItem.h"
+#include "core/platform/JSONValues.h"
 #include "core/platform/Pasteboard.h"
 #include "core/platform/network/ResourceError.h"
 #include "core/platform/network/ResourceRequest.h"
@@ -136,30 +138,14 @@ void InspectorFrontendHost::loaded()
 {
 }
 
-void InspectorFrontendHost::requestSetDockSide(const String& side)
-{
-    if (!m_client)
-        return;
-    if (side == "undocked")
-        m_client->requestSetDockSide(InspectorFrontendClient::Undocked);
-    else if (side == "right")
-        m_client->requestSetDockSide(InspectorFrontendClient::DockedToRight);
-    else if (side == "bottom")
-        m_client->requestSetDockSide(InspectorFrontendClient::DockedToBottom);
-}
-
 void InspectorFrontendHost::closeWindow()
 {
     if (m_client) {
-        m_client->closeWindow();
+        RefPtr<JSONObject> message = JSONObject::create();
+        message->setString("method", "closeWindow");
+        sendMessageToEmbedder(message->toJSONString());
         disconnectClient(); // Disconnect from client.
     }
-}
-
-void InspectorFrontendHost::bringToFront()
-{
-    if (m_client)
-        m_client->bringToFront();
 }
 
 void InspectorFrontendHost::setZoomFactor(float zoom)
@@ -175,14 +161,6 @@ void InspectorFrontendHost::inspectedURLChanged(const String& newURL)
 
 void InspectorFrontendHost::setAttachedWindowHeight(unsigned height)
 {
-    if (m_client)
-        m_client->changeAttachedWindowHeight(height);
-}
-
-void InspectorFrontendHost::moveWindowBy(float x, float y) const
-{
-    if (m_client)
-        m_client->moveWindowBy(x, y);
 }
 
 void InspectorFrontendHost::setInjectedScriptForOrigin(const String& origin, const String& script)
@@ -200,27 +178,9 @@ void InspectorFrontendHost::copyText(const String& text)
     Pasteboard::generalPasteboard()->writePlainText(text, Pasteboard::CannotSmartReplace);
 }
 
-void InspectorFrontendHost::openInNewTab(const String& url)
-{
-    if (m_client)
-        m_client->openInNewTab(url);
-}
-
 bool InspectorFrontendHost::canSave()
 {
     return true;
-}
-
-void InspectorFrontendHost::save(const String& url, const String& content, bool forceSaveAs)
-{
-    if (m_client)
-        m_client->save(url, content, forceSaveAs);
-}
-
-void InspectorFrontendHost::append(const String& url, const String& content)
-{
-    if (m_client)
-        m_client->append(url, content);
 }
 
 void InspectorFrontendHost::close(const String&)
@@ -231,6 +191,12 @@ void InspectorFrontendHost::sendMessageToBackend(const String& message)
 {
     if (m_client)
         m_client->sendMessageToBackend(message);
+}
+
+void InspectorFrontendHost::sendMessageToEmbedder(const String& message)
+{
+    if (m_client)
+        m_client->sendMessageToEmbedder(message);
 }
 
 void InspectorFrontendHost::showContextMenu(Event* event, const Vector<ContextMenuItem>& items)
@@ -258,7 +224,7 @@ String InspectorFrontendHost::loadResourceSynchronously(const String& url)
     Vector<char> data;
     ResourceError error;
     ResourceResponse response;
-    m_frontendPage->mainFrame()->loader()->loadResourceSynchronously(request, DoNotAllowStoredCredentials, error, response, data);
+    m_frontendPage->mainFrame()->document()->fetcher()->fetchSynchronously(request, DoNotAllowStoredCredentials, error, response, data);
     WTF::TextEncoding textEncoding(response.textEncodingName());
     bool useDetector = false;
     if (!textEncoding.isValid()) {
@@ -272,13 +238,13 @@ String InspectorFrontendHost::loadResourceSynchronously(const String& url)
 String InspectorFrontendHost::getSelectionBackgroundColor()
 {
     Color color = RenderTheme::theme().activeSelectionBackgroundColor();
-    return color != Color::transparent ? color.serialized() : "";
+    return color.isValid() ? color.serialized() : "";
 }
 
 String InspectorFrontendHost::getSelectionForegroundColor()
 {
     Color color = RenderTheme::theme().activeSelectionForegroundColor();
-    return color != Color::transparent ? color.serialized() : "";
+    return color.isValid() ? color.serialized() : "";
 }
 
 bool InspectorFrontendHost::supportsFileSystems()
@@ -286,46 +252,10 @@ bool InspectorFrontendHost::supportsFileSystems()
     return true;
 }
 
-void InspectorFrontendHost::requestFileSystems()
-{
-    if (m_client)
-        m_client->requestFileSystems();
-}
-
-void InspectorFrontendHost::addFileSystem()
-{
-    if (m_client)
-        m_client->addFileSystem();
-}
-
-void InspectorFrontendHost::removeFileSystem(const String& fileSystemPath)
-{
-    if (m_client)
-        m_client->removeFileSystem(fileSystemPath);
-}
-
 PassRefPtr<DOMFileSystem> InspectorFrontendHost::isolatedFileSystem(const String& fileSystemName, const String& rootURL)
 {
     ScriptExecutionContext* context = m_frontendPage->mainFrame()->document();
-    return DOMFileSystem::create(context, fileSystemName, FileSystemTypeIsolated, KURL(ParsedURLString, rootURL), AsyncFileSystem::create());
-}
-
-void InspectorFrontendHost::indexPath(int requestId, const String& fileSystemPath)
-{
-    if (m_client)
-        m_client->indexPath(requestId, fileSystemPath);
-}
-
-void InspectorFrontendHost::stopIndexing(int requestId)
-{
-    if (m_client)
-        m_client->stopIndexing(requestId);
-}
-
-void InspectorFrontendHost::searchInPath(int requestId, const String& fileSystemPath, const String& query)
-{
-    if (m_client)
-        m_client->searchInPath(requestId, fileSystemPath, query);
+    return DOMFileSystem::create(context, fileSystemName, FileSystemTypeIsolated, KURL(ParsedURLString, rootURL));
 }
 
 bool InspectorFrontendHost::isUnderTest()

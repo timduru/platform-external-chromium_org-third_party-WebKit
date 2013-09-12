@@ -24,11 +24,11 @@
 #ifndef RenderFieldset_h
 #define RenderFieldset_h
 
-#include "core/rendering/RenderBlock.h"
+#include "core/rendering/RenderBlockFlow.h"
 
 namespace WebCore {
 
-class RenderFieldset FINAL : public RenderBlock {
+class RenderFieldset FINAL : public RenderBlockFlow {
 public:
     explicit RenderFieldset(Element*);
 
@@ -43,6 +43,8 @@ private:
 
     virtual void computePreferredLogicalWidths();
     virtual bool avoidsFloats() const { return true; }
+
+    virtual bool supportsPartialLayout() const OVERRIDE { return false; }
 
     virtual void paintBoxDecorations(PaintInfo&, const LayoutPoint&);
     virtual void paintMask(PaintInfo&, const LayoutPoint&);

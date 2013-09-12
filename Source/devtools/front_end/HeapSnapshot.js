@@ -476,10 +476,57 @@ WebInspector.HeapSnapshotNodeIterator.prototype = {
     }
 }
 
+
 /**
+ * @param{WebInspector.HeapSnapshotWorkerDispatcher=} dispatcher
  * @constructor
  */
-WebInspector.HeapSnapshot = function(profile)
+WebInspector.HeapSnapshotProgress = function(dispatcher)
+{
+    this._dispatcher = dispatcher;
+}
+
+WebInspector.HeapSnapshotProgress.Event = {
+    Update: "ProgressUpdate"
+};
+
+WebInspector.HeapSnapshotProgress.prototype = {
+    /**
+     * @param{string} status
+     */
+    updateStatus: function(status)
+    {
+        this._sendUpdateEvent(WebInspector.UIString(status));
+    },
+
+    /**
+     * @param{string} title
+     * @param{number} value
+     * @param{number} total
+     */
+    updateProgress: function(title, value, total)
+    {
+        var percentValue = ((total ? (value / total) : 0) * 100).toFixed(0);
+        this._sendUpdateEvent(WebInspector.UIString(title, percentValue));
+    },
+
+    /**
+     * @param{string} text
+     */
+    _sendUpdateEvent: function(text)
+    {
+        // May be undefined in tests.
+        if (this._dispatcher)
+            this._dispatcher.sendEvent(WebInspector.HeapSnapshotProgress.Event.Update, text);
+    }
+}
+
+
+/**
+ * @param{WebInspector.HeapSnapshotProgress} progress
+ * @constructor
+ */
+WebInspector.HeapSnapshot = function(profile, progress)
 {
     this.uid = profile.snapshot.uid;
     this._nodes = profile.nodes;
@@ -487,6 +534,7 @@ WebInspector.HeapSnapshot = function(profile)
     /** @type{HeapSnapshotMetainfo} */
     this._metaNode = profile.snapshot.meta;
     this._strings = profile.strings;
+    this._progress = progress;
 
     this._noDistance = -5;
     this._rootNodeIndex = 0;
@@ -565,16 +613,26 @@ WebInspector.HeapSnapshot.prototype = {
         this.nodeCount = this._nodes.length / this._nodeFieldCount;
         this._edgeCount = this._containmentEdges.length / this._edgeFieldsCount;
 
+        this._progress.updateStatus("Building edge indexes\u2026");
         this._buildEdgeIndexes();
+        this._progress.updateStatus("Marking invisible edges\u2026");
         this._markInvisibleEdges();
+        this._progress.updateStatus("Building retainers\u2026");
         this._buildRetainers();
+        this._progress.updateStatus("Calculating node flags\u2026");
         this._calculateFlags();
+        this._progress.updateStatus("Calculating distances\u2026");
         this._calculateDistances();
+        this._progress.updateStatus("Building postorder index\u2026");
         var result = this._buildPostOrderIndex();
         // Actually it is array that maps node ordinal number to dominator node ordinal number.
+        this._progress.updateStatus("Building dominator tree\u2026");
         this._dominatorsTree = this._buildDominatorTree(result.postOrderIndex2NodeOrdinal, result.nodeOrdinal2PostOrderIndex);
+        this._progress.updateStatus("Calculating retained sizes\u2026");
         this._calculateRetainedSizes(result.postOrderIndex2NodeOrdinal);
+        this._progress.updateStatus("Buiding dominated nodes\u2026");
         this._buildDominatedNodes();
+        this._progress.updateStatus("Finished processing.");
     },
 
     _buildEdgeIndexes: function()
@@ -1479,6 +1537,7 @@ WebInspector.HeapSnapshotFilteredOrderedIterator = function(iterator, filter, un
     this._position = 0;
     this._currentComparator = null;
     this._sortedPrefixLength = 0;
+    this._sortedSuffixLength = 0;
 }
 
 WebInspector.HeapSnapshotFilteredOrderedIterator.prototype = {
@@ -1575,11 +1634,14 @@ WebInspector.HeapSnapshotFilteredOrderedIterator.prototype = {
         this._createIterationOrder();
         if (begin > end)
             throw new Error("Start position > end position: " + begin + " > " + end);
-        if (end >= this._iterationOrder.length)
+        if (end > this._iterationOrder.length)
             end = this._iterationOrder.length;
-        if (this._sortedPrefixLength < end) {
-            this.sort(this._currentComparator, this._sortedPrefixLength, this._iterationOrder.length - 1, end - this._sortedPrefixLength);
-            this._sortedPrefixLength = end;
+        if (this._sortedPrefixLength < end && begin < this._iterationOrder.length - this._sortedSuffixLength) {
+            this.sort(this._currentComparator, this._sortedPrefixLength, this._iterationOrder.length - 1 - this._sortedSuffixLength, begin, end - 1);
+            if (begin <= this._sortedPrefixLength)
+                this._sortedPrefixLength = end;
+            if (end >= this._iterationOrder.length - this._sortedSuffixLength)
+                this._sortedSuffixLength = this._iterationOrder.length - begin;
         }
 
         this._position = begin;
@@ -1599,16 +1661,19 @@ WebInspector.HeapSnapshotFilteredOrderedIterator.prototype = {
     sortAll: function()
     {
         this._createIterationOrder();
-        if (this._sortedPrefixLength === this._iterationOrder.length)
+        if (this._sortedPrefixLength + this._sortedSuffixLength >= this._iterationOrder.length)
             return;
-        this.sort(this._currentComparator, this._sortedPrefixLength, this._iterationOrder.length - 1, this._iterationOrder.length);
+        this.sort(this._currentComparator, this._sortedPrefixLength, this._iterationOrder.length - 1 - this._sortedSuffixLength,
+                  this._sortedPrefixLength, this._iterationOrder.length - 1 - this._sortedSuffixLength);
         this._sortedPrefixLength = this._iterationOrder.length;
+        this._sortedSuffixLength = 0;
     },
 
     sortAndRewind: function(comparator)
     {
         this._currentComparator = comparator;
         this._sortedPrefixLength = 0;
+        this._sortedSuffixLength = 0;
         this.rewind();
     }
 }
@@ -1629,7 +1694,7 @@ WebInspector.HeapSnapshotEdgesProvider = function(snapshot, filter, edgesIter)
 }
 
 WebInspector.HeapSnapshotEdgesProvider.prototype = {
-    sort: function(comparator, leftBound, rightBound, count)
+    sort: function(comparator, leftBound, rightBound, windowLeft, windowRight)
     {
         var fieldName1 = comparator.fieldName1;
         var fieldName2 = comparator.fieldName2;
@@ -1690,11 +1755,11 @@ WebInspector.HeapSnapshotEdgesProvider.prototype = {
         }
 
         if (fieldName1 === "!edgeName")
-            this._iterationOrder.sortRange(compareEdgeAndNode, leftBound, rightBound, count);
+            this._iterationOrder.sortRange(compareEdgeAndNode, leftBound, rightBound, windowLeft, windowRight);
         else if (fieldName2 === "!edgeName")
-            this._iterationOrder.sortRange(compareNodeAndEdge, leftBound, rightBound, count);
+            this._iterationOrder.sortRange(compareNodeAndEdge, leftBound, rightBound, windowLeft, windowRight);
         else
-            this._iterationOrder.sortRange(compareNodeAndNode, leftBound, rightBound, count);
+            this._iterationOrder.sortRange(compareNodeAndNode, leftBound, rightBound, windowLeft, windowRight);
     },
 
     __proto__: WebInspector.HeapSnapshotFilteredOrderedIterator.prototype
@@ -1729,7 +1794,7 @@ WebInspector.HeapSnapshotNodesProvider.prototype = {
         return -1;
     },
 
-    sort: function(comparator, leftBound, rightBound, count)
+    sort: function(comparator, leftBound, rightBound, windowLeft, windowRight)
     {
         var fieldName1 = comparator.fieldName1;
         var fieldName2 = comparator.fieldName2;
@@ -1758,7 +1823,7 @@ WebInspector.HeapSnapshotNodesProvider.prototype = {
             return result;
         }
 
-        this._iterationOrder.sortRange(sortByComparator, leftBound, rightBound, count);
+        this._iterationOrder.sortRange(sortByComparator, leftBound, rightBound, windowLeft, windowRight);
     },
 
     __proto__: WebInspector.HeapSnapshotFilteredOrderedIterator.prototype

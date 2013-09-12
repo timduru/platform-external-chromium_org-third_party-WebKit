@@ -393,7 +393,7 @@ void RuleSet::addChildRules(const Vector<RefPtr<StyleRuleBase> >& rules, const M
             resolver->setBuildScopedStyleTreeInDocumentOrder(false);
             resolver->ensureScopedStyleResolver(scope->shadowHost())->addHostRule(static_cast<StyleRuleHost*>(rule), hasDocumentSecurityOrigin, scope);
             resolver->setBuildScopedStyleTreeInDocumentOrder(enabled);
-        } else if (RuntimeEnabledFeatures::cssViewportEnabled() && rule->isViewportRule()) {
+        } else if (rule->isViewportRule()) {
             // @viewport should not be scoped.
             if (!isDocumentScope(scope))
                 continue;
@@ -415,7 +415,7 @@ void RuleSet::addRulesFromSheet(StyleSheetContents* sheet, const MediaQueryEvalu
             addRulesFromSheet(importRule->styleSheet(), medium, resolver, scope);
     }
 
-    bool hasDocumentSecurityOrigin = resolver && resolver->document()->securityOrigin()->canRequest(sheet->baseURL());
+    bool hasDocumentSecurityOrigin = resolver && resolver->document().securityOrigin()->canRequest(sheet->baseURL());
     AddRuleFlags addRuleFlags = static_cast<AddRuleFlags>((hasDocumentSecurityOrigin ? RuleHasDocumentSecurityOrigin : 0) | (!scope ? RuleCanUseFastCheckSelector : 0));
 
     addChildRules(sheet->childRules(), medium, resolver, scope, hasDocumentSecurityOrigin, addRuleFlags);

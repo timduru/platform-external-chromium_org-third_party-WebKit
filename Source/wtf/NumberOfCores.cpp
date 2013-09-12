@@ -26,7 +26,7 @@
 #include "config.h"
 #include "NumberOfCores.h"
 
-#if OS(DARWIN) || OS(OPENBSD) || OS(NETBSD) || OS(FREEBSD)
+#if OS(MACOSX) || OS(OPENBSD) || OS(FREEBSD)
 #include <sys/param.h>
 // sys/types.h must come before sys/sysctl.h because the latter uses
 // data types defined in the former. See sysctl(3) and style(9).
@@ -34,7 +34,7 @@
 #include <sys/sysctl.h>
 #elif OS(LINUX)
 #include <unistd.h>
-#elif OS(WINDOWS)
+#elif OS(WIN)
 #include "wtf/UnusedParam.h"
 #include <windows.h>
 #endif
@@ -49,7 +49,7 @@ int numberOfProcessorCores()
     if (s_numberOfCores > 0)
         return s_numberOfCores;
 
-#if OS(DARWIN) || OS(OPENBSD) || OS(NETBSD) || OS(FREEBSD)
+#if OS(MACOSX) || OS(OPENBSD) || OS(NETBSD) || OS(FREEBSD)
     unsigned result;
     size_t length = sizeof(result);
     int name[] = {
@@ -63,7 +63,7 @@ int numberOfProcessorCores()
     long sysconfResult = sysconf(_SC_NPROCESSORS_ONLN);
 
     s_numberOfCores = sysconfResult < 0 ? defaultIfUnavailable : static_cast<int>(sysconfResult);
-#elif OS(WINDOWS)
+#elif OS(WIN)
     UNUSED_PARAM(defaultIfUnavailable);
     SYSTEM_INFO sysInfo;
     GetSystemInfo(&sysInfo);

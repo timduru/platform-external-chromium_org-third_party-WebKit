@@ -32,7 +32,6 @@
 #include "core/dom/Document.h"
 #include "core/dom/Event.h"
 #include "core/dom/EventNames.h"
-#include "core/dom/NodeRenderingContext.h"
 #include "core/dom/NodeTraversal.h"
 #include "core/dom/Text.h"
 #include "core/editing/FrameSelection.h"
@@ -49,7 +48,7 @@ namespace WebCore {
 using namespace HTMLNames;
 using namespace std;
 
-HTMLTextFormControlElement::HTMLTextFormControlElement(const QualifiedName& tagName, Document* doc, HTMLFormElement* form)
+HTMLTextFormControlElement::HTMLTextFormControlElement(const QualifiedName& tagName, Document& doc, HTMLFormElement* form)
     : HTMLFormControlElementWithState(tagName, doc, form)
     , m_lastChangeWasUserEdit(false)
     , m_cachedSelectionStart(-1)
@@ -140,7 +139,7 @@ bool HTMLTextFormControlElement::placeholderShouldBeVisible() const
         && isEmptyValue()
         && isEmptySuggestedValue()
         && !isPlaceholderEmpty()
-        && (document()->focusedElement() != this || (RenderTheme::theme().shouldShowPlaceholderWhenFocused()))
+        && (document().focusedElement() != this || (RenderTheme::theme().shouldShowPlaceholderWhenFocused()))
         && (!renderer() || renderer()->style()->visibility() == VISIBLE);
 }
 
@@ -271,7 +270,7 @@ void HTMLTextFormControlElement::setSelectionRange(int start, int end, const Str
 
 void HTMLTextFormControlElement::setSelectionRange(int start, int end, TextFieldSelectionDirection direction)
 {
-    document()->updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIgnorePendingStylesheets();
 
     if (!renderer() || !renderer()->isTextControl())
         return;
@@ -303,8 +302,8 @@ void HTMLTextFormControlElement::setSelectionRange(int start, int end, TextField
         newSelection = VisibleSelection(startPosition, endPosition);
     newSelection.setIsDirectional(direction != SelectionHasNoDirection);
 
-    if (Frame* frame = document()->frame())
-        frame->selection()->setSelection(newSelection);
+    if (Frame* frame = document().frame())
+        frame->selection().setSelection(newSelection);
 }
 
 VisiblePosition HTMLTextFormControlElement::visiblePositionForIndex(int index) const
@@ -323,7 +322,8 @@ int HTMLTextFormControlElement::indexForVisiblePosition(const VisiblePosition& p
     Position indexPosition = pos.deepEquivalent().parentAnchoredEquivalent();
     if (enclosingTextFormControl(indexPosition) != this)
         return 0;
-    RefPtr<Range> range = Range::create(indexPosition.document());
+    ASSERT(indexPosition.document());
+    RefPtr<Range> range = Range::create(*indexPosition.document());
     range->setStart(innerTextElement(), 0, ASSERT_NO_EXCEPTION);
     range->setEnd(indexPosition.containerNode(), indexPosition.offsetInContainerNode(), ASSERT_NO_EXCEPTION);
     return TextIterator::rangeLength(range.get());
@@ -333,7 +333,7 @@ int HTMLTextFormControlElement::selectionStart() const
 {
     if (!isTextFormControl())
         return 0;
-    if (document()->focusedElement() != this && hasCachedSelection())
+    if (document().focusedElement() != this && hasCachedSelection())
         return m_cachedSelectionStart;
 
     return computeSelectionStart();
@@ -342,18 +342,18 @@ int HTMLTextFormControlElement::selectionStart() const
 int HTMLTextFormControlElement::computeSelectionStart() const
 {
     ASSERT(isTextFormControl());
-    Frame* frame = document()->frame();
+    Frame* frame = document().frame();
     if (!frame)
         return 0;
 
-    return indexForVisiblePosition(frame->selection()->start());
+    return indexForVisiblePosition(frame->selection().start());
 }
 
 int HTMLTextFormControlElement::selectionEnd() const
 {
     if (!isTextFormControl())
         return 0;
-    if (document()->focusedElement() != this && hasCachedSelection())
+    if (document().focusedElement() != this && hasCachedSelection())
         return m_cachedSelectionEnd;
     return computeSelectionEnd();
 }
@@ -361,11 +361,11 @@ int HTMLTextFormControlElement::selectionEnd() const
 int HTMLTextFormControlElement::computeSelectionEnd() const
 {
     ASSERT(isTextFormControl());
-    Frame* frame = document()->frame();
+    Frame* frame = document().frame();
     if (!frame)
         return 0;
 
-    return indexForVisiblePosition(frame->selection()->end());
+    return indexForVisiblePosition(frame->selection().end());
 }
 
 static const AtomicString& directionString(TextFieldSelectionDirection direction)
@@ -391,7 +391,7 @@ const AtomicString& HTMLTextFormControlElement::selectionDirection() const
 {
     if (!isTextFormControl())
         return directionString(SelectionHasNoDirection);
-    if (document()->focusedElement() != this && hasCachedSelection())
+    if (document().focusedElement() != this && hasCachedSelection())
         return directionString(m_cachedSelectionDirection);
 
     return directionString(computeSelectionDirection());
@@ -400,11 +400,11 @@ const AtomicString& HTMLTextFormControlElement::selectionDirection() const
 TextFieldSelectionDirection HTMLTextFormControlElement::computeSelectionDirection() const
 {
     ASSERT(isTextFormControl());
-    Frame* frame = document()->frame();
+    Frame* frame = document().frame();
     if (!frame)
         return SelectionHasNoDirection;
 
-    const VisibleSelection& selection = frame->selection()->selection();
+    const VisibleSelection& selection = frame->selection().selection();
     return selection.isDirectional() ? (selection.isBaseFirst() ? SelectionHasForwardDirection : SelectionHasBackwardDirection) : SelectionHasNoDirection;
 }
 
@@ -473,8 +473,8 @@ void HTMLTextFormControlElement::selectionChanged(bool userTriggered)
     // selectionStart() or selectionEnd() will return cached selection when this node doesn't have focus
     cacheSelection(computeSelectionStart(), computeSelectionEnd(), computeSelectionDirection());
 
-    if (Frame* frame = document()->frame()) {
-        if (frame->selection()->isRange() && userTriggered)
+    if (Frame* frame = document().frame()) {
+        if (frame->selection().isRange() && userTriggered)
             dispatchEvent(Event::createBubble(eventNames().selectEvent));
     }
 }
@@ -483,7 +483,7 @@ void HTMLTextFormControlElement::parseAttribute(const QualifiedName& name, const
 {
     if (name == placeholderAttr) {
         updatePlaceholderVisibility(true);
-        UseCounter::count(document(), UseCounter::PlaceholderAttribute);
+        UseCounter::count(&document(), UseCounter::PlaceholderAttribute);
     } else
         HTMLFormControlElementWithState::parseAttribute(name, value);
 }
@@ -502,8 +502,8 @@ void HTMLTextFormControlElement::setInnerTextValue(const String& value)
 
     bool textIsChanged = value != innerTextValue();
     if (textIsChanged || !innerTextElement()->hasChildNodes()) {
-        if (textIsChanged && document() && renderer()) {
-            if (AXObjectCache* cache = document()->existingAXObjectCache())
+        if (textIsChanged && renderer()) {
+            if (AXObjectCache* cache = document().existingAXObjectCache())
                 cache->postNotification(this, AXObjectCache::AXValueChanged, false);
         }
         innerTextElement()->setInnerText(value, ASSERT_NO_EXCEPTION);

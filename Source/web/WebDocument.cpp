@@ -31,9 +31,7 @@
 #include "config.h"
 #include "WebDocument.h"
 
-#include "public/platform/WebURL.h"
-#include "wtf/PassRefPtr.h"
-#include "WebAccessibilityObject.h"
+#include "WebAXObject.h"
 #include "WebDOMEvent.h"
 #include "WebDocumentType.h"
 #include "WebElement.h"
@@ -62,7 +60,9 @@
 #include "core/html/HTMLHeadElement.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/rendering/RenderObject.h"
+#include "public/platform/WebURL.h"
 #include "weborigin/SecurityOrigin.h"
+#include "wtf/PassRefPtr.h"
 #include <v8.h>
 
 using namespace WebCore;
@@ -203,8 +203,8 @@ WebDocumentType WebDocument::doctype() const
 void WebDocument::insertUserStyleSheet(const WebString& sourceCode, UserStyleLevel styleLevel)
 {
     RefPtr<Document> document = unwrap<Document>();
-
-    RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(document.get());
+    ASSERT(document);
+    RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(*document.get());
     parsedSheet->setIsUserStyleSheet(styleLevel == UserStyleUserLevel);
     parsedSheet->parseString(sourceCode);
     if (parsedSheet->isUserStyleSheet())
@@ -250,18 +250,16 @@ WebElement WebDocument::createElement(const WebString& tagName)
     return element;
 }
 
-WebAccessibilityObject WebDocument::accessibilityObject() const
+WebAXObject WebDocument::accessibilityObject() const
 {
     const Document* document = constUnwrap<Document>();
-    return WebAccessibilityObject(
-        document->axObjectCache()->getOrCreate(document->renderer()));
+    return WebAXObject(document->axObjectCache()->getOrCreate(document->renderer()));
 }
 
-WebAccessibilityObject WebDocument::accessibilityObjectFromID(int axID) const
+WebAXObject WebDocument::accessibilityObjectFromID(int axID) const
 {
     const Document* document = constUnwrap<Document>();
-    return WebAccessibilityObject(
-        document->axObjectCache()->objectFromAXID(axID));
+    return WebAXObject(document->axObjectCache()->objectFromAXID(axID));
 }
 
 WebVector<WebDraggableRegion> WebDocument::draggableRegions() const

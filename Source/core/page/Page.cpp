@@ -78,7 +78,7 @@ static void networkStateChanged()
 
     AtomicString eventName = networkStateNotifier().onLine() ? eventNames().onlineEvent : eventNames().offlineEvent;
     for (unsigned i = 0; i < frames.size(); i++)
-        frames[i]->document()->dispatchWindowEvent(Event::create(eventName, false, false));
+        frames[i]->document()->dispatchWindowEvent(Event::create(eventName));
 }
 
 float deviceScaleFactor(Frame* frame)
@@ -206,7 +206,7 @@ void Page::updateDragAndDrop(Node* dropTargetNode, const IntPoint& eventPosition
     m_autoscrollController->updateDragAndDrop(dropTargetNode, eventPosition, eventTime);
 }
 
-#if OS(WINDOWS)
+#if OS(WIN)
 void Page::handleMouseReleaseForPanScrolling(Frame* frame, const PlatformMouseEvent& point)
 {
     m_autoscrollController->handleMouseReleaseForPanScrolling(frame, point);
@@ -404,9 +404,6 @@ void Page::setPageScaleFactor(float scale, const IntPoint& origin)
 {
     FrameView* view = mainFrame()->view();
 
-    bool oldProgrammaticScroll = view->inProgrammaticScroll();
-    view->setInProgrammaticScroll(false);
-
     if (scale != m_pageScaleFactor) {
         m_pageScaleFactor = scale;
 
@@ -421,8 +418,6 @@ void Page::setPageScaleFactor(float scale, const IntPoint& origin)
 
     if (view && view->scrollPosition() != origin)
         view->notifyScrollPositionChanged(origin);
-
-    view->setInProgrammaticScroll(oldProgrammaticScroll);
 }
 
 void Page::setDeviceScaleFactor(float scaleFactor)
@@ -630,7 +625,7 @@ void Page::addRelevantRepaintedObject(RenderObject* object, const LayoutRect& ob
         return;
 
     // Objects inside sub-frames are not considered to be relevant.
-    if (object->document()->frame() != mainFrame())
+    if (object->document().frame() != mainFrame())
         return;
 
     RenderView* view = object->view();

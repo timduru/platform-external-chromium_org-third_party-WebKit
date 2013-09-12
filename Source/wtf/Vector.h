@@ -25,10 +25,10 @@
 #include "wtf/FastAllocBase.h"
 #include "wtf/Noncopyable.h"
 #include "wtf/NotFound.h"
+#include "wtf/QuantizedAllocation.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/UnusedParam.h"
 #include "wtf/VectorTraits.h"
-#include <limits>
 #include <utility>
 #include <string.h>
 
@@ -37,7 +37,10 @@ namespace WTF {
 #if defined(MEMORY_TOOL_REPLACES_ALLOCATOR)
 static const size_t kInitialVectorSize = 1;
 #else
-static const size_t kInitialVectorSize = 16;
+#ifndef WTF_VECTOR_INITIAL_SIZE
+#define WTF_VECTOR_INITIAL_SIZE 4
+#endif
+static const size_t kInitialVectorSize = WTF_VECTOR_INITIAL_SIZE;
 #endif
 
     template <bool needsDestruction, typename T>
@@ -176,7 +179,7 @@ static const size_t kInitialVectorSize = 16;
     {
         static void uninitializedFill(T* dst, T* dstEnd, const T& val)
         {
-            ASSERT(sizeof(T) == sizeof(char));
+            COMPILE_ASSERT(sizeof(T) == sizeof(char), Size_of_type_should_be_equal_to_one);
 #if COMPILER(GCC) && defined(_FORTIFY_SOURCE)
             if (!__builtin_constant_p(dstEnd - dst) || (!(dstEnd - dst)))
 #endif
@@ -254,9 +257,9 @@ static const size_t kInitialVectorSize = 16;
         void allocateBuffer(size_t newCapacity)
         {
             ASSERT(newCapacity);
-            // Using "unsigned" is not a limitation because Chromium's max malloc() is 2GB even on 64-bit.
-            RELEASE_ASSERT(newCapacity <= std::numeric_limits<unsigned>::max() / sizeof(T));
-            size_t sizeToAllocate = fastMallocGoodSize(newCapacity * sizeof(T));
+            RELEASE_ASSERT(newCapacity <= QuantizedAllocation::kMaxUnquantizedAllocation / sizeof(T));
+            size_t originalSizeToAllocate = newCapacity * sizeof(T);
+            size_t sizeToAllocate = QuantizedAllocation::quantizedSize(originalSizeToAllocate);
             m_capacity = sizeToAllocate / sizeof(T);
             m_buffer = static_cast<T*>(fastMalloc(sizeToAllocate));
         }
@@ -269,9 +272,9 @@ static const size_t kInitialVectorSize = 16;
         void reallocateBuffer(size_t newCapacity)
         {
             ASSERT(shouldReallocateBuffer(newCapacity));
-            // Using "unsigned" is not a limitation because Chromium's max malloc() is 2GB even on 64-bit.
-            RELEASE_ASSERT(newCapacity <= std::numeric_limits<unsigned>::max() / sizeof(T));
-            size_t sizeToAllocate = fastMallocGoodSize(newCapacity * sizeof(T));
+            RELEASE_ASSERT(newCapacity <= QuantizedAllocation::kMaxUnquantizedAllocation / sizeof(T));
+            size_t originalSizeToAllocate = newCapacity * sizeof(T);
+            size_t sizeToAllocate = QuantizedAllocation::quantizedSize(originalSizeToAllocate);
             m_capacity = sizeToAllocate / sizeof(T);
             m_buffer = static_cast<T*>(fastRealloc(m_buffer, sizeToAllocate));
         }
@@ -292,14 +295,6 @@ static const size_t kInitialVectorSize = 16;
         T* buffer() { return m_buffer; }
         const T* buffer() const { return m_buffer; }
         size_t capacity() const { return m_capacity; }
-
-        T* releaseBuffer()
-        {
-            T* buffer = m_buffer;
-            m_buffer = 0;
-            m_capacity = 0;
-            return buffer;
-        }
 
     protected:
         VectorBufferBase()
@@ -347,6 +342,7 @@ static const size_t kInitialVectorSize = 16;
         ~VectorBuffer()
         {
             deallocateBuffer(buffer());
+            m_buffer = 0;
         }
 
         void swap(VectorBuffer<T, 0>& other)
@@ -364,8 +360,6 @@ static const size_t kInitialVectorSize = 16;
 
         using Base::buffer;
         using Base::capacity;
-
-        using Base::releaseBuffer;
 
     protected:
         using Base::m_size;
@@ -396,6 +390,7 @@ static const size_t kInitialVectorSize = 16;
         ~VectorBuffer()
         {
             deallocateBuffer(buffer());
+            m_buffer = 0;
         }
 
         void allocateBuffer(size_t newCapacity)
@@ -411,7 +406,7 @@ static const size_t kInitialVectorSize = 16;
 
         void deallocateBuffer(T* bufferToDeallocate)
         {
-            if (bufferToDeallocate == inlineBuffer())
+            if (LIKELY(bufferToDeallocate == inlineBuffer()))
                 return;
             Base::deallocateBuffer(bufferToDeallocate);
         }
@@ -460,13 +455,6 @@ static const size_t kInitialVectorSize = 16;
         using Base::buffer;
         using Base::capacity;
 
-        T* releaseBuffer()
-        {
-            if (buffer() == inlineBuffer())
-                return 0;
-            return Base::releaseBuffer();
-        }
-
     protected:
         using Base::m_size;
 
@@ -505,8 +493,7 @@ static const size_t kInitialVectorSize = 16;
             : Base(size)
         {
             m_size = size;
-            if (begin())
-                TypeOperations::initialize(begin(), end());
+            TypeOperations::initialize(begin(), end());
         }
 
         ~Vector()
@@ -605,16 +592,13 @@ static const size_t kInitialVectorSize = 16;
             : Base(size)
         {
             m_size = size;
-            if (begin())
-                TypeOperations::uninitializedFill(begin(), end(), val);
+            TypeOperations::uninitializedFill(begin(), end(), val);
         }
 
         void fill(const T&, size_t);
         void fill(const T& val) { fill(val, size()); }
 
         template<typename Iterator> void appendRange(Iterator start, Iterator end);
-
-        T* releaseBuffer();
 
         void swap(Vector<T, inlineCapacity>& other)
         {
@@ -639,7 +623,6 @@ static const size_t kInitialVectorSize = 16;
         using Base::shouldReallocateBuffer;
         using Base::reallocateBuffer;
         using Base::restoreInlineBufferIfNeeded;
-        using Base::releaseBuffer;
     };
 
     template<typename T, size_t inlineCapacity>
@@ -647,8 +630,7 @@ static const size_t kInitialVectorSize = 16;
         : Base(other.capacity())
     {
         m_size = other.size();
-        if (begin())
-            TypeOperations::uninitializedCopy(other.begin(), other.end(), begin());
+        TypeOperations::uninitializedCopy(other.begin(), other.end(), begin());
     }
 
     template<typename T, size_t inlineCapacity>
@@ -657,14 +639,13 @@ static const size_t kInitialVectorSize = 16;
         : Base(other.capacity())
     {
         m_size = other.size();
-        if (begin())
-            TypeOperations::uninitializedCopy(other.begin(), other.end(), begin());
+        TypeOperations::uninitializedCopy(other.begin(), other.end(), begin());
     }
 
     template<typename T, size_t inlineCapacity>
     Vector<T, inlineCapacity>& Vector<T, inlineCapacity>::operator=(const Vector<T, inlineCapacity>& other)
     {
-        if (&other == this)
+        if (UNLIKELY(&other == this))
             return *this;
 
         if (size() > other.size())
@@ -829,8 +810,7 @@ static const size_t kInitialVectorSize = 16;
         else {
             if (size > capacity())
                 expandCapacity(size);
-            if (begin())
-                TypeOperations::initialize(end(), begin() + size);
+            TypeOperations::initialize(end(), begin() + size);
         }
 
         m_size = size;
@@ -850,21 +830,19 @@ static const size_t kInitialVectorSize = 16;
         ASSERT(size >= m_size);
         if (size > capacity())
             expandCapacity(size);
-        if (begin())
-            TypeOperations::initialize(end(), begin() + size);
+        TypeOperations::initialize(end(), begin() + size);
         m_size = size;
     }
 
     template<typename T, size_t inlineCapacity>
     void Vector<T, inlineCapacity>::reserveCapacity(size_t newCapacity)
     {
-        if (newCapacity <= capacity())
+        if (UNLIKELY(newCapacity <= capacity()))
             return;
         T* oldBuffer = begin();
         T* oldEnd = end();
         Base::allocateBuffer(newCapacity);
-        if (begin())
-            TypeOperations::move(oldBuffer, oldEnd, begin());
+        TypeOperations::move(oldBuffer, oldEnd, begin());
         Base::deallocateBuffer(oldBuffer);
     }
 
@@ -1057,22 +1035,6 @@ static const size_t kInitialVectorSize = 16;
     {
         for (size_t i = 0; i < m_size / 2; ++i)
             std::swap(at(i), at(m_size - 1 - i));
-    }
-
-    template<typename T, size_t inlineCapacity>
-    inline T* Vector<T, inlineCapacity>::releaseBuffer()
-    {
-        T* buffer = Base::releaseBuffer();
-        if (inlineCapacity && !buffer && m_size) {
-            // If the vector had some data, but no buffer to release,
-            // that means it was using the inline buffer. In that case,
-            // we create a brand new buffer so the caller always gets one.
-            size_t bytes = m_size * sizeof(T);
-            buffer = static_cast<T*>(fastMalloc(bytes));
-            memcpy(buffer, data(), bytes);
-        }
-        m_size = 0;
-        return buffer;
     }
 
     template<typename T, size_t inlineCapacity>

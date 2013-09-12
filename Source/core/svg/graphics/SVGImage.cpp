@@ -33,6 +33,7 @@
 #include "core/dom/shadow/ComposedTreeWalker.h"
 #include "core/loader/DocumentLoader.h"
 #include "core/page/Chrome.h"
+#include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Settings.h"
 #include "core/platform/graphics/GraphicsContextStateSaver.h"
@@ -42,6 +43,7 @@
 #include "core/rendering/style/RenderStyle.h"
 #include "core/rendering/svg/RenderSVGRoot.h"
 #include "core/svg/SVGDocument.h"
+#include "core/svg/SVGFEImageElement.h"
 #include "core/svg/SVGImageElement.h"
 #include "core/svg/SVGSVGElement.h"
 #include "core/svg/graphics/SVGImageChromeClient.h"
@@ -70,19 +72,22 @@ bool SVGImage::isInSVGImage(const Element* element)
 {
     ASSERT(element);
 
-    Page* page = element->document()->page();
+    Page* page = element->document().page();
     if (!page)
         return false;
 
     return page->chrome().client().isSVGImageChromeClient();
 }
 
-bool SVGImage::hasSingleSecurityOrigin() const
+bool SVGImage::currentFrameHasSingleSecurityOrigin() const
 {
     if (!m_page)
         return true;
 
     Frame* frame = m_page->mainFrame();
+
+    RELEASE_ASSERT(frame->document()->loadEventFinished());
+
     SVGSVGElement* rootElement = toSVGDocument(frame->document())->rootElement();
     if (!rootElement)
         return true;
@@ -93,13 +98,10 @@ bool SVGImage::hasSingleSecurityOrigin() const
     while (Node* node = walker.get()) {
         if (node->hasTagName(SVGNames::foreignObjectTag))
             return false;
-        // FIXME(crbug.com/249037): Images should be allowed but the
-        // implementation is difficult because images can have animations which
-        // cause them to dynamically change their single-origin state.
         if (node->hasTagName(SVGNames::imageTag))
-            return false;
+            return toSVGImageElement(node)->currentFrameHasSingleSecurityOrigin();
         if (node->hasTagName(SVGNames::feImageTag))
-            return false;
+            return toSVGFEImageElement(node)->currentFrameHasSingleSecurityOrigin();
         walker.next();
     }
 
@@ -167,11 +169,8 @@ void SVGImage::drawForContainer(GraphicsContext* context, const FloatSize contai
     if (!m_page)
         return;
 
-    ImageObserver* observer = imageObserver();
-    ASSERT(observer);
-
-    // Temporarily reset image observer, we don't want to receive any changeInRect() calls due to this relayout.
-    setImageObserver(0);
+    // Temporarily disable the image observer to prevent changeInRect() calls due re-laying out the image.
+    ImageObserverDisabler imageObserverDisabler(this);
 
     IntSize roundedContainerSize = roundedIntSize(containerSize);
     setContainerSize(roundedContainerSize);
@@ -185,8 +184,6 @@ void SVGImage::drawForContainer(GraphicsContext* context, const FloatSize contai
     scaledSrc.setSize(adjustedSrcSize);
 
     draw(context, dstRect, scaledSrc, compositeOp, blendMode);
-
-    setImageObserver(observer);
 }
 
 PassRefPtr<NativeImageSkia> SVGImage::nativeImageForCurrentFrame()
@@ -240,8 +237,6 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
     if (!m_page)
         return;
 
-    FrameView* view = frameView();
-
     GraphicsContextStateSaver stateSaver(*context);
     context->setCompositeOperation(compositeOp, blendMode);
     context->clip(enclosingIntRect(dstRect));
@@ -258,6 +253,7 @@ void SVGImage::draw(GraphicsContext* context, const FloatRect& dstRect, const Fl
     context->translate(destOffset.x(), destOffset.y());
     context->scale(scale);
 
+    FrameView* view = frameView();
     view->resize(containerSize());
 
     if (view->needsLayout())

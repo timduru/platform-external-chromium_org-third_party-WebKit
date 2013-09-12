@@ -25,7 +25,7 @@
 #include "core/page/FrameView.h"
 #include "core/platform/PODFreeListArena.h"
 #include "core/rendering/LayoutState.h"
-#include "core/rendering/RenderBlock.h"
+#include "core/rendering/RenderBlockFlow.h"
 #include "wtf/OwnPtr.h"
 
 namespace WebCore {
@@ -39,7 +39,7 @@ class RenderWidget;
 // The root of the render tree, corresponding to the CSS initial containing block.
 // It's dimensions match that of the viewport, and it is always at position (0,0)
 // relative to the document (and so isn't necessarily in view).
-class RenderView FINAL : public RenderBlock {
+class RenderView FINAL : public RenderBlockFlow {
 public:
     explicit RenderView(Document*);
     virtual ~RenderView();
@@ -58,6 +58,8 @@ public:
     virtual void layout() OVERRIDE;
     virtual void updateLogicalWidth() OVERRIDE;
     virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
+
+    virtual bool supportsPartialLayout() const OVERRIDE { return true; }
 
     virtual LayoutUnit availableLogicalHeight(AvailableLogicalHeightType) const OVERRIDE;
 
@@ -179,7 +181,7 @@ public:
 
     IntervalArena* intervalArena();
 
-    IntSize viewportSize() const { return document()->viewportSize(); }
+    IntSize viewportSize() const { return document().viewportSize(); }
 
     void setRenderQuoteHead(RenderQuote* head) { m_renderQuoteHead = head; }
     RenderQuote* renderQuoteHead() const { return m_renderQuoteHead; }
@@ -216,10 +218,11 @@ private:
     {
         // We push LayoutState even if layoutState is disabled because it stores layoutDelta too.
         if (!doingFullRepaint() || m_layoutState->isPaginated() || renderer->hasColumns() || renderer->flowThreadContainingBlock()
-            || m_layoutState->lineGrid() || (renderer->style()->lineGrid() != RenderStyle::initialLineGrid() && renderer->isBlockFlow())
+            || m_layoutState->lineGrid() || (renderer->style()->lineGrid() != RenderStyle::initialLineGrid() && renderer->isRenderBlockFlow())
             || (renderer->isRenderBlock() && toRenderBlock(renderer)->shapeInsideInfo())
             || (m_layoutState->shapeInsideInfo() && renderer->isRenderBlock() && !toRenderBlock(renderer)->allowsShapeInsideInfoSharing())
             ) {
+            pushLayoutStateForCurrentFlowThread(renderer);
             m_layoutState = new LayoutState(m_layoutState, renderer, offset, pageHeight, pageHeightChanged, colInfo);
             return true;
         }
@@ -231,6 +234,7 @@ private:
         LayoutState* state = m_layoutState;
         m_layoutState = state->m_next;
         delete state;
+        popLayoutStateForCurrentFlowThread();
     }
 
     // Suspends the LayoutState optimization. Used under transforms that cannot be represented by
@@ -249,6 +253,9 @@ private:
 
     size_t getRetainedWidgets(Vector<RenderWidget*>&);
     void releaseWidgets(Vector<RenderWidget*>&);
+
+    void pushLayoutStateForCurrentFlowThread(const RenderObject*);
+    void popLayoutStateForCurrentFlowThread();
 
     friend class LayoutStateMaintainer;
     friend class LayoutStateDisabler;

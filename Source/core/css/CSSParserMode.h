@@ -61,7 +61,7 @@ struct CSSParserContext {
     WTF_MAKE_FAST_ALLOCATED;
 public:
     CSSParserContext(CSSParserMode, const KURL& baseURL = KURL());
-    CSSParserContext(Document*, const KURL& baseURL = KURL(), const String& charset = emptyString());
+    CSSParserContext(const Document&, const KURL& baseURL = KURL(), const String& charset = emptyString());
 
     KURL baseURL;
     String charset;
@@ -73,7 +73,7 @@ public:
     bool isCSSTouchActionEnabled;
     bool needsSiteSpecificQuirks;
     // This quirk is to maintain compatibility with Android apps built on
-    // the Android SDK prior to and including version 17. Presumably, this
+    // the Android SDK prior to and including version 18. Presumably, this
     // can be removed any time after 2015. See http://crbug.com/277157.
     bool useLegacyBackgroundSizeShorthandBehavior;
 };

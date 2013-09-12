@@ -37,7 +37,6 @@
 #include "bindings/v8/npruntime_impl.h"
 #include "bindings/v8/npruntime_priv.h"
 #include "core/page/DOMWindow.h"
-#include "core/page/Frame.h"
 #include "wtf/text/WTFString.h"
 
 namespace WebCore {
@@ -84,13 +83,13 @@ v8::Handle<v8::Value> convertNPVariantToV8Object(const NPVariant* variant, NPObj
     case NPVariantType_Int32:
         return v8::Integer::New(NPVARIANT_TO_INT32(*variant), isolate);
     case NPVariantType_Double:
-        return v8::Number::New(NPVARIANT_TO_DOUBLE(*variant));
+        return v8::Number::New(isolate, NPVARIANT_TO_DOUBLE(*variant));
     case NPVariantType_Bool:
-        return v8Boolean(NPVARIANT_TO_BOOLEAN(*variant));
+        return v8Boolean(NPVARIANT_TO_BOOLEAN(*variant), isolate);
     case NPVariantType_Null:
-        return v8::Null();
+        return v8::Null(isolate);
     case NPVariantType_Void:
-        return v8::Undefined();
+        return v8::Undefined(isolate);
     case NPVariantType_String: {
         NPString src = NPVARIANT_TO_STRING(*variant);
         return v8::String::New(src.UTF8Characters, src.UTF8Length);
@@ -99,10 +98,10 @@ v8::Handle<v8::Value> convertNPVariantToV8Object(const NPVariant* variant, NPObj
         NPObject* object = NPVARIANT_TO_OBJECT(*variant);
         if (V8NPObject* v8Object = npObjectToV8NPObject(object))
             return v8::Local<v8::Object>::New(isolate, v8Object->v8Object);
-        return createV8ObjectForNPObject(object, owner);
+        return createV8ObjectForNPObject(object, owner, isolate);
     }
     default:
-        return v8::Undefined();
+        return v8::Undefined(isolate);
     }
 }
 

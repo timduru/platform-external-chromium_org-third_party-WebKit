@@ -70,6 +70,7 @@ const AlgorithmNameMapping algorithmNameMappings[] = {
     {"AES-CBC", WebKit::WebCryptoAlgorithmIdAesCbc},
     {"HMAC", WebKit::WebCryptoAlgorithmIdHmac},
     {"RSASSA-PKCS1-v1_5", WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5},
+    {"RSAES-PKCS1-v1_5", WebKit::WebCryptoAlgorithmIdRsaEsPkcs1v1_5},
     {"SHA-1", WebKit::WebCryptoAlgorithmIdSha1},
     {"SHA-224", WebKit::WebCryptoAlgorithmIdSha224},
     {"SHA-256", WebKit::WebCryptoAlgorithmIdSha256},
@@ -96,6 +97,12 @@ const OperationParamsMapping operationParamsMappings[] = {
     {WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5, Verify, WebKit::WebCryptoAlgorithmParamsTypeRsaSsaParams},
     {WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5, GenerateKey, WebKit::WebCryptoAlgorithmParamsTypeRsaKeyGenParams},
     {WebKit::WebCryptoAlgorithmIdRsaSsaPkcs1v1_5, ImportKey, WebKit::WebCryptoAlgorithmParamsTypeNone},
+
+    // RSAES-PKCS1-v1_5
+    {WebKit::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, Encrypt, WebKit::WebCryptoAlgorithmParamsTypeNone},
+    {WebKit::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, Decrypt, WebKit::WebCryptoAlgorithmParamsTypeNone},
+    {WebKit::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, GenerateKey, WebKit::WebCryptoAlgorithmParamsTypeRsaKeyGenParams},
+    {WebKit::WebCryptoAlgorithmIdRsaEsPkcs1v1_5, ImportKey, WebKit::WebCryptoAlgorithmParamsTypeNone},
 
     // SHA-*
     {WebKit::WebCryptoAlgorithmIdSha1, Digest, WebKit::WebCryptoAlgorithmParamsTypeNone},
@@ -124,7 +131,10 @@ struct AlgorithmInfo {
 // but in a more convenient runtime form.
 class AlgorithmRegistry {
 public:
-    static const AlgorithmInfo* lookupAlgorithmByName(const String& algorithmName);
+    static AlgorithmRegistry& instance();
+
+    const AlgorithmInfo* lookupAlgorithmByName(const String&) const;
+    const AlgorithmInfo* lookupAlgorithmById(WebKit::WebCryptoAlgorithmId) const;
 
 private:
     AlgorithmRegistry();
@@ -137,14 +147,24 @@ private:
     AlgorithmInfo m_algorithms[WebKit::NumberOfWebCryptoAlgorithmId];
 };
 
-const AlgorithmInfo* AlgorithmRegistry::lookupAlgorithmByName(const String& algorithmName)
+AlgorithmRegistry& AlgorithmRegistry::instance()
 {
     DEFINE_STATIC_LOCAL(AlgorithmRegistry, registry, ());
+    return registry;
+}
 
-    AlgorithmNameToIdMap::const_iterator it = registry.m_algorithmNameToId.find(algorithmName);
-    if (it == registry.m_algorithmNameToId.end())
+const AlgorithmInfo* AlgorithmRegistry::lookupAlgorithmByName(const String& algorithmName) const
+{
+    AlgorithmNameToIdMap::const_iterator it = m_algorithmNameToId.find(algorithmName);
+    if (it == m_algorithmNameToId.end())
         return 0;
-    return &registry.m_algorithms[it->value];
+    return lookupAlgorithmById(it->value);
+}
+
+const AlgorithmInfo* AlgorithmRegistry::lookupAlgorithmById(WebKit::WebCryptoAlgorithmId algorithmId) const
+{
+    ASSERT(algorithmId >= 0 && algorithmId < WTF_ARRAY_LENGTH(m_algorithms));
+    return &m_algorithms[algorithmId];
 }
 
 AlgorithmRegistry::AlgorithmRegistry()
@@ -431,7 +451,7 @@ const AlgorithmInfo* algorithmInfo(const Dictionary& raw, const ExceptionContext
         return 0;
     }
 
-    const AlgorithmInfo* info = AlgorithmRegistry::lookupAlgorithmByName(algorithmName);
+    const AlgorithmInfo* info = AlgorithmRegistry::instance().lookupAlgorithmByName(algorithmName);
     if (!info) {
         es.throwDOMException(NotSupportedError, context.toString("Unrecognized algorithm name"));
         return 0;
@@ -462,7 +482,7 @@ bool normalizeAlgorithm(const Dictionary& raw, AlgorithmOperation op, WebKit::We
     if (!parseAlgorithmParams(raw, paramsType, params, context, es))
         return false;
 
-    algorithm = WebKit::WebCryptoAlgorithm(info->algorithmId, info->algorithmName, params.release());
+    algorithm = WebKit::WebCryptoAlgorithm(info->algorithmId, params.release());
     return true;
 }
 
@@ -471,6 +491,11 @@ bool normalizeAlgorithm(const Dictionary& raw, AlgorithmOperation op, WebKit::We
 bool normalizeAlgorithm(const Dictionary& raw, AlgorithmOperation op, WebKit::WebCryptoAlgorithm& algorithm, ExceptionState& es)
 {
     return normalizeAlgorithm(raw, op, algorithm, ExceptionContext(), es);
+}
+
+const char* algorithmIdToName(WebKit::WebCryptoAlgorithmId id)
+{
+    return AlgorithmRegistry::instance().lookupAlgorithmById(id)->algorithmName;
 }
 
 } // namespace WebCore

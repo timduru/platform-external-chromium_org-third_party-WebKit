@@ -156,7 +156,7 @@ v8::Local<v8::Value> ScriptController::callFunction(v8::Handle<v8::Function> fun
 {
     // Keep Frame (and therefore ScriptController) alive.
     RefPtr<Frame> protect(m_frame);
-    return ScriptController::callFunctionWithInstrumentation(m_frame ? m_frame->document() : 0, function, receiver, argc, args);
+    return ScriptController::callFunctionWithInstrumentation(m_frame ? m_frame->document() : 0, function, receiver, argc, args, m_isolate);
 }
 
 ScriptValue ScriptController::callFunctionEvenIfScriptDisabled(v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> argv[])
@@ -190,7 +190,7 @@ static String resourceString(const v8::Handle<v8::Function> function)
     return builder.toString();
 }
 
-v8::Local<v8::Value> ScriptController::callFunctionWithInstrumentation(ScriptExecutionContext* context, v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[])
+v8::Local<v8::Value> ScriptController::callFunctionWithInstrumentation(ScriptExecutionContext* context, v8::Handle<v8::Function> function, v8::Handle<v8::Object> receiver, int argc, v8::Handle<v8::Value> args[], v8::Isolate* isolate)
 {
     InspectorInstrumentationCookie cookie;
     if (InspectorInstrumentation::timelineAgentEnabled(context)) {
@@ -200,7 +200,7 @@ v8::Local<v8::Value> ScriptController::callFunctionWithInstrumentation(ScriptExe
         cookie = InspectorInstrumentation::willCallFunction(context, resourceName, lineNumber);
     }
 
-    v8::Local<v8::Value> result = V8ScriptRunner::callFunction(function, context, receiver, argc, args);
+    v8::Local<v8::Value> result = V8ScriptRunner::callFunction(function, context, receiver, argc, args, isolate);
 
     InspectorInstrumentation::didCallFunction(cookie);
     return result;
@@ -230,7 +230,7 @@ v8::Local<v8::Value> ScriptController::compileAndRunScript(const ScriptSourceCod
 
         // Keep Frame (and therefore ScriptController) alive.
         RefPtr<Frame> protect(m_frame);
-        result = V8ScriptRunner::runCompiledScript(script, m_frame->document());
+        result = V8ScriptRunner::runCompiledScript(script, m_frame->document(), m_isolate);
         ASSERT(!tryCatch.HasCaught() || result.IsEmpty());
     }
 
@@ -354,7 +354,7 @@ void ScriptController::bindToWindowObject(Frame* frame, const String& key, NPObj
 
     v8::Context::Scope scope(v8Context);
 
-    v8::Handle<v8::Object> value = createV8ObjectForNPObject(object, 0);
+    v8::Handle<v8::Object> value = createV8ObjectForNPObject(object, 0, m_isolate);
 
     // Attach to the global object.
     v8::Handle<v8::Object> global = v8Context->Global();
@@ -414,7 +414,7 @@ PassScriptInstance ScriptController::createScriptInstanceForWidget(Widget* widge
     // NPObject as part of its wrapper. However, before accessing the object
     // it must consult the _NPN_Registry.
 
-    v8::Local<v8::Object> wrapper = createV8ObjectForNPObject(npObject, 0);
+    v8::Local<v8::Object> wrapper = createV8ObjectForNPObject(npObject, 0, m_isolate);
 
     // Track the plugin object. We've been given a reference to the object.
     m_pluginObjects.set(widget, npObject);
@@ -455,9 +455,9 @@ static NPObject* createNoScriptObject()
     return 0;
 }
 
-static NPObject* createScriptObject(Frame* frame)
+static NPObject* createScriptObject(Frame* frame, v8::Isolate* isolate)
 {
-    v8::HandleScope handleScope;
+    v8::HandleScope handleScope(isolate);
     v8::Handle<v8::Context> v8Context = ScriptController::mainWorldContext(frame);
     if (v8Context.IsEmpty())
         return createNoScriptObject();
@@ -478,7 +478,7 @@ NPObject* ScriptController::windowScriptNPObject()
     if (canExecuteScripts(NotAboutToExecuteScript)) {
         // JavaScript is enabled, so there is a JavaScript window object.
         // Return an NPObject bound to the window object.
-        m_windowScriptNPObject = createScriptObject(m_frame);
+        m_windowScriptNPObject = createScriptObject(m_frame, m_isolate);
         _NPN_RegisterObject(m_windowScriptNPObject, 0);
     } else {
         // JavaScript is not enabled, so we cannot bind the NPObject to the
@@ -495,7 +495,7 @@ NPObject* ScriptController::createScriptObjectForPluginElement(HTMLPlugInElement
     if (!canExecuteScripts(NotAboutToExecuteScript))
         return createNoScriptObject();
 
-    v8::HandleScope handleScope;
+    v8::HandleScope handleScope(m_isolate);
     v8::Handle<v8::Context> v8Context = ScriptController::mainWorldContext(m_frame);
     if (v8Context.IsEmpty())
         return createNoScriptObject();
@@ -528,7 +528,7 @@ void ScriptController::setCaptureCallStackForUncaughtExceptions(bool value)
 
 void ScriptController::collectIsolatedContexts(Vector<std::pair<ScriptState*, SecurityOrigin*> >& result)
 {
-    v8::HandleScope handleScope;
+    v8::HandleScope handleScope(m_isolate);
     for (IsolatedWorldMap::iterator it = m_isolatedWorlds.begin(); it != m_isolatedWorlds.end(); ++it) {
         V8WindowShell* isolatedWorldShell = it->value.get();
         SecurityOrigin* origin = isolatedWorldShell->world()->isolatedWorldSecurityOrigin();
@@ -547,7 +547,7 @@ bool ScriptController::setContextDebugId(int debugId)
     ASSERT(debugId > 0);
     if (!m_windowShell->isContextInitialized())
         return false;
-    v8::HandleScope scope;
+    v8::HandleScope scope(m_isolate);
     v8::Local<v8::Context> context = m_windowShell->context();
     return V8PerContextDebugData::setContextDebugData(context, "page", debugId);
 }
@@ -663,7 +663,7 @@ ScriptValue ScriptController::executeScriptInMainWorld(const ScriptSourceCode& s
     const String* savedSourceURL = m_sourceURL;
     m_sourceURL = &sourceURL;
 
-    v8::HandleScope handleScope;
+    v8::HandleScope handleScope(m_isolate);
     v8::Handle<v8::Context> v8Context = ScriptController::mainWorldContext(m_frame);
     if (v8Context.IsEmpty())
         return ScriptValue();
@@ -690,10 +690,10 @@ void ScriptController::executeScriptInIsolatedWorld(int worldID, const Vector<Sc
 {
     ASSERT(worldID > 0);
 
-    v8::HandleScope handleScope;
+    v8::HandleScope handleScope(m_isolate);
     v8::Local<v8::Array> v8Results;
     {
-        v8::HandleScope evaluateHandleScope;
+        v8::HandleScope evaluateHandleScope(m_isolate);
         RefPtr<DOMWrapperWorld> world = DOMWrapperWorld::ensureIsolatedWorld(worldID, extensionGroup);
         V8WindowShell* isolatedWorldShell = windowShell(world.get());
 

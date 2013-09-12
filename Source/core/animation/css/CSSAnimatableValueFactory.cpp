@@ -38,6 +38,7 @@
 #include "core/animation/AnimatableNumber.h"
 #include "core/animation/AnimatableTransform.h"
 #include "core/animation/AnimatableUnknown.h"
+#include "core/animation/AnimatableVisibility.h"
 #include "core/animation/css/CSSAnimations.h"
 #include "core/css/CSSPrimitiveValue.h"
 #include "core/platform/Length.h"
@@ -102,18 +103,18 @@ inline static PassRefPtr<AnimatableValue> createFromLengthBox(const LengthBox le
 
 PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::createFromColor(CSSPropertyID property, const RenderStyle* style)
 {
-    StyleColor color = style->colorIncludingFallback(property, false);
-    StyleColor visitedLinkColor = style->colorIncludingFallback(property, true);
-    Color fallbackColor = style->color().color();
-    Color fallbackVisitedLinkColor = style->visitedLinkColor().color();
+    Color color = style->colorIncludingFallback(property, false);
+    Color visitedLinkColor = style->colorIncludingFallback(property, true);
+    Color fallbackColor = style->color();
+    Color fallbackVisitedLinkColor = style->visitedLinkColor();
     Color resolvedColor;
-    if (color.isValid() && !color.isCurrentColor())
-        resolvedColor = color.color();
+    if (color.isValid())
+        resolvedColor = color;
     else
         resolvedColor = fallbackColor;
     Color resolvedVisitedLinkColor;
-    if (visitedLinkColor.isValid() && !visitedLinkColor.isCurrentColor())
-        resolvedVisitedLinkColor = visitedLinkColor.color();
+    if (visitedLinkColor.isValid())
+        resolvedVisitedLinkColor = visitedLinkColor;
     else
         resolvedVisitedLinkColor = fallbackVisitedLinkColor;
     return AnimatableColor::create(resolvedColor, resolvedVisitedLinkColor);
@@ -181,6 +182,10 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return createFromDouble(style->opacity());
     case CSSPropertyOutlineColor:
         return createFromColor(property, style);
+    case CSSPropertyOutlineOffset:
+        return createFromDouble(style->outlineOffset());
+    case CSSPropertyOutlineWidth:
+        return createFromDouble(style->outlineWidth());
     case CSSPropertyPaddingBottom:
         return createFromLength(style->paddingBottom(), style);
     case CSSPropertyPaddingLeft:
@@ -219,6 +224,8 @@ PassRefPtr<AnimatableValue> CSSAnimatableValueFactory::create(CSSPropertyID prop
         return createFromLength(style->transformOriginY(), style);
     case CSSPropertyWidth:
         return createFromLength(style->width(), style);
+    case CSSPropertyVisibility:
+        return AnimatableVisibility::create(style->visibility());
     default:
         RELEASE_ASSERT_WITH_MESSAGE(!CSSAnimations::isAnimatableProperty(property), "Web Animations not yet implemented: Create AnimatableValue from render style: %s", getPropertyNameString(property).utf8().data());
         ASSERT_NOT_REACHED();

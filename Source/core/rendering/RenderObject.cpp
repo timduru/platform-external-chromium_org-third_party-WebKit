@@ -84,7 +84,9 @@
 #include "wtf/UnusedParam.h"
 #include "wtf/text/StringBuilder.h"
 #include <algorithm>
+#ifndef NDEBUG
 #include <stdio.h>
+#endif
 
 using namespace std;
 
@@ -94,11 +96,11 @@ using namespace HTMLNames;
 
 #ifndef NDEBUG
 
-RenderObject::SetLayoutNeededForbiddenScope::SetLayoutNeededForbiddenScope(RenderObject* renderObject, bool isForbidden)
+RenderObject::SetLayoutNeededForbiddenScope::SetLayoutNeededForbiddenScope(RenderObject* renderObject)
     : m_renderObject(renderObject)
     , m_preexistingForbidden(m_renderObject->isSetNeedsLayoutForbidden())
 {
-    m_renderObject->setNeedsLayoutIsForbidden(isForbidden);
+    m_renderObject->setNeedsLayoutIsForbidden(true);
 }
 
 RenderObject::SetLayoutNeededForbiddenScope::~SetLayoutNeededForbiddenScope()
@@ -136,7 +138,7 @@ void RenderObject::operator delete(void* ptr)
 
 RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
 {
-    Document* doc = element->document();
+    Document& doc = element->document();
 
     // Minimal support for content properties replacing an entire element.
     // Works only if we have exactly one piece of content and it's a URL.
@@ -166,13 +168,13 @@ RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
     // treat <rt> as ruby text ONLY if it still has its default treatment of block
     if (element->hasTagName(rtTag) && style->display() == BLOCK)
         return new RenderRubyText(element);
-    if (RuntimeEnabledFeatures::cssRegionsEnabled() && style->isDisplayRegionType() && !style->regionThread().isEmpty() && doc->renderView())
+    if (RuntimeEnabledFeatures::cssRegionsEnabled() && style->isDisplayRegionType() && !style->regionThread().isEmpty() && doc.renderView())
         return new RenderRegion(element, 0);
 
     if (style->display() == RUN_IN)
-        UseCounter::count(doc, UseCounter::CSSDisplayRunIn);
+        UseCounter::count(&doc, UseCounter::CSSDisplayRunIn);
     else if (style->display() == COMPACT)
-        UseCounter::count(doc, UseCounter::CSSDisplayCompact);
+        UseCounter::count(&doc, UseCounter::CSSDisplayCompact);
 
     switch (style->display()) {
     case NONE:
@@ -183,9 +185,9 @@ RenderObject* RenderObject::createObject(Element* element, RenderStyle* style)
     case INLINE_BLOCK:
     case RUN_IN:
     case COMPACT:
-        if ((!style->hasAutoColumnCount() || !style->hasAutoColumnWidth()) && doc->regionBasedColumnsEnabled())
+        if ((!style->hasAutoColumnCount() || !style->hasAutoColumnWidth()) && doc.regionBasedColumnsEnabled())
             return new RenderMultiColumnBlock(element);
-        return new RenderBlock(element);
+        return new RenderBlockFlow(element);
     case LIST_ITEM:
         return new RenderListItem(element);
     case TABLE:
@@ -223,7 +225,7 @@ DEFINE_DEBUG_ONLY_GLOBAL(WTF::RefCountedLeakCounter, renderObjectCounter, ("Rend
 RenderObject::RenderObject(Node* node)
     : ImageResourceClient()
     , m_style(0)
-    , m_node(node)
+    , m_nodeProxy(node)
     , m_parent(0)
     , m_previous(0)
     , m_next(0)
@@ -674,12 +676,6 @@ void RenderObject::markContainingBlocksForLayout(bool scheduleRelayout, RenderOb
     bool simplifiedNormalFlowLayout = needsSimplifiedNormalFlowLayout() && !selfNeedsLayout() && !normalChildNeedsLayout();
 
     while (object) {
-#ifndef NDEBUG
-        // FIXME: Remove this once we remove the special cases for counters, quotes and mathml
-        // calling setNeedsLayout during preferred width computation.
-        SetLayoutNeededForbiddenScope layoutForbiddenScope(object, isSetNeedsLayoutForbidden());
-#endif
-
         if (object->selfNeedsLayout())
             return;
 
@@ -738,6 +734,12 @@ void RenderObject::checkBlockPositionedObjectsNeedLayout()
 
     if (isRenderBlock())
         toRenderBlock(this)->checkPositionedObjectsNeedLayout();
+}
+
+void RenderObject::checkNotInPartialLayout()
+{
+    // During partial layout, setNeedsLayout(true or false) should not be called.
+    ASSERT(!frameView()->partialLayout().isStopping());
 }
 #endif
 
@@ -1139,12 +1141,12 @@ void RenderObject::addPDFURLRect(GraphicsContext* context, const LayoutRect& rec
     const AtomicString& href = toElement(n)->getAttribute(hrefAttr);
     if (href.isNull())
         return;
-    KURL url = n->document()->completeURL(href);
+    KURL url = n->document().completeURL(href);
     if (!url.isValid())
         return;
-    if (context->supportsURLFragments() && url.hasFragmentIdentifier() && equalIgnoringFragmentIdentifier(url, n->document()->baseURL())) {
+    if (context->supportsURLFragments() && url.hasFragmentIdentifier() && equalIgnoringFragmentIdentifier(url, n->document().baseURL())) {
         String name = url.fragmentIdentifier();
-        if (document()->findAnchor(name))
+        if (document().findAnchor(name))
             context->setURLFragmentForRect(name, pixelSnappedIntRect(rect));
         return;
     }
@@ -1270,8 +1272,7 @@ FloatRect RenderObject::absoluteBoundingBoxRectForRange(const Range* range)
     if (!range || !range->startContainer())
         return FloatRect();
 
-    if (range->ownerDocument())
-        range->ownerDocument()->updateLayout();
+    range->ownerDocument().updateLayout();
 
     Vector<FloatQuad> quads;
     range->textQuads(quads);
@@ -1320,7 +1321,7 @@ RenderLayerModelObject* RenderObject::containerForRepaint() const
         }
     }
 
-    if (document()->view()->hasSoftwareFilters()) {
+    if (document().view()->hasSoftwareFilters()) {
         if (RenderLayer* parentLayer = enclosingLayer()) {
             RenderLayer* enclosingFilterLayer = parentLayer->enclosingFilterLayer();
             if (enclosingFilterLayer)
@@ -1335,7 +1336,7 @@ RenderLayerModelObject* RenderObject::containerForRepaint() const
     if (parentRenderFlowThread) {
         // The ancestor document will do the reparenting when the repaint propagates further up.
         // We're just a seamless child document, and we don't need to do the hacking.
-        if (parentRenderFlowThread && parentRenderFlowThread->document() != document())
+        if (&parentRenderFlowThread && &parentRenderFlowThread->document() != &document())
             return repaintContainer;
         // If we have already found a repaint container then we will repaint into that container only if it is part of the same
         // flow thread. Otherwise we will need to catch the repaint call and send it to the flow thread.
@@ -1542,7 +1543,7 @@ bool RenderObject::repaintAfterLayoutIfNeeded(const RenderLayerModelObject* repa
 
 bool RenderObject::checkForRepaintDuringLayout() const
 {
-    return !document()->view()->needsFullRepaint() && !hasLayer() && everHadLayout();
+    return !document().view()->needsFullRepaint() && !hasLayer() && everHadLayout();
 }
 
 LayoutRect RenderObject::rectWithOutlineForRepaint(const RenderLayerModelObject* repaintContainer, LayoutUnit outlineWidth) const
@@ -1564,7 +1565,7 @@ void RenderObject::computeRectForRepaint(const RenderLayerModelObject* repaintCo
         return;
 
     if (RenderObject* o = parent()) {
-        if (o->isBlockFlow()) {
+        if (o->isRenderBlockFlow()) {
             RenderBlock* cb = toRenderBlock(o);
             if (cb->hasColumns())
                 cb->adjustRectForColumns(rect);
@@ -1662,18 +1663,16 @@ bool RenderObject::isSelectable() const
 
 Color RenderObject::selectionBackgroundColor() const
 {
-    Color backgroundColor= Color::transparent;
+    Color backgroundColor;
     if (isSelectable()) {
         RefPtr<RenderStyle> pseudoStyle = getUncachedPseudoStyle(PseudoStyleRequest(SELECTION));
-        if (pseudoStyle) {
-            StyleColor styleColor = resolveCurrentColor(pseudoStyle.get(), CSSPropertyBackgroundColor);
-            if (styleColor.isValid())
-                return styleColor.color().blendWithWhite();
+        if (pseudoStyle && resolveColor(pseudoStyle.get(), CSSPropertyBackgroundColor).isValid()) {
+            backgroundColor = resolveColor(pseudoStyle.get(), CSSPropertyBackgroundColor).blendWithWhite();
+        } else {
+            backgroundColor = frame()->selection().isFocusedAndActive() ?
+                RenderTheme::theme().activeSelectionBackgroundColor() :
+                RenderTheme::theme().inactiveSelectionBackgroundColor();
         }
-
-        backgroundColor = frame()->selection()->isFocusedAndActive() ?
-            RenderTheme::theme().activeSelectionBackgroundColor() :
-            RenderTheme::theme().inactiveSelectionBackgroundColor();
     }
 
     return backgroundColor;
@@ -1688,12 +1687,13 @@ Color RenderObject::selectionColor(int colorProperty) const
 
     Color color;
     if (RefPtr<RenderStyle> pseudoStyle = getUncachedPseudoStyle(PseudoStyleRequest(SELECTION))) {
-        StyleColor styleColor = resolveCurrentColor(pseudoStyle.get(), colorProperty);
-        color = styleColor.isValid() ? styleColor.color() : resolveColor(pseudoStyle.get(), CSSPropertyColor);
-    } else
-        color = frame()->selection()->isFocusedAndActive() ?
+        Color selectionColor = resolveColor(pseudoStyle.get(), colorProperty);
+        color = selectionColor.isValid() ? selectionColor : resolveColor(pseudoStyle.get(), CSSPropertyColor);
+    } else {
+        color = frame()->selection().isFocusedAndActive() ?
             RenderTheme::theme().activeSelectionForegroundColor() :
             RenderTheme::theme().inactiveSelectionForegroundColor();
+    }
 
     return color;
 }
@@ -1914,8 +1914,8 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
                 || m_style->zIndex() != newStyle->zIndex()
                 || m_style->hasAutoZIndex() != newStyle->hasAutoZIndex();
             if (visibilityChanged) {
-                document()->setAnnotatedRegionsDirty(true);
-                if (AXObjectCache* cache = document()->existingAXObjectCache())
+                document().setAnnotatedRegionsDirty(true);
+                if (AXObjectCache* cache = document().existingAXObjectCache())
                     cache->childrenChanged(parent());
             }
 
@@ -1946,7 +1946,7 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
 
         s_affectsParentBlock = isFloatingOrOutOfFlowPositioned()
             && (!newStyle->isFloating() && !newStyle->hasOutOfFlowPosition())
-            && parent() && (parent()->isBlockFlow() || parent()->isRenderInline());
+            && parent() && (parent()->isRenderBlockFlow() || parent()->isRenderInline());
 
         // reset style flags
         if (diff == StyleDifferenceLayout || diff == StyleDifferenceLayoutPositionedMovementOnly) {
@@ -1974,7 +1974,7 @@ void RenderObject::styleWillChange(StyleDifference diff, const RenderStyle* newS
         bool newStyleSlowScroll = newStyle && !shouldBlitOnFixedBackgroundImage && newStyle->hasFixedBackgroundImage();
         bool oldStyleSlowScroll = m_style && !shouldBlitOnFixedBackgroundImage && m_style->hasFixedBackgroundImage();
 
-        bool drawsRootBackground = isRoot() || (isBody() && !rendererHasBackground(document()->documentElement()->renderer()));
+        bool drawsRootBackground = isRoot() || (isBody() && !rendererHasBackground(document().documentElement()->renderer()));
         if (drawsRootBackground && !shouldBlitOnFixedBackgroundImage) {
             if (view()->compositor()->supportsFixedRootBackgroundCompositing()) {
                 if (newStyleSlowScroll && newStyle->hasEntirelyFixedBackground())
@@ -2299,8 +2299,13 @@ void RenderObject::computeLayerHitTestRects(LayerHitTestRects& layerRects) const
         RenderObject* container = this->container();
         if (container) {
             currentLayer = container->enclosingLayer();
-            if (currentLayer && currentLayer->renderer() != container)
+            if (currentLayer && currentLayer->renderer() != container) {
                 layerOffset.move(container->offsetFromAncestorContainer(currentLayer->renderer()));
+                // If the layer itself is scrolled, we have to undo the subtraction of its scroll
+                // offset since we want the offset relative to the scrolling content, not the
+                // element itself.
+                layerOffset.move(currentLayer->scrolledContentOffset());
+            }
         } else {
             currentLayer = enclosingLayer();
         }
@@ -2373,7 +2378,7 @@ RenderObject* RenderObject::rendererForRootBackground()
         // to crawl around a render tree with potential :before/:after content and
         // anonymous blocks created by inline <body> tags etc. We can locate the <body>
         // render object very easily via the DOM.
-        HTMLElement* body = document()->body();
+        HTMLElement* body = document().body();
         RenderObject* bodyObject = (body && body->hasLocalName(bodyTag)) ? body->renderer() : 0;
         if (bodyObject)
             return bodyObject;
@@ -2386,13 +2391,13 @@ RespectImageOrientationEnum RenderObject::shouldRespectImageOrientation() const
 {
     // Respect the image's orientation if it's being used as a full-page image or it's
     // an <img> and the setting to respect it everywhere is set.
-    return document()->isImageDocument() ||
-        (document()->settings() && document()->settings()->shouldRespectImageOrientation() && node() && node()->hasTagName(HTMLNames::imgTag)) ? RespectImageOrientation : DoNotRespectImageOrientation;
+    return document().isImageDocument()
+        || (document().settings() && document().settings()->shouldRespectImageOrientation() && node() && node()->hasTagName(HTMLNames::imgTag)) ? RespectImageOrientation : DoNotRespectImageOrientation;
 }
 
 bool RenderObject::hasOutlineAnnotation() const
 {
-    return node() && node()->isLink() && document()->printing();
+    return node() && node()->isLink() && document().printing();
 }
 
 bool RenderObject::hasEntirelyFixedBackground() const
@@ -2504,14 +2509,14 @@ void RenderObject::willBeDestroyed()
 
     // For accessibility management, notify the parent of the imminent change to its child set.
     // We do it now, before remove(), while the parent pointer is still available.
-    if (AXObjectCache* cache = document()->existingAXObjectCache())
+    if (AXObjectCache* cache = document().existingAXObjectCache())
         cache->childrenChanged(this->parent());
 
     remove();
 
     // The remove() call above may invoke axObjectCache()->childrenChanged() on the parent, which may require the AX render
     // object for this renderer. So we remove the AX render object now, after the renderer is removed.
-    if (AXObjectCache* cache = document()->existingAXObjectCache())
+    if (AXObjectCache* cache = document().existingAXObjectCache())
         cache->remove(this);
 
 #ifndef NDEBUG
@@ -2821,7 +2826,7 @@ static PassRefPtr<RenderStyle> firstLineStyleForCachedUncachedType(StyleCacheSta
     if (renderer->isBeforeOrAfterContent())
         rendererForFirstLineStyle = renderer->parent();
 
-    if (rendererForFirstLineStyle->isBlockFlow()) {
+    if (rendererForFirstLineStyle->isRenderBlockFlow() || rendererForFirstLineStyle->isRenderButton()) {
         if (RenderBlock* firstLineBlock = rendererForFirstLineStyle->firstLineBlock()) {
             if (type == Cached)
                 return firstLineBlock->getCachedPseudoStyle(FIRST_LINE, style);
@@ -2843,7 +2848,7 @@ static PassRefPtr<RenderStyle> firstLineStyleForCachedUncachedType(StyleCacheSta
 
 PassRefPtr<RenderStyle> RenderObject::uncachedFirstLineStyle(RenderStyle* style) const
 {
-    if (!document()->styleSheetCollections()->usesFirstLineRules())
+    if (!document().styleSheetCollections()->usesFirstLineRules())
         return 0;
 
     ASSERT(!isText());
@@ -2853,7 +2858,7 @@ PassRefPtr<RenderStyle> RenderObject::uncachedFirstLineStyle(RenderStyle* style)
 
 RenderStyle* RenderObject::cachedFirstLineStyle() const
 {
-    ASSERT(document()->styleSheetCollections()->usesFirstLineRules());
+    ASSERT(document().styleSheetCollections()->usesFirstLineRules());
 
     if (RefPtr<RenderStyle> style = firstLineStyleForCachedUncachedType(Cached, isText() ? parent() : this, m_style.get()))
         return style.get();
@@ -2895,12 +2900,12 @@ PassRefPtr<RenderStyle> RenderObject::getUncachedPseudoStyle(const PseudoStyleRe
     Element* element = toElement(n);
 
     if (pseudoStyleRequest.pseudoId == FIRST_LINE_INHERITED) {
-        RefPtr<RenderStyle> result = document()->styleResolver()->styleForElement(element, parentStyle, DisallowStyleSharing);
+        RefPtr<RenderStyle> result = document().styleResolver()->styleForElement(element, parentStyle, DisallowStyleSharing);
         result->setStyleType(FIRST_LINE_INHERITED);
         return result.release();
     }
 
-    return document()->styleResolver()->pseudoStyleForElement(element, pseudoStyleRequest, parentStyle);
+    return document().styleResolver()->pseudoStyleForElement(element, pseudoStyleRequest, parentStyle);
 }
 
 bool RenderObject::hasBlendMode() const
@@ -2910,20 +2915,20 @@ bool RenderObject::hasBlendMode() const
 
 static Color decorationColor(const RenderObject* object, RenderStyle* style)
 {
-    StyleColor result;
+    Color result;
     // Check for text decoration color first.
-    result = object->resolveStyleColor(style, CSSPropertyTextDecorationColor);
+    result = object->resolveColor(style, CSSPropertyTextDecorationColor);
     if (result.isValid())
-        return result.color();
+        return result;
     if (style->textStrokeWidth() > 0) {
         // Prefer stroke color if possible but not if it's fully transparent.
         result = object->resolveColor(style, CSSPropertyWebkitTextStrokeColor);
         if (result.alpha())
-            return result.color();
+            return result;
     }
 
     result = object->resolveColor(style, CSSPropertyWebkitTextFillColor);
-    return result.color();
+    return result;
 }
 
 void RenderObject::getTextDecorationColors(int decorations, Color& underline, Color& overline,
@@ -3008,12 +3013,12 @@ bool RenderObject::willRenderImage(ImageResource*)
         return false;
 
     // We will not render a new image when Active DOM is suspended
-    if (document()->activeDOMObjectsAreSuspended())
+    if (document().activeDOMObjectsAreSuspended())
         return false;
 
     // If we're not in a window (i.e., we're dormant from being in a background tab)
     // then we don't want to render either.
-    return !document()->view()->isOffscreen();
+    return !document().view()->isOffscreen();
 }
 
 int RenderObject::maximalOutlineSize(PaintPhase p) const
@@ -3127,7 +3132,7 @@ Element* RenderObject::offsetParent() const
 
         // CSS regions specification says that region flows should return the body element as their offsetParent.
         if (ancestor->isRenderNamedFlowThread())
-            return document()->body();
+            return document().body();
 
         node = ancestor->node();
 

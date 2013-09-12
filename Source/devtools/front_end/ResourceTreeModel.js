@@ -223,7 +223,7 @@ WebInspector.ResourceTreeModel.prototype = {
     },
 
     /**
-     * @param {NetworkAgent.FrameId} frameId
+     * @param {PageAgent.FrameId} frameId
      */
     _frameDetached: function(frameId)
     {
@@ -283,7 +283,7 @@ WebInspector.ResourceTreeModel.prototype = {
     },
 
     /**
-     * @param {NetworkAgent.FrameId} frameId
+     * @param {PageAgent.FrameId} frameId
      * @return {WebInspector.ResourceTreeFrame}
      */
     frameForId: function(frameId)
@@ -671,6 +671,10 @@ WebInspector.PageDispatcher.prototype = {
         this._resourceTreeModel.dispatchEventToListeners(WebInspector.ResourceTreeModel.EventTypes.Load, time);
     },
 
+    frameAttached: function(frameId)
+    {
+    },
+
     frameNavigated: function(frame)
     {
         this._resourceTreeModel._frameNavigated(frame);
@@ -712,10 +716,15 @@ WebInspector.PageDispatcher.prototype = {
 
     /**
      * @param {string} data
+     * @param {number=} deviceScaleFactor
+     * @param {number=} pageScaleFactor
+     * @param {DOMAgent.Rect=} viewport
+     * @param {number=} offsetTop
+     * @param {number=} offsetBottom
      */
-    screencastFrame: function(data)
+    screencastFrame: function(data, deviceScaleFactor, pageScaleFactor, viewport, offsetTop, offsetBottom)
     {
-        this._resourceTreeModel.dispatchEventToListeners(WebInspector.ResourceTreeModel.EventTypes.ScreencastFrame, data);
+        this._resourceTreeModel.dispatchEventToListeners(WebInspector.ResourceTreeModel.EventTypes.ScreencastFrame, {data:data, deviceScaleFactor: deviceScaleFactor, pageScaleFactor: pageScaleFactor, viewport:viewport, offsetTop: offsetTop, offsetBottom: offsetBottom});
     }
 }
 

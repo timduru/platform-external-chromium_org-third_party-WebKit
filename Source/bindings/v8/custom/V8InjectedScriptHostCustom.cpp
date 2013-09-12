@@ -71,13 +71,13 @@ Node* InjectedScriptHost::scriptValueAsNode(ScriptValue value)
 
 ScriptValue InjectedScriptHost::nodeAsScriptValue(ScriptState* state, Node* node)
 {
-    v8::HandleScope scope;
+    v8::HandleScope scope(state->isolate());
     v8::Local<v8::Context> context = state->context();
     v8::Context::Scope contextScope(context);
 
     if (!BindingSecurity::shouldAllowAccessToNode(node))
         return ScriptValue(v8::Null());
-    return ScriptValue(toV8(node, v8::Handle<v8::Object>(), context->GetIsolate()));
+    return ScriptValue(toV8(node, v8::Handle<v8::Object>(), state->isolate()));
 }
 
 void V8InjectedScriptHost::inspectedObjectMethodCustom(const v8::FunctionCallbackInfo<v8::Value>& args)
@@ -256,7 +256,7 @@ static v8::Handle<v8::Array> getJSListenerFunctions(Document* document, const Ev
         v8::Local<v8::Object> listenerEntry = v8::Object::New();
         listenerEntry->Set(v8::String::NewSymbol("listener"), function);
         listenerEntry->Set(v8::String::NewSymbol("useCapture"), v8::Boolean::New(listenerInfo.eventListenerVector[i].useCapture));
-        result->Set(v8::Number::New(outputIndex++), listenerEntry);
+        result->Set(v8::Number::New(v8Listener->isolate(), outputIndex++), listenerEntry);
     }
     return result;
 }
@@ -272,10 +272,6 @@ void V8InjectedScriptHost::getEventListenersMethodCustom(const v8::FunctionCallb
     Node* node = V8Node::toNative(value->ToObject());
     if (!node)
         return;
-    // This can only happen for orphan DocumentType nodes.
-    Document* document = node->document();
-    if (!node->document())
-        return;
 
     InjectedScriptHost* host = V8InjectedScriptHost::toNative(args.Holder());
     Vector<EventListenerInfo> listenersArray;
@@ -283,7 +279,7 @@ void V8InjectedScriptHost::getEventListenersMethodCustom(const v8::FunctionCallb
 
     v8::Local<v8::Object> result = v8::Object::New();
     for (size_t i = 0; i < listenersArray.size(); ++i) {
-        v8::Handle<v8::Array> listeners = getJSListenerFunctions(document, listenersArray[i]);
+        v8::Handle<v8::Array> listeners = getJSListenerFunctions(&node->document(), listenersArray[i]);
         if (!listeners->Length())
             continue;
         AtomicString eventType = listenersArray[i].eventType;

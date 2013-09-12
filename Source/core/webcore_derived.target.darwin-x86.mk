@@ -311,6 +311,8 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/bindings/v8/custom/V8InspectorFrontendHostCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8JavaScriptCallFrameCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8LocationCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8MIDIInputCustom.cpp \
+	third_party/WebKit/Source/bindings/v8/custom/V8MIDIOutputCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8MessageChannelCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8MessageEventCustom.cpp \
 	third_party/WebKit/Source/bindings/v8/custom/V8MessagePortCustom.cpp \
@@ -386,6 +388,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
+	'-DWTF_VECTOR_INITIAL_SIZE=16' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -398,6 +401,7 @@ MY_DEFS_Debug := \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
+	'-DCLD_VERSION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -415,12 +419,10 @@ MY_DEFS_Debug := \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
-	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
-	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
@@ -555,6 +557,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
+	'-DWTF_VECTOR_INITIAL_SIZE=16' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -567,6 +570,7 @@ MY_DEFS_Release := \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
+	'-DCLD_VERSION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -584,12 +588,10 @@ MY_DEFS_Release := \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
-	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
-	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
@@ -697,7 +699,9 @@ LOCAL_LDFLAGS_Debug := \
 	-nostdlib \
 	-Wl,--no-undefined \
 	-Wl,--exclude-libs=ALL \
+	-Wl,--fatal-warnings \
 	-Wl,--gc-sections \
+	-Wl,--warn-shared-textrel \
 	-Wl,-O1 \
 	-Wl,--as-needed
 
@@ -714,7 +718,9 @@ LOCAL_LDFLAGS_Release := \
 	-Wl,--exclude-libs=ALL \
 	-Wl,-O1 \
 	-Wl,--as-needed \
-	-Wl,--gc-sections
+	-Wl,--gc-sections \
+	-Wl,--fatal-warnings \
+	-Wl,--warn-shared-textrel
 
 
 LOCAL_LDFLAGS := $(LOCAL_LDFLAGS_$(GYP_CONFIGURATION))

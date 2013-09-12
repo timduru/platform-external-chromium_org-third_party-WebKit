@@ -39,11 +39,17 @@ namespace WebCore {
 SubtreeLayoutScope::SubtreeLayoutScope(RenderObject* root)
     : m_root(root)
 {
-    RELEASE_ASSERT(m_root->document()->view()->isInLayout());
+    RELEASE_ASSERT(m_root->document().view()->isInLayout());
 }
 
 SubtreeLayoutScope::~SubtreeLayoutScope()
 {
+    // Partial layout early-exits layout and will leave the tree as needing layout.
+    if (m_root->frameView()->partialLayout().isStopping()) {
+        ASSERT(m_root->needsLayout());
+        return;
+    }
+
     RELEASE_ASSERT(!m_root->needsLayout());
 
 #ifndef NDEBUG

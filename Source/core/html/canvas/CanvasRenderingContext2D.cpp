@@ -5,7 +5,7 @@
  * Copyright (C) 2008 Eric Seidel <eric@webkit.org>
  * Copyright (C) 2008 Dirk Schulze <krit@webkit.org>
  * Copyright (C) 2010 Torch Mobile (Beijing) Co. Ltd. All rights reserved.
- * Copyright (C) 2012 Intel Corporation. All rights reserved.
+ * Copyright (C) 2012, 2013 Intel Corporation. All rights reserved.
  * Copyright (C) 2013 Adobe Systems Incorporated. All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -81,7 +81,7 @@ static const char* const defaultFont = "10px sans-serif";
 
 static bool isOriginClean(ImageResource* cachedImage, SecurityOrigin* securityOrigin)
 {
-    if (!cachedImage->image()->hasSingleSecurityOrigin())
+    if (!cachedImage->image()->currentFrameHasSingleSecurityOrigin())
         return false;
     if (cachedImage->passesAccessControlCheck(securityOrigin))
         return true;
@@ -708,6 +708,31 @@ void CanvasRenderingContext2D::transform(float m11, float m12, float m21, float 
     m_path.transform(transform.inverse());
 }
 
+void CanvasRenderingContext2D::resetTransform()
+{
+    GraphicsContext* c = drawingContext();
+    if (!c)
+        return;
+
+    AffineTransform ctm = state().m_transform;
+    bool invertibleCTM = state().m_invertibleCTM;
+    // It is possible that CTM is identity while CTM is not invertible.
+    // When CTM becomes non-invertible, realizeSaves() can make CTM identity.
+    if (ctm.isIdentity() && invertibleCTM)
+        return;
+
+    realizeSaves();
+    // resetTransform() resolves the non-invertible CTM state.
+    modifiableState().m_transform.makeIdentity();
+    modifiableState().m_invertibleCTM = true;
+    c->setCTM(canvas()->baseTransform());
+
+    if (invertibleCTM)
+        m_path.transform(ctm.inverse());
+    // When else, do nothing because all transform methods didn't update m_path when CTM became non-invertible.
+    // It means that resetTransform() restores m_path just before CTM became non-invertible.
+}
+
 void CanvasRenderingContext2D::setTransform(float m11, float m12, float m21, float m22, float dx, float dy)
 {
     GraphicsContext* c = drawingContext();
@@ -736,7 +761,7 @@ void CanvasRenderingContext2D::setStrokeColor(const String& color)
     if (color == state().m_unparsedStrokeColor)
         return;
     realizeSaves();
-    setStrokeStyle(CanvasStyle::createFromString(color, canvas()->document()));
+    setStrokeStyle(CanvasStyle::createFromString(color, &canvas()->document()));
     modifiableState().m_unparsedStrokeColor = color;
 }
 
@@ -778,7 +803,7 @@ void CanvasRenderingContext2D::setFillColor(const String& color)
     if (color == state().m_unparsedFillColor)
         return;
     realizeSaves();
-    setFillStyle(CanvasStyle::createFromString(color, canvas()->document()));
+    setFillStyle(CanvasStyle::createFromString(color, &canvas()->document()));
     modifiableState().m_unparsedFillColor = color;
 }
 
@@ -1586,21 +1611,6 @@ void CanvasRenderingContext2D::clearCanvas()
     c->restore();
 }
 
-Path CanvasRenderingContext2D::transformAreaToDevice(const Path& path) const
-{
-    Path transformed(path);
-    transformed.transform(state().m_transform);
-    transformed.transform(canvas()->baseTransform());
-    return transformed;
-}
-
-Path CanvasRenderingContext2D::transformAreaToDevice(const FloatRect& rect) const
-{
-    Path path;
-    path.addRect(rect);
-    return transformAreaToDevice(path);
-}
-
 bool CanvasRenderingContext2D::rectContainsCanvas(const FloatRect& rect) const
 {
     FloatQuad quad(rect);
@@ -1608,48 +1618,7 @@ bool CanvasRenderingContext2D::rectContainsCanvas(const FloatRect& rect) const
     return state().m_transform.mapQuad(quad).containsQuad(canvasQuad);
 }
 
-template<class T> IntRect CanvasRenderingContext2D::calculateCompositingBufferRect(const T& area, IntSize* croppedOffset)
-{
-    IntRect canvasRect(0, 0, canvas()->width(), canvas()->height());
-    canvasRect = canvas()->baseTransform().mapRect(canvasRect);
-    Path path = transformAreaToDevice(area);
-    IntRect bufferRect = enclosingIntRect(path.boundingRect());
-    IntPoint originalLocation = bufferRect.location();
-    bufferRect.intersect(canvasRect);
-    if (croppedOffset)
-        *croppedOffset = originalLocation - bufferRect.location();
-    return bufferRect;
-}
-
-PassOwnPtr<ImageBuffer> CanvasRenderingContext2D::createCompositingBuffer(const IntRect& bufferRect)
-{
-    RenderingMode renderMode = isAccelerated() ? Accelerated : Unaccelerated;
-    return ImageBuffer::create(bufferRect.size(), 1, renderMode);
-}
-
-void CanvasRenderingContext2D::compositeBuffer(ImageBuffer* buffer, const IntRect& bufferRect, CompositeOperator op)
-{
-    IntRect canvasRect(0, 0, canvas()->width(), canvas()->height());
-    canvasRect = canvas()->baseTransform().mapRect(canvasRect);
-
-    GraphicsContext* c = drawingContext();
-    if (!c)
-        return;
-
-    c->save();
-    c->setCTM(AffineTransform());
-    c->setCompositeOperation(op);
-
-    c->save();
-    c->clipOut(bufferRect);
-    c->clearRect(canvasRect);
-    c->restore();
-
-    c->drawImageBuffer(buffer, bufferRect.location(), state().m_globalComposite);
-    c->restore();
-}
-
-static void drawImageToContext(Image* image, GraphicsContext* context, FloatRect& dest, const FloatRect& src, CompositeOperator op)
+static void drawImageToContext(Image* image, GraphicsContext* context, const FloatRect& dest, const FloatRect& src, CompositeOperator op)
 {
     context->drawImage(image, dest, src, op);
 }
@@ -1663,55 +1632,33 @@ template<class T> void  CanvasRenderingContext2D::fullCanvasCompositedDrawImage(
 {
     ASSERT(isFullCanvasCompositeMode(op));
 
-    IntSize croppedOffset;
-    IntRect bufferRect = calculateCompositingBufferRect(dest, &croppedOffset);
-    if (bufferRect.isEmpty()) {
-        clearCanvas();
-        return;
-    }
+    drawingContext()->beginTransparencyLayer(1, op);
+    drawImageToContext(image, drawingContext(), dest, src, CompositeSourceOver);
+    drawingContext()->endLayer();
+}
 
-    OwnPtr<ImageBuffer> buffer = createCompositingBuffer(bufferRect);
-    if (!buffer)
-        return;
+static void fillPrimitive(const FloatRect& rect, GraphicsContext* context)
+{
+    context->fillRect(rect);
+}
 
-    GraphicsContext* c = drawingContext();
-    if (!c)
-        return;
-
-    FloatRect adjustedDest = dest;
-    adjustedDest.setLocation(FloatPoint(0, 0));
-    AffineTransform effectiveTransform = c->getCTM();
-    IntRect transformedAdjustedRect = enclosingIntRect(effectiveTransform.mapRect(adjustedDest));
-    buffer->context()->translate(-transformedAdjustedRect.location().x(), -transformedAdjustedRect.location().y());
-    buffer->context()->translate(croppedOffset.width(), croppedOffset.height());
-    buffer->context()->concatCTM(effectiveTransform);
-    drawImageToContext(image, buffer->context(), adjustedDest, src, CompositeSourceOver);
-
-    compositeBuffer(buffer.get(), bufferRect, op);
+static void fillPrimitive(const Path& path, GraphicsContext* context)
+{
+    context->fillPath(path);
 }
 
 template<class T> void CanvasRenderingContext2D::fullCanvasCompositedFill(const T& area)
 {
     ASSERT(isFullCanvasCompositeMode(state().m_globalComposite));
 
-    IntRect bufferRect = calculateCompositingBufferRect(area, 0);
-    if (bufferRect.isEmpty()) {
-        clearCanvas();
-        return;
-    }
-
-    OwnPtr<ImageBuffer> buffer = createCompositingBuffer(bufferRect);
-    if (!buffer)
-        return;
-
-    Path path = transformAreaToDevice(area);
-    path.translate(FloatSize(-bufferRect.x(), -bufferRect.y()));
-
-    buffer->context()->setCompositeOperation(CompositeSourceOver);
-    state().m_fillStyle->applyFillColor(buffer->context());
-    buffer->context()->fillPath(path);
-
-    compositeBuffer(buffer.get(), bufferRect, state().m_globalComposite);
+    GraphicsContext* c = drawingContext();
+    ASSERT(c);
+    c->beginTransparencyLayer(1, state().m_globalComposite);
+    CompositeOperator previousOperator = c->compositeOperation();
+    c->setCompositeOperation(CompositeSourceOver);
+    fillPrimitive(area, c);
+    c->setCompositeOperation(previousOperator);
+    c->endLayer();
 }
 
 PassRefPtr<CanvasGradient> CanvasRenderingContext2D::createLinearGradient(float x0, float y0, float x1, float y1, ExceptionState& es)
@@ -2306,7 +2253,7 @@ void CanvasRenderingContext2D::inflateStrokeRect(FloatRect& rect) const
 
 const Font& CanvasRenderingContext2D::accessFont()
 {
-    canvas()->document()->updateStyleIfNeeded();
+    canvas()->document().updateStyleIfNeeded();
 
     if (!state().m_realizedFont)
         setFont(state().m_unparsedFont);
@@ -2351,7 +2298,7 @@ void CanvasRenderingContext2D::drawSystemFocusRing(Element* element)
     // Note: we need to check document->focusedElement() rather than just calling
     // element->focused(), because element->focused() isn't updated until after
     // focus events fire.
-    if (element->document() && element->document()->focusedElement() == element)
+    if (element->document().focusedElement() == element)
         drawFocusRing(m_path);
 }
 
@@ -2388,7 +2335,7 @@ void CanvasRenderingContext2D::updateFocusRingAccessibility(const Path& path, El
     // bounding box with the accessible object. Do this even if the element
     // isn't focused because assistive technology might try to explore the object's
     // location before it gets focus.
-    if (AXObjectCache* axObjectCache = element->document()->existingAXObjectCache()) {
+    if (AXObjectCache* axObjectCache = element->document().existingAXObjectCache()) {
         if (AccessibilityObject* obj = axObjectCache->getOrCreate(element)) {
             // Get the bounding rect and apply transformations.
             FloatRect bounds = m_path.boundingRect();

@@ -47,8 +47,10 @@
 ../core/dom/DOMError.idl
 ../core/dom/DOMException.idl
 ../core/dom/DOMImplementation.idl
+../core/dom/DOMSettableTokenList.idl
 ../core/dom/DOMStringList.idl
 ../core/dom/DOMStringMap.idl
+../core/dom/DOMTokenList.idl
 ../core/dom/DataTransferItem.idl
 ../core/dom/DataTransferItemList.idl
 ../core/dom/Document.idl
@@ -106,8 +108,6 @@
 ../core/fileapi/FileReader.idl
 ../core/fileapi/FileReaderSync.idl
 ../core/fileapi/Stream.idl
-../core/html/DOMSettableTokenList.idl
-../core/html/DOMTokenList.idl
 ../core/html/FormData.idl
 ../core/html/HTMLAllCollection.idl
 ../core/html/HTMLAnchorElement.idl
@@ -543,7 +543,6 @@
 ../core/svg/SVGStyleElement.idl
 ../core/svg/SVGSwitchElement.idl
 ../core/svg/SVGSymbolElement.idl
-../core/svg/SVGTRefElement.idl
 ../core/svg/SVGTSpanElement.idl
 ../core/svg/SVGTextContentElement.idl
 ../core/svg/SVGTextElement.idl

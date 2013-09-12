@@ -79,12 +79,15 @@ void timingFromAnimationData(const CSSAnimationData* animationData, Timing& timi
         else
             timing.iterationCount = animationData->iterationCount();
     }
+    // For CSS animations, timing functions apply to individual keyframes, not
+    // to the complete animation.
+    // FIXME: Until chained timing functions are implemented, we simply apply
+    // the default timing function to the complete animation.
     if (animationData->isTimingFunctionSet()) {
-        if (!animationData->timingFunction()->isLinearTimingFunction())
+        if (animationData->timingFunction()->type() != TimingFunction::LinearFunction)
             timing.timingFunction = animationData->timingFunction();
     } else {
-        // CSS default is ease, default in model is linear.
-        timing.timingFunction = CubicBezierTimingFunction::preset(CubicBezierTimingFunction::Ease);
+        timing.timingFunction = CSSAnimationData::initialAnimationTimingFunction();
     }
     if (animationData->isFillModeSet()) {
         switch (animationData->fillMode()) {
@@ -222,7 +225,7 @@ void CSSAnimations::maybeApplyPendingUpdate(Element* element)
     for (Vector<CSSAnimationUpdate::NewAnimation>::const_iterator iter = update->newAnimations().begin(); iter != update->newAnimations().end(); ++iter) {
         OwnPtr<CSSAnimations::EventDelegate> eventDelegate = adoptPtr(new EventDelegate(element, iter->name));
         RefPtr<Animation> animation = Animation::create(element, iter->animation->effect(), iter->animation->specified(), eventDelegate.release());
-        RefPtr<Player> player = element->document()->timeline()->play(animation.get());
+        RefPtr<Player> player = element->document().timeline()->play(animation.get());
         m_animations.set(iter->name, player.get());
     }
 }
@@ -238,8 +241,8 @@ void CSSAnimations::cancel()
 
 void CSSAnimations::EventDelegate::maybeDispatch(Document::ListenerType listenerType, AtomicString& eventName, double elapsedTime)
 {
-    if (m_target->document()->hasListenerType(listenerType))
-        m_target->document()->timeline()->addEventToDispatch(m_target, WebKitAnimationEvent::create(eventName, m_name, elapsedTime));
+    if (m_target->document().hasListenerType(listenerType))
+        m_target->document().timeline()->addEventToDispatch(m_target, WebKitAnimationEvent::create(eventName, m_name, elapsedTime));
 }
 
 void CSSAnimations::EventDelegate::onEventCondition(const TimedItem* timedItem, bool isFirstSample, TimedItem::Phase previousPhase, double previousIteration)

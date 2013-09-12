@@ -53,6 +53,11 @@ enum ResizerHitTestType {
     ResizerForTouch
 };
 
+enum ScrollOffsetClamping {
+    ScrollOffsetUnclamped,
+    ScrollOffsetClamped
+};
+
 class RenderLayer;
 class RenderLayerModelObject;
 
@@ -98,6 +103,7 @@ public:
     virtual bool scrollbarsCanBeActive() const OVERRIDE;
     virtual IntRect scrollableAreaBoundingBox() const OVERRIDE;
     virtual bool userInputScrollable(ScrollbarOrientation) const OVERRIDE;
+    virtual bool shouldPlaceVerticalScrollbarOnLeft() const OVERRIDE;
     virtual int pageStep(ScrollbarOrientation) const OVERRIDE;
 
     int scrollXOffset() const { return m_scrollOffset.width() + scrollOrigin().x(); }
@@ -105,12 +111,38 @@ public:
 
     IntSize scrollOffset() const { return m_scrollOffset; }
 
+    // FIXME: We shouldn't allow access to m_overflowRect outside this class.
+    LayoutRect overflowRect() const { return m_overflowRect; }
+
+    void scrollToOffset(const IntSize& scrollOffset, ScrollOffsetClamping = ScrollOffsetUnclamped);
+
+    void updateAfterLayout();
+    void updateAfterStyleChange(const RenderStyle*);
+
 private:
+    bool hasHorizontalOverflow() const;
+    bool hasVerticalOverflow() const;
+    bool hasScrollableHorizontalOverflow() const;
+    bool hasScrollableVerticalOverflow() const;
+
+    int scrollWidth() const;
+    int scrollHeight() const;
+
+    void computeScrollDimensions();
+
+    IntSize clampScrollOffset(const IntSize&) const;
+    IntSize adjustedScrollOffset() const { return IntSize(scrollXOffset(), scrollYOffset()); }
+
     void setScrollOffset(const IntSize& scrollOffset) { m_scrollOffset = scrollOffset; }
 
     RenderLayerModelObject* renderer() const;
 
     RenderLayer* m_layer;
+
+    unsigned m_scrollDimensionsDirty : 1;
+
+    // The width/height of our scrolled area.
+    LayoutRect m_overflowRect;
 
     // This is the (scroll) offset from scrollOrigin().
     IntSize m_scrollOffset;

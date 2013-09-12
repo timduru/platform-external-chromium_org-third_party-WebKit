@@ -123,7 +123,7 @@ public:
         DeprecatedFlexboxWebContent,
         DeprecatedFlexboxChrome,
         DeprecatedFlexboxChromeExtension,
-        SVGTRefElement,
+        UnusedSlot04,
         UnprefixedPerformanceTimeline,
         PrefixedPerformanceTimeline,
         UnprefixedUserTiming,
@@ -197,6 +197,11 @@ public:
         UnprefixedAnimationIterationEvent,
         PrefixedAndUnprefixedAnimationIterationEvent,
         EventReturnValue, // Legacy IE extension.
+        SVGSVGElement,
+        SVGAnimateColorElement,
+        InsertAdjacentText,
+        InsertAdjacentElement,
+        HasAttributes, // Removed from DOM4.
         // Add new features immediately above this line. Don't change assigned
         // numbers of each items, and don't reuse unused slots.
         NumberOfFeatures, // This enum value must be last.

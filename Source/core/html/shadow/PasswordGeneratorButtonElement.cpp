@@ -52,7 +52,7 @@ using namespace HTMLNames;
 
 // FIXME: This class is only used in Chromium and has no layout tests.
 
-PasswordGeneratorButtonElement::PasswordGeneratorButtonElement(Document* document)
+PasswordGeneratorButtonElement::PasswordGeneratorButtonElement(Document& document)
     : HTMLDivElement(HTMLNames::divTag, document)
     , m_isInHoverState(false)
 {
@@ -171,7 +171,7 @@ void PasswordGeneratorButtonElement::defaultEventHandler(Event* event)
 
     RefPtr<PasswordGeneratorButtonElement> protector(this);
     if (event->type() == eventNames().clickEvent) {
-        if (Page* page = document()->page())
+        if (Page* page = document().page())
             page->chrome().client().openPasswordGenerator(input.get());
         event->setDefaultHandled();
     }

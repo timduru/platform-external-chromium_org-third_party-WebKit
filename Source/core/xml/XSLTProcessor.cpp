@@ -60,7 +60,7 @@ XSLTProcessor::~XSLTProcessor()
 PassRefPtr<Document> XSLTProcessor::createDocumentFromSource(const String& sourceString,
     const String& sourceEncoding, const String& sourceMIMEType, Node* sourceNode, Frame* frame)
 {
-    RefPtr<Document> ownerDocument = sourceNode->document();
+    RefPtr<Document> ownerDocument = &sourceNode->document();
     bool sourceIsDocument = (sourceNode == ownerDocument.get());
     String documentSource = sourceString;
 
@@ -121,7 +121,7 @@ PassRefPtr<DocumentFragment> XSLTProcessor::transformToFragment(Node* sourceNode
 
     if (!transformToString(sourceNode, resultMIMEType, resultString, resultEncoding))
         return 0;
-    return createFragmentForTransformToFragment(resultString, resultMIMEType, outputDoc);
+    return createFragmentForTransformToFragment(resultString, resultMIMEType, *outputDoc);
 }
 
 void XSLTProcessor::setParameter(const String& /*namespaceURI*/, const String& localName, const String& value)

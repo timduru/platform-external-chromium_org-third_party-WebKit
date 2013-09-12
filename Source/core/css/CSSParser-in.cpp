@@ -212,15 +212,15 @@ CSSParserContext::CSSParserContext(CSSParserMode mode, const KURL& baseURL)
 {
 }
 
-CSSParserContext::CSSParserContext(Document* document, const KURL& baseURL, const String& charset)
-    : baseURL(baseURL.isNull() ? document->baseURL() : baseURL)
+CSSParserContext::CSSParserContext(const Document& document, const KURL& baseURL, const String& charset)
+    : baseURL(baseURL.isNull() ? document.baseURL() : baseURL)
     , charset(charset)
-    , mode(document->inQuirksMode() ? CSSQuirksMode : CSSStrictMode)
-    , isHTMLDocument(document->isHTMLDocument())
-    , isCSSCustomFilterEnabled(document->settings() ? document->settings()->isCSSCustomFilterEnabled() : false)
-    , isCSSStickyPositionEnabled(document->cssStickyPositionEnabled())
-    , needsSiteSpecificQuirks(document->settings() ? document->settings()->needsSiteSpecificQuirks() : false)
-    , useLegacyBackgroundSizeShorthandBehavior(document->settings() ? document->settings()->useLegacyBackgroundSizeShorthandBehavior() : false)
+    , mode(document.inQuirksMode() ? CSSQuirksMode : CSSStrictMode)
+    , isHTMLDocument(document.isHTMLDocument())
+    , isCSSCustomFilterEnabled(document.settings() ? document.settings()->isCSSCustomFilterEnabled() : false)
+    , isCSSStickyPositionEnabled(document.cssStickyPositionEnabled())
+    , needsSiteSpecificQuirks(document.settings() ? document.settings()->needsSiteSpecificQuirks() : false)
+    , useLegacyBackgroundSizeShorthandBehavior(document.settings() ? document.settings()->useLegacyBackgroundSizeShorthandBehavior() : false)
 {
 }
 
@@ -396,6 +396,14 @@ PassRefPtr<StyleKeyframe> CSSParser::parseKeyframeRule(StyleSheetContents* sheet
     setupParser("@-internal-keyframe-rule ", string, "");
     cssyyparse(this);
     return m_keyframe.release();
+}
+
+PassOwnPtr<Vector<double> > CSSParser::parseKeyframeKeyList(const String& string)
+{
+    setupParser("@-internal-keyframe-key-list ", string, "");
+    cssyyparse(this);
+    ASSERT(m_valueList);
+    return StyleKeyframe::createKeyList(m_valueList.get());
 }
 
 bool CSSParser::parseSupportsCondition(const String& string)
@@ -1148,10 +1156,15 @@ PassRefPtr<CSSValueList> CSSParser::parseFontFaceValue(const AtomicString& strin
     RefPtr<MutableStylePropertySet> dummyStyle = MutableStylePropertySet::create();
     if (!parseValue(dummyStyle.get(), CSSPropertyFontFamily, string, false, CSSQuirksMode, 0))
         return 0;
-    return static_pointer_cast<CSSValueList>(dummyStyle->getPropertyCSSValue(CSSPropertyFontFamily));
+
+    RefPtr<CSSValue> fontFamily = dummyStyle->getPropertyCSSValue(CSSPropertyFontFamily);
+    if (!fontFamily->isValueList())
+        return 0;
+
+    return toCSSValueList(dummyStyle->getPropertyCSSValue(CSSPropertyFontFamily).get());
 }
 
-bool CSSParser::parseValue(MutableStylePropertySet* declaration, CSSPropertyID propertyID, const String& string, bool important, Document* document)
+bool CSSParser::parseValue(MutableStylePropertySet* declaration, CSSPropertyID propertyID, const String& string, bool important, const Document& document)
 {
     ASSERT(!string.isEmpty());
 
@@ -1164,7 +1177,7 @@ bool CSSParser::parseValue(MutableStylePropertySet* declaration, CSSPropertyID p
     if (parseKeywordValue(declaration, propertyID, string, important, context))
         return true;
 
-    CSSParser parser(context, UseCounter::getFrom(document));
+    CSSParser parser(context, UseCounter::getFrom(&document));
     return parser.parseValue(declaration, propertyID, string, important, static_cast<StyleSheetContents*>(0));
 }
 
@@ -1285,10 +1298,10 @@ void CSSParser::parseSelector(const String& string, CSSSelectorList& selectorLis
 
 PassRefPtr<ImmutableStylePropertySet> CSSParser::parseInlineStyleDeclaration(const String& string, Element* element)
 {
-    Document* document = element->document();
-    CSSParserContext context = document->elementSheet()->contents()->parserContext();
-    context.mode = strictToCSSParserMode(element->isHTMLElement() && !document->inQuirksMode());
-    return CSSParser(context, UseCounter::getFrom(document)).parseDeclaration(string, document->elementSheet()->contents());
+    Document& document = element->document();
+    CSSParserContext context = document.elementSheet()->contents()->parserContext();
+    context.mode = strictToCSSParserMode(element->isHTMLElement() && !document.inQuirksMode());
+    return CSSParser(context, UseCounter::getFrom(&document)).parseDeclaration(string, document.elementSheet()->contents());
 }
 
 PassRefPtr<ImmutableStylePropertySet> CSSParser::parseDeclaration(const String& string, StyleSheetContents* contextStyleSheet)
@@ -1348,7 +1361,7 @@ PassRefPtr<MediaQuerySet> CSSParser::parseMediaQueryList(const String& string)
     setupParser("@-internal-medialist ", string, "");
     cssyyparse(this);
 
-    ASSERT(m_mediaList.get());
+    ASSERT(m_mediaList);
     return m_mediaList.release();
 }
 
@@ -1679,6 +1692,14 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     if (!value)
         return false;
 
+    if (inViewport()) {
+        // Allow @viewport rules from UA stylesheets even if the feature is disabled.
+        if (!RuntimeEnabledFeatures::cssViewportEnabled() && m_context.mode != UASheetMode)
+            return false;
+
+        return parseViewportProperty(propId, important);
+    }
+
     // Note: m_parsedCalculation is used to pass the calc value to validUnit and then cleared at the end of this function.
     // FIXME: This is to avoid having to pass parsedCalc to all validUnit callers.
     ASSERT(!m_parsedCalculation);
@@ -1714,13 +1735,6 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
             return false;
         addProperty(propId, cssValuePool().createIdentifierValue(id), important);
         return true;
-    }
-
-    if (inViewport()) {
-        if (!RuntimeEnabledFeatures::cssViewportEnabled())
-            return false;
-
-        return parseViewportProperty(propId, important);
     }
 
     bool validPrimitive = false;
@@ -1932,6 +1946,7 @@ bool CSSParser::parseValue(CSSPropertyID propId, bool important)
     case CSSPropertyWebkitBackgroundComposite:
     case CSSPropertyBackgroundImage:
     case CSSPropertyBackgroundOrigin:
+    case CSSPropertyMaskSourceType:
     case CSSPropertyWebkitBackgroundOrigin:
     case CSSPropertyBackgroundPosition:
     case CSSPropertyBackgroundPositionX:
@@ -4230,6 +4245,17 @@ bool CSSParser::parseFillProperty(CSSPropertyID propId, CSSPropertyID& propId1, 
                         m_valueList->next();
                     break;
                 }
+                case CSSPropertyMaskSourceType: {
+                    if (RuntimeEnabledFeatures::cssMaskSourceTypeEnabled()) {
+                        if (val->id == CSSValueAuto || val->id == CSSValueAlpha || val->id == CSSValueLuminance) {
+                            currValue = cssValuePool().createIdentifierValue(val->id);
+                            m_valueList->next();
+                        } else {
+                            currValue = 0;
+                        }
+                    }
+                    break;
+                }
                 default:
                     break;
             }
@@ -6127,10 +6153,10 @@ bool CSSParser::fastParseColor(RGBA32& rgb, const StringType& name, bool strict)
         return true;
 
     // Try named colors.
-    StyleColor color;
-    color.setNamedColor(name);
-    if (color.isValid()) {
-        rgb = color.rgb();
+    Color tc;
+    tc.setNamedColor(name);
+    if (tc.isValid()) {
+        rgb = tc.rgb();
         return true;
     }
     return false;
@@ -10387,6 +10413,9 @@ inline void CSSParser::detectAtToken(int length, bool hasEscape)
             if (LIKELY(!hasEscape))
                 m_token = INTERNAL_KEYFRAME_RULE_SYM;
         }
+        CASE("-internal-keyframe-key-list") {
+            m_token = INTERNAL_KEYFRAME_KEY_LIST_SYM;
+        }
         CASE("-internal-supports-condition") {
             m_parsingMode = SupportsMode;
             m_token = INTERNAL_SUPPORTS_CONDITION_SYM;
@@ -11531,26 +11560,12 @@ void CSSParser::deleteFontFaceOnlyValues()
 
 StyleKeyframe* CSSParser::createKeyframe(CSSParserValueList* keys)
 {
-    // Create a key string from the passed keys
-    StringBuilder keyString;
-    for (unsigned i = 0; i < keys->size(); ++i) {
-        ASSERT(keys->valueAt(i)->unit == CSSPrimitiveValue::CSS_NUMBER);
-        double key = keys->valueAt(i)->fValue;
-        if (key < 0 || key > 100) {
-            // As per http://www.w3.org/TR/css3-animations/#keyframes,
-            // "If a keyframe selector specifies negative percentage values
-            // or values higher than 100%, then the keyframe will be ignored."
-            clearProperties();
-            return 0;
-        }
-        if (i != 0)
-            keyString.append(',');
-        keyString.append(String::number(key));
-        keyString.append('%');
-    }
+    OwnPtr<Vector<double> > keyVector = StyleKeyframe::createKeyList(keys);
+    if (keyVector->isEmpty())
+        return 0;
 
     RefPtr<StyleKeyframe> keyframe = StyleKeyframe::create();
-    keyframe->setKeyText(keyString.toString());
+    keyframe->setKeys(keyVector.release());
     keyframe->setProperties(createStylePropertySet());
 
     clearProperties();
@@ -11634,8 +11649,11 @@ unsigned CSSParser::safeUserStringTokenOffset()
 
 StyleRuleBase* CSSParser::createViewportRule()
 {
-    if (!RuntimeEnabledFeatures::cssViewportEnabled())
+    // Allow @viewport rules from UA stylesheets even if the feature is disabled.
+    if (!RuntimeEnabledFeatures::cssViewportEnabled() && m_context.mode != UASheetMode) {
+        endRuleBody(true);
         return 0;
+    }
 
     m_allowImportRules = m_allowNamespaceDeclarations = false;
 
@@ -11653,7 +11671,7 @@ StyleRuleBase* CSSParser::createViewportRule()
 
 bool CSSParser::parseViewportProperty(CSSPropertyID propId, bool important)
 {
-    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled());
+    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled() || m_context.mode == UASheetMode);
 
     CSSParserValue* value = m_valueList->current();
     if (!value)
@@ -11713,7 +11731,7 @@ bool CSSParser::parseViewportProperty(CSSPropertyID propId, bool important)
 
 bool CSSParser::parseViewportShorthand(CSSPropertyID propId, CSSPropertyID first, CSSPropertyID second, bool important)
 {
-    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled());
+    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled() || m_context.mode == UASheetMode);
     unsigned numValues = m_valueList->size();
 
     if (numValues > 2)

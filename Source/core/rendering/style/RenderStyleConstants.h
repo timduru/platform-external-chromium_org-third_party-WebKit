@@ -28,6 +28,14 @@
 
 namespace WebCore {
 
+enum StyleRecalcChange {
+    NoChange,
+    NoInherit,
+    Inherit,
+    Force,
+    Reattach,
+};
+
 static const size_t PrintColorAdjustBits = 1;
 enum PrintColorAdjust {
     PrintColorAdjustEconomy,
@@ -161,6 +169,9 @@ enum EFillSizeType { Contain, Cover, SizeLength, SizeNone };
 
 // CSS3 Background Position
 enum BackgroundEdgeOrigin { TopEdge, RightEdge, BottomEdge, LeftEdge };
+
+// CSS Mask Source Types
+enum EMaskSourceType { MaskAlpha, MaskLuminance };
 
 // CSS3 Marquee Properties
 

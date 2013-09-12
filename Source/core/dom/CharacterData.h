@@ -37,10 +37,12 @@ public:
     void setData(const String&);
     unsigned length() const { return m_data.length(); }
     String substringData(unsigned offset, unsigned count, ExceptionState&);
-    void appendData(const String&, AttachBehavior = AttachLazily);
-    void insertData(unsigned offset, const String&, ExceptionState&, AttachBehavior = AttachLazily);
-    void deleteData(unsigned offset, unsigned count, ExceptionState&, AttachBehavior = AttachLazily);
-    void replaceData(unsigned offset, unsigned count, const String&, ExceptionState&, AttachBehavior = AttachLazily);
+    void appendData(const String&);
+    void replaceData(unsigned offset, unsigned count, const String&, ExceptionState&);
+
+    enum RecalcStyleBehavior { DoNotRecalcStyle, DeprecatedRecalcStyleImmediatlelyForEditing };
+    void insertData(unsigned offset, const String&, ExceptionState&, RecalcStyleBehavior = DoNotRecalcStyle);
+    void deleteData(unsigned offset, unsigned count, ExceptionState&, RecalcStyleBehavior = DoNotRecalcStyle);
 
     bool containsOnlyWhitespace() const;
 
@@ -51,8 +53,8 @@ public:
     unsigned parserAppendData(const String& string, unsigned offset, unsigned lengthLimit);
 
 protected:
-    CharacterData(TreeScope* treeScope, const String& text, ConstructionType type)
-        : Node(treeScope, type)
+    CharacterData(TreeScope& treeScope, const String& text, ConstructionType type)
+        : Node(&treeScope, type)
         , m_data(!text.isNull() ? text : emptyString())
     {
         ASSERT(type == CreateOther || type == CreateText || type == CreateEditingText);
@@ -74,8 +76,20 @@ private:
     virtual bool isCharacterDataNode() const OVERRIDE FINAL { return true; }
     virtual int maxCharacterOffset() const OVERRIDE FINAL;
     virtual bool offsetInCharacters() const OVERRIDE FINAL;
-    void setDataAndUpdate(const String&, unsigned offsetOfReplacedData, unsigned oldLength, unsigned newLength, AttachBehavior = AttachLazily);
+    void setDataAndUpdate(const String&, unsigned offsetOfReplacedData, unsigned oldLength, unsigned newLength, RecalcStyleBehavior = DoNotRecalcStyle);
 };
+
+inline CharacterData* toCharacterData(Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isCharacterDataNode());
+    return static_cast<CharacterData*>(node);
+}
+
+inline const CharacterData* toCharacterData(const Node* node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isCharacterDataNode());
+    return static_cast<const CharacterData*>(node);
+}
 
 } // namespace WebCore
 

@@ -361,7 +361,7 @@ void DOMWindow::setDocument(PassRefPtr<Document> document)
         }
     }
 
-    m_frame->selection()->updateSecureKeyboardEntryIfActive();
+    m_frame->selection().updateSecureKeyboardEntryIfActive();
 
     if (m_frame->page() && m_frame->page()->mainFrame() == m_frame) {
         m_frame->page()->mainFrame()->notifyChromeClientWheelEventHandlerCountChanged();
@@ -1410,9 +1410,7 @@ bool DOMWindow::addEventListener(const AtomicString& eventType, PassRefPtr<Event
 
     if (Document* document = this->document()) {
         document->addListenerTypeIfNeeded(eventType);
-        if (eventType == eventNames().wheelEvent || eventType == eventNames().mousewheelEvent)
-            document->didAddWheelEventHandler();
-        else if (eventNames().isTouchEventType(eventType))
+        if (eventNames().isTouchEventType(eventType))
             document->didAddTouchEventHandler(document);
         else if (eventType == eventNames().storageEvent)
             didAddStorageEventListener(this);
@@ -1446,9 +1444,7 @@ bool DOMWindow::removeEventListener(const AtomicString& eventType, EventListener
         return false;
 
     if (Document* document = this->document()) {
-        if (eventType == eventNames().wheelEvent || eventType == eventNames().mousewheelEvent)
-            document->didRemoveWheelEventHandler();
-        else if (eventNames().isTouchEventType(eventType))
+        if (eventNames().isTouchEventType(eventType))
             document->didRemoveTouchEventHandler(document);
     }
 

@@ -58,7 +58,7 @@ static Element* highestVisuallyEquivalentDivBelowRoot(Element* startBlock)
     return curBlock;
 }
 
-InsertParagraphSeparatorCommand::InsertParagraphSeparatorCommand(Document *document, bool mustUseDefaultParagraphElement, bool pasteBlockqutoeIntoUnquotedArea)
+InsertParagraphSeparatorCommand::InsertParagraphSeparatorCommand(Document& document, bool mustUseDefaultParagraphElement, bool pasteBlockqutoeIntoUnquotedArea)
     : CompositeEditCommand(document)
     , m_mustUseDefaultParagraphElement(mustUseDefaultParagraphElement)
     , m_pasteBlockqutoeIntoUnquotedArea(pasteBlockqutoeIntoUnquotedArea)
@@ -81,7 +81,7 @@ void InsertParagraphSeparatorCommand::calculateStyleBeforeInsertion(const Positi
 
     ASSERT(pos.isNotNull());
     m_style = EditingStyle::create(pos);
-    m_style->mergeTypingStyle(pos.anchorNode()->document());
+    m_style->mergeTypingStyle(pos.document());
 }
 
 void InsertParagraphSeparatorCommand::applyStyleAfterInsertion(Node* originalEnclosingBlock)
@@ -203,10 +203,11 @@ void InsertParagraphSeparatorCommand::doApply()
     if (startBlock->isRootEditableElement()) {
         blockToInsert = createDefaultParagraphElement(document());
         nestNewBlock = true;
-    } else if (shouldUseDefaultParagraphElement(startBlock.get()))
+    } else if (shouldUseDefaultParagraphElement(startBlock.get())) {
         blockToInsert = createDefaultParagraphElement(document());
-    else
+    } else {
         blockToInsert = startBlock->cloneElementWithoutChildren();
+    }
 
     //---------------------------------------------------------------------
     // Handle case when position is in the last visible position in its block,
@@ -359,7 +360,7 @@ void InsertParagraphSeparatorCommand::doApply()
     else
         insertNodeAfter(blockToInsert.get(), startBlock);
 
-    document()->updateLayoutIgnorePendingStylesheets();
+    document().updateLayoutIgnorePendingStylesheets();
 
     // If the paragraph separator was inserted at the end of a paragraph, an empty line must be
     // created.  All of the nodes, starting at visiblePos, are about to be added to the new paragraph
@@ -391,7 +392,7 @@ void InsertParagraphSeparatorCommand::doApply()
 
     // Handle whitespace that occurs after the split
     if (positionAfterSplit.isNotNull()) {
-        document()->updateLayoutIgnorePendingStylesheets();
+        document().updateLayoutIgnorePendingStylesheets();
         if (!positionAfterSplit.isRenderedCharacter()) {
             // Clear out all whitespace and insert one non-breaking space
             ASSERT(!positionAfterSplit.containerNode()->renderer() || positionAfterSplit.containerNode()->renderer()->style()->collapseWhiteSpace());

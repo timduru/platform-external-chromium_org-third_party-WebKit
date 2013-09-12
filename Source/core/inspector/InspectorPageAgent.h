@@ -93,6 +93,8 @@ public:
     virtual void removeScriptToEvaluateOnLoad(ErrorString*, const String& identifier);
     virtual void reload(ErrorString*, const bool* optionalIgnoreCache, const String* optionalScriptToEvaluateOnLoad, const String* optionalScriptPreprocessor);
     virtual void navigate(ErrorString*, const String& url);
+    virtual void getNavigationHistory(ErrorString*, int*, RefPtr<TypeBuilder::Array<TypeBuilder::Page::NavigationEntry> >&);
+    virtual void navigateToHistoryEntry(ErrorString*, int);
     virtual void getCookies(ErrorString*, RefPtr<TypeBuilder::Array<TypeBuilder::Page::Cookie> >& cookies, WTF::String* cookiesString);
     virtual void deleteCookie(ErrorString*, const String& cookieName, const String& url);
     virtual void getResourceTree(ErrorString*, RefPtr<TypeBuilder::Page::FrameResourceTree>&);
@@ -115,8 +117,8 @@ public:
     virtual void setTouchEmulationEnabled(ErrorString*, bool);
     virtual void setEmulatedMedia(ErrorString*, const String&);
     virtual void setForceCompositingMode(ErrorString*, bool force);
-    virtual void captureScreenshot(ErrorString*, const String* format, const int* quality, const double* scale, String* data);
-    virtual void startScreencast(ErrorString*, const String* format, const int* quality, const double* scale);
+    virtual void captureScreenshot(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight, String* data, double* deviceScaleFactor, double* pageScaleFactor, RefPtr<TypeBuilder::DOM::Rect>&);
+    virtual void startScreencast(ErrorString*, const String* format, const int* quality, const int* maxWidth, const int* maxHeight);
     virtual void stopScreencast(ErrorString*);
     virtual void handleJavaScriptDialog(ErrorString*, bool accept, const String* promptText);
     virtual void setShowViewportSizeOnResize(ErrorString*, bool show, const bool* showGrid);
@@ -133,6 +135,7 @@ public:
     void loadEventFired(Frame*);
     void childDocumentOpened(Document*);
     void didCommitLoad(Frame*, DocumentLoader*);
+    void frameAttachedToParent(Frame*);
     void frameDetachedFromParent(Frame*);
     void loaderDetachedFromFrame(DocumentLoader*);
     void frameStartedLoading(Frame*);

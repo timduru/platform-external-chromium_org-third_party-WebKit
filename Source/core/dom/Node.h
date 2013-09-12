@@ -100,11 +100,6 @@ enum StyleChangeSource {
     StyleChangeFromRenderer
 };
 
-enum AttachBehavior {
-    DeprecatedAttachNow,
-    AttachLazily,
-};
-
 class NodeRareDataBase {
 public:
     RenderObject* renderer() const { return m_renderer; }
@@ -165,9 +160,6 @@ public:
 
     static bool isSupported(const String& feature, const String& version);
     static void dumpStatistics();
-
-    enum StyleChange { NoChange, NoInherit, Inherit, Force, Reattach };
-    static StyleChange diff(const RenderStyle*, const RenderStyle*, Document*);
 
     virtual ~Node();
     void willBeDeletedFrom(Document*);
@@ -273,7 +265,7 @@ public:
     bool isStyledElement() const { return isHTMLElement() || isSVGElement(); }
 
     bool isDocumentNode() const;
-    bool isTreeScope() const { return treeScope()->rootNode() == this; }
+    bool isTreeScope() const { return treeScope().rootNode() == this; }
     bool isDocumentFragment() const { return getFlag(IsDocumentFragmentFlag); }
     bool isShadowRoot() const { return isDocumentFragment() && isTreeScope(); }
     bool isInsertionPoint() const { return getFlag(IsInsertionPointFlag); }
@@ -415,12 +407,8 @@ public:
     bool isV8CollectableDuringMinorGC() const { return getFlag(V8CollectableDuringMinorGCFlag); }
     void setV8CollectableDuringMinorGC(bool flag) { setFlag(flag, V8CollectableDuringMinorGCFlag); }
 
-    enum ShouldSetAttached {
-        SetAttached,
-        DoNotSetAttached
-    };
-    void lazyAttach(ShouldSetAttached = SetAttached);
-    void lazyReattach(ShouldSetAttached = SetAttached);
+    void lazyAttach();
+    void lazyReattach();
 
     virtual void setFocus(bool flag);
     virtual void setActive(bool flag = true, bool pause = false);
@@ -481,21 +469,18 @@ public:
     unsigned nodeIndex() const;
 
     // Returns the DOM ownerDocument attribute. This method never returns NULL, except in the case
-    // of (1) a Document node or (2) a DocumentType node that is not used with any Document yet.
+    // of a Document node.
     Document* ownerDocument() const;
 
-    // Returns the document associated with this node. This method never returns NULL, except in the case
-    // of a DocumentType node that is not used with any Document yet. A Document node returns itself.
-    Document* document() const
+    // Returns the document associated with this node. A Document node returns itself.
+    Document& document() const
     {
         ASSERT(this);
-        // FIXME: below ASSERT is useful, but prevents the use of document() in the constructor or destructor
-        // due to the virtual function call to nodeType().
-        ASSERT(documentInternal() || (nodeType() == DOCUMENT_TYPE_NODE && !inDocument()));
-        return documentInternal();
+        ASSERT(documentInternal());
+        return *documentInternal();
     }
 
-    TreeScope* treeScope() const { return m_treeScope; }
+    TreeScope& treeScope() const { return *m_treeScope; }
 
     // Returns true if this node is associated with a document and is in its associated document's
     // node tree, false otherwise.
@@ -592,9 +577,9 @@ public:
     // Implementation can determine the type of subtree by seeing insertionPoint->inDocument().
     // For a performance reason, notifications are delivered only to ContainerNode subclasses if the insertionPoint is out of document.
     //
-    // There are another callback named didNotifyDescendantInsertions(), which is called after all the descendant is notified.
-    // Only a few subclasses actually need this. To utilize this, the node should return InsertionShouldCallDidNotifyDescendantInsertions
-    // from insrtedInto().
+    // There are another callback named didNotifySubtreeInsertionsToDocument(), which is called after all the descendant is notified,
+    // if this node was inserted into the document tree. Only a few subclasses actually need this. To utilize this, the node should
+    // return InsertionShouldCallDidNotifySubtreeInsertions from insrtedInto().
     //
     enum InsertionNotificationRequest {
         InsertionDone,
@@ -602,7 +587,7 @@ public:
     };
 
     virtual InsertionNotificationRequest insertedInto(ContainerNode* insertionPoint);
-    virtual void didNotifySubtreeInsertions(ContainerNode*) { }
+    virtual void didNotifySubtreeInsertionsToDocument() { }
 
     // Notifies the node that it is no longer part of the tree.
     //
@@ -820,7 +805,7 @@ protected:
 
     void setHasCustomStyleCallbacks() { setFlag(true, HasCustomStyleCallbacksFlag); }
 
-    Document* documentInternal() const { return treeScope()->documentScope(); }
+    Document* documentInternal() const { return treeScope().documentScope(); }
     void setTreeScope(TreeScope* scope) { m_treeScope = scope; }
 
 private:
@@ -924,7 +909,7 @@ inline void Node::lazyReattachIfAttached()
         lazyReattach();
 }
 
-inline void Node::lazyReattach(ShouldSetAttached shouldSetAttached)
+inline void Node::lazyReattach()
 {
     if (styleChangeType() == LazyAttachStyleChange)
         return;
@@ -934,12 +919,12 @@ inline void Node::lazyReattach(ShouldSetAttached shouldSetAttached)
 
     if (attached())
         detach(context);
-    lazyAttach(shouldSetAttached);
+    lazyAttach();
 }
 
-inline bool shouldRecalcStyle(Node::StyleChange change, const Node* node)
+inline bool shouldRecalcStyle(StyleRecalcChange change, const Node* node)
 {
-    return change >= Node::Inherit || node->childNeedsStyleRecalc() || node->needsStyleRecalc();
+    return change >= Inherit || node->childNeedsStyleRecalc() || node->needsStyleRecalc();
 }
 
 } //namespace

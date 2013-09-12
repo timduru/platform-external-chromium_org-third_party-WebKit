@@ -35,7 +35,6 @@
 #include "core/dom/IconURL.h"
 #include "core/dom/SecurityContext.h"
 #include "core/fetch/CachePolicy.h"
-#include "core/fetch/ResourceLoadNotifier.h"
 #include "core/fetch/ResourceLoaderOptions.h"
 #include "core/loader/FrameLoaderStateMachine.h"
 #include "core/loader/FrameLoaderTypes.h"
@@ -54,6 +53,7 @@ class Chrome;
 class DOMWrapperWorld;
 class DocumentLoader;
 class Event;
+class FetchContext;
 class FormState;
 class FormSubmission;
 class FrameLoaderClient;
@@ -83,7 +83,7 @@ public:
     Frame* frame() const { return m_frame; }
 
     HistoryController* history() const { return &m_history; }
-    ResourceLoadNotifier* notifier() const { return &m_notifer; }
+
     IconController* icon() const { return m_icon.get(); }
     MixedContentChecker* mixedContentChecker() const { return &m_mixedContentChecker; }
 
@@ -93,9 +93,6 @@ public:
     void load(const FrameLoadRequest&); // The entry point for non-reload, non-history loads.
     void reload(ReloadPolicy = NormalReload, const KURL& overrideURL = KURL(), const String& overrideEncoding = String());
     void loadHistoryItem(HistoryItem*); // The entry point for all back/forward loads
-
-    // FIXME: This doesn't really belong here, since we don't load Frames synchronously.
-    unsigned long loadResourceSynchronously(const ResourceRequest&, StoredCredentials, ResourceError&, ResourceResponse&, Vector<char>& data);
 
     HistoryItem* requestedHistoryItem() const { return m_requestedHistoryItem.get(); }
 
@@ -110,8 +107,15 @@ public:
     // FIXME: clear() is trying to do too many things. We should break it down into smaller functions.
     void clear(ClearOptions);
 
+    // Sets a timer to notify the client that the initial empty document has
+    // been accessed, and thus it is no longer safe to show a provisional URL
+    // above the document without risking a URL spoof.
     void didAccessInitialDocument();
-    void didAccessInitialDocumentTimerFired(Timer<FrameLoader>*);
+
+    // If the initial empty document is showing and has been accessed, this
+    // cancels the timer and immediately notifies the client in cases that
+    // waiting to notify would allow a URL spoof.
+    void notifyIfInitialDocumentAccessed();
 
     bool isLoading() const;
 
@@ -124,15 +128,11 @@ public:
     DocumentLoader* policyDocumentLoader() const { return m_policyDocumentLoader.get(); }
     DocumentLoader* provisionalDocumentLoader() const { return m_provisionalDocumentLoader.get(); }
     FrameState state() const { return m_state; }
+    FetchContext& fetchContext() const { return *m_fetchContext; }
 
     const ResourceRequest& originalRequest() const;
     void receivedMainResourceError(const ResourceError&);
 
-    bool willLoadMediaElementURL(KURL&);
-
-    void handleFallbackContent();
-
-    bool isHostedByObjectElement() const;
     bool isLoadingMainFrame() const;
 
     bool subframeIsLoading() const;
@@ -147,8 +147,7 @@ public:
     void didLayout(LayoutMilestones);
     void didFirstLayout();
 
-    void loadedResourceFromMemoryCache(Resource*);
-
+    void checkLoadComplete(DocumentLoader*);
     void checkLoadComplete();
     void detachFromParent();
 
@@ -211,7 +210,11 @@ public:
     bool containsPlugins() const { return m_containsPlugins; }
     bool allowPlugins(ReasonForCallingAllowPlugins);
 
-    void updateForSameDocumentNavigation(const KURL&, SameDocumentNavigationSource, PassRefPtr<SerializedScriptValue>, const String& title);
+    enum UpdateBackForwardListPolicy {
+        UpdateBackForwardList,
+        DoNotUpdateBackForwardList
+    };
+    void updateForSameDocumentNavigation(const KURL&, SameDocumentNavigationSource, PassRefPtr<SerializedScriptValue>, const String& title, UpdateBackForwardListPolicy);
 
 private:
     bool allChildrenAreComplete() const; // immediate children, not all descendants
@@ -219,6 +222,7 @@ private:
     void completed();
 
     void checkTimerFired(Timer<FrameLoader>*);
+    void didAccessInitialDocumentTimerFired(Timer<FrameLoader>*);
 
     void insertDummyHistoryItem();
 
@@ -243,8 +247,6 @@ private:
     void loadWithNavigationAction(const ResourceRequest&, const NavigationAction&,
         FrameLoadType, PassRefPtr<FormState>, const SubstituteData&, const String& overrideEncoding = String());
 
-    void requestFromDelegate(ResourceRequest&, unsigned long& identifier, ResourceError&);
-
     void detachChildren();
     void closeAndRemoveChild(Frame*);
 
@@ -262,7 +264,6 @@ private:
     // header dependencies unless performance testing proves otherwise.
     // Some of these could be lazily created for memory savings on devices.
     mutable HistoryController m_history;
-    mutable ResourceLoadNotifier m_notifer;
     mutable FrameLoaderStateMachine m_stateMachine;
     OwnPtr<IconController> m_icon;
     mutable MixedContentChecker m_mixedContentChecker;
@@ -280,6 +281,7 @@ private:
     RefPtr<DocumentLoader> m_documentLoader;
     RefPtr<DocumentLoader> m_provisionalDocumentLoader;
     RefPtr<DocumentLoader> m_policyDocumentLoader;
+    OwnPtr<FetchContext> m_fetchContext;
 
     bool m_inStopAllLoaders;
 

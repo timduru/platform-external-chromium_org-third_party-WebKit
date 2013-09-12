@@ -137,11 +137,12 @@ Array.prototype.binaryIndexOf = function(value, comparator) {}
  * @param {function(number, number): number} comparator
  * @param {number} leftBound
  * @param {number} rightBound
- * @param {number} k
+ * @param {number} sortWindowLeft
+ * @param {number} sortWindowRight
  * @return {!Array.<number>}
  * @this {Array.<number>}
  */
-Array.prototype.sortRange = function(comparator, leftBound, rightBound, k) {}
+Array.prototype.sortRange = function(comparator, leftBound, rightBound, sortWindowLeft, sortWindowRight) {}
 
 /**
  * @this {Array.<number>}
@@ -222,6 +223,7 @@ InspectorFrontendHostAPI.prototype.save = function(url, content, forceSaveAs) {}
 InspectorFrontendHostAPI.prototype.close = function(url) {}
 InspectorFrontendHostAPI.prototype.append = function(url, content) {}
 InspectorFrontendHostAPI.prototype.sendMessageToBackend = function(message) {}
+InspectorFrontendHostAPI.prototype.sendMessageToEmbedder = function(message) {}
 InspectorFrontendHostAPI.prototype.recordActionTaken = function(actionCode) {}
 InspectorFrontendHostAPI.prototype.recordPanelShown = function(panelCode) {}
 InspectorFrontendHostAPI.prototype.recordSettingChanged = function(settingCode) {}
@@ -353,6 +355,7 @@ function ExtensionDescriptor() {
 function ExtensionReloadOptions() {
     this.ignoreCache = false;
     this.injectedScript = "";
+    this.preprocessingScript = "";
     this.userAgent = "";
 }
 

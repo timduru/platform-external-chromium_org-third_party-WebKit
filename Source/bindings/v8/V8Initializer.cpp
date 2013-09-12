@@ -95,14 +95,14 @@ static void messageHandlerInMainThread(v8::Handle<v8::Message> message, v8::Hand
     RefPtr<ScriptCallStack> callStack;
     // Currently stack trace is only collected when inspector is open.
     if (!stackTrace.IsEmpty() && stackTrace->GetFrameCount() > 0)
-        callStack = createScriptCallStack(stackTrace, ScriptCallStack::maxCallStackSizeToCapture);
+        callStack = createScriptCallStack(stackTrace, ScriptCallStack::maxCallStackSizeToCapture, v8::Isolate::GetCurrent());
 
     v8::Handle<v8::Value> resourceName = message->GetScriptResourceName();
     bool shouldUseDocumentURL = resourceName.IsEmpty() || !resourceName->IsString();
     String resource = shouldUseDocumentURL ? firstWindow->document()->url() : toWebCoreString(resourceName);
     AccessControlStatus corsStatus = message->IsSharedCrossOrigin() ? SharableCrossOrigin : NotSharableCrossOrigin;
 
-    RefPtr<ErrorEvent> event = ErrorEvent::create(errorMessage, resource, message->GetLineNumber(), message->GetStartColumn());
+    RefPtr<ErrorEvent> event = ErrorEvent::create(errorMessage, resource, message->GetLineNumber(), message->GetStartColumn(), DOMWrapperWorld::current());
     if (V8DOMWrapper::isDOMWrapper(data)) {
         v8::Handle<v8::Object> obj = v8::Handle<v8::Object>::Cast(data);
         WrapperTypeInfo* type = toWrapperTypeInfo(obj);
@@ -190,7 +190,7 @@ static void messageHandlerInWorker(v8::Handle<v8::Message> message, v8::Handle<v
     if (ScriptExecutionContext* context = getScriptExecutionContext()) {
         String errorMessage = toWebCoreString(message->Get());
         String sourceURL = toWebCoreString(message->GetScriptResourceName());
-        RefPtr<ErrorEvent> event = ErrorEvent::create(errorMessage, sourceURL, message->GetLineNumber(), message->GetStartColumn());
+        RefPtr<ErrorEvent> event = ErrorEvent::create(errorMessage, sourceURL, message->GetLineNumber(), message->GetStartColumn(), DOMWrapperWorld::current());
         AccessControlStatus corsStatus = message->IsSharedCrossOrigin() ? SharableCrossOrigin : NotSharableCrossOrigin;
 
         V8ErrorHandler::storeExceptionOnErrorEventWrapper(event.get(), data, v8::Isolate::GetCurrent());

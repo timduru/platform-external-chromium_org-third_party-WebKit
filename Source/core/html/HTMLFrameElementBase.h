@@ -45,13 +45,13 @@ public:
     virtual bool canContainRangeEndPoint() const { return false; }
 
 protected:
-    HTMLFrameElementBase(const QualifiedName&, Document*);
+    HTMLFrameElementBase(const QualifiedName&, Document&);
 
     bool isURLAllowed() const;
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual InsertionNotificationRequest insertedInto(ContainerNode*) OVERRIDE;
-    virtual void didNotifySubtreeInsertions(ContainerNode*) OVERRIDE;
+    virtual void didNotifySubtreeInsertionsToDocument() OVERRIDE;
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
 
 private:

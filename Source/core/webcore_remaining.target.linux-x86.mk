@@ -58,6 +58,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/animation/AnimatableNumber.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableTransform.cpp \
 	third_party/WebKit/Source/core/animation/AnimatableValue.cpp \
+	third_party/WebKit/Source/core/animation/AnimatableVisibility.cpp \
 	third_party/WebKit/Source/core/animation/Animation.cpp \
 	third_party/WebKit/Source/core/animation/DocumentTimeline.cpp \
 	third_party/WebKit/Source/core/animation/InertAnimation.cpp \
@@ -160,7 +161,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/css/SelectorCheckerFastPath.cpp \
 	third_party/WebKit/Source/core/css/SelectorFilter.cpp \
 	third_party/WebKit/Source/core/css/ShadowValue.cpp \
-	third_party/WebKit/Source/core/css/StyleColor.cpp \
 	third_party/WebKit/Source/core/css/StyleInvalidationAnalysis.cpp \
 	third_party/WebKit/Source/core/css/StyleMedia.cpp \
 	third_party/WebKit/Source/core/css/StylePropertySerializer.cpp \
@@ -244,19 +244,23 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/editing/chromium/EditorChromium.cpp \
 	third_party/WebKit/Source/core/editing/htmlediting.cpp \
 	third_party/WebKit/Source/core/editing/markup.cpp \
+	third_party/WebKit/Source/core/fetch/CachedMetadata.cpp \
+	third_party/WebKit/Source/core/fetch/CrossOriginAccessControl.cpp \
 	third_party/WebKit/Source/core/fetch/CSSStyleSheetResource.cpp \
 	third_party/WebKit/Source/core/fetch/DocumentResource.cpp \
+	third_party/WebKit/Source/core/fetch/FetchContext.cpp \
+	third_party/WebKit/Source/core/fetch/FetchRequest.cpp \
 	third_party/WebKit/Source/core/fetch/FontResource.cpp \
 	third_party/WebKit/Source/core/fetch/ImageResource.cpp \
 	third_party/WebKit/Source/core/fetch/RawResource.cpp \
 	third_party/WebKit/Source/core/fetch/Resource.cpp \
 	third_party/WebKit/Source/core/fetch/ResourceFetcher.cpp \
-	third_party/WebKit/Source/core/fetch/ResourceLoadNotifier.cpp \
 	third_party/WebKit/Source/core/fetch/ResourceLoader.cpp \
+	third_party/WebKit/Source/core/fetch/ResourceLoaderSet.cpp \
 	third_party/WebKit/Source/core/fetch/ResourcePtr.cpp \
-	third_party/WebKit/Source/core/fetch/FetchRequest.cpp \
 	third_party/WebKit/Source/core/fetch/ScriptResource.cpp \
 	third_party/WebKit/Source/core/fetch/ShaderResource.cpp \
+	third_party/WebKit/Source/core/fetch/TextResourceDecoder.cpp \
 	third_party/WebKit/Source/core/fetch/TextTrackResource.cpp \
 	third_party/WebKit/Source/core/fetch/XSLStyleSheetResource.cpp \
 	third_party/WebKit/Source/core/fetch/MemoryCache.cpp \
@@ -335,9 +339,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/inspector/WorkerDebuggerAgent.cpp \
 	third_party/WebKit/Source/core/inspector/WorkerInspectorController.cpp \
 	third_party/WebKit/Source/core/inspector/WorkerRuntimeAgent.cpp \
-	third_party/WebKit/Source/core/loader/CachedMetadata.cpp \
 	third_party/WebKit/Source/core/loader/CookieJar.cpp \
-	third_party/WebKit/Source/core/loader/CrossOriginAccessControl.cpp \
 	third_party/WebKit/Source/core/loader/CrossOriginPreflightResultCache.cpp \
 	third_party/WebKit/Source/core/loader/DocumentLoadTiming.cpp \
 	third_party/WebKit/Source/core/loader/DocumentLoader.cpp \
@@ -346,6 +348,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/EmptyClients.cpp \
 	third_party/WebKit/Source/core/loader/FormState.cpp \
 	third_party/WebKit/Source/core/loader/FormSubmission.cpp \
+	third_party/WebKit/Source/core/loader/FrameFetchContext.cpp \
 	third_party/WebKit/Source/core/loader/FrameLoader.cpp \
 	third_party/WebKit/Source/core/loader/FrameLoaderStateMachine.cpp \
 	third_party/WebKit/Source/core/loader/HistoryController.cpp \
@@ -361,7 +364,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/loader/PrerendererClient.cpp \
 	third_party/WebKit/Source/core/loader/ProgressTracker.cpp \
 	third_party/WebKit/Source/core/loader/SinkDocument.cpp \
-	third_party/WebKit/Source/core/loader/TextResourceDecoder.cpp \
 	third_party/WebKit/Source/core/loader/TextResourceDecoderBuilder.cpp \
 	third_party/WebKit/Source/core/loader/TextTrackLoader.cpp \
 	third_party/WebKit/Source/core/loader/ThreadableLoader.cpp \
@@ -555,6 +557,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
+	'-DWTF_VECTOR_INITIAL_SIZE=16' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -567,6 +570,7 @@ MY_DEFS_Debug := \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
+	'-DCLD_VERSION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -584,12 +588,10 @@ MY_DEFS_Debug := \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
-	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
-	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
@@ -716,6 +718,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
+	'-DWTF_VECTOR_INITIAL_SIZE=16' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -728,6 +731,7 @@ MY_DEFS_Release := \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
+	'-DCLD_VERSION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -745,12 +749,10 @@ MY_DEFS_Release := \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
-	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
-	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
@@ -849,7 +851,9 @@ LOCAL_LDFLAGS_Debug := \
 	-nostdlib \
 	-Wl,--no-undefined \
 	-Wl,--exclude-libs=ALL \
+	-Wl,--fatal-warnings \
 	-Wl,--gc-sections \
+	-Wl,--warn-shared-textrel \
 	-Wl,-O1 \
 	-Wl,--as-needed
 
@@ -866,7 +870,9 @@ LOCAL_LDFLAGS_Release := \
 	-Wl,--exclude-libs=ALL \
 	-Wl,-O1 \
 	-Wl,--as-needed \
-	-Wl,--gc-sections
+	-Wl,--gc-sections \
+	-Wl,--fatal-warnings \
+	-Wl,--warn-shared-textrel
 
 
 LOCAL_LDFLAGS := $(LOCAL_LDFLAGS_$(GYP_CONFIGURATION))

@@ -40,6 +40,7 @@
 #include "core/page/Settings.h"
 #include "core/page/animation/AnimationController.h"
 #include "core/page/scrolling/ScrollingCoordinator.h"
+#include "core/platform/animation/KeyframeValueList.h"
 #include "core/platform/graphics/FontCache.h"
 #include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/graphics/GraphicsLayer.h"
@@ -159,9 +160,9 @@ RenderLayerBacking::RenderLayerBacking(RenderLayer* layer)
     , m_backgroundLayerPaintsFixedRootBackground(false)
 {
     if (layer->isRootLayer()) {
-        Frame* frame = toRenderView(renderer())->frameView()->frame();
-        Page* page = frame ? frame->page() : 0;
-        if (page && frame && page->mainFrame() == frame) {
+        Frame& frame = toRenderView(renderer())->frameView()->frame();
+        Page* page = frame.page();
+        if (page && page->mainFrame() == &frame) {
             m_isMainFrameRenderViewLayer = true;
         }
     }
@@ -815,8 +816,7 @@ void RenderLayerBacking::updateDrawsContent(bool isSimpleContainer)
 
     bool hasPaintedContent = containsPaintedContent(isSimpleContainer);
     if (hasPaintedContent && isAcceleratedCanvas(renderer())) {
-        HTMLCanvasElement* canvas = static_cast<HTMLCanvasElement*>(renderer()->node());
-        CanvasRenderingContext* context = canvas->renderingContext();
+        CanvasRenderingContext* context = toHTMLCanvasElement(renderer()->node())->renderingContext();
         // Content layer may be null if context is lost.
         if (WebKit::WebLayer* contentLayer = context->platformLayer()) {
             Color bgColor;
@@ -1219,7 +1219,7 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
 
     if (renderObject->node() && renderObject->node()->isDocumentNode()) {
         // Look to see if the root object has a non-simple background
-        RenderObject* rootObject = renderObject->document()->documentElement() ? renderObject->document()->documentElement()->renderer() : 0;
+        RenderObject* rootObject = renderObject->document().documentElement() ? renderObject->document().documentElement()->renderer() : 0;
         if (!rootObject)
             return false;
 
@@ -1231,7 +1231,7 @@ bool RenderLayerBacking::isSimpleContainerCompositingLayer() const
             return false;
 
         // Now look at the body's renderer.
-        HTMLElement* body = renderObject->document()->body();
+        HTMLElement* body = renderObject->document().body();
         RenderObject* bodyObject = (body && body->hasLocalName(bodyTag)) ? body->renderer() : 0;
         if (!bodyObject)
             return false;
@@ -1695,7 +1695,7 @@ bool RenderLayerBacking::startAnimation(double timeOffset, const CSSAnimationDat
             continue;
 
         // Get timing function.
-        RefPtr<TimingFunction> tf = keyframeStyle->hasAnimations() ? (*keyframeStyle->animations()).animation(0)->timingFunction() : 0;
+        RefPtr<TimingFunction> tf = currentKeyframe.timingFunction(keyframes.animationName());
 
         bool isFirstOrLastKeyframe = key == 0 || key == 1;
         if ((hasTransform && isFirstOrLastKeyframe) || currentKeyframe.containsProperty(CSSPropertyWebkitTransform))

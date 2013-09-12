@@ -79,7 +79,7 @@ static inline unsigned computeLengthForSubmission(const String& text)
     return text.length() + numberOfLineBreaks(text);
 }
 
-HTMLTextAreaElement::HTMLTextAreaElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+HTMLTextAreaElement::HTMLTextAreaElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
     : HTMLTextFormControlElement(tagName, document, form)
     , m_rows(defaultRows)
     , m_cols(defaultCols)
@@ -93,7 +93,7 @@ HTMLTextAreaElement::HTMLTextAreaElement(const QualifiedName& tagName, Document*
     ScriptWrappable::init(this);
 }
 
-PassRefPtr<HTMLTextAreaElement> HTMLTextAreaElement::create(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+PassRefPtr<HTMLTextAreaElement> HTMLTextAreaElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
 {
     RefPtr<HTMLTextAreaElement> textArea = adoptRef(new HTMLTextAreaElement(tagName, document, form));
     textArea->ensureUserAgentShadowRoot();
@@ -211,7 +211,7 @@ bool HTMLTextAreaElement::appendFormData(FormDataList& encoding, bool)
     if (name().isEmpty())
         return false;
 
-    document()->updateLayout();
+    document().updateLayout();
 
     const String& text = (m_wrap == HardWrap) ? valueWithHardLineBreaks() : value();
     encoding.appendData(name(), text);
@@ -253,8 +253,8 @@ void HTMLTextAreaElement::updateFocusAppearance(bool restorePreviousSelection)
     } else
         restoreCachedSelection();
 
-    if (document()->frame())
-        document()->frame()->selection()->revealSelection();
+    if (document().frame())
+        document().frame()->selection().revealSelection();
 }
 
 void HTMLTextAreaElement::defaultEventHandler(Event* event)
@@ -269,7 +269,7 @@ void HTMLTextAreaElement::defaultEventHandler(Event* event)
 
 void HTMLTextAreaElement::handleFocusEvent(Element*, FocusDirection)
 {
-    if (Frame* frame = document()->frame())
+    if (Frame* frame = document().frame())
         frame->editor().textAreaOrTextFieldDidBeginEditing(this);
 }
 
@@ -305,7 +305,7 @@ void HTMLTextAreaElement::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent*
     // If the text field has no focus, we don't need to take account of the
     // selection length. The selection is the source of text drag-and-drop in
     // that case, and nothing in the text field will be removed.
-    unsigned selectionLength = focused() ? computeLengthForSubmission(plainText(document()->frame()->selection()->selection().toNormalizedRange().get())) : 0;
+    unsigned selectionLength = focused() ? computeLengthForSubmission(plainText(document().frame()->selection().selection().toNormalizedRange().get())) : 0;
     ASSERT(currentLength >= selectionLength);
     unsigned baseLength = currentLength - selectionLength;
     unsigned appendableLength = unsignedMaxLength > baseLength ? unsignedMaxLength - baseLength : 0;
@@ -387,7 +387,7 @@ void HTMLTextAreaElement::setValueCommon(const String& newValue)
     setFormControlValueMatchesRenderer(true);
 
     // Set the caret to the end of the text value.
-    if (document()->focusedElement() == this) {
+    if (document().focusedElement() == this) {
         unsigned endOfString = m_value.length();
         setSelectionRange(endOfString, endOfString);
     }
@@ -428,7 +428,7 @@ void HTMLTextAreaElement::setDefaultValue(const String& defaultValue)
     value.replace("\r\n", "\n");
     value.replace('\r', '\n');
 
-    insertBefore(document()->createTextNode(value), firstChild(), IGNORE_EXCEPTION);
+    insertBefore(document().createTextNode(value), firstChild(), IGNORE_EXCEPTION);
 
     if (!m_isDirty)
         setNonDirtyValue(value);

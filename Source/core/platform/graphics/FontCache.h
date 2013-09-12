@@ -39,10 +39,14 @@
 #include "wtf/text/WTFString.h"
 #include "wtf/unicode/Unicode.h"
 
-#if OS(WINDOWS)
+#if OS(WIN)
 #include <windows.h>
 #include <objidl.h>
 #include <mlang.h>
+#endif
+
+#if OS(WIN) && !ENABLE(GDI_FONTS_ON_WINDOWS)
+#include "SkFontMgr.h"
 #endif
 
 class SkTypeface;
@@ -93,7 +97,7 @@ public:
     size_t inactiveFontDataCount();
     void purgeInactiveFontData(int count = INT_MAX);
 
-#if OS(WINDOWS)
+#if OS(WIN)
     PassRefPtr<SimpleFontData> fontDataFromDescriptionAndLogFont(const FontDescription&, ShouldRetain, const LOGFONT&, wchar_t* outFontFamilyName);
 #endif
 
@@ -139,7 +143,11 @@ private:
     // Don't purge if this count is > 0;
     int m_purgePreventCount;
 
-#if OS(DARWIN) || OS(ANDROID)
+#if OS(WIN) && !ENABLE(GDI_FONTS_ON_WINDOWS)
+    OwnPtr<SkFontMgr> m_fontManager;
+#endif
+
+#if OS(MACOSX) || OS(ANDROID)
     friend class ComplexTextController;
 #endif
     friend class SimpleFontData; // For getFontResourceData(const FontPlatformData*)

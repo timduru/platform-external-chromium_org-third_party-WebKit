@@ -87,7 +87,7 @@ static inline bool isAllWhitespace(const String& string)
     return string.isAllSpecialCharacters<isHTMLSpace>();
 }
 
-static inline void insert(HTMLConstructionSiteTask& task, AttachBehavior attachBehavior = AttachLazily)
+static inline void insert(HTMLConstructionSiteTask& task)
 {
     if (task.parent->hasTagName(templateTag))
         task.parent = toHTMLTemplateElement(task.parent.get())->content();
@@ -96,16 +96,16 @@ static inline void insert(HTMLConstructionSiteTask& task, AttachBehavior attachB
         parent->parserRemoveChild(task.child.get());
 
     if (task.nextChild)
-        task.parent->parserInsertBefore(task.child.get(), task.nextChild.get(), attachBehavior);
+        task.parent->parserInsertBefore(task.child.get(), task.nextChild.get());
     else
-        task.parent->parserAppendChild(task.child.get(), attachBehavior);
+        task.parent->parserAppendChild(task.child.get());
 }
 
 static inline void executeInsertTask(HTMLConstructionSiteTask& task)
 {
     ASSERT(task.operation == HTMLConstructionSiteTask::Insert);
 
-    insert(task, DeprecatedAttachNow);
+    insert(task);
 
     task.child->beginParsingChildren();
 
@@ -206,18 +206,18 @@ HTMLConstructionSite::HTMLConstructionSite(Document* document, ParserContentPoli
     , m_redirectAttachToFosterParent(false)
     , m_inQuirksMode(document->inQuirksMode())
 {
-    ASSERT(m_document->isHTMLDocument() || m_document->isSVGDocument() || m_document->isXHTMLDocument());
+    ASSERT(m_document->isHTMLDocument() || m_document->isXHTMLDocument());
 }
 
 HTMLConstructionSite::HTMLConstructionSite(DocumentFragment* fragment, ParserContentPolicy parserContentPolicy)
-    : m_document(fragment->document())
+    : m_document(&fragment->document())
     , m_attachmentRoot(fragment)
     , m_parserContentPolicy(parserContentPolicy)
     , m_isParsingFragment(true)
     , m_redirectAttachToFosterParent(false)
-    , m_inQuirksMode(fragment->document()->inQuirksMode())
+    , m_inQuirksMode(fragment->document().inQuirksMode())
 {
-    ASSERT(m_document->isHTMLDocument() || m_document->isSVGDocument() || m_document->isXHTMLDocument());
+    ASSERT(m_document->isHTMLDocument() || m_document->isXHTMLDocument());
 }
 
 HTMLConstructionSite::~HTMLConstructionSite()
@@ -251,7 +251,8 @@ void HTMLConstructionSite::dispatchDocumentElementAvailableIfNeeded()
 
 void HTMLConstructionSite::insertHTMLHtmlStartTagBeforeHTML(AtomicHTMLToken* token)
 {
-    RefPtr<HTMLHtmlElement> element = HTMLHtmlElement::create(m_document);
+    ASSERT(m_document);
+    RefPtr<HTMLHtmlElement> element = HTMLHtmlElement::create(*m_document);
     setAttributes(element.get(), token, m_parserContentPolicy);
     attachLater(m_attachmentRoot, element);
     m_openElements.pushHTMLHtmlElement(HTMLStackItem::create(element, token));
@@ -430,7 +431,8 @@ void HTMLConstructionSite::insertComment(AtomicHTMLToken* token)
 void HTMLConstructionSite::insertCommentOnDocument(AtomicHTMLToken* token)
 {
     ASSERT(token->type() == HTMLToken::Comment);
-    attachLater(m_attachmentRoot, Comment::create(m_document, token->comment()));
+    ASSERT(m_document);
+    attachLater(m_attachmentRoot, Comment::create(*m_document, token->comment()));
 }
 
 void HTMLConstructionSite::insertCommentOnHTMLHtmlElement(AtomicHTMLToken* token)
@@ -549,8 +551,7 @@ void HTMLConstructionSite::insertTextNode(const String& characters, WhitespaceMo
     if (previousChild && previousChild->isTextNode()) {
         // FIXME: We're only supposed to append to this text node if it
         // was the last text node inserted by the parser.
-        CharacterData* textNode = static_cast<CharacterData*>(previousChild);
-        currentPosition = textNode->parserAppendData(characters, 0, lengthLimit);
+        currentPosition = toCharacterData(previousChild)->parserAppendData(characters, 0, lengthLimit);
     }
 
     while (currentPosition < characters.length()) {
@@ -609,12 +610,12 @@ void HTMLConstructionSite::takeAllChildren(HTMLStackItem* newParent, HTMLElement
 PassRefPtr<Element> HTMLConstructionSite::createElement(AtomicHTMLToken* token, const AtomicString& namespaceURI)
 {
     QualifiedName tagName(nullAtom, token->name(), namespaceURI);
-    RefPtr<Element> element = ownerDocumentForCurrentNode()->createElement(tagName, true);
+    RefPtr<Element> element = ownerDocumentForCurrentNode().createElement(tagName, true);
     setAttributes(element.get(), token, m_parserContentPolicy);
     return element.release();
 }
 
-inline Document* HTMLConstructionSite::ownerDocumentForCurrentNode()
+inline Document& HTMLConstructionSite::ownerDocumentForCurrentNode()
 {
     if (currentNode()->hasTagName(templateTag))
         return toHTMLTemplateElement(currentElement())->content()->document();
@@ -624,14 +625,14 @@ inline Document* HTMLConstructionSite::ownerDocumentForCurrentNode()
 PassRefPtr<Element> HTMLConstructionSite::createHTMLElement(AtomicHTMLToken* token)
 {
     QualifiedName tagName(nullAtom, token->name(), xhtmlNamespaceURI);
-    Document* document = ownerDocumentForCurrentNode();
+    Document& document = ownerDocumentForCurrentNode();
     // Only associate the element with the current form if we're creating the new element
     // in a document with a browsing context (rather than in <template> contents).
-    HTMLFormElement* form = document->frame() ? m_form.get() : 0;
+    HTMLFormElement* form = document.frame() ? m_form.get() : 0;
     // FIXME: This can't use HTMLConstructionSite::createElement because we
     // have to pass the current form element.  We should rework form association
     // to occur after construction to allow better code sharing here.
-    RefPtr<Element> element = HTMLElementFactory::createHTMLElement(tagName, document, form, true);
+    RefPtr<Element> element = HTMLElementFactory::createHTMLElement(tagName, &document, form, true);
     setAttributes(element.get(), token, m_parserContentPolicy);
     ASSERT(element->isHTMLElement());
     return element.release();

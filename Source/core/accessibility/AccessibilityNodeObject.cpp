@@ -259,9 +259,7 @@ void AccessibilityNodeObject::elementsFromAttribute(Vector<Element*>& elements, 
     if (!node || !node->isElementNode())
         return;
 
-    TreeScope* scope = node->treeScope();
-    if (!scope)
-        return;
+    TreeScope& scope = node->treeScope();
 
     String idList = getAttribute(attribute).string();
     if (idList.isEmpty())
@@ -274,7 +272,7 @@ void AccessibilityNodeObject::elementsFromAttribute(Vector<Element*>& elements, 
     unsigned size = idVector.size();
     for (unsigned i = 0; i < size; ++i) {
         AtomicString idName(idVector[i]);
-        Element* idElement = scope->getElementById(idName);
+        Element* idElement = scope.getElementById(idName);
         if (idElement)
             elements.append(idElement);
     }
@@ -343,7 +341,7 @@ HTMLLabelElement* AccessibilityNodeObject::labelForElement(Element* element) con
 
     const AtomicString& id = element->getIdAttribute();
     if (!id.isEmpty()) {
-        if (HTMLLabelElement* label = element->treeScope()->labelElementForId(id))
+        if (HTMLLabelElement* label = element->treeScope().labelElementForId(id))
             return label;
     }
 
@@ -900,7 +898,7 @@ AccessibilityObject* AccessibilityNodeObject::titleUIElement() const
         return 0;
 
     if (isFieldset())
-        return axObjectCache()->getOrCreate(static_cast<HTMLFieldSetElement*>(node())->legend());
+        return axObjectCache()->getOrCreate(toHTMLFieldSetElement(node())->legend());
 
     HTMLLabelElement* label = labelForElement(toElement(node()));
     if (label)
@@ -935,7 +933,7 @@ void AccessibilityNodeObject::colorValue(int& r, int& g, int& b) const
         return;
 
     // HTMLInputElement::value always returns a string parseable by Color().
-    StyleColor color(input->value());
+    Color color(input->value());
     r = color.red();
     g = color.green();
     b = color.blue();
@@ -1453,7 +1451,7 @@ Document* AccessibilityNodeObject::document() const
 {
     if (!node())
         return 0;
-    return node()->document();
+    return &node()->document();
 }
 
 void AccessibilityNodeObject::setNode(Node* node)

@@ -34,6 +34,7 @@
 #include "core/dom/UserGestureIndicator.h"
 #include "core/editing/VisibleUnits.h"
 #include "core/editing/htmlediting.h"
+#include "core/page/Frame.h"
 #include "core/platform/LocalizedStrings.h"
 #include "core/rendering/RenderListItem.h"
 #include "core/rendering/RenderTheme.h"
@@ -505,12 +506,7 @@ AccessibilityObject* AccessibilityObject::firstAccessibleObjectFromNode(const No
     if (!node)
         return 0;
 
-    Document* document = node->document();
-    if (!document)
-        return 0;
-
-    AXObjectCache* cache = document->axObjectCache();
-
+    AXObjectCache* cache = node->document().axObjectCache();
     AccessibilityObject* accessibleObject = cache->getOrCreate(node->renderer());
     while (accessibleObject && accessibleObject->accessibilityIsIgnored()) {
         node = NodeTraversal::next(node);
@@ -563,7 +559,7 @@ Document* AccessibilityObject::document() const
     if (!frameView)
         return 0;
 
-    return frameView->frame()->document();
+    return frameView->frame().document();
 }
 
 FrameView* AccessibilityObject::documentFrameView() const
@@ -888,7 +884,7 @@ static bool replacedNodeNeedsCharacter(Node* replacedNode)
         return false;
 
     // create an AX object, but skip it if it is not supposed to be seen
-    AccessibilityObject* object = replacedNode->renderer()->document()->axObjectCache()->getOrCreate(replacedNode);
+    AccessibilityObject* object = replacedNode->renderer()->document().axObjectCache()->getOrCreate(replacedNode);
     if (object->accessibilityIsIgnored())
         return false;
 

@@ -23,10 +23,12 @@ CSSAnimationUnprefixed status=experimental
 CSSCompositing status=experimental
 CSSExclusions status=experimental
 CSSGridLayout status=experimental
+CSSMaskSourceType status=experimental
 CSSRegions status=experimental
-CSSShapes status=experimental, writeable=True
+CSSShapes status=experimental
 CSSTouchAction status=test
 CSSVariables status=experimental
+CSSViewport status=experimental
 CSS3Text status=experimental
 CSS3TextDecorations status=experimental
 CustomElements status=experimental
@@ -47,7 +49,6 @@ ExperimentalContentSecurityPolicyFeatures status=experimental
 FileSystem status=stable
 FontLoadEvents status=experimental
 Fullscreen status=stable
-CSSViewport status=experimental
 Gamepad status=stable
 Geolocation status=stable
 HTMLImports status=test
@@ -66,7 +67,7 @@ MediaStream status=stable
 Notifications status=stable
 ObjectFitPosition status=experimental
 PagePopup status=stable
-ParseSVGAsHTML
+PartialLayout status=experimental
 PathOpsSVGClipping
 PeerConnection depends_on=MediaStream, status=stable
 ProgrammaticScrollNotifications status=test

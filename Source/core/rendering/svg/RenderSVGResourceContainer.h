@@ -43,6 +43,7 @@ public:
     static AffineTransform transformOnNonScalingStroke(RenderObject*, const AffineTransform& resourceTransform);
 
     void idChanged();
+    void addClientRenderLayer(Node*);
     void addClientRenderLayer(RenderLayer*);
     void removeClientRenderLayer(RenderLayer*);
 
@@ -75,19 +76,19 @@ private:
     HashSet<RenderLayer*> m_clientLayers;
 };
 
-inline RenderSVGResourceContainer* getRenderSVGResourceContainerById(Document* document, const AtomicString& id)
+inline RenderSVGResourceContainer* getRenderSVGResourceContainerById(Document& document, const AtomicString& id)
 {
     if (id.isEmpty())
         return 0;
 
-    if (RenderSVGResourceContainer* renderResource = document->accessSVGExtensions()->resourceById(id))
+    if (RenderSVGResourceContainer* renderResource = document.accessSVGExtensions()->resourceById(id))
         return renderResource;
 
     return 0;
 }
 
 template<typename Renderer>
-Renderer* getRenderSVGResourceById(Document* document, const AtomicString& id)
+Renderer* getRenderSVGResourceById(Document& document, const AtomicString& id)
 {
     if (RenderSVGResourceContainer* container = getRenderSVGResourceContainerById(document, id))
         return container->cast<Renderer>();

@@ -31,6 +31,7 @@
 #include "core/fetch/FetchRequest.h"
 #include "core/fetch/Resource.h"
 #include "core/fetch/ResourceLoaderHost.h"
+#include "core/fetch/ResourceLoaderOptions.h"
 #include "core/fetch/ResourcePtr.h"
 #include "core/platform/Timer.h"
 #include "wtf/Deque.h"
@@ -43,6 +44,7 @@ namespace WebCore {
 
 class CSSStyleSheetResource;
 class DocumentResource;
+class FetchContext;
 class FontResource;
 class ImageResource;
 class RawResource;
@@ -57,6 +59,7 @@ class FrameLoader;
 class ImageLoader;
 class KURL;
 class ResourceTimingInfo;
+class ResourceLoaderSet;
 
 // The ResourceFetcher provides a per-context interface to the MemoryCache
 // and enforces a bunch of security checks and rules for resource revalidation.
@@ -77,6 +80,8 @@ public:
 
     using RefCounted<ResourceFetcher>::ref;
     using RefCounted<ResourceFetcher>::deref;
+
+    unsigned long fetchSynchronously(const ResourceRequest&, StoredCredentials, ResourceError&, ResourceResponse&, Vector<char>&);
 
     ResourcePtr<ImageResource> fetchImage(FetchRequest&);
     ResourcePtr<CSSStyleSheetResource> fetchCSSStyleSheet(FetchRequest&);
@@ -108,9 +113,8 @@ public:
 
     bool shouldDeferImageLoad(const KURL&) const;
 
-    CachePolicy cachePolicy(Resource::Type) const;
-
     Frame* frame() const; // Can be null
+    FetchContext& context() const;
     Document* document() const { return m_document; } // Can be null
     void setDocument(Document* document) { m_document = document; }
 
@@ -129,6 +133,11 @@ public:
     void printPreloadStats();
     bool canRequest(Resource::Type, const KURL&, const ResourceLoaderOptions&, bool forPreload = false);
     bool canAccess(Resource*);
+    bool checkInsecureContent(Resource::Type, const KURL&, MixedContentBlockingTreatment) const;
+
+    void setDefersLoading(bool);
+    void stopFetching();
+    bool isFetching() const;
 
     // ResourceLoaderHost
     virtual void incrementRequestCount(const Resource*) OVERRIDE;
@@ -156,7 +165,6 @@ private:
 
     explicit ResourceFetcher(DocumentLoader*);
 
-    FrameLoader* frameLoader();
     bool shouldLoadNewResource() const;
 
     ResourcePtr<Resource> requestResource(Resource::Type, FetchRequest&);
@@ -174,7 +182,6 @@ private:
     void addAdditionalRequestHeaders(ResourceRequest&, Resource::Type);
 
     void notifyLoadedFromMemoryCache(Resource*);
-    bool checkInsecureContent(Resource::Type, const KURL&) const;
 
     void garbageCollectDocumentResourcesTimerFired(Timer<ResourceFetcher>*);
     void performPostLoadActions();
@@ -201,6 +208,9 @@ private:
 
     typedef HashMap<Resource*, RefPtr<ResourceTimingInfo> > ResourceTimingInfoMap;
     ResourceTimingInfoMap m_resourceTimingInfoMap;
+
+    OwnPtr<ResourceLoaderSet> m_loaders;
+    OwnPtr<ResourceLoaderSet> m_multipartLoaders;
 
     // 29 bits left
     bool m_autoLoadImages : 1;

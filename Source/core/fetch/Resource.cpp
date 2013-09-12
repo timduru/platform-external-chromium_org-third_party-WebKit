@@ -24,6 +24,8 @@
 #include "config.h"
 #include "core/fetch/Resource.h"
 
+#include "core/fetch/CachedMetadata.h"
+#include "core/fetch/CrossOriginAccessControl.h"
 #include "core/fetch/MemoryCache.h"
 #include "core/fetch/ResourceClient.h"
 #include "core/fetch/ResourceClientWalker.h"
@@ -31,8 +33,6 @@
 #include "core/fetch/ResourceLoader.h"
 #include "core/fetch/ResourcePtr.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/loader/CachedMetadata.h"
-#include "core/loader/CrossOriginAccessControl.h"
 #include "core/platform/Logging.h"
 #include "core/platform/PurgeableBuffer.h"
 #include "core/platform/SharedBuffer.h"
@@ -81,11 +81,11 @@ const char* const headerPrefixesToIgnoreAfterRevalidation[] = {
 static inline bool shouldUpdateHeaderAfterRevalidation(const AtomicString& header)
 {
     for (size_t i = 0; i < WTF_ARRAY_LENGTH(headersToIgnoreAfterRevalidation); i++) {
-        if (header == headersToIgnoreAfterRevalidation[i])
+        if (equalIgnoringCase(header, headersToIgnoreAfterRevalidation[i]))
             return false;
     }
     for (size_t i = 0; i < WTF_ARRAY_LENGTH(headerPrefixesToIgnoreAfterRevalidation); i++) {
-        if (header.startsWith(headerPrefixesToIgnoreAfterRevalidation[i]))
+        if (header.startsWith(headerPrefixesToIgnoreAfterRevalidation[i], false))
             return false;
     }
     return true;

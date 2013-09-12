@@ -135,6 +135,7 @@ WebInspector.CodeMirrorTextEditor = function(url, delegate)
     this._codeMirror.setOption("flattenSpans", false);
     this._codeMirror.setOption("maxHighlightLength", 1000);
     this._codeMirror.setOption("mode", null);
+    this._codeMirror.setOption("crudeMeasuringFrom", 1000);
 
     this._shouldClearHistory = true;
     this._lineSeparator = "\n";
@@ -478,7 +479,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
      */
     copyRange: function(textRange)
     {
-        var pos = this._toPos(textRange);
+        var pos = this._toPos(textRange.normalize());
         return this._codeMirror.getRange(pos.start, pos.end);
     },
 
@@ -844,13 +845,7 @@ WebInspector.CodeMirrorTextEditor.prototype = {
 
     onResize: function()
     {
-        if (WebInspector.experimentsSettings.scrollBeyondEndOfFile.isEnabled())
-            this._resizeEditor();
-        else {
-            var width = this.element.parentElement.offsetWidth;
-            var height = this.element.parentElement.offsetHeight;
-            this._codeMirror.setSize(width, height);
-        }
+        this._resizeEditor();
     },
 
     /**
@@ -906,12 +901,11 @@ WebInspector.CodeMirrorTextEditor.prototype = {
      */
     _change: function(codeMirror, changeObject)
     {
-        if (WebInspector.experimentsSettings.scrollBeyondEndOfFile.isEnabled()) {
-            var hasOneLine = this._codeMirror.lineCount() === 1;
-            if (hasOneLine !== this._hasOneLine)
-                this._resizeEditor();
-            this._hasOneLine = hasOneLine;
-        }
+        // We do not show "scroll beyond end of file" span for one line documents, so we need to check if "document has one line" changed.
+        var hasOneLine = this._codeMirror.lineCount() === 1;
+        if (hasOneLine !== this._hasOneLine)
+            this._resizeEditor();
+        this._hasOneLine = hasOneLine;
         var widgets = this._elementToWidget.values();
         for (var i = 0; i < widgets.length; ++i)
             this._codeMirror.removeLineWidget(widgets[i]);

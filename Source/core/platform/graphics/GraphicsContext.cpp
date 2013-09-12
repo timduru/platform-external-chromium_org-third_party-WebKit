@@ -48,7 +48,7 @@
 #include "wtf/Assertions.h"
 #include "wtf/MathExtras.h"
 
-#if OS(DARWIN)
+#if OS(MACOSX)
 #include <ApplicationServices/ApplicationServices.h>
 #endif
 
@@ -273,7 +273,7 @@ void GraphicsContext::setShadow(const FloatSize& offset, float blur, const Color
     if (paintingDisabled())
         return;
 
-    if (!color.alpha() || (!offset.width() && !offset.height() && !blur)) {
+    if (!color.isValid() || !color.alpha() || (!offset.width() && !offset.height() && !blur)) {
         clearShadow();
         return;
     }
@@ -401,6 +401,11 @@ bool GraphicsContext::concat(const SkMatrix& matrix)
 
 void GraphicsContext::beginTransparencyLayer(float opacity, const FloatRect* bounds)
 {
+    beginTransparencyLayer(opacity, m_state->m_compositeOperator, bounds);
+}
+
+void GraphicsContext::beginTransparencyLayer(float opacity, CompositeOperator op, const FloatRect* bounds)
+{
     if (paintingDisabled())
         return;
 
@@ -412,7 +417,8 @@ void GraphicsContext::beginTransparencyLayer(float opacity, const FloatRect* bou
 
     SkPaint layerPaint;
     layerPaint.setAlpha(static_cast<unsigned char>(opacity * 255));
-    layerPaint.setXfermodeMode(m_state->m_xferMode);
+    RefPtr<SkXfermode> xferMode = WebCoreCompositeToSkiaComposite(op, m_state->m_blendMode);
+    layerPaint.setXfermode(xferMode.get());
 
     if (bounds) {
         SkRect skBounds = WebCoreFloatRectToSKRect(*bounds);
@@ -697,7 +703,7 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float widt
     static SkBitmap* misspellBitmap2x[2] = { 0, 0 };
     SkBitmap** misspellBitmap = deviceScaleFactor == 2 ? misspellBitmap2x : misspellBitmap1x;
     if (!misspellBitmap[index]) {
-#if OS(DARWIN)
+#if OS(MACOSX)
         // Match the artwork used by the Mac.
         const int rowPixels = 4 * deviceScaleFactor;
         const int colPixels = 3 * deviceScaleFactor;
@@ -772,7 +778,7 @@ void GraphicsContext::drawLineForDocumentMarker(const FloatPoint& pt, float widt
 #endif
     }
 
-#if OS(DARWIN)
+#if OS(MACOSX)
     SkScalar originX = WebCoreFloatToSkScalar(pt.x()) * deviceScaleFactor;
     SkScalar originY = WebCoreFloatToSkScalar(pt.y()) * deviceScaleFactor;
 
@@ -1701,14 +1707,19 @@ void GraphicsContext::setupPaintCommon(SkPaint* paint) const
 #endif
 
     paint->setAntiAlias(m_state->m_shouldAntialias);
-    paint->setXfermodeMode(m_state->m_xferMode);
-    paint->setLooper(m_state->m_looper.get());
+
+    if (!SkXfermode::IsMode(m_state->m_xferMode.get(), SkXfermode::kSrcOver_Mode))
+        paint->setXfermode(m_state->m_xferMode.get());
+
+    if (m_state->m_looper)
+        paint->setLooper(m_state->m_looper.get());
+
     paint->setColorFilter(m_state->m_colorFilter.get());
 }
 
 void GraphicsContext::drawOuterPath(const SkPath& path, SkPaint& paint, int width)
 {
-#if OS(DARWIN)
+#if OS(MACOSX)
     paint.setAlpha(64);
     paint.setStrokeWidth(width);
     paint.setPathEffect(new SkCornerPathEffect((width - 1) * 0.5f))->unref();
@@ -1721,7 +1732,7 @@ void GraphicsContext::drawOuterPath(const SkPath& path, SkPaint& paint, int widt
 
 void GraphicsContext::drawInnerPath(const SkPath& path, SkPaint& paint, int width)
 {
-#if OS(DARWIN)
+#if OS(MACOSX)
     paint.setAlpha(128);
     paint.setStrokeWidth(width * 0.5f);
     drawPath(path, paint);
@@ -1740,7 +1751,7 @@ void GraphicsContext::setRadii(SkVector* radii, IntSize topLeft, IntSize topRigh
         SkIntToScalar(bottomLeft.height()));
 }
 
-#if OS(DARWIN)
+#if OS(MACOSX)
 CGColorSpaceRef deviceRGBColorSpaceRef()
 {
     static CGColorSpaceRef deviceSpace = CGColorSpaceCreateDeviceRGB();
@@ -1852,6 +1863,10 @@ void GraphicsContext::setupShader(SkPaint* paint, Gradient* grad, Pattern* pat, 
     }
 
     paint->setColor(m_state->applyAlpha(color));
+
+    if (!shader)
+        return;
+
     paint->setShader(shader.get());
 }
 

@@ -44,14 +44,14 @@ static bool supportsLabels(Element* element)
     return toLabelableElement(element)->supportLabels();
 }
 
-inline HTMLLabelElement::HTMLLabelElement(const QualifiedName& tagName, Document* document)
+inline HTMLLabelElement::HTMLLabelElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(labelTag));
     ScriptWrappable::init(this);
 }
 
-PassRefPtr<HTMLLabelElement> HTMLLabelElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<HTMLLabelElement> HTMLLabelElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(new HTMLLabelElement(tagName, document));
 }
@@ -78,7 +78,7 @@ LabelableElement* HTMLLabelElement::control()
         return 0;
     }
 
-    if (Element* element = treeScope()->getElementById(controlId)) {
+    if (Element* element = treeScope().getElementById(controlId)) {
         if (supportsLabels(element))
             return toLabelableElement(element);
     }
@@ -131,7 +131,7 @@ void HTMLLabelElement::defaultEventHandler(Event* evt)
 
         processingClick = true;
 
-        document()->updateLayoutIgnorePendingStylesheets();
+        document().updateLayoutIgnorePendingStylesheets();
         if (element->isMouseFocusable())
             element->focus(true, FocusDirectionMouse);
 

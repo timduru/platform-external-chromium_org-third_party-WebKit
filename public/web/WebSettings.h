@@ -122,6 +122,7 @@ public:
     virtual void setLoadWithOverviewMode(bool) = 0;
     virtual void setLocalStorageEnabled(bool) = 0;
     virtual void setMediaPlaybackRequiresUserGesture(bool) = 0;
+    virtual void setMediaFullscreenRequiresUserGesture(bool) = 0;
     virtual void setMemoryInfoEnabled(bool) = 0;
     virtual void setMinimumAccelerated2dCanvasSize(int) = 0;
     virtual void setMinimumFontSize(int) = 0;
@@ -176,10 +177,13 @@ public:
     virtual void setUseWideViewport(bool) = 0;
     virtual void setValidationMessageTimerMagnification(int) = 0;
     virtual void setViewportEnabled(bool) = 0;
+    virtual void setViewportMetaLayoutSizeQuirk(bool) = 0;
+    virtual void setViewportMetaZeroValuesQuirk(bool) = 0;
     virtual void setVisualWordMovementEnabled(bool) = 0;
     virtual void setWebAudioEnabled(bool) = 0;
     virtual void setWebGLErrorsToConsoleEnabled(bool) = 0;
     virtual void setWebSecurityEnabled(bool) = 0;
+    virtual void setWideViewportQuirkEnabled(bool) = 0;
     virtual void setXSSAuditorEnabled(bool) = 0;
 
     // DEPRECATED: Delete after Chromium-side calls deleted.

@@ -106,10 +106,15 @@ static PassOwnPtr<InputTypeFactoryMap> createInputTypeFactoryMap()
     return map.release();
 }
 
-PassRefPtr<InputType> InputType::create(HTMLInputElement* element, const AtomicString& typeName)
+static const InputTypeFactoryMap* factoryMap()
 {
     static const InputTypeFactoryMap* factoryMap = createInputTypeFactoryMap().leakPtr();
-    InputTypeFactoryFunction factory = typeName.isEmpty() ? 0 : factoryMap->get(typeName);
+    return factoryMap;
+}
+
+PassRefPtr<InputType> InputType::create(HTMLInputElement* element, const AtomicString& typeName)
+{
+    InputTypeFactoryFunction factory = typeName.isEmpty() ? 0 : factoryMap()->get(typeName);
     if (!factory)
         factory = TextInputType::create;
     return factory(element);
@@ -118,6 +123,24 @@ PassRefPtr<InputType> InputType::create(HTMLInputElement* element, const AtomicS
 PassRefPtr<InputType> InputType::createText(HTMLInputElement* element)
 {
     return TextInputType::create(element);
+}
+
+const AtomicString& InputType::normalizeTypeName(const AtomicString& typeName)
+{
+    if (typeName.isEmpty())
+        return InputTypeNames::text();
+    InputTypeFactoryMap::const_iterator it = factoryMap()->find(typeName);
+    return it == factoryMap()->end() ? InputTypeNames::text() : it->key;
+}
+
+bool InputType::canChangeFromAnotherType(const AtomicString& normalizedTypeName)
+{
+    // Don't allow the type to be changed to file after the first type change.
+    // In other engines this might mean a JavaScript programmer could set a text
+    // field's value to something like /etc/passwd and then change it to a file
+    // input. I don't think this would actually occur in Blink, but this rule
+    // still may be important for compatibility.
+    return normalizedTypeName != InputTypeNames::file();
 }
 
 InputType::~InputType()
@@ -390,11 +413,11 @@ void InputType::destroyShadowSubtree()
 
     root->removeChildren();
 
-    // It's ok to clear contents of all other ShadowRoots because they must have
-    // been created by InputFieldPasswordGeneratorButtonElement, and we don't allow adding
-    // AuthorShadowRoot to HTMLInputElement.
-    // FIXME: Remove the PasswordGeneratorButtonElement's shadow root and then remove this loop.
-    while ((root = root->youngerShadowRoot())) {
+    // It's ok to clear contents of all other UA ShadowRoots because they must
+    // have been created by InputFieldPasswordGeneratorButtonElement.
+    // FIXME: Remove the PasswordGeneratorButtonElement's shadow root and then
+    // remove this loop.
+    while ((root = root->youngerShadowRoot()) && root->type() == ShadowRoot::UserAgentShadowRoot) {
         root->removeChildren();
         root->appendChild(HTMLShadowElement::create(shadowTag, element()->document()));
     }
@@ -432,7 +455,7 @@ void InputType::dispatchSimulatedClickIfActive(KeyboardEvent* event) const
 
 Chrome* InputType::chrome() const
 {
-    if (Page* page = element()->document()->page())
+    if (Page* page = element()->document().page())
         return &page->chrome();
     return 0;
 }
@@ -486,11 +509,6 @@ void InputType::countUsage()
 bool InputType::shouldRespectAlignAttribute()
 {
     return false;
-}
-
-bool InputType::canChangeFromAnotherType() const
-{
-    return true;
 }
 
 void InputType::sanitizeValueInResponseToMinOrMaxAttributeChange()
@@ -827,7 +845,7 @@ void InputType::applyStep(int count, AnyStepHandling anyStepHandling, TextFieldE
 
     setValueAsDecimal(newValue, eventBehavior, es);
 
-    if (AXObjectCache* cache = element()->document()->existingAXObjectCache())
+    if (AXObjectCache* cache = element()->document().existingAXObjectCache())
         cache->postNotification(element(), AXObjectCache::AXValueChanged, true);
 }
 
@@ -960,7 +978,7 @@ void InputType::observeFeatureIfVisible(UseCounter::Feature feature) const
 {
     if (RenderStyle* style = element()->renderStyle()) {
         if (style->visibility() != HIDDEN)
-            UseCounter::count(element()->document(), feature);
+            UseCounter::count(&element()->document(), feature);
     }
 }
 

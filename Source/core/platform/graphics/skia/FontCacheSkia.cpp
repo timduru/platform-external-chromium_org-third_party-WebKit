@@ -29,7 +29,8 @@
  */
 
 #include "config.h"
-#include <unicode/locid.h>
+
+#include "SkFontMgr.h"
 #include "SkTypeface.h"
 #include "core/platform/NotImplemented.h"
 #include "core/platform/graphics/Font.h"
@@ -39,6 +40,7 @@
 #include "wtf/Assertions.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/CString.h"
+#include <unicode/locid.h>
 
 namespace WebCore {
 
@@ -46,7 +48,7 @@ void FontCache::platformInit()
 {
 }
 
-#if !OS(WINDOWS)
+#if !OS(WIN)
 PassRefPtr<SimpleFontData> FontCache::getFontDataForCharacter(const Font& font, UChar32 c)
 {
     icu::Locale locale = icu::Locale::getDefault();
@@ -146,10 +148,16 @@ SkTypeface* FontCache::createTypeface(const FontDescription& fontDescription, co
     if (fontDescription.italic())
         style |= SkTypeface::kItalic;
 
+    // FIXME: Use SkFontStyle and matchFamilyStyle instead of legacyCreateTypeface.
+#if OS(WIN) && !ENABLE(GDI_FONTS_ON_WINDOWS)
+    if (m_fontManager)
+        return m_fontManager->legacyCreateTypeface(name.data(), style);
+#endif
+
     return SkTypeface::CreateFromName(name.data(), static_cast<SkTypeface::Style>(style));
 }
 
-#if !OS(WINDOWS)
+#if !OS(WIN)
 FontPlatformData* FontCache::createFontPlatformData(const FontDescription& fontDescription, const AtomicString& family)
 {
     CString name;

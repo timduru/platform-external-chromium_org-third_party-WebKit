@@ -46,7 +46,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLTableElement::HTMLTableElement(const QualifiedName& tagName, Document* document)
+HTMLTableElement::HTMLTableElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
     , m_borderAttr(false)
     , m_borderColorAttr(false)
@@ -58,12 +58,12 @@ HTMLTableElement::HTMLTableElement(const QualifiedName& tagName, Document* docum
     ScriptWrappable::init(this);
 }
 
-PassRefPtr<HTMLTableElement> HTMLTableElement::create(Document* document)
+PassRefPtr<HTMLTableElement> HTMLTableElement::create(Document& document)
 {
     return adoptRef(new HTMLTableElement(tableTag, document));
 }
 
-PassRefPtr<HTMLTableElement> HTMLTableElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<HTMLTableElement> HTMLTableElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(new HTMLTableElement(tagName, document));
 }
@@ -72,7 +72,7 @@ HTMLTableCaptionElement* HTMLTableElement::caption() const
 {
     for (Node* child = firstChild(); child; child = child->nextSibling()) {
         if (child->hasTagName(captionTag))
-            return static_cast<HTMLTableCaptionElement*>(child);
+            return toHTMLTableCaptionElement(child);
     }
     return 0;
 }
@@ -317,7 +317,7 @@ void HTMLTableElement::collectStyleForPresentationAttribute(const QualifiedName&
     else if (name == backgroundAttr) {
         String url = stripLeadingAndTrailingHTMLSpaces(value);
         if (!url.isEmpty())
-            style->setProperty(CSSProperty(CSSPropertyBackgroundImage, CSSImageValue::create(document()->completeURL(url).string())));
+            style->setProperty(CSSProperty(CSSPropertyBackgroundImage, CSSImageValue::create(document().completeURL(url).string())));
     } else if (name == valignAttr) {
         if (!value.isEmpty())
             addPropertyToPresentationAttributeStyle(style, CSSPropertyVerticalAlign, value);
@@ -576,7 +576,7 @@ void HTMLTableElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) cons
 {
     HTMLElement::addSubresourceAttributeURLs(urls);
 
-    addSubresourceURL(urls, document()->completeURL(getAttribute(backgroundAttr)));
+    addSubresourceURL(urls, document().completeURL(getAttribute(backgroundAttr)));
 }
 
 }

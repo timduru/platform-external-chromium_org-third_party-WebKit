@@ -33,7 +33,7 @@ namespace WebCore {
 
 static const double timeWithoutMouseMovementBeforeHidingFullscreenControls = 3;
 
-MediaControls::MediaControls(Document* document)
+MediaControls::MediaControls(Document& document)
     : HTMLDivElement(HTMLNames::divTag, document)
     , m_mediaController(0)
     , m_panel(0)
@@ -79,7 +79,7 @@ void MediaControls::setMediaController(MediaControllerInterface* controller)
 
 void MediaControls::reset()
 {
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 
@@ -121,7 +121,7 @@ void MediaControls::reset()
 
 void MediaControls::reportedError()
 {
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 
@@ -319,7 +319,7 @@ void MediaControls::startHideFullscreenControlsTimer()
     if (!m_isFullscreen)
         return;
 
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 

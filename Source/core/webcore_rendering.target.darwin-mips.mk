@@ -42,12 +42,14 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/ImageQualityController.cpp \
 	third_party/WebKit/Source/core/rendering/LayoutState.cpp \
 	third_party/WebKit/Source/core/rendering/OrderIterator.cpp \
+	third_party/WebKit/Source/core/rendering/LayoutIndicator.cpp \
 	third_party/WebKit/Source/core/rendering/LayoutRepainter.cpp \
 	third_party/WebKit/Source/core/rendering/Pagination.cpp \
 	third_party/WebKit/Source/core/rendering/PointerEventsHitRules.cpp \
 	third_party/WebKit/Source/core/rendering/RenderApplet.cpp \
 	third_party/WebKit/Source/core/rendering/RenderBR.cpp \
 	third_party/WebKit/Source/core/rendering/RenderBlock.cpp \
+	third_party/WebKit/Source/core/rendering/RenderBlockFlow.cpp \
 	third_party/WebKit/Source/core/rendering/RenderBlockLineLayout.cpp \
 	third_party/WebKit/Source/core/rendering/RenderBox.cpp \
 	third_party/WebKit/Source/core/rendering/RenderBoxModelObject.cpp \
@@ -135,6 +137,7 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/RenderView.cpp \
 	third_party/WebKit/Source/core/rendering/RenderWidget.cpp \
 	third_party/WebKit/Source/core/rendering/RenderWordBreak.cpp \
+	third_party/WebKit/Source/core/rendering/RenderingNodeProxy.cpp \
 	third_party/WebKit/Source/core/rendering/RootInlineBox.cpp \
 	third_party/WebKit/Source/core/rendering/ScrollBehavior.cpp \
 	third_party/WebKit/Source/core/rendering/SubtreeLayoutScope.cpp \
@@ -145,7 +148,6 @@ LOCAL_SRC_FILES := \
 	third_party/WebKit/Source/core/rendering/shapes/Shape.cpp \
 	third_party/WebKit/Source/core/rendering/shapes/ShapeInfo.cpp \
 	third_party/WebKit/Source/core/rendering/shapes/ShapeInsideInfo.cpp \
-	third_party/WebKit/Source/core/rendering/shapes/ShapeInterval.cpp \
 	third_party/WebKit/Source/core/rendering/shapes/ShapeOutsideInfo.cpp \
 	third_party/WebKit/Source/core/rendering/style/BasicShapes.cpp \
 	third_party/WebKit/Source/core/rendering/style/ContentData.cpp \
@@ -217,6 +219,7 @@ MY_CFLAGS_Debug := \
 
 MY_DEFS_Debug := \
 	'-DANGLE_DX11' \
+	'-DWTF_VECTOR_INITIAL_SIZE=16' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -229,6 +232,7 @@ MY_DEFS_Debug := \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
+	'-DCLD_VERSION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -246,12 +250,10 @@ MY_DEFS_Debug := \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
-	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
-	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
@@ -374,6 +376,7 @@ MY_CFLAGS_Release := \
 
 MY_DEFS_Release := \
 	'-DANGLE_DX11' \
+	'-DWTF_VECTOR_INITIAL_SIZE=16' \
 	'-D_FILE_OFFSET_BITS=64' \
 	'-DNO_TCMALLOC' \
 	'-DDISCARDABLE_MEMORY_ALWAYS_SUPPORTED_NATIVELY' \
@@ -386,6 +389,7 @@ MY_DEFS_Release := \
 	'-DENABLE_GPU=1' \
 	'-DUSE_OPENSSL=1' \
 	'-DENABLE_EGLIMAGE=1' \
+	'-DCLD_VERSION=1' \
 	'-DWEBCORE_NAVIGATOR_VENDOR="Google Inc."' \
 	'-DWEBKIT_IMPLEMENTATION=1' \
 	'-DINSIDE_WEBKIT' \
@@ -403,12 +407,10 @@ MY_DEFS_Release := \
 	'-DENABLE_INPUT_SPEECH=0' \
 	'-DENABLE_LEGACY_NOTIFICATIONS=0' \
 	'-DENABLE_MEDIA_CAPTURE=1' \
-	'-DENABLE_NOTIFICATIONS=0' \
 	'-DENABLE_ORIENTATION_EVENTS=1' \
 	'-DENABLE_NAVIGATOR_CONTENT_UTILS=0' \
 	'-DWTF_USE_NATIVE_FULLSCREEN_VIDEO=1' \
 	'-DENABLE_OPENTYPE_VERTICAL=1' \
-	'-DWTF_USE_HARFBUZZ=1' \
 	'-DU_USING_ICU_NAMESPACE=0' \
 	'-DSK_ENABLE_INST_COUNT=0' \
 	'-DSK_SUPPORT_GPU=1' \
@@ -508,7 +510,9 @@ LOCAL_LDFLAGS_Debug := \
 	-nostdlib \
 	-Wl,--no-undefined \
 	-Wl,--exclude-libs=ALL \
+	-Wl,--fatal-warnings \
 	-Wl,--gc-sections \
+	-Wl,--warn-shared-textrel \
 	-Wl,-O1 \
 	-Wl,--as-needed
 
@@ -525,7 +529,9 @@ LOCAL_LDFLAGS_Release := \
 	-Wl,--exclude-libs=ALL \
 	-Wl,-O1 \
 	-Wl,--as-needed \
-	-Wl,--gc-sections
+	-Wl,--gc-sections \
+	-Wl,--fatal-warnings \
+	-Wl,--warn-shared-textrel
 
 
 LOCAL_LDFLAGS := $(LOCAL_LDFLAGS_$(GYP_CONFIGURATION))

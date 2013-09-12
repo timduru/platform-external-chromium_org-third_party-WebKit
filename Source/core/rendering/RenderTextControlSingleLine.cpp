@@ -116,7 +116,7 @@ void RenderTextControlSingleLine::layout()
         layoutScope.setNeedsLayout(innerBlockRenderer);
     }
 
-    RenderBlock::layoutBlock(false);
+    RenderBlockFlow::layoutBlock(false);
 
     HTMLElement* container = containerElement();
     RenderBox* containerRenderer = container ? container->renderBox() : 0;
@@ -153,7 +153,7 @@ void RenderTextControlSingleLine::layout()
 
     // If we need another layout pass, we have changed one of children's height so we need to relayout them.
     if (needsLayout())
-        RenderBlock::layoutBlock(true);
+        RenderBlockFlow::layoutBlock(true);
 
     // Center the child block in the block progression direction (vertical centering for horizontal text fields).
     if (!container && innerTextRenderer && innerTextRenderer->height() != contentLogicalHeight()) {
@@ -253,7 +253,7 @@ void RenderTextControlSingleLine::styleDidChange(StyleDifference diff, const Ren
 
 void RenderTextControlSingleLine::capsLockStateMayHaveChanged()
 {
-    if (!node() || !document())
+    if (!node())
         return;
 
     // Only draw the caps lock indicator if these things are true:
@@ -263,8 +263,8 @@ void RenderTextControlSingleLine::capsLockStateMayHaveChanged()
     // 4) The caps lock is on
     bool shouldDrawCapsLockIndicator = false;
 
-    if (Frame* frame = document()->frame())
-        shouldDrawCapsLockIndicator = inputElement()->isPasswordField() && frame->selection()->isFocusedAndActive() && document()->focusedElement() == node() && PlatformKeyboardEvent::currentCapsLockState();
+    if (Frame* frame = document().frame())
+        shouldDrawCapsLockIndicator = inputElement()->isPasswordField() && frame->selection().isFocusedAndActive() && document().focusedElement() == node() && PlatformKeyboardEvent::currentCapsLockState();
 
     if (shouldDrawCapsLockIndicator != m_shouldDrawCapsLockIndicator) {
         m_shouldDrawCapsLockIndicator = shouldDrawCapsLockIndicator;
@@ -372,7 +372,7 @@ PassRefPtr<RenderStyle> RenderTextControlSingleLine::createInnerTextStyle(const 
 
 bool RenderTextControlSingleLine::textShouldBeTruncated() const
 {
-    return document()->focusedElement() != node() && style()->textOverflow() == TextOverflowEllipsis;
+    return document().focusedElement() != node() && style()->textOverflow() == TextOverflowEllipsis;
 }
 
 void RenderTextControlSingleLine::autoscroll(const IntPoint& position)

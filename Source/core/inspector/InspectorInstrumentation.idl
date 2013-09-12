@@ -217,6 +217,12 @@ interface InspectorInstrumentation {
     [Timeline, Page, Inline=FastReturn]
     void didPaint([Keep] RenderObject*, GraphicsContext*, const LayoutRect&);
 
+    [Timeline, Inline=FastReturn]
+    void willPaintImage([Keep] RenderImage*);
+
+    [Timeline, Inline=FastReturn]
+    void didPaintImage(RenderImage*);
+
     [Resource, Timeline, Inline=FastReturn]
     InspectorInstrumentationCookie willRecalculateStyle([Keep] Document*);
 
@@ -318,13 +324,16 @@ interface InspectorInstrumentation {
     [DOM, Timeline, Page]
     void loadEventFired([Keep] Frame*);
 
+    [Page]
+    void frameAttachedToParent([Keep] Frame*);
+
     [Canvas, Page, CSS]
     void frameDetachedFromParent([Keep] Frame*);
 
     [Page, Inline=FastReturn]
     void childDocumentOpened([Keep] Document*);
 
-    [Console, Resource, CSS, Database, DOM, LayerTree, Inspector, Canvas, Page]
+    [Console, Resource, CSS, Database, DOM, Inspector, Canvas, Page, PageDebugger]
     void didCommitLoad([Keep] Frame*, DocumentLoader*);
 
     [DOM, Inline=FastReturn]

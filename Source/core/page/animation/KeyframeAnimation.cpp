@@ -53,7 +53,7 @@ KeyframeAnimation::KeyframeAnimation(const CSSAnimationData* animation, RenderOb
 {
     // Get the keyframe RenderStyles
     if (m_object && m_object->node() && m_object->node()->isElementNode())
-        m_object->document()->styleResolver()->keyframeStylesForAnimation(toElement(m_object->node()), unanimatedStyle, m_keyframes);
+        m_object->document().styleResolver()->keyframeStylesForAnimation(toElement(m_object->node()), unanimatedStyle, m_keyframes);
 
     // Update the m_transformFunctionListValid flag based on whether the function lists in the keyframes match.
     validateTransformFunctionList();
@@ -68,20 +68,6 @@ KeyframeAnimation::~KeyframeAnimation()
     // Make sure to tell the renderer that we are ending. This will make sure any accelerated animations are removed.
     if (!postActive())
         endAnimation();
-}
-
-static const CSSAnimationData* getAnimationFromStyleByName(const RenderStyle* style, const AtomicString& name)
-{
-    if (!style->animations())
-        return 0;
-
-    size_t animationCount = style->animations()->size();
-    for (size_t i = 0; i < animationCount; i++) {
-        if (name == style->animations()->animation(i)->name())
-            return style->animations()->animation(i);
-    }
-
-    return 0;
 }
 
 void KeyframeAnimation::fetchIntervalEndpointsForProperty(CSSPropertyID property, const RenderStyle*& fromStyle, const RenderStyle*& toStyle, double& prog) const
@@ -133,7 +119,7 @@ void KeyframeAnimation::fetchIntervalEndpointsForProperty(CSSPropertyID property
     }
 
     // Iterate backward to find previous keyframe.
-    for (size_t i = currentIndex; i < numKeyframes; --i) {
+    for (int i = currentIndex; i >= 0; --i) {
         const KeyframeValue& keyFrame = m_keyframes[i];
         if (keyFrame.key() <= fractionalTime && keyFrame.containsProperty(property)) {
             prevIndex = i;
@@ -159,10 +145,7 @@ void KeyframeAnimation::fetchIntervalEndpointsForProperty(CSSPropertyID property
     offset = prevKeyframe.key();
     scale = 1.0 / (nextKeyframe.key() - prevKeyframe.key());
 
-    const TimingFunction* timingFunction = 0;
-    if (const CSSAnimationData* matchedAnimation = getAnimationFromStyleByName(fromStyle, name()))
-        timingFunction = matchedAnimation->timingFunction().get();
-
+    const TimingFunction* timingFunction = prevKeyframe.timingFunction(name());
     prog = progress(scale, offset, timingFunction);
 }
 
@@ -287,7 +270,7 @@ void KeyframeAnimation::endAnimation()
 
 bool KeyframeAnimation::shouldSendEventForListener(Document::ListenerType listenerType) const
 {
-    return m_object->document()->hasListenerType(listenerType);
+    return m_object->document().hasListenerType(listenerType);
 }
 
 void KeyframeAnimation::onAnimationStart(double elapsedTime)

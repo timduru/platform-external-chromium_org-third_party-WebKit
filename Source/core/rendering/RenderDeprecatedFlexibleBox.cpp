@@ -126,13 +126,13 @@ RenderDeprecatedFlexibleBox::RenderDeprecatedFlexibleBox(Element* element)
     setChildrenInline(false); // All of our children must be block-level
     m_stretchingChildren = false;
     if (!isAnonymous()) {
-        const KURL& url = document()->url();
+        const KURL& url = document().url();
         if (url.protocolIs("chrome"))
-            UseCounter::count(document(), UseCounter::DeprecatedFlexboxChrome);
+            UseCounter::count(&document(), UseCounter::DeprecatedFlexboxChrome);
         else if (url.protocolIs("chrome-extension"))
-            UseCounter::count(document(), UseCounter::DeprecatedFlexboxChromeExtension);
+            UseCounter::count(&document(), UseCounter::DeprecatedFlexboxChromeExtension);
         else
-            UseCounter::count(document(), UseCounter::DeprecatedFlexboxWebContent);
+            UseCounter::count(&document(), UseCounter::DeprecatedFlexboxWebContent);
     }
 }
 
@@ -900,7 +900,7 @@ void RenderDeprecatedFlexibleBox::layoutVerticalBox(bool relayoutChildren)
 
 void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool relayoutChildren)
 {
-    UseCounter::count(document(), UseCounter::LineClamp);
+    UseCounter::count(&document(), UseCounter::LineClamp);
 
     int maxLineCount = 0;
     for (RenderBox* child = iterator.first(); child; child = iterator.next()) {
@@ -909,7 +909,7 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
 
         child->clearOverrideSize();
         if (relayoutChildren || (child->isReplaced() && (child->style()->width().isPercent() || child->style()->height().isPercent()))
-            || (child->style()->height().isAuto() && child->isBlockFlow())) {
+            || (child->style()->height().isAuto() && child->isRenderBlock())) {
             child->setChildNeedsLayout(MarkOnlyThis);
 
             // Dirty all the positioned objects.
@@ -919,7 +919,7 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
             }
         }
         child->layoutIfNeeded();
-        if (child->style()->height().isAuto() && child->isBlockFlow())
+        if (child->style()->height().isAuto() && child->isRenderBlock())
             maxLineCount = max(maxLineCount, toRenderBlock(child)->lineCount());
     }
 
@@ -931,7 +931,7 @@ void RenderDeprecatedFlexibleBox::applyLineClamp(FlexBoxIterator& iterator, bool
         return;
 
     for (RenderBox* child = iterator.first(); child; child = iterator.next()) {
-        if (childDoesNotAffectWidthOrFlexing(child) || !child->style()->height().isAuto() || !child->isBlockFlow())
+        if (childDoesNotAffectWidthOrFlexing(child) || !child->style()->height().isAuto() || !child->isRenderBlock())
             continue;
 
         RenderBlock* blockChild = toRenderBlock(child);
@@ -1007,7 +1007,7 @@ void RenderDeprecatedFlexibleBox::clearLineClamp()
 
         child->clearOverrideSize();
         if ((child->isReplaced() && (child->style()->width().isPercent() || child->style()->height().isPercent()))
-            || (child->style()->height().isAuto() && child->isBlockFlow())) {
+            || (child->style()->height().isAuto() && child->isRenderBlock())) {
             child->setChildNeedsLayout();
 
             if (child->isRenderBlock()) {

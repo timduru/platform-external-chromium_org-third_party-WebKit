@@ -40,20 +40,21 @@ WebInspector.ScreencastView = function()
 
     this.element.addStyleClass("fill");
     this.element.addStyleClass("screencast");
-    this._viewportElement = this.element.createChild("div", "screencast-viewport");
 
-    this._isCasting = false;
-    this._imageElement = this._viewportElement.createChild("img");
-    this._imageElement.tabIndex = 1;
-    this._imageElement.addEventListener("mousedown", this._handleMouseEvent.bind(this), false);
-    this._imageElement.addEventListener("mouseup", this._handleMouseEvent.bind(this), false);
-    this._imageElement.addEventListener("mousemove", this._handleMouseEvent.bind(this), false);
-    this._imageElement.addEventListener("mousewheel", this._handleMouseEvent.bind(this), false);
-    this._imageElement.addEventListener("click", this._handleMouseEvent.bind(this), false);
-    this._imageElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), false);
-    this._imageElement.addEventListener("keydown", this._handleKeyEvent.bind(this), false);
-    this._imageElement.addEventListener("keyup", this._handleKeyEvent.bind(this), false);
-    this._imageElement.addEventListener("keypress", this._handleKeyEvent.bind(this), false);
+    this._createNavigationBar();
+
+    this._viewportElement = this.element.createChild("div", "screencast-viewport hidden");
+    this._canvasElement = this._viewportElement.createChild("canvas");
+    this._canvasElement.tabIndex = 1;
+    this._canvasElement.addEventListener("mousedown", this._handleMouseEvent.bind(this), false);
+    this._canvasElement.addEventListener("mouseup", this._handleMouseEvent.bind(this), false);
+    this._canvasElement.addEventListener("mousemove", this._handleMouseEvent.bind(this), false);
+    this._canvasElement.addEventListener("mousewheel", this._handleMouseEvent.bind(this), false);
+    this._canvasElement.addEventListener("click", this._handleMouseEvent.bind(this), false);
+    this._canvasElement.addEventListener("contextmenu", this._handleContextMenuEvent.bind(this), false);
+    this._canvasElement.addEventListener("keydown", this._handleKeyEvent.bind(this), false);
+    this._canvasElement.addEventListener("keyup", this._handleKeyEvent.bind(this), false);
+    this._canvasElement.addEventListener("keypress", this._handleKeyEvent.bind(this), false);
 
     this._titleElement = this._viewportElement.createChild("div", "screencast-element-title monospace hidden");
     this._tagNameElement = this._titleElement.createChild("span", "screencast-tag-name");
@@ -66,35 +67,48 @@ WebInspector.ScreencastView = function()
     this._nodeHeightElement = this._titleElement.createChild("span");
     this._titleElement.createChild("span", "screencast-px").textContent = "px";
 
-    this._canvasElement = this._viewportElement.createChild("canvas");
+    this._imageElement = new Image();
+    this._isCasting = false;
     this._context = this._canvasElement.getContext("2d");
-
-    this._scale = 0.7;
+    this._checkerboardPattern = this._createCheckerboardPattern(this._context);
 
     WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.ScreencastFrame, this._screencastFrame, this);
 }
 
+WebInspector.ScreencastView._bordersSize = 40;
+
+WebInspector.ScreencastView._navBarHeight = 29;
+
+WebInspector.ScreencastView._HttpRegex = /^https?:\/\/(.+)/;
+
 WebInspector.ScreencastView.prototype = {
     wasShown: function()
     {
-        this.startCasting();
+        this._startCasting();
     },
 
     willHide: function()
     {
-        this.stopCasting();
+        this._stopCasting();
     },
 
-    startCasting: function()
+    _startCasting: function()
     {
         if (this._isCasting)
             return;
         this._isCasting = true;
-        PageAgent.startScreencast("jpeg", 80, this._scale);
+
+        const maxImageDimension = 800;
+        var dimensions = this._viewportDimensions();
+        if (dimensions.width < 0 || dimensions.height < 0) {
+            this._isCasting = false;
+            return;
+        }
+        PageAgent.startScreencast("jpeg", 80, Math.min(maxImageDimension, dimensions.width), Math.min(maxImageDimension, dimensions.height));
         WebInspector.domAgent.setHighlighter(this);
     },
 
-    stopCasting: function()
+    _stopCasting: function()
     {
         if (!this._isCasting)
             return;
@@ -108,13 +122,39 @@ WebInspector.ScreencastView.prototype = {
      */
     _screencastFrame: function(event)
     {
-        var base64Data = /** type {string} */(event.data);
-        var previousWidth = this._imageElement.naturalWidth;
-        var previousHeight = this._imageElement.naturalHeight;
+        var base64Data = /** type {string} */(event.data.data);
         this._imageElement.src = "data:image/jpg;base64," + base64Data;
-        if (previousWidth !== this._imageElement.naturalWidth || previousHeight !== this._imageElement.naturalHeight)
-            this.onResize();
+        this._deviceScaleFactor = /** type {number} */(event.data.deviceScaleFactor);
+        this._pageScaleFactor = /** type {number} */(event.data.pageScaleFactor);
+        this._viewport = /** type {DOMAgent.Rect} */(event.data.viewport);
+        if (!this._viewport)
+            return;
+        var offsetTop = /** type {number} */(event.data.offsetTop) || 0;
+        var offsetBottom = /** type {number} */(event.data.offsetBottom) || 0;
+
+
+        var screenWidthDIP = this._viewport.width * this._pageScaleFactor;
+        var screenHeightDIP = this._viewport.height * this._pageScaleFactor + offsetTop + offsetBottom;
+        this._screenOffsetTop = offsetTop;
+        this._resizeViewport(screenWidthDIP, screenHeightDIP);
+
+        this._imageZoom = this._imageElement.naturalWidth ? this._canvasElement.offsetWidth / this._imageElement.naturalWidth : 1;
         this.highlightDOMNode(this._highlightNodeId, this._highlightConfig);
+    },
+
+    /**
+     * @param {number} screenWidthDIP
+     * @param {number} screenHeightDIP
+     */
+    _resizeViewport: function(screenWidthDIP, screenHeightDIP)
+    {
+        var dimensions = this._viewportDimensions();
+        this._screenZoom = Math.min(dimensions.width / screenWidthDIP, dimensions.height / screenHeightDIP);
+
+        var bordersSize = WebInspector.ScreencastView._bordersSize;
+        this._viewportElement.removeStyleClass("hidden");
+        this._viewportElement.style.width = screenWidthDIP * this._screenZoom + bordersSize + "px";
+        this._viewportElement.style.height = screenHeightDIP * this._screenZoom + bordersSize + "px";
     },
 
     /**
@@ -122,31 +162,31 @@ WebInspector.ScreencastView.prototype = {
      */
     _handleMouseEvent: function(event)
     {
-        if (!WebInspector.inspectElementModeController.enabled()) {
-            this._simulateTouchGestureForMouseEvent(event);
-            event.consume(true);
+        if (!this._viewport)
             return;
-        }
-        var type;
-        switch (event.type) {
-        case "mousedown": type = "mousePressed"; break;
-        case "mouseup": type = "mouseReleased"; break;
-        case "mousemove": type = "mouseMoved"; break;
-        default: return;
-        }
-        var button;
-        switch (event.which) {
-        case 0: button = "none"; break;
-        case 1: button = "left"; break;
-        case 2: button = "middle"; break;
-        case 3: button = "right"; break;
-        default: return;
+
+        if (!this._inspectModeConfig || event.type === "mousewheel") {
+            this._simulateTouchGestureForMouseEvent(event);
+            event.preventDefault();
+            return;
         }
 
         var position = this._convertIntoScreenSpace(event);
-        InputAgent.dispatchMouseEvent(type, position.x, position.y, this._modifiersForEvent(event), event.timeStamp / 1000, button, event.detail, true);
-        this.element.focus();
-        event.consume(true);
+        DOMAgent.getNodeForLocation(position.x / this._pageScaleFactor, position.y / this._pageScaleFactor, callback.bind(this));
+
+        /**
+         * @param {?Protocol.Error} error
+         * @param {number} nodeId
+         */
+        function callback(error, nodeId)
+        {
+            if (error)
+                return;
+            if (event.type === "mousemove")
+                this.highlightDOMNode(nodeId, this._inspectModeConfig);
+            else if (event.type === "click")
+                WebInspector.domAgent.dispatchEventToListeners(WebInspector.DOMAgent.Events.InspectNodeRequested, nodeId);
+        }
     },
 
     /**
@@ -165,8 +205,8 @@ WebInspector.ScreencastView.prototype = {
         var text = event.type === "keypress" ? String.fromCharCode(event.charCode) : undefined;
         InputAgent.dispatchKeyEvent(type, this._modifiersForEvent(event), event.timeStamp / 1000, text, text ? text.toLowerCase() : undefined,
                                     event.keyIdentifier, event.keyCode /* windowsVirtualKeyCode */, event.keyCode /* nativeVirtualKeyCode */, undefined /* macCharCode */, false, false, false);
-        this.element.focus();
-        event.consume(true);
+        event.consume();
+        this._canvasElement.focus();
     },
 
     /**
@@ -199,9 +239,17 @@ WebInspector.ScreencastView.prototype = {
             } else if (event.type === "mouseup") {
                 InputAgent.dispatchGestureEvent("scrollEnd", x, y, timeStamp);
             } else if (event.type === "mousewheel") {
-                InputAgent.dispatchGestureEvent("scrollBegin", x, y, timeStamp);
-                InputAgent.dispatchGestureEvent("scrollUpdate", x, y, timeStamp, event.wheelDeltaX, event.wheelDeltaY);
-                InputAgent.dispatchGestureEvent("scrollEnd", x, y, timeStamp);
+                if (event.altKey) {
+                    var factor = 1.1;
+                    var scale = event.wheelDeltaY < 0 ? 1 / factor : factor;
+                    InputAgent.dispatchGestureEvent("pinchBegin", x, y, timeStamp);
+                    InputAgent.dispatchGestureEvent("pinchUpdate", x, y, timeStamp, 0, 0, scale);
+                    InputAgent.dispatchGestureEvent("pinchEnd", x, y, timeStamp);
+                } else {
+                    InputAgent.dispatchGestureEvent("scrollBegin", x, y, timeStamp);
+                    InputAgent.dispatchGestureEvent("scrollUpdate", x, y, timeStamp, event.wheelDeltaX, event.wheelDeltaY);
+                    InputAgent.dispatchGestureEvent("scrollEnd", x, y, timeStamp);
+                }
             } else if (event.type === "click") {
                 InputAgent.dispatchGestureEvent("tapDown", x, y, timeStamp);
                 InputAgent.dispatchGestureEvent("tap", x, y, timeStamp);
@@ -243,10 +291,10 @@ WebInspector.ScreencastView.prototype = {
      */
     _convertIntoScreenSpace: function(event)
     {
+        var zoom = this._canvasElement.offsetWidth / this._viewport.width / this._pageScaleFactor;
         var position  = {};
-        const gutterSize = 40;
-        position.x = Math.round((event.x - gutterSize) / this._scale / this._zoom);
-        position.y = Math.round((event.y - gutterSize) / this._scale / this._zoom);
+        position.x = Math.round(event.offsetX / zoom);
+        position.y = Math.round(event.offsetY / zoom - this._screenOffsetTop);
         return position;
     },
 
@@ -270,27 +318,13 @@ WebInspector.ScreencastView.prototype = {
 
     onResize: function()
     {
-        if (!this._imageElement.naturalWidth)
-            return;
-
-        const gutterSize = 30;
-        const bordersSize = 60;
-        var ratio = this._imageElement.naturalWidth / this._imageElement.naturalHeight;
-        var maxWidth = this.element.offsetWidth - bordersSize - gutterSize;
-        var maxHeight = this.element.offsetHeight - bordersSize - gutterSize;
-        var width;
-        var height;
-        if (maxWidth > ratio * maxHeight) {
-            width = ratio * maxHeight;
-            height = maxHeight;
-        } else {
-            width = maxWidth;
-            height = maxWidth / ratio;
+        if (this._deferredCasting) {
+            clearTimeout(this._deferredCasting);
+            delete this._deferredCasting;
         }
-        this._viewportElement.style.width = width + bordersSize + "px";
-        this._viewportElement.style.height = height + bordersSize + "px";
-        this._repaintHighlight();
-        this._zoom = this._imageElement.offsetWidth / this._imageElement.naturalWidth;
+
+        this._stopCasting();
+        this._deferredCasting = setTimeout(this._startCasting.bind(this), 100);
     },
 
     /**
@@ -307,7 +341,7 @@ WebInspector.ScreencastView.prototype = {
             this._config = null;
             this._node = null;
             this._titleElement.addStyleClass("hidden");
-            this._repaintHighlight();
+            this._repaint();
             return;
         }
 
@@ -320,11 +354,13 @@ WebInspector.ScreencastView.prototype = {
          */
         function callback(error, model)
         {
-            if (error)
+            if (error) {
+                this._repaint();
                 return;
+            }
             this._model = this._scaleModel(model);
             this._config = config;
-            this._repaintHighlight();
+            this._repaint();
         }
     },
 
@@ -334,25 +370,25 @@ WebInspector.ScreencastView.prototype = {
      */
     _scaleModel: function(model)
     {
-        var scale = this._canvasElement.offsetWidth / model.visibleContentRect.width;
+        var scale = this._canvasElement.offsetWidth / this._viewport.width;
         /**
          * @param {DOMAgent.Quad} quad
          */
         function scaleQuad(quad)
         {
             for (var i = 0; i < quad.length; i += 2) {
-                quad[i] = (quad[i] - model.visibleContentRect.x) * scale;
-                quad[i + 1] = (quad[i + 1] - model.visibleContentRect.y) * scale;
+                quad[i] = (quad[i] - this._viewport.x) * scale;
+                quad[i + 1] = (quad[i + 1] - this._viewport.y) * scale + this._screenOffsetTop * this._screenZoom;
             }
         }
-        scaleQuad(model.content);
-        scaleQuad(model.padding);
-        scaleQuad(model.border);
-        scaleQuad(model.margin);
+        scaleQuad.call(this, model.content);
+        scaleQuad.call(this, model.padding);
+        scaleQuad.call(this, model.border);
+        scaleQuad.call(this, model.margin);
         return model;
     },
 
-    _repaintHighlight: function()
+    _repaint: function()
     {
         var model = this._model;
         var config = this._config;
@@ -360,36 +396,49 @@ WebInspector.ScreencastView.prototype = {
         this._canvasElement.width = window.devicePixelRatio * this._canvasElement.offsetWidth;
         this._canvasElement.height = window.devicePixelRatio * this._canvasElement.offsetHeight;
 
-        if (!model || !config)
-            return;
-
+        this._context.save();
         this._context.scale(window.devicePixelRatio, window.devicePixelRatio);
 
+        // Paint top and bottom gutter.
         this._context.save();
-        const transparentColor = "rgba(0, 0, 0, 0)";
-        var hasContent = model.content && config.contentColor !== transparentColor;
-        var hasPadding = model.padding && config.paddingColor !== transparentColor;
-        var hasBorder = model.border && config.borderColor !== transparentColor;
-        var hasMargin = model.margin && config.marginColor !== transparentColor;
-
-        var clipQuad;
-        if (hasMargin && (!hasBorder || !this._quadsAreEqual(model.margin, model.border))) {
-            this._drawOutlinedQuadWithClip(model.margin, model.border, config.marginColor);
-            clipQuad = model.border;
-        }
-        if (hasBorder && (!hasPadding || !this._quadsAreEqual(model.border, model.padding))) {
-            this._drawOutlinedQuadWithClip(model.border, model.padding, config.borderColor);
-            clipQuad = model.padding;
-        }
-        if (hasPadding && (!hasContent || !this._quadsAreEqual(model.padding, model.content))) {
-            this._drawOutlinedQuadWithClip(model.padding, model.content, config.paddingColor);
-            clipQuad = model.content;
-        }
-        if (hasContent)
-            this._drawOutlinedQuad(model.content, config.contentColor);
+        this._context.fillStyle = this._checkerboardPattern;
+        this._context.fillRect(0, 0, this._canvasElement.offsetWidth, this._screenOffsetTop * this._screenZoom);
+        this._context.fillRect(0, this._screenOffsetTop * this._screenZoom + this._imageElement.naturalHeight * this._imageZoom, this._canvasElement.offsetWidth, this._canvasElement.offsetHeight);
         this._context.restore();
 
-        this._drawElementTitle();
+        if (model && config) {
+            this._context.save();
+            const transparentColor = "rgba(0, 0, 0, 0)";
+            var hasContent = model.content && config.contentColor !== transparentColor;
+            var hasPadding = model.padding && config.paddingColor !== transparentColor;
+            var hasBorder = model.border && config.borderColor !== transparentColor;
+            var hasMargin = model.margin && config.marginColor !== transparentColor;
+
+            var clipQuad;
+            if (hasMargin && (!hasBorder || !this._quadsAreEqual(model.margin, model.border))) {
+                this._drawOutlinedQuadWithClip(model.margin, model.border, config.marginColor);
+                clipQuad = model.border;
+            }
+            if (hasBorder && (!hasPadding || !this._quadsAreEqual(model.border, model.padding))) {
+                this._drawOutlinedQuadWithClip(model.border, model.padding, config.borderColor);
+                clipQuad = model.padding;
+            }
+            if (hasPadding && (!hasContent || !this._quadsAreEqual(model.padding, model.content))) {
+                this._drawOutlinedQuadWithClip(model.padding, model.content, config.paddingColor);
+                clipQuad = model.content;
+            }
+            if (hasContent)
+                this._drawOutlinedQuad(model.content, config.contentColor);
+            this._context.restore();
+
+            this._drawElementTitle();
+
+            this._context.globalCompositeOperation = "destination-over";
+        }
+
+        this._context.drawImage(this._imageElement, 0, this._screenOffsetTop * this._screenZoom, this._imageElement.naturalWidth * this._imageZoom, this._imageElement.naturalHeight * this._imageZoom);
+
+        this._context.restore();
     },
 
 
@@ -413,6 +462,8 @@ WebInspector.ScreencastView.prototype = {
      */
     _cssColor: function(color)
     {
+        if (!color)
+            return "transparent";
         return WebInspector.Color.fromRGBA([color.r, color.g, color.b, color.a]).toString(WebInspector.Color.Format.RGBA) || "";
     },
 
@@ -470,7 +521,8 @@ WebInspector.ScreencastView.prototype = {
         var canvasWidth = this._canvasElement.offsetWidth;
         var canvasHeight = this._canvasElement.offsetHeight;
 
-        this._tagNameElement.textContent = this._node.nodeName().toLowerCase();
+        var lowerCaseName = this._node.localName() || this._node.nodeName().toLowerCase();
+        this._tagNameElement.textContent = lowerCaseName;
         this._nodeIdElement.textContent = this._node.getAttribute("id") ? "#" + this._node.getAttribute("id") : "";
         this._nodeIdElement.textContent = this._node.getAttribute("id") ? "#" + this._node.getAttribute("id") : "";
         var className = this._node.getAttribute("class");
@@ -539,6 +591,121 @@ WebInspector.ScreencastView.prototype = {
         this._titleElement.removeStyleClass("hidden");
         this._titleElement.style.top = (boxY + 3) + "px";
         this._titleElement.style.left = (boxX + 3) + "px";
+    },
+
+    /**
+     * @return {{width: number, height: number}}
+     */
+    _viewportDimensions: function()
+    {
+        const gutterSize = 30;
+        const bordersSize = WebInspector.ScreencastView._bordersSize;
+        return { width: this.element.offsetWidth - bordersSize - gutterSize,
+                 height: this.element.offsetHeight - bordersSize - gutterSize - WebInspector.ScreencastView._navBarHeight};
+    },
+
+    /**
+     * @param {boolean} enabled
+     * @param {boolean} inspectShadowDOM
+     * @param {DOMAgent.HighlightConfig} config
+     * @param {function(?Protocol.Error)} callback
+     */
+    setInspectModeEnabled: function(enabled, inspectShadowDOM, config, callback)
+    {
+        this._inspectModeConfig = enabled ? config : null;
+        callback(null);
+    },
+
+    /**
+     * @param {CanvasRenderingContext2D} context
+     */
+    _createCheckerboardPattern: function(context)
+    {
+        var pattern = /** @type {HTMLCanvasElement} */(document.createElement("canvas"));
+        const size = 32;
+        pattern.width = size * 2;
+        pattern.height = size * 2;
+        var pctx = pattern.getContext("2d");
+
+        pctx.fillStyle = "rgb(195, 195, 195)";
+        pctx.fillRect(0, 0, size * 2, size * 2);
+
+        pctx.fillStyle = "rgb(225, 225, 225)";
+        pctx.fillRect(0, 0, size, size);
+        pctx.fillRect(size, size, size, size);
+        return context.createPattern(pattern, "repeat");
+    },
+
+    _createNavigationBar: function()
+    {
+        this._navigationBar = this.element.createChild("div", "screencast-navigation");
+
+        this._navigationBack = this._navigationBar.createChild("button", "back");
+        this._navigationBack.disabled = true;
+        this._navigationBack.addEventListener("click", this._navigateToHistoryEntry.bind(this, -1), false);
+
+        this._navigationForward = this._navigationBar.createChild("button", "forward");
+        this._navigationForward.disabled = true;
+        this._navigationForward.addEventListener("click", this._navigateToHistoryEntry.bind(this, 1), false);
+
+        this._navigationReload = this._navigationBar.createChild("button", "reload");
+        this._navigationReload.addEventListener("click", this._navigateReload.bind(this), false);
+
+        this._navigationUrl = this._navigationBar.createChild("input");
+        this._navigationUrl.type = "text";
+        this._navigationUrl.addEventListener('keyup', this._navigationUrlKeyUp.bind(this), true);
+
+        this._requestNavigationHistory();
+        WebInspector.resourceTreeModel.addEventListener(WebInspector.ResourceTreeModel.EventTypes.InspectedURLChanged, this._requestNavigationHistory, this);
+    },
+
+    _navigateToHistoryEntry: function(offset)
+    {
+        var newIndex = this._historyIndex + offset;
+        if (newIndex < 0 || newIndex >= this._historyEntries.length)
+          return;
+        PageAgent.navigateToHistoryEntry(this._historyEntries[newIndex].id);
+        this._requestNavigationHistory();
+    },
+
+    _navigateReload: function()
+    {
+        PageAgent.reload();
+    },
+
+    _navigationUrlKeyUp: function(event)
+    {
+        if (event.keyIdentifier != 'Enter')
+            return;
+        var url = this._navigationUrl.value;
+        if (!url)
+            return;
+        if (!url.match(WebInspector.ScreencastView._HttpRegex))
+            url = "http://" + url;
+        PageAgent.navigate(url);
+    },
+
+    _requestNavigationHistory: function()
+    {
+        PageAgent.getNavigationHistory(this._onNavigationHistory.bind(this));
+    },
+
+    _onNavigationHistory: function(error, currentIndex, entries)
+    {
+        if (error)
+          return;
+
+        this._historyIndex = currentIndex;
+        this._historyEntries = entries;
+
+        this._navigationBack.disabled = currentIndex == 0;
+        this._navigationForward.disabled = currentIndex == (entries.length - 1);
+
+        var url = entries[currentIndex].url;
+        var match = url.match(WebInspector.ScreencastView._HttpRegex);
+        if (match)
+            url = match[1];
+        this._navigationUrl.value = url;
     },
 
     __proto__: WebInspector.View.prototype

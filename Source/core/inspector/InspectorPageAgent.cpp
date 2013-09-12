@@ -46,6 +46,7 @@
 #include "core/fetch/Resource.h"
 #include "core/fetch/ResourceFetcher.h"
 #include "core/fetch/ScriptResource.h"
+#include "core/fetch/TextResourceDecoder.h"
 #include "core/html/HTMLFrameOwnerElement.h"
 #include "core/inspector/ContentSearchUtils.h"
 #include "core/inspector/DOMPatchSupport.h"
@@ -60,7 +61,6 @@
 #include "core/loader/DocumentLoader.h"
 #include "core/loader/FrameLoadRequest.h"
 #include "core/loader/FrameLoader.h"
-#include "core/loader/TextResourceDecoder.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
@@ -457,6 +457,12 @@ void InspectorPageAgent::navigate(ErrorString*, const String& url)
     frame->loader()->load(request);
 }
 
+void InspectorPageAgent::getNavigationHistory(ErrorString*, int*, RefPtr<TypeBuilder::Array<TypeBuilder::Page::NavigationEntry> >&)
+{ }
+
+void InspectorPageAgent::navigateToHistoryEntry(ErrorString*, int)
+{ }
+
 static PassRefPtr<TypeBuilder::Page::Cookie> buildObjectForCookie(const Cookie& cookie)
 {
     return TypeBuilder::Page::Cookie::create()
@@ -655,7 +661,7 @@ void InspectorPageAgent::setDocumentContent(ErrorString* errorString, const Stri
         *errorString = "No Document instance to set HTML for";
         return;
     }
-    DOMPatchSupport::patchDocument(document, html);
+    DOMPatchSupport::patchDocument(*document, html);
 }
 
 void InspectorPageAgent::setDeviceMetricsOverride(ErrorString* errorString, int width, int height, double fontScaleFactor, bool fitWindow)
@@ -828,6 +834,11 @@ void InspectorPageAgent::didCommitLoad(Frame*, DocumentLoader* loader)
         m_pendingScriptPreprocessor = String();
     }
     m_frontend->frameNavigated(buildObjectForFrame(loader->frame()));
+}
+
+void InspectorPageAgent::frameAttachedToParent(Frame* frame)
+{
+    m_frontend->frameAttached(frameId(frame));
 }
 
 void InspectorPageAgent::frameDetachedFromParent(Frame* frame)
@@ -1264,12 +1275,12 @@ void InspectorPageAgent::setForceCompositingMode(ErrorString* errorString, bool 
     mainFrame->view()->updateCompositingLayersAfterStyleChange();
 }
 
-void InspectorPageAgent::captureScreenshot(ErrorString*, const String*, const int*, const double*, String*)
+void InspectorPageAgent::captureScreenshot(ErrorString*, const String*, const int*, const int*, const int*, String*, double*, double*, RefPtr<TypeBuilder::DOM::Rect>&)
 {
     // Handled on the browser level.
 }
 
-void InspectorPageAgent::startScreencast(ErrorString*, const String*, const int*, const double*)
+void InspectorPageAgent::startScreencast(ErrorString*, const String*, const int*, const int*, const int*)
 {
     // Handled on the browser level.
 }

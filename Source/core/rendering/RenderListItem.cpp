@@ -39,7 +39,7 @@ namespace WebCore {
 using namespace HTMLNames;
 
 RenderListItem::RenderListItem(Element* element)
-    : RenderBlock(element)
+    : RenderBlockFlow(element)
     , m_marker(0)
     , m_hasExplicitValue(false)
     , m_isValueUpToDate(false)
@@ -73,7 +73,7 @@ void RenderListItem::willBeDestroyed()
         m_marker->destroy();
         m_marker = 0;
     }
-    RenderBlock::willBeDestroyed();
+    RenderBlockFlow::willBeDestroyed();
 }
 
 void RenderListItem::insertedIntoTree()
@@ -85,7 +85,7 @@ void RenderListItem::insertedIntoTree()
 
 void RenderListItem::willBeRemovedFromTree()
 {
-    RenderBlock::willBeRemovedFromTree();
+    RenderBlockFlow::willBeRemovedFromTree();
 
     updateListMarkerNumbers();
 }
@@ -221,7 +221,7 @@ static RenderObject* getParentOfFirstLineBox(RenderBlock* curr, RenderObject* ma
     if (!firstChild)
         return 0;
 
-    bool inQuirksMode = curr->document()->inQuirksMode();
+    bool inQuirksMode = curr->document().inQuirksMode();
     for (RenderObject* currChild = firstChild; currChild; currChild = currChild->nextSibling()) {
         if (currChild == marker)
             continue;
@@ -296,6 +296,11 @@ void RenderListItem::updateMarkerLocation()
             // If markerParent is an anonymous block that has lost all its children, destroy it.
             if (markerParent && markerParent->isAnonymousBlock() && !markerParent->firstChild() && !toRenderBlock(markerParent)->continuation())
                 markerParent->destroy();
+
+            // If the marker is inside we need to redo the preferred width calculations
+            // as the size of the item now includes the size of the list marker.
+            if (m_marker->isInside())
+                containingBlock()->updateLogicalWidth();
         }
     }
 }
@@ -305,12 +310,12 @@ void RenderListItem::layout()
     ASSERT(needsLayout());
 
     updateMarkerLocation();
-    RenderBlock::layout();
+    RenderBlockFlow::layout();
 }
 
 void RenderListItem::addOverflowFromChildren()
 {
-    RenderBlock::addOverflowFromChildren();
+    RenderBlockFlow::addOverflowFromChildren();
     positionListMarker();
 }
 
@@ -414,7 +419,7 @@ void RenderListItem::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
     if (!logicalHeight() && hasOverflowClip())
         return;
 
-    RenderBlock::paint(paintInfo, paintOffset);
+    RenderBlockFlow::paint(paintInfo, paintOffset);
 }
 
 const String& RenderListItem::markerText() const

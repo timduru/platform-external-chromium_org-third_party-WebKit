@@ -32,13 +32,13 @@
 #define RenderListBox_h
 
 #include "core/platform/ScrollableArea.h"
-#include "core/rendering/RenderBlock.h"
+#include "core/rendering/RenderBlockFlow.h"
 
 namespace WebCore {
 
 class HTMLSelectElement;
 
-class RenderListBox FINAL : public RenderBlock, private ScrollableArea {
+class RenderListBox FINAL : public RenderBlockFlow, private ScrollableArea {
 public:
     explicit RenderListBox(Element*);
     virtual ~RenderListBox();
@@ -80,6 +80,8 @@ private:
     virtual void computeLogicalHeight(LayoutUnit logicalHeight, LayoutUnit logicalTop, LogicalExtentComputedValues&) const OVERRIDE;
 
     virtual void layout();
+
+    virtual bool supportsPartialLayout() const OVERRIDE { return false; }
 
     virtual void addFocusRingRects(Vector<IntRect>&, const LayoutPoint& additionalOffset, const RenderLayerModelObject* paintContainer = 0) OVERRIDE;
 
@@ -123,6 +125,7 @@ private:
     virtual IntPoint minimumScrollPosition() const OVERRIDE;
     virtual IntPoint maximumScrollPosition() const OVERRIDE;
     virtual bool userInputScrollable(ScrollbarOrientation) const OVERRIDE;
+    virtual bool shouldPlaceVerticalScrollbarOnLeft() const OVERRIDE;
     virtual int lineStep(ScrollbarOrientation) const;
     virtual int pageStep(ScrollbarOrientation) const;
     virtual float pixelStep(ScrollbarOrientation) const;

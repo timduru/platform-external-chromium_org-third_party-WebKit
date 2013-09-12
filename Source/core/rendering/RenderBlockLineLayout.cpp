@@ -54,9 +54,46 @@ namespace WebCore {
 // We don't let our line box tree for a single line get any deeper than this.
 const unsigned cMaxLineDepth = 200;
 
+struct RenderTextInfo {
+    // Destruction of m_layout requires TextLayout to be a complete type, so the constructor and destructor are made non-inline to avoid compilation errors.
+    RenderTextInfo();
+    ~RenderTextInfo();
+
+    RenderText* m_text;
+    OwnPtr<TextLayout> m_layout;
+    LazyLineBreakIterator m_lineBreakIterator;
+    const Font* m_font;
+};
+
+class LineBreaker {
+public:
+    LineBreaker(RenderBlock* block)
+        : m_block(block)
+    {
+        reset();
+    }
+
+    InlineIterator nextLineBreak(InlineBidiResolver&, LineInfo&, RenderTextInfo&, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements&);
+
+    bool lineWasHyphenated() { return m_hyphenated; }
+    const Vector<RenderBox*>& positionedObjects() { return m_positionedObjects; }
+    EClear clear() { return m_clear; }
+private:
+    void reset();
+
+    InlineIterator nextSegmentBreak(InlineBidiResolver&, LineInfo&, RenderTextInfo&, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements&);
+    void skipTrailingWhitespace(InlineIterator&, const LineInfo&);
+    void skipLeadingWhitespace(InlineBidiResolver&, LineInfo&, FloatingObject* lastFloatFromPreviousLine, LineWidth&);
+
+    RenderBlock* m_block;
+    bool m_hyphenated;
+    EClear m_clear;
+    Vector<RenderBox*> m_positionedObjects;
+};
+
 static LayoutUnit logicalHeightForLine(const RenderBlock* block, bool isFirstLine, LayoutUnit replacedHeight = 0)
 {
-    if (!block->document()->inNoQuirksMode() && replacedHeight)
+    if (!block->document().inNoQuirksMode() && replacedHeight)
         return replacedHeight;
 
     if (!(block->style(isFirstLine)->lineBoxContain() & LineBoxContainBlock))
@@ -396,7 +433,7 @@ static TextDirection determinePlaintextDirectionality(RenderObject* root, Render
     observer.setStatus(BidiStatus(root->style()->direction(), isOverride(root->style()->unicodeBidi())));
     while (!iter.atEnd()) {
         if (observer.inIsolate()) {
-            iter.increment(&observer);
+            iter.increment(&observer, InlineIterator::FastIncrementInlineRenderer);
             continue;
         }
         if (iter.atParagraphSeparator())
@@ -428,7 +465,7 @@ static void checkMidpoints(LineMidpointState& lineMidpointState, InlineIterator&
         if (currpoint == lBreak) {
             // We hit the line break before the start point.  Shave off the start point.
             lineMidpointState.numMidpoints--;
-            if (endpoint.m_obj->style()->collapseWhiteSpace())
+            if (endpoint.m_obj->style()->collapseWhiteSpace() && endpoint.m_obj->isText())
                 endpoint.m_pos--;
         }
     }
@@ -509,7 +546,7 @@ void RenderBlock::appendRunsForObject(BidiRunList<BidiRun>& runs, int start, int
         if (static_cast<int>(nextMidpoint.m_pos + 1) <= end) {
             lineMidpointState.betweenMidpoints = true;
             lineMidpointState.currentMidpoint++;
-            if (nextMidpoint.m_pos != INT_MAX) { // INT_MAX means stop at the object and don't include any of it.
+            if (nextMidpoint.m_pos != UINT_MAX) { // UINT_MAX means stop at the object and don't include any of it.
                 if (static_cast<int>(nextMidpoint.m_pos + 1) > start)
                     runs.addRun(createRun(start, nextMidpoint.m_pos + 1, obj, resolver));
                 return appendRunsForObject(runs, nextMidpoint.m_pos + 1, end, obj, resolver);
@@ -529,7 +566,7 @@ static inline InlineBox* createInlineBoxForRenderer(RenderObject* obj, bool isRo
         // We only treat a box as text for a <br> if we are on a line by ourself or in strict mode
         // (Note the use of strict mode.  In "almost strict" mode, we don't treat the box for <br> as text.)
         if (obj->isBR())
-            textBox->setIsText(isOnlyRun || obj->document()->inNoQuirksMode());
+            textBox->setIsText(isOnlyRun || obj->document().inNoQuirksMode());
         return textBox;
     }
 
@@ -539,20 +576,10 @@ static inline InlineBox* createInlineBoxForRenderer(RenderObject* obj, bool isRo
     return toRenderInline(obj)->createAndAppendInlineFlowBox();
 }
 
-// FIXME: Don't let counters mark themselves as needing pref width recalcs during layout
-// so we don't need this hack.
-static inline void updateCounterIfNeeded(RenderText* o)
-{
-    if (!o->preferredLogicalWidthsDirty() || !o->isCounter())
-        return;
-    toRenderCounter(o)->updateCounter();
-}
-
 static inline void dirtyLineBoxesForRenderer(RenderObject* o, bool fullLayout)
 {
     if (o->isText()) {
         RenderText* renderText = toRenderText(o);
-        updateCounterIfNeeded(renderText);
         renderText->dirtyLineBoxes(fullLayout);
     } else
         toRenderInline(o)->dirtyLineBoxes(fullLayout);
@@ -867,7 +894,7 @@ static inline void setLogicalWidthForTextRun(RootInlineBox* lineBox, BidiRun* ru
 
     bool kerningIsEnabled = font.typesettingFeatures() & Kerning;
 
-#if OS(DARWIN)
+#if OS(MACOSX)
     // FIXME: Having any font feature settings enabled can lead to selection gaps on
     // Chromium-mac. https://bugs.webkit.org/show_bug.cgi?id=113418
     bool canUseSimpleFontCodePath = renderer->canUseSimpleFontCodePath() && !font.fontDescription().featureSettings();
@@ -959,8 +986,14 @@ static inline void computeExpansionForJustifiedText(BidiRun* firstRun, BidiRun* 
     }
 }
 
-void RenderBlock::updateLogicalWidthForAlignment(const ETextAlign& textAlign, BidiRun* trailingSpaceRun, float& logicalLeft, float& totalLogicalWidth, float& availableLogicalWidth, int expansionOpportunityCount)
+void RenderBlock::updateLogicalWidthForAlignment(const ETextAlign& textAlign, const RootInlineBox* rootInlineBox, BidiRun* trailingSpaceRun, float& logicalLeft, float& totalLogicalWidth, float& availableLogicalWidth, int expansionOpportunityCount)
 {
+    TextDirection direction;
+    if (rootInlineBox && rootInlineBox->renderer()->style()->unicodeBidi() == Plaintext)
+        direction = rootInlineBox->direction();
+    else
+        direction = style()->direction();
+
     // Armed with the total width of the line (without justification),
     // we now examine our text-align property in order to determine where to position the
     // objects horizontally. The total width of the line can be increased if we end up
@@ -989,13 +1022,13 @@ void RenderBlock::updateLogicalWidthForAlignment(const ETextAlign& textAlign, Bi
         }
         // Fall through
     case TASTART:
-        if (style()->isLeftToRightDirection())
+        if (direction == LTR)
             updateLogicalWidthForLeftAlignedBlock(style()->isLeftToRightDirection(), trailingSpaceRun, logicalLeft, totalLogicalWidth, availableLogicalWidth);
         else
             updateLogicalWidthForRightAlignedBlock(style()->isLeftToRightDirection(), trailingSpaceRun, logicalLeft, totalLogicalWidth, availableLogicalWidth);
         break;
     case TAEND:
-        if (style()->isLeftToRightDirection())
+        if (direction == LTR)
             updateLogicalWidthForRightAlignedBlock(style()->isLeftToRightDirection(), trailingSpaceRun, logicalLeft, totalLogicalWidth, availableLogicalWidth);
         else
             updateLogicalWidthForLeftAlignedBlock(style()->isLeftToRightDirection(), trailingSpaceRun, logicalLeft, totalLogicalWidth, availableLogicalWidth);
@@ -1142,7 +1175,7 @@ BidiRun* RenderBlock::computeInlineDirectionPositionsForSegment(RootInlineBox* l
         expansionOpportunityCount--;
     }
 
-    updateLogicalWidthForAlignment(textAlign, trailingSpaceRun, logicalLeft, totalLogicalWidth, availableLogicalWidth, expansionOpportunityCount);
+    updateLogicalWidthForAlignment(textAlign, lineBox, trailingSpaceRun, logicalLeft, totalLogicalWidth, availableLogicalWidth, expansionOpportunityCount);
 
     computeExpansionForJustifiedText(firstRun, trailingSpaceRun, expansionOpportunities, expansionOpportunityCount, totalLogicalWidth, availableLogicalWidth);
 
@@ -1317,7 +1350,8 @@ static inline void constructBidiRunsForSegment(InlineBidiResolver& topResolver, 
         // tree to see which parent inline is the isolate. We could change enterIsolate
         // to take a RenderObject and do this logic there, but that would be a layering
         // violation for BidiResolver (which knows nothing about RenderObject).
-        RenderInline* isolatedInline = toRenderInline(containingIsolate(startObj, currentRoot));
+        RenderInline* isolatedInline = toRenderInline(highestContainingIsolateWithinRoot(startObj, currentRoot));
+        ASSERT(isolatedInline);
 
         InlineBidiResolver isolatedResolver;
         EUnicodeBidi unicodeBidi = isolatedInline->style()->unicodeBidi();
@@ -1396,7 +1430,7 @@ static inline void constructBidiRunsForLine(const RenderBlock* block, InlineBidi
 }
 
 // This function constructs line boxes for all of the text runs in the resolver and computes their position.
-RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(BidiRunList<BidiRun>& bidiRuns, const InlineIterator& end, LineInfo& lineInfo, VerticalPositionCache& verticalPositionCache, BidiRun* trailingSpaceRun, WordMeasurements& wordMeasurements)
+RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(unsigned bidiLevel, BidiRunList<BidiRun>& bidiRuns, const InlineIterator& end, LineInfo& lineInfo, VerticalPositionCache& verticalPositionCache, BidiRun* trailingSpaceRun, WordMeasurements& wordMeasurements)
 {
     if (!bidiRuns.runCount())
         return 0;
@@ -1408,6 +1442,7 @@ RootInlineBox* RenderBlock::createLineBoxesFromBidiRuns(BidiRunList<BidiRun>& bi
     if (!lineBox)
         return 0;
 
+    lineBox->setBidiLevel(bidiLevel);
     lineBox->setEndsWithBreak(lineInfo.previousLineBrokeCleanly());
 
     bool isSVGRootInlineBox = lineBox->isSVGRootInlineBox();
@@ -1603,13 +1638,13 @@ void RenderBlock::layoutRunsAndFloats(LineLayoutState& layoutState, bool hasInli
     repaintDirtyFloats(layoutState.floats());
 }
 
-RenderBlock::RenderTextInfo::RenderTextInfo()
+RenderTextInfo::RenderTextInfo()
     : m_text(0)
     , m_font(0)
 {
 }
 
-RenderBlock::RenderTextInfo::~RenderTextInfo()
+RenderTextInfo::~RenderTextInfo()
 {
 }
 
@@ -1870,7 +1905,7 @@ void RenderBlock::layoutRunsAndFloatsInRange(LineLayoutState& layoutState, Inlin
             // inline flow boxes.
 
             LayoutUnit oldLogicalHeight = logicalHeight();
-            RootInlineBox* lineBox = createLineBoxesFromBidiRuns(bidiRuns, end, layoutState.lineInfo(), verticalPositionCache, trailingSpaceRun, wordMeasurements);
+            RootInlineBox* lineBox = createLineBoxesFromBidiRuns(resolver.status().context->level(), bidiRuns, end, layoutState.lineInfo(), verticalPositionCache, trailingSpaceRun, wordMeasurements);
 
             bidiRuns.deleteRuns();
             resolver.markCurrentRunEmpty(); // FIXME: This can probably be replaced by an ASSERT (or just removed).
@@ -2087,7 +2122,7 @@ void RenderBlock::repaintDirtyFloats(Vector<FloatWithRect>& floats)
     }
 }
 
-void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom)
+void RenderBlockFlow::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repaintLogicalTop, LayoutUnit& repaintLogicalBottom)
 {
     setLogicalHeight(borderBefore() + paddingBefore());
 
@@ -2164,7 +2199,7 @@ void RenderBlock::layoutInlineChildren(bool relayoutChildren, LayoutUnit& repain
         }
 
         for (size_t i = 0; i < replacedChildren.size(); i++)
-             replacedChildren[i]->layoutIfNeeded();
+            replacedChildren[i]->layoutIfNeeded();
 
         layoutRunsAndFloats(layoutState, hasInlineChild);
     }
@@ -2476,7 +2511,7 @@ static inline bool shouldCollapseWhiteSpace(const RenderStyle* style, const Line
 static bool requiresLineBoxForContent(RenderInline* flow, const LineInfo& lineInfo)
 {
     RenderObject* parent = flow->parent();
-    if (flow->document()->inNoQuirksMode()
+    if (flow->document().inNoQuirksMode()
         && (flow->style(lineInfo.isFirstLine())->lineHeight() != parent->style(lineInfo.isFirstLine())->lineHeight()
         || flow->style()->verticalAlign() != parent->style()->verticalAlign()
         || !parent->style()->font().fontMetrics().hasIdenticalAscentDescentAndLineGap(flow->style()->font().fontMetrics())))
@@ -2526,7 +2561,7 @@ bool RenderBlock::generatesLineBoxesForInlineChild(RenderObject* inlineObj)
 // object iteration process.
 // NB. this function will insert any floating elements that would otherwise
 // be skipped but it will not position them.
-void RenderBlock::LineBreaker::skipTrailingWhitespace(InlineIterator& iterator, const LineInfo& lineInfo)
+void LineBreaker::skipTrailingWhitespace(InlineIterator& iterator, const LineInfo& lineInfo)
 {
     while (!iterator.atEnd() && !requiresLineBox(iterator, lineInfo, TrailingWhitespace)) {
         RenderObject* object = iterator.m_obj;
@@ -2538,7 +2573,7 @@ void RenderBlock::LineBreaker::skipTrailingWhitespace(InlineIterator& iterator, 
     }
 }
 
-void RenderBlock::LineBreaker::skipLeadingWhitespace(InlineBidiResolver& resolver, LineInfo& lineInfo,
+void LineBreaker::skipLeadingWhitespace(InlineBidiResolver& resolver, LineInfo& lineInfo,
                                                      FloatingObject* lastFloatFromPreviousLine, LineWidth& width)
 {
     while (!resolver.position().atEnd() && !requiresLineBox(resolver.position(), lineInfo, LeadingWhitespace)) {
@@ -2681,7 +2716,7 @@ void TrailingObjects::updateMidpointsForTrailingBoxes(LineMidpointState& lineMid
         ASSERT(collapseFirstSpace == CollapseFirstSpace);
         // Add a new end midpoint that stops right at the very end.
         unsigned length = m_whitespace->textLength();
-        unsigned pos = length >= 2 ? length - 2 : INT_MAX;
+        unsigned pos = length >= 2 ? length - 2 : UINT_MAX;
         InlineIterator endMid(0, m_whitespace, pos);
         startIgnoringSpaces(lineMidpointState, endMid);
         for (size_t i = 0; i < m_boxes.size(); ++i) {
@@ -2690,14 +2725,14 @@ void TrailingObjects::updateMidpointsForTrailingBoxes(LineMidpointState& lineMid
     }
 }
 
-void RenderBlock::LineBreaker::reset()
+void LineBreaker::reset()
 {
     m_positionedObjects.clear();
     m_hyphenated = false;
     m_clear = CNONE;
 }
 
-InlineIterator RenderBlock::LineBreaker::nextLineBreak(InlineBidiResolver& resolver, LineInfo& lineInfo, RenderTextInfo& renderTextInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements& wordMeasurements)
+InlineIterator LineBreaker::nextLineBreak(InlineBidiResolver& resolver, LineInfo& lineInfo, RenderTextInfo& renderTextInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements& wordMeasurements)
 {
     ShapeInsideInfo* shapeInsideInfo = m_block->layoutShapeInsideInfo();
 
@@ -2752,7 +2787,7 @@ static inline bool iteratorIsBeyondEndOfRenderCombineText(const InlineIterator& 
     return iter.m_obj == renderer && iter.m_pos >= renderer->textLength();
 }
 
-InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& resolver, LineInfo& lineInfo, RenderTextInfo& renderTextInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements& wordMeasurements)
+InlineIterator LineBreaker::nextSegmentBreak(InlineBidiResolver& resolver, LineInfo& lineInfo, RenderTextInfo& renderTextInfo, FloatingObject* lastFloatFromPreviousLine, unsigned consecutiveHyphenatedLines, WordMeasurements& wordMeasurements)
 {
     reset();
 
@@ -2799,7 +2834,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
     // very specific circumstances (in order to match common WinIE renderings).
     // Not supporting the quirk has caused us to mis-render some real sites. (See Bugzilla 10517.)
     RenderStyle* blockStyle = m_block->style();
-    bool allowImagesToBreak = !m_block->document()->inQuirksMode() || !m_block->isTableCell() || !blockStyle->logicalWidth().isIntrinsicOrAuto();
+    bool allowImagesToBreak = !m_block->document().inQuirksMode() || !m_block->isTableCell() || !blockStyle->logicalWidth().isIntrinsicOrAuto();
 
     EWhiteSpace currWS = blockStyle->whiteSpace();
     EWhiteSpace lastWS = currWS;
@@ -3003,7 +3038,6 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
             }
 
             if (renderTextInfo.m_text != t) {
-                updateCounterIfNeeded(t);
                 renderTextInfo.m_text = t;
                 renderTextInfo.m_font = &f;
                 renderTextInfo.m_layout = f.createLayout(t, width.currentWidth(), collapseWhiteSpace);
@@ -3017,7 +3051,7 @@ InlineIterator RenderBlock::LineBreaker::nextSegmentBreak(InlineBidiResolver& re
 
             // Non-zero only when kerning is enabled and TextLayout isn't used, in which case we measure
             // words with their trailing space, then subtract its width.
-            float wordTrailingSpaceWidth = (f.typesettingFeatures() & Kerning) && !textLayout ? f.width(constructTextRun(t, f, &space, 1, style)) + wordSpacing : 0;
+            float wordTrailingSpaceWidth = (f.typesettingFeatures() & Kerning) && !textLayout ? f.width(RenderBlock::constructTextRun(t, f, &space, 1, style)) + wordSpacing : 0;
 
             UChar lastCharacter = renderTextInfo.m_lineBreakIterator.lastCharacter();
             UChar secondToLastCharacter = renderTextInfo.m_lineBreakIterator.secondToLastCharacter();
@@ -3378,7 +3412,7 @@ void RenderBlock::deleteEllipsisLineBoxes()
             float logicalLeft = pixelSnappedLogicalLeftOffsetForLine(curr->lineTop(), firstLine);
             float availableLogicalWidth = logicalRightOffsetForLine(curr->lineTop(), false) - logicalLeft;
             float totalLogicalWidth = curr->logicalWidth();
-            updateLogicalWidthForAlignment(textAlign, 0, logicalLeft, totalLogicalWidth, availableLogicalWidth, 0);
+            updateLogicalWidthForAlignment(textAlign, curr, 0, logicalLeft, totalLogicalWidth, availableLogicalWidth, 0);
 
             if (ltr)
                 curr->adjustLogicalPosition((logicalLeft - curr->logicalLeft()), 0);
@@ -3425,7 +3459,7 @@ void RenderBlock::checkLinesForTextOverflow()
 
                 float logicalLeft = 0; // We are only intersted in the delta from the base position.
                 float truncatedWidth = pixelSnappedLogicalRightOffsetForLine(curr->lineTop(), firstLine);
-                updateLogicalWidthForAlignment(textAlign, 0, logicalLeft, totalLogicalWidth, truncatedWidth, 0);
+                updateLogicalWidthForAlignment(textAlign, curr, 0, logicalLeft, totalLogicalWidth, truncatedWidth, 0);
                 if (ltr)
                     curr->adjustLogicalPosition(logicalLeft, 0);
                 else
@@ -3500,7 +3534,7 @@ LayoutUnit RenderBlock::startAlignedOffsetForLine(LayoutUnit position, bool firs
     float totalLogicalWidth = 0;
     float logicalLeft = logicalLeftOffsetForLine(logicalHeight(), false);
     float availableLogicalWidth = logicalRightOffsetForLine(logicalHeight(), false) - logicalLeft;
-    updateLogicalWidthForAlignment(textAlign, 0, logicalLeft, totalLogicalWidth, availableLogicalWidth, 0);
+    updateLogicalWidthForAlignment(textAlign, 0, 0, logicalLeft, totalLogicalWidth, availableLogicalWidth, 0);
 
     if (!style()->isLeftToRightDirection())
         return logicalWidth() - logicalLeft;

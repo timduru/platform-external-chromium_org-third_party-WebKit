@@ -64,7 +64,6 @@
 #include "core/css/resolver/StyleBuilder.h"
 #include "core/css/resolver/ViewportStyleResolver.h"
 #include "core/dom/NodeRenderStyle.h"
-#include "core/dom/NodeRenderingContext.h"
 #include "core/dom/StyleSheetCollections.h"
 #include "core/dom/Text.h"
 #include "core/dom/shadow/ElementShadow.h"
@@ -106,14 +105,14 @@ static StylePropertySet* rightToLeftDeclaration()
     return rightToLeftDecl.get();
 }
 
-StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
+StyleResolver::StyleResolver(Document& document, bool matchAuthorAndUserStyles)
     : m_document(document)
     , m_matchAuthorAndUserStyles(matchAuthorAndUserStyles)
-    , m_fontSelector(CSSFontSelector::create(document))
-    , m_viewportStyleResolver(ViewportStyleResolver::create(document))
-    , m_styleResourceLoader(document->fetcher())
+    , m_fontSelector(CSSFontSelector::create(&document))
+    , m_viewportStyleResolver(ViewportStyleResolver::create(&document))
+    , m_styleResourceLoader(document.fetcher())
 {
-    Element* root = document->documentElement();
+    Element* root = document.documentElement();
 
     CSSDefaultStyleSheets::initDefaultStyle(root);
 
@@ -123,7 +122,7 @@ StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
     // document doesn't have documentElement
     // NOTE: this assumes that element that gets passed to styleForElement -call
     // is always from the document that owns the style selector
-    FrameView* view = document->view();
+    FrameView* view = document.view();
     if (view)
         m_medium = adoptPtr(new MediaQueryEvaluator(view->mediaType()));
     else
@@ -133,16 +132,16 @@ StyleResolver::StyleResolver(Document* document, bool matchAuthorAndUserStyles)
         m_rootDefaultStyle = styleForElement(root, 0, DisallowStyleSharing, MatchOnlyUserAgentRules);
 
     if (m_rootDefaultStyle && view)
-        m_medium = adoptPtr(new MediaQueryEvaluator(view->mediaType(), view->frame(), m_rootDefaultStyle.get()));
+        m_medium = adoptPtr(new MediaQueryEvaluator(view->mediaType(), &view->frame(), m_rootDefaultStyle.get()));
 
     m_styleTree.clear();
 
-    StyleSheetCollections* styleSheetCollection = document->styleSheetCollections();
+    StyleSheetCollections* styleSheetCollection = document.styleSheetCollections();
     m_ruleSets.initUserStyle(styleSheetCollection, *m_medium, *this);
 
 #if ENABLE(SVG_FONTS)
-    if (document->svgExtensions()) {
-        const HashSet<SVGFontFaceElement*>& svgFontFaceElements = document->svgExtensions()->svgFontFaceElements();
+    if (document.svgExtensions()) {
+        const HashSet<SVGFontFaceElement*>& svgFontFaceElements = document.svgExtensions()->svgFontFaceElements();
         HashSet<SVGFontFaceElement*>::const_iterator end = svgFontFaceElements.end();
         for (HashSet<SVGFontFaceElement*>::const_iterator it = svgFontFaceElements.begin(); it != end; ++it)
             fontSelector()->addFontFaceRule((*it)->fontFaceRule());
@@ -175,16 +174,15 @@ void StyleResolver::finishAppendAuthorStyleSheets()
 {
     collectFeatures();
 
-    if (document()->renderer() && document()->renderer()->style())
-        document()->renderer()->style()->font().update(fontSelector());
+    if (document().renderer() && document().renderer()->style())
+        document().renderer()->style()->font().update(fontSelector());
 
-    if (RuntimeEnabledFeatures::cssViewportEnabled())
-        collectViewportRules();
+    collectViewportRules();
 }
 
 void StyleResolver::resetAuthorStyle(const ContainerNode* scopingNode)
 {
-    ScopedStyleResolver* resolver = scopingNode ? m_styleTree.scopedStyleResolverFor(scopingNode) : m_styleTree.scopedStyleResolverForDocument();
+    ScopedStyleResolver* resolver = scopingNode ? m_styleTree.scopedStyleResolverFor(*scopingNode) : m_styleTree.scopedStyleResolverForDocument();
     if (!resolver)
         return;
 
@@ -210,7 +208,8 @@ void StyleResolver::resetAtHostRules(const ContainerNode* scopingNode)
 
     const ShadowRoot* shadowRoot = toShadowRoot(scopingNode);
     const ContainerNode* shadowHost = shadowRoot->shadowHost();
-    ScopedStyleResolver* resolver = m_styleTree.scopedStyleResolverFor(shadowHost);
+    ASSERT(shadowHost);
+    ScopedStyleResolver* resolver = m_styleTree.scopedStyleResolverFor(*shadowHost);
     if (!resolver)
         return;
 
@@ -235,15 +234,70 @@ static PassOwnPtr<RuleSet> makeRuleSet(const Vector<RuleFeature>& rules)
 void StyleResolver::collectFeatures()
 {
     m_features.clear();
-    m_ruleSets.collectFeaturesTo(m_features, document()->isViewSource());
+    m_ruleSets.collectFeaturesTo(m_features, document().isViewSource());
     m_styleTree.collectFeaturesTo(m_features);
 
     m_siblingRuleSet = makeRuleSet(m_features.siblingRules);
     m_uncommonAttributeRuleSet = makeRuleSet(m_features.uncommonAttributeRules);
 }
 
+bool StyleResolver::supportsStyleSharing(Element* element)
+{
+    if (!element || !element->isStyledElement() || !element->parentElement())
+        return false;
+
+    // If the element has inline style it is probably unique.
+    if (element->inlineStyle())
+        return false;
+    if (element->isSVGElement() && toSVGElement(element)->animatedSMILStyleProperties())
+        return false;
+    // Ids stop style sharing if they show up in the stylesheets.
+    if (element->hasID() && m_features.idsInRules.contains(element->idForStyleResolution().impl()))
+        return false;
+    // Active and hovered elements always make a chain towards the document node
+    // and no siblings or cousins will have the same state.
+    if (element->hovered())
+        return false;
+    if (element->active())
+        return false;
+    // There is always only one focused element.
+    if (element->focused())
+        return false;
+    if (element->parentElement()->hasFlagsSetDuringStylingOfChildren())
+        return false;
+    if (element->hasScopedHTMLStyleChild())
+        return false;
+    if (element == m_document.cssTarget())
+        return false;
+    if (element->isHTMLElement() && toHTMLElement(element)->hasDirectionAuto())
+        return false;
+    if (element->hasActiveAnimations())
+        return false;
+    // When a dialog is first shown, its style is mutated to center it in the
+    // viewport. So the styles can't be shared since the viewport position and
+    // size may be different each time a dialog is opened.
+    if (element->hasTagName(dialogTag))
+        return false;
+    if (isShadowHost(element) && element->shadow()->containsActiveStyles())
+        return false;
+    return true;
+}
+
+void StyleResolver::addToStyleSharingList(Element* element)
+{
+    if (m_styleSharingList.size() >= styleSharingListSize)
+        m_styleSharingList.remove(--m_styleSharingList.end());
+    m_styleSharingList.prepend(element);
+}
+
+void StyleResolver::clearStyleSharingList()
+{
+    m_styleSharingList.clear();
+}
+
 void StyleResolver::pushParentElement(Element* parent)
 {
+    ASSERT(parent);
     const ContainerNode* parentsParent = parent->parentOrShadowHostElement();
 
     // We are not always invoked consistently. For example, script execution can cause us to enter
@@ -256,28 +310,29 @@ void StyleResolver::pushParentElement(Element* parent)
         m_selectorFilter.pushParent(parent);
 
     // Note: We mustn't skip ShadowRoot nodes for the scope stack.
-    m_styleTree.pushStyleCache(parent, parent->parentOrShadowHostNode());
+    m_styleTree.pushStyleCache(*parent, parent->parentOrShadowHostNode());
 }
 
 void StyleResolver::popParentElement(Element* parent)
 {
+    ASSERT(parent);
     // Note that we may get invoked for some random elements in some wacky cases during style resolve.
     // Pause maintaining the stack in this case.
     if (m_selectorFilter.parentStackIsConsistent(parent))
         m_selectorFilter.popParent();
 
-    m_styleTree.popStyleCache(parent);
+    m_styleTree.popStyleCache(*parent);
 }
 
-void StyleResolver::pushParentShadowRoot(const ShadowRoot* shadowRoot)
+void StyleResolver::pushParentShadowRoot(const ShadowRoot& shadowRoot)
 {
-    ASSERT(shadowRoot->host());
-    m_styleTree.pushStyleCache(shadowRoot, shadowRoot->host());
+    ASSERT(shadowRoot.host());
+    m_styleTree.pushStyleCache(shadowRoot, shadowRoot.host());
 }
 
-void StyleResolver::popParentShadowRoot(const ShadowRoot* shadowRoot)
+void StyleResolver::popParentShadowRoot(const ShadowRoot& shadowRoot)
 {
-    ASSERT(shadowRoot->host());
+    ASSERT(shadowRoot.host());
     m_styleTree.popStyleCache(shadowRoot);
 }
 
@@ -316,14 +371,14 @@ inline void StyleResolver::matchShadowDistributedRules(ElementRuleCollector& col
 
 void StyleResolver::matchHostRules(Element* element, ScopedStyleResolver* resolver, ElementRuleCollector& collector, bool includeEmptyRules)
 {
-    if (element != resolver->scopingNode())
+    if (element != &resolver->scopingNode())
         return;
     resolver->matchHostRules(collector, includeEmptyRules);
 }
 
 static inline bool applyAuthorStylesOf(const Element* element)
 {
-    return element->treeScope()->applyAuthorStyles() || (element->shadow() && element->shadow()->applyAuthorStyles());
+    return element->treeScope().applyAuthorStyles() || (element->shadow() && element->shadow()->applyAuthorStyles());
 }
 
 void StyleResolver::matchScopedAuthorRulesForShadowHost(Element* element, ElementRuleCollector& collector, bool includeEmptyRules, Vector<ScopedStyleResolver*, 8>& resolvers, Vector<ScopedStyleResolver*, 8>& resolversInShadowTree)
@@ -338,7 +393,7 @@ void StyleResolver::matchScopedAuthorRulesForShadowHost(Element* element, Elemen
     for (int j = resolversInShadowTree.size() - 1; j >= 0; --j)
         resolversInShadowTree.at(j)->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope, cascadeOrder++);
 
-    if (resolvers.isEmpty() || resolvers.first()->treeScope() != element->treeScope())
+    if (resolvers.isEmpty() || &resolvers.first()->treeScope() != &element->treeScope())
         ++cascadeScope;
     cascadeOrder += resolvers.size();
     for (unsigned i = 0; i < resolvers.size(); ++i)
@@ -379,7 +434,7 @@ void StyleResolver::matchScopedAuthorRules(Element* element, ElementRuleCollecto
     for (unsigned i = 0; i < resolvers.size(); ++i, --cascadeOrder) {
         ScopedStyleResolver* resolver = resolvers.at(i);
         // FIXME: Need to clarify how to treat style scoped.
-        resolver->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope++, resolver->treeScope() == element->treeScope() && resolver->scopingNode()->isShadowRoot() ? 0 : cascadeOrder);
+        resolver->collectMatchingAuthorRules(collector, includeEmptyRules, applyAuthorStyles, cascadeScope++, &resolver->treeScope() == &element->treeScope() && resolver->scopingNode().isShadowRoot() ? 0 : cascadeOrder);
     }
 
     collector.sortAndTransferMatchedRules();
@@ -422,11 +477,11 @@ void StyleResolver::matchUARules(ElementRuleCollector& collector)
     matchUARules(collector, userAgentStyleSheet);
 
     // In quirks mode, we match rules from the quirks user agent sheet.
-    if (document()->inQuirksMode())
+    if (document().inQuirksMode())
         matchUARules(collector, CSSDefaultStyleSheets::defaultQuirksStyle);
 
     // If document uses view source styles (in view source mode or in xml viewer mode), then we match rules from the view source style sheet.
-    if (document()->isViewSource())
+    if (document().isViewSource())
         matchUARules(collector, CSSDefaultStyleSheets::viewSourceStyle());
 
     collector.setMatchingUARules(false);
@@ -500,18 +555,18 @@ bool StyleResolver::styleSharingCandidateMatchesRuleSet(const ElementResolveCont
     return collector.hasAnyMatchingRules(ruleSet);
 }
 
-PassRefPtr<RenderStyle> StyleResolver::styleForDocument(const Document* document, CSSFontSelector* fontSelector)
+PassRefPtr<RenderStyle> StyleResolver::styleForDocument(Document& document, CSSFontSelector* fontSelector)
 {
-    const Frame* frame = document->frame();
+    const Frame* frame = document.frame();
 
     // HTML5 states that seamless iframes should replace default CSS values
     // with values inherited from the containing iframe element. However,
     // some values (such as the case of designMode = "on") still need to
     // be set by this "document style".
     RefPtr<RenderStyle> documentStyle = RenderStyle::create();
-    bool seamlessWithParent = document->shouldDisplaySeamlesslyWithParent();
+    bool seamlessWithParent = document.shouldDisplaySeamlesslyWithParent();
     if (seamlessWithParent) {
-        RenderStyle* iframeStyle = document->seamlessParentIFrame()->renderStyle();
+        RenderStyle* iframeStyle = document.seamlessParentIFrame()->renderStyle();
         if (iframeStyle)
             documentStyle->inheritFrom(iframeStyle);
     }
@@ -519,52 +574,14 @@ PassRefPtr<RenderStyle> StyleResolver::styleForDocument(const Document* document
     // FIXME: It's not clear which values below we want to override in the seamless case!
     documentStyle->setDisplay(BLOCK);
     if (!seamlessWithParent) {
-        documentStyle->setRTLOrdering(document->visuallyOrdered() ? VisualOrder : LogicalOrder);
-        documentStyle->setZoom(frame && !document->printing() ? frame->pageZoomFactor() : 1);
-        documentStyle->setLocale(document->contentLanguage());
+        documentStyle->setRTLOrdering(document.visuallyOrdered() ? VisualOrder : LogicalOrder);
+        documentStyle->setZoom(frame && !document.printing() ? frame->pageZoomFactor() : 1);
+        documentStyle->setLocale(document.contentLanguage());
     }
     // This overrides any -webkit-user-modify inherited from the parent iframe.
-    documentStyle->setUserModify(document->inDesignMode() ? READ_WRITE : READ_ONLY);
+    documentStyle->setUserModify(document.inDesignMode() ? READ_WRITE : READ_ONLY);
 
-    Element* docElement = document->documentElement();
-    RenderObject* docElementRenderer = docElement ? docElement->renderer() : 0;
-    if (docElementRenderer) {
-        // Use the direction and writing-mode of the body to set the
-        // viewport's direction and writing-mode unless the property is set on the document element.
-        // If there is no body, then use the document element.
-        RenderObject* bodyRenderer = document->body() ? document->body()->renderer() : 0;
-        if (bodyRenderer && !document->writingModeSetOnDocumentElement())
-            documentStyle->setWritingMode(bodyRenderer->style()->writingMode());
-        else
-            documentStyle->setWritingMode(docElementRenderer->style()->writingMode());
-        if (bodyRenderer && !document->directionSetOnDocumentElement())
-            documentStyle->setDirection(bodyRenderer->style()->direction());
-        else
-            documentStyle->setDirection(docElementRenderer->style()->direction());
-    }
-
-    if (frame) {
-        if (FrameView* frameView = frame->view()) {
-            const Pagination& pagination = frameView->pagination();
-            if (pagination.mode != Pagination::Unpaginated) {
-                Pagination::setStylesForPaginationMode(pagination.mode, documentStyle.get());
-                documentStyle->setColumnGap(pagination.gap);
-                if (RenderView* view = document->renderView()) {
-                    if (view->hasColumns())
-                        view->updateColumnInfoFromStyle(documentStyle.get());
-                }
-            }
-        }
-    }
-
-    // Seamless iframes want to inherit their font from their parent iframe, so early return before setting the font.
-    if (seamlessWithParent)
-        return documentStyle.release();
-
-    FontBuilder fontBuilder;
-    fontBuilder.initForStyleResolve(document, documentStyle.get(), document->isSVGDocument());
-    fontBuilder.createFontForDocument(fontSelector, documentStyle.get());
-
+    document.setStyleDependentState(documentStyle.get());
     return documentStyle.release();
 }
 
@@ -578,10 +595,10 @@ static inline bool isAtShadowBoundary(const Element* element)
     return parentNode && parentNode->isShadowRoot();
 }
 
-static inline void resetDirectionAndWritingModeOnDocument(Document* document)
+static inline void resetDirectionAndWritingModeOnDocument(Document& document)
 {
-    document->setDirectionSetOnDocumentElement(false);
-    document->setWritingModeSetOnDocumentElement(false);
+    document.setDirectionSetOnDocumentElement(false);
+    document.setWritingModeSetOnDocumentElement(false);
 }
 
 static void addContentAttrValuesToFeatures(const Vector<AtomicString>& contentAttrValues, RuleFeatureSet& features)
@@ -593,22 +610,22 @@ static void addContentAttrValuesToFeatures(const Vector<AtomicString>& contentAt
 PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderStyle* defaultParent, StyleSharingBehavior sharingBehavior,
     RuleMatchingBehavior matchingBehavior, RenderRegion* regionForStyling)
 {
-    ASSERT(document()->frame());
+    ASSERT(document().frame());
     ASSERT(documentSettings());
 
     // Once an element has a renderer, we don't try to destroy it, since otherwise the renderer
     // will vanish if a style recalc happens during loading.
-    if (sharingBehavior == AllowStyleSharing && !element->document()->haveStylesheetsLoaded() && !element->renderer()) {
+    if (sharingBehavior == AllowStyleSharing && !element->document().haveStylesheetsLoaded() && !element->renderer()) {
         if (!s_styleNotYetAvailable) {
             s_styleNotYetAvailable = RenderStyle::create().leakRef();
             s_styleNotYetAvailable->setDisplay(NONE);
             s_styleNotYetAvailable->font().update(m_fontSelector);
         }
-        element->document()->setHasNodesWithPlaceholderStyle();
+        element->document().setHasNodesWithPlaceholderStyle();
         return s_styleNotYetAvailable;
     }
 
-    if (element == document()->documentElement())
+    if (element == document().documentElement())
         resetDirectionAndWritingModeOnDocument(document());
     StyleResolverState state(document(), element, defaultParent, regionForStyling);
 
@@ -669,14 +686,14 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
         addContentAttrValuesToFeatures(state.contentAttrValues(), m_features);
     }
     {
-        StyleAdjuster adjuster(state.cachedUAStyle(), m_document->inQuirksMode());
+        StyleAdjuster adjuster(state.cachedUAStyle(), m_document.inQuirksMode());
         adjuster.adjustRenderStyle(state.style(), state.parentStyle(), element);
     }
-    document()->didAccessStyleResolver();
+    document().didAccessStyleResolver();
 
     // FIXME: Shouldn't this be on RenderBody::styleDidChange?
     if (element->hasTagName(bodyTag))
-        document()->textLinkColors().setTextColor(state.style()->visitedDependentColor(CSSPropertyColor));
+        document().textLinkColors().setTextColor(state.style()->visitedDependentColor(CSSPropertyColor));
 
     // If any changes to CSS Animations were detected, stash the update away for application after the
     // render object is updated if we're in the appropriate scope.
@@ -689,10 +706,10 @@ PassRefPtr<RenderStyle> StyleResolver::styleForElement(Element* element, RenderS
 
 PassRefPtr<RenderStyle> StyleResolver::styleForKeyframe(Element* e, const RenderStyle* elementStyle, const StyleKeyframe* keyframe)
 {
-    ASSERT(document()->frame());
+    ASSERT(document().frame());
     ASSERT(documentSettings());
 
-    if (e == document()->documentElement())
+    if (e == document().documentElement())
         resetDirectionAndWritingModeOnDocument(document());
     StyleResolverState state(document(), e);
 
@@ -735,7 +752,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForKeyframe(Element* e, const Render
     // Start loading resources referenced by this style.
     m_styleResourceLoader.loadPendingResources(state.style(), state.elementStyleResources());
 
-    document()->didAccessStyleResolver();
+    document().didAccessStyleResolver();
 
     return state.takeStyle();
 }
@@ -781,8 +798,7 @@ void StyleResolver::keyframeStylesForAnimation(Element* e, const RenderStyle* el
         keyframeValue.addProperties(keyframe->properties());
 
         // Add this keyframe style to all the indicated key times
-        Vector<double> keys;
-        keyframe->getKeys(keys);
+        const Vector<double>& keys = keyframe->keys();
         for (size_t keyIndex = 0; keyIndex < keys.size(); ++keyIndex) {
             keyframeValue.setKey(keys[keyIndex]);
             list.insert(keyframeValue);
@@ -829,8 +845,7 @@ void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* 
     for (size_t i = 0; i < styleKeyframes.size(); ++i) {
         const StyleKeyframe* styleKeyframe = styleKeyframes[i].get();
         RefPtr<RenderStyle> keyframeStyle = styleForKeyframe(0, style, styleKeyframe);
-        Vector<double> offsets;
-        styleKeyframe->getKeys(offsets);
+        const Vector<double>& offsets = styleKeyframe->keys();
         RefPtr<Keyframe> firstOffsetKeyframe;
         for (size_t j = 0; j < offsets.size(); ++j) {
             RefPtr<Keyframe> keyframe = Keyframe::create();
@@ -907,14 +922,12 @@ void StyleResolver::resolveKeyframes(const Element* element, const RenderStyle* 
 
 PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const PseudoStyleRequest& pseudoStyleRequest, RenderStyle* parentStyle)
 {
-    ASSERT(document()->frame());
+    ASSERT(document().frame());
     ASSERT(documentSettings());
     ASSERT(parentStyle);
     if (!e)
         return 0;
 
-    if (e == document()->documentElement())
-        resetDirectionAndWritingModeOnDocument(document());
     StyleResolverState state(document(), e, parentStyle);
 
     if (pseudoStyleRequest.allowsInheritance(state.parentStyle())) {
@@ -951,7 +964,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
         addContentAttrValuesToFeatures(state.contentAttrValues(), m_features);
     }
     {
-        StyleAdjuster adjuster(state.cachedUAStyle(), m_document->inQuirksMode());
+        StyleAdjuster adjuster(state.cachedUAStyle(), m_document.inQuirksMode());
         // FIXME: Passing 0 as the Element* introduces a lot of complexity
         // in the adjustRenderStyle code.
         adjuster.adjustRenderStyle(state.style(), state.parentStyle(), 0);
@@ -960,7 +973,7 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
     // Start loading resources referenced by this style.
     m_styleResourceLoader.loadPendingResources(state.style(), state.elementStyleResources());
 
-    document()->didAccessStyleResolver();
+    document().didAccessStyleResolver();
 
     // Now return the style.
     return state.takeStyle();
@@ -969,10 +982,11 @@ PassRefPtr<RenderStyle> StyleResolver::pseudoStyleForElement(Element* e, const P
 PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
 {
     resetDirectionAndWritingModeOnDocument(document());
-    StyleResolverState state(document(), document()->documentElement()); // m_rootElementStyle will be set to the document style.
+    StyleResolverState state(document(), document().documentElement()); // m_rootElementStyle will be set to the document style.
 
     state.setStyle(RenderStyle::create());
-    state.style()->inheritFrom(state.rootElementStyle());
+    if (state.rootElementStyle())
+        state.style()->inheritFrom(state.rootElementStyle());
 
     state.fontBuilder().initForStyleResolve(state.document(), state.style(), state.useSVGZoomRules());
 
@@ -1005,7 +1019,7 @@ PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
     // Start loading resources referenced by this style.
     m_styleResourceLoader.loadPendingResources(state.style(), state.elementStyleResources());
 
-    document()->didAccessStyleResolver();
+    document().didAccessStyleResolver();
 
     // Now return the style.
     return state.takeStyle();
@@ -1013,11 +1027,13 @@ PassRefPtr<RenderStyle> StyleResolver::styleForPage(int pageIndex)
 
 void StyleResolver::collectViewportRules()
 {
-    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled());
+    collectViewportRules(CSSDefaultStyleSheets::defaultStyle, UserAgentOrigin);
 
-    collectViewportRules(CSSDefaultStyleSheets::defaultStyle);
+    if (document().isMobileDocument())
+        collectViewportRules(CSSDefaultStyleSheets::xhtmlMobileProfileStyle(), UserAgentOrigin);
+
     if (m_ruleSets.userStyle())
-        collectViewportRules(m_ruleSets.userStyle());
+        collectViewportRules(m_ruleSets.userStyle(), UserAgentOrigin);
 
     if (ScopedStyleResolver* scopedResolver = m_styleTree.scopedStyleResolverForDocument())
         scopedResolver->collectViewportRulesTo(this);
@@ -1025,13 +1041,13 @@ void StyleResolver::collectViewportRules()
     viewportStyleResolver()->resolve();
 }
 
-void StyleResolver::collectViewportRules(RuleSet* rules)
+void StyleResolver::collectViewportRules(RuleSet* rules, ViewportOrigin origin)
 {
-    ASSERT(RuntimeEnabledFeatures::cssViewportEnabled());
-
     rules->compactRulesIfNeeded();
 
     const Vector<StyleRuleViewport*>& viewportRules = rules->viewportRules();
+    if (origin == AuthorOrigin && viewportRules.size())
+        viewportStyleResolver()->setHasAuthorStyle();
     for (size_t i = 0; i < viewportRules.size(); ++i)
         viewportStyleResolver()->addViewportRule(viewportRules[i]);
 }
@@ -1092,10 +1108,10 @@ PassRefPtr<CSSRuleList> StyleResolver::styleRulesForElement(Element* e, unsigned
 
 PassRefPtr<CSSRuleList> StyleResolver::pseudoStyleRulesForElement(Element* e, PseudoId pseudoId, unsigned rulesToInclude)
 {
-    if (!e || !e->document()->haveStylesheetsLoaded())
+    if (!e || !e->document().haveStylesheetsLoaded())
         return 0;
 
-    if (e == document()->documentElement())
+    if (e == document().documentElement())
         resetDirectionAndWritingModeOnDocument(document());
     StyleResolverState state(document(), e);
 
@@ -1445,13 +1461,13 @@ void StyleResolver::applyMatchedProperties(StyleResolverState& state, const Matc
     if (RuntimeEnabledFeatures::webAnimationsEnabled() && !applyInheritedOnly) {
         calculateCSSAnimationUpdate(state);
         // Apply animated properties, then reapply any rules marked important.
-        if (applyAnimatedProperties<HighPriorityProperties>(state, element->document()->timeline())) {
+        if (applyAnimatedProperties<HighPriorityProperties>(state, element->document().timeline())) {
             bool important = true;
             applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstAuthorRule, matchResult.ranges.lastAuthorRule, applyInheritedOnly);
             applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);
             applyMatchedProperties<HighPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUARule, matchResult.ranges.lastUARule, applyInheritedOnly);
         }
-        if (applyAnimatedProperties<LowPriorityProperties>(state, element->document()->timeline())) {
+        if (applyAnimatedProperties<LowPriorityProperties>(state, element->document().timeline())) {
             bool important = true;
             applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstAuthorRule, matchResult.ranges.lastAuthorRule, applyInheritedOnly);
             applyMatchedProperties<LowPriorityProperties>(state, matchResult, important, matchResult.ranges.firstUserRule, matchResult.ranges.lastUserRule, applyInheritedOnly);

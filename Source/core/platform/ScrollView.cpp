@@ -110,7 +110,7 @@ void ScrollView::setHasVerticalScrollbar(bool hasBar)
 
 PassRefPtr<Scrollbar> ScrollView::createScrollbar(ScrollbarOrientation orientation)
 {
-    return Scrollbar::createNativeScrollbar(this, orientation, RegularScrollbar);
+    return Scrollbar::create(this, orientation, RegularScrollbar);
 }
 
 void ScrollView::setScrollbarModes(ScrollbarMode horizontalMode, ScrollbarMode verticalMode,
@@ -807,6 +807,11 @@ bool ScrollView::userInputScrollable(ScrollbarOrientation orientation) const
         m_horizontalScrollbarMode : m_verticalScrollbarMode;
 
     return mode == ScrollbarAuto || mode == ScrollbarAlwaysOn;
+}
+
+bool ScrollView::shouldPlaceVerticalScrollbarOnLeft() const
+{
+    return false;
 }
 
 void ScrollView::repaintContentRectangle(const IntRect& rect)

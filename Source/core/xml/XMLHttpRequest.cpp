@@ -24,6 +24,7 @@
 #include "core/xml/XMLHttpRequest.h"
 
 #include "FetchInitiatorTypeNames.h"
+#include "RuntimeEnabledFeatures.h"
 #include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "core/dom/ContextFeatures.h"
@@ -33,13 +34,14 @@
 #include "core/dom/EventNames.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/editing/markup.h"
+#include "core/fetch/CrossOriginAccessControl.h"
+#include "core/fetch/TextResourceDecoder.h"
 #include "core/fileapi/Blob.h"
 #include "core/fileapi/File.h"
+#include "core/fileapi/Stream.h"
 #include "core/html/DOMFormData.h"
 #include "core/html/HTMLDocument.h"
 #include "core/inspector/InspectorInstrumentation.h"
-#include "core/loader/CrossOriginAccessControl.h"
-#include "core/loader/TextResourceDecoder.h"
 #include "core/loader/ThreadableLoader.h"
 #include "core/page/ContentSecurityPolicy.h"
 #include "core/page/Settings.h"
@@ -253,10 +255,11 @@ Document* XMLHttpRequest::responseXML(ExceptionState& es)
             || scriptExecutionContext()->isWorkerGlobalScope()) {
             m_responseDocument = 0;
         } else {
+            DocumentInit init = DocumentInit::fromContext(document()->contextDocument(), m_url);
             if (isHTML)
-                m_responseDocument = HTMLDocument::create(DocumentInit(m_url));
+                m_responseDocument = HTMLDocument::create(init);
             else
-                m_responseDocument = Document::create(DocumentInit(m_url));
+                m_responseDocument = Document::create(init);
             // FIXME: Set Last-Modified.
             m_responseDocument->setContent(m_responseText.flattenToString());
             m_responseDocument->setSecurityOrigin(securityOrigin());
@@ -310,12 +313,26 @@ ArrayBuffer* XMLHttpRequest::responseArrayBuffer()
     if (m_error || m_state != DONE)
         return 0;
 
-    if (!m_responseArrayBuffer.get() && m_binaryResponseBuilder.get() && m_binaryResponseBuilder->size() > 0) {
-        m_responseArrayBuffer = m_binaryResponseBuilder->getAsArrayBuffer();
-        m_binaryResponseBuilder.clear();
+    if (!m_responseArrayBuffer.get()) {
+        if (m_binaryResponseBuilder.get() && m_binaryResponseBuilder->size() > 0) {
+            m_responseArrayBuffer = m_binaryResponseBuilder->getAsArrayBuffer();
+            m_binaryResponseBuilder.clear();
+        } else {
+            m_responseArrayBuffer = ArrayBuffer::create(static_cast<void*>(0), 0);
+        }
     }
 
     return m_responseArrayBuffer.get();
+}
+
+Stream* XMLHttpRequest::responseStream()
+{
+    ASSERT(m_responseTypeCode == ResponseTypeStream);
+
+    if (m_error || (m_state != LOADING && m_state != DONE))
+        return 0;
+
+    return m_responseStream.get();
 }
 
 void XMLHttpRequest::setTimeout(unsigned long timeout, ExceptionState& es)
@@ -345,20 +362,26 @@ void XMLHttpRequest::setResponseType(const String& responseType, ExceptionState&
         return;
     }
 
-    if (responseType == "")
+    if (responseType == "") {
         m_responseTypeCode = ResponseTypeDefault;
-    else if (responseType == "text")
+    } else if (responseType == "text") {
         m_responseTypeCode = ResponseTypeText;
-    else if (responseType == "json")
+    } else if (responseType == "json") {
         m_responseTypeCode = ResponseTypeJSON;
-    else if (responseType == "document")
+    } else if (responseType == "document") {
         m_responseTypeCode = ResponseTypeDocument;
-    else if (responseType == "blob")
+    } else if (responseType == "blob") {
         m_responseTypeCode = ResponseTypeBlob;
-    else if (responseType == "arraybuffer")
+    } else if (responseType == "arraybuffer") {
         m_responseTypeCode = ResponseTypeArrayBuffer;
-    else
+    } else if (responseType == "stream") {
+        if (RuntimeEnabledFeatures::streamEnabled())
+            m_responseTypeCode = ResponseTypeStream;
+        else
+            return;
+    } else {
         ASSERT_NOT_REACHED();
+    }
 }
 
 String XMLHttpRequest::responseType()
@@ -376,6 +399,8 @@ String XMLHttpRequest::responseType()
         return "blob";
     case ResponseTypeArrayBuffer:
         return "arraybuffer";
+    case ResponseTypeStream:
+        return "stream";
     }
     return "";
 }
@@ -748,6 +773,7 @@ void XMLHttpRequest::createRequest(ExceptionState& es)
     options.securityOrigin = securityOrigin();
     options.initiator = FetchInitiatorTypeNames::xmlhttprequest;
     options.contentSecurityPolicyEnforcement = ContentSecurityPolicy::shouldBypassMainWorld(scriptExecutionContext()) ? DoNotEnforceContentSecurityPolicy : EnforceConnectSrcDirective;
+    options.mixedContentBlockingTreatment = TreatAsActiveContent;
     options.timeoutMilliseconds = m_timeoutMilliseconds;
 
     m_exceptionCode = 0;
@@ -825,15 +851,19 @@ void XMLHttpRequest::internalAbort(DropProtection async)
 
     InspectorInstrumentation::didFailXHRLoading(scriptExecutionContext(), this);
 
-    if (m_loader) {
-        m_loader->cancel();
-        m_loader = 0;
+    if (m_responseStream && m_state != DONE)
+        m_responseStream->abort();
 
-        if (async == DropProtectionAsync)
-            dropProtectionSoon();
-        else
-            dropProtection();
-    }
+    if (!m_loader)
+        return;
+
+    m_loader->cancel();
+    m_loader = 0;
+
+    if (async == DropProtectionAsync)
+        dropProtectionSoon();
+    else
+        dropProtection();
 }
 
 void XMLHttpRequest::clearResponse()
@@ -849,6 +879,7 @@ void XMLHttpRequest::clearResponseBuffers()
     m_createdDocument = false;
     m_responseDocument = 0;
     m_responseBlob = 0;
+    m_responseStream = 0;
     m_binaryResponseBuilder.clear();
     m_responseArrayBuffer.clear();
 }
@@ -1096,6 +1127,9 @@ void XMLHttpRequest::didFinishLoading(unsigned long identifier, double)
     if (m_decoder)
         m_responseText = m_responseText.concatenateWith(m_decoder->flush());
 
+    if (m_responseStream)
+        m_responseStream->finalize();
+
     InspectorInstrumentation::didFinishXHRLoading(scriptExecutionContext(), this, identifier, m_responseText, m_url, m_lastSendURL, m_lastSendLineNumber);
 
     // Prevent dropProtection releasing the last reference, and retain |this| until the end of this method.
@@ -1172,13 +1206,17 @@ void XMLHttpRequest::didReceiveData(const char* data, int len)
     if (len == -1)
         len = strlen(data);
 
-    if (useDecoder)
+    if (useDecoder) {
         m_responseText = m_responseText.concatenateWith(m_decoder->decode(data, len));
-    else if (m_responseTypeCode == ResponseTypeArrayBuffer || m_responseTypeCode == ResponseTypeBlob) {
+    } else if (m_responseTypeCode == ResponseTypeArrayBuffer || m_responseTypeCode == ResponseTypeBlob) {
         // Buffer binary data.
         if (!m_binaryResponseBuilder)
             m_binaryResponseBuilder = SharedBuffer::create();
         m_binaryResponseBuilder->append(data, len);
+    } else if (m_responseTypeCode == ResponseTypeStream) {
+        if (!m_responseStream)
+            m_responseStream = Stream::create(responseMIMEType());
+        m_responseStream->addData(data, len);
     }
 
     if (!m_error) {

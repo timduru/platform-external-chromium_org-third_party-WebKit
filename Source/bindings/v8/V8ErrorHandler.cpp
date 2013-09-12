@@ -55,8 +55,12 @@ v8::Local<v8::Value> V8ErrorHandler::callListenerFunction(ScriptExecutionContext
         return V8EventListener::callListenerFunction(context, jsEvent, event);
 
     ErrorEvent* errorEvent = static_cast<ErrorEvent*>(event);
-    v8::Local<v8::Object> listener = getListenerObject(context);
+
     v8::Isolate* isolate = toV8Context(context, world())->GetIsolate();
+    if (errorEvent->world() && errorEvent->world() != world())
+        return v8::Null(isolate);
+
+    v8::Local<v8::Object> listener = getListenerObject(context);
     v8::Local<v8::Value> returnValue;
     if (!listener.IsEmpty() && listener->IsFunction()) {
         v8::Local<v8::Function> callFunction = v8::Local<v8::Function>::Cast(listener);
@@ -70,9 +74,9 @@ v8::Local<v8::Value> V8ErrorHandler::callListenerFunction(ScriptExecutionContext
         v8::TryCatch tryCatch;
         tryCatch.SetVerbose(true);
         if (worldType(isolate) == WorkerWorld)
-            returnValue = V8ScriptRunner::callFunction(callFunction, context, thisValue, WTF_ARRAY_LENGTH(parameters), parameters);
+            returnValue = V8ScriptRunner::callFunction(callFunction, context, thisValue, WTF_ARRAY_LENGTH(parameters), parameters, isolate);
         else
-            returnValue = ScriptController::callFunctionWithInstrumentation(0, callFunction, thisValue, WTF_ARRAY_LENGTH(parameters), parameters);
+            returnValue = ScriptController::callFunctionWithInstrumentation(0, callFunction, thisValue, WTF_ARRAY_LENGTH(parameters), parameters, isolate);
     }
     return returnValue;
 }

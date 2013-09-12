@@ -47,17 +47,17 @@ RuleSet* CSSDefaultStyleSheets::defaultStyle;
 RuleSet* CSSDefaultStyleSheets::defaultQuirksStyle;
 RuleSet* CSSDefaultStyleSheets::defaultPrintStyle;
 RuleSet* CSSDefaultStyleSheets::defaultViewSourceStyle;
+RuleSet* CSSDefaultStyleSheets::defaultXHTMLMobileProfileStyle;
 
 StyleSheetContents* CSSDefaultStyleSheets::simpleDefaultStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::defaultStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::quirksStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::svgStyleSheet;
-StyleSheetContents* CSSDefaultStyleSheets::mathMLStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::mediaControlsStyleSheet;
 StyleSheetContents* CSSDefaultStyleSheets::fullscreenStyleSheet;
 
 // FIXME: It would be nice to use some mechanism that guarantees this is in sync with the real UA stylesheet.
-static const char* simpleUserAgentStyleSheet = "html,body,div{display:block}head{display:none}body{margin:8px}div:focus,span:focus{outline:auto 5px -webkit-focus-ring-color}a:-webkit-any-link{color:-webkit-link;text-decoration:underline}a:-webkit-any-link:active{color:-webkit-activelink}";
+static const char* simpleUserAgentStyleSheet = "html,body,div{display:block}head{display:none}body{margin:8px}div:focus,span:focus{outline:auto 5px -webkit-focus-ring-color}a:-webkit-any-link{color:-webkit-link;text-decoration:underline}a:-webkit-any-link:active{color:-webkit-activelink}body:-webkit-seamless-document{margin:0}body:-webkit-full-page-media{background-color:black}";
 
 static inline bool elementCanUseSimpleDefaultStyle(Element* e)
 {
@@ -152,6 +152,14 @@ RuleSet* CSSDefaultStyleSheets::viewSourceStyle()
     return defaultViewSourceStyle;
 }
 
+RuleSet* CSSDefaultStyleSheets::xhtmlMobileProfileStyle()
+{
+    if (!defaultXHTMLMobileProfileStyle) {
+        defaultXHTMLMobileProfileStyle = RuleSet::create().leakPtr();
+        defaultXHTMLMobileProfileStyle->addRulesFromSheet(parseUASheet(xhtmlmpUserAgentStyleSheet, sizeof(xhtmlmpUserAgentStyleSheet)), screenEval());
+    }
+    return defaultXHTMLMobileProfileStyle;
+}
 
 void CSSDefaultStyleSheets::ensureDefaultStyleSheetsForElement(Element* element, bool& changedDefaultStyle)
 {
@@ -160,14 +168,15 @@ void CSSDefaultStyleSheets::ensureDefaultStyleSheetsForElement(Element* element,
         changedDefaultStyle = true;
     }
 
+    // FIXME: We should assert that the sheet only styles SVG elements.
     if (element->isSVGElement() && !svgStyleSheet) {
-        // SVG rules.
         svgStyleSheet = parseUASheet(svgUserAgentStyleSheet, sizeof(svgUserAgentStyleSheet));
         defaultStyle->addRulesFromSheet(svgStyleSheet, screenEval());
         defaultPrintStyle->addRulesFromSheet(svgStyleSheet, printEval());
         changedDefaultStyle = true;
     }
 
+    // FIXME: We should assert that this sheet only contains rules for <video> and <audio>.
     if (!mediaControlsStyleSheet && (isHTMLVideoElement(element) || element->hasTagName(audioTag))) {
         String mediaRules = String(mediaControlsUserAgentStyleSheet, sizeof(mediaControlsUserAgentStyleSheet)) + RenderTheme::theme().extraMediaControlsStyleSheet();
         mediaControlsStyleSheet = parseUASheet(mediaRules);
@@ -176,7 +185,9 @@ void CSSDefaultStyleSheets::ensureDefaultStyleSheetsForElement(Element* element,
         changedDefaultStyle = true;
     }
 
-    if (!fullscreenStyleSheet && FullscreenElementStack::isFullScreen(element->document())) {
+    // FIXME: This only works because we Force recalc the entire document so the new sheet
+    // is loaded for <html> and the correct styles apply to everyone.
+    if (!fullscreenStyleSheet && FullscreenElementStack::isFullScreen(&element->document())) {
         String fullscreenRules = String(fullscreenUserAgentStyleSheet, sizeof(fullscreenUserAgentStyleSheet)) + RenderTheme::theme().extraFullScreenStyleSheet();
         fullscreenStyleSheet = parseUASheet(fullscreenRules);
         defaultStyle->addRulesFromSheet(fullscreenStyleSheet, screenEval());
@@ -185,7 +196,7 @@ void CSSDefaultStyleSheets::ensureDefaultStyleSheetsForElement(Element* element,
     }
 
     ASSERT(defaultStyle->features().idsInRules.isEmpty());
-    ASSERT(mathMLStyleSheet || defaultStyle->features().siblingRules.isEmpty());
+    ASSERT(defaultStyle->features().siblingRules.isEmpty());
 }
 
 } // namespace WebCore

@@ -42,7 +42,7 @@
 #include "core/fetch/ImageResource.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/page/Frame.h"
-#include "core/platform/chromium/ClipboardChromium.h"
+#include "core/platform/chromium/ChromiumDataObject.h"
 #include "core/platform/chromium/ClipboardUtilitiesChromium.h"
 #include "core/platform/graphics/Image.h"
 #include "core/platform/graphics/skia/NativeImageSkia.h"
@@ -51,6 +51,8 @@
 #include "public/platform/WebClipboard.h"
 #include "public/platform/WebDragData.h"
 #include "weborigin/KURL.h"
+#include "wtf/PassRefPtr.h"
+#include "wtf/RefPtr.h"
 
 namespace WebCore {
 
@@ -78,9 +80,9 @@ void Pasteboard::setSelectionMode(bool selectionMode)
 void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete, const String& text)
 {
     String html = createMarkup(selectedRange, 0, AnnotateForInterchange, false, ResolveNonLocalURLs);
-    KURL url = selectedRange->startContainer()->document()->url();
+    KURL url = selectedRange->startContainer()->document().url();
     String plainText = text;
-#if OS(WINDOWS)
+#if OS(WIN)
     replaceNewlinesWithWindowsStyleNewlines(plainText);
 #endif
     replaceNBSPWithSpace(plainText);
@@ -91,7 +93,7 @@ void Pasteboard::writeSelection(Range* selectedRange, bool canSmartCopyOrDelete,
 void Pasteboard::writePlainText(const String& text, SmartReplaceOption)
 {
     // FIXME: add support for smart replace
-#if OS(WINDOWS)
+#if OS(WIN)
     String plainText(text);
     replaceNewlinesWithWindowsStyleNewlines(plainText);
     WebKit::Platform::current()->clipboard()->writePlainText(plainText);
@@ -141,15 +143,14 @@ void Pasteboard::writeImage(Node* node, const KURL&, const String& title)
         urlString = toElement(node)->getAttribute(XLinkNames::hrefAttr);
     else if (node->hasTagName(HTMLNames::embedTag) || node->hasTagName(HTMLNames::objectTag))
         urlString = toElement(node)->imageSourceURL();
-    KURL url = urlString.isEmpty() ? KURL() : node->document()->completeURL(stripLeadingAndTrailingHTMLSpaces(urlString));
+    KURL url = urlString.isEmpty() ? KURL() : node->document().completeURL(stripLeadingAndTrailingHTMLSpaces(urlString));
     WebKit::WebImage webImage = bitmap->bitmap();
     WebKit::Platform::current()->clipboard()->writeImage(webImage, WebKit::WebURL(url), WebKit::WebString(title));
 }
 
-void Pasteboard::writeClipboard(Clipboard* clipboard)
+void Pasteboard::writeDataObject(PassRefPtr<ChromiumDataObject> dataObject)
 {
-    WebKit::WebDragData dragData = static_cast<ClipboardChromium*>(clipboard)->dataObject();
-    WebKit::Platform::current()->clipboard()->writeDataObject(dragData);
+    WebKit::Platform::current()->clipboard()->writeDataObject(dataObject);
 }
 
 bool Pasteboard::canSmartReplace()
@@ -173,7 +174,8 @@ PassRefPtr<DocumentFragment> Pasteboard::documentFragment(Frame* frame, PassRefP
         WebKit::WebURL url;
         WebKit::WebString markup = WebKit::Platform::current()->clipboard()->readHTML(buffer, &url, &fragmentStart, &fragmentEnd);
         if (!markup.isEmpty()) {
-            if (RefPtr<DocumentFragment> fragment = createFragmentFromMarkupWithContext(frame->document(), markup, fragmentStart, fragmentEnd, KURL(url), DisallowScriptingAndPluginContent))
+            ASSERT(frame->document());
+            if (RefPtr<DocumentFragment> fragment = createFragmentFromMarkupWithContext(*frame->document(), markup, fragmentStart, fragmentEnd, KURL(url), DisallowScriptingAndPluginContent))
                 return fragment.release();
         }
     }

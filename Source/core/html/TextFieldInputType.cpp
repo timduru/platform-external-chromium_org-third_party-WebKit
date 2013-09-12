@@ -86,9 +86,9 @@ bool TextFieldInputType::isTextField() const
 
 static inline bool shouldIgnoreRequiredAttribute(const HTMLInputElement& input)
 {
-    if (!input.document()->settings() || !input.document()->settings()->needsSiteSpecificQuirks())
+    if (!input.document().settings() || !input.document().settings()->needsSiteSpecificQuirks())
         return false;
-    if (!equalIgnoringCase(input.document()->url().host(), "egov.uscis.gov"))
+    if (!equalIgnoringCase(input.document().url().host(), "egov.uscis.gov"))
         return false;
     return input.fastGetAttribute(requiredAttr) == "no";
 }
@@ -145,8 +145,7 @@ void TextFieldInputType::setValue(const String& sanitizedValue, bool valueChange
         break;
     }
 
-    // FIXME: Why do we do this when eventBehavior == DispatchNoEvent
-    if (!input->focused() || eventBehavior == DispatchNoEvent)
+    if (!input->focused())
         input->setTextAsOfLastFormControlChangeEvent(sanitizedValue);
 }
 
@@ -154,7 +153,7 @@ void TextFieldInputType::handleKeydownEvent(KeyboardEvent* event)
 {
     if (!element()->focused())
         return;
-    Frame* frame = element()->document()->frame();
+    Frame* frame = element()->document().frame();
     if (!frame || !frame->editor().doTextFieldCommandFromEvent(element(), event))
         return;
     event->setDefaultHandled();
@@ -188,7 +187,7 @@ void TextFieldInputType::forwardEvent(Event* event)
             if (RenderBox* innerTextRenderer = innerTextElement()->renderBox()) {
                 if (RenderLayer* innerLayer = innerTextRenderer->layer()) {
                     IntSize scrollOffset(!renderTextControl->style()->isLeftToRightDirection() ? innerLayer->scrollWidth() : 0, 0);
-                    innerLayer->scrollToOffset(scrollOffset, RenderLayer::ScrollOffsetClamped);
+                    innerLayer->scrollToOffset(scrollOffset, ScrollOffsetClamped);
                 }
             }
 
@@ -243,7 +242,7 @@ void TextFieldInputType::createShadowSubtree()
     ASSERT(!m_innerText);
     ASSERT(!m_innerBlock);
 
-    Document* document = element()->document();
+    Document& document = element()->document();
     bool shouldHaveSpinButton = this->shouldHaveSpinButton();
     bool createsContainer = shouldHaveSpinButton || needsContainer();
 
@@ -337,9 +336,9 @@ static bool isASCIILineBreak(UChar c)
     return c == '\r' || c == '\n';
 }
 
-static String limitLength(const String& string, int maxLength)
+static String limitLength(const String& string, unsigned maxLength)
 {
-    unsigned newLength = maxLength;
+    unsigned newLength = std::min(maxLength, string.length());
     // FIXME: We should not truncate the string at a control character. It's not
     // compatible with IE and Firefox.
     for (unsigned i = 0; i < newLength; ++i) {
@@ -349,6 +348,8 @@ static String limitLength(const String& string, int maxLength)
             break;
         }
     }
+    if (newLength == string.length())
+        return string;
     if (newLength > 0 && U16_IS_LEAD(string[newLength - 1]))
         --newLength;
     return string.left(newLength);
@@ -373,7 +374,7 @@ void TextFieldInputType::handleBeforeTextInsertedEvent(BeforeTextInsertedEvent* 
     // If the text field has no focus, we don't need to take account of the
     // selection length. The selection is the source of text drag-and-drop in
     // that case, and nothing in the text field will be removed.
-    unsigned selectionLength = element()->focused() ? plainText(element()->document()->frame()->selection()->selection().toNormalizedRange().get()).length() : 0;
+    unsigned selectionLength = element()->focused() ? plainText(element()->document().frame()->selection().selection().toNormalizedRange().get()).length() : 0;
     ASSERT(oldLength >= selectionLength);
 
     // Selected characters will be removed by the next text event.
@@ -456,7 +457,7 @@ void TextFieldInputType::didSetValueByUserEdit(ValueChangeState state)
 {
     if (!element()->focused())
         return;
-    if (Frame* frame = element()->document()->frame())
+    if (Frame* frame = element()->document().frame())
         frame->editor().textDidChangeInTextField(element());
 }
 

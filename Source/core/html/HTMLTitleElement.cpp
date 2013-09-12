@@ -35,7 +35,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLTitleElement::HTMLTitleElement(const QualifiedName& tagName, Document* document)
+inline HTMLTitleElement::HTMLTitleElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(titleTag));
@@ -43,7 +43,7 @@ inline HTMLTitleElement::HTMLTitleElement(const QualifiedName& tagName, Document
     ScriptWrappable::init(this);
 }
 
-PassRefPtr<HTMLTitleElement> HTMLTitleElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<HTMLTitleElement> HTMLTitleElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(new HTMLTitleElement(tagName, document));
 }
@@ -52,7 +52,7 @@ Node::InsertionNotificationRequest HTMLTitleElement::insertedInto(ContainerNode*
 {
     HTMLElement::insertedInto(insertionPoint);
     if (inDocument() && !isInShadowTree())
-        document()->setTitleElement(text(), this);
+        document().setTitleElement(text(), this);
     return InsertionDone;
 }
 
@@ -60,14 +60,14 @@ void HTMLTitleElement::removedFrom(ContainerNode* insertionPoint)
 {
     HTMLElement::removedFrom(insertionPoint);
     if (insertionPoint->inDocument() && !insertionPoint->isInShadowTree())
-        document()->removeTitle(this);
+        document().removeTitle(this);
 }
 
 void HTMLTitleElement::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
 {
     HTMLElement::childrenChanged(changedByParser, beforeChange, afterChange, childCountDelta);
     if (inDocument() && !isInShadowTree())
-        document()->setTitleElement(text(), this);
+        document().setTitleElement(text(), this);
 }
 
 String HTMLTitleElement::text() const
@@ -99,7 +99,7 @@ void HTMLTitleElement::setText(const String &value)
         if (numChildren > 0)
             removeChildren();
 
-        appendChild(document()->createTextNode(valueCopy.impl()), IGNORE_EXCEPTION);
+        appendChild(document().createTextNode(valueCopy.impl()), IGNORE_EXCEPTION);
     }
 }
 

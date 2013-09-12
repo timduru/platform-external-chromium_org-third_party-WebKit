@@ -21,11 +21,6 @@
 #include "core/rendering/RootInlineBox.h"
 
 #include "core/dom/Document.h"
-#include "core/page/Chrome.h"
-#include "core/page/ChromeClient.h"
-#include "core/page/Frame.h"
-#include "core/page/Page.h"
-#include "core/platform/graphics/GraphicsContext.h"
 #include "core/platform/text/BidiResolver.h"
 #include "core/rendering/EllipsisBox.h"
 #include "core/rendering/HitTestResult.h"
@@ -250,7 +245,7 @@ LayoutUnit RootInlineBox::alignBoxesInBlockDirection(LayoutUnit heightOfBlock, G
     bool setMaxDescent = false;
 
     // Figure out if we're in no-quirks mode.
-    bool noQuirksMode = renderer()->document()->inNoQuirksMode();
+    bool noQuirksMode = renderer()->document().inNoQuirksMode();
 
     m_baselineType = requiresIdeographicBaseline(textBoxDataMap) ? IdeographicBaseline : AlphabeticBaseline;
 
@@ -842,7 +837,7 @@ LayoutUnit RootInlineBox::verticalPositionForBox(InlineBox* box, VerticalPositio
 
     // This method determines the vertical position for inline elements.
     bool firstLine = isFirstLineStyle();
-    if (firstLine && !renderer->document()->styleSheetCollections()->usesFirstLineRules())
+    if (firstLine && !renderer->document().styleSheetCollections()->usesFirstLineRules())
         firstLine = false;
 
     // Check the cache.

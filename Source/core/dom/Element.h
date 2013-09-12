@@ -434,8 +434,8 @@ public:
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual void detach(const AttachContext& = AttachContext()) OVERRIDE;
     virtual RenderObject* createRenderer(RenderStyle*);
-    virtual bool rendererIsNeeded(const NodeRenderingContext&);
-    bool recalcStyle(StyleChange = NoChange);
+    virtual bool rendererIsNeeded(const RenderStyle&);
+    bool recalcStyle(StyleRecalcChange);
     void didAffectSelector(AffectedSelectorMask);
 
     ElementShadow* shadow() const;
@@ -444,7 +444,7 @@ public:
     ShadowRoot* shadowRoot() const;
 
     bool hasAuthorShadowRoot() const { return shadowRoot(); }
-
+    virtual void didAddShadowRoot(ShadowRoot&);
     ShadowRoot* userAgentShadowRoot() const;
     ShadowRoot* ensureUserAgentShadowRoot();
     virtual const AtomicString& shadowPseudoId() const { return !part().isEmpty() ? part() : pseudo(); }
@@ -500,7 +500,7 @@ public:
     KURL getURLAttribute(const QualifiedName&) const;
     KURL getNonEmptyURLAttribute(const QualifiedName&) const;
 
-    virtual const AtomicString& imageSourceURL() const;
+    virtual const AtomicString imageSourceURL() const;
     virtual String target() const { return String(); }
     virtual Image* imageContents() { return 0; }
 
@@ -554,7 +554,6 @@ public:
 
     DOMStringMap* dataset();
 
-    static bool isMathMLElement() { return false; }
     virtual bool isMediaElement() const { return false; }
 
 #if ENABLE(INPUT_SPEECH)
@@ -595,7 +594,7 @@ public:
 
     virtual bool shouldBeReparentedUnderRenderView(const RenderStyle*) const { return isInTopLayer(); }
 
-    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const;
+    virtual bool childShouldCreateRenderer(const Node& child) const;
     bool hasPendingResources() const;
     void setHasPendingResources();
     void clearHasPendingResources();
@@ -665,8 +664,8 @@ protected:
     virtual void childrenChanged(bool changedByParser = false, Node* beforeChange = 0, Node* afterChange = 0, int childCountDelta = 0) OVERRIDE;
     virtual void removeAllEventListeners() OVERRIDE;
 
-    virtual void willRecalcStyle(StyleChange);
-    virtual void didRecalcStyle(StyleChange);
+    virtual void willRecalcStyle(StyleRecalcChange);
+    virtual void didRecalcStyle(StyleRecalcChange);
     virtual PassRefPtr<RenderStyle> customStyleForRenderer();
 
     virtual bool shouldRegisterAsNamedItem() const { return false; }
@@ -697,13 +696,13 @@ private:
     void setInlineStyleFromString(const AtomicString&);
     MutableStylePropertySet* ensureMutableInlineStyle();
 
-    StyleChange recalcOwnStyle(StyleChange);
-    void recalcChildStyle(StyleChange);
+    StyleRecalcChange recalcOwnStyle(StyleRecalcChange);
+    void recalcChildStyle(StyleRecalcChange);
 
     void makePresentationAttributeCacheKey(PresentationAttributeCacheKey&) const;
     void rebuildPresentationAttributeStyle();
 
-    void updatePseudoElement(PseudoId, StyleChange);
+    void updatePseudoElement(PseudoId, StyleRecalcChange);
     void createPseudoElementIfNeeded(PseudoId);
 
     // FIXME: Everyone should allow author shadows.
@@ -725,9 +724,9 @@ private:
     void synchronizeAttribute(const AtomicString& localName) const;
 
     void updateId(const AtomicString& oldId, const AtomicString& newId);
-    void updateId(TreeScope*, const AtomicString& oldId, const AtomicString& newId);
+    void updateId(TreeScope&, const AtomicString& oldId, const AtomicString& newId);
     void updateName(const AtomicString& oldName, const AtomicString& newName);
-    void updateLabel(TreeScope*, const AtomicString& oldForAttributeValue, const AtomicString& newForAttributeValue);
+    void updateLabel(TreeScope&, const AtomicString& oldForAttributeValue, const AtomicString& newForAttributeValue);
 
     void scrollByUnits(int units, ScrollGranularity);
 
@@ -799,6 +798,12 @@ inline const Element* toElement(const Node* node)
 {
     ASSERT_WITH_SECURITY_IMPLICATION(!node || node->isElementNode());
     return static_cast<const Element*>(node);
+}
+
+inline const Element& toElement(const Node& node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(node.isElementNode());
+    return static_cast<const Element&>(node);
 }
 
 // This will catch anyone doing an unnecessary cast.
@@ -884,12 +889,12 @@ inline bool Element::isIdAttributeName(const QualifiedName& attributeName) const
     // with a non-null namespace, because it will return false, a false negative, if the prefixes
     // don't match but the local name and namespace both do. However, since this has been like this
     // for a while and the code paths may be hot, we'll have to measure performance if we fix it.
-    return attributeName == document()->idAttributeName();
+    return attributeName == document().idAttributeName();
 }
 
 inline const AtomicString& Element::getIdAttribute() const
 {
-    return hasID() ? fastGetAttribute(document()->idAttributeName()) : nullAtom;
+    return hasID() ? fastGetAttribute(document().idAttributeName()) : nullAtom;
 }
 
 inline const AtomicString& Element::getNameAttribute() const
@@ -908,7 +913,7 @@ inline const AtomicString& Element::getClassAttribute() const
 
 inline void Element::setIdAttribute(const AtomicString& value)
 {
-    setAttribute(document()->idAttributeName(), value);
+    setAttribute(document().idAttributeName(), value);
 }
 
 inline const SpaceSplitString& Element::classNames() const
@@ -981,7 +986,7 @@ inline void Node::removedFrom(ContainerNode* insertionPoint)
     ASSERT(insertionPoint->inDocument() || isContainerNode());
     if (insertionPoint->inDocument())
         clearFlag(InDocumentFlag);
-    if (isInShadowTree() && !treeScope()->rootNode()->isShadowRoot())
+    if (isInShadowTree() && !treeScope().rootNode()->isShadowRoot())
         clearFlag(IsInShadowTreeFlag);
 }
 

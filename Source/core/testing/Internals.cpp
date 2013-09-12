@@ -54,12 +54,12 @@
 #include "core/dom/Element.h"
 #include "core/dom/ExceptionCode.h"
 #include "core/dom/FullscreenElementStack.h"
-#include "core/dom/NodeRenderingContext.h"
 #include "core/dom/PseudoElement.h"
 #include "core/dom/Range.h"
 #include "core/dom/StaticNodeList.h"
 #include "core/dom/TreeScope.h"
 #include "core/dom/ViewportArguments.h"
+#include "core/dom/WheelController.h"
 #include "core/dom/shadow/ComposedTreeWalker.h"
 #include "core/dom/shadow/ElementShadow.h"
 #include "core/dom/shadow/SelectRuleFeatureSet.h"
@@ -195,7 +195,7 @@ void Internals::resetToConsistentState(Page* page)
     page->setPagination(Pagination());
     TextRun::setAllowsRoundingHacks(false);
     WebCore::overrideUserPreferredLanguages(Vector<String>());
-    WebCore::Settings::setUsesOverlayScrollbars(false);
+    WebCore::RuntimeEnabledFeatures::setOverlayScrollbarsEnabled(false);
     delete s_pagePopupDriver;
     s_pagePopupDriver = 0;
     page->chrome().client().resetPagePopupDriver();
@@ -299,7 +299,7 @@ PassRefPtr<Element> Internals::createContentElement(ExceptionState& es)
         return 0;
     }
 
-    return HTMLContentElement::create(document);
+    return HTMLContentElement::create(*document);
 }
 
 bool Internals::isValidContentSelect(Element* insertionPoint, ExceptionState& es)
@@ -319,7 +319,7 @@ Node* Internals::treeScopeRootNode(Node* node, ExceptionState& es)
         return 0;
     }
 
-    return node->treeScope()->rootNode();
+    return node->treeScope().rootNode();
 }
 
 Node* Internals::parentTreeScope(Node* node, ExceptionState& es)
@@ -328,7 +328,7 @@ Node* Internals::parentTreeScope(Node* node, ExceptionState& es)
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
-    const TreeScope* parentTreeScope = node->treeScope()->parentTreeScope();
+    const TreeScope* parentTreeScope = node->treeScope().parentTreeScope();
     return parentTreeScope ? parentTreeScope->rootNode() : 0;
 }
 
@@ -403,7 +403,7 @@ unsigned short Internals::compareTreeScopePosition(const Node* node1, const Node
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
-    return treeScope1->comparePosition(treeScope2);
+    return treeScope1->comparePosition(*treeScope2);
 }
 
 unsigned Internals::numberOfActiveAnimations() const
@@ -717,7 +717,7 @@ void Internals::selectColorInColorChooser(Element* element, const String& colorV
 {
     if (!element->hasTagName(inputTag))
         return;
-    toHTMLInputElement(element)->selectColorInColorChooser(StyleColor(colorValue).color());
+    toHTMLInputElement(element)->selectColorInColorChooser(Color(colorValue));
 }
 
 Vector<String> Internals::formControlStateOfPreviousHistoryItem(ExceptionState& es)
@@ -797,12 +797,12 @@ PassRefPtr<ClientRect> Internals::unscaledViewportRect(ExceptionState& es)
 PassRefPtr<ClientRect> Internals::absoluteCaretBounds(ExceptionState& es)
 {
     Document* document = contextDocument();
-    if (!document || !document->frame() || !document->frame()->selection()) {
+    if (!document || !document->frame()) {
         es.throwDOMException(InvalidAccessError);
         return ClientRect::create();
     }
 
-    return ClientRect::create(document->frame()->selection()->absoluteCaretBounds());
+    return ClientRect::create(document->frame()->selection().absoluteCaretBounds());
 }
 
 PassRefPtr<ClientRect> Internals::boundingBox(Element* element, ExceptionState& es)
@@ -812,7 +812,7 @@ PassRefPtr<ClientRect> Internals::boundingBox(Element* element, ExceptionState& 
         return ClientRect::create();
     }
 
-    element->document()->updateLayoutIgnorePendingStylesheets();
+    element->document().updateLayoutIgnorePendingStylesheets();
     RenderObject* renderer = element->renderer();
     if (!renderer)
         return ClientRect::create();
@@ -844,7 +844,7 @@ unsigned Internals::markerCountForNode(Node* node, const String& markerType, Exc
         return 0;
     }
 
-    return node->document()->markers()->markersFor(node, markerTypes).size();
+    return node->document().markers()->markersFor(node, markerTypes).size();
 }
 
 unsigned Internals::activeMarkerCountForNode(Node* node, ExceptionState& es)
@@ -856,7 +856,7 @@ unsigned Internals::activeMarkerCountForNode(Node* node, ExceptionState& es)
 
     // Only TextMatch markers can be active.
     DocumentMarker::MarkerType markerType = DocumentMarker::TextMatch;
-    Vector<DocumentMarker*> markers = node->document()->markers()->markersFor(node, markerType);
+    Vector<DocumentMarker*> markers = node->document().markers()->markersFor(node, markerType);
 
     unsigned activeMarkerCount = 0;
     for (Vector<DocumentMarker*>::iterator iter = markers.begin(); iter != markers.end(); ++iter) {
@@ -880,7 +880,7 @@ DocumentMarker* Internals::markerAt(Node* node, const String& markerType, unsign
         return 0;
     }
 
-    Vector<DocumentMarker*> markers = node->document()->markers()->markersFor(node, markerTypes);
+    Vector<DocumentMarker*> markers = node->document().markers()->markersFor(node, markerTypes);
     if (markers.size() <= index)
         return 0;
     return markers[index];
@@ -904,8 +904,8 @@ String Internals::markerDescriptionForNode(Node* node, const String& markerType,
 
 void Internals::addTextMatchMarker(const Range* range, bool isActive)
 {
-    range->ownerDocument()->updateLayoutIgnorePendingStylesheets();
-    range->ownerDocument()->markers()->addTextMatchMarker(range, isActive);
+    range->ownerDocument().updateLayoutIgnorePendingStylesheets();
+    range->ownerDocument().markers()->addTextMatchMarker(range, isActive);
 }
 
 void Internals::setMarkersActive(Node* node, unsigned startOffset, unsigned endOffset, bool active, ExceptionState& es)
@@ -915,7 +915,7 @@ void Internals::setMarkersActive(Node* node, unsigned startOffset, unsigned endO
         return;
     }
 
-    node->document()->markers()->setMarkersActive(node, startOffset, endOffset, active);
+    node->document().markers()->setMarkersActive(node, startOffset, endOffset, active);
 }
 
 void Internals::setScrollViewPosition(Document* document, long x, long y, ExceptionState& es)
@@ -978,7 +978,7 @@ String Internals::viewportAsText(Document* document, float, int availableWidth, 
     document->page()->mainFrame()->view()->setFrameRect(IntRect(IntPoint::zero(), initialViewportSize));
 
     ViewportArguments arguments = page->viewportArguments();
-    PageScaleConstraints constraints = arguments.resolve(initialViewportSize, 980 /* defaultLayoutWidthForNonMobilePages */);
+    PageScaleConstraints constraints = arguments.resolve(initialViewportSize);
 
     constraints.fitToContentsWidth(constraints.layoutSize.width(), availableWidth);
 
@@ -1090,11 +1090,11 @@ void Internals::setAutofilled(Element* element, bool enabled, ExceptionState& es
 
 void Internals::scrollElementToRect(Element* element, long x, long y, long w, long h, ExceptionState& es)
 {
-    if (!element || !element->document() || !element->document()->view()) {
+    if (!element || !element->document().view()) {
         es.throwDOMException(InvalidAccessError);
         return;
     }
-    FrameView* frameView = element->document()->view();
+    FrameView* frameView = element->document().view();
     frameView->scrollElementToRect(element, IntRect(x, y, w, h));
 }
 
@@ -1117,7 +1117,7 @@ PassRefPtr<Range> Internals::rangeFromLocationAndLength(Element* scope, int rang
     }
 
     // TextIterator depends on Layout information, make sure layout it up to date.
-    scope->document()->updateLayoutIgnorePendingStylesheets();
+    scope->document().updateLayoutIgnorePendingStylesheets();
 
     return TextIterator::rangeFromLocationAndLength(scope, rangeLocation, rangeLength);
 }
@@ -1130,7 +1130,7 @@ unsigned Internals::locationFromRange(Element* scope, const Range* range, Except
     }
 
     // TextIterator depends on Layout information, make sure layout it up to date.
-    scope->document()->updateLayoutIgnorePendingStylesheets();
+    scope->document().updateLayoutIgnorePendingStylesheets();
 
     size_t location = 0;
     size_t unusedLength = 0;
@@ -1146,7 +1146,7 @@ unsigned Internals::lengthFromRange(Element* scope, const Range* range, Exceptio
     }
 
     // TextIterator depends on Layout information, make sure layout it up to date.
-    scope->document()->updateLayoutIgnorePendingStylesheets();
+    scope->document().updateLayoutIgnorePendingStylesheets();
 
     size_t unusedLocation = 0;
     size_t length = 0;
@@ -1307,7 +1307,7 @@ unsigned Internals::wheelEventHandlerCount(Document* document, ExceptionState& e
         return 0;
     }
 
-    return document->wheelEventHandlerCount();
+    return WheelController::from(document)->wheelEventHandlerCount();
 }
 
 unsigned Internals::touchEventHandlerCount(Document* document, ExceptionState& es)
@@ -1544,11 +1544,17 @@ void Internals::toggleOverwriteModeEnabled(Document* document, ExceptionState&)
 
 unsigned Internals::numberOfLiveNodes() const
 {
+    if (StyleResolver* resolver = contextDocument()->styleResolverIfExists())
+        resolver->clearStyleSharingList();
+
     return InspectorCounters::counterValue(InspectorCounters::NodeCounter);
 }
 
 unsigned Internals::numberOfLiveDocuments() const
 {
+    if (StyleResolver* resolver = contextDocument()->styleResolverIfExists())
+        resolver->clearStyleSharingList();
+
     return InspectorCounters::counterValue(InspectorCounters::DocumentCounter);
 }
 
@@ -1676,7 +1682,7 @@ static PassRefPtr<NodeList> paintOrderList(Element* element, ExceptionState& es,
         return 0;
     }
 
-    element->document()->updateLayout();
+    element->document().updateLayout();
 
     RenderObject* renderer = element->renderer();
     if (!renderer || !renderer->isBox()) {
@@ -1712,7 +1718,7 @@ bool Internals::scrollsWithRespectTo(Element* element1, Element* element2, Excep
         return 0;
     }
 
-    element1->document()->updateLayout();
+    element1->document().updateLayout();
 
     RenderObject* renderer1 = element1->renderer();
     RenderObject* renderer2 = element2->renderer();
@@ -1748,7 +1754,7 @@ String Internals::elementLayerTreeAsText(Element* element, unsigned flags, Excep
         return String();
     }
 
-    element->document()->updateLayout();
+    element->document().updateLayout();
 
     RenderObject* renderer = element->renderer();
     if (!renderer || !renderer->isBox()) {
@@ -1774,7 +1780,7 @@ void Internals::setNeedsCompositedScrolling(Element* element, unsigned needsComp
         return;
     }
 
-    element->document()->updateLayout();
+    element->document().updateLayout();
 
     RenderObject* renderer = element->renderer();
     if (!renderer || !renderer->isBox()) {
@@ -1841,6 +1847,11 @@ void Internals::garbageCollectDocumentResources(Document* document, ExceptionSta
         return;
     }
 
+    if (StyleResolver* resolver = contextDocument()->styleResolverIfExists())
+        resolver->clearStyleSharingList();
+    if (StyleResolver* resolver = document->styleResolverIfExists())
+        resolver->clearStyleSharingList();
+
     ResourceFetcher* fetcher = document->fetcher();
     if (!fetcher)
         return;
@@ -1859,7 +1870,10 @@ void Internals::allowRoundingHacks() const
 
 void Internals::insertAuthorCSS(Document* document, const String& css) const
 {
-    RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(document);
+    if (!document)
+        return;
+
+    RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(*document);
     parsedSheet->setIsUserStyleSheet(false);
     parsedSheet->parseString(css);
     document->styleSheetCollections()->addAuthorSheet(parsedSheet);
@@ -1867,7 +1881,10 @@ void Internals::insertAuthorCSS(Document* document, const String& css) const
 
 void Internals::insertUserCSS(Document* document, const String& css) const
 {
-    RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(document);
+    if (!document)
+        return;
+
+    RefPtr<StyleSheetContents> parsedSheet = StyleSheetContents::create(*document);
     parsedSheet->setIsUserStyleSheet(true);
     parsedSheet->parseString(css);
     document->styleSheetCollections()->addUserSheet(parsedSheet);
@@ -2134,9 +2151,9 @@ PassRefPtr<SerializedScriptValue> Internals::deserializeBuffer(PassRefPtr<ArrayB
     return SerializedScriptValue::createFromWire(value);
 }
 
-void Internals::setUsesOverlayScrollbars(bool enabled)
+void Internals::setOverlayScrollbarsEnabled(bool enabled)
 {
-    WebCore::Settings::setUsesOverlayScrollbars(enabled);
+    RuntimeEnabledFeatures::setOverlayScrollbarsEnabled(enabled);
 }
 
 void Internals::forceReload(bool endToEnd)
@@ -2147,12 +2164,12 @@ void Internals::forceReload(bool endToEnd)
 PassRefPtr<ClientRect> Internals::selectionBounds(ExceptionState& es)
 {
     Document* document = contextDocument();
-    if (!document || !document->frame() || !document->frame()->selection()) {
+    if (!document || !document->frame()) {
         es.throwDOMException(InvalidAccessError);
         return 0;
     }
 
-    return ClientRect::create(document->frame()->selection()->bounds());
+    return ClientRect::create(document->frame()->selection().bounds());
 }
 
 String Internals::markerTextForListItem(Element* element, ExceptionState& es)

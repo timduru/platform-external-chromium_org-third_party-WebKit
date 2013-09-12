@@ -984,7 +984,7 @@ void EditingStyle::mergeTypingStyle(Document* document)
 {
     ASSERT(document);
 
-    RefPtr<EditingStyle> typingStyle = document->frame()->selection()->typingStyle();
+    RefPtr<EditingStyle> typingStyle = document->frame()->selection().typingStyle();
     if (!typingStyle || typingStyle == this)
         return;
 
@@ -1133,7 +1133,7 @@ void EditingStyle::mergeStyle(const StylePropertySet* style, CSSPropertyOverride
 static PassRefPtr<MutableStylePropertySet> styleFromMatchedRulesForElement(Element* element, unsigned rulesToInclude)
 {
     RefPtr<MutableStylePropertySet> style = MutableStylePropertySet::create();
-    RefPtr<CSSRuleList> matchedRules = element->document()->styleResolver()->styleRulesForElement(element, rulesToInclude);
+    RefPtr<CSSRuleList> matchedRules = element->document().styleResolver()->styleRulesForElement(element, rulesToInclude);
     if (matchedRules) {
         for (unsigned i = 0; i < matchedRules->length(); i++) {
             if (matchedRules->item(i)->type() == CSSRule::STYLE_RULE)
@@ -1270,7 +1270,7 @@ PassRefPtr<EditingStyle> EditingStyle::styleAtSelectionStart(const VisibleSelect
         return 0;
 
     RefPtr<EditingStyle> style = EditingStyle::create(element, EditingStyle::AllProperties);
-    style->mergeTypingStyle(element->document());
+    style->mergeTypingStyle(&element->document());
 
     // If background color is transparent, traverse parent nodes until we hit a different value or document root
     // Also, if the selection is a range, ignore the background color at the start of selection,
@@ -1301,7 +1301,8 @@ WritingDirection EditingStyle::textDirectionForSelection(const VisibleSelection&
     if (selection.isRange()) {
         end = selection.end().upstream();
 
-        Node* pastLast = Range::create(end.document(), position.parentAnchoredEquivalent(), end.parentAnchoredEquivalent())->pastLastNode();
+        ASSERT(end.document());
+        Node* pastLast = Range::create(*end.document(), position.parentAnchoredEquivalent(), end.parentAnchoredEquivalent())->pastLastNode();
         for (Node* n = node; n && n != pastLast; n = NodeTraversal::next(n)) {
             if (!n->isStyledElement())
                 continue;
@@ -1394,7 +1395,7 @@ StyleChange::StyleChange(EditingStyle* style, const Position& position)
     , m_applySubscript(false)
     , m_applySuperscript(false)
 {
-    Document* document = position.anchorNode() ? position.anchorNode()->document() : 0;
+    Document* document = position.document();
     if (!style || !style->style() || !document || !document->frame())
         return;
 

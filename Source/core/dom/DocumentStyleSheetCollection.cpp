@@ -45,10 +45,10 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-DocumentStyleSheetCollection::DocumentStyleSheetCollection(TreeScope* treeScope)
+DocumentStyleSheetCollection::DocumentStyleSheetCollection(TreeScope& treeScope)
     : StyleSheetCollection(treeScope)
 {
-    ASSERT(treeScope->rootNode() == treeScope->rootNode()->document());
+    ASSERT(treeScope.rootNode() == &treeScope.rootNode()->document());
 }
 
 void DocumentStyleSheetCollection::collectStyleSheets(StyleSheetCollections* collections, Vector<RefPtr<StyleSheet> >& styleSheets, Vector<RefPtr<CSSStyleSheet> >& activeSheets)
@@ -65,7 +65,7 @@ void DocumentStyleSheetCollection::collectStyleSheets(StyleSheetCollections* col
         if (n->nodeType() == Node::PROCESSING_INSTRUCTION_NODE && !document()->isHTMLDocument()) {
             // Processing instruction (XML documents only).
             // We don't support linking to embedded CSS stylesheets, see <https://bugs.webkit.org/show_bug.cgi?id=49281> for discussion.
-            ProcessingInstruction* pi = static_cast<ProcessingInstruction*>(n);
+            ProcessingInstruction* pi = toProcessingInstruction(n);
             // Don't apply XSL transforms to already transformed documents -- <rdar://problem/4132806>
             if (pi->isXSL() && !document()->transformSourceDocument()) {
                 // Don't apply XSL transforms until loading is finished.
@@ -102,7 +102,7 @@ void DocumentStyleSheetCollection::collectStyleSheets(StyleSheetCollections* col
             } else if (n->isSVGElement() && n->hasTagName(SVGNames::styleTag)) {
                 sheet = static_cast<SVGStyleElement*>(n)->sheet();
             } else {
-                sheet = static_cast<HTMLStyleElement*>(n)->sheet();
+                sheet = toHTMLStyleElement(n)->sheet();
             }
 
             if (sheet && !sheet->disabled() && sheet->isCSSStyleSheet())
@@ -143,7 +143,7 @@ static void collectActiveCSSStyleSheetsFromSeamlessParents(Vector<RefPtr<CSSStyl
     HTMLIFrameElement* seamlessParentIFrame = document->seamlessParentIFrame();
     if (!seamlessParentIFrame)
         return;
-    sheets.append(seamlessParentIFrame->document()->styleSheetCollections()->activeAuthorStyleSheets());
+    sheets.append(seamlessParentIFrame->document().styleSheetCollections()->activeAuthorStyleSheets());
 }
 
 bool DocumentStyleSheetCollection::updateActiveStyleSheets(StyleSheetCollections* collections, StyleResolverUpdateMode updateMode)

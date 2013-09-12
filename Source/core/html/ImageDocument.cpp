@@ -166,23 +166,23 @@ PassRefPtr<DocumentParser> ImageDocument::createParser()
 
 void ImageDocument::createDocumentStructure()
 {
-    RefPtr<HTMLHtmlElement> rootElement = HTMLHtmlElement::create(this);
+    RefPtr<HTMLHtmlElement> rootElement = HTMLHtmlElement::create(*this);
     appendChild(rootElement);
     rootElement->insertedByParser();
 
     if (frame() && frame()->loader())
         frame()->loader()->dispatchDocumentElementAvailable();
 
-    RefPtr<HTMLHeadElement> head = HTMLHeadElement::create(this);
-    RefPtr<HTMLMetaElement> meta = HTMLMetaElement::create(this);
+    RefPtr<HTMLHeadElement> head = HTMLHeadElement::create(*this);
+    RefPtr<HTMLMetaElement> meta = HTMLMetaElement::create(*this);
     meta->setAttribute(nameAttr, "viewport");
     meta->setAttribute(contentAttr, "width=device-width");
     head->appendChild(meta);
 
-    RefPtr<HTMLBodyElement> body = HTMLBodyElement::create(this);
+    RefPtr<HTMLBodyElement> body = HTMLBodyElement::create(*this);
     body->setAttribute(styleAttr, "margin: 0px;");
 
-    m_imageElement = HTMLImageElement::create(this);
+    m_imageElement = HTMLImageElement::create(*this);
     m_imageElement->setAttribute(styleAttr, "-webkit-user-select: none");
     m_imageElement->setLoadManually(true);
     m_imageElement->setSrc(url().string());
@@ -202,7 +202,7 @@ void ImageDocument::createDocumentStructure()
 
 float ImageDocument::scale() const
 {
-    if (!m_imageElement || m_imageElement->document() != this)
+    if (!m_imageElement || &m_imageElement->document() != this)
         return 1.0f;
 
     FrameView* view = frame()->view();
@@ -220,7 +220,7 @@ float ImageDocument::scale() const
 
 void ImageDocument::resizeImageToFit()
 {
-    if (!m_imageElement || m_imageElement->document() != this || pageZoomFactor(this) > 1)
+    if (!m_imageElement || &m_imageElement->document() != this || pageZoomFactor(this) > 1)
         return;
 
     LayoutSize imageSize = m_imageElement->cachedImage()->imageSizeForRenderer(m_imageElement->renderer(), pageZoomFactor(this));
@@ -275,7 +275,7 @@ void ImageDocument::imageUpdated()
 
 void ImageDocument::restoreImageSize()
 {
-    if (!m_imageElement || !m_imageSizeIsKnown || m_imageElement->document() != this || pageZoomFactor(this) < 1)
+    if (!m_imageElement || !m_imageSizeIsKnown || &m_imageElement->document() != this || pageZoomFactor(this) < 1)
         return;
 
     LayoutSize imageSize = m_imageElement->cachedImage()->imageSizeForRenderer(m_imageElement->renderer(), 1.0f);
@@ -292,7 +292,7 @@ void ImageDocument::restoreImageSize()
 
 bool ImageDocument::imageFitsInWindow() const
 {
-    if (!m_imageElement || m_imageElement->document() != this)
+    if (!m_imageElement || &m_imageElement->document() != this)
         return true;
 
     FrameView* view = frame()->view();
@@ -307,7 +307,7 @@ bool ImageDocument::imageFitsInWindow() const
 
 void ImageDocument::windowSizeChanged()
 {
-    if (!m_imageElement || !m_imageSizeIsKnown || m_imageElement->document() != this)
+    if (!m_imageElement || !m_imageSizeIsKnown || &m_imageElement->document() != this)
         return;
 
     bool fitsInWindow = imageFitsInWindow();

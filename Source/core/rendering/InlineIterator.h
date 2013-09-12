@@ -35,6 +35,11 @@ namespace WebCore {
 // optionally notifying a BidiResolver every time it steps into/out of a RenderInline.
 class InlineIterator {
 public:
+    enum IncrementRule {
+        FastIncrementInlineRenderer,
+        FastIncrementInTextNode
+    };
+
     InlineIterator()
         : m_root(0)
         , m_obj(0)
@@ -70,7 +75,7 @@ public:
     RenderObject* root() const { return m_root; }
 
     void fastIncrementInTextNode();
-    void increment(InlineBidiResolver* = 0);
+    void increment(InlineBidiResolver* = 0, IncrementRule = FastIncrementInTextNode);
     bool atEnd() const;
 
     inline bool atTextParagraphSeparator()
@@ -352,11 +357,11 @@ private:
     bool m_atEndOfInline;
 };
 
-inline void InlineIterator::increment(InlineBidiResolver* resolver)
+inline void InlineIterator::increment(InlineBidiResolver* resolver, IncrementRule rule)
 {
     if (!m_obj)
         return;
-    if (m_obj->isText()) {
+    if (m_obj->isText() && rule == FastIncrementInTextNode) {
         fastIncrementInTextNode();
         if (m_pos < toRenderText(m_obj)->textLength())
             return;
@@ -414,14 +419,11 @@ static inline bool isIsolatedInline(RenderObject* object)
     return object->isRenderInline() && isIsolated(object->style()->unicodeBidi());
 }
 
-static inline RenderObject* containingIsolate(RenderObject* object, RenderObject* root)
+static inline RenderObject* highestContainingIsolateWithinRoot(RenderObject* object, RenderObject* root)
 {
     ASSERT(object);
     RenderObject* containingIsolateObj = 0;
     while (object && object != root) {
-        if (containingIsolateObj && !isIsolatedInline(object))
-            break;
-
         if (isIsolatedInline(object))
             containingIsolateObj = object;
 

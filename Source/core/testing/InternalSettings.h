@@ -50,7 +50,6 @@ public:
         void restoreTo(Settings*);
 
         bool m_originalCSSExclusionsEnabled;
-        bool m_originalCSSShapesEnabled;
         bool m_originalAuthorShadowDOMForAnyElementEnabled;
         bool m_originalExperimentalWebSocketEnabled;
         bool m_originalStyleScoped;
@@ -60,13 +59,13 @@ public:
         float m_originalTextAutosizingFontScaleFactor;
         String m_originalMediaTypeOverride;
         bool m_originalMockScrollbarsEnabled;
-        bool m_originalUsesOverlayScrollbars;
         bool m_langAttributeAwareFormControlUIEnabled;
         bool m_imagesEnabled;
         bool m_shouldDisplaySubtitles;
         bool m_shouldDisplayCaptions;
         bool m_shouldDisplayTextDescriptions;
         String m_defaultVideoPosterURL;
+        bool m_originalCompositorDrivenAcceleratedScrollEnabled;
     };
 
     static PassRefPtr<InternalSettings> create(Page* page)
@@ -96,7 +95,6 @@ public:
     void setTextAutosizingFontScaleFactor(float fontScaleFactor, ExceptionState&);
     void setTextAutosizingWindowSizeOverride(int width, int height, ExceptionState&);
     void setTouchEventEmulationEnabled(bool, ExceptionState&);
-    void setUsesOverlayScrollbars(bool, ExceptionState&);
     void setViewportEnabled(bool, ExceptionState&);
 
     // FIXME: This is a temporary flag and should be removed once accelerated

@@ -148,6 +148,10 @@ my %header;
 #     NameSpaceInternal   ... namespace ${implClassName}V8Internal in case of non-callback
 my %implementation;
 
+# Promise is not yet in the Web IDL spec but is going to be speced
+# as primitive types in the future.
+# Since V8 dosn't provide Promise primitive object currently,
+# primitiveTypeHash doesn't contain Promise.
 my %primitiveTypeHash = ("boolean" => 1,
                          "void" => 1,
                          "Date" => 1,
@@ -427,6 +431,8 @@ sub AddIncludesForType
         AddToImplIncludes("bindings/v8/SerializedScriptValue.h");
     } elsif ($type eq "any" || IsCallbackFunctionType($type)) {
         AddToImplIncludes("bindings/v8/ScriptValue.h");
+    } elsif ($type eq "Promise") {
+        AddToImplIncludes("bindings/v8/ScriptPromise.h");
     } elsif (IsTypedArrayType($type)) {
         AddToImplIncludes("bindings/v8/custom/V8${type}Custom.h");
     } else {
@@ -1138,7 +1144,6 @@ sub GenerateDomainSafeFunctionGetter
 
     my $newTemplateParams = "${implClassName}V8Internal::${funcName}MethodCallback, v8Undefined(), $signature";
 
-    AddToImplIncludes("core/page/Frame.h");
     AddToImplIncludes("bindings/v8/BindingSecurity.h");
     $implementation{nameSpaceInternal}->add(<<END);
 static void ${funcName}AttributeGetter(v8::Local<v8::String> name, const v8::PropertyCallbackInfo<v8::Value>& info)
@@ -1697,7 +1702,6 @@ static void ${implClassName}ReplaceableAttributeSetter(v8::Local<v8::String> nam
 {
 END
     if ($interface->extendedAttributes->{"CheckSecurity"}) {
-        AddToImplIncludes("core/page/Frame.h");
         AddToImplIncludes("bindings/v8/BindingSecurity.h");
         $code .= <<END;
     ${implClassName}* imp = ${v8ClassName}::toNative(info.Holder());
@@ -2085,7 +2089,7 @@ END
         $code .= "    }\n";
     }
     if ($leastNumMandatoryParams >= 1) {
-        $code .= "    if (args.Length() < $leastNumMandatoryParams) {\n";
+        $code .= "    if (UNLIKELY(args.Length() < $leastNumMandatoryParams)) {\n";
         $code .= "        throwNotEnoughArgumentsError(args.GetIsolate());\n";
         $code .= "        return;\n";
         $code .= "    }\n";
@@ -2239,7 +2243,6 @@ END
     # Check domain security if needed
     if ($interface->extendedAttributes->{"CheckSecurity"} && !$function->extendedAttributes->{"DoNotCheckSecurity"}) {
         # We have not find real use cases yet.
-        AddToImplIncludes("core/page/Frame.h");
         AddToImplIncludes("bindings/v8/BindingSecurity.h");
         $code .= <<END;
     if (!BindingSecurity::shouldAllowAccessToFrame(imp->frame()))
@@ -2326,7 +2329,7 @@ sub GenerateArgumentsCountCheck
 
     my $argumentsCountCheckString = "";
     if ($numMandatoryParams >= 1) {
-        $argumentsCountCheckString .= "    if (args.Length() < $numMandatoryParams) {\n";
+        $argumentsCountCheckString .= "    if (UNLIKELY(args.Length() < $numMandatoryParams)) {\n";
         $argumentsCountCheckString .= "        throwNotEnoughArgumentsError(args.GetIsolate());\n";
         $argumentsCountCheckString .= "        return;\n";
         $argumentsCountCheckString .= "    }\n";
@@ -2352,7 +2355,7 @@ sub GenerateParametersCheck
         # Optional arguments with [Optional=...] should not generate the early call.
         # Optional Dictionary arguments always considered to have default of empty dictionary.
         if ($parameter->isOptional && !$parameter->extendedAttributes->{"Default"} && $nativeType ne "Dictionary" && !IsCallbackInterface($parameter->type)) {
-            $parameterCheckString .= "    if (args.Length() <= $paramIndex)";
+            $parameterCheckString .= "    if (UNLIKELY(args.Length() <= $paramIndex))";
             my $functionCall = GenerateFunctionCallString($function, $paramIndex, "    " x 2, $interface, $forMainWorldSuffix, %replacements);
             my $multiLine = ($functionCall =~ tr/\n//) > 1;
             $parameterCheckString .= $multiLine ? " {\n" : "\n";
@@ -2458,7 +2461,7 @@ sub GenerateParametersCheck
             my $default = defined $parameter->extendedAttributes->{"Default"} ? $parameter->extendedAttributes->{"Default"} : "";
             my $jsValue = $parameter->isOptional && $default eq "NullString" ? "argumentOrNull(args, $paramIndex)" : "args[$paramIndex]";
             $parameterCheckString .= JSValueToNativeStatement($parameter->type, $parameter->extendedAttributes, $jsValue, $parameterName, "    ", "args.GetIsolate()");
-            if ($nativeType eq 'Dictionary') {
+            if ($nativeType eq 'Dictionary' or $nativeType eq 'ScriptPromise') {
                 $parameterCheckString .= "    if (!$parameterName.isUndefinedOrNull() && !$parameterName.isObject()) {\n";
                 $parameterCheckString .= "        throwTypeError(\"Not an object.\", args.GetIsolate());\n";
                 $parameterCheckString .= "        return;\n";
@@ -2492,7 +2495,7 @@ END
         $code .= "    }\n";
     }
     if ($leastNumMandatoryParams >= 1) {
-        $code .= "    if (args.Length() < $leastNumMandatoryParams) {\n";
+        $code .= "    if (UNLIKELY(args.Length() < $leastNumMandatoryParams)) {\n";
         $code .= "        throwNotEnoughArgumentsError(args.GetIsolate());\n";
         $code .= "        return;\n";
         $code .= "    }\n";
@@ -2551,7 +2554,7 @@ END
         } elsif ($interface->extendedAttributes->{"ConstructorCallWith"} eq "Document") {
             push(@beforeArgumentList, "document");
             $code .= "\n";
-            $code .= "    Document* document = toDocument(getScriptExecutionContext());";
+            $code .= "    Document& document = *toDocument(getScriptExecutionContext());";
         }
     }
 
@@ -2797,7 +2800,6 @@ sub GenerateNamedConstructor
         $toEventTarget = "${v8ClassName}::toEventTarget";
     }
 
-    AddToImplIncludes("core/page/Frame.h");
     $implementation{nameSpaceWebCore}->add(<<END);
 WrapperTypeInfo ${v8ClassName}Constructor::info = { ${v8ClassName}Constructor::GetTemplate, ${v8ClassName}::derefObject, $toActiveDOMObject, $toEventTarget, 0, ${v8ClassName}::installPerContextPrototypeProperties, 0, WrapperTypeObjectPrototype };
 
@@ -2814,6 +2816,7 @@ END
     AddToImplIncludes("V8Document.h");
     $code .= <<END;
     Document* document = currentDocument();
+    ASSERT(document);
 
     // Make sure the document is added to the DOM Node map. Otherwise, the ${implClassName} instance
     // may end up being the only node in the map and get garbage-collected prematurely.
@@ -2831,7 +2834,7 @@ END
     my ($parameterCheckString, $paramIndex, %replacements) = GenerateParametersCheck($function, $interface);
     $code .= $parameterCheckString;
 
-    push(@beforeArgumentList, "document");
+    push(@beforeArgumentList, "*document");
 
     if ($interface->extendedAttributes->{"ConstructorRaisesException"}) {
         push(@afterArgumentList, "es");
@@ -3160,6 +3163,8 @@ sub GenerateIsNullExpression
     if (IsRefPtrType($type)) {
         return "!${variableName}";
     } elsif ($type eq "DOMString") {
+        return "${variableName}.isNull()";
+    } elsif ($type eq "Promise") {
         return "${variableName}.isNull()";
     } else {
         return "";
@@ -4683,7 +4688,7 @@ END
                 $code .= "\n    v8::Handle<v8::Value> *argv = 0;\n\n";
             }
             $code .= "    bool callbackReturnValue = false;\n";
-            $code .= "    return !invokeCallback(m_callback.newLocal(isolate), ${thisObjectHandle}" . scalar(@args) . ", argv, callbackReturnValue, scriptExecutionContext());\n";
+            $code .= "    return !invokeCallback(m_callback.newLocal(isolate), ${thisObjectHandle}" . scalar(@args) . ", argv, callbackReturnValue, scriptExecutionContext(), isolate);\n";
             $code .= "}\n";
             $implementation{nameSpaceWebCore}->add($code);
         }
@@ -4713,7 +4718,6 @@ sub GenerateToV8Converters
     }
 
     AddToImplIncludes("bindings/v8/ScriptController.h");
-    AddToImplIncludes("core/page/Frame.h");
 
     my $createWrapperArgumentType = GetPassRefPtrType($nativeType);
     my $baseType = BaseInterfaceName($interface);
@@ -4748,6 +4752,7 @@ END
 END
 
     if (InheritsInterface($interface, "Document")) {
+        AddToImplIncludes("core/page/Frame.h");
         $code .= <<END;
     if (Frame* frame = impl->frame()) {
         if (frame->script()->initializeMainWorld()) {
@@ -5010,6 +5015,8 @@ sub GetNativeType
 
     return "String" if $type eq "DOMString" or IsEnumType($type);
 
+    return "ScriptPromise" if $type eq "Promise";
+
     return "Range::CompareHow" if $type eq "CompareHow";
     return "DOMTimeStamp" if $type eq "DOMTimeStamp";
     return "double" if $type eq "Date";
@@ -5136,6 +5143,11 @@ sub JSValueToNative
     if ($type eq "any" || IsCallbackFunctionType($type)) {
         AddToImplIncludes("bindings/v8/ScriptValue.h");
         return "ScriptValue($value)";
+    }
+
+    if ($type eq "Promise") {
+        AddToImplIncludes("bindings/v8/ScriptPromise.h");
+        return "ScriptPromise($value)";
     }
 
     if ($type eq "NodeFilter") {
@@ -5269,6 +5281,7 @@ sub IsWrapperType
     return 0 if IsEnumType($type);
     return 0 if IsPrimitiveType($type);
     return 0 if $type eq "DOMString";
+    return 0 if $type eq "Promise";
     return !$nonWrapperTypes{$type};
 }
 
@@ -5409,16 +5422,16 @@ sub NativeToJSValue
     # long long and unsigned long long are not representable in ECMAScript.
     if ($type eq "long long" or $type eq "unsigned long long" or $type eq "DOMTimeStamp") {
         return "${indent}v8SetReturnValue(${getCallbackInfo}, static_cast<double>($nativeValue));" if $isReturnValue;
-        return "$indent$receiver v8::Number::New(static_cast<double>($nativeValue));";
+        return "$indent$receiver v8::Number::New($getIsolate, static_cast<double>($nativeValue));";
     }
 
     if (IsPrimitiveType($type)) {
         die "unexpected type $type" if not ($type eq "float" or $type eq "double");
         return "${indent}v8SetReturnValue(${getCallbackInfo}, ${nativeValue});" if $isReturnValue;
-        return "$indent$receiver v8::Number::New($nativeValue);";
+        return "$indent$receiver v8::Number::New($getIsolate, $nativeValue);";
     }
 
-    if ($nativeType eq "ScriptValue") {
+    if ($nativeType eq "ScriptValue" or $nativeType eq "ScriptPromise") {
         return "${indent}v8SetReturnValue(${getCallbackInfo}, ${nativeValue}.v8Value());" if $isReturnValue;
         return "$indent$receiver $nativeValue.v8Value();";
     }
@@ -5688,6 +5701,7 @@ sub IsRefPtrType
     return 0 if GetArrayType($type);
     return 0 if GetSequenceType($type);
     return 0 if $type eq "DOMString";
+    return 0 if $type eq "Promise";
     return 0 if IsCallbackFunctionType($type);
     return 0 if IsEnumType($type);
     return 0 if IsUnionType($type);
@@ -5778,6 +5792,7 @@ sub ToMethodName
     my $param = shift;
     my $ret = lcfirst($param);
     $ret =~ s/hTML/html/ if $ret =~ /^hTML/;
+    $ret =~ s/iME/ime/ if $ret =~ /^iME/;
     $ret =~ s/uRL/url/ if $ret =~ /^uRL/;
     $ret =~ s/jS/js/ if $ret =~ /^jS/;
     $ret =~ s/xML/xml/ if $ret =~ /^xML/;

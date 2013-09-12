@@ -35,6 +35,7 @@
 #include "core/html/HTMLImageElement.h"
 #include "core/html/HTMLInputElement.h"
 #include "core/html/HTMLMapElement.h"
+#include "core/inspector/InspectorInstrumentation.h"
 #include "core/page/Frame.h"
 #include "core/page/Page.h"
 #include "core/platform/graphics/Font.h"
@@ -172,7 +173,7 @@ void RenderImage::imageChanged(WrappedImagePtr newImage, const IntRect* rect)
 
     // Set image dimensions, taking into account the size of the alt text.
     if (m_imageResource->errorOccurred() || !newImage) {
-        if (!m_altText.isEmpty() && document()->hasPendingStyleRecalc()) {
+        if (!m_altText.isEmpty() && document().hasPendingStyleRecalc()) {
             ASSERT(node());
             if (node()) {
                 m_needsToSetSizeForAltText = true;
@@ -251,9 +252,6 @@ void RenderImage::imageDimensionsChanged(bool imageSizeChanged, const IntRect* r
             // (unless the box has already been scheduled for layout). In order to calculate it, we
             // may need values from the containing block, though, so make sure that we're not too
             // early. It may be that layout hasn't even taken place once yet.
-
-            // FIXME: we should not have to trigger another call to setContainerSizeForRenderer()
-            // from here, since it's already being done during layout (crbug.com/275755).
             updateInnerContentRect();
         }
     }
@@ -353,7 +351,7 @@ void RenderImage::paintReplaced(PaintInfo& paintInfo, const LayoutPoint& paintOf
             }
 
             if (!m_altText.isEmpty()) {
-                String text = document()->displayStringModifiedByEncoding(m_altText);
+                String text = document().displayStringModifiedByEncoding(m_altText);
                 const Font& font = style()->font();
                 const FontMetrics& fontMetrics = font.fontMetrics();
                 LayoutUnit ascent = fontMetrics.ascent();
@@ -420,15 +418,15 @@ void RenderImage::paint(PaintInfo& paintInfo, const LayoutPoint& paintOffset)
 
 void RenderImage::paintAreaElementFocusRing(PaintInfo& paintInfo)
 {
-    Document* document = this->document();
+    Document& document = this->document();
 
-    if (document->printing() || !document->frame()->selection()->isFocusedAndActive())
+    if (document.printing() || !document.frame()->selection().isFocusedAndActive())
         return;
 
     if (paintInfo.context->paintingDisabled() && !paintInfo.context->updatingControlTints())
         return;
 
-    Element* focusedElement = document->focusedElement();
+    Element* focusedElement = document.focusedElement();
     if (!focusedElement || !isHTMLAreaElement(focusedElement))
         return;
 
@@ -489,7 +487,10 @@ void RenderImage::paintIntoRect(GraphicsContext* context, const LayoutRect& rect
     CompositeOperator compositeOperator = imageElt ? imageElt->compositeOperator() : CompositeSourceOver;
     Image* image = m_imageResource->image().get();
     bool useLowQualityScaling = shouldPaintAtLowQuality(context, image, image, alignedRect.size());
+
+    InspectorInstrumentation::willPaintImage(this);
     context->drawImage(m_imageResource->image(alignedRect.width(), alignedRect.height()).get(), alignedRect, compositeOperator, shouldRespectImageOrientation(), useLowQualityScaling);
+    InspectorInstrumentation::didPaintImage(this);
 }
 
 bool RenderImage::boxShadowShouldBeAppliedToBackground(BackgroundBleedAvoidance bleedAvoidance, InlineFlowBox*) const
@@ -539,7 +540,7 @@ LayoutUnit RenderImage::minimumReplacedHeight() const
 HTMLMapElement* RenderImage::imageMap() const
 {
     HTMLImageElement* i = node() && node()->hasTagName(imgTag) ? toHTMLImageElement(node()) : 0;
-    return i ? i->treeScope()->getImageMap(i->fastGetAttribute(usemapAttr)) : 0;
+    return i ? i->treeScope().getImageMap(i->fastGetAttribute(usemapAttr)) : 0;
 }
 
 bool RenderImage::nodeAtPoint(const HitTestRequest& request, HitTestResult& result, const HitTestLocation& locationInContainer, const LayoutPoint& accumulatedOffset, HitTestAction hitTestAction)
@@ -617,7 +618,7 @@ RenderBox* RenderImage::embeddedContentBox() const
 
     ImageResource* cachedImage = m_imageResource->cachedImage();
     if (cachedImage && cachedImage->image() && cachedImage->image()->isSVGImage())
-        return static_cast<SVGImage*>(cachedImage->image())->embeddedContentBox();
+        return toSVGImage(cachedImage->image())->embeddedContentBox();
 
     return 0;
 }

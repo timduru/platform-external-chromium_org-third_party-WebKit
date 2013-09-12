@@ -844,6 +844,10 @@ body.remote .dock-status-bar-item {
     -webkit-mask-position: -64px -24px;
 }
 
+.screencast-status-bar-item .glyph {
+    -webkit-mask-position: -256px -96px;
+}
+
 .clear-status-bar-item .glyph {
     -webkit-mask-position: -64px 0;
 }
@@ -2438,13 +2442,14 @@ body.inactive li.selected .bubble.search-matches {
 }
 
 .source-frame-stepin-mark {
+    cursor: pointer;
     text-decoration: underline;
-    background-color: #bfccfe;
 }
 
 .source-frame-stepin-mark-highlighted {
+    font-weight: 800;
+    cursor: pointer;
     text-decoration: underline;
-    background-color: #698cfe;
 }
 
 .workers-list {

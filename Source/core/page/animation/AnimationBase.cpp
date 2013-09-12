@@ -75,11 +75,6 @@ bool AnimationBase::playStatePlaying() const
     return m_animation->playState() == AnimPlayStatePlaying;
 }
 
-bool AnimationBase::animationsMatch(const CSSAnimationData* anim) const
-{
-    return m_animation->animationsMatch(anim);
-}
-
 void AnimationBase::updateStateMachine(AnimStateInput input, double param)
 {
     if (!m_compAnim)
@@ -496,7 +491,7 @@ double AnimationBase::progress(double scale, double offset, const TimingFunction
     const double fractionalTime = this->fractionalTime(scale, elapsedTime, offset);
 
     if (!timingFunction)
-        timingFunction = m_animation->timingFunction().get();
+        timingFunction = m_animation->timingFunction();
 
     return timingFunction->evaluate(fractionalTime, accuracyForDuration(m_animation->duration()));
 }

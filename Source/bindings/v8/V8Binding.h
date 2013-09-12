@@ -264,17 +264,17 @@ namespace WebCore {
 
     template<>
     struct V8ValueTraits<float> {
-        static inline v8::Handle<v8::Value> arrayV8Value(const float& value, v8::Isolate*)
+        static inline v8::Handle<v8::Value> arrayV8Value(const float& value, v8::Isolate* isolate)
         {
-            return v8::Number::New(value);
+            return v8::Number::New(isolate, value);
         }
     };
 
     template<>
     struct V8ValueTraits<double> {
-        static inline v8::Handle<v8::Value> arrayV8Value(const double& value, v8::Isolate*)
+        static inline v8::Handle<v8::Value> arrayV8Value(const double& value, v8::Isolate* isolate)
         {
-            return v8::Number::New(value);
+            return v8::Number::New(isolate, value);
         }
     };
 
@@ -435,13 +435,14 @@ namespace WebCore {
             return Vector<RefPtr<T> >();
 
         Vector<RefPtr<T> > result;
+        result.reserveInitialCapacity(length);
         v8::Local<v8::Object> object = v8::Local<v8::Object>::Cast(v8Value);
         for (uint32_t i = 0; i < length; ++i) {
             v8::Handle<v8::Value> element = object->Get(i);
 
             if (V8T::HasInstance(element, isolate, worldType(isolate))) {
                 v8::Handle<v8::Object> elementObject = v8::Handle<v8::Object>::Cast(element);
-                result.append(V8T::toNative(elementObject));
+                result.uncheckedAppend(V8T::toNative(elementObject));
             } else {
                 if (success)
                     *success = false;
@@ -465,10 +466,11 @@ namespace WebCore {
             return Vector<T>();
 
         Vector<T> result;
+        result.reserveInitialCapacity(length);
         typedef NativeValueTraits<T> TraitsType;
         v8::Local<v8::Object> object = v8::Local<v8::Object>::Cast(v8Value);
         for (uint32_t i = 0; i < length; ++i)
-            result.append(TraitsType::nativeValue(object->Get(i)));
+            result.uncheckedAppend(TraitsType::nativeValue(object->Get(i)));
         return result;
     }
 
@@ -479,8 +481,9 @@ namespace WebCore {
         Vector<T> result;
         typedef NativeValueTraits<T> TraitsType;
         int length = args.Length();
+        result.reserveInitialCapacity(length);
         for (int i = startIndex; i < length; ++i)
-            result.append(TraitsType::nativeValue(args[i]));
+            result.uncheckedAppend(TraitsType::nativeValue(args[i]));
         return result;
     }
 
@@ -613,8 +616,7 @@ namespace WebCore {
     // If the current context causes out of memory, JavaScript setting
     // is disabled and it returns true.
     bool handleOutOfMemory();
-    // FIXME: This should receive an Isolate.
-    v8::Local<v8::Value> handleMaxRecursionDepthExceeded();
+    v8::Local<v8::Value> handleMaxRecursionDepthExceeded(v8::Isolate*);
 
     void crashIfV8IsDead();
 
@@ -632,6 +634,8 @@ namespace WebCore {
     }
 
     v8::Local<v8::Value> getHiddenValueFromMainWorldWrapper(v8::Isolate*, ScriptWrappable*, v8::Handle<v8::String> key);
+
+    v8::Isolate* getIsolateFromScriptExecutionContext(ScriptExecutionContext*);
 
 } // namespace WebCore
 

@@ -55,7 +55,7 @@ void CharacterData::setData(const String& data)
     unsigned oldLength = length();
 
     setDataAndUpdate(nonNullData, 0, oldLength, nonNullData.length());
-    document()->textRemoved(this, 0, oldLength);
+    document().textRemoved(this, 0, oldLength);
 }
 
 String CharacterData::substringData(unsigned offset, unsigned count, ExceptionState& es)
@@ -98,9 +98,9 @@ unsigned CharacterData::parserAppendData(const String& string, unsigned offset, 
 
     ASSERT(!renderer() || isTextNode());
     if (isTextNode())
-        toText(this)->updateTextRenderer(oldLength, 0, DeprecatedAttachNow);
+        toText(this)->updateTextRenderer(oldLength, 0);
 
-    document()->incDOMTreeVersion();
+    document().incDOMTreeVersion();
 
     if (parentNode())
         parentNode()->childrenChanged();
@@ -108,16 +108,16 @@ unsigned CharacterData::parserAppendData(const String& string, unsigned offset, 
     return characterLengthLimit;
 }
 
-void CharacterData::appendData(const String& data, AttachBehavior attachBehavior)
+void CharacterData::appendData(const String& data)
 {
     String newStr = m_data + data;
 
-    setDataAndUpdate(newStr, m_data.length(), 0, data.length(), attachBehavior);
+    setDataAndUpdate(newStr, m_data.length(), 0, data.length());
 
     // FIXME: Should we call textInserted here?
 }
 
-void CharacterData::insertData(unsigned offset, const String& data, ExceptionState& es, AttachBehavior attachBehavior)
+void CharacterData::insertData(unsigned offset, const String& data, ExceptionState& es, RecalcStyleBehavior recalcStyleBehavior)
 {
     if (offset > length()) {
         es.throwDOMException(IndexSizeError);
@@ -127,12 +127,12 @@ void CharacterData::insertData(unsigned offset, const String& data, ExceptionSta
     String newStr = m_data;
     newStr.insert(data, offset);
 
-    setDataAndUpdate(newStr, offset, 0, data.length(), attachBehavior);
+    setDataAndUpdate(newStr, offset, 0, data.length(), recalcStyleBehavior);
 
-    document()->textInserted(this, offset, data.length());
+    document().textInserted(this, offset, data.length());
 }
 
-void CharacterData::deleteData(unsigned offset, unsigned count, ExceptionState& es, AttachBehavior attachBehavior)
+void CharacterData::deleteData(unsigned offset, unsigned count, ExceptionState& es, RecalcStyleBehavior recalcStyleBehavior)
 {
     if (offset > length()) {
         es.throwDOMException(IndexSizeError);
@@ -148,12 +148,12 @@ void CharacterData::deleteData(unsigned offset, unsigned count, ExceptionState& 
     String newStr = m_data;
     newStr.remove(offset, realCount);
 
-    setDataAndUpdate(newStr, offset, count, 0, attachBehavior);
+    setDataAndUpdate(newStr, offset, count, 0, recalcStyleBehavior);
 
-    document()->textRemoved(this, offset, realCount);
+    document().textRemoved(this, offset, realCount);
 }
 
-void CharacterData::replaceData(unsigned offset, unsigned count, const String& data, ExceptionState& es, AttachBehavior attachBehavior)
+void CharacterData::replaceData(unsigned offset, unsigned count, const String& data, ExceptionState& es)
 {
     if (offset > length()) {
         es.throwDOMException(IndexSizeError);
@@ -170,11 +170,11 @@ void CharacterData::replaceData(unsigned offset, unsigned count, const String& d
     newStr.remove(offset, realCount);
     newStr.insert(data, offset);
 
-    setDataAndUpdate(newStr, offset, count, data.length(), attachBehavior);
+    setDataAndUpdate(newStr, offset, count, data.length());
 
     // update the markers for spell checking and grammar checking
-    document()->textRemoved(this, offset, realCount);
-    document()->textInserted(this, offset, data.length());
+    document().textRemoved(this, offset, realCount);
+    document().textInserted(this, offset, data.length());
 }
 
 String CharacterData::nodeValue() const
@@ -192,22 +192,22 @@ void CharacterData::setNodeValue(const String& nodeValue)
     setData(nodeValue);
 }
 
-void CharacterData::setDataAndUpdate(const String& newData, unsigned offsetOfReplacedData, unsigned oldLength, unsigned newLength, AttachBehavior attachBehavior)
+void CharacterData::setDataAndUpdate(const String& newData, unsigned offsetOfReplacedData, unsigned oldLength, unsigned newLength, RecalcStyleBehavior recalcStyleBehavior)
 {
     String oldData = m_data;
     m_data = newData;
 
     ASSERT(!renderer() || isTextNode());
     if (isTextNode())
-        toText(this)->updateTextRenderer(offsetOfReplacedData, oldLength, attachBehavior);
+        toText(this)->updateTextRenderer(offsetOfReplacedData, oldLength, recalcStyleBehavior);
 
     if (nodeType() == PROCESSING_INSTRUCTION_NODE)
         toProcessingInstruction(this)->checkStyleSheet();
 
-    if (document()->frame())
-        document()->frame()->selection()->textWasReplaced(this, offsetOfReplacedData, oldLength, newLength);
+    if (document().frame())
+        document().frame()->selection().textWasReplaced(this, offsetOfReplacedData, oldLength, newLength);
 
-    document()->incDOMTreeVersion();
+    document().incDOMTreeVersion();
     didModifyData(oldData);
 }
 
@@ -220,11 +220,11 @@ void CharacterData::didModifyData(const String& oldData)
         parentNode()->childrenChanged();
 
     if (!isInShadowTree()) {
-        if (document()->hasListenerType(Document::DOMCHARACTERDATAMODIFIED_LISTENER))
+        if (document().hasListenerType(Document::DOMCHARACTERDATAMODIFIED_LISTENER))
             dispatchScopedEvent(MutationEvent::create(eventNames().DOMCharacterDataModifiedEvent, true, 0, oldData, m_data));
         dispatchSubtreeModifiedEvent();
     }
-    InspectorInstrumentation::characterDataModified(document(), this);
+    InspectorInstrumentation::characterDataModified(&document(), this);
 }
 
 int CharacterData::maxCharacterOffset() const

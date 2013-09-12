@@ -67,7 +67,7 @@ public:
     bool forceAsync() const { return m_forceAsync; }
 
     // Helper functions used by our parent classes.
-    void insertedInto(ContainerNode*);
+    void didNotifySubtreeInsertionsToDocument();
     void childrenChanged();
     void handleSourceAttribute(const String& sourceUrl);
     void handleAsyncAttribute();
@@ -82,7 +82,6 @@ private:
     void stopLoadRequest();
 
     ScriptLoaderClient* client() const;
-    Document* executingDocument() const;
 
     // ResourceClient
     virtual void notifyFinished(Resource*) OVERRIDE;

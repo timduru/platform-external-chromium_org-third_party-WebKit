@@ -289,11 +289,13 @@ public:
     DEFINE_ATTRIBUTE_EVENT_LISTENER(webkitvisibilitychange);
     DEFINE_ATTRIBUTE_EVENT_LISTENER(securitypolicyviolation);
 
-    void setViewportArguments(const ViewportArguments& viewportArguments) { m_viewportArguments = viewportArguments; }
+    bool shouldOverrideLegacyViewport(ViewportArguments::Type);
+    void setViewportArguments(const ViewportArguments&);
     const ViewportArguments& viewportArguments() const { return m_viewportArguments; }
 #ifndef NDEBUG
     bool didDispatchViewportPropertiesChanged() const { return m_didDispatchViewportPropertiesChanged; }
 #endif
+    bool hasLegacyViewportTag() const { return m_legacyViewportArguments.isLegacyViewportType(); }
 
     void setReferrerPolicy(ReferrerPolicy referrerPolicy) { m_referrerPolicy = referrerPolicy; }
     ReferrerPolicy referrerPolicy() const { return m_referrerPolicy; }
@@ -417,6 +419,7 @@ public:
     bool isFrameSet() const;
 
     bool isSrcdocDocument() const { return m_isSrcdocDocument; }
+    bool isMobileDocument() const { return m_isMobileDocument; }
 
     StyleResolver* styleResolverIfExists() const { return m_styleResolver.get(); }
 
@@ -484,11 +487,14 @@ public:
     PassRefPtr<CSSStyleDeclaration> createCSSStyleDeclaration();
     PassRefPtr<Text> createEditingTextNode(const String&);
 
-    void recalcStyle(StyleChange = NoChange);
+    void setStyleDependentState(RenderStyle* documentStyle);
+    void inheritHtmlAndBodyElementStyles(StyleRecalcChange);
+    void recalcStyle(StyleRecalcChange);
     void updateStyleIfNeeded();
     void updateStyleForNodeIfNeeded(Node*);
     void updateLayout();
     void updateLayoutIgnorePendingStylesheets();
+    void partialUpdateLayoutIgnorePendingStylesheets(Node*);
     PassRefPtr<RenderStyle> styleForElementIgnoringPendingStylesheets(Element*);
     PassRefPtr<RenderStyle> styleForPage(int pageIndex);
 
@@ -838,6 +844,7 @@ public:
 
     Document* parentDocument() const;
     Document* topDocument() const;
+    WeakPtr<Document> contextDocument();
 
     ScriptRunner* scriptRunner() { return m_scriptRunner.get(); }
 
@@ -921,6 +928,7 @@ public:
     void initContentSecurityPolicy(const ContentSecurityPolicyResponseHeaders&);
 
     bool allowInlineEventHandlers(Node*, EventListener*, const String& contextURL, const WTF::OrdinalNumber& contextLine);
+    bool allowExecutingScripts(Node*);
 
     void statePopped(PassRefPtr<SerializedScriptValue>);
 
@@ -977,10 +985,6 @@ public:
     virtual void logExceptionToConsole(const String& errorMessage, const String& sourceURL, int lineNumber, int columnNumber, PassRefPtr<ScriptCallStack>);
 
     void initDNSPrefetch();
-
-    unsigned wheelEventHandlerCount() const { return m_wheelEventHandlerCount; }
-    void didAddWheelEventHandler();
-    void didRemoveWheelEventHandler();
 
     double lastHandledUserGestureTimestamp() const { return m_lastHandledUserGestureTimestamp; }
     void resetLastHandledUserGestureTimestamp();
@@ -1048,7 +1052,7 @@ public:
     HTMLDialogElement* activeModalDialog() const;
 
     const Document* templateDocument() const;
-    Document* ensureTemplateDocument();
+    Document& ensureTemplateDocument();
     void setTemplateDocumentHost(Document* templateDocumentHost) { m_templateDocumentHost = templateDocumentHost; }
     Document* templateDocumentHost() { return m_templateDocumentHost; }
 
@@ -1119,6 +1123,8 @@ private:
 
     void seamlessParentUpdatedStylesheets();
 
+    void recalcStyleForLayoutIgnoringPendingStylesheets();
+
     PassRefPtr<NodeList> handleZeroPadding(const HitTestRequest&, HitTestResult&) const;
 
     void loadEventDelayTimerFired(Timer<Document>*);
@@ -1161,6 +1167,7 @@ private:
     // But sometimes you need to ignore pending stylesheet count to
     // force an immediate layout when requested by JS.
     bool m_ignorePendingStylesheets;
+    bool m_evaluateMediaQueriesOnStyleRecalc;
 
     // If we do ignore the pending stylesheet count, then we need to add a boolean
     // to track that this happened so that we can do a full repaint when the stylesheets
@@ -1308,11 +1315,13 @@ private:
     bool m_isViewSource;
     bool m_sawElementsInKnownNamespaces;
     bool m_isSrcdocDocument;
+    bool m_isMobileDocument;
 
     RenderObject* m_renderer;
     RefPtr<DocumentEventQueue> m_eventQueue;
 
     WeakPtrFactory<Document> m_weakFactory;
+    WeakPtr<Document> m_contextDocument;
 
     QualifiedName m_idAttributeName;
 
@@ -1324,6 +1333,7 @@ private:
     Timer<Document> m_loadEventDelayTimer;
 
     ViewportArguments m_viewportArguments;
+    ViewportArguments m_legacyViewportArguments;
 
     ReferrerPolicy m_referrerPolicy;
 
@@ -1337,7 +1347,6 @@ private:
     bool m_writeRecursionIsTooDeep;
     unsigned m_writeRecursionDepth;
 
-    unsigned m_wheelEventHandlerCount;
     OwnPtr<TouchEventTargetSet> m_touchEventTargets;
 
     double m_lastHandledUserGestureTimestamp;
@@ -1395,6 +1404,14 @@ inline const Document* Document::templateDocument() const
         return this;
 
     return m_templateDocument.get();
+}
+
+inline bool Document::shouldOverrideLegacyViewport(ViewportArguments::Type origin)
+{
+    // The different (legacy) meta tags have different priorities based on the type
+    // regardless of which order they appear in the DOM. The priority is given by the
+    // ViewportArguments::Type enum.
+    return origin >= m_legacyViewportArguments.type;
 }
 
 inline Document* toDocument(ScriptExecutionContext* scriptExecutionContext)

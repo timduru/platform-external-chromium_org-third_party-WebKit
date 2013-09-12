@@ -261,17 +261,17 @@ void RenderTreeAsText::writeRenderObject(TextStream& ts, const RenderObject& o, 
             // Do not dump invalid or transparent backgrounds, since that is the default.
             Color backgroundColor = o.resolveColor(CSSPropertyBackgroundColor);
             if (o.parent()->resolveColor(CSSPropertyBackgroundColor) != backgroundColor
-                && backgroundColor.rgb())
+                && backgroundColor.isValid() && backgroundColor.rgb())
                 ts << " [bgcolor=" << backgroundColor.nameForRenderTreeAsText() << "]";
 
             Color textFillColor = o.resolveColor(CSSPropertyWebkitTextFillColor);
             if (o.parent()->resolveColor(CSSPropertyWebkitTextFillColor) != textFillColor
-                && textFillColor != color && textFillColor.rgb())
+                && textFillColor.isValid() && textFillColor != color && textFillColor.rgb())
                 ts << " [textFillColor=" << textFillColor.nameForRenderTreeAsText() << "]";
 
             Color textStrokeColor = o.resolveColor(CSSPropertyWebkitTextStrokeColor);
             if (o.parent()->resolveColor(CSSPropertyWebkitTextStrokeColor) != textStrokeColor
-                && textStrokeColor != color && textStrokeColor.rgb())
+                && textStrokeColor.isValid() && textStrokeColor != color && textStrokeColor.rgb())
                 ts << " [textStrokeColor=" << textStrokeColor.nameForRenderTreeAsText() << "]";
 
             if (o.parent()->style()->textStrokeWidth() != o.style()->textStrokeWidth() && o.style()->textStrokeWidth() > 0)
@@ -519,7 +519,7 @@ void write(TextStream& ts, const RenderObject& o, int indent, RenderAsTextBehavi
         Widget* widget = toRenderWidget(&o)->widget();
         if (widget && widget->isFrameView()) {
             FrameView* view = toFrameView(widget);
-            RenderView* root = view->frame()->contentRenderer();
+            RenderView* root = view->frame().contentRenderer();
             if (root) {
                 view->layout();
                 RenderLayer* l = root->layer();
@@ -720,7 +720,7 @@ static String nodePosition(Node* node)
 {
     StringBuilder result;
 
-    Element* body = node->document()->body();
+    Element* body = node->document().body();
     Node* parent;
     for (Node* n = node; n; n = parent) {
         parent = n->parentOrShadowHostNode();
@@ -761,7 +761,7 @@ static void writeSelection(TextStream& ts, const RenderObject* o)
     if (!frame)
         return;
 
-    VisibleSelection selection = frame->selection()->selection();
+    VisibleSelection selection = frame->selection().selection();
     if (selection.isCaret()) {
         ts << "caret: position " << selection.start().deprecatedEditingOffset() << " of " << nodePosition(selection.start().deprecatedNode());
         if (selection.affinity() == UPSTREAM)
@@ -804,8 +804,8 @@ String externalRepresentation(Element* element, RenderAsTextBehavior behavior)
 {
     // Doesn't support printing mode.
     ASSERT(!(behavior & RenderAsTextPrintingMode));
-    if (!(behavior & RenderAsTextDontUpdateLayout) && element->document())
-        element->document()->updateLayout();
+    if (!(behavior & RenderAsTextDontUpdateLayout))
+        element->document().updateLayout();
 
     RenderObject* renderer = element->renderer();
     if (!renderer || !renderer->isBox())
@@ -831,7 +831,7 @@ String counterValueForElement(Element* element)
 {
     // Make sure the element is not freed during the layout.
     RefPtr<Element> elementRef(element);
-    element->document()->updateLayout();
+    element->document().updateLayout();
     TextStream stream;
     bool isFirstCounter = true;
     // The counter renderers should be children of :before or :after pseudo-elements.
@@ -846,7 +846,7 @@ String markerTextForListItem(Element* element)
 {
     // Make sure the element is not freed during the layout.
     RefPtr<Element> elementRef(element);
-    element->document()->updateLayout();
+    element->document().updateLayout();
 
     RenderObject* renderer = element->renderer();
     if (!renderer || !renderer->isListItem())

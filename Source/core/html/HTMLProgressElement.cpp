@@ -26,7 +26,6 @@
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/ExceptionCode.h"
-#include "core/dom/NodeRenderingContext.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/parser/HTMLParserIdioms.h"
 #include "core/html/shadow/ProgressShadowElement.h"
@@ -39,7 +38,7 @@ using namespace HTMLNames;
 const double HTMLProgressElement::IndeterminatePosition = -1;
 const double HTMLProgressElement::InvalidPosition = -2;
 
-HTMLProgressElement::HTMLProgressElement(const QualifiedName& tagName, Document* document)
+HTMLProgressElement::HTMLProgressElement(const QualifiedName& tagName, Document& document)
     : LabelableElement(tagName, document)
     , m_value(0)
 {
@@ -51,7 +50,7 @@ HTMLProgressElement::~HTMLProgressElement()
 {
 }
 
-PassRefPtr<HTMLProgressElement> HTMLProgressElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<HTMLProgressElement> HTMLProgressElement::create(const QualifiedName& tagName, Document& document)
 {
     RefPtr<HTMLProgressElement> progress = adoptRef(new HTMLProgressElement(tagName, document));
     progress->ensureUserAgentShadowRoot();
@@ -151,11 +150,14 @@ void HTMLProgressElement::didAddUserAgentShadowRoot(ShadowRoot* root)
     ASSERT(!m_value);
 
     RefPtr<ProgressInnerElement> inner = ProgressInnerElement::create(document());
+    inner->setPart(AtomicString("-webkit-progress-inner-element", AtomicString::ConstructFromLiteral));
     root->appendChild(inner);
 
     RefPtr<ProgressBarElement> bar = ProgressBarElement::create(document());
+    bar->setPart(AtomicString("-webkit-progress-bar", AtomicString::ConstructFromLiteral));
     RefPtr<ProgressValueElement> value = ProgressValueElement::create(document());
     m_value = value.get();
+    m_value->setPart(AtomicString("-webkit-progress-value", AtomicString::ConstructFromLiteral));
     m_value->setWidthPercentage(HTMLProgressElement::IndeterminatePosition * 100);
     bar->appendChild(m_value);
 

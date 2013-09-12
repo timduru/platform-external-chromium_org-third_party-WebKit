@@ -36,13 +36,13 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-inline HTMLTableSectionElement::HTMLTableSectionElement(const QualifiedName& tagName, Document* document)
+inline HTMLTableSectionElement::HTMLTableSectionElement(const QualifiedName& tagName, Document& document)
     : HTMLTablePartElement(tagName, document)
 {
     ScriptWrappable::init(this);
 }
 
-PassRefPtr<HTMLTableSectionElement> HTMLTableSectionElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<HTMLTableSectionElement> HTMLTableSectionElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(new HTMLTableSectionElement(tagName, document));
 }

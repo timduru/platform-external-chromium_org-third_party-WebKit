@@ -41,7 +41,7 @@
 #include "PopupContainer.h"
 #include "PopupMenuChromium.h"
 #include "RuntimeEnabledFeatures.h"
-#include "WebAccessibilityObject.h"
+#include "WebAXObject.h"
 #include "WebAutofillClient.h"
 #include "WebColorChooser.h"
 #include "WebConsoleMessage.h"
@@ -119,13 +119,6 @@ static WebPopupType convertPopupType(PopupContainer::PopupType type)
         ASSERT_NOT_REACHED();
         return WebPopupTypeNone;
     }
-}
-
-// Converts a WebCore::AXObjectCache::AXNotification to a WebKit::WebAccessibilityNotification
-static WebAccessibilityNotification toWebAccessibilityNotification(AXObjectCache::AXNotification notification)
-{
-    // These enums have the same values; enforced in AssertMatchingEnums.cpp.
-    return static_cast<WebAccessibilityNotification>(notification);
 }
 
 // Converts a WebCore::AXObjectCache::AXNotification to a WebKit::WebAXEvent
@@ -586,7 +579,7 @@ void ChromeClientImpl::mouseDidMoveOverElement(
         if (object && object->isWidget()) {
             Widget* widget = toRenderWidget(object)->widget();
             if (widget && widget->isPluginContainer()) {
-                WebPluginContainerImpl* plugin = static_cast<WebPluginContainerImpl*>(widget);
+                WebPluginContainerImpl* plugin = toPluginContainerImpl(widget);
                 url = plugin->plugin()->linkAtPosition(result.roundedPointInInnerNodeFrame());
             }
         }
@@ -737,7 +730,7 @@ void ChromeClientImpl::setCursor(const WebCore::Cursor& cursor)
 
 void ChromeClientImpl::setCursor(const WebCursorInfo& cursor)
 {
-#if OS(DARWIN)
+#if OS(MACOSX)
     // On Mac the mousemove event propagates to both the popup and main window.
     // If a popup is open we don't want the main window to change the cursor.
     if (m_webView->hasOpenedPopup())
@@ -759,7 +752,7 @@ void ChromeClientImpl::formStateDidChange(const Node* node)
 
     // The current history item is not updated yet.  That happens lazily when
     // WebFrame::currentHistoryItem is requested.
-    WebFrameImpl* webframe = WebFrameImpl::fromFrame(node->document()->frame());
+    WebFrameImpl* webframe = WebFrameImpl::fromFrame(node->document().frame());
     if (webframe->client())
         webframe->client()->didUpdateCurrentHistoryItem(webframe);
 }
@@ -811,9 +804,7 @@ void ChromeClientImpl::postAccessibilityNotification(AccessibilityObject* obj, A
     if (!obj)
         return;
 
-    // FIXME: Remove this first call once Chromium has switched over to using the second. (http://crbug.com/269034)
-    m_webView->client()->postAccessibilityNotification(WebAccessibilityObject(obj), toWebAccessibilityNotification(notification));
-    m_webView->client()->postAccessibilityEvent(WebAccessibilityObject(obj), toWebAXEvent(notification));
+    m_webView->client()->postAccessibilityEvent(WebAXObject(obj), toWebAXEvent(notification));
 }
 
 String ChromeClientImpl::acceptLanguages()

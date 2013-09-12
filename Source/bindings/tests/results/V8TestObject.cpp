@@ -56,7 +56,6 @@
 #include "core/dom/CustomElementCallbackDispatcher.h"
 #include "core/dom/Document.h"
 #include "core/page/DOMWindow.h"
-#include "core/page/Frame.h"
 #include "core/page/PageConsole.h"
 #include "core/page/UseCounter.h"
 #include "core/platform/chromium/TraceEvent.h"
@@ -2967,7 +2966,7 @@ static void voidMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 
 static void voidMethodWithArgsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 3) {
+    if (UNLIKELY(args.Length() < 3)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3003,7 +3002,7 @@ static void longMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& 
 
 static void longMethodWithArgsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 3) {
+    if (UNLIKELY(args.Length() < 3)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3039,7 +3038,7 @@ static void objMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void objMethodWithArgsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 3) {
+    if (UNLIKELY(args.Length() < 3)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3060,7 +3059,7 @@ static void objMethodWithArgsMethodCallback(const v8::FunctionCallbackInfo<v8::V
 
 static void methodWithSequenceArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3080,7 +3079,7 @@ static void methodWithSequenceArgMethodCallback(const v8::FunctionCallbackInfo<v
 
 static void methodReturningSequenceMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3099,7 +3098,7 @@ static void methodReturningSequenceMethodCallback(const v8::FunctionCallbackInfo
 
 static void methodWithEnumArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3124,7 +3123,7 @@ static void methodWithEnumArgMethodCallback(const v8::FunctionCallbackInfo<v8::V
 
 static void methodThatRequiresAllArgsAndThrowsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2) {
+    if (UNLIKELY(args.Length() < 2)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3148,7 +3147,7 @@ static void methodThatRequiresAllArgsAndThrowsMethodCallback(const v8::FunctionC
 
 static void serializedValueMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3171,7 +3170,7 @@ static void serializedValueMethodCallback(const v8::FunctionCallbackInfo<v8::Val
 
 static void optionsObjectMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3506,7 +3505,7 @@ static void withActiveWindowAndFirstWindowMethodCallback(const v8::FunctionCallb
 static void methodWithOptionalArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestObj* imp = V8TestObject::toNative(args.Holder());
-    if (args.Length() <= 0) {
+    if (UNLIKELY(args.Length() <= 0)) {
         imp->methodWithOptionalArg();
 
         return;
@@ -3526,13 +3525,13 @@ static void methodWithOptionalArgMethodCallback(const v8::FunctionCallbackInfo<v
 
 static void methodWithNonOptionalArgAndOptionalArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
     V8TRYCATCH_VOID(int, nonOpt, toInt32(args[0]));
-    if (args.Length() <= 1) {
+    if (UNLIKELY(args.Length() <= 1)) {
         imp->methodWithNonOptionalArgAndOptionalArg(nonOpt);
 
         return;
@@ -3552,19 +3551,19 @@ static void methodWithNonOptionalArgAndOptionalArgMethodCallback(const v8::Funct
 
 static void methodWithNonOptionalArgAndTwoOptionalArgsMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
     V8TRYCATCH_VOID(int, nonOpt, toInt32(args[0]));
-    if (args.Length() <= 1) {
+    if (UNLIKELY(args.Length() <= 1)) {
         imp->methodWithNonOptionalArgAndTwoOptionalArgs(nonOpt);
 
         return;
     }
     V8TRYCATCH_VOID(int, opt1, toInt32(args[1]));
-    if (args.Length() <= 2) {
+    if (UNLIKELY(args.Length() <= 2)) {
         imp->methodWithNonOptionalArgAndTwoOptionalArgs(nonOpt, opt1);
 
         return;
@@ -3585,7 +3584,7 @@ static void methodWithNonOptionalArgAndTwoOptionalArgsMethodCallback(const v8::F
 static void methodWithOptionalStringMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
     TestObj* imp = V8TestObject::toNative(args.Holder());
-    if (args.Length() <= 0) {
+    if (UNLIKELY(args.Length() <= 0)) {
         imp->methodWithOptionalString();
 
         return;
@@ -3637,7 +3636,7 @@ static void methodWithOptionalStringIsNullStringMethodCallback(const v8::Functio
 
 static void methodWithCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3661,7 +3660,7 @@ static void methodWithCallbackArgMethodCallback(const v8::FunctionCallbackInfo<v
 
 static void methodWithNonCallbackArgAndCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2) {
+    if (UNLIKELY(args.Length() < 2)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3709,7 +3708,7 @@ static void methodWithCallbackAndOptionalArgMethodCallback(const v8::FunctionCal
 
 static void methodWithNullableCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3755,7 +3754,7 @@ static void staticMethodWithCallbackAndOptionalArgMethodCallback(const v8::Funct
 
 static void staticMethodWithCallbackArgMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3778,7 +3777,7 @@ static void staticMethodWithCallbackArgMethodCallback(const v8::FunctionCallback
 
 static void methodWithEnforceRangeInt8Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3798,7 +3797,7 @@ static void methodWithEnforceRangeInt8MethodCallback(const v8::FunctionCallbackI
 
 static void methodWithEnforceRangeUInt8Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3818,7 +3817,7 @@ static void methodWithEnforceRangeUInt8MethodCallback(const v8::FunctionCallback
 
 static void methodWithEnforceRangeInt32Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3838,7 +3837,7 @@ static void methodWithEnforceRangeInt32MethodCallback(const v8::FunctionCallback
 
 static void methodWithEnforceRangeUInt32Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3858,7 +3857,7 @@ static void methodWithEnforceRangeUInt32MethodCallback(const v8::FunctionCallbac
 
 static void methodWithEnforceRangeInt64Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3878,7 +3877,7 @@ static void methodWithEnforceRangeInt64MethodCallback(const v8::FunctionCallback
 
 static void methodWithEnforceRangeUInt64Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -3980,7 +3979,7 @@ static void callbackFunctionReturnValueMethodCallback(const v8::FunctionCallback
 
 static void callbackFunctionArgumentMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4000,7 +3999,7 @@ static void callbackFunctionArgumentMethodCallback(const v8::FunctionCallbackInf
 
 static void overloadedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2) {
+    if (UNLIKELY(args.Length() < 2)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4014,13 +4013,13 @@ static void overloadedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
     TestObj* imp = V8TestObject::toNative(args.Holder());
     V8TRYCATCH_VOID(TestObj*, objArg, V8TestObject::HasInstance(args[0], args.GetIsolate(), worldType(args.GetIsolate())) ? V8TestObject::toNative(v8::Handle<v8::Object>::Cast(args[0])) : 0);
-    if (args.Length() <= 1) {
+    if (UNLIKELY(args.Length() <= 1)) {
         imp->overloadedMethod(objArg);
 
         return;
@@ -4033,7 +4032,7 @@ static void overloadedMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod3Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4046,7 +4045,7 @@ static void overloadedMethod3Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod4Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4059,7 +4058,7 @@ static void overloadedMethod4Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod5Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4076,7 +4075,7 @@ static void overloadedMethod5Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod6Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4089,7 +4088,7 @@ static void overloadedMethod6Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod7Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4102,7 +4101,7 @@ static void overloadedMethod7Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod8Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4115,7 +4114,7 @@ static void overloadedMethod8Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod9Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4128,7 +4127,7 @@ static void overloadedMethod9Method(const v8::FunctionCallbackInfo<v8::Value>& a
 
 static void overloadedMethod10Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4141,7 +4140,7 @@ static void overloadedMethod10Method(const v8::FunctionCallbackInfo<v8::Value>& 
 
 static void overloadedMethod11Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4198,7 +4197,7 @@ static void overloadedMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& ar
         overloadedMethod11Method(args);
         return;
     }
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4228,7 +4227,7 @@ static void classMethodMethodCallback(const v8::FunctionCallbackInfo<v8::Value>&
 
 static void classMethodWithOptionalMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() <= 0) {
+    if (UNLIKELY(args.Length() <= 0)) {
         v8SetReturnValueInt(args, TestObj::classMethodWithOptional());
         return;
     }
@@ -4255,7 +4254,7 @@ static void classMethod2MethodCallback(const v8::FunctionCallbackInfo<v8::Value>
 
 static void overloadedMethod11Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4271,7 +4270,7 @@ static void overloadedMethod11Method(const v8::FunctionCallbackInfo<v8::Value>& 
 
 static void overloadedMethod12Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4295,7 +4294,7 @@ static void overloadedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& a
         overloadedMethod12Method(args);
         return;
     }
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4317,7 +4316,7 @@ static void overloadedMethod1MethodCallback(const v8::FunctionCallbackInfo<v8::V
 
 static void classMethodWithClampMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2) {
+    if (UNLIKELY(args.Length() < 2)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4344,7 +4343,7 @@ static void classMethodWithClampMethodCallback(const v8::FunctionCallbackInfo<v8
 
 static void enabledAtRuntimeMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4364,7 +4363,7 @@ static void enabledAtRuntimeMethodMethodCallback(const v8::FunctionCallbackInfo<
 
 static void enabledPerContextMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4384,7 +4383,7 @@ static void enabledPerContextMethodMethodCallback(const v8::FunctionCallbackInfo
 
 static void methodWithUnsignedLongSequenceMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4404,7 +4403,7 @@ static void methodWithUnsignedLongSequenceMethodCallback(const v8::FunctionCallb
 
 static void stringArrayFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4427,7 +4426,7 @@ static void stringArrayFunctionMethodCallback(const v8::FunctionCallbackInfo<v8:
 
 static void domStringListFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4472,7 +4471,7 @@ static void getSVGDocumentMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
 
 static void convert1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4492,7 +4491,7 @@ static void convert1MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 
 static void convert2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4512,7 +4511,7 @@ static void convert2MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 
 static void convert4Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4532,7 +4531,7 @@ static void convert4MethodCallback(const v8::FunctionCallbackInfo<v8::Value>& ar
 
 static void convert5Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4595,7 +4594,7 @@ static void orangeMethodCallback(const v8::FunctionCallbackInfo<v8::Value>& args
 
 static void strictFunctionMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 3) {
+    if (UNLIKELY(args.Length() < 3)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4620,7 +4619,7 @@ static void strictFunctionMethodCallback(const v8::FunctionCallbackInfo<v8::Valu
 
 static void variadicStringMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4641,7 +4640,7 @@ static void variadicStringMethodMethodCallback(const v8::FunctionCallbackInfo<v8
 
 static void variadicDoubleMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4662,7 +4661,7 @@ static void variadicDoubleMethodMethodCallback(const v8::FunctionCallbackInfo<v8
 
 static void variadicNodeMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4720,7 +4719,7 @@ static void perWorldMethodMethodCallbackForMainWorld(const v8::FunctionCallbackI
 
 static void overloadedPerWorldMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4733,7 +4732,7 @@ static void overloadedPerWorldMethod1Method(const v8::FunctionCallbackInfo<v8::V
 
 static void overloadedPerWorldMethod1MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4746,7 +4745,7 @@ static void overloadedPerWorldMethod1MethodForMainWorld(const v8::FunctionCallba
 
 static void overloadedPerWorldMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2) {
+    if (UNLIKELY(args.Length() < 2)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4760,7 +4759,7 @@ static void overloadedPerWorldMethod2Method(const v8::FunctionCallbackInfo<v8::V
 
 static void overloadedPerWorldMethod2MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2) {
+    if (UNLIKELY(args.Length() < 2)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4782,7 +4781,7 @@ static void overloadedPerWorldMethodMethod(const v8::FunctionCallbackInfo<v8::Va
         overloadedPerWorldMethod2Method(args);
         return;
     }
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4799,7 +4798,7 @@ static void overloadedPerWorldMethodMethodForMainWorld(const v8::FunctionCallbac
         overloadedPerWorldMethod2MethodForMainWorld(args);
         return;
     }
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4822,7 +4821,7 @@ static void overloadedPerWorldMethodMethodCallbackForMainWorld(const v8::Functio
 
 static void activityLoggedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4847,7 +4846,7 @@ static void activityLoggedMethod1MethodCallback(const v8::FunctionCallbackInfo<v
 
 static void activityLoggedMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4860,7 +4859,7 @@ static void activityLoggedMethod2Method(const v8::FunctionCallbackInfo<v8::Value
 
 static void activityLoggedMethod2MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4897,7 +4896,7 @@ static void activityLoggedMethod2MethodCallbackForMainWorld(const v8::FunctionCa
 
 static void activityLoggedInIsolatedWorldMethodMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4910,7 +4909,7 @@ static void activityLoggedInIsolatedWorldMethodMethod(const v8::FunctionCallback
 
 static void activityLoggedInIsolatedWorldMethodMethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4942,7 +4941,7 @@ static void activityLoggedInIsolatedWorldMethodMethodCallbackForMainWorld(const 
 
 static void overloadedActivityLoggedMethod1Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4955,7 +4954,7 @@ static void overloadedActivityLoggedMethod1Method(const v8::FunctionCallbackInfo
 
 static void overloadedActivityLoggedMethod1MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4968,7 +4967,7 @@ static void overloadedActivityLoggedMethod1MethodForMainWorld(const v8::Function
 
 static void overloadedActivityLoggedMethod2Method(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2) {
+    if (UNLIKELY(args.Length() < 2)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -4982,7 +4981,7 @@ static void overloadedActivityLoggedMethod2Method(const v8::FunctionCallbackInfo
 
 static void overloadedActivityLoggedMethod2MethodForMainWorld(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 2) {
+    if (UNLIKELY(args.Length() < 2)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -5004,7 +5003,7 @@ static void overloadedActivityLoggedMethodMethod(const v8::FunctionCallbackInfo<
         overloadedActivityLoggedMethod2Method(args);
         return;
     }
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -5021,7 +5020,7 @@ static void overloadedActivityLoggedMethodMethodForMainWorld(const v8::FunctionC
         overloadedActivityLoggedMethod2MethodForMainWorld(args);
         return;
     }
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }
@@ -5085,7 +5084,7 @@ static void deprecatedStaticMethodMethodCallback(const v8::FunctionCallbackInfo<
 
 static void constructor(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }

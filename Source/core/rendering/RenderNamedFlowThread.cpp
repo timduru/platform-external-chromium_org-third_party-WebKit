@@ -82,7 +82,7 @@ void RenderNamedFlowThread::clearContentNodes()
 
         ASSERT(contentNode && contentNode->isElementNode());
         ASSERT(contentNode->inNamedFlow());
-        ASSERT(contentNode->document() == document());
+        ASSERT(&contentNode->document() == &document());
 
         contentNode->clearInNamedFlow();
     }
@@ -92,14 +92,16 @@ void RenderNamedFlowThread::clearContentNodes()
 
 void RenderNamedFlowThread::updateWritingMode()
 {
-    if (RenderRegion* firstRegion = m_regionList.first()) {
-        if (style()->writingMode() != firstRegion->style()->writingMode()) {
-            // The first region defines the principal writing mode for the entire flow.
-            RefPtr<RenderStyle> newStyle = RenderStyle::clone(style());
-            newStyle->setWritingMode(firstRegion->style()->writingMode());
-            setStyle(newStyle);
-        }
-    }
+    RenderRegion* firstRegion = m_regionList.first();
+    if (!firstRegion)
+        return;
+    if (style()->writingMode() == firstRegion->style()->writingMode())
+        return;
+
+    // The first region defines the principal writing mode for the entire flow.
+    RefPtr<RenderStyle> newStyle = RenderStyle::clone(style());
+    newStyle->setWritingMode(firstRegion->style()->writingMode());
+    setStyle(newStyle.release());
 }
 
 RenderObject* RenderNamedFlowThread::nextRendererForNode(Node* node) const
@@ -440,7 +442,7 @@ void RenderNamedFlowThread::pushDependencies(RenderNamedFlowThreadList& list)
 void RenderNamedFlowThread::registerNamedFlowContentNode(Node* contentNode)
 {
     ASSERT(contentNode && contentNode->isElementNode());
-    ASSERT(contentNode->document() == document());
+    ASSERT(&contentNode->document() == &document());
 
     contentNode->setInNamedFlow();
 
@@ -463,7 +465,7 @@ void RenderNamedFlowThread::unregisterNamedFlowContentNode(Node* contentNode)
     ASSERT(contentNode && contentNode->isElementNode());
     ASSERT(m_contentNodes.contains(contentNode));
     ASSERT(contentNode->inNamedFlow());
-    ASSERT(contentNode->document() == document());
+    ASSERT(&contentNode->document() == &document());
 
     contentNode->clearInNamedFlow();
     m_contentNodes.remove(contentNode);
@@ -493,7 +495,7 @@ bool RenderNamedFlowThread::isChildAllowed(RenderObject* child, RenderStyle* sty
 void RenderNamedFlowThread::dispatchRegionLayoutUpdateEvent()
 {
     RenderFlowThread::dispatchRegionLayoutUpdateEvent();
-    InspectorInstrumentation::didUpdateRegionLayout(document(), m_namedFlow.get());
+    InspectorInstrumentation::didUpdateRegionLayout(&document(), m_namedFlow.get());
 
     if (!m_regionLayoutUpdateEventTimer.isActive() && m_namedFlow->hasEventListeners())
         m_regionLayoutUpdateEventTimer.startOneShot(0);
@@ -502,7 +504,7 @@ void RenderNamedFlowThread::dispatchRegionLayoutUpdateEvent()
 void RenderNamedFlowThread::dispatchRegionOversetChangeEvent()
 {
     RenderFlowThread::dispatchRegionOversetChangeEvent();
-    InspectorInstrumentation::didChangeRegionOverset(document(), m_namedFlow.get());
+    InspectorInstrumentation::didChangeRegionOverset(&document(), m_namedFlow.get());
 
     if (!m_regionOversetChangeEventTimer.isActive() && m_namedFlow->hasEventListeners())
         m_regionOversetChangeEventTimer.startOneShot(0);

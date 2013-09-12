@@ -58,7 +58,6 @@ namespace WebCore {
 
 InternalSettings::Backup::Backup(Settings* settings)
     : m_originalCSSExclusionsEnabled(RuntimeEnabledFeatures::cssExclusionsEnabled())
-    , m_originalCSSShapesEnabled(RuntimeEnabledFeatures::cssShapesEnabled())
     , m_originalAuthorShadowDOMForAnyElementEnabled(RuntimeEnabledFeatures::authorShadowDOMForAnyElementEnabled())
     , m_originalExperimentalWebSocketEnabled(settings->experimentalWebSocketEnabled())
     , m_originalStyleScoped(RuntimeEnabledFeatures::styleScopedEnabled())
@@ -74,13 +73,13 @@ InternalSettings::Backup::Backup(Settings* settings)
     , m_shouldDisplayCaptions(settings->shouldDisplayCaptions())
     , m_shouldDisplayTextDescriptions(settings->shouldDisplayTextDescriptions())
     , m_defaultVideoPosterURL(settings->defaultVideoPosterURL())
+    , m_originalCompositorDrivenAcceleratedScrollEnabled(settings->isCompositorDrivenAcceleratedScrollingEnabled())
 {
 }
 
 void InternalSettings::Backup::restoreTo(Settings* settings)
 {
     RuntimeEnabledFeatures::setCSSExclusionsEnabled(m_originalCSSExclusionsEnabled);
-    RuntimeEnabledFeatures::setCSSShapesEnabled(m_originalCSSShapesEnabled);
     RuntimeEnabledFeatures::setAuthorShadowDOMForAnyElementEnabled(m_originalAuthorShadowDOMForAnyElementEnabled);
     settings->setExperimentalWebSocketEnabled(m_originalExperimentalWebSocketEnabled);
     RuntimeEnabledFeatures::setStyleScopedEnabled(m_originalStyleScoped);
@@ -96,6 +95,7 @@ void InternalSettings::Backup::restoreTo(Settings* settings)
     settings->setShouldDisplayCaptions(m_shouldDisplayCaptions);
     settings->setShouldDisplayTextDescriptions(m_shouldDisplayTextDescriptions);
     settings->setDefaultVideoPosterURL(m_defaultVideoPosterURL);
+    settings->setCompositorDrivenAcceleratedScrollingEnabled(m_originalCompositorDrivenAcceleratedScrollEnabled);
 }
 
 // We can't use RefCountedSupplement because that would try to make InternalSettings RefCounted

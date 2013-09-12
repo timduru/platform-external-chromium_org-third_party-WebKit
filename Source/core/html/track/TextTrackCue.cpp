@@ -92,7 +92,7 @@ static const String& verticalGrowingRightKeyword()
 
 // ----------------------------
 
-TextTrackCueBox::TextTrackCueBox(Document* document, TextTrackCue* cue)
+TextTrackCueBox::TextTrackCueBox(Document& document, TextTrackCue* cue)
     : HTMLDivElement(divTag, document)
     , m_cue(cue)
 {
@@ -204,7 +204,7 @@ TextTrackCue::TextTrackCue(ScriptExecutionContext* context, double start, double
     , m_isActive(false)
     , m_pauseOnExit(false)
     , m_snapToLines(true)
-    , m_cueBackgroundBox(HTMLDivElement::create(toDocument(context)))
+    , m_cueBackgroundBox(HTMLDivElement::create(*toDocument(context)))
     , m_displayTreeShouldChange(true)
     , m_displayDirection(CSSValueLtr)
 {
@@ -228,7 +228,8 @@ TextTrackCue::~TextTrackCue()
 
 PassRefPtr<TextTrackCueBox> TextTrackCue::createDisplayTree()
 {
-    return TextTrackCueBox::create(ownerDocument(), this);
+    ASSERT(ownerDocument());
+    return TextTrackCueBox::create(*ownerDocument(), this);
 }
 
 PassRefPtr<TextTrackCueBox> TextTrackCue::displayTreeInternal()
@@ -515,7 +516,7 @@ void TextTrackCue::copyWebVTTNodeToDOMTree(ContainerNode* webVTTNode, ContainerN
 PassRefPtr<DocumentFragment> TextTrackCue::getCueAsHTML()
 {
     createWebVTTNodeTree();
-    RefPtr<DocumentFragment> clonedFragment = DocumentFragment::create(ownerDocument());
+    RefPtr<DocumentFragment> clonedFragment = DocumentFragment::create(*ownerDocument());
     copyWebVTTNodeToDOMTree(m_webVTTNodeTree.get(), clonedFragment.get());
     return clonedFragment.release();
 }
@@ -524,7 +525,7 @@ PassRefPtr<DocumentFragment> TextTrackCue::createCueRenderingTree()
 {
     RefPtr<DocumentFragment> clonedFragment;
     createWebVTTNodeTree();
-    clonedFragment = DocumentFragment::create(ownerDocument());
+    clonedFragment = DocumentFragment::create(*ownerDocument());
     m_webVTTNodeTree->cloneChildNodes(clonedFragment.get());
     return clonedFragment.release();
 }

@@ -76,7 +76,7 @@ public:
     // Should be called whenever the root layer for the given frame view changes.
     void frameViewRootLayerDidChange(FrameView*);
 
-#if OS(DARWIN)
+#if OS(MACOSX)
     // Dispatched by the scrolling tree during handleWheelEvent. This is required as long as scrollbars are painted on the main thread.
     void handleWheelEventPhase(PlatformWheelEventPhase);
 #endif
@@ -89,6 +89,8 @@ public:
 
     MainThreadScrollingReasons mainThreadScrollingReasons() const;
     bool shouldUpdateScrollLayerPositionOnMainThread() const { return mainThreadScrollingReasons() != 0; }
+
+    PassOwnPtr<WebKit::WebScrollbarLayer> createSolidColorScrollbarLayer(ScrollbarOrientation, int thumbThickness, bool isLeftSideVerticalScrollbar);
 
     void willDestroyScrollableArea(ScrollableArea*);
     // Returns true if the coordinator handled this change.

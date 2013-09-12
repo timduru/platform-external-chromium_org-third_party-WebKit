@@ -40,7 +40,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-HTMLImageElement::HTMLImageElement(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+HTMLImageElement::HTMLImageElement(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
     : HTMLElement(tagName, document)
     , m_imageLoader(this)
     , m_form(form)
@@ -52,12 +52,12 @@ HTMLImageElement::HTMLImageElement(const QualifiedName& tagName, Document* docum
         form->registerImgElement(this);
 }
 
-PassRefPtr<HTMLImageElement> HTMLImageElement::create(Document* document)
+PassRefPtr<HTMLImageElement> HTMLImageElement::create(Document& document)
 {
     return adoptRef(new HTMLImageElement(imgTag, document));
 }
 
-PassRefPtr<HTMLImageElement> HTMLImageElement::create(const QualifiedName& tagName, Document* document, HTMLFormElement* form)
+PassRefPtr<HTMLImageElement> HTMLImageElement::create(const QualifiedName& tagName, Document& document, HTMLFormElement* form)
 {
     return adoptRef(new HTMLImageElement(tagName, document, form));
 }
@@ -68,7 +68,7 @@ HTMLImageElement::~HTMLImageElement()
         m_form->removeImgElement(this);
 }
 
-PassRefPtr<HTMLImageElement> HTMLImageElement::createForJSConstructor(Document* document, const int* optionalWidth, const int* optionalHeight)
+PassRefPtr<HTMLImageElement> HTMLImageElement::createForJSConstructor(Document& document, const int* optionalWidth, const int* optionalHeight)
 {
     RefPtr<HTMLImageElement> image = adoptRef(new HTMLImageElement(imgTag, document));
     if (optionalWidth)
@@ -222,9 +222,9 @@ int HTMLImageElement::width(bool ignorePendingStylesheets)
     }
 
     if (ignorePendingStylesheets)
-        document()->updateLayoutIgnorePendingStylesheets();
+        document().updateLayoutIgnorePendingStylesheets();
     else
-        document()->updateLayout();
+        document().updateLayout();
 
     RenderBox* box = renderBox();
     return box ? adjustForAbsoluteZoom(box->contentBoxRect().pixelSnappedWidth(), box) : 0;
@@ -245,9 +245,9 @@ int HTMLImageElement::height(bool ignorePendingStylesheets)
     }
 
     if (ignorePendingStylesheets)
-        document()->updateLayoutIgnorePendingStylesheets();
+        document().updateLayoutIgnorePendingStylesheets();
     else
-        document()->updateLayout();
+        document().updateLayout();
 
     RenderBox* box = renderBox();
     return box ? adjustForAbsoluteZoom(box->contentBoxRect().pixelSnappedHeight(), box) : 0;
@@ -296,7 +296,7 @@ void HTMLImageElement::setHeight(int value)
 
 KURL HTMLImageElement::src() const
 {
-    return document()->completeURL(getAttribute(srcAttr));
+    return document().completeURL(getAttribute(srcAttr));
 }
 
 void HTMLImageElement::setSrc(const String& value)
@@ -342,7 +342,7 @@ void HTMLImageElement::addSubresourceAttributeURLs(ListHashSet<KURL>& urls) cons
 
     addSubresourceURL(urls, src());
     // FIXME: What about when the usemap attribute begins with "#"?
-    addSubresourceURL(urls, document()->completeURL(getAttribute(usemapAttr)));
+    addSubresourceURL(urls, document().completeURL(getAttribute(usemapAttr)));
 }
 
 void HTMLImageElement::didMoveToNewDocument(Document* oldDocument)
@@ -362,7 +362,7 @@ bool HTMLImageElement::isServerMap() const
     if (usemap.string()[0] == '#')
         return false;
 
-    return document()->completeURL(stripLeadingAndTrailingHTMLSpaces(usemap)).isEmpty();
+    return document().completeURL(stripLeadingAndTrailingHTMLSpaces(usemap)).isEmpty();
 }
 
 Image* HTMLImageElement::imageContents()

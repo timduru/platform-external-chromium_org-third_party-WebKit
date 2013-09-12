@@ -30,10 +30,12 @@
 #include "RuntimeEnabledFeatures.h"
 #include "core/dom/Document.h"
 #include "core/dom/Node.h"
+#include "core/dom/WheelController.h"
 #include "core/html/HTMLElement.h"
 #include "core/page/Frame.h"
 #include "core/page/FrameView.h"
 #include "core/page/Page.h"
+#include "core/page/Settings.h"
 #include "core/platform/PlatformWheelEvent.h"
 #include "core/platform/ScrollAnimator.h"
 #include "core/platform/ScrollbarTheme.h"
@@ -44,7 +46,7 @@
 #include "core/platform/graphics/IntRect.h"
 #include "core/platform/graphics/Region.h"
 #include "core/platform/graphics/transforms/TransformState.h"
-#if OS(DARWIN)
+#if OS(MACOSX)
 #include "core/platform/mac/ScrollAnimatorMac.h"
 #endif
 #include "core/plugins/PluginView.h"
@@ -208,6 +210,14 @@ static PassOwnPtr<WebScrollbarLayer> createScrollbarLayer(Scrollbar* scrollbar)
     return scrollbarLayer.release();
 }
 
+PassOwnPtr<WebScrollbarLayer> ScrollingCoordinator::createSolidColorScrollbarLayer(ScrollbarOrientation orientation, int thumbThickness, bool isLeftSideVerticalScrollbar)
+{
+    WebKit::WebScrollbar::Orientation webOrientation = (orientation == HorizontalScrollbar) ? WebKit::WebScrollbar::Horizontal : WebKit::WebScrollbar::Vertical;
+    OwnPtr<WebScrollbarLayer> scrollbarLayer = adoptPtr(WebKit::Platform::current()->compositorSupport()->createSolidColorScrollbarLayer(webOrientation, thumbThickness, isLeftSideVerticalScrollbar));
+    GraphicsLayer::registerContentsLayer(scrollbarLayer->layer());
+    return scrollbarLayer.release();
+}
+
 static void detachScrollbarLayer(GraphicsLayer* scrollbarGraphicsLayer)
 {
     ASSERT(scrollbarGraphicsLayer);
@@ -245,7 +255,7 @@ WebScrollbarLayer* ScrollingCoordinator::getWebScrollbarLayer(ScrollableArea* sc
 void ScrollingCoordinator::scrollableAreaScrollbarLayerDidChange(ScrollableArea* scrollableArea, ScrollbarOrientation orientation)
 {
 // FIXME: Instead of hardcode here, we should make a setting flag.
-#if OS(DARWIN)
+#if OS(MACOSX)
     static const bool platformSupportsCoordinatedScrollbar = ScrollAnimatorMac::canUseCoordinatedScrollbar();
     static const bool platformSupportsMainFrameOnly = false; // Don't care.
 #elif OS(ANDROID)
@@ -271,8 +281,18 @@ void ScrollingCoordinator::scrollableAreaScrollbarLayerDidChange(ScrollableArea*
         }
 
         WebScrollbarLayer* scrollbarLayer = getWebScrollbarLayer(scrollableArea, orientation);
-        if (!scrollbarLayer)
-            scrollbarLayer = addWebScrollbarLayer(scrollableArea, orientation, createScrollbarLayer(scrollbar));
+        if (!scrollbarLayer) {
+            Settings* settings = m_page->mainFrame()->document()->settings();
+
+            OwnPtr<WebScrollbarLayer> webScrollbarLayer;
+            if (settings->useSolidColorScrollbars()) {
+                ASSERT(RuntimeEnabledFeatures::overlayScrollbarsEnabled());
+                webScrollbarLayer = createSolidColorScrollbarLayer(orientation, -1, scrollableArea->shouldPlaceVerticalScrollbarOnLeft());
+            } else {
+                webScrollbarLayer = createScrollbarLayer(scrollbar);
+            }
+            scrollbarLayer = addWebScrollbarLayer(scrollableArea, orientation, webScrollbarLayer.release());
+        }
 
         // Root layer non-overlay scrollbars should be marked opaque to disable
         // blending.
@@ -526,7 +546,7 @@ bool ScrollingCoordinator::coordinatesScrollingForFrameView(FrameView* frameView
     ASSERT(m_page);
 
     // We currently only handle the main frame.
-    if (frameView->frame() != m_page->mainFrame())
+    if (&frameView->frame() != m_page->mainFrame())
         return false;
 
     // We currently only support composited mode.
@@ -653,7 +673,7 @@ unsigned ScrollingCoordinator::computeCurrentWheelEventHandlerCount()
 
     for (Frame* frame = m_page->mainFrame(); frame; frame = frame->tree()->traverseNext()) {
         if (frame->document())
-            wheelEventHandlerCount += frame->document()->wheelEventHandlerCount();
+            wheelEventHandlerCount += WheelController::from(frame->document())->wheelEventHandlerCount();
     }
 
     return wheelEventHandlerCount;
@@ -711,11 +731,7 @@ bool ScrollingCoordinator::isForMainFrame(ScrollableArea* scrollableArea) const
 
 GraphicsLayer* ScrollingCoordinator::scrollLayerForFrameView(FrameView* frameView)
 {
-    Frame* frame = frameView->frame();
-    if (!frame)
-        return 0;
-
-    RenderView* renderView = frame->contentRenderer();
+    RenderView* renderView = frameView->frame().contentRenderer();
     if (!renderView)
         return 0;
     return renderView->compositor()->scrollLayer();
@@ -739,7 +755,7 @@ void ScrollingCoordinator::frameViewRootLayerDidChange(FrameView* frameView)
     updateShouldUpdateScrollLayerPositionOnMainThread();
 }
 
-#if OS(DARWIN)
+#if OS(MACOSX)
 void ScrollingCoordinator::handleWheelEventPhase(PlatformWheelEventPhase phase)
 {
     ASSERT(isMainThread());

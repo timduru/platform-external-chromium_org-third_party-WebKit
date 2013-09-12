@@ -35,6 +35,7 @@
 #include "core/rendering/ColumnInfo.h"
 #include "core/rendering/FlowThreadController.h"
 #include "core/rendering/HitTestResult.h"
+#include "core/rendering/RenderFlowThread.h"
 #include "core/rendering/RenderGeometryMap.h"
 #include "core/rendering/RenderLayer.h"
 #include "core/rendering/RenderLayerBacking.h"
@@ -45,7 +46,7 @@
 namespace WebCore {
 
 RenderView::RenderView(Document* document)
-    : RenderBlock(document)
+    : RenderBlockFlow(document)
     , m_frameView(document->view())
     , m_selectionStart(0)
     , m_selectionEnd(0)
@@ -120,8 +121,13 @@ void RenderView::layoutContent(const LayoutState& state)
     ASSERT(needsLayout());
 
     RenderBlock::layout();
+
+    if (m_frameView->partialLayout().isStopping())
+        return;
+
     if (hasRenderNamedFlowThreads())
         flowThreadController()->layoutRenderNamedFlowThreads();
+
 #ifndef NDEBUG
     checkLayoutState(state);
 #endif
@@ -136,11 +142,9 @@ void RenderView::checkLayoutState(const LayoutState& state)
 }
 #endif
 
-static RenderBox* enclosingSeamlessRenderer(Document* doc)
+static RenderBox* enclosingSeamlessRenderer(const Document& doc)
 {
-    if (!doc)
-        return 0;
-    Element* ownerElement = doc->seamlessParentIFrame();
+    Element* ownerElement = doc.seamlessParentIFrame();
     if (!ownerElement)
         return 0;
     return ownerElement->renderBox();
@@ -214,6 +218,11 @@ bool RenderView::initializeLayoutState(LayoutState& state)
 // as detected in the previous step.
 void RenderView::layoutContentInAutoLogicalHeightRegions(const LayoutState& state)
 {
+    if (!m_frameView->partialLayout().isStopping()) {
+        // Disable partial layout for any two-pass layout algorithm.
+        m_frameView->partialLayout().reset();
+    }
+
     // We need to invalidate all the flows with auto-height regions if one such flow needs layout.
     // If none is found we do a layout a check back again afterwards.
     if (!flowThreadController()->updateFlowThreadsNeedingLayout()) {
@@ -242,7 +251,7 @@ void RenderView::layoutContentInAutoLogicalHeightRegions(const LayoutState& stat
 
 void RenderView::layout()
 {
-    if (!document()->paginated())
+    if (!document().paginated())
         setPageLogicalHeight(0);
 
     if (shouldUsePrintingLayout())
@@ -281,6 +290,11 @@ void RenderView::layout()
         layoutContentInAutoLogicalHeightRegions(state);
     else
         layoutContent(state);
+
+    if (m_frameView->partialLayout().isStopping()) {
+        m_layoutState = 0;
+        return;
+    }
 
 #ifndef NDEBUG
     checkLayoutState(state);
@@ -451,7 +465,7 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
     // FIXME: This needs to be dynamic.  We should be able to go back to blitting if we ever stop being inside
     // a transform, transparency layer, etc.
     Element* elt;
-    for (elt = document()->ownerElement(); view() && elt && elt->renderer(); elt = elt->document()->ownerElement()) {
+    for (elt = document().ownerElement(); view() && elt && elt->renderer(); elt = elt->document().ownerElement()) {
         RenderLayer* layer = elt->renderer()->enclosingLayer();
         if (layer->cannotBlitToWindow()) {
             frameView()->setCannotBlitToWindow();
@@ -464,7 +478,7 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
         }
     }
 
-    if (document()->ownerElement() || !view())
+    if (document().ownerElement() || !view())
         return;
 
     if (paintInfo.skipRootBackground())
@@ -472,7 +486,7 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
 
     bool rootFillsViewport = false;
     bool rootObscuresBackground = false;
-    Node* documentElement = document()->documentElement();
+    Node* documentElement = document().documentElement();
     if (RenderObject* rootRenderer = documentElement ? documentElement->renderer() : 0) {
         // The document element's renderer is currently forced to be a block, but may not always be.
         RenderBox* rootBox = rootRenderer->isBox() ? toRenderBox(rootRenderer) : 0;
@@ -480,7 +494,7 @@ void RenderView::paintBoxDecorations(PaintInfo& paintInfo, const LayoutPoint&)
         rootObscuresBackground = rendererObscuresBackground(rootRenderer);
     }
 
-    Page* page = document()->page();
+    Page* page = document().page();
     float pageScaleFactor = page ? page->pageScaleFactor() : 1;
 
     // If painting will entirely fill the view, no need to fill the background.
@@ -527,7 +541,7 @@ void RenderView::repaintViewRectangle(const LayoutRect& ur) const
 
     // We always just invalidate the root view, since we could be an iframe that is clipped out
     // or even invisible.
-    Element* elt = document()->ownerElement();
+    Element* elt = document().ownerElement();
     if (!elt)
         m_frameView->repaintContentRectangle(pixelSnappedIntRect(ur));
     else if (RenderBox* obj = elt->renderBox()) {
@@ -614,7 +628,7 @@ static RenderObject* rendererAfterPosition(RenderObject* object, unsigned offset
 
 IntRect RenderView::selectionBounds(bool clipToVisibleContent) const
 {
-    document()->updateStyleIfNeeded();
+    document().updateStyleIfNeeded();
 
     typedef HashMap<RenderObject*, OwnPtr<RenderSelectionInfo> > SelectionMap;
     SelectionMap selectedObjects;
@@ -656,7 +670,7 @@ IntRect RenderView::selectionBounds(bool clipToVisibleContent) const
 
 void RenderView::repaintSelection() const
 {
-    document()->updateStyleIfNeeded();
+    document().updateStyleIfNeeded();
 
     HashSet<RenderBlock*> processedBlocks;
 
@@ -867,15 +881,14 @@ void RenderView::selectionStartEnd(int& startPos, int& endPos) const
 
 bool RenderView::printing() const
 {
-    return document()->printing();
+    return document().printing();
 }
 
 bool RenderView::shouldUsePrintingLayout() const
 {
     if (!printing() || !m_frameView)
         return false;
-    Frame* frame = m_frameView->frame();
-    return frame && frame->shouldUsePrintingLayout();
+    return m_frameView->frame().shouldUsePrintingLayout();
 }
 
 size_t RenderView::getRetainedWidgets(Vector<RenderWidget*>& renderWidgets)
@@ -947,7 +960,7 @@ IntRect RenderView::unscaledDocumentRect() const
 
 bool RenderView::rootBackgroundIsEntirelyFixed() const
 {
-    RenderObject* rootObject = document()->documentElement() ? document()->documentElement()->renderer() : 0;
+    RenderObject* rootObject = document().documentElement() ? document().documentElement()->renderer() : 0;
     if (!rootObject)
         return false;
 
@@ -1011,8 +1024,7 @@ int RenderView::viewLogicalHeight() const
 
 float RenderView::zoomFactor() const
 {
-    Frame* frame = m_frameView->frame();
-    return frame ? frame->pageZoomFactor() : 1;
+    return m_frameView->frame().pageZoomFactor();
 }
 
 void RenderView::pushLayoutState(RenderObject* root)
@@ -1020,6 +1032,7 @@ void RenderView::pushLayoutState(RenderObject* root)
     ASSERT(m_layoutStateDisableCount == 0);
     ASSERT(m_layoutState == 0);
 
+    pushLayoutStateForCurrentFlowThread(root);
     m_layoutState = new LayoutState(root);
 }
 
@@ -1039,7 +1052,7 @@ void RenderView::updateHitTestResult(HitTestResult& result, const LayoutPoint& p
     if (result.innerNode())
         return;
 
-    Node* node = document()->documentElement();
+    Node* node = document().documentElement();
     if (node) {
         result.setInnerNode(node);
         if (!result.innerNonSharedNode())
@@ -1103,6 +1116,30 @@ FlowThreadController* RenderView::flowThreadController()
     return m_flowThreadController.get();
 }
 
+void RenderView::pushLayoutStateForCurrentFlowThread(const RenderObject* object)
+{
+    if (!m_flowThreadController)
+        return;
+
+    RenderFlowThread* currentFlowThread = m_flowThreadController->currentRenderFlowThread();
+    if (!currentFlowThread)
+        return;
+
+    currentFlowThread->pushFlowThreadLayoutState(object);
+}
+
+void RenderView::popLayoutStateForCurrentFlowThread()
+{
+    if (!m_flowThreadController)
+        return;
+
+    RenderFlowThread* currentFlowThread = m_flowThreadController->currentRenderFlowThread();
+    if (!currentFlowThread)
+        return;
+
+    currentFlowThread->popFlowThreadLayoutState();
+}
+
 IntervalArena* RenderView::intervalArena()
 {
     if (!m_intervalArena)
@@ -1113,9 +1150,9 @@ IntervalArena* RenderView::intervalArena()
 bool RenderView::backgroundIsKnownToBeOpaqueInRect(const LayoutRect&) const
 {
     // FIXME: Remove this main frame check. Same concept applies to subframes too.
-    Page* page = document()->page();
+    Page* page = document().page();
     Frame* mainFrame = page ? page->mainFrame() : 0;
-    if (!m_frameView || m_frameView->frame() != mainFrame)
+    if (!m_frameView || &m_frameView->frame() != mainFrame)
         return false;
 
     return m_frameView->hasOpaqueBackground();

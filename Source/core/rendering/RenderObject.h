@@ -33,8 +33,10 @@
 #include "core/platform/graphics/FloatQuad.h"
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/platform/graphics/transforms/TransformationMatrix.h"
+#include "core/rendering/LayoutIndicator.h"
 #include "core/rendering/PaintPhase.h"
 #include "core/rendering/RenderObjectChildList.h"
+#include "core/rendering/RenderingNodeProxy.h"
 #include "core/rendering/ScrollBehavior.h"
 #include "core/rendering/SubtreeLayoutScope.h"
 #include "core/rendering/style/RenderStyle.h"
@@ -64,6 +66,8 @@ class RenderLayerModelObject;
 class RenderNamedFlowThread;
 class RenderSVGResourceContainer;
 class RenderTable;
+class RenderTheme;
+class RenderView;
 class TransformState;
 
 struct PaintInfo;
@@ -221,7 +225,7 @@ public:
     // Helper class forbidding calls to setNeedsLayout() during its lifetime.
     class SetLayoutNeededForbiddenScope {
     public:
-        explicit SetLayoutNeededForbiddenScope(RenderObject*, bool isForbidden = true);
+        explicit SetLayoutNeededForbiddenScope(RenderObject*);
         ~SetLayoutNeededForbiddenScope();
     private:
         RenderObject* m_renderObject;
@@ -301,7 +305,6 @@ public:
     bool isPseudoElement() const { return node() && node()->isPseudoElement(); }
 
     virtual bool isBR() const { return false; }
-    virtual bool isBlockFlow() const { return false; }
     virtual bool isBoxModelObject() const { return false; }
     virtual bool isCounter() const { return false; }
     virtual bool isDialog() const { return false; }
@@ -325,6 +328,7 @@ public:
     virtual bool isMeter() const { return false; }
     virtual bool isProgress() const { return false; }
     virtual bool isRenderBlock() const { return false; }
+    virtual bool isRenderBlockFlow() const { return false; }
     virtual bool isRenderSVGBlock() const { return false; };
     virtual bool isRenderButton() const { return false; }
     virtual bool isRenderIFrame() const { return false; }
@@ -369,7 +373,7 @@ public:
 
     virtual bool isRenderScrollbarPart() const { return false; }
 
-    bool isRoot() const { return document()->documentElement() == m_node; }
+    bool isRoot() const { return document().documentElement() == m_nodeProxy.unsafeNode(); }
     bool isBody() const;
     bool isHR() const;
     bool isLegend() const;
@@ -530,13 +534,7 @@ public:
     bool backgroundIsKnownToBeObscured();
     bool borderImageIsLoadedAndCanBeRendered() const;
     bool mustRepaintBackgroundOrBorder() const;
-    bool hasBackground() const
-    {
-        StyleColor color = resolveColor(CSSPropertyBackgroundColor);
-        if (color.isValid() && color.alpha())
-            return true;
-        return style()->hasBackgroundImage();
-    }
+    bool hasBackground() const { return style()->hasBackground(); }
     bool hasEntirelyFixedBackground() const;
 
     bool needsLayout() const
@@ -583,24 +581,29 @@ public:
 
     virtual void updateDragState(bool dragOn);
 
-    RenderView* view() const { return document()->renderView(); };
+    RenderView* view() const { return document().renderView(); };
+    FrameView* frameView() const { return document().view(); };
 
     // Returns true if this renderer is rooted, and optionally returns the hosting view (the root of the hierarchy).
     bool isRooted(RenderView** = 0) const;
 
-    Node* node() const { return isAnonymous() ? 0 : m_node; }
-    Node* nonPseudoNode() const { return isPseudoElement() ? 0 : node(); }
+    Node* node() const { return isAnonymous() ? 0 : m_nodeProxy.unsafeNode(); }
+    Node* nonPseudoNode() const
+    {
+        ASSERT(!LayoutIndicator::inLayout());
+        return isPseudoElement() ? 0 : node();
+    }
 
     // FIXME: Why does RenderWidget need this?
-    void clearNode() { m_node = 0; }
+    void clearNode() { m_nodeProxy.clear(); }
 
     // Returns the styled node that caused the generation of this renderer.
     // This is the same as node() except for renderers of :before and :after
     // pseudo elements for which their parent node is returned.
     Node* generatingNode() const { return isPseudoElement() ? node()->parentOrShadowHostNode() : node(); }
 
-    Document* document() const { return m_node->document(); }
-    Frame* frame() const { return document()->frame(); }
+    Document& document() const { return m_nodeProxy.unsafeNode()->document(); }
+    Frame* frame() const { return document().frame(); }
 
     bool hasOutlineAnnotation() const;
     bool hasOutline() const { return style()->hasOutline() || hasOutlineAnnotation(); }
@@ -669,6 +672,9 @@ public:
 
     void forceLayout();
     void forceChildLayout();
+
+    // True if we can abort layout, leaving a partially laid out tree.
+    virtual bool supportsPartialLayout() const { return false; }
 
     // used for element state updates that cannot be fixed with a
     // repaint and do not need a relayout
@@ -755,46 +761,28 @@ public:
     virtual LayoutUnit maxPreferredLogicalWidth() const { return 0; }
 
     RenderStyle* style() const { return m_style.get(); }
-    RenderStyle* firstLineStyle() const { return document()->styleSheetCollections()->usesFirstLineRules() ? cachedFirstLineStyle() : style(); }
+    RenderStyle* firstLineStyle() const { return document().styleSheetCollections()->usesFirstLineRules() ? cachedFirstLineStyle() : style(); }
     RenderStyle* style(bool firstLine) const { return firstLine ? firstLineStyle() : style(); }
 
     inline Color resolveColor(const RenderStyle* styleToUse, int colorProperty) const
     {
-        StyleColor styleColor = resolveCurrentColor(styleToUse, colorProperty);
-        return styleColor.color();
+        return styleToUse->visitedDependentColor(colorProperty);
     }
 
     inline Color resolveColor(int colorProperty) const
     {
-        StyleColor styleColor = resolveCurrentColor(style(), colorProperty);
-        return styleColor.color();
+        return style()->visitedDependentColor(colorProperty);
     }
 
-    inline Color resolveColor(int colorProperty, Color fallbackIfInvalid) const
+    inline Color resolveColor(int colorProperty, Color fallback) const
     {
-        StyleColor styleColor = resolveCurrentColor(style(), colorProperty);
-        return styleColor.isValid() ? styleColor.color() : fallbackIfInvalid;
+        Color color = resolveColor(colorProperty);
+        return color.isValid() ? color : fallback;
     }
 
-    inline Color resolveColor(StyleColor color) const
+    inline Color resolveColor(Color color) const
     {
-        return resolveCurrentColor(color).color();
-    }
-
-    inline Color resolveColor(StyleColor color, Color fallbackIfInvalid) const
-    {
-        StyleColor styleColor = resolveCurrentColor(color);
-        return styleColor.isValid() ? styleColor.color() : fallbackIfInvalid;
-    }
-
-    inline StyleColor resolveStyleColor(int colorProperty) const
-    {
-        return resolveCurrentColor(style(), colorProperty);
-    }
-
-    inline StyleColor resolveStyleColor(const RenderStyle* styleToUse, int colorProperty) const
-    {
-        return resolveCurrentColor(styleToUse, colorProperty);
+        return color;
     }
 
     // Used only by Element::pseudoStyleCacheIsInvalid to get a first line style based off of a
@@ -864,7 +852,6 @@ public:
     virtual unsigned int length() const { return 1; }
 
     bool isFloatingOrOutOfFlowPositioned() const { return (isFloating() || isOutOfFlowPositioned()); }
-    bool isFloatingWithShapeOutside() const { return isBox() && isFloating() && style()->shapeOutside(); }
 
     bool isTransparent() const { return style()->opacity() < 1.0f; }
     float opacity() const { return style()->opacity(); }
@@ -1015,7 +1002,7 @@ protected:
     virtual void insertedIntoTree();
     virtual void willBeRemovedFromTree();
 
-    void setDocumentForAnonymous(Document* document) { ASSERT(isAnonymous()); m_node = document; }
+    void setDocumentForAnonymous(Document* document) { ASSERT(isAnonymous()); m_nodeProxy.set(document); }
 
     // Add hit-test rects for the render tree rooted at this node to the provided collection on a
     // per-RenderLayer basis.
@@ -1044,37 +1031,16 @@ private:
 
     Color selectionColor(int colorProperty) const;
 
-    inline StyleColor resolveCurrentColor(const RenderStyle* styleToUse, int colorProperty) const
-    {
-        StyleColor styleColor = styleToUse->visitedDependentColor(colorProperty);
-        if (UNLIKELY(styleColor.isCurrentColor()))
-            styleColor = styleToUse->visitedDependentColor(CSSPropertyColor);
-
-        // In the unlikely case that CSSPropertyColor is also 'currentColor'
-        // the color of the nearest ancestor with a valid color is used.
-        for (const RenderObject* object = this; UNLIKELY(styleColor.isCurrentColor()) && object && object->style(); object = object->parent())
-            styleColor = object->style()->visitedDependentColor(CSSPropertyColor);
-
-        return styleColor;
-    }
-
-    inline StyleColor resolveCurrentColor(StyleColor color) const
-    {
-        StyleColor styleColor = color;
-        for (const RenderObject* object = this; UNLIKELY(styleColor.isCurrentColor()) && object && object->style(); object = object->parent())
-            styleColor = object->style()->visitedDependentColor(CSSPropertyColor);
-        return styleColor;
-    }
-
     void removeShapeImageClient(ShapeValue*);
 
 #ifndef NDEBUG
     void checkBlockPositionedObjectsNeedLayout();
+    void checkNotInPartialLayout();
 #endif
 
     RefPtr<RenderStyle> m_style;
 
-    Node* m_node;
+    RenderingNodeProxy m_nodeProxy;
 
     RenderObject* m_parent;
     RenderObject* m_previous;
@@ -1210,7 +1176,7 @@ private:
 
 inline bool RenderObject::documentBeingDestroyed() const
 {
-    return !document()->renderer();
+    return !document().renderer();
 }
 
 inline bool RenderObject::isBeforeContent() const
@@ -1240,6 +1206,9 @@ inline bool RenderObject::isBeforeOrAfterContent() const
 
 inline void RenderObject::setNeedsLayout(MarkingBehavior markParents, SubtreeLayoutScope* layouter)
 {
+#ifndef NDEBUG
+    checkNotInPartialLayout();
+#endif
     ASSERT(!isSetNeedsLayoutForbidden());
     bool alreadyNeededLayout = m_bitfields.selfNeedsLayout();
     setSelfNeedsLayout(true);
@@ -1253,6 +1222,9 @@ inline void RenderObject::setNeedsLayout(MarkingBehavior markParents, SubtreeLay
 
 inline void RenderObject::clearNeedsLayout()
 {
+#ifndef NDEBUG
+    checkNotInPartialLayout();
+#endif
     setSelfNeedsLayout(false);
     setEverHadLayout(true);
     setPosChildNeedsLayout(false);

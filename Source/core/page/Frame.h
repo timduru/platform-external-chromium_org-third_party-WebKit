@@ -28,7 +28,6 @@
 #ifndef Frame_h
 #define Frame_h
 
-#include "core/css/StyleColor.h"
 #include "core/loader/FrameLoader.h"
 #include "core/loader/NavigationScheduler.h"
 #include "core/page/AdjustViewSizeOrNot.h"
@@ -48,6 +47,7 @@ namespace WebCore {
     class Editor;
     class Element;
     class EventHandler;
+    class FetchContext;
     class FloatSize;
     class FrameDestructionObserver;
     class FrameSelection;
@@ -73,7 +73,7 @@ namespace WebCore {
 
         void init();
         void setView(PassRefPtr<FrameView>);
-        void createView(const IntSize&, const StyleColor&, bool,
+        void createView(const IntSize&, const Color&, bool,
             const IntSize& fixedLayoutSize = IntSize(), bool useFixedLayout = false, ScrollbarMode = ScrollbarAuto, bool horizontalLock = false,
             ScrollbarMode = ScrollbarAuto, bool verticalLock = false);
 
@@ -98,10 +98,11 @@ namespace WebCore {
         EventHandler* eventHandler() const;
         FrameLoader* loader() const;
         NavigationScheduler* navigationScheduler() const;
-        FrameSelection* selection() const;
+        FrameSelection& selection() const;
         FrameTree* tree() const;
         AnimationController* animation() const;
         InputMethodController& inputMethodController() const;
+        FetchContext& fetchContext() const { return loader()->fetchContext(); }
         ScriptController* script();
 
         RenderView* contentRenderer() const; // Root of the render tree for the document contained in this frame.
@@ -185,7 +186,7 @@ namespace WebCore {
 
         OwnPtr<ScriptController> m_script;
         const OwnPtr<Editor> m_editor;
-        OwnPtr<FrameSelection> m_selection;
+        const OwnPtr<FrameSelection> m_selection;
         OwnPtr<EventHandler> m_eventHandler;
         OwnPtr<AnimationController> m_animationController;
         OwnPtr<InputMethodController> m_inputMethodController;
@@ -230,9 +231,9 @@ namespace WebCore {
         return m_domWindow.get();
     }
 
-    inline FrameSelection* Frame::selection() const
+    inline FrameSelection& Frame::selection() const
     {
-        return m_selection.get();
+        return *m_selection;
     }
 
     inline Editor& Frame::editor() const

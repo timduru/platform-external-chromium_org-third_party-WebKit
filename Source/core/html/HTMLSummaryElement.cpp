@@ -24,25 +24,25 @@
 #include "HTMLNames.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/dom/KeyboardEvent.h"
-#include "core/dom/NodeRenderingContext.h"
+#include "core/dom/NodeRenderingTraversal.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/html/HTMLDetailsElement.h"
 #include "core/html/shadow/DetailsMarkerControl.h"
 #include "core/html/shadow/HTMLContentElement.h"
-#include "core/rendering/RenderBlock.h"
+#include "core/rendering/RenderBlockFlow.h"
 
 namespace WebCore {
 
 using namespace HTMLNames;
 
-PassRefPtr<HTMLSummaryElement> HTMLSummaryElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<HTMLSummaryElement> HTMLSummaryElement::create(const QualifiedName& tagName, Document& document)
 {
     RefPtr<HTMLSummaryElement> summary = adoptRef(new HTMLSummaryElement(tagName, document));
     summary->ensureUserAgentShadowRoot();
     return summary.release();
 }
 
-HTMLSummaryElement::HTMLSummaryElement(const QualifiedName& tagName, Document* document)
+HTMLSummaryElement::HTMLSummaryElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
 {
     ASSERT(hasTagName(summaryTag));
@@ -50,7 +50,7 @@ HTMLSummaryElement::HTMLSummaryElement(const QualifiedName& tagName, Document* d
 
 RenderObject* HTMLSummaryElement::createRenderer(RenderStyle*)
 {
-    return new RenderBlock(this);
+    return new RenderBlockFlow(this);
 }
 
 void HTMLSummaryElement::didAddUserAgentShadowRoot(ShadowRoot* root)

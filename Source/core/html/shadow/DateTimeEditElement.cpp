@@ -144,7 +144,7 @@ void DateTimeEditBuilder::visitField(DateTimeFormat::FieldType fieldType, int co
     const int countForAbbreviatedMonth = 3;
     const int countForFullMonth = 4;
     const int countForNarrowMonth = 5;
-    Document* const document = m_editElement.document();
+    Document& document = m_editElement.document();
 
     switch (fieldType) {
     case DateTimeFormat::FieldTypeDayOfMonth: {
@@ -440,7 +440,7 @@ DateTimeEditElement::EditControlOwner::~EditControlOwner()
 {
 }
 
-DateTimeEditElement::DateTimeEditElement(Document* document, EditControlOwner& editControlOwner)
+DateTimeEditElement::DateTimeEditElement(Document& document, EditControlOwner& editControlOwner)
     : HTMLDivElement(divTag, document)
     , m_editControlOwner(&editControlOwner)
 {
@@ -482,7 +482,7 @@ void DateTimeEditElement::blurByOwner()
         field->blur();
 }
 
-PassRefPtr<DateTimeEditElement> DateTimeEditElement::create(Document* document, EditControlOwner& editControlOwner)
+PassRefPtr<DateTimeEditElement> DateTimeEditElement::create(Document& document, EditControlOwner& editControlOwner)
 {
     RefPtr<DateTimeEditElement> container = adoptRef(new DateTimeEditElement(document, editControlOwner));
     container->setPart(AtomicString("-webkit-datetime-edit", AtomicString::ConstructFromLiteral));
@@ -573,7 +573,7 @@ DateTimeFieldElement* DateTimeEditElement::focusedField() const
 
 size_t DateTimeEditElement::focusedFieldIndex() const
 {
-    Element* const focusedFieldElement = document()->focusedElement();
+    Element* const focusedFieldElement = document().focusedElement();
     for (size_t fieldIndex = 0; fieldIndex < m_fields.size(); ++fieldIndex) {
         if (m_fields[fieldIndex] == focusedFieldElement)
             return fieldIndex;

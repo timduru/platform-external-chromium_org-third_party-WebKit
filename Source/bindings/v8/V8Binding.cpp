@@ -411,7 +411,8 @@ PassRefPtr<DOMStringList> toDOMStringList(v8::Handle<v8::Value> value, v8::Isola
     v8::Local<v8::Array> v8Array = v8::Local<v8::Array>::Cast(v8Value);
     for (size_t i = 0; i < v8Array->Length(); ++i) {
         v8::Local<v8::Value> indexedValue = v8Array->Get(v8::Integer::New(i, isolate));
-        ret->append(toWebCoreString(indexedValue));
+        V8TRYCATCH_FOR_V8STRINGRESOURCE_RETURN(V8StringResource<>, stringValue, indexedValue, 0);
+        ret->append(stringValue);
     }
     return ret.release();
 }
@@ -539,9 +540,9 @@ bool handleOutOfMemory()
     return true;
 }
 
-v8::Local<v8::Value> handleMaxRecursionDepthExceeded()
+v8::Local<v8::Value> handleMaxRecursionDepthExceeded(v8::Isolate* isolate)
 {
-    throwError(v8RangeError, "Maximum call stack size exceeded.", v8::Isolate::GetCurrent());
+    throwError(v8RangeError, "Maximum call stack size exceeded.", isolate);
     return v8::Local<v8::Value>();
 }
 
@@ -588,6 +589,17 @@ v8::Local<v8::Value> getHiddenValueFromMainWorldWrapper(v8::Isolate* isolate, Sc
 {
     v8::Local<v8::Object> wrapper = wrappable->newLocalWrapper(isolate);
     return wrapper.IsEmpty() ? v8::Local<v8::Value>() : wrapper->GetHiddenValue(key);
+}
+
+v8::Isolate* getIsolateFromScriptExecutionContext(ScriptExecutionContext* context)
+{
+    if (context && context->isDocument()) {
+        static v8::Isolate* mainWorldIsolate = 0;
+        if (!mainWorldIsolate)
+            mainWorldIsolate = v8::Isolate::GetCurrent();
+        return mainWorldIsolate;
+    }
+    return v8::Isolate::GetCurrent();
 }
 
 } // namespace WebCore

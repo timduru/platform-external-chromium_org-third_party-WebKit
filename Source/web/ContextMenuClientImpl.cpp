@@ -133,14 +133,14 @@ static String selectMisspelledWord(Frame* selectedFrame)
     WebFrameImpl::selectWordAroundPosition(selectedFrame, pos);
     misspelledWord = selectedFrame->selectedText().stripWhiteSpace();
 
-#if OS(DARWIN)
+#if OS(MACOSX)
     // If misspelled word is still empty, then that portion should not be
     // selected. Set the selection to that position only, and do not expand.
     if (misspelledWord.isEmpty())
-        selectedFrame->selection()->setSelection(VisibleSelection(pos));
+        selectedFrame->selection().setSelection(VisibleSelection(pos));
 #else
     // On non-Mac, right-click should not make a range selection in any case.
-    selectedFrame->selection()->setSelection(VisibleSelection(pos));
+    selectedFrame->selection().setSelection(VisibleSelection(pos));
 #endif
     return misspelledWord;
 }
@@ -152,7 +152,7 @@ static bool IsWhiteSpaceOrPunctuation(UChar c)
 
 static String selectMisspellingAsync(Frame* selectedFrame, DocumentMarker& marker)
 {
-    VisibleSelection selection = selectedFrame->selection()->selection();
+    VisibleSelection selection = selectedFrame->selection().selection();
     if (!selection.isCaretOrRange())
         return String();
 
@@ -250,7 +250,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
             Widget* widget = toRenderWidget(object)->widget();
             if (widget && widget->isPluginContainer()) {
                 data.mediaType = WebContextMenuData::MediaTypePlugin;
-                WebPluginContainerImpl* plugin = static_cast<WebPluginContainerImpl*>(widget);
+                WebPluginContainerImpl* plugin = toPluginContainerImpl(widget);
                 WebString text = plugin->plugin()->selectionAsText();
                 if (!text.isEmpty()) {
                     data.selectedText = text;
@@ -262,7 +262,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
                     data.mediaFlags |= WebContextMenuData::MediaCanPrint;
 
                 HTMLPlugInImageElement* pluginElement = toHTMLPlugInImageElement(r.innerNonSharedNode());
-                data.srcURL = pluginElement->document()->completeURL(pluginElement->url());
+                data.srcURL = pluginElement->document().completeURL(pluginElement->url());
                 data.mediaFlags |= WebContextMenuData::MediaCanSave;
 
                 // Add context menu commands that are supported by the plugin.
@@ -334,7 +334,7 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
                 }
             }
         }
-        HTMLFormElement* form = selectedFrame->selection()->currentForm();
+        HTMLFormElement* form = selectedFrame->selection().currentForm();
         if (form && r.innerNonSharedNode()->hasTagName(HTMLNames::inputTag)) {
             HTMLInputElement* selectedElement = toHTMLInputElement(r.innerNonSharedNode());
             if (selectedElement) {
@@ -345,12 +345,12 @@ void ContextMenuClientImpl::showContextMenu(const WebCore::ContextMenu* defaultM
         }
     }
 
-#if OS(DARWIN)
+#if OS(MACOSX)
     if (selectedFrame->editor().selectionHasStyle(CSSPropertyDirection, "ltr") != FalseTriState)
         data.writingDirectionLeftToRight |= WebContextMenuData::CheckableMenuItemChecked;
     if (selectedFrame->editor().selectionHasStyle(CSSPropertyDirection, "rtl") != FalseTriState)
         data.writingDirectionRightToLeft |= WebContextMenuData::CheckableMenuItemChecked;
-#endif // OS(DARWIN)
+#endif // OS(MACOSX)
 
     // Now retrieve the security info.
     DocumentLoader* dl = selectedFrame->loader()->documentLoader();

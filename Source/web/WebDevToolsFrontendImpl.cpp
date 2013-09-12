@@ -146,9 +146,11 @@ void WebDevToolsFrontendImpl::maybeDispatch(WebCore::Timer<WebDevToolsFrontendIm
 void WebDevToolsFrontendImpl::doDispatchOnInspectorFrontend(const WebString& message)
 {
     WebFrameImpl* frame = m_webViewImpl->mainFrameImpl();
-    v8::Isolate* isolate = v8::Isolate::GetCurrent();
-    v8::HandleScope scope;
-    v8::Handle<v8::Context> frameContext = frame->frame() ? frame->frame()->script()->currentWorldContext() : v8::Local<v8::Context>();
+    if (!frame->frame())
+        return;
+    v8::Isolate* isolate = frame->frame()->script()->isolate();
+    v8::HandleScope scope(isolate);
+    v8::Handle<v8::Context> frameContext = frame->frame()->script()->currentWorldContext();
     v8::Context::Scope contextScope(frameContext);
     v8::Handle<v8::Value> inspectorFrontendApiValue = frameContext->Global()->Get(v8::String::New("InspectorFrontendAPI"));
     if (!inspectorFrontendApiValue->IsObject())
@@ -172,7 +174,7 @@ void WebDevToolsFrontendImpl::doDispatchOnInspectorFrontend(const WebString& mes
     args.append(v8String(message, isolate));
     v8::TryCatch tryCatch;
     tryCatch.SetVerbose(true);
-    ScriptController::callFunctionWithInstrumentation(frame->frame() ? frame->frame()->document() : 0, function, dispatcherObject, args.size(), args.data());
+    ScriptController::callFunctionWithInstrumentation(frame->frame() ? frame->frame()->document() : 0, function, dispatcherObject, args.size(), args.data(), isolate);
 }
 
 } // namespace WebKit

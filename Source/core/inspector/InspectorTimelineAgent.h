@@ -62,6 +62,7 @@ class InstrumentingAgents;
 class KURL;
 class Node;
 class Page;
+class RenderImage;
 class RenderObject;
 class ResourceError;
 class ResourceLoader;
@@ -86,18 +87,14 @@ extern const char PaintSetup[];
 class TimelineTimeConverter {
 public:
     TimelineTimeConverter()
-        : m_timestampsBaseMs(0)
-        , m_startTimeMs(0)
+        : m_startOffset(0)
     {
     }
-    double toProtocolTimestamp(double seconds) const  { return seconds * 1000.0 - m_timestampsBaseMs; }
-    double startTimeMs() const { return m_startTimeMs; }
-    double timestampsBaseMs() const { return m_timestampsBaseMs; }
+    double fromMonotonicallyIncreasingTime(double time) const  { return (time - m_startOffset) * 1000.0; }
     void reset();
 
 private:
-    double m_timestampsBaseMs;
-    double m_startTimeMs;
+    double m_startOffset;
 };
 
 class InspectorTimelineAgent
@@ -152,6 +149,9 @@ public:
 
     void willPaint(RenderObject*);
     void didPaint(RenderObject*, GraphicsContext*, const LayoutRect&);
+
+    void willPaintImage(RenderImage*);
+    void didPaintImage();
 
     void willScrollLayer(RenderObject*);
     void didScrollLayer();
@@ -237,14 +237,14 @@ private:
     void appendRecord(PassRefPtr<JSONObject> data, const String& type, bool captureCallStack, Frame*);
     void pushCurrentRecord(PassRefPtr<JSONObject>, const String& type, bool captureCallStack, Frame*, bool hasLowLevelDetails = false);
 
-    void setDOMCounters(TypeBuilder::Timeline::TimelineEvent* record);
-    void setNativeHeapStatistics(TypeBuilder::Timeline::TimelineEvent* record);
+    void setDOMCounters(TypeBuilder::Timeline::TimelineEvent*);
     void setFrameIdentifier(JSONObject* record, Frame*);
+    void populateImageDetails(JSONObject* data, const RenderImage&);
+
     void pushGCEventRecords();
 
     void didCompleteCurrentRecord(const String& type);
 
-    void setHeapSizeStatistics(JSONObject* record);
     void commitFrameRecord();
 
     void addRecordToTimeline(PassRefPtr<JSONObject>);
@@ -256,7 +256,7 @@ private:
     long long idForNode(Node*);
     void releaseNodeIds();
 
-    double timestamp() const;
+    double timestamp();
     Page* page();
 
     InspectorPageAgent* m_pageAgent;
@@ -290,6 +290,7 @@ private:
     RefPtr<TimelineTraceEventProcessor> m_traceEventProcessor;
     unsigned m_styleRecalcElementCounter;
     int m_layerTreeId;
+    RenderImage* m_imageBeingPainted;
 };
 
 } // namespace WebCore

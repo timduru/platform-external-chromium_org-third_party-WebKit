@@ -39,7 +39,7 @@ class SVGUseElement FINAL : public SVGGraphicsElement,
                             public SVGURIReference,
                             public DocumentResourceClient {
 public:
-    static PassRefPtr<SVGUseElement> create(const QualifiedName&, Document*, bool wasInsertedByParser);
+    static PassRefPtr<SVGUseElement> create(const QualifiedName&, Document&, bool wasInsertedByParser);
     virtual ~SVGUseElement();
 
     SVGElementInstance* instanceRoot();
@@ -51,7 +51,7 @@ public:
     RenderObject* rendererClipChild() const;
 
 private:
-    SVGUseElement(const QualifiedName&, Document*, bool wasInsertedByParser);
+    SVGUseElement(const QualifiedName&, Document&, bool wasInsertedByParser);
 
     virtual bool isValid() const { return SVGTests::isValid(); }
     virtual bool supportsFocus() const OVERRIDE { return hasFocusEventListeners(); }
@@ -65,7 +65,7 @@ private:
     virtual void svgAttributeChanged(const QualifiedName&);
 
     virtual void attach(const AttachContext& = AttachContext()) OVERRIDE;
-    virtual void willRecalcStyle(StyleChange) OVERRIDE;
+    virtual void willRecalcStyle(StyleRecalcChange) OVERRIDE;
 
     virtual RenderObject* createRenderer(RenderStyle*);
     virtual void toClipPath(Path&);

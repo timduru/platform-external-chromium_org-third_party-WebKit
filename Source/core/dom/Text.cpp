@@ -23,6 +23,7 @@
 #include "core/dom/Text.h"
 
 #include "SVGNames.h"
+#include "bindings/v8/ExceptionMessages.h"
 #include "bindings/v8/ExceptionState.h"
 #include "bindings/v8/ExceptionStatePlaceholder.h"
 #include "core/css/resolver/StyleResolver.h"
@@ -41,12 +42,12 @@ using namespace std;
 
 namespace WebCore {
 
-PassRefPtr<Text> Text::create(Document* document, const String& data)
+PassRefPtr<Text> Text::create(Document& document, const String& data)
 {
     return adoptRef(new Text(document, data, CreateText));
 }
 
-PassRefPtr<Text> Text::createEditingText(Document* document, const String& data)
+PassRefPtr<Text> Text::createEditingText(Document& document, const String& data)
 {
     return adoptRef(new Text(document, data, CreateEditingText));
 }
@@ -56,7 +57,7 @@ PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionState& es)
     // IndexSizeError: Raised if the specified offset is negative or greater than
     // the number of 16-bit units in data.
     if (offset > length()) {
-        es.throwDOMException(IndexSizeError);
+        es.throwDOMException(IndexSizeError, ExceptionMessages::failedToExecute("splitText", "Text", "The offset " + String::number(offset) + " is larger than the Text node's length."));
         return 0;
     }
 
@@ -72,11 +73,11 @@ PassRefPtr<Text> Text::splitText(unsigned offset, ExceptionState& es)
     if (es.hadException())
         return 0;
 
-    if (parentNode())
-        document()->textNodeSplit(this);
-
     if (renderer())
         toRenderText(renderer())->setTextWithOffset(dataImpl(), 0, oldStr.length());
+
+    if (parentNode())
+        document().textNodeSplit(this);
 
     return newText.release();
 }
@@ -87,7 +88,7 @@ static const Text* earliestLogicallyAdjacentTextNode(const Text* t)
     while ((n = n->previousSibling())) {
         Node::NodeType type = n->nodeType();
         if (type == Node::TEXT_NODE || type == Node::CDATA_SECTION_NODE) {
-            t = static_cast<const Text*>(n);
+            t = toText(n);
             continue;
         }
 
@@ -102,7 +103,7 @@ static const Text* latestLogicallyAdjacentTextNode(const Text* t)
     while ((n = n->nextSibling())) {
         Node::NodeType type = n->nodeType();
         if (type == Node::TEXT_NODE || type == Node::CDATA_SECTION_NODE) {
-            t = static_cast<const Text*>(n);
+            t = toText(n);
             continue;
         }
 
@@ -121,8 +122,7 @@ String Text::wholeText() const
     for (const Node* n = startText; n != onePastEndText; n = n->nextSibling()) {
         if (!n->isTextNode())
             continue;
-        const Text* t = static_cast<const Text*>(n);
-        const String& data = t->data();
+        const String& data = toText(n)->data();
         if (std::numeric_limits<unsigned>::max() - data.length() < resultLength)
             CRASH();
         resultLength += data.length();
@@ -132,8 +132,7 @@ String Text::wholeText() const
     for (const Node* n = startText; n != onePastEndText; n = n->nextSibling()) {
         if (!n->isTextNode())
             continue;
-        const Text* t = static_cast<const Text*>(n);
-        result.append(t->data());
+        result.append(toText(n)->data());
     }
     ASSERT(result.length() == resultLength);
 
@@ -238,12 +237,6 @@ bool Text::textRendererIsNeeded(const NodeRenderingContext& context)
     return true;
 }
 
-static bool isSVGShadowText(Text* text)
-{
-    Node* parentNode = text->parentNode();
-    return parentNode->isShadowRoot() && toShadowRoot(parentNode)->host()->hasTagName(SVGNames::trefTag);
-}
-
 static bool isSVGText(Text* text)
 {
     Node* parentOrShadowHostNode = text->parentOrShadowHostNode();
@@ -252,7 +245,7 @@ static bool isSVGText(Text* text)
 
 RenderText* Text::createTextRenderer(RenderStyle* style)
 {
-    if (isSVGText(this) || isSVGShadowText(this))
+    if (isSVGText(this))
         return new RenderSVGInlineText(this, dataImpl());
 
     if (style->hasTextCombine())
@@ -267,11 +260,11 @@ void Text::attach(const AttachContext& context)
     CharacterData::attach(context);
 }
 
-bool Text::recalcTextStyle(StyleChange change)
+bool Text::recalcTextStyle(StyleRecalcChange change)
 {
     if (RenderText* renderer = toRenderText(this->renderer())) {
         if (change != NoChange || needsStyleRecalc())
-            renderer->setStyle(document()->styleResolver()->styleForText(this));
+            renderer->setStyle(document().styleResolver()->styleForText(this));
         if (needsStyleRecalc())
             renderer->setText(dataImpl());
         clearNeedsStyleRecalc();
@@ -292,16 +285,16 @@ bool Text::needsWhitespaceRenderer()
     return false;
 }
 
-void Text::updateTextRenderer(unsigned offsetOfReplacedData, unsigned lengthOfReplacedData, AttachBehavior attachBehavior)
+void Text::updateTextRenderer(unsigned offsetOfReplacedData, unsigned lengthOfReplacedData, RecalcStyleBehavior recalcStyleBehavior)
 {
     if (!attached())
         return;
     RenderText* textRenderer = toRenderText(renderer());
     if (!textRenderer || !textRendererIsNeeded(NodeRenderingContext(this, textRenderer->style()))) {
-        if (attachBehavior == DeprecatedAttachNow)
-            reattach();
-        else
-            lazyReattach();
+        lazyReattach();
+        // FIXME: Editing should be updated so this is not neccesary.
+        if (recalcStyleBehavior == DeprecatedRecalcStyleImmediatlelyForEditing)
+            document().updateStyleIfNeeded();
         return;
     }
     textRenderer->setTextWithOffset(dataImpl(), offsetOfReplacedData, lengthOfReplacedData);
@@ -317,7 +310,7 @@ PassRefPtr<Text> Text::cloneWithData(const String& data)
     return create(document(), data);
 }
 
-PassRefPtr<Text> Text::createWithLengthLimit(Document* document, const String& data, unsigned start, unsigned lengthLimit)
+PassRefPtr<Text> Text::createWithLengthLimit(Document& document, const String& data, unsigned start, unsigned lengthLimit)
 {
     unsigned dataLength = data.length();
 

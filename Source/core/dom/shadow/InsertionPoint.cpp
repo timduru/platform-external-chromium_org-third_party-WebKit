@@ -41,7 +41,7 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-InsertionPoint::InsertionPoint(const QualifiedName& tagName, Document* document)
+InsertionPoint::InsertionPoint(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document, CreateInsertionPoint)
     , m_registeredWithShadowRoot(false)
 {
@@ -114,7 +114,7 @@ void InsertionPoint::detach(const AttachContext& context)
     HTMLElement::detach(context);
 }
 
-void InsertionPoint::willRecalcStyle(StyleChange change)
+void InsertionPoint::willRecalcStyle(StyleRecalcChange change)
 {
     if (change < Inherit)
         return;
@@ -143,7 +143,7 @@ bool InsertionPoint::isActive() const
 
 PassRefPtr<NodeList> InsertionPoint::getDistributedNodes()
 {
-    document()->updateDistributionForNodeIfNeeded(this);
+    document().updateDistributionForNodeIfNeeded(this);
 
     Vector<RefPtr<Node> > nodes;
     for (size_t i = 0; i < m_distribution.size(); ++i)
@@ -152,9 +152,9 @@ PassRefPtr<NodeList> InsertionPoint::getDistributedNodes()
     return StaticNodeList::adopt(nodes);
 }
 
-bool InsertionPoint::rendererIsNeeded(const NodeRenderingContext& context)
+bool InsertionPoint::rendererIsNeeded(const RenderStyle& style)
 {
-    return !isActive() && HTMLElement::rendererIsNeeded(context);
+    return !isActive() && HTMLElement::rendererIsNeeded(style);
 }
 
 void InsertionPoint::childrenChanged(bool changedByParser, Node* beforeChange, Node* afterChange, int childCountDelta)
@@ -173,7 +173,7 @@ Node::InsertionNotificationRequest InsertionPoint::insertedInto(ContainerNode* i
     if (ShadowRoot* root = containingShadowRoot()) {
         if (ElementShadow* rootOwner = root->owner()) {
             rootOwner->setNeedsDistributionRecalc();
-            if (isActive() && !m_registeredWithShadowRoot && insertionPoint->treeScope()->rootNode() == root) {
+            if (isActive() && !m_registeredWithShadowRoot && insertionPoint->treeScope().rootNode() == root) {
                 m_registeredWithShadowRoot = true;
                 root->addInsertionPoint(this);
                 rootOwner->didAffectApplyAuthorStyles();
@@ -203,7 +203,7 @@ void InsertionPoint::removedFrom(ContainerNode* insertionPoint)
     // Since this insertion point is no longer visible from the shadow subtree, it need to clean itself up.
     clearDistribution();
 
-    if (m_registeredWithShadowRoot && insertionPoint->treeScope()->rootNode() == root) {
+    if (m_registeredWithShadowRoot && insertionPoint->treeScope().rootNode() == root) {
         ASSERT(root);
         m_registeredWithShadowRoot = false;
         root->removeInsertionPoint(this);

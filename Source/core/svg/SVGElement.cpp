@@ -36,7 +36,6 @@
 #include "core/dom/Document.h"
 #include "core/dom/ElementTraversal.h"
 #include "core/dom/Event.h"
-#include "core/dom/NodeRenderingContext.h"
 #include "core/dom/shadow/ShadowRoot.h"
 #include "core/rendering/RenderObject.h"
 #include "core/rendering/svg/RenderSVGResourceContainer.h"
@@ -70,17 +69,12 @@ void mapAttributeToCSSProperty(HashMap<StringImpl*, CSSPropertyID>* propertyName
     propertyNameToIdMap->set(attrName.localName().impl(), propertyId);
 }
 
-SVGElement::SVGElement(const QualifiedName& tagName, Document* document, ConstructionType constructionType)
-    : Element(tagName, document, constructionType)
+SVGElement::SVGElement(const QualifiedName& tagName, Document& document, ConstructionType constructionType)
+    : Element(tagName, &document, constructionType)
 {
     ScriptWrappable::init(this);
     registerAnimatedPropertiesForSVGElement();
     setHasCustomStyleCallbacks();
-}
-
-PassRefPtr<SVGElement> SVGElement::create(const QualifiedName& tagName, Document* document)
-{
-    return adoptRef(new SVGElement(tagName, document));
 }
 
 SVGElement::~SVGElement()
@@ -88,7 +82,6 @@ SVGElement::~SVGElement()
     if (!hasSVGRareData())
         ASSERT(!SVGElementRareData::rareDataMap().contains(this));
     else {
-        ASSERT(document());
         SVGElementRareData::SVGElementRareDataMap& rareDataMap = SVGElementRareData::rareDataMap();
         SVGElementRareData::SVGElementRareDataMap::iterator it = rareDataMap.find(this);
         ASSERT(it != rareDataMap.end());
@@ -111,12 +104,11 @@ SVGElement::~SVGElement()
         // removeAllElementReferencesForTarget() below.
         clearHasSVGRareData();
     }
-    ASSERT(document());
-    document()->accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);
-    document()->accessSVGExtensions()->removeAllElementReferencesForTarget(this);
+    document().accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);
+    document().accessSVGExtensions()->removeAllElementReferencesForTarget(this);
 }
 
-void SVGElement::willRecalcStyle(StyleChange change)
+void SVGElement::willRecalcStyle(StyleRecalcChange change)
 {
     // FIXME: This assumes that when shouldNotifyRendererWithIdenticalStyles() is true
     // the change came from a SMIL animation, but what if there were non-SMIL changes
@@ -132,11 +124,11 @@ void SVGElement::willRecalcStyle(StyleChange change)
 
 void SVGElement::buildPendingResourcesIfNeeded()
 {
-    Document* document = this->document();
-    if (!needsPendingResourceHandling() || !document || !inDocument() || isInShadowTree())
+    Document& document = this->document();
+    if (!needsPendingResourceHandling() || !inDocument() || isInShadowTree())
         return;
 
-    SVGDocumentExtensions* extensions = document->accessSVGExtensions();
+    SVGDocumentExtensions* extensions = document.accessSVGExtensions();
     String resourceId = getIdAttribute();
     if (!extensions->hasPendingResource(resourceId))
         return;
@@ -154,7 +146,7 @@ void SVGElement::buildPendingResourcesIfNeeded()
     }
 }
 
-bool SVGElement::rendererIsNeeded(const NodeRenderingContext& context)
+bool SVGElement::rendererIsNeeded(const RenderStyle& style)
 {
     // http://www.w3.org/TR/SVG/extend.html#PrivateData
     // Prevent anything other than SVG renderers from appearing in our render tree
@@ -162,7 +154,7 @@ bool SVGElement::rendererIsNeeded(const NodeRenderingContext& context)
     // with the SVG content. In general, the SVG user agent will include the unknown
     // elements in the DOM but will otherwise ignore unknown elements.
     if (!parentOrShadowHostElement() || parentOrShadowHostElement()->isSVGElement())
-        return Element::rendererIsNeeded(context);
+        return Element::rendererIsNeeded(style);
 
     return false;
 }
@@ -214,7 +206,7 @@ void SVGElement::reportAttributeParsingError(SVGParsingError error, const Qualif
         return;
 
     String errorString = "<" + tagName() + "> attribute " + name.toString() + "=\"" + value + "\"";
-    SVGDocumentExtensions* extensions = document()->accessSVGExtensions();
+    SVGDocumentExtensions* extensions = document().accessSVGExtensions();
 
     if (error == NegativeValueForbiddenError) {
         extensions->reportError("Invalid negative value for " + errorString);
@@ -244,7 +236,7 @@ String SVGElement::title() const
 
     // Walk up the tree, to find out whether we're inside a <use> shadow tree, to find the right title.
     if (isInShadowTree()) {
-        Element* shadowHostElement = toShadowRoot(treeScope()->rootNode())->host();
+        Element* shadowHostElement = toShadowRoot(treeScope().rootNode())->host();
         // At this time, SVG nodes are not allowed in non-<use> shadow trees, so any shadow root we do
         // have should be a use. The assert and following test is here to catch future shadow DOM changes
         // that do enable SVG in a shadow tree.
@@ -342,8 +334,8 @@ void SVGElement::removedFrom(ContainerNode* rootParent)
     Element::removedFrom(rootParent);
 
     if (wasInDocument) {
-        document()->accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);
-        document()->accessSVGExtensions()->removeAllElementReferencesForTarget(this);
+        document().accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);
+        document().accessSVGExtensions()->removeAllElementReferencesForTarget(this);
     }
 
     SVGElementInstance::invalidateAllInstancesOfElement(this);
@@ -501,7 +493,7 @@ SVGDocumentExtensions* SVGElement::accessDocumentSVGExtensions()
 {
     // This function is provided for use by SVGAnimatedProperty to avoid
     // global inclusion of core/dom/Document.h in SVG code.
-    return document() ? document()->accessSVGExtensions() : 0;
+    return document().accessSVGExtensions();
 }
 
 void SVGElement::mapInstanceToElement(SVGElementInstance* instance)
@@ -858,7 +850,7 @@ void SVGElement::sendSVGLoadEventIfPossible(bool sendParentLoadEvents)
         // If the load event was not sent yet by Document::implicitClose(), but the <image> from the example
         // above, just appeared, don't send the SVGLoad event to the outermost <svg>, but wait for the document
         // to be "ready to render", first.
-        if (!document()->loadEventFinished())
+        if (!document().loadEventFinished())
             break;
     }
 }
@@ -892,7 +884,7 @@ void SVGElement::finishParsingChildren()
     sendSVGLoadEventIfPossible();
 }
 
-bool SVGElement::childShouldCreateRenderer(const NodeRenderingContext& childContext) const
+bool SVGElement::childShouldCreateRenderer(const Node& child) const
 {
     DEFINE_STATIC_LOCAL(HashSet<QualifiedName>, invalidTextContent, ());
 
@@ -901,11 +893,10 @@ bool SVGElement::childShouldCreateRenderer(const NodeRenderingContext& childCont
 #if ENABLE(SVG_FONTS)
         invalidTextContent.add(SVGNames::altGlyphTag);
 #endif
-        invalidTextContent.add(SVGNames::trefTag);
         invalidTextContent.add(SVGNames::tspanTag);
     }
-    if (childContext.node()->isSVGElement()) {
-        SVGElement* svgChild = toSVGElement(childContext.node());
+    if (child.isSVGElement()) {
+        const SVGElement* svgChild = toSVGElement(&child);
         if (invalidTextContent.contains(svgChild->tagQName()))
             return false;
 
@@ -919,7 +910,7 @@ void SVGElement::attributeChanged(const QualifiedName& name, const AtomicString&
     Element::attributeChanged(name, newValue);
 
     if (isIdAttributeName(name))
-        document()->accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);
+        document().accessSVGExtensions()->rebuildAllElementReferencesForTarget(this);
 
     // Changes to the style attribute are processed lazily (see Element::getAttribute() and related methods),
     // so we don't want changes to the style attribute to result in extra work here.
@@ -987,7 +978,7 @@ void SVGElement::synchronizeSystemLanguage(SVGElement* contextElement)
 PassRefPtr<RenderStyle> SVGElement::customStyleForRenderer()
 {
     if (!correspondingElement())
-        return document()->styleResolver()->styleForElement(this);
+        return document().styleResolver()->styleForElement(this);
 
     RenderStyle* style = 0;
     if (Element* parent = parentOrShadowHostElement()) {
@@ -995,7 +986,7 @@ PassRefPtr<RenderStyle> SVGElement::customStyleForRenderer()
             style = renderer->style();
     }
 
-    return document()->styleResolver()->styleForElement(correspondingElement(), style, DisallowStyleSharing);
+    return document().styleResolver()->styleForElement(correspondingElement(), style, DisallowStyleSharing);
 }
 
 MutableStylePropertySet* SVGElement::animatedSMILStyleProperties() const

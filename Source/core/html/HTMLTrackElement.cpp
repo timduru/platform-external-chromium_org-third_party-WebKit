@@ -51,7 +51,7 @@ static String urlForLoggingTrack(const KURL& url)
 }
 #endif
 
-inline HTMLTrackElement::HTMLTrackElement(const QualifiedName& tagName, Document* document)
+inline HTMLTrackElement::HTMLTrackElement(const QualifiedName& tagName, Document& document)
     : HTMLElement(tagName, document)
     , m_loadTimer(this, &HTMLTrackElement::loadTimerFired)
 {
@@ -66,7 +66,7 @@ HTMLTrackElement::~HTMLTrackElement()
         m_track->clearClient();
 }
 
-PassRefPtr<HTMLTrackElement> HTMLTrackElement::create(const QualifiedName& tagName, Document* document)
+PassRefPtr<HTMLTrackElement> HTMLTrackElement::create(const QualifiedName& tagName, Document& document)
 {
     return adoptRef(new HTMLTrackElement(tagName, document));
 }
@@ -118,7 +118,7 @@ void HTMLTrackElement::parseAttribute(const QualifiedName& name, const AtomicStr
 
 KURL HTMLTrackElement::src() const
 {
-    return document()->completeURL(getAttribute(srcAttr));
+    return document().completeURL(getAttribute(srcAttr));
 }
 
 void HTMLTrackElement::setSrc(const String& url)
@@ -252,7 +252,7 @@ bool HTMLTrackElement::canLoadUrl(const KURL& url)
     if (url.isEmpty())
         return false;
 
-    if (!document()->contentSecurityPolicy()->allowMediaFromSource(url)) {
+    if (!document().contentSecurityPolicy()->allowMediaFromSource(url)) {
         LOG(Media, "HTMLTrackElement::canLoadUrl(%s) -> rejected by Content Security Policy", urlForLoggingTrack(url).utf8().data());
         return false;
     }

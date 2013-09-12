@@ -58,7 +58,7 @@ public:
         return adoptRef(new ShadowRoot(document, type));
     }
 
-    void recalcStyle(StyleChange);
+    void recalcStyle(StyleRecalcChange);
 
     bool applyAuthorStyles() const { return m_applyAuthorStyles; }
     void setApplyAuthorStyles(bool);
@@ -145,7 +145,7 @@ private:
 
 inline Element* ShadowRoot::activeElement() const
 {
-    if (Element* element = treeScope()->adjustedFocusedElement())
+    if (Element* element = treeScope().adjustedFocusedElement())
         return element;
     return 0;
 }
@@ -161,6 +161,12 @@ inline ShadowRoot* toShadowRoot(Node* node)
     return const_cast<ShadowRoot*>(toShadowRoot(static_cast<const Node*>(node)));
 }
 
+inline const ShadowRoot& toShadowRoot(const Node& node)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(node.isShadowRoot());
+    return static_cast<const ShadowRoot&>(node);
+}
+
 inline const ShadowRoot* toShadowRoot(const TreeScope* treeScope)
 {
     ASSERT_WITH_SECURITY_IMPLICATION(!treeScope || (treeScope->rootNode() && treeScope->rootNode()->isShadowRoot()));
@@ -170,6 +176,12 @@ inline const ShadowRoot* toShadowRoot(const TreeScope* treeScope)
 inline ShadowRoot* toShadowRoot(TreeScope* treeScope)
 {
     return const_cast<ShadowRoot*>(toShadowRoot(static_cast<const TreeScope*>(treeScope)));
+}
+
+inline ShadowRoot& toShadowRoot(TreeScope& treeScope)
+{
+    ASSERT_WITH_SECURITY_IMPLICATION(treeScope.rootNode() && treeScope.rootNode()->isShadowRoot());
+    return static_cast<ShadowRoot&>(treeScope);
 }
 
 } // namespace

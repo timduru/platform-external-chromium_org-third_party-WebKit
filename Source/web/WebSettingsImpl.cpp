@@ -38,7 +38,7 @@
 #include "public/platform/WebString.h"
 #include "public/platform/WebURL.h"
 
-#if OS(WINDOWS)
+#if OS(WIN)
 #include "core/rendering/RenderThemeChromiumWin.h"
 #endif
 
@@ -56,6 +56,7 @@ WebSettingsImpl::WebSettingsImpl(Settings* settings)
     , m_deferredImageDecodingEnabled(false)
     , m_doubleTapToZoomEnabled(false)
     , m_supportDeprecatedTargetDensityDPI(false)
+    , m_viewportMetaLayoutSizeQuirk(false)
     , m_pinchOverlayScrollbarThickness(0)
 {
     ASSERT(settings);
@@ -99,7 +100,7 @@ void WebSettingsImpl::setPictographFontFamily(const WebString& font, UScriptCode
 void WebSettingsImpl::setDefaultFontSize(int size)
 {
     m_settings->setDefaultFontSize(size);
-#if OS(WINDOWS)
+#if OS(WIN)
     // RenderTheme is a singleton that needs to know the default font size to
     // draw some form controls. We let it know each time the size changes.
     WebCore::RenderThemeChromiumWin::setDefaultFontSize(size);
@@ -179,6 +180,20 @@ void WebSettingsImpl::setJavaScriptCanOpenWindowsAutomatically(bool canOpenWindo
 void WebSettingsImpl::setSupportDeprecatedTargetDensityDPI(bool supportDeprecatedTargetDensityDPI)
 {
     m_supportDeprecatedTargetDensityDPI = supportDeprecatedTargetDensityDPI;
+    // TODO(mnaganov): This is to avoid breaking Chromium Android WebView tests upstream.
+    // Will be removed once setWideViewportQuirkEnabled will be wired up in Chromium.
+    // See http://crbug.com/288037.
+    m_settings->setWideViewportQuirkEnabled(supportDeprecatedTargetDensityDPI);
+}
+
+void WebSettingsImpl::setViewportMetaLayoutSizeQuirk(bool viewportMetaLayoutSizeQuirk)
+{
+    m_viewportMetaLayoutSizeQuirk = viewportMetaLayoutSizeQuirk;
+}
+
+void WebSettingsImpl::setViewportMetaZeroValuesQuirk(bool viewportMetaZeroValuesQuirk)
+{
+    m_settings->setViewportMetaZeroValuesQuirk(viewportMetaZeroValuesQuirk);
 }
 
 void WebSettingsImpl::setSupportsMultipleWindows(bool supportsMultipleWindows)
@@ -259,6 +274,11 @@ void WebSettingsImpl::setAuthorAndUserStylesEnabled(bool enabled)
 void WebSettingsImpl::setUseLegacyBackgroundSizeShorthandBehavior(bool useLegacyBackgroundSizeShorthandBehavior)
 {
     m_settings->setUseLegacyBackgroundSizeShorthandBehavior(useLegacyBackgroundSizeShorthandBehavior);
+}
+
+void WebSettingsImpl::setWideViewportQuirkEnabled(bool wideViewportQuirkEnabled)
+{
+    m_settings->setWideViewportQuirkEnabled(wideViewportQuirkEnabled);
 }
 
 void WebSettingsImpl::setUseWideViewport(bool useWideViewport)
@@ -633,6 +653,11 @@ void WebSettingsImpl::setShouldRespectImageOrientation(bool enabled)
 void WebSettingsImpl::setMediaPlaybackRequiresUserGesture(bool required)
 {
     m_settings->setMediaPlaybackRequiresUserGesture(required);
+}
+
+void WebSettingsImpl::setMediaFullscreenRequiresUserGesture(bool required)
+{
+    m_settings->setMediaFullscreenRequiresUserGesture(required);
 }
 
 void WebSettingsImpl::setFixedPositionCreatesStackingContext(bool creates)

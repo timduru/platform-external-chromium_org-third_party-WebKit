@@ -77,7 +77,6 @@ static inline const AtomicString& getGenericFontFamilyForScript(const ScriptFont
 }
 
 bool Settings::gMockScrollbarsEnabled = false;
-bool Settings::gUsesOverlayScrollbars = false;
 
 // NOTEs
 //  1) EditingMacBehavior comprises builds on Mac;
@@ -88,13 +87,13 @@ bool Settings::gUsesOverlayScrollbars = false;
 static EditingBehaviorType editingBehaviorTypeForPlatform()
 {
     return
-#if OS(DARWIN)
+#if OS(MACOSX)
     EditingMacBehavior
-#elif OS(WINDOWS)
+#elif OS(WIN)
     EditingWindowsBehavior
 #elif OS(ANDROID)
     EditingAndroidBehavior
-#elif OS(UNIX)
+#elif OS(POSIX)
     EditingUnixBehavior
 #else
     // Fallback
@@ -104,12 +103,12 @@ static EditingBehaviorType editingBehaviorTypeForPlatform()
 }
 
 static const bool defaultUnifiedTextCheckerEnabled = false;
-#if OS(DARWIN)
+#if OS(MACOSX)
 static const bool defaultSmartInsertDeleteEnabled = true;
 #else
 static const bool defaultSmartInsertDeleteEnabled = false;
 #endif
-#if OS(WINDOWS)
+#if OS(WIN)
 static const bool defaultSelectTrailingWhitespaceEnabled = true;
 #else
 static const bool defaultSelectTrailingWhitespaceEnabled = false;
@@ -137,6 +136,7 @@ Settings::Settings(Page* page)
     , m_cssStickyPositionEnabled(true)
     , m_dnsPrefetchingEnabled(false)
     , m_touchEventEmulationEnabled(false)
+    , m_openGLMultisamplingEnabled(false)
     , m_viewportEnabled(false)
     , m_setImageLoadingSettingsTimer(this, &Settings::imageLoadingSettingsTimerFired)
     , m_compositorDrivenAcceleratedScrollingEnabled(false)
@@ -356,16 +356,6 @@ void Settings::setMockScrollbarsEnabled(bool flag)
 bool Settings::mockScrollbarsEnabled()
 {
     return gMockScrollbarsEnabled;
-}
-
-void Settings::setUsesOverlayScrollbars(bool flag)
-{
-    gUsesOverlayScrollbars = flag;
-}
-
-bool Settings::usesOverlayScrollbars()
-{
-    return gUsesOverlayScrollbars;
 }
 
 void Settings::setOpenGLMultisamplingEnabled(bool flag)

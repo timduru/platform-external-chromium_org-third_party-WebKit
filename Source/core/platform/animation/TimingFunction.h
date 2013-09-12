@@ -25,7 +25,10 @@
 #ifndef TimingFunction_h
 #define TimingFunction_h
 
+#include "RuntimeEnabledFeatures.h"
 #include "core/platform/graphics/UnitBezier.h"
+#include "wtf/OwnPtr.h"
+#include "wtf/PassOwnPtr.h"
 #include "wtf/PassRefPtr.h"
 #include "wtf/RefCounted.h"
 #include <algorithm>
@@ -35,17 +38,13 @@ namespace WebCore {
 class TimingFunction : public RefCounted<TimingFunction> {
 public:
 
-    enum TimingFunctionType {
+    enum Type {
         LinearFunction, CubicBezierFunction, StepsFunction
     };
 
     virtual ~TimingFunction() { }
 
-    TimingFunctionType type() const { return m_type; }
-
-    bool isLinearTimingFunction() const { return m_type == LinearFunction; }
-    bool isCubicBezierTimingFunction() const { return m_type == CubicBezierFunction; }
-    bool isStepsTimingFunction() const { return m_type == StepsFunction; }
+    Type type() const { return m_type; }
 
     // Evaluates the timing function at the given fraction. The accuracy parameter provides a hint as to the required
     // accuracy and is not guaranteed.
@@ -53,12 +52,13 @@ public:
     virtual bool operator==(const TimingFunction& other) const = 0;
 
 protected:
-    TimingFunction(TimingFunctionType type)
+    TimingFunction(Type type)
         : m_type(type)
     {
     }
 
-    TimingFunctionType m_type;
+private:
+    Type m_type;
 };
 
 class LinearTimingFunction : public TimingFunction {
@@ -72,12 +72,14 @@ public:
 
     virtual double evaluate(double fraction, double) const
     {
+        ASSERT(RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1));
+        RELEASE_ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
         return fraction;
     }
 
     virtual bool operator==(const TimingFunction& other) const
     {
-        return other.isLinearTimingFunction();
+        return other.type() == LinearFunction;
     }
 
 private:
@@ -89,7 +91,7 @@ private:
 
 class CubicBezierTimingFunction : public TimingFunction {
 public:
-    enum TimingFunctionPreset {
+    enum SubType {
         Ease,
         EaseIn,
         EaseOut,
@@ -102,9 +104,9 @@ public:
         return adoptRef(new CubicBezierTimingFunction(Custom, x1, y1, x2, y2));
     }
 
-    static CubicBezierTimingFunction* preset(TimingFunctionPreset type)
+    static CubicBezierTimingFunction* preset(SubType subType)
     {
-        switch (type) {
+        switch (subType) {
         case Ease:
             {
                 static CubicBezierTimingFunction* ease = adoptRef(new CubicBezierTimingFunction(Ease, 0.25, 0.1, 0.25, 1.0)).leakRef();
@@ -135,15 +137,19 @@ public:
 
     virtual double evaluate(double fraction, double accuracy) const
     {
-        return UnitBezier(m_x1, m_y1, m_x2, m_y2).solve(fraction, accuracy);
+        ASSERT(RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1));
+        RELEASE_ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
+        if (!m_bezier)
+            m_bezier = adoptPtr(new UnitBezier(m_x1, m_y1, m_x2, m_y2));
+        return m_bezier->solve(fraction, accuracy);
     }
 
     virtual bool operator==(const TimingFunction& other) const
     {
-        if (other.isCubicBezierTimingFunction()) {
+        if (other.type() == CubicBezierFunction) {
             const CubicBezierTimingFunction* ctf = static_cast<const CubicBezierTimingFunction*>(&other);
-            if (m_timingFunctionPreset != Custom)
-                return m_timingFunctionPreset == ctf->m_timingFunctionPreset;
+            if (m_subType != Custom)
+                return m_subType == ctf->m_subType;
 
             return m_x1 == ctf->m_x1 && m_y1 == ctf->m_y1 && m_x2 == ctf->m_x2 && m_y2 == ctf->m_y2;
         }
@@ -155,16 +161,16 @@ public:
     double x2() const { return m_x2; }
     double y2() const { return m_y2; }
 
-    TimingFunctionPreset timingFunctionPreset() const { return m_timingFunctionPreset; }
+    SubType subType() const { return m_subType; }
 
 private:
-    explicit CubicBezierTimingFunction(TimingFunctionPreset preset, double x1, double y1, double x2, double y2)
+    explicit CubicBezierTimingFunction(SubType subType, double x1, double y1, double x2, double y2)
         : TimingFunction(CubicBezierFunction)
         , m_x1(x1)
         , m_y1(y1)
         , m_x2(x2)
         , m_y2(y2)
-        , m_timingFunctionPreset(preset)
+        , m_subType(subType)
     {
     }
 
@@ -172,27 +178,58 @@ private:
     double m_y1;
     double m_x2;
     double m_y2;
-    TimingFunctionPreset m_timingFunctionPreset;
+    SubType m_subType;
+    mutable OwnPtr<UnitBezier> m_bezier;
 };
 
 class StepsTimingFunction : public TimingFunction {
 public:
+    enum SubType {
+        Start,
+        End,
+        Custom
+    };
+
     static PassRefPtr<StepsTimingFunction> create(int steps, bool stepAtStart)
     {
-        return adoptRef(new StepsTimingFunction(steps, stepAtStart));
+        return adoptRef(new StepsTimingFunction(Custom, steps, stepAtStart));
     }
+
+    static StepsTimingFunction* preset(SubType subType)
+    {
+        switch (subType) {
+        case Start:
+            {
+                static StepsTimingFunction* start = adoptRef(new StepsTimingFunction(Start, 1, true)).leakRef();
+                return start;
+            }
+        case End:
+            {
+                static StepsTimingFunction* end = adoptRef(new StepsTimingFunction(End, 1, false)).leakRef();
+                return end;
+            }
+        default:
+            ASSERT_NOT_REACHED();
+            return 0;
+        }
+    }
+
 
     ~StepsTimingFunction() { }
 
     virtual double evaluate(double fraction, double) const
     {
+        ASSERT(RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1));
+        RELEASE_ASSERT_WITH_MESSAGE(!RuntimeEnabledFeatures::webAnimationsEnabled() || (fraction >= 0 && fraction <= 1), "Web Animations not yet implemented: Timing function behavior outside the range [0, 1] is not yet specified");
         return std::min(1.0, (floor(m_steps * fraction) + m_stepAtStart) / m_steps);
     }
 
     virtual bool operator==(const TimingFunction& other) const
     {
-        if (other.isStepsTimingFunction()) {
+        if (other.type() == StepsFunction) {
             const StepsTimingFunction* stf = static_cast<const StepsTimingFunction*>(&other);
+            if (m_subType != Custom)
+                return m_subType == stf->m_subType;
             return m_steps == stf->m_steps && m_stepAtStart == stf->m_stepAtStart;
         }
         return false;
@@ -201,16 +238,20 @@ public:
     int numberOfSteps() const { return m_steps; }
     bool stepAtStart() const { return m_stepAtStart; }
 
+    SubType subType() const { return m_subType; }
+
 private:
-    StepsTimingFunction(int steps, bool stepAtStart)
+    StepsTimingFunction(SubType subType, int steps, bool stepAtStart)
         : TimingFunction(StepsFunction)
         , m_steps(steps)
         , m_stepAtStart(stepAtStart)
+        , m_subType(subType)
     {
     }
 
     int m_steps;
     bool m_stepAtStart;
+    SubType m_subType;
 };
 
 } // namespace WebCore

@@ -25,6 +25,7 @@
 #include "config.h"
 #include "wtf/text/StringImpl.h"
 
+#include "wtf/LeakAnnotations.h"
 #include "wtf/StdLibExtras.h"
 #include "wtf/text/AtomicString.h"
 #include "wtf/text/StringBuffer.h"
@@ -249,7 +250,7 @@ void StringStats::printStats()
 #endif
 
 
-StringImpl::~StringImpl()
+inline StringImpl::~StringImpl()
 {
     ASSERT(!isStatic());
 
@@ -257,6 +258,12 @@ StringImpl::~StringImpl()
 
     if (isAtomic())
         AtomicString::remove(this);
+}
+
+void StringImpl::destroyIfNotStatic()
+{
+    if (!isStatic())
+        delete this;
 }
 
 PassRefPtr<StringImpl> StringImpl::createUninitialized(unsigned length, LChar*& data)
@@ -345,6 +352,7 @@ StringImpl* StringImpl::createStatic(const char* string, unsigned length, unsign
     // heap allocation from this call.
     RELEASE_ASSERT(length <= ((std::numeric_limits<unsigned>::max() - sizeof(StringImpl)) / sizeof(LChar)));
     size_t size = sizeof(StringImpl) + length * sizeof(LChar);
+    WTF_ANNOTATE_SCOPED_MEMORY_LEAK;
     StringImpl* impl = static_cast<StringImpl*>(fastMalloc(size));
 
     LChar* data = reinterpret_cast<LChar*>(impl + 1);

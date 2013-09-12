@@ -153,8 +153,7 @@ static bool eventHasListeners(const AtomicString& eventType, DOMWindow* window, 
 
 void TimelineTimeConverter::reset()
 {
-    m_startTimeMs = currentTime() * 1000;
-    m_timestampsBaseMs = monotonicallyIncreasingTime() * 1000;
+    m_startOffset = monotonicallyIncreasingTime() - currentTime();
 }
 
 void InspectorTimelineAgent::pushGCEventRecords()
@@ -165,9 +164,9 @@ void InspectorTimelineAgent::pushGCEventRecords()
     GCEvents events = m_gcEvents;
     m_gcEvents.clear();
     for (GCEvents::iterator i = events.begin(); i != events.end(); ++i) {
-        RefPtr<JSONObject> record = TimelineRecordFactory::createGenericRecord(m_timeConverter.toProtocolTimestamp(i->startTime), m_maxCallStackDepth, TimelineRecordType::GCEvent);
+        RefPtr<JSONObject> record = TimelineRecordFactory::createGenericRecord(m_timeConverter.fromMonotonicallyIncreasingTime(i->startTime), m_maxCallStackDepth, TimelineRecordType::GCEvent);
         record->setObject("data", TimelineRecordFactory::createGCEventData(i->collectedBytes));
-        record->setNumber("endTime", m_timeConverter.toProtocolTimestamp(i->endTime));
+        record->setNumber("endTime", m_timeConverter.fromMonotonicallyIncreasingTime(i->endTime));
         addRecordToTimeline(record.release());
     }
 }
@@ -219,7 +218,6 @@ void InspectorTimelineAgent::start(ErrorString*, const int* maxCallStackDepth, c
     m_state->setBoolean(TimelineAgentState::includeDomCounters, includeDomCounters && *includeDomCounters);
     m_state->setBoolean(TimelineAgentState::includeNativeMemoryStatistics, includeNativeMemoryStatistics && *includeNativeMemoryStatistics);
     m_timeConverter.reset();
-    m_frontend->timelineStarted(m_timeConverter.timestampsBaseMs(), m_timeConverter.startTimeMs());
 
     m_instrumentingAgents->setInspectorTimelineAgent(this);
     ScriptGCEvent::addEventListener(this);
@@ -383,6 +381,17 @@ void InspectorTimelineAgent::didPaint(RenderObject* renderer, GraphicsContext*, 
     didCompleteCurrentRecord(TimelineRecordType::Paint);
 }
 
+void InspectorTimelineAgent::willPaintImage(RenderImage* renderImage)
+{
+    ASSERT(!m_imageBeingPainted);
+    m_imageBeingPainted = renderImage;
+}
+
+void InspectorTimelineAgent::didPaintImage()
+{
+    m_imageBeingPainted = 0;
+}
+
 void InspectorTimelineAgent::willScrollLayer(RenderObject* renderer)
 {
     pushCurrentRecord(TimelineRecordFactory::createLayerData(idForNode(renderer->generatingNode())), TimelineRecordType::ScrollLayer, false, renderer->frame());
@@ -395,7 +404,10 @@ void InspectorTimelineAgent::didScrollLayer()
 
 void InspectorTimelineAgent::willDecodeImage(const String& imageType)
 {
-    pushCurrentRecord(TimelineRecordFactory::createDecodeImageData(imageType), TimelineRecordType::DecodeImage, true, 0);
+    RefPtr<JSONObject> data = TimelineRecordFactory::createDecodeImageData(imageType);
+    if (m_imageBeingPainted)
+        populateImageDetails(data.get(), *m_imageBeingPainted);
+    pushCurrentRecord(data, TimelineRecordType::DecodeImage, true, 0);
 }
 
 void InspectorTimelineAgent::didDecodeImage()
@@ -405,7 +417,10 @@ void InspectorTimelineAgent::didDecodeImage()
 
 void InspectorTimelineAgent::willResizeImage(bool shouldCache)
 {
-    pushCurrentRecord(TimelineRecordFactory::createResizeImageData(shouldCache), TimelineRecordType::ResizeImage, true, 0);
+    RefPtr<JSONObject> data = TimelineRecordFactory::createResizeImageData(shouldCache);
+    if (m_imageBeingPainted)
+        populateImageDetails(data.get(), *m_imageBeingPainted);
+    pushCurrentRecord(data, TimelineRecordType::ResizeImage, true, 0);
 }
 
 void InspectorTimelineAgent::didResizeImage()
@@ -693,6 +708,12 @@ void InspectorTimelineAgent::setFrameIdentifier(JSONObject* record, Frame* frame
     record->setString("frameId", frameId);
 }
 
+void InspectorTimelineAgent::populateImageDetails(JSONObject* data, const RenderImage& renderImage)
+{
+    const ImageResource* resource = renderImage.cachedImage();
+    TimelineRecordFactory::appendImageDetails(data, idForNode(renderImage.generatingNode()), resource ? resource->url().string() : "");
+}
+
 void InspectorTimelineAgent::didCompleteCurrentRecord(const String& type)
 {
     // An empty stack could merely mean that the timeline agent was turned on in the middle of
@@ -731,6 +752,7 @@ InspectorTimelineAgent::InspectorTimelineAgent(InstrumentingAgents* instrumentin
     , m_weakFactory(this)
     , m_styleRecalcElementCounter(0)
     , m_layerTreeId(0)
+    , m_imageBeingPainted(0)
 {
 }
 
@@ -806,9 +828,9 @@ void InspectorTimelineAgent::releaseNodeIds()
         m_domAgent->releaseBackendNodeIds(&unused, BackendNodeIdGroup);
 }
 
-double InspectorTimelineAgent::timestamp() const
+double InspectorTimelineAgent::timestamp()
 {
-    return m_timeConverter.toProtocolTimestamp(WTF::monotonicallyIncreasingTime());
+    return m_timeConverter.fromMonotonicallyIncreasingTime(WTF::monotonicallyIncreasingTime());
 }
 
 Page* InspectorTimelineAgent::page()

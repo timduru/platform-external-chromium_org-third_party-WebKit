@@ -99,7 +99,7 @@ public:
     Node* mousePressNode() const;
     void setMousePressNode(PassRefPtr<Node>);
 
-#if OS(WINDOWS)
+#if OS(WIN)
     void startPanScrolling(RenderObject*);
 #endif
 
@@ -254,7 +254,6 @@ private:
 
     bool handleDrag(const MouseEventWithHitTestResults&, CheckDragHysteresis);
     bool tryStartDrag(const MouseEventWithHitTestResults&);
-    bool handleMouseUp(const MouseEventWithHitTestResults&);
     void clearDragState();
 
     bool dispatchDragSrcEvent(const AtomicString& eventType, const PlatformMouseEvent&);

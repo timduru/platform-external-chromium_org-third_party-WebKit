@@ -26,12 +26,12 @@
 #define FrameView_h
 
 #include "core/page/AdjustViewSizeOrNot.h"
-#include "core/page/Frame.h"
 #include "core/platform/ScrollView.h"
 #include "core/platform/graphics/Color.h"
 #include "core/platform/graphics/LayoutRect.h"
 #include "core/rendering/Pagination.h"
 #include "core/rendering/PaintPhase.h"
+#include "core/rendering/PartialLayoutState.h"
 #include "wtf/Forward.h"
 #include "wtf/OwnPtr.h"
 #include "wtf/text/WTFString.h"
@@ -41,6 +41,7 @@ namespace WebCore {
 class Element;
 class Event;
 class FloatSize;
+class Frame;
 class FrameActionScheduler;
 class KURL;
 class Node;
@@ -73,13 +74,12 @@ public:
 
     virtual bool scheduleAnimation();
 
-    Frame* frame() const { return m_frame.get(); }
-    void clearFrame();
+    Frame& frame() const { return *m_frame; }
 
-    RenderView* renderView() const { return m_frame ? m_frame->contentRenderer() : 0; }
+    RenderView* renderView() const;
 
-    int mapFromLayoutToCSSUnits(LayoutUnit);
-    LayoutUnit mapFromCSSToLayoutUnits(int);
+    int mapFromLayoutToCSSUnits(LayoutUnit) const;
+    LayoutUnit mapFromCSSToLayoutUnits(int) const;
 
     LayoutUnit marginWidth() const { return m_margins.width(); } // -1 means default
     LayoutUnit marginHeight() const { return m_margins.height(); } // -1 means default
@@ -138,8 +138,8 @@ public:
     bool hasOpaqueBackground() const;
 
     Color baseBackgroundColor() const;
-    void setBaseBackgroundColor(const StyleColor&);
-    void updateBackgroundRecursively(const StyleColor&, bool);
+    void setBaseBackgroundColor(const Color&);
+    void updateBackgroundRecursively(const Color&, bool);
 
     bool shouldUpdateWhileOffscreen() const;
     void setShouldUpdateWhileOffscreen(bool);
@@ -230,7 +230,7 @@ public:
     virtual void paintScrollCorner(GraphicsContext*, const IntRect& cornerRect);
     virtual void paintScrollbar(GraphicsContext*, Scrollbar*, const IntRect&) OVERRIDE;
 
-    StyleColor documentBackgroundColor() const;
+    Color documentBackgroundColor() const;
 
     static double currentFrameTimeStamp() { return s_currentFrameTimeStamp; }
 
@@ -335,6 +335,8 @@ public:
     // DEPRECATED: Use viewportConstrainedVisibleContentRect() instead.
     IntSize scrollOffsetForFixedPosition() const;
 
+    PartialLayoutState& partialLayout() { return m_partialLayout; }
+
 protected:
     virtual bool scrollContentsFastPath(const IntSize& scrollDelta, const IntRect& rectToScroll, const IntRect& clipRect);
     virtual void scrollContentsSlowPath(const IntRect& updateRect);
@@ -363,6 +365,7 @@ private:
 
     void paintControlTints();
 
+    void updateCounters();
     void autoSizeIfEnabled();
     void forceLayoutParentViewIfNeeded();
     void performPreLayoutTasks();
@@ -422,6 +425,8 @@ private:
 
     virtual AXObjectCache* axObjectCache() const;
     void removeFromAXObjectCache();
+
+    bool isMainFrame() const;
 
     static double s_currentFrameTimeStamp; // used for detecting decoded resource thrash in the cache
     static bool s_inPaintContents;
@@ -531,6 +536,8 @@ private:
     bool m_hasSoftwareFilters;
 
     float m_visibleContentScaleFactor;
+
+    PartialLayoutState m_partialLayout;
 };
 
 inline void FrameView::incrementVisuallyNonEmptyCharacterCount(unsigned count)
@@ -554,16 +561,6 @@ inline void FrameView::incrementVisuallyNonEmptyPixelCount(const IntSize& size)
     static const unsigned visualPixelThreshold = 32 * 32;
     if (m_visuallyNonEmptyPixelCount > visualPixelThreshold)
         setIsVisuallyNonEmpty();
-}
-
-inline int FrameView::mapFromLayoutToCSSUnits(LayoutUnit value)
-{
-    return value / m_frame->pageZoomFactor();
-}
-
-inline LayoutUnit FrameView::mapFromCSSToLayoutUnits(int value)
-{
-    return value * m_frame->pageZoomFactor();
 }
 
 inline FrameView* toFrameView(Widget* widget)

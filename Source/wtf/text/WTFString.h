@@ -116,11 +116,6 @@ public:
     // Construct a string referencing an existing StringImpl.
     String(StringImpl* impl) : m_impl(impl) { }
     String(PassRefPtr<StringImpl> impl) : m_impl(impl) { }
-    String(RefPtr<StringImpl> impl) : m_impl(impl) { }
-
-    // FIXME: Remove this API once all callers are gone.
-    enum ConstructFromLiteralTag { ConstructFromLiteral };
-    String(const char* characters, ConstructFromLiteralTag) : m_impl(StringImpl::create(reinterpret_cast<const LChar*>(characters))) { }
 
 #if COMPILER_SUPPORTS(CXX_RVALUE_REFERENCES)
     // We have to declare the copy constructor and copy assignment operator as well, otherwise
@@ -683,7 +678,9 @@ template<> struct DefaultHash<String> {
     typedef StringHash Hash;
 };
 
-template <> struct VectorTraits<String> : SimpleClassVectorTraits { };
+template <> struct VectorTraits<String> : SimpleClassVectorTraits {
+    static const bool canCompareWithMemcmp = false;
+};
 
 // Shared global empty string.
 WTF_EXPORT const String& emptyString();

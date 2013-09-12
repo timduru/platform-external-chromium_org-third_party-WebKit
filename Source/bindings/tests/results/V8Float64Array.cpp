@@ -36,7 +36,6 @@
 #include "bindings/v8/custom/V8Int32ArrayCustom.h"
 #include "core/dom/ContextFeatures.h"
 #include "core/dom/Document.h"
-#include "core/page/Frame.h"
 #include "core/platform/chromium/TraceEvent.h"
 #include "wtf/GetPtr.h"
 #include "wtf/RefPtr.h"
@@ -72,7 +71,7 @@ template <typename T> void V8_USE(T) { }
 
 static void fooMethod(const v8::FunctionCallbackInfo<v8::Value>& args)
 {
-    if (args.Length() < 1) {
+    if (UNLIKELY(args.Length() < 1)) {
         throwNotEnoughArgumentsError(args.GetIsolate());
         return;
     }

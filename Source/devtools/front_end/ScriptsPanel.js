@@ -353,6 +353,7 @@ WebInspector.ScriptsPanel.prototype = {
     {
         this._debuggerResumed();
         this.sidebarPanes.watchExpressions.reset();
+        delete this._skipExecutionLineRevealing;
     },
 
     _projectWillReset: function(event)
@@ -416,6 +417,14 @@ WebInspector.ScriptsPanel.prototype = {
     showUISourceCode: function(uiSourceCode, lineNumber, columnNumber)
     {
         this._showSourceLocation(uiSourceCode, lineNumber, columnNumber);
+    },
+
+    /**
+     * @return {?WebInspector.UISourceCode}
+     */
+    currentUISourceCode: function()
+    {
+        return this._currentUISourceCode;
     },
 
     /**
@@ -632,6 +641,7 @@ WebInspector.ScriptsPanel.prototype = {
         if (this._paused) {
             this._updateButtonTitle(this._pauseButton, WebInspector.UIString("Resume script execution (%s)."))
             this._pauseButton.state = true;
+            this._pauseButton.setLongClickOptionsEnabled((function() { return [ this._longResumeButton ] }).bind(this));
 
             this._pauseButton.setEnabled(true);
             this._stepOverButton.setEnabled(true);
@@ -642,6 +652,7 @@ WebInspector.ScriptsPanel.prototype = {
         } else {
             this._updateButtonTitle(this._pauseButton, WebInspector.UIString("Pause script execution (%s)."))
             this._pauseButton.state = false;
+            this._pauseButton.setLongClickOptionsEnabled(null);
 
             this._pauseButton.setEnabled(!this._waitingToPause);
             this._stepOverButton.setEnabled(false);
@@ -706,8 +717,29 @@ WebInspector.ScriptsPanel.prototype = {
         } else {
             this._stepping = false;
             this._waitingToPause = true;
+            // Make sure pauses didn't stick skipped.
+            DebuggerAgent.setSkipAllPauses(false);
             DebuggerAgent.pause();
         }
+
+        this._clearInterface();
+        return true;
+    },
+
+    /**
+     * @param {WebInspector.Event=} event
+     * @return {boolean}
+     */
+    _longResume: function(event)
+    {
+        if (!this._paused)
+            return true;
+
+        this._paused = false;
+        this._waitingToPause = false;
+        DebuggerAgent.setSkipAllPauses(true, true);
+        setTimeout(DebuggerAgent.setSkipAllPauses.bind(DebuggerAgent, false), 500);
+        DebuggerAgent.resume();
 
         this._clearInterface();
         return true;
@@ -861,6 +893,11 @@ WebInspector.ScriptsPanel.prototype = {
         handler = this._togglePause.bind(this);
         this._pauseButton = this._createButtonAndRegisterShortcuts("scripts-pause", "", handler, WebInspector.ScriptsPanelDescriptor.ShortcutKeys.PauseContinue);
         debugToolbar.appendChild(this._pauseButton.element);
+
+        // Long resume.
+        title = WebInspector.UIString("Resume with all pauses blocked for 500 ms");
+        this._longResumeButton = new WebInspector.StatusBarButton(title, "scripts-long-resume");
+        this._longResumeButton.addEventListener("click", this._longResume.bind(this), this);
 
         // Step over.
         title = WebInspector.UIString("Step over next function call (%s).");
@@ -1060,6 +1097,7 @@ WebInspector.ScriptsPanel.prototype = {
 
     _toggleFormatSource: function()
     {
+        delete this._skipExecutionLineRevealing;
         this._toggleFormatSourceButton.toggled = !this._toggleFormatSourceButton.toggled;
         var uiSourceCodes = this._workspace.uiSourceCodes();
         for (var i = 0; i < uiSourceCodes.length; ++i)
@@ -1319,10 +1357,6 @@ WebInspector.ScriptsPanel.prototype = {
 
         if (WebInspector.isolatedFileSystemManager.supportsFileSystems())
             this._appendUISourceCodeMappingItems(contextMenu, uiSourceCode);
-
-        var resource = WebInspector.resourceForURL(uiSourceCode.url);
-        if (resource && resource.request)
-            contextMenu.appendApplicableItems(resource.request);
     },
 
     /** 

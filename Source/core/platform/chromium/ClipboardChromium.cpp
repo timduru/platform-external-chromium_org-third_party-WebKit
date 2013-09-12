@@ -246,8 +246,6 @@ void ClipboardChromium::clearData(const String& type)
         return;
 
     m_dataObject->clearData(normalizeType(type));
-
-    ASSERT_NOT_REACHED();
 }
 
 void ClipboardChromium::clearAllData()
@@ -442,7 +440,7 @@ void ClipboardChromium::writeRange(Range* selectedRange, Frame* frame)
     m_dataObject->setHTMLAndBaseURL(createMarkup(selectedRange, 0, AnnotateForInterchange, false, ResolveNonLocalURLs), frame->document()->url());
 
     String str = frame->selectedTextForClipboard();
-#if OS(WINDOWS)
+#if OS(WIN)
     replaceNewlinesWithWindowsStyleNewlines(str);
 #endif
     replaceNBSPWithSpace(str);
@@ -455,7 +453,7 @@ void ClipboardChromium::writePlainText(const String& text)
         return;
 
     String str = text;
-#if OS(WINDOWS)
+#if OS(WIN)
     replaceNewlinesWithWindowsStyleNewlines(str);
 #endif
     replaceNBSPWithSpace(str);

@@ -34,7 +34,7 @@ using namespace std;
 
 namespace WebCore {
 
-MediaControlsChromium::MediaControlsChromium(Document* document)
+MediaControlsChromium::MediaControlsChromium(Document& document)
     : MediaControls(document)
     , m_durationDisplay(0)
     , m_enclosure(0)
@@ -43,15 +43,15 @@ MediaControlsChromium::MediaControlsChromium(Document* document)
 
 // MediaControls::create() for Android is defined in MediaControlsChromiumAndroid.cpp.
 #if !OS(ANDROID)
-PassRefPtr<MediaControls> MediaControls::create(Document* document)
+PassRefPtr<MediaControls> MediaControls::create(Document& document)
 {
     return MediaControlsChromium::createControls(document);
 }
 #endif
 
-PassRefPtr<MediaControlsChromium> MediaControlsChromium::createControls(Document* document)
+PassRefPtr<MediaControlsChromium> MediaControlsChromium::createControls(Document& document)
 {
-    if (!document->page())
+    if (!document.page())
         return 0;
 
     RefPtr<MediaControlsChromium> controls = adoptRef(new MediaControlsChromium(document));
@@ -62,7 +62,7 @@ PassRefPtr<MediaControlsChromium> MediaControlsChromium::createControls(Document
     return 0;
 }
 
-bool MediaControlsChromium::initializeControls(Document* document)
+bool MediaControlsChromium::initializeControls(Document& document)
 {
     // Create an enclosing element for the panel so we can visually offset the controls correctly.
     RefPtr<MediaControlPanelEnclosureElement> enclosure = MediaControlPanelEnclosureElement::create(document);
@@ -151,7 +151,7 @@ void MediaControlsChromium::setMediaController(MediaControllerInterface* control
 
 void MediaControlsChromium::reset()
 {
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 
@@ -175,7 +175,7 @@ void MediaControlsChromium::updateCurrentTimeDisplay()
     double now = m_mediaController->currentTime();
     double duration = m_mediaController->duration();
 
-    Page* page = document()->page();
+    Page* page = document().page();
     if (!page)
         return;
 

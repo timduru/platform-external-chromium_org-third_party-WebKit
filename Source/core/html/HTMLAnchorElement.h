@@ -55,8 +55,8 @@ enum {
 
 class HTMLAnchorElement : public HTMLElement {
 public:
-    static PassRefPtr<HTMLAnchorElement> create(Document*);
-    static PassRefPtr<HTMLAnchorElement> create(const QualifiedName&, Document*);
+    static PassRefPtr<HTMLAnchorElement> create(Document&);
+    static PassRefPtr<HTMLAnchorElement> create(const QualifiedName&, Document&);
 
     virtual ~HTMLAnchorElement();
 
@@ -103,7 +103,7 @@ public:
     void invalidateCachedVisitedLinkHash() { m_cachedVisitedLinkHash = 0; }
 
 protected:
-    HTMLAnchorElement(const QualifiedName&, Document*);
+    HTMLAnchorElement(const QualifiedName&, Document&);
 
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
 
@@ -149,7 +149,7 @@ private:
 inline LinkHash HTMLAnchorElement::visitedLinkHash() const
 {
     if (!m_cachedVisitedLinkHash)
-        m_cachedVisitedLinkHash = WebCore::visitedLinkHash(document()->baseURL(), fastGetAttribute(HTMLNames::hrefAttr));
+        m_cachedVisitedLinkHash = WebCore::visitedLinkHash(document().baseURL(), fastGetAttribute(HTMLNames::hrefAttr));
     return m_cachedVisitedLinkHash;
 }
 

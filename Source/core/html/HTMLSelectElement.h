@@ -39,8 +39,8 @@ class HTMLOptionElement;
 
 class HTMLSelectElement FINAL : public HTMLFormControlElementWithState, public TypeAheadDataSource {
 public:
-    static PassRefPtr<HTMLSelectElement> create(Document*);
-    static PassRefPtr<HTMLSelectElement> create(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
+    static PassRefPtr<HTMLSelectElement> create(Document&);
+    static PassRefPtr<HTMLSelectElement> create(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
 
     int selectedIndex() const;
     void setSelectedIndex(int);
@@ -115,7 +115,7 @@ public:
     bool anonymousIndexedSetterRemove(unsigned, ExceptionState&);
 
 protected:
-    HTMLSelectElement(const QualifiedName&, Document*, HTMLFormElement*, bool createdByParser);
+    HTMLSelectElement(const QualifiedName&, Document&, HTMLFormElement*, bool createdByParser);
 
 private:
     virtual const AtomicString& formControlType() const;
@@ -136,7 +136,7 @@ private:
     virtual void parseAttribute(const QualifiedName&, const AtomicString&) OVERRIDE;
     virtual bool isPresentationAttribute(const QualifiedName&) const OVERRIDE;
 
-    virtual bool childShouldCreateRenderer(const NodeRenderingContext&) const OVERRIDE;
+    virtual bool childShouldCreateRenderer(const Node& child) const OVERRIDE;
     virtual RenderObject* createRenderer(RenderStyle *);
     virtual bool appendFormData(FormDataList&, bool);
 

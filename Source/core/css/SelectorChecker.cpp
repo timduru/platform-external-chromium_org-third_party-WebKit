@@ -63,9 +63,9 @@ namespace WebCore {
 
 using namespace HTMLNames;
 
-SelectorChecker::SelectorChecker(Document* document, Mode mode)
-    : m_strictParsing(!document->inQuirksMode())
-    , m_documentIsHTML(document->isHTMLDocument())
+SelectorChecker::SelectorChecker(Document& document, Mode mode)
+    : m_strictParsing(!document.inQuirksMode())
+    , m_documentIsHTML(document.isHTMLDocument())
     , m_mode(mode)
 {
 }
@@ -153,10 +153,8 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
                 return SelectorFailsLocally;
 
             PseudoId pseudoId = CSSSelector::pseudoId(context.selector->pseudoType());
-            if (pseudoId == FIRST_LETTER) {
-                if (Document* document = context.element->document())
-                    document->styleSheetCollections()->setUsesFirstLetterRules(true);
-            }
+            if (pseudoId == FIRST_LETTER)
+                context.element->document().styleSheetCollections()->setUsesFirstLetterRules(true);
             if (pseudoId != NOPSEUDO && m_mode != SharingRules)
                 dynamicPseudo = pseudoId;
         }
@@ -265,7 +263,7 @@ SelectorChecker::Match SelectorChecker::match(const SelectorCheckingContext& con
     case CSSSelector::ShadowPseudo:
         {
             // If we're in the same tree-scope as the scoping element, then following a shadow descendant combinator would escape that and thus the scope.
-            if (context.scope && context.scope->treeScope() == context.element->treeScope() && (context.behaviorAtBoundary & BoundaryBehaviorMask) != StaysWithinTreeScope)
+            if (context.scope && &context.scope->treeScope() == &context.element->treeScope() && (context.behaviorAtBoundary & BoundaryBehaviorMask) != StaysWithinTreeScope)
                 return SelectorFailsCompletely;
             Element* shadowHostNode = context.element->shadowHost();
             if (!shadowHostNode)
@@ -437,10 +435,10 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
         } else if (context.hasScrollbarPseudo) {
             // CSS scrollbars match a specific subset of pseudo classes, and they have specialized rules for each
             // (since there are no elements involved).
-            return checkScrollbarPseudoClass(context, element->document(), selector);
+            return checkScrollbarPseudoClass(context, &element->document(), selector);
         } else if (context.hasSelectionPseudo) {
             if (selector->pseudoType() == CSSSelector::PseudoWindowInactive)
-                return !element->document()->page()->focusController().isActive();
+                return !element->document().page()->focusController().isActive();
         }
 
         // Normal element pseudo class checking.
@@ -468,7 +466,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                     element->setStyleAffectedByEmpty();
                     if (context.elementStyle)
                         context.elementStyle->setEmptyState(result);
-                    else if (element->renderStyle() && (element->document()->styleSheetCollections()->usesSiblingRules() || element->renderStyle()->unique()))
+                    else if (element->renderStyle() && (element->document().styleSheetCollections()->usesSiblingRules() || element->renderStyle()->unique()))
                         element->renderStyle()->setEmptyState(result);
                 }
                 return result;
@@ -603,7 +601,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
             }
             break;
         case CSSSelector::PseudoTarget:
-            if (element == element->document()->cssTarget())
+            if (element == element->document().cssTarget())
                 return true;
             break;
         case CSSSelector::PseudoAny:
@@ -675,7 +673,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
                 return !element->isDisabledFormControl();
             break;
         case CSSSelector::PseudoFullPageMedia:
-            return element && element->document() && element->document()->isMediaDocument();
+            return element && element->document().isMediaDocument();
             break;
         case CSSSelector::PseudoDefault:
             return element && element->isDefaultButtonForForm();
@@ -694,12 +692,12 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
         case CSSSelector::PseudoValid:
             if (!element)
                 return false;
-            element->document()->setContainsValidityStyleRules();
+            element->document().setContainsValidityStyleRules();
             return element->willValidate() && element->isValidFormControlElement();
         case CSSSelector::PseudoInvalid:
             if (!element)
                 return false;
-            element->document()->setContainsValidityStyleRules();
+            element->document().setContainsValidityStyleRules();
             return element->willValidate() && !element->isValidFormControlElement();
         case CSSSelector::PseudoChecked:
             {
@@ -721,7 +719,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
         case CSSSelector::PseudoIndeterminate:
             return element && element->shouldAppearIndeterminate();
         case CSSSelector::PseudoRoot:
-            if (element == element->document()->documentElement())
+            if (element == element->document().documentElement())
                 return true;
             break;
         case CSSSelector::PseudoLang:
@@ -745,7 +743,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
             // context's Document is in the fullscreen state has the 'full-screen' pseudoclass applied.
             if (element->isFrameElementBase() && element->containsFullScreenElement())
                 return true;
-            if (FullscreenElementStack* fullscreen = FullscreenElementStack::fromIfExists(element->document())) {
+            if (FullscreenElementStack* fullscreen = FullscreenElementStack::fromIfExists(&element->document())) {
                 if (!fullscreen->webkitIsFullScreen())
                     return false;
                 return element == fullscreen->webkitCurrentFullScreenElement();
@@ -756,22 +754,22 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
         case CSSSelector::PseudoFullScreenDocument:
             // While a Document is in the fullscreen state, the 'full-screen-document' pseudoclass applies
             // to all elements of that Document.
-            if (!FullscreenElementStack::isFullScreen(element->document()))
+            if (!FullscreenElementStack::isFullScreen(&element->document()))
                 return false;
             return true;
         case CSSSelector::PseudoSeamlessDocument:
             // While a document is rendered in a seamless iframe, the 'seamless-document' pseudoclass applies
             // to all elements of that Document.
-            return element->document()->shouldDisplaySeamlesslyWithParent();
+            return element->document().shouldDisplaySeamlesslyWithParent();
         case CSSSelector::PseudoInRange:
             if (!element)
                 return false;
-            element->document()->setContainsValidityStyleRules();
+            element->document().setContainsValidityStyleRules();
             return element->isInRange();
         case CSSSelector::PseudoOutOfRange:
             if (!element)
                 return false;
-            element->document()->setContainsValidityStyleRules();
+            element->document().setContainsValidityStyleRules();
             return element->isOutOfRange();
         case CSSSelector::PseudoFutureCue:
             return (element->isWebVTTElement() && !toWebVTTElement(element)->isPastNode());
@@ -780,7 +778,7 @@ bool SelectorChecker::checkOne(const SelectorCheckingContext& context, const Sib
 
         case CSSSelector::PseudoScope:
             {
-                const Node* contextualReferenceNode = !context.scope || (context.behaviorAtBoundary & BoundaryBehaviorMask) == CrossesBoundary ? element->document()->documentElement() : context.scope;
+                const Node* contextualReferenceNode = !context.scope || (context.behaviorAtBoundary & BoundaryBehaviorMask) == CrossesBoundary ? element->document().documentElement() : context.scope;
                 if (element == contextualReferenceNode)
                     return true;
                 break;
@@ -984,7 +982,7 @@ unsigned SelectorChecker::determineLinkMatchType(const CSSSelector* selector)
 
 bool SelectorChecker::isFrameFocused(const Element* element)
 {
-    return element->document()->frame() && element->document()->frame()->selection()->isFocusedAndActive();
+    return element->document().frame() && element->document().frame()->selection().isFocusedAndActive();
 }
 
 bool SelectorChecker::matchesFocusPseudoClass(const Element* element)

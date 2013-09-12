@@ -330,7 +330,7 @@ Value FunId::evaluate() const
         idList.append(str);
     }
 
-    TreeScope* contextScope = evaluationContext().node->treeScope();
+    TreeScope& contextScope = evaluationContext().node->treeScope();
     NodeSet result;
     HashSet<Node*> resultSet;
 
@@ -349,7 +349,7 @@ Value FunId::evaluate() const
 
         // If there are several nodes with the same id, id() should return the first one.
         // In WebKit, getElementById behaves so, too, although its behavior in this case is formally undefined.
-        Node* node = contextScope->getElementById(idList.substring(startPos, endPos - startPos));
+        Node* node = contextScope.getElementById(idList.substring(startPos, endPos - startPos));
         if (node && resultSet.add(node).isNewEntry)
             result.append(node);
 
@@ -366,7 +366,7 @@ static inline String expandedNameLocalPart(Node* node)
     // The local part of an XPath expanded-name matches DOM local name for most node types, except for namespace nodes and processing instruction nodes.
     ASSERT(node->nodeType() != Node::XPATH_NAMESPACE_NODE); // Not supported yet.
     if (node->nodeType() == Node::PROCESSING_INSTRUCTION_NODE)
-        return static_cast<ProcessingInstruction*>(node)->target();
+        return toProcessingInstruction(node)->target();
     return node->localName().string();
 }
 
