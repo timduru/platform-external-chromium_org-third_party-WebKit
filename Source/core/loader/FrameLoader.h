@@ -112,8 +112,8 @@ public:
     void stopLoading(UnloadEventPolicy);
     bool closeURL();
     void cancelAndClear();
-    // FIXME: clear() is trying to do too many things. We should break it down into smaller functions (ideally with fewer raw Boolean parameters).
-    void clear(bool clearWindowProperties = true, bool clearScriptObjects = true, bool clearFrameView = true);
+    // FIXME: clear() is trying to do too many things. We should break it down into smaller functions.
+    void clear(ClearOptions);
 
     // Sets a timer to notify the client that the initial empty document has
     // been accessed, and thus it is no longer safe to show a provisional URL
