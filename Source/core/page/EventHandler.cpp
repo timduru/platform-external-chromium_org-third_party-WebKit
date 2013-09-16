@@ -1276,7 +1276,7 @@ bool EventHandler::handleMousePressEvent(const PlatformMouseEvent& mouseEvent)
         return true;
 
     UserGestureIndicator gestureIndicator(DefinitelyProcessingUserGesture);
-    m_lastMouseDownUserGestureToken = gestureIndicator.currentToken();
+    m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken = gestureIndicator.currentToken();
 
     // FIXME (bug 68185): this call should be made at another abstraction layer
     m_frame->loader()->resetMultipleFormSubmissionProtection();
@@ -1602,8 +1602,8 @@ bool EventHandler::handleMouseReleaseEvent(const PlatformMouseEvent& mouseEvent)
 
     OwnPtr<UserGestureIndicator> gestureIndicator;
 
-    if (m_lastMouseDownUserGestureToken)
-        gestureIndicator = adoptPtr(new UserGestureIndicator(m_lastMouseDownUserGestureToken.release()));
+    if (m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken)
+        gestureIndicator = adoptPtr(new UserGestureIndicator(m_frame->tree()->top()->eventHandler()->m_lastMouseDownUserGestureToken.release()));
     else
         gestureIndicator = adoptPtr(new UserGestureIndicator(DefinitelyProcessingUserGesture));
 

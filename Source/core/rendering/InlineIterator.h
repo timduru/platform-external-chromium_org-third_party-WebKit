@@ -414,15 +414,17 @@ static inline bool isIsolatedInline(RenderObject* object)
     return object->isRenderInline() && isIsolated(object->style()->unicodeBidi());
 }
 
-static inline RenderObject* containingIsolate(RenderObject* object, RenderObject* root)
+static inline RenderObject* highestContainingIsolateWithinRoot(RenderObject* object, RenderObject* root)
 {
     ASSERT(object);
+    RenderObject* containingIsolateObj = 0;
     while (object && object != root) {
         if (isIsolatedInline(object))
-            return object;
+            containingIsolateObj = object;
+
         object = object->parent();
     }
-    return 0;
+    return containingIsolateObj;
 }
 
 static inline unsigned numberOfIsolateAncestors(const InlineIterator& iter)
