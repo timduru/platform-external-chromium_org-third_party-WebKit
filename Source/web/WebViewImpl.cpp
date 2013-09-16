@@ -378,6 +378,7 @@ WebViewImpl::WebViewImpl(WebViewClient* client)
     , m_editorClientImpl(this)
     , m_inspectorClientImpl(this)
     , m_backForwardClientImpl(this)
+    , m_fixedLayoutSizeLock(false)
     , m_shouldAutoResize(false)
     , m_observedNewNavigation(false)
 #ifndef NDEBUG
@@ -1688,7 +1689,7 @@ void WebViewImpl::resize(const WebSize& newSize)
         }
     }
 
-    if (settings()->viewportEnabled()) {
+    if (settings()->viewportEnabled() && !m_fixedLayoutSizeLock) {
         // Relayout immediately to recalculate the minimum scale limit.
         if (view->needsLayout())
             view->layout();
@@ -3009,7 +3010,7 @@ void WebViewImpl::refreshPageScaleFactorAfterLayout()
     updatePageDefinedPageScaleConstraints(mainFrameImpl()->frame()->document()->viewportArguments());
     m_pageScaleConstraintsSet.computeFinalConstraints();
 
-    if (settings()->viewportEnabled()) {
+    if (settings()->viewportEnabled() && !m_fixedLayoutSizeLock) {
         int verticalScrollbarWidth = 0;
         if (view->verticalScrollbar() && !view->verticalScrollbar()->isOverlayScrollbar())
             verticalScrollbarWidth = view->verticalScrollbar()->width();
@@ -3050,7 +3051,8 @@ void WebViewImpl::updatePageDefinedPageScaleConstraints(const ViewportArguments&
         && layoutSize.width != fixedLayoutSize().width)
             page()->mainFrame()->document()->textAutosizer()->recalculateMultipliers();
 
-    setFixedLayoutSize(layoutSize);
+    if (page()->mainFrame() && page()->mainFrame()->view() && !m_fixedLayoutSizeLock)
+        page()->mainFrame()->view()->setFixedLayoutSize(layoutSize);
 }
 
 IntSize WebViewImpl::contentsSize() const
@@ -3139,10 +3141,19 @@ void WebViewImpl::setFixedLayoutSize(const WebSize& layoutSize)
         return;
 
     Frame* frame = page()->mainFrame();
-    if (!frame || !frame->view())
+    if (!frame)
         return;
 
-    frame->view()->setFixedLayoutSize(layoutSize);
+    FrameView* view = frame->view();
+    if (!view)
+        return;
+
+    m_fixedLayoutSizeLock = layoutSize.width || layoutSize.height;
+
+    if (m_fixedLayoutSizeLock)
+        view->setFixedLayoutSize(layoutSize);
+    else
+        view->setFixedLayoutSize(flooredIntSize(m_pageScaleConstraintsSet.pageDefinedConstraints().layoutSize));
 }
 
 void WebViewImpl::performMediaPlayerAction(const WebMediaPlayerAction& action,
