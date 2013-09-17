@@ -632,8 +632,8 @@ TEST_F(WebFrameTest, setLoadWithOverviewModeToFalse)
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-auto-initial-scale.html", true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
     m_webView->settings()->setLoadWithOverviewMode(false);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
 
     // The page must be displayed at 100% zoom.
@@ -653,8 +653,8 @@ TEST_F(WebFrameTest, SetLoadWithOverviewModeToFalseAndNoWideViewport)
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->settings()->setLoadWithOverviewMode(false);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
     m_webView->settings()->setUseWideViewport(false);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
 
     // The page must be displayed at 100% zoom, despite that it hosts a wide div element.
@@ -673,8 +673,8 @@ TEST_F(WebFrameTest, NoWideViewportIgnoresPageViewportWidth)
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-auto-initial-scale.html", true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
     m_webView->settings()->setUseWideViewport(false);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
 
     // The page sets viewport width to 3000, but with UseWideViewport == false is must be ignored.
@@ -695,8 +695,8 @@ TEST_F(WebFrameTest, NoWideViewportIgnoresPageViewportWidthButAccountsScale)
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-wide-2x-initial-scale.html", true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
     m_webView->settings()->setUseWideViewport(false);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
 
     // The page sets viewport width to 3000, but with UseWideViewport == false is must be ignored.
@@ -716,8 +716,8 @@ TEST_F(WebFrameTest, WideViewportSetsTo980WithAutoWidth)
     int viewportHeight = 480;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-2x-initial-scale.html", true, 0, &client);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->enableFixedLayoutMode(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
     m_webView->settings()->setUseWideViewport(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -738,7 +738,6 @@ TEST_F(WebFrameTest, PageViewportInitialScaleOverridesLoadWithOverviewMode)
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-wide-2x-initial-scale.html", true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->settings()->setLoadWithOverviewMode(false);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
@@ -759,7 +758,7 @@ TEST_F(WebFrameTest, setInitialPageScaleFactorPermanently)
     float enforcedPageScaleFactor = 2.0f;
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "fixed_layout.html", true, 0, &client);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
     m_webView->settings()->setLoadWithOverviewMode(false);
     m_webView->setInitialPageScaleOverride(enforcedPageScaleFactor);
     m_webView->enableFixedLayoutMode(true);
@@ -792,7 +791,6 @@ TEST_F(WebFrameTest, PermanentInitialPageScaleFactorOverridesLoadWithOverviewMod
 
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-auto-initial-scale.html", true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->settings()->setViewportEnabled(true);
     m_webView->settings()->setLoadWithOverviewMode(false);
     m_webView->setInitialPageScaleOverride(enforcedPageScalePactor);
@@ -832,8 +830,8 @@ TEST_F(WebFrameTest, WideViewportInitialScaleDoesNotExpandFixedLayoutWidth)
     m_webView = FrameTestHelpers::createWebViewAndLoad(m_baseURL + "viewport-device-0.5x-initial-scale.html", true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
     m_webView->settings()->setUseWideViewport(true);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->settings()->setViewportMetaLayoutSizeQuirk(true);
     m_webView->resize(WebSize(viewportWidth, viewportHeight));
 
@@ -853,8 +851,8 @@ TEST_F(WebFrameTest, ZeroValuesQuirk)
     m_webView = FrameTestHelpers::createWebView(true, 0, &client);
     m_webView->enableFixedLayoutMode(true);
     m_webView->settings()->setViewportEnabled(true);
-    m_webView->settings()->setSupportDeprecatedTargetDensityDPI(true);
     m_webView->settings()->setViewportMetaZeroValuesQuirk(true);
+    m_webView->settings()->setWideViewportQuirkEnabled(true);
     FrameTestHelpers::loadFrame(m_webView->mainFrame(), m_baseURL + "viewport-zero-values.html");
     Platform::current()->unitTestSupport()->serveAsynchronousMockedRequests();
     m_webView->resize(WebSize(viewportWidth, viewportHeight));

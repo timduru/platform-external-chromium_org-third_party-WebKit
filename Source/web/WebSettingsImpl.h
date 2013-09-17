@@ -169,6 +169,7 @@ public:
     virtual void setWebAudioEnabled(bool);
     virtual void setWebGLErrorsToConsoleEnabled(bool);
     virtual void setWebSecurityEnabled(bool);
+    virtual void setWideViewportQuirkEnabled(bool);
     virtual void setXSSAuditorEnabled(bool);
 
     bool showFPSCounter() const { return m_showFPSCounter; }

@@ -273,6 +273,11 @@ void WebSettingsImpl::setUseLegacyBackgroundSizeShorthandBehavior(bool useLegacy
     m_settings->setUseLegacyBackgroundSizeShorthandBehavior(useLegacyBackgroundSizeShorthandBehavior);
 }
 
+void WebSettingsImpl::setWideViewportQuirkEnabled(bool wideViewportQuirkEnabled)
+{
+    m_settings->setWideViewportQuirkEnabled(wideViewportQuirkEnabled);
+}
+
 void WebSettingsImpl::setUseWideViewport(bool useWideViewport)
 {
     m_settings->setUseWideViewport(useWideViewport);
