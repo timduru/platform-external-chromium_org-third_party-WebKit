@@ -79,8 +79,6 @@ public:
 
     static bool isCaseSensitiveAttribute(const QualifiedName&);
 
-    virtual PassRefPtr<Document> cloneDocumentWithoutChildren() OVERRIDE FINAL;
-
 protected:
     HTMLDocument(const DocumentInit&, DocumentClassFlags extendedDocumentClasses = DefaultDocumentClass);
 

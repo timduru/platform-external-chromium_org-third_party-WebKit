@@ -629,7 +629,7 @@ ResourceRequestCachePolicy ResourceFetcher::resourceRequestCachePolicy(const Res
     if (type == Resource::MainResource) {
         FrameLoadType frameLoadType = frame()->loader()->loadType();
         bool isReload = frameLoadType == FrameLoadTypeReload || frameLoadType == FrameLoadTypeReloadFromOrigin;
-        if (request.httpMethod() == "POST" && (isReload || frameLoadType == FrameLoadTypeBackForward))
+        if (request.httpMethod() == "POST" && frameLoadType == FrameLoadTypeBackForward)
             return ReturnCacheDataDontLoad;
         if (!m_documentLoader->overrideEncoding().isEmpty() || frameLoadType == FrameLoadTypeBackForward)
             return ReturnCacheDataElseLoad;
@@ -952,12 +952,12 @@ void ResourceFetcher::didLoadResource(Resource* resource)
                 initiatorDocument = document()->parentDocument();
             ASSERT(initiatorDocument);
             RefPtr<ResourceTimingInfo> info = it->value;
+            m_resourceTimingInfoMap.remove(it);
             info->setInitialRequest(resource->resourceRequest());
             info->setFinalResponse(resource->response());
             info->setLoadFinishTime(resource->loadFinishTime());
             if (DOMWindow* initiatorWindow = initiatorDocument->domWindow())
                 initiatorWindow->performance()->addResourceTiming(*info, initiatorDocument);
-            m_resourceTimingInfoMap.remove(it);
         }
     }
 
