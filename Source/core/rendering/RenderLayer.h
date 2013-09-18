@@ -897,6 +897,7 @@ private:
     void updateLayerPositionsAfterScroll(RenderGeometryMap*, UpdateLayerPositionsAfterScrollFlags = NoFlag);
 
     friend IntSize RenderBox::scrolledContentOffset() const;
+    friend void RenderObject::computeLayerHitTestRects(LayerHitTestRects& layerRects) const;
     IntSize scrolledContentOffset() const { return m_scrollOffset; }
 
     IntSize clampScrollOffset(const IntSize&) const;
